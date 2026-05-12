@@ -15,40 +15,32 @@
 		"moduleDetection": "force",
 		"resolveJsonModule": true,
 		"isolatedModules": true,
-		"jsx": "preserve",
+		"jsx": "react-jsx",
 		"incremental": true,
 		"noUncheckedIndexedAccess": true,
 		"verbatimModuleSyntax": true,
 		"baseUrl": ".",
 		"paths": {
 			"~/*": ["./src/*"],
+			"@app/*": ["./src/server/app-layer/*"],
 			"@trpc-internal/parser": ["node_modules/@trpc/server/dist/core/parser"],
 			"@trpc-internal/utils": [
 				"node_modules/@trpc/server/dist/core/internals/utils"
 			],
-			"zod/lib/helpers/errorUtil": ["node_modules/zod/lib/helpers/errorUtil"],
-			"@langwatch-oss/*": ["./*"]
+			"zod/lib/helpers/errorUtil": ["node_modules/zod/lib/helpers/errorUtil"]
 		},
-		"plugins": [
-			{
-				"name": "next"
-			}
-		]
+		"plugins": []
 	},
 	"include": [
 		// "./src/**/*"
 		".eslintrc.cjs",
-		"next-env.d.ts",
 		"**/*.ts",
 		"**/*.tsx",
 		"**/*.cjs",
-		"**/*.mjs",
-		".next/types/**/*.ts",
-		".next-saas/types/**/*.ts"
+		"**/*.mjs"
 	],
 	"exclude": [
 		"node_modules",
-		"saas-src/**/*",
 		".next",
 		".next-saas",
 		"**/*.snippet.*",

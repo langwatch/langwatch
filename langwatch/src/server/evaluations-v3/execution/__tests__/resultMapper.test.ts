@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { StudioServerEvent } from "~/optimization_studio/types/events";
 import {
+  coercePassed,
+  coerceScore,
   extractTargetOutput,
   isEvaluatorNode,
   mapErrorEvent,
@@ -85,6 +87,133 @@ describe("resultMapper", () => {
 
     it("handles null output value", () => {
       expect(extractTargetOutput({ output: null })).toBeNull();
+    });
+
+    describe("when outputs are evaluator-as-target (regression: sticky details)", () => {
+      it("excludes details when it is null", () => {
+        const result = extractTargetOutput(
+          { passed: true, score: 0.9, details: null },
+          { isEvaluatorAsTarget: true },
+        );
+        expect(result).toEqual({ passed: true, score: 0.9 });
+        expect(result).not.toHaveProperty("details");
+      });
+
+      it("excludes details when it is undefined", () => {
+        const result = extractTargetOutput(
+          { passed: true, score: 0.9, details: undefined },
+          { isEvaluatorAsTarget: true },
+        );
+        expect(result).toEqual({ passed: true, score: 0.9 });
+        expect(result).not.toHaveProperty("details");
+      });
+
+      it("includes details when it is a non-empty string", () => {
+        const result = extractTargetOutput(
+          {
+            passed: true,
+            score: 0.9,
+            details: "The output matched expectations",
+          },
+          { isEvaluatorAsTarget: true },
+        );
+        expect(result).toEqual({
+          passed: true,
+          score: 0.9,
+          details: "The output matched expectations",
+        });
+      });
+
+      it("passes through all non-null output fields dynamically", () => {
+        const result = extractTargetOutput(
+          {
+            passed: false,
+            score: 0.3,
+            label: "negative",
+            custom_field: "extra data",
+          },
+          { isEvaluatorAsTarget: true },
+        );
+        expect(result).toEqual({
+          passed: false,
+          score: 0.3,
+          label: "negative",
+          custom_field: "extra data",
+        });
+      });
+
+      it("detects evaluator with only custom output fields (no passed/score/label)", () => {
+        const result = extractTargetOutput(
+          { custom_metric: 0.8, reasoning: "good quality" },
+          { isEvaluatorAsTarget: true },
+        );
+        expect(result).toEqual({
+          custom_metric: 0.8,
+          reasoning: "good quality",
+        });
+      });
+
+      it("returns undefined when all values are null/undefined", () => {
+        const result = extractTargetOutput(
+          { details: null, custom_field: undefined },
+          { isEvaluatorAsTarget: true },
+        );
+        expect(result).toBeUndefined();
+      });
+    });
+  });
+
+  describe("coerceScore", () => {
+    it("passes through native numbers", () => {
+      expect(coerceScore(0.85)).toBe(0.85);
+      expect(coerceScore(0)).toBe(0);
+      expect(coerceScore(1)).toBe(1);
+    });
+
+    it("coerces string numbers", () => {
+      expect(coerceScore("0.85")).toBe(0.85);
+      expect(coerceScore("1")).toBe(1);
+      expect(coerceScore("0")).toBe(0);
+      expect(coerceScore("  0.5  ")).toBe(0.5);
+    });
+
+    it("returns undefined for non-numeric strings", () => {
+      expect(coerceScore("abc")).toBeUndefined();
+      expect(coerceScore("")).toBeUndefined();
+      expect(coerceScore("  ")).toBeUndefined();
+    });
+
+    it("returns undefined for non-number/string types", () => {
+      expect(coerceScore(undefined)).toBeUndefined();
+      expect(coerceScore(null)).toBeUndefined();
+      expect(coerceScore(true)).toBeUndefined();
+    });
+  });
+
+  describe("coercePassed", () => {
+    it("passes through native booleans", () => {
+      expect(coercePassed(true)).toBe(true);
+      expect(coercePassed(false)).toBe(false);
+    });
+
+    it("coerces string booleans (case-insensitive)", () => {
+      expect(coercePassed("true")).toBe(true);
+      expect(coercePassed("false")).toBe(false);
+      expect(coercePassed("TRUE")).toBe(true);
+      expect(coercePassed("False")).toBe(false);
+      expect(coercePassed("  True  ")).toBe(true);
+    });
+
+    it("returns undefined for unrecognized strings", () => {
+      expect(coercePassed("yes")).toBeUndefined();
+      expect(coercePassed("1")).toBeUndefined();
+      expect(coercePassed("")).toBeUndefined();
+    });
+
+    it("returns undefined for non-boolean/string types", () => {
+      expect(coercePassed(undefined)).toBeUndefined();
+      expect(coercePassed(null)).toBeUndefined();
+      expect(coercePassed(0)).toBeUndefined();
     });
   });
 
@@ -316,6 +445,125 @@ describe("resultMapper", () => {
           score: 0.0, // Score should be preserved
         });
       }
+    });
+
+    it("coerces string score from workflow evaluators", () => {
+      const result = mapEvaluatorResult("target-1.eval-1", 0, {
+        status: "success",
+        outputs: { score: "0.85", passed: true },
+      });
+
+      expect(result.type).toBe("evaluator_result");
+      if (result.type === "evaluator_result") {
+        expect(result.result).toMatchObject({
+          status: "processed",
+          score: 0.85,
+          passed: true,
+        });
+      }
+    });
+
+    it("coerces string passed from workflow evaluators", () => {
+      const result = mapEvaluatorResult("target-1.eval-1", 0, {
+        status: "success",
+        outputs: { passed: "true", score: 1.0 },
+      });
+
+      expect(result.type).toBe("evaluator_result");
+      if (result.type === "evaluator_result") {
+        expect(result.result).toMatchObject({
+          status: "processed",
+          passed: true,
+          score: 1.0,
+        });
+      }
+    });
+
+    it("coerces string 'false' passed value", () => {
+      const result = mapEvaluatorResult("target-1.eval-1", 0, {
+        status: "success",
+        outputs: { passed: "False", score: "0" },
+      });
+
+      expect(result.type).toBe("evaluator_result");
+      if (result.type === "evaluator_result") {
+        expect(result.result).toMatchObject({
+          status: "processed",
+          passed: false,
+          score: 0,
+        });
+      }
+    });
+
+    it("returns undefined for non-numeric string score", () => {
+      const result = mapEvaluatorResult("target-1.eval-1", 0, {
+        status: "success",
+        outputs: { score: "not-a-number", passed: true },
+      });
+
+      expect(result.type).toBe("evaluator_result");
+      if (result.type === "evaluator_result") {
+        expect(result.result).toMatchObject({
+          status: "processed",
+          score: undefined,
+          passed: true,
+        });
+      }
+    });
+
+    describe("when details is null (regression: sticky details)", () => {
+      it("does not include details in the result", () => {
+        const result = mapEvaluatorResult("target-1.eval-1", 0, {
+          status: "success",
+          outputs: { passed: true, score: 1.0, details: null },
+        });
+
+        expect(result.type).toBe("evaluator_result");
+        if (result.type === "evaluator_result") {
+          expect(result.result).toMatchObject({
+            status: "processed",
+            details: undefined,
+          });
+        }
+      });
+    });
+
+    describe("when details is an empty string", () => {
+      it("does not include details in the result", () => {
+        const result = mapEvaluatorResult("target-1.eval-1", 0, {
+          status: "success",
+          outputs: { passed: true, score: 1.0, details: "" },
+        });
+
+        expect(result.type).toBe("evaluator_result");
+        if (result.type === "evaluator_result") {
+          expect(result.result).toMatchObject({
+            status: "processed",
+            details: undefined,
+          });
+        }
+      });
+    });
+
+    describe("when details is a non-empty string", () => {
+      it("includes details in the result", () => {
+        const result = mapEvaluatorResult("target-1.eval-1", 0, {
+          status: "success",
+          outputs: {
+            passed: true,
+            score: 1.0,
+            details: "Output matched exactly",
+          },
+        });
+
+        expect(result.type).toBe("evaluator_result");
+        if (result.type === "evaluator_result") {
+          expect(result.result).toMatchObject({
+            status: "processed",
+            details: "Output matched exactly",
+          });
+        }
+      });
     });
 
     it("does not affect error results when stripScore is true", () => {

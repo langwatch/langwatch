@@ -1,5 +1,4 @@
 import { Client as ElasticClient } from "@elastic/elasticsearch";
-import { Client as OpenSearchClient } from "@opensearch-project/opensearch";
 
 import { env } from "../env.mjs";
 import { decrypt } from "../utils/encryption";
@@ -61,9 +60,25 @@ const getOrgElasticsearchDetailsFromProject = async (projectId: string) => {
   return project?.team.organization ?? null;
 };
 
+/**
+ * Returns a proxy that throws on any method call — used when ES is not configured
+ * so callers don't need null checks but get a clear error if they actually try to use it.
+ */
+const unconfiguredEsClient: ElasticClient = new Proxy({} as ElasticClient, {
+  get(_target, prop) {
+    if (prop === "then" || typeof prop === "symbol") return undefined;
+    return () => {
+      throw new Error(
+        `Elasticsearch is not configured (called .${String(prop)}()). ` +
+          `Set ELASTICSEARCH_NODE_URL or remove this code path.`,
+      );
+    };
+  },
+});
+
 export const esClient = async (
   args?: { projectId: string } | { organizationId: string } | { test: true },
-) => {
+): Promise<ElasticClient> => {
   let elasticsearchNodeUrl: string | null = null;
   let elasticsearchApiKey: string | null = null;
 
@@ -108,21 +123,18 @@ export const esClient = async (
       : (env.ELASTICSEARCH_API_KEY ?? null);
   }
 
-  const client =
-    !!env.IS_OPENSEARCH || !!env.IS_QUICKWIT
-      ? (new OpenSearchClient({
-          node: elasticsearchNodeUrl?.replace("quickwit://", "http://"),
-        }) as unknown as ElasticClient)
-      : new ElasticClient({
-          node: elasticsearchNodeUrl ?? "http://bogus:9200",
-          ...(elasticsearchApiKey
-            ? {
-                auth: {
-                  apiKey: elasticsearchApiKey,
-                },
-              }
-            : {}),
-        });
+  if (!elasticsearchNodeUrl) return unconfiguredEsClient;
+
+  const client = new ElasticClient({
+    node: elasticsearchNodeUrl,
+    ...(elasticsearchApiKey
+      ? {
+          auth: {
+            apiKey: elasticsearchApiKey,
+          },
+        }
+      : {}),
+  });
 
   // Apply patches to this specific client instance
   if (env.IS_OPENSEARCH) {

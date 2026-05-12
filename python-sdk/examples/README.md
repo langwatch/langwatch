@@ -163,5 +163,5 @@ When adding new examples:
 ## 🔗 Related Documentation
 
 - [Main SDK Documentation](../README.md)
-- [Testing Guidelines](../../docs/TESTING_PHILOSOPHY.md)
+- [Testing Guidelines](../../dev/docs/TESTING_PHILOSOPHY.md)
 - [Agent Guidelines](../AGENTS.md)

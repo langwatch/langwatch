@@ -36,6 +36,20 @@ class LangWatchWorkflowModule(ReportingModule):
         class WrappedModule(module):  # type: ignore
             pass
 
+        # For __call__-only classes (no forward method), bridge __call__ to forward
+        # so the downstream patching chain (with_autoparsing, with_reporting) works.
+        def _has_own_method(cls, name):
+            return any(name in klass.__dict__ for klass in cls.__mro__ if klass not in (type, object))
+
+        if not _has_own_method(WrappedModule, "forward"):
+            if _has_own_method(WrappedModule, "__call__"):
+                WrappedModule.forward = WrappedModule.__call__  # type: ignore
+            else:
+                raise TypeError(
+                    f"Class '{module.__name__}' for node {node_id} has no callable "
+                    f"entrypoint. Define forward(self, ...) or __call__(self, ...)."
+                )
+
         # Apply autoparsing and reporting to the subclass, not the original
         wrapped_module = self.with_reporting(with_autoparsing(WrappedModule), node_id)
         wrapped_module.__forward_before_metadata__ = wrapped_module.forward  # type: ignore
@@ -65,6 +79,15 @@ class LangWatchWorkflowModule(ReportingModule):
             return result
 
         wrapped_module.forward = forward_with_metadata  # type: ignore
+
+        # For non-dspy.Module classes, instance() calls __call__ directly,
+        # bypassing forward. Wire __call__ through forward so the full
+        # patching chain (autoparsing, reporting, metadata) is always hit.
+        if not issubclass(wrapped_module, dspy.Module):
+            def call_via_forward(instance_self, *args, **kwargs):
+                return instance_self.forward(*args, **kwargs)
+            wrapped_module.__call__ = call_via_forward  # type: ignore
+
         return wrapped_module
 
     def run_in_parallel(self, *module_kwargs: Tuple[T, Dict[str, Any]]):

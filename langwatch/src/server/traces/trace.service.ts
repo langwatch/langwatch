@@ -2,13 +2,77 @@ import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
 import { prisma as defaultPrisma } from "~/server/db";
 import type { Protections } from "~/server/elasticsearch/protections";
+import { mapTraceEvaluationsToLegacyEvaluations } from "~/server/evaluations/evaluation-run.mappers";
+import { EvaluationService } from "~/server/evaluations/evaluation.service";
 import type { Evaluation, Trace } from "~/server/tracer/types";
 import { createLogger } from "~/utils/logger/server";
 import { ClickHouseTraceService } from "./clickhouse-trace.service";
 import { ElasticsearchTraceService } from "./elasticsearch-trace.service";
+
+/**
+ * Minimum prefix length we will attempt to resolve. Shorter strings fall
+ * through to "not found" — this keeps us from scanning the entire
+ * trace_summaries table on a single-character typo and narrows the search
+ * space enough to meaningfully detect ambiguity.
+ */
+export const MIN_TRACE_ID_PREFIX_LENGTH = 8;
+
+/**
+ * Full length of a trace ID. Inputs shorter than this are treated as
+ * potential prefixes; equal-or-longer inputs are treated as literal IDs.
+ */
+export const FULL_TRACE_ID_LENGTH = 32;
+
+/**
+ * How many candidates the resolver asks ClickHouse for when disambiguating
+ * a prefix. Matches the cap the error message previews, so API clients see
+ * every candidate the resolver considered.
+ */
+export const TRACE_ID_PREFIX_CANDIDATE_LIMIT = 5;
+
+/**
+ * Time window (in days) that prefix resolution scans. Without a partition
+ * bound, ClickHouse would scan every partition (including cold storage on
+ * S3) on a miss. 90 days covers the CLI's "copy a truncated ID from a
+ * recent search" use case while keeping the query on hot partitions.
+ * Full 32-char IDs still resolve unbounded via the normal exact-match path.
+ */
+export const TRACE_ID_PREFIX_LOOKUP_WINDOW_DAYS = 90;
+
+/**
+ * Thrown when a trace ID prefix matches more than one trace in the project.
+ * Callers (route handlers) map this to a 409 response listing the full
+ * candidate IDs so the user can disambiguate.
+ */
+export class AmbiguousTraceIdPrefixError extends Error {
+  constructor(
+    public readonly prefix: string,
+    public readonly candidateTraceIds: string[],
+  ) {
+    const preview = candidateTraceIds
+      .slice(0, TRACE_ID_PREFIX_CANDIDATE_LIMIT)
+      .join(", ");
+    const suffix =
+      candidateTraceIds.length > TRACE_ID_PREFIX_CANDIDATE_LIMIT
+        ? `, …${candidateTraceIds.length - TRACE_ID_PREFIX_CANDIDATE_LIMIT} more`
+        : "";
+    super(
+      `Trace ID prefix "${prefix}" is ambiguous — matches: ${preview}${suffix}. Use a longer prefix.`,
+    );
+    this.name = "AmbiguousTraceIdPrefixError";
+  }
+}
+
+/**
+ * Trace IDs per the OpenTelemetry spec are 32 hex characters. We only
+ * attempt prefix resolution for hex-only inputs — non-hex typos ("my-id ")
+ * short-circuit to 404 without scanning.
+ */
+const HEX_ONLY = /^[0-9a-f]+$/i;
 import type {
   AggregationFiltersInput,
   CustomersAndLabelsResult,
+  DistinctFieldNamesResult,
   GetAllTracesForProjectInput,
   PromptStudioSpanResult,
   TopicCountsResult,
@@ -16,12 +80,9 @@ import type {
 } from "./types";
 
 /**
- * Unified service for fetching traces from either ClickHouse or Elasticsearch.
+ * Unified service for fetching traces from ClickHouse.
  *
- * This service acts as a facade that:
- * 1. Checks if ClickHouse Traces Data Source is enabled for the project (via featureClickHouseDataSourceTraces flag)
- * 2. Routes requests to the appropriate backend based on the feature flag
- * 3. Applies consistent protections/redaction to all responses
+ * This service acts as a facade that routes all requests to the ClickHouse backend.
  *
  * @example
  * ```ts
@@ -30,14 +91,16 @@ import type {
  * ```
  */
 export class TraceService {
-  private readonly logger = createLogger("langwatch:traces:service");
   private readonly tracer = getLangWatchTracer("langwatch.traces.service");
+  private readonly logger = createLogger("langwatch:traces:service");
   private readonly clickHouseService: ClickHouseTraceService;
   private readonly elasticsearchService: ElasticsearchTraceService;
+  private readonly evaluationService: EvaluationService;
 
   constructor(readonly prisma: PrismaClient) {
     this.clickHouseService = ClickHouseTraceService.create(prisma);
     this.elasticsearchService = ElasticsearchTraceService.create(prisma);
+    this.evaluationService = EvaluationService.create(prisma);
   }
 
   /**
@@ -48,16 +111,6 @@ export class TraceService {
    */
   static create(prisma: PrismaClient = defaultPrisma): TraceService {
     return new TraceService(prisma);
-  }
-
-  /**
-   * Check if ClickHouse is enabled for the given project.
-   *
-   * @param projectId - The project ID
-   * @returns True if ClickHouse is enabled, false otherwise
-   */
-  async isClickHouseEnabled(projectId: string): Promise<boolean> {
-    return this.clickHouseService.isClickHouseEnabled(projectId);
   }
 
   /**
@@ -77,26 +130,66 @@ export class TraceService {
       "TraceService.getById",
       { attributes: { "tenant.id": projectId, "trace.id": traceId } },
       async (span) => {
-        const useClickHouse = await this.isClickHouseEnabled(projectId);
-        span.setAttribute(
-          "backend",
-          useClickHouse ? "clickhouse" : "elasticsearch",
-        );
+        span.setAttribute("backend", "clickhouse");
 
-        if (useClickHouse) {
-          const traces = await this.clickHouseService.getTracesWithSpans(
-            projectId,
-            [traceId],
-            protections,
-          );
-          return traces?.[0];
-        }
-
-        return this.elasticsearchService.getById(
+        const traces = await this.clickHouseService.getTracesWithSpans(
           projectId,
-          traceId,
+          [traceId],
           protections,
         );
+        if (traces === null) {
+          throw new Error(
+            "ClickHouse is enabled but returned null for getById — check ClickHouse client configuration",
+          );
+        }
+        if (traces[0]) {
+          return traces[0];
+        }
+
+        // No exact match. If the input looks like a truncated hex prefix
+        // (shorter than a full trace ID, but long enough to meaningfully
+        // narrow the scan), try git-style prefix resolution scoped to this
+        // project and the last TRACE_ID_PREFIX_LOOKUP_WINDOW_DAYS days.
+        if (
+          traceId.length < FULL_TRACE_ID_LENGTH &&
+          traceId.length >= MIN_TRACE_ID_PREFIX_LENGTH &&
+          HEX_ONLY.test(traceId)
+        ) {
+          const now = Date.now();
+          const candidates = await this.clickHouseService.resolveTraceIdByPrefix(
+            {
+              projectId,
+              prefix: traceId,
+              occurredAt: {
+                from: now - TRACE_ID_PREFIX_LOOKUP_WINDOW_DAYS * 24 * 60 * 60 * 1000,
+                to: now,
+              },
+              limit: TRACE_ID_PREFIX_CANDIDATE_LIMIT,
+            },
+          );
+          if (candidates === null) {
+            throw new Error(
+              "ClickHouse is enabled but returned null for resolveTraceIdByPrefix — check ClickHouse client configuration",
+            );
+          }
+          if (candidates.length === 0) {
+            return undefined;
+          }
+          if (candidates.length > 1) {
+            span.setAttribute("trace.id.prefix.ambiguous", true);
+            throw new AmbiguousTraceIdPrefixError(traceId, candidates);
+          }
+
+          span.setAttribute("trace.id.prefix.resolved", candidates[0]!);
+          const resolved = await this.clickHouseService.getTracesWithSpans(
+            projectId,
+            [candidates[0]!],
+            protections,
+          );
+          return resolved?.[0];
+        }
+
+        return undefined;
       },
     );
   }
@@ -120,26 +213,19 @@ export class TraceService {
         attributes: { "tenant.id": projectId, "trace.count": traceIds.length },
       },
       async (span) => {
-        const useClickHouse = await this.isClickHouseEnabled(projectId);
-        span.setAttribute(
-          "backend",
-          useClickHouse ? "clickhouse" : "elasticsearch",
-        );
+        span.setAttribute("backend", "clickhouse");
 
-        if (useClickHouse) {
-          const traces = await this.clickHouseService.getTracesWithSpans(
-            projectId,
-            traceIds,
-            protections,
-          );
-          return traces ?? [];
-        }
-
-        return this.elasticsearchService.getTracesWithSpans(
+        const traces = await this.clickHouseService.getTracesWithSpans(
           projectId,
           traceIds,
           protections,
         );
+        if (traces === null) {
+          throw new Error(
+            "ClickHouse is enabled but returned null for getTracesWithSpans — check ClickHouse client configuration",
+          );
+        }
+        return traces;
       },
     );
   }
@@ -161,33 +247,19 @@ export class TraceService {
       "TraceService.getTracesByThreadId",
       { attributes: { "tenant.id": projectId, "thread.id": threadId } },
       async (span) => {
-        const useClickHouse = await this.isClickHouseEnabled(projectId);
-        span.setAttribute(
-          "backend",
-          useClickHouse ? "clickhouse" : "elasticsearch",
-        );
+        span.setAttribute("backend", "clickhouse");
 
-        if (useClickHouse) {
-          const traces = await this.clickHouseService.getTracesByThreadId(
-            projectId,
-            threadId,
-            protections,
-          );
-          if (traces !== null) {
-            return traces;
-          }
-          // Fall back to Elasticsearch if ClickHouse returns null
-          this.logger.warn(
-            { projectId, threadId },
-            "ClickHouse enabled but returned null for getTracesByThreadId, falling back to Elasticsearch",
-          );
-        }
-
-        return this.elasticsearchService.getTracesByThreadId(
+        const traces = await this.clickHouseService.getTracesByThreadId(
           projectId,
           threadId,
           protections,
         );
+        if (traces === null) {
+          throw new Error(
+            "ClickHouse is enabled but returned null for getTracesByThreadId — check ClickHouse client configuration",
+          );
+        }
+        return traces;
       },
     );
   }
@@ -213,32 +285,20 @@ export class TraceService {
       "TraceService.getAllTracesForProject",
       { attributes: { "tenant.id": input.projectId } },
       async (span) => {
-        const useClickHouse = await this.isClickHouseEnabled(input.projectId);
-        span.setAttribute(
-          "backend",
-          useClickHouse ? "clickhouse" : "elasticsearch",
-        );
+        span.setAttribute("backend", "clickhouse");
 
-        if (useClickHouse) {
-          const result = await this.clickHouseService.getAllTracesForProject(
-            input,
-            protections,
-          );
-          if (result !== null) {
-            return result;
-          }
-          // If ClickHouse returns null (e.g., client not available), fall back
-          this.logger.warn(
-            { projectId: input.projectId },
-            "ClickHouse enabled but returned null, falling back to Elasticsearch",
-          );
-        }
-
-        return this.elasticsearchService.getAllTracesForProject(
+        const result = await this.clickHouseService.getAllTracesForProject(
           input,
           protections,
           options,
         );
+        if (result === null) {
+          throw new Error(
+            "ClickHouse is enabled but returned null for getAllTracesForProject — check ClickHouse client configuration",
+          );
+        }
+
+        return result;
       },
     );
   }
@@ -261,13 +321,16 @@ export class TraceService {
       {
         attributes: { "tenant.id": projectId, "trace.count": traceIds.length },
       },
-      async () => {
-        // Evaluations are only in Elasticsearch for now
-        return this.elasticsearchService.getEvaluationsMultiple(
+      async (span) => {
+        span.setAttribute("backend", "clickhouse");
+
+        const result = await this.evaluationService.getEvaluationsMultiple({
           projectId,
           traceIds,
           protections,
-        );
+        });
+
+        return mapTraceEvaluationsToLegacyEvaluations(result);
       },
     );
   }
@@ -294,34 +357,20 @@ export class TraceService {
         },
       },
       async (span) => {
-        const useClickHouse = await this.isClickHouseEnabled(projectId);
-        span.setAttribute(
-          "backend",
-          useClickHouse ? "clickhouse" : "elasticsearch",
-        );
+        span.setAttribute("backend", "clickhouse");
 
-        if (useClickHouse) {
-          const traces =
-            await this.clickHouseService.getTracesWithSpansByThreadIds(
-              projectId,
-              threadIds,
-              protections,
-            );
-          if (traces !== null) {
-            return traces;
-          }
-          // Fall back to Elasticsearch if ClickHouse returns null
-          this.logger.warn(
-            { projectId, threadIds },
-            "ClickHouse enabled but returned null for getTracesWithSpansByThreadIds, falling back to Elasticsearch",
+        const traces =
+          await this.clickHouseService.getTracesWithSpansByThreadIds(
+            projectId,
+            threadIds,
+            protections,
+          );
+        if (traces === null) {
+          throw new Error(
+            "ClickHouse is enabled but returned null for getTracesWithSpansByThreadIds — check ClickHouse client configuration",
           );
         }
-
-        return this.elasticsearchService.getTracesWithSpansByThreadIds(
-          projectId,
-          threadIds,
-          protections,
-        );
+        return traces;
       },
     );
   }
@@ -339,24 +388,15 @@ export class TraceService {
       "TraceService.getTopicCounts",
       { attributes: { "tenant.id": input.projectId } },
       async (span) => {
-        const useClickHouse = await this.isClickHouseEnabled(input.projectId);
-        span.setAttribute(
-          "backend",
-          useClickHouse ? "clickhouse" : "elasticsearch",
-        );
+        span.setAttribute("backend", "clickhouse");
 
-        if (useClickHouse) {
-          const result = await this.clickHouseService.getTopicCounts(input);
-          if (result !== null) {
-            return result;
-          }
-          this.logger.warn(
-            { projectId: input.projectId },
-            "ClickHouse enabled but returned null for getTopicCounts, falling back to Elasticsearch",
+        const result = await this.clickHouseService.getTopicCounts(input);
+        if (result === null) {
+          throw new Error(
+            "ClickHouse is enabled but returned null for getTopicCounts — check ClickHouse client configuration",
           );
         }
-
-        return this.elasticsearchService.getTopicCounts(input);
+        return result;
       },
     );
   }
@@ -374,25 +414,51 @@ export class TraceService {
       "TraceService.getCustomersAndLabels",
       { attributes: { "tenant.id": input.projectId } },
       async (span) => {
-        const useClickHouse = await this.isClickHouseEnabled(input.projectId);
-        span.setAttribute(
-          "backend",
-          useClickHouse ? "clickhouse" : "elasticsearch",
-        );
+        span.setAttribute("backend", "clickhouse");
 
-        if (useClickHouse) {
-          const result =
-            await this.clickHouseService.getCustomersAndLabels(input);
-          if (result !== null) {
-            return result;
-          }
-          this.logger.warn(
-            { projectId: input.projectId },
-            "ClickHouse enabled but returned null for getCustomersAndLabels, falling back to Elasticsearch",
+        const result =
+          await this.clickHouseService.getCustomersAndLabels(input);
+        if (result === null) {
+          throw new Error(
+            "ClickHouse is enabled but returned null for getCustomersAndLabels — check ClickHouse client configuration",
           );
         }
+        return result;
+      },
+    );
+  }
 
-        return this.elasticsearchService.getCustomersAndLabels(input);
+  /**
+   * Get distinct span names and metadata keys for a project within a date range.
+   *
+   * @param projectId - The project ID
+   * @param startDate - Start of date range (epoch millis)
+   * @param endDate - End of date range (epoch millis)
+   * @returns DistinctFieldNamesResult with span names and metadata keys
+   */
+  async getDistinctFieldNames(
+    projectId: string,
+    startDate: number,
+    endDate: number,
+  ): Promise<DistinctFieldNamesResult> {
+    return this.tracer.withActiveSpan(
+      "TraceService.getDistinctFieldNames",
+      { attributes: { "tenant.id": projectId } },
+      async (span) => {
+        span.setAttribute("backend", "clickhouse");
+
+        const result =
+          await this.clickHouseService.getDistinctFieldNames(
+            projectId,
+            startDate,
+            endDate,
+          );
+        if (result === null) {
+          throw new Error(
+            "ClickHouse is enabled but returned null for getDistinctFieldNames — check ClickHouse client configuration",
+          );
+        }
+        return result;
       },
     );
   }
@@ -414,29 +480,9 @@ export class TraceService {
       "TraceService.getSpanForPromptStudio",
       { attributes: { "tenant.id": projectId, "span.id": spanId } },
       async (span) => {
-        const useClickHouse = await this.isClickHouseEnabled(projectId);
-        span.setAttribute(
-          "backend",
-          useClickHouse ? "clickhouse" : "elasticsearch",
-        );
+        span.setAttribute("backend", "clickhouse");
 
-        if (useClickHouse) {
-          const result = await this.clickHouseService.getSpanForPromptStudio(
-            projectId,
-            spanId,
-            protections,
-          );
-          if (result !== null) {
-            return result;
-          }
-          // Fall back to Elasticsearch - span might not be found in ClickHouse
-          this.logger.debug(
-            { projectId, spanId },
-            "Span not found in ClickHouse, falling back to Elasticsearch",
-          );
-        }
-
-        return this.elasticsearchService.getSpanForPromptStudio(
+        return this.clickHouseService.getSpanForPromptStudio(
           projectId,
           spanId,
           protections,

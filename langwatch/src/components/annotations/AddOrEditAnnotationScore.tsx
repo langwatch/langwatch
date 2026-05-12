@@ -18,6 +18,7 @@ import { Plus, X } from "react-feather";
 import { useForm } from "react-hook-form";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { FullWidthFormControl } from "../FullWidthFormControl";
 import { Checkbox } from "../ui/checkbox";
 import { Radio, RadioGroup } from "../ui/radio";
@@ -197,6 +198,7 @@ export const AddOrEditAnnotationScore = ({
           void queryClient.annotationScore.getById.invalidate();
         },
         onError: (error) => {
+          if (isHandledByGlobalHandler(error)) return;
           toaster.create({
             title: annotationScoreId
               ? "Error updating annotation score"

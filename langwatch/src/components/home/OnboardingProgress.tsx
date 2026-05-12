@@ -7,7 +7,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import { useEffect } from "react";
 import { useAnalytics } from "react-contextual-analytics";
 import {
@@ -91,7 +91,7 @@ export const buildOnboardingSteps = (
     {
       key: "createProject",
       title: "Create your new project",
-      href: "/settings/projects",
+      href: "/settings/teams",
       complete: true,
     },
     {

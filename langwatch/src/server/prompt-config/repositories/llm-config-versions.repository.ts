@@ -109,6 +109,26 @@ export class LlmConfigVersionsRepository {
   }
 
   /**
+   * Returns the id of the most recent version for a config, or null when no
+   * version exists. Non-throwing variant intended for read-path enrichment
+   * (e.g. deciding whether a returned version is "latest") where a missing
+   * row is a legitimate case, not an error.
+   */
+  async findLatestId(params: {
+    configId: string;
+    projectId: string;
+    tx?: Prisma.TransactionClient;
+  }): Promise<string | null> {
+    const client = params.tx ?? this.prisma;
+    const v = await client.llmPromptConfigVersion.findFirst({
+      where: { configId: params.configId, projectId: params.projectId },
+      orderBy: { createdAt: "desc" },
+      select: { id: true },
+    });
+    return v?.id ?? null;
+  }
+
+  /**
    * Get the latest version for a config
    */
   async getLatestVersion(

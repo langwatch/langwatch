@@ -6,32 +6,32 @@ import { OpenTelemetrySetup } from "../../../components/sections/observability/O
 import type { Docs, IconData } from "../../shared/types";
 import { iconWithLabel, singleIcon, themedIcon } from "../../shared/types";
 import type { FrameworkKey, PlatformKey } from "../types";
-import goAnthropicSource from "./snippets/go/anthropic.snippet.go";
-import goAzureSource from "./snippets/go/azure.snippet.go";
-import goGeminiSource from "./snippets/go/gemini.snippet.go";
-import goGrokSource from "./snippets/go/grok.snippet.go";
-import goGroqSource from "./snippets/go/groq.snippet.go";
-import goMistralSource from "./snippets/go/mistral.snippet.go";
-import goOllamaSource from "./snippets/go/ollama.snippet.go";
-import goOpenaiSource from "./snippets/go/openai.snippet.go";
-import springAiYamlSource from "./snippets/java/springai.snippet.yaml";
-import n8nBashSource from "./snippets/noandlo/n8n.snippet.sh";
-import agnoPySource from "./snippets/python/agno.snippet.py";
-import anthropicPySource from "./snippets/python/anthropic.snippet.py";
-import dspyPySource from "./snippets/python/dspy.snippet.py";
-import haystackPySource from "./snippets/python/haystack.snippet.py";
-import langchainPySource from "./snippets/python/langchain.snippet.py";
-import langgraphPySource from "./snippets/python/langgraph.snippet.py";
-import litellmPySource from "./snippets/python/litellm.snippet.py";
-import openaiPySource from "./snippets/python/openai.snippet.py";
-import openaiAgentsPySource from "./snippets/python/openaiagents.snippet.py";
-import pydanticPySource from "./snippets/python/pydanticai.snippet.py";
-import strandsPySource from "./snippets/python/strandsagents.snippet.py";
-import langchainTsSource from "./snippets/typescript/langchain.snippet.sts";
-import langgraphTsSource from "./snippets/typescript/langgraph.snippet.sts";
-import mastraTsSource from "./snippets/typescript/mastra.snippet.sts";
-import openaiTsSource from "./snippets/typescript/openai.snippet.sts";
-import vercelAiTsSource from "./snippets/typescript/vercelai.snippet.sts";
+import goAnthropicSource from "./snippets/go/anthropic.snippet.go?raw";
+import goAzureSource from "./snippets/go/azure.snippet.go?raw";
+import goGeminiSource from "./snippets/go/gemini.snippet.go?raw";
+import goGrokSource from "./snippets/go/grok.snippet.go?raw";
+import goGroqSource from "./snippets/go/groq.snippet.go?raw";
+import goMistralSource from "./snippets/go/mistral.snippet.go?raw";
+import goOllamaSource from "./snippets/go/ollama.snippet.go?raw";
+import goOpenaiSource from "./snippets/go/openai.snippet.go?raw";
+import springAiYamlSource from "./snippets/java/springai.snippet.yaml?raw";
+import n8nBashSource from "./snippets/noandlo/n8n.snippet.sh?raw";
+import agnoPySource from "./snippets/python/agno.snippet.py?raw";
+import anthropicPySource from "./snippets/python/anthropic.snippet.py?raw";
+import dspyPySource from "./snippets/python/dspy.snippet.py?raw";
+import haystackPySource from "./snippets/python/haystack.snippet.py?raw";
+import langchainPySource from "./snippets/python/langchain.snippet.py?raw";
+import langgraphPySource from "./snippets/python/langgraph.snippet.py?raw";
+import litellmPySource from "./snippets/python/litellm.snippet.py?raw";
+import openaiPySource from "./snippets/python/openai.snippet.py?raw";
+import openaiAgentsPySource from "./snippets/python/openaiagents.snippet.py?raw";
+import pydanticPySource from "./snippets/python/pydanticai.snippet.py?raw";
+import strandsPySource from "./snippets/python/strandsagents.snippet.py?raw";
+import langchainTsSource from "./snippets/typescript/langchain.snippet.sts?raw";
+import langgraphTsSource from "./snippets/typescript/langgraph.snippet.sts?raw";
+import mastraTsSource from "./snippets/typescript/mastra.snippet.sts?raw";
+import openaiTsSource from "./snippets/typescript/openai.snippet.sts?raw";
+import vercelAiTsSource from "./snippets/typescript/vercelai.snippet.sts?raw";
 
 export interface InstallMatrix {
   js?: { npm: string; pnpm: string; yarn: string; bun: string };
@@ -45,10 +45,25 @@ export interface SnippetRef {
   filename: string;
 }
 
+/**
+ * Category split surfaced by the traces-v2 empty-state onboarding:
+ *   - "agents" — frameworks that orchestrate LLM calls (LangChain, Vercel AI,
+ *     CrewAI, no/low-code flow tools…). What most users adopting LangWatch
+ *     today are building.
+ *   - "traditional" — direct LLM clients (OpenAI, Anthropic, Gemini…) and
+ *     transport-level options (OpenTelemetry, Spring AI). Useful for teams
+ *     who haven't picked an agent framework yet.
+ *
+ * Purely a UI-grouping concern — the backend treats every integration the
+ * same way.
+ */
+export type IntegrationCategory = "agents" | "traditional";
+
 export interface IntegrationSpec {
   platform: PlatformKey;
   framework?: FrameworkKey;
   label: string;
+  category: IntegrationCategory;
   icon?: IconData;
   docs: Docs;
   install?: InstallMatrix;
@@ -91,6 +106,7 @@ export const registry: IntegrationRegistry = [
     platform: "typescript",
     framework: "vercel_ai",
     label: "Vercel AI SDK",
+    category: "agents",
     docs: {
       internal: "/integration/typescript/integrations/vercel-ai-sdk",
       external: "https://sdk.vercel.ai/docs",
@@ -114,6 +130,7 @@ export const registry: IntegrationRegistry = [
     platform: "typescript",
     framework: "mastra",
     label: "Mastra",
+    category: "agents",
     docs: {
       internal: "/integration/typescript/integrations/mastra",
       external: "https://docs.mastra.ai/",
@@ -125,10 +142,10 @@ export const registry: IntegrationRegistry = [
     ),
     install: {
       js: {
-        npm: "npm i langwatch @mastra/core @ai-sdk/openai @mastra/otel-exporter @mastra/loggers @mastra/libsql",
-        pnpm: "pnpm add langwatch @mastra/core @ai-sdk/openai @mastra/otel-exporter @mastra/loggers @mastra/libsql",
-        yarn: "yarn add langwatch @mastra/core @ai-sdk/openai @mastra/otel-exporter @mastra/loggers @mastra/libsql",
-        bun: "bun add langwatch @mastra/core @ai-sdk/openai @mastra/otel-exporter @mastra/loggers @mastra/libsql",
+        npm: "npm i @mastra/core @mastra/evals @mastra/libsql @mastra/loggers @mastra/memory @mastra/otel-exporter @mastra/observability",
+        pnpm: "pnpm add @mastra/core @mastra/evals @mastra/libsql @mastra/loggers @mastra/memory @mastra/otel-exporter @mastra/observability",
+        yarn: "yarn add @mastra/core @mastra/evals @mastra/libsql @mastra/loggers @mastra/memory @mastra/otel-exporter @mastra/observability",
+        bun: "bun add @mastra/core @mastra/evals @mastra/libsql @mastra/loggers @mastra/memory @mastra/otel-exporter @mastra/observability",
       },
     },
     snippet: tsRef(mastraTsSource as unknown as string),
@@ -137,6 +154,7 @@ export const registry: IntegrationRegistry = [
     platform: "typescript",
     framework: "langchain",
     label: "LangChain",
+    category: "agents",
     docs: {
       internal: "/integration/typescript/integrations/langchain",
       external: "https://langchain-ai.github.io/langchain/",
@@ -160,6 +178,7 @@ export const registry: IntegrationRegistry = [
     platform: "typescript",
     framework: "langgraph",
     label: "LangGraph",
+    category: "agents",
     docs: {
       internal: "/integration/typescript/integrations/langgraph",
       external: "https://langchain-ai.github.io/langgraph/",
@@ -183,6 +202,7 @@ export const registry: IntegrationRegistry = [
     platform: "typescript",
     framework: "openai",
     label: "OpenAI (Manual Instrumentation)",
+    category: "traditional",
     docs: { internal: "/integration/typescript/integrations/open-ai" },
     icon: themedIcon(
       "/images/external-icons/openai-lighttheme.svg",
@@ -205,6 +225,7 @@ export const registry: IntegrationRegistry = [
     platform: "python",
     framework: "openai",
     label: "OpenAI",
+    category: "traditional",
     docs: {
       internal: "/integration/python/integrations/open-ai",
       external: "https://platform.openai.com/docs/overview",
@@ -226,6 +247,7 @@ export const registry: IntegrationRegistry = [
     platform: "python",
     framework: "openai_agents",
     label: "OpenAI Agents",
+    category: "agents",
     docs: {
       internal: "/integration/python/integrations/openai-agents",
       external: "https://platform.openai.com/docs/guides/agents",
@@ -250,6 +272,7 @@ export const registry: IntegrationRegistry = [
     platform: "python",
     framework: "langchain",
     label: "LangChain",
+    category: "agents",
     docs: {
       internal: "/integration/python/integrations/langchain",
       external: "https://docs.langchain.com/oss/python/langchain/quickstart/",
@@ -271,6 +294,7 @@ export const registry: IntegrationRegistry = [
     platform: "python",
     framework: "langgraph",
     label: "LangGraph",
+    category: "agents",
     docs: {
       internal: "/integration/python/integrations/langgraph",
       external: "https://docs.langchain.com/oss/python/langgraph/quickstart",
@@ -292,6 +316,7 @@ export const registry: IntegrationRegistry = [
     platform: "python",
     framework: "litellm",
     label: "LiteLLM",
+    category: "traditional",
     docs: {
       internal: "/integration/python/integrations/lite-llm",
       external: "https://docs.litellm.ai/docs/",
@@ -309,6 +334,7 @@ export const registry: IntegrationRegistry = [
     platform: "python",
     framework: "dspy",
     label: "DSPy",
+    category: "agents",
     docs: {
       internal: "/integration/python/integrations/dspy",
       external: "https://dspy.ai/",
@@ -326,6 +352,7 @@ export const registry: IntegrationRegistry = [
     platform: "python",
     framework: "strands",
     label: "Strand Agents",
+    category: "agents",
     docs: {
       internal: "/integration/python/integrations/strand-agents",
       external: "https://strandsagents.com/latest/",
@@ -343,6 +370,7 @@ export const registry: IntegrationRegistry = [
     platform: "python",
     framework: "agno",
     label: "Agno",
+    category: "agents",
     docs: {
       internal: "/integration/python/integrations/agno",
       external: "https://docs.agno.com/introduction",
@@ -360,6 +388,7 @@ export const registry: IntegrationRegistry = [
     platform: "python",
     framework: "anthropic",
     label: "Anthropic",
+    category: "traditional",
     docs: {
       internal: "/integration/python/integrations/anthropic",
       external: "https://docs.claude.com/en/home",
@@ -381,6 +410,7 @@ export const registry: IntegrationRegistry = [
     platform: "python",
     framework: "pydantic",
     label: "Pydantic AI",
+    category: "agents",
     docs: {
       internal: "/integration/python/integrations/pydantic-ai",
       external: "https://ai.pydantic.dev/",
@@ -398,6 +428,7 @@ export const registry: IntegrationRegistry = [
     platform: "python",
     framework: "haystack",
     label: "Haystack",
+    category: "agents",
     docs: {
       internal: "/integration/python/integrations/haystack",
       external: "https://docs.haystack.deepset.ai/docs/intro",
@@ -417,6 +448,7 @@ export const registry: IntegrationRegistry = [
     platform: "go",
     framework: "openai",
     label: "OpenAI",
+    category: "traditional",
     docs: {
       internal: "/integration/go/integrations/open-ai",
       external: "https://github.com/openai/openai-go",
@@ -438,6 +470,7 @@ export const registry: IntegrationRegistry = [
     platform: "go",
     framework: "azure",
     label: "Azure OpenAI",
+    category: "traditional",
     docs: {
       internal: "/integration/go/integrations/azure-openai",
       external: "https://learn.microsoft.com/azure/ai-services/openai/",
@@ -455,6 +488,7 @@ export const registry: IntegrationRegistry = [
     platform: "go",
     framework: "anthropic",
     label: "Anthropic",
+    category: "traditional",
     docs: {
       internal: "/integration/go/integrations/anthropic",
       external: "https://docs.claude.com/",
@@ -476,6 +510,7 @@ export const registry: IntegrationRegistry = [
     platform: "go",
     framework: "gemini",
     label: "Gemini",
+    category: "traditional",
     docs: {
       internal: "/integration/go/integrations/google-gemini",
       external: "https://ai.google.dev/",
@@ -493,6 +528,7 @@ export const registry: IntegrationRegistry = [
     platform: "go",
     framework: "groq",
     label: "Groq",
+    category: "traditional",
     docs: {
       internal: "/integration/go/integrations/groq",
       external: "https://console.groq.com/docs",
@@ -510,6 +546,7 @@ export const registry: IntegrationRegistry = [
     platform: "go",
     framework: "grok",
     label: "Grok (xAI)",
+    category: "traditional",
     docs: {
       internal: "/integration/go/integrations/grok",
       external: "https://x.ai/",
@@ -531,6 +568,7 @@ export const registry: IntegrationRegistry = [
     platform: "go",
     framework: "mistral",
     label: "Mistral",
+    category: "traditional",
     docs: { external: "https://docs.mistral.ai/" },
     icon: singleIcon("/images/external-icons/mistral.svg", "Mistral"),
     install: {
@@ -545,6 +583,7 @@ export const registry: IntegrationRegistry = [
     platform: "go",
     framework: "ollama",
     label: "Ollama",
+    category: "traditional",
     docs: {
       internal: "/integration/go/integrations/ollama",
       external: "https://github.com/ollama/ollama",
@@ -568,6 +607,7 @@ export const registry: IntegrationRegistry = [
     platform: "java",
     framework: "spring",
     label: "Spring Boot AI",
+    category: "traditional",
     docs: {
       internal: "/integration/java/integrations/spring-ai",
       external: "https://spring.io/projects/spring-ai",
@@ -591,6 +631,7 @@ export const registry: IntegrationRegistry = [
       "OpenTelemetry",
     ),
     label: "OpenTelemetry",
+    category: "traditional",
     customComponent: OpenTelemetrySetup,
   },
 
@@ -599,6 +640,7 @@ export const registry: IntegrationRegistry = [
     platform: "no_and_lo",
     framework: "n8n",
     label: "n8n",
+    category: "agents",
     docs: { internal: "/integration/n8n", external: "https://docs.n8n.io/" },
     icon: singleIcon("/images/external-icons/n8n.svg", "n8n"),
     install: {
@@ -615,6 +657,7 @@ export const registry: IntegrationRegistry = [
     platform: "no_and_lo",
     framework: "flowise",
     label: "Flowise",
+    category: "agents",
     docs: {
       internal: "/integration/flowise",
       external: "https://docs.flowiseai.com/",
@@ -626,6 +669,7 @@ export const registry: IntegrationRegistry = [
     platform: "no_and_lo",
     framework: "langflow",
     label: "Langflow",
+    category: "agents",
     docs: {
       internal: "/integration/langflow",
       external: "https://docs.langflow.org/",
@@ -648,10 +692,9 @@ export function getRegistryEntry(
   );
 }
 
-export function deriveFrameworksByPlatform(): Record<
-  PlatformKey,
-  { key: FrameworkKey; label: string; icon?: IconData }[]
-> {
+export function deriveFrameworksByPlatform(
+  category?: IntegrationCategory,
+): Record<PlatformKey, { key: FrameworkKey; label: string; icon?: IconData }[]> {
   const out: Record<
     PlatformKey,
     { key: FrameworkKey; label: string; icon?: IconData }[]
@@ -664,10 +707,26 @@ export function deriveFrameworksByPlatform(): Record<
     no_and_lo: [],
   };
   for (const r of registry) {
+    if (category && r.category !== category) continue;
     // Skip entries without a framework (platform-only items)
     if (r.framework) {
       out[r.platform].push({ key: r.framework, label: r.label, icon: r.icon });
     }
+  }
+  return out;
+}
+
+/**
+ * Returns the set of platforms that have at least one framework — or one
+ * platform-only entry — in the given category. Used to hide platform tabs
+ * that would render an empty FrameworkGrid.
+ */
+export function derivePlatformsForCategory(
+  category: IntegrationCategory,
+): Set<PlatformKey> {
+  const out = new Set<PlatformKey>();
+  for (const r of registry) {
+    if (r.category === category) out.add(r.platform);
   }
   return out;
 }

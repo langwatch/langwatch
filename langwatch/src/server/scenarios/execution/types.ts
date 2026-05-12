@@ -7,6 +7,19 @@
  */
 
 import { z } from "zod";
+import type { Span } from "../../tracer/types";
+
+// ============================================================================
+// Field Mapping Types
+// (defined first so adapter schemas can reference them)
+// ============================================================================
+
+/** Field mapping for agent inputs — maps to a scenario source or a static value */
+export const FieldMappingSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("source"), sourceId: z.string(), path: z.array(z.string()) }),
+  z.object({ type: z.literal("value"), value: z.string() }),
+]);
+export type FieldMapping = z.infer<typeof FieldMappingSchema>;
 
 // ============================================================================
 // Adapter Data Types (Zod schemas for data contracts)
@@ -83,13 +96,94 @@ export const HttpAgentDataSchema = z.object({
   auth: AuthConfigSchema.optional(),
   bodyTemplate: z.string().optional(),
   outputPath: z.string().optional(),
+  /** Maps agent input field identifiers to scenario data sources or static values. */
+  scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
 });
 export type HttpAgentData = z.infer<typeof HttpAgentDataSchema>;
+
+/**
+ * Pre-fetched code agent configuration for serialized execution.
+ * Contains all data needed to execute code-based scenarios without DB access.
+ *
+ * The code field contains Python source code, and inputs/outputs define
+ * the data shape expected by the code execution engine (langwatch_nlp).
+ */
+export const CodeAgentDataSchema = z.object({
+  type: z.literal("code"),
+  agentId: z.string(),
+  code: z.string(),
+  inputs: z.array(
+    z.object({
+      identifier: z.string(),
+      type: z.string(),
+    })
+  ),
+  outputs: z.array(
+    z.object({
+      identifier: z.string(),
+      type: z.string(),
+    })
+  ),
+  /** Maps agent input field identifiers to scenario data sources or static values. */
+  scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
+  /** Which output field to use as the scenario result. When unset, uses the first output. */
+  scenarioOutputField: z.string().optional(),
+  /**
+   * Project secrets exposed to the Python code as the `secrets.NAME` namespace.
+   * Pre-fetched so the worker-thread adapter runs without DB access. Mirrors
+   * the studio's addEnvs behavior for in-app workflow execution.
+   */
+  secrets: z.record(z.string(), z.string()).default({}),
+});
+export type CodeAgentData = z.infer<typeof CodeAgentDataSchema>;
+
+/**
+ * Pre-fetched workflow agent configuration for serialized execution.
+ *
+ * Contains the fully published workflow DSL plus scenario-mapping metadata.
+ * Workflow execution is delegated to the langwatch_nlp service's /studio/execute_sync
+ * endpoint using an execute_flow event, identical to code agents but with the
+ * user's own workflow DSL (rather than a synthesized entry→code→end workflow).
+ */
+export const WorkflowAgentDataSchema = z.object({
+  type: z.literal("workflow"),
+  agentId: z.string(),
+  workflowId: z.string(),
+  /** The published workflow DSL (from WorkflowVersion.dsl). Opaque to the adapter. */
+  workflow: z.record(z.string(), z.unknown()),
+  /** Ordered declared entry-node inputs used for mapping resolution + fallback. */
+  inputs: z.array(
+    z.object({
+      identifier: z.string(),
+      type: z.string(),
+    })
+  ),
+  /** Ordered end-node outputs used for default/fallback output extraction. */
+  outputs: z.array(
+    z.object({
+      identifier: z.string(),
+      type: z.string(),
+    })
+  ),
+  /** Maps agent input field identifiers to scenario data sources or static values. */
+  scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
+  /** Which output field to use as the scenario result. When unset, uses the first output. */
+  scenarioOutputField: z.string().optional(),
+  /**
+   * Project secrets merged into the workflow DSL before execution. Mirrors the
+   * studio's addEnvs behavior so `secrets.NAME` works inside code nodes of the
+   * published workflow.
+   */
+  secrets: z.record(z.string(), z.string()).default({}),
+});
+export type WorkflowAgentData = z.infer<typeof WorkflowAgentDataSchema>;
 
 /** Union type for all supported target adapter data */
 export const TargetAdapterDataSchema = z.discriminatedUnion("type", [
   PromptConfigDataSchema,
   HttpAgentDataSchema,
+  CodeAgentDataSchema,
+  WorkflowAgentDataSchema,
 ]);
 export type TargetAdapterData = z.infer<typeof TargetAdapterDataSchema>;
 
@@ -126,6 +220,9 @@ export const ExecutionContextSchema = z.object({
   scenarioId: z.string(),
   setId: z.string(),
   batchRunId: z.string(),
+  /** Pre-assigned scenario run ID passed through to the SDK to prevent duplicate entries.
+   *  Optional during validation prefetch; required at execution time. */
+  scenarioRunId: z.string().optional(),
 });
 export type ExecutionContext = z.infer<typeof ExecutionContextSchema>;
 
@@ -146,10 +243,20 @@ export type TelemetryConfig = z.infer<typeof TelemetryConfigSchema>;
 
 /** Target configuration - what to test against */
 export const TargetConfigSchema = z.object({
-  type: z.enum(["prompt", "http"]),
+  type: z.enum(["prompt", "http", "code", "workflow"]),
   referenceId: z.string(),
 });
 export type TargetConfig = z.infer<typeof TargetConfigSchema>;
+
+// ============================================================================
+// Span Query Types
+// ============================================================================
+
+/** Function that queries spans from a data source (ES, trace API, etc.) by trace ID */
+export type SpanQueryFn = (params: {
+  projectId: string;
+  traceId: string;
+}) => Promise<Span[]>;
 
 // ============================================================================
 // Result Types
@@ -161,6 +268,8 @@ export const ScenarioExecutionResultSchema = z.object({
   runId: z.string().optional(),
   reasoning: z.string().optional(),
   error: z.string().optional(),
+  /** When true, the job was cancelled by user (not a crash/error). */
+  cancelled: z.boolean().optional(),
 });
 export type ScenarioExecutionResult = z.infer<
   typeof ScenarioExecutionResultSchema
@@ -177,8 +286,11 @@ export type ScenarioExecutionResult = z.infer<
 export const ChildProcessJobDataSchema = z.object({
   context: ExecutionContextSchema,
   scenario: ScenarioConfigSchema,
+  /** Pre-generated scenario run ID so the SDK uses the same aggregate ID. */
+  scenarioRunId: z.string().optional(),
   adapterData: TargetAdapterDataSchema,
   modelParams: LiteLLMParamsSchema,
   nlpServiceUrl: z.string(),
+  target: TargetConfigSchema,
 });
 export type ChildProcessJobData = z.infer<typeof ChildProcessJobDataSchema>;

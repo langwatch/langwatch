@@ -3,21 +3,38 @@ import {
   Box,
   Button,
   Checkbox,
+  createListCollection,
   Field,
   HStack,
   Input,
-  NativeSelect,
   Text,
   Textarea,
   VStack,
 } from "@chakra-ui/react";
 import { Upload, X } from "lucide-react";
 import { api } from "~/utils/api";
+import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { toaster } from "../ui/toaster";
 import { Radio, RadioGroup } from "~/components/ui/radio";
+import { Select } from "~/components/ui/select";
 import { ENTERPRISE_TEMPLATE } from "../../../ee/licensing/planTemplates";
 import { getPlanDefaults, type PlanType } from "./planFormDefaults";
 import { formatFileSize } from "./licenseStatusUtils";
+
+const planTypeCollection = createListCollection({
+  items: [
+    { label: "Pro", value: "PRO" },
+    { label: "Enterprise", value: "ENTERPRISE" },
+    { label: "Custom", value: "CUSTOM" },
+  ],
+});
+
+const usageUnitCollection = createListCollection({
+  items: [
+    { label: "Traces", value: "traces" },
+    { label: "Events (traces + evaluations + experiments)", value: "events" },
+  ],
+});
 
 type PrivateKeyInputMethod = "file" | "key";
 
@@ -45,7 +62,6 @@ interface FormData {
   maxTeams: number;
   maxProjects: number;
   maxMessagesPerMonth: number;
-  evaluationsCredit: number;
   maxWorkflows: number;
   maxPrompts: number;
   maxEvaluators: number;
@@ -53,6 +69,7 @@ interface FormData {
   maxAgents: number;
   maxExperiments: number;
   canPublish: boolean;
+  usageUnit: "traces" | "events";
 }
 
 // Calculate default expiration date (1 year from now)
@@ -74,7 +91,6 @@ const defaultFormData: FormData = {
   maxTeams: ENTERPRISE_TEMPLATE.maxTeams ?? 100,
   maxProjects: ENTERPRISE_TEMPLATE.maxProjects,
   maxMessagesPerMonth: ENTERPRISE_TEMPLATE.maxMessagesPerMonth,
-  evaluationsCredit: ENTERPRISE_TEMPLATE.evaluationsCredit,
   maxWorkflows: ENTERPRISE_TEMPLATE.maxWorkflows,
   maxPrompts: ENTERPRISE_TEMPLATE.maxPrompts ?? 1000,
   maxEvaluators: ENTERPRISE_TEMPLATE.maxEvaluators ?? 1000,
@@ -82,6 +98,7 @@ const defaultFormData: FormData = {
   maxAgents: ENTERPRISE_TEMPLATE.maxAgents ?? 1000,
   maxExperiments: ENTERPRISE_TEMPLATE.maxExperiments ?? 1000,
   canPublish: ENTERPRISE_TEMPLATE.canPublish,
+  usageUnit: (ENTERPRISE_TEMPLATE.usageUnit as "traces" | "events") ?? "events",
 };
 
 function downloadLicenseFile(license: string, organizationName: string) {
@@ -138,6 +155,7 @@ export const LicenseGeneratorForm = forwardRef<LicenseGeneratorFormRef, LicenseG
         });
       },
       onError: (error) => {
+        if (isHandledByGlobalHandler(error)) return;
         toaster.create({
           title: "Failed to generate license",
           description: error.message,
@@ -234,7 +252,6 @@ export const LicenseGeneratorForm = forwardRef<LicenseGeneratorFormRef, LicenseG
           maxTeams: formData.maxTeams,
           maxProjects: formData.maxProjects,
           maxMessagesPerMonth: formData.maxMessagesPerMonth,
-          evaluationsCredit: formData.evaluationsCredit,
           maxWorkflows: formData.maxWorkflows,
           maxPrompts: formData.maxPrompts,
           maxEvaluators: formData.maxEvaluators,
@@ -242,6 +259,7 @@ export const LicenseGeneratorForm = forwardRef<LicenseGeneratorFormRef, LicenseG
           maxAgents: formData.maxAgents,
           maxExperiments: formData.maxExperiments,
           canPublish: formData.canPublish,
+          usageUnit: formData.usageUnit,
         },
       });
     };
@@ -464,17 +482,51 @@ export const LicenseGeneratorForm = forwardRef<LicenseGeneratorFormRef, LicenseG
 
         <Field.Root width="full">
           <Field.Label fontWeight="medium">Plan Type</Field.Label>
-          <NativeSelect.Root>
-            <NativeSelect.Field
-              value={formData.planType}
-              onChange={(e) => handlePlanTypeChange(e.target.value as PlanType)}
-            >
-              <option value="PRO">Pro</option>
-              <option value="ENTERPRISE">Enterprise</option>
-              <option value="CUSTOM">Custom</option>
-            </NativeSelect.Field>
-            <NativeSelect.Indicator />
-          </NativeSelect.Root>
+          <Select.Root
+            collection={planTypeCollection}
+            value={[formData.planType]}
+            onValueChange={(details) => {
+              const selected = details.value[0];
+              if (selected) handlePlanTypeChange(selected as PlanType);
+            }}
+          >
+            <Select.Trigger width="full">
+              <Select.ValueText placeholder="Select plan type" />
+            </Select.Trigger>
+            <Select.Content paddingY={2}>
+              {planTypeCollection.items.map((item) => (
+                <Select.Item key={item.value} item={item}>
+                  {item.label}
+                </Select.Item>
+              ))}
+            </Select.Content>
+          </Select.Root>
+        </Field.Root>
+
+        <Field.Root width="full">
+          <Field.Label fontWeight="medium">Usage Unit</Field.Label>
+          <Select.Root
+            collection={usageUnitCollection}
+            value={[formData.usageUnit]}
+            onValueChange={(details) => {
+              const selected = details.value[0];
+              if (selected) handleInputChange("usageUnit", selected);
+            }}
+          >
+            <Select.Trigger width="full">
+              <Select.ValueText placeholder="Select usage unit" />
+            </Select.Trigger>
+            <Select.Content paddingY={2}>
+              {usageUnitCollection.items.map((item) => (
+                <Select.Item key={item.value} item={item}>
+                  {item.label}
+                </Select.Item>
+              ))}
+            </Select.Content>
+          </Select.Root>
+          <Text fontSize="xs" color="fg.muted" marginTop={1}>
+            Determines how usage is counted against the monthly limit.
+          </Text>
         </Field.Root>
 
         <Text fontSize="sm" fontWeight="semibold" marginBottom={2}>
@@ -505,11 +557,6 @@ export const LicenseGeneratorForm = forwardRef<LicenseGeneratorFormRef, LicenseG
                 label="Max Messages/Month"
                 value={formData.maxMessagesPerMonth}
                 onChange={(value) => handleInputChange("maxMessagesPerMonth", value)}
-              />
-              <NumberField
-                label="Evaluations Credit"
-                value={formData.evaluationsCredit}
-                onChange={(value) => handleInputChange("evaluationsCredit", value)}
               />
               <NumberField
                 label="Max Workflows"

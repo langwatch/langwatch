@@ -1,4 +1,4 @@
-import type { NextApiRequest } from "next";
+import type { NextApiRequest } from "~/types/next-stubs";
 
 export function getClientIp(
   req: NextApiRequest | undefined,

@@ -1,5 +1,5 @@
 import type { Node } from "@xyflow/react";
-import { getFullDataset } from "../../server/api/routers/datasetRecord";
+import { getFullDataset } from "../../server/api/routers/datasetRecord.utils";
 import type { Component, Workflow } from "../types/dsl";
 import type { StudioClientEvent } from "../types/events";
 import {
@@ -73,13 +73,17 @@ export const loadDatasets = async (
         };
       }
 
-      // For database datasets, we'll just pass the ID and let the Python SDK fetch it
+      // Inline the database dataset server-side. Python's path used to
+      // tolerate a dataset_id-only payload and fetch via
+      // langwatch.dataset.get_dataset; the Go engine has no equivalent
+      // fetch port and rejects with "entry node has no inline dataset"
+      // (services/nlpgo/app/engine/evaluation.go). Inlining here keeps
+      // both engines on a single uniform shape — Python's Pydantic
+      // dataset path tolerates inline records, so this is a no-op for
+      // the legacy engine. (3.2.0 prod regression: a customer saw
+      // the Go-only error on a saved-dataset Evaluate run.)
       if (!node.data.dataset.id) {
         throw new Error("Dataset ID is required");
-      }
-
-      if (entrySelection == "all") {
-        return node;
       }
 
       const dataset = await getFullDataset({

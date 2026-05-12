@@ -15,6 +15,7 @@ import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
+import { useRegisterDrawerFooter } from "~/optimization_studio/components/drawers/useInsideDrawer";
 import {
   type AvailableSource,
   type FieldMapping,
@@ -30,6 +31,7 @@ import {
 } from "~/hooks/useDrawer";
 import { useModelProvidersSettings } from "~/hooks/useModelProvidersSettings";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { PromptEditorFooter } from "~/prompts/components/PromptEditorFooter";
 import { PromptEditorHeader } from "~/prompts/components/PromptEditorHeader";
 import { VersionBadge } from "~/prompts/components/ui/VersionBadge";
 import { ChangeHandleDialog } from "~/prompts/forms/ChangeHandleDialog";
@@ -44,6 +46,7 @@ import { usePromptConfigForm } from "~/prompts/hooks/usePromptConfigForm";
 import type { PromptConfigFormValues } from "~/prompts/types";
 import { areFormValuesEqual } from "~/prompts/utils/areFormValuesEqual";
 import { buildDefaultFormValues } from "~/prompts/utils/buildDefaultFormValues";
+import { localConfigToFormValues } from "./utils/localConfigToFormValues";
 import {
   formValuesToTriggerSaveVersionParams,
   versionedPromptToPromptConfigFormValuesWithSystemMessage,
@@ -52,7 +55,8 @@ import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import type { LlmConfigInputType } from "~/types";
 import { api } from "~/utils/api";
 import { DEFAULT_MODEL } from "~/utils/constants";
-import { isHandledByGlobalLicenseHandler } from "~/utils/trpcError";
+import { useUpgradeModalStore } from "~/stores/upgradeModalStore";
+import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { getMaxTokenLimit } from "~/components/llmPromptConfigs/utils/tokenUtils";
 
 export type PromptEditorDrawerProps = {
@@ -109,6 +113,8 @@ export type PromptEditorDrawerProps = {
     inputs?: Array<{ identifier: string; type: string }>;
     outputs?: Array<{ identifier: string; type: string }>;
   }) => void;
+  /** When true, renders form content without Drawer shell (for embedding in external drawer) */
+  headless?: boolean;
 };
 
 /**
@@ -157,7 +163,7 @@ const extractLocalConfig = (
  * - Supports local tinkering in evaluations context (close without save persists locally)
  */
 export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
-  const { project } = useOrganizationTeamProject();
+  const { project, hasPermission } = useOrganizationTeamProject();
   const { modelMetadata } = useModelProvidersSettings({ projectId: project?.id });
   const { closeDrawer, canGoBack, goBack } = useDrawer();
   const complexProps = getComplexProps();
@@ -167,6 +173,9 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
 
   // License enforcement for prompt creation
   const { checkAndProceed } = useLicenseEnforcement("prompts");
+  const openLiteMemberRestriction = useUpgradeModalStore(
+    (state) => state.openLiteMemberRestriction,
+  );
 
   // Check if we're in evaluations context (targetId in URL params)
   const targetId = drawerParams.targetId as string | undefined;
@@ -259,7 +268,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
     props.promptVersionId ??
     drawerParams.promptVersionId ??
     (complexProps.promptVersionId as string | undefined);
-  const isOpen = props.open !== false && props.open !== undefined;
+  const isOpen = props.headless ? true : (props.open !== false && props.open !== undefined);
 
   // Load existing prompt if editing
   // If promptVersionId is provided, fetch that specific version instead of latest
@@ -286,21 +295,19 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
     return undefined;
   }, [promptQuery.data]);
 
-  // ============================================================================
-  // CONFIG VALUES STATE - Single Source of Truth for Form Initialization
-  // ============================================================================
-  //
-  // configValues: The baseline config that the form uses. Updated on:
-  //   1. Initialization (when drawer opens)
-  //   2. After save (with fresh server data)
-  //
-  // isFormInitialized: Tracks whether we've done the initial setup for this
-  //   drawer session. Prevents re-initialization when deps change.
-  //
+  // Seed configValues from initialLocalConfig so the form watch subscription's
+  // first synchronous fire carries the caller's edits, not defaults. Without
+  // this seed, the subscription fires on defaults before the init useEffect
+  // runs and clobbers the caller's local edits (#3155).
   const [configValues, setConfigValues] = useState<PromptConfigFormValues>(
-    buildDefaultFormValues,
+    () => localConfigToFormValues(props.initialLocalConfig),
   );
   const [isFormInitialized, setIsFormInitialized] = useState(false);
+  // Ref set directly in init/reset effects so the watch subscription
+  // can read it without stale closures or React batching issues.
+  // DO NOT mirror from state — state batching causes the reset effect
+  // to override the init effect's setIsFormInitialized(true) on mount.
+  const isFormInitializedRef = useRef(false);
 
   // Form setup using the prompts module hook
   const { methods } = usePromptConfigForm({
@@ -365,12 +372,40 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       // If we have local changes (initialLocalConfig), form will differ from saved,
       // which keeps hasUnsavedChanges=true and doesn't clear the local config.
       savedFormValuesRef.current = serverValues;
+      // Set ref BEFORE methods.reset() — reset triggers the watch subscription
+      // synchronously, and the watch needs to see isFormInitializedRef=true to
+      // allow syncing the correct values (not block them as pre-init defaults).
+      isFormInitializedRef.current = true;
       methods.reset(formValues);
       initializedTargetIdRef.current = targetId;
       setIsFormInitialized(true);
-    } else if (!promptId && modelMetadata) {
-      // New prompt - use defaults with model's max tokens
-      // Wait for modelMetadata to be loaded before initializing
+
+      // Sync inputs/outputs to bridge AFTER the watch subscription settles.
+      // The watch fires synchronously from methods.reset and may call
+      // onLocalConfigChange(undefined) for saved prompts. We queue our
+      // sync after that so the bridge receives the full config with inputs,
+      // allowing it to update node handles and edges to match the prompt.
+      if (onLocalConfigChange) {
+        const config = extractLocalConfig(
+          formValues as PromptConfigFormValues,
+        );
+        queueMicrotask(() => {
+          onLocalConfigChangeRef.current?.(config);
+          // If there are no actual unsaved changes (no initialLocalConfig),
+          // clear localPromptConfig after syncing. The sync already updated
+          // the node's inputs/outputs via shallow merge.
+          if (!props.initialLocalConfig) {
+            queueMicrotask(() => {
+              onLocalConfigChangeRef.current?.(undefined);
+            });
+          }
+        });
+      }
+
+    } else if ((!promptId || (!promptQuery.data && !promptQuery.isLoading)) && modelMetadata) {
+      // New prompt OR prompt referenced by ID but not found in DB (e.g. after
+      // importing a workflow from another project). Use defaults with model's
+      // max tokens, merging initialLocalConfig if available.
       const defaultModel = project?.defaultModel ?? DEFAULT_MODEL;
       const defaultModelMetadata = modelMetadata[defaultModel];
       const maxTokens = getMaxTokenLimit(defaultModelMetadata);
@@ -385,8 +420,43 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
           },
         },
       });
-      setConfigValues(defaults);
-      methods.reset(defaults);
+
+      // Merge initialLocalConfig over defaults to restore previous edits
+      const formValues = props.initialLocalConfig
+        ? {
+            ...defaults,
+            version: {
+              ...defaults.version,
+              configData: {
+                ...defaults.version.configData,
+                llm: {
+                  ...defaults.version.configData.llm,
+                  ...props.initialLocalConfig.llm,
+                },
+                messages:
+                  props.initialLocalConfig.messages.length > 0
+                    ? (props.initialLocalConfig
+                        .messages as typeof defaults.version.configData.messages)
+                    : defaults.version.configData.messages,
+                inputs:
+                  props.initialLocalConfig.inputs.length > 0
+                    ? (props.initialLocalConfig
+                        .inputs as typeof defaults.version.configData.inputs)
+                    : defaults.version.configData.inputs,
+                outputs:
+                  props.initialLocalConfig.outputs.length > 0
+                    ? (props.initialLocalConfig
+                        .outputs as typeof defaults.version.configData.outputs)
+                    : defaults.version.configData.outputs,
+              },
+            },
+          }
+        : defaults;
+
+      setConfigValues(formValues);
+      // Set ref BEFORE methods.reset() — see comment in DB prompt branch above.
+      isFormInitializedRef.current = true;
+      methods.reset(formValues);
       initializedTargetIdRef.current = targetId;
       setIsFormInitialized(true);
 
@@ -426,6 +496,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
   }, [
     isOpen,
     promptQuery.data,
+    promptQuery.isLoading,
     promptId,
     props.initialLocalConfig,
     methods,
@@ -439,12 +510,22 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
   // Reset when drawer closes
   useEffect(() => {
     if (!isOpen) {
+      isFormInitializedRef.current = false;
       setIsFormInitialized(false);
     }
   }, [isOpen]);
 
-  // Reset when switching prompts, versions, or targets
+  // Reset when switching prompts, versions, or targets.
+  // Skip the initial mount — on mount, this effect fires unconditionally and
+  // its setIsFormInitialized(false) would be batched with the init effect's
+  // setIsFormInitialized(true), causing the last-write (false) to win.
+  const promptResetMountRef = useRef(true);
   useEffect(() => {
+    if (promptResetMountRef.current) {
+      promptResetMountRef.current = false;
+      return;
+    }
+    isFormInitializedRef.current = false;
     setIsFormInitialized(false);
   }, [promptId, promptVersionId, targetId]);
 
@@ -486,6 +567,9 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       });
 
       // Update local config for evaluations context.
+      // IMPORTANT: Don't push form values to the node until the form is initialized.
+      // Before initialization, the form contains defaults ("You are a helpful assistant.")
+      // which would overwrite the node's localPromptConfig (real user data) via the bridge.
       // IMPORTANT: Only call the callback if the current targetId matches what we
       // initialized with. This prevents race conditions when switching targets:
       // the callback ref is updated during render (before effects), so without this
@@ -493,7 +577,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       // with target-A's stale form values before the form reinitializes.
       if (
         onLocalConfigChangeRef.current &&
-        promptIdRef.current &&
+        isFormInitializedRef.current &&
         targetIdRef.current === initializedTargetIdRef.current
       ) {
         if (isUnsaved) {
@@ -548,7 +632,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       onClose();
     },
     onError: (error) => {
-      if (isHandledByGlobalLicenseHandler(error)) return;
+      if (isHandledByGlobalHandler(error)) return;
       toaster.create({
         title: "Error creating prompt",
         description: error.message,
@@ -599,6 +683,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       // Don't close - let user continue editing or close manually
     },
     onError: (error) => {
+      if (isHandledByGlobalHandler(error)) return;
       toaster.create({
         title: "Error updating prompt",
         description: error.message,
@@ -621,6 +706,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       });
     },
     onError: (error) => {
+      if (isHandledByGlobalHandler(error)) return;
       toaster.create({
         title: "Error renaming prompt",
         description: error.message,
@@ -675,7 +761,11 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       const saveData = pendingSaveDataRef.current;
 
       if (promptId && promptQuery.data?.id) {
-        // Update existing prompt - no limit check needed
+        // Update existing prompt - check RBAC first
+        if (!hasPermission("prompts:update")) {
+          openLiteMemberRestriction({ resource: "prompts" });
+          return;
+        }
         updateMutation.mutate({
           projectId: project.id,
           id: promptQuery.data.id,
@@ -685,7 +775,11 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
           },
         });
       } else if (newPromptData) {
-        // Create new prompt - check limit first
+        // Create new prompt - check RBAC first, then license limit
+        if (!hasPermission("prompts:create")) {
+          openLiteMemberRestriction({ resource: "prompts" });
+          return;
+        }
         checkAndProceed(() => {
           createMutation.mutate({
             projectId: project.id,
@@ -706,6 +800,8 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       createMutation,
       updateMutation,
       checkAndProceed,
+      hasPermission,
+      openLiteMemberRestriction,
     ],
   );
 
@@ -763,6 +859,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       // If we have a local config change handler (evaluations context), just close
       // Local config is already being updated on every change
       if (onLocalConfigChange) {
+        debouncedUpdateLocalConfig.flush();
         onClose();
         return;
       }
@@ -775,6 +872,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
         return;
       }
     }
+    debouncedUpdateLocalConfig.flush();
     onClose();
   };
 
@@ -949,12 +1047,141 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
   // Get configId for version history
   const _configId = promptQuery.data?.id;
 
+  // Get current version ID for footer
+  const _currentVersionId = methods.watch("versionMetadata")?.versionId;
+
+  // Build the footer element (shared between headless and drawer modes).
+  // The footer is rendered outside the main FormProvider (in Drawer.Footer or
+  // StudioDrawerWrapper footer slot), so we wrap it in its own FormProvider
+  // to give child components (SavePromptButton, etc.) access to form context.
+  const footerElement = (
+    <FormProvider {...methods}>
+      <PromptEditorFooter
+        onSave={() => void handleSave()}
+        hasUnsavedChanges={hasUnsavedChanges}
+        isValid={isValid}
+        isSaving={isSaving}
+        onVersionRestore={handleVersionRestore}
+        configId={_configId}
+        handle={promptQuery.data?.handle ?? undefined}
+        currentVersionId={_currentVersionId}
+        onApply={targetId || props.headless ? handleClose : undefined}
+      />
+    </FormProvider>
+  );
+
+  // In headless mode, register the footer with the parent StudioDrawerWrapper.
+  // The hook must be called unconditionally (React rules of hooks).
+  // When not in headless mode, we pass null so nothing is registered.
+  useRegisterDrawerFooter(props.headless ? footerElement : null);
+
+  // Extract the form body into a variable for reuse in both headless and drawer modes
+  const formBodyContent = (
+    <FormProvider {...methods}>
+      <VStack
+        as="form"
+        gap={4}
+        align="stretch"
+        flex={1}
+        overflowY="auto"
+      >
+        {/* Header bar - shared with prompt playground */}
+        <Box
+          borderBottomWidth="1px"
+          borderColor="border"
+          paddingX={4}
+          paddingY={3}
+          position="sticky"
+          top={0}
+          zIndex={1}
+        >
+          <PromptEditorHeader
+            onSave={() => void handleSave()}
+            hasUnsavedChanges={hasUnsavedChanges}
+            isValid={isValid}
+            isSaving={isSaving}
+            onVersionRestore={handleVersionRestore}
+            variant="model-only"
+          />
+        </Box>
+
+        {/* Save Version Dialog - asks for commit message when updating */}
+        <SaveVersionDialog
+          isOpen={saveVersionDialogOpen}
+          onClose={() => setSaveVersionDialogOpen(false)}
+          onSubmit={handleSaveVersionSubmit}
+          nextVersion={nextVersion}
+        />
+
+        {/* Save Prompt Dialog - asks for handle when creating new prompt */}
+        <ChangeHandleDialog
+          isOpen={savePromptDialogOpen}
+          onClose={() => setSavePromptDialogOpen(false)}
+          onSubmit={handleSavePromptSubmit}
+        />
+
+        {/* Change Handle Dialog - for renaming existing prompts */}
+        <ChangeHandleDialog
+          isOpen={changeHandleDialogOpen}
+          onClose={() => setChangeHandleDialogOpen(false)}
+          currentHandle={promptQuery.data?.handle}
+          currentScope={promptQuery.data?.scope}
+          onSubmit={handleChangeHandleSubmit}
+        />
+
+        {/* Messages (includes system prompt + user messages) */}
+        <Box paddingX={4}>
+          <PromptMessagesField
+            messageFields={messageFields}
+            availableFields={availableFields}
+            otherNodesFields={{}}
+            availableSources={availableSources}
+            onSetVariableMapping={handleSetVariableMapping}
+          />
+        </Box>
+
+        {/* Variables */}
+        <Box paddingX={4} paddingBottom={4}>
+          <FormVariablesSection
+            title="Variables"
+            showMappings={
+              !!availableSources && availableSources.length > 0
+            }
+            availableSources={availableSources}
+            mappings={inputMappings}
+            onMappingChange={onInputMappingsChange}
+            missingMappingIds={missingMappingIds}
+            showMissingMappingsError={!props.headless}
+            lockedVariables={new Set(["input"])}
+            variableInfo={{
+              input:
+                "This is the user message input. It will be sent as the user message to the LLM.",
+            }}
+            showAddButton={false}
+          />
+        </Box>
+      </VStack>
+    </FormProvider>
+  );
+
+  // Handle loading state (shared between headless and drawer modes)
+  const loadingContent = promptId && promptQuery.isLoading ? (
+    <HStack justify="center" paddingY={8}>
+      <Spinner size="md" />
+    </HStack>
+  ) : null;
+
+  // Headless mode - render without Drawer shell (for embedding in external drawer)
+  if (props.headless) {
+    return loadingContent ?? formBodyContent;
+  }
+
+  // Full mode with Drawer shell
   return (
     <Drawer.Root
       open={isOpen}
       onOpenChange={({ open }) => !open && handleClose()}
       size="sm"
-      closeOnInteractOutside={false}
       modal={false}
     >
       <Drawer.Content>
@@ -1027,113 +1254,18 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
           overflow="hidden"
           padding={0}
         >
-          {promptId && promptQuery.isLoading ? (
-            <HStack justify="center" paddingY={8}>
-              <Spinner size="md" />
-            </HStack>
-          ) : (
-            <FormProvider {...methods}>
-              <VStack
-                as="form"
-                gap={4}
-                align="stretch"
-                flex={1}
-                overflowY="auto"
-              >
-                {/* Header bar - shared with prompt playground */}
-                <Box
-                  borderBottomWidth="1px"
-                  borderColor="border"
-                  paddingX={4}
-                  paddingY={3}
-                  position="sticky"
-                  top={0}
-                  zIndex={1}
-                  background="bg.panel"
-                >
-                  <PromptEditorHeader
-                    onSave={() => void handleSave()}
-                    hasUnsavedChanges={hasUnsavedChanges}
-                    isValid={isValid}
-                    isSaving={isSaving}
-                    onVersionRestore={handleVersionRestore}
-                  />
-                </Box>
-
-                {/* Save Version Dialog - asks for commit message when updating */}
-                <SaveVersionDialog
-                  isOpen={saveVersionDialogOpen}
-                  onClose={() => setSaveVersionDialogOpen(false)}
-                  onSubmit={handleSaveVersionSubmit}
-                  nextVersion={nextVersion}
-                />
-
-                {/* Save Prompt Dialog - asks for handle when creating new prompt */}
-                <ChangeHandleDialog
-                  isOpen={savePromptDialogOpen}
-                  onClose={() => setSavePromptDialogOpen(false)}
-                  onSubmit={handleSavePromptSubmit}
-                />
-
-                {/* Change Handle Dialog - for renaming existing prompts */}
-                <ChangeHandleDialog
-                  isOpen={changeHandleDialogOpen}
-                  onClose={() => setChangeHandleDialogOpen(false)}
-                  currentHandle={promptQuery.data?.handle}
-                  currentScope={promptQuery.data?.scope}
-                  onSubmit={handleChangeHandleSubmit}
-                />
-
-                {/* Messages (includes system prompt + user messages) */}
-                <Box paddingX={4}>
-                  <PromptMessagesField
-                    messageFields={messageFields}
-                    availableFields={availableFields}
-                    otherNodesFields={{}}
-                    availableSources={availableSources}
-                    onSetVariableMapping={handleSetVariableMapping}
-                  />
-                </Box>
-
-                {/* Variables */}
-                <Box paddingX={4} paddingBottom={4}>
-                  <FormVariablesSection
-                    title="Variables"
-                    showMappings={
-                      !!availableSources && availableSources.length > 0
-                    }
-                    availableSources={availableSources}
-                    mappings={inputMappings}
-                    onMappingChange={onInputMappingsChange}
-                    missingMappingIds={missingMappingIds}
-                    lockedVariables={new Set(["input"])}
-                    variableInfo={{
-                      input:
-                        "This is the user message input. It will be sent as the user message to the LLM.",
-                    }}
-                    showAddButton={false}
-                  />
-                </Box>
-              </VStack>
-            </FormProvider>
-          )}
+          {loadingContent ?? formBodyContent}
         </Drawer.Body>
 
-        {/* Footer with Apply button - only shown in evaluations context */}
-        {targetId && (
-          <Drawer.Footer
-            borderTopWidth="1px"
-            borderColor="border"
-            paddingX={4}
-            paddingY={3}
-          >
-            <HStack justify="flex-end" width="full">
-              <Button colorPalette="blue" onClick={handleClose}>
-                Apply
-              </Button>
-            </HStack>
-          </Drawer.Footer>
-        )}
+        {/* Footer with History, API, Save, and optionally Apply buttons */}
+        <Drawer.Footer
+          borderTopWidth="1px"
+          borderColor="border"
+          paddingX={4}
+          paddingY={3}
+        >
+          {footerElement}
+        </Drawer.Footer>
       </Drawer.Content>
     </Drawer.Root>
   );

@@ -45,6 +45,7 @@ import { useRunEvalution } from "../hooks/useRunEvalution";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import type { Field, Signature, Workflow } from "../types/dsl";
 import { simpleRecordListToNodeDataset } from "../utils/datasetUtils";
+import { isExperimentQueryEnabled } from "./evaluationQueryEnabled";
 import { OptimizationProgressBar } from "./ProgressToast";
 
 export function ResultsPanel({
@@ -73,7 +74,7 @@ export function ResultsPanel({
   return (
     <HStack
       display={isCollapsed ? "none" : undefined}
-      background="white"
+      background="bg"
       borderTop="2px solid"
       borderColor="border"
       width="full"
@@ -158,7 +159,10 @@ export function EvaluationResults({
       experimentSlug: experimentId ? undefined : slugify(workflowId ?? ""),
     },
     {
-      enabled: !!project && !!workflowId,
+      enabled: isExperimentQueryEnabled({
+        hasProject: !!project,
+        workflowId,
+      }),
       refetchOnWindowFocus: false,
       refetchInterval: keepFetching ? 1 : undefined,
     },
@@ -221,21 +225,21 @@ export function EvaluationResults({
   const sidebarRuns: BatchRunSummary[] = (
     batchEvaluationRuns.data?.runs ?? []
   ).map((run) => ({
-    runId: run.run_id,
-    workflowVersion: run.workflow_version,
+    runId: run.runId,
+    workflowVersion: run.workflowVersion,
     timestamps: run.timestamps,
     progress: run.progress,
     total: run.total,
     summary: {
-      datasetCost: run.summary.dataset_cost,
-      evaluationsCost: run.summary.evaluations_cost,
+      datasetCost: run.summary.datasetCost,
+      evaluationsCost: run.summary.evaluationsCost,
       evaluations: Object.fromEntries(
         Object.entries(run.summary.evaluations).map(([id, ev]) => [
           id,
           {
             name: ev.name,
-            averageScore: ev.average_score,
-            averagePassed: ev.average_passed,
+            averageScore: ev.averageScore,
+            averagePassed: ev.averagePassed,
           },
         ]),
       ),
@@ -305,7 +309,7 @@ export function EvaluationResults({
           <BatchSummaryFooter
             run={sidebarSelectedRun}
             showProgress={
-              (!selectedRun || selectedRun.run_id === evaluationStateRunId) &&
+              (!selectedRun || selectedRun.runId === evaluationStateRunId) &&
               !!evaluationStateRunId &&
               evaluationState?.status === "running"
             }

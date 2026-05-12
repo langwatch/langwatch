@@ -1,13 +1,7 @@
-import fs from "fs/promises";
-import NodeFetchCache, { FileSystemCache } from "node-fetch-cache";
-import path from "path";
-import type { Tiktoken } from "tiktoken/lite";
-// @ts-ignore
-import models from "tiktoken/model_to_encoding.json";
-// @ts-ignore
-import registry from "tiktoken/registry.json";
+import { TiktokenClient } from "~/server/app-layer/clients/tokenizer/tiktoken.client";
 import { createLogger } from "../../../../utils/logger/server";
 import { startSpan } from "../../../../utils/posthogErrorCapture";
+import { compileSafeRegex } from "../../../../utils/safeRegex";
 import {
   getLLMModelCosts,
   type MaybeStoredLLMModelCost,
@@ -16,113 +10,7 @@ import { isBuildOrNoRedis } from "../../../redis";
 
 const logger = createLogger("langwatch:workers:collector:cost");
 
-const cachedModel: Record<
-  string,
-  {
-    model: {
-      explicit_n_vocab: number | undefined;
-      pat_str: string;
-      special_tokens: Record<string, number>;
-      bpe_ranks: string;
-    };
-    encoder: Tiktoken;
-  }
-> = {};
-
-const loadingModel = new Set<string>();
-
-const initTikToken = async (
-  modelName: string,
-): Promise<{ encoder: Tiktoken } | undefined> => {
-  let Tiktoken: typeof import("tiktoken/lite").Tiktoken;
-  let load: typeof import("tiktoken/load").load;
-  try {
-    Tiktoken = (await import("tiktoken/lite")).Tiktoken;
-    load = (await import("tiktoken/load")).load;
-  } catch (error) {
-    logger.warn(
-      { error },
-      "tiktoken could not be loaded, skipping tokenization",
-    );
-    return undefined;
-  }
-
-  const fallback = "gpt-4o";
-  const tokenizer =
-    modelName in models
-      ? (models as any)[modelName]
-      : (models as any)[fallback];
-
-  const startedWaiting = Date.now();
-  while (loadingModel.has(tokenizer)) {
-    await new Promise((resolve) => setTimeout(resolve, 100));
-    if (Date.now() - startedWaiting > 10000) {
-      logger.warn({ tokenizer }, "timeout waiting for tokenizer");
-      loadingModel.delete(tokenizer);
-      break;
-    }
-  }
-
-  if (!cachedModel[tokenizer]) {
-    logger.info(`loading tiktoken model ${tokenizer}`);
-    loadingModel.add(tokenizer);
-    const registryInfo = (registry as any)[tokenizer];
-    const fetch = NodeFetchCache.create({
-      cache: new FileSystemCache({
-        cacheDirectory: "node_modules/.cache/tiktoken",
-        ttl: 1000 * 60 * 60 * 24 * 365, // 1 year
-      }),
-    });
-
-    const model = await load(registryInfo, async (url) => {
-      const filename = path.basename(url);
-
-      // Prevent directory traversal
-      const isSafeFilename = /^[a-zA-Z0-9._-]+$/.test(filename);
-      if (!isSafeFilename) {
-        logger.warn(
-          { filename },
-          "Unsafe filename detected; using remote fetch instead",
-        );
-        return fetch(url).then((r) => r.text());
-      }
-
-      if (process.env.TIKTOKENS_PATH) {
-        const localPath = path.join(process.env.TIKTOKENS_PATH, filename);
-        logger.debug(
-          { localPath },
-          "Attempting to load tiktoken model from local file",
-        );
-
-        try {
-          return await fs.readFile(localPath, "utf8");
-        } catch (error) {
-          logger.warn(
-            {
-              localPath,
-              error: error instanceof Error ? error.message : String(error),
-            },
-            "Local read failed; falling back to remote fetch",
-          );
-        }
-      }
-
-      // Default: fetch from remote
-      return fetch(url).then((r) => r.text());
-    });
-
-    const encoder = new Tiktoken(
-      model.bpe_ranks,
-      model.special_tokens,
-      model.pat_str,
-    );
-
-    cachedModel[tokenizer] = { model, encoder };
-    loadingModel.delete(tokenizer);
-  }
-
-  return cachedModel[tokenizer];
-};
+const tiktokenClient = new TiktokenClient();
 
 async function countTokens(
   llmModelCost: MaybeStoredLLMModelCost,
@@ -131,13 +19,10 @@ async function countTokens(
   if (!text) return 0;
 
   const model = llmModelCost.model.includes("/")
-    ? llmModelCost.model.split("/")[1]!
+    ? llmModelCost.model.substring(llmModelCost.model.indexOf("/") + 1)
     : llmModelCost.model;
 
-  const tiktoken = await initTikToken(model);
-  if (!tiktoken) return undefined;
-
-  return tiktoken.encoder.encode(text).length;
+  return tiktokenClient.countTokens(model, text);
 }
 
 export async function tokenizeAndEstimateCost({
@@ -182,18 +67,180 @@ export function estimateCost({
     : undefined;
 }
 
-export const matchingLLMModelCost = (
+const VENDOR_MAPPINGS: Record<string, string> = {
+  "deepseek-ai/": "deepseek/",
+  "minimaxai/": "minimax/",
+  "zai-org/": "z-ai/",
+  "zhipu-ai/": "z-ai/",
+};
+
+const QUANTIZATION_SUFFIXES = [
+  "-fp8",
+  "-gptq",
+  "-awq",
+  "-gguf",
+  "-int4",
+  "-int8",
+];
+
+/**
+ * Normalize model name for better matching:
+ * - Convert to lowercase
+ * - Normalize common vendor prefix variations
+ * - Remove quantization variant suffixes (FP8, GPTQ, etc.)
+ */
+export const normalizeModelName = (model: string): string => {
+  let normalized = model.toLowerCase();
+
+  for (const [from, to] of Object.entries(VENDOR_MAPPINGS)) {
+    if (normalized.startsWith(from)) {
+      normalized = normalized.replace(from, to);
+      break;
+    }
+  }
+
+  for (const suffix of QUANTIZATION_SUFFIXES) {
+    if (normalized.endsWith(suffix)) {
+      normalized = normalized.slice(0, -suffix.length);
+      break;
+    }
+  }
+
+  return normalized;
+};
+
+/** Cache: pattern → compiled RegExp (safe) or null (unsafe/invalid). */
+const regexCache = new Map<string, RegExp | null>();
+
+/**
+ * Returns a cached, safe-checked RegExp for the given pattern.
+ * Unsafe or invalid patterns are cached as null and warned once.
+ */
+const getSafeRegex = (pattern: string): RegExp | null => {
+  const cached = regexCache.get(pattern);
+  if (cached !== undefined) return cached;
+
+  const re = compileSafeRegex(pattern);
+  if (!re) {
+    logger.warn({ pattern }, "skipping unsafe regex in model cost matching");
+  }
+  regexCache.set(pattern, re);
+  return re;
+};
+
+/**
+ * Tests a regex pattern against a model string, skipping patterns
+ * that are vulnerable to catastrophic backtracking (ReDoS).
+ * Results are cached so each pattern is compiled and safety-checked only once.
+ */
+const safeRegexTest = (pattern: string, input: string): boolean => {
+  const re = getSafeRegex(pattern);
+  return re !== null && re.test(input);
+};
+
+/**
+ * Strips the provider subtype from a model string.
+ * Example: "openai.responses/gpt-5-mini" → "openai/gpt-5-mini"
+ */
+export function stripProviderSubtype(model: string): string {
+  const slashIdx = model.indexOf("/");
+  if (slashIdx === -1) return model;
+  const provider = model.slice(0, slashIdx);
+  if (!provider.includes(".")) return model;
+  return provider.split(".")[0] + model.slice(slashIdx);
+}
+
+/**
+ * Normalize Bedrock-style model IDs into the `<vendor>/<model>` shape
+ * the static registry uses. Bedrock identifies models as
+ *   [<region>.]<vendor>.<model>[-v<N>][:<version>]
+ * e.g. `eu.anthropic.claude-haiku-4-5-20251001-v1:0` →
+ *      `anthropic/claude-haiku-4-5-20251001`
+ * The registry regexes already match dated Claude/Nova slugs, so
+ * stripping just the Bedrock envelope is enough.
+ */
+export function normalizeBedrockModelId(model: string): string {
+  let normalized = model;
+  // 1. Strip `:<version>` suffix (`:0`, `:1`, `:latest`).
+  normalized = normalized.replace(/:[0-9a-z.]+$/i, "");
+  // 2. Strip `-v<N>` revision marker (`-v1`, `-v2`).
+  normalized = normalized.replace(/-v\d+$/i, "");
+  // 3. Strip cross-region inference prefix (`eu.`, `us.`, `apac.`,
+  //    `ap.`, `eu-west-*.`, ...). Only the leading region segment;
+  //    vendor segment keeps its own dots untouched.
+  normalized = normalized.replace(/^[a-z]{2,}(?:-[a-z0-9]+)*\.(?=[a-z]+\.)/i, "");
+  // 4. Vendor-dot → vendor-slash. First dot only — any dots in the
+  //    vendor-model half (e.g. `claude-opus-4.5`) stay.
+  const firstDot = normalized.indexOf(".");
+  if (firstDot > 0 && !normalized.slice(0, firstDot).includes("/")) {
+    normalized = normalized.slice(0, firstDot) + "/" + normalized.slice(firstDot + 1);
+  }
+  return normalized;
+}
+
+/**
+ * Matches a model string against cost entries with cascading fallbacks:
+ * 1. Raw model string
+ * 2. Strip provider subtype (openai.responses → openai)
+ *
+ * Date suffixes are handled by the prefix-match regex patterns in the
+ * static model registry, so no explicit date stripping is needed.
+ */
+export const matchModelCostWithFallbacks = (
+  model: string,
+  costs: MaybeStoredLLMModelCost[],
+): MaybeStoredLLMModelCost | undefined => {
+  const match = matchingLLMModelCost(model, costs);
+  if (match) return match;
+
+  const strippedSubtype = stripProviderSubtype(model);
+  if (strippedSubtype !== model) {
+    const subtypeMatch = matchingLLMModelCost(strippedSubtype, costs);
+    if (subtypeMatch) return subtypeMatch;
+  }
+
+  // Bedrock-shaped IDs (cross-region prefix + `-v<N>:0` suffix +
+  // vendor-dot-model) don't match registry keys directly — fall back to
+  // the normalized form so `eu.anthropic.claude-haiku-4-5-20251001-v1:0`
+  // hits the `anthropic/claude-haiku-4.5` entry's regex.
+  const normalizedBedrock = normalizeBedrockModelId(model);
+  if (normalizedBedrock !== model) {
+    return matchingLLMModelCost(normalizedBedrock, costs);
+  }
+
+  return undefined;
+};
+
+/** Low-level regex matcher — no date/subtype stripping. Use matchModelCostWithFallbacks. */
+const matchingLLMModelCost = (
   model: string,
   llmModelCosts: MaybeStoredLLMModelCost[],
 ): MaybeStoredLLMModelCost | undefined => {
-  const llmModelCost = llmModelCosts.find((llmModelCost) =>
-    new RegExp(llmModelCost.regex).test(model),
-  );
-  if (!llmModelCost && model.includes("/")) {
-    const model_ = model.split("/")[1]!;
-    return matchingLLMModelCost(model_, llmModelCosts);
+  // Try raw model string first so custom case-sensitive regexes work
+  const rawMatch = findModelCost(model, llmModelCosts);
+  if (rawMatch) return rawMatch;
+
+  // Fall back to normalized form for built-in fuzzy matching
+  const normalizedModel = normalizeModelName(model);
+  if (normalizedModel !== model) {
+    return findModelCost(normalizedModel, llmModelCosts);
   }
-  return llmModelCost;
+  return undefined;
+};
+
+const findModelCost = (
+  model: string,
+  llmModelCosts: MaybeStoredLLMModelCost[],
+): MaybeStoredLLMModelCost | undefined => {
+  const match = llmModelCosts.find((entry) =>
+    safeRegexTest(entry.regex, model),
+  );
+
+  if (!match && model.includes("/")) {
+    const stripped = model.substring(model.indexOf("/") + 1);
+    return findModelCost(stripped, llmModelCosts);
+  }
+  return match;
 };
 
 export const getMatchingLLMModelCost = async (
@@ -201,13 +248,12 @@ export const getMatchingLLMModelCost = async (
   model: string,
 ) => {
   const llmModelCosts = await getLLMModelCosts({ projectId });
-  return matchingLLMModelCost(model, llmModelCosts);
+  return matchModelCostWithFallbacks(model, llmModelCosts);
 };
 
 // Pre-warm most used models
 export const prewarmTiktokenModels = async () => {
-  await initTikToken("gpt-4");
-  await initTikToken("gpt-4o");
+  await tiktokenClient.prewarm(["gpt-4", "gpt-4o"]);
 };
 
 if (isBuildOrNoRedis) {

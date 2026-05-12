@@ -5,12 +5,12 @@
  * Includes run color assignments for visual differentiation.
  */
 import { useMemo } from "react";
-import type { ESBatchEvaluation } from "~/server/experiments/types";
+import type { ExperimentRunWithItems } from "~/server/evaluations-v3/services/types";
 import { api } from "~/utils/api";
 
 // Run colors for comparison mode - distinct, accessible colors
 export const RUN_COLORS = [
-  "#3182ce", // blue
+  "#3b82f6", // blue
   "#dd6b20", // orange
   "#38a169", // green
   "#d53f8c", // pink
@@ -23,7 +23,7 @@ export const RUN_COLORS = [
 export type RunWithColor = {
   runId: string;
   color: string;
-  data: ESBatchEvaluation | null;
+  data: ExperimentRunWithItems | null;
   isLoading: boolean;
   error: unknown;
 };

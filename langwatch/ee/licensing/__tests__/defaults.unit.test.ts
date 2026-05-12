@@ -19,7 +19,6 @@ describe("resolvePlanDefaults", () => {
       maxMembers: 100,
       maxProjects: 50,
       maxMessagesPerMonth: 1_000_000,
-      evaluationsCredit: 10_000,
       maxWorkflows: 200,
       canPublish: true,
       // Optional fields omitted: maxMembersLite, maxPrompts, maxEvaluators, maxScenarios
@@ -33,7 +32,6 @@ describe("resolvePlanDefaults", () => {
     expect(resolved.maxMembers).toBe(100);
     expect(resolved.maxProjects).toBe(50);
     expect(resolved.maxMessagesPerMonth).toBe(1_000_000);
-    expect(resolved.evaluationsCredit).toBe(10_000);
     expect(resolved.maxWorkflows).toBe(200);
     expect(resolved.canPublish).toBe(true);
 
@@ -44,6 +42,57 @@ describe("resolvePlanDefaults", () => {
     expect(resolved.maxScenarios).toBe(DEFAULT_LIMIT);
     expect(resolved.maxAgents).toBe(DEFAULT_LIMIT);
     expect(resolved.maxOnlineEvaluations).toBe(DEFAULT_LIMIT);
+    expect(resolved.usageUnit).toBe("traces");
+  });
+
+  it("defaults usageUnit to traces when not provided", () => {
+    const plan: LicensePlanLimits = {
+      type: "PRO",
+      name: "Pro",
+      maxMembers: 10,
+      maxProjects: 20,
+      maxMessagesPerMonth: 100_000,
+      maxWorkflows: 50,
+      canPublish: true,
+    };
+
+    const resolved = resolvePlanDefaults(plan);
+
+    expect(resolved.usageUnit).toBe("traces");
+  });
+
+  it("preserves explicit usageUnit events value", () => {
+    const plan: LicensePlanLimits = {
+      type: "ENTERPRISE",
+      name: "Enterprise",
+      maxMembers: 100,
+      maxProjects: 50,
+      maxMessagesPerMonth: 1_000_000,
+      maxWorkflows: 200,
+      canPublish: true,
+      usageUnit: "events",
+    };
+
+    const resolved = resolvePlanDefaults(plan);
+
+    expect(resolved.usageUnit).toBe("events");
+  });
+
+  it("normalizes unknown usageUnit values to traces", () => {
+    const plan: LicensePlanLimits = {
+      type: "ENTERPRISE",
+      name: "Enterprise",
+      maxMembers: 100,
+      maxProjects: 50,
+      maxMessagesPerMonth: 1_000_000,
+      maxWorkflows: 200,
+      canPublish: true,
+      usageUnit: "spans",
+    };
+
+    const resolved = resolvePlanDefaults(plan);
+
+    expect(resolved.usageUnit).toBe("traces");
   });
 
   it("preserves explicitly set optional fields", () => {
@@ -54,7 +103,6 @@ describe("resolvePlanDefaults", () => {
       maxMembersLite: 5,
       maxProjects: 10,
       maxMessagesPerMonth: 100_000,
-      evaluationsCredit: 1_000,
       maxWorkflows: 50,
       maxPrompts: 25,
       maxEvaluators: 30,
@@ -81,7 +129,6 @@ describe("resolvePlanDefaults", () => {
       maxMembersLite: 3, // Set
       maxProjects: 5,
       maxMessagesPerMonth: 50_000,
-      evaluationsCredit: 500,
       maxWorkflows: 20,
       maxPrompts: 10, // Set
       // maxEvaluators: omitted
@@ -109,7 +156,6 @@ describe("resolvePlanDefaults", () => {
       maxMembers: 1,
       maxProjects: 1,
       maxMessagesPerMonth: 1000,
-      evaluationsCredit: 100,
       maxWorkflows: 10,
       canPublish: false,
     };
@@ -126,7 +172,6 @@ describe("resolvePlanDefaults", () => {
       maxTeams: resolved.maxTeams,
       maxProjects: resolved.maxProjects,
       maxMessagesPerMonth: resolved.maxMessagesPerMonth,
-      evaluationsCredit: resolved.evaluationsCredit,
       maxWorkflows: resolved.maxWorkflows,
       maxPrompts: resolved.maxPrompts,
       maxEvaluators: resolved.maxEvaluators,
@@ -139,6 +184,7 @@ describe("resolvePlanDefaults", () => {
       maxCustomGraphs: resolved.maxCustomGraphs,
       maxAutomations: resolved.maxAutomations,
       canPublish: resolved.canPublish,
+      usageUnit: resolved.usageUnit,
     };
 
     expect(allFields).toEqual(resolved);

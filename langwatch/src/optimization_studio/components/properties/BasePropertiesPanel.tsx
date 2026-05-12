@@ -31,6 +31,7 @@ import type {
 } from "../../types/dsl";
 import { nameToId } from "../../utils/nodeUtils";
 import { ComponentIcon } from "../ColorfulBlockIcons";
+import { useInsideDrawer } from "../drawers/useInsideDrawer";
 import {
   ComponentExecutionButton,
   getNodeDisplayName,
@@ -174,7 +175,7 @@ export function FieldsDefinition({
           >
             <HStack width="full">
               <HStack
-                background="gray.100"
+                background="bg.muted"
                 paddingRight={2}
                 borderRadius="8px"
                 width="full"
@@ -207,7 +208,7 @@ export function FieldsDefinition({
                 )}
                 <HStack
                   position="relative"
-                  background="white"
+                  background="bg"
                   borderRadius="8px"
                   paddingX={2}
                   paddingY={1}
@@ -488,6 +489,8 @@ export function BasePropertiesPanel({
   hideHeader?: boolean;
   maxWidth?: string;
 } & StackProps) {
+  const insideDrawer = useInsideDrawer();
+
   const {
     deselectAllNodes,
     propertiesExpanded,
@@ -513,19 +516,23 @@ export function BasePropertiesPanel({
     setNode({ id, data: { name: value } }, newId);
   };
 
+  const shouldHideHeader = hideHeader || insideDrawer;
+
   return (
     <VStack
       align="start"
       gap={6}
       padding={3}
-      maxWidth="550px"
-      width="25vw"
-      minWidth="350px"
+      {...(!insideDrawer && {
+        maxWidth: "550px",
+        width: "25vw",
+        minWidth: "350px",
+      })}
       height="full"
-      overflowY="auto"
+      {...(!insideDrawer && { overflowY: "auto" })}
       {...props}
     >
-      {!hideHeader && (
+      {!shouldHideHeader && (
         <VStack gap={2} width="full" align="start">
           <HStack
             paddingY={1}

@@ -1,0 +1,32 @@
+import { describe, expect, it } from "vitest";
+
+import { getAgentEditorDrawer } from "../getAgentEditorDrawer";
+
+describe("getAgentEditorDrawer", () => {
+  describe("when editing a code agent", () => {
+    /** @scenario Agents page routes each agent type to its matching editor drawer */
+    it("returns agentCodeEditor", () => {
+      expect(getAgentEditorDrawer("code")).toBe("agentCodeEditor");
+    });
+  });
+
+  describe("when editing an http agent", () => {
+    it("returns agentHttpEditor", () => {
+      expect(getAgentEditorDrawer("http")).toBe("agentHttpEditor");
+    });
+  });
+
+  describe("when editing a workflow agent", () => {
+    it("returns agentWorkflowEditor (not workflowSelector, which is create-only)", () => {
+      expect(getAgentEditorDrawer("workflow")).toBe("agentWorkflowEditor");
+    });
+  });
+
+  describe("when editing a signature agent", () => {
+    it("throws because signature agents have no editor drawer", () => {
+      expect(() => getAgentEditorDrawer("signature")).toThrow(
+        /signature agents have no editor drawer/,
+      );
+    });
+  });
+});

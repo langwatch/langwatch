@@ -1,5 +1,4 @@
 import {
-  Alert,
   Badge,
   Box,
   Flex,
@@ -14,9 +13,12 @@ import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
 import { format } from "date-fns";
+import { formatChartDate } from "./formatChartDate";
 import numeral from "numeral";
-import React, { useCallback, useMemo } from "react";
+import React, { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { LuShield } from "react-icons/lu";
+import { ChartTooltip } from "./ChartTooltip";
+import { ChartErrorState } from "./ChartErrorState";
 import {
   Area,
   AreaChart,
@@ -36,16 +38,20 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import type { Payload } from "recharts/types/component/DefaultTooltipContent";
+import type { Formatter, NameType, Payload, ValueType } from "recharts/types/component/DefaultTooltipContent";
+import { useRouter } from "~/utils/compat/next-router";
 import type { z } from "zod";
 import type { FilterField } from "~/server/filters/types";
+import { availableFilters } from "~/server/filters/registry";
 import {
   useColorModeValue,
   useColorRawValue,
 } from "../../components/ui/color-mode";
 import { useFilterParams } from "../../hooks/useFilterParams";
 import { useGetRotatingColorForCharts } from "../../hooks/useGetRotatingColorForCharts";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
+import { buildMetadataFilterParams } from "../../utils/buildMetadataFilterParams";
 import {
   getGroup,
   getMetric,
@@ -58,12 +64,13 @@ import { uppercaseFirstLetter } from "../../utils/stringCasing";
 import type { Unpacked } from "../../utils/types";
 import { Delayed } from "../Delayed";
 import { usePeriodSelector } from "../PeriodSelector";
-import { QuickwitNote } from "./QuickwitNote";
 import { SummaryMetric } from "./SummaryMetric";
 
 type Series = Unpacked<z.infer<typeof timeseriesSeriesInput>["series"]> & {
   name: string;
   colorSet: RotatingColorSet;
+  increaseIs?: "good" | "bad" | "neutral";
+  noDataUrl?: string;
 };
 
 export type CustomGraphInput = {
@@ -90,6 +97,7 @@ export type CustomGraphInput = {
   timeScale: "full" | number;
   connected?: boolean;
   height?: number;
+  excludeUnknownBuckets?: boolean;
   monitorGraph?: {
     disabled?: boolean;
     isGuardrail?: boolean;
@@ -123,24 +131,24 @@ export function CustomGraph({
   titleProps,
   hideGroupLabel = false,
   filters,
+  onDataPointClick,
+  emptyState,
 }: {
   input: CustomGraphInput;
   titleProps?: SystemStyleObject;
   hideGroupLabel?: boolean;
   size?: "sm" | "md";
   filters?: Record<FilterField, string[] | Record<string, string[]>>;
+  onDataPointClick?: (params: {
+    evaluatorId?: string;
+    groupKey?: string;
+    date?: string;
+    startDate?: string;
+    endDate?: string;
+  }) => void;
+  emptyState?: React.ReactNode;
 }) {
   const publicEnv = usePublicEnv();
-
-  if (
-    publicEnv.data?.IS_QUICKWIT &&
-    (input.series.some(
-      (series) => !getMetric(series.metric).quickwitSupport || series.pipeline,
-    ) ||
-      (input.groupBy && !getGroup(input.groupBy).quickwitSupport))
-  ) {
-    return <QuickwitNote />;
-  }
 
   return (
     <CustomGraph_
@@ -149,6 +157,8 @@ export function CustomGraph({
       hideGroupLabel={hideGroupLabel}
       load={!!publicEnv.data}
       filters={filters}
+      onDataPointClick={onDataPointClick}
+      emptyState={emptyState}
     />
   );
 }
@@ -161,10 +171,13 @@ const CustomGraph_ = React.memo(
     load = true,
     size,
     filters,
+    onDataPointClick,
+    emptyState,
   }: {
     input: CustomGraphInput;
     titleProps?: {
       fontSize?: SystemStyleObject["fontSize"];
+      textStyle?: SystemStyleObject["textStyle"];
       color?: SystemStyleObject["color"];
       fontWeight?: SystemStyleObject["fontWeight"];
     };
@@ -172,10 +185,148 @@ const CustomGraph_ = React.memo(
     load?: boolean;
     size?: "sm" | "md";
     filters?: Record<FilterField, string[] | Record<string, string[]>>;
+    onDataPointClick?: (params: {
+      evaluatorId?: string;
+      groupKey?: string;
+      date?: string;
+      startDate?: string;
+      endDate?: string;
+    }) => void;
+    emptyState?: React.ReactNode;
   }) {
     const height_ = input.height ?? 300;
     const { filterParams, queryOpts } = useFilterParams();
     const { daysDifference } = usePeriodSelector();
+    const router = useRouter();
+    const { project } = useOrganizationTeamProject();
+
+    // Legend toggle: track hidden series in localStorage
+    const storageKey = `analytics:hidden:${project?.id ?? ""}:${input.graphId}`;
+    const [hiddenSeries, setHiddenSeries] = useState<Set<string>>(() => {
+      if (typeof window === "undefined") return new Set();
+      try {
+        const stored = localStorage.getItem(storageKey);
+        return stored ? new Set(JSON.parse(stored) as string[]) : new Set();
+      } catch {
+        return new Set();
+      }
+    });
+
+    // Re-sync when storageKey changes (project or graphId changed)
+    useEffect(() => {
+      try {
+        const stored = localStorage.getItem(storageKey);
+        setHiddenSeries(stored ? new Set(JSON.parse(stored) as string[]) : new Set());
+      } catch {
+        setHiddenSeries(new Set());
+      }
+    }, [storageKey]);
+
+    // Unique prefix for SVG gradient ids to avoid collisions across charts
+    const uniqueId = useId();
+
+    const toggleSeries = useCallback(
+      (dataKey: string) => {
+        setHiddenSeries((prev) => {
+          const next = new Set(prev);
+          if (next.has(dataKey)) {
+            next.delete(dataKey);
+          } else {
+            next.add(dataKey);
+          }
+          try {
+            localStorage.setItem(storageKey, JSON.stringify([...next]));
+          } catch {
+            // localStorage full or unavailable
+          }
+          return next;
+        });
+      },
+      [storageKey],
+    );
+
+    // Default handler for drill-down on pie/donut and summary bar charts
+    const defaultOnDataPointClick = useCallback(
+      (params: {
+        evaluatorId?: string;
+        groupKey?: string;
+        date?: string;
+        startDate?: string;
+        endDate?: string;
+      }) => {
+        if (!project || !params.groupKey || !input.groupBy) {
+          return;
+        }
+
+        // Build filter params based on groupBy field
+        let filterParams: Record<string, string | string[]> = {};
+
+        // Map groupBy to filter field and urlKey
+        // Special case: metadata.model maps to spans.model filter (urlKey: "model")
+        if (input.groupBy === "metadata.model") {
+          filterParams.model = params.groupKey;
+        } else if (input.groupBy.startsWith("metadata.")) {
+          const metadataKey = input.groupBy.replace("metadata.", "");
+          const metadataFilters = buildMetadataFilterParams(
+            metadataKey,
+            params.groupKey,
+            params.groupKey,
+          );
+          filterParams = { ...filterParams, ...metadataFilters };
+        } else {
+          // Look up the filter in the registry to get the correct urlKey
+          const filter = availableFilters[input.groupBy as FilterField];
+          if (filter) {
+            // Use the filter's urlKey for the query parameter
+            filterParams[filter.urlKey] = params.groupKey;
+          } else {
+            // Fallback: use groupBy as-is if not found in registry
+            filterParams[input.groupBy] = params.groupKey;
+          }
+        }
+
+        // Include active date range as ISO strings for navigation query
+        if (params.startDate != null) {
+          filterParams.startDate =
+            typeof params.startDate === "number"
+              ? new Date(params.startDate).toISOString()
+              : String(params.startDate);
+        }
+        if (params.endDate != null) {
+          filterParams.endDate =
+            typeof params.endDate === "number"
+              ? new Date(params.endDate).toISOString()
+              : String(params.endDate);
+        }
+
+        // Navigate to messages page with filter
+        void router.push(
+          {
+            pathname: `/${project.slug}/messages`,
+            query: filterParams,
+          },
+          undefined,
+          { shallow: false },
+        );
+      },
+      [project, router, input.groupBy],
+    );
+
+    // Use custom handler if provided, otherwise use default for summary charts
+    const handleDataPointClick = useMemo(() => {
+      if (onDataPointClick) {
+        return onDataPointClick;
+      }
+      // Enable default handler for pie/donut charts and summary bar charts
+      if (
+        ["pie", "donnut"].includes(input.graphType) ||
+        (["bar", "horizontal_bar"].includes(input.graphType) &&
+          input.timeScale === "full")
+      ) {
+        return defaultOnDataPointClick;
+      }
+      return undefined;
+    }, [onDataPointClick, input.graphType, input.timeScale, defaultOnDataPointClick]);
 
     const timeScale = useMemo(() => {
       // Force "full" only for summary charts to get aggregated data
@@ -263,7 +414,7 @@ const CustomGraph_ = React.memo(
       ),
     );
     const currentAndPreviousDataFilled =
-      input.graphType === "scatter"
+      input.graphType === "scatter" || input.graphType === "line"
         ? currentAndPreviousData
         : fillEmptyData(
           currentAndPreviousData,
@@ -290,10 +441,9 @@ const CustomGraph_ = React.memo(
     );
 
     const sortedKeys = expectedKeys
-      .filter((key) => keysToSum[key]! !== 0)
       .toSorted((a, b) => {
-        const totalA = keysToSum[a]!;
-        const totalB = keysToSum[b]!;
+        const totalA = keysToSum[a] ?? 0;
+        const totalB = keysToSum[b] ?? 0;
 
         return totalB - totalA;
       });
@@ -324,9 +474,10 @@ const CustomGraph_ = React.memo(
 
         const group =
           input.groupBy && groupKey ? getGroup(input.groupBy) : undefined;
-        const groupName = groupKey
+        const displayGroupKey = groupKey || "unknown";
+        const groupName = groupKey !== undefined
           ? `${hideGroupLabel ? "" : group?.label.toLowerCase() + " "
-          }${groupKey}`
+          }${displayGroupKey}`
           : "";
         return input.series.length > 1
           ? (series?.name ?? aggKey) + (groupName ? ` (${groupName})` : "")
@@ -336,6 +487,7 @@ const CustomGraph_ = React.memo(
               .replace("Evaluation passed failed", "Evaluation Failed")
               .replace("Contains error", "Traces")
               .replace(/^Evaluation label /i, "")
+              .replace(/^Thumbs up\/down /i, "")
             : (series?.name ?? aggKey);
       },
       [seriesByKey, input.groupBy, input.series.length, hideGroupLabel],
@@ -377,9 +529,7 @@ const CustomGraph_ = React.memo(
         };
 
         const colorIndex = colorMap[groupKey] ?? neutral;
-        const color = getColor(colorSet, colorIndex);
-
-        return color;
+        return getColor(colorSet, colorIndex);
       }
 
       return getColor(colorSet, index);
@@ -398,37 +548,38 @@ const CustomGraph_ = React.memo(
     const valueFormats = Array.from(
       new Set(
         input.series.map((series) => {
+          if (series.aggregation === "cardinality") {
+            return "0a";
+          }
           const metric = getMetric(series.metric);
           return metric?.format ?? "0a";
         }),
       ),
     );
     const yAxisValueFormat = valueFormats.length === 1 ? valueFormats[0] : "";
-    const maxValue = Math.max(
-      ...Object.values(keysToValues).flatMap((values) => values),
-    );
+    const allValues = Object.values(keysToValues)
+      .flatMap((values) => values)
+      .filter(Number.isFinite);
+    const maxValue = allValues.length > 0 ? Math.max(...allValues) : 0;
 
     const getColor = useGetRotatingColorForCharts();
+    const areaFillOpacity = useColorModeValue(0.3, 0.15);
     const gray400 = useColorRawValue("gray.400");
+    const gridColor = useColorModeValue(
+      "rgba(0, 0, 0, 0.08)",
+      "rgba(255, 255, 255, 0.08)",
+    );
+    const cursorColor = useColorModeValue(
+      "rgba(0, 0, 0, 0.1)",
+      "rgba(255, 255, 255, 0.1)",
+    );
 
-    const formatDate = (date: string) => {
-      if (!date) return "";
-
-      // If timeScale is in minutes (10, 30, or 60), show hours
-      if (typeof timeScale === "number" && timeScale < 1440) {
-        // If more than one day difference, include the date
-        if (daysDifference > 1) {
-          return format(new Date(date), "MMM d HH:mm");
-        }
-        return format(new Date(date), "HH:mm");
-      }
-
-      return format(new Date(date), "MMM d");
-    };
-    const tooltipValueFormatter = (
-      value: number | string,
-      _: string,
-      payload: Payload<any, any>,
+    const formatDate = (date: string) =>
+      formatChartDate({ date, timeScale, daysDifference });
+    const tooltipValueFormatter: Formatter<ValueType, NameType> = (
+      value,
+      _,
+      payload,
     ) => {
       if (payload.dataKey === "date") {
         return formatDate(value as string);
@@ -439,49 +590,115 @@ const CustomGraph_ = React.memo(
         payload.payload?.key ?? (payload.dataKey as string),
       );
       const metric = series?.metric && getMetric(series.metric);
+      const effectiveFormat =
+        series?.aggregation === "cardinality" ? "0a" : metric?.format;
 
-      return formatWith(metric?.format, value as number);
+      return formatWith(effectiveFormat, value as number);
     };
 
     const container = (child: React.ReactNode) => {
+      const dataLoaded = !timeseries.isLoading && timeseries.data;
+      const isSummaryType = summaryGraphTypes.includes(input.graphType);
       const allEmpty =
-        currentAndPreviousData &&
-        (maxValue == 0 || currentAndPreviousData?.length === 0);
+        dataLoaded &&
+        (allValues.length === 0 ||
+          currentAndPreviousData?.length === 0 ||
+          (!isSummaryType && allValues.every((v) => v === 0)));
 
       return (
         <Box width="full" height="full" position="relative">
-          {input.graphType !== "summary" && timeseries.isFetching && (
+          {timeseries.isLoading && (
+            <Box
+              position="absolute"
+              inset={0}
+              display="flex"
+              alignItems="center"
+              justifyContent="center"
+            >
+              <HStack gap={1} align="end" opacity={0.15}>
+                {[35, 55, 25, 70, 45, 65, 40, 55, 30, 60, 50, 35].map(
+                  (h, i) => (
+                    <Skeleton
+                      key={i}
+                      width="8px"
+                      height={`${h}%`}
+                      maxHeight={`${(h / 100) * (height_ - 40)}px`}
+                      borderRadius="sm"
+                    />
+                  ),
+                )}
+              </HStack>
+            </Box>
+          )}
+          {timeseries.isFetching && !timeseries.isLoading && (
             <Delayed>
               <Spinner position="absolute" right={4} top={4} />
             </Delayed>
           )}
-          {timeseries.error && (
-            <Alert.Root
-              status="error"
-              position="absolute"
-              borderStartWidth="4px"
-              borderStartColor="colorPalette.solid"
-              width="fit-content"
-              right={4}
-              top={4}
-            >
-              <Alert.Indicator />
-              <Alert.Content>
-                <Alert.Description>Error loading graph data</Alert.Description>
-              </Alert.Content>
-            </Alert.Root>
+          {timeseries.error && !timeseries.data ? (
+            <ChartErrorState
+              errorMessage={timeseries.error.message}
+              onRetry={() => void timeseries.refetch()}
+            />
+          ) : (
+            <>
+              {timeseries.error && timeseries.data && (
+                <button
+                  type="button"
+                  style={{
+                    position: "absolute",
+                    right: 16,
+                    top: 16,
+                    zIndex: 1,
+                    cursor: "pointer",
+                    background: "none",
+                    border: "none",
+                    padding: 0,
+                  }}
+                  aria-label="Retry loading chart data"
+                  onClick={() => void timeseries.refetch()}
+                  title={timeseries.error.message}
+                >
+                  <Badge
+                    colorPalette="red"
+                    variant="solid"
+                    fontSize="xs"
+                  >
+                    Refresh failed — click to retry
+                  </Badge>
+                </button>
+              )}
+              {allEmpty && input.graphType !== "monitor_graph" ? (
+                emptyState ?? (
+                  <VStack
+                    position="absolute"
+                    top="50%"
+                    left="50%"
+                    transform="translate(-50%, -50%)"
+                    gap={2}
+                  >
+                    <HStack gap={1} align="end" opacity={0.3}>
+                      {[40, 65, 30, 80, 50, 70, 45, 60].map((h, i) => (
+                        <Box
+                          key={i}
+                          width="6px"
+                          height={`${h}%`}
+                          maxHeight="40px"
+                          bg="border"
+                          borderRadius="sm"
+                        />
+                      ))}
+                    </HStack>
+                    <Text textStyle="xs" color="fg.subtle">
+                      No data — try adjusting the date range
+                    </Text>
+                  </VStack>
+                )
+              ) : (
+                child
+              )}
+            </>
           )}
-          {input.graphType !== "summary" && allEmpty && (
-            <Box
-              position="absolute"
-              top="50%"
-              left="50%"
-              transform="translate(-50%, -50%)"
-            >
-              No data
-            </Box>
-          )}
-          {child}
         </Box>
       );
     };
@@ -522,8 +739,7 @@ const CustomGraph_ = React.memo(
           <Flex
             paddingBottom={3}
             width="full"
-            justifyContent="space-between"
-            maxWidth={Object.entries(seriesSet).length * 142}
+            gap={0}
           >
             {timeseries.isLoading &&
               Object.entries(seriesSet).map(([key, series]) => (
@@ -541,6 +757,7 @@ const CustomGraph_ = React.memo(
                 previous={previousByKey[entry.key]?.value}
                 format={entry.metric?.format}
                 increaseIs={entry.metric?.increaseIs}
+                noDataUrl={entry.noDataUrl}
                 titleProps={titleProps}
               />
             ))}
@@ -563,6 +780,20 @@ const CustomGraph_ = React.memo(
               labelLine={false}
               label={pieChartPercentageLabel as any}
               innerRadius={input.graphType === "donnut" ? "50%" : 0}
+              onClick={(data: any, index: number) => {
+                if (handleDataPointClick && data && typeof index === "number" && pieData[index]) {
+                  const entry = pieData[index]!;
+                  const { series, groupKey } = getSeries(seriesByKey, entry.key);
+                  // Derive evaluatorId from per-series metadata, fall back to groupByKey or first series key
+                  const evaluatorId = series?.key || input.groupByKey || input.series[0]?.key;
+
+                  handleDataPointClick({
+                    evaluatorId,
+                    groupKey,
+                  });
+                }
+              }}
+              style={{ cursor: handleDataPointClick ? "pointer" : "default" }}
             >
               {pieData.map((entry, index) => (
                 <Cell
@@ -572,15 +803,16 @@ const CustomGraph_ = React.memo(
               ))}
             </Pie>
             <Tooltip
+              content={<ChartTooltip />}
               formatter={tooltipValueFormatter}
               wrapperStyle={{ zIndex: 1000 }}
             />
             <Legend
               wrapperStyle={{
                 padding: "0 2rem",
-                maxHeight: "15%",
-                overflow: "auto",
+                flexWrap: "wrap",
                 zIndex: 1,
+                fontSize: 11,
               }}
             />
           </PieChart>
@@ -635,9 +867,12 @@ const CustomGraph_ = React.memo(
               height={
                 input.graphType === "horizontal_bar" ? undefined : xAxisWidth
               }
+              interval={
+                input.graphType === "horizontal_bar" ? 0 : undefined
+              }
               tickLine={false}
               axisLine={false}
-              tick={{ fill: gray400 }}
+              tick={{ fill: gray400 }} style={{ fontSize: "11px" }}
               angle={input.graphType === "horizontal_bar" ? undefined : 45}
               textAnchor={
                 input.graphType === "horizontal_bar" ? "end" : "start"
@@ -646,8 +881,8 @@ const CustomGraph_ = React.memo(
             <YAxisComponent
               type="number"
               dataKey="value"
-              domain={[0, "dataMax"]}
-              tick={{ fill: gray400 }}
+              domain={[0, (dataMax: number) => (dataMax > 0 ? dataMax : 1)]}
+              tick={{ fill: gray400 }} style={{ fontSize: "11px" }}
               tickFormatter={(value: number) => {
                 if (typeof yAxisValueFormat === "function") {
                   return yAxisValueFormat(value);
@@ -656,11 +891,30 @@ const CustomGraph_ = React.memo(
               }}
             />
             <Tooltip
+              content={<ChartTooltip />}
               formatter={tooltipValueFormatter}
+              cursor={{ fill: cursorColor }}
               wrapperStyle={{ zIndex: 1000 }}
             />
-            <Bar dataKey="value">
-              {summaryData.current.map((entry, index) => (
+            <Bar
+              dataKey="value"
+              minPointSize={4}
+              onClick={(item: any) => {
+                if (handleDataPointClick && item && item.payload && item.payload.key) {
+                  const key = item.payload.key;
+                  const { series, groupKey } = getSeries(seriesByKey, key);
+                  // Derive evaluatorId from per-series metadata, fall back to groupByKey or first series key
+                  const evaluatorId = series?.key || input.groupByKey || input.series[0]?.key;
+
+                  handleDataPointClick({
+                    evaluatorId,
+                    groupKey,
+                  });
+                }
+              }}
+              style={{ cursor: handleDataPointClick ? "pointer" : "default" }}
+            >
+              {sortedCurrentData.map((entry, index) => (
                 <Cell
                   key={`cell-${index}`}
                   fill={colorForSeries(entry.key, index)}
@@ -708,9 +962,33 @@ const CustomGraph_ = React.memo(
           // @ts-ignore
           layout={input.graphType === "horizontal_bar" ? "vertical" : undefined}
         >
+          <defs>
+            {(sortedKeys ?? []).map((aggKey, index) => (
+              <linearGradient
+                key={`gradient-${aggKey}`}
+                id={`gradient-${uniqueId}-${index}`}
+                x1="0"
+                y1="0"
+                x2="0"
+                y2="1"
+              >
+                <stop
+                  offset="0%"
+                  stopColor={colorForSeries(aggKey, index)}
+                  stopOpacity={areaFillOpacity}
+                />
+                <stop
+                  offset="100%"
+                  stopColor={colorForSeries(aggKey, index)}
+                  stopOpacity={0.02}
+                />
+              </linearGradient>
+            ))}
+          </defs>
           <CartesianGrid
             vertical={input.graphType === "scatter"}
             strokeDasharray="5 7"
+            stroke={gridColor}
           />
           <XAxisComponent
             type="category"
@@ -719,7 +997,7 @@ const CustomGraph_ = React.memo(
             tickFormatter={formatDate}
             tickLine={false}
             axisLine={false}
-            tick={{ fill: gray400 }}
+            tick={{ fill: gray400 }} style={{ fontSize: "11px" }}
           />
           <YAxisComponent
             type="number"
@@ -727,8 +1005,8 @@ const CustomGraph_ = React.memo(
             tickLine={false}
             tickCount={4}
             tickMargin={20}
-            domain={[0, "dataMax"]}
-            tick={{ fill: gray400 }}
+            domain={[0, (dataMax: number) => (dataMax > 0 ? dataMax : 1)]}
+            tick={{ fill: gray400 }} style={{ fontSize: "11px" }}
             tickFormatter={(value: number) => {
               if (typeof yAxisValueFormat === "function") {
                 return yAxisValueFormat(value);
@@ -737,7 +1015,9 @@ const CustomGraph_ = React.memo(
             }}
           />
           <Tooltip
+            content={<ChartTooltip />}
             formatter={tooltipValueFormatter}
+            cursor={{ fill: cursorColor }}
             labelFormatter={(_label, payload) => {
               if (input.graphType === "scatter") return "";
               return (
@@ -752,29 +1032,65 @@ const CustomGraph_ = React.memo(
           <Legend
             wrapperStyle={{
               padding: "0 2rem",
-              maxHeight: "15%",
-              overflow: "auto",
+              flexWrap: "wrap",
               zIndex: 1,
+              cursor: "pointer",
+              fontSize: 11,
             }}
+            onClick={(e) => {
+              const key = e.dataKey as string | undefined;
+              if (key) toggleSeries(key.replace(/^previous>/, ""));
+            }}
+            formatter={(value, entry) => (
+              <span
+                style={{
+                  opacity:
+                    entry.dataKey &&
+                    hiddenSeries.has(
+                      (entry.dataKey as string).replace(/^previous>/, ""),
+                    )
+                      ? 0.3
+                      : 1,
+                }}
+              >
+                {value}
+              </span>
+            )}
           />
           {(sortedKeys ?? []).map((aggKey, index) => {
             const strokeColor = colorForSeries(aggKey, index);
             const fillColor = colorForSeries(aggKey, index);
+            const isAreaType = ["area", "stacked_area"].includes(
+              input.graphType,
+            );
+            const isBarType = [
+              "bar",
+              "stacked_bar",
+              "horizontal_bar",
+            ].includes(input.graphType);
+            const { series, groupKey } = getSeries(seriesByKey, aggKey);
+            // Derive evaluatorId from per-series metadata, fall back to groupByKey or first series key
+            const evaluatorId = series?.key || input.groupByKey || input.series[0]?.key;
+            const isHidden = hiddenSeries.has(aggKey);
+            // Extra props that only apply to Bar-type graphs
+            const extraProps: Record<string, unknown> = {};
+            if (isBarType && !["stacked_bar"].includes(input.graphType)) {
+              extraProps.radius = [3, 3, 0, 0];
+            }
             return (
               <React.Fragment key={aggKey}>
-                {/* @ts-ignore */}
+                {/* @ts-ignore - GraphElement is a union type (Line|Bar|Area|Scatter), some props are Bar-specific */}
                 <GraphElement
                   key={aggKey}
-                  type="linear"
+                  type="monotone"
+                  hide={isHidden}
                   dataKey={aggKey}
                   stroke={strokeColor}
-                  stackId={
-                    ["stacked_bar", "stacked_area"].includes(input.graphType)
-                      ? "same"
-                      : undefined
-                  }
-                  fill={fillColor}
-                  strokeWidth={2.5}
+                  stackId={["stacked_bar", "stacked_area"].includes(input.graphType) ? "same" : undefined}
+                  fill={isAreaType ? `url(#gradient-${uniqueId}-${index})` : fillColor}
+                  fillOpacity={isBarType ? 0.8 : undefined}
+                  {...extraProps}
+                  strokeWidth={isBarType ? 0 : 2.5}
                   dot={false}
                   activeDot={
                     input.graphType !== "scatter" ? { r: 8 } : undefined
@@ -785,12 +1101,50 @@ const CustomGraph_ = React.memo(
                       ? true
                       : undefined
                   }
+                  onClick={(data: any) => {
+                    if (onDataPointClick && data) {
+                      // Extract date from data - check multiple possible locations
+                      let date: string | undefined;
+                      if (["bar", "stacked_bar", "horizontal_bar"].includes(input.graphType)) {
+                        // For bar charts, check multiple possible locations for the date
+                        date = data.payload?.date || data.date || data.activePayload?.[0]?.payload?.date;
+                      } else {
+                        // For other chart types (line, area, etc.), use existing logic
+                        date = data.date || data.payload?.date;
+                      }
+
+                      // Calculate date range based on timeScale for bar charts (not summary)
+                      let startDate: string | undefined;
+                      let endDate: string | undefined;
+                      if (
+                        date &&
+                        ["bar", "stacked_bar", "horizontal_bar"].includes(input.graphType) &&
+                        typeof timeScale === "number"
+                      ) {
+                        const clickedDate = new Date(date);
+                        startDate = clickedDate.toISOString();
+                        // Calculate endDate by adding the timeScale in minutes
+                        const endDateObj = new Date(clickedDate.getTime() + timeScale * 60 * 1000);
+                        endDate = endDateObj.toISOString();
+                      }
+
+                      onDataPointClick({
+                        evaluatorId,
+                        groupKey,
+                        date,
+                        startDate,
+                        endDate,
+                      });
+                    }
+                  }}
+                  style={{ cursor: onDataPointClick ? "pointer" : "default" }}
                 />
                 {input.includePrevious && (
                   // @ts-ignore
                   <GraphElement
                     key={"previous>" + aggKey}
-                    type="linear"
+                    type="monotone"
+                    hide={isHidden}
                     dataKey={"previous>" + aggKey}
                     stackId={
                       ["stacked_bar", "stacked_area"].includes(input.graphType)
@@ -826,7 +1180,10 @@ const CustomGraph_ = React.memo(
     return (
       JSON.stringify(prevProps.input) === JSON.stringify(nextProps.input) &&
       JSON.stringify(prevProps.titleProps) ===
-      JSON.stringify(nextProps.titleProps)
+        JSON.stringify(nextProps.titleProps) &&
+      JSON.stringify(prevProps.filters) ===
+        JSON.stringify(nextProps.filters) &&
+      prevProps.onDataPointClick === nextProps.onDataPointClick
     );
   },
 );
@@ -903,18 +1260,17 @@ const shapeDataForGraph = (
   const flattenPreviousPeriod =
     timeseries.data && flattenGroupData(input, timeseries.data.previousPeriod);
 
-  const currentAndPreviousData =
-    flattenPreviousPeriod &&
-    flattenCurrentPeriod?.map((entry, index) => {
-      return {
-        ...entry,
-        ...Object.fromEntries(
-          Object.entries(flattenPreviousPeriod[index] ?? {}).map(
-            ([key, value]) => [`previous>${key}`, value ?? 0],
-          ),
+  const currentAndPreviousData = flattenCurrentPeriod?.map((entry, index) => {
+    if (!flattenPreviousPeriod) return entry;
+    return {
+      ...entry,
+      ...Object.fromEntries(
+        Object.entries(flattenPreviousPeriod[index] ?? {}).map(
+          ([key, value]) => [`previous>${key}`, value ?? 0],
         ),
-      };
-    });
+      ),
+    };
+  });
 
   return currentAndPreviousData as
     | ({ date: string } & Record<string, number>)[]
@@ -946,11 +1302,21 @@ const shapeDataForSummary = (
       // Sum all values across all time periods for summary charts
       const totalValue = values.reduce((sum, value) => sum + (value ?? 0), 0);
 
+      // Count aggregations should use integer format regardless of metric's default
+      const isCardinalitySeries = series?.aggregation === "cardinality";
+      const formatOverride =
+        isCardinalitySeries && metric ? { ...metric, format: "0a" } : metric;
+
       return {
         key: aggKey,
         name: nameForSeries(aggKey),
-        metric,
+        metric: formatOverride
+          ? series?.increaseIs
+            ? { ...formatOverride, increaseIs: series.increaseIs }
+            : formatOverride
+          : undefined,
         value: totalValue,
+        noDataUrl: series?.noDataUrl,
       };
     });
   };
@@ -972,7 +1338,7 @@ const collectAllDays = (
       if (!result[key]) {
         result[key] = [];
       }
-      result[key]!.push(entry[key]!);
+      result[key]?.push(entry[key] ?? 0);
     }
   }
 
@@ -1007,11 +1373,16 @@ const flattenGroupData = (
       }
 
       const aggregations = Object.fromEntries(
-        Object.entries(buckets).flatMap(([bucketKey, bucket]) => {
-          return Object.entries(bucket).map(([metricKey, metricValue]) => {
-            return [`${bucketKey}>${metricKey}`, metricValue ?? 0];
-          });
-        }),
+        Object.entries(buckets)
+          .filter(
+            ([bucketKey]) =>
+              !(input.excludeUnknownBuckets && bucketKey === "unknown"),
+          )
+          .flatMap(([bucketKey, bucket]) => {
+            return Object.entries(bucket).map(([metricKey, metricValue]) => {
+              return [`${bucketKey}>${metricKey}`, metricValue ?? 0];
+            });
+          }),
       );
 
       return {
@@ -1094,6 +1465,7 @@ function MonitorGraph({
     : currentAndPreviousData
       ?.map((entry) => entry[firstKey]!)
       .filter((x) => x !== undefined && x !== null);
+  const hasData = allValues !== undefined && allValues.length > 0;
   const total =
     allValues?.reduce((acc, curr) => {
       return acc + curr;
@@ -1105,24 +1477,28 @@ function MonitorGraph({
   // TODO: allow user to define the thresholds instead of hardcoded amounts
   const colorSet: RotatingColorSet = input.monitorGraph?.disabled
     ? "grayTones"
-    : average > 0.8 || !hasLoaded
+    : !hasData || average > 0.8 || !hasLoaded
       ? "greenTones"
       : average < 0.4
         ? "redTones"
         : "orangeTones";
 
+  const finiteValues =
+    allValues && allValues.length > 0
+      ? allValues.filter(Number.isFinite)
+      : [];
   const maxValue = isPassRate
     ? 1
-    : Math.max(...(allValues && allValues.length > 0 ? allValues : [1]));
+    : finiteValues.length > 0
+      ? Math.max(...finiteValues)
+      : 1;
 
   // Color adjustments for light/dark mode
   // Light mode: light backgrounds, dark text
   // Dark mode: dark backgrounds, light text
   const bgAdjustment = useColorModeValue(-400, 200);
-  const borderAdjustment = useColorModeValue(-200, 100);
   const textAdjustment = useColorModeValue(300, -300);
   const areaAdjustment = useColorModeValue(-300, 100);
-  const skeletonAdjustment = useColorModeValue(-100, 100);
 
   // Glow effect for dark mode based on colorSet
   const glowColor = getColor(colorSet, 0, 0);
@@ -1137,7 +1513,7 @@ function MonitorGraph({
       height="full"
       position="relative"
       border="1px solid"
-      borderColor={getColor(colorSet, 0, borderAdjustment)}
+      borderColor="border"
       backgroundColor={getColor(colorSet, 0, bgAdjustment)}
       borderRadius="lg"
       paddingTop={2}
@@ -1174,17 +1550,24 @@ function MonitorGraph({
         <HStack gap={2}>
           <Text fontSize="2xl" fontWeight="bold">
             {hasLoaded ? (
-              numeral(average).format(isPassRate ? "0%" : "0.[00]")
+              hasData ? (
+                numeral(average).format(isPassRate ? "0%" : "0.[00]")
+              ) : (
+                "-"
+              )
             ) : (
               <Skeleton
                 width="56px"
                 height="36px"
-                backgroundColor={getColor(colorSet, 0, skeletonAdjustment)}
               />
             )}
           </Text>
           <Text fontSize="xs">
-            {isPassRate ? "Pass Rate" : "Average Score"}
+            {hasData
+              ? isPassRate
+                ? "Pass Rate"
+                : "Average Score"
+              : "No data yet"}
           </Text>
         </HStack>
         <Text fontSize="xs">
@@ -1239,7 +1622,7 @@ function MonitorGraph({
                 tickFormatter={formatDate}
                 tickLine={false}
                 axisLine={false}
-                tick={{ fill: gray400 }}
+                tick={{ fill: gray400 }} style={{ fontSize: "11px" }}
               />
               <YAxis
                 type="number"
@@ -1248,7 +1631,7 @@ function MonitorGraph({
                 tickCount={4}
                 tickMargin={20}
                 domain={[0, maxValue]}
-                tick={{ fill: gray400 }}
+                tick={{ fill: gray400 }} style={{ fontSize: "11px" }}
                 tickFormatter={(value) => {
                   if (typeof yAxisValueFormat === "function") {
                     return yAxisValueFormat(value);

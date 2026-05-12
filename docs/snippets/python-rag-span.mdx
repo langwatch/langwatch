@@ -1,0 +1,50 @@
+To capture a RAG span, you can use the `@langwatch.span(type="rag")` decorator, along with a call to `.update()` to add the `contexts` to the span:
+
+```python
+@langwatch.span(type="rag")
+def rag_retrieval():
+    # the documents you retrieved from your vector database
+    search_results = ["France is a country in Europe.", "Paris is the capital of France."]
+
+    # capture them on the span contexts before returning
+    langwatch.get_current_span().update(contexts=search_results)
+
+    return search_results
+```
+
+If you have document or chunk ids from the results, we recommend you can to capture them along with the id using `RAGChunk`, as this allows them to be grouped together and generate documents analytics on LangWatch dashboard:
+
+```python
+from langwatch.types import RAGChunk
+
+@langwatch.span(type="rag")
+def rag_retrieval():
+    # the documents you retrieved from your vector database
+    search_results = [
+        {
+            "id": "doc-1",
+            "content": "France is a country in Europe.",
+        },
+        {
+            "id": "doc-2",
+            "content": "Paris is the capital of France.",
+        },
+    ]
+
+    # capture then on the span contexts with RAGChunk before returning
+    langwatch.get_current_span().update(
+        contexts=[
+            RAGChunk(
+                document_id=document["id"],
+                content=document["content"],
+            )
+            for document in search_results
+        ]
+    )
+
+    return search_results
+```
+
+Then you'll be able to see the captured contexts that will also be used later on for evaluatios on LangWatch dashboard:
+
+![RAG Spans](/images/integration/rag.png)

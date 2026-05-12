@@ -4,6 +4,15 @@ Feature: Evaluator management
   I want to create, edit, and manage reusable evaluators
   So that I can use them across evaluations and other platform features
 
+  # Drawer-component scenarios are bound to the existing component tests
+  # (EvaluatorListDrawer, EvaluatorCategorySelectorDrawer,
+  # EvaluatorTypeSelectorDrawer). The remaining @unimplemented scenarios
+  # describe full agents/evaluators-page CRUD flows or backing-store
+  # invariants (config JSON shape, project scoping, mappings storage)
+  # — they need a Next.js page-level harness or a service-layer test
+  # that doesn't exist for the evaluator service yet. Each is a tracked
+  # gap, not an aspirational stretch goal.
+
   # ============================================================================
   # Evaluator types
   # ============================================================================
@@ -41,6 +50,7 @@ Feature: Evaluator management
   # Evaluator CRUD - Create
   # ============================================================================
 
+  @unimplemented
   Scenario: Create built-in evaluator with settings
     Given I am on the evaluators page
     When I click "New Evaluator"
@@ -54,6 +64,7 @@ Feature: Evaluator management
     Then the evaluator "Correctness Check" is saved to the database
     And the evaluator appears in the evaluators list
 
+  @unimplemented
   Scenario: Create workflow-based custom evaluator
     Given I am on the evaluators page
     And workflow "Custom Scorer" exists with evaluator output
@@ -66,6 +77,7 @@ Feature: Evaluator management
     Then the evaluator is saved with workflowId reference
     And the evaluator appears in the evaluators list
 
+  @unimplemented
   Scenario: Evaluator settings vary by type
     When I select evaluator type "Exact Match"
     Then I see settings for case sensitivity and trimming
@@ -76,18 +88,21 @@ Feature: Evaluator management
   # Evaluator CRUD - Read/List
   # ============================================================================
 
+  @unimplemented
   Scenario: View evaluators list
     Given evaluators "Exact Match", "LLM Judge", and "Custom Scorer" exist
     When I navigate to the evaluators page
     Then I see a list of evaluators
     And each evaluator shows its name, type, and last updated date
 
+  @unimplemented
   Scenario: Empty state when no evaluators
     Given no evaluators exist in the project
     When I navigate to the evaluators page
     Then I see an empty state message
     And I see a "Create your first evaluator" call to action
 
+  @unimplemented
   Scenario: Evaluators are project-scoped
     Given I am in project "Project A"
     And evaluator "My Evaluator" exists in "Project A"
@@ -100,6 +115,7 @@ Feature: Evaluator management
   # Evaluator CRUD - Update
   # ============================================================================
 
+  @unimplemented
   Scenario: Edit evaluator settings
     Given evaluator "Exact Match" exists with case_sensitive=true
     When I click on evaluator "Exact Match"
@@ -109,6 +125,7 @@ Feature: Evaluator management
     Then the evaluator is updated in the database
     And the updatedAt timestamp is refreshed
 
+  @unimplemented
   Scenario: Edit evaluator name
     Given evaluator "Old Name" exists
     When I click on evaluator "Old Name"
@@ -120,6 +137,7 @@ Feature: Evaluator management
   # Evaluator CRUD - Delete (soft delete)
   # ============================================================================
 
+  @unimplemented
   Scenario: Archive evaluator
     Given evaluator "Old Evaluator" exists
     When I click the delete button for "Old Evaluator"
@@ -127,6 +145,7 @@ Feature: Evaluator management
     Then the evaluator is soft-deleted (archivedAt is set)
     And "Old Evaluator" no longer appears in the evaluators list
 
+  @unimplemented
   Scenario: Archived evaluators are excluded from list
     Given evaluator "Active Evaluator" exists
     And evaluator "Archived Evaluator" was archived
@@ -138,6 +157,7 @@ Feature: Evaluator management
   # Evaluator config storage
   # ============================================================================
 
+  @unimplemented
   Scenario: Built-in evaluator config stored as JSON
     Given I create an "Exact Match" evaluator with:
       | name            | My Exact Match |
@@ -146,6 +166,7 @@ Feature: Evaluator management
     Then the evaluator record has type "evaluator"
     And the config JSON contains the evaluator type and settings
 
+  @unimplemented
   Scenario: Workflow evaluator has workflowId at top level
     Given I create a workflow-based evaluator referencing workflow "Scorer"
     Then the evaluator record has type "workflow"
@@ -207,6 +228,7 @@ Feature: Evaluator management
     Then the EvaluatorEditorDrawer opens
     And I see the settings form for "Exact Match"
 
+  @unimplemented
   Scenario: EvaluatorEditorDrawer renders dynamic form
     Given I am creating an "LLM as Judge" evaluator
     When the EvaluatorEditorDrawer opens
@@ -214,6 +236,12 @@ Feature: Evaluator management
     And required fields are marked
     And I can enter values for all settings
 
+  @unit
+  Scenario: Custom workflow evaluator option is shown
+    Given the EvaluatorCategorySelectorDrawer is open
+    Then the option "Custom (from Workflow)" is rendered alongside the built-in evaluator categories
+
+  @unimplemented
   Scenario: Custom workflow evaluator skips category/type selection
     Given the EvaluatorCategorySelectorDrawer is open
     When I select "Custom (from Workflow)"
@@ -224,6 +252,7 @@ Feature: Evaluator management
   # Evaluator mappings (stored in evaluation state, not evaluator DB)
   # ============================================================================
 
+  @unimplemented
   Scenario: Evaluator input mappings are per-evaluation
     Given evaluator "Exact Match" exists in the database
     And I use "Exact Match" in evaluation A with agent "GPT-4"
@@ -232,6 +261,7 @@ Feature: Evaluator management
     And evaluation B has its own input mappings for "Exact Match"
     And these mappings are NOT stored in the evaluator database record
 
+  @unimplemented
   Scenario: Mappings stored in evaluation state only
     Given I add evaluator "Exact Match" to agent "GPT-4" in an evaluation
     When I configure the input mapping: output -> agent.response

@@ -118,9 +118,9 @@ describe("TargetVariablesPanel", () => {
 
     it("shows mapped variable as a tag", () => {
       renderComponent();
-      // The mapped field should show as a closable tag with just the field name
+      // The mapped field should show as a closable tag with source prefix and field name
       expect(screen.getByTestId("source-mapping-tag")).toBeInTheDocument();
-      expect(screen.getByText("input_text")).toBeInTheDocument();
+      expect(screen.getByText("dataset-1.input_text")).toBeInTheDocument();
     });
 
     it("shows helper text", () => {

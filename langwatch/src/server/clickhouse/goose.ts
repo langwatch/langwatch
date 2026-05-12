@@ -20,20 +20,12 @@ const logger = createLogger("langwatch:clickhouse:migrations");
  * Configuration via environment variables:
  * - CLICKHOUSE_URL: Connection string with database in path (e.g., http://host:8123/langwatch)
  * - CLICKHOUSE_CLUSTER: Cluster name for Replicated database engine. If set, enables replication.
- * - TIERED_*_TABLE_HOT_DAYS: TTL configuration for tiered storage (optional, defaults to 2)
  *
  * @see https://github.com/pressly/goose
  */
 
 const MIGRATIONS_DIR = path.join(__dirname, "migrations");
 const VALID_DB_NAME = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
-
-const TTL_ENV_VARS = [
-  "TIERED_EVENT_LOG_TABLE_HOT_DAYS",
-  "TIERED_PROCESSOR_CHECKPOINTS_TABLE_HOT_DAYS",
-  "TIERED_STORED_SPANS_TABLE_HOT_DAYS",
-  "TIERED_TRACE_SUMMARIES_TABLE_HOT_DAYS",
-] as const;
 
 export interface GooseOptions {
   connectionUrl?: string;
@@ -48,6 +40,7 @@ interface ClickHouseConfig {
   databaseUrl: string; // For bootstrap with database context
   gooseConnectionString: string; // HTTP connection string for goose
   clusterName: string | undefined; // If set, enables replication with this cluster name
+  hasLocalPrimaryPolicy?: boolean; // Set during bootstrap — true if 'local_primary' storage policy exists
 }
 
 /**
@@ -85,20 +78,7 @@ function validateIdentifier(name: string, label: string): void {
   }
 }
 
-function validateNumericEnvVar(name: string, defaultVal: number): number {
-  const val = process.env[name];
-  if (!val) return defaultVal;
-  const num = parseInt(val, 10);
-  if (Number.isNaN(num) || num < 0) {
-    throw new MigrationError(
-      `${name} must be a non-negative integer, got: "${val}"`,
-      "preflight",
-    );
-  }
-  return num;
-}
-
-function parseConnectionUrl(
+export function parseConnectionUrl(
   connectionUrl?: string,
   databaseOverride?: string,
 ): ClickHouseConfig {
@@ -188,11 +168,6 @@ async function preflight(config: ClickHouseConfig): Promise<void> {
 
   // Check goose binary exists
   checkGooseBinary();
-
-  // Validate TTL environment variables
-  for (const envVar of TTL_ENV_VARS) {
-    validateNumericEnvVar(envVar, 2);
-  }
 
   try {
     await withClient(config.serverUrl, async (client) => {
@@ -342,6 +317,21 @@ async function bootstrapDatabase(
     );
   });
 
+  // Check if 'local_primary' storage policy exists on this CH instance.
+  // Production CH has it (configured via k8s statefulset XML config).
+  // Local dev / bare CH instances don't — migrations use 'default' policy instead.
+  await withClient(config.databaseUrl, async (client) => {
+    const result = await client.query({
+      query: `SELECT policy_name FROM system.storage_policies WHERE policy_name = 'local_primary'`,
+      format: "JSONEachRow",
+    });
+    const rows = await result.json();
+    config.hasLocalPrimaryPolicy = rows.length > 0;
+    if (!config.hasLocalPrimaryPolicy) {
+      logger.info("Storage policy 'local_primary' not found — migrations will use 'default' policy");
+    }
+  });
+
   logger.info("Bootstrap completed");
 }
 
@@ -369,8 +359,11 @@ function buildMigrationEnvVars(config: ClickHouseConfig): NodeJS.ProcessEnv {
       ? "ReplicatedReplacingMergeTree("
       : "ReplacingMergeTree(",
 
-    // TTL vars
-    ...Object.fromEntries(TTL_ENV_VARS.map((v) => [v, process.env[v]])),
+    // Storage policy: use 'local_primary' if available (production with S3 tiering),
+    // otherwise omit the setting (uses ClickHouse default policy)
+    CLICKHOUSE_STORAGE_POLICY_SETTING: config.hasLocalPrimaryPolicy
+      ? ", storage_policy = 'local_primary'"
+      : "",
   };
 
   // Filter out undefined values
@@ -524,16 +517,7 @@ export async function getMigrateStatus(
   return executeGoose("status", config, options);
 }
 
-export async function runMigrationsIfConfigured(
-  options: GooseOptions = {},
-): Promise<void> {
-  if (process.env.ENABLE_CLICKHOUSE !== "true") {
-    logger.info(
-      "ENABLE_CLICKHOUSE is not set, skipping ClickHouse migrations.",
-    );
-    return;
-  }
-
+export async function runMigrations(options: GooseOptions = {}): Promise<void> {
   const connectionUrlStr = options.connectionUrl ?? process.env.CLICKHOUSE_URL;
   if (!connectionUrlStr) {
     logger.info(

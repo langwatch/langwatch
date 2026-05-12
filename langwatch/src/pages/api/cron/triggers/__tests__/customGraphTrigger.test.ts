@@ -1,9 +1,18 @@
 import { type Project, type Trigger, TriggerAction } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { processCustomGraphTrigger } from "../customGraphTrigger";
+import type { TimeseriesBucket } from "~/server/analytics/types";
+import {
+  processCustomGraphTrigger,
+  sumMetricAcrossGroups,
+} from "../customGraphTrigger";
 
-vi.mock("~/server/analytics/timeseries", () => ({
-  timeseries: vi.fn(),
+const { mockGetTimeseries } = vi.hoisted(() => ({
+  mockGetTimeseries: vi.fn(),
+}));
+vi.mock("~/server/analytics/analytics.service", () => ({
+  getAnalyticsService: () => ({
+    getTimeseries: mockGetTimeseries,
+  }),
 }));
 
 vi.mock("~/server/db", () => ({
@@ -36,7 +45,6 @@ vi.mock("~/utils/posthogErrorCapture", () => ({
   captureException: vi.fn(),
 }));
 
-import { timeseries } from "~/server/analytics/timeseries";
 import { prisma } from "~/server/db";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { handleSendEmail } from "../actions/sendEmail";
@@ -229,7 +237,7 @@ describe("processCustomGraphTrigger", () => {
 
       vi.mocked(prisma.triggerSent.findFirst).mockResolvedValue(null);
 
-      vi.mocked(timeseries).mockResolvedValue({
+      mockGetTimeseries.mockResolvedValue({
         currentPeriod: [{ "1/errors/count": 60 }, { "1/errors/count": 70 }],
         previousPeriod: [],
       } as any);
@@ -281,7 +289,7 @@ describe("processCustomGraphTrigger", () => {
         filters: {},
       } as any);
 
-      vi.mocked(timeseries).mockResolvedValue({
+      mockGetTimeseries.mockResolvedValue({
         currentPeriod: [{ "0/count/count": 15 }, { "0/count/count": 20 }],
         previousPeriod: [],
       } as any);
@@ -338,7 +346,7 @@ describe("processCustomGraphTrigger", () => {
         filters: {},
       } as any);
 
-      vi.mocked(timeseries).mockResolvedValue({
+      mockGetTimeseries.mockResolvedValue({
         currentPeriod: [{ "0/count/count": 5 }],
         previousPeriod: [],
       } as any);
@@ -385,7 +393,7 @@ describe("processCustomGraphTrigger", () => {
         filters: {},
       } as any);
 
-      vi.mocked(timeseries).mockResolvedValue({
+      mockGetTimeseries.mockResolvedValue({
         currentPeriod: [{ "0/count/count": 15 }],
         previousPeriod: [],
       } as any);
@@ -394,6 +402,112 @@ describe("processCustomGraphTrigger", () => {
       await processCustomGraphTrigger(trigger, mockProjects);
 
       expect(handleSendSlackMessage).toHaveBeenCalled();
+    });
+  });
+
+  describe("when graph uses groupBy", () => {
+    it("sums grouped metric values across groups per time bucket", async () => {
+      const trigger = {
+        id: "trigger-1",
+        projectId: "project-1",
+        customGraphId: "graph-1",
+        action: TriggerAction.SEND_EMAIL,
+        actionParams: {
+          threshold: 10,
+          operator: "gt",
+          timePeriod: 60,
+          seriesName: "0/metadata.trace_id/cardinality",
+        },
+      } as unknown as Trigger;
+
+      vi.mocked(prisma.customGraph.findUnique).mockResolvedValue({
+        id: "graph-1",
+        name: "Test Graph",
+        graph: {
+          series: [
+            {
+              name: "traces",
+              metric: "metadata.trace_id",
+              aggregation: "cardinality",
+            },
+          ],
+          groupBy: "sentiment.thumbs_up_down",
+        },
+        filters: {},
+      } as any);
+
+      mockGetTimeseries.mockResolvedValue({
+        currentPeriod: [
+          {
+            date: "2024-01-01",
+            "sentiment.thumbs_up_down": {
+              "Thumbs Up": {
+                "0/metadata.trace_id/cardinality": 10,
+              },
+              "Thumbs Down": {
+                "0/metadata.trace_id/cardinality": 5,
+              },
+            },
+          },
+        ],
+        previousPeriod: [],
+      });
+
+      vi.mocked(checkThreshold).mockReturnValue(true);
+
+      const result = await processCustomGraphTrigger(trigger, mockProjects);
+
+      // 10 + 5 = 15, summed across groups
+      expect(result.value).toBe(15);
+    });
+
+    it("evaluates to 0 when no group contains the monitored metric", async () => {
+      const trigger = {
+        id: "trigger-1",
+        projectId: "project-1",
+        customGraphId: "graph-1",
+        action: TriggerAction.SEND_EMAIL,
+        actionParams: {
+          threshold: 10,
+          operator: "gt",
+          timePeriod: 60,
+          seriesName: "0/metadata.trace_id/cardinality",
+        },
+      } as unknown as Trigger;
+
+      vi.mocked(prisma.customGraph.findUnique).mockResolvedValue({
+        id: "graph-1",
+        name: "Test Graph",
+        graph: {
+          series: [
+            {
+              name: "traces",
+              metric: "metadata.trace_id",
+              aggregation: "cardinality",
+            },
+          ],
+          groupBy: "sentiment.thumbs_up_down",
+        },
+        filters: {},
+      } as any);
+
+      mockGetTimeseries.mockResolvedValue({
+        currentPeriod: [
+          {
+            date: "2024-01-01",
+            "sentiment.thumbs_up_down": {
+              "Thumbs Up": { "other/metric": 99 },
+            },
+          },
+        ],
+        previousPeriod: [],
+      });
+
+      vi.mocked(checkThreshold).mockReturnValue(false);
+
+      const result = await processCustomGraphTrigger(trigger, mockProjects);
+
+      expect(result.value).toBe(0);
     });
   });
 
@@ -427,7 +541,7 @@ describe("processCustomGraphTrigger", () => {
         filters: {},
       } as any);
 
-      vi.mocked(timeseries).mockResolvedValue({
+      mockGetTimeseries.mockResolvedValue({
         currentPeriod: [
           { "0/count/avg": 10 },
           { "0/count/avg": 20 },
@@ -468,7 +582,7 @@ describe("processCustomGraphTrigger", () => {
         filters: {},
       } as any);
 
-      vi.mocked(timeseries).mockResolvedValue({
+      mockGetTimeseries.mockResolvedValue({
         currentPeriod: [],
         previousPeriod: [],
       } as any);
@@ -504,7 +618,7 @@ describe("processCustomGraphTrigger", () => {
         filters: {},
       } as any);
 
-      vi.mocked(timeseries).mockResolvedValue({
+      mockGetTimeseries.mockResolvedValue({
         currentPeriod: [{ "0/count/count": 15 }],
         previousPeriod: [],
       } as any);
@@ -552,6 +666,81 @@ describe("processCustomGraphTrigger", () => {
           type: "customGraphAlert",
         },
       });
+    });
+  });
+});
+
+describe("sumMetricAcrossGroups()", () => {
+  const seriesKey = "0/metadata.trace_id/cardinality";
+
+  describe("when entry has grouped data with the metric", () => {
+    it("sums the metric across all groups", () => {
+      const entry: TimeseriesBucket = {
+        date: "2024-01-01",
+        "sentiment.thumbs_up_down": {
+          "Thumbs Up": { [seriesKey]: 10 },
+          "Thumbs Down": { [seriesKey]: 5 },
+        },
+      };
+
+      expect(
+        sumMetricAcrossGroups(entry, "sentiment.thumbs_up_down", seriesKey),
+      ).toBe(15);
+    });
+  });
+
+  describe("when some groups lack the metric", () => {
+    it("sums only the groups that have it", () => {
+      const entry: TimeseriesBucket = {
+        date: "2024-01-01",
+        "metadata.model": {
+          "gpt-4": { [seriesKey]: 8 },
+          "claude": { "other/metric": 99 },
+          "gemini": { [seriesKey]: 2 },
+        },
+      };
+
+      expect(
+        sumMetricAcrossGroups(entry, "metadata.model", seriesKey),
+      ).toBe(10);
+    });
+  });
+
+  describe("when groupBy key is missing from entry", () => {
+    it("returns undefined", () => {
+      const entry: TimeseriesBucket = { date: "2024-01-01" };
+
+      expect(
+        sumMetricAcrossGroups(entry, "sentiment.thumbs_up_down", seriesKey),
+      ).toBeUndefined();
+    });
+  });
+
+  describe("when no group contains the metric", () => {
+    it("returns undefined", () => {
+      const entry: TimeseriesBucket = {
+        date: "2024-01-01",
+        "sentiment.thumbs_up_down": {
+          "Thumbs Up": { "other/metric": 10 },
+        },
+      };
+
+      expect(
+        sumMetricAcrossGroups(entry, "sentiment.thumbs_up_down", seriesKey),
+      ).toBeUndefined();
+    });
+  });
+
+  describe("when groupBy value is not an object", () => {
+    it("returns undefined", () => {
+      const entry: TimeseriesBucket = {
+        date: "2024-01-01",
+        "metadata.model": 42,
+      };
+
+      expect(
+        sumMetricAcrossGroups(entry, "metadata.model", seriesKey),
+      ).toBeUndefined();
     });
   });
 });

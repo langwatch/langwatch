@@ -13,8 +13,14 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowRight } from "react-feather";
 import type { Trace } from "~/server/tracer/types";
 import type { Workflow } from "../../optimization_studio/types/dsl";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { DatasetRecordEntry } from "../../server/datasets/types";
-import { TRACE_MAPPINGS } from "../../server/tracer/tracesMapping";
+import {
+  SERVER_ONLY_THREAD_SOURCES,
+  THREAD_MAPPING_LABELS,
+  TRACE_MAPPINGS,
+} from "../../server/tracer/tracesMapping";
+import { api } from "../../utils/api";
 
 /**
  * Thread mappings - simplified set of options for thread-based data
@@ -36,7 +42,10 @@ export const THREAD_MAPPINGS = {
 export type ThreadMapping = Record<
   string,
   {
-    source: keyof typeof THREAD_MAPPINGS | "";
+    source:
+      | keyof typeof THREAD_MAPPINGS
+      | (typeof SERVER_ONLY_THREAD_SOURCES)[number]
+      | "";
     selectedFields?: string[]; // Fields to include when source is 'traces'
   }
 >;
@@ -87,7 +96,10 @@ const mapThreadToDatasetEntry = (
 ): Record<string, string | number> => {
   return Object.fromEntries(
     Object.entries(mapping).map(([column, { source, selectedFields }]) => {
-      const source_ = source ? THREAD_MAPPINGS[source] : undefined;
+      const source_ =
+        source && source in THREAD_MAPPINGS
+          ? THREAD_MAPPINGS[source as keyof typeof THREAD_MAPPINGS]
+          : undefined;
       let value = source_?.mapping(thread);
 
       // If source is traces and selectedFields are specified, filter the trace objects
@@ -171,6 +183,30 @@ export const ThreadMapping = ({
   const mapping = threadMappingState.mapping;
   const now = useMemo(() => new Date().getTime(), []);
   const isInitializedRef = React.useRef(false);
+  const { project } = useOrganizationTeamProject();
+
+  // Check if any column uses a server-only source (e.g. formatted_traces)
+  const needsFormattedDigest = useMemo(
+    () =>
+      Object.values(mapping).some(
+        (m) =>
+          (SERVER_ONLY_THREAD_SOURCES as readonly string[]).includes(m.source),
+      ),
+    [mapping],
+  );
+
+  // Fetch formatted span digests from server when needed
+  const formattedDigests = api.traces.getFormattedSpansDigest.useQuery(
+    {
+      projectId: project?.id ?? "",
+      traceIds: traces.map((t) => t.trace_id),
+    },
+    {
+      enabled: !!project?.id && needsFormattedDigest && traces.length > 0,
+      refetchOnWindowFocus: false,
+      staleTime: 5 * 60 * 1000,
+    },
+  );
 
   // Initialize mapping with defaults
   useEffect(() => {
@@ -220,8 +256,27 @@ export const ThreadMapping = ({
     const entries: DatasetRecordEntry[] = [];
     const threadData = groupTracesByThreadId(traces);
 
+    // Identify columns mapped to server-only sources
+    const serverOnlyColumns = Object.entries(mapping)
+      .filter(([, m]) =>
+        (SERVER_ONLY_THREAD_SOURCES as readonly string[]).includes(m.source),
+      )
+      .map(([col, m]) => ({ col, source: m.source }));
+
     for (const thread of threadData) {
       const mappedEntry = mapThreadToDatasetEntry(thread, mapping);
+
+      // Override server-only source columns with data from server
+      for (const { col, source } of serverOnlyColumns) {
+        if (source === "formatted_traces" && formattedDigests.data) {
+          const threadDigests = thread.traces
+            .map((t) => formattedDigests.data[t.trace_id] ?? "")
+            .filter(Boolean)
+            .join("\n\n---\n\n");
+          mappedEntry[col] = threadDigests;
+        }
+      }
+
       entries.push({
         id: `${now}-${index}`,
         selected: true,
@@ -231,7 +286,7 @@ export const ThreadMapping = ({
     }
 
     setDatasetEntries?.(entries);
-  }, [mapping, setDatasetEntries, traces, now]);
+  }, [mapping, setDatasetEntries, traces, formattedDigests.data, now]);
 
   const isThreeColumns = !!dsl;
 
@@ -336,6 +391,7 @@ export const ThreadMapping = ({
                               [targetField]: {
                                 source: e.target.value as
                                   | keyof typeof THREAD_MAPPINGS
+                                  | (typeof SERVER_ONLY_THREAD_SOURCES)[number]
                                   | "",
                                 selectedFields:
                                   prev.mapping[targetField]?.selectedFields ??
@@ -347,9 +403,12 @@ export const ThreadMapping = ({
                         value={source}
                       >
                         <option value=""></option>
-                        {Object.keys(THREAD_MAPPINGS).map((key) => (
+                        {[
+                          ...SERVER_ONLY_THREAD_SOURCES,
+                          ...Object.keys(THREAD_MAPPINGS),
+                        ].map((key) => (
                           <option key={key} value={key}>
-                            {key}
+                            {THREAD_MAPPING_LABELS[key] ?? key}
                           </option>
                         ))}
                       </NativeSelect.Field>

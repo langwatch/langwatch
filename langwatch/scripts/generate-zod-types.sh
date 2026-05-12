@@ -9,10 +9,6 @@ generate_tracer_types() {
   fi
 }
 
-generate_evaluations_types() {
-  ts-to-zod src/server/evaluations/types.ts src/server/evaluations/types.generated.ts
-}
-
 generate_evaluators_types() {
   # Fix for @default false not being parsed correctly by ts-to-zod
   cat src/server/evaluations/evaluators.generated.ts | sed 's/@default false/@default "false"/' >src/server/evaluations/evaluators.temp.generated.ts
@@ -51,18 +47,15 @@ set -e
 # Run all generators in parallel and store their PIDs
 generate_tracer_types &
 pid1=$!
-generate_evaluations_types &
-pid2=$!
 generate_evaluators_types &
-pid3=$!
+pid2=$!
 generate_datasets_types &
-pid4=$!
+pid3=$!
 generate_experiments_types &
-pid5=$!
+pid4=$!
 
 # Wait for each process and check its exit status
 wait $pid1 || exit 1
 wait $pid2 || exit 1
 wait $pid3 || exit 1
 wait $pid4 || exit 1
-wait $pid5 || exit 1

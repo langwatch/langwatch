@@ -3,11 +3,14 @@ import { useColorMode } from "../ui/color-mode";
 export function FullLogo({
   width = 155,
   height = 38,
+  forceColorMode,
 }: {
   width?: number | string;
   height?: number | string;
+  forceColorMode?: "light" | "dark";
 }) {
-  const { colorMode } = useColorMode();
+  const { colorMode: systemColorMode } = useColorMode();
+  const colorMode = forceColorMode ?? systemColorMode;
 
   if (colorMode === "dark") {
     return (

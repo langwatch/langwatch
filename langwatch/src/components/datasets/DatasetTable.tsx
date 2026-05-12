@@ -39,6 +39,7 @@ import type {
   DatasetRecordInput,
 } from "../../server/datasets/types";
 import { api } from "../../utils/api";
+import { isHandledByGlobalHandler } from "../../utils/trpcError";
 import {
   type AddDatasetDrawerProps,
   AddOrEditDatasetDrawer,
@@ -118,6 +119,7 @@ export function DatasetTable({
       enabled: !!project && !!datasetId,
       refetchOnWindowFocus: false,
       onError: (error) => {
+        if (isHandledByGlobalHandler(error)) return;
         toaster.create({
           title: "Error fetching dataset",
           description: error.message,
@@ -650,10 +652,11 @@ export function DatasetTable({
               bottom={isEmbedded ? "32px" : 6}
               marginTop={6}
               marginLeft={insideWizard ? 0 : 6}
-              backgroundColor="#ffffff"
+              bg="bg"
               padding="8px"
               paddingX="16px"
-              border="1px solid #ccc"
+              border="1px solid"
+              borderColor="border"
               boxShadow="base"
               borderRadius="md"
               zIndex="100"
@@ -663,7 +666,7 @@ export function DatasetTable({
               <ChevronDown width={16} height={16} />
             </Button>
           </Menu.Trigger>
-          <Menu.Content zIndex="popover">
+          <Menu.Content>
             <Menu.Item
               value="import-csv"
               onClick={() => addRowsFromCSVModal.onOpen()}
@@ -698,12 +701,13 @@ export function DatasetTable({
             bottom={6}
             left="50%"
             transform="translateX(-50%)"
-            backgroundColor="#ffffff"
+            bg="bg"
             padding="8px"
             paddingX="16px"
-            border="1px solid #ccc"
+            border="1px solid"
+            borderColor="border"
             boxShadow="base"
-            borderRadius={"md"}
+            borderRadius="md"
           >
             <HStack gap={3}>
               <Text>{selectedEntryIds.size} entries selected</Text>

@@ -1,0 +1,155 @@
+// Trace drawer + facet sidebar architecture for the traces-v2 feature.
+//
+// Render with:
+//   dot -Tsvg trace-architecture.dot -o trace-architecture.svg
+//
+// Reflects the layout that backs the trace details drawer at
+// `/<project>/traces?drawer.open=traceV2Details&drawer.traceId=...`.
+
+digraph TraceArchitecture {
+  rankdir=LR;
+  fontname="Inter";
+  node  [fontname="Inter", fontsize=10, shape=box, style="rounded,filled", color="#cbd5e1", fillcolor="#f8fafc"];
+  edge  [fontname="Inter", fontsize=9, color="#64748b"];
+
+  // ────────────────────────────── URL ──────────────────────────────
+  subgraph cluster_url {
+    label="URL params";
+    style="rounded";
+    color="#e2e8f0";
+    URL [label="?drawer.open=traceV2Details\n&drawer.traceId=…\n&drawer.t=<ms>"];
+  }
+
+  // ───────────────────────── React surface ─────────────────────────
+  subgraph cluster_ui {
+    label="UI (langwatch/src/features/traces-v2)";
+    style="rounded";
+    color="#bae6fd";
+
+    TracesPage    [label="TracesPage"];
+    TraceTable    [label="TraceTable\n(row click)"];
+    FilterSidebar [label="FilterSidebar"];
+    SearchBar     [label="SearchBar"];
+
+    DrawerShell   [label="TraceV2DrawerShell", fillcolor="#dbeafe"];
+    DrawerHeader  [label="DrawerHeader"];
+    Viz           [label="VizPlaceholder\n(waterfall / flame / spanlist)"];
+    SpanTabBar    [label="SpanTabBar"];
+    Accordions    [label="TraceAccordions"];
+    EmptyState    [label="Drawer 404 / error", fillcolor="#fee2e2", color="#fecaca"];
+
+    FacetSection      [label="FacetSection"];
+    RangeSection      [label="RangeSection"];
+    AttributesSection [label="AttributesSection"];
+    SidebarSection    [label="SidebarSection"];
+
+    FilterSidebar -> FacetSection;
+    FilterSidebar -> RangeSection;
+    FilterSidebar -> AttributesSection;
+    FacetSection      -> SidebarSection;
+    RangeSection      -> SidebarSection;
+    AttributesSection -> SidebarSection;
+
+    DrawerShell -> DrawerHeader;
+    DrawerShell -> Viz;
+    DrawerShell -> SpanTabBar;
+    DrawerShell -> Accordions;
+    DrawerShell -> EmptyState [label="!trace"];
+  }
+
+  // ───────────────────────────── Hooks ─────────────────────────────
+  subgraph cluster_hooks {
+    label="Hooks";
+    style="rounded";
+    color="#bbf7d0";
+
+    useOpen      [label="useOpenTraceDrawer\n(seed header from row)"];
+    useHeader    [label="useTraceHeader"];
+    useSpanTree  [label="useSpanTree"];
+    useFacets    [label="useTraceFacets"];
+    useThread    [label="useThreadContext"];
+    useDrawer    [label="useDrawer / useDrawerParams"];
+  }
+
+  // ───────────────────────────── Stores ────────────────────────────
+  subgraph cluster_stores {
+    label="Stores (Zustand + localStorage)";
+    style="rounded";
+    color="#fde68a";
+
+    DrawerStore  [label="drawerStore\n(traceId, span, viewMode)"];
+    FilterStore  [label="filterStore\n(AST + ranges)"];
+    LensStore    [label="facetLensStore\n(sectionOrder, sectionOpen)"];
+    UIStore      [label="uiStore\n(sidebarCollapsed)"];
+  }
+
+  // ────────────────────────── Server tRPC ──────────────────────────
+  subgraph cluster_trpc {
+    label="tRPC router (server/api/routers/tracesV2.ts)";
+    style="rounded";
+    color="#ddd6fe";
+
+    R_header    [label="tracesV2.header"];
+    R_spans     [label="tracesV2.spanTreePaginated"];
+    R_facets    [label="tracesV2.facets"];
+  }
+
+  // ──────────────────────────── App layer ──────────────────────────
+  subgraph cluster_app {
+    label="App layer (server/app-layer/traces)";
+    style="rounded";
+    color="#e9d5ff";
+
+    SummaryService [label="TraceSummaryService"];
+    SpansService   [label="SpanStorageService"];
+    ListService    [label="TraceListService\n(facets / search)"];
+  }
+
+  // ────────────────────────── Repositories ─────────────────────────
+  subgraph cluster_repo {
+    label="Repositories";
+    style="rounded";
+    color="#fbcfe8";
+
+    SummaryRepo [label="TraceSummaryClickHouseRepository"];
+    SpansRepo   [label="SpanStorageClickHouseRepository"];
+    ListRepo    [label="TraceListClickHouseRepository"];
+  }
+
+  // ───────────────────────────── Storage ───────────────────────────
+  CH [label="ClickHouse\ntrace_summaries / spans", shape=cylinder, fillcolor="#fef3c7", color="#fcd34d"];
+
+  // ──────────────────────── Edges: UI → URL ────────────────────────
+  TracesPage    -> URL [style=dashed, label="row click → openDrawer"];
+  TraceTable    -> useOpen;
+  useOpen       -> URL  [style=dashed, label="push drawer.* params"];
+  useOpen       -> R_header [style=dashed, label="utils.tracesV2.header.setData\n(seed cache)"];
+
+  // URL → drawer
+  URL           -> useDrawer;
+  useDrawer     -> DrawerShell;
+  DrawerShell   -> DrawerStore [label="openTrace(traceId)"];
+
+  // ─────────────── UI → hooks → stores / network ────────────────
+  DrawerShell   -> useHeader;
+  DrawerShell   -> useSpanTree;
+  DrawerShell   -> useThread;
+
+  useHeader     -> R_header;
+  useSpanTree   -> R_spans;
+  useThread     -> R_header [style=dashed, label="thread siblings"];
+
+  FilterSidebar -> useFacets;
+  FilterSidebar -> FilterStore;
+  FilterSidebar -> LensStore;
+  FilterSidebar -> UIStore;
+  useFacets     -> R_facets;
+
+  // ────────────────────── tRPC → app layer ──────────────────────
+  R_header -> SummaryService -> SummaryRepo -> CH;
+  R_spans  -> SpansService   -> SpansRepo   -> CH;
+  R_facets -> ListService    -> ListRepo    -> CH;
+
+  // ─────────────────────── Error fallback ───────────────────────
+  R_header -> EmptyState [color="#dc2626", label="TraceNotFoundError → NOT_FOUND", fontcolor="#dc2626"];
+}

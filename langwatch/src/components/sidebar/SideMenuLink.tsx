@@ -1,7 +1,8 @@
-import { Badge, Box, HStack, Spacer, Text } from "@chakra-ui/react";
+import { Badge, Box, HStack, Text } from "@chakra-ui/react";
 import type { Project } from "@prisma/client";
 import type React from "react";
 import { trackEvent } from "../../utils/tracking";
+import { BetaPill } from "../ui/BetaPill";
 import { Link } from "../ui/link";
 
 export const MENU_ITEM_HEIGHT = "32px";
@@ -17,7 +18,11 @@ export type SideMenuItemProps = {
   badgeNumber?: number;
   showLabel?: boolean;
   rightElement?: React.ReactNode;
+  beta?: string | boolean;
+  betaLabel?: string;
 };
+
+const DEFAULT_BETA_MESSAGE = "This feature is in beta";
 
 // Renders the common visual content (icon, label, badge)
 export const SideMenuItem = ({
@@ -27,7 +32,19 @@ export const SideMenuItem = ({
   badgeNumber,
   showLabel = true,
   rightElement,
+  beta,
+  betaLabel,
 }: SideMenuItemProps) => {
+  const betaPill = beta ? (
+    <BetaPill
+      label={betaLabel}
+      message={
+        <Text fontSize="sm">
+          {typeof beta === "string" ? beta : DEFAULT_BETA_MESSAGE}
+        </Text>
+      }
+    />
+  ) : null;
   const badge =
     badgeNumber && badgeNumber > 0 ? (
       <Badge
@@ -90,11 +107,14 @@ export const SideMenuItem = ({
             fontWeight="normal"
             color="nav.fg"
             whiteSpace="nowrap"
+            flex={1}
+            overflow="hidden"
+            textOverflow="ellipsis"
           >
             {label}
           </Text>
-          {(badge ?? rightElement) && <Spacer />}
           {badge}
+          {betaPill}
           {rightElement}
         </>
       )}
@@ -118,6 +138,8 @@ export const SideMenuLink = ({
   badgeNumber,
   onClick,
   showLabel = true,
+  beta,
+  betaLabel,
 }: SideMenuLinkProps) => {
   return (
     <Link
@@ -139,6 +161,8 @@ export const SideMenuLink = ({
         isActive={isActive}
         badgeNumber={badgeNumber}
         showLabel={showLabel}
+        beta={beta}
+        betaLabel={betaLabel}
       />
     </Link>
   );

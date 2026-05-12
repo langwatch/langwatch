@@ -43,6 +43,17 @@ export const computeExecutionCells = ({
 }: ComputeExecutionCellsParams): CellId[] => {
   const cells: CellId[] = [];
 
+  // Handle evaluator-all-rows scope: cells are determined by precomputedTargetOutputs keys
+  if (scope.type === "evaluator-all-rows") {
+    for (const rowIndexStr of Object.keys(scope.precomputedTargetOutputs)) {
+      const rowIndex = Number(rowIndexStr);
+      if (rowIndex >= 0 && rowIndex < datasetRows.length) {
+        cells.push({ rowIndex, targetId: scope.targetId });
+      }
+    }
+    return cells;
+  }
+
   // Determine which row indices to process based on scope
   let rowIndices: number[];
   switch (scope.type) {

@@ -19,6 +19,15 @@ const mockPrisma = {
   teamUserCustomRole: {
     findFirst: vi.fn(),
   },
+  groupMembership: {
+    findMany: vi.fn(),
+  },
+  roleBinding: {
+    findMany: vi.fn(),
+  },
+  teamUser: {
+    findFirst: vi.fn(),
+  },
 } as any;
 
 // Mock session
@@ -32,6 +41,9 @@ const mockSession = {
 describe("Demo Project and Public Sharing Tests", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPrisma.groupMembership.findMany.mockResolvedValue([]);
+    mockPrisma.roleBinding.findMany.mockResolvedValue([]);
+    mockPrisma.teamUser.findFirst.mockResolvedValue(null);
   });
 
   afterEach(() => {
@@ -236,10 +248,13 @@ describe("Demo Project and Public Sharing Tests", () => {
       mockPrisma.project.findUnique.mockResolvedValue({
         team: {
           id: "team-123",
-          members: [{ userId: "user-123", role: TeamUserRole.ADMIN }],
+          organizationId: "org-123",
+          organization: { members: [{ role: "MEMBER" }] },
         },
       });
-      mockPrisma.teamUserCustomRole.findFirst.mockResolvedValue(null);
+      mockPrisma.roleBinding.findMany.mockResolvedValue([
+        { role: TeamUserRole.ADMIN, customRoleId: null },
+      ]);
 
       const middleware = checkPermissionOrPubliclyShared(
         checkProjectPermission("workflows:view" as Permission),

@@ -1,27 +1,32 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { type ZodError, z } from "zod";
-import { fromZodError } from "zod-validation-error";
-import { toaster } from "../components/ui/toaster";
+import { useCallback, useEffect, useState } from "react";
+import type { CustomModelEntry } from "../server/modelProviders/customModel.schema";
 import {
-  getProviderModelOptions,
-  type MaybeStoredModelProvider,
   modelProviders as modelProvidersRegistry,
+  type MaybeStoredModelProvider,
 } from "../server/modelProviders/registry";
-import { api } from "../utils/api";
-import {
-  buildCustomKeyState,
-  filterMaskedApiKeys,
-  getDisplayKeysForProvider,
-  getEffectiveDefaults,
-  getSchemaShape,
-  hasUserEnteredNewApiKey,
-  hasUserModifiedNonApiKeyFields,
-  isProviderDefaultModel,
-} from "../utils/modelProviderHelpers";
 
-type SelectOption = { value: string; label: string };
+// Mirrors the server's deriveDefaultName. Kept here so the drawer can
+// pre-fill the input on open without an extra tRPC round trip.
+function humanizeProviderName(providerKey: string): string {
+  const def =
+    modelProvidersRegistry[providerKey as keyof typeof modelProvidersRegistry];
+  if (def?.name) return def.name;
+  return providerKey
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+import { useCredentialKeys } from "./useCredentialKeys";
+import { useCustomModels } from "./useCustomModels";
+import { useDefaultProviderSelection } from "./useDefaultProviderSelection";
+import { type ExtraHeader, useExtraHeaders } from "./useExtraHeaders";
+import { type FormSnapshot, useProviderFormSubmit } from "./useProviderFormSubmit";
 
-export type ExtraHeader = { key: string; value: string; concealed?: boolean };
+export type ModelProviderScopeType = "ORGANIZATION" | "TEAM" | "PROJECT";
+
+export type ScopeSelection = {
+  scopeType: ModelProviderScopeType;
+  scopeId: string;
+};
 
 export type UseModelProviderFormParams = {
   provider: MaybeStoredModelProvider;
@@ -34,23 +39,55 @@ export type UseModelProviderFormParams = {
       }
     | null
     | undefined;
+  enabledProvidersCount: number;
   isUsingEnvVars?: boolean;
+  // Principal-style scope context (iter 108). The team+org IDs come from
+  // useOrganizationTeamProject so the form can render the picker and derive
+  // the scopeId for ORGANIZATION/TEAM selections. Legacy PROJECT scope
+  // keeps working when these are undefined.
+  teamId?: string;
+  organizationId?: string;
+  /**
+   * Permission predicates used to decide the default scope selection for
+   * a brand-new provider (iter 109). The form opens at the widest scope
+   * the user can manage: ORGANIZATION if they have organization:manage,
+   * else TEAM if they have team:manage, else PROJECT. Callers wire these
+   * from useOrganizationTeamProject's hasPermission helper.
+   */
+  canManageOrganization?: boolean;
+  canManageTeam?: boolean;
   onSuccess?: () => void;
   onError?: (error: unknown) => void;
 };
 
 export type UseModelProviderFormState = {
+  /**
+   * User-facing name. Defaults to the humanized provider string
+   * ("openai" → "OpenAI"); operators override it when they run
+   * multiple instances of the same provider at different scopes
+   * so the list and model-selector groups stay distinguishable.
+   */
+  name: string;
   useApiGateway: boolean;
   customKeys: Record<string, string>;
   displayKeys: Record<string, any>;
   initialKeys: Record<string, unknown>;
   extraHeaders: ExtraHeader[];
-  customModels: SelectOption[];
-  customEmbeddingsModels: SelectOption[];
+  customModels: CustomModelEntry[];
+  customEmbeddingsModels: CustomModelEntry[];
   useAsDefaultProvider: boolean;
   projectDefaultModel: string | null;
   projectTopicClusteringModel: string | null;
   projectEmbeddingsModel: string | null;
+  /**
+   * Multi-scope selection (iter 109). Every write sends this array to
+   * the tRPC layer and the service fail-closes the whole write if any
+   * single scope is unmanageable by the caller. For backwards-compat
+   * reads, `scopeType` still exposes the narrowest entry's tier.
+   */
+  scopes: ScopeSelection[];
+  /** Narrowest scope tier from `scopes` — kept for the legacy picker. */
+  scopeType: ModelProviderScopeType;
   isSaving: boolean;
   errors: {
     customKeysRoot?: string;
@@ -59,6 +96,9 @@ export type UseModelProviderFormState = {
 
 export type UseModelProviderFormActions = {
   setEnabled: (enabled: boolean) => Promise<void>;
+  setName: (name: string) => void;
+  setScopes: (scopes: ScopeSelection[]) => void;
+  setScopeType: (scope: ModelProviderScopeType) => void;
   setUseApiGateway: (use: boolean) => void;
   setCustomKey: (key: string, value: string) => void;
   addExtraHeader: () => void;
@@ -66,10 +106,11 @@ export type UseModelProviderFormActions = {
   toggleExtraHeaderConcealed: (index: number) => void;
   setExtraHeaderKey: (index: number, key: string) => void;
   setExtraHeaderValue: (index: number, value: string) => void;
-  setCustomModels: (options: SelectOption[]) => void;
-  setCustomEmbeddingsModels: (options: SelectOption[]) => void;
-  addCustomModelsFromText: (text: string) => void;
-  addCustomEmbeddingsFromText: (text: string) => void;
+  addCustomModel: (entry: CustomModelEntry) => void;
+  removeCustomModel: (modelId: string) => void;
+  setCustomModels: (models: CustomModelEntry[]) => void;
+  addCustomEmbeddingsModel: (entry: CustomModelEntry) => void;
+  removeCustomEmbeddingsModel: (modelId: string) => void;
   setUseAsDefaultProvider: (use: boolean) => void;
   setProjectDefaultModel: (model: string | null) => void;
   setProjectTopicClusteringModel: (model: string | null) => void;
@@ -81,510 +122,233 @@ export type UseModelProviderFormActions = {
 export function useModelProviderForm(
   params: UseModelProviderFormParams,
 ): [UseModelProviderFormState, UseModelProviderFormActions] {
-  const { provider, projectId, project, isUsingEnvVars, onSuccess, onError } =
-    params;
-
-  // Compute effective defaults using unified helper
-  const effectiveDefaults = useMemo(
-    () => getEffectiveDefaults(project),
-    [project],
-  );
   const {
-    defaultModel: initialProjectDefaultModel,
-    topicClusteringModel: initialProjectTopicClusteringModel,
-    embeddingsModel: initialProjectEmbeddingsModel,
-  } = effectiveDefaults;
+    provider,
+    projectId,
+    project,
+    enabledProvidersCount,
+    isUsingEnvVars,
+    teamId,
+    organizationId,
+    canManageOrganization,
+    canManageTeam,
+    onSuccess,
+    onError,
+  } = params;
 
-  const utils = api.useContext();
-  const updateMutation = api.modelProvider.update.useMutation();
-  const updateProjectDefaultModelsMutation =
-    api.project.updateProjectDefaultModels.useMutation();
+  // Name state — editing an existing row shows the stored name, new
+  // rows pre-fill with the humanized provider default so the input
+  // never looks empty.
+  const initialName =
+    (provider as { name?: string }).name ??
+    humanizeProviderName(provider.provider);
+  const [name, setName] = useState<string>(initialName);
 
-  const providerDefinition =
-    modelProvidersRegistry[
-      provider.provider as keyof typeof modelProvidersRegistry
-    ];
+  // Scope state — defaults to the stored provider's scope set when
+  // editing. For brand-new providers we open at the widest scope the
+  // user can manage (org > team > project) so an admin lands on the
+  // most useful default instead of having to flip from PROJECT every
+  // time. Iter 109 made this an array; existing callers that only
+  // expect a single tier still work via the derived `scopeType`.
+  const defaultNewScope: ModelProviderScopeType =
+    canManageOrganization && organizationId
+      ? "ORGANIZATION"
+      : canManageTeam && teamId
+        ? "TEAM"
+        : "PROJECT";
+  const defaultScopeId =
+    defaultNewScope === "ORGANIZATION"
+      ? organizationId
+      : defaultNewScope === "TEAM"
+        ? teamId
+        : projectId;
 
-  // Track the originally stored keys to switch projections when toggling gateway
-  const originalStoredKeysRef = useRef<Record<string, unknown>>(
-    (provider.customKeys as Record<string, unknown>) || {},
+  const initialScopes: ScopeSelection[] =
+    provider.scopes && provider.scopes.length > 0
+      ? provider.scopes.map((s) => ({
+          scopeType: s.scopeType,
+          scopeId: s.scopeId,
+        }))
+      : provider.scopeType && provider.scopeId
+        ? [{ scopeType: provider.scopeType, scopeId: provider.scopeId }]
+        : defaultScopeId
+          ? [{ scopeType: defaultNewScope, scopeId: defaultScopeId }]
+          : [];
+  const [scopes, setScopes] = useState<ScopeSelection[]>(initialScopes);
+
+  // Narrowest tier (PROJECT > TEAM > ORGANIZATION) — legacy consumers
+  // that expected a single `scopeType` pick the most specific one.
+  const scopeType: ModelProviderScopeType = scopes.some(
+    (s) => s.scopeType === "PROJECT",
+  )
+    ? "PROJECT"
+    : scopes.some((s) => s.scopeType === "TEAM")
+      ? "TEAM"
+      : scopes[0]?.scopeType ?? defaultNewScope;
+
+  const scopeId =
+    scopes.find((s) => s.scopeType === scopeType)?.scopeId ?? undefined;
+
+  const setScopeType = useCallback(
+    (next: ModelProviderScopeType) => {
+      const nextId =
+        next === "ORGANIZATION"
+          ? organizationId
+          : next === "TEAM"
+            ? teamId
+            : projectId;
+      if (!nextId) return;
+      setScopes([{ scopeType: next, scopeId: nextId }]);
+    },
+    [organizationId, teamId, projectId],
   );
 
-  const originalSchemaShape = useMemo<Record<string, unknown>>(() => {
-    return providerDefinition?.keysSchema
-      ? getSchemaShape(providerDefinition.keysSchema)
-      : {};
-  }, [providerDefinition?.keysSchema]);
+  // --- Sub-hooks ---
+  const credentialKeysHook = useCredentialKeys({ provider });
+  const extraHeadersHook = useExtraHeaders({ provider });
+  const customModelsHook = useCustomModels({ provider });
+  const defaultProviderHook = useDefaultProviderSelection({
+    provider,
+    project,
+    enabledProvidersCount,
+  });
 
-  const initialUseApiGateway = useMemo(() => {
-    if (provider.provider === "azure" && provider.customKeys) {
-      return !!(provider.customKeys as any).AZURE_API_GATEWAY_BASE_URL;
-    }
-    return false;
-  }, [provider.provider, provider.customKeys]);
-
-  const [useApiGateway, setUseApiGatewayState] =
-    useState<boolean>(initialUseApiGateway);
-
-  const displayKeys = useMemo(() => {
-    return getDisplayKeysForProvider(
-      provider.provider,
-      useApiGateway,
-      originalSchemaShape,
-    );
-  }, [provider.provider, useApiGateway, originalSchemaShape]);
-
-  const [customKeys, setCustomKeys] = useState<Record<string, string>>(() =>
-    buildCustomKeyState(
-      displayKeys,
-      originalStoredKeysRef.current ?? {},
-      undefined,
-      {
-        providerEnabledWithEnvVars: provider.enabled,
-      },
-    ),
+  // Build snapshot callback for submit (avoids stale closures)
+  const getFormSnapshot = useCallback(
+    (): FormSnapshot => ({
+      provider,
+      projectId,
+      isUsingEnvVars,
+      customKeys: credentialKeysHook.customKeys,
+      initialKeys: credentialKeysHook.originalStoredKeysRef.current,
+      providerKeysSchema: credentialKeysHook.providerDefinition?.keysSchema,
+      extraHeaders: extraHeadersHook.extraHeaders,
+      customModels: customModelsHook.customModels,
+      customEmbeddingsModels: customModelsHook.customEmbeddingsModels,
+      useAsDefaultProvider: defaultProviderHook.useAsDefaultProvider,
+      projectDefaultModel: defaultProviderHook.projectDefaultModel,
+      projectTopicClusteringModel:
+        defaultProviderHook.projectTopicClusteringModel,
+      projectEmbeddingsModel: defaultProviderHook.projectEmbeddingsModel,
+      name,
+      scopes,
+      scopeType,
+      scopeId,
+    }),
+    [
+      provider,
+      projectId,
+      isUsingEnvVars,
+      credentialKeysHook.customKeys,
+      credentialKeysHook.originalStoredKeysRef,
+      credentialKeysHook.providerDefinition?.keysSchema,
+      extraHeadersHook.extraHeaders,
+      customModelsHook.customModels,
+      customModelsHook.customEmbeddingsModels,
+      defaultProviderHook.useAsDefaultProvider,
+      defaultProviderHook.projectDefaultModel,
+      defaultProviderHook.projectTopicClusteringModel,
+      defaultProviderHook.projectEmbeddingsModel,
+      name,
+      scopes,
+      scopeType,
+      scopeId,
+    ],
   );
 
-  const [extraHeaders, setExtraHeaders] = useState<ExtraHeader[]>(
-    (provider.extraHeaders ?? []).map((h) => ({
-      key: h.key,
-      value: h.value,
-      concealed: !!h.value,
-    })),
+  const formSubmitHook = useProviderFormSubmit({
+    getFormSnapshot,
+    onSuccess,
+    onError,
+  });
+
+  // --- Cross-hook coordination: gateway toggle wires credential keys → extra headers ---
+  const handleGatewayToggle = useCallback(
+    (useGateway: boolean) => {
+      if (provider.provider === "azure" && useGateway) {
+        extraHeadersHook.ensureApiKeyHeader();
+      }
+    },
+    [provider.provider, extraHeadersHook.ensureApiKeyHeader],
   );
 
-  const getStoredModelOptions = (
-    models: string[] | undefined,
-    providerName: string,
-    mode: "chat" | "embedding",
-  ): SelectOption[] => {
-    if (!models || models.length === 0) {
-      return getProviderModelOptions(providerName, mode);
-    }
-    return models.map((model) => ({ value: model, label: model }));
-  };
-
-  const [customModels, setCustomModels] = useState<SelectOption[]>(
-    getStoredModelOptions(
-      provider.models ?? undefined,
-      provider.provider,
-      "chat",
-    ),
-  );
-  const [customEmbeddingsModels, setCustomEmbeddingsModels] = useState<
-    SelectOption[]
-  >(
-    getStoredModelOptions(
-      provider.embeddingsModels ?? undefined,
-      provider.provider,
-      "embedding",
-    ),
+  const setUseApiGateway = useCallback(
+    (use: boolean) => {
+      credentialKeysHook.setUseApiGateway(use, handleGatewayToggle);
+    },
+    [credentialKeysHook.setUseApiGateway, handleGatewayToggle],
   );
 
-  // Auto-enable toggle if this provider is used for the Default Model (matching badge logic)
-  const [useAsDefaultProvider, setUseAsDefaultProvider] = useState<boolean>(
-    () => isProviderDefaultModel(provider.provider, project),
-  );
-  const [projectDefaultModel, setProjectDefaultModel] = useState<string | null>(
-    initialProjectDefaultModel,
-  );
-  const [projectTopicClusteringModel, setProjectTopicClusteringModel] =
-    useState<string | null>(initialProjectTopicClusteringModel);
-  const [projectEmbeddingsModel, setProjectEmbeddingsModel] = useState<
-    string | null
-  >(initialProjectEmbeddingsModel);
-
-  const [isSaving, setIsSaving] = useState(false);
-  const [errors, setErrors] = useState<{ customKeysRoot?: string }>({});
-
-  const setManaged = useCallback((managed: boolean) => {
-    if (managed) {
-      setCustomKeys({ MANAGED: "true" });
-    } else {
-      setCustomKeys({});
-    }
-  }, []);
-
+  // --- Single reset effect ---
   useEffect(() => {
-    const storedKeys = (provider.customKeys as Record<string, unknown>) ?? {};
-    originalStoredKeysRef.current = storedKeys;
-
-    const nextUseApiGateway =
-      provider.provider === "azure" && provider.customKeys
-        ? !!(provider.customKeys as any).AZURE_API_GATEWAY_BASE_URL
-        : false;
-
-    setUseApiGatewayState(nextUseApiGateway);
-
-    const nextDisplayKeys = getDisplayKeysForProvider(
-      provider.provider,
-      nextUseApiGateway,
-      originalSchemaShape,
+    const nextUseApiGateway = credentialKeysHook.reset(provider);
+    extraHeadersHook.reset(provider, nextUseApiGateway);
+    customModelsHook.reset(provider);
+    defaultProviderHook.reset(provider, project, enabledProvidersCount);
+    formSubmitHook.reset();
+    setName(
+      (provider as { name?: string }).name ??
+        humanizeProviderName(provider.provider),
     );
-
-    setCustomKeys(() =>
-      buildCustomKeyState(nextDisplayKeys, storedKeys, undefined, {
-        providerEnabledWithEnvVars: provider.enabled,
-      }),
-    );
-
-    let nextExtraHeaders = (provider.extraHeaders ?? []).map((header) => ({
-      key: header.key,
-      value: header.value,
-      concealed: !!header.value,
-    }));
-
-    if (
-      provider.provider === "azure" &&
-      nextUseApiGateway &&
-      nextExtraHeaders.length === 0
-    ) {
-      nextExtraHeaders = [{ key: "api-key", value: "", concealed: false }];
-    }
-
-    setExtraHeaders(nextExtraHeaders);
-
-    setCustomModels(
-      getStoredModelOptions(
-        provider.models ?? undefined,
-        provider.provider,
-        "chat",
-      ),
-    );
-
-    setCustomEmbeddingsModels(
-      getStoredModelOptions(
-        provider.embeddingsModels ?? undefined,
-        provider.provider,
-        "embedding",
-      ),
-    );
-
-    // Auto-enable the toggle if this provider is used for the Default Model (matching badge logic)
-    const isUsedForDefaultModel = isProviderDefaultModel(
-      provider.provider,
-      project,
-    );
-    setUseAsDefaultProvider(isUsedForDefaultModel);
-
-    setProjectDefaultModel(initialProjectDefaultModel);
-    setProjectTopicClusteringModel(initialProjectTopicClusteringModel);
-    setProjectEmbeddingsModel(initialProjectEmbeddingsModel);
-    setErrors({});
-    setIsSaving(false);
   }, [
     provider.provider,
     provider.id,
     provider.enabled,
     provider.customKeys,
+    provider.customModels,
+    provider.customEmbeddingsModels,
     provider.extraHeaders,
-    originalSchemaShape,
-    initialProjectDefaultModel,
-    initialProjectTopicClusteringModel,
-    initialProjectEmbeddingsModel,
-    project,
+    project?.defaultModel,
+    project?.topicClusteringModel,
+    project?.embeddingsModel,
+    enabledProvidersCount,
   ]);
 
-  const setEnabled = useCallback(
-    async (newEnabled: boolean) => {
-      try {
-        await updateMutation.mutateAsync({
-          id: provider.id,
-          projectId: projectId ?? "",
-          provider: provider.provider,
-          enabled: newEnabled,
-          customKeys: provider.customKeys as any,
-          customModels: provider.models ?? [],
-          customEmbeddingsModels: provider.embeddingsModels ?? [],
-        });
-        onSuccess?.();
-      } catch (err) {
-        onError?.(err);
-        toaster.create({
-          title: "Failed to update provider",
-          description: err instanceof Error ? err.message : String(err),
-          type: "error",
-          duration: 4000,
-          meta: { closable: true },
-        });
-      }
-    },
-    [
-      onSuccess,
-      onError,
-      provider.id,
-      provider.provider,
-      provider.customKeys,
-      provider.models,
-      provider.embeddingsModels,
-      projectId,
-      updateMutation,
-    ],
-  );
-
-  const setUseApiGateway = useCallback(
-    (use: boolean) => {
-      setUseApiGatewayState(use);
-      setCustomKeys((previousKeys) => {
-        originalStoredKeysRef.current = {
-          ...originalStoredKeysRef.current,
-          ...previousKeys,
-        };
-
-        const nextDisplayKeys = getDisplayKeysForProvider(
-          provider.provider,
-          use,
-          originalSchemaShape,
-        );
-
-        return buildCustomKeyState(
-          nextDisplayKeys,
-          originalStoredKeysRef.current,
-          previousKeys,
-        );
-      });
-
-      if (provider.provider === "azure" && use && extraHeaders.length === 0) {
-        setExtraHeaders([{ key: "api-key", value: "", concealed: false }]);
-      }
-    },
-    [provider.provider, extraHeaders.length, originalSchemaShape],
-  );
-
-  const setCustomKey = useCallback((key: string, value: string) => {
-    setCustomKeys((prev) => ({ ...prev, [key]: value }));
-  }, []);
-
-  const addExtraHeader = useCallback(() => {
-    setExtraHeaders((prev) => [
-      ...prev,
-      { key: "", value: "", concealed: false },
-    ]);
-  }, []);
-
-  const removeExtraHeader = useCallback((index: number) => {
-    setExtraHeaders((prev) => prev.filter((_, i) => i !== index));
-  }, []);
-
-  const toggleExtraHeaderConcealed = useCallback((index: number) => {
-    setExtraHeaders((prev) =>
-      prev.map((h, i) => (i === index ? { ...h, concealed: !h.concealed } : h)),
-    );
-  }, []);
-
-  const setExtraHeaderKey = useCallback((index: number, key: string) => {
-    setExtraHeaders((prev) =>
-      prev.map((h, i) => (i === index ? { ...h, key } : h)),
-    );
-  }, []);
-
-  const setExtraHeaderValue = useCallback((index: number, value: string) => {
-    setExtraHeaders((prev) =>
-      prev.map((h, i) => (i === index ? { ...h, value } : h)),
-    );
-  }, []);
-
-  const addCustomModelsFromText = useCallback((text: string) => {
-    const newModels = text
-      .split(",")
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0)
-      .map((s) => ({ value: s, label: s }));
-    setCustomModels((prev) => {
-      const existingValues = new Set(prev.map((m) => m.value));
-      const uniqueNew = newModels.filter((m) => !existingValues.has(m.value));
-      return [...prev, ...uniqueNew];
-    });
-  }, []);
-
-  const addCustomEmbeddingsFromText = useCallback((text: string) => {
-    const newModels = text
-      .split(",")
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0)
-      .map((s) => ({ value: s, label: s }));
-    setCustomEmbeddingsModels((prev) => {
-      const existingValues = new Set(prev.map((m) => m.value));
-      const uniqueNew = newModels.filter((m) => !existingValues.has(m.value));
-      return [...prev, ...uniqueNew];
-    });
-  }, []);
-
-  const submit = useCallback(async () => {
-    setIsSaving(true);
-    setErrors({});
-    try {
-      // Check if user modified non-API-key fields (like URLs) when using env vars
-      const hasNonApiKeyChanges =
-        isUsingEnvVars &&
-        hasUserModifiedNonApiKeyFields(
-          customKeys,
-          originalStoredKeysRef.current,
-        );
-
-      // Validate if not using env vars, OR if using env vars but has non-API-key changes
-      if (!isUsingEnvVars || hasNonApiKeyChanges) {
-        // Validate keys according to schema if present
-        const keysSchema = providerDefinition?.keysSchema
-          ? z
-              .union([
-                providerDefinition.keysSchema,
-                z.object({ MANAGED: z.string() }),
-              ])
-              .optional()
-              .nullable()
-          : z.object({ MANAGED: z.string() }).optional().nullable();
-        const keysToValidate: Record<string, unknown> = { ...customKeys };
-        const parsed = (keysSchema as any).safeParse
-          ? (keysSchema as any).safeParse(keysToValidate)
-          : { success: true };
-        if (!parsed.success) {
-          setErrors({
-            customKeysRoot: fromZodError(parsed.error as ZodError).message,
-          });
-          setIsSaving(false);
-          return;
-        }
-      }
-
-      // Determine what customKeys to send:
-      // - Not using env vars: send all customKeys
-      // - Using env vars with new API key or non-API-key changes: send the keys
-      // - Using env vars without changes: send undefined (don't update)
-      let customKeysToSend: Record<string, unknown> | undefined;
-      const userEnteredNewKey = hasUserEnteredNewApiKey(customKeys);
-      if (!isUsingEnvVars) {
-        customKeysToSend = { ...customKeys };
-      } else if (userEnteredNewKey || hasNonApiKeyChanges) {
-        // User entered a new key or modified non-API-key fields - send the keys
-        customKeysToSend = userEnteredNewKey
-          ? { ...customKeys }
-          : filterMaskedApiKeys(customKeys);
-      } else {
-        customKeysToSend = undefined;
-      }
-
-      // Build custom keys to send (merge azure headers when applicable)
-      if (!isUsingEnvVars && provider.provider === "azure") {
-        const headerMap: Record<string, string> = {};
-        (extraHeaders ?? []).forEach((header) => {
-          if (header.key.trim() && header.value.trim()) {
-            const sanitizedKey = header.key
-              .trim()
-              .replace(/[^a-zA-Z0-9_-]/g, "_");
-            if (sanitizedKey) headerMap[sanitizedKey] = header.value.trim();
-          }
-        });
-        customKeysToSend = { ...customKeysToSend, ...headerMap };
-      }
-
-      // Strip concealed for send
-      const extraHeadersToSend = (extraHeaders ?? [])
-        .filter((h) => h.key?.trim())
-        .map(({ key, value }) => ({ key, value }));
-
-      await updateMutation.mutateAsync({
-        id: provider.id,
-        projectId: projectId ?? "",
-        provider: provider.provider,
-        enabled: true, // Always enable when saving through the form
-        customKeys: customKeysToSend,
-        customModels: (customModels ?? []).map((m) => m.value),
-        customEmbeddingsModels: (customEmbeddingsModels ?? []).map(
-          (m) => m.value,
-        ),
-        extraHeaders: extraHeadersToSend,
-      });
-
-      // Update project default models if useAsDefaultProvider is enabled
-      if (useAsDefaultProvider && projectId) {
-        await updateProjectDefaultModelsMutation.mutateAsync({
-          projectId,
-          defaultModel: projectDefaultModel ?? undefined,
-          topicClusteringModel: projectTopicClusteringModel ?? undefined,
-          embeddingsModel: projectEmbeddingsModel ?? undefined,
-        });
-
-        // Invalidate organization query to refetch project data
-        // This triggers useOrganizationTeamProject to refetch automatically
-        void utils.organization.getAll.invalidate();
-      }
-
-      toaster.create({
-        title: "Model Provider Updated",
-        type: "success",
-        duration: 3000,
-        meta: { closable: true },
-      });
-      onSuccess?.();
-    } catch (err) {
-      onError?.(err);
-      toaster.create({
-        title: "Failed to save settings",
-        description: err instanceof Error ? err.message : String(err),
-        type: "error",
-        duration: 4000,
-        meta: { closable: true },
-      });
-    } finally {
-      setIsSaving(false);
-    }
-  }, [
-    isUsingEnvVars,
-    customKeys,
-    customModels,
-    customEmbeddingsModels,
-    extraHeaders,
-    onError,
-    onSuccess,
-    projectId,
-    providerDefinition?.keysSchema,
-    provider.id,
-    provider.provider,
-    updateMutation,
-    useAsDefaultProvider,
-    projectDefaultModel,
-    projectTopicClusteringModel,
-    projectEmbeddingsModel,
-    updateProjectDefaultModelsMutation,
-    utils,
-  ]);
-
+  // --- Assemble public interface ---
   return [
     {
-      useApiGateway,
-      customKeys,
-      displayKeys,
-      initialKeys: originalStoredKeysRef.current,
-      extraHeaders,
-      customModels,
-      customEmbeddingsModels,
-      useAsDefaultProvider,
-      projectDefaultModel,
-      projectTopicClusteringModel,
-      projectEmbeddingsModel,
-      isSaving,
-      errors,
+      useApiGateway: credentialKeysHook.useApiGateway,
+      customKeys: credentialKeysHook.customKeys,
+      displayKeys: credentialKeysHook.displayKeys,
+      initialKeys: credentialKeysHook.initialKeys,
+      extraHeaders: extraHeadersHook.extraHeaders,
+      customModels: customModelsHook.customModels,
+      customEmbeddingsModels: customModelsHook.customEmbeddingsModels,
+      useAsDefaultProvider: defaultProviderHook.useAsDefaultProvider,
+      projectDefaultModel: defaultProviderHook.projectDefaultModel,
+      projectTopicClusteringModel:
+        defaultProviderHook.projectTopicClusteringModel,
+      projectEmbeddingsModel: defaultProviderHook.projectEmbeddingsModel,
+      name,
+      scopes,
+      scopeType,
+      isSaving: formSubmitHook.isSaving,
+      errors: formSubmitHook.errors,
     },
     {
-      setEnabled,
+      setEnabled: formSubmitHook.setEnabled,
+      setName,
+      setScopes,
+      setScopeType,
       setUseApiGateway,
-      setCustomKey,
-      addExtraHeader,
-      removeExtraHeader,
-      toggleExtraHeaderConcealed,
-      setExtraHeaderKey,
-      setExtraHeaderValue,
-      setCustomModels,
-      setCustomEmbeddingsModels,
-      addCustomModelsFromText,
-      addCustomEmbeddingsFromText,
-      setUseAsDefaultProvider,
-      setProjectDefaultModel,
-      setProjectTopicClusteringModel,
-      setProjectEmbeddingsModel,
-      setManaged,
-      submit,
+      setCustomKey: credentialKeysHook.setCustomKey,
+      addExtraHeader: extraHeadersHook.addExtraHeader,
+      removeExtraHeader: extraHeadersHook.removeExtraHeader,
+      toggleExtraHeaderConcealed: extraHeadersHook.toggleExtraHeaderConcealed,
+      setExtraHeaderKey: extraHeadersHook.setExtraHeaderKey,
+      setExtraHeaderValue: extraHeadersHook.setExtraHeaderValue,
+      addCustomModel: customModelsHook.addCustomModel,
+      removeCustomModel: customModelsHook.removeCustomModel,
+      setCustomModels: customModelsHook.setCustomModels,
+      addCustomEmbeddingsModel: customModelsHook.addCustomEmbeddingsModel,
+      removeCustomEmbeddingsModel: customModelsHook.removeCustomEmbeddingsModel,
+      setUseAsDefaultProvider: defaultProviderHook.setUseAsDefaultProvider,
+      setProjectDefaultModel: defaultProviderHook.setProjectDefaultModel,
+      setProjectTopicClusteringModel:
+        defaultProviderHook.setProjectTopicClusteringModel,
+      setProjectEmbeddingsModel: defaultProviderHook.setProjectEmbeddingsModel,
+      setManaged: credentialKeysHook.setManaged,
+      submit: formSubmitHook.submit,
     },
   ];
 }

@@ -1,0 +1,278 @@
+---
+title: Using Built-in Evaluators
+sidebarTitle: Built-in Evaluators
+description: Run LangWatch's library of evaluators directly from your code for experiments, online evaluation, and guardrails.
+---
+
+LangWatch provides a library of ready-to-use evaluators for common evaluation tasks. You can use these directly in your code without any setup on the platform.
+
+<Info>
+**When to use Built-in Evaluators:**
+- You want to quickly add evaluation without platform configuration
+- You're running experiments or online evaluations programmatically
+- You want to use well-tested, standardized evaluation methods
+
+**See also:**
+- [Saved Evaluators](/evaluations/evaluators/saved-evaluators) - Reuse configured evaluators across your project
+- [Custom Scoring](/evaluations/evaluators/custom-scoring) - Send scores from your own evaluation logic
+</Info>
+
+## Available Evaluators
+
+LangWatch offers evaluators across several categories:
+
+| Category | Examples | Use Case |
+|----------|----------|----------|
+| **RAG Quality** | `ragas/faithfulness`, `ragas/context_precision` | Evaluate retrieval-augmented generation |
+| **Safety** | `presidio/pii_detection`, `azure/jailbreak` | Detect PII, jailbreaks, harmful content |
+| **Correctness** | `langevals/exact_match`, `langevals/llm_boolean` | Check answer accuracy |
+| **Custom Criteria** | `langevals/llm_boolean`, `langevals/llm_score` | LLM-as-Judge for custom checks |
+
+[Browse all evaluators →](/evaluations/evaluators/list)
+
+## Using Built-in Evaluators
+
+### In Experiments
+
+Run evaluators on your test dataset during batch evaluation:
+
+<CodeGroup>
+```python Python
+import langwatch
+
+df = langwatch.datasets.get_dataset("my-dataset").to_pandas()
+
+experiment = langwatch.experiment.init("my-experiment")
+
+for index, row in experiment.loop(df.iterrows()):
+    # Your LLM call
+    output = my_llm(row["input"])
+
+    # Run built-in evaluator
+    experiment.evaluate(
+        "ragas/faithfulness",  # Built-in evaluator slug
+        index=index,
+        data={
+            "input": row["input"],
+            "output": output,
+            "contexts": row["contexts"],
+        },
+    )
+```
+
+```typescript TypeScript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+
+const dataset = await langwatch.datasets.get("my-dataset");
+const experiment = await langwatch.experiments.init("my-experiment");
+
+await experiment.run(
+  dataset.entries.map((e) => e.entry),
+  async ({ item, index }) => {
+    // Your LLM call
+    const output = await myLLM(item.input);
+
+    // Run built-in evaluator
+    await experiment.evaluate("ragas/faithfulness", {
+      index,
+      data: {
+        input: item.input,
+        output: output,
+        contexts: item.contexts,
+      },
+    });
+  },
+  { concurrency: 4 }
+);
+```
+</CodeGroup>
+
+### In Online Evaluation
+
+Run evaluators on production traces in real-time:
+
+<CodeGroup>
+```python Python
+import langwatch
+
+@langwatch.span()
+def my_llm_step(user_input: str):
+    # Your LLM call
+    output = my_llm(user_input)
+
+    # Run evaluator on production traffic
+    result = langwatch.evaluation.evaluate(
+        "presidio/pii_detection",  # Built-in evaluator slug
+        name="PII Check",
+        data={
+            "input": user_input,
+            "output": output,
+        },
+    )
+
+    return output
+```
+
+```typescript TypeScript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+
+async function myLLMStep(userInput: string): Promise<string> {
+  // Your LLM call
+  const output = await myLLM(userInput);
+
+  // Run evaluator on production traffic
+  const result = await langwatch.evaluations.evaluate("presidio/pii_detection", {
+    name: "PII Check",
+    data: {
+      input: userInput,
+      output: output,
+    },
+  });
+
+  return output;
+}
+```
+</CodeGroup>
+
+### As Guardrails
+
+Use evaluators to block harmful content before responding:
+
+<CodeGroup>
+```python Python
+import langwatch
+
+@langwatch.span()
+def my_llm_step(user_input: str):
+    # Check input before processing
+    guardrail = langwatch.evaluation.evaluate(
+        "azure/jailbreak",  # Built-in evaluator slug
+        name="Jailbreak Detection",
+        data={"input": user_input},
+        as_guardrail=True,
+    )
+
+    if not guardrail.passed:
+        return "I can't help with that request."
+
+    # Safe to proceed
+    return my_llm(user_input)
+```
+
+```typescript TypeScript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+
+async function myLLMStep(userInput: string): Promise<string> {
+  // Check input before processing
+  const guardrail = await langwatch.evaluations.evaluate("azure/jailbreak", {
+    name: "Jailbreak Detection",
+    data: { input: userInput },
+    asGuardrail: true,
+  });
+
+  if (!guardrail.passed) {
+    return "I can't help with that request.";
+  }
+
+  // Safe to proceed
+  return await myLLM(userInput);
+}
+```
+</CodeGroup>
+
+## Evaluator Inputs
+
+Different evaluators require different inputs. Check the [evaluator list](/evaluations/evaluators/list) for each evaluator's requirements.
+
+| Input | Description | Example Evaluators |
+|-------|-------------|-------------------|
+| `input` | User question/prompt | Jailbreak Detection, Off-Topic |
+| `output` | LLM response | PII Detection, Valid Format |
+| `contexts` | Retrieved documents (array) | Faithfulness, Context Precision |
+| `expected_output` | Ground truth answer | Answer Correctness, Exact Match |
+| `conversation` | Conversation history | Conversation Relevancy |
+
+## Configuring Settings
+
+Many evaluators accept configuration settings:
+
+<CodeGroup>
+```python Python
+experiment.evaluate(
+    "langevals/llm_boolean",
+    index=index,
+    data={"input": question, "output": response},
+    settings={
+        "model": "openai/gpt-4o-mini",
+        "prompt": "Does this response fully answer the question? Reply true or false.",
+    },
+)
+```
+
+```typescript TypeScript
+await experiment.evaluate("langevals/llm_boolean", {
+  index,
+  data: { input: question, output: response },
+  settings: {
+    model: "openai/gpt-4o-mini",
+    prompt: "Does this response fully answer the question? Reply true or false.",
+  },
+});
+```
+</CodeGroup>
+
+## The `name` Parameter
+
+<Warning>
+Always provide a descriptive `name` when using evaluators in online evaluation. This helps track results in Analytics.
+</Warning>
+
+```python
+# Good - descriptive name
+langwatch.evaluation.evaluate(
+    "langevals/llm_category",
+    name="Tone Checker",  # Shows up in Analytics
+    data={...},
+)
+
+# Bad - no name, hard to track
+langwatch.evaluation.evaluate(
+    "langevals/llm_category",
+    data={...},
+)
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Evaluators List"
+    description="Browse all available built-in evaluators."
+    icon="list"
+    href="/evaluations/evaluators/list"
+  />
+  <Card
+    title="Saved Evaluators"
+    description="Save configured evaluators for reuse."
+    icon="bookmark"
+    href="/evaluations/evaluators/saved-evaluators"
+  />
+  <Card
+    title="Custom Scoring"
+    description="Send scores from your own evaluation logic."
+    icon="code"
+    href="/evaluations/evaluators/custom-scoring"
+  />
+  <Card
+    title="API Reference"
+    description="Full API documentation for evaluators."
+    icon="book"
+    href="/api-reference/evaluators/overview"
+  />
+</CardGroup>

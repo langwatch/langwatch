@@ -3,7 +3,7 @@ import {
   ATTRIBUTE_KEYS,
   buildTraceSummariesConditions,
   buildStoredSpansConditions,
-  buildEvaluationStatesConditions,
+  buildEvaluationRunsConditions,
   buildQueryFilter,
   extractStandardResults,
 } from "../clickhouse/query-helpers";
@@ -11,15 +11,15 @@ import type { ClickHouseFilterQueryParams } from "../clickhouse/types";
 
 describe("ATTRIBUTE_KEYS", () => {
   it("defines thread_id attribute key", () => {
-    expect(ATTRIBUTE_KEYS.thread_id).toBe("Attributes['thread.id']");
+    expect(ATTRIBUTE_KEYS.thread_id).toBe("Attributes['gen_ai.conversation.id']");
   });
 
   it("defines user_id attribute key", () => {
-    expect(ATTRIBUTE_KEYS.user_id).toBe("Attributes['user.id']");
+    expect(ATTRIBUTE_KEYS.user_id).toBe("Attributes['langwatch.user_id']");
   });
 
   it("defines customer_id attribute key", () => {
-    expect(ATTRIBUTE_KEYS.customer_id).toBe("Attributes['customer.id']");
+    expect(ATTRIBUTE_KEYS.customer_id).toBe("Attributes['langwatch.customer_id']");
   });
 });
 
@@ -35,18 +35,19 @@ describe("buildTraceSummariesConditions", () => {
     expect(result).toContain("TenantId = {tenantId:String}");
   });
 
-  it("returns CreatedAt start condition", () => {
+  it("returns OccurredAt conditions for partition pruning", () => {
     const result = buildTraceSummariesConditions(baseParams);
     expect(result).toContain(
-      "CreatedAt >= fromUnixTimestamp64Milli({startDate:UInt64})"
+      "OccurredAt >= fromUnixTimestamp64Milli({startDate:UInt64})"
+    );
+    expect(result).toContain(
+      "OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})"
     );
   });
 
-  it("returns CreatedAt end condition", () => {
+  it("does not filter on CreatedAt (OccurredAt is the user-facing timestamp)", () => {
     const result = buildTraceSummariesConditions(baseParams);
-    expect(result).toContain(
-      "CreatedAt <= fromUnixTimestamp64Milli({endDate:UInt64})"
-    );
+    expect(result).not.toContain("CreatedAt");
   });
 
   it("joins conditions with AND", () => {
@@ -78,7 +79,7 @@ describe("buildStoredSpansConditions", () => {
   });
 });
 
-describe("buildEvaluationStatesConditions", () => {
+describe("buildEvaluationRunsConditions", () => {
   const baseParams: ClickHouseFilterQueryParams = {
     tenantId: "test-tenant",
     startDate: 1704067200000,
@@ -86,12 +87,12 @@ describe("buildEvaluationStatesConditions", () => {
   };
 
   it("returns TenantId condition with parameter placeholder", () => {
-    const result = buildEvaluationStatesConditions(baseParams);
+    const result = buildEvaluationRunsConditions(baseParams);
     expect(result).toContain("TenantId = {tenantId:String}");
   });
 
   it("uses ScheduledAt for date filtering", () => {
-    const result = buildEvaluationStatesConditions(baseParams);
+    const result = buildEvaluationRunsConditions(baseParams);
     expect(result).toContain(
       "ScheduledAt >= fromUnixTimestamp64Milli({startDate:UInt64})"
     );

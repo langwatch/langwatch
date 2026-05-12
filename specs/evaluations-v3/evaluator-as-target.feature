@@ -15,18 +15,7 @@ Feature: Evaluator as evaluation target
   # ============================================================================
   # Target type selection
   # ============================================================================
-
-  Scenario: Evaluator appears as third option in type selector
-    When I click the "+ Add" button
-    Then the TargetTypeSelectorDrawer opens
-    And I see three options: "Prompt", "Agent", and "Evaluator"
-
-  Scenario: Select Evaluator type opens evaluator list
-    Given the TargetTypeSelectorDrawer is open
-    When I select "Evaluator"
-    Then the EvaluatorListDrawer opens
-    And I can select from existing evaluators
-
+  @unimplemented
   Scenario: Evaluator card shows correct styling
     When I click the "+ Add" button
     Then the Evaluator card shows a checkmark icon
@@ -36,6 +25,7 @@ Feature: Evaluator as evaluation target
   # Adding evaluator as target
   # ============================================================================
 
+  @unimplemented
   Scenario: Add existing evaluator as target
     Given evaluator "Sentiment Check" of type "langevals/sentiment" exists
     When I click "+ Add"
@@ -46,6 +36,7 @@ Feature: Evaluator as evaluation target
     And the target type is "evaluator"
     And the target has outputs: passed, score, label
 
+  @unimplemented
   Scenario: Evaluator target inputs derived from evaluator definition
     Given evaluator "Custom LLM Judge" with required fields ["output", "expected_output"] exists
     When I click "+ Add"
@@ -54,6 +45,7 @@ Feature: Evaluator as evaluation target
     Then the target has inputs: output, expected_output
     And I can map dataset columns to these inputs
 
+  @unimplemented
   Scenario: Evaluator target has standard evaluator outputs
     Given evaluator "Exact Match" exists
     When I add it as a target
@@ -63,6 +55,7 @@ Feature: Evaluator as evaluation target
       | score      | float |
       | label      | str   |
 
+  @unimplemented
   Scenario: Create new evaluator inline
     When I click "+ Add"
     And I select "Evaluator"
@@ -76,6 +69,7 @@ Feature: Evaluator as evaluation target
   # Mapping and configuration
   # ============================================================================
 
+  @unimplemented
   Scenario: Map dataset columns to evaluator target inputs
     Given an evaluator target "Sentiment Check" with input "output"
     And dataset column "response"
@@ -83,12 +77,14 @@ Feature: Evaluator as evaluation target
     Then the mapping is saved
     And execution will pass "response" value to the evaluator
 
+  @unimplemented
   Scenario: Evaluator target shows missing mapping warning
     Given an evaluator target "Exact Match" with inputs ["output", "expected_output"]
     And only "output" is mapped
     Then the target column header shows a warning indicator
     And hovering shows tooltip about unmapped inputs
 
+  @unimplemented
   Scenario: Value mapping works for evaluator targets
     Given an evaluator target with input "threshold"
     When I set a value mapping of "0.8" for "threshold"
@@ -98,12 +94,7 @@ Feature: Evaluator as evaluation target
   # ============================================================================
   # Target header and UI
   # ============================================================================
-
-  Scenario: Evaluator target header shows evaluator icon
-    Given an evaluator target "Sentiment Check" is configured
-    Then the target header shows a checkmark icon
-    And the icon has green color styling
-
+  @unimplemented
   Scenario: Evaluator target header shows popover on click
     Given an evaluator target "Sentiment Check" is configured
     When I click on the target header "Sentiment Check"
@@ -111,6 +102,7 @@ Feature: Evaluator as evaluation target
       | Edit Evaluator       |
       | Remove from Workbench|
 
+  @unimplemented
   Scenario: Edit evaluator target opens evaluator editor
     Given an evaluator target "Sentiment Check" is configured
     When I click on the target header "Sentiment Check"
@@ -118,16 +110,11 @@ Feature: Evaluator as evaluation target
     Then the EvaluatorEditorDrawer opens
     And I can view the evaluator settings
 
-  Scenario: Remove evaluator target from workbench
-    Given an evaluator target "Sentiment Check" is configured
-    When I click on the target header "Sentiment Check"
-    And I click "Remove from Workbench" in the popover
-    Then the target column is removed from the table
-
   # ============================================================================
   # Execution
   # ============================================================================
 
+  @unimplemented
   Scenario: Execute evaluator target
     Given an evaluator target "Exact Match" is configured
     And input "output" is mapped to dataset column "response"
@@ -136,6 +123,7 @@ Feature: Evaluator as evaluation target
     Then the evaluator executes for each row
     And the target output shows passed/score/label for each row
 
+  @unimplemented
   Scenario: Evaluator target result displays in cell
     Given an evaluator target completed execution
     Then the cell shows the evaluator result
@@ -143,20 +131,17 @@ Feature: Evaluator as evaluation target
     And I see the score value
     And I see the label if present
 
-  Scenario: Evaluator target error displays in cell
-    Given an evaluator target failed with "Invalid input format"
-    Then the cell shows an error state
-    And I can see the error message
-
   # ============================================================================
   # Meta-evaluation (evaluators on evaluator targets)
   # ============================================================================
 
+  @unimplemented
   Scenario: Add downstream evaluator to evaluator target
     Given an evaluator target "First Evaluator" is configured
     When I add evaluator "Pass Rate Check" to the evaluation
     Then "Pass Rate Check" can evaluate the outputs of "First Evaluator"
 
+  @unimplemented
   Scenario: Map downstream evaluator to evaluator target outputs
     Given an evaluator target "First Evaluator" is configured
     And an evaluator "Score Threshold" is added to the evaluation
@@ -164,6 +149,7 @@ Feature: Evaluator as evaluation target
     Then I can map input "value" to "First Evaluator" output "score"
     And I can map input "threshold" to a literal value
 
+  @unimplemented
   Scenario: Execute with downstream evaluator on evaluator target
     Given an evaluator target "Sentiment Check" is configured
     And an evaluator "Pass Rate Check" maps input "passed" to "Sentiment Check" output "passed"
@@ -176,6 +162,7 @@ Feature: Evaluator as evaluation target
   # Comparison flow
   # ============================================================================
 
+  @unimplemented
   Scenario: Compare two evaluators
     Given evaluator "Evaluator A" exists
     And evaluator "Evaluator B" exists
@@ -186,6 +173,7 @@ Feature: Evaluator as evaluation target
     Then 2 target columns show the different evaluators
     And I can compare their outputs side by side
 
+  @unimplemented
   Scenario: Compare evaluator with prompt
     Given evaluator "Sentiment Check" exists
     And prompt "Sentiment Classifier" exists
@@ -198,6 +186,7 @@ Feature: Evaluator as evaluation target
   # Persistence
   # ============================================================================
 
+  @unimplemented
   Scenario: Evaluator target is saved with experiment
     Given an evaluator target "Sentiment Check" is configured
     When the experiment is saved

@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar, Union
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -23,20 +25,20 @@ class PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataPromptingTech
     """
     Attributes:
         type_ (PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataPromptingTechniqueType):
-        demonstrations (Union[Unset,
-            PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataPromptingTechniqueDemonstrations]):
+        demonstrations (PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataPromptingTechniqueDemonstrations |
+            Unset):
     """
 
     type_: PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataPromptingTechniqueType
-    demonstrations: Union[
-        Unset, "PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataPromptingTechniqueDemonstrations"
-    ] = UNSET
+    demonstrations: (
+        PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataPromptingTechniqueDemonstrations | Unset
+    ) = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         type_ = self.type_.value
 
-        demonstrations: Union[Unset, dict[str, Any]] = UNSET
+        demonstrations: dict[str, Any] | Unset = UNSET
         if not isinstance(self.demonstrations, Unset):
             demonstrations = self.demonstrations.to_dict()
 
@@ -62,9 +64,9 @@ class PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataPromptingTech
         type_ = PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataPromptingTechniqueType(d.pop("type"))
 
         _demonstrations = d.pop("demonstrations", UNSET)
-        demonstrations: Union[
-            Unset, PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataPromptingTechniqueDemonstrations
-        ]
+        demonstrations: (
+            PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataPromptingTechniqueDemonstrations | Unset
+        )
         if isinstance(_demonstrations, Unset):
             demonstrations = UNSET
         else:

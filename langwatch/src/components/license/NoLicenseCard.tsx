@@ -9,8 +9,12 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Upload, X } from "lucide-react";
+import { Link } from "~/components/ui/link";
 import { Radio, RadioGroup } from "~/components/ui/radio";
+import { Tooltip } from "~/components/ui/tooltip";
 import { formatFileSize } from "./licenseStatusUtils";
+import { CONTACT_SALES_URL, DEFAULT_LICENSE_PURCHASE_URL } from "../../../ee/licensing/constants";
+import { usePublicEnv } from "~/hooks/usePublicEnv";
 
 type ActivationMethod = "file" | "key";
 
@@ -29,6 +33,9 @@ export function NoLicenseCard({
   onFileActivate,
   isActivating,
 }: NoLicenseCardProps) {
+  const publicEnv = usePublicEnv();
+  const purchaseLinkUrl = publicEnv.data?.STRIPE_LICENSE_PAYMENT_LINK_URL ?? DEFAULT_LICENSE_PURCHASE_URL;
+
   const [activationMethod, setActivationMethod] =
     useState<ActivationMethod>("file");
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
@@ -62,7 +69,7 @@ export function NoLicenseCard({
       const file = e.dataTransfer.files[0];
       if (file) handleFileSelect(file);
     },
-    [handleFileSelect]
+    [handleFileSelect],
   );
 
   const handleDropzoneClick = useCallback(() => {
@@ -74,7 +81,7 @@ export function NoLicenseCard({
       const file = e.target.files?.[0];
       if (file) handleFileSelect(file);
     },
-    [handleFileSelect]
+    [handleFileSelect],
   );
 
   const handleRemoveFile = useCallback(() => {
@@ -121,7 +128,9 @@ export function NoLicenseCard({
 
           <RadioGroup
             value={activationMethod}
-            onValueChange={(e) => handleMethodChange(e.value as ActivationMethod)}
+            onValueChange={(e) =>
+              handleMethodChange(e.value as ActivationMethod)
+            }
             disabled={isActivating}
           >
             <HStack gap={4}>
@@ -216,16 +225,39 @@ export function NoLicenseCard({
             </Field.Root>
           )}
 
-          <Button
-            colorPalette="blue"
-            variant="solid"
-            size="sm"
-            onClick={handleActivate}
-            loading={isActivating}
-            disabled={isActivateDisabled}
-          >
-            Activate License
-          </Button>
+          <HStack gap={3}>
+            <Button
+              colorPalette="blue"
+              variant="solid"
+              size="sm"
+              onClick={handleActivate}
+              loading={isActivating}
+              disabled={isActivateDisabled}
+            >
+              Activate License
+            </Button>
+            {purchaseLinkUrl && (
+              <Tooltip content="After purchase, your license will be generated and delivered to your email.">
+                <Button asChild variant="outline" size="sm">
+                  <Link
+                    href={purchaseLinkUrl}
+                    isExternal
+                  >
+                    Purchase license
+                  </Link>
+                </Button>
+              </Tooltip>
+            )}
+            <Link
+              href={CONTACT_SALES_URL}
+              isExternal
+              color="blue.fg"
+              fontSize="sm"
+              _hover={{ textDecoration: "underline" }}
+            >
+              Contact sales
+            </Link>
+          </HStack>
         </VStack>
       </VStack>
     </Box>

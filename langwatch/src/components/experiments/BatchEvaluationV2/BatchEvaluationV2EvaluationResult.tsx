@@ -8,11 +8,12 @@ import type {
 } from "@ag-grid-community/core";
 import { ModuleRegistry } from "@ag-grid-community/core";
 import { AgGridReact } from "@ag-grid-community/react";
-import { Box, Button } from "@chakra-ui/react";
+import { Box, Button, HStack } from "@chakra-ui/react";
 import numeral from "numeral";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { TraceIdPeek } from "~/features/traces-v2/components/TraceIdPeek";
 import { useDrawer } from "~/hooks/useDrawer";
-import type { ESBatchEvaluation } from "../../../server/experiments/types";
+import type { ExperimentRunWithItems } from "../../../server/evaluations-v3/services/types";
 import { formatMilliseconds } from "../../../utils/formatMilliseconds";
 import { formatMoney } from "../../../utils/formatMoney";
 import { ExternalImage, getImageUrl } from "../../ExternalImage";
@@ -25,10 +26,10 @@ ModuleRegistry.registerModules([ClientSideRowModelModule]);
 
 type EvaluationRowData = {
   rowNumber: number;
-  datasetEntry?: ESBatchEvaluation["dataset"][number];
+  datasetEntry?: ExperimentRunWithItems["dataset"][number];
   evaluationsForEntry: Record<
     string,
-    ESBatchEvaluation["evaluations"][number] | undefined
+    ExperimentRunWithItems["evaluations"][number] | undefined
   >;
 };
 
@@ -43,8 +44,8 @@ export function BatchEvaluationV2EvaluationResult({
   workflowId: _workflowId,
 }: {
   evaluator: string;
-  results: ESBatchEvaluation["evaluations"];
-  datasetByIndex: Record<number, ESBatchEvaluation["dataset"][number]>;
+  results: ExperimentRunWithItems["evaluations"];
+  datasetByIndex: Record<number, ExperimentRunWithItems["dataset"][number]>;
   datasetColumns: Set<string>;
   predictedColumns: Record<string, Set<string>>;
   isFinished: boolean;
@@ -369,7 +370,7 @@ export function BatchEvaluationV2EvaluationResult({
 
     // Trace column
     const hasAnyTraceId = Object.values(datasetByIndex).some(
-      (d) => d.trace_id && d.trace_id !== "0",
+      (d) => d.traceId && d.traceId !== "0",
     );
     if (hasAnyTraceId) {
       colDefs.push({
@@ -377,21 +378,24 @@ export function BatchEvaluationV2EvaluationResult({
         headerName: "Trace",
         minWidth: 90,
         cellRenderer: (p: any) => {
-          const traceId = getRowData(p).datasetEntry?.trace_id;
+          const traceId = getRowData(p).datasetEntry?.traceId;
           return traceId ? (
-            <Button
-              size="xs"
-              colorPalette="gray"
-              onClick={(e) => {
-                e.preventDefault();
-                openDrawer("traceDetails", {
-                  traceId,
-                  selectedTab: "traceDetails",
-                });
-              }}
-            >
-              View
-            </Button>
+            <HStack gap={1}>
+              <Button
+                size="xs"
+                colorPalette="gray"
+                onClick={(e) => {
+                  e.preventDefault();
+                  openDrawer("traceDetails", {
+                    traceId,
+                    selectedTab: "traceDetails",
+                  });
+                }}
+              >
+                View
+              </Button>
+              <TraceIdPeek traceId={traceId} />
+            </HStack>
           ) : (
             "-"
           );

@@ -3,9 +3,14 @@ Feature: Metadata tag filtering in traces panel
   I want to click on metadata tags to filter traces
   So that I can quickly find related traces by metadata value
 
+  # The @unit pure-logic scenarios are bound via existing
+  # `buildMetadataFilterParams.unit.test.ts`. The @e2e clicking
+  # interaction needs a Playwright E2E or page-level integration test
+  # against the trace details panel.
+
   # E2E: Happy path demonstrating user interaction with real UI
 
-  @e2e
+  @e2e @unimplemented
   Scenario: Clicking metadata tag filters traces
     Given I am viewing a trace with user_id "user-123"
     When I click the "user_id" metadata tag

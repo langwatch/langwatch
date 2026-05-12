@@ -1,0 +1,69 @@
+---
+title: OpenAI Instrumentation
+sidebarTitle: Python
+description: Instrument OpenAI API calls with the LangWatch Python SDK to capture traces, debug, and support AI agent testing workflows.
+icon: python
+keywords: openai, instrumentation, autotrack, langwatch, python
+---
+
+<Tip>
+  **Quick setup?** Instead of following these steps manually, [copy a prompt](/skills/code-prompts#instrument-my-code) into your coding agent and it will set this up for you automatically.
+</Tip>
+
+LangWatch integrates with OpenAI to automatically capture detailed information about your LLM calls.
+
+## Installation
+
+<CodeGroup>
+```bash pip
+pip install langwatch openai
+```
+
+```bash uv
+uv add langwatch openai
+```
+</CodeGroup>
+
+## Usage
+
+<Info>
+The LangWatch API key is configured by default via the `LANGWATCH_API_KEY` environment variable.
+</Info>
+
+Use `autotrack_openai_calls()` to automatically capture all OpenAI calls made with a specific client instance within a trace.
+
+```python
+import langwatch
+from openai import OpenAI
+
+langwatch.setup()
+client = OpenAI()
+
+
+@langwatch.trace(name="OpenAI Chat Completion")
+def get_openai_chat_response(user_prompt: str):
+    langwatch.get_current_trace().autotrack_openai_calls(client)
+
+    response = client.chat.completions.create(
+        model="gpt-5",
+        messages=[{"role": "user", "content": user_prompt}],
+    )
+    completion = response.choices[0].message.content
+    return completion
+
+
+if __name__ == "__main__":
+    user_query = "Tell me a joke"
+    response = get_openai_chat_response(user_query)
+
+    print(f"User: {user_query}")
+    print(f"AI: {response}")
+```
+
+The `@langwatch.trace()` decorator creates a parent trace, and `autotrack_openai_calls()` enables automatic tracking of all calls made with the specified client instance for the duration of that trace.
+
+## Related
+
+- [Capturing RAG](/integration/python/tutorials/capturing-rag) - Learn how to capture RAG data from retrievers and tools
+- [Capturing Metadata and Attributes](/integration/python/tutorials/capturing-metadata) - Add custom metadata and attributes to your traces and spans
+- [Capturing Evaluations & Guardrails](/integration/python/tutorials/capturing-evaluations-guardrails) - Log evaluations and implement guardrails in your OpenAI applications

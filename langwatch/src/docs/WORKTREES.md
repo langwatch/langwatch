@@ -2,51 +2,57 @@
 
 Git worktrees allow you to work on multiple branches simultaneously in separate directories.
 
-## Setup
+## Quick Start
 
-### Location
+Use the `make worktree` command from the repo root:
 
-Worktrees should be created as siblings of `langwatch-saas`, NOT inside it.
+```bash
+# From an issue number (fetches title from GitHub, derives branch name):
+make worktree 1663
 
-```
-<workspace>/
-├── langwatch-saas/              # Main repo
-│   └── langwatch/langwatch/     # Submodule (this repo)
-└── worktree-<branch-name>/      # Worktrees go here (sibling of langwatch-saas)
-    └── langwatch/
+# From a feature name:
+make worktree add-dark-mode
 ```
 
-### Creating a Worktree
+Or call the script directly:
 
-1. Navigate to the langwatch submodule:
-   ```bash
-   cd langwatch-saas/langwatch/langwatch
-   ```
+```bash
+./scripts/worktree.sh 1663           # issue-based
+./scripts/worktree.sh add-dark-mode  # feature-based
+```
 
-2. Ensure you're on main and it's up to date:
-   ```bash
-   git checkout main && git pull
-   ```
+The script will:
+1. Fetch latest from `origin`
+2. Derive a branch name (`issue<N>/<slug>` or `feat/<name>`)
+3. Create the worktree in `.worktrees/<branch-with-slash-as-hyphen>/`
+4. Check out an existing remote branch if one exists, or create a new branch from `origin/main`
+5. Copy all `.env*` files from the current directory
+6. Run `pnpm install` in the new worktree
+7. Print a summary with the `cd` command to start working
 
-3. Create the worktree (paths relative to langwatch-saas parent):
-   ```bash
-   # For an existing branch:
-   git worktree add "../../worktree-<branch-name>" "<branch-name>"
+## Directory Layout
 
-   # For a new branch:
-   git worktree add -b "<branch-name>" "../../worktree-<branch-name>" main
-   ```
+Worktrees are created inside the `.worktrees/` directory at the repo root:
 
-4. Copy the `.env` file:
-   ```bash
-   cp .env "../../worktree-<branch-name>/langwatch/.env"
-   ```
+```
+langwatch/                                    # Repo root
+├── .worktrees/                               # All worktrees (gitignored)
+│   ├── issue1663-fix-scenario-runs/          # Issue-based worktree
+│   └── feat-add-dark-mode/                   # Feature-based worktree
+├── scripts/worktree.sh                       # Worktree creation script
+└── ...
+```
 
-5. Install dependencies in the new worktree:
-   ```bash
-   cd "../../worktree-<branch-name>/langwatch"
-   pnpm install
-   ```
+## Branch Naming Convention
+
+| Input | Branch Name | Directory |
+|-------|-------------|-----------|
+| `1663` (issue) | `issue1663/<slug-from-title>` | `.worktrees/issue1663-<slug>` |
+| `add-dark-mode` | `feat/add-dark-mode` | `.worktrees/feat-add-dark-mode` |
+
+Slugs are derived from issue titles: lowercase, hyphens, special characters stripped, truncated at word boundary for very long titles.
+
+## Managing Worktrees
 
 ### Listing Worktrees
 
@@ -57,11 +63,12 @@ git worktree list
 ### Removing a Worktree
 
 ```bash
-git worktree remove "../../worktree-<branch-name>"
+git worktree remove .worktrees/<directory-name>
 ```
 
 ## Important Notes
 
-- Always copy `.env` to the new worktree - it's gitignored and won't be created automatically
-- Run `pnpm install` in each new worktree
+- The script copies all `.env*` files and runs `pnpm install` automatically
 - Worktrees share the same git history but have independent working directories
+- The `.worktrees/` directory is gitignored
+- The `gh` CLI is required for issue-based worktrees (to fetch the issue title)

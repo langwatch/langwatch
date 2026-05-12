@@ -52,5 +52,29 @@ dspy.LM(
 {% endif %}
 {% endmacro %}
 
+{% macro value_params(node, workflow_edges) %}
+{% set edge_inputs = [] %}
+{% for edge in workflow_edges if edge.target == node.id %}
+{% set _ = edge_inputs.append(edge.targetHandle.split(".")[-1]) %}
+{% endfor %}
+{% for input_field in node.data.inputs or [] %}
+{% if input_field.identifier not in edge_inputs and input_field.value is not none %}
+{{ input_field.identifier }}={{ input_field.value.__repr__() }},
+{% endif %}
+{% endfor %}
+{% endmacro %}
+
+{% macro value_params_dict(node, workflow_edges) %}
+{% set edge_inputs = [] %}
+{% for edge in workflow_edges if edge.target == node.id %}
+{% set _ = edge_inputs.append(edge.targetHandle.split(".")[-1]) %}
+{% endfor %}
+{% for input_field in node.data.inputs or [] %}
+{% if input_field.identifier not in edge_inputs and input_field.value is not none %}
+"{{ input_field.identifier }}": {{ input_field.value.__repr__() }},
+{% endif %}
+{% endfor %}
+{% endmacro %}
+
 {% macro escape_prompt(prompt) %}
 ""{{ prompt | tojson | replace('\\n', '\n') | replace('\\t', '\t') | replace('\\"', '"') | replace('"""', '\\"\\"\\"') }}""{% endmacro %}

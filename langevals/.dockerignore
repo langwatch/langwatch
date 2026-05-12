@@ -1,0 +1,9 @@
+.pytest_cache
+.venv
+*/**/.venv
+langevals.code-workspace
+.env
+__pycache__
+dist
+openapi.json
+*/**/.cache

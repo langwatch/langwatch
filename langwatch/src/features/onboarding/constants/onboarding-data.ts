@@ -179,25 +179,3 @@ export const roleItems: IconFormItem<RoleType>[] = [
     icon: BadgeQuestionMark,
   },
 ];
-
-export const slideVariants = {
-  enter: (direction: number) => ({
-    x: direction > 0 ? 200 : -200,
-    opacity: 0,
-  }),
-  center: {
-    zIndex: 1,
-    x: 0,
-    opacity: 1,
-  },
-  exit: (direction: number) => ({
-    zIndex: 0,
-    x: direction < 0 ? 200 : -200,
-    opacity: 0,
-  }),
-};
-
-export const transition = {
-  x: { type: "spring" as const, stiffness: 400, damping: 25 },
-  opacity: { duration: 0.15 },
-};

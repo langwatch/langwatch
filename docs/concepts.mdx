@@ -1,0 +1,63 @@
+---
+title: Concepts
+description: Explore core concepts of LLM tracing, observability, datasets, and evaluations in LangWatch to design reliable AI agent testing workflows.
+keywords: LangWatch, concepts, tracing, observability, LLM, AI, travel, blog, user, customer, labels, threads, traces, spans
+---
+
+Understanding the core concepts of LangWatch is essential for effective observability in your LLM applications. This guide explains key terms and their relationships using practical examples, like building an AI travel assistant or a text generation service.
+
+### Threads: The Whole Conversation
+
+Field: `thread_id`
+
+Think of a **Thread** as the entire journey a user takes in a single session. It's the complete chat with your AI travel buddy, from "Where should I go?" to booking the flight. For the blog post generator, a `thread_id` bundles up the whole session – from brainstorming headlines to polishing the final SEO-optimized draft. It groups *all* the back-and-forth interactions (Traces) for a specific task or conversation.
+
+### Traces: One Task, End-to-End
+
+Field: `trace_id`
+
+<Note>While previously LangWatch allowed you to pass in a custom `trace_id`, we now generate it for you automatically, and provide no way to pass in your own.</Note>
+
+Zooming in from Threads, a **Trace** represents a single, complete task performed by your AI. It's one round trip.
+
+* **Travel Bot:** A user asking, "What are the cheapest flights to Bali in July?" is one Trace. Asking, "Does the hotel allow llamas?" is another Trace.
+* **Blog Tool:** Generating headline options? That's a Trace. Drafting the intro paragraph? Another Trace. Optimizing for keywords? You guessed it – a Trace.
+
+Each `trace_id` captures an entire end-to-end generation, no matter how many internal steps (Spans) it takes.
+
+### Spans: The Building Blocks
+
+Field: `span_id`
+
+<Note>While previously LangWatch allowed you to pass in a custom `span_id`, we now generate it for you automatically, and provide no way to pass in your own.</Note>
+
+Now, let's get granular! **Spans** are the individual steps or operations *within* a single Trace. Think of them as the building blocks of getting the job done.
+
+* **Travel Bot Trace:** Might have a Span for the LLM call figuring out destinations, another Span querying an airline API for prices, and a final Span formatting the response.
+* **Blog Tool Trace:** Could involve a Span for the initial text generation, a second Span where the LLM critiques its own work (clever!), and a third Span refining the text based on that critique.
+
+Each `span_id` pinpoints a specific action taken by your system or an LLM call.
+
+### User ID: Who's Using the App?
+
+Field: `user_id`
+
+Simple but crucial: The **User ID** identifies the actual end-user interacting with your product. Whether they're planning trips or writing posts, this `user_id` (usually their account ID in your system) links the activity back to a real person, helping you see how different users experience your AI features.
+
+### Customer ID: For Platform Builders
+
+Field: `customer_id`
+
+Are you building a platform *for other companies* to create *their own* LLM apps? That's where the **Customer ID** shines. If you're providing the tools for others (your customers) to build AI assistants for *their* users, the `customer_id` lets you (and them!) track usage and performance per customer account. It's perfect for offering custom analytics dashboards, showing your customers how *their* AI implementations are doing.
+
+### Labels: Your Organizational Superpowers
+
+Field: `labels`
+
+Think of **Labels** as flexible tags you can slap onto Traces to organize, filter, and compare anything you want! They're your secret weapon for slicing and dicing your data.
+
+* **Categorize Actions:** Use labels like `blogpost_title` or `blogpost_keywords`.
+* **Track Versions:** Label traces with `version:v1.0.0`, then deploy an improved prompt and label new traces `version:v1.0.1`.
+* **Run Experiments:** Tag traces with `experiment:prompt_a` vs. `experiment:prompt_b`.
+
+Labels make it easy to zoom in on specific features or A/B test different approaches right within the LangWatch dashboard.

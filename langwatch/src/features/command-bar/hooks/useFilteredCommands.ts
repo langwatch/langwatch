@@ -1,5 +1,6 @@
+import { ToggleLeft } from "lucide-react";
 import { useMemo } from "react";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import type { Command } from "../types";
 import {
   actionCommands,
@@ -11,6 +12,13 @@ import {
 import { MIN_SEARCH_QUERY_LENGTH, MIN_CATEGORY_MATCH_LENGTH } from "../constants";
 import { getPlanManagementUrl } from "~/hooks/usePlanManagementUrl";
 import { getPageCommands } from "../pageCommands";
+import { useFeatureFlag } from "~/hooks/useFeatureFlag";
+import {
+  setFeatureFlagOverride,
+  useFeatureFlagOverrides,
+} from "~/hooks/useFeatureFlagOverrides";
+import { useOpsPermission } from "~/hooks/useOpsPermission";
+import { FRONTEND_FEATURE_FLAGS } from "~/server/featureFlag/frontendFeatureFlags";
 
 export interface FilteredCommands {
   navigation: Command[];
@@ -26,8 +34,29 @@ export interface FilteredCommands {
  */
 export function useFilteredCommands(
   query: string,
-  isSaas: boolean | undefined
+  isSaas: boolean | undefined,
+  projectId: string | undefined,
+  isDevMode: boolean,
 ): FilteredCommands {
+  const { enabled: isDarkModeEnabled } = useFeatureFlag(
+    "release_ui_dark_mode_enabled",
+  );
+  const { enabled: isTracesV2Enabled } = useFeatureFlag(
+    "release_ui_traces_v2_enabled",
+    { projectId, enabled: !!projectId },
+  );
+  const { hasAccess: hasOpsAccess } = useOpsPermission();
+
+  const availableNavCommands = useMemo(() => {
+    let commands = hasOpsAccess
+      ? navigationCommands
+      : navigationCommands.filter((cmd) => !cmd.id.startsWith("nav-ops"));
+    if (!isTracesV2Enabled) {
+      commands = commands.filter((cmd) => cmd.id !== "nav-traces-v2");
+    }
+    return commands;
+  }, [hasOpsAccess, isTracesV2Enabled]);
+
   const filteredNavigation = useMemo(() => {
     if (!query.trim()) return [];
 
@@ -41,11 +70,56 @@ export function useFilteredCommands(
     );
 
     if (isSearchingCategory) {
-      return navigationCommands;
+      return availableNavCommands;
     }
 
-    return filterCommands(navigationCommands, query);
-  }, [query]);
+    return filterCommands(availableNavCommands, query);
+  }, [query, availableNavCommands]);
+
+  const featureFlagOverrides = useFeatureFlagOverrides();
+  const featureFlagToggleCommands = useMemo<Command[]>(() => {
+    if (!isDevMode) return [];
+    return FRONTEND_FEATURE_FLAGS.map((flag) => {
+      const current = featureFlagOverrides[flag];
+      const stateLabel =
+        current === undefined
+          ? "server-resolved"
+          : current
+            ? "forced ON"
+            : "forced OFF";
+      return {
+        id: `action-feature-flag-toggle:${flag}`,
+        label: `Toggle ${flag}`,
+        description: `Currently ${stateLabel} — cycles default → on → off`,
+        icon: ToggleLeft,
+        category: "actions",
+        keywords: [
+          "feature",
+          "flag",
+          "flags",
+          "toggle",
+          "dev",
+          "override",
+          flag,
+        ],
+        action: () => {
+          const next =
+            current === undefined ? true : current === true ? false : undefined;
+          setFeatureFlagOverride(flag, next);
+        },
+      };
+    });
+  }, [isDevMode, featureFlagOverrides]);
+
+  const availableActionCommands = useMemo(() => {
+    let commands = hasOpsAccess
+      ? actionCommands
+      : actionCommands.filter((cmd) => cmd.id !== "action-send-trace");
+    if (!isDevMode) {
+      commands = commands.filter((cmd) => cmd.id !== "action-feature-flags");
+    }
+    return [...commands, ...featureFlagToggleCommands];
+  }, [hasOpsAccess, isDevMode, featureFlagToggleCommands]);
 
   const filteredActions = useMemo(() => {
     if (!query.trim()) return [];
@@ -60,11 +134,11 @@ export function useFilteredCommands(
     );
 
     if (isSearchingCategory) {
-      return actionCommands;
+      return availableActionCommands;
     }
 
-    return filterCommands(actionCommands, query);
-  }, [query]);
+    return filterCommands(availableActionCommands, query);
+  }, [query, availableActionCommands]);
 
   // Filter support commands based on query (filter out "Open Chat" if not SAAS)
   const filteredSupport = useMemo(() => {
@@ -97,9 +171,9 @@ export function useFilteredCommands(
     return filterCommands(availableCommands, query);
   }, [query, isSaas]);
 
-  // Filter theme commands based on query
+  // Filter theme commands based on query (only when dark mode flag is enabled)
   const filteredTheme = useMemo(() => {
-    if (!query.trim() || themeCommands.length === 0) return [];
+    if (!isDarkModeEnabled || !query.trim()) return [];
 
     const lowerQuery = query.toLowerCase().trim();
 
@@ -115,7 +189,7 @@ export function useFilteredCommands(
     }
 
     return filterCommands(themeCommands, query);
-  }, [query]);
+  }, [query, isDarkModeEnabled]);
 
   // Filter page-specific commands based on current route
   const router = useRouter();

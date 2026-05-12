@@ -188,23 +188,32 @@ export class ParameterRegistry {
 
   /**
    * Filter and sort parameters for display.
+   *
+   * `max_tokens` is always included regardless of whether the model entry
+   * declares it: every chat model accepts a per-invocation token ceiling,
+   * and the popover is chat-only. Treating it as opt-in caused the slider
+   * to flicker-then-disappear for legacy custom models (notably managed
+   * Bedrock entries registered with `["temperature"]` only).
    */
   getDisplayParameters(supportedParameters: string[]): string[] {
-    if (!supportedParameters || supportedParameters.length === 0) {
-      return ["temperature", "max_tokens"]; // Default
-    }
-
     const displayOrder = this.getDisplayOrder();
 
-    return supportedParameters
-      .filter((param) => this.parameters.has(param))
-      .sort((a, b) => {
-        const aIndex = displayOrder.indexOf(a);
-        const bIndex = displayOrder.indexOf(b);
-        const aOrder = aIndex === -1 ? 999 : aIndex;
-        const bOrder = bIndex === -1 ? 999 : bIndex;
-        return aOrder - bOrder;
-      });
+    const base =
+      !supportedParameters || supportedParameters.length === 0
+        ? ["temperature"]
+        : supportedParameters.filter((param) => this.parameters.has(param));
+
+    const withMaxTokens = base.includes("max_tokens")
+      ? base
+      : [...base, "max_tokens"];
+
+    return withMaxTokens.sort((a, b) => {
+      const aIndex = displayOrder.indexOf(a);
+      const bIndex = displayOrder.indexOf(b);
+      const aOrder = aIndex === -1 ? 999 : aIndex;
+      const bOrder = bIndex === -1 ? 999 : bIndex;
+      return aOrder - bOrder;
+    });
   }
 
   /**

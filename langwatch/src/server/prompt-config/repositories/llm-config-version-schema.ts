@@ -63,6 +63,8 @@ const configSchemaV1_0 = z.object({
     verbosity: z.string().optional(),
     demonstrations: nodeDatasetSchema.optional(),
     prompting_technique: promptingTechniqueSchema.optional(),
+    // Deprecated: response_format is now derived from outputs at read time.
+    // Kept optional for backward compat reading old data, but never written for new data.
     response_format: responseFormatSchema.optional(),
   }),
 });

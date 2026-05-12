@@ -1,37 +1,71 @@
-import { Grid, GridItem, Heading } from "@chakra-ui/react";
+import { Button, Grid, GridItem, Heading, HStack, Text } from "@chakra-ui/react";
 import type { Scenario } from "@prisma/client";
+import { generate } from "@langwatch/ksuid";
+import { useRouter } from "~/utils/compat/next-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { UseFormReturn } from "react-hook-form";
-import { useDrawer, useDrawerParams } from "../../hooks/useDrawer";
+import { KSUID_RESOURCES } from "../../utils/constants";
+import { type UseFormReturn, useWatch } from "react-hook-form";
+import { getComplexProps, setFlowCallbacks, useDrawer, useDrawerParams } from "../../hooks/useDrawer";
+import { AgentTypeSelectorDrawer } from "../agents/AgentTypeSelectorDrawer";
 import { checkCompoundLimits } from "../../hooks/useCompoundLicenseCheck";
 import { useLicenseEnforcement } from "../../hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useRunScenario } from "../../hooks/useRunScenario";
 import { useScenarioTarget } from "../../hooks/useScenarioTarget";
 import { api } from "../../utils/api";
-import { isHandledByGlobalLicenseHandler } from "../../utils/trpcError";
-import { AgentHttpEditorDrawer } from "../agents/AgentHttpEditorDrawer";
+import { isHandledByGlobalHandler } from "../../utils/trpcError";
+import type { TypedAgent } from "../../server/agents/agent.repository";
+import type { CustomComponentConfig } from "../../optimization_studio/types/dsl";
 import { PromptEditorDrawer } from "../prompts/PromptEditorDrawer";
+import { hasScenarioInputMapping } from "../suites/ScenarioInputMappingSection";
+import { TagList } from "../ui/TagList";
 import { Drawer } from "../ui/drawer";
 import { toaster } from "../ui/toaster";
 import { SaveAndRunMenu } from "./SaveAndRunMenu";
 import { ScenarioEditorSidebar } from "./ScenarioEditorSidebar";
-import { ScenarioForm, type ScenarioFormData } from "./ScenarioForm";
+import { ScenarioForm, type ScenarioFormData, type ScenarioInitialData } from "./ScenarioForm";
 import type { TargetValue } from "./TargetSelector";
+
 export type ScenarioFormDrawerProps = {
   open?: boolean;
   onClose?: () => void;
   onSuccess?: (scenario: Scenario) => void;
-};
+  scenarioId?: string;
+} & Partial<ScenarioInitialData>;
+
+/**
+ * URL-based wrapper for ScenarioFormDrawer.
+ * Reads scenarioId from drawer URL params and passes it as a prop.
+ * Use this when rendering via the drawer registry / URL navigation.
+ */
+export function ScenarioFormDrawerFromUrl(props: Omit<ScenarioFormDrawerProps, "scenarioId">) {
+  const params = useDrawerParams();
+  const { drawerOpen } = useDrawer();
+  // When rendered from the drawer registry (CurrentDrawer), no `open` prop is
+  // passed.  Fall back to checking the URL so the drawer actually opens.
+  const open = props.open ?? drawerOpen("scenarioEditor");
+  return <ScenarioFormDrawer {...props} open={open} scenarioId={params.scenarioId} />;
+}
+
 /**
  * Drawer container for scenario create/edit form.
  * Two-column layout: form on left, help sidebar on right.
  * Bottom bar with Quick Test and Save and Run.
+ *
+ * When opened without a scenarioId (new scenario flow), the first save
+ * creates the record and transitions to edit mode by updating the URL
+ * with the new scenarioId. This prevents the double-save bug where
+ * subsequent saves would create duplicates.
  */
 export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   const { project } = useOrganizationTeamProject();
-  const { closeDrawer } = useDrawer();
-  const params = useDrawerParams();
+  const router = useRouter();
+  const { closeDrawer, openDrawer } = useDrawer();
+  const rawComplexProps = getComplexProps();
+  const complexPropsData =
+    rawComplexProps && "initialFormData" in rawComplexProps
+      ? (rawComplexProps as Partial<ScenarioInitialData>)
+      : {};
   const utils = api.useContext();
   const [formInstance, setFormInstance] =
     useState<UseFormReturn<ScenarioFormData> | null>(null);
@@ -39,7 +73,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     projectId: project?.id,
     projectSlug: project?.slug,
   });
-  const scenarioId = params.scenarioId;
+  const scenarioId = props.scenarioId;
 
   // License enforcement for scenario creation
   const scenarioEnforcement = useLicenseEnforcement("scenarios");
@@ -48,8 +82,8 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   const { target: persistedTarget, setTarget: persistTarget } =
     useScenarioTarget(scenarioId);
   const [selectedTarget, setSelectedTarget] = useState<TargetValue>(null);
-  const [agentDrawerOpen, setAgentDrawerOpen] = useState(false);
   const [promptDrawerOpen, setPromptDrawerOpen] = useState(false);
+  const [agentTypeSelectorOpen, setAgentTypeSelectorOpen] = useState(false);
 
   // Initialize from persisted target when scenario loads
   useEffect(() => {
@@ -68,6 +102,23 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     },
     [persistTarget, scenarioId],
   );
+  const handleCreateAgent = useCallback(() => {
+    const onAgentSaved = (agent: TypedAgent) => {
+      const targetType = agent.type as NonNullable<TargetValue>["type"];
+      handleTargetChange({ type: targetType, id: agent.id });
+      toaster.create({
+        title: "Agent created",
+        description: `"${agent.name}" is now selected as the target.`,
+        type: "success",
+        meta: { closable: true },
+      });
+    };
+    setFlowCallbacks("agentHttpEditor", { onSave: onAgentSaved });
+    setFlowCallbacks("agentCodeEditor", { onSave: onAgentSaved });
+    setFlowCallbacks("workflowSelector", { onSave: onAgentSaved });
+    setAgentTypeSelectorOpen(true);
+  }, [handleTargetChange]);
+
   const isOpen = props.open !== false && props.open !== undefined;
   const onClose = props.onClose ?? closeDrawer;
   const { data: scenario } = api.scenarios.getById.useQuery(
@@ -81,7 +132,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     },
     onError: (error) => {
       // Skip toast if already handled by global license handler (shows modal instead)
-      if (isHandledByGlobalLicenseHandler(error)) return;
+      if (isHandledByGlobalHandler(error)) return;
       toaster.create({
         title: "Failed to create scenario",
         description: error.message,
@@ -101,7 +152,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     },
     onError: (error) => {
       // Skip toast if already handled by global license handler (shows modal instead)
-      if (isHandledByGlobalLicenseHandler(error)) return;
+      if (isHandledByGlobalHandler(error)) return;
       toaster.create({
         title: "Failed to update scenario",
         description: error.message,
@@ -110,44 +161,70 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
       });
     },
   });
+
+  /**
+   * Transition from create mode to edit mode after first save.
+   * Updates the URL with the new scenarioId so subsequent saves
+   * trigger updates instead of creating duplicates.
+   */
+  const transitionToEditMode = useCallback(
+    (newScenarioId: string) => {
+      openDrawer(
+        "scenarioEditor",
+        {
+          urlParams: { scenarioId: newScenarioId },
+        },
+        { resetStack: true }
+      );
+    },
+    [openDrawer],
+  );
+
   const handleSave = useCallback(
-    async (data: ScenarioFormData): Promise<Scenario | null> => {
+    async (data: ScenarioFormData, { skipTransition = false } = {}): Promise<Scenario | null> => {
       if (!project?.id) return null;
+
+      // Edit mode: scenarioId is in URL and scenario data is loaded
       if (scenario) {
         return updateMutation.mutateAsync({
           projectId: project.id,
           id: scenario.id,
           ...data,
         });
-      } else {
-        // Check license limit before creating a new scenario
-        return new Promise((resolve) => {
-          checkCompoundLimits([scenarioEnforcement], async () => {
-            try {
-              const result = await createMutation.mutateAsync({
-                projectId: project.id,
-                ...data,
-              });
-              resolve(result);
-            } catch {
-              // Error already handled by global mutation cache if license error
-              resolve(null);
-            }
-          });
+      }
 
-          // If limit exceeded, modal is shown and callback won't run - resolve null
-          if (!scenarioEnforcement.isAllowed) {
+      // Create mode: no scenarioId in URL yet
+      return new Promise((resolve) => {
+        checkCompoundLimits([scenarioEnforcement], async () => {
+          try {
+            const result = await createMutation.mutateAsync({
+              projectId: project.id,
+              ...data,
+            });
+            // Transition to edit mode to prevent double-create on subsequent saves.
+            // Skip when the drawer is about to close (save-without-running).
+            if (!skipTransition) {
+              transitionToEditMode(result.id);
+            }
+            resolve(result);
+          } catch {
+            // Error already handled by global mutation cache if license error
             resolve(null);
           }
         });
-      }
+
+        // If limit exceeded, modal is shown and callback won't run - resolve null
+        if (!scenarioEnforcement.isAllowed) {
+          resolve(null);
+        }
+      });
     },
-    [project?.id, scenario, createMutation, updateMutation, scenarioEnforcement],
+    [project?.id, scenario, createMutation, updateMutation, scenarioEnforcement, transitionToEditMode],
   );
   const handleSaveAndRun = useCallback(
     async (target: TargetValue) => {
       const form = formInstance;
-      if (!form || !project?.id) return;
+      if (!form || !project?.id || !project?.slug) return;
       if (!target) {
         toaster.create({
           title: "Select a target",
@@ -158,15 +235,65 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         });
         return;
       }
+
+      // Gate: workflow agents require valid scenario mappings before running.
+      if (target.type === "workflow") {
+        try {
+          const agent = await utils.agents.getById.fetch({
+            id: target.id,
+            projectId: project.id,
+          });
+          if (agent) {
+            const config = agent.config as CustomComponentConfig;
+            const mappings = config.scenarioMappings ?? {};
+            // We don't have workflow outputs here — server-side pre-run check
+            // covers output validation. Share the input half of the rule with
+            // the editor drawer via hasScenarioInputMapping.
+            if (!hasScenarioInputMapping(mappings)) {
+              toaster.create({
+                title: "Configure scenario mappings",
+                description:
+                  "Set up how this workflow agent maps scenario inputs and outputs before running.",
+                type: "warning",
+                meta: { closable: true },
+              });
+              openDrawer("agentWorkflowEditor", {
+                urlParams: { agentId: target.id },
+              });
+              return;
+            }
+          }
+        } catch {
+          // If agent fetch fails, allow the run to proceed — server will validate.
+        }
+      }
+
       try {
         await form.handleSubmit(async (data) => {
-          const savedScenario = await handleSave(data);
+          // skipTransition: don't open the edit-mode drawer mid-save — we're
+          // navigating away to /simulations next, so the create→edit URL push
+          // would race with our redirect (lw#3586 F11). The whole `await` is
+          // also why the redirect itself MUST be the only router.push that
+          // fires after — `onClose()` does its own router.push inside
+          // closeDrawer, and back-to-back router.push calls get coalesced
+          // (the cleanup push wins, the redirect gets dropped silently).
+          const savedScenario = await handleSave(data, { skipTransition: true });
           if (!savedScenario) return;
 
           // Persist the target selection for this scenario
           persistTarget(target);
 
-          await runScenario({ scenarioId: savedScenario.id, target });
+          // Generate batchRunId so the simulations page can show a placeholder immediately
+          const batchRunId = generate(KSUID_RESOURCES.SCENARIO_BATCH).toString();
+
+          // Fire the run — no callbacks, simulations page picks up via SSE
+          void runScenario({ scenarioId: savedScenario.id, target, batchRunId });
+
+          // Navigate to simulations — drawer closes implicitly via route change.
+          // Intentionally NOT calling onClose() here: closeDrawer() does its
+          // own router.push to strip drawer.* params, which would race with
+          // this redirect and silently win (lw#3586 F11).
+          void router.push(`/${project.slug}/simulations?pendingBatch=${batchRunId}`);
         })();
       } catch (error) {
         toaster.create({
@@ -178,38 +305,46 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         });
       }
     },
-    [handleSave, project?.id, persistTarget, runScenario, formInstance],
+    [handleSave, project?.id, project?.slug, persistTarget, runScenario, formInstance, router, utils, openDrawer],
   );
   const handleSaveWithoutRunning = useCallback(async () => {
     const form = formInstance;
     if (!form) return;
     await form.handleSubmit(async (data) => {
-      const saved = await handleSave(data);
-      if (saved) {
-        toaster.create({
-          title: scenario ? "Scenario updated" : "Scenario created",
-          type: "success",
-          meta: { closable: true },
-        });
+      try {
+        const saved = await handleSave(data, { skipTransition: true });
+        if (saved) {
+          toaster.create({
+            title: scenario ? "Scenario updated" : "Scenario created",
+            type: "success",
+            meta: { closable: true },
+          });
+          onClose();
+        }
+      } catch {
+        // Error already handled by mutation onError callback
       }
     })();
-  }, [handleSave, scenario, formInstance]);
+  }, [handleSave, scenario, formInstance, onClose]);
   const setFormRef = useCallback((form: UseFormReturn<ScenarioFormData>) => {
     setFormInstance(form);
   }, []);
   const isSubmitting =
     createMutation.isPending || updateMutation.isPending || isRunning;
+
+  // Use initial data from complexProps (new scenario from modal) or from DB (editing)
+  const initialFormData =
+    props.initialFormData ?? complexPropsData.initialFormData;
   const defaultValues: Partial<ScenarioFormData> | undefined = useMemo(
-    () => scenario ?? undefined,
-    [scenario],
+    () => scenario ?? initialFormData ?? undefined,
+    [scenario, initialFormData],
   );
+
   return (
     <Drawer.Root
-      closeOnInteractOutside={false}
       open={isOpen}
       onOpenChange={({ open }) => !open && onClose()}
       size="xl"
-      modal={false}
     >
       <Drawer.Content>
         <Drawer.CloseTrigger />
@@ -234,40 +369,37 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
               />
             </GridItem>
             {/* Right: Help Sidebar */}
-            <GridItem overflowY="auto" padding={4} bg="bg.subtle">
+            <GridItem overflowY="auto" padding={4} bg="bg.muted">
               <ScenarioEditorSidebar form={formInstance} />
             </GridItem>
           </Grid>
         </Drawer.Body>
         {/* Bottom Bar */}
-        <Drawer.Footer borderTopWidth="1px" justifyContent="flex-end">
-          <SaveAndRunMenu
-            selectedTarget={selectedTarget}
-            onTargetChange={handleTargetChange}
-            onSaveAndRun={handleSaveAndRun}
-            onSaveWithoutRunning={handleSaveWithoutRunning}
-            onCreateAgent={() => setAgentDrawerOpen(true)}
-            onCreatePrompt={() => setPromptDrawerOpen(true)}
-            isLoading={isSubmitting}
-          />
+        <Drawer.Footer borderTopWidth="1px" justifyContent="space-between">
+          {formInstance && (
+            <FooterLabels form={formInstance} />
+          )}
+          <HStack gap={2} flexShrink={0}>
+            <Button variant="outline" size="sm" onClick={onClose}>
+              Cancel
+            </Button>
+            <SaveAndRunMenu
+              selectedTarget={selectedTarget}
+              onTargetChange={handleTargetChange}
+              onSaveAndRun={handleSaveAndRun}
+              onSaveWithoutRunning={handleSaveWithoutRunning}
+              onCreateAgent={handleCreateAgent}
+              onCreatePrompt={() => setPromptDrawerOpen(true)}
+              isLoading={isSubmitting}
+            />
+          </HStack>
         </Drawer.Footer>
       </Drawer.Content>
 
-      {/* Agent Creation Drawer */}
-      <AgentHttpEditorDrawer
-        open={agentDrawerOpen}
-        onClose={() => setAgentDrawerOpen(false)}
-        onSave={(agent) => {
-          // Auto-select the newly created agent
-          handleTargetChange({ type: "http", id: agent.id });
-          setAgentDrawerOpen(false);
-          toaster.create({
-            title: "Agent created",
-            description: `"${agent.name}" is now selected as the target.`,
-            type: "success",
-            meta: { closable: true },
-          });
-        }}
+      {/* Agent Type Selector Drawer */}
+      <AgentTypeSelectorDrawer
+        open={agentTypeSelectorOpen}
+        onClose={() => setAgentTypeSelectorOpen(false)}
       />
 
       {/* Prompt Creation Drawer */}
@@ -287,5 +419,24 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         }}
       />
     </Drawer.Root>
+  );
+}
+
+function FooterLabels({ form }: { form: UseFormReturn<ScenarioFormData> }) {
+  const labels = useWatch({ control: form.control, name: "labels" });
+
+  return (
+    <HStack gap={2} flex={1} overflow="hidden" flexWrap="wrap">
+      <Text fontSize="xs" fontWeight="medium" color="fg.muted" flexShrink={0}>
+        Labels
+      </Text>
+      <TagList
+        labels={labels}
+        onRemove={(_label, index) =>
+          form.setValue("labels", labels.filter((_, i) => i !== index))
+        }
+        onAdd={(label) => form.setValue("labels", [...labels, label])}
+      />
+    </HStack>
   );
 }

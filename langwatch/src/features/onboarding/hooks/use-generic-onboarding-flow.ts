@@ -1,4 +1,4 @@
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import { useEffect, useRef, useState } from "react";
 import { OnboardingFlowDirection } from "../types/types";
 

@@ -1,0 +1,11 @@
+packages:
+  - packages/*
+  # The langwatch/ next.js app keeps its own pnpm-workspace.yaml for its
+  # internal sub-packages (saas-src, langwatch/packages/*, mcp-server). We do
+  # NOT include it here — the @langwatch/server tarball ships langwatch/'s
+  # pre-built dist + a copy of the source so a fresh `pnpm install` runs at
+  # ~/.langwatch/app on first boot. Treating it as a peer workspace would
+  # double-install React/Next/etc. across the dev environment.
+
+onlyBuiltDependencies:
+  - esbuild

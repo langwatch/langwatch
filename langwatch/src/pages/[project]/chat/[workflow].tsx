@@ -1,7 +1,7 @@
 import { Box, Card as ChakraCard } from "@chakra-ui/react";
 import type { Edge, Node } from "@xyflow/react";
-import dynamic from "next/dynamic";
-import { useRouter } from "next/router";
+import dynamic from "~/utils/compat/next-dynamic";
+import { useRouter } from "~/utils/compat/next-router";
 import { useEffect, useState } from "react";
 import { FullLogo } from "../../../components/icons/FullLogo";
 import { LoadingScreen } from "../../../components/LoadingScreen";
@@ -52,7 +52,7 @@ function ChatContent() {
     <Box height="100vh">
       <Box height="full" bg="bg.muted" p={16} pt={4}>
         <FullLogo />
-        <ChakraCard.Root height="90%" bg="white" p={5} mt={4}>
+        <ChakraCard.Root height="90%" bg="bg.panel" p={5} mt={4}>
           <ChatBox
             useApi={true}
             workflowId={workflowId}
@@ -71,10 +71,7 @@ function ChatContent() {
   );
 }
 
-const ClientOnlyChatContent = dynamic(() => Promise.resolve(ChatContent), {
-  ssr: false,
-});
-
+// No SSR in Vite — export directly (was wrapped in dynamic() for Next.js SSR avoidance)
 export default function ChatPage() {
-  return <ClientOnlyChatContent />;
+  return <ChatContent />;
 }

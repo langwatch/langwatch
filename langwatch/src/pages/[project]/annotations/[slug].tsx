@@ -6,7 +6,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import AnnotationsLayout from "~/components/AnnotationsLayout";
 
 import { AnnotationsTable } from "~/components/annotations/AnnotationsTable";
@@ -57,7 +57,6 @@ export default function Annotations() {
         maxWidth={"calc(100vw - 330px)"}
         padding={0}
         margin={0}
-        backgroundColor="white"
       >
         <AnnotationsTable
           noDataTitle="No queued annotations for this queue"

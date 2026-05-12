@@ -61,14 +61,13 @@ async def execute_flow(
     # TODO: handle workflow errors here throwing an special event showing the error was during the execution of the workflow?
     yield start_workflow_event(workflow, trace_id)
 
+    origin = event.origin or "workflow"
+
     with optional_langwatch_trace(
+        name="execute_flow",
+        type="workflow",
         do_not_trace=do_not_trace,
-        trace_id=event.trace_id,
-        skip_root_span=True,
-        metadata={
-            "platform": "optimization_studio",
-            "environment": "development" if manual_execution_mode else "production",
-        },
+        origin=origin,
     ) as trace:
         if not do_not_trace and trace:
             trace.autotrack_dspy()
@@ -195,6 +194,7 @@ def validate_workflow(workflow: Workflow) -> None:
                     isinstance(input_field, Field)
                     and not input_field.optional
                     and input_field.identifier not in connected_inputs[node.id]
+                    and input_field.value is None
                 ):
                     raise ClientReadableValueError(
                         f"Missing required input '{input_field.identifier}' for node {node.id}"

@@ -56,7 +56,7 @@ class S3Syncer:
                     continue
 
                 s3_key = f"{self.s3_prefix}/{relative_path}"
-                logger.info(f"Uploading {local_path} to s3://{self.bucket}/{s3_key}")
+                logger.info("Uploading file to S3", local_path=local_path, s3_path=f"s3://{self.bucket}/{s3_key}")
                 self.s3_client.upload_file(local_path, self.bucket, s3_key)
 
                 if relative_path not in self.known_files:
@@ -64,7 +64,7 @@ class S3Syncer:
                     new_files_added = True
 
             except Exception as e:
-                logger.error(f"Error uploading {local_path}: {str(e)}")
+                logger.error("Error uploading file", local_path=local_path, error=str(e))
 
         # Update files.json if new files were added
         if new_files_added:
@@ -77,7 +77,7 @@ class S3Syncer:
                 s3_key = f"{self.s3_prefix}/files.json"
                 self.s3_client.upload_file(files_json_path, self.bucket, s3_key)
             except Exception as e:
-                logger.error(f"Error updating files.json: {str(e)}")
+                logger.error("Error updating files.json", error=str(e))
 
     def process_deletions(self, file_path: str):
         self.known_files.discard(file_path)
@@ -127,7 +127,7 @@ def setup_s3_cache(s3_cache_key: str):
 
     s3_client, bucket_name = s3_client_and_bucket()
     if not bucket_name:
-        logger.warning("Warning: CACHE_BUCKET not set, caching disabled")
+        logger.warning("CACHE_BUCKET not set, caching disabled")
         return
 
     # Create temp directory for cache
@@ -136,7 +136,7 @@ def setup_s3_cache(s3_cache_key: str):
     # Define cache path
     bucket_cache_path = f"/cache/{s3_cache_key}"
 
-    logger.info("Fetching cache from s3 for optimization...")
+    logger.info("Fetching cache from S3 for optimization")
 
     # Download existing cache files if any
     known_files = download_cache_files(
@@ -144,7 +144,7 @@ def setup_s3_cache(s3_cache_key: str):
     )
 
     if len(known_files) > 0:
-        logger.info("Cache fetched from s3")
+        logger.info("Cache fetched from S3", file_count=len(known_files))
 
     # Mount S3 path for real-time sync
     local_cache_mount_point = os.path.join(local_cache_dir, "cache")
@@ -184,7 +184,7 @@ def download_cache_files(
             with open(tmp_file.name) as f:
                 known_files = json.load(f)
     except Exception as e:
-        logger.info(f"No existing files.json found or error reading it: {str(e)}")
+        logger.info("No existing files.json found or error reading it", error=str(e))
         # Create new files.json
         with open(os.path.join(local_cache_dir, "files.json"), "w") as f:
             json.dump([], f)
@@ -197,6 +197,6 @@ def download_cache_files(
             os.makedirs(os.path.dirname(local_path), exist_ok=True)
             s3_client.download_file(bucket_name, s3_key, local_path)
         except Exception as e:
-            logger.warning(f"Error downloading {file_path}: {str(e)}")
+            logger.warning("Error downloading file", file_path=file_path, error=str(e))
 
     return known_files

@@ -9,7 +9,7 @@ import { api } from "~/utils/api";
 import { AgentListDrawer } from "../AgentListDrawer";
 
 // Mock dependencies
-vi.mock("next/router", () => ({
+vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     push: vi.fn(),
     query: {},
@@ -24,6 +24,7 @@ vi.mock("~/hooks/useDrawer", () => ({
     drawerOpen: vi.fn(() => false),
   }),
   getComplexProps: () => ({}),
+  getFlowCallbacks: () => null,
 }));
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
@@ -170,6 +171,7 @@ describe("AgentListDrawer", () => {
       });
     });
 
+    /** @scenario AgentListDrawer shows available agents */
     it("shows agent list with all agents", async () => {
       renderDrawer();
       await waitFor(() => {
@@ -198,6 +200,7 @@ describe("AgentListDrawer", () => {
   });
 
   describe("Selection", () => {
+    /** @scenario Select agent from drawer */
     it("calls onSelect when clicking an agent", async () => {
       const user = userEvent.setup();
       renderDrawer();
@@ -232,6 +235,7 @@ describe("AgentListDrawer", () => {
   });
 
   describe("Create new agent", () => {
+    /** @scenario Create new agent from drawer flow */
     it("calls onCreateNew when clicking New Agent button", async () => {
       const user = userEvent.setup();
       renderDrawer();
@@ -263,6 +267,7 @@ describe("AgentListDrawer", () => {
   });
 
   describe("Empty state", () => {
+    /** @scenario AgentListDrawer empty state */
     it("shows empty message when no agents", async () => {
       vi.mocked(api.agents.getAll.useQuery).mockReturnValue({
         data: [],

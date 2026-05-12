@@ -10,8 +10,9 @@ import {
   type EvaluatorTypes,
 } from "../../evaluations/evaluators.generated";
 import { evaluatorsSchema } from "../../evaluations/evaluators.zod.generated";
-import { checkPreconditionsSchema } from "../../evaluations/types.generated";
+import { validatedPreconditionsSchema } from "../../evaluations/preconditionValidation";
 import { enforceLicenseLimit } from "../../license-enforcement";
+import { coerceMonitorMappings } from "../../tracer/tracesMapping";
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
@@ -122,7 +123,7 @@ export const monitorsRouter = createTRPCRouter({
         projectId: z.string(),
         name: z.string(),
         checkType: z.string(),
-        preconditions: checkPreconditionsSchema,
+        preconditions: validatedPreconditionsSchema,
         settings: z.object({}).passthrough(),
         mappings: z.object({}).passthrough().optional(),
         sample: z.number().min(0).max(1),
@@ -185,7 +186,7 @@ export const monitorsRouter = createTRPCRouter({
           slug,
           preconditions,
           parameters,
-          mappings: mappings ?? {},
+          mappings: coerceMonitorMappings(mappings),
           sample,
           enabled: true,
           executionMode,
@@ -204,7 +205,7 @@ export const monitorsRouter = createTRPCRouter({
         projectId: z.string(),
         name: z.string(),
         checkType: z.string(),
-        preconditions: checkPreconditionsSchema,
+        preconditions: validatedPreconditionsSchema,
         settings: z.object({}).passthrough(),
         mappings: z.object({}).passthrough(),
         sample: z.number().min(0).max(1),
@@ -265,7 +266,7 @@ export const monitorsRouter = createTRPCRouter({
           sample,
           ...(enabled !== undefined && { enabled }),
           executionMode,
-          mappings,
+          mappings: coerceMonitorMappings(mappings),
           ...(evaluatorId !== undefined && { evaluatorId }),
           ...(level !== undefined && { level }),
           ...(threadIdleTimeout !== undefined && { threadIdleTimeout }),

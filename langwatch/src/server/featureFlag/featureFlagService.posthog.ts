@@ -1,7 +1,10 @@
 import { getLangWatchTracer } from "langwatch";
 import { createLogger } from "~/utils/logger/server";
 import { getPostHogInstance } from "../posthog";
-import { FEATURE_FLAG_CACHE_TTL_MS } from "./constants";
+import {
+  FEATURE_FLAG_CACHE_TTL_MS,
+  KILL_SWITCH_CACHE_TTL_MS,
+} from "./constants";
 import { StaleWhileRevalidateCache } from "./staleWhileRevalidateCache.redis";
 import type { FeatureFlagOptions, FeatureFlagServiceInterface } from "./types";
 
@@ -27,7 +30,7 @@ import type { FeatureFlagOptions, FeatureFlagServiceInterface } from "./types";
  *
  * Configure targeting rules in PostHog release conditions.
  *
- * @see docs/adr/005-feature-flags.md for architecture decisions
+ * @see dev/docs/adr/005-feature-flags.md for architecture decisions
  * @see FEATURE_FLAG_CACHE_TTL_MS for cache TTL configuration
  */
 export class FeatureFlagServicePostHog implements FeatureFlagServiceInterface {
@@ -39,9 +42,13 @@ export class FeatureFlagServicePostHog implements FeatureFlagServiceInterface {
     "langwatch.posthog-feature-flag-service",
   );
 
+  // Underlying storage TTL is the larger of the two windows so kill-switch
+  // callers passing ttlOverrideMs = KILL_SWITCH_CACHE_TTL_MS don't get
+  // evicted by Redis at the frontend-flag staleness window.
   private readonly cache = new StaleWhileRevalidateCache(
     FEATURE_FLAG_CACHE_TTL_MS,
     FEATURE_FLAG_CACHE_TTL_MS,
+    KILL_SWITCH_CACHE_TTL_MS,
   );
 
   constructor() {
@@ -74,7 +81,7 @@ export class FeatureFlagServicePostHog implements FeatureFlagServiceInterface {
           "feature.flag.project_id": options?.projectId ?? "",
           "feature.flag.organization_id": options?.organizationId ?? "",
           "tenant.id": options?.projectId ?? "",
-          "cache.redis_available": this.cache.isRedisAvailable(),
+          "cache.backend": "redis",
         },
       },
       async (span) => {
@@ -87,14 +94,11 @@ export class FeatureFlagServicePostHog implements FeatureFlagServiceInterface {
         const orgId = options?.organizationId;
         const cacheKey = `${flagKey}:${distinctId}:${projectId ?? ""}:${orgId ?? ""}`;
 
-        // Check hybrid cache first
-        const cachedResult = await this.cache.get(cacheKey);
+        // Check hybrid cache first. Hot-path callers may pass a longer
+        // cacheTtlMs to extend the staleness window without hitting PostHog.
+        const cachedResult = await this.cache.get(cacheKey, options?.cacheTtlMs);
         if (cachedResult !== undefined) {
-          const cacheType = this.cache.isRedisAvailable() ? "redis" : "memory";
-          span.setAttribute(
-            "feature.flag.source",
-            `posthog-cached-${cacheType}`,
-          );
+          span.setAttribute("feature.flag.source", "posthog-cached");
           span.setAttribute("feature.flag.enabled", cachedResult.value);
           return cachedResult.value;
         }
@@ -155,24 +159,10 @@ export class FeatureFlagServicePostHog implements FeatureFlagServiceInterface {
   }
 
   /**
-   * Clear the hybrid cache (both Redis and memory).
-   */
-  async clearCache(): Promise<void> {
-    await this.cache.clear();
-    this.logger.debug("Cleared hybrid feature flag cache");
-  }
-
-  /**
    * Check if PostHog is available.
    */
   isAvailable(): boolean {
     return this.posthog !== null;
   }
 
-  /**
-   * Check if Redis is available (false means using memory cache).
-   */
-  isRedisAvailable(): boolean {
-    return this.cache.isRedisAvailable();
-  }
 }

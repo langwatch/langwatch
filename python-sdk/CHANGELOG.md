@@ -1,5 +1,168 @@
 # Changelog
 
+## [0.22.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.21.0...python-sdk@v0.22.0) (2026-04-21)
+
+
+### Features
+
+* **auth:** fine-grained personal access tokens ([#3212](https://github.com/langwatch/langwatch/issues/3212)) ([#3213](https://github.com/langwatch/langwatch/issues/3213)) ([bb7a6ee](https://github.com/langwatch/langwatch/commit/bb7a6ee422e6442dafaafa0848cce1869f980d16))
+
+
+### Bug Fixes
+
+* unskip platform experiment e2e and telemetry context tests ([#3083](https://github.com/langwatch/langwatch/issues/3083)) ([ac2640a](https://github.com/langwatch/langwatch/commit/ac2640af2ca94648708657c01b859612b48854ea))
+
+## [0.21.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.20.0...python-sdk@v0.21.0) (2026-04-18)
+
+
+### Features
+
+* **sdk:** add Experiment.print_summary for CI parity with platform runs ([#3318](https://github.com/langwatch/langwatch/issues/3318)) ([942c6ec](https://github.com/langwatch/langwatch/commit/942c6ec70747cbed9ac9828034474a939a7433ab))
+
+## [0.20.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.19.0...python-sdk@v0.20.0) (2026-04-17)
+
+
+### Features
+
+* **python-sdk:** async-native experiment aloop + asubmit ([#3273](https://github.com/langwatch/langwatch/issues/3273)) ([6711d9e](https://github.com/langwatch/langwatch/commit/6711d9e83a9b9c8c3b0ac7050e2bd12f121b7d5e))
+
+## [0.19.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.18.0...python-sdk@v0.19.0) (2026-04-16)
+
+
+### Features
+
+* expose all platform features via TypeScript and Python SDKs ([#3210](https://github.com/langwatch/langwatch/issues/3210)) ([d3148a8](https://github.com/langwatch/langwatch/commit/d3148a8839ecd9c10b725bcb00bc428795d5901d))
+* full CLI, API, and MCP coverage for all platform features ([#3168](https://github.com/langwatch/langwatch/issues/3168)) ([921b7b9](https://github.com/langwatch/langwatch/commit/921b7b92d3ccc038556fe2241a3a90302786631e))
+
+## [0.18.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.17.0...python-sdk@v0.18.0) (2026-04-10)
+
+
+### Features
+
+* **evaluations:** expose thread variables in trace-level evaluator mapping ([#2794](https://github.com/langwatch/langwatch/issues/2794)) ([750ad39](https://github.com/langwatch/langwatch/commit/750ad39c77314e477df3784ba807124fc1eb4c1b))
+* prompt labels data model, migration, and API endpoints ([#2712](https://github.com/langwatch/langwatch/issues/2712)) ([3ae192d](https://github.com/langwatch/langwatch/commit/3ae192d8ca9256305222bb008693ad564527a0d0))
+* python SDK prompt label support ([#2795](https://github.com/langwatch/langwatch/issues/2795)) ([13b230b](https://github.com/langwatch/langwatch/commit/13b230b879e8ebde77654b88ba2cfb28813fe97c))
+* **python-sdk:** add custom prompt tag support ([#2843](https://github.com/langwatch/langwatch/issues/2843)) ([8699076](https://github.com/langwatch/langwatch/commit/869907635b9c57f0216f0f9cb7beb2b85c31eef5))
+* **python-sdk:** add dataset CRUD methods ([#2871](https://github.com/langwatch/langwatch/issues/2871)) ([d455079](https://github.com/langwatch/langwatch/commit/d45507916074048fbddbcd550d92d4901547b947))
+* **typescript-sdk:** add custom tag support (fetch, CRUD, list) ([#2841](https://github.com/langwatch/langwatch/issues/2841)) ([f8839ab](https://github.com/langwatch/langwatch/commit/f8839abea053e1fa1e879c27db193ee641add526))
+
+
+### Bug Fixes
+
+* **docs:** broken docs/ references after move to dev/docs/ ([#2650](https://github.com/langwatch/langwatch/issues/2650)) ([5c29d48](https://github.com/langwatch/langwatch/commit/5c29d488704eb6d4cfdfd8c95d982fe716686335))
+* update ~45 broken docs/ references to dev/docs/ after docs move ([5c29d48](https://github.com/langwatch/langwatch/commit/5c29d488704eb6d4cfdfd8c95d982fe716686335)), closes [#2648](https://github.com/langwatch/langwatch/issues/2648)
+
+
+### Code Refactoring
+
+* rename promptLabel to promptTag for naming consistency ([#2900](https://github.com/langwatch/langwatch/issues/2900)) ([70be268](https://github.com/langwatch/langwatch/commit/70be2689124e21e8f7d90c12aaa83887ed97f98c))
+
+## [0.17.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.16.0...python-sdk@v0.17.0) (2026-03-18)
+
+
+### Features
+
+* **tracing:** explicit application origin to prevent evaluation race condition ([#2346](https://github.com/langwatch/langwatch/issues/2346)) ([348874e](https://github.com/langwatch/langwatch/commit/348874e48ce79537596d28887c6ed9c719200b29))
+
+
+### Bug Fixes
+
+* **python-sdk:** make langchain-core an optional dependency ([#2464](https://github.com/langwatch/langwatch/issues/2464)) ([cde8406](https://github.com/langwatch/langwatch/commit/cde8406990f5e19af98048a43a0d7d9782553a48))
+* skip litellm_bot test on RateLimitError from Cerebras ([#2355](https://github.com/langwatch/langwatch/issues/2355)) ([76bf87f](https://github.com/langwatch/langwatch/commit/76bf87f1db51b0fab681c593cd5515c66d0908f1))
+
+## [0.16.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.15.0...python-sdk@v0.16.0) (2026-03-13)
+
+
+### Features
+
+* **tracing:** explicit application origin to prevent evaluation race condition ([#2325](https://github.com/langwatch/langwatch/issues/2325)) ([b11b499](https://github.com/langwatch/langwatch/commit/b11b49990bdb1ccf1bf302b9a54b442d3b6f3be3))
+
+
+### Bug Fixes
+
+* custom SDK evaluations - gray badges, stuck Processing, precondition crash ([#2234](https://github.com/langwatch/langwatch/issues/2234)) ([77cba68](https://github.com/langwatch/langwatch/commit/77cba6844de4e58a14bac4348254ef93213d4079))
+* **mcp:** align prompt tool schemas with backend API ([#2326](https://github.com/langwatch/langwatch/issues/2326)) ([65279f3](https://github.com/langwatch/langwatch/commit/65279f38687bae5c7dc7a13db33dcb2f7d135397))
+* **security:** bump critical Dependabot vulnerabilities (unstructured + nltk) ([#2275](https://github.com/langwatch/langwatch/issues/2275)) ([cc1f004](https://github.com/langwatch/langwatch/commit/cc1f004d2ec710c9eaaa762e336516d447338090))
+* **security:** bump moderate/low severity vulnerabilities in python-sdk ([#2299](https://github.com/langwatch/langwatch/issues/2299)) ([da288b2](https://github.com/langwatch/langwatch/commit/da288b2559e01e0af6046c19eec39eb3d4678d77))
+
+## [0.15.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.14.0...python-sdk@v0.15.0) (2026-03-11)
+
+
+### Features
+
+* **prompts:** open existing prompt from trace when prompt handle is present ([#2223](https://github.com/langwatch/langwatch/issues/2223)) ([428f8ff](https://github.com/langwatch/langwatch/commit/428f8ff22b8cb5a4be5942d5b26bf2d62f44d7be))
+
+## [0.14.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.13.0...python-sdk@v0.14.0) (2026-03-08)
+
+
+### Features
+
+* **examples:** add metadata and labels examples for TypeScript and Python SDKs ([#1585](https://github.com/langwatch/langwatch/issues/1585)) ([7d09ab8](https://github.com/langwatch/langwatch/commit/7d09ab805146542921e8b1f1258d5e6e59462bfe))
+* **traces:** add langwatch.origin attribute for trace origin classification ([#2066](https://github.com/langwatch/langwatch/issues/2066)) ([1d94865](https://github.com/langwatch/langwatch/commit/1d9486548e994d8d2f933a7f530196df8d255e43))
+
+
+### Miscellaneous
+
+* **deps:** bump Python (uv) dependencies across langwatch_nlp, python-sdk, langevals ([#1940](https://github.com/langwatch/langwatch/issues/1940)) ([d103f89](https://github.com/langwatch/langwatch/commit/d103f89fc1936dc8dae73f2b90885a28b97e2775))
+* **deps:** bump Python uv lockfile packages (v2) ([#1954](https://github.com/langwatch/langwatch/issues/1954)) ([23b3a5c](https://github.com/langwatch/langwatch/commit/23b3a5ce9f16d6a722690cbdd86cb095f01dba08))
+
+## [0.13.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.12.0...python-sdk@v0.13.0) (2026-02-15)
+
+
+### Features
+
+* add POST /api/evaluators to create evaluators via REST API ([#1574](https://github.com/langwatch/langwatch/issues/1574)) ([3084655](https://github.com/langwatch/langwatch/commit/308465566db22345663ba78135338ad587e8d84d))
+* full Liquid template support with autocomplete ([#1583](https://github.com/langwatch/langwatch/issues/1583)) ([00863a7](https://github.com/langwatch/langwatch/commit/00863a7643c8f6af48582bf82512fd37391902a7))
+
+## [0.12.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.11.0...python-sdk@v0.12.0) (2026-02-13)
+
+
+### Features
+
+* **cli:** add separate prompt pull and prompt push commands ([#1543](https://github.com/langwatch/langwatch/issues/1543)) ([76c4881](https://github.com/langwatch/langwatch/commit/76c48817d284b300b33a37bbc52c4047bff8e36e))
+
+
+### Bug Fixes
+
+* handle NaN/Infinity in JSON serialization for batch evaluation payloads ([#1557](https://github.com/langwatch/langwatch/issues/1557)) ([072c347](https://github.com/langwatch/langwatch/commit/072c347ca3ba7c148ae19d0d9e3fc80f6d6c84fc))
+* handle NaN/Infinity in JSON serialization for batch evaluation payloads ([#1558](https://github.com/langwatch/langwatch/issues/1558)) ([072c347](https://github.com/langwatch/langwatch/commit/072c347ca3ba7c148ae19d0d9e3fc80f6d6c84fc))
+
+
+### Miscellaneous
+
+* **deps-dev:** bump chainlit from 2.8.3 to 2.9.6 in /python-sdk ([#1508](https://github.com/langwatch/langwatch/issues/1508)) ([5cdb91a](https://github.com/langwatch/langwatch/commit/5cdb91a628442b747eb776978156c5531ab80f61))
+* **deps-dev:** bump json-repair from 0.49.0 to 0.57.1 in /python-sdk ([#1507](https://github.com/langwatch/langwatch/issues/1507)) ([eb681e5](https://github.com/langwatch/langwatch/commit/eb681e5d5d341aee61fc9eed7236d9d40168c6ff))
+* **deps-dev:** bump openinference-instrumentation-dspy from 0.1.28 to 0.1.33 in /python-sdk ([#1505](https://github.com/langwatch/langwatch/issues/1505)) ([1280b4c](https://github.com/langwatch/langwatch/commit/1280b4cab9e67ce2976837a6244588d8cfdfd814))
+* **deps-dev:** bump openinference-instrumentation-dspy in /python-sdk ([1280b4c](https://github.com/langwatch/langwatch/commit/1280b4cab9e67ce2976837a6244588d8cfdfd814))
+* **deps-dev:** bump python-dotenv from 1.0.1 to 1.2.1 in /python-sdk ([#1509](https://github.com/langwatch/langwatch/issues/1509)) ([01d4a17](https://github.com/langwatch/langwatch/commit/01d4a171ae4b6253d82e157d477ecac58d3de25f))
+* **deps-dev:** update uvicorn requirement from &lt;0.40.0,&gt;=0.38.0 to &gt;=0.38.0,&lt;0.41.0 in /python-sdk ([#1445](https://github.com/langwatch/langwatch/issues/1445)) ([a26937d](https://github.com/langwatch/langwatch/commit/a26937df10f8dd39f93c79532d42a681fffb73d9))
+* **deps-dev:** update uvicorn requirement in /python-sdk ([a26937d](https://github.com/langwatch/langwatch/commit/a26937df10f8dd39f93c79532d42a681fffb73d9))
+
+## [0.11.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.10.2...python-sdk@v0.11.0) (2026-02-12)
+
+
+### Features
+
+* add library to help catch trace parity dift betwen ElasicSearch and ClickHouse ([#1426](https://github.com/langwatch/langwatch/issues/1426)) ([bce70bf](https://github.com/langwatch/langwatch/commit/bce70bfe453a9202414e17afa8018786fe3d225f))
+* add public REST API for evaluators ([#1540](https://github.com/langwatch/langwatch/issues/1540)) ([46f4064](https://github.com/langwatch/langwatch/commit/46f4064c32dee33be58eee54f98c810a0da57cee))
+* add public REST API for evaluators (/api/evaluators) ([46f4064](https://github.com/langwatch/langwatch/commit/46f4064c32dee33be58eee54f98c810a0da57cee))
+* pass thread_id through execute_component to LangWatch tracing ([ac986cc](https://github.com/langwatch/langwatch/commit/ac986cc3ca0e5e37fa8e71ae304e2cad63cb6b14))
+
+
+### Bug Fixes
+
+* use z.date() for evaluator schema dates to match Prisma output ([3b5041a](https://github.com/langwatch/langwatch/commit/3b5041a93c3b18f2c3c3cdb6713abdd567bad3e2))
+
+
+### Miscellaneous
+
+* **deps:** bump ruff from 0.12.9 to 0.15.0 in /python-sdk ([#1506](https://github.com/langwatch/langwatch/issues/1506)) ([89b6fb3](https://github.com/langwatch/langwatch/commit/89b6fb32a1571b87e3c7f963fa6e565b3063b8f1))
+
+
+### Code Refactoring
+
+* migrate python-sdk prompts to Pydantic + walk up directory tree for prompts.json ([#1392](https://github.com/langwatch/langwatch/issues/1392)) ([66cb286](https://github.com/langwatch/langwatch/commit/66cb286a853964be3d614a509d08a9f38126b42b))
+
 ## [0.10.2](https://github.com/langwatch/langwatch/compare/python-sdk@v0.10.1...python-sdk@v0.10.2) (2026-02-05)
 
 

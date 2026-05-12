@@ -15,7 +15,7 @@ export {
   ATTRIBUTE_KEYS,
   buildTraceSummariesConditions,
   buildStoredSpansConditions,
-  buildEvaluationStatesConditions,
+  buildEvaluationRunsConditions,
   buildQueryFilter,
   extractStandardResults,
   buildScopeConditions,

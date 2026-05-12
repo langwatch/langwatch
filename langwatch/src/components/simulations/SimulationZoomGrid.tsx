@@ -1,10 +1,18 @@
-import { Box, Button, Grid, HStack } from "@chakra-ui/react";
+import { Box, Grid, HStack, IconButton, Text } from "@chakra-ui/react";
+import { keyframes } from "@emotion/react";
 import type React from "react";
 import { createContext, useContext, useLayoutEffect, useState } from "react";
 import { ZoomIn, ZoomOut } from "react-feather";
-import { useSimulationRouter } from "~/hooks/simulations/useSimulationRouter";
+import { useDrawer } from "~/hooks/useDrawer";
 import { useZoom } from "~/hooks/useZoom";
+import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
+import { Tooltip } from "../ui/tooltip";
 import { SimulationChatViewer } from "./SimulationChatViewer";
+
+const cardPopIn = keyframes`
+  from { opacity: 0; transform: scale(0.9) translateY(10px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+`;
 
 const ZoomContext = createContext<ReturnType<typeof useZoom> | null>(null);
 
@@ -38,26 +46,48 @@ function Controls({ showScale = true }: ControlsProps) {
   const { scale, zoomIn, zoomOut } = useZoomContext();
 
   return (
-    <HStack gap={2}>
-      <Button bgColor="bg.panel" size="sm" variant="outline" onClick={zoomOut}>
-        Zoom Out <ZoomOut size={16} />
-      </Button>
-      <Button bgColor="bg.panel" size="sm" variant="outline" onClick={zoomIn}>
-        Zoom In <ZoomIn size={16} />
-      </Button>
+    <HStack
+      gap={1}
+      bg="bg.panel"
+      border="1px solid"
+      borderColor="border"
+      borderRadius="lg"
+      px={1}
+      py={0.5}
+      w="fit-content"
+      boxShadow="sm"
+    >
+      <Tooltip content="Zoom out">
+        <IconButton
+          size="xs"
+          variant="ghost"
+          aria-label="Zoom out"
+          onClick={zoomOut}
+        >
+          <ZoomOut size={14} />
+        </IconButton>
+      </Tooltip>
       {showScale && (
-        <Box
-          px={2}
-          py={1}
-          bg="bg.muted"
-          borderRadius="full"
+        <Text
           fontSize="xs"
           fontFamily="mono"
-          fontWeight="bold"
+          color="fg.muted"
+          minW="36px"
+          textAlign="center"
         >
           {Math.round(scale * 100)}%
-        </Box>
+        </Text>
       )}
+      <Tooltip content="Zoom in">
+        <IconButton
+          size="xs"
+          variant="ghost"
+          aria-label="Zoom in"
+          onClick={zoomIn}
+        >
+          <ZoomIn size={14} />
+        </IconButton>
+      </Tooltip>
     </HStack>
   );
 }
@@ -65,12 +95,12 @@ function Controls({ showScale = true }: ControlsProps) {
 // Grid component that renders the scaled simulation grid
 interface GridProps {
   scenarioRunIds: string[];
+  runDataMap?: Map<string, ScenarioRunData>;
 }
 
-function GridComponent({ scenarioRunIds }: GridProps) {
+function GridComponent({ scenarioRunIds, runDataMap }: GridProps) {
   const { scale, containerRef } = useZoomContext();
-  const { goToSimulationRun, scenarioSetId, batchRunId } =
-    useSimulationRouter();
+  const { openDrawer } = useDrawer();
 
   // State to track container dimensions and column count
   const [containerWidth, setContainerWidth] = useState(0);
@@ -81,31 +111,9 @@ function GridComponent({ scenarioRunIds }: GridProps) {
   const GRID_GAP = 24; // 6 * 4px from gap={6} in Chakra UI
 
   const handleExpandToggle = (simulationId: string) => {
-    if (scenarioSetId && batchRunId) {
-      goToSimulationRun({
-        scenarioSetId,
-        batchRunId,
-        scenarioRunId: simulationId,
-      });
-    } else {
-      console.warn("scenarioSetId or batchRunId is not defined");
-    }
-  };
-
-  // Calculate optimal column count based on container width and scale
-  const calculateColsCount = () => {
-    if (containerWidth === 0) return 3; // fallback while measuring
-
-    // Calculate effective card width considering current scale
-    const effectiveCardWidth = TARGET_CARD_WIDTH * scale;
-
-    // Calculate how many cards can fit, accounting for gaps
-    // Formula: (availableWidth + gap) / (cardWidth + gap)
-    const maxColumns = Math.floor(
-      (containerWidth + GRID_GAP) / (effectiveCardWidth + GRID_GAP),
-    );
-
-    return Math.max(1, maxColumns);
+    openDrawer("scenarioRunDetail", {
+      urlParams: { scenarioRunId: simulationId },
+    });
   };
 
   // Measure container width using ResizeObserver for accuracy
@@ -129,14 +137,21 @@ function GridComponent({ scenarioRunIds }: GridProps) {
 
   // Update column count when width or scale changes
   useLayoutEffect(() => {
-    const newColsCount = calculateColsCount();
-    setColsCount(newColsCount);
+    if (containerWidth === 0) {
+      setColsCount(3);
+      return;
+    }
+    const effectiveCardWidth = TARGET_CARD_WIDTH * scale;
+    const maxColumns = Math.floor(
+      (containerWidth + GRID_GAP) / (effectiveCardWidth + GRID_GAP),
+    );
+    setColsCount(Math.max(1, maxColumns));
   }, [containerWidth, scale]);
 
   return (
     <Box
       ref={containerRef}
-      overflow="hidden"
+      // overflow="hidden"
       style={{
         touchAction: "none",
         userSelect: "none",
@@ -153,20 +168,22 @@ function GridComponent({ scenarioRunIds }: GridProps) {
           height: `${100 / scale}%`,
         }}
       >
-        {scenarioRunIds?.map((scenarioRunId) => (
+        {scenarioRunIds?.map((scenarioRunId, idx) => (
           <Box
             key={scenarioRunId}
             width="full"
             height="400px"
             cursor="pointer"
             onClick={() => handleExpandToggle(scenarioRunId)}
-            overflow="auto"
-            style={{
+            overflow="visible"
+            css={{
+              opacity: 0,
+              animation: `${cardPopIn} 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) ${idx * 0.06}s forwards`,
               minWidth: 0,
               minHeight: 0,
             }}
           >
-            <SimulationChatViewer scenarioRunId={scenarioRunId} />
+            <SimulationChatViewer scenarioRunId={scenarioRunId} data={runDataMap?.get(scenarioRunId)} />
           </Box>
         ))}
       </Grid>

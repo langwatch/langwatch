@@ -105,6 +105,8 @@ type VariableMappingInputProps = {
   isMissing?: boolean;
   /** When true, shows yellow background but not "Required" placeholder (for optional fields) */
   optionalHighlighting?: boolean;
+  /** Identifier used for data-testid on the underlying input element */
+  inputTestId?: string;
 };
 
 /** Represents a selectable option in the dropdown */
@@ -190,6 +192,7 @@ export const VariableMappingInput = ({
   disabled = false,
   isMissing = false,
   optionalHighlighting = false,
+  inputTestId,
 }: VariableMappingInputProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -306,7 +309,7 @@ export const VariableMappingInput = ({
     // If we're in nested selection mode, filter the nested fields
     if (currentDropdownContext.fields && currentDropdownContext.source) {
       const filtered = currentDropdownContext.fields.filter((field) =>
-        (field.label ?? field.name)
+        (field.label ?? field.name ?? "")
           .toLowerCase()
           .includes(searchQuery.toLowerCase()),
       );
@@ -681,7 +684,9 @@ export const VariableMappingInput = ({
             >
               <SourceTypeIconComponent type={sourceInfo.source.type} />
               <Tag.Label fontFamily="mono" fontSize="12px">
-                {sourceInfo.path.join(".")}
+                {sourceInfo.source.id !== "trace"
+                  ? `${sourceInfo.source.id}.${sourceInfo.path.join(".")}`
+                  : sourceInfo.path.join(".")}
               </Tag.Label>
               <Tag.EndElement>
                 <Tag.CloseTrigger
@@ -776,6 +781,7 @@ export const VariableMappingInput = ({
             minWidth={isSourceMapping || inProgressPath ? "20px" : undefined}
             height="24px"
             paddingX={0}
+            data-testid={inputTestId}
           />
         </HStack>
       </Box>
@@ -817,7 +823,9 @@ export const VariableMappingInput = ({
                     marginBottom={1}
                   >
                     <Text fontSize="xs" color="blue.600">
-                      {inProgressPath.path.join(" → ")}
+                      {inProgressPath.path
+                        .map((s) => s.replace(/_/g, " "))
+                        .join(" → ")}
                     </Text>
                     <Text fontSize="xs" color="blue.400">
                       →
@@ -925,7 +933,7 @@ export const VariableMappingInput = ({
                           <VariableTypeIcon type={field.type} size={12} />
                           <Text fontSize="13px" fontFamily="mono" flex={1}>
                             {(() => {
-                              const label = field.label ?? field.name;
+                              const label = field.label ?? field.name ?? "";
                               // Render "* (description)" with gray parenthesis part
                               if (label.startsWith("* (") && label.endsWith(")")) {
                                 const parenContent = label.slice(2); // "(description)"
@@ -957,7 +965,7 @@ export const VariableMappingInput = ({
 
                 {/* "Use as value" option when user typed something (only at top level) */}
                 {searchQuery.trim() && !inProgressPath && (
-                  <div data-testid="use-as-value-option">
+                  <Box>
                     {filteredSources.length > 0 && (
                       <Box height="1px" background="border" marginY={1} />
                     )}
@@ -991,6 +999,7 @@ export const VariableMappingInput = ({
                       data-highlighted={
                         highlightedIndex === allOptions.length - 1
                       }
+                      data-testid="use-as-value-option"
                     >
                       <Type size={14} color="var(--chakra-colors-gray-500)" />
                       <Text fontSize="13px" color="fg.muted">
@@ -1001,7 +1010,7 @@ export const VariableMappingInput = ({
                         " as value
                       </Text>
                     </HStack>
-                  </div>
+                  </Box>
                 )}
               </VStack>
             )}

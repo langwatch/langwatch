@@ -1,0 +1,73 @@
+# size-ha.yaml — High-availability production. 3-node replicated ClickHouse.
+#
+# 3 app replicas, 3 workers, 2 NLP/langevals, replicated CH with Keeper.
+# Combine with access, external database, and cold storage overlays.
+#
+# Usage:
+#   helm install lw . \
+#     -f examples/overlays/size-ha.yaml \
+#     -f examples/overlays/access-ingress.yaml \
+#     -f examples/overlays/postgres-external.yaml \
+#     -f examples/overlays/redis-external.yaml \
+#     -f examples/overlays/cold-storage-s3.yaml
+
+app:
+  replicaCount: 3
+  resources:
+    requests: { cpu: 1, memory: 4Gi }
+    limits:   { cpu: 2, memory: 4Gi }
+  podDisruptionBudget:
+    minAvailable: 2
+
+workers:
+  enabled: true
+  replicaCount: 3
+  resources:
+    requests: { cpu: 1, memory: 4Gi }
+    limits:   { cpu: 2, memory: 4Gi }
+  podDisruptionBudget:
+    minAvailable: 2
+
+langwatch_nlp:
+  replicaCount: 2
+  resources:
+    requests: { cpu: 1, memory: 2Gi }
+    limits:   { cpu: 2, memory: 4Gi }
+
+langevals:
+  replicaCount: 2
+  resources:
+    requests: { cpu: 1, memory: 4Gi }
+    limits:   { cpu: 2, memory: 8Gi }
+
+clickhouse:
+  chartManaged: true
+  replicas: 3
+  memory: 16Gi
+  cpu: 4
+  storage:
+    size: 300Gi
+
+postgresql:
+  chartManaged: true
+  auth:
+    database: "langwatch"
+  primary:
+    persistence:
+      size: 50Gi
+
+redis:
+  chartManaged: true
+  master:
+    persistence:
+      size: 10Gi
+
+prometheus:
+  chartManaged: true
+  server:
+    retention: 60d
+    persistentVolume:
+      size: 50Gi
+
+cronjobs:
+  enabled: true

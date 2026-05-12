@@ -19,6 +19,7 @@ import {
 import { useLocalStorageSelectedDataSetId } from "~/hooks/useLocalStorageSelectedDataSetId";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { useAnimatedFocusElementById } from "../../../../hooks/useAnimatedFocusElementById";
 import type { DatasetColumns } from "../../../../server/datasets/types";
 import { toaster } from "../../../ui/toaster";
@@ -157,6 +158,7 @@ export function DatasetStep() {
           handleDataSourceSelect("manual");
         },
         onError: (error) => {
+          if (isHandledByGlobalHandler(error)) return;
           toaster.create({
             title: "Error creating new dataset",
             description: error.message,

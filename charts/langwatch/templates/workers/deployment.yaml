@@ -1,0 +1,122 @@
+{{- if .Values.workers.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-workers
+  labels:
+    app.kubernetes.io/name: {{ .Release.Name }}-workers
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: workers
+    {{- include "langwatch.labels" . | nindent 4 }}
+    {{- if .Values.workers.deployment.labels }}
+    {{- toYaml .Values.workers.deployment.labels | nindent 4 }}
+    {{- end }}
+  {{- with .Values.workers.deployment.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  replicas: {{ .Values.workers.replicaCount }}
+  {{- if .Values.workers.deployment.strategy }}
+  strategy:
+    {{- toYaml .Values.workers.deployment.strategy | nindent 8 }}
+  {{- end }}
+  {{- if hasKey (default (dict) .Values.workers.deployment) "revisionHistoryLimit" }}
+  revisionHistoryLimit: {{ .Values.workers.deployment.revisionHistoryLimit }}
+  {{- end }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Release.Name }}-workers
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ .Release.Name }}-workers
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: workers
+        {{- if .Values.workers.pod.labels }}
+        {{- toYaml .Values.workers.pod.labels | nindent 8 }}
+        {{- end }}
+      annotations:
+        {{- with (coalesce .Values.workers.pod.annotations .Values.global.podAnnotations) }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with (coalesce .Values.workers.podSecurityContext .Values.global.podSecurityContext)}}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- with (coalesce .Values.workers.nodeSelector .Values.global.scheduling.nodeSelector)}}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- with (coalesce .Values.workers.tolerations .Values.global.scheduling.tolerations)}}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- with (coalesce .Values.workers.affinity .Values.global.scheduling.affinity)}}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- with (coalesce .Values.workers.topologySpreadConstraints .Values.global.scheduling.topologySpreadConstraints)}}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      initContainers:
+        {{- with .Values.workers.extraInitContainers}}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      containers:
+        {{- with .Values.workers.extraContainers}}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        - name: {{ .Release.Name }}-workers
+          securityContext:
+            {{- toYaml (coalesce .Values.workers.containerSecurityContext .Values.global.containerSecurityContext) | nindent 12 }}
+          image: "{{ .Values.images.app.repository }}:{{ .Values.images.app.tag }}"
+          imagePullPolicy: "{{ .Values.images.app.pullPolicy }}"
+          workingDir: /app/langwatch
+          command: ['pnpm']
+          args: ['run', 'start:workers']
+          env:
+            {{- include "langwatch.sharedEnv" . | nindent 12 }}
+
+            - name: LANGWATCH_ENDPOINT
+              value: {{ .Values.workers.upstreams.langwatch.scheme | default "http" }}://{{ .Values.workers.upstreams.langwatch.name | default (printf "%s-app" .Release.Name) }}:{{ .Values.workers.upstreams.langwatch.port | default 5560 }}
+
+            {{- with .Values.workers.extraEnvs}}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+
+          startupProbe:
+            exec:
+              command: ["sh", "-c", "kill -0 1"]
+            failureThreshold: 12
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command: ["sh", "-c", "kill -0 1"]
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.workers.resources | nindent 12 }}
+          volumeMounts:
+            {{- with .Values.workers.extraVolumeMounts}}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+            - name: tmp-dir
+              mountPath: /tmp
+
+      volumes:
+        {{- with .Values.workers.extraVolumes}}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        - name: tmp-dir
+          emptyDir: {}
+{{- end }}

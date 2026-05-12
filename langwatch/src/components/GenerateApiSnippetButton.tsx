@@ -26,7 +26,7 @@ export function GenerateApiSnippetButton({
         disabled={!hasHandle}
         size="sm"
         variant="outline"
-        backgroundColor="white"
+        bg="bg"
         onClick={onClick}
       >
         <UnplugIcon />

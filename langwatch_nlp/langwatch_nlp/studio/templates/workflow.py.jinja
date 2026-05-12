@@ -1,4 +1,4 @@
-{% from 'macros.jinja' import edge_param, edge_param_dict, node_llm_config_to_dspy_lm %}
+{% from 'macros.jinja' import edge_param, edge_param_dict, node_llm_config_to_dspy_lm, value_params, value_params_dict %}
 
 import time
 import asyncio
@@ -137,6 +137,7 @@ class WorkflowModule(LangWatchWorkflowModule):
                                 {{ edge_param_dict(edge, source_parts, target_parts, use_kwargs) }}
                             {% endif %}
                         {% endfor %}
+                        {{ value_params_dict(node, workflow.edges) }}
                 }),
                     {% endfor %}
             )
@@ -150,6 +151,7 @@ class WorkflowModule(LangWatchWorkflowModule):
                             {{ edge_param(edge, source_parts, target_parts, use_kwargs) }}
                         {% endif %}
                     {% endfor %}
+                    {{ value_params(layer[0], workflow.edges) }}
             )
                 {% endif %}
             {% endfor %}

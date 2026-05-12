@@ -6,6 +6,8 @@ import {
   limitTypeSchema,
 } from "../../license-enforcement";
 import { checkOrganizationPermission } from "../rbac";
+import { getApp } from "../../app-layer/app";
+import { captureException } from "../../../utils/posthogErrorCapture";
 
 export const licenseEnforcementRouter = createTRPCRouter({
   /**
@@ -47,5 +49,41 @@ export const licenseEnforcementRouter = createTRPCRouter({
         (typeof limitTypes)[number],
         (typeof results)[number]
       >;
+    }),
+
+  /**
+   * Report that a UI pre-check blocked a user from creating a resource.
+   *
+   * Fire-and-forget from the client's perspective: the upgrade modal
+   * appears immediately; this mutation triggers an ops notification
+   * as a side effect. Server re-verifies the limit to prevent
+   * fabricated requests from triggering false alerts.
+   */
+  reportLimitBlocked: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        limitType: limitTypeSchema,
+      }),
+    )
+    .use(checkOrganizationPermission("organization:view"))
+    .mutation(async ({ ctx, input }) => {
+      const service = createLicenseEnforcementService(ctx.prisma);
+      const result = await service.checkLimit(
+        input.organizationId,
+        input.limitType,
+        ctx.session.user,
+      );
+
+      if (!result.allowed) {
+        void getApp()
+          .usageLimits.notifyResourceLimitReached({
+            organizationId: input.organizationId,
+            limitType: input.limitType,
+            current: result.current,
+            max: result.max,
+          })
+          .catch(captureException);
+      }
     }),
 });

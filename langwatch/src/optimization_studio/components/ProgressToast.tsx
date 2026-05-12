@@ -102,7 +102,7 @@ export function BaseProgressToast({
       right="3"
       zIndex={100}
       width="fit-content"
-      background="white"
+      background="bg"
       padding={1}
       borderRadius="md"
       border="1px solid"

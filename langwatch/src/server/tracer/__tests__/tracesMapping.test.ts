@@ -2,9 +2,18 @@ import { describe, expect, it } from "vitest";
 import {
   buildMetadataFieldChildren,
   buildSpanFieldChildren,
+  coerceMonitorMappings,
+  extractTracesFields,
+  getThreadAvailableSources,
+  getTraceAvailableSources,
+  mapTraceToDatasetEntry,
+  mappingStateSchema,
   SPAN_SUBFIELDS,
+  THREAD_MAPPINGS,
   TRACE_MAPPINGS,
+  tryAndConvertTo,
 } from "../tracesMapping";
+import { formatSpansDigest } from "../spanToReadableSpan";
 
 describe("SPAN_SUBFIELDS", () => {
   it("contains * (full span object) as first option", () => {
@@ -293,5 +302,632 @@ describe("TRACE_MAPPINGS.metadata.mapping", () => {
     );
 
     expect(result).toBeUndefined();
+  });
+});
+
+describe("extractTracesFields", () => {
+  const mockTraces = [
+    {
+      trace_id: "trace-1",
+      timestamps: { started_at: Date.now() },
+      input: { type: "text", value: "Hello" },
+      output: { type: "text", value: "World" },
+      metadata: { thread_id: "thread-1" },
+    },
+    {
+      trace_id: "trace-2",
+      timestamps: { started_at: Date.now() },
+      input: { type: "text", value: "Foo" },
+      output: { type: "text", value: "Bar" },
+      metadata: { thread_id: "thread-1" },
+    },
+  ] as any[];
+
+  it("extracts default fields (trace_id, input, output) when no selectedFields provided", () => {
+    const result = extractTracesFields(mockTraces, []);
+
+    expect(result).toHaveLength(2);
+    expect(result[0]).toEqual({
+      trace_id: "trace-1",
+      input: "Hello",
+      output: "World",
+    });
+    expect(result[1]).toEqual({
+      trace_id: "trace-2",
+      input: "Foo",
+      output: "Bar",
+    });
+  });
+
+  it("extracts only specified fields when selectedFields provided", () => {
+    const result = extractTracesFields(mockTraces, ["input"]);
+
+    expect(result).toHaveLength(2);
+    expect(result[0]).toEqual({ input: "Hello" });
+    expect(result[1]).toEqual({ input: "Foo" });
+  });
+
+  it("extracts multiple specified fields", () => {
+    const result = extractTracesFields(mockTraces, ["input", "output"]);
+
+    expect(result).toHaveLength(2);
+    expect(result[0]).toEqual({ input: "Hello", output: "World" });
+    expect(result[1]).toEqual({ input: "Foo", output: "Bar" });
+  });
+});
+
+describe("THREAD_MAPPINGS", () => {
+  const mockThread = {
+    thread_id: "thread-1",
+    traces: [
+      {
+        trace_id: "trace-1",
+        timestamps: { started_at: Date.now() },
+        input: { type: "text", value: "Hello" },
+        output: { type: "text", value: "World" },
+      },
+    ] as any[],
+  };
+
+  it("thread_id mapping returns the thread id", () => {
+    expect(THREAD_MAPPINGS.thread_id.mapping(mockThread)).toBe("thread-1");
+  });
+
+  it("traces mapping with no selectedFields returns traces with default fields", () => {
+    const result = THREAD_MAPPINGS.traces.mapping(mockThread);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toHaveProperty("trace_id", "trace-1");
+    expect(result[0]).toHaveProperty("input", "Hello");
+    expect(result[0]).toHaveProperty("output", "World");
+  });
+
+  it("traces mapping with selectedFields returns only those fields", () => {
+    const result = THREAD_MAPPINGS.traces.mapping(mockThread, ["input"]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toEqual({ input: "Hello" });
+  });
+});
+
+describe("formatSpansDigest", () => {
+  it("produces a string digest from spans", async () => {
+    const spans = [
+      {
+        span_id: "span-1",
+        trace_id: "trace-1",
+        type: "agent" as const,
+        name: "my-agent",
+        timestamps: { started_at: 1700000000000, finished_at: 1700000002000 },
+        input: { type: "text" as const, value: "Hello" },
+        output: { type: "text" as const, value: "Hi there" },
+        error: null,
+        metrics: null,
+        params: null,
+      },
+      {
+        span_id: "span-2",
+        parent_id: "span-1",
+        trace_id: "trace-1",
+        type: "llm" as const,
+        name: "gpt-4o",
+        model: "gpt-4o",
+        vendor: "openai",
+        timestamps: { started_at: 1700000000500, finished_at: 1700000001500 },
+        input: {
+          type: "chat_messages" as const,
+          value: [{ role: "user" as const, content: "Hello" }],
+        },
+        output: {
+          type: "chat_messages" as const,
+          value: [{ role: "assistant" as const, content: "Hi there" }],
+        },
+        error: null,
+        metrics: { prompt_tokens: 10, completion_tokens: 5 },
+        params: { temperature: 0.7 },
+      },
+    ];
+
+    const result = await formatSpansDigest(spans);
+
+    expect(typeof result).toBe("string");
+    expect(result).toContain("my-agent");
+    expect(result).toContain("gpt-4o");
+  });
+
+  it("returns empty digest for empty spans array", async () => {
+    const result = await formatSpansDigest([]);
+    expect(result).toBe("No spans recorded.");
+  });
+
+  it("includes error information in the digest", async () => {
+    const spans = [
+      {
+        span_id: "span-err",
+        trace_id: "trace-1",
+        type: "tool" as const,
+        name: "failing-tool",
+        timestamps: { started_at: 1700000000000, finished_at: 1700000001000 },
+        input: { type: "text" as const, value: "query" },
+        output: null,
+        error: {
+          has_error: true as const,
+          message: "Connection refused",
+          stacktrace: [],
+        },
+        metrics: null,
+        params: null,
+      },
+    ];
+
+    const result = await formatSpansDigest(spans);
+
+    expect(typeof result).toBe("string");
+    expect(result).toContain("failing-tool");
+    expect(result).toContain("ERROR");
+  });
+
+  it("joins multiple trace digests with separator for thread use", async () => {
+    const trace1Spans = [
+      {
+        span_id: "s1",
+        trace_id: "trace-1",
+        type: "span" as const,
+        name: "first-span",
+        timestamps: { started_at: 1700000000000, finished_at: 1700000001000 },
+        input: null,
+        output: null,
+        error: null,
+        metrics: null,
+        params: null,
+      },
+    ];
+    const trace2Spans = [
+      {
+        span_id: "s2",
+        trace_id: "trace-2",
+        type: "span" as const,
+        name: "second-span",
+        timestamps: { started_at: 1700000002000, finished_at: 1700000003000 },
+        input: null,
+        output: null,
+        error: null,
+        metrics: null,
+        params: null,
+      },
+    ];
+
+    const result = (
+      await Promise.all(
+        [trace1Spans, trace2Spans].map((spans) => formatSpansDigest(spans)),
+      )
+    ).join("\n\n---\n\n");
+
+    expect(typeof result).toBe("string");
+    expect(result).toContain("first-span");
+    expect(result).toContain("second-span");
+    expect(result).toContain("---");
+  });
+});
+
+describe("getTraceAvailableSources", () => {
+  it("includes formatted_trace with label 'Full Trace (AI-Readable)'", () => {
+    const sources = getTraceAvailableSources([], []);
+    const traceSource = sources[0]!;
+    const formattedField = traceSource.fields.find(
+      (f) => f.name === "formatted_trace",
+    );
+
+    expect(formattedField).toBeDefined();
+    expect(formattedField!.label).toBe("Full Trace (AI-Readable)");
+    expect(formattedField!.type).toBe("str");
+  });
+
+  it("does not include threads in trace-level sources", () => {
+    const sources = getTraceAvailableSources([], []);
+    const traceSource = sources[0]!;
+    const threadsField = traceSource.fields.find(
+      (f) => f.name === "threads",
+    );
+
+    expect(threadsField).toBeUndefined();
+  });
+});
+
+describe("getThreadAvailableSources", () => {
+  it("includes formatted_traces with label 'Full Thread (AI-Readable)'", () => {
+    const sources = getThreadAvailableSources();
+    const threadSource = sources[0]!;
+    const formattedField = threadSource.fields.find(
+      (f) => f.name === "formatted_traces",
+    );
+
+    expect(formattedField).toBeDefined();
+    expect(formattedField!.label).toBe("Full Thread (AI-Readable)");
+    expect(formattedField!.type).toBe("str");
+  });
+});
+
+// Regression tests for threads mapping bugs
+describe("TRACE_MAPPINGS.threads", () => {
+  const makeTrace = (overrides: Record<string, any> = {}) => ({
+    trace_id: "trace-1",
+    timestamps: { started_at: Date.now() },
+    input: { type: "text", value: "Hello" },
+    output: { type: "text", value: "World" },
+    metadata: { thread_id: "thread-abc" },
+    ...overrides,
+  });
+
+  describe("when allTraces contains traces with the same thread_id", () => {
+    it("returns thread traces with selected fields extracted", () => {
+      const trace1 = makeTrace({ trace_id: "trace-1" });
+      const trace2 = makeTrace({
+        trace_id: "trace-2",
+        input: { type: "text", value: "Second" },
+        output: { type: "text", value: "Response" },
+      });
+      const unrelatedTrace = makeTrace({
+        trace_id: "trace-3",
+        metadata: { thread_id: "other-thread" },
+      });
+
+      const result = TRACE_MAPPINGS.threads.mapping(
+        trace1 as any,
+        "",
+        "",
+        {
+          allTraces: [trace1, trace2, unrelatedTrace] as any[],
+          selectedFields: ["thread_id"],
+        },
+      );
+
+      expect(result).toHaveLength(2);
+      expect(result[0]).toEqual({ thread_id: "thread-abc" });
+      expect(result[1]).toEqual({ thread_id: "thread-abc" });
+    });
+
+    it("returns thread traces with multiple selected fields", () => {
+      const trace1 = makeTrace({ trace_id: "trace-1" });
+      const trace2 = makeTrace({
+        trace_id: "trace-2",
+        input: { type: "text", value: "Second" },
+      });
+
+      const result = TRACE_MAPPINGS.threads.mapping(
+        trace1 as any,
+        "",
+        "",
+        {
+          allTraces: [trace1, trace2] as any[],
+          selectedFields: ["input", "output"],
+        },
+      );
+
+      expect(result).toHaveLength(2);
+      expect(result[0]).toEqual({ input: "Hello", output: "World" });
+      expect(result[1]).toEqual({ input: "Second", output: "World" });
+    });
+  });
+
+  describe("when allTraces is undefined", () => {
+    it("returns an empty array", () => {
+      const trace = makeTrace();
+
+      const result = TRACE_MAPPINGS.threads.mapping(
+        trace as any,
+        "",
+        "",
+        { allTraces: undefined, selectedFields: ["thread_id"] },
+      );
+
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe("when trace has no thread_id", () => {
+    it("returns an empty array", () => {
+      const trace = makeTrace({ metadata: {} });
+
+      const result = TRACE_MAPPINGS.threads.mapping(
+        trace as any,
+        "",
+        "",
+        { allTraces: [trace] as any[], selectedFields: ["thread_id"] },
+      );
+
+      expect(result).toEqual([]);
+    });
+  });
+});
+
+describe("mapTraceToDatasetEntry()", () => {
+  describe("when mapping uses 'threads' source with selectedFields", () => {
+    it("passes allTraces to the threads mapping and returns thread data", () => {
+      const trace1 = {
+        trace_id: "trace-1",
+        timestamps: { started_at: Date.now() },
+        input: { type: "text", value: "Hello" },
+        output: { type: "text", value: "World" },
+        metadata: { thread_id: "thread-abc" },
+      };
+      const trace2 = {
+        trace_id: "trace-2",
+        timestamps: { started_at: Date.now() },
+        input: { type: "text", value: "Second" },
+        output: { type: "text", value: "Response" },
+        metadata: { thread_id: "thread-abc" },
+      };
+
+      const mapping = {
+        my_threads: {
+          source: "threads",
+          key: undefined as string | undefined,
+          subkey: undefined as string | undefined,
+          selectedFields: ["input", "output"],
+        },
+      };
+
+      const result = mapTraceToDatasetEntry(
+        trace1 as any,
+        mapping,
+        new Set(),
+        undefined,
+        [trace1, trace2] as any[],
+      );
+
+      expect(result).toHaveLength(1);
+      // The threads mapping returns an array of objects, which gets JSON.stringified
+      const parsed = JSON.parse(result[0]!.my_threads as string);
+      expect(parsed).toHaveLength(2);
+      expect(parsed[0]).toEqual({ input: "Hello", output: "World" });
+      expect(parsed[1]).toEqual({ input: "Second", output: "Response" });
+    });
+  });
+});
+
+describe("TRACE_MAPPINGS keys for threads sub-field selection", () => {
+  it("does not include thread sources as valid sub-field options", () => {
+    // Bug regression: "threads" appeared in its own sub-field multi-select,
+    // creating a recursive option that makes no sense.
+    // The sub-field options for threads should exclude thread sources.
+    const threadSubFieldOptions = Object.keys(TRACE_MAPPINGS).filter(
+      (key) => key !== "threads" && key !== "threads_until_current",
+    );
+
+    // Verify thread sources are in the raw keys (proves we're testing the right thing)
+    expect(Object.keys(TRACE_MAPPINGS)).toContain("threads");
+    expect(Object.keys(TRACE_MAPPINGS)).toContain("threads_until_current");
+
+    // But the filtered list used for sub-field selection excludes them
+    expect(threadSubFieldOptions).not.toContain("threads");
+    expect(threadSubFieldOptions).not.toContain("threads_until_current");
+  });
+});
+
+describe("threads_until_current mapping", () => {
+  const makeTrace = (
+    traceId: string,
+    threadId: string,
+    startedAt: number,
+    input: string,
+  ) =>
+    ({
+      trace_id: traceId,
+      metadata: { thread_id: threadId },
+      timestamps: { started_at: startedAt },
+      input: { value: input },
+      output: { value: "" },
+      spans: [],
+    }) as any;
+
+  const allTraces = [
+    makeTrace("t1", "thread-A", 1000, "first"),
+    makeTrace("t2", "thread-A", 2000, "second"),
+    makeTrace("t3", "thread-A", 3000, "third"),
+    makeTrace("t4", "thread-B", 1500, "other-thread"),
+  ];
+
+  it("returns only traces up to and including the current trace timestamp", () => {
+    const currentTrace = allTraces[1]!; // t2, timestamp 2000
+    const result = TRACE_MAPPINGS.threads_until_current.mapping(
+      currentTrace,
+      "",
+      "",
+      { allTraces },
+    ) as any[];
+
+    expect(result.map((t: any) => t.trace_id)).toEqual(["t1", "t2"]);
+  });
+
+  it("includes traces with equal timestamps", () => {
+    const currentTrace = allTraces[2]!; // t3, timestamp 3000
+    const result = TRACE_MAPPINGS.threads_until_current.mapping(
+      currentTrace,
+      "",
+      "",
+      { allTraces },
+    ) as any[];
+
+    expect(result.map((t: any) => t.trace_id)).toEqual(["t1", "t2", "t3"]);
+  });
+
+  it("excludes traces from other threads", () => {
+    const currentTrace = allTraces[2]!; // t3, thread-A
+    const result = TRACE_MAPPINGS.threads_until_current.mapping(
+      currentTrace,
+      "",
+      "",
+      { allTraces },
+    ) as any[];
+
+    expect(result.map((t: any) => t.trace_id)).not.toContain("t4");
+  });
+
+  it("extracts selectedFields from filtered traces", () => {
+    const currentTrace = allTraces[1]!; // t2, timestamp 2000
+    const result = TRACE_MAPPINGS.threads_until_current.mapping(
+      currentTrace,
+      "",
+      "",
+      { allTraces, selectedFields: ["input"] },
+    ) as Record<string, unknown>[];
+
+    expect(result).toEqual([{ input: "first" }, { input: "second" }]);
+  });
+
+  it("returns empty array when trace has no thread_id", () => {
+    const noThreadTrace = { ...allTraces[0]!, metadata: {} } as any;
+    const result = TRACE_MAPPINGS.threads_until_current.mapping(
+      noThreadTrace,
+      "",
+      "",
+      { allTraces },
+    );
+
+    expect(result).toEqual([]);
+  });
+});
+
+describe("mappingStateSchema", () => {
+  describe("when a trace-type mapping uses 'threads' source with selectedFields", () => {
+    it("preserves selectedFields after Zod parsing", () => {
+      // Bug regression: the trace variant of the Zod schema did not include selectedFields,
+      // causing Zod to strip it during validation. This meant that after
+      // saving and loading the mapping, the threads sub-field selection was lost.
+      const input = {
+        mapping: {
+          my_column: {
+            source: "threads",
+            key: "",
+            subkey: "",
+            selectedFields: ["thread_id", "input", "output"],
+          },
+        },
+        expansions: [],
+      };
+
+      const result = mappingStateSchema.parse(input);
+
+      expect(result.mapping.my_column).toHaveProperty("selectedFields");
+      expect(
+        "selectedFields" in result.mapping.my_column!
+          ? result.mapping.my_column!.selectedFields
+          : undefined,
+      ).toEqual(["thread_id", "input", "output"]);
+    });
+  });
+
+  describe("when a trace-type mapping has no selectedFields", () => {
+    it("parses successfully without selectedFields", () => {
+      const input = {
+        mapping: {
+          my_column: {
+            source: "input",
+          },
+        },
+        expansions: [],
+      };
+
+      const result = mappingStateSchema.parse(input);
+
+      expect(result.mapping.my_column).toHaveProperty("source", "input");
+    });
+  });
+});
+
+describe("tryAndConvertTo", () => {
+  describe("when given an OTel typed-object wrapper", () => {
+    it("returns the bare value when the wrapper type is 'text'", () => {
+      // Bug: currently returns '{"type":"text","value":"stockout"}' instead of "stockout"
+      expect(tryAndConvertTo({ type: "text", value: "stockout" }, "string")).toBe(
+        "stockout",
+      );
+    });
+
+    it("returns the bare value stringified when the wrapper type is 'json' and value is a number", () => {
+      // Any `type` discriminator should trigger unwrap
+      expect(tryAndConvertTo({ type: "json", value: 42 }, "string")).toBe("42");
+    });
+  });
+
+  describe("when given an array of OTel typed-object wrappers", () => {
+    it("unwraps each element and returns a string array", () => {
+      expect(
+        tryAndConvertTo(
+          [
+            { type: "text", value: "a" },
+            { type: "text", value: "b" },
+          ],
+          "string[]",
+        ),
+      ).toEqual(["a", "b"]);
+    });
+  });
+
+  describe("when given a plain object that is not a typed-object wrapper", () => {
+    it("stringifies the object as JSON", () => {
+      // Guard: non-wrapper objects must NOT be unwrapped
+      expect(tryAndConvertTo({ foo: "bar" }, "string")).toBe('{"foo":"bar"}');
+    });
+  });
+
+  describe("when given a bare string", () => {
+    it("returns the string unchanged", () => {
+      expect(tryAndConvertTo("stockout", "string")).toBe("stockout");
+    });
+  });
+
+  describe("when given null", () => {
+    it("returns undefined", () => {
+      expect(tryAndConvertTo(null, "string")).toBeUndefined();
+    });
+  });
+
+  describe("when given undefined", () => {
+    it("returns undefined", () => {
+      expect(tryAndConvertTo(undefined, "string")).toBeUndefined();
+    });
+  });
+});
+
+describe("coerceMonitorMappings (runtime write-path coercion for non-Zod callers)", () => {
+  describe("when value is null", () => {
+    it("coerces to canonical empty MappingState", () => {
+      expect(coerceMonitorMappings(null)).toEqual({
+        mapping: {},
+        expansions: [],
+      });
+    });
+  });
+
+  describe("when value is undefined", () => {
+    it("coerces to canonical empty MappingState", () => {
+      expect(coerceMonitorMappings(undefined)).toEqual({
+        mapping: {},
+        expansions: [],
+      });
+    });
+  });
+
+  describe("when value is the legacy `{}` shape that caused issue #3875", () => {
+    it("coerces to canonical empty MappingState", () => {
+      expect(coerceMonitorMappings({})).toEqual({
+        mapping: {},
+        expansions: [],
+      });
+    });
+  });
+
+  describe("when value is a properly shaped MappingState", () => {
+    it("preserves the value", () => {
+      const valid = {
+        mapping: {
+          input: { source: "input", key: undefined, subkey: undefined },
+        },
+        expansions: [],
+      };
+      expect(coerceMonitorMappings(valid)).toEqual(valid);
+    });
   });
 });

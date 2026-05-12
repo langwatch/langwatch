@@ -1,5 +1,6 @@
 import { HStack, Text, VStack } from "@chakra-ui/react";
 import type React from "react";
+import type { IconData } from "../../../regions/shared/types";
 import {
   type FrameworkKey,
   LARGE_FRAMEWORK_ICON_KEYS,
@@ -8,18 +9,30 @@ import {
 import { FRAMEWORKS_BY_PLATFORM } from "../../../regions/observability/ui-options";
 import { SelectableIconCard } from "../shared/SelectableIconCard";
 
+type FrameworksByPlatform = Record<
+  PlatformKey,
+  readonly { key: FrameworkKey; label: string; icon?: IconData }[]
+>;
+
 interface FrameworkGridProps {
   language: PlatformKey;
   selectedFramework: FrameworkKey | null;
   onSelectFramework: (framework: FrameworkKey) => void;
+  /**
+   * Override the platform-to-frameworks map. The traces-v2 empty-state
+   * onboarding passes a category-filtered map; the original onboarding flow
+   * falls through to the full FRAMEWORKS_BY_PLATFORM.
+   */
+  frameworksByPlatform?: FrameworksByPlatform;
 }
 
 export function FrameworkGrid({
   language,
   selectedFramework,
   onSelectFramework,
+  frameworksByPlatform = FRAMEWORKS_BY_PLATFORM,
 }: FrameworkGridProps): React.ReactElement | null {
-  const frameworks = FRAMEWORKS_BY_PLATFORM[language];
+  const frameworks = frameworksByPlatform[language];
   if (!frameworks || frameworks.length === 0) return null;
 
   // If no framework is selected, default to the first available framework
@@ -30,16 +43,16 @@ export function FrameworkGrid({
 
   return (
     <VStack align="stretch" gap={3}>
-      <VStack align="stretch" gap={0}>
-        <Text fontSize="md" fontWeight="semibold">
+      <VStack align="stretch" gap={0.5}>
+        <Text fontSize="md" fontWeight="semibold" letterSpacing="-0.01em">
           Integrate LangWatch with{" "}
           {framework?.label ?? "your selected framework"}
         </Text>
-        <Text fontSize="xs" color="fg.muted">
+        <Text fontSize="xs" color="fg.muted" lineHeight="tall">
           Pick your model provider or framework to tailor setup guide.
         </Text>
       </VStack>
-      <HStack gap={3} wrap="wrap">
+      <HStack gap={3} rowGap={4} wrap="wrap" pb={1}>
         {frameworks.map((fw) => (
           <SelectableIconCard
             key={fw.key}

@@ -14,6 +14,36 @@ from dspy.signatures.signature import Signature
 import liquid
 
 
+def _coerce_for_liquid(value: Any) -> Any:
+    """
+    Prepare a template input for Liquid rendering.
+
+    Liquid can iterate over lists and access dict/object attributes natively, so non-string
+    values are returned as-is. Strings that parse as JSON objects/arrays are parsed back —
+    structured inputs (e.g. conversation history) arrive JSON-stringified across the TS↔NLP
+    serialized-adapter boundary and must re-enter Liquid as native Python so `{% for m in
+    messages %}` works. A `dspy.History` instance surfaces its `messages` list for the same
+    reason. See langwatch/langwatch#3415.
+    """
+    # dspy.History exposes its turn list on `.messages`; surface that for Liquid iteration.
+    messages_attr = getattr(value, "messages", None)
+    if messages_attr is not None and isinstance(messages_attr, list) and not isinstance(value, (list, dict, str)):
+        return messages_attr
+
+    if isinstance(value, str):
+        stripped = value.lstrip()
+        if stripped[:1] in ("[", "{"):
+            try:
+                parsed = json.loads(value)
+            except (ValueError, TypeError):
+                return value
+            if isinstance(parsed, (list, dict)):
+                return parsed
+        return value
+
+    return value
+
+
 def _filter_empty_content_messages(messages: list[dict]) -> list[dict]:
     """
     Filter messages with empty content to prevent Anthropic API errors.
@@ -165,17 +195,22 @@ class TemplateAdapter(dspy.JSONAdapter):
     def _format_template_inputs(self, template: str, inputs: dict[str, Any]) -> str:
         """
         Format the template inputs filling the {{ input }} placeholders.
+
+        Non-string values are passed to Liquid as native Python objects so the template can
+        iterate (`{% for m in messages %}`) or access fields (`{{ msg.role }}`). Strings that
+        parse cleanly as JSON objects/arrays are also parsed back to native form — this is the
+        shape values arrive in when serialized-adapter transport (see
+        langwatch/src/server/scenarios/execution/resolve-field-mappings.ts) JSON-stringifies
+        structured inputs before sending them to the NLP service. Without this back-conversion,
+        `{{messages}}` renders as an escaped JSON blob in a single user turn instead of the
+        intended multi-turn history. See langwatch/langwatch#3415.
         """
 
-        str_inputs: dict[str, str] = {}
+        rendered_inputs: dict[str, Any] = {}
         for k, v in inputs.items():
-            str_inputs[k] = (
-                v
-                if type(v) == str
-                else json.dumps(v, cls=SerializableWithStringFallback, ensure_ascii=False)
-            )
+            rendered_inputs[k] = _coerce_for_liquid(v)
 
-        return liquid.render(template, **str_inputs)
+        return liquid.render(template, **rendered_inputs)
 
     def parse(self, signature, completion):
         if getattr(signature, "_messages", None) is None:

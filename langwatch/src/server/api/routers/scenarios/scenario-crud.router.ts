@@ -2,7 +2,11 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { enforceLicenseLimit } from "~/server/license-enforcement";
+import { ScenarioNotFoundError } from "~/server/scenarios/errors";
 import { ScenarioService } from "~/server/scenarios/scenario.service";
+import { trackServerEvent } from "~/server/posthog";
+import { fireScenarioCreatedNurturing } from "~/../ee/billing/nurturing/hooks/featureAdoption";
+import { captureException } from "~/utils/posthogErrorCapture";
 import { createLogger } from "~/utils/logger/server";
 import { checkProjectPermission } from "../../rbac";
 import { projectSchema } from "./schemas";
@@ -43,6 +47,22 @@ export const scenarioCrudRouter = createTRPCRouter({
         lastUpdatedById: ctx.session.user.id,
       });
 
+      trackServerEvent({ userId: ctx.session.user.id, event: "scenario_created", projectId: input.projectId });
+
+      void ctx.prisma.scenario
+        .count({
+          where: { projectId: input.projectId, archivedAt: null },
+        })
+        .then((count) => {
+          fireScenarioCreatedNurturing({
+            userId: ctx.session.user.id,
+            scenarioCount: count,
+            scenarioId: result.id,
+            projectId: input.projectId,
+          });
+        })
+        .catch(captureException);
+
       logger.info({ projectId: input.projectId, scenarioId: result.id }, "Scenario created");
       return result;
     }),
@@ -72,6 +92,18 @@ export const scenarioCrudRouter = createTRPCRouter({
       return scenario;
     }),
 
+  getByIdIncludingArchived: protectedProcedure
+    .input(projectSchema.extend({ id: z.string() }))
+    .use(checkProjectPermission("scenarios:view"))
+    .query(async ({ ctx, input }) => {
+      logger.debug(
+        { projectId: input.projectId, scenarioId: input.id },
+        "Fetching scenario by id including archived",
+      );
+      const service = ScenarioService.create(ctx.prisma);
+      return service.getByIdIncludingArchived(input);
+    }),
+
   update: protectedProcedure
     .input(updateScenarioSchema)
     .use(checkProjectPermission("scenarios:manage"))
@@ -86,6 +118,47 @@ export const scenarioCrudRouter = createTRPCRouter({
       });
 
       logger.info({ projectId, scenarioId: id }, "Scenario updated");
+      return result;
+    }),
+
+  archive: protectedProcedure
+    .input(projectSchema.extend({ id: z.string() }))
+    .use(checkProjectPermission("scenarios:manage"))
+    .mutation(async ({ ctx, input }) => {
+      logger.info({ projectId: input.projectId, scenarioId: input.id }, "Archiving scenario");
+
+      const service = ScenarioService.create(ctx.prisma);
+      try {
+        const result = await service.archive(input);
+        logger.info({ projectId: input.projectId, scenarioId: input.id }, "Scenario archived");
+        return result;
+      } catch (error) {
+        if (error instanceof ScenarioNotFoundError) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: error.message,
+          });
+        }
+        throw error;
+      }
+    }),
+
+  batchArchive: protectedProcedure
+    .input(projectSchema.extend({ ids: z.array(z.string()).min(1) }))
+    .use(checkProjectPermission("scenarios:manage"))
+    .mutation(async ({ ctx, input }) => {
+      logger.info(
+        { projectId: input.projectId, count: input.ids.length },
+        "Batch archiving scenarios",
+      );
+
+      const service = ScenarioService.create(ctx.prisma);
+      const result = await service.batchArchive(input);
+
+      logger.info(
+        { projectId: input.projectId, archived: result.archived.length, failed: result.failed.length },
+        "Batch archive complete",
+      );
       return result;
     }),
 });

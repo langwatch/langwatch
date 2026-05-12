@@ -86,9 +86,10 @@ const mockPush = vi.fn((url: string) => {
   return Promise.resolve(true);
 });
 
-vi.mock("next/router", () => ({
+vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     query: mockQuery,
+    pathname: "",
     asPath:
       Object.keys(mockQuery).length > 0
         ? "/test?" + qs.stringify(mockQuery)
@@ -159,7 +160,7 @@ describe("GuardrailsDrawer + CurrentDrawer Integration (REGRESSION)", () => {
     vi.useRealTimers();
   });
 
-  it("REGRESSION: selecting evaluator in list should return to guardrails drawer", async () => {
+  it("REGRESSION: selecting evaluator in list returns to guardrails drawer", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
     // Start with guardrails drawer open

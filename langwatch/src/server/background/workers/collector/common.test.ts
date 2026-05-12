@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { transformElasticSearchSpanToSpan } from "../../../elasticsearch/transformers";
-import type { BaseSpan } from "../../../tracer/types";
+import type { BaseSpan, SpanInputOutput } from "../../../tracer/types";
 import {
   flattenSpanTree,
   getFirstInputAsText,
   getLastOutputAsText,
   organizeSpansIntoTree,
+  typedValueToText,
 } from "./common"; // replace with your actual module path
 
 const elasticSearchSpanToSpan = transformElasticSearchSpanToSpan(
@@ -1278,5 +1279,327 @@ describe("Span organizing and flattening tests", () => {
       spans.map(elasticSearchSpanToSpan as any),
     );
     expect(input).toBe("how much is 2+2?");
+  });
+
+  describe("when messages use 'parts' instead of 'content' (Vercel AI SDK / pi-ai pattern)", () => {
+    it("extracts text from chat_messages with parts field", () => {
+      const spans: BaseSpan[] = [
+        {
+          ...commonSpanProps,
+          span_id: "1",
+          name: "openclaw.agent.turn",
+          parent_id: null,
+          timestamps: { started_at: 100, finished_at: 500 },
+          input: {
+            type: "chat_messages",
+            value: [
+              {
+                role: "system",
+                content: [{ type: "text", content: "You are a helpful assistant." }],
+              },
+              {
+                role: "user",
+                parts: [{ type: "text", content: "[Sun 2026-02-08 20:58 UTC] hi" }],
+              },
+            ],
+          },
+          output: {
+            type: "chat_messages",
+            value: [
+              {
+                role: "assistant",
+                parts: [{ type: "text", content: "Hey Rogerio! What's up?" }],
+              },
+            ],
+          },
+        },
+      ];
+
+      const input = getFirstInputAsText(spans);
+      expect(input).toBe("[Sun 2026-02-08 20:58 UTC] hi");
+
+      const output = getLastOutputAsText(spans);
+      expect(output).toBe("Hey Rogerio! What's up?");
+    });
+
+    it("extracts text from content blocks using 'content' field instead of 'text'", () => {
+      const spans: BaseSpan[] = [
+        {
+          ...commonSpanProps,
+          span_id: "1",
+          name: "chat claude-opus-4-6",
+          parent_id: null,
+          timestamps: { started_at: 100, finished_at: 500 },
+          input: {
+            type: "chat_messages",
+            value: [
+              {
+                role: "system",
+                content: [
+                  { type: "text", content: "You are Snaps, a lobster AI." },
+                ],
+              },
+              {
+                role: "user",
+                content: [
+                  { type: "text", content: "What is the weather?" },
+                ],
+              },
+            ],
+          },
+          output: {
+            type: "chat_messages",
+            value: [
+              {
+                role: "assistant",
+                content: [
+                  { type: "text", content: "It's sunny at 22C!" },
+                ],
+              },
+            ],
+          },
+        },
+      ];
+
+      const input = getFirstInputAsText(spans);
+      expect(input).toBe("What is the weather?");
+
+      const output = getLastOutputAsText(spans);
+      expect(output).toBe("It's sunny at 22C!");
+    });
+
+    it("extracts text from json array of messages with parts pattern", () => {
+      const spans: BaseSpan[] = [
+        {
+          ...commonSpanProps,
+          span_id: "1",
+          name: "agent turn",
+          parent_id: null,
+          timestamps: { started_at: 100, finished_at: 500 },
+          input: {
+            type: "json",
+            value: [
+              { role: "system", content: [{ type: "text", content: "Be helpful." }] },
+              { role: "user", parts: [{ type: "text", content: "hello there" }] },
+            ],
+          },
+          output: {
+            type: "json",
+            value: [
+              { role: "assistant", parts: [{ type: "text", content: "Hi! How can I help?" }] },
+            ],
+          },
+        },
+      ];
+
+      const input = getFirstInputAsText(spans);
+      expect(input).toBe("hello there");
+
+      const output = getLastOutputAsText(spans);
+      expect(output).toBe("Hi! How can I help?");
+    });
+  });
+
+  it("extracts text from json array of chat-message-like objects with non-standard roles", () => {
+    const spans: BaseSpan[] = [
+      {
+        ...commonSpanProps,
+        span_id: "1",
+        name: "chat_completion",
+        parent_id: null,
+        timestamps: { started_at: 100, finished_at: 500 },
+        input: {
+          type: "json",
+          value: [
+            { role: "system", content: "You are a helpful assistant" },
+            { role: "user", content: "hello there" },
+            { role: "assistant", content: "Hi! How can I help?" },
+            { role: "user", content: "what is the weather?" },
+            { role: "toolResult", content: '{"status": "ok"}' },
+          ],
+        },
+        output: {
+          type: "json",
+          value: [
+            { role: "system", content: "You are a helpful assistant" },
+            { role: "user", content: "what is the weather?" },
+            { role: "assistant", content: "The weather is sunny today!" },
+          ],
+        },
+      },
+    ];
+
+    const input = getFirstInputAsText(spans);
+    expect(input).toBe("what is the weather?");
+
+    const output = getLastOutputAsText(spans);
+    expect(output).toBe("The weather is sunny today!");
+  });
+});
+
+describe("typedValueToText()", () => {
+  describe("when type is 'list'", () => {
+    it("recurses into the first item by default", () => {
+      const result = typedValueToText({
+        type: "list",
+        value: [
+          { type: "text", value: "hello" },
+          { type: "text", value: "world" },
+        ],
+      });
+
+      expect(result).toBe("hello");
+    });
+
+    it("recurses into the last item when last=true", () => {
+      const result = typedValueToText(
+        {
+          type: "list",
+          value: [
+            { type: "text", value: "hello" },
+            { type: "text", value: "world" },
+          ],
+        },
+        true,
+      );
+
+      expect(result).toBe("world");
+    });
+
+    it("returns empty string when list is empty", () => {
+      const result = typedValueToText({
+        type: "list",
+        value: [],
+      });
+
+      expect(result).toBe("");
+    });
+
+    it("returns empty string when list items lack type/value structure", () => {
+      const result = typedValueToText({
+        type: "list",
+        value: ["plain string", 42] as any,
+      });
+
+      expect(result).toBe("");
+    });
+  });
+
+  describe("when a top-level special key exists but its value is empty", () => {
+    it("does not short-circuit to empty — returns the stringified payload instead", () => {
+      const result = typedValueToText({
+        type: "json",
+        value: {
+          content: "",
+          formatName: "standard",
+          formattedProperties: "x",
+        },
+      });
+
+      expect(result).not.toBe("");
+      expect(result).toContain("standard");
+    });
+
+    it("drills into a single-key wrapper even when a sibling-less empty key exists", () => {
+      // This is the user's scenario: {data: {content: "..."}} renders as the real content
+      const result = typedValueToText({
+        type: "json",
+        value: {
+          data: {
+            content: "COMPANY_ANALYSIS",
+            formatName: "standard",
+          },
+        },
+      });
+
+      expect(result).toBe("COMPANY_ANALYSIS");
+    });
+
+    it("fixes the `query` → `user_query` typo by returning json.query when set", () => {
+      const result = typedValueToText({
+        type: "json",
+        value: { query: "what is the weather?" },
+      });
+
+      expect(result).toBe("what is the weather?");
+    });
+
+    it("recursive hasNonEmptyValue: nested-empty wrapper skips to the next sibling special key", () => {
+      // Regression: before the recursion, `output` being an object with keys
+      // (even nested-empty) short-circuited the loop and `answer` was never
+      // considered. Now `{ content: "" }` is treated as empty, so the loop
+      // continues past `output` and picks up `answer` instead.
+      const result = typedValueToText({
+        type: "json",
+        value: {
+          output: { content: "" },
+          answer: "the real answer",
+        },
+      });
+
+      expect(result).toBe("the real answer");
+    });
+
+    it("recursive hasNonEmptyValue: does not hang / recurse infinitely on circular references", () => {
+      const circular: Record<string, unknown> = { output: {} };
+      (circular.output as Record<string, unknown>).self = circular;
+      (circular as Record<string, unknown>).answer = "still findable";
+
+      // Explicit safety test: the WeakSet cycle guard must prevent infinite
+      // recursion. Specific text output is not asserted — cycles are not
+      // realistic in real JSON payloads (the JSON encoder would have thrown
+      // before we ever saw them), so this is purely a robustness check.
+      expect(() =>
+        typedValueToText({ type: "json", value: circular }),
+      ).not.toThrow();
+    });
+  });
+});
+
+describe("getLastOutputAsText — multi-span fallback", () => {
+  const base = {
+    trace_id: "t",
+    type: "span" as const,
+    name: "s",
+  };
+
+  it("falls back to an earlier span when the last-finishing span renders as empty", () => {
+    const spans = [
+      {
+        ...base,
+        span_id: "a",
+        parent_id: null,
+        timestamps: { started_at: 100, finished_at: 200 },
+        input: { type: "text" as const, value: "in" },
+        output: {
+          type: "json" as const,
+          value: {
+            data: {
+              content: "COMPANY_ANALYSIS",
+              formatName: "standard",
+            },
+          },
+        },
+      },
+      // A later-finishing span whose output renders to "" under the current heuristics
+      // (nested list of primitives with no structured SpanInputOutput items).
+      {
+        ...base,
+        span_id: "b",
+        parent_id: null,
+        timestamps: { started_at: 150, finished_at: 300 },
+        input: { type: "text" as const, value: "in2" },
+        output: {
+          type: "list" as const,
+          // Intentional malformed shape: `list.value` is typed as
+          // `SpanInputOutput[]`, but real-world traces occasionally ship
+          // bare primitives here. This test pins the fallback behavior.
+          value: ["plain", 1] as unknown as SpanInputOutput[],
+        },
+      },
+    ];
+
+    const output = getLastOutputAsText(spans as BaseSpan[]);
+    expect(output).toBe("COMPANY_ANALYSIS");
   });
 });

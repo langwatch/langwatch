@@ -1,4 +1,4 @@
-import type { Organization } from "@prisma/client";
+import { PricingModel, type Organization } from "@prisma/client";
 import { Factory } from "fishery";
 import { nanoid } from "nanoid";
 
@@ -25,10 +25,12 @@ export const organizationFactory = Factory.define<
   s3Bucket: null,
   useCustomS3: false,
   sentPlanLimitAlert: null,
+  pricingModel: PricingModel.SEAT_EVENT,
   promoCode: null,
   ssoDomain: null,
   ssoProvider: null,
   license: null,
   licenseExpiresAt: null,
   licenseLastValidatedAt: null,
+  presenceEnabled: false,
 }));

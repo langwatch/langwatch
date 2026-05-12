@@ -1,5 +1,4 @@
 import {
-  Alert,
   Badge,
   Button,
   Card,
@@ -24,7 +23,6 @@ import { Lock } from "react-feather";
 import { Controller, type SubmitHandler, useForm } from "react-hook-form";
 import { HorizontalFormControl } from "~/components/HorizontalFormControl";
 import { Tooltip } from "~/components/ui/tooltip";
-import { ApiKeyManagementSection } from "../components/settings/ApiKeyManagementSection";
 import { ProjectSelector } from "../components/DashboardLayout";
 import SettingsLayout from "../components/SettingsLayout";
 import {
@@ -37,9 +35,10 @@ import { Switch } from "../components/ui/switch";
 import { toaster } from "../components/ui/toaster";
 import { withPermissionGuard } from "../components/WithPermissionGuard";
 import { useActivePlan } from "../hooks/useActivePlan";
+import { useLiteMemberGuard } from "../hooks/useLiteMemberGuard";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "../hooks/usePublicEnv";
-import type { FullyLoadedOrganization } from "../server/api/routers/organization";
+import type { FullyLoadedOrganization } from "../server/app-layer/organizations/repositories/organization.repository";
 import { api } from "../utils/api";
 
 type OrganizationFormData = {
@@ -50,6 +49,7 @@ type OrganizationFormData = {
   elasticsearchNodeUrl: string;
   elasticsearchApiKey: string;
   s3Bucket: string;
+  presenceEnabled: boolean;
 };
 
 function Settings() {
@@ -72,6 +72,7 @@ function SettingsForm({
   project: Project;
 }) {
   const { hasPermission } = useOrganizationTeamProject();
+  const { isLiteMember } = useLiteMemberGuard();
   const [defaultValues, setDefaultValues] = useState<OrganizationFormData>({
     name: organization.name,
     s3Endpoint: organization.s3Endpoint ?? "",
@@ -80,8 +81,9 @@ function SettingsForm({
     elasticsearchNodeUrl: organization.elasticsearchNodeUrl ?? "",
     elasticsearchApiKey: organization.elasticsearchApiKey ?? "",
     s3Bucket: organization.s3Bucket ?? "",
+    presenceEnabled: organization.presenceEnabled,
   });
-  const { register, handleSubmit, getFieldState } = useForm({
+  const { register, handleSubmit, getFieldState, control } = useForm({
     defaultValues,
   });
   const updateOrganization = api.organization.update.useMutation();
@@ -104,6 +106,7 @@ function SettingsForm({
         elasticsearchNodeUrl: data.elasticsearchNodeUrl,
         elasticsearchApiKey: data.elasticsearchApiKey,
         s3Bucket: data.s3Bucket,
+        presenceEnabled: data.presenceEnabled,
       },
       {
         onSuccess: () => {
@@ -182,6 +185,53 @@ function SettingsForm({
                   <Text>{organization.slug}</Text>
                 )}
               </HorizontalFormControl>
+              <HorizontalFormControl
+                label="Project ID"
+                helper="Use this ID when authenticating with Personal Access Tokens"
+              >
+                <Input
+                  width="full"
+                  disabled
+                  type="text"
+                  value={project.id}
+                />
+              </HorizontalFormControl>
+
+              <HorizontalFormControl
+                label="Live presence"
+                helper={
+                  <VStack align="start" gap={1}>
+                    <Text>
+                      Lets teammates see who else is on the site in real time —
+                      avatars, cursors, and which view each person is in.
+                      Disable to turn it off across every project in this
+                      organization.
+                    </Text>
+                    {!hasPermission("organization:manage") && (
+                      <Badge colorPalette="blue" variant="surface" size={"xs"}>
+                        <Tooltip content="Contact your admin to change this setting">
+                          <HStack>
+                            <Lock size={10} />
+                            <Text>Admin only</Text>
+                          </HStack>
+                        </Tooltip>
+                      </Badge>
+                    )}
+                  </VStack>
+                }
+              >
+                <Controller
+                  control={control}
+                  name="presenceEnabled"
+                  render={({ field }) => (
+                    <Switch
+                      checked={field.value}
+                      onChange={(e) => field.onChange(e.target.checked)}
+                      disabled={!hasPermission("organization:manage")}
+                    />
+                  )}
+                />
+              </HorizontalFormControl>
 
               {organization.useCustomS3 && (
                 <HorizontalFormControl
@@ -254,15 +304,17 @@ function SettingsForm({
               )}
             </VStack>
 
-            <HStack width="full" justify="flex-end" paddingTop={4}>
-              <Button
-                type="submit"
-                colorPalette="blue"
-                loading={updateOrganization.isLoading}
-              >
-                Save Changes
-              </Button>
-            </HStack>
+            {!isLiteMember && (
+              <HStack width="full" justify="flex-end" paddingTop={4}>
+                <Button
+                  type="submit"
+                  colorPalette="blue"
+                  loading={updateOrganization.isLoading}
+                >
+                  Save Changes
+                </Button>
+              </HStack>
+            )}
           </VStack>
         </form>
 
@@ -287,6 +339,7 @@ type ProjectFormData = {
   capturedInputVisibility: ProjectSensitiveDataVisibilityLevel;
   capturedOutputVisibility: ProjectSensitiveDataVisibilityLevel;
   traceSharingEnabled: boolean;
+  presenceEnabled: boolean;
 };
 
 function ProjectSettingsForm({ project }: { project: Project }) {
@@ -385,6 +438,7 @@ function ProjectSettingsForm({ project }: { project: Project }) {
     capturedInputVisibility: project.capturedInputVisibility,
     capturedOutputVisibility: project.capturedOutputVisibility,
     traceSharingEnabled: project.traceSharingEnabled,
+    presenceEnabled: project.presenceEnabled,
   };
   const [previousValues, setPreviousValues] =
     useState<ProjectFormData>(defaultValues);
@@ -445,6 +499,7 @@ function ProjectSettingsForm({ project }: { project: Project }) {
           ? data.capturedOutputVisibility
           : void 0,
         traceSharingEnabled: userIsAdmin ? data.traceSharingEnabled : void 0,
+        presenceEnabled: userIsAdmin ? data.presenceEnabled : void 0,
       },
       {
         onSuccess: () => {
@@ -721,6 +776,48 @@ function ProjectSettingsForm({ project }: { project: Project }) {
           </HorizontalFormControl>
 
           <HorizontalFormControl
+            label="Live presence"
+            helper={
+              <VStack align="start" gap={1}>
+                <Text>
+                  Show teammate avatars, cursors, and active views inside this
+                  project.{" "}
+                  {!organization?.presenceEnabled
+                    ? "Disabled at the organization level — turn it on there first."
+                    : "Disable to turn presence off for this project only."}
+                </Text>
+                {!userIsAdmin && (
+                  <Badge colorPalette="blue" variant="surface" size={"xs"}>
+                    <Tooltip content="Contact your admin to change this setting">
+                      <HStack>
+                        <Lock size={10} />
+                        <Text>Admin only</Text>
+                      </HStack>
+                    </Tooltip>
+                  </Badge>
+                )}
+              </VStack>
+            }
+            invalid={!!formState.errors.presenceEnabled}
+          >
+            <Controller
+              control={control}
+              name="presenceEnabled"
+              render={({ field }) => (
+                <Switch
+                  checked={
+                    field.value && (organization?.presenceEnabled ?? true)
+                  }
+                  onChange={(e) => field.onChange(e.target.checked)}
+                  disabled={
+                    !userIsAdmin || !(organization?.presenceEnabled ?? true)
+                  }
+                />
+              )}
+            />
+          </HorizontalFormControl>
+
+          <HorizontalFormControl
             label="Trace Sharing"
             helper={
               <VStack align="start" gap={1}>
@@ -751,8 +848,6 @@ function ProjectSettingsForm({ project }: { project: Project }) {
               )}
             />
           </HorizontalFormControl>
-
-          <ApiKeyManagementSection project={project} />
 
           {organization?.useCustomS3 && (
             <HorizontalFormControl

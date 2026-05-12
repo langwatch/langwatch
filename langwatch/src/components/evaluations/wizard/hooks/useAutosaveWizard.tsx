@@ -1,10 +1,10 @@
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import { useEffect } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { useOrganizationTeamProject } from "../../../../hooks/useOrganizationTeamProject";
 import { getRandomWorkflowIcon } from "../../../../optimization_studio/components/workflow/NewWorkflowForm";
-import { getWorkflow } from "../../../../optimization_studio/hooks/useWorkflowStore";
+import { getWorkflow } from "../../../../optimization_studio/hooks/workflowStoreCore";
 import { api } from "../../../../utils/api";
 import { toaster } from "../../../ui/toaster";
 import {

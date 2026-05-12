@@ -1,5 +1,5 @@
 import { useEffect, useCallback, useRef } from "react";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRecentItems } from "./useRecentItems";
 import type { RecentItemType } from "./types";

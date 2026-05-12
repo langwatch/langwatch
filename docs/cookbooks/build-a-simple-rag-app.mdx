@@ -1,0 +1,289 @@
+---
+title: Measuring RAG Performance
+description: Discover how to measure the performance of Retrieval-Augmented Generation (RAG) systems using metrics like retrieval precision, answer accuracy, and latency.
+keywords:
+  [
+    RAG performance,
+    evaluate RAG,
+    retrieval metrics,
+    answer accuracy,
+    LLM evaluation,
+    latency,
+    information retrieval,
+    RAG benchmarking,
+  ]
+---
+
+In this cookbook, we demonstrate how to build a RAG application and apply a systematic evaluation framework using LangWatch. We'll focus on data-driven approaches to measure and improve retrieval performance.
+
+Traditionally, RAG evaluation emphasizes the quality of the generated answers. However, this approach has major drawbacks: it’s slow (you must wait for the LLM to generate responses), expensive (LLM usage costs add up quickly), and subjective (evaluating answer quality can be inconsistent). Instead, we focus on evaluating retrieval, which is fast, cheap, and objective.
+
+## Requirements
+
+Before starting, ensure you have the following packages installed:
+
+```bash
+pip install langwatch openai chromadb pandas matplotlib
+```
+
+## Setup
+
+Start by setting up LangWatch to monitor your RAG application:
+
+```python
+import os
+import openai
+import langwatch
+
+# Set your OpenAI and LangWatch API Key's:
+os.environ["OPENAI_API_KEY"] = "your_api_key_here"
+langwatch.login()
+```
+
+## Retrieval Metrics
+
+Before building our RAG system, let's understand the key metrics we'll use to evaluate retrieval performance:
+
+**Precision** measures how many of our retrieved items are actually relevant. If your system retrieves 10 documents but only 5 are relevant, that's 50% precision.
+
+**Recall** measures how many of the total relevant items we managed to find. If there are 20 relevant documents in your database but you only retrieve 10 of them, that's 50% recall.
+
+**Mean Reciprocal Rank (MRR)** measures how high the first relevant document appears in your results. If the first relevant document is at position 3, the MRR is 1/3.
+
+```python
+def calculate_recall(predictions: list[str], ground_truth: list[str]):
+    """Calculate the proportion of relevant items that were retrieved"""
+    return len([label for label in ground_truth if label in predictions]) / len(ground_truth)
+
+def calculate_mrr(predictions: list[str], ground_truth: list[str]):
+    """Calculate Mean Reciprocal Rank - how high the relevant items appear in results"""
+    mrr = 0
+    for label in ground_truth:
+        if label in predictions:
+            # Find the position of the first relevant item
+            mrr = max(mrr, 1 / (predictions.index(label) + 1))
+    return mrr
+```
+
+If you retrieve a large number of documents (e.g., 100) and only a few are relevant, you have **high recall but low precision** — forcing the LLM to sift through noise. If you retrieve very few documents and miss many relevant ones, you have **high precision but low recall** — limiting the LLM’s ability to generate good answers. Assuming LLMs improve at selecting relevant information, recall becomes more and more important. That's why most practitioners focus on optimizing recall. MRR is helpful when displaying citations to users. If citation quality isn’t critical for your app, focusing on precision and recall is often enough.
+
+## Generating Synthetic Data
+
+In many domains - enterprise tools, legal, finance, internal docs - you don’t start with an evaluation dataset. You don’t have thousands of labeled questions or relevance scores. You barely have users. But you do have access to your own corpus. And with a bit of prompting, you can start generating useful data from it. If you already have a dataset, you can use it directly. If not, you can generate a synthetic dataset using LangWatch’s `data_simulator` library. For retrieval evaluation, your dataset should contain queries and the expected document IDs that should be retrieved. In this example, I downloaded four research papers (GPT-1, GPT-2, GPT-3, GPT-4) and will use `data_simulator` to generate queries based on them.
+
+```python
+from data_simulator import DataSimulator
+
+# Initialize the simulator
+simulator = DataSimulator(api_key=os.environ["OPENAI_API_KEY"])
+
+# Generate synthetic dataset
+results = simulator.generate_from_docs(
+    file_paths=[f"{DATA_DIR}/gpt_1.pdf", f"{DATA_DIR}/gpt_2.pdf", f"{DATA_DIR}/gpt_3.pdf", f"{DATA_DIR}/gpt_4.pdf"],
+    context="You're an AI research assistant helping researchers understand and analyze academic papers. The researchers need to find specific information, understand methodologies, compare approaches, and extract key findings from these papers.",
+    example_queries="what are the main contributions of this paper\nwhat architecture is used in this paper\nexplain the significance of figure X in this paper"
+)
+```
+
+This library allows me to provide a context and example queries, and it will generate a dataset of queries and expected document IDs. Let's take a look at some of the queries it generated:
+
+```python
+# Convert to DataFrame for easier analysis
+eval_df = pd.DataFrame(results)
+
+# Basic statistics
+print(f"\nTotal number of questions: {len(eval_df)}")
+
+# Display some example queries
+print("\nExample queries:")
+for i, query in enumerate(eval_df['query'].sample(5).values):
+    print(f"{i+1}. {query}")
+```
+
+```text
+Total number of questions: 214
+
+Example queries:
+1. summarize the evaluation approach used for testing GPT-4 models
+2. details on the evaluation methodology for few-shot learning in this study
+3. compare the accuracy metrics across different model sizes for the HellaSwag and LAMBADA tasks
+4. analysis of contamination effects on LAMBADA dataset performance
+5. details on the evaluation conditions for GPT-3's in-context learning abilities
+```
+
+Notice how the questions even look like they could be from a real user! This is because we provided example queries that resembled user behavior. This is a quick way to get started with evaluating your RAG application. As you start collecting real-world data, you can use provide those as example_queries and generate more useful data.
+
+## Setting up a Vector Database
+
+Let's use a vector database to store our documents and retrieve them based on user queries. We'll initialize two collections, one with small embeddings and one with large embeddings. This will help us test the performance of our RAG system with different embedding models.
+
+```python
+import chromadb
+from chromadb.utils.embedding_functions import OpenAIEmbeddingFunction
+
+# Initialize Chroma
+client = chromadb.PersistentClient()
+
+# Initialize embeddings
+small_embedding = OpenAIEmbeddingFunction(model_name="text-embedding-3-small", api_key=openai.api_key)
+large_embedding = OpenAIEmbeddingFunction(model_name="text-embedding-3-large", api_key=openai.api_key)
+
+# Create collections
+small_collection = client.get_or_create_collection(name="small", embedding_function=small_embedding)
+large_collection = client.get_or_create_collection(name="large", embedding_function=large_embedding)
+
+# Add documents to both collections
+for _, row in eval_df.iterrows():
+    small_collection.add(
+        documents=[row['document']],
+        ids=[row['id']],
+        metadatas=[{'id': row['id'], 'query': row['query']}]
+    )
+    large_collection.add(
+        documents=[row['document']],
+        ids=[row['id']],
+        metadatas=[{'id': row['id'], 'query': row['query']}]
+    )
+
+print(f"Created collection small with {small_collection.count()} documents.")
+print(f"Created collection large with {large_collection.count()} documents.")
+```
+
+## Parametrizing our Retrieval Pipeline
+
+The key to running quick experiments is to parametrize the retrieval pipeline. This makes it easy to swap different retrieval methods as your RAG system evolves. In this example, we’ll compare a small and large embedding model based on recall and MRR. We’ll also vary the number of retrieved documents (k) to see how performance changes.
+
+First, we’ll define a function to retrieve documents.
+
+```python
+import pandas as pd
+import langwatch
+
+# Initialize a new evaluation experiment
+evaluation = langwatch.experiment.init("rag-retrieval-evaluation")
+
+def retrieve(query, collection, k=5):
+    """Retrieve documents from a collection based on a query"""
+    results = collection.query(query_texts=[query], n_results=k)
+
+    # Get the document IDs from the results
+    retrieved_ids = results['ids'][0]
+
+    return retrieved_ids
+```
+
+Now we can set up our parametrized retrieval pipeline.
+
+```python
+# Main evaluation function
+def run_evaluation(k_values=[1, 3, 5, 10]):
+    """Run evaluation across different k values and embedding models"""
+    results = []
+
+    # Sample a subset of queries for evaluation
+    eval_sample = eval_df.sample(min(50, len(eval_df)))
+
+    for k in k_values:
+        for model_name, collection in [("small", small_collection), ("large", large_collection)]:
+
+            model_results = []
+
+            # Use evaluation.loop() but process results synchronously
+            for index, row in evaluation.loop(eval_sample.iterrows()):
+                query = row['query']
+                expected_ids = [row['id']]  # The document ID that should be retrieved
+
+                # Retrieve documents
+                retrieved_ids = retrieve(query, collection, k)
+
+                # Calculate metrics
+                recall = calculate_recall(retrieved_ids, expected_ids)
+                mrr = calculate_mrr(retrieved_ids, expected_ids)
+
+                # Log metrics to LangWatch
+                evaluation.log("recall", index=index, score=recall,
+                              data={"model": model_name, "k": k, "query": query})
+
+                evaluation.log("mrr", index=index, score=mrr,
+                              data={"model": model_name, "k": k, "query": query})
+
+                # Store results for this query
+                model_results.append({
+                    "recall": recall,
+                    "mrr": mrr
+                })
+
+            # Calculate average metrics
+            avg_recall = sum(r["recall"] for r in model_results) / len(model_results) if model_results else 0
+            avg_mrr = sum(r["mrr"] for r in model_results) / len(model_results) if model_results else 0
+
+            results.append({
+                "model": model_name,
+                "k": k,
+                "avg_recall": avg_recall,
+                "avg_mrr": avg_mrr
+            })
+
+            print(f"Model: {model_name}, k={k}, Recall={avg_recall:.4f}, MRR={avg_mrr:.4f}")
+
+    return pd.DataFrame(results)
+
+# Run the evaluation
+results_df = run_evaluation()
+```
+
+## Visualizing the Results
+
+Let's visualize the results:
+
+```python
+# Plot the results
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 5))
+
+# Plot Recall@K
+for model in ["small", "large"]:
+    model_data = results_df[results_df["model"] == model]
+    ax1.plot(model_data["k"], model_data["avg_recall"], marker="o", label=f"text-embedding-3-{model}")
+
+ax1.set_title("Recall@K by Embedding Model")
+ax1.set_xlabel("K")
+ax1.set_ylabel("Recall")
+ax1.legend()
+ax1.grid(True)
+
+# Plot MRR@K
+for model in ["small", "large"]:
+    model_data = results_df[results_df["model"] == model]
+    ax2.plot(model_data["k"], model_data["avg_mrr"], marker="o", label=f"text-embedding-3-{model}")
+
+ax2.set_title("MRR@K by Embedding Model")
+ax2.set_xlabel("K")
+ax2.set_ylabel("MRR")
+ax2.legend()
+ax2.grid(True)
+
+plt.tight_layout()
+plt.savefig("embedding_comparison.png")
+plt.show()
+```
+
+<Frame caption="Comparison plot between Recall@K and MRR@K for different large/small embedding models">
+  <img src="/images/output.png" alt="comparison plot" />
+</Frame>
+
+We can see that the best configuration for recall is the small embedding model with k=10. This is surprising, as we would expect the large embedding model to perform better. Although, if we cared a lot more about citations, the large embedding model might be preferred.
+
+## Conclusion
+
+Based on our evaluation results, we can now make data-driven decisions about the RAG system. In this case, the smaller embedding model outperformed the larger one for our use case, which brings both performance and cost benefits. Since many factors influence RAG performance, it's important to run more experiments — varying parameters like:
+
+1. **Document chunking strategies**: Try different chunk sizes and overlap percentages
+2. **Adding a reranker**: Test if a separate reranking step improves precision
+3. **Hybrid retrieval**: Combine vector search with BM25 or other keyword-based methods
+4. **Query expansion**: Test if expanding queries with an LLM improves recall
+
+Keep in mind: these results are specific to our test dataset. Your evaluations may reveal different trade-offs based on your domain and data characteristics.
+
+In the next notebook, we’ll explore how fine-tuning embedding models can impact retrieval — and why you (almost) always should.
+
+For the full notebook, check it out on: [GitHub](https://github.com/langwatch/cookbooks/blob/main/notebooks/simple-rag-app.ipynb).

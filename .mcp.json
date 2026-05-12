@@ -1,14 +1,21 @@
 {
   "mcpServers": {
-    "playwright-test": {
-      "command": "pnpm",
+    "playwright": {
+      "type": "stdio",
+      "command": "bash",
       "args": [
-        "exec",
-        "playwright",
-        "run-test-mcp-server",
-        "--config",
-        "agentic-e2e-tests/playwright.config.ts"
-      ]
+        "scripts/playwright-mcp.sh"
+      ],
+      "env": {}
+    },
+    "playwright-headed": {
+      "type": "stdio",
+      "command": "bash",
+      "args": [
+        "scripts/playwright-mcp.sh",
+        "--headed"
+      ],
+      "env": {}
     }
   }
 }

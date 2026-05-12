@@ -87,7 +87,7 @@ export default async function execute() {
 
         // Skip if no trace ID, project ID, or spans
         if (!traceId || !projectId || !Array.isArray(spans)) {
-          logger.warn({ traceId, projectId }, "Invalid trace data, skipping");
+          logger.warn({ observedTraceId: traceId, projectId }, "Invalid trace data, skipping");
           totalSkippedCount++;
           continue;
         }

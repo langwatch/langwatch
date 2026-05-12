@@ -106,6 +106,48 @@ export function buildMetadataFieldChildren(
   ];
 }
 
+function filterThreadTraces(
+  trace: TraceWithAnnotations,
+  data: { allTraces?: TraceWithAnnotations[]; selectedFields?: string[] },
+  extraFilter?: (t: TraceWithAnnotations) => boolean,
+): TraceWithAnnotations[] | Record<string, unknown>[] {
+  const threadId = trace.metadata?.thread_id;
+  if (!threadId || !data.allTraces) {
+    return [];
+  }
+
+  let threadTraces = data.allTraces
+    .filter((t) => t.metadata?.thread_id === threadId)
+    .sort((a, b) => a.timestamps.started_at - b.timestamps.started_at);
+  if (extraFilter) {
+    threadTraces = threadTraces.filter(extraFilter);
+  }
+
+  if (data.selectedFields && data.selectedFields.length > 0) {
+    return threadTraces.map((threadTrace) => {
+      const filteredTrace: Record<string, unknown> = {};
+      for (const field of data.selectedFields!) {
+        const traceMapping =
+          TRACE_MAPPINGS[field as keyof typeof TRACE_MAPPINGS];
+        if (traceMapping) {
+          filteredTrace[field] = traceMapping.mapping(
+            threadTrace,
+            "",
+            "",
+            {},
+          );
+        } else {
+          filteredTrace[field] =
+            threadTrace[field as keyof TraceWithAnnotations];
+        }
+      }
+      return filteredTrace;
+    });
+  }
+
+  return threadTraces;
+}
+
 export const TRACE_MAPPINGS = {
   trace_id: {
     mapping: (trace: TraceWithAnnotations) => trace.trace_id,
@@ -429,50 +471,27 @@ export const TRACE_MAPPINGS = {
   threads: {
     mapping: (
       trace: TraceWithAnnotations,
-      key: string,
-      subkey: string,
+      _key: string,
+      _subkey: string,
       data: {
         allTraces?: TraceWithAnnotations[];
         selectedFields?: string[];
       } = {},
-    ) => {
-      // Return all traces that belong to the same thread_id as the current trace
-      const threadId = trace.metadata?.thread_id;
-      if (!threadId || !data.allTraces) {
-        return [];
-      }
-
-      // Filter all traces to find those with the same thread_id
-      const threadTraces = data.allTraces.filter(
-        (t) => t.metadata?.thread_id === threadId,
-      );
-
-      // If selectedFields are provided, extract only those fields from each trace
-      if (data.selectedFields && data.selectedFields.length > 0) {
-        return threadTraces.map((threadTrace) => {
-          const filteredTrace: Record<string, any> = {};
-          for (const field of data.selectedFields!) {
-            const traceMapping =
-              TRACE_MAPPINGS[field as keyof typeof TRACE_MAPPINGS];
-            if (traceMapping) {
-              filteredTrace[field] = traceMapping.mapping(
-                threadTrace,
-                "",
-                "",
-                {},
-              );
-            } else {
-              filteredTrace[field] =
-                threadTrace[field as keyof TraceWithAnnotations];
-            }
-          }
-          return filteredTrace;
-        });
-      }
-
-      // If no selectedFields, return all traces with full data
-      return threadTraces;
-    },
+    ) => filterThreadTraces(trace, data),
+  },
+  threads_until_current: {
+    mapping: (
+      trace: TraceWithAnnotations,
+      _key: string,
+      _subkey: string,
+      data: {
+        allTraces?: TraceWithAnnotations[];
+        selectedFields?: string[];
+      } = {},
+    ) =>
+      filterThreadTraces(trace, data, (t) => {
+        return t.timestamps.started_at <= trace.timestamps.started_at;
+      }),
   },
 } satisfies Record<
   string,
@@ -564,13 +583,22 @@ export const TRACE_EXPANSIONS = {
  * Extract selected fields from traces based on trace mapping configuration
  * Single Responsibility: Transform traces array into field values based on selectedFields
  */
+const DEFAULT_TRACE_FIELDS: (keyof typeof TRACE_MAPPINGS)[] = [
+  "trace_id",
+  "input",
+  "output",
+];
+
 export const extractTracesFields = (
   traces: TraceWithAnnotations[],
   selectedFields: (keyof typeof TRACE_MAPPINGS)[],
 ): Record<string, any>[] => {
+  // When no fields are selected, extract default fields so the data is useful
+  const fields =
+    selectedFields.length > 0 ? selectedFields : DEFAULT_TRACE_FIELDS;
   return traces.map((trace) => {
     const result: Record<string, any> = {};
-    for (const field of selectedFields) {
+    for (const field of fields) {
       const traceMapping = TRACE_MAPPINGS[field];
       if (traceMapping) {
         result[field] = traceMapping.mapping(trace as any, "", "", {});
@@ -606,6 +634,22 @@ export type TraceMapping = Record<
   }
 >;
 
+/**
+ * Additional mapping source keys that are only executed server-side (e.g. in the evaluations worker).
+ * They appear in the UI and schema but their implementations live outside this shared module
+ * to avoid pulling Node.js-only dependencies into the frontend bundle.
+ */
+export const SERVER_ONLY_TRACE_SOURCES = ["formatted_trace"] as const;
+export const SERVER_ONLY_THREAD_SOURCES = ["formatted_traces"] as const;
+
+export type AllTraceMappingSources =
+  | keyof typeof TRACE_MAPPINGS
+  | (typeof SERVER_ONLY_TRACE_SOURCES)[number];
+
+export type AllThreadMappingSources =
+  | keyof typeof THREAD_MAPPINGS
+  | (typeof SERVER_ONLY_THREAD_SOURCES)[number];
+
 export const mappingStateSchema = z.object({
   mapping: z.record(
     z.string(),
@@ -613,13 +657,15 @@ export const mappingStateSchema = z.object({
       z
         .object({
           source: z.union([
-            z.enum(
-              Object.keys(TRACE_MAPPINGS) as [keyof typeof TRACE_MAPPINGS],
-            ),
+            z.enum([
+              ...(Object.keys(TRACE_MAPPINGS) as [keyof typeof TRACE_MAPPINGS]),
+              ...SERVER_ONLY_TRACE_SOURCES,
+            ]),
             z.literal(""),
           ]),
           key: z.string().optional(),
           subkey: z.string().optional(),
+          selectedFields: z.array(z.string()).optional(),
         })
         .extend({
           type: z.literal("trace").optional(),
@@ -627,9 +673,12 @@ export const mappingStateSchema = z.object({
       z
         .object({
           source: z.union([
-            z.enum(
-              Object.keys(THREAD_MAPPINGS) as [keyof typeof THREAD_MAPPINGS],
-            ),
+            z.enum([
+              ...(Object.keys(THREAD_MAPPINGS) as [
+                keyof typeof THREAD_MAPPINGS,
+              ]),
+              ...SERVER_ONLY_THREAD_SOURCES,
+            ]),
             z.literal(""),
           ]),
           key: z.string().optional(),
@@ -648,6 +697,47 @@ export const mappingStateSchema = z.object({
 
 export type MappingState = z.infer<typeof mappingStateSchema>;
 
+// Coerces legacy `{}` and other partial-shape payloads into a valid MappingState
+// before persisting. Without this, monitors created via API with `mappings: {}`
+// end up missing the `.mapping` subkey, which crashes downstream evaluator code
+// at `Object.values(mappingState.mapping)` (see threadMappingResolver.ts). The
+// read-side guard there is defensive; this is the canonical write-side fix.
+//
+// Using z.preprocess (vs z.unknown().transform().pipe()) so hono-openapi can
+// infer the output type from the inner mappingStateSchema for the OpenAPI spec.
+export const monitorMappingsSchema = z.preprocess(
+  (value) => {
+    if (value === null || value === undefined) return value;
+    if (
+      typeof value === "object" &&
+      !Array.isArray(value) &&
+      "mapping" in (value as object)
+    ) {
+      return value;
+    }
+    return { mapping: {}, expansions: [] };
+  },
+  mappingStateSchema.nullable().optional(),
+);
+
+// Runtime equivalent of monitorMappingsSchema for callers that don't validate
+// through Zod (e.g. internal tRPC routes that consume already-typed input).
+// Coerces null/undefined/malformed shapes into a canonical empty MappingState
+// so the persist layer never writes the `{}` shape that triggers the
+// `Object.values(undefined)` crash in evaluator code paths.
+export const coerceMonitorMappings = (value: unknown): MappingState => {
+  if (
+    value !== null &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    "mapping" in (value as object)
+  ) {
+    const parsed = mappingStateSchema.safeParse(value);
+    if (parsed.success) return parsed.data;
+  }
+  return { mapping: {}, expansions: [] };
+};
+
 /**
  * Thread mapping type used in the wizard UI
  * Single Responsibility: Type definition for thread mapping configuration in the UI
@@ -656,7 +746,7 @@ export type ThreadMappingState = {
   mapping: Record<
     string,
     {
-      source: keyof typeof THREAD_MAPPINGS | "";
+      source: AllThreadMappingSources | "";
       selectedFields?: string[];
     }
   >;
@@ -729,7 +819,7 @@ export const mapTraceToDatasetEntry = (
   mapping: Record<
     string,
     {
-      source: keyof typeof TRACE_MAPPINGS | "";
+      source: string;
       key?: string;
       subkey?: string;
       selectedFields?: string[];
@@ -755,7 +845,7 @@ export const mapTraceToDatasetEntry = (
         ([column, { source, key, subkey, selectedFields }]) => {
           const source_ =
             source && source in TRACE_MAPPINGS
-              ? TRACE_MAPPINGS[source]
+              ? TRACE_MAPPINGS[source as keyof typeof TRACE_MAPPINGS]
               : undefined;
 
           let value = source_?.mapping(trace, key!, subkey!, {
@@ -793,10 +883,26 @@ type StringTypeToType = {
   array: any[];
 };
 
+// Returns the unwrapped .value if v is an OTel typed-object wrapper ({ type, value } with exactly
+// those two own keys and a string type). Returns undefined to signal "no unwrap needed" — this
+// lets null/0/false/etc. pass through correctly as unwrapped values.
+const unwrapTypedObject = (v: unknown): unknown => {
+  if (v === null || typeof v !== "object" || Array.isArray(v)) return undefined;
+  if (!("type" in v) || !("value" in v)) return undefined;
+  if (Object.keys(v as object).length !== 2) return undefined;
+  const obj = v as { type: unknown; value: unknown };
+  if (typeof obj.type !== "string") return undefined;
+  return obj.value;
+};
+
 export const tryAndConvertTo = <T extends keyof StringTypeToType>(
   value: any,
   type: T,
 ): StringTypeToType[T] | undefined => {
+  // Unwrap OTel typed-object wrappers first so downstream coercion sees the bare value.
+  // OTel SDK auto-wraps span IO as { type: <string>, value: <any> }; evaluators need bare values. (#3875)
+  const unwrapped = unwrapTypedObject(value);
+  if (unwrapped !== undefined) value = unwrapped;
   if (value === null || value === undefined) {
     return undefined;
   }
@@ -888,6 +994,25 @@ const THREAD_TRACES_CHILDREN = [
 ];
 
 /**
+ * Human-readable labels for trace mapping sources.
+ * Keys not listed here will use their key name as the label.
+ */
+export const TRACE_MAPPING_LABELS: Record<string, string | undefined> = {
+  formatted_trace: "Full Trace (AI-Readable)",
+  threads: "all traces",
+  threads_until_current: "traces until now",
+  thread_id: "thread_id",
+};
+
+/**
+ * Human-readable labels for thread mapping sources.
+ * Keys not listed here will use their key name as the label.
+ */
+export const THREAD_MAPPING_LABELS: Record<string, string | undefined> = {
+  formatted_traces: "Full Thread (AI-Readable)",
+};
+
+/**
  * Convert TRACE_MAPPINGS to AvailableSource format for the mapping UI.
  * Provides dynamic children for metadata and spans based on project traces.
  *
@@ -900,85 +1025,46 @@ export function getTraceAvailableSources(
 ): TraceAvailableSource[] {
   // Filter out "threads" from trace-level sources - it's confusing at trace level
   // (threads is for getting all traces in a thread, which is a thread-level concept)
-  const traceFields = Object.entries(TRACE_MAPPINGS)
-    .filter(([key]) => key !== "threads")
-    .map(([key, config]) => {
-      const hasKeys = "keys" in config && typeof config.keys === "function";
+  const traceFields: TraceAvailableSource["fields"] = [
+    // Server-only trace sources at the top for discoverability
+    ...SERVER_ONLY_TRACE_SOURCES.map((source) => ({
+      name: source,
+      label: TRACE_MAPPING_LABELS[source],
+      type: "str" as const,
+    })),
+    ...Object.entries(TRACE_MAPPINGS)
+      .filter(
+        ([key]) => key !== "threads" && key !== "threads_until_current",
+      )
+      .map(([key, config]) => {
+        const hasKeys = "keys" in config && typeof config.keys === "function";
 
-      // Provide dynamic children for metadata
-      if (key === "metadata") {
-        return {
-          name: key,
-          type: "dict" as const,
-          // Use dynamic metadata keys with "* (any key)" always available
-          children: buildMetadataFieldChildren(metadataKeys),
-          // Allow selecting metadata itself (returns full metadata object)
-          isComplete: true,
-          isCompleteLabel: "All metadata",
-        };
-      }
-
-      if (key === "spans") {
-        return {
-          name: key,
-          type: "list" as const,
-          // Use dynamic span names with "* (any span)" always available
-          children: buildSpanFieldChildren(spanNames),
-          // Allow selecting spans itself (returns all spans array)
-          isComplete: true,
-          isCompleteLabel: "Full spans array",
-        };
-      }
-
-      // Other fields with keys() function - mark as complete (no nested selection needed)
-      if (hasKeys) {
-        return {
-          name: key,
-          type: "dict" as const,
-          isComplete: true,
-        };
-      }
-
-      return {
-        name: key,
-        type: "str" as const,
-      };
-    });
-
-  return [
-    {
-      id: "trace",
-      name: "Trace",
-      type: "dataset",
-      fields: traceFields,
-    },
-  ];
-}
-
-/**
- * Convert THREAD_MAPPINGS to AvailableSource format for the mapping UI.
- */
-export function getThreadAvailableSources(): TraceAvailableSource[] {
-  return [
-    {
-      id: "thread",
-      name: "Thread",
-      type: "dataset",
-      fields: Object.entries(THREAD_MAPPINGS).map(([key, config]) => {
-        // Special handling for "traces" - provide nested children for field selection
-        if (key === "traces") {
+        // Provide dynamic children for metadata
+        if (key === "metadata") {
           return {
             name: key,
-            type: "list" as const,
-            children: THREAD_TRACES_CHILDREN,
-            // Allow selecting traces itself (returns all trace data)
+            type: "dict" as const,
+            // Use dynamic metadata keys with "* (any key)" always available
+            children: buildMetadataFieldChildren(metadataKeys),
+            // Allow selecting metadata itself (returns full metadata object)
             isComplete: true,
+            isCompleteLabel: "All metadata",
           };
         }
 
-        const hasKeys = "keys" in config && typeof config.keys === "function";
+        if (key === "spans") {
+          return {
+            name: key,
+            type: "list" as const,
+            // Use dynamic span names with "* (any span)" always available
+            children: buildSpanFieldChildren(spanNames),
+            // Allow selecting spans itself (returns all spans array)
+            isComplete: true,
+            isCompleteLabel: "Full spans array",
+          };
+        }
 
-        // For thread mappings, most fields are complete selections
+        // Other fields with keys() function - mark as complete (no nested selection needed)
         if (hasKeys) {
           return {
             name: key,
@@ -992,6 +1078,63 @@ export function getThreadAvailableSources(): TraceAvailableSource[] {
           type: "str" as const,
         };
       }),
+  ];
+
+  return [
+    {
+      id: "trace",
+      name: "Current Trace",
+      type: "dataset",
+      fields: traceFields,
+    },
+    // Include thread sources at trace level so evaluators can access
+    // full thread context even when triggered per-trace
+    ...getThreadAvailableSources(),
+  ];
+}
+
+/**
+ * Convert THREAD_MAPPINGS to AvailableSource format for the mapping UI.
+ */
+export function getThreadAvailableSources(): TraceAvailableSource[] {
+  return [
+    {
+      id: "thread",
+      name: "Current Thread",
+      type: "dataset",
+      fields: [
+        // Server-only thread sources at the top for discoverability
+        ...SERVER_ONLY_THREAD_SOURCES.map((source) => ({
+          name: source,
+          label: THREAD_MAPPING_LABELS[source],
+          type: "str" as const,
+        })),
+        ...Object.entries(THREAD_MAPPINGS)
+          .filter(([key]) => key !== "traces")
+          .map(([key, config]) => {
+            const hasKeys =
+              "keys" in config && typeof config.keys === "function";
+
+            if (hasKeys) {
+              return {
+                name: key,
+                type: "dict" as const,
+                isComplete: true,
+              };
+            }
+
+            return {
+              name: key,
+              type: "str" as const,
+            };
+          }),
+        {
+          name: "traces",
+          type: "list" as const,
+          children: THREAD_TRACES_CHILDREN,
+          isComplete: true,
+        },
+      ],
     },
   ];
 }

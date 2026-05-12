@@ -6,6 +6,7 @@ import type { PromptsConfig, LocalPromptConfig, MaterializedPrompt, PromptsLock 
 import { localPromptConfigSchema } from "../types";
 import { PromptConverter } from "@/cli/utils/promptConverter";
 import { PromptFileNotFoundError } from "./errors/prompt-not-found.error";
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 
 export class FileManager {
   private static readonly PROMPTS_CONFIG_FILE = "prompts.json";
@@ -15,26 +16,65 @@ export class FileManager {
 
   private static _projectRoot: string | undefined;
 
+  /** Reset the cached project root. Tests use this to exercise different cwds. */
+  static _resetProjectRootCache(): void {
+    this._projectRoot = undefined;
+  }
+
+  private static readonly PROJECT_MARKERS = [
+    ".git",
+    "package.json",
+    "pyproject.toml",
+  ];
+
+  private static hasProjectMarker(dir: string): boolean {
+    return this.PROJECT_MARKERS.some((m) => fs.existsSync(path.join(dir, m)));
+  }
+
   private static findProjectRoot(): string {
     if (this._projectRoot) {
       return this._projectRoot;
     }
 
-    let currentDir = process.cwd();
-    const root = path.parse(currentDir).root;
+    const cwd = process.cwd();
+    const fsRoot = path.parse(cwd).root;
 
-    while (currentDir !== root) {
+    // Find the highest ancestor that still looks like part of "this project"
+    // (has package.json / pyproject.toml / .git). If cwd itself has no marker,
+    // we don't walk up at all — prevents grabbing a stray prompts.json from
+    // /tmp or other shared scratch dirs.
+    let topProjectDir: string | null = null;
+    let scan = cwd;
+    while (scan !== fsRoot) {
+      if (this.hasProjectMarker(scan)) {
+        topProjectDir = scan;
+      }
+      scan = path.dirname(scan);
+    }
+
+    if (!topProjectDir) {
+      this._projectRoot = cwd;
+      return cwd;
+    }
+
+    // Walk up from cwd looking for prompts.json, capped at the project boundary.
+    let currentDir = cwd;
+    while (true) {
       const configPath = path.join(currentDir, this.PROMPTS_CONFIG_FILE);
       if (fs.existsSync(configPath)) {
         this._projectRoot = currentDir;
         return currentDir;
       }
+      if (currentDir === topProjectDir) break;
       currentDir = path.dirname(currentDir);
     }
 
-    // Fallback to cwd if no prompts.json found
-    this._projectRoot = process.cwd();
-    return this._projectRoot;
+    // No prompts.json anywhere within the project — default to cwd so `init`
+    // creates it where the user actually ran the command. This also keeps
+    // concurrent test workdirs isolated: each tempdir gets its own prompts.json
+    // instead of all pointing at a shared repo-root file.
+    this._projectRoot = cwd;
+    return cwd;
   }
 
   static getPromptsConfigPath(): string {
@@ -77,7 +117,7 @@ export class FileManager {
       const content = fs.readFileSync(configPath, "utf-8");
       return JSON.parse(content) as PromptsConfig;
     } catch (error) {
-      throw new Error(`Failed to parse prompts.json: ${error instanceof Error ? error.message : "Unknown error"}`);
+      throw new Error(`Failed to parse prompts.json: ${formatApiErrorMessage({ error })}`);
     }
   }
 
@@ -113,7 +153,7 @@ export class FileManager {
       const content = fs.readFileSync(lockPath, "utf-8");
       return JSON.parse(content) as PromptsLock;
     } catch (error) {
-      throw new Error(`Failed to parse prompts-lock.json: ${error instanceof Error ? error.message : "Unknown error"}`);
+      throw new Error(`Failed to parse prompts-lock.json: ${formatApiErrorMessage({ error })}`);
     }
   }
 
@@ -168,7 +208,7 @@ export class FileManager {
       if (error instanceof Error && error.message.includes("Invalid prompt configuration")) {
         throw error; // Re-throw zod validation errors as-is
       }
-      throw new Error(`Failed to parse local prompt file ${filePath}: ${error instanceof Error ? error.message : "Unknown error"}`);
+      throw new Error(`Failed to parse local prompt file ${filePath}: ${formatApiErrorMessage({ error })}`);
     }
   }
 

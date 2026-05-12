@@ -30,9 +30,14 @@ describe("createTracingProxy Integration Tests", () => {
     spanExporter = new InMemorySpanExporter();
     spanProcessor = new SimpleSpanProcessor(spanExporter);
 
-    // Setup observability with real OpenTelemetry SDK
+    // Setup observability with real OpenTelemetry SDK.
+    // `langwatch: "disabled"` prevents the default BatchSpanProcessor + LangWatchTraceExporter
+    // from being attached — without it, test spans get buffered into the batch exporter and
+    // never reach the InMemorySpanExporter, causing widespread "expected 1 span, got 0" flakes
+    // (see langwatch/langwatch#3097).
     observabilityHandle = setupObservability({
       serviceName: "tracing-proxy-integration-test",
+      langwatch: "disabled",
       spanProcessors: [spanProcessor],
       debug: { logger: new NoOpLogger() },
       advanced: {

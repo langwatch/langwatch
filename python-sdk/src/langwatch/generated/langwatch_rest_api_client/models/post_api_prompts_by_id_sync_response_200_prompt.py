@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar, Union, cast
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -36,7 +38,7 @@ class PostApiPromptsByIdSyncResponse200Prompt:
     """
     Attributes:
         id (str):
-        handle (Union[None, str]):
+        handle (None | str):
         scope (PostApiPromptsByIdSyncResponse200PromptScope):
         name (str):
         updated_at (str):
@@ -46,21 +48,21 @@ class PostApiPromptsByIdSyncResponse200Prompt:
         version (float):
         created_at (str):
         prompt (str):
-        messages (list['PostApiPromptsByIdSyncResponse200PromptMessagesItem']):
-        inputs (list['PostApiPromptsByIdSyncResponse200PromptInputsItem']):
-        outputs (list['PostApiPromptsByIdSyncResponse200PromptOutputsItem']):
+        messages (list[PostApiPromptsByIdSyncResponse200PromptMessagesItem]):
+        inputs (list[PostApiPromptsByIdSyncResponse200PromptInputsItem]):
+        outputs (list[PostApiPromptsByIdSyncResponse200PromptOutputsItem]):
         model (str):
-        author_id (Union[None, Unset, str]):
-        commit_message (Union[None, Unset, str]):
-        temperature (Union[Unset, float]):
-        max_tokens (Union[Unset, float]):
-        demonstrations (Union[Unset, PostApiPromptsByIdSyncResponse200PromptDemonstrations]):
-        prompting_technique (Union[Unset, PostApiPromptsByIdSyncResponse200PromptPromptingTechnique]):
-        response_format (Union[Unset, PostApiPromptsByIdSyncResponse200PromptResponseFormat]):
+        author_id (None | str | Unset):
+        commit_message (None | str | Unset):
+        temperature (float | Unset):
+        max_tokens (float | Unset):
+        demonstrations (PostApiPromptsByIdSyncResponse200PromptDemonstrations | Unset):
+        prompting_technique (PostApiPromptsByIdSyncResponse200PromptPromptingTechnique | Unset):
+        response_format (PostApiPromptsByIdSyncResponse200PromptResponseFormat | Unset):
     """
 
     id: str
-    handle: Union[None, str]
+    handle: None | str
     scope: PostApiPromptsByIdSyncResponse200PromptScope
     name: str
     updated_at: str
@@ -70,23 +72,23 @@ class PostApiPromptsByIdSyncResponse200Prompt:
     version: float
     created_at: str
     prompt: str
-    messages: list["PostApiPromptsByIdSyncResponse200PromptMessagesItem"]
-    inputs: list["PostApiPromptsByIdSyncResponse200PromptInputsItem"]
-    outputs: list["PostApiPromptsByIdSyncResponse200PromptOutputsItem"]
+    messages: list[PostApiPromptsByIdSyncResponse200PromptMessagesItem]
+    inputs: list[PostApiPromptsByIdSyncResponse200PromptInputsItem]
+    outputs: list[PostApiPromptsByIdSyncResponse200PromptOutputsItem]
     model: str
-    author_id: Union[None, Unset, str] = UNSET
-    commit_message: Union[None, Unset, str] = UNSET
-    temperature: Union[Unset, float] = UNSET
-    max_tokens: Union[Unset, float] = UNSET
-    demonstrations: Union[Unset, "PostApiPromptsByIdSyncResponse200PromptDemonstrations"] = UNSET
-    prompting_technique: Union[Unset, "PostApiPromptsByIdSyncResponse200PromptPromptingTechnique"] = UNSET
-    response_format: Union[Unset, "PostApiPromptsByIdSyncResponse200PromptResponseFormat"] = UNSET
+    author_id: None | str | Unset = UNSET
+    commit_message: None | str | Unset = UNSET
+    temperature: float | Unset = UNSET
+    max_tokens: float | Unset = UNSET
+    demonstrations: PostApiPromptsByIdSyncResponse200PromptDemonstrations | Unset = UNSET
+    prompting_technique: PostApiPromptsByIdSyncResponse200PromptPromptingTechnique | Unset = UNSET
+    response_format: PostApiPromptsByIdSyncResponse200PromptResponseFormat | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         id = self.id
 
-        handle: Union[None, str]
+        handle: None | str
         handle = self.handle
 
         scope = self.scope.value
@@ -124,13 +126,13 @@ class PostApiPromptsByIdSyncResponse200Prompt:
 
         model = self.model
 
-        author_id: Union[None, Unset, str]
+        author_id: None | str | Unset
         if isinstance(self.author_id, Unset):
             author_id = UNSET
         else:
             author_id = self.author_id
 
-        commit_message: Union[None, Unset, str]
+        commit_message: None | str | Unset
         if isinstance(self.commit_message, Unset):
             commit_message = UNSET
         else:
@@ -140,15 +142,15 @@ class PostApiPromptsByIdSyncResponse200Prompt:
 
         max_tokens = self.max_tokens
 
-        demonstrations: Union[Unset, dict[str, Any]] = UNSET
+        demonstrations: dict[str, Any] | Unset = UNSET
         if not isinstance(self.demonstrations, Unset):
             demonstrations = self.demonstrations.to_dict()
 
-        prompting_technique: Union[Unset, dict[str, Any]] = UNSET
+        prompting_technique: dict[str, Any] | Unset = UNSET
         if not isinstance(self.prompting_technique, Unset):
             prompting_technique = self.prompting_technique.to_dict()
 
-        response_format: Union[Unset, dict[str, Any]] = UNSET
+        response_format: dict[str, Any] | Unset = UNSET
         if not isinstance(self.response_format, Unset):
             response_format = self.response_format.to_dict()
 
@@ -214,10 +216,10 @@ class PostApiPromptsByIdSyncResponse200Prompt:
         d = dict(src_dict)
         id = d.pop("id")
 
-        def _parse_handle(data: object) -> Union[None, str]:
+        def _parse_handle(data: object) -> None | str:
             if data is None:
                 return data
-            return cast(Union[None, str], data)
+            return cast(None | str, data)
 
         handle = _parse_handle(d.pop("handle"))
 
@@ -262,21 +264,21 @@ class PostApiPromptsByIdSyncResponse200Prompt:
 
         model = d.pop("model")
 
-        def _parse_author_id(data: object) -> Union[None, Unset, str]:
+        def _parse_author_id(data: object) -> None | str | Unset:
             if data is None:
                 return data
             if isinstance(data, Unset):
                 return data
-            return cast(Union[None, Unset, str], data)
+            return cast(None | str | Unset, data)
 
         author_id = _parse_author_id(d.pop("authorId", UNSET))
 
-        def _parse_commit_message(data: object) -> Union[None, Unset, str]:
+        def _parse_commit_message(data: object) -> None | str | Unset:
             if data is None:
                 return data
             if isinstance(data, Unset):
                 return data
-            return cast(Union[None, Unset, str], data)
+            return cast(None | str | Unset, data)
 
         commit_message = _parse_commit_message(d.pop("commitMessage", UNSET))
 
@@ -285,14 +287,14 @@ class PostApiPromptsByIdSyncResponse200Prompt:
         max_tokens = d.pop("maxTokens", UNSET)
 
         _demonstrations = d.pop("demonstrations", UNSET)
-        demonstrations: Union[Unset, PostApiPromptsByIdSyncResponse200PromptDemonstrations]
+        demonstrations: PostApiPromptsByIdSyncResponse200PromptDemonstrations | Unset
         if isinstance(_demonstrations, Unset):
             demonstrations = UNSET
         else:
             demonstrations = PostApiPromptsByIdSyncResponse200PromptDemonstrations.from_dict(_demonstrations)
 
         _prompting_technique = d.pop("promptingTechnique", UNSET)
-        prompting_technique: Union[Unset, PostApiPromptsByIdSyncResponse200PromptPromptingTechnique]
+        prompting_technique: PostApiPromptsByIdSyncResponse200PromptPromptingTechnique | Unset
         if isinstance(_prompting_technique, Unset):
             prompting_technique = UNSET
         else:
@@ -301,7 +303,7 @@ class PostApiPromptsByIdSyncResponse200Prompt:
             )
 
         _response_format = d.pop("responseFormat", UNSET)
-        response_format: Union[Unset, PostApiPromptsByIdSyncResponse200PromptResponseFormat]
+        response_format: PostApiPromptsByIdSyncResponse200PromptResponseFormat | Unset
         if isinstance(_response_format, Unset):
             response_format = UNSET
         else:

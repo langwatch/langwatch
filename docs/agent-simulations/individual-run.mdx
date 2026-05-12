@@ -1,0 +1,33 @@
+---
+title: Individual Run View
+---
+
+The **Individual Run View** is where you can perform a detailed analysis of a single scenario. You can access this view by clicking on a scenario from the **Batch Runs** page.
+
+This page displays the full conversation log between the user and the agent.
+
+<img
+  src="/images/simulations/individual-simulation-run-with-history.png"
+  alt="Individual Simulation Run"
+  width="100%"
+/>
+
+A key feature of this page is the **Previous Runs** panel on the right. It shows the history for that specific scenario, identified by its `scenarioId`, allowing you to see how its behavior has changed over time across different batches. This is invaluable for tracking regressions or improvements.
+
+### Test Report
+
+At the bottom of the conversation, you'll find the **Scenario Test Report**. This block provides a summary of the scenario's execution and its final outcome.
+
+<img
+  src="/images/simulations/simulation-results.png"
+  alt="Scenario Test Report"
+  width="100%"
+/>
+
+The report includes:
+
+- **Status**: The final result of the run (e.g., PASSED, FAILED).
+- **Success Criteria**: The total number of criteria that were met.
+- **Duration**: The total time the scenario took to execute.
+- **Met Criteria**: A list of the specific evaluation criteria that were satisfied.
+- **Reasoning**: The explanation provided by the Judge Agent for its final verdict.

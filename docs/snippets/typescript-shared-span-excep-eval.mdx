@@ -1,0 +1,36 @@
+<Note>
+On short-live environments like Lambdas or Serverless Functions, be sure to call <br /> `await trace.sendSpans();` to wait for all pending requests to be sent before the runtime is destroyed.
+</Note>
+
+## Capture a RAG Span
+
+Appart from LLM spans, another very used type of span is the RAG span. This is used to capture the retrieved contexts from a RAG that will be used by the LLM, and enables a whole new set of RAG-based features evaluations for RAG quality on LangWatch.
+
+import TypeScriptRAG from "/snippets/typescript-rag.mdx";
+
+<TypeScriptRAG />
+
+## Capture an arbritary Span
+
+You can also use generic spans to capture any type of operation, its inputs and outputs, for example for a function call:
+
+import TypeScriptCaptureSpans from "/snippets/typescript-capture-spans.mdx";
+
+<TypeScriptCaptureSpans />
+
+## Capturing Exceptions
+
+To capture also when your code throws an exception, you can simply wrap your code around a try/catch, and update or end the span with the exception:
+
+import TypeScriptExceptions from "/snippets/typescript-exceptions.mdx";
+
+<TypeScriptExceptions />
+
+## Capturing custom evaluation results
+
+[LangWatch Evaluators](/evaluations/evaluators/list) can run automatically on your traces, but if you have an in-house custom evaluator, you can also capture the evaluation
+results of your custom evaluator on the current trace or span by using the `.addEvaluation` method:
+
+import TypeScriptCustomEvaluation from "/snippets/typescript-custom-evaluation.mdx"
+
+<TypeScriptCustomEvaluation />

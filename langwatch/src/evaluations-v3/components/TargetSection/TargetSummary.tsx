@@ -16,6 +16,7 @@ import {
 } from "~/components/shared/PassRateIndicator";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useInteractiveTooltip } from "~/hooks/useInteractiveTooltip";
+import { useEvaluatorNames } from "../../hooks/useEvaluatorName";
 import type { EvaluatorConfig } from "../../types";
 import type { TargetAggregate } from "../../utils/computeAggregates";
 import {
@@ -41,14 +42,14 @@ type TargetSummaryProps = {
  * so we handle the hover logic ourselves via contentProps mouse handlers.
  */
 // Helper to get evaluator name from the evaluators array
-const getEvaluatorName = (
-  evaluatorId: string,
-  evaluators: EvaluatorConfig[]
-): string => {
-  // For now, just use the evaluator ID as the display name
-  // The proper solution would be to fetch names via tRPC, but that requires
-  // hooks which can't be used in a map iteration
-  return evaluators.find((e) => e.id === evaluatorId)?.id ?? evaluatorId;
+const getEvaluatorName = ({
+  evaluatorId,
+  evaluatorNames,
+}: {
+  evaluatorId: string;
+  evaluatorNames: Map<string, string>;
+}): string => {
+  return evaluatorNames.get(evaluatorId) ?? evaluatorId;
 };
 
 export const TargetSummary = memo(function TargetSummary({
@@ -58,6 +59,7 @@ export const TargetSummary = memo(function TargetSummary({
 }: TargetSummaryProps) {
   const { isOpen, handleMouseEnter, handleMouseLeave } =
     useInteractiveTooltip(150);
+  const evaluatorNames = useEvaluatorNames(evaluators);
 
   // Show summary if we have any completed rows, OR any errors, OR any metrics
   const hasResults =
@@ -72,12 +74,12 @@ export const TargetSummary = memo(function TargetSummary({
       gap={0}
       fontSize="12px"
       minWidth="230px"
-      color="white"
+      color="fg"
     >
       <VStack align="stretch" gap={2} padding={2}>
         {/* Progress */}
         <HStack justify="space-between">
-          <Text color="white/75">Rows</Text>
+          <Text color="fg.muted">Rows</Text>
           <Text fontWeight="medium">
             {aggregates.completedRows}/{aggregates.totalRows}
             {aggregates.errorRows > 0 && (
@@ -92,7 +94,7 @@ export const TargetSummary = memo(function TargetSummary({
         {/* Pass Rate */}
         {aggregates.overallPassRate !== null && (
           <HStack justify="space-between">
-            <Text color="white/75">Pass Rate</Text>
+            <Text color="fg.muted">Pass Rate</Text>
             <HStack gap={1.5}>
               <PassRateCircle passRate={aggregates.overallPassRate} />
               <Text
@@ -108,7 +110,7 @@ export const TargetSummary = memo(function TargetSummary({
         {/* Average Score */}
         {aggregates.overallAverageScore !== null && (
           <HStack justify="space-between">
-            <Text color="white/75">Avg Score</Text>
+            <Text color="fg.muted">Avg Score</Text>
             <Text fontWeight="medium">
               {formatScore(aggregates.overallAverageScore)}
             </Text>
@@ -126,19 +128,19 @@ export const TargetSummary = memo(function TargetSummary({
             <HStack
               justify="space-between"
               cursor="pointer"
-              _hover={{ bg: "white/10" }}
+              _hover={{ bg: "bg.muted" }}
               marginX={-2}
               paddingX={2}
               paddingY={0.5}
               borderRadius="md"
             >
-              <Text color="white/75">Avg Latency</Text>
+              <Text color="fg.muted">Avg Latency</Text>
               <HStack gap={1}>
-                <Icon as={LuClock} color="white/60" boxSize={3} />
+                <Icon as={LuClock} color="fg.muted" boxSize={3} />
                 <Text fontWeight="medium">
                   {formatLatency(aggregates.averageLatency)}
                 </Text>
-                <Icon as={LuChevronRight} boxSize={3} color="white/50" />
+                <Icon as={LuChevronRight} boxSize={3} color="fg.subtle" />
               </HStack>
             </HStack>
           </Tooltip>
@@ -155,18 +157,18 @@ export const TargetSummary = memo(function TargetSummary({
             <HStack
               justify="space-between"
               cursor="pointer"
-              _hover={{ bg: "white/10" }}
+              _hover={{ bg: "bg.muted" }}
               marginX={-2}
               paddingX={2}
               paddingY={0.5}
               borderRadius="md"
             >
-              <Text color="white/75">Total Cost</Text>
+              <Text color="fg.muted">Total Cost</Text>
               <HStack gap={1}>
                 <Text fontWeight="medium">
                   {formatCost(aggregates.totalCost)}
                 </Text>
-                <Icon as={LuChevronRight} boxSize={3} color="white/50" />
+                <Icon as={LuChevronRight} boxSize={3} color="fg.subtle" />
               </HStack>
             </HStack>
           </Tooltip>
@@ -175,7 +177,7 @@ export const TargetSummary = memo(function TargetSummary({
         {/* Total Execution Time */}
         {aggregates.totalDuration !== null && (
           <HStack justify="space-between">
-            <Text color="white/75">Execution Time</Text>
+            <Text color="fg.muted">Execution Time</Text>
             <Text fontWeight="medium">
               {formatLatency(aggregates.totalDuration)}
             </Text>
@@ -188,13 +190,16 @@ export const TargetSummary = memo(function TargetSummary({
         <>
           <Box borderTopWidth="1px" borderColor="border.emphasized" />
           <VStack align="stretch" gap={2} padding={2}>
-            <Text color="white/85" fontWeight="semibold">
+            <Text color="fg" fontWeight="semibold">
               Evaluators
             </Text>
             {aggregates.evaluators.map((evaluator) => (
               <HStack key={evaluator.evaluatorId} justify="space-between">
-                <Text color="white/75" truncate maxWidth="150px">
-                  {getEvaluatorName(evaluator.evaluatorId, evaluators)}
+                <Text color="fg.muted" truncate maxWidth="150px">
+                  {getEvaluatorName({
+                    evaluatorId: evaluator.evaluatorId,
+                    evaluatorNames,
+                  })}
                 </Text>
                 <HStack gap={2}>
                   {evaluator.passRate !== null && (
@@ -212,7 +217,7 @@ export const TargetSummary = memo(function TargetSummary({
                     </HStack>
                   )}
                   {evaluator.averageScore !== null && (
-                    <Text fontSize="11px" color="white/75">
+                    <Text fontSize="11px" color="fg.muted">
                       {formatScore(evaluator.averageScore)}
                     </Text>
                   )}

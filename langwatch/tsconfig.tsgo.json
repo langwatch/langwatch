@@ -21,12 +21,12 @@
 		"verbatimModuleSyntax": true,
 		"paths": {
 			"~/*": ["./src/*"],
+			"@app/*": ["./src/server/app-layer/*"],
 			"@trpc-internal/parser": ["./node_modules/@trpc/server/dist/core/parser"],
 			"@trpc-internal/utils": [
 				"./node_modules/@trpc/server/dist/core/internals/utils"
 			],
-			"zod/lib/helpers/errorUtil": ["./node_modules/zod/lib/helpers/errorUtil"],
-			"@langwatch-oss/*": ["./*"]
+			"zod/lib/helpers/errorUtil": ["./node_modules/zod/lib/helpers/errorUtil"]
 		},
 		"plugins": [
 			{
@@ -47,10 +47,11 @@
 	],
 	"exclude": [
 		"node_modules",
-		"saas-src/**/*",
+		"../mcp-server",
 		".next",
 		".next-saas",
 		"**/*.snippet.*",
-		"src/**/codegen/snippets/**/*"
+		"src/**/codegen/snippets/**/*",
+		"packages/insanity-check/**/*"
 	]
 }

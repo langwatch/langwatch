@@ -35,6 +35,44 @@ export {
   EvaluatorError,
 } from "./client-sdk/services/experiments";
 
+// Evaluators API exports
+export {
+  EvaluatorsApiService,
+  type EvaluatorResponse,
+  type EvaluatorField,
+  type CreateEvaluatorBody,
+  EvaluatorsApiError,
+} from "./client-sdk/services/evaluators";
+
+// Dataset API exports
+export {
+  DatasetsFacade,
+  DatasetError,
+  DatasetNotFoundError,
+  DatasetApiError,
+  DatasetValidationError,
+  DatasetPlanLimitError,
+  type Dataset,
+  type DatasetEntry,
+  type DatasetMetadata,
+  type DatasetColumnType,
+  type DatasetListItem,
+  type Pagination,
+  type PaginatedResponse,
+  type GetDatasetOptions,
+  type ListDatasetsOptions,
+  type ListDatasetsApiResponse,
+  type ListRecordsOptions,
+  type ListRecordsApiResponse,
+  type CreateDatasetOptions,
+  type UpdateDatasetOptions,
+  type CreateFromUploadResponse,
+  type BatchCreateRecordsResponse,
+  type DeleteRecordsResponse,
+  type UploadResponse,
+  type DatasetRecordResponse,
+} from "./client-sdk/services/datasets";
+
 // Evaluations API exports (Online Evaluations / Guardrails)
 export {
   EvaluationsFacade,

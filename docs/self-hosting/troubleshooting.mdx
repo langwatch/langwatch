@@ -1,0 +1,289 @@
+---
+title: Troubleshooting & FAQ
+description: "Common issues and solutions for LangWatch self-hosting"
+---
+
+## Health Checks
+
+Verify your deployment is healthy:
+
+```bash
+# App health
+kubectl -n langwatch exec deploy/langwatch-app -- curl -s http://localhost:5560/api/health
+
+# Worker health
+kubectl -n langwatch exec deploy/langwatch-workers -- curl -s http://localhost:2999/healthz
+
+# Pod status
+kubectl -n langwatch get pods
+
+# Recent events
+kubectl -n langwatch get events --sort-by='.lastTimestamp' | tail -20
+```
+
+## Docker Compose Issues
+
+### Port 5560 already in use
+
+Another process is using port 5560. Find and stop it:
+
+```bash
+lsof -i :5560
+# Then either stop that process or change the port in compose.yml
+```
+
+### Containers keep restarting
+
+Check logs for the failing container:
+
+```bash
+docker compose logs app --tail=50
+docker compose logs postgres --tail=50
+```
+
+Common causes:
+- PostgreSQL not ready before app starts (health checks should handle this)
+- Missing or invalid `.env` file
+- Insufficient Docker memory (increase to 8+ GB in Docker Desktop settings)
+
+### Slow startup
+
+First startup is slower because:
+- Docker pulls all images
+- PostgreSQL runs initial migrations
+- OpenSearch initializes its cluster
+
+Subsequent starts are faster. If it remains slow, check Docker resource allocation.
+
+## Kubernetes / Helm Issues
+
+### Pods stuck in `CrashLoopBackOff`
+
+```bash
+# Check pod logs
+kubectl -n langwatch logs <pod-name> --previous
+
+# Common causes:
+# 1. Database connection failed — check DATABASE_URL secret
+# 2. Missing secrets — check autogen.enabled or secrets.existingSecret
+# 3. ClickHouse not ready — check clickhouse pod status
+```
+
+### Pods stuck in `Pending`
+
+```bash
+# Check events for the pod
+kubectl -n langwatch describe pod <pod-name>
+
+# Common causes:
+# 1. Insufficient cluster resources (CPU/memory)
+# 2. No StorageClass available for PVC provisioning
+# 3. Node selector/affinity mismatch
+```
+
+### PVC stuck in `Pending`
+
+```bash
+kubectl -n langwatch get pvc
+kubectl -n langwatch describe pvc <pvc-name>
+```
+
+Ensure your cluster has a default StorageClass:
+
+```bash
+kubectl get storageclass
+```
+
+If not, set one in your values:
+
+```yaml
+clickhouse:
+  storage:
+    storageClass: "gp3"  # or your available StorageClass
+```
+
+### Ingress not routing traffic
+
+```bash
+# Check ingress resource
+kubectl -n langwatch get ingress
+kubectl -n langwatch describe ingress <ingress-name>
+
+# Verify the ingress controller is running
+kubectl get pods -n ingress-nginx  # or your ingress namespace
+```
+
+Ensure `app.http.baseHost` and `app.http.publicUrl` match the Ingress host.
+
+### Istio / Service Mesh
+
+CronJob pods may hang after completion because the Istio sidecar keeps the pod alive.
+
+Fix: disable sidecar injection for CronJobs:
+
+```yaml
+cronjobs:
+  pod:
+    annotations:
+      sidecar.istio.io/inject: "false"
+```
+
+## ClickHouse Issues
+
+### ClickHouse OOM kills
+
+Increase ClickHouse memory:
+
+```yaml
+clickhouse:
+  memory: "16Gi"  # Up from default 4Gi
+```
+
+The subchart auto-tunes internal memory limits based on this value.
+
+### ClickHouse connection errors
+
+```bash
+# Check ClickHouse pod status
+kubectl -n langwatch get pods -l app.kubernetes.io/component=clickhouse
+
+# Test connectivity from app pod
+kubectl -n langwatch exec deploy/langwatch-app -- \
+  curl -s "http://langwatch-clickhouse:8123/?query=SELECT%201"
+```
+
+### Cold storage not working
+
+Verify S3 credentials and bucket access:
+
+```bash
+# Check ClickHouse logs for S3 errors
+kubectl -n langwatch logs sts/langwatch-clickhouse --tail=50 | grep -i s3
+```
+
+Ensure the service account has S3 access (IRSA) or static credentials are configured correctly.
+
+## PostgreSQL Issues
+
+### Migration failures on startup
+
+If Prisma migrations fail, the app pod will crash. Check logs:
+
+```bash
+kubectl -n langwatch logs deploy/langwatch-app --tail=100 | grep -i prisma
+```
+
+To skip migrations temporarily (for debugging):
+
+```yaml
+app:
+  extraEnvs:
+    - name: SKIP_PRISMA_MIGRATE
+      value: "true"
+```
+
+<Warning>
+Only skip migrations for debugging. Running with pending migrations can cause application errors.
+</Warning>
+
+### Connection refused
+
+Verify the connection string:
+
+```bash
+# For chart-managed PostgreSQL
+kubectl -n langwatch exec deploy/langwatch-postgresql -- \
+  pg_isready -U postgres
+
+# For external PostgreSQL, test from the app pod
+kubectl -n langwatch exec deploy/langwatch-app -- \
+  curl -v telnet://your-rds-host:5432
+```
+
+## Authentication Issues
+
+### SSO callback URL mismatch
+
+The callback URL configured in your identity provider must exactly match:
+
+```
+https://your-langwatch-domain.com/api/auth/callback/{provider}
+```
+
+Check that `app.http.publicUrl` matches your actual domain (including `https://`).
+
+### "Email already exists" during SSO migration
+
+This happens when a user already has an email/password account. Follow the [SSO migration steps](/self-hosting/configuration/sso#migrating-from-emailpassword-to-sso) to link existing accounts.
+
+### Sessions expire too quickly
+
+`NEXTAUTH_SECRET` may have changed between deployments. Ensure it's stored persistently in a Kubernetes Secret, not auto-generated.
+
+## Debugging Tools
+
+### Grafana Dashboards
+
+LangWatch ships with off-the-shelf Grafana dashboards for monitoring the platform — including trace throughput, worker queue depth, ClickHouse performance, and error rates. See [Observability & Monitoring](/self-hosting/configuration/observability) for setup.
+
+### Skynet (Internal Event Debugger)
+
+LangWatch includes Skynet, an internal event debugging tool that lets you inspect the event sourcing pipeline in real-time — view individual events, trace processing steps, and diagnose pipeline issues.
+
+## FAQ
+
+### How much disk space does ClickHouse need?
+
+Roughly 1 KB per span (compressed). See [Sizing & Scaling](/self-hosting/configuration/sizing-and-scaling#storage-sizing) for detailed estimates.
+
+### Can I use an existing PostgreSQL / Redis?
+
+Yes. Use the external database overlays:
+
+```bash
+helm install langwatch langwatch/langwatch \
+  -f examples/overlays/postgres-external.yaml \
+  -f examples/overlays/redis-external.yaml
+```
+
+See [Kubernetes (Helm)](/self-hosting/deployment/kubernetes-helm#production-deployment) for full instructions.
+
+### Can I run without LangEvals or NLP?
+
+Yes. These services are optional. If you don't need built-in evaluators or NLP features, you can scale them to zero:
+
+```yaml
+langwatch_nlp:
+  replicaCount: 0
+langevals:
+  replicaCount: 0
+```
+
+### How do I disable telemetry?
+
+```yaml
+app:
+  telemetry:
+    usage:
+      enabled: false
+```
+
+Or set `DISABLE_USAGE_STATS=true`.
+
+### What ports need to be open?
+
+Only port 443 (HTTPS) for the Ingress/Load Balancer. All other communication is internal to the cluster. See [Security](/self-hosting/security#firewall-rules) for the full port matrix.
+
+### Can I run LangWatch in an air-gapped environment?
+
+Yes. Mirror the Docker images to your private registry and configure the Helm chart to pull from there. See [Docker Images](/self-hosting/deployment/docker-images#private-registries).
+
+### How do I check the LangWatch version?
+
+```bash
+# Helm chart version and app version
+helm list -n langwatch
+
+# Image version running in pods
+kubectl -n langwatch get pods -o jsonpath='{.items[*].spec.containers[*].image}'
+```

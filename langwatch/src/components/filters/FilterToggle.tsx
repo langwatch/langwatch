@@ -1,9 +1,10 @@
 import { Box, Button, HStack, Text } from "@chakra-ui/react";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
+import qs from "qs";
 import { X } from "react-feather";
 import { type FilterParam, useFilterParams } from "../../hooks/useFilterParams";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { dependencies } from "../../injection/dependencies.client";
+import { useFeatureFlag } from "../../hooks/useFeatureFlag";
 import { filterOutEmptyFilters } from "../../server/analytics/utils";
 import type { FilterField } from "../../server/filters/types";
 import { Tooltip } from "../ui/tooltip";
@@ -39,23 +40,55 @@ export const useFilterToggle = (
       : defaultShowFilters;
 
   const setShowFilters = (show: boolean) => {
+    const currentPath = router.asPath.split("?")[0] ?? router.asPath;
+    const queryString = router.asPath.split("?")[1] ?? "";
+    const queryParams = qs.parse(queryString.replaceAll("%2C", ","), {
+      allowDots: true,
+      comma: true,
+      allowEmptyArrays: true,
+    });
+
+    const showFiltersValue = show
+      ? defaultShowFilters
+        ? undefined
+        : "true"
+      : defaultShowFilters
+        ? "false"
+        : undefined;
+
+    const newParams = { ...queryParams };
+    if (showFiltersValue === undefined) {
+      delete newParams.show_filters;
+    } else {
+      newParams.show_filters = showFiltersValue;
+    }
+
+    const newQs = qs.stringify(newParams, {
+      allowDots: true,
+      arrayFormat: "comma" as const,
+      // @ts-ignore
+      allowEmptyArrays: true,
+    });
+
+    // Build url query from parsed newQs + dynamic route params only.
+    // Using parsed as the base (not spreading over router.query) ensures
+    // deleted keys like show_filters are actually removed.
+    const pathParamKeys = new Set(
+      (router.pathname.match(/\[(\w+)\]/g) ?? []).map((m) => m.slice(1, -1)),
+    );
+    const routeParams = Object.fromEntries(
+      Object.entries(router.query).filter(([key]) => pathParamKeys.has(key)),
+    );
+    const parsed = qs.parse(newQs, {
+      allowDots: true,
+      comma: true,
+      allowEmptyArrays: true,
+    });
+
     void router.push(
-      {
-        query: Object.fromEntries(
-          Object.entries({
-            ...router.query,
-            show_filters: show
-              ? defaultShowFilters
-                ? undefined
-                : "true"
-              : defaultShowFilters
-                ? "false"
-                : undefined,
-          }).filter(([, value]) => value !== undefined),
-        ),
-      },
-      undefined,
-      { shallow: true },
+      { pathname: router.pathname, query: { ...routeParams, ...parsed } },
+      newQs ? `${currentPath}?${newQs}` : currentPath,
+      { shallow: true, scroll: false },
     );
   };
 
@@ -116,12 +149,16 @@ export function FilterToggleButton({
   negateFiltersToggled?: boolean;
   setNegateFilters?: (negateFilters: boolean) => void;
 }) {
-  const { project } = useOrganizationTeamProject();
+  const { project, organization } = useOrganizationTeamProject();
   const { filterCount, hasAnyFilters } = getFilterCount(filters);
 
-  const hasNegateFilters = dependencies.hasNegateFilters?.({
-    projectId: project?.id ?? "",
-  });
+  const { enabled: hasNegateFilters } = useFeatureFlag(
+    "release_ui_negate_filters_enabled",
+    {
+      projectId: project?.id,
+      organizationId: organization?.id,
+    },
+  );
 
   return (
     <HStack gap={2}>

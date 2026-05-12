@@ -417,6 +417,106 @@ describe("ComparisonCharts", () => {
       expect(screen.getByTestId("xaxis-option-target")).toBeInTheDocument();
     });
 
+    describe("given a single run with only evaluator targets", () => {
+      describe("when ComparisonCharts renders", () => {
+        it("defaults group by to runs for V3 evaluator-type targets", () => {
+          const evaluatorOnlyRun: ComparisonRunData = {
+            runId: "run-1",
+            runName: "Run 1",
+            color: "#3182ce",
+            isLoading: false,
+            data: {
+              runId: "run-1",
+              experimentId: "exp-1",
+              projectId: "project-1",
+              createdAt: Date.now(),
+              datasetColumns: [{ name: "input", hasImages: false }],
+              targetColumns: [
+                {
+                  id: "eval-target-1",
+                  name: "field_precision",
+                  type: "evaluator",
+                  outputFields: ["output"],
+                },
+                {
+                  id: "eval-target-2",
+                  name: "field_recall",
+                  type: "evaluator",
+                  outputFields: ["output"],
+                },
+              ],
+              evaluatorIds: ["field_precision", "field_recall"],
+              evaluatorNames: {
+                field_precision: "field_precision",
+                field_recall: "field_recall",
+              },
+              rows: [],
+            },
+          };
+
+          render(
+            <ComparisonCharts
+              comparisonData={[evaluatorOnlyRun]}
+              isVisible={true}
+            />,
+            { wrapper: Wrapper },
+          );
+
+          expect(screen.getByTestId("group-by-button")).toHaveTextContent(
+            "Group by: Runs",
+          );
+        });
+
+        it("defaults group by to runs for virtual _eval_ targets", () => {
+          const virtualEvalRun: ComparisonRunData = {
+            runId: "run-1",
+            runName: "Run 1",
+            color: "#3182ce",
+            isLoading: false,
+            data: {
+              runId: "run-1",
+              experimentId: "exp-1",
+              projectId: "project-1",
+              createdAt: Date.now(),
+              datasetColumns: [{ name: "input", hasImages: false }],
+              targetColumns: [
+                {
+                  id: "_eval_field_precision",
+                  name: "field_precision",
+                  type: "legacy",
+                  outputFields: ["output"],
+                },
+                {
+                  id: "_eval_field_recall",
+                  name: "field_recall",
+                  type: "legacy",
+                  outputFields: ["output"],
+                },
+              ],
+              evaluatorIds: ["field_precision", "field_recall"],
+              evaluatorNames: {
+                field_precision: "field_precision",
+                field_recall: "field_recall",
+              },
+              rows: [],
+            },
+          };
+
+          render(
+            <ComparisonCharts
+              comparisonData={[virtualEvalRun]}
+              isVisible={true}
+            />,
+            { wrapper: Wrapper },
+          );
+
+          expect(screen.getByTestId("group-by-button")).toHaveTextContent(
+            "Group by: Runs",
+          );
+        });
+      });
+    });
+
     it("shows Model option when targets have model in metadata", async () => {
       const user = userEvent.setup();
       const comparisonData = [

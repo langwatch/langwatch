@@ -1,0 +1,267 @@
+Feature: Explicit application origin for race condition prevention
+  As a LangWatch user with online evaluations enabled
+  I want traces from my application to be explicitly tagged with origin "application"
+  So that online evaluations never incorrectly fire on evaluation or simulation traces
+  when child spans arrive before the root span
+
+  # All scenarios describe the trace projection's origin tagging during
+  # the event-sourcing pipeline. Need targeted unit tests in
+  # `langwatch/src/server/event-sourcing/pipelines/trace-processing/`
+  # for the origin-tagging projection. Backend logic is implemented;
+  # test cases for these specific race scenarios aren't written yet.
+
+  # =========================================================================
+  # Problem
+  # =========================================================================
+  #
+  # When a trace's child spans arrive before the root span (which carries
+  # langwatch.origin), the trace has no origin for up to a minute. The
+  # evaluation trigger reactor fires after 30s, sees empty origin, and the
+  # precondition matcher defaults `data.origin || "application"` — matching
+  # traces that are actually evaluations or simulations.
+  #
+  # Solution has three parts:
+  #   1. SDKs explicitly set langwatch.origin = "application" on root spans
+  #      for regular traces (NOT experiments), making 95%+ unambiguous
+  #   2. Empty origin = pending (not application) — the reactor and
+  #      precondition matcher stop treating empty as "application"
+  #   3. Origin inference in the fold projection:
+  #      - Explicit langwatch.origin attribute → use it (new SDK)
+  #      - Legacy markers (instrumentationScope, metadata.platform, etc.) → infer
+  #      - SDK heuristic: sdk.name present but no origin → "application" (old SDK)
+  #      All three run on every span arrival, no delay needed.
+  #   4. Deferred fallback for pure OTEL traces (no SDK info, no origin):
+  #      The reactor schedules a 5-min deferred check. On fire, re-read fold
+  #      state from projection store. If still empty → "application".
+  #
+  # SDK version heuristic:
+  #   All spans from a LangWatch SDK carry telemetry.sdk.name in resource
+  #   attributes. If sdk.name is present but langwatch.origin is absent,
+  #   it's an old SDK that doesn't know about explicit origin. Old SDK
+  #   evaluations/simulations are already tagged via legacy inference
+  #   (instrumentationScope.name, metadata.labels, etc.), so the remaining
+  #   untagged traces must be regular application traces. No 5-min delay
+  #   needed — infer "application" at normal debounce time.
+  #
+  # Elasticsearch path:
+  #   The legacy ES path does not implement origin filtering. Null origin
+  #   continues to pass through. Only the event-sourcing pipeline applies
+  #   origin guards.
+  #
+  # =========================================================================
+
+  Background:
+    Given the trace processing pipeline is running
+    And a project exists with online evaluations enabled
+
+  # ===========================================================================
+  # Part 1: SDKs explicitly set origin "application"
+  # ===========================================================================
+
+  @unit @unimplemented
+  Scenario: Python SDK sets origin "application" on root span for regular traces
+    Given a user application instrumented with the LangWatch Python SDK
+    When the user calls langwatch.trace() to create a trace
+    Then the root span contains attribute "langwatch.origin" = "application"
+
+  @unit @unimplemented
+  Scenario: Python SDK does not set origin "application" for experiment traces
+    Given a user runs an experiment via langwatch.experiment()
+    When the experiment creates traces for evaluation targets
+    Then the root span contains attribute "langwatch.origin" = "evaluation"
+    And the origin is NOT "application"
+
+  @unit @unimplemented
+  Scenario: TypeScript SDK sets origin "application" on root span for regular traces
+    Given a user application instrumented with the LangWatch TypeScript SDK
+    When the SDK creates a trace for a regular application call
+    Then the root span contains attribute "langwatch.origin" = "application"
+
+  @unit @unimplemented
+  Scenario: TypeScript SDK does not set origin "application" for experiment traces
+    Given a user runs an experiment via the TypeScript SDK
+    When the experiment creates traces for evaluation targets
+    Then the root span contains attribute "langwatch.origin" = "evaluation"
+    And the origin is NOT "application"
+
+  # ===========================================================================
+  # Part 2: Empty origin = pending, not application
+  # ===========================================================================
+
+  # --- Evaluation trigger reactor guards ---
+
+  @unit @unimplemented
+  Scenario: Evaluation trigger skips traces with empty origin and no SDK info
+    Given an online evaluation monitor is enabled for the project
+    And a trace arrives where the fold state has no langwatch.origin
+    And the fold state has no sdk.name (pure OTEL trace)
+    When the evaluation trigger reactor fires at normal debounce
+    Then no evaluation commands are dispatched for this trace
+    And a deferred check is scheduled for 5 minutes later
+
+  @unit @unimplemented
+  Scenario: Evaluation trigger runs on traces with explicit application origin
+    Given an online evaluation monitor is enabled for the project
+    And a trace arrives where the fold state has langwatch.origin = "application"
+    When the evaluation trigger reactor fires at normal debounce
+    Then evaluation commands are dispatched for matching monitors
+
+  @unit @unimplemented
+  Scenario: Evaluation trigger dispatches for any known origin (preconditions filter)
+    Given an online evaluation monitor is enabled for the project
+    And a trace arrives where the fold state has langwatch.origin = "evaluation"
+    When the evaluation trigger reactor fires at normal debounce
+    Then evaluation commands are dispatched for matching monitors
+    Because origin filtering is handled by precondition matchers, not the reactor
+
+  # --- SDK version heuristic for old SDK backward compat ---
+  # The fold projection infers origin = "application" when sdk.name is present
+  # but no explicit origin or legacy markers exist. By the time the reactor
+  # fires, the fold state already has langwatch.origin set.
+
+  @unit @unimplemented
+  Scenario: Fold projection infers application origin for old SDK traces
+    Given an online evaluation monitor is enabled for the project
+    And a trace arrives from an old SDK (sdk.name present, no langwatch.origin)
+    When the fold projection processes the span
+    Then it sets langwatch.origin = "application" in the fold state
+    And when the evaluation trigger reactor fires at normal debounce
+    Then evaluation commands are dispatched for matching monitors
+
+  @unit @unimplemented
+  Scenario: Old SDK evaluation traces are dispatched with evaluation origin
+    Given a trace arrives from an old Python SDK running an experiment
+    And the fold state has sdk.name = "langwatch"
+    And legacy inference sets langwatch.origin = "evaluation" from instrumentationScope
+    When the evaluation trigger reactor fires at normal debounce
+    Then evaluation commands are dispatched with origin "evaluation"
+    And precondition matchers filter based on the monitor's configured origin
+
+  # --- Precondition matcher changes ---
+
+  # Removed scenario: "Precondition matcher does not default empty origin to application"
+  # Contradicts current code as of 2026-05-01: normalizePreconditionTraceData in
+  # precondition-matchers.ts:223 intentionally defaults empty/undefined origin to
+  # "application" (preconditions.unit.test.ts:55-65 documents the OPPOSITE assertion).
+
+  @unit @unimplemented
+  Scenario: Precondition matcher matches explicit application origin
+    Given a precondition: traces.origin is "application"
+    And a trace with langwatch.origin = "application" in the fold state
+    When the precondition matcher evaluates the trace
+    Then the precondition passes
+
+  # ===========================================================================
+  # Part 3: Deferred evaluation for pure OTEL traces (5-min fallback)
+  # ===========================================================================
+
+  # Only traces with NO LangWatch SDK info face the 5-min delay.
+  # These are pure OTEL exporters, third-party integrations, etc.
+  # The single reactor handles both phases — no separate deferred reactor.
+
+  @unit @unimplemented
+  Scenario: Deferred check treats still-empty origin as "application"
+    Given the deferred evaluation check fires for a trace
+    And the fold state (re-read from projection store) still has no langwatch.origin
+    When the deferred handler evaluates the trace
+    Then it treats the trace as origin "application"
+    And dispatches evaluation commands for matching monitors
+
+  @unit @unimplemented
+  Scenario: Deferred check dispatches with acquired origin (preconditions filter)
+    Given a trace initially had no langwatch.origin
+    And a root span later arrived with langwatch.origin = "evaluation"
+    When the deferred evaluation check fires
+    And the fold state (re-read from store) now has langwatch.origin = "evaluation"
+    Then evaluation commands are dispatched with origin "evaluation"
+    And precondition matchers filter based on the monitor's configured origin
+
+  @unit @unimplemented
+  Scenario: Deferred check runs evaluations for traces that acquired application origin
+    Given a trace initially had no langwatch.origin
+    And a root span later arrived with langwatch.origin = "application"
+    When the deferred evaluation check fires
+    And the fold state (re-read from store) now has langwatch.origin = "application"
+    Then evaluation commands are dispatched for matching monitors
+
+  @unit @unimplemented
+  Scenario: Deferred check deduplicates per trace
+    Given a trace receives multiple span batches with no origin or SDK info
+    And each reactor dispatch schedules a deferred check
+    When the deferred check fires
+    Then only one evaluation check runs for that trace
+    And it uses fold state re-read from the projection store (fresh, not captured)
+
+  @integration @unimplemented
+  Scenario: No deferred check is scheduled for SDK-instrumented traces
+    Given a trace arrives from a LangWatch SDK (old or new)
+    And the fold state has sdk.name present
+    When the evaluation trigger reactor fires at normal debounce
+    Then no deferred check is scheduled
+    Because the SDK heuristic handles origin resolution immediately
+
+  # ===========================================================================
+  # Part 4: ClickHouse filter builder + frontend consistency
+  # ===========================================================================
+
+  # The ClickHouse filter builder must match the new semantics:
+  # origin = "application" matches ONLY explicit "application", not empty/NULL.
+
+  # Removed scenario: "ClickHouse filter for origin application matches only explicit value"
+  # Contradicts current code as of 2026-05-01: filter-translator.ts:286-289 matches
+  # `'' OR IS NULL OR = 'application'` and filter-translator.test.ts:105-111 explicitly
+  # asserts the opposite behavior — the design defaults missing origin to application.
+
+  @unit @unimplemented
+  Scenario: Frontend renders "Application" tag for explicit application origin
+    Given a trace has langwatch.origin = "application" in its attributes
+    When the trace is displayed in the traces table
+    Then an "Application" origin tag is shown
+
+  @unit @unimplemented
+  Scenario: Frontend renders no origin tag for traces with empty origin
+    Given a trace has no langwatch.origin attribute
+    When the trace is displayed in the traces table
+    Then no origin tag is shown
+
+  # ===========================================================================
+  # Race condition scenarios (the core problem this feature prevents)
+  # ===========================================================================
+
+  # Removed scenario: "Child spans arriving before root span do not trigger evaluations prematurely"
+  # Contradicts current code as of 2026-05-01: trace-origin.service.ts:117 restricts
+  # the SDK heuristic to root spans only; traceSummaryOrigin.unit.test.ts:339-351
+  # asserts the OPPOSITE (heuristic does NOT fire on child spans).
+
+  @integration @unimplemented
+  Scenario: New SDK child spans before root span are handled correctly
+    Given an online evaluation monitor is enabled for the project
+    And a trace's child spans arrive first from a new SDK
+    And the child spans carry langwatch.origin = "application" (set by SDK on all spans)
+    When the evaluation trigger reactor fires at normal debounce
+    Then evaluation commands are dispatched for matching monitors
+
+  @integration @unimplemented
+  Scenario: Pure OTEL trace with no SDK info gets evaluated after 5-min delay
+    Given an online evaluation monitor is enabled for the project
+    And a complete trace arrives from a generic OTEL exporter
+    And no span has sdk.name or langwatch.origin attributes
+    When the evaluation trigger reactor fires at normal debounce
+    Then no evaluation commands are dispatched
+    And a deferred check is scheduled for 5 minutes
+    When the deferred check fires and re-reads the fold state
+    And the fold state still has no langwatch.origin
+    Then the trace is treated as origin "application"
+    And evaluation commands are dispatched for matching monitors
+
+  @integration @unimplemented
+  Scenario: Pure OTEL evaluation trace is not incorrectly evaluated
+    Given an online evaluation monitor is enabled for the project
+    And child spans arrive from a pure OTEL exporter with no origin
+    When the evaluation trigger reactor fires at normal debounce
+    Then no evaluation commands are dispatched (no SDK, no origin)
+    When the root span arrives with evaluation markers (evaluation.run_id)
+    And legacy inference sets langwatch.origin = "evaluation"
+    When the deferred check fires and re-reads the fold state
+    Then no evaluation commands are dispatched
+    Because the origin is "evaluation", not "application"

@@ -1,16 +1,80 @@
-import { setEnvironment } from "@langwatch/ksuid";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import promBundle from "express-prom-bundle";
-import { createServer, type IncomingMessage } from "http";
-import next from "next";
+import { createServer, type IncomingMessage, type ServerResponse } from "http";
+import { createSecureServer } from "http2";
 import path from "path";
+
+/**
+ * Auto-mints a self-signed cert pair for the local dev HTTPS+HTTP/2 server.
+ * Cached at `<repo>/.dev-certs/` so the same cert is reused across boots —
+ * means you only see the browser's "untrusted certificate" prompt once per
+ * machine, then Chrome remembers it.
+ *
+ * Worktrees can share a single cert by setting `LANGWATCH_DEV_CERT_DIR`
+ * to a stable path (otherwise each worktree mints + trusts its own).
+ *
+ * Override the auto-generated pair by setting `DEV_HTTPS_CERT` and
+ * `DEV_HTTPS_KEY` to file paths — useful when teammates prefer mkcert
+ * (which gets auto-trusted via the system root store, no prompts).
+ */
+async function loadDevHttpsCredentials(
+  repoDir: string,
+): Promise<{ cert: Buffer; key: Buffer }> {
+  if (process.env.DEV_HTTPS_CERT && process.env.DEV_HTTPS_KEY) {
+    return {
+      cert: readFileSync(process.env.DEV_HTTPS_CERT),
+      key: readFileSync(process.env.DEV_HTTPS_KEY),
+    };
+  }
+
+  const cacheDir =
+    process.env.LANGWATCH_DEV_CERT_DIR ?? path.join(repoDir, ".dev-certs");
+  const certPath = path.join(cacheDir, "dev.pem");
+  const keyPath = path.join(cacheDir, "dev-key.pem");
+
+  if (existsSync(certPath) && existsSync(keyPath)) {
+    return { cert: readFileSync(certPath), key: readFileSync(keyPath) };
+  }
+
+  const { generate } = await import("selfsigned");
+  const pems = generate(
+    [{ name: "commonName", value: "localhost" }],
+    {
+      days: 825, // Apple's max accepted lifetime for trusted certs.
+      keySize: 2048,
+      extensions: [
+        {
+          name: "subjectAltName",
+          altNames: [
+            { type: 2, value: "localhost" },
+            { type: 2, value: "*.localhost" },
+            { type: 7, ip: "127.0.0.1" },
+            { type: 7, ip: "::1" },
+          ],
+        },
+      ],
+    },
+  );
+
+  mkdirSync(cacheDir, { recursive: true });
+  writeFileSync(certPath, pems.cert);
+  writeFileSync(keyPath, pems.private);
+  return { cert: Buffer.from(pems.cert), key: Buffer.from(pems.private) };
+}
 import { register } from "prom-client";
-import type { Duplex } from "stream";
-import { parse } from "url";
+import { getApp } from "./server/app-layer/app";
+import { initializeWebApp } from "./server/app-layer/presets";
 import { getWorkerMetricsPort } from "./server/background/config";
-import { getClickHouseClient } from "./server/clickhouse/client";
-import { initializeEventSourcing } from "./server/event-sourcing";
-import { connection as redis } from "./server/redis";
+import { createMcpHandler } from "./mcp/handler";
+import { shutdownPostHog } from "./server/posthog";
+import { verifyRedisReady } from "./server/redis";
 import { createLogger } from "./utils/logger/server";
+
+// Hono — unified API router
+import type { Hono } from "hono";
+import { createApiRouter } from "./server/api-router";
+import { serveStaticOrFallback } from "./server/static-handler";
+import { setupTRPCWebSocket } from "./server/websockets/trpc-ws";
 
 const logger = createLogger("langwatch:start");
 
@@ -23,9 +87,7 @@ export const metricsMiddleware = promBundle({
   customLabels: { project_name: "langwatch" },
   bypass: {
     onRequest: (req) => {
-      if (
-        /^\/(api|_next|\[project\]|auth|settings|share|$)/.test(req.url ?? "")
-      ) {
+      if (/^\/(api|assets|auth|settings|share|$)/.test(req.url ?? "")) {
         return false;
       }
       return true;
@@ -33,20 +95,8 @@ export const metricsMiddleware = promBundle({
     onFinish: () => false,
   },
   normalizePath: (req) => {
-    if (req.url?.includes("/_next/static")) {
-      return "/_next/static";
-    }
-    // @ts-ignore
-    const nextMeta = req[Symbol.for("NextInternalRequestMeta")];
-    const nextJsPath = nextMeta?.match?.definition?.pathname;
-    if (nextJsPath) {
-      // Keep trpc request individual if they are not being lumped in together
-      if (req.url?.includes("/trpc") && !req.url?.includes(",")) {
-        return req.url.split("?")[0];
-      }
-      return nextJsPath;
-    }
-    return req.url;
+    if (req.url?.includes("/assets/")) return "/assets/*";
+    return req.url?.split("?")[0] ?? req.url;
   },
 });
 
@@ -61,105 +111,183 @@ const isMetricsAuthorized = (req: IncomingMessage): boolean => {
   );
 };
 
-module.exports.startApp = async (dir = path.dirname(__dirname)) => {
+export const startApp = async (dir = path.dirname(__dirname)) => {
   const dev = process.env.NODE_ENV !== "production";
-  const env = process.env.ENVIRONMENT ?? "local";
-  setEnvironment(env);
-
-  // Initialize event sourcing before handling requests
-  initializeEventSourcing({
-    clickHouseClient: getClickHouseClient(),
-    redisConnection: redis,
-  });
-
   const hostname = "0.0.0.0";
-  const port = parseInt(process.env.PORT ?? "5560");
-  // when using middleware `hostname` and `port` must be provided below
-  const app = next({
-    dev,
-    hostname,
-    port,
-    dir,
-    turbo: !!dev && !process.env.USE_WEBPACK,
-    turbopack: !!dev && !process.env.USE_WEBPACK,
-  });
-  await app.prepare();
-  const handle = app.getRequestHandler();
-  const upgradeHandler = app.getUpgradeHandler();
+
+  // Initialize the app-layer (services, repositories, event sourcing, etc.)
+  // This was previously done by Next.js instrumentation hook.
+  initializeWebApp();
+
+  // Fail fast if Redis is unreachable — better-auth uses it as secondary
+  // session store, and without it every request ends in a "Redirecting to
+  // Sign in…" loop with no actionable error for the developer.
+  await verifyRedisReady();
+
+  // Partial-config assertion on LW_VIRTUAL_KEY_PEPPER /
+  // LW_GATEWAY_INTERNAL_SECRET / LW_GATEWAY_JWT_SECRET now lives in
+  // env-create.mjs so workers.ts, CLI scripts, and every other entry
+  // point that imports env get it at import time (was server-only here).
+  //
+  // Server-only dev hint: if the AI Gateway menu is force-flagged on but
+  // no secrets are set at all, the UI renders but /api/internal/gateway/*
+  // returns 503. That's an onboarding confusion that's specific to
+  // running `pnpm dev` with the flag, so the warning stays here.
+  const gatewayFlagForced = (process.env.FEATURE_FLAG_FORCE_ENABLE ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .includes("release_ui_ai_gateway_menu_enabled");
+  const gwSecretsUnset =
+    !process.env.LW_VIRTUAL_KEY_PEPPER &&
+    !process.env.LW_GATEWAY_INTERNAL_SECRET &&
+    !process.env.LW_GATEWAY_JWT_SECRET;
+  if (gatewayFlagForced && gwSecretsUnset) {
+    logger.warn(
+      "AI Gateway menu forced on via FEATURE_FLAG_FORCE_ENABLE, but no " +
+        "gateway secrets are set. The UI will render but /api/internal/gateway/* " +
+        "will return 503. See langwatch/.env.example for the required block.",
+    );
+  }
+
+  // Dev: API server on PORT+1000 (default 6560).
+  //      Vite dev server runs separately on PORT (default 5560) and proxies /api/* here.
+  // Prod: Single server on PORT (default 5560) serves API routes + static files.
+  const basePort = parseInt(process.env.PORT ?? "5560");
+  const port = dev ? basePort + 1000 : basePort;
+
+  const mcpHandler = createMcpHandler();
+  const honoApp = createApiRouter();
+
+  // In production, resolve the built client assets directory
+  const clientDistDir = dev ? null : path.join(dir, "dist/client");
+
+  // Security headers (migrated from next.config.mjs)
+  const cspHeader = [
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://*.posthog.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://*.googletagmanager.com https://*.pendo.io https://client.crisp.chat https://static.hsappstatic.net https://*.google-analytics.com https://www.google.com https://*.reo.dev",
+    "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://*.pendo.io https://client.crisp.chat https://*.google.com https://*.reo.dev https://fonts.googleapis.com https://unpkg.com",
+    "img-src 'self' blob: data: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://image.crisp.chat https://*.googletagmanager.com https://*.pendo.io https://*.google-analytics.com https://www.google.com https://*.reo.dev",
+    "font-src 'self' data: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://client.crisp.chat https://www.google.com https://*.reo.dev https://fonts.gstatic.com",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+    ...(!dev ? ["upgrade-insecure-requests"] : []),
+    "worker-src 'self' blob:",
+    "connect-src 'self' https://*.posthog.com https://*.pendo.io wss://*.pendo.io wss://client.relay.crisp.chat https://client.crisp.chat https://*.googletagmanager.com https://analytics.google.com https://stats.g.doubleclick.net https://*.google-analytics.com https://www.google.com https://*.reo.dev",
+    "frame-src 'self' https://*.posthog.com https://*.pendo.io https://www.youtube.com https://get.langwatch.ai https://*.googletagmanager.com https://www.google.com https://*.reo.dev",
+  ].join("; ");
+
+  const securityHeaders: Record<string, string> = {
+    "Referrer-Policy": "no-referrer",
+    "X-Content-Type-Options": "nosniff",
+    // CSP only in production — dev needs inline scripts for Vite HMR
+    ...(!dev ? { "Content-Security-Policy": cspHeader } : {}),
+    ...(!dev ? { "Strict-Transport-Security": "max-age=31536000; includeSubDomains" } : {}),
+  };
+
+  // Optional HTTPS + HTTP/2 path for local dev. Set
+  // `LANGWATCH_DEV_HTTP2=1` and a self-signed cert is auto-generated on
+  // first boot (cached in `.dev-certs/` so subsequent boots reuse).
+  // Browsers only negotiate h2 over TLS, so HTTPS is mandatory; first
+  // visit shows a one-time untrusted-cert warning, then Chrome
+  // remembers. `allowHTTP1: true` keeps non-h2 clients (curl,
+  // older tools) working over the same port.
+  //
+  // Default off — `pnpm dev` keeps using plain HTTP/1.1 so nobody who
+  // hasn't opted in sees a breaking change.
+  const useHttp2 = dev && process.env.LANGWATCH_DEV_HTTP2 === "1";
 
   // eslint-disable-next-line @typescript-eslint/no-misused-promises
-  const server = createServer(async (req, res) => {
+  const handler = async (req: IncomingMessage, res: ServerResponse) => {
     try {
-      // Be sure to pass `true` as the second argument to `url.parse`.
-      // This tells it to parse the query portion of the URL.
-      const parsedUrl = parse(req.url ?? "", true);
+      // Collapse runs of slashes so paths like `//authorize` resolve to `/authorize`
+      // instead of failing the absolute-path guard on the SPA fallback below.
+      const pathname = ((req.url ?? "/").split("?")[0] ?? "/").replace(/\/{2,}/g, "/");
 
-      if (
-        parsedUrl.pathname === "/metrics" ||
-        parsedUrl.pathname === "/workers/metrics"
-      ) {
+      // Apply security headers to all responses
+      for (const [key, value] of Object.entries(securityHeaders)) {
+        res.setHeader(key, value);
+      }
+
+      // MCP routes — intercept before everything
+      if (mcpHandler.isMcpRoute(pathname)) {
+        mcpHandler.handleRequest(req, res);
+        return;
+      }
+
+      // Metrics endpoints
+      if (pathname === "/metrics" || pathname === "/workers/metrics") {
         if (!isMetricsAuthorized(req)) {
           res.statusCode = 401;
           res.end("Unauthorized");
           return;
         }
-
-        if (parsedUrl.pathname === "/metrics") {
+        if (pathname === "/metrics") {
           res.setHeader("Content-Type", register.contentType);
           res.end(await register.metrics());
         } else {
           const workersMetricsRes = await fetch(
             `http://0.0.0.0:${getWorkerMetricsPort()}/metrics`
           );
-          const workersMetrics = await workersMetricsRes.text();
           res.setHeader("Content-Type", register.contentType);
-          res.end(workersMetrics);
+          res.end(await workersMetricsRes.text());
         }
-      } else {
-        // Apply metrics middleware
-        await new Promise<void>((resolve) => {
-          void metricsMiddleware(req as any, res as any, resolve as any);
-        });
-
-        // Handle the request with Next.js
-        await handle(req, res, parsedUrl);
+        return;
       }
+
+      // Apply metrics middleware
+      await new Promise<void>((resolve) => {
+        void metricsMiddleware(req as any, res as any, resolve as any);
+      });
+
+      // ---- API Routes (all go through Hono) ----
+      if (pathname.startsWith("/api/")) {
+        const handled = await routeThroughHono(honoApp, req, res, hostname, port);
+        if (handled) return;
+
+        res.statusCode = 404;
+        res.setHeader("Content-Type", "application/json");
+        res.end(JSON.stringify({ error: "Not Found" }));
+        return;
+      }
+
+      // ---- Production: serve static assets + SPA fallback ----
+      if (clientDistDir) {
+        const handled = serveStaticOrFallback({ res, pathname, clientDistDir });
+        if (handled) return;
+      }
+
+      res.statusCode = 404;
+      res.end("Not Found");
     } catch (err) {
-      logger.error(
-        { url: req.url, error: err },
-        "error occurred handling request",
-      );
+      logger.error({ url: req.url, error: err }, "error occurred handling request");
       res.statusCode = 500;
       res.end("internal server error");
     }
-  });
-
-  const upgradeListener =
-    (defaultHandler: (req: any, socket: any, head: Buffer) => any) =>
-    (req: IncomingMessage, socket: Duplex, head: Buffer) => {
-      const parsedUrl = parse(req.url ?? "", true);
-
-      // Pass hot module reloading requests to Next.js
-      if (parsedUrl.pathname === "/_next/webpack-hmr") {
-        void defaultHandler(req, socket, head);
-      } else {
-        socket.destroy();
-      }
-    };
-
-  const initialHandler = upgradeListener(upgradeHandler);
-  server.on("upgrade", initialHandler);
-
-  // Workaround because apparently next.js calls .on("upgrade", ...) internally,
-  // overwriting the initialHandler, we need to re - attach it while keeping hmr working
-  const originalOn = server.on.bind(server);
-  server.on = (event, handler) => {
-    if (event === "upgrade") {
-      server.off("upgrade", initialHandler);
-      return originalOn(event, upgradeListener(handler));
-    }
-    return originalOn(event, handler);
   };
+
+  let server: ReturnType<typeof createServer> | ReturnType<typeof createSecureServer>;
+  if (useHttp2) {
+    const { cert, key } = await loadDevHttpsCredentials(dir);
+    // Node's http2 compat-API hands us the same IncomingMessage /
+    // ServerResponse shapes the http server uses, so the handler
+    // body doesn't need to know which transport it's on.
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises
+    server = createSecureServer(
+      { cert, key, allowHTTP1: true },
+      handler as unknown as Parameters<typeof createSecureServer>[1],
+    );
+    logger.info("HTTP/2 + TLS enabled (LANGWATCH_DEV_HTTP2=1)");
+  } else {
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises
+    server = createServer(handler);
+  }
+
+  // Bind the tRPC router to a WebSocket transport on the same HTTP server.
+  // Lets high-frequency procedures (presence cursor today) escape the
+  // browser's 6-connection HTTP cap by riding a single long-lived socket.
+  const wsHandle = setupTRPCWebSocket(server as ReturnType<typeof createServer>);
 
   server.once("error", (err) => {
     logger.error({ error: err }, "error occurred on server");
@@ -176,39 +304,130 @@ module.exports.startApp = async (dir = path.dirname(__dirname)) => {
 ███████╗██║  ██║██║ ╚████║╚██████╔╝╚███╔███╔╝██║  ██║   ██║   ╚██████╗██║  ██║
 ╚══════╝╚═╝  ╚═╝╚═╝  ╚═══╝ ╚═════╝  ╚══╝╚══╝ ╚═╝  ╚═╝   ╚═╝    ╚═════╝╚═╝  ╚═╝
 `;
+    // Print the banner via raw stdout instead of through pino — pino
+    // would JSON-encode the multi-line art into a single escaped `msg`
+    // string, which is unreadable when piped through prefixed log streams
+    // (npx-server, docker logs with prefixes, etc.). Metadata still goes
+    // through the structured logger for log aggregators downstream.
+    process.stdout.write(asciiArt);
     logger.info(
       {
         hostname,
         port,
-        fullUrl: `http://${
-          hostname === "0.0.0.0" ? "localhost" : hostname
-        }:${port}`,
+        fullUrl: `${useHttp2 ? "https" : "http"}://${hostname === "0.0.0.0" ? "localhost" : hostname}:${port}`,
+        mode: dev ? `development (API only — Vite on :${basePort})` : "production",
       },
-      asciiArt,
+      "langwatch listening",
     );
-
-    // Background workers are started separately via start:workers script
   });
 
-  // Global error handlers for uncaught exceptions and unhandled promise rejections
+  // Graceful shutdown
+  const shutdown = async (signal: string) => {
+    logger.info({ signal }, "Received signal, shutting down...");
+    const forceExitTimer = setTimeout(() => {
+      logger.warn("Graceful shutdown timed out after 5s, forcing exit");
+      process.exit(1);
+    }, 5_000);
+    forceExitTimer.unref();
+    // Politely tell WS clients to reconnect *before* tearing down the
+    // socket — gives them tRPC's staggered reconnect path instead of a
+    // hard TCP RST and a thundering herd on the next pod.
+    try {
+      wsHandle.broadcastReconnectNotification();
+      await wsHandle.close();
+    } catch (error) {
+      logger.warn({ error }, "error while closing tRPC websocket server");
+    }
+    server.close();
+    if ("closeAllConnections" in server) server.closeAllConnections();
+    mcpHandler.closeAllSessions();
+    try {
+      await Promise.all([getApp().close(), shutdownPostHog()]);
+    } catch (error) {
+      logger.error({ error }, "Failed to close App");
+    }
+    process.exit(0);
+  };
+  process.on("SIGTERM", () => void shutdown("SIGTERM"));
+  process.on("SIGINT", () => void shutdown("SIGINT"));
+
   process.on("uncaughtException", (err) => {
     logger.fatal({ error: err }, "uncaught exception detected");
-    // shutdown the server gracefully
-    server.close(() => {
-      process.exit(1); // then exit
-    });
-
-    // If a graceful shutdown is not achieved after 1 second,
-    // shut down the process completely
-    setTimeout(() => {
-      process.abort(); // exit immediately and generate a core dump file
-    }, 1000).unref();
+    server.close(() => process.exit(1));
+    setTimeout(() => process.abort(), 1000).unref();
   });
 
   process.on("unhandledRejection", (reason, promise) => {
     logger.fatal(
       { reason: reason instanceof Error ? reason : { value: reason }, promise },
-      "unhandled rejection detected",
+      "unhandled rejection detected"
     );
   });
 };
+
+async function routeThroughHono(
+  honoApp: Hono,
+  req: IncomingMessage,
+  res: ServerResponse,
+  hostname: string,
+  port: number
+): Promise<boolean> {
+  const body =
+    req.method !== "GET" && req.method !== "HEAD"
+      ? await readBody(req)
+      : undefined;
+
+  const headers = new Headers();
+  for (const [key, value] of Object.entries(req.headers)) {
+    if (value === undefined) continue;
+    if (Array.isArray(value)) {
+      for (const v of value) headers.append(key, v);
+    } else {
+      headers.set(key, value);
+    }
+  }
+
+  const honoReq = new Request(`http://${hostname}:${port}${req.url}`, {
+    method: req.method,
+    headers,
+    body: body as BodyInit | undefined,
+    // @ts-ignore - duplex needed for streaming bodies
+    duplex: "half",
+  });
+
+  const honoRes = await honoApp.fetch(honoReq);
+
+  if (honoRes.status === 404) {
+    const text = await honoRes.text();
+    if (text === "404 Not Found") return false;
+    res.statusCode = 404;
+    honoRes.headers.forEach((v, k) => res.setHeader(k, v));
+    res.end(text);
+    return true;
+  }
+
+  res.statusCode = honoRes.status;
+  honoRes.headers.forEach((v, k) => res.setHeader(k, v));
+
+  if (honoRes.body) {
+    const reader = honoRes.body.getReader();
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      res.write(value);
+    }
+    res.end();
+  } else {
+    res.end(await honoRes.text());
+  }
+  return true;
+}
+
+function readBody(req: IncomingMessage): Promise<Uint8Array> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    req.on("data", (chunk: Buffer) => chunks.push(chunk));
+    req.on("end", () => resolve(new Uint8Array(Buffer.concat(chunks))));
+    req.on("error", reject);
+  });
+}

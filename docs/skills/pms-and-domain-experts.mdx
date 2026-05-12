@@ -1,0 +1,25 @@
+---
+title: "PM & Domain Expert Skills"
+description: "Skills for PMs and domain experts to collaborate with their team using AI assistants."
+sidebarTitle: "PM & Domain Experts"
+---
+
+import { SkillAccordion } from "/snippets/skill-accordion.jsx"
+import { PROMPTS } from "/snippets/prompts-data.jsx"
+
+<SkillAccordion title="How is my agent performing?" prompt={PROMPTS.platform_analytics} />
+<SkillAccordion title="Create scenario tests for my agent" prompt={PROMPTS.platform_scenarios} />
+<SkillAccordion title="Set up evaluators for my agent" prompt={PROMPTS.platform_evaluators} />
+
+---
+
+### Use the Platform Directly
+
+<CardGroup cols={2}>
+  <Card title="Experiments" description="Batch test your prompts and models on datasets." icon="flask" href="/evaluations/experiments/overview" />
+  <Card title="Scenarios" description="Define simulation tests for your agent." icon="play" href="/agent-simulations/overview" />
+  <Card title="Prompt Playground" description="Edit, test, and iterate on prompts." icon="code" href="/prompt-management/prompt-playground" />
+  <Card title="Datasets" description="Create and manage test datasets." icon="table" href="/datasets/overview" />
+  <Card title="Evaluators" description="Browse and configure scoring functions." icon="check-double" href="/evaluations/evaluators/overview" />
+  <Card title="Analytics" description="View costs, latency, and usage trends." icon="chart-line" href="/observability/overview" />
+</CardGroup>

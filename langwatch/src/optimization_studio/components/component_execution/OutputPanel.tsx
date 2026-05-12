@@ -14,7 +14,7 @@ export const OutputPanel = ({ node }: { node: Node<Component> }) => {
 
   return (
     <Box
-      background="white"
+      background="bg"
       height="full"
       padding={6}
       border="1px solid"

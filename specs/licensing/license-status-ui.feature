@@ -1,5 +1,12 @@
 @wip @unit
 Feature: License Status UI Component
+
+  # All scenarios in this file describe rendering of the LicenseStatusCard
+  # (no-license empty state, status badge, member usage, expiration date,
+  # toasts, skeleton). They require a component test against the rendered
+  # status card or Playwright E2E. No fixture exists yet — all aspirational
+  # pending the page-test harness.
+
   As a LangWatch administrator
   I want to view and manage my license in the settings UI
   So that I can activate, view status, and remove licenses
@@ -12,18 +19,21 @@ Feature: License Status UI Component
   # No License State
   # ============================================================================
 
+  @unimplemented
   Scenario: Displays message when no license is installed
     Given the organization has no license
     When the component renders
     Then I see text "No license installed"
     And I see text "Running without a license. Some features may be limited."
 
+  @unimplemented
   Scenario: Shows license input textarea when no license
     Given the organization has no license
     When the component renders
     Then I see a textarea with placeholder "Paste your license key here..."
     And I see an "Activate License" button
 
+  @unimplemented
   Scenario: Activate button is disabled when textarea is empty
     Given the organization has no license
     When the component renders
@@ -34,32 +44,38 @@ Feature: License Status UI Component
   # Valid License State
   # ============================================================================
 
+  @unimplemented
   Scenario: Displays license status badge when valid
     Given the organization has a valid "GROWTH" license
     When the component renders
     Then I see a green badge with text "GROWTH"
 
+  @unimplemented
   Scenario: Displays plan name
     Given the organization has a valid license with plan name "Growth"
     When the component renders
     Then I see "Plan:" label with value "Growth"
 
+  @unimplemented
   Scenario: Displays member usage
     Given the organization has 5 members
     And the license allows 10 members
     When the component renders
     Then I see "Members:" label with value "5 / 10"
 
+  @unimplemented
   Scenario: Displays expiration date
     Given the organization has a license expiring "December 31, 2028"
     When the component renders
     Then I see "Expires:" label with value "December 31, 2028"
 
+  @unimplemented
   Scenario: Shows remove license button for valid license
     Given the organization has a valid license
     When the component renders
     Then I see a "Remove License" button
 
+  @unimplemented
   Scenario: Hides license input when license exists
     Given the organization has a valid license
     When the component renders
@@ -69,11 +85,13 @@ Feature: License Status UI Component
   # Invalid/Expired License State
   # ============================================================================
 
+  @unimplemented
   Scenario: Displays red badge for invalid license
     Given the organization has an invalid license
     When the component renders
     Then I see a red badge with text "Invalid"
 
+  @unimplemented
   Scenario: Displays warning for expired license
     Given the organization has an expired license
     When the component renders
@@ -84,13 +102,7 @@ Feature: License Status UI Component
   # License Upload Flow
   # ============================================================================
 
-  Scenario: Shows loading state during upload
-    Given the organization has no license
-    And I enter a license key in the textarea
-    When I click "Activate License"
-    Then the button shows a loading spinner
-    And the button is disabled
-
+  @unimplemented
   Scenario: Shows success toast on successful activation
     Given the organization has no license
     And I enter a valid license key
@@ -100,6 +112,7 @@ Feature: License Status UI Component
     And the textarea is cleared
     And the license status is refreshed
 
+  @unimplemented
   Scenario: Shows error toast on failed activation
     Given the organization has no license
     And I enter an invalid license key
@@ -111,6 +124,7 @@ Feature: License Status UI Component
   # License Removal Flow
   # ============================================================================
 
+  @unimplemented
   Scenario: Shows info toast on license removal
     Given the organization has a valid license
     When I click "Remove License"
@@ -122,6 +136,7 @@ Feature: License Status UI Component
   # Loading State
   # ============================================================================
 
+  @unimplemented
   Scenario: Shows skeleton while loading status
     Given the license status is loading
     When the component renders

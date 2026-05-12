@@ -46,7 +46,7 @@ vi.stubGlobal("localStorage", localStorageMock);
 const TEST_PROJECT_ID = "test-project-123";
 const mockRouterPush = vi.fn();
 
-vi.mock("next/router", () => ({
+vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     query: { project: "test-project" },
     push: mockRouterPush,

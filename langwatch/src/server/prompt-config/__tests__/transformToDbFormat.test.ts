@@ -39,7 +39,12 @@ describe("transformToDbFormat", () => {
       const mapping = buildCamelToSnakeMapping();
 
       expect(mapping.promptingTechnique).toBe("prompting_technique");
-      expect(mapping.responseFormat).toBe("response_format");
+    });
+
+    it("does not include responseFormat (derived from outputs)", () => {
+      const mapping = buildCamelToSnakeMapping();
+
+      expect(mapping.responseFormat).toBeUndefined();
     });
   });
 
@@ -60,11 +65,11 @@ describe("transformToDbFormat", () => {
       expect(result).not.toHaveProperty("promptingTechnique");
     });
 
-    it("converts responseFormat to response_format when defined", () => {
+    it("strips responseFormat and response_format (derived from outputs)", () => {
       const input = { ...BASE_CONFIG, responseFormat: { type: "json" } };
       const result = transformCamelToSnake(input);
 
-      expect(result.response_format).toEqual({ type: "json" });
+      expect(result).not.toHaveProperty("response_format");
       expect(result).not.toHaveProperty("responseFormat");
     });
 

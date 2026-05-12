@@ -4,6 +4,7 @@
 
 import { AgentRole, type AgentInput } from "@langwatch/scenario";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { TemplateRenderError } from "../../http-template-engine";
 import type { HttpAgentData } from "../../types";
 import { SerializedHttpAgentAdapter } from "../http-agent.adapter";
 
@@ -12,9 +13,18 @@ vi.mock("~/utils/ssrfProtection", () => ({
   ssrfSafeFetch: vi.fn(),
 }));
 
+vi.mock("../../trace-context-headers", () => ({
+  injectTraceContextHeaders: vi.fn(({ headers }: { headers: Record<string, string> }) => ({
+    headers,
+    traceId: undefined,
+  })),
+}));
+
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
+import { injectTraceContextHeaders } from "../../trace-context-headers";
 
 const mockSsrfSafeFetch = vi.mocked(ssrfSafeFetch);
+const mockInjectTraceContextHeaders = vi.mocked(injectTraceContextHeaders);
 
 describe("SerializedHttpAgentAdapter", () => {
   const defaultConfig: HttpAgentData = {
@@ -31,7 +41,7 @@ describe("SerializedHttpAgentAdapter", () => {
     messages: [{ role: "user", content: "Hello" }],
     newMessages: [{ role: "user", content: "Hello" }],
     requestedRole: AgentRole.AGENT,
-    judgmentRequest: false,
+
     scenarioState: {} as AgentInput["scenarioState"],
     scenarioConfig: {} as AgentInput["scenarioConfig"],
   };
@@ -241,6 +251,299 @@ describe("SerializedHttpAgentAdapter", () => {
       const callArgs = mockSsrfSafeFetch.mock.calls[0]![1];
       const body = JSON.parse(callArgs?.body as string);
       expect(body.input).toBe("Hello");
+    });
+
+    describe("when body template contains Liquid conditions", () => {
+      it("renders if/else based on input content", async () => {
+        const config: HttpAgentData = {
+          ...defaultConfig,
+          bodyTemplate:
+            '{"mode": "{% if input contains \'search\' %}search{% else %}chat{% endif %}", "query": "{{ input }}"}',
+        };
+        const adapter = new SerializedHttpAgentAdapter(config);
+
+        const input: AgentInput = {
+          ...defaultInput,
+          messages: [{ role: "user", content: "search for cats" }],
+          newMessages: [{ role: "user", content: "search for cats" }],
+        };
+
+        await adapter.call(input);
+
+        const callArgs = mockSsrfSafeFetch.mock.calls[0]![1];
+        const body = JSON.parse(callArgs?.body as string);
+        expect(body.mode).toBe("search");
+        expect(body.query).toBe("search for cats");
+      });
+    });
+  });
+
+  describe("when scenarioMappings are on the agent config", () => {
+    /** @scenario HTTP agent adapter uses resolved fieldMappings for template variables */
+    it("merges resolved mappings into the template context, overriding defaults", async () => {
+      const config: HttpAgentData = {
+        ...defaultConfig,
+        bodyTemplate: '{"query": "{{query}}", "history": {{context}}}',
+        scenarioMappings: {
+          query: { type: "source", sourceId: "scenario", path: ["input"] },
+          context: { type: "source", sourceId: "scenario", path: ["messages"] },
+        },
+      };
+      const adapter = new SerializedHttpAgentAdapter(config);
+
+      await adapter.call(defaultInput);
+
+      const callArgs = mockSsrfSafeFetch.mock.calls[0]![1];
+      const body = JSON.parse(callArgs?.body as string);
+      expect(body.query).toBe("Hello");
+      expect(body.history).toEqual([{ role: "user", content: "Hello" }]);
+    });
+  });
+
+  describe("when no scenarioMappings are on the agent config", () => {
+    /** @scenario HTTP agent adapter falls back to legacy behavior without mappings */
+    it("falls back to legacy template context with input, messages, threadId", async () => {
+      const config: HttpAgentData = {
+        ...defaultConfig,
+        bodyTemplate: '{"input": "{{input}}", "messages": {{messages}}}',
+      };
+      const adapter = new SerializedHttpAgentAdapter(config);
+
+      await adapter.call(defaultInput);
+
+      const callArgs = mockSsrfSafeFetch.mock.calls[0]![1];
+      const body = JSON.parse(callArgs?.body as string);
+      expect(body.input).toBe("Hello");
+      expect(body.messages).toEqual([{ role: "user", content: "Hello" }]);
+    });
+  });
+
+  describe("trace ID capture", () => {
+    it("exposes captured trace ID after a request", async () => {
+      mockInjectTraceContextHeaders.mockImplementation(({ headers }) => ({
+        headers,
+        traceId: "captured_trace_id_123",
+      }));
+
+      const adapter = new SerializedHttpAgentAdapter(defaultConfig);
+      await adapter.call(defaultInput);
+
+      expect(adapter.getTraceId()).toBe("captured_trace_id_123");
+    });
+
+    it("returns undefined when no trace ID was captured", () => {
+      const adapter = new SerializedHttpAgentAdapter(defaultConfig);
+      expect(adapter.getTraceId()).toBeUndefined();
+    });
+  });
+
+  describe("trace context injection", () => {
+    it("calls injectTraceContextHeaders on each request", async () => {
+      const adapter = new SerializedHttpAgentAdapter(defaultConfig);
+
+      await adapter.call(defaultInput);
+
+      expect(mockInjectTraceContextHeaders).toHaveBeenCalledWith({
+        headers: expect.objectContaining({ "Content-Type": "application/json" }),
+      });
+    });
+
+    describe("when custom headers are configured", () => {
+      it("calls injection after custom headers are applied", async () => {
+        const config: HttpAgentData = {
+          ...defaultConfig,
+          headers: [{ key: "X-Custom", value: "custom-value" }],
+        };
+        const adapter = new SerializedHttpAgentAdapter(config);
+
+        await adapter.call(defaultInput);
+
+        expect(mockInjectTraceContextHeaders).toHaveBeenCalledWith({
+          headers: expect.objectContaining({
+            "Content-Type": "application/json",
+            "X-Custom": "custom-value",
+          }),
+        });
+      });
+    });
+  });
+
+  describe("URL template interpolation", () => {
+    it("renders {{threadId}} placeholder in url", async () => {
+      const config: HttpAgentData = {
+        ...defaultConfig,
+        url: "https://api.example.com/conversations/{{threadId}}/messages",
+      };
+      const adapter = new SerializedHttpAgentAdapter(config);
+
+      await adapter.call(defaultInput);
+
+      expect(mockSsrfSafeFetch).toHaveBeenCalledWith(
+        "https://api.example.com/conversations/thread_123/messages",
+        expect.any(Object),
+      );
+    });
+
+    it("URL-encodes interpolated values by default", async () => {
+      const config: HttpAgentData = {
+        ...defaultConfig,
+        url: "https://api.example.com/search/{{input}}",
+      };
+      const input: AgentInput = {
+        ...defaultInput,
+        messages: [{ role: "user", content: "hello world & friends?" }],
+        newMessages: [{ role: "user", content: "hello world & friends?" }],
+      };
+
+      const adapter = new SerializedHttpAgentAdapter(config);
+      await adapter.call(input);
+
+      expect(mockSsrfSafeFetch).toHaveBeenCalledWith(
+        "https://api.example.com/search/hello%20world%20%26%20friends%3F",
+        expect.any(Object),
+      );
+    });
+
+    it("does NOT URL-encode the body template (BC preserved)", async () => {
+      const config: HttpAgentData = {
+        ...defaultConfig,
+        bodyTemplate: '{"query": "{{input}}"}',
+      };
+      const input: AgentInput = {
+        ...defaultInput,
+        messages: [{ role: "user", content: "hello world & friends" }],
+        newMessages: [{ role: "user", content: "hello world & friends" }],
+      };
+
+      const adapter = new SerializedHttpAgentAdapter(config);
+      await adapter.call(input);
+
+      const callArgs = mockSsrfSafeFetch.mock.calls[0]![1];
+      const body = JSON.parse(callArgs?.body as string);
+      expect(body.query).toBe("hello world & friends");
+    });
+
+    describe("when using `| raw` filter", () => {
+      it("skips URL-encoding for raw-filtered values only", async () => {
+        const config: HttpAgentData = {
+          ...defaultConfig,
+          url: "https://api.example.com/{{threadId | raw}}/q/{{input}}",
+        };
+        const input: AgentInput = {
+          ...defaultInput,
+          threadId: "path/with/slash",
+          messages: [{ role: "user", content: "needs encoding" }],
+          newMessages: [{ role: "user", content: "needs encoding" }],
+        };
+
+        const adapter = new SerializedHttpAgentAdapter(config);
+        await adapter.call(input);
+
+        expect(mockSsrfSafeFetch).toHaveBeenCalledWith(
+          "https://api.example.com/path/with/slash/q/needs%20encoding",
+          expect.any(Object),
+        );
+      });
+    });
+
+    describe("when url has no placeholders", () => {
+      it("passes url through unchanged", async () => {
+        const adapter = new SerializedHttpAgentAdapter(defaultConfig);
+        await adapter.call(defaultInput);
+
+        expect(mockSsrfSafeFetch).toHaveBeenCalledWith(
+          "https://api.example.com/chat",
+          expect.any(Object),
+        );
+      });
+    });
+
+    describe("when url contains Liquid conditional", () => {
+      it("renders if-branch when condition is truthy via scenarioMappings", async () => {
+        const config: HttpAgentData = {
+          ...defaultConfig,
+          url: "https://api.example.com{% if conversationId %}/chat/{{conversationId}}/message{% else %}/chat/start{% endif %}",
+          scenarioMappings: {
+            conversationId: { type: "value", value: "conv-42" },
+          },
+        };
+        const adapter = new SerializedHttpAgentAdapter(config);
+
+        await adapter.call(defaultInput);
+
+        expect(mockSsrfSafeFetch).toHaveBeenCalledWith(
+          "https://api.example.com/chat/conv-42/message",
+          expect.any(Object),
+        );
+      });
+
+      it("renders else-branch when condition is falsy", async () => {
+        const config: HttpAgentData = {
+          ...defaultConfig,
+          url: "https://api.example.com{% if conversationId %}/chat/{{conversationId}}/message{% else %}/chat/start{% endif %}",
+        };
+        const adapter = new SerializedHttpAgentAdapter(config);
+
+        await adapter.call(defaultInput);
+
+        expect(mockSsrfSafeFetch).toHaveBeenCalledWith(
+          "https://api.example.com/chat/start",
+          expect.any(Object),
+        );
+      });
+    });
+
+    describe("SSRF regression", () => {
+      beforeEach(() => {
+        mockSsrfSafeFetch.mockRejectedValue(
+          new Error("Access to private IP denied"),
+        );
+      });
+
+      it.each([
+        ["localhost"],
+        ["127.0.0.1"],
+        ["169.254.169.254"],
+      ])(
+        "passes the %s-resolved url (post-render) to ssrfSafeFetch",
+        async (host) => {
+          const config: HttpAgentData = {
+            ...defaultConfig,
+            url: "https://{{input | raw}}/path",
+          };
+          const input: AgentInput = {
+            ...defaultInput,
+            messages: [{ role: "user", content: host }],
+            newMessages: [{ role: "user", content: host }],
+          };
+          const adapter = new SerializedHttpAgentAdapter(config);
+
+          await expect(adapter.call(input)).rejects.toThrow();
+
+          expect(mockSsrfSafeFetch).toHaveBeenCalledWith(
+            `https://${host}/path`,
+            expect.any(Object),
+          );
+        },
+      );
+    });
+
+    describe("when url template is malformed", () => {
+      it("throws TemplateRenderError with field=url", async () => {
+        const config: HttpAgentData = {
+          ...defaultConfig,
+          url: "https://api.example.com/{% if %}/broken",
+        };
+        const adapter = new SerializedHttpAgentAdapter(config);
+
+        await expect(adapter.call(defaultInput)).rejects.toThrow(
+          TemplateRenderError,
+        );
+
+        await expect(adapter.call(defaultInput)).rejects.toMatchObject({
+          field: "url",
+        });
+      });
     });
   });
 });

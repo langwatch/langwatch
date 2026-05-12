@@ -72,4 +72,136 @@ export class DatasetRecordRepository {
       await this.prisma.$transaction(updatePromises);
     }
   }
+
+  /**
+   * Lists records for a dataset with pagination.
+   */
+  async listPaginated(input: {
+    datasetId: string;
+    projectId: string;
+    skip: number;
+    take: number;
+  }): Promise<{ records: DatasetRecord[]; total: number }> {
+    const where = {
+      datasetId: input.datasetId,
+      projectId: input.projectId,
+    };
+
+    const [records, total] = await Promise.all([
+      this.prisma.datasetRecord.findMany({
+        where,
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        skip: input.skip,
+        take: input.take,
+      }),
+      this.prisma.datasetRecord.count({ where }),
+    ]);
+
+    return { records, total };
+  }
+
+  /**
+   * Finds a single record by id within a dataset and project.
+   */
+  async findOne(input: {
+    id: string;
+    datasetId: string;
+    projectId: string;
+  }): Promise<DatasetRecord | null> {
+    return await this.prisma.datasetRecord.findUnique({
+      where: {
+        id: input.id,
+        projectId: input.projectId,
+        datasetId: input.datasetId,
+      },
+    });
+  }
+
+  /**
+   * Updates a single record's entry.
+   */
+  async updateEntry(input: {
+    id: string;
+    datasetId: string;
+    projectId: string;
+    entry: Prisma.InputJsonValue;
+  }): Promise<DatasetRecord> {
+    return await this.prisma.datasetRecord.update({
+      where: {
+        id: input.id,
+        projectId: input.projectId,
+        datasetId: input.datasetId,
+      },
+      data: { entry: input.entry },
+    });
+  }
+
+  /**
+   * Creates a new record.
+   */
+  async create(input: {
+    id: string;
+    datasetId: string;
+    projectId: string;
+    entry: Prisma.InputJsonValue;
+  }): Promise<DatasetRecord> {
+    return await this.prisma.datasetRecord.create({
+      data: {
+        id: input.id,
+        entry: input.entry,
+        datasetId: input.datasetId,
+        projectId: input.projectId,
+      },
+    });
+  }
+
+  /**
+   * Creates multiple records in a single batch operation.
+   * Returns the created records with their generated timestamps.
+   */
+  async createMany(input: {
+    records: Array<{
+      id: string;
+      entry: Prisma.InputJsonValue;
+    }>;
+    datasetId: string;
+    projectId: string;
+  }): Promise<DatasetRecord[]> {
+    const data = input.records.map((record) => ({
+      id: record.id,
+      entry: record.entry,
+      datasetId: input.datasetId,
+      projectId: input.projectId,
+    }));
+
+    await this.prisma.datasetRecord.createMany({ data });
+
+    // Fetch the created records to return full entities with timestamps
+    return await this.prisma.datasetRecord.findMany({
+      where: {
+        id: { in: input.records.map((r) => r.id) },
+        datasetId: input.datasetId,
+        projectId: input.projectId,
+      },
+      orderBy: { createdAt: "asc" },
+    });
+  }
+
+  /**
+   * Deletes records by IDs within a dataset and project.
+   * Returns the count of deleted records.
+   */
+  async deleteMany(input: {
+    recordIds: string[];
+    datasetId: string;
+    projectId: string;
+  }): Promise<{ count: number }> {
+    return await this.prisma.datasetRecord.deleteMany({
+      where: {
+        id: { in: input.recordIds },
+        datasetId: input.datasetId,
+        projectId: input.projectId,
+      },
+    });
+  }
 }

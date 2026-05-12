@@ -8,12 +8,6 @@ Feature: License to PlanInfo Mapping
   # Basic Mapping
   # ============================================================================
 
-  Scenario: Maps license plan data to PlanInfo structure
-    Given a license with plan type "PRO" and name "Pro"
-    When I map the license to PlanInfo
-    Then the PlanInfo type is "PRO"
-    And the PlanInfo name is "Pro"
-
   Scenario: Maps all numeric limits correctly
     Given a license with:
       | maxMembers          | 5      |
@@ -64,17 +58,18 @@ Feature: License to PlanInfo Mapping
   # Constants: UNLIMITED_PLAN
   # ============================================================================
 
+  # Limits use Number.MAX_SAFE_INTEGER (effectively unlimited and JSON-safe)
+  # rather than Infinity, which serializes to null and would break tRPC.
   Scenario: UNLIMITED_PLAN has correct structure for backward compatibility
     When I access the UNLIMITED_PLAN constant
     Then the plan type is "OPEN_SOURCE"
     And the plan name is "Open Source"
     And the plan free is true
     And the plan overrideAddingLimitations is true
-    And maxMembers is 99999
-    And maxProjects is 9999
-    And maxMessagesPerMonth is 999999999
-    And evaluationsCredit is 999999
-    And maxWorkflows is 9999
+    And maxMembers is Number.MAX_SAFE_INTEGER
+    And maxProjects is Number.MAX_SAFE_INTEGER
+    And maxMessagesPerMonth is Number.MAX_SAFE_INTEGER
+    And maxWorkflows is Number.MAX_SAFE_INTEGER
     And canPublish is true
 
   # ============================================================================
@@ -86,9 +81,8 @@ Feature: License to PlanInfo Mapping
     Then the plan type is "FREE"
     And the plan name is "Free"
     And the plan free is true
-    And maxMembers is 2
+    And maxMembers is 1
     And maxProjects is 2
     And maxMessagesPerMonth is 1000
-    And evaluationsCredit is 2
-    And maxWorkflows is 1
+    And maxWorkflows is 3
     And canPublish is false

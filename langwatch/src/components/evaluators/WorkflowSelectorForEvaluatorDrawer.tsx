@@ -10,21 +10,21 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import { useCallback, useState } from "react";
 import { useForm } from "react-hook-form";
 import { LuArrowLeft } from "react-icons/lu";
 
 import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
-import { getComplexProps, useDrawer } from "~/hooks/useDrawer";
+import { getComplexProps, getFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
 import { checkCompoundLimits } from "~/hooks/useCompoundLicenseCheck";
 import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { DEFAULT_MODEL } from "~/utils/constants";
 import { trackEvent } from "~/utils/tracking";
-import { isHandledByGlobalLicenseHandler } from "~/utils/trpcError";
+import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import type { Workflow } from "~/optimization_studio/types/dsl";
 import { customEvaluatorTemplate } from "~/optimization_studio/templates/custom_evaluator";
 import { getRandomWorkflowIcon } from "~/optimization_studio/components/workflow/NewWorkflowForm";
@@ -66,8 +66,10 @@ export function WorkflowSelectorForEvaluatorDrawer(
   const emojiPicker = useDisclosure();
 
   const onClose = props.onClose ?? closeDrawer;
+  const flowCallbacks = getFlowCallbacks("workflowSelectorForEvaluator");
   const onSave =
     props.onSave ??
+    flowCallbacks?.onSave ??
     (complexProps.onSave as WorkflowSelectorForEvaluatorDrawerProps["onSave"]);
   const isOpen = props.open !== false && props.open !== undefined;
 
@@ -108,7 +110,7 @@ export function WorkflowSelectorForEvaluatorDrawer(
     },
     onError: (error) => {
       // Skip toast if error was already handled by global license modal
-      if (isHandledByGlobalLicenseHandler(error)) return;
+      if (isHandledByGlobalHandler(error)) return;
       toaster.create({
         title: "Error creating evaluator",
         description: error.message,
@@ -163,7 +165,7 @@ export function WorkflowSelectorForEvaluatorDrawer(
         );
       } catch (error) {
         // Skip toast if error was already handled by global license modal
-        if (isHandledByGlobalLicenseHandler(error)) return;
+        if (isHandledByGlobalHandler(error)) return;
         console.error("Error creating workflow evaluator:", error);
         toaster.create({
           title: "Error",
@@ -190,6 +192,7 @@ export function WorkflowSelectorForEvaluatorDrawer(
         open={isOpen}
         onOpenChange={({ open }) => !open && onClose()}
         size="md"
+        modal={false}
       >
         <Drawer.Content>
           <Drawer.CloseTrigger />

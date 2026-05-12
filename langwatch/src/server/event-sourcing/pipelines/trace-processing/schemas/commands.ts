@@ -16,6 +16,7 @@ export const recordSpanCommandDataSchema = z.object({
   resource: resourceSchema.nullable(),
   instrumentationScope: instrumentationScopeSchema.nullable(),
   piiRedactionLevel: piiRedactionLevelSchema.optional(),
+  occurredAt: z.number(),
 });
 
 export type RecordSpanCommandData = z.infer<typeof recordSpanCommandDataSchema>;
@@ -28,6 +29,60 @@ export const assignTopicCommandDataSchema = z.object({
   subtopicId: z.string().nullable(),
   subtopicName: z.string().nullable(),
   isIncremental: z.boolean(),
+  occurredAt: z.number(),
 });
 
 export type AssignTopicCommandData = z.infer<typeof assignTopicCommandDataSchema>;
+
+export const recordLogCommandDataSchema = z.object({
+  tenantId: z.string(),
+  traceId: z.string(),
+  spanId: z.string(),
+  timeUnixMs: z.number(),
+  severityNumber: z.number(),
+  severityText: z.string(),
+  body: z.string(),
+  attributes: z.record(z.string(), z.string()),
+  resourceAttributes: z.record(z.string(), z.string()),
+  scopeName: z.string(),
+  scopeVersion: z.string().nullable(),
+  piiRedactionLevel: piiRedactionLevelSchema.optional(),
+  occurredAt: z.number(),
+});
+
+export type RecordLogCommandData = z.infer<typeof recordLogCommandDataSchema>;
+
+export const metricTypeSchema = z.enum(["histogram", "gauge", "sum"]);
+export type MetricType = z.infer<typeof metricTypeSchema>;
+
+export const recordMetricCommandDataSchema = z.object({
+  tenantId: z.string(),
+  traceId: z.string(),
+  spanId: z.string(),
+  metricName: z.string(),
+  metricUnit: z.string(),
+  metricType: metricTypeSchema,
+  value: z.number(),
+  timeUnixMs: z.number(),
+  attributes: z.record(z.string(), z.string()),
+  resourceAttributes: z.record(z.string(), z.string()),
+  piiRedactionLevel: piiRedactionLevelSchema.optional(),
+  occurredAt: z.number(),
+});
+
+export type RecordMetricCommandData = z.infer<
+  typeof recordMetricCommandDataSchema
+>;
+
+export const resolveOriginCommandDataSchema = z.object({
+  tenantId: z.string(),
+  traceId: z.string(),
+  origin: z.string(),
+  reason: z.string(),
+  occurredAt: z.number(),
+});
+
+export type ResolveOriginCommandData = z.infer<
+  typeof resolveOriginCommandDataSchema
+>;
+

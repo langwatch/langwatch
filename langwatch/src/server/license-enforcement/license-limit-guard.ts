@@ -1,6 +1,8 @@
 import { TRPCError } from "@trpc/server";
 import type { RoleChangeType } from "./member-classification";
 import type { ILicenseEnforcementRepository } from "./license-enforcement.repository";
+import { getApp } from "~/server/app-layer/app";
+import { captureException } from "~/utils/posthogErrorCapture";
 
 /**
  * Error messages for license limit violations.
@@ -23,6 +25,7 @@ export interface MemberTypeLimits {
 /**
  * Asserts that a role change doesn't exceed license limits.
  * Throws TRPCError with FORBIDDEN code if limits would be exceeded.
+ * Sends a fire-and-forget Slack notification to ops before throwing.
  *
  * @throws TRPCError with code FORBIDDEN if limit exceeded
  */
@@ -40,9 +43,23 @@ export async function assertMemberTypeLimitNotExceeded(
   if (changeType === "lite-to-full") {
     const memberCount = await licenseRepo.getMemberCount(organizationId);
     if (memberCount >= limits.maxMembers) {
+      void getApp()
+        .usageLimits.notifyResourceLimitReached({
+          organizationId,
+          limitType: "members",
+          current: memberCount,
+          max: limits.maxMembers,
+        })
+        .catch(captureException);
+
       throw new TRPCError({
         code: "FORBIDDEN",
         message: LICENSE_LIMIT_ERRORS.FULL_MEMBER_LIMIT,
+        cause: {
+          limitType: "members",
+          current: memberCount,
+          max: limits.maxMembers,
+        },
       });
     }
   }
@@ -50,9 +67,23 @@ export async function assertMemberTypeLimitNotExceeded(
   if (changeType === "full-to-lite") {
     const liteCount = await licenseRepo.getMembersLiteCount(organizationId);
     if (liteCount >= limits.maxMembersLite) {
+      void getApp()
+        .usageLimits.notifyResourceLimitReached({
+          organizationId,
+          limitType: "membersLite",
+          current: liteCount,
+          max: limits.maxMembersLite,
+        })
+        .catch(captureException);
+
       throw new TRPCError({
         code: "FORBIDDEN",
         message: LICENSE_LIMIT_ERRORS.MEMBER_LITE_LIMIT,
+        cause: {
+          limitType: "membersLite",
+          current: liteCount,
+          max: limits.maxMembersLite,
+        },
       });
     }
   }

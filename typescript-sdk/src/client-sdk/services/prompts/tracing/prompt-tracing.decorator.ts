@@ -32,12 +32,13 @@ export class PromptTracingDecorator {
 
     const result = compileFn();
 
-    span.setAttributes({
-      'langwatch.prompt.id': result.id,
-      'langwatch.prompt.handle': result.handle ?? '',
-      'langwatch.prompt.version.id': result.versionId,
-      'langwatch.prompt.version.number': result.version,
-    });
+    // Only emit combined handle:version format when both are available
+    if (result.handle != null && result.version != null) {
+      span.setAttribute(
+        'langwatch.prompt.id',
+        `${result.handle}:${result.version}`,
+      );
+    }
 
     if (shouldCaptureOutput()) {
       span.setOutput({

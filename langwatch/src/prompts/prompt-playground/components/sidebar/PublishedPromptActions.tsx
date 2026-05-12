@@ -1,7 +1,7 @@
 import { Box, Button, Text } from "@chakra-ui/react";
 import { useCallback, useState } from "react";
 import { ArrowUp, Copy, RefreshCw } from "react-feather";
-import { LuEllipsisVertical, LuPencil, LuTrash2 } from "react-icons/lu";
+import { LuClock, LuEllipsisVertical, LuPencil, LuTrash2 } from "react-icons/lu";
 import { DeleteConfirmationDialog } from "~/components/annotations/DeleteConfirmationDialog";
 import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
@@ -11,8 +11,11 @@ import { CopyPromptDialog } from "~/prompts/components/CopyPromptDialog";
 import { PushToCopiesDialog } from "~/prompts/components/PushToCopiesDialog";
 import { usePrompts } from "~/prompts/hooks/usePrompts";
 import { useRenamePromptHandle } from "~/prompts/hooks/useRenamePromptHandle";
+import { computeInitialFormValuesForPrompt } from "~/prompts/utils/computeInitialFormValuesForPrompt";
+import { useDraggableTabsBrowserStore } from "../../prompt-playground-store/DraggableTabsBrowserStore";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import { api } from "~/utils/api";
+import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { getDisplayHandle } from "./PublishedPromptsList";
 
 interface PublishedPromptActionsProps {
@@ -36,13 +39,12 @@ export function PublishedPromptActions({
     useState(false);
   const { deletePrompt } = usePrompts();
   const { project, hasPermission } = useOrganizationTeamProject();
+  const { addTab } = useDraggableTabsBrowserStore(({ addTab }) => ({ addTab }));
   const {
     renameHandle,
     canRename,
     permissionReason: renamePermissionReason,
   } = useRenamePromptHandle({ promptId });
-  const hasPromptsCreatePermission = hasPermission("prompts:create");
-  const hasPromptsUpdatePermission = hasPermission("prompts:update");
 
   const syncFromSource = api.prompts.syncFromSource.useMutation();
   const utils = api.useContext();
@@ -70,6 +72,7 @@ export function PublishedPromptActions({
         },
       });
     } catch (error) {
+      if (isHandledByGlobalHandler(error)) return;
       toaster.create({
         title: "Error updating prompt",
         description:
@@ -108,6 +111,7 @@ export function PublishedPromptActions({
         type: "success",
       });
     } catch (error) {
+      if (isHandledByGlobalHandler(error)) return;
       toaster.create({
         title: "Failed to delete prompt",
         description:
@@ -139,75 +143,57 @@ export function PublishedPromptActions({
           </Menu.Trigger>
           <Menu.Content onClick={(event) => event.stopPropagation()}>
             {isCopiedPrompt && (
-              <Tooltip
-                content={
-                  !hasPromptsUpdatePermission
-                    ? "You need prompts:update permission to sync from source"
-                    : undefined
-                }
-                disabled={hasPromptsUpdatePermission}
-                positioning={{ placement: "right" }}
-                showArrow
-              >
                 <Menu.Item
                   value="sync"
-                  onClick={
-                    hasPromptsUpdatePermission
-                      ? () => void onSyncFromSource()
-                      : undefined
-                  }
-                  disabled={!hasPromptsUpdatePermission}
+                  onClick={() => void onSyncFromSource()}
                 >
                   <RefreshCw size={16} /> Update from source
                 </Menu.Item>
-              </Tooltip>
             )}
             {hasCopies && (
-              <Tooltip
-                content={
-                  !hasPromptsUpdatePermission
-                    ? "You need prompts:update permission to push to replicas"
-                    : undefined
-                }
-                disabled={hasPromptsUpdatePermission}
-                positioning={{ placement: "right" }}
-                showArrow
-              >
                 <Menu.Item
                   value="push"
-                  onClick={
-                    hasPromptsUpdatePermission
-                      ? () => setIsPushToCopiesDialogOpen(true)
-                      : undefined
-                  }
-                  disabled={!hasPromptsUpdatePermission}
+                  onClick={() => setIsPushToCopiesDialogOpen(true)}
                 >
                   <ArrowUp size={16} /> Push to replicas
                 </Menu.Item>
-              </Tooltip>
             )}
-            <Tooltip
-              content={
-                !hasPromptsCreatePermission
-                  ? "You need prompts:create permission to replicate prompts"
-                  : undefined
-              }
-              disabled={hasPromptsCreatePermission}
-              positioning={{ placement: "right" }}
-              showArrow
-            >
               <Menu.Item
                 value="copy"
-                onClick={
-                  hasPromptsCreatePermission
-                    ? () => setIsCopyDialogOpen(true)
-                    : undefined
-                }
-                disabled={!hasPromptsCreatePermission}
+                onClick={() => setIsCopyDialogOpen(true)}
               >
                 <Copy size={16} /> Replicate to another project
               </Menu.Item>
-            </Tooltip>
+            <Menu.Item
+              value="view-history"
+              onClick={() => {
+                if (!prompt) return;
+                const projectDefaultModel = project?.defaultModel;
+                const normalizedDefaultModel =
+                  typeof projectDefaultModel === "string"
+                    ? projectDefaultModel
+                    : undefined;
+                const defaultValues = computeInitialFormValuesForPrompt({
+                  prompt,
+                  defaultModel: normalizedDefaultModel,
+                  useSystemMessage: true,
+                });
+                addTab({
+                  data: {
+                    chat: { initialMessagesFromSpanData: [] },
+                    form: { currentValues: defaultValues },
+                    meta: {
+                      title: defaultValues.handle ?? null,
+                      versionNumber: defaultValues.versionMetadata?.versionNumber,
+                      openHistoryOnLoad: true,
+                    },
+                    variableValues: {},
+                  },
+                });
+              }}
+            >
+              <LuClock size={16} /> View history
+            </Menu.Item>
             <Tooltip
               content={renamePermissionReason}
               disabled={canRename}

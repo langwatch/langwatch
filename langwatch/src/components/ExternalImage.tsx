@@ -22,7 +22,7 @@ export const getImageUrl = (str: unknown): string | null => {
   if (str_.startsWith("data:image/")) {
     const base64Regex =
       /^data:image\/(jpeg|jpg|gif|png|webp|svg\+xml|bmp);base64,/i;
-    return str_.match(base64Regex)?.[0] ?? null;
+    return base64Regex.test(str_) ? str_ : null;
   }
 
   try {
@@ -38,10 +38,12 @@ export const getImageUrl = (str: unknown): string | null => {
     }
 
     // Check if url is from commonly used image hosting sites which don't end up in the imageExtensionRegex
-    if (
-      url_.hostname.endsWith("gstatic.com") ||
-      url_.hostname.endsWith("googleusercontent.com")
-    ) {
+    const isGoogleImageHost = (hostname: string) =>
+      hostname === "gstatic.com" ||
+      hostname.endsWith(".gstatic.com") ||
+      hostname === "googleusercontent.com" ||
+      hostname.endsWith(".googleusercontent.com");
+    if (isGoogleImageHost(url_.hostname)) {
       return str_;
     }
 
@@ -78,7 +80,7 @@ export const getProxiedImageUrl = (url: string): string => {
   if (url.startsWith("data:")) return url;
   if (url.startsWith("/")) return url;
 
-  return `/image-proxy?url=${encodeURIComponent(url)}`;
+  return `/api/image-proxy?url=${encodeURIComponent(url)}`;
 };
 
 export const ExternalImage = ({

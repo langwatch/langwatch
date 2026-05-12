@@ -1596,7 +1596,7 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
           datasetColumns,
           loadedPrompts: new Map(),
           loadedAgents: new Map(),
-          saveToEs: true, // Enable ES storage!
+          // ES storage removed — ClickHouse is the sole data store
         };
 
         const events = await collectEvents(input);
@@ -1728,7 +1728,7 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
           datasetColumns,
           loadedPrompts: new Map(),
           loadedAgents: new Map(),
-          saveToEs: false, // Explicitly disabled
+          // ES storage removed — ClickHouse is the sole data store
         };
 
         const events = await collectEvents(input);
@@ -1831,6 +1831,7 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
           outputs: [{ identifier: "output", type: "str" }],
           updatedAt: new Date(),
           createdAt: new Date(),
+          tags: [],
         };
 
         // Create loadedPrompts map with our mock prompt
@@ -1846,7 +1847,6 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
           datasetColumns,
           loadedPrompts, // Pass loaded prompts
           loadedAgents: new Map(),
-          saveToEs: true,
         };
 
         const events = await collectEvents(input);
@@ -2004,7 +2004,6 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
           loadedPrompts: new Map(),
           loadedAgents: new Map(),
           loadedEvaluators,
-          saveToEs: true,
         };
 
         const events = await collectEvents(input);
@@ -2140,7 +2139,6 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
           datasetColumns,
           loadedPrompts: new Map(),
           loadedAgents: new Map(),
-          saveToEs: true,
         };
 
         const events = await collectEvents(input);

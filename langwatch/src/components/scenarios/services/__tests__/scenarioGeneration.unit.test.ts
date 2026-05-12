@@ -12,7 +12,6 @@ describe("generateScenarioWithAI()", () => {
     name: "Test Scenario",
     situation: "Test situation",
     criteria: ["criterion 1"],
-    labels: ["test"],
   };
 
   beforeEach(() => {
@@ -68,7 +67,6 @@ describe("generateScenarioWithAI()", () => {
         name: "Current",
         situation: "Current situation",
         criteria: ["existing"],
-        labels: ["label"],
       };
 
       await generateScenarioWithAI(
@@ -123,6 +121,42 @@ describe("generateScenarioWithAI()", () => {
       await expect(
         generateScenarioWithAI("test prompt", "project-123", null)
       ).rejects.toThrow("Invalid response: missing scenario data");
+    });
+
+    it("throws error when criteria contains objects instead of strings", async () => {
+      const malformedScenario = {
+        name: "Test Scenario",
+        situation: "A situation",
+        criteria: [
+          { criterion: "Agent acknowledges the error" },
+          { criterion: "Agent offers a solution" },
+        ],
+      };
+
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ scenario: malformedScenario }),
+      });
+
+      await expect(
+        generateScenarioWithAI("test prompt", "project-123", null)
+      ).rejects.toThrow("Invalid scenario data");
+    });
+
+    it("throws error when name is missing", async () => {
+      const malformedScenario = {
+        situation: "A situation",
+        criteria: ["criterion 1"],
+      };
+
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ scenario: malformedScenario }),
+      });
+
+      await expect(
+        generateScenarioWithAI("test prompt", "project-123", null)
+      ).rejects.toThrow("Invalid scenario data");
     });
   });
 });

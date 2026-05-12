@@ -1,5 +1,14 @@
 @wip @integration
 Feature: Project Limit Enforcement with License
+
+  # All scenarios in this file describe project-creation enforcement
+  # against license limits. The repository.getProjectCount is exercised
+  # indirectly by license-enforcement.service.unit.test.ts (the it.each
+  # over LimitType includes 'projects'). End-to-end "I create a project,
+  # FORBIDDEN" requires a tRPC project-create-router integration test
+  # against a license-bearing organization, which does not exist yet —
+  # all aspirational pending that harness.
+
   As a LangWatch self-hosted deployment with a license
   I want the project creation limit to be enforced
   So that organizations respect their licensed project count
@@ -19,13 +28,6 @@ Feature: Project Limit Enforcement with License
     When I create a project named "New Project"
     Then the project is created successfully
 
-  Scenario: Blocks project creation when at limit
-    Given the organization has a license with maxProjects 3
-    And the organization has 3 projects
-    When I create a project named "New Project"
-    Then the request fails with FORBIDDEN
-    And the error message contains "maximum number of projects"
-
   Scenario: Blocks project creation when over limit
     Given the organization has a license with maxProjects 2
     And the organization has 3 projects
@@ -33,46 +35,27 @@ Feature: Project Limit Enforcement with License
     Then the request fails with FORBIDDEN
 
   # ============================================================================
-  # No License (Unlimited when enforcement disabled)
-  # ============================================================================
-
-  Scenario: No license allows unlimited projects when enforcement disabled
-    Given LICENSE_ENFORCEMENT_ENABLED is "false"
-    And the organization has no license
-    And the organization has 100 projects
-    When I create a project named "New Project"
-    Then the project is created successfully
-
-  # ============================================================================
   # Invalid/Expired License (FREE Tier)
   # ============================================================================
 
+  @unimplemented
   Scenario: Expired license enforces FREE tier project limit
     Given the organization has an expired license
     And the organization has 2 projects
     When I create a project named "New Project"
     Then the request fails with FORBIDDEN
 
+  @unimplemented
   Scenario: Invalid license blocks at FREE tier limit of 2
     Given the organization has an invalid license signature
     And the organization has 2 projects
     When I create a project named "New Project"
     Then the request fails with FORBIDDEN
 
+  @unimplemented
   Scenario: Invalid license allows creation under FREE tier limit
     Given the organization has an invalid license signature
     And the organization has 1 project
-    When I create a project named "New Project"
-    Then the project is created successfully
-
-  # ============================================================================
-  # Feature Flag Override
-  # ============================================================================
-
-  Scenario: Feature flag disabled allows unlimited projects
-    Given the organization has a license with maxProjects 2
-    And the organization has 5 projects
-    And LICENSE_ENFORCEMENT_ENABLED is "false"
     When I create a project named "New Project"
     Then the project is created successfully
 

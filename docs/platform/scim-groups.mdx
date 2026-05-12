@@ -1,0 +1,187 @@
+---
+title: "SCIM Groups & Role Mapping"
+description: "Automatically assign roles to users in LangWatch based on groups pushed from your identity provider."
+sidebarTitle: SCIM Groups
+keywords: scim, groups, role mapping, provisioning, okta, azure ad, entra id, identity provider, rbac, access control
+---
+
+SCIM Groups allow your identity provider to push group memberships into LangWatch. Admins can then map those groups to specific roles at the organization, team, or project level — so users automatically get the right access the moment they are provisioned.
+
+<Info>
+  SCIM Groups are an **Enterprise** feature. See [SCIM Provisioning](/platform/scim) for setting up user provisioning first.
+</Info>
+
+---
+
+## How It Works
+
+1. Your identity provider pushes groups to LangWatch via the SCIM `/Groups` endpoint
+2. Groups appear in **Settings → Groups** in LangWatch
+3. Admins assign role bindings to each group (e.g. _MEMBER on Team Engineering_)
+4. When a user is added to the group in the IdP, they inherit all roles assigned to that group
+5. When a user is removed from the group (or deprovisioned), access is revoked automatically
+
+---
+
+## Viewing Groups
+
+Navigate to **Settings → Groups** to see all groups pushed from your identity provider. Each row shows:
+
+| Column | Description |
+|--------|-------------|
+| **Group** | The group name as defined in your IdP |
+| **Source** | `SCIM` for IdP-managed groups, `Manual` for manually created groups |
+| **Access** | The role bindings assigned to this group |
+| **Members** | Number of users currently in the group |
+
+Click any group row to open the detail panel where you can manage bindings and members.
+
+---
+
+## Assigning Roles to a Group
+
+Open a group and use the **Access granted** section to add role bindings:
+
+1. Select a **role** (Admin, Member, Viewer, or a custom role)
+2. Select the **scope** — Organization, Team, or Project
+3. Select the specific team or project (for Team/Project scope)
+4. Click **Add**
+
+<Tip>
+  You can add multiple bindings to a single group — for example, _Member on the whole organization_ plus _Admin on Team Platform_.
+</Tip>
+
+### Role Scopes
+
+| Scope | What it grants |
+|-------|---------------|
+| **Organization** | Access across the entire organization at the specified role level |
+| **Team** | Access to a specific team and all its projects |
+| **Project** | Access to a single project only |
+
+---
+
+## Role Resolution
+
+A user may belong to multiple groups, each with different role assignments. LangWatch resolves the effective role using the **highest privilege wins** rule:
+
+**Hierarchy:** `ADMIN > MEMBER > VIEWER`
+
+If a user is in:
+- Group A → Member on Team Engineering
+- Group B → Admin on Team Engineering
+
+They receive **Admin** on Team Engineering.
+
+For custom roles: if a user only has custom role assignments (no built-in roles), the custom role is used. If they have both built-in and custom roles, the built-in hierarchy takes precedence.
+
+The most specific scope always applies — a project-level binding overrides a team-level binding for that project.
+
+---
+
+## User Lifecycle with Groups
+
+### When a User is Added to a Group
+
+The user immediately inherits all role bindings assigned to that group. If they were not yet a member of your LangWatch organization, they are provisioned as a **Member** first (see [User Provisioning](/platform/scim#provisioning-create)).
+
+### When a User is Removed from a Group
+
+Their group-inherited roles are removed. If they have no other active bindings, they will have no project or team access but remain in the organization.
+
+### When a User is Deprovisioned (DELETE)
+
+When your IdP sends a SCIM DELETE for a user:
+
+- Their org membership and all role bindings are **removed**
+- Their account is **deactivated** — they can no longer sign in
+- Their data (traces, annotations, datasets) is **preserved**
+
+A second DELETE for the same user returns `404 Not Found` — the operation is idempotent.
+
+### When a User is Suspended (PATCH active=false)
+
+When your IdP suspends a user (sets `active: false`):
+
+- Their account is **deactivated** — they can no longer sign in
+- Their org membership and role bindings are **preserved**
+- Re-activating (`active: true`) immediately restores access
+
+<Info>
+  Use `PATCH active=false` for temporary suspension (e.g. leave of absence). Use DELETE for permanent offboarding. The distinction matters because DELETE removes all role bindings and group memberships — re-provisioning the user starts from scratch.
+</Info>
+
+---
+
+## Manual Groups
+
+You can also create groups manually without an identity provider:
+
+1. In **Settings → Groups**, click **Add manual group** at the bottom of the table
+2. Enter a group name
+3. Optionally add role bindings and members in the creation dialog
+4. Click **Create group**
+
+Manual groups behave identically to SCIM groups for role assignment. Members must already be in your organization to be added.
+
+<Note>
+  Manual groups are not synced with any identity provider. Membership must be managed from within LangWatch.
+</Note>
+
+---
+
+## SCIM Group Endpoints
+
+LangWatch supports the following SCIM group operations:
+
+| Endpoint | Methods |
+|----------|---------|
+| `/api/scim/v2/Groups` | `GET`, `POST` |
+| `/api/scim/v2/Groups/{id}` | `GET`, `PUT`, `PATCH`, `DELETE` |
+
+### Supported PATCH Operations
+
+| Operation | Example | Effect |
+|-----------|---------|--------|
+| `add members` | Add users to group | Users inherit group's roles |
+| `remove members` | Remove users from group | Roles revoked for removed users |
+| `replace displayName` | Rename the group | Group name updated in LangWatch |
+| `replace members` | Full member replacement | Adds new, removes old members |
+
+### Supported Filter
+
+Groups can be filtered by `displayName` using a case-insensitive `eq` filter:
+
+```
+GET /api/scim/v2/Groups?filter=displayName eq "Engineering"
+```
+
+---
+
+## Troubleshooting
+
+**Groups are not appearing in LangWatch**
+
+- Confirm that group push (SCIM provisioning of groups) is enabled in your IdP's application settings
+- Check your IdP's provisioning logs for errors on the Groups endpoint
+- Verify your bearer token has not been revoked
+
+**Users in a group have no access**
+
+- Open the group in **Settings → Groups** and check the **Access granted** section
+- If empty, add at least one role binding to the group
+- Confirm the user appears in the group's **Members** list
+
+**User has more access than expected**
+
+- The user may be in multiple groups — check all group memberships in your IdP
+- Direct role bindings on the user (from **Settings → Members**) also apply and are combined with group bindings
+
+**Removing a user from a group in the IdP has no effect**
+
+- Ensure your IdP is configured to push group membership changes (not just user changes)
+- Check provisioning logs for any errors on the PATCH groups endpoint
+
+---
+
+For additional help, contact us at [support@langwatch.ai](mailto:support@langwatch.ai).

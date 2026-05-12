@@ -1,6 +1,5 @@
 import { prisma } from "~/server/db";
-import type { Trace } from "~/server/tracer/types";
-import type { TraceGroups, TriggerData } from "./types";
+import type { TriggerData } from "./types";
 
 export const updateAlert = async (
   triggerId: string,
@@ -48,33 +47,6 @@ export const addTriggersSent = async (
       },
     });
   }
-};
-
-export const triggerSentForMany = async (
-  triggerId: string,
-  traceIds: string[],
-  projectId: string,
-) => {
-  const triggerSent = await prisma.triggerSent.findMany({
-    where: {
-      triggerId,
-      traceId: { in: traceIds },
-      projectId,
-    },
-  });
-  return triggerSent;
-};
-
-export const getLatestUpdatedAt = (traces: TraceGroups): number | undefined => {
-  const updatedTimes = traces.groups
-    .flatMap((group: Trace[]) =>
-      group
-        .map((item: Trace) => item.timestamps?.updated_at)
-        .filter((timestamp): timestamp is number => timestamp !== undefined),
-    )
-    .sort((a: number, b: number) => b - a);
-
-  return updatedTimes[0];
 };
 
 export const checkThreshold = (

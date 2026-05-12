@@ -53,6 +53,16 @@ const labelsMapping: Partial<
   },
 };
 
+/**
+ * ES range aggregation buckets use the user-defined key (e.g. "previous"/"current")
+ * as `key_as_string`, not a date. This swaps it with `from_as_string` so downstream
+ * code that expects a date string in `key_as_string` works correctly.
+ */
+export const rangeBucketWithDate = (bucket: any): any => ({
+  ...bucket,
+  key_as_string: bucket?.from_as_string,
+});
+
 export const timeseries = async (input: TimeseriesInputType) => {
   if (env.IS_QUICKWIT) {
     // TODO: Remove this once Quickwit v0.9 is released as it supports cardinality
@@ -69,8 +79,12 @@ export const timeseries = async (input: TimeseriesInputType) => {
       typeof input.timeScale === "number" ? input.timeScale : undefined,
     );
 
-  // Calculate total time span in minutes
-  const totalMinutes = (endDate.getTime() - startDate.getTime()) / (1000 * 60);
+  // Calculate total time span in minutes, clamping to 1 minute minimum
+  // to prevent negative or zero values from inverted date ranges
+  const totalMinutes = Math.max(
+    1,
+    (endDate.getTime() - startDate.getTime()) / (1000 * 60),
+  );
 
   // Adjust timeScale to avoid too many buckets (max 1000 buckets)
   let adjustedTimeScale = input.timeScale;
@@ -173,7 +187,7 @@ export const timeseries = async (input: TimeseriesInputType) => {
             [filtersWrapperKey]: {
               filter: {
                 bool: {
-                  must: generateFilterConditions(filters ?? {}),
+                  must: generateFilterConditions(filters ?? {}).filterConditions,
                 } as QueryDslBoolQuery,
               },
               aggs: aggregationQuery,
@@ -361,8 +375,12 @@ export const timeseries = async (input: TimeseriesInputType) => {
       );
 
     return {
-      previousPeriod: parseAggregations([previous]),
-      currentPeriod: parseAggregations([current]),
+      previousPeriod: parseAggregations([
+        rangeBucketWithDate(previous),
+      ]),
+      currentPeriod: parseAggregations([
+        rangeBucketWithDate(current),
+      ]),
     };
   }
 

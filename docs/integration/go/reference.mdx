@@ -1,0 +1,723 @@
+---
+title: Go SDK API Reference
+sidebarTitle: Reference
+description: Complete API reference for the LangWatch Go SDK, including core functions, OpenAI instrumentation, and span types.
+icon: terminal
+keywords: go, golang, sdk, api, reference, documentation, langwatch, opentelemetry, tracer, span
+---
+
+This reference provides detailed documentation for all public APIs in the LangWatch Go SDK and its associated instrumentation packages.
+
+## Installation
+
+```bash
+go get github.com/langwatch/langwatch/sdk-go
+go get github.com/langwatch/langwatch/sdk-go/instrumentation/openai
+```
+
+<Tip>
+For a quick start guide with step-by-step instructions, see the [Go Integration Guide](/integration/go/guide). For practical examples of creating traces and spans, see the [Core Concepts section](/integration/go/guide#core-concepts) in the guide.
+</Tip>
+
+## Core SDK (`langwatch`)
+
+### Setup
+
+Create a LangWatch exporter and configure it as your tracer provider:
+
+```go
+func setupLangWatch(ctx context.Context) func(context.Context) {
+	exporter, err := langwatch.NewDefaultExporter(ctx)
+	if err != nil {
+		log.Fatalf("failed to create exporter: %v", err)
+	}
+
+	tp := sdktrace.NewTracerProvider(sdktrace.WithBatcher(exporter))
+	otel.SetTracerProvider(tp)
+
+	return func(ctx context.Context) {
+		if err := tp.Shutdown(ctx); err != nil {
+			log.Printf("Error shutting down: %v", err)
+		}
+	}
+}
+```
+
+The exporter reads `LANGWATCH_API_KEY` from your environment automatically.
+
+<Warning>
+**Always call shutdown!** Traces are buffered in memory before being sent. Without `defer shutdown(ctx)`, your traces will be lost when the application exits. This is critical for CLI tools, serverless functions, and any short-lived process.
+</Warning>
+
+For custom configuration, use `NewExporter` with options:
+
+```go
+exporter, err := langwatch.NewExporter(ctx,
+	langwatch.WithAPIKey("your-api-key"),
+	langwatch.WithEndpoint("https://custom.endpoint.ai"),
+	langwatch.WithFilters(langwatch.LangWatchOnly()),
+)
+```
+
+| Option | Description |
+| --- | --- |
+| `WithAPIKey(key)` | Set API key (defaults to `LANGWATCH_API_KEY` env var) |
+| `WithEndpoint(url)` | Set endpoint (defaults to `https://app.langwatch.ai`) |
+| `WithFilters(...)` | Apply span filters (see [Filtering](#filtering)) |
+
+### Tracer
+
+`Tracer()` retrieves a `LangWatchTracer` instance, which is a thin wrapper around an OpenTelemetry `Tracer`.
+
+```go
+func Tracer(instrumentationName string, opts ...trace.TracerOption) LangWatchTracer
+```
+
+| Parameter | Type | Description |
+| --- | --- | --- |
+| `instrumentationName` | `string` | Name of the library or application being instrumented. |
+| `opts` | `...trace.TracerOption`| Optional OpenTelemetry tracer options (e.g., `trace.WithInstrumentationVersion`). |
+
+**Example:**
+```go
+// Basic usage
+tracer := langwatch.Tracer("my-app")
+
+// With instrumentation version
+tracer := langwatch.Tracer("my-app", 
+    trace.WithInstrumentationVersion("1.0.0"))
+```
+
+### LangWatchTracer
+
+The `LangWatchTracer` interface provides a `Start` method that mirrors OpenTelemetry's but returns a `LangWatchSpan`.
+
+```go
+type LangWatchTracer interface {
+	Start(ctx context.Context, spanName string, opts ...trace.SpanStartOption) (context.Context, LangWatchSpan)
+}
+```
+
+**Example:**
+```go
+tracer := langwatch.Tracer("my-app")
+ctx, span := tracer.Start(ctx, "HandleUserRequest")
+defer span.End()
+
+// The span is now active and can be used to record data
+span.SetType(langwatch.SpanTypeLLM)
+span.RecordInputString("User query")
+```
+
+### LangWatchSpan
+
+The `LangWatchSpan` interface embeds the standard `trace.Span` and adds several helper methods for LangWatch-specific data.
+
+<ParamField path="SetType(spanType SpanType)" type="function">
+  Sets the span type for categorization in LangWatch. This enables specialized UI treatment and analytics.
+  
+  **Example:**
+  ```go
+  span.SetType(langwatch.SpanTypeLLM)        // For LLM calls
+  span.SetType(langwatch.SpanTypeRAG)        // For RAG operations
+  span.SetType(langwatch.SpanTypeRetrieval)  // For document retrieval
+  span.SetType(langwatch.SpanTypeTool)       // For tool/function calls
+  ```
+  
+  <Tip>
+  Using span types is optional but highly recommended as it enables LangWatch to provide more tailored insights and visualizations.
+  </Tip>
+</ParamField>
+
+<ParamField path="SetThreadID(threadID string)" type="function">
+  Assigns a thread ID to group this trace with a conversation. Useful for multi-turn conversations.
+  
+  **Example:**
+  ```go
+  span.SetThreadID("conversation-123")
+  span.SetThreadID("user-session-abc-def")
+  ```
+  
+  <Note>
+  All spans within the same trace will share the same thread ID, allowing you to group related interactions together.
+  </Note>
+</ParamField>
+
+<ParamField path="SetUserID(userID string)" type="function">
+  Assigns a user ID to the trace for user-centric analytics and filtering.
+  
+  **Example:**
+  ```go
+  span.SetUserID("user-abc-123")
+  span.SetUserID("customer-xyz-789")
+  ```
+</ParamField>
+
+<ParamField path="RecordInputString(input string)" type="function">
+  Records a simple string as the span's input. Ideal for user queries or simple text inputs.
+  
+  **Example:**
+  ```go
+  span.RecordInputString("What is the weather like today?")
+  span.RecordInputString("User query text")
+  ```
+</ParamField>
+
+<ParamField path="RecordInput(input any)" type="function">
+  Records a structured object (e.g., struct, map) as the span's input, serialized to JSON. Use for complex request objects.
+  
+  **Example:**
+  ```go
+  type ChatRequest struct {
+      Messages []Message `json:"messages"`
+      Model    string   `json:"model"`
+      Temperature float64 `json:"temperature"`
+  }
+  
+  request := ChatRequest{
+      Messages: []Message{{Role: "user", Content: "Hello"}},
+      Model: "gpt-4o-mini",
+      Temperature: 0.7,
+  }
+  span.RecordInput(request)
+  ```
+</ParamField>
+
+<ParamField path="RecordOutputString(output string)" type="function">
+  Records a simple string as the span's output. Ideal for AI responses or simple text outputs.
+  
+  **Example:**
+  ```go
+  span.RecordOutputString("The capital of France is Paris.")
+  span.RecordOutputString("AI response text")
+  ```
+</ParamField>
+
+<ParamField path="RecordOutput(output any)" type="function">
+  Records a structured object as the span's output, serialized to JSON. Use for complex response objects.
+  
+  **Example:**
+  ```go
+  type ChatResponse struct {
+      Content string `json:"content"`
+      Tokens  int    `json:"tokens"`
+      Model   string `json:"model"`
+  }
+  
+  response := ChatResponse{
+      Content: "The capital of France is Paris.",
+      Tokens: 8,
+      Model: "gpt-4o-mini",
+  }
+  span.RecordOutput(response)
+  ```
+</ParamField>
+
+<ParamField path="SetRequestModel(model string)" type="function">
+  Sets the model identifier used for a request (e.g., an LLM call). This is the model you requested to use.
+  
+  **Example:**
+  ```go
+  span.SetRequestModel("gpt-4o-mini")
+  span.SetRequestModel("claude-3-sonnet")
+  span.SetRequestModel("llama-3.1-8b")
+  ```
+</ParamField>
+
+<ParamField path="SetResponseModel(model string)" type="function">
+  Sets the model identifier reported in a response. This is the actual model that processed your request.
+  
+  **Example:**
+  ```go
+  span.SetResponseModel("gpt-4o-mini-2024-07-18")
+  span.SetResponseModel("claude-3-sonnet-20240229")
+  ```
+  
+  <Note>
+  The response model may differ from the request model, especially with OpenAI's model updates.
+  </Note>
+</ParamField>
+
+<ParamField path="SetRAGContextChunks(chunks []SpanRAGContextChunk)" type="function">
+  Attaches a slice of retrieved context chunks for RAG analysis. This enables LangWatch to analyze the relevance and quality of retrieved documents.
+  
+  **Example:**
+  ```go
+  chunks := []langwatch.SpanRAGContextChunk{
+      {
+          Content: "Paris is the capital of France...",
+          Source: "wikipedia-paris",
+          Score: 0.95,
+      },
+      {
+          Content: "France is a country in Europe...",
+          Source: "wikipedia-france", 
+          Score: 0.87,
+      },
+  }
+  span.SetRAGContextChunks(chunks)
+  ```
+</ParamField>
+
+## OpenAI Instrumentation
+
+The `github.com/langwatch/langwatch/sdk-go/instrumentation/openai` package provides middleware for the official `openai-go` client.
+
+<Tip>
+For step-by-step instructions on setting up OpenAI instrumentation, see the [OpenAI integration guide](/integration/go/integrations/open-ai).
+</Tip>
+
+### Middleware
+
+`Middleware()` creates an `openai.Middleware` that automatically traces OpenAI API calls.
+
+```go
+func Middleware(instrumentationName string, opts ...Option) openai.Middleware
+```
+
+**Parameters:**
+- `instrumentationName` - Name of your application or service
+- `opts` - Optional configuration options
+
+**Configuration Options (`...Option`):**
+
+<ParamField path="WithCaptureInput()" type="function">
+  Records the full input payload as a span attribute. This captures the complete request sent to the LLM.
+  
+  **Example:**
+  ```go
+  otelopenai.Middleware("my-app", otelopenai.WithCaptureInput())
+  ```
+  
+  <Warning>
+  Enabling input capture may include sensitive data in your traces. Ensure this aligns with your data privacy requirements.
+  </Warning>
+</ParamField>
+
+<ParamField path="WithCaptureOutput()" type="function">
+  Records the full response payload as a span attribute. For streams, this is the final accumulated response.
+  
+  **Example:**
+  ```go
+  otelopenai.Middleware("my-app", otelopenai.WithCaptureOutput())
+  ```
+  
+  <Tip>
+  This is particularly useful for debugging and understanding what the LLM actually returned.
+  </Tip>
+</ParamField>
+
+<ParamField path="WithGenAISystem(system string)" type="function">
+  Sets the `gen_ai.system` attribute. Useful for identifying providers like `"anthropic"` or `"azure"`. Defaults to `"openai"`.
+  
+  **Example:**
+  ```go
+  // For Anthropic Claude
+  otelopenai.Middleware("my-app", otelopenai.WithGenAISystem("anthropic"))
+  
+  // For Azure OpenAI
+  otelopenai.Middleware("my-app", otelopenai.WithGenAISystem("azure"))
+  ```
+</ParamField>
+
+<ParamField path="WithTracerProvider(provider trace.TracerProvider)" type="function">
+  Specifies the `trace.TracerProvider` to use. Defaults to the global provider.
+  
+  **Example:**
+  ```go
+  customProvider := sdktrace.NewTracerProvider(...)
+  otelopenai.Middleware("my-app", otelopenai.WithTracerProvider(customProvider))
+  ```
+</ParamField>
+
+## Filtering
+
+Control which spans are exported to reduce noise and focus on what matters.
+
+### Preset Filters
+
+```go
+// NewDefaultExporter automatically uses ExcludeHTTPRequests
+exporter, err := langwatch.NewDefaultExporter(ctx)
+
+// Or choose your own filters
+exporter, err := langwatch.NewExporter(ctx,
+	langwatch.WithFilters(
+		langwatch.ExcludeHTTPRequests(), // Remove GET, POST, etc. spans
+		langwatch.LangWatchOnly(),       // Keep only LangWatch instrumentation
+	),
+)
+```
+
+| Filter | Description |
+| --- | --- |
+| `ExcludeHTTPRequests()` | Removes HTTP verb spans (GET, POST, etc.) |
+| `LangWatchOnly()` | Keeps only spans from LangWatch instrumentation |
+
+### Custom Filters
+
+Use `Include()` to keep matching spans or `Exclude()` to remove them:
+
+```go
+exporter, err := langwatch.NewExporter(ctx,
+	langwatch.WithFilters(
+		// Keep only spans from specific scopes
+		langwatch.Include(langwatch.Criteria{
+			ScopeName: []langwatch.Matcher{
+				langwatch.StartsWith("github.com/langwatch/"),
+				langwatch.StartsWith("my-app/"),
+			},
+		}),
+		// Remove database spans
+		langwatch.Exclude(langwatch.Criteria{
+			SpanName: []langwatch.Matcher{
+				langwatch.StartsWith("database."),
+			},
+		}),
+	),
+)
+```
+
+### Matchers
+
+| Matcher | Description |
+| --- | --- |
+| `Equals(s)` | Exact match |
+| `EqualsIgnoreCase(s)` | Case-insensitive exact match |
+| `StartsWith(prefix)` | Prefix match |
+| `StartsWithIgnoreCase(prefix)` | Case-insensitive prefix match |
+| `MustMatchRegex(pattern)` | Regex match |
+
+<Note>
+Multiple filters use AND semantics (span must pass all). Within a `Criteria`, matchers use OR semantics (span matches if any matcher matches).
+</Note>
+
+## LangWatch Span Types
+
+`SpanType` is a string constant used with `span.SetType()` to categorize spans in LangWatch for specialized UI treatment and analytics.
+
+| Constant | Description | Use Case |
+| --- | --- | --- |
+| `SpanTypeLLM` | A call to a Large Language Model. | Direct LLM API calls, chat completions |
+| `SpanTypeChain` | A sequence of related operations or a sub-pipeline. | Multi-step processing, workflow orchestration |
+| `SpanTypeTool` | A call to an external tool or function. | Function calls, API integrations, database queries |
+| `SpanTypeAgent` | An autonomous agent's operation or decision-making step. | Agent reasoning, decision points, planning |
+| `SpanTypeRAG` | An overarching RAG operation, often containing retrieval and LLM spans. | Complete RAG workflows |
+| `SpanTypeRetrieval`| The specific step of retrieving documents from a knowledge base. | Vector database queries, document search |
+| `SpanTypeQuery` | A generic database or API query. | SQL queries, REST API calls |
+| `SpanTypeEmbedding` | The specific step of generating embeddings. | Text embedding generation |
+
+<Note>
+Using these span types is optional but highly recommended, as it enables LangWatch to provide more tailored insights and visualizations for your traces.
+</Note>
+
+## Collected Attributes
+
+The OpenAI instrumentation automatically adds these attributes to spans:
+
+### Request Attributes
+
+- `gen_ai.system` - AI system name (e.g., "openai")
+- `gen_ai.request.model` - Model used for the request
+- `gen_ai.request.temperature` - Temperature parameter
+- `gen_ai.request.top_p` - Top-p parameter
+- `gen_ai.request.top_k` - Top-k parameter
+- `gen_ai.request.frequency_penalty` - Frequency penalty
+- `gen_ai.request.presence_penalty` - Presence penalty
+- `gen_ai.request.max_tokens` - Maximum tokens
+- `langwatch.gen_ai.streaming` - Boolean indicating streaming
+- `gen_ai.operation.name` - Operation name (e.g., "completions")
+- `langwatch.input.value` - Input content (if WithCaptureInput enabled)
+
+### Response Attributes
+
+- `gen_ai.response.id` - Response ID from the API
+- `gen_ai.response.model` - Model that generated the response
+- `gen_ai.response.finish_reasons` - Completion finish reasons
+- `gen_ai.usage.input_tokens` - Number of input tokens used
+- `gen_ai.usage.output_tokens` - Number of output tokens generated
+- `gen_ai.openai.response.system_fingerprint` - OpenAI system fingerprint
+- `langwatch.output.value` - Output content (if WithCaptureOutput enabled)
+
+### HTTP Attributes
+
+Standard HTTP client attributes are also included:
+- `http.request.method` - HTTP method
+- `url.path` - Request path
+- `server.address` - Server address
+- `http.response.status_code` - HTTP status code
+
+## Request/Response Examples
+
+### Basic Chat Completion
+
+<RequestExample>
+```go
+// Create a trace
+tracer := langwatch.Tracer("chat-app")
+ctx, span := tracer.Start(ctx, "ChatCompletion")
+defer span.End()
+
+span.SetType(langwatch.SpanTypeLLM)
+span.SetThreadID("conversation-123")
+span.RecordInputString("What is the weather like today?")
+
+// Make OpenAI API call
+response, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
+    Model: openai.ChatModelGPT4oMini,
+    Messages: []openai.ChatCompletionMessageParamUnion{
+        openai.UserMessage("What is the weather like today?"),
+    },
+})
+```
+</RequestExample>
+
+<ResponseExample>
+```go
+// Record the response
+span.RecordOutputString(response.Choices[0].Message.Content)
+span.SetResponseModel(response.Model)
+
+// Response contains:
+// - Content: "I don't have access to real-time weather data..."
+// - Model: "gpt-4o-mini-2024-07-18"
+// - Usage: {InputTokens: 8, OutputTokens: 15}
+```
+</ResponseExample>
+
+### RAG Pipeline
+
+<RequestExample>
+```go
+// Start RAG trace
+tracer := langwatch.Tracer("rag-app")
+ctx, span := tracer.Start(ctx, "RAGQuery")
+defer span.End()
+
+span.SetType(langwatch.SpanTypeRAG)
+span.SetThreadID("user-session-456")
+span.RecordInputString("How do I implement authentication in Go?")
+
+// Document retrieval span
+ctx, retrievalSpan := tracer.Start(ctx, "RetrieveDocuments")
+retrievalSpan.SetType(langwatch.SpanTypeRetrieval)
+retrievalSpan.RecordInputString("authentication Go implementation")
+
+// ... retrieval logic ...
+
+chunks := []langwatch.SpanRAGContextChunk{
+    {Content: documents[0], Source: "auth-guide", Score: 0.92},
+    {Content: documents[1], Source: "go-docs", Score: 0.88},
+}
+retrievalSpan.SetRAGContextChunks(chunks)
+retrievalSpan.End()
+```
+</RequestExample>
+
+<ResponseExample>
+```go
+// LLM call with retrieved context
+ctx, llmSpan := tracer.Start(ctx, "GenerateResponse")
+llmSpan.SetType(langwatch.SpanTypeLLM)
+
+// ... LLM call with context ...
+
+llmSpan.RecordOutputString("To implement authentication in Go, you can use...")
+llmSpan.End()
+
+// Record final RAG response
+span.RecordOutputString("Final RAG response with citations...")
+```
+</ResponseExample>
+
+## Error Handling
+
+All SDK methods handle errors gracefully. In case of failures:
+
+1. **Serialization errors** - Fallback to string representation
+2. **Network errors** - Logged but don't interrupt application flow
+3. **Invalid data** - Sanitized or excluded from traces
+
+**Example error handling:**
+```go
+func safeRecordInput(span langwatch.LangWatchSpan, input any) {
+    defer func() {
+        if r := recover(); r != nil {
+            // Fallback to string representation
+            span.RecordInputString(fmt.Sprintf("%v", input))
+        }
+    }()
+    span.RecordInput(input)
+}
+```
+
+## Environment Variables
+
+| Variable | Description |
+| --- | --- |
+| `LANGWATCH_API_KEY` | Your LangWatch API key (required) |
+| `LANGWATCH_ENDPOINT` | Custom endpoint (defaults to `https://app.langwatch.ai`) |
+
+## Complete Example
+
+Here's a comprehensive example showing a complete RAG application with proper error handling and best practices:
+
+```go
+package main
+
+import (
+	"context"
+	"log"
+	"os"
+	"time"
+
+	langwatch "github.com/langwatch/langwatch/sdk-go"
+	otelopenai "github.com/langwatch/langwatch/sdk-go/instrumentation/openai"
+
+	"github.com/openai/openai-go"
+	"github.com/openai/openai-go/option"
+	"go.opentelemetry.io/otel"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+)
+
+func main() {
+	ctx := context.Background()
+
+	// Setup LangWatch tracing
+	shutdown := setupLangWatch(ctx)
+	// Critical: defer shutdown immediately to ensure traces are flushed
+	// Without this, buffered traces will be lost when the application exits
+	defer shutdown(ctx)
+
+	// Create instrumented OpenAI client
+	client := openai.NewClient(
+		option.WithAPIKey(os.Getenv("OPENAI_API_KEY")),
+		option.WithMiddleware(otelopenai.Middleware("rag-app",
+			otelopenai.WithCaptureInput(),
+			otelopenai.WithCaptureOutput(),
+		)),
+	)
+
+	// Process user query
+	if err := processQuery(ctx, client, "How do I implement JWT authentication in Go?"); err != nil {
+		log.Fatalf("Failed to process query: %v", err)
+	}
+}
+
+func processQuery(ctx context.Context, client *openai.Client, query string) error {
+	tracer := langwatch.Tracer("rag-app")
+	ctx, span := tracer.Start(ctx, "ProcessUserQuery")
+	defer span.End()
+
+	span.SetType(langwatch.SpanTypeRAG)
+	span.SetThreadID("user-session-" + time.Now().Format("20060102"))
+	span.SetUserID("user-123")
+	span.RecordInputString(query)
+
+	// Step 1: Retrieve relevant documents
+	documents, err := retrieveDocuments(ctx, query)
+	if err != nil {
+		span.RecordError(err)
+		return err
+	}
+
+	// Step 2: Generate response with context
+	response, err := generateResponse(ctx, client, query, documents)
+	if err != nil {
+		span.RecordError(err)
+		return err
+	}
+
+	span.RecordOutputString(response)
+	return nil
+}
+
+func retrieveDocuments(ctx context.Context, query string) ([]string, error) {
+	tracer := langwatch.Tracer("retrieval")
+	ctx, span := tracer.Start(ctx, "RetrieveDocuments")
+	defer span.End()
+
+	span.SetType(langwatch.SpanTypeRetrieval)
+	span.RecordInputString(query)
+
+	// Simulate document retrieval
+	documents := []string{
+		"JWT tokens are commonly used for authentication...",
+		"Use the crypto/bcrypt package for password hashing...",
+	}
+
+	chunks := []langwatch.SpanRAGContextChunk{
+		{Content: documents[0], Source: "auth-guide", Score: 0.92},
+		{Content: documents[1], Source: "go-docs", Score: 0.88},
+	}
+	span.SetRAGContextChunks(chunks)
+
+	return documents, nil
+}
+
+func generateResponse(ctx context.Context, client *openai.Client, query string, documents []string) (string, error) {
+	tracer := langwatch.Tracer("llm")
+	ctx, span := tracer.Start(ctx, "GenerateResponse")
+	defer span.End()
+
+	span.SetType(langwatch.SpanTypeLLM)
+	span.SetRequestModel("gpt-4o-mini")
+
+	// Prepare context for LLM
+	ragContext := "Context:\n" + documents[0] + "\n" + documents[1]
+
+	response, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
+		Model: openai.ChatModelGPT4oMini,
+		Messages: []openai.ChatCompletionMessageParamUnion{
+			openai.SystemMessage("You are a helpful assistant. Use the provided context to answer questions."),
+			openai.UserMessage(ragContext + "\n\nQuestion: " + query),
+		},
+	})
+	if err != nil {
+		return "", err
+	}
+
+	content := response.Choices[0].Message.Content
+	span.RecordOutputString(content)
+	span.SetResponseModel(response.Model)
+
+	return content, nil
+}
+
+func setupLangWatch(ctx context.Context) func(context.Context) {
+	// NewDefaultExporter reads LANGWATCH_API_KEY from environment
+	// and automatically applies the ExcludeHTTPRequests filter
+	exporter, err := langwatch.NewDefaultExporter(ctx)
+	if err != nil {
+		log.Fatalf("failed to create LangWatch exporter: %v", err)
+	}
+
+	tp := sdktrace.NewTracerProvider(sdktrace.WithBatcher(exporter))
+	otel.SetTracerProvider(tp)
+
+	return func(ctx context.Context) {
+		// Shutdown flushes all pending traces to LangWatch
+		// This is critical - without it, traces may be lost!
+		if err := tp.Shutdown(ctx); err != nil {
+			log.Printf("Error shutting down tracer provider: %v", err)
+		}
+	}
+}
+```
+
+## Version Compatibility
+
+- **Go Version:** 1.19 or later
+- **OpenTelemetry:** v1.24.0 or later
+- **OpenAI Go SDK:** Latest version
+
+## Support
+
+For additional help:
+- [GitHub Issues](https://github.com/langwatch/langwatch/issues)
+- [Documentation](https://docs.langwatch.ai)
+- [Community Support](https://docs.langwatch.ai/support)
+
+<Tip>
+For common setup issues and troubleshooting tips, see the [Troubleshooting section](/integration/go/guide#troubleshooting) in the integration guide.
+</Tip> 

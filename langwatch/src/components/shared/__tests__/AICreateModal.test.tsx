@@ -105,41 +105,6 @@ describe("<AICreateModal/>", () => {
       ).toBeInTheDocument();
     });
 
-    it("displays character counter at 0 / 500", () => {
-      render(
-        <AICreateModal
-          open={true}
-          onClose={vi.fn()}
-          title="Create new scenario"
-          exampleTemplates={defaultExampleTemplates}
-          onGenerate={vi.fn()}
-          onSkip={vi.fn()}
-        />,
-        { wrapper: Wrapper }
-      );
-
-      const dialog = getDialogContent();
-      expect(within(dialog).getByText("0 / 500")).toBeInTheDocument();
-    });
-
-    it("displays character counter with custom maxLength", () => {
-      render(
-        <AICreateModal
-          open={true}
-          onClose={vi.fn()}
-          title="Create new scenario"
-          exampleTemplates={defaultExampleTemplates}
-          onGenerate={vi.fn()}
-          onSkip={vi.fn()}
-          maxLength={300}
-        />,
-        { wrapper: Wrapper }
-      );
-
-      const dialog = getDialogContent();
-      expect(within(dialog).getByText("0 / 300")).toBeInTheDocument();
-    });
-
     it("displays example pills", () => {
       render(
         <AICreateModal
@@ -218,7 +183,7 @@ describe("<AICreateModal/>", () => {
   });
 
   describe("when user types in textarea", () => {
-    it("updates character counter", () => {
+    it("allows unlimited text input", () => {
       render(
         <AICreateModal
           open={true}
@@ -233,31 +198,10 @@ describe("<AICreateModal/>", () => {
 
       const dialog = getDialogContent();
       const textarea = within(dialog).getByRole("textbox");
-      fireEvent.change(textarea, { target: { value: "Test description" } });
+      const longText = "A".repeat(1000);
+      fireEvent.change(textarea, { target: { value: longText } });
 
-      expect(within(dialog).getByText("16 / 500")).toBeInTheDocument();
-    });
-
-    it("truncates text at maxLength", () => {
-      render(
-        <AICreateModal
-          open={true}
-          onClose={vi.fn()}
-          title="Create new scenario"
-          exampleTemplates={defaultExampleTemplates}
-          onGenerate={vi.fn()}
-          onSkip={vi.fn()}
-          maxLength={10}
-        />,
-        { wrapper: Wrapper }
-      );
-
-      const dialog = getDialogContent();
-      const textarea = within(dialog).getByRole("textbox");
-      fireEvent.change(textarea, { target: { value: "This is a very long description" } });
-
-      expect(textarea).toHaveValue("This is a ");
-      expect(within(dialog).getByText("10 / 10")).toBeInTheDocument();
+      expect(textarea).toHaveValue(longText);
     });
   });
 
@@ -662,170 +606,178 @@ describe("<AICreateModal/>", () => {
     });
   });
 
-  describe("when hasModelProviders is false", () => {
-    it("displays warning message", () => {
-      render(
-        <AICreateModal
-          open={true}
-          onClose={vi.fn()}
-          title="Create new scenario"
-          exampleTemplates={defaultExampleTemplates}
-          onGenerate={vi.fn()}
-          onSkip={vi.fn()}
-          hasModelProviders={false}
-        />,
-        { wrapper: Wrapper }
-      );
+  // ─────────────────────────────────────────────────────────────────────────
+  // Error classifier integration
+  // ─────────────────────────────────────────────────────────────────────────
 
-      const dialog = getDialogContent();
-      expect(
-        within(dialog).getByText("No model provider configured")
-      ).toBeInTheDocument();
-    });
+  describe("given an auth-shape error", () => {
+    describe("when ErrorState renders", () => {
+      it("shows the Configure model provider button", async () => {
+        const onGenerate = vi
+          .fn()
+          .mockRejectedValue(new Error("Invalid API key provided by the provider"));
 
-    it("does not render textarea", () => {
-      render(
-        <AICreateModal
-          open={true}
-          onClose={vi.fn()}
-          title="Create new scenario"
-          exampleTemplates={defaultExampleTemplates}
-          onGenerate={vi.fn()}
-          onSkip={vi.fn()}
-          hasModelProviders={false}
-        />,
-        { wrapper: Wrapper }
-      );
+        render(
+          <AICreateModal
+            open={true}
+            onClose={vi.fn()}
+            title="Create new scenario"
+            exampleTemplates={defaultExampleTemplates}
+            onGenerate={onGenerate}
+            onSkip={vi.fn()}
+          />,
+          { wrapper: Wrapper }
+        );
 
-      const dialog = getDialogContent();
-      expect(within(dialog).queryByRole("textbox")).not.toBeInTheDocument();
-    });
+        const dialog = getDialogContent();
+        const textarea = within(dialog).getByRole("textbox");
+        fireEvent.change(textarea, { target: { value: "Test description" } });
+        fireEvent.click(
+          within(dialog).getByRole("button", { name: /generate with ai/i })
+        );
 
-    it("does not render Generate with AI button", () => {
-      render(
-        <AICreateModal
-          open={true}
-          onClose={vi.fn()}
-          title="Create new scenario"
-          exampleTemplates={defaultExampleTemplates}
-          onGenerate={vi.fn()}
-          onSkip={vi.fn()}
-          hasModelProviders={false}
-        />,
-        { wrapper: Wrapper }
-      );
+        await waitFor(() => {
+          expect(
+            within(dialog).getByTestId("error-configure-model-provider-button")
+          ).toBeInTheDocument();
+        });
+      });
 
-      const dialog = getDialogContent();
-      expect(
-        within(dialog).queryByRole("button", { name: /generate with ai/i })
-      ).not.toBeInTheDocument();
-    });
+      it("shows tailored copy about API key", async () => {
+        const onGenerate = vi
+          .fn()
+          .mockRejectedValue(new Error("Invalid API key provided"));
 
-    it("does not render example template pills", () => {
-      render(
-        <AICreateModal
-          open={true}
-          onClose={vi.fn()}
-          title="Create new scenario"
-          exampleTemplates={defaultExampleTemplates}
-          onGenerate={vi.fn()}
-          onSkip={vi.fn()}
-          hasModelProviders={false}
-        />,
-        { wrapper: Wrapper }
-      );
+        render(
+          <AICreateModal
+            open={true}
+            onClose={vi.fn()}
+            title="Create new scenario"
+            exampleTemplates={defaultExampleTemplates}
+            onGenerate={onGenerate}
+            onSkip={vi.fn()}
+          />,
+          { wrapper: Wrapper }
+        );
 
-      const dialog = getDialogContent();
-      expect(within(dialog).queryByText("Customer Support")).not.toBeInTheDocument();
-      expect(within(dialog).queryByText("RAG Q&A")).not.toBeInTheDocument();
-      expect(within(dialog).queryByText("Tool-calling Agent")).not.toBeInTheDocument();
-    });
+        const dialog = getDialogContent();
+        const textarea = within(dialog).getByRole("textbox");
+        fireEvent.change(textarea, { target: { value: "Test description" } });
+        fireEvent.click(
+          within(dialog).getByRole("button", { name: /generate with ai/i })
+        );
 
-    it("renders I'll write it myself button", () => {
-      render(
-        <AICreateModal
-          open={true}
-          onClose={vi.fn()}
-          title="Create new scenario"
-          exampleTemplates={defaultExampleTemplates}
-          onGenerate={vi.fn()}
-          onSkip={vi.fn()}
-          hasModelProviders={false}
-        />,
-        { wrapper: Wrapper }
-      );
-
-      const dialog = getDialogContent();
-      expect(
-        within(dialog).getByRole("button", { name: /i'll write it myself/i })
-      ).toBeInTheDocument();
-    });
-
-    it("renders link to model provider settings", () => {
-      render(
-        <AICreateModal
-          open={true}
-          onClose={vi.fn()}
-          title="Create new scenario"
-          exampleTemplates={defaultExampleTemplates}
-          onGenerate={vi.fn()}
-          onSkip={vi.fn()}
-          hasModelProviders={false}
-        />,
-        { wrapper: Wrapper }
-      );
-
-      const dialog = getDialogContent();
-      const link = within(dialog).getByRole("link", { name: /model provider/i });
-      expect(link).toBeInTheDocument();
-      expect(link).toHaveAttribute("href", "/settings/model-providers");
-    });
-
-    it("calls onSkip when I'll write it myself is clicked", () => {
-      const onSkip = vi.fn();
-      render(
-        <AICreateModal
-          open={true}
-          onClose={vi.fn()}
-          title="Create new scenario"
-          exampleTemplates={defaultExampleTemplates}
-          onGenerate={vi.fn()}
-          onSkip={onSkip}
-          hasModelProviders={false}
-        />,
-        { wrapper: Wrapper }
-      );
-
-      const dialog = getDialogContent();
-      fireEvent.click(
-        within(dialog).getByRole("button", { name: /i'll write it myself/i })
-      );
-
-      expect(onSkip).toHaveBeenCalledTimes(1);
+        await waitFor(() => {
+          expect(within(dialog).getByText(/api key/i)).toBeInTheDocument();
+        });
+      });
     });
   });
 
-  describe("when hasModelProviders is true", () => {
-    it("does not display warning message", () => {
-      render(
-        <AICreateModal
-          open={true}
-          onClose={vi.fn()}
-          title="Create new scenario"
-          exampleTemplates={defaultExampleTemplates}
-          onGenerate={vi.fn()}
-          onSkip={vi.fn()}
-          hasModelProviders={true}
-        />,
-        { wrapper: Wrapper }
-      );
+  describe("given an unknown error", () => {
+    describe("when ErrorState renders", () => {
+      it("shows the raw error message verbatim", async () => {
+        const onGenerate = vi
+          .fn()
+          .mockRejectedValue(new Error("Completely unexpected server meltdown 42"));
 
-      const dialog = getDialogContent();
-      expect(
-        within(dialog).queryByText(/no model provider/i)
-      ).not.toBeInTheDocument();
+        render(
+          <AICreateModal
+            open={true}
+            onClose={vi.fn()}
+            title="Create new scenario"
+            exampleTemplates={defaultExampleTemplates}
+            onGenerate={onGenerate}
+            onSkip={vi.fn()}
+          />,
+          { wrapper: Wrapper }
+        );
+
+        const dialog = getDialogContent();
+        const textarea = within(dialog).getByRole("textbox");
+        fireEvent.change(textarea, { target: { value: "Test description" } });
+        fireEvent.click(
+          within(dialog).getByRole("button", { name: /generate with ai/i })
+        );
+
+        await waitFor(() => {
+          expect(
+            within(dialog).getByText("Completely unexpected server meltdown 42")
+          ).toBeInTheDocument();
+        });
+      });
+
+      it("does not show Configure model provider button", async () => {
+        const onGenerate = vi
+          .fn()
+          .mockRejectedValue(new Error("Completely unexpected server meltdown 42"));
+
+        render(
+          <AICreateModal
+            open={true}
+            onClose={vi.fn()}
+            title="Create new scenario"
+            exampleTemplates={defaultExampleTemplates}
+            onGenerate={onGenerate}
+            onSkip={vi.fn()}
+          />,
+          { wrapper: Wrapper }
+        );
+
+        const dialog = getDialogContent();
+        const textarea = within(dialog).getByRole("textbox");
+        fireEvent.change(textarea, { target: { value: "Test description" } });
+        fireEvent.click(
+          within(dialog).getByRole("button", { name: /generate with ai/i })
+        );
+
+        await waitFor(() => {
+          expect(
+            within(dialog).queryByTestId("error-configure-model-provider-button")
+          ).not.toBeInTheDocument();
+        });
+      });
     });
+  });
 
+  describe("given a config-shape error", () => {
+    describe("when Configure is clicked", () => {
+      it("links to settings/model-providers in a new tab", async () => {
+        const onGenerate = vi
+          .fn()
+          .mockRejectedValue(new Error("No default model configured for this project"));
+
+        render(
+          <AICreateModal
+            open={true}
+            onClose={vi.fn()}
+            title="Create new scenario"
+            exampleTemplates={defaultExampleTemplates}
+            onGenerate={onGenerate}
+            onSkip={vi.fn()}
+          />,
+          { wrapper: Wrapper }
+        );
+
+        const dialog = getDialogContent();
+        const textarea = within(dialog).getByRole("textbox");
+        fireEvent.change(textarea, { target: { value: "Test description" } });
+        fireEvent.click(
+          within(dialog).getByRole("button", { name: /generate with ai/i })
+        );
+
+        await waitFor(() => {
+          const configureBtn = within(dialog).getByTestId(
+            "error-configure-model-provider-button"
+          );
+          expect(configureBtn).toHaveAttribute("href", "/settings/model-providers");
+          expect(configureBtn).toHaveAttribute("target", "_blank");
+        });
+      });
+    });
+  });
+
+  describe("when rendered with default props", () => {
     it("renders textarea", () => {
       render(
         <AICreateModal
@@ -835,7 +787,6 @@ describe("<AICreateModal/>", () => {
           exampleTemplates={defaultExampleTemplates}
           onGenerate={vi.fn()}
           onSkip={vi.fn()}
-          hasModelProviders={true}
         />,
         { wrapper: Wrapper }
       );
@@ -853,7 +804,6 @@ describe("<AICreateModal/>", () => {
           exampleTemplates={defaultExampleTemplates}
           onGenerate={vi.fn()}
           onSkip={vi.fn()}
-          hasModelProviders={true}
         />,
         { wrapper: Wrapper }
       );
@@ -873,7 +823,6 @@ describe("<AICreateModal/>", () => {
           exampleTemplates={defaultExampleTemplates}
           onGenerate={vi.fn()}
           onSkip={vi.fn()}
-          hasModelProviders={true}
         />,
         { wrapper: Wrapper }
       );

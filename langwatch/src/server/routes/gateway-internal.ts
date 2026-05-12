@@ -1,0 +1,627 @@
+/**
+ * Hono routes for internal gateway control-plane endpoints.
+ *
+ * Consumed only by the LangWatch AI Gateway (Go) service. All paths are
+ * protected by the shared HMAC secret `LW_GATEWAY_INTERNAL_SECRET` +
+ * `X-LangWatch-Gateway-Signature` header. Never expose publicly.
+ *
+ * Contract source of truth:
+ *   specs/ai-gateway/_shared/contract.md §4 (v0.1)
+ *
+ * Iteration 1: route skeleton + auth middleware + contract-shaped stubs.
+ * Real logic follows once the service layer for VirtualKey / Budget lands.
+ */
+import { Hono } from "hono";
+import type { Context, Next } from "hono";
+import { createHash, createHmac, timingSafeEqual } from "crypto";
+import { z } from "zod";
+
+import { env } from "~/env.mjs";
+import { loggerMiddleware } from "~/app/api/middleware/logger";
+import { tracerMiddleware } from "~/app/api/middleware/tracer";
+import { createLogger } from "~/utils/logger/server";
+
+import { prisma } from "~/server/db";
+import {
+  getClickHouseClientForProject,
+  isClickHouseEnabled,
+} from "~/server/clickhouse/clickhouseClient";
+import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
+import { GatewayBudgetService } from "~/server/gateway/budget.service";
+import { ChangeEventRepository } from "~/server/gateway/changeEvent.repository";
+import { GatewayConfigMaterialiser } from "~/server/gateway/config.materialiser";
+import { signGatewayJwt } from "~/server/gateway/gatewayJwt";
+import {
+  VirtualKeyCryptoError,
+  hashVirtualKeySecret,
+  parseVirtualKey,
+} from "~/server/gateway/virtualKey.crypto";
+import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
+
+export const app = new Hono().basePath("/api/internal/gateway");
+app.use(tracerMiddleware({ name: "gateway-internal" }));
+app.use(loggerMiddleware());
+
+const logger = createLogger("langwatch:gateway-internal");
+
+const guardrailCheckRequestSchema = z.object({
+  vk_id: z.string().min(1),
+  direction: z.enum(["pre", "post", "stream_chunk"]),
+  guardrail_ids: z.array(z.string()).default([]),
+  content: z.unknown().optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+});
+
+// ── auth middleware ─────────────────────────────────────────────────────
+
+export const GATEWAY_SIGNATURE_WINDOW_SECONDS = 300;
+
+/**
+ * Build the canonical string the Go gateway signs:
+ *   METHOD + "\n" + PATH + "\n" + TIMESTAMP + "\n" + hex(sha256(body))
+ */
+export function buildGatewayCanonicalString(input: {
+  method: string;
+  path: string;
+  timestamp: string;
+  body: string;
+}): string {
+  const bodyHash = createHash("sha256").update(input.body).digest("hex");
+  return `${input.method}\n${input.path}\n${input.timestamp}\n${bodyHash}`;
+}
+
+/** hex(hmac_sha256(secret, canonical)) */
+export function computeGatewaySignature(
+  secret: string,
+  canonical: string,
+): string {
+  return createHmac("sha256", secret).update(canonical).digest("hex");
+}
+
+/**
+ * Verify the gateway's HMAC signature with a replay-protection timestamp.
+ *
+ * Canonical string:
+ *   method + "\n" + path + "\n" + unix_timestamp + "\n" + hex(sha256(body))
+ *
+ * Headers:
+ *   X-LangWatch-Gateway-Signature: hex(hmac_sha256(LW_GATEWAY_INTERNAL_SECRET, canonical))
+ *   X-LangWatch-Gateway-Timestamp: unix seconds (±300s window)
+ *   X-LangWatch-Gateway-Node: advisory, unsigned
+ *
+ * Verification order (by design — matches `services/gateway/internal/auth`):
+ *   1. Missing headers → 401 (cheap check)
+ *   2. Signature compare (constant-time) → 401 if bad
+ *   3. Timestamp window → 401 if drifted
+ *
+ * Doing the HMAC compare before the timestamp check prevents timing-side
+ * channels from leaking which failed (invalid sig vs. replayed request).
+ * Machine-to-machine only; never touches the user session.
+ */
+async function verifyGatewaySignature(c: Context, next: Next) {
+  const secret = process.env.LW_GATEWAY_INTERNAL_SECRET ?? env.LW_GATEWAY_INTERNAL_SECRET;
+  if (!secret) {
+    return c.json(
+      {
+        error: {
+          type: "internal_error",
+          code: "gateway_internal_secret_missing",
+          message: "LW_GATEWAY_INTERNAL_SECRET not configured on control-plane",
+        },
+      },
+      500,
+    );
+  }
+
+  const presentedSig = c.req.header("X-LangWatch-Gateway-Signature");
+  const presentedTs = c.req.header("X-LangWatch-Gateway-Timestamp");
+  if (!presentedSig || !presentedTs) {
+    return c.json(
+      {
+        error: {
+          type: "permission_denied",
+          code: "missing_signature",
+          message:
+            "X-LangWatch-Gateway-Signature and X-LangWatch-Gateway-Timestamp are required",
+        },
+      },
+      401,
+    );
+  }
+
+  const body = await c.req.raw.clone().text();
+  const url = new URL(c.req.url);
+  const canonical = buildGatewayCanonicalString({
+    method: c.req.method,
+    path: url.pathname,
+    timestamp: presentedTs,
+    body,
+  });
+  const expected = computeGatewaySignature(secret, canonical);
+
+  const a = Buffer.from(expected);
+  const b = Buffer.from(presentedSig);
+  if (a.length !== b.length || !timingSafeEqual(a, b)) {
+    return c.json(
+      {
+        error: {
+          type: "permission_denied",
+          code: "invalid_signature",
+          message: "signature mismatch",
+        },
+      },
+      401,
+    );
+  }
+
+  const ts = Number.parseInt(presentedTs, 10);
+  if (!Number.isFinite(ts)) {
+    return c.json(
+      {
+        error: {
+          type: "permission_denied",
+          code: "invalid_timestamp",
+          message: "X-LangWatch-Gateway-Timestamp must be unix seconds",
+        },
+      },
+      401,
+    );
+  }
+  const now = Math.floor(Date.now() / 1000);
+  if (Math.abs(now - ts) > GATEWAY_SIGNATURE_WINDOW_SECONDS) {
+    return c.json(
+      {
+        error: {
+          type: "permission_denied",
+          code: "timestamp_out_of_window",
+          message: `timestamp drift > ${GATEWAY_SIGNATURE_WINDOW_SECONDS}s`,
+        },
+      },
+      401,
+    );
+  }
+
+  await next();
+}
+
+app.use("/*", verifyGatewaySignature);
+
+// ── helpers ─────────────────────────────────────────────────────────────
+
+function notImplemented(c: Context) {
+  return c.json(
+    {
+      error: {
+        type: "internal_error",
+        code: "not_implemented",
+        message:
+          "Stub. Contract-shaped response lands once VirtualKey/Budget service layer is wired. See specs/ai-gateway/_shared/contract.md §4.",
+      },
+    },
+    501,
+  );
+}
+
+// ── routes ──────────────────────────────────────────────────────────────
+
+/**
+ * §4.1 — resolve a raw virtual key to a signed JWT + current revision.
+ *
+ * Request:  { key_presented: "lw_vk_live_01HZX...", gateway_node_id: "gw-eks-abc" }
+ * Response: { jwt, revision, key_id, display_prefix }
+ */
+app.post("/resolve-key", async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as {
+    key_presented?: string;
+    gateway_node_id?: string;
+  };
+  const presented = body.key_presented;
+  if (!presented || typeof presented !== "string") {
+    return c.json(
+      {
+        error: {
+          type: "bad_request",
+          code: "missing_key_presented",
+          message: "key_presented is required",
+        },
+      },
+      400,
+    );
+  }
+
+  try {
+    parseVirtualKey(presented);
+  } catch (err) {
+    if (err instanceof VirtualKeyCryptoError) {
+      return c.json(
+        {
+          error: {
+            type: "invalid_api_key",
+            code: err.code,
+            message: err.message,
+          },
+        },
+        401,
+      );
+    }
+    throw err;
+  }
+
+  const hashed = hashVirtualKeySecret(presented);
+  const service = VirtualKeyService.create(prisma);
+  const vk = await service.getByHashedSecretInternal(hashed);
+  if (!vk) {
+    return c.json(
+      {
+        error: {
+          type: "invalid_api_key",
+          code: "virtual_key_not_found",
+          message: "unknown virtual key",
+        },
+      },
+      401,
+    );
+  }
+  if (vk.status === "REVOKED") {
+    return c.json(
+      {
+        error: {
+          type: "virtual_key_revoked",
+          code: "virtual_key_revoked",
+          message: "virtual key has been revoked",
+        },
+      },
+      403,
+    );
+  }
+
+  const project = await prisma.project.findUnique({
+    where: { id: vk.projectId },
+    include: { team: true },
+  });
+  if (!project) {
+    return c.json(
+      {
+        error: {
+          type: "internal_error",
+          code: "project_orphaned",
+          message: "virtual key references missing project",
+        },
+      },
+      500,
+    );
+  }
+
+  const { jwt } = signGatewayJwt({
+    vk_id: vk.id,
+    project_id: project.id,
+    team_id: project.teamId,
+    org_id: project.team.organizationId,
+    principal_id: vk.principalUserId,
+    revision: vk.revision.toString(),
+  });
+
+  // Fire-and-forget last-used bump. Failures here must not deny the request.
+  void service.touchUsage(vk.id).catch(() => {});
+
+  return c.json({
+    jwt,
+    revision: vk.revision.toString(),
+    key_id: vk.id,
+    display_prefix: vk.displayPrefix,
+  });
+});
+
+/**
+ * §4.2 — full warm-cache config by vk_id with `If-None-Match: <revision>`.
+ * Returns 304 Not Modified when client has current revision.
+ */
+app.get("/config/:vk_id", async (c) => {
+  const vkId = c.req.param("vk_id");
+  // Two-step fetch avoids Prisma's `include` generating a nested
+  // findMany on GatewayProviderCredential that the multitenancy
+  // middleware rejects (no projectId in scope yet — VK IS what
+  // teaches us projectId). Step 1 uses the narrow findUnique
+  // exemption; step 2 scopes by the projectId we just learned.
+  const vkRow = await prisma.virtualKey.findUnique({
+    where: { id: vkId },
+  });
+  if (!vkRow) {
+    return c.json(
+      {
+        error: {
+          type: "invalid_api_key",
+          code: "virtual_key_not_found",
+          message: "unknown virtual key",
+        },
+      },
+      404,
+    );
+  }
+  const providerCredentials = await prisma.virtualKeyProviderCredential.findMany({
+    where: { virtualKeyId: vkRow.id },
+    orderBy: { priority: "asc" },
+  });
+  const vk = { ...vkRow, providerCredentials };
+
+  const ifNoneMatch = c.req.header("If-None-Match");
+  const currentRevision = vk.revision.toString();
+  if (ifNoneMatch && ifNoneMatch === currentRevision) {
+    return c.body(null, 304, {
+      ETag: currentRevision,
+      "Cache-Control": "no-store",
+    });
+  }
+
+  const payload = await new GatewayConfigMaterialiser(prisma).materialise(vk);
+  return c.json(payload, 200, {
+    ETag: currentRevision,
+    "Cache-Control": "no-store",
+  });
+});
+
+/**
+ * §4.3 — mutations since a given revision. Short, polite long-poll:
+ * Hono isn't the right place for 25s held sockets, so we do a brief loop
+ * with 2s sleeps for a maximum of ~10s per request. The Go client falls
+ * straight back into the next long-poll on 204.
+ *
+ * Query: ?since=<revision>&timeout_s=10
+ * Response: { current_revision, changes: [{kind, vk_id, revision}, ...] }
+ * Returns 204 No Content when no diff within timeout.
+ */
+app.get("/changes", async (c) => {
+  const sinceParam = c.req.query("since") ?? "0";
+  const orgId = c.req.query("organization_id");
+  if (!orgId) {
+    return c.json(
+      {
+        error: {
+          type: "bad_request",
+          code: "missing_organization_id",
+          message: "organization_id query param is required",
+        },
+      },
+      400,
+    );
+  }
+
+  let since: bigint;
+  try {
+    since = BigInt(sinceParam);
+  } catch {
+    return c.json(
+      {
+        error: {
+          type: "bad_request",
+          code: "invalid_since",
+          message: "since must be an integer",
+        },
+      },
+      400,
+    );
+  }
+
+  const timeoutSeconds = Math.max(
+    1,
+    Math.min(25, Number.parseInt(c.req.query("timeout_s") ?? "10", 10) || 10),
+  );
+  const repo = new ChangeEventRepository(prisma);
+  const deadline = Date.now() + timeoutSeconds * 1000;
+
+  while (Date.now() < deadline) {
+    const { events, currentRevision } = await repo.since(orgId, since, 500);
+    if (events.length > 0) {
+      return c.json(
+        {
+          current_revision: currentRevision.toString(),
+          changes: events.map((e) => ({
+            kind: e.kind,
+            virtual_key_id: e.virtualKeyId,
+            budget_id: e.budgetId,
+            provider_credential_id: e.providerCredentialId,
+            project_id: e.projectId,
+            revision: e.revision.toString(),
+          })),
+        },
+        200,
+      );
+    }
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+  }
+
+  const current = await repo.currentRevision(orgId);
+  return c.body(null, 204, {
+    "X-LangWatch-Revision": current.toString(),
+  });
+});
+
+/**
+ * §4.4 — projective pre-request budget check.
+ *
+ * Request:  { vk_id, gateway_request_id, projected_cost_usd, model }
+ * Response: { decision: allow|soft_warn|hard_block, warnings[], block_reason }
+ */
+app.post("/budget/check", async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as {
+    vk_id?: string;
+    gateway_request_id?: string;
+    projected_cost_usd?: number | string;
+    model?: string;
+  };
+  if (!body.vk_id || body.projected_cost_usd === undefined) {
+    return c.json(
+      {
+        error: {
+          type: "bad_request",
+          code: "missing_required_fields",
+          message: "vk_id and projected_cost_usd are required",
+        },
+      },
+      400,
+    );
+  }
+
+  const vk = await prisma.virtualKey.findUnique({
+    where: { id: body.vk_id },
+  });
+  if (!vk) {
+    return c.json(
+      {
+        error: {
+          type: "invalid_api_key",
+          code: "virtual_key_not_found",
+          message: "unknown virtual key",
+        },
+      },
+      404,
+    );
+  }
+  const project = await prisma.project.findUnique({
+    where: { id: vk.projectId },
+    include: { team: true },
+  });
+  if (!project) {
+    return c.json(
+      {
+        error: {
+          type: "internal_error",
+          code: "project_orphaned",
+          message: "virtual key references missing project",
+        },
+      },
+      500,
+    );
+  }
+
+  const service = GatewayBudgetService.create(
+    prisma,
+    isClickHouseEnabled()
+      ? new GatewayBudgetClickHouseRepository(async (projectId) => {
+          const client = await getClickHouseClientForProject(projectId);
+          if (!client) {
+            throw new Error(
+              `ClickHouse enabled but no client for project ${projectId}`,
+            );
+          }
+          return client;
+        })
+      : undefined,
+  );
+  const result = await service.check({
+    organizationId: project.team.organizationId,
+    teamId: project.teamId,
+    projectId: project.id,
+    virtualKeyId: vk.id,
+    principalUserId: vk.principalUserId,
+    projectedCostUsd: body.projected_cost_usd,
+  });
+
+  return c.json(
+    {
+      decision: result.decision,
+      warnings: result.warnings.map((w) => ({
+        scope: w.scope,
+        pct_used: w.pctUsed,
+        limit_usd: w.limitUsd,
+      })),
+      block_reason: result.blockReason,
+      blocked_by: result.blockedBy.map((b) => ({
+        budget_id: b.budgetId,
+        scope: b.scope,
+        scope_id: b.scopeId,
+        window: b.window,
+        limit_usd: b.limitUsd,
+        spent_usd: b.spentUsd,
+      })),
+      // Contract §4.4 — raw per-scope ledger consumed by the gateway's
+      // Checker.ApplyLive reconciliation path. Includes every applicable
+      // budget, not just the ones in warn/block.
+      scopes: result.scopes.map((s) => ({
+        scope: s.scope,
+        scope_id: s.scopeId,
+        window: s.window,
+        spent_usd: s.spentUsd,
+        limit_usd: s.limitUsd,
+      })),
+    },
+    200,
+  );
+});
+
+// §4.5 — `/budget/debit` is removed. Cost recording is now driven by the
+// trace-fold reactor on the trace-processing pipeline
+// (langwatch/src/server/event-sourcing/pipelines/trace-processing/reactors/
+// gatewayBudgetSync.reactor.ts), which folds OTel span usage attributes
+// into the ClickHouse `gateway_budget_ledger_events` table. Single source
+// of truth, no PG dual-write — see CLAUDE.md & the migration
+// 00017_create_gateway_budget_ledger.sql for the CH schema.
+
+/**
+ * §4.6 — inline guardrail pipeline.
+ *
+ * Request:  { vk_id, direction, guardrail_ids, content, metadata }
+ * Response: { decision: allow|block|modify, reason, modified_content, policies_triggered }
+ *
+ * Current implementation is a plumbing stub: validates the request shape,
+ * returns `allow` with no policies triggered, and logs so the Go gateway can
+ * exercise the full control-plane round-trip while real evaluator wiring
+ * lands. When the langwatch/langwatch_nlp evaluator SDK is connected here,
+ * this body swaps for a parallel fan-out with first-block short-circuit
+ * (contract §4.6, and @sergey's iter 3 gateway-side fan-out mirrors this
+ * contract).
+ */
+app.post("/guardrail/check", async (c) => {
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json(
+      {
+        error: {
+          type: "bad_request",
+          code: "invalid_json",
+          message: "guardrail/check requires a JSON body",
+        },
+      },
+      400,
+    );
+  }
+  const parsed = guardrailCheckRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json(
+      {
+        error: {
+          type: "bad_request",
+          code: "validation_error",
+          message: parsed.error.message,
+        },
+      },
+      400,
+    );
+  }
+  logger.info(
+    {
+      vkId: parsed.data.vk_id,
+      direction: parsed.data.direction,
+      guardrailIds: parsed.data.guardrail_ids,
+    },
+    "guardrail/check plumbing stub — returning allow",
+  );
+  return c.json({
+    decision: "allow" as const,
+    reason: null,
+    modified_content: null,
+    policies_triggered: [],
+  });
+});
+
+/**
+ * §9 — startup bootstrap. Paginated stream of all non-revoked VK JWTs so the
+ * gateway can serve traffic if the control-plane is offline on cold start.
+ * Enterprise opt-in (env `LW_GATEWAY_BOOTSTRAP_PULL=true` on gateway side).
+ *
+ * Query: ?cursor=<opaque>&limit=1000
+ * Response: { jwts: [...], next_cursor: null | string, current_revision }
+ */
+app.get("/bootstrap", (c) => notImplemented(c));

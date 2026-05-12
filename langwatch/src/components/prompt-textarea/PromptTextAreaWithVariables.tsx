@@ -1,4 +1,4 @@
-import { Box, Text } from "@chakra-ui/react";
+import { Box, HStack, Text } from "@chakra-ui/react";
 import {
   type ChangeEvent,
   type DragEvent,
@@ -9,21 +9,25 @@ import {
   useState,
 } from "react";
 import { RichTextarea, type RichTextareaHandle } from "rich-textarea";
+import type { CaretPosition } from "rich-textarea";
 import { useLayoutMode } from "~/prompts/prompt-playground/components/prompt-browser/prompt-browser-window/PromptBrowserWindowContent";
 import { VariableInsertMenu } from "../variables/VariableInsertMenu";
 import type { AvailableSource } from "../variables/VariableMappingInput";
+import { AddLogicButton } from "./components/AddLogicButton";
 import { AddVariableButton } from "./components/AddVariableButton";
+import { TemplateLogicMenu } from "./components/TemplateLogicMenu";
 import { GripHandles, LineHighlights } from "./components/ParagraphOverlay";
 import { useDebouncedTextarea } from "./hooks/useDebouncedTextarea";
 import { useParagraphDragDrop } from "./hooks/useParagraphDragDrop";
+import { useTemplateLogicMenu } from "./hooks/useTemplateLogicMenu";
 import { useTextareaResize } from "./hooks/useTextareaResize";
 import { useVariableMenu } from "./hooks/useVariableMenu";
 import type { PromptTextAreaWithVariablesProps } from "./types";
 import {
-  findUnclosedBraces,
-  parseVariablesFromText,
-  VARIABLE_REGEX,
-} from "./utils";
+  extractLiquidVariables,
+  tokenizeLiquidTemplate,
+} from "./liquidTokenizer";
+import { findUnclosedBraces, findUnclosedPercentBraces } from "./utils";
 
 export const PromptTextAreaWithVariables = ({
   value,
@@ -99,6 +103,10 @@ export const PromptTextAreaWithVariables = ({
   const textareaRef = useRef<RichTextareaHandle>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Shared caret refs for both menus
+  const caretPositionRef = useRef<CaretPosition | null>(null);
+  const lastUserCursorPosRef = useRef(-1);
+
   // Hover state
   const [isHovered, setIsHovered] = useState(false);
 
@@ -113,26 +121,7 @@ export const PromptTextAreaWithVariables = ({
   );
 
   // Variable menu logic
-  const {
-    menuOpen,
-    menuPosition,
-    menuQuery,
-    setMenuQuery,
-    highlightedIndex,
-    setHighlightedIndex,
-    isKeyboardNav,
-    setIsKeyboardNav,
-    buttonMenuMode,
-    optionCount,
-    addButtonRef,
-    handleSelectionChange,
-    openMenu,
-    closeMenu,
-    selectHighlightedOption,
-    handleSelectField,
-    handleCreateVariable,
-    handleAddVariableClick,
-  } = useVariableMenu({
+  const variableMenu = useVariableMenu({
     localValue,
     setValueImmediate,
     containerRef,
@@ -142,7 +131,32 @@ export const PromptTextAreaWithVariables = ({
     onSetVariableMapping,
     otherNodesFields,
     onAddEdge,
+    caretPositionRef,
+    lastUserCursorPosRef,
   });
+
+  // Template logic menu
+  const logicMenu = useTemplateLogicMenu({
+    localValue,
+    setValueImmediate,
+    containerRef,
+    caretPositionRef,
+    lastUserCursorPosRef,
+  });
+
+  // Shared selection change handler that updates caret refs for both menus
+  const handleSelectionChange = useCallback(
+    (pos: CaretPosition) => {
+      caretPositionRef.current = pos;
+      if (pos.focused) {
+        const nativeTextarea = containerRef.current?.querySelector("textarea");
+        if (nativeTextarea?.selectionStart !== undefined) {
+          lastUserCursorPosRef.current = nativeTextarea.selectionStart;
+        }
+      }
+    },
+    [containerRef, caretPositionRef, lastUserCursorPosRef],
+  );
 
   // Textarea resize detection
   const minHeightPx = parseInt(minHeight ?? "120", 10);
@@ -172,10 +186,22 @@ export const PromptTextAreaWithVariables = ({
     borderless,
   });
 
-  // Variables used in text but not defined
-  const usedVariables = useMemo(
-    () => parseVariablesFromText(localValue),
+  // Variables used in text - Liquid-aware extraction
+  const liquidVariables = useMemo(
+    () => extractLiquidVariables(localValue),
     [localValue],
+  );
+
+  const usedVariables = liquidVariables.inputVariables;
+
+  // Variables that are defined locally (loop iterators, assign) - not "undefined"
+  const locallyDefinedVariables = useMemo(
+    () =>
+      new Set([
+        ...liquidVariables.loopVariables,
+        ...liquidVariables.assignedVariables,
+      ]),
+    [liquidVariables],
   );
 
   const invalidVariables = useMemo(
@@ -183,10 +209,17 @@ export const PromptTextAreaWithVariables = ({
     [usedVariables, existingVariableIds],
   );
 
-  // Handle keyboard input
+  // Handle keyboard input - dispatches to whichever menu is active
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
-      if (!menuOpen) {
+      // Determine which menu is active
+      const activeMenu = variableMenu.menuOpen
+        ? variableMenu
+        : logicMenu.menuOpen
+          ? logicMenu
+          : null;
+
+      if (!activeMenu) {
         if (e.key === "Escape") return;
         return;
       }
@@ -194,36 +227,33 @@ export const PromptTextAreaWithVariables = ({
       switch (e.key) {
         case "ArrowDown":
           e.preventDefault();
-          setIsKeyboardNav(true);
-          setHighlightedIndex((prev) => Math.min(prev + 1, optionCount - 1));
+          activeMenu.setIsKeyboardNav(true);
+          activeMenu.setHighlightedIndex((prev: number) =>
+            Math.min(prev + 1, activeMenu.optionCount - 1),
+          );
           break;
         case "ArrowUp":
           e.preventDefault();
-          setIsKeyboardNav(true);
-          setHighlightedIndex((prev) => Math.max(prev - 1, 0));
+          activeMenu.setIsKeyboardNav(true);
+          activeMenu.setHighlightedIndex((prev: number) =>
+            Math.max(prev - 1, 0),
+          );
           break;
         case "Enter":
         case "Tab":
           e.preventDefault();
-          selectHighlightedOption();
+          activeMenu.selectHighlightedOption();
           break;
         case "Escape":
           e.preventDefault();
-          closeMenu();
+          activeMenu.closeMenu();
           break;
       }
     },
-    [
-      menuOpen,
-      optionCount,
-      closeMenu,
-      selectHighlightedOption,
-      setHighlightedIndex,
-      setIsKeyboardNav,
-    ],
+    [variableMenu, logicMenu],
   );
 
-  // Handle text change
+  // Handle text change - checks for both {%  and {{ triggers with mutual exclusion
   const handleChange = useCallback(
     (e: ChangeEvent<HTMLTextAreaElement>) => {
       const newValue = e.target.value;
@@ -231,72 +261,120 @@ export const PromptTextAreaWithVariables = ({
 
       handleValueChange(newValue);
 
-      // Check for unclosed {{ before cursor
-      const unclosed = findUnclosedBraces(newValue, cursorPos);
+      // Check {%  first since it's more specific than {{
+      const unclosedPercent = findUnclosedPercentBraces(newValue, cursorPos);
 
-      if (unclosed) {
-        if (!menuOpen) {
-          setTimeout(() => openMenu(unclosed.start, unclosed.query), 0);
-        } else {
-          setMenuQuery(unclosed.query);
+      if (unclosedPercent) {
+        // Close variable menu if open (mutual exclusion)
+        if (variableMenu.menuOpen) {
+          variableMenu.closeMenu();
         }
-      } else if (menuOpen) {
-        closeMenu();
+
+        if (!logicMenu.menuOpen) {
+          setTimeout(
+            () =>
+              logicMenu.openMenu(unclosedPercent.start, unclosedPercent.query),
+            0,
+          );
+        } else {
+          logicMenu.setMenuQuery(unclosedPercent.query);
+        }
+        return;
+      }
+
+      // If no {% trigger, close logic menu if open
+      if (logicMenu.menuOpen) {
+        logicMenu.closeMenu();
+      }
+
+      // Check for unclosed {{ before cursor
+      const unclosedBraces = findUnclosedBraces(newValue, cursorPos);
+
+      if (unclosedBraces) {
+        if (!variableMenu.menuOpen) {
+          setTimeout(
+            () =>
+              variableMenu.openMenu(
+                unclosedBraces.start,
+                unclosedBraces.query,
+              ),
+            0,
+          );
+        } else {
+          variableMenu.setMenuQuery(unclosedBraces.query);
+        }
+      } else if (variableMenu.menuOpen) {
+        variableMenu.closeMenu();
       }
     },
-    [handleValueChange, menuOpen, openMenu, closeMenu, setMenuQuery],
+    [handleValueChange, variableMenu, logicMenu],
   );
 
-  // Render function for rich-textarea - highlights variables
+  // Render function for rich-textarea - highlights Liquid tags and variables
   const renderText = useCallback(
     (text: string) => {
       if (!text) return null;
 
-      const parts: React.ReactNode[] = [];
-      let lastIndex = 0;
-      let match;
+      const tokens = tokenizeLiquidTemplate(text);
+      if (tokens.length === 0) return null;
 
-      const regex = new RegExp(VARIABLE_REGEX);
-      while ((match = regex.exec(text)) !== null) {
-        if (match.index > lastIndex) {
-          parts.push(text.substring(lastIndex, match.index));
+      return tokens.map((token, index) => {
+        if (token.type === "plain-text") {
+          return token.value;
         }
 
-        const varName = match[1] ?? "";
-        const isInvalid = varName ? !existingVariableIds.has(varName) : true;
+        if (token.type === "variable") {
+          // Extract the variable name (before any filter pipe)
+          const inner = token.value.slice(2, -2).trim();
+          const varName = inner.split("|")[0]!.trim().split(".")[0]!.trim();
+          // Valid if it's an existing external variable OR a locally-defined one (loop/assign)
+          const isInvalid = varName
+            ? !existingVariableIds.has(varName) &&
+              !locallyDefinedVariables.has(varName)
+            : true;
 
-        const variableColor = isInvalid
-          ? "var(--chakra-colors-red-500)"
-          : "var(--chakra-colors-blue-500)";
+          const variableColor = isInvalid
+            ? "var(--chakra-colors-red-500)"
+            : "var(--chakra-colors-blue-500)";
 
-        parts.push(
+          return (
+            <span
+              key={`var-${index}`}
+              style={{
+                color: variableColor,
+                // In borderless mode with variable-width fonts (Inter), real fontWeight
+                // changes character width and breaks caret positioning. Use text-shadow
+                // for a "faux bold" effect that doesn't affect text metrics.
+                fontWeight: borderless ? undefined : 600,
+                textShadow: borderless
+                  ? `0px 0px 1px ${variableColor}`
+                  : undefined,
+              }}
+            >
+              {token.value}
+            </span>
+          );
+        }
+
+        // liquid-tag: highlight with a distinct color
+        const tagColor = "var(--chakra-colors-purple-500)";
+        return (
           <span
-            key={`var-${match.index}`}
+            key={`tag-${index}`}
             style={{
-              color: variableColor,
-              // In borderless mode with variable-width fonts (Inter), real fontWeight
-              // changes character width and breaks caret positioning. Use text-shadow
-              // for a "faux bold" effect that doesn't affect text metrics.
+              color: tagColor,
               fontWeight: borderless ? undefined : 600,
               textShadow: borderless
-                ? `0px 0px 1px ${variableColor}`
+                ? `0px 0px 1px ${tagColor}`
                 : undefined,
             }}
           >
-            {match[0]}
-          </span>,
+            {token.value}
+          </span>
         );
-
-        lastIndex = regex.lastIndex;
-      }
-
-      if (lastIndex < text.length) {
-        parts.push(text.substring(lastIndex));
-      }
-
-      return parts;
+      });
     },
-    [existingVariableIds, borderless],
+    [existingVariableIds, locallyDefinedVariables, borderless],
   );
 
   const visibleParagraphPositions = getVisibleParagraphPositions(isHovered);
@@ -426,33 +504,67 @@ export const PromptTextAreaWithVariables = ({
             </Text>
           )}
 
-          {/* Add variable button */}
+          {/* Add variable and Add logic buttons */}
           {showAddContextButton && isHovered && !disabled && (
-            <AddVariableButton
-              ref={addButtonRef}
-              onClick={handleAddVariableClick}
+            <HStack
+              position="absolute"
               bottom={
                 (invalidVariables.length > 0 ? 9 : 2.5) - (borderless ? 2 : 0)
               }
-            />
+              right={2}
+              gap={1}
+            >
+              <AddLogicButton
+                ref={logicMenu.addButtonRef}
+                onClick={logicMenu.handleAddLogicClick}
+              />
+              <AddVariableButton
+                ref={variableMenu.addButtonRef}
+                onClick={variableMenu.handleAddVariableClick}
+              />
+            </HStack>
           )}
         </Box>
 
         {/* Variable Insert Menu */}
         <VariableInsertMenu
-          isOpen={menuOpen}
-          position={menuPosition}
+          isOpen={variableMenu.menuOpen}
+          position={variableMenu.menuPosition}
           availableSources={availableSources}
-          query={menuQuery}
-          onQueryChange={buttonMenuMode ? setMenuQuery : undefined}
-          highlightedIndex={highlightedIndex}
-          onHighlightChange={setHighlightedIndex}
-          isKeyboardNav={isKeyboardNav}
-          onKeyboardNavChange={setIsKeyboardNav}
-          onSelect={handleSelectField}
-          onCreateVariable={onCreateVariable ? handleCreateVariable : undefined}
-          onClose={closeMenu}
-          triggerRef={addButtonRef}
+          query={variableMenu.menuQuery}
+          onQueryChange={
+            variableMenu.buttonMenuMode
+              ? variableMenu.setMenuQuery
+              : undefined
+          }
+          highlightedIndex={variableMenu.highlightedIndex}
+          onHighlightChange={variableMenu.setHighlightedIndex}
+          isKeyboardNav={variableMenu.isKeyboardNav}
+          onKeyboardNavChange={variableMenu.setIsKeyboardNav}
+          onSelect={variableMenu.handleSelectField}
+          onCreateVariable={
+            onCreateVariable ? variableMenu.handleCreateVariable : undefined
+          }
+          onClose={variableMenu.closeMenu}
+          triggerRef={variableMenu.addButtonRef}
+        />
+
+        {/* Template Logic Menu */}
+        <TemplateLogicMenu
+          isOpen={logicMenu.menuOpen}
+          position={logicMenu.menuPosition}
+          query={logicMenu.menuQuery}
+          onQueryChange={
+            logicMenu.buttonMenuMode ? logicMenu.setMenuQuery : undefined
+          }
+          filteredConstructs={logicMenu.filteredConstructs}
+          highlightedIndex={logicMenu.highlightedIndex}
+          onHighlightChange={logicMenu.setHighlightedIndex}
+          isKeyboardNav={logicMenu.isKeyboardNav}
+          onKeyboardNavChange={logicMenu.setIsKeyboardNav}
+          onSelect={logicMenu.insertConstruct}
+          onClose={logicMenu.closeMenu}
+          triggerRef={logicMenu.addButtonRef}
         />
       </Box>
     </>

@@ -3,30 +3,26 @@ import {
   Box,
   Button,
   HStack,
-  type MenuItemProps,
   Separator,
   Skeleton,
   Spacer,
-  Spinner,
   Text,
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
 import type { Dataset, DatasetRecord, Project } from "@prisma/client";
 import type { Edge } from "@xyflow/react";
-import { useRouter } from "next/router";
 import { useCallback, useState } from "react";
 import {
   ArrowUp,
   ArrowUpCircle,
   ChevronDown,
   Code,
-  Lock,
   Play,
   Share2,
   XCircle,
 } from "react-feather";
-import { useForm } from "react-hook-form";
+import { FormProvider, useForm } from "react-hook-form";
 import { RenderCode } from "~/components/code/RenderCode";
 import { langwatchEndpoint } from "../../components/code/langwatchEndpointEnv";
 import { SmallLabel } from "../../components/SmallLabel";
@@ -37,8 +33,6 @@ import { toaster } from "../../components/ui/toaster";
 import { Tooltip } from "../../components/ui/tooltip";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
-import { trackEvent } from "../../utils/tracking";
-import { usePlanManagementUrl } from "../../hooks/usePlanManagementUrl";
 import { useModelProviderKeys } from "../hooks/useModelProviderKeys";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import type { Workflow } from "../types/dsl";
@@ -48,7 +42,8 @@ import {
 } from "../utils/datasetUtils";
 import { getEntryInputs } from "../utils/nodeUtils";
 import { AddModelProviderKey } from "./AddModelProviderKey";
-import { useVersionState, VersionToBeUsed } from "./History";
+import { useVersionState } from "./History";
+import { VersionToBeUsed } from "./VersionToBeUsed";
 
 // Type with dataset property
 interface NodeDataWithDataset {
@@ -239,7 +234,6 @@ function PublishMenu({
     project,
     allowSaveIfAutoSaveIsCurrentButNotLatest: false,
   });
-  const router = useRouter();
   const trpc = api.useContext();
 
   const publishedWorkflow = api.optimization.getPublishedWorkflow.useQuery(
@@ -324,55 +318,9 @@ function PublishMenu({
     });
   };
 
-  const { organization } = useOrganizationTeamProject();
-  const { url: planManagementUrl } = usePlanManagementUrl();
-  const usage = api.limits.getUsage.useQuery(
-    { organizationId: organization?.id ?? "" },
-    {
-      enabled: !!organization,
-    },
-  );
-
-  const planAllowsToPublish = usage.data?.activePlan.canPublish;
   const publishDisabledLabel = !publishedWorkflow.data?.version
     ? "Publish a version to enable this option"
     : undefined;
-
-  const SubscriptionMenuItem = (
-    props: MenuItemProps & {
-      tooltip?: string;
-    },
-  ) => {
-    if (!planAllowsToPublish) {
-      return (
-        <Tooltip
-          content="Subscribe to unlock publishing, click to continue"
-          positioning={{ placement: "right" }}
-        >
-          <Menu.Item
-            {...props}
-            disabled={false}
-            color="fg.subtle"
-            onClick={() => {
-              trackEvent("subscription_hook_click", {
-                projectId: project?.id,
-                hook: "studio_click_subscribe_to_publish",
-              });
-              void router.push(planManagementUrl);
-            }}
-          >
-            {usage.data ? <Lock size={16} /> : <Spinner size="sm" />}
-            {props.children}
-          </Menu.Item>
-        </Tooltip>
-      );
-    }
-    return (
-      <Tooltip content={props.tooltip} positioning={{ placement: "right" }}>
-        <Menu.Item {...props} />
-      </Tooltip>
-    );
-  };
 
   const handleExportWorkflow = async () => {
     await exportWorkflow(workflow, datasetRecords.data ?? undefined);
@@ -389,16 +337,17 @@ function PublishMenu({
           <Separator />
         </>
       )}
-      <SubscriptionMenuItem
-        tooltip={canPublish}
-        onClick={onTogglePublish}
-        disabled={!!canPublish}
-        value="publish"
-      >
-        <ArrowUp size={16} />{" "}
-        <Text textTransform="capitalize">{`Publish ${workflow_type}`}</Text>
-      </SubscriptionMenuItem>
-      <SubscriptionMenuItem
+      <Tooltip content={canPublish} positioning={{ placement: "right" }}>
+        <Menu.Item
+          onClick={onTogglePublish}
+          disabled={!!canPublish}
+          value="publish"
+        >
+          <ArrowUp size={16} />{" "}
+          <Text textTransform="capitalize">{`Publish ${workflow_type}`}</Text>
+        </Menu.Item>
+      </Tooltip>
+      <Menu.Item
         hidden={
           workflow_type === "workflow" || !publishedWorkflow.data?.isEvaluator
         }
@@ -406,9 +355,9 @@ function PublishMenu({
         value="evaluator"
       >
         <XCircle size={16} /> Unpublish Evaluator
-      </SubscriptionMenuItem>
+      </Menu.Item>
 
-      <SubscriptionMenuItem
+      <Menu.Item
         hidden={
           workflow_type === "workflow" || !publishedWorkflow.data?.isComponent
         }
@@ -416,22 +365,26 @@ function PublishMenu({
         onClick={disableAsComponent}
       >
         <XCircle size={16} /> Unpublish Component
-      </SubscriptionMenuItem>
+      </Menu.Item>
 
-      <SubscriptionMenuItem
-        tooltip={publishDisabledLabel}
-        onClick={onToggleApi}
-        disabled={!!publishDisabledLabel}
-        value="api-reference"
+      <Tooltip
+        content={publishDisabledLabel}
+        positioning={{ placement: "right" }}
       >
-        <Code size={16} /> View API Reference
-      </SubscriptionMenuItem>
-      <SubscriptionMenuItem
+        <Menu.Item
+          onClick={onToggleApi}
+          disabled={!!publishDisabledLabel}
+          value="api-reference"
+        >
+          <Code size={16} /> View API Reference
+        </Menu.Item>
+      </Tooltip>
+      <Menu.Item
         onClick={() => void handleExportWorkflow()}
         value="export-workflow"
       >
         <Share2 size={16} /> Export Workflow
-      </SubscriptionMenuItem>
+      </Menu.Item>
     </>
   );
 }
@@ -449,11 +402,31 @@ function PublishModalContent({
 }) {
   const { project } = useOrganizationTeamProject();
 
-  const { workflowId, getWorkflow, workflow_type } = useWorkflowStore(
-    ({ workflow_id: workflowId, getWorkflow, workflow_type }) => ({
+  const {
+    workflowId,
+    getWorkflow,
+    workflow_type,
+    setLastCommittedWorkflow,
+    setCurrentVersionId,
+    currentVersionId,
+    checkCanCommitNewVersion,
+  } = useWorkflowStore(
+    ({
+      workflow_id: workflowId,
+      getWorkflow,
+      workflow_type,
+      setLastCommittedWorkflow,
+      setCurrentVersionId,
+      currentVersionId,
+      checkCanCommitNewVersion,
+    }) => ({
       workflowId,
       getWorkflow,
       workflow_type,
+      setLastCommittedWorkflow,
+      setCurrentVersionId,
+      currentVersionId,
+      checkCanCommitNewVersion,
     }),
   );
 
@@ -474,12 +447,21 @@ function PublishModalContent({
 
   const formVersion = form.watch("version");
 
-  const { versions, versionToBeEvaluated, nextVersion, canSaveNewVersion } =
-    useVersionState({
-      project,
-      form,
-      allowSaveIfAutoSaveIsCurrentButNotLatest: false,
-    });
+  const {
+    versions,
+    versionToBeEvaluated,
+  } = useVersionState({
+    project,
+    form,
+    allowSaveIfAutoSaveIsCurrentButNotLatest: false,
+  });
+
+  // Use the same check as VersionToBeUsed to decide whether a new commit is needed.
+  // canSaveNewVersion (from useVersionState) may be true due to autoSaved conditions
+  // even when there are no actual DSL changes, which causes a mismatch: the UI shows
+  // CurrentVersionDisplay (no commit message input) but onSubmit tries to commit,
+  // fails form validation silently, and the button appears to hang.
+  const canSave = checkCanCommitNewVersion();
 
   const publishWorkflow = api.workflow.publish.useMutation();
 
@@ -506,9 +488,9 @@ function PublishModalContent({
     }) => {
       if (!project || !workflowId) return;
 
-      let versionId: string | undefined = versionToBeEvaluated.id;
+      let versionId: string | undefined;
 
-      if (canSaveNewVersion) {
+      if (canSave) {
         try {
           const versionResponse = await commitVersion.mutateAsync({
             projectId: project.id,
@@ -520,6 +502,8 @@ function PublishModalContent({
             },
           });
           versionId = versionResponse.id;
+          setLastCommittedWorkflow(getWorkflow());
+          setCurrentVersionId(versionId);
         } catch (error) {
           toaster.create({
             title: "Error saving version",
@@ -531,11 +515,13 @@ function PublishModalContent({
           });
           throw error;
         }
+      } else {
+        versionId = currentVersionId;
       }
 
       if (!versionId) {
         toaster.create({
-          title: "Version ID not found for evaluation",
+          title: "Version ID not found for publishing",
           type: "error",
           duration: 5000,
           meta: {
@@ -577,13 +563,15 @@ function PublishModalContent({
       );
     },
     [
-      canSaveNewVersion,
+      canSave,
       commitVersion,
+      currentVersionId,
       getWorkflow,
       project,
       publishWorkflow,
       publishedWorkflow,
-      versionToBeEvaluated.id,
+      setCurrentVersionId,
+      setLastCommittedWorkflow,
       versions,
       workflowId,
       workflow_type,
@@ -620,6 +608,7 @@ function PublishModalContent({
     : false;
 
   return (
+    <FormProvider {...form}>
     <Dialog.Content
       as="form"
       // eslint-disable-next-line @typescript-eslint/no-misused-promises
@@ -637,14 +626,7 @@ function PublishModalContent({
             Publish your workflow to make it available via API, as a component
             to other workflows, or as a custom evaluator.
           </Text>
-          {versionToBeEvaluated && (
-            <VersionToBeUsed
-              form={form}
-              nextVersion={nextVersion}
-              canSaveNewVersion={canSaveNewVersion}
-              versionToBeEvaluated={versionToBeEvaluated}
-            />
-          )}
+          <VersionToBeUsed />
         </VStack>
       </Dialog.Body>
       <Dialog.Footer borderTop="1px solid" borderColor="border" marginTop={4}>
@@ -669,9 +651,9 @@ function PublishModalContent({
                   {isDisabled
                     ? "Publish"
                     : `Publish Version ${
-                        canSaveNewVersion
+                        canSave
                           ? formVersion
-                          : versionToBeEvaluated.version
+                          : versionToBeEvaluated.version ?? ""
                       }`}
                 </Button>
               </HStack>
@@ -699,6 +681,7 @@ function PublishModalContent({
         </VStack>
       </Dialog.Footer>
     </Dialog.Content>
+    </FormProvider>
   );
 }
 

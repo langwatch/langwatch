@@ -1,0 +1,28 @@
+package gatewaytracer
+
+const (
+	AttrOrigin                    = "langwatch.origin"
+	OriginGateway                 = "gateway"
+	AttrVirtualKeyID              = "langwatch.virtual_key_id"
+	AttrProjectID                 = "langwatch.project_id"
+	AttrTeamID                    = "langwatch.team_id"
+	AttrOrgID                     = "langwatch.organization_id"
+	AttrPrincipalID               = "langwatch.principal_id"
+	AttrGatewayReqID              = "langwatch.gateway_request_id"
+	AttrModel                     = "langwatch.model"
+	AttrProvider                  = "langwatch.provider"
+	AttrModelSource               = "langwatch.model_source"
+	AttrStreaming                 = "langwatch.streaming"
+	AttrCostUSD                   = "langwatch.cost_usd"
+	AttrDurationMS                = "langwatch.duration_ms"
+	AttrStatus                    = "langwatch.status"
+	AttrDecision                  = "langwatch.budget.decision"
+	AttrGuardrailVerdict          = "langwatch.guardrail.verdict"
+	AttrCacheRuleID               = "langwatch.cache.rule_id"
+	AttrCacheRulePriority         = "langwatch.cache.rule_priority"
+	AttrCacheModeApplied          = "langwatch.cache.mode_applied"
+	AttrFallbackAttemptsCount     = "langwatch.fallback.attempts_count"
+	AttrFallbackWinningProvider   = "langwatch.fallback.winning_provider"
+	AttrFallbackWinningCredential = "langwatch.fallback.winning_credential"
+	AttrThreadID                  = "langwatch.thread_id"
+)

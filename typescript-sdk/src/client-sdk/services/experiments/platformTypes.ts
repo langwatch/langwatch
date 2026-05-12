@@ -74,4 +74,8 @@ export type ExperimentRunResult = {
    * @param exitOnFailure - If true (default), calls process.exit(1) when there are failures
    */
   printSummary: (exitOnFailure?: boolean) => void;
+  /**
+   * Human-readable string representation
+   */
+  toString: () => string;
 };

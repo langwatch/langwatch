@@ -19,6 +19,8 @@ export const orderedResources: Resource[] = [
   Resources.TRIGGERS,
   Resources.WORKFLOWS,
   Resources.PROMPTS,
+  Resources.SECRETS,
+  Resources.AUDIT_LOG,
   Resources.TEAM,
   Resources.PROJECT,
   // Resources.PLAYGROUND, // Hidden intentionally
@@ -31,7 +33,15 @@ export function getValidActionsForResource(resource: Resource): Action[] {
   if (resource === Resources.TRACES) {
     return [Actions.VIEW, Actions.SHARE];
   }
+  if (resource === Resources.SECRETS) {
+    return [Actions.VIEW, Actions.MANAGE];
+  }
   if (resource === Resources.SCENARIOS) {
+    return [Actions.VIEW];
+  }
+  if (resource === Resources.AUDIT_LOG) {
+    // Audit log is read-only; rows are emitted by other services and never
+    // mutated through this surface. Only :view is meaningful.
     return [Actions.VIEW];
   }
   return [

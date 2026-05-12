@@ -115,8 +115,8 @@ const buildColumns = (
         cell: ({ getValue }) => {
           const value = getValue();
 
-          // Check for image - only if column is marked as having images
-          if (col.hasImages && typeof value === "string") {
+          // Check each cell for image URLs regardless of column type
+          if (typeof value === "string") {
             const imageUrl = getImageUrl(value);
             if (imageUrl) {
               return (

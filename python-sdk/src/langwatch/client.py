@@ -19,6 +19,7 @@ from opentelemetry.sdk.trace import ReadableSpan
 
 from .exporters.filterable_batch_span_exporter import FilterableBatchSpanProcessor
 from .types import LangWatchClientProtocol
+from .utils.auth import build_auth_headers
 
 from .generated.langwatch_rest_api_client import Client as LangWatchApiClient
 
@@ -37,6 +38,7 @@ class Client(LangWatchClientProtocol):
     _instance: ClassVar[Optional["Client"]] = None
     _debug: ClassVar[bool] = False
     _api_key: ClassVar[str] = ""
+    _project_id: ClassVar[Optional[str]] = None
     _endpoint_url: ClassVar[str] = ""
     _base_attributes: ClassVar[BaseAttributes] = {}
     _instrumentors: ClassVar[Sequence[BaseInstrumentor]] = ()
@@ -71,6 +73,7 @@ class Client(LangWatchClientProtocol):
         ignore_global_tracer_provider_override_warning: Optional[bool] = None,
         skip_open_telemetry_setup: Optional[bool] = None,
         prompts_path: Optional[str] = None,
+        project_id: Optional[str] = None,
     ) -> "Client":
         """Ensure only one instance of Client exists (singleton pattern)."""
         if cls._instance is None:
@@ -91,6 +94,7 @@ class Client(LangWatchClientProtocol):
         ignore_global_tracer_provider_override_warning: Optional[bool] = None,
         skip_open_telemetry_setup: Optional[bool] = None,
         prompts_path: Optional[str] = None,
+        project_id: Optional[str] = None,
     ):
         """
         Initialize the LangWatch tracing client.
@@ -118,6 +122,14 @@ class Client(LangWatchClientProtocol):
             # Update via public setters so side-effects run
             if api_key is not None and api_key != self.api_key:
                 self.api_key = api_key
+            if project_id is not None and project_id != Client._project_id:
+                Client._project_id = project_id
+                if (
+                    not Client._skip_open_telemetry_setup
+                    and not Client._disable_sending
+                ):
+                    self.__shutdown_tracer_provider()
+                    self.__setup_tracer_provider()
             if endpoint_url is not None and endpoint_url != Client._endpoint_url:
                 Client._endpoint_url = endpoint_url
                 if (
@@ -191,12 +203,30 @@ class Client(LangWatchClientProtocol):
         elif not Client._api_key:
             Client._api_key = os.getenv("LANGWATCH_API_KEY", "")
 
+        # project_id is required when api_key is a PAT so the server can
+        # resolve the correct role binding. Falls back to the env var.
+        if project_id is not None:
+            Client._project_id = project_id
+        elif Client._project_id is None:
+            Client._project_id = os.getenv("LANGWATCH_PROJECT_ID")
+
         if endpoint_url is not None:
             Client._endpoint_url = endpoint_url
-        elif not Client._endpoint_url:
-            Client._endpoint_url = (
-                os.getenv("LANGWATCH_ENDPOINT") or "https://app.langwatch.ai"
-            )
+        else:
+            # Always re-read LANGWATCH_ENDPOINT from env on every setup()
+            # call. The previous "pin once on first init" behavior caused
+            # Client._endpoint_url to stick at the default (https://app.langwatch.ai)
+            # whenever some code path called setup() before the host env had
+            # LANGWATCH_ENDPOINT set — most commonly dspy's ProcessPool
+            # worker init order, which made every self-host evaluator
+            # callback 401 against the cloud API. Re-reading per-call costs
+            # one os.getenv lookup; the explicit endpoint_url path above
+            # still wins.
+            env_endpoint = os.getenv("LANGWATCH_ENDPOINT")
+            if env_endpoint:
+                Client._endpoint_url = env_endpoint
+            elif not Client._endpoint_url:
+                Client._endpoint_url = "https://app.langwatch.ai"
 
         if debug is not None:
             Client._debug = debug
@@ -548,7 +578,10 @@ class Client(LangWatchClientProtocol):
             raise ValueError("LangWatch API key is required but not provided")
 
         headers = {
-            "Authorization": f"Bearer {Client._api_key}",
+            **build_auth_headers(
+                api_key=Client._api_key,
+                project_id=Client._project_id,
+            ),
             "X-LangWatch-SDK-Version": str(__version__),
         }
 
@@ -584,7 +617,10 @@ class Client(LangWatchClientProtocol):
         """
         Client._rest_api_client = LangWatchApiClient(
             base_url=Client._endpoint_url,
-            headers={"X-Auth-Token": Client._api_key},
+            headers=build_auth_headers(
+                api_key=Client._api_key,
+                project_id=Client._project_id,
+            ),
             raise_on_unexpected_status=True,
         )
 

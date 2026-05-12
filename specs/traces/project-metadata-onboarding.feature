@@ -1,0 +1,29 @@
+Feature: Project becomes integrated after first trace ingestion
+  Projects using event-sourcing ingestion mark themselves as integrated
+  when the first trace arrives, enabling the messages page to render
+  the trace list instead of the welcome screen.
+
+  # The 2 @unimplemented scenarios describe the trace-processing
+  # pipeline marking projects as integrated. Need a targeted unit test
+  # in `langwatch/src/server/event-sourcing/pipelines/trace-processing/`
+  # for the project.firstMessage projection.
+
+  @integration @unimplemented
+  Scenario: Project marks as integrated after first trace ingestion
+    Given a project with firstMessage set to false
+    And the project uses event-sourcing ingestion
+    When a trace is processed through the trace-processing pipeline
+    Then project.firstMessage is set to true
+    And project.integrated is set to true
+    And project.language is detected from SDK attributes
+
+  @integration @unimplemented
+  Scenario: Messages page renders trace list for integrated projects
+    Given a project with firstMessage = true
+    When the user opens the project messages page
+    Then the messages page renders the trace list instead of the welcome screen
+    # Page-level gating lives in src/pages/[project]/messages.tsx via
+    # api.project.getHasFirstMessage; project.firstMessage is set by the
+    # projectMetadata reactor on first trace ingestion (no separate
+    # featureEventSourcingTraceIngestion / disableElasticSearchTraceWriting
+    # flags exist in the codebase as of 2026-05-01).

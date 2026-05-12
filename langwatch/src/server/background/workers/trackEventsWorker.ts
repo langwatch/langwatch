@@ -1,5 +1,7 @@
 import { type Job, Worker } from "bullmq";
+import { BullMQOtel } from "bullmq-otel";
 import type { TrackEventJob } from "~/server/background/types";
+import { withJobContext } from "../../context/asyncContext";
 import type {
   ElasticSearchEvent,
   ElasticSearchTrace,
@@ -9,8 +11,10 @@ import {
   captureException,
   withScope,
 } from "../../../utils/posthogErrorCapture";
+import { env } from "../../../env.mjs";
 import { esClient, TRACE_INDEX, traceIndexId } from "../../elasticsearch";
 import {
+  recordJobWaitDuration,
   getJobProcessingCounter,
   getJobProcessingDurationHistogram,
 } from "../../metrics";
@@ -21,9 +25,21 @@ import { TRACK_EVENTS_QUEUE } from "../queues/trackEventsQueue";
 const logger = createLogger("langwatch:workers:trackEventWorker");
 
 export async function runTrackEventJob(job: Job<TrackEventJob, void, string>) {
+  recordJobWaitDuration(job, "track_events");
   logger.info({ jobId: job.id, data: job.data }, "processing job");
-  getJobProcessingCounter("track_event", "processing").inc();
+  getJobProcessingCounter("track_events", "processing").inc();
   const start = Date.now();
+
+  // Track events live in the Elasticsearch trace index — without ES,
+  // there's no destination and no parity with ClickHouse for this shape
+  // (event arrays appended onto a trace doc via painless script). Drain
+  // the job successfully so it doesn't BullMQ-retry forever and starve
+  // the worker's concurrency slots; the trace itself is still recorded
+  // through the regular collector pipeline.
+  if (!env.ELASTICSEARCH_NODE_URL) {
+    getJobProcessingCounter("track_events", "completed").inc();
+    return;
+  }
   let event: ElasticSearchEvent = {
     ...job.data.event,
     project_id: job.data.project_id,
@@ -32,10 +48,12 @@ export async function runTrackEventJob(job: Job<TrackEventJob, void, string>) {
       value,
     })),
     event_details: job.data.event.event_details
-      ? Object.entries(job.data.event.event_details).map(([key, value]) => ({
-          key,
-          value,
-        }))
+      ? Object.entries(job.data.event.event_details)
+          .filter(([, value]) => value != null)
+          .map(([key, value]) => ({
+            key,
+            value: value!,
+          }))
       : [],
     timestamps: {
       started_at: job.data.event.timestamp,
@@ -102,9 +120,9 @@ export async function runTrackEventJob(job: Job<TrackEventJob, void, string>) {
     },
     refresh: true,
   });
-  getJobProcessingCounter("track_event", "completed").inc();
+  getJobProcessingCounter("track_events", "completed").inc();
   const duration = Date.now() - start;
-  getJobProcessingDurationHistogram("track_event").observe(duration);
+  getJobProcessingDurationHistogram("track_events").observe(duration);
 }
 
 export const startTrackEventsWorker = () => {
@@ -115,10 +133,11 @@ export const startTrackEventsWorker = () => {
 
   const trackEventsWorker = new Worker<TrackEventJob, void, string>(
     TRACK_EVENTS_QUEUE.NAME,
-    runTrackEventJob,
+    withJobContext(runTrackEventJob),
     {
       connection,
       concurrency: 3,
+      telemetry: new BullMQOtel(TRACK_EVENTS_QUEUE.NAME),
     },
   );
 
@@ -128,7 +147,7 @@ export const startTrackEventsWorker = () => {
 
   trackEventsWorker.on("failed", async (job, err) => {
     logger.error({ jobId: job?.id, error: err.message }, "job failed");
-    getJobProcessingCounter("track_event", "failed").inc();
+    getJobProcessingCounter("track_events", "failed").inc();
     await withScope((scope) => {
       scope.setTag?.("worker", "trackEvents");
       scope.setExtra?.("job", job?.data);

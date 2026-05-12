@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar
 
@@ -22,11 +24,11 @@ class PostApiPromptsByIdSyncResponse200PromptPromptingTechniqueDemonstrationsInl
     Attributes:
         records (PostApiPromptsByIdSyncResponse200PromptPromptingTechniqueDemonstrationsInlineRecords):
         column_types
-            (list['PostApiPromptsByIdSyncResponse200PromptPromptingTechniqueDemonstrationsInlineColumnTypesItem']):
+            (list[PostApiPromptsByIdSyncResponse200PromptPromptingTechniqueDemonstrationsInlineColumnTypesItem]):
     """
 
-    records: "PostApiPromptsByIdSyncResponse200PromptPromptingTechniqueDemonstrationsInlineRecords"
-    column_types: list["PostApiPromptsByIdSyncResponse200PromptPromptingTechniqueDemonstrationsInlineColumnTypesItem"]
+    records: PostApiPromptsByIdSyncResponse200PromptPromptingTechniqueDemonstrationsInlineRecords
+    column_types: list[PostApiPromptsByIdSyncResponse200PromptPromptingTechniqueDemonstrationsInlineColumnTypesItem]
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:

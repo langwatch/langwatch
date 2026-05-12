@@ -15,11 +15,15 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
 }));
 
 const mockUseQuery = vi.fn();
+const mockMutate = vi.fn();
 vi.mock("~/utils/api", () => ({
   api: {
     licenseEnforcement: {
       checkLimit: {
         useQuery: (...args: unknown[]) => mockUseQuery(...args),
+      },
+      reportLimitBlocked: {
+        useMutation: () => ({ mutate: mockMutate }),
       },
     },
   },
@@ -176,6 +180,56 @@ describe("useLicenseEnforcement", () => {
       expect(callback).toHaveBeenCalled();
       // Modal store should not have been called
       expect(mockOpenUpgradeModal).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("fire-and-forget notification", () => {
+    it("calls reportLimitBlocked when checkAndProceed blocks a user", () => {
+      mockUseQuery.mockReturnValue({
+        data: { allowed: false, current: 10, max: 10 },
+        isLoading: false,
+      });
+
+      const { result } = renderHook(() => useLicenseEnforcement("workflows"));
+
+      act(() => {
+        result.current.checkAndProceed(() => {});
+      });
+
+      expect(mockMutate).toHaveBeenCalledWith({
+        organizationId: "org-123",
+        limitType: "workflows",
+      });
+    });
+
+    it("does not call reportLimitBlocked when action is allowed", () => {
+      mockUseQuery.mockReturnValue({
+        data: { allowed: true, current: 3, max: 10 },
+        isLoading: false,
+      });
+
+      const { result } = renderHook(() => useLicenseEnforcement("workflows"));
+
+      act(() => {
+        result.current.checkAndProceed(() => {});
+      });
+
+      expect(mockMutate).not.toHaveBeenCalled();
+    });
+
+    it("does not call reportLimitBlocked when data is not yet loaded", () => {
+      mockUseQuery.mockReturnValue({
+        data: undefined,
+        isLoading: true,
+      });
+
+      const { result } = renderHook(() => useLicenseEnforcement("workflows"));
+
+      act(() => {
+        result.current.checkAndProceed(() => {});
+      });
+
+      expect(mockMutate).not.toHaveBeenCalled();
     });
   });
 

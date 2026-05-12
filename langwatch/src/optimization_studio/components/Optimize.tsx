@@ -19,6 +19,7 @@ import { CheckSquare, Info, TrendingUp } from "react-feather";
 import {
   Controller,
   type ControllerRenderProps,
+  FormProvider,
   type UseFormReturn,
   useForm,
 } from "react-hook-form";
@@ -41,7 +42,8 @@ import { trainTestSplit } from "../utils/datasetUtils";
 import { checkIsEvaluator } from "../utils/nodeUtils";
 
 import { AddModelProviderKey } from "./AddModelProviderKey";
-import { useVersionState, VersionToBeUsed } from "./History";
+import { useVersionState } from "./History";
+import { VersionToBeUsed } from "./VersionToBeUsed";
 import { OptimizationStudioLLMConfigField } from "./properties/llm-configs/OptimizationStudioLLMConfigField";
 
 const optimizerOptions: {
@@ -55,15 +57,19 @@ const optimizerOptions: {
 }));
 
 export function Optimize() {
+  // All hooks MUST run before any conditional return — see the "Rules of
+  // Hooks". The flag-gated early return below requires every hook used in
+  // this component to be called above it.
   const { open, onToggle, onClose, setOpen } = useDisclosure();
 
   const { project } = useOrganizationTeamProject();
   const { optimizationState } = useWorkflowStore(({ state }) => ({
     optimizationState: state.optimization,
   }));
-
-  const isRunning = optimizationState?.status === "running";
-
+  const engineMode = api.workflow.engineMode.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project?.id, staleTime: 60_000 },
+  );
   const form = useForm<OptimizeForm>({
     defaultValues: {
       version: "",
@@ -72,6 +78,16 @@ export function Optimize() {
       params: {},
     },
   });
+
+  // Hide the Optimize button when the project is on the Go NLP engine.
+  // Optimization was DSPy-only and the Go engine intentionally drops DSPy
+  // (see specs/nlp-go/feature-flag.feature). Server-side guards reject
+  // optimize websocket events too — UI hide is the visible half.
+  if (engineMode.data && !engineMode.data.optimizeEnabled) {
+    return null;
+  }
+
+  const isRunning = optimizationState?.status === "running";
 
   return (
     <>
@@ -119,6 +135,10 @@ export function OptimizeModalContent({
     deselectAllNodes,
     setOpenResultsPanelRequest,
     default_llm,
+    setLastCommittedWorkflow,
+    setCurrentVersionId,
+    currentVersionId,
+    checkCanCommitNewVersion,
   } = useWorkflowStore(
     ({
       workflow_id: workflowId,
@@ -128,6 +148,10 @@ export function OptimizeModalContent({
       deselectAllNodes,
       setOpenResultsPanelRequest,
       default_llm,
+      setLastCommittedWorkflow,
+      setCurrentVersionId,
+      currentVersionId,
+      checkCanCommitNewVersion,
     }) => ({
       workflowId,
       getWorkflow,
@@ -136,6 +160,10 @@ export function OptimizeModalContent({
       deselectAllNodes,
       setOpenResultsPanelRequest,
       default_llm,
+      setLastCommittedWorkflow,
+      setCurrentVersionId,
+      currentVersionId,
+      checkCanCommitNewVersion,
     }),
   );
 
@@ -178,7 +206,7 @@ export function OptimizeModalContent({
     },
   );
 
-  const { versions, canSaveNewVersion, nextVersion, versionToBeEvaluated } =
+  const { versions } =
     useVersionState({
       project,
       form: form as unknown as UseFormReturn<{
@@ -187,6 +215,7 @@ export function OptimizeModalContent({
       }>,
       allowSaveIfAutoSaveIsCurrentButNotLatest: false,
     });
+  const canSave = checkCanCommitNewVersion();
 
   const commitVersion = api.workflow.commitVersion.useMutation();
   const { startOptimizationExecution } = useOptimizationExecution();
@@ -211,8 +240,6 @@ export function OptimizeModalContent({
     async ({ version, commitMessage, optimizer, params }: OptimizeForm) => {
       if (!project || !workflowId) return;
 
-      let versionId: string | undefined = versionToBeEvaluated.id;
-
       if (!train.length) {
         return;
       }
@@ -231,7 +258,9 @@ export function OptimizeModalContent({
         return;
       }
 
-      if (canSaveNewVersion) {
+      let versionId: string | undefined;
+
+      if (canSave) {
         try {
           const versionResponse = await commitVersion.mutateAsync({
             projectId: project.id,
@@ -243,6 +272,8 @@ export function OptimizeModalContent({
             },
           });
           versionId = versionResponse.id;
+          setLastCommittedWorkflow(getWorkflow());
+          setCurrentVersionId(versionId);
           toaster.create({
             title: "Version saved",
             description: "New version has been saved successfully",
@@ -256,6 +287,8 @@ export function OptimizeModalContent({
           });
           throw error;
         }
+      } else {
+        versionId = currentVersionId;
       }
 
       if (!versionId) {
@@ -277,13 +310,15 @@ export function OptimizeModalContent({
       setHasStarted(true);
     },
     [
-      canSaveNewVersion,
+      canSave,
       commitVersion,
+      currentVersionId,
       getWorkflow,
       project,
+      setCurrentVersionId,
+      setLastCommittedWorkflow,
       startOptimizationExecution,
       train.length,
-      versionToBeEvaluated.id,
       versions,
       workflowId,
     ],
@@ -333,6 +368,7 @@ export function OptimizeModalContent({
   const llmConfig = form.watch("params.llm");
 
   return (
+    <FormProvider {...form}>
     <Dialog.Content
       as="form"
       // eslint-disable-next-line @typescript-eslint/no-misused-promises
@@ -345,17 +381,7 @@ export function OptimizeModalContent({
       <Dialog.Body display="flex" flexDirection="column" gap={4}>
         <VStack align="start" width="full" gap={4}>
           <VStack align="start" width="full">
-            <VersionToBeUsed
-              form={
-                form as unknown as UseFormReturn<{
-                  version: string;
-                  commitMessage: string;
-                }>
-              }
-              nextVersion={nextVersion}
-              canSaveNewVersion={canSaveNewVersion}
-              versionToBeEvaluated={versionToBeEvaluated}
-            />
+            <VersionToBeUsed />
           </VStack>
           <VStack align="start" width="full" gap={2}>
             <SmallLabel>Optimizer</SmallLabel>
@@ -496,7 +522,7 @@ export function OptimizeModalContent({
                 disabled={!!isDisabled}
               >
                 <CheckSquare size={16} />
-                {canSaveNewVersion
+                {canSave
                   ? "Save & Run Optimization"
                   : "Run Optimization"}
               </Button>
@@ -505,6 +531,7 @@ export function OptimizeModalContent({
         </VStack>
       </Dialog.Footer>
     </Dialog.Content>
+    </FormProvider>
   );
 }
 
@@ -539,7 +566,7 @@ const OptimizerSelect = ({
       <Select.Trigger>
         <Select.ValueText placeholder="Select optimizer" />
       </Select.Trigger>
-      <Select.Content zIndex="popover">
+      <Select.Content>
         {optimizerOptions.map((option) => (
           <Select.Item item={option} key={option.value}>
             <VStack align="start" width="full">

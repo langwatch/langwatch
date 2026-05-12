@@ -1,5 +1,11 @@
 import type { PlanInfo } from "./planInfo";
 
+export const CONTACT_SALES_URL =
+  "https://meetings-eu1.hubspot.com/manouk-draisma?uuid=3c29cf0c-03e5-4a53-81fd-94abb0b66cfd";
+
+export const DEFAULT_LICENSE_PURCHASE_URL =
+  "https://buy.stripe.com/dRm3cwaIDgXs6yK6sX0480f";
+
 /**
  * Default limit for fields not present in older licenses.
  * Using a large number instead of Infinity for JSON serialization safety.
@@ -83,8 +89,6 @@ const FREE_TIER_LIMITS = {
   AUTOMATIONS: 3,
   /** ~33 messages per day */
   MESSAGES_PER_MONTH: 1_000,
-  /** Just enough to try the feature */
-  EVALUATIONS_CREDIT: 2,
 } as const;
 
 /**
@@ -97,6 +101,7 @@ const FREE_TIER_LIMITS = {
  * - The value is 9,007,199,254,740,991 - far beyond any real limit
  */
 export const UNLIMITED_PLAN: PlanInfo = {
+  planSource: "free",
   type: "OPEN_SOURCE",
   name: "Open Source",
   free: true,
@@ -106,7 +111,6 @@ export const UNLIMITED_PLAN: PlanInfo = {
   maxTeams: Number.MAX_SAFE_INTEGER,
   maxProjects: Number.MAX_SAFE_INTEGER,
   maxMessagesPerMonth: Number.MAX_SAFE_INTEGER,
-  evaluationsCredit: Number.MAX_SAFE_INTEGER,
   maxWorkflows: Number.MAX_SAFE_INTEGER,
   maxPrompts: Number.MAX_SAFE_INTEGER,
   maxEvaluators: Number.MAX_SAFE_INTEGER,
@@ -119,6 +123,7 @@ export const UNLIMITED_PLAN: PlanInfo = {
   maxCustomGraphs: Number.MAX_SAFE_INTEGER,
   maxAutomations: Number.MAX_SAFE_INTEGER,
   canPublish: true,
+  usageUnit: "traces",
   prices: {
     USD: 0,
     EUR: 0,
@@ -130,13 +135,13 @@ export const UNLIMITED_PLAN: PlanInfo = {
  * Provides minimal access to encourage license renewal.
  */
 export const FREE_PLAN: PlanInfo = {
+  planSource: "free",
   type: "FREE",
   name: "Free",
   free: true,
   overrideAddingLimitations: false,
 
   maxMessagesPerMonth: FREE_TIER_LIMITS.MESSAGES_PER_MONTH,
-  evaluationsCredit: FREE_TIER_LIMITS.EVALUATIONS_CREDIT,
 
   maxMembers: FREE_TIER_LIMITS.MEMBERS,
   maxMembersLite: FREE_TIER_LIMITS.MEMBERS_LITE,
@@ -155,6 +160,7 @@ export const FREE_PLAN: PlanInfo = {
   maxCustomGraphs: FREE_TIER_LIMITS.CUSTOM_GRAPHS,
   maxAutomations: FREE_TIER_LIMITS.AUTOMATIONS,
   canPublish: false,
+  usageUnit: "traces",
   prices: {
     USD: 0,
     EUR: 0,

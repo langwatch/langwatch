@@ -1,12 +1,56 @@
 import { createServer } from "node:http";
 import { createOpenAI } from "@ai-sdk/openai";
-import { generateText } from "ai";
+import { generateText, stepCountIs, tool } from "ai";
+import { z } from "zod";
+import { context as otelContext, propagation, trace } from "@opentelemetry/api";
+
+// getLangWatchTracer is loaded lazily after setupObservability initializes
+let tracer:
+  | ReturnType<typeof import("langwatch").getLangWatchTracer>
+  | undefined;
+
+// Initialize LangWatch observability before the server starts handling requests.
+// This sets up the OTEL NodeSDK with LangWatch exporters so that Vercel AI SDK
+// spans (LLM calls, tool calls) are captured and exported.
+async function initObservability() {
+  const apiKey = process.env.LANGWATCH_API_KEY;
+  const endpoint = process.env.LANGWATCH_ENDPOINT;
+
+  console.log(
+    `[ai-server] LANGWATCH_API_KEY: ${apiKey ? `${apiKey.slice(0, 8)}...` : "NOT SET"}`,
+  );
+  console.log(`[ai-server] LANGWATCH_ENDPOINT: ${endpoint ?? "NOT SET"}`);
+
+  if (apiKey) {
+    const { setupObservability } = await import("langwatch/observability/node");
+    setupObservability({
+      serviceName: "ai-server",
+      debug: {
+        consoleTracing: true,
+        logLevel: "debug",
+      },
+    });
+    const { getLangWatchTracer } = await import("langwatch");
+    tracer = getLangWatchTracer("ai-server");
+    console.log("[ai-server] LangWatch observability initialized (debug mode)");
+  } else {
+    console.warn(
+      "[ai-server] WARNING: No LANGWATCH_API_KEY — traces will NOT be exported",
+    );
+  }
+}
+void initObservability();
 
 /**
- * Test AI Server
+ * Test AI Server — Weather Agent
  *
- * A minimal HTTP server for testing HTTP agent configurations.
- * Simulates a real AI endpoint with proper auth requirements.
+ * A minimal HTTP server that simulates a weather agent with tool calls.
+ * Used for testing HTTP agent configurations and verifying that tool call
+ * spans appear correctly in OTEL traces.
+ *
+ * The agent has a `get_weather` tool that returns mock weather data.
+ * When asked about weather, the LLM will make a tool call, which produces
+ * tool call spans in the trace for verification.
  *
  * Required headers:
  *   X-API-Key: <your-openai-api-key>
@@ -24,8 +68,41 @@ import { generateText } from "ai";
  *     -H "Content-Type: application/json" \
  *     -H "X-API-Key: sk-..." \
  *     -H "X-Client-ID: my-app" \
- *     -d '{"model": "gpt-4o-mini", "messages": [{"role": "user", "content": "Hello"}]}'
+ *     -d '{"model": "gpt-4o-mini", "messages": [{"role": "user", "content": "What is the weather in Tokyo?"}]}'
  */
+
+const MOCK_WEATHER: Record<string, { temperature: number; condition: string }> =
+  {
+    tokyo: { temperature: 22, condition: "partly cloudy" },
+    london: { temperature: 14, condition: "rainy" },
+    "new york": { temperature: 28, condition: "sunny" },
+    paris: { temperature: 18, condition: "overcast" },
+    sydney: { temperature: 25, condition: "clear" },
+  };
+
+const weatherTool = tool({
+  description: "Get the current weather for a city",
+  inputSchema: z.object({
+    city: z.string().describe("The city name to get weather for"),
+  }),
+  outputSchema: z.object({
+    city: z.string(),
+    temperature_celsius: z.number(),
+    condition: z.string(),
+  }),
+  execute: async ({ city }) => {
+    const key = city.toLowerCase();
+    const data = MOCK_WEATHER[key] ?? { temperature: 20, condition: "unknown" };
+    return {
+      city,
+      temperature_celsius: data.temperature,
+      condition: data.condition,
+    };
+  },
+});
+
+const SYSTEM_PROMPT =
+  "You are a helpful weather assistant. Use the get_weather tool to look up weather information when asked. Always use the tool rather than guessing.";
 
 const PORT = 3456;
 const API_KEY_HEADER = "x-api-key";
@@ -48,6 +125,14 @@ function jsonResponse(
 const server = createServer(async (req, res) => {
   const timestamp = new Date().toISOString();
   console.log(`[${timestamp}] ${req.method} ${req.url}`);
+
+  // Log trace context headers when present (for OTEL propagation debugging)
+  const traceparent = req.headers["traceparent"];
+  if (traceparent) {
+    console.log(
+      `[${timestamp}] Trace context: traceparent=${traceparent}`,
+    );
+  }
 
   // CORS headers for browser testing
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -128,17 +213,74 @@ const server = createServer(async (req, res) => {
     );
 
     try {
+      // Extract incoming trace context so AI SDK spans are children of the caller's trace
+      const parentContext = propagation.extract(
+        otelContext.active(),
+        req.headers,
+      );
+      const extractedSpan = trace.getSpan(parentContext);
+      const extractedTraceId = extractedSpan?.spanContext().traceId;
+      const extractedSpanId = extractedSpan?.spanContext().spanId;
+      console.log(
+        `[${timestamp}] OTEL context extraction: traceparent=${traceparent ?? "none"}, ` +
+          `extractedTraceId=${extractedTraceId ?? "none"}, extractedSpanId=${extractedSpanId ?? "none"}`,
+      );
+
       // Create OpenAI client with the provided API key
       const openai = createOpenAI({ apiKey });
 
-      const { text } = await generateText({
-        model: openai(model),
-        messages: messages as NonNullable<
-          Parameters<typeof generateText>[0]["messages"]
-        >,
-      });
+      // Run generateText within the extracted trace context, wrapped in a
+      // labeled span so the trace is visible in LangWatch with proper labels.
+      const generate = async () => {
+        if (tracer) {
+          return tracer.withActiveSpan("weather-agent", async (span) => {
+            span.setAttribute(
+              "metadata",
+              JSON.stringify({ labels: ["ai-server", "weather-agent"] }),
+            );
+            span.setAttribute("langwatch.user.id", clientId);
+            return generateText({
+              model: openai(model),
+              system: SYSTEM_PROMPT,
+              messages: messages as NonNullable<
+                Parameters<typeof generateText>[0]["messages"]
+              >,
+              tools: { get_weather: weatherTool },
+              stopWhen: stepCountIs(3),
+              experimental_telemetry: { isEnabled: true },
+            });
+          });
+        }
+        return generateText({
+          model: openai(model),
+          system: SYSTEM_PROMPT,
+          messages: messages as NonNullable<
+            Parameters<typeof generateText>[0]["messages"]
+          >,
+          tools: { get_weather: weatherTool },
+          stopWhen: stepCountIs(3),
+          experimental_telemetry: { isEnabled: true },
+        });
+      };
 
-      console.log(`[${timestamp}] 200 Generation success`);
+      const { text, steps } = await otelContext.with(parentContext, generate);
+
+      const toolCalls = steps.flatMap((s) => s.toolCalls);
+      console.log(
+        `[${timestamp}] 200 Generation success (${steps.length} steps, ${toolCalls.length} tool calls)`,
+      );
+      if (toolCalls.length > 0) {
+        for (const tc of toolCalls) {
+          console.log(
+            `[${timestamp}]   tool_call: ${tc.toolName}(${JSON.stringify(tc.input)})`,
+          );
+        }
+      }
+      // Log active span after generation to verify OTEL context
+      const activeSpan = trace.getActiveSpan();
+      console.log(
+        `[${timestamp}] Active span after generation: ${activeSpan ? `traceId=${activeSpan.spanContext().traceId}` : "none"}`,
+      );
       jsonResponse(res, 200, {
         choices: [
           {

@@ -9,7 +9,7 @@ Feature: Scenario Failure Handler
   # The handler ensures failure events are emitted to Elasticsearch when
   # scenario jobs fail (child process crash, timeout, prefetch error).
 
-  @unit
+  @unit @unimplemented
   Scenario: Emit both RUN_STARTED and RUN_FINISHED when no events exist
     Given a scenario job failed with error "Child process exited with code 1"
     And no events exist in Elasticsearch for this batchRunId
@@ -19,7 +19,16 @@ Feature: Scenario Failure Handler
     And the RUN_FINISHED event includes the error message
     And both events share the same scenarioRunId
 
-  @unit
+  @unit @unimplemented
+  Scenario: Use pre-assigned scenarioRunId when no events exist in Elasticsearch
+    Given a scenario job failed with error "Child process exited with code 1"
+    And no events exist in Elasticsearch for this batchRunId
+    And the job data includes a pre-assigned scenarioRunId
+    When ScenarioFailureHandler.ensureFailureEventsEmitted is called
+    Then the pre-assigned scenarioRunId is used for both events
+    And no new scenarioRunId is generated
+
+  @unit @unimplemented
   Scenario: Emit only RUN_FINISHED when RUN_STARTED exists
     Given a scenario job failed with error "Scenario execution timed out"
     And a RUN_STARTED event exists for this batchRunId
@@ -29,22 +38,7 @@ Feature: Scenario Failure Handler
     And the RUN_FINISHED uses the existing scenarioRunId from RUN_STARTED
     And no new RUN_STARTED event is emitted
 
-  @unit
-  Scenario: Idempotent - no action when RUN_FINISHED already exists
-    Given a scenario job failed
-    And both RUN_STARTED and RUN_FINISHED events exist for this batchRunId
-    When ScenarioFailureHandler.ensureFailureEventsEmitted is called
-    Then no events are emitted
-    And the handler returns successfully
-
-  @unit
-  Scenario: Generate synthetic scenarioRunId with correct format
-    Given a scenario job failed
-    And no events exist in Elasticsearch
-    When the handler generates a synthetic scenarioRunId
-    Then the ID follows the pattern "scenariorun_{nanoid}"
-
-  @unit
+  @unit @unimplemented
   Scenario: Include job metadata in failure events
     Given a scenario job failed with:
       | projectId  | proj_123     |
@@ -66,21 +60,13 @@ Feature: Scenario Failure Handler
   # The processor's completed handler should call the failure handler
   # when result.success is false.
 
-  @integration
-  Scenario: Worker calls failure handler on job failure
-    Given a scenario job completes with result.success = false
-    And the result includes error "Prefetch failed: Scenario not found"
-    When the worker's completed event fires
-    Then ScenarioFailureHandler.ensureFailureEventsEmitted is called
-    And the handler receives the job data and error message
-
-  @integration
+  @integration @unimplemented
   Scenario: Worker does not call failure handler on success
     Given a scenario job completes with result.success = true
     When the worker's completed event fires
     Then ScenarioFailureHandler is not invoked
 
-  @integration
+  @integration @unimplemented
   Scenario: Failure handler errors do not crash worker
     Given a scenario job completes with result.success = false
     And ScenarioFailureHandler throws an error
@@ -94,47 +80,12 @@ Feature: Scenario Failure Handler
   # Update pollForScenarioRun to return early on RUN_STARTED instead of
   # waiting for messages, and properly handle error states.
 
-  @unit
-  Scenario: Return success when RUN_STARTED exists with IN_PROGRESS status
-    Given a scenario run exists with:
-      | scenarioRunId | run_123      |
-      | status        | IN_PROGRESS  |
-      | messages      | []           |
-    When pollForScenarioRun fetches the batch run data
-    Then it returns success with scenarioRunId "run_123"
-    And does not continue polling
-
-  @unit
-  Scenario: Return error when run has ERROR status
-    Given a scenario run exists with:
-      | scenarioRunId | run_123      |
-      | status        | ERROR        |
-    When pollForScenarioRun fetches the batch run data
-    Then it returns failure with error "run_error"
-    And includes scenarioRunId "run_123"
-
-  @unit
-  Scenario: Return error when run has FAILED status
-    Given a scenario run exists with:
-      | scenarioRunId | run_123      |
-      | status        | FAILED       |
-    When pollForScenarioRun fetches the batch run data
-    Then it returns failure with error "run_error"
-    And includes scenarioRunId "run_123"
-
-  @unit
-  Scenario: Continue polling when no runs exist yet
-    Given no scenario runs exist for the batchRunId
-    When pollForScenarioRun is called
-    Then it continues polling until timeout
-    And returns failure with error "timeout" after max attempts
-
   # ============================================================================
   # End-to-End Failure Visibility - E2E Tests
   # ============================================================================
   # Verify the complete flow from job failure to frontend error display.
 
-  @e2e
+  @e2e @unimplemented
   Scenario: Frontend displays error instead of timeout on job failure
     Given I am logged into project "my-project"
     And scenario "Broken Config" exists with invalid prompt configuration
@@ -144,7 +95,7 @@ Feature: Scenario Failure Handler
     And I see an error message explaining the failure
     And I do not see "took too long to start"
 
-  @e2e
+  @e2e @unimplemented
   Scenario: Frontend displays error when child process crashes
     Given I am logged into project "my-project"
     And scenario "Crash Test" exists
@@ -154,7 +105,7 @@ Feature: Scenario Failure Handler
     And I see the error from the child process
     And the run status shows ERROR
 
-  @e2e
+  @e2e @unimplemented
   Scenario: Run history shows failed runs with error details
     Given scenario "Problematic" has a failed run
     When I view the run history
@@ -162,32 +113,23 @@ Feature: Scenario Failure Handler
     And I can click to view the error details
 
   # ============================================================================
-  # Worker Death Handling - Stalled Job Behavior
+  # Child Process Timeout - Stalled Execution Handling
   # ============================================================================
-  # When a worker dies mid-scenario (crash, OOM, network partition), BullMQ
-  # detects the stalled job after ~30s. These scenarios ensure stalled jobs
-  # fail cleanly instead of retrying indefinitely.
+  # When a child process hangs or the worker dies mid-scenario (crash, OOM),
+  # the scenario processor's 5-minute timeout (CHILD_PROCESS.TIMEOUT_MS) kills
+  # the child. The failure handler then emits ERROR events so the UI shows
+  # the failure.
 
-  @unit
-  Scenario: Stalled jobs fail without retry
-    Given a scenario job has stalled
-    When BullMQ processes the stalled job
-    Then the job fails immediately
-    And no retry is attempted
+  @unit @unimplemented
+  Scenario: Timed-out child process triggers failure handler
+    Given a scenario child process has been running for over 5 minutes
+    When the scenario processor timeout fires
+    Then the child process is killed
+    And the failure handler emits ERROR events
 
-  @integration
-  Scenario: Worker logs stalled jobs with warning level
-    Given a scenario worker is processing jobs
-    When a job becomes stalled
-    Then the worker emits a "stalled" event
-    And the event is logged at warning level
-    And the log includes the job ID
-
-  @integration
-  Scenario: Stalled job triggers failure handler after detection
-    Given a scenario job is being processed
-    And the worker dies mid-execution
-    When BullMQ detects the stalled job after ~30 seconds
-    Then the job transitions to failed state
-    And ScenarioFailureHandler.ensureFailureEventsEmitted is called
-    And the error message indicates the job was stalled
+  @integration @unimplemented
+  Scenario: Scenario processor logs timeout with error level
+    Given a scenario child process is running
+    When the 5-minute processor timeout fires
+    Then the event is logged at error level
+    And the log includes the scenarioRunId

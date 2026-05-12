@@ -1,10 +1,6 @@
 import { LicenseHandler, PUBLIC_KEY } from "../../ee/licensing";
-import type { PlanInfo } from "../../ee/licensing/planInfo";
 import { createLicenseHandler } from "../../ee/licensing/server";
 import { prisma } from "./db";
-
-// Re-export PlanInfo from canonical location for backward compatibility
-export type { PlanInfo } from "../../ee/licensing/planInfo";
 
 // Singleton LicenseHandler instance for self-hosted deployments
 let licenseHandler: LicenseHandler | null = null;
@@ -18,18 +14,4 @@ export function getLicenseHandler(): LicenseHandler {
     licenseHandler = createLicenseHandler(prisma, PUBLIC_KEY);
   }
   return licenseHandler;
-}
-
-export abstract class SubscriptionHandler {
-  static async getActivePlan(
-    organizationId: string,
-    _user?: {
-      id: string;
-      email?: string | null;
-      name?: string | null;
-    },
-    handler: LicenseHandler = getLicenseHandler(),
-  ): Promise<PlanInfo> {
-    return handler.getActivePlan(organizationId);
-  }
 }

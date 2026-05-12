@@ -2,6 +2,7 @@ import { Box } from "@chakra-ui/react";
 import {
   Braces,
   Hash,
+  Image,
   List,
   MessageSquare,
   ToggleLeft,
@@ -55,6 +56,9 @@ export const VariableTypeIcon = ({
 
     case "chat_messages":
       return <MessageSquare {...iconProps} />;
+
+    case "image":
+      return <Image {...iconProps} />;
 
     default:
       return <Type {...iconProps} />;

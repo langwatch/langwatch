@@ -13,6 +13,11 @@ from .fetch_policy import FetchPolicy
 
 # Standardized data structures
 from .structures import (
+    Message,
+    Input,
+    Output,
+    ResponseFormat,
+    # Backward compatibility aliases
     MessageDict,
     InputDict,
     OutputDict,
@@ -22,7 +27,12 @@ from .structures import (
 __all__ = [
     # Core types
     "PromptData",
-    # API types
+    # Pydantic models
+    "Message",
+    "Input",
+    "Output",
+    "ResponseFormat",
+    # Backward compatibility aliases
     "MessageDict",
     "InputDict",
     "OutputDict",

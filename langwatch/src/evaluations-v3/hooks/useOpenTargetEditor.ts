@@ -27,6 +27,7 @@ import {
   convertFromUIMapping,
   convertToUIMapping,
 } from "../utils/fieldMappingConverters";
+import { createEvaluatorEditorCallbacks } from "../utils/evaluatorEditorCallbacks";
 import { createPromptEditorCallbacks } from "../utils/promptEditorCallbacks";
 import { useEvaluationsV3Store } from "./useEvaluationsV3Store";
 
@@ -310,40 +311,57 @@ export const useOpenTargetEditor = () => {
         const availableSources = buildAvailableSources();
         const uiMappings = buildUIMappings(target, activeDatasetId);
 
-        // Build mappings config for the evaluator editor
+        const handleMappingChange = (
+          identifier: string,
+          mapping: UIFieldMapping | undefined,
+        ) => {
+          const currentActiveDatasetId =
+            useEvaluationsV3Store.getState().activeDatasetId;
+          const currentDatasets = useEvaluationsV3Store.getState().datasets;
+          const checkIsDatasetSource = (sourceId: string) =>
+            currentDatasets.some((d) => d.id === sourceId);
+
+          if (mapping) {
+            setTargetMapping(
+              target.id,
+              currentActiveDatasetId,
+              identifier,
+              convertFromUIMapping(mapping, checkIsDatasetSource),
+            );
+          } else {
+            removeTargetMapping(
+              target.id,
+              currentActiveDatasetId,
+              identifier,
+            );
+          }
+        };
+
+        // Set flow callbacks for the evaluator editor using the centralized helper.
+        // onMappingChange is registered here (durable) instead of inside mappingsConfig
+        // (ephemeral complexProps) so it survives in-app drawer navigation and
+        // ErrorBoundary remounts (not hard browser reloads — those clear all state).
+        setFlowCallbacks("evaluatorEditor",
+          createEvaluatorEditorCallbacks({
+            targetId: target.id,
+            updateTarget,
+            onMappingChange: handleMappingChange,
+          }),
+        );
+
+        // Build mappings config without onMappingChange — callback is durable via flowCallbacks
         const mappingsConfig = {
           availableSources,
           initialMappings: uiMappings,
-          onMappingChange: (
-            identifier: string,
-            mapping: UIFieldMapping | undefined,
-          ) => {
-            const currentActiveDatasetId =
-              useEvaluationsV3Store.getState().activeDatasetId;
-            const currentDatasets = useEvaluationsV3Store.getState().datasets;
-            const checkIsDatasetSource = (sourceId: string) =>
-              currentDatasets.some((d) => d.id === sourceId);
-
-            if (mapping) {
-              setTargetMapping(
-                target.id,
-                currentActiveDatasetId,
-                identifier,
-                convertFromUIMapping(mapping, checkIsDatasetSource),
-              );
-            } else {
-              removeTargetMapping(
-                target.id,
-                currentActiveDatasetId,
-                identifier,
-              );
-            }
-          },
         };
+
+        // Pass initialLocalConfig from target state so drawer resumes unsaved changes
+        const initialLocalConfig = target.localEvaluatorConfig;
 
         openDrawer("evaluatorEditor", {
           evaluatorId: target.targetEvaluatorId,
           mappingsConfig,
+          initialLocalConfig,
           urlParams: { targetId: target.id },
         });
 

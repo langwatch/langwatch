@@ -37,7 +37,7 @@ func Middleware(name string, opts ...Option) oaioption.Middleware {
 		trace.WithSchemaURL(semconv.SchemaURL),
 	}
 
-	tracer := langwatch.Tracer(tracerName, tracerOpts...)
+	tracer := langwatch.TracerFromProvider(cfg.tracerProvider, tracerName, tracerOpts...)
 
 	if cfg.propagators == nil {
 		cfg.propagators = otel.GetTextMapPropagator()

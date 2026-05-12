@@ -2,31 +2,33 @@ import {
   Badge,
   Box,
   Button,
-  Card,
   CloseButton,
-  Container,
   Heading,
   HStack,
   Icon,
   Portal,
-  Progress,
   Skeleton,
   Spacer,
+  Spinner,
   Table,
   Tag,
   Text,
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import numeral from "numeral";
-import Parse from "papaparse";
 import { useEffect, useRef, useState } from "react";
+import { useBufferedTraceData } from "~/hooks/useBufferedTraceData";
 import { ChevronDown, ChevronUp, Download, Edit, Shield } from "react-feather";
 import { LuChevronsUpDown, LuList, LuRefreshCw } from "react-icons/lu";
 import { useLocalStorage } from "usehooks-ts";
 import { useDrawer } from "~/hooks/useDrawer";
+import { useLiteMemberGuard } from "~/hooks/useLiteMemberGuard";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useUpgradeModalStore } from "~/stores/upgradeModalStore";
+import { useTraceDetailsDrawer } from "~/hooks/useTraceDetailsDrawer";
+import { useTraceUpdateListener } from "~/hooks/useTraceUpdateListener";
 import { getEvaluatorDefinitions } from "~/server/evaluations/getEvaluator";
 import type { ElasticSearchEvaluation, Trace } from "~/server/tracer/types";
 import { api } from "~/utils/api";
@@ -35,6 +37,7 @@ import { getSingleQueryParam } from "~/utils/getSingleQueryParam";
 import { stringifyIfObject } from "~/utils/stringifyIfObject";
 import { useFilterParams } from "../../hooks/useFilterParams";
 import { useMinimumSpinDuration } from "../../hooks/useMinimumSpinDuration";
+import { getOriginColor, getOriginLabel } from "../../utils/originColors";
 import { getColorForString } from "../../utils/rotatingColors";
 import { titleCase } from "../../utils/stringCasing";
 import { AddAnnotationQueueDrawer } from "../AddAnnotationQueueDrawer";
@@ -51,13 +54,15 @@ import { formatEvaluationSingleValue } from "../traces/EvaluationStatusItem";
 import { Checkbox } from "../ui/checkbox";
 import { Dialog } from "../ui/dialog";
 import { PageLayout } from "../ui/layouts/PageLayout";
-import { Link } from "../ui/link";
 import { Popover } from "../ui/popover";
 import { RedactedField } from "../ui/RedactedField";
 import { toaster } from "../ui/toaster";
 import { Tooltip } from "../ui/tooltip";
+import { ExportConfigDialog } from "./ExportConfigDialog";
+import { ExportProgress } from "./ExportProgress";
 import { ToggleAnalytics, ToggleTableView } from "./HeaderButtons";
 import type { TraceWithGuardrail } from "./MessageCard";
+import { useExportTraces } from "./useExportTraces";
 
 export interface MessagesTableProps {
   hideExport?: boolean;
@@ -75,6 +80,11 @@ export function MessagesTable({
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();
+  const { openTraceDetailsDrawer } = useTraceDetailsDrawer();
+  const { isLiteMember } = useLiteMemberGuard();
+  const openLiteMemberRestriction = useUpgradeModalStore(
+    (s) => s.openLiteMemberRestriction,
+  );
   const queryClient = api.useContext();
 
   const { filterParams, queryOpts } = useFilterParams();
@@ -84,25 +94,148 @@ export function MessagesTable({
 
   const {
     period: { startDate, endDate },
+    mode,
     setPeriod,
+    setRelativePeriod,
   } = usePeriodSelector();
 
   const navigationFooter = useNavigationFooter();
 
+  const {
+    isDialogOpen: isExportDialogOpen,
+    openExportDialog: openExportDialogRaw,
+    closeExportDialog,
+    isExporting,
+    progress: exportProgress,
+    startExport,
+    cancelExport,
+  } = useExportTraces({
+    projectId: project?.id,
+    filters: filterParams.filters,
+    startDate: filterParams.startDate,
+    endDate: filterParams.endDate,
+    query: getSingleQueryParam(router.query.query),
+  });
+
+  // Track whether the export dialog was opened for selected traces or all
+  const isSelectedExportRef = useRef(false);
+  const openExportDialog = (options: { selectedTraceIds?: string[] }) => {
+    isSelectedExportRef.current = (options.selectedTraceIds ?? []).length > 0;
+    openExportDialogRaw(options);
+  };
+
+  // Live endDate that gets bumped to "now" on SSE events so the query
+  // window extends to include newly-arrived traces.
+  const [liveEndDate, setLiveEndDate] = useState(filterParams.endDate);
+  useEffect(() => {
+    setLiveEndDate(filterParams.endDate);
+  }, [filterParams.endDate]);
+
+  const urlScrollId = getSingleQueryParam(router.query.scrollId);
+
   const traceGroups = api.traces.getAllForProject.useQuery(
     {
       ...filterParams,
+      endDate: liveEndDate,
       query: getSingleQueryParam(router.query.query),
       groupBy: "none",
       pageOffset: navigationFooter.pageOffset,
       pageSize: navigationFooter.pageSize,
       sortBy: getSingleQueryParam(router.query.sortBy),
       sortDirection: getSingleQueryParam(router.query.orderBy),
+      scrollId: urlScrollId,
     },
     queryOpts,
   );
 
   navigationFooter.useUpdateTotalHits(traceGroups);
+
+  // --- Live update buffering ---
+  const [isMouseOnTable, setIsMouseOnTable] = useState(false);
+
+  const {
+    displayData,
+    pendingData,
+    pendingCount,
+    highlightIds,
+    acceptPending: acceptPendingBuffer,
+    mouseLeftAtRef,
+    bypassBufferRef,
+    displayDataRef,
+    addPendingCount,
+    reset: resetBuffer,
+  } = useBufferedTraceData({
+    freshData: traceGroups.data,
+    isMouseOnTable,
+  });
+
+  // Clear display data when user-driven query params change (filter/sort/page)
+  // so skeletons show during loading. SSE-driven liveEndDate changes don't go through here.
+  const userQueryKey = JSON.stringify({
+    filterParams,
+    pageOffset: navigationFooter.pageOffset,
+    pageSize: navigationFooter.pageSize,
+    sortBy: getSingleQueryParam(router.query.sortBy),
+    sortDirection: getSingleQueryParam(router.query.orderBy),
+    query: getSingleQueryParam(router.query.query),
+    scrollId: urlScrollId,
+  });
+  const prevUserQueryKeyRef = useRef(userQueryKey);
+  useEffect(() => {
+    if (prevUserQueryKeyRef.current !== userQueryKey) {
+      prevUserQueryKeyRef.current = userQueryKey;
+      resetBuffer();
+    }
+  }, [userQueryKey, resetBuffer]);
+
+  const IDLE_THRESHOLD_MS = 60_000;
+
+  useTraceUpdateListener({
+    projectId: project?.id ?? "",
+    onTraceSummaryUpdated: (traceIds) => {
+      const displayedIds = new Set(
+        displayDataRef.current?.groups.flatMap((g) =>
+          g.map((t) => t.trace_id),
+        ) ?? [],
+      );
+
+      // If no traceIds in payload (defensive), fall back to full refetch
+      if (traceIds.length === 0) {
+        setLiveEndDate(Date.now());
+        return;
+      }
+
+      const hasVisibleUpdate = traceIds.some((id) => displayedIds.has(id));
+      const newCount = traceIds.filter(
+        (id) => !displayedIds.has(id),
+      ).length;
+
+      if (hasVisibleUpdate) {
+        // Same endDate refetch — refreshes visible trace data without pulling new traces
+        void traceGroups.refetch();
+      }
+      if (newCount > 0) {
+        const pageHasFocus = document.hasFocus();
+        const mouseIdleMs = Date.now() - mouseLeftAtRef.current;
+        const mouseIdleLongEnough =
+          mouseLeftAtRef.current > 0 && mouseIdleMs >= IDLE_THRESHOLD_MS;
+
+        if (!pageHasFocus || mouseIdleLongEnough) {
+          // Page unfocused or mouse idle long enough — fetch and show directly
+          setLiveEndDate(Date.now());
+        } else {
+          addPendingCount(newCount);
+        }
+      }
+    },
+    enabled: !!project,
+  });
+
+  // Wrap acceptPending to also bump liveEndDate (component-level concern)
+  const acceptPending = () => {
+    acceptPendingBuffer();
+    setLiveEndDate(Date.now());
+  };
 
   const isRefreshing = useMinimumSpinDuration(
     traceGroups.isLoading || traceGroups.isRefetching,
@@ -116,8 +249,6 @@ export function MessagesTable({
       refetchOnMount: false,
     },
   );
-
-  const downloadTraces = api.traces.getAllForDownload.useMutation();
 
   const [previousTraceChecks, setPreviousTraceChecks] = useState<
     Record<string, ElasticSearchEvaluation[]>
@@ -152,9 +283,8 @@ export function MessagesTable({
             paddingLeft={2}
             marginRight={1}
             onClick={() =>
-              openDrawer("traceDetails", {
+              openTraceDetailsDrawer({
                 traceId,
-                selectedTab: "messages",
               })
             }
           >
@@ -217,7 +347,7 @@ export function MessagesTable({
       sortable: true,
       render: (trace, index) => {
         const checkId = columnKey.split(".")[1];
-        const traceCheck = traceGroups.data?.traceChecks?.[
+        const traceCheck = displayData?.traceChecks?.[
           trace.trace_id
         ]?.find(
           (traceCheck_: ElasticSearchEvaluation) =>
@@ -229,7 +359,7 @@ export function MessagesTable({
           <Table.Cell
             key={index}
             onClick={() =>
-              openDrawer("traceDetails", {
+              openTraceDetailsDrawer({
                 traceId: trace.trace_id,
               })
             }
@@ -315,7 +445,7 @@ export function MessagesTable({
         <Table.Cell
           key={index}
           onClick={() =>
-            openDrawer("traceDetails", {
+            openTraceDetailsDrawer({
               traceId: trace.trace_id,
             })
           }
@@ -334,7 +464,7 @@ export function MessagesTable({
         <Table.Cell
           key={index}
           onClick={() =>
-            openDrawer("traceDetails", {
+            openTraceDetailsDrawer({
               traceId: trace.trace_id,
             })
           }
@@ -357,20 +487,24 @@ export function MessagesTable({
             key={index}
             maxWidth="300px"
             onClick={() =>
-              openDrawer("traceDetails", {
+              openTraceDetailsDrawer({
                 traceId: trace.trace_id,
               })
             }
           >
-            <Tooltip
-              content={<Box whiteSpace="pre-wrap">{safeInputValue}</Box>}
-            >
-              <RedactedField field="input">
-                <Text truncate display="block">
-                  {safeInputValue}
-                </Text>
-              </RedactedField>
-            </Tooltip>
+            {!safeInputValue && isTraceRecent(trace) ? (
+              <ProcessingIndicator />
+            ) : (
+              <Tooltip
+                content={<Box whiteSpace="pre-wrap">{safeInputValue}</Box>}
+              >
+                <RedactedField field="input">
+                  <Text truncate display="block">
+                    {safeInputValue}
+                  </Text>
+                </RedactedField>
+              </Tooltip>
+            )}
           </Table.Cell>
         );
       },
@@ -387,7 +521,7 @@ export function MessagesTable({
           <Table.Cell
             key={index}
             onClick={() =>
-              openDrawer("traceDetails", {
+              openTraceDetailsDrawer({
                 traceId: trace.trace_id,
               })
             }
@@ -400,7 +534,7 @@ export function MessagesTable({
           <Table.Cell
             key={index}
             onClick={() =>
-              openDrawer("traceDetails", {
+              openTraceDetailsDrawer({
                 traceId: trace.trace_id,
               })
             }
@@ -428,6 +562,8 @@ export function MessagesTable({
                   <Box lineClamp={1} maxWidth="300px">
                     {safeOutputValue}
                   </Box>
+                ) : isTraceRecent(trace) ? (
+                  <ProcessingIndicator />
                 ) : (
                   <Box>{"<empty>"}</Box>
                 )}
@@ -439,6 +575,50 @@ export function MessagesTable({
 
       value: (trace: Trace) => getSafeRenderOutputValueFromTrace(trace),
     },
+    "traces.origin": {
+      name: "Origin",
+      sortable: false,
+      width: 120,
+      render: (trace: TraceWithGuardrail, index: number) => {
+        const rawOrigin = trace.metadata["langwatch.origin"];
+        const displayOrigin =
+          typeof rawOrigin === "string" && rawOrigin !== ""
+            ? rawOrigin
+            : null;
+
+        return (
+          <Table.Cell
+            key={index}
+            onClick={() =>
+              openTraceDetailsDrawer({
+                traceId: trace.trace_id,
+              })
+            }
+          >
+            {displayOrigin && (() => {
+              const colors = getOriginColor(displayOrigin);
+              return (
+                <Badge
+                  size="sm"
+                  paddingX={2}
+                  background={colors.background}
+                  color={colors.color}
+                  fontSize="12px"
+                >
+                  {getOriginLabel(displayOrigin)}
+                </Badge>
+              );
+            })()}
+          </Table.Cell>
+        );
+      },
+      value: (trace: Trace) => {
+        const rawOrigin = trace.metadata["langwatch.origin"];
+        return typeof rawOrigin === "string" && rawOrigin !== ""
+          ? rawOrigin
+          : "";
+      },
+    } satisfies HeaderColumn,
     "metadata.labels": {
       name: "Labels",
       sortable: true,
@@ -469,7 +649,7 @@ export function MessagesTable({
         <Table.Cell
           key={index}
           onClick={() =>
-            openDrawer("traceDetails", {
+            openTraceDetailsDrawer({
               traceId: trace.trace_id,
             })
           }
@@ -497,7 +677,7 @@ export function MessagesTable({
         <Table.Cell
           key={index}
           onClick={() =>
-            openDrawer("traceDetails", {
+            openTraceDetailsDrawer({
               traceId: trace.trace_id,
             })
           }
@@ -525,7 +705,7 @@ export function MessagesTable({
         <Table.Cell
           key={index}
           onClick={() =>
-            openDrawer("traceDetails", {
+            openTraceDetailsDrawer({
               traceId: trace.trace_id,
             })
           }
@@ -542,7 +722,7 @@ export function MessagesTable({
         <Table.Cell
           key={index}
           onClick={() =>
-            openDrawer("traceDetails", {
+            openTraceDetailsDrawer({
               traceId: trace.trace_id,
             })
           }
@@ -559,7 +739,7 @@ export function MessagesTable({
         <Table.Cell
           key={index}
           onClick={() =>
-            openDrawer("traceDetails", {
+            openTraceDetailsDrawer({
               traceId: trace.trace_id,
             })
           }
@@ -579,7 +759,7 @@ export function MessagesTable({
           minWidth="300px"
           maxWidth="300px"
           onClick={() =>
-            openDrawer("traceDetails", {
+            openTraceDetailsDrawer({
               traceId: trace.trace_id,
             })
           }
@@ -598,7 +778,7 @@ export function MessagesTable({
         <Table.Cell
           key={index}
           onClick={() =>
-            openDrawer("traceDetails", {
+            openTraceDetailsDrawer({
               traceId: trace.trace_id,
             })
           }
@@ -622,7 +802,7 @@ export function MessagesTable({
         <Table.Cell
           key={index}
           onClick={() =>
-            openDrawer("traceDetails", {
+            openTraceDetailsDrawer({
               traceId: trace.trace_id,
             })
           }
@@ -667,19 +847,46 @@ export function MessagesTable({
 
   const [selectedHeaderColumns, setSelectedHeaderColumns] = useState<
     Record<keyof typeof headerColumns, { enabled: boolean; name: string }>
-  >(
-    localStorageHeaderColumns
-      ? localStorageHeaderColumns
-      : Object.fromEntries(
-          Object.entries(headerColumns).map(([key, column]) => [
-            key,
-            {
-              enabled: key !== "trace.trace_id",
-              name: column.name,
-            },
-          ]),
-        ),
-  );
+  >(() => {
+    if (!localStorageHeaderColumns) {
+      return Object.fromEntries(
+        Object.entries(headerColumns).map(([key, column]) => [
+          key,
+          {
+            enabled: key !== "trace.trace_id",
+            name: column.name,
+          },
+        ]),
+      );
+    }
+
+    // Re-order columns to match canonical headerColumns order,
+    // preserving enabled/name from localStorage. This ensures that
+    // column order changes in source code are respected for existing users.
+    const ordered: Record<string, { enabled: boolean; name: string }> = {};
+
+    // First: canonical columns in source order
+    for (const key of Object.keys(headerColumns)) {
+      if (key in localStorageHeaderColumns) {
+        ordered[key] = localStorageHeaderColumns[key]!;
+      } else {
+        // New column added in source — enable by default
+        ordered[key] = {
+          enabled: key !== "trace.trace_id",
+          name: headerColumns[key]!.name,
+        };
+      }
+    }
+
+    // Then: extra columns only in localStorage (e.g. dynamic evaluation columns)
+    for (const [key, value] of Object.entries(localStorageHeaderColumns)) {
+      if (!(key in ordered)) {
+        ordered[key] = value;
+      }
+    }
+
+    return ordered;
+  });
 
   const isFirstRender = useRef(true);
 
@@ -766,83 +973,6 @@ export function MessagesTable({
     selectedHeaderColumns,
   ).filter(([_, { enabled }]) => enabled);
 
-  const [downloadProgress, setDownloadProgress] = useState(0);
-
-  const fetchAllTraces = async () => {
-    const allGroups = [];
-    const allChecks = {};
-    let currentOffset = 0;
-    const batchSize = 5000;
-
-    setDownloadProgress(10);
-
-    const initialBatch = await downloadTraces.mutateAsync({
-      ...filterParams,
-      query: getSingleQueryParam(router.query.query),
-      groupBy: "none",
-      pageOffset: navigationFooter.pageOffset,
-      pageSize: navigationFooter.pageSize,
-      sortBy: getSingleQueryParam(router.query.sortBy),
-      sortDirection: getSingleQueryParam(router.query.orderBy),
-      includeSpans: true,
-    });
-
-    let scrollId = initialBatch.scrollId;
-    allGroups.push(...initialBatch.groups);
-    Object.assign(allChecks, initialBatch.traceChecks);
-
-    const totalHits = initialBatch.totalHits;
-    let processedItems = initialBatch.groups.length;
-    setDownloadProgress((processedItems / totalHits) * 100);
-
-    while (scrollId) {
-      const batch = await downloadTraces.mutateAsync({
-        ...filterParams,
-        query: getSingleQueryParam(router.query.query),
-        groupBy: "none",
-        pageOffset: currentOffset,
-        pageSize: batchSize,
-        sortBy: getSingleQueryParam(router.query.sortBy),
-        sortDirection: getSingleQueryParam(router.query.orderBy),
-        includeSpans: true,
-        scrollId: scrollId,
-      });
-      processedItems += batch.groups.length;
-
-      setDownloadProgress((processedItems / totalHits) * 100);
-
-      scrollId = batch.scrollId;
-
-      if (!batch.groups.length) break;
-
-      allGroups.push(...batch.groups);
-      Object.assign(allChecks, batch.traceChecks);
-      currentOffset += batchSize;
-    }
-
-    setDownloadProgress(0);
-
-    return {
-      groups: allGroups,
-      traceChecks: allChecks,
-    };
-  };
-
-  const downloadCSV = async (selection = false) => {
-    try {
-      await downloadCSV_(selection);
-    } catch (error) {
-      toaster.create({
-        title: "Error Downloading CSV",
-        description: (error as any).toString(),
-        type: "error",
-        meta: {
-          closable: true,
-        },
-      });
-      console.error(error);
-    }
-  };
   const queueItem = api.annotation.createQueueItem.useMutation();
   const [annotators, setAnnotators] = useState<{ id: string; name: string }[]>(
     [],
@@ -885,93 +1015,13 @@ export function MessagesTable({
     );
   };
 
-  const downloadCSV_ = async (selection = false) => {
-    const traceGroups_ = selection
-      ? (traceGroups.data ?? {
-          groups: [],
-          traceChecks: {} as Record<string, ElasticSearchEvaluation[]>,
-        })
-      : await fetchAllTraces();
-
-    const checkedHeaderColumnsEntries_ = checkedHeaderColumnsEntries.filter(
-      ([column, _]) => column !== "checked",
-    );
-
-    const evaluations: Record<string, ElasticSearchEvaluation[]> =
-      traceGroups_.traceChecks;
-
-    const getValueForColumn = (
-      trace: TraceWithGuardrail,
-      column: string,
-      name: string,
-    ) => {
-      return (
-        headerColumns[column]?.value?.(
-          trace,
-          evaluations[trace.trace_id] ?? [],
-        ) ??
-        headerColumnForEvaluation({
-          columnKey: column,
-          checkName: name,
-        }).value(trace, evaluations[trace.trace_id] ?? [])
-      );
-    };
-
-    let csv;
-    if (selection) {
-      csv = traceGroups_.groups
-        .flatMap((traceGroup) =>
-          traceGroup
-            .filter((trace) => selectedTraceIds.includes(trace.trace_id))
-            .map((trace) =>
-              checkedHeaderColumnsEntries_.map(([column, { name }]) =>
-                getValueForColumn(trace, column, name),
-              ),
-            ),
-        )
-        .filter((row) => row.some((cell) => cell !== ""));
-    } else {
-      csv = traceGroups_.groups.flatMap((traceGroup) =>
-        traceGroup.map((trace) =>
-          checkedHeaderColumnsEntries_
-            .filter(([column, _]) => column !== "checked")
-            .map(([column, { name }]) =>
-              getValueForColumn(trace, column, name),
-            ),
-        ),
-      );
-    }
-
-    const fields = checkedHeaderColumnsEntries_
-      .map(([_, { name }]) => {
-        return name;
-      })
-      .filter((field) => field !== undefined);
-
-    const csvBlob = Parse.unparse({
-      fields: fields,
-      data: csv ?? [],
-    });
-
-    const url = window.URL.createObjectURL(new Blob([csvBlob]));
-
-    const link = document.createElement("a");
-    link.href = url;
-    const today = new Date();
-    const formattedDate = today.toISOString().split("T")[0];
-    const fileName = `Traces - ${formattedDate}.csv`;
-    link.setAttribute("download", fileName);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-  };
-
   const toggleAllTraces = () => {
-    if (selectedTraceIds.length === traceGroups.data?.groups.length) {
+    const totalTraceCount = displayData?.groups.reduce((sum, g) => sum + g.length, 0) ?? 0;
+    if (selectedTraceIds.length === totalTraceCount) {
       setSelectedTraceIds([]);
     } else {
       setSelectedTraceIds(
-        traceGroups.data?.groups.flatMap((traceGroup) =>
+        displayData?.groups.flatMap((traceGroup) =>
           traceGroup.map((trace) => trace.trace_id),
         ) ?? [],
       );
@@ -985,7 +1035,7 @@ export function MessagesTable({
         <Tooltip content="Refresh">
           <PageLayout.HeaderButton
             variant="ghost"
-            onClick={() => void traceGroups.refetch()}
+            onClick={() => setLiveEndDate(Date.now())}
           >
             <LuRefreshCw
               className={
@@ -996,19 +1046,27 @@ export function MessagesTable({
             />
           </PageLayout.HeaderButton>
         </Tooltip>
+        {pendingCount > 0 && (
+          <Button
+            size="xs"
+            variant="subtle"
+            colorPalette="blue"
+            onClick={acceptPending}
+          >
+            {pendingCount} new
+          </Button>
+        )}
         <Spacer />
-        {!hideExport && (
+        {!hideExport && !isLiteMember && (
           <Tooltip
             disabled={navigationFooter.totalHits < 10_000}
             content={
-              navigationFooter.totalHits >= 10_000 ? "Up to 10.000 items" : ""
+              navigationFooter.totalHits >= 10_000 ? "Up to 10,000 traces" : ""
             }
           >
             <PageLayout.HeaderButton
-              variant={downloadTraces.isPending ? "ghost" : "outline"}
-              onClick={() => void downloadCSV()}
-              loading={downloadTraces.isPending}
-              loadingText="Downloading..."
+              variant="outline"
+              onClick={() => openExportDialog({})}
             >
               <Download size={16} />
               Export all
@@ -1046,30 +1104,35 @@ export function MessagesTable({
                   ...selectedHeaderColumns,
                 }).map(([columnKey, column]) => {
                   if (columnKey === "checked") return null;
+                  const toggleColumn = () => {
+                    setSelectedHeaderColumns({
+                      ...selectedHeaderColumns,
+                      [columnKey]: {
+                        enabled: !selectedHeaderColumns[columnKey]?.enabled,
+                        name: column.name,
+                      },
+                    });
+                    setLocalStorageHeaderColumns({
+                      ...selectedHeaderColumns,
+                      [columnKey]: {
+                        enabled: !selectedHeaderColumns[columnKey]?.enabled,
+                        name: column.name,
+                      },
+                    });
+                  };
                   return (
-                    <Checkbox
+                    <HStack
                       key={columnKey}
-                      checked={selectedHeaderColumns[columnKey]?.enabled}
-                      onChange={() => {
-                        setSelectedHeaderColumns({
-                          ...selectedHeaderColumns,
-                          [columnKey]: {
-                            enabled: !selectedHeaderColumns[columnKey]?.enabled,
-                            name: column.name,
-                          },
-                        });
-
-                        setLocalStorageHeaderColumns({
-                          ...selectedHeaderColumns,
-                          [columnKey]: {
-                            enabled: !selectedHeaderColumns[columnKey]?.enabled,
-                            name: column.name,
-                          },
-                        });
-                      }}
+                      width="full"
+                      cursor="pointer"
+                      onClick={toggleColumn}
                     >
-                      {column.name}
-                    </Checkbox>
+                      <Checkbox
+                        checked={selectedHeaderColumns[columnKey]?.enabled}
+                      >
+                        {column.name}
+                      </Checkbox>
+                    </HStack>
                   );
                 })}
               </VStack>
@@ -1078,12 +1141,29 @@ export function MessagesTable({
         </Popover.Root>
         {/** Column selector - end */}
 
-        <PeriodSelector period={{ startDate, endDate }} setPeriod={setPeriod} />
+        <PeriodSelector
+          period={{ startDate, endDate }}
+          mode={mode}
+          setPeriod={setPeriod}
+          setRelativePeriod={setRelativePeriod}
+        />
         <FilterToggle />
         {!hideAnalyticsToggle && <ToggleAnalytics />}
       </PageLayout.Header>
       <HStack align="top" gap={8}>
-        <Box flex="1" minWidth="0">
+        <Box
+          flex="1"
+          minWidth="0"
+          onMouseEnter={() => {
+            setIsMouseOnTable(true);
+            mouseLeftAtRef.current = 0;
+          }}
+          onMouseLeave={() => {
+            setIsMouseOnTable(false);
+            mouseLeftAtRef.current = Date.now();
+            if (pendingCount > 0 || pendingData) acceptPending();
+          }}
+        >
           <VStack
             gap={0}
             align="start"
@@ -1092,19 +1172,6 @@ export function MessagesTable({
               showFilters ? "calc(100vw - 550px)" : "calc(100vw - 200px)"
             }
           >
-            {downloadProgress > 0 && (
-              <Progress.Root
-                colorPalette="orange"
-                value={downloadProgress}
-                size="xs"
-                width="full"
-                boxShadow="none"
-              >
-                <Progress.Track boxShadow="none" background="none">
-                  <Progress.Range />
-                </Progress.Track>
-              </Progress.Root>
-            )}
             {checkedHeaderColumnsEntries.length === 0 && (
               <Text>No columns selected</Text>
             )}
@@ -1145,8 +1212,12 @@ export function MessagesTable({
                             <HStack width="full">
                               <Checkbox
                                 checked={
+                                  selectedTraceIds.length > 0 &&
                                   selectedTraceIds.length ===
-                                  traceGroups.data?.groups.length
+                                    (displayData?.groups.reduce(
+                                      (sum, g) => sum + g.length,
+                                      0,
+                                    ) ?? 0)
                                 }
                                 onCheckedChange={() => toggleAllTraces()}
                               />
@@ -1168,12 +1239,17 @@ export function MessagesTable({
                   </Table.Row>
                 </Table.Header>
                 <Table.Body>
-                  {traceGroups.data?.groups.flatMap((traceGroup) =>
+                  {displayData?.groups.flatMap((traceGroup) =>
                     traceGroup.map((trace) => (
                       <Table.Row
                         key={trace.trace_id}
                         role="button"
                         cursor="pointer"
+                        className={
+                          highlightIds.has(trace.trace_id)
+                            ? "trace-highlight-new"
+                            : undefined
+                        }
                       >
                         {checkedHeaderColumnsEntries.map(
                           ([column, { name }], index) =>
@@ -1186,7 +1262,7 @@ export function MessagesTable({
                       </Table.Row>
                     )),
                   )}
-                  {traceGroups.isLoading &&
+                  {!displayData &&
                     Array.from({ length: 3 }).map((_, i) => (
                       <Table.Row key={i}>
                         {Array.from({
@@ -1201,7 +1277,7 @@ export function MessagesTable({
                       </Table.Row>
                     ))}
                   {traceGroups.isFetched &&
-                    traceGroups.data?.groups.length === 0 && (
+                    displayData?.groups.length === 0 && (
                       <Table.Row>
                         <Table.Cell />
                         <Table.Cell
@@ -1215,7 +1291,12 @@ export function MessagesTable({
                 </Table.Body>
               </Table.Root>
             </Table.ScrollArea>
-            <NavigationFooter {...navigationFooter} />
+            <NavigationFooter
+              {...navigationFooter}
+              scrollId={traceGroups.data?.scrollId}
+            />
+            {/* Spacer for fixed SavedViewsBar */}
+            <Box height="32px" flexShrink={0} />
           </VStack>
         </Box>
 
@@ -1228,14 +1309,16 @@ export function MessagesTable({
       {selectedTraceIds.length > 0 && (
         <Box
           position="fixed"
-          bottom={10}
+          bottom={16}
           left="50%"
           transform="translateX(-50%)"
-          backgroundColor="#ffffff"
+          zIndex={20}
+          backgroundColor="bg.emphasized"
           padding="8px"
           paddingX="16px"
-          border="1px solid #ccc"
-          boxShadow="0 0 15px rgba(0, 0, 0, 0.2)"
+          border="1px solid"
+          borderColor="border.muted"
+          boxShadow="lg"
           borderRadius="md"
         >
           <HStack gap={3}>
@@ -1249,7 +1332,13 @@ export function MessagesTable({
                   colorPalette="black"
                   minWidth="fit-content"
                   variant="outline"
-                  onClick={() => void downloadCSV(true)}
+                  onClick={() => {
+                    if (isLiteMember) {
+                      openLiteMemberRestriction({ resource: "traces" });
+                      return;
+                    }
+                    openExportDialog({ selectedTraceIds });
+                  }}
                 >
                   Export <Download size={16} style={{ marginLeft: 8 }} />
                 </Button>
@@ -1263,6 +1352,10 @@ export function MessagesTable({
               variant="outline"
               minWidth="fit-content"
               onClick={() => {
+                if (isLiteMember) {
+                  openLiteMemberRestriction({ resource: "datasets" });
+                  return;
+                }
                 openDrawer("addDatasetRecord", {
                   selectedTraceIds,
                 });
@@ -1273,16 +1366,16 @@ export function MessagesTable({
             {!hideAddToQueue && (
               <Dialog.Root
                 open={dialog.open}
-                onOpenChange={(e) =>
-                  e.open ? dialog.onOpen() : dialog.onClose()
-                }
+                onOpenChange={(e) => {
+                  if (e.open && isLiteMember) {
+                    openLiteMemberRestriction({ resource: "annotations" });
+                    return;
+                  }
+                  e.open ? dialog.onOpen() : dialog.onClose();
+                }}
               >
                 <Dialog.Trigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => dialog.onOpen()}
-                  >
+                  <Button variant="outline" size="sm">
                     Add to Queue
                   </Button>
                 </Dialog.Trigger>
@@ -1318,6 +1411,25 @@ export function MessagesTable({
           </HStack>
         </Box>
       )}
+      <ExportConfigDialog
+        isOpen={isExportDialogOpen}
+        onClose={closeExportDialog}
+        onExport={startExport}
+        traceCount={
+          isSelectedExportRef.current
+            ? selectedTraceIds.length
+            : Math.min(navigationFooter.totalHits, 10_000)
+        }
+        isSelectedExport={isSelectedExportRef.current}
+      />
+      <Box position="fixed" bottom={4} right={4} zIndex={30}>
+        <ExportProgress
+          exported={exportProgress.exported}
+          total={exportProgress.total}
+          isExporting={isExporting}
+          onCancel={cancelExport}
+        />
+      </Box>
     </>
   );
 }
@@ -1328,4 +1440,20 @@ function getSafeRenderInputValueFromTrace(trace: Trace): string {
 
 function getSafeRenderOutputValueFromTrace(trace: Trace): string {
   return stringifyIfObject(trace.output?.value);
+}
+
+// Assumes server and client clocks are within ~60s. If the server clock
+// is ahead, recently-ingested traces won't highlight — acceptable trade-off
+// vs. a dedicated "isNew" flag from the server.
+function isTraceRecent(trace: Trace): boolean {
+  return trace.timestamps.started_at > Date.now() - 20_000;
+}
+
+function ProcessingIndicator() {
+  return (
+    <HStack gap={2} color="fg.muted">
+      <Spinner size="xs" />
+      <Text fontSize="sm">processing</Text>
+    </HStack>
+  );
 }

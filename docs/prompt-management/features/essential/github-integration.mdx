@@ -1,0 +1,124 @@
+---
+title: "GitHub Integration"
+description: "Sync prompts with GitHub using LangWatch to maintain version history, enable review workflows, and support agent evaluations."
+---
+
+LangWatch's prompt management integrates seamlessly with GitHub through the [Prompts CLI](/prompt-management/cli), enabling you to version control your prompts alongside your code and automatically sync changes with the LangWatch platform.
+
+## How It Works
+
+The CLI creates standard YAML files that work perfectly with Git workflows:
+- **Local prompts** are stored as `.prompt.yaml` files in your repository
+- **Remote prompts** are materialized locally but gitignored (fetched fresh on each sync)
+- **Dependencies** are declared in `prompts.json` and locked in `prompts-lock.json`
+
+## Setup for GitHub
+
+### 1. Initialize Prompts in Your Repository
+
+```bash
+# Install the CLI
+npm install -g langwatch
+
+# Authenticate
+langwatch login
+
+# Initialize prompts in your repo
+langwatch prompt init
+```
+
+This creates the essential files:
+```
+your-repo/
+├── prompts/
+│   └── .materialized/      # Add to .gitignore
+├── prompts.json            # Commit to Git
+└── prompts-lock.json       # Commit to Git
+```
+
+### 2. Configure .gitignore
+
+Add the materialized directory to your `.gitignore`:
+
+```gitignore
+# LangWatch prompts
+prompts/.materialized/
+```
+
+This ensures remote prompts are fetched fresh and not committed to your repository.
+
+### 3. Create and Version Your Prompts
+
+Create local prompts that will be versioned with your code:
+
+```bash
+# Create a prompt for your feature
+langwatch prompt create features/user-onboarding
+
+# Edit the prompt file
+vim prompts/features/user-onboarding.prompt.yaml
+
+# Push to LangWatch platform
+langwatch prompt push
+```
+
+Commit your prompt files:
+```bash
+git add prompts/features/user-onboarding.prompt.yaml prompts.json prompts-lock.json
+git commit -m "Add user onboarding prompt"
+```
+
+## GitHub Actions Integration
+
+Automatically sync prompts on every push or pull request using GitHub Actions.
+
+Create `.github/workflows/langwatch-sync.yml`:
+
+```yaml
+name: LangWatch Prompt Sync
+
+on:
+  push:
+    branches: [main, develop]
+    paths: ['prompts/**', 'prompts.json']
+  pull_request:
+    branches: [main]
+    paths: ['prompts/**', 'prompts.json']
+
+jobs:
+  sync-prompts:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install LangWatch CLI
+        run: npm install -g langwatch
+
+      - name: Sync prompts
+        env:
+          LANGWATCH_API_KEY: ${{ secrets.LANGWATCH_API_KEY }}
+        run: langwatch prompt sync
+
+      - name: Verify sync
+        run: |
+          echo "✅ Prompts synced successfully"
+          echo "View your prompts at https://app.langwatch.ai"
+```
+
+### Setting Up the API Key
+
+1. Go to your [LangWatch project settings](https://app.langwatch.ai/settings)
+2. Create new API credentials
+3. In your GitHub repository, go to **Settings** → **Secrets and variables** → **Actions**
+4. Add a new secret named `LANGWATCH_API_KEY` with your API key value
+
+## Learn More
+
+For complete documentation on all CLI commands, advanced workflows, conflict resolution, and detailed usage examples, see the [Prompts CLI documentation](/prompt-management/cli).

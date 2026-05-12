@@ -24,12 +24,11 @@ from langwatch_nlp.studio.app import app as studio_app, lifespan as studio_lifes
 
 import langwatch_nlp.topic_clustering.batch_clustering as batch_clustering
 import langwatch_nlp.topic_clustering.incremental_clustering as incremental_clustering
-import langwatch_nlp.sentiment_analysis as sentiment_analysis
 import litellm.proxy.proxy_server as litellm_proxy_server
 
 from litellm.router import Router
 
-os.environ["AZURE_API_VERSION"] = "2024-02-01"
+os.environ["AZURE_API_VERSION"] = "2024-06-01"
 if "DATABASE_URL" in os.environ:
     # we need to delete this otherwise if this is present the proxy server tries to set up a db
     del os.environ["DATABASE_URL"]
@@ -53,7 +52,6 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 batch_clustering.setup_endpoints(app)
 incremental_clustering.setup_endpoints(app)
-sentiment_analysis.setup_endpoints(app)
 
 
 app.mount("/studio", studio_app)

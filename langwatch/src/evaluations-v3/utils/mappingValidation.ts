@@ -16,6 +16,7 @@ import type {
   FieldMapping,
   TargetConfig,
 } from "../types";
+import { extractVariablesFromBodyTemplate } from "./httpAgentUtils";
 
 // ============================================================================
 // Types
@@ -205,16 +206,26 @@ export const getTargetMissingMappings = (
   }
 
   if (isHttpAgent) {
-    // HTTP agents: all fields are optional, but at least one must be mapped
-    let hasAtLeastOneMapping = false;
+    // Derive the effective variable set from the body template (source of truth).
+    // Only fall back to persisted inputs when no body template is available.
+    const templateVars = extractVariablesFromBodyTemplate(
+      target.httpConfig?.bodyTemplate,
+    );
+    const httpFieldIds = new Set(
+      templateVars.length > 0
+        ? templateVars
+        : inputs.map((input) => input.identifier),
+    );
 
-    for (const fieldId of usedFields) {
-      if (!inputIds.has(fieldId)) continue;
+    // HTTP agents: all fields are optional, but at least one must be mapped.
+    // Check the value too — Object.keys includes keys with undefined values.
+    const hasAtLeastOneMapping = Object.entries(datasetMappings).some(
+      ([fieldId, mapping]) =>
+        mapping !== undefined && httpFieldIds.has(fieldId),
+    );
 
-      const hasMapping = datasetMappings[fieldId] !== undefined;
-      if (hasMapping) {
-        hasAtLeastOneMapping = true;
-      } else {
+    for (const fieldId of httpFieldIds) {
+      if (datasetMappings[fieldId] === undefined) {
         // Add to missing but mark as NOT required (optional)
         missingMappings.push({
           fieldId,
@@ -225,10 +236,7 @@ export const getTargetMissingMappings = (
     }
 
     // Valid if at least one field has a mapping (or there are no fields)
-    const totalFields = Array.from(usedFields).filter((f) =>
-      inputIds.has(f),
-    ).length;
-    const isValid = totalFields === 0 || hasAtLeastOneMapping;
+    const isValid = httpFieldIds.size === 0 || hasAtLeastOneMapping;
 
     return {
       isValid,

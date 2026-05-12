@@ -28,13 +28,23 @@ const getImportedModelCosts = () => {
       const modelName = hasVendorPrefix ? modelId.split("/").slice(1).join("/") : modelId;
 
       const escapedModelName = escapeStringRegexp(modelName)
+        // Convert hex-escaped hyphens (\x2d) and escaped hyphens (\-) to literal hyphens
         .replaceAll("\\x2d", "-")
+        .replaceAll("\\-", "-")
         // Fix for langchain using vertexai while litellm uses vertex_ai
-        .replace("vertex_ai", "(vertex_ai|vertexai)");
+        .replace("vertex_ai", "(vertex_ai|vertexai)")
+        // Allow version numbers to use either dots or hyphens (e.g., "4.6" or "4-6")
+        .replaceAll("\\.", "[.-]");
+
+      const escapedVendorPrefix = hasVendorPrefix
+        ? escapeStringRegexp(vendorPrefix!)
+            .replaceAll("\\x2d", "-")
+            .replaceAll("\\-", "-")
+        : "";
 
       const regex = hasVendorPrefix
-        ? `^(${escapeStringRegexp(vendorPrefix!)}\\/)?${escapedModelName}$`
-        : `^${escapedModelName}$`;
+        ? `^(${escapedVendorPrefix}\\/)?${escapedModelName}`
+        : `^${escapedModelName}`;
 
       tokenModels[modelId] = {
         regex,
@@ -91,17 +101,51 @@ export type MaybeStoredLLMModelCost = {
   createdAt?: Date;
 };
 
+let cachedStaticModelCosts: MaybeStoredLLMModelCost[] | null = null;
+
+const getStaticSpecificityKey = (model: string) =>
+  model.includes("/") ? model.split("/").slice(1).join("/") : model;
+
+/**
+ * Returns static model costs from llmModels.json (no DB query).
+ * Cached at module level since the JSON registry is immutable at runtime.
+ */
+export const getStaticModelCosts = (): MaybeStoredLLMModelCost[] => {
+  if (!cachedStaticModelCosts) {
+    const importedData = getImportedModelCosts();
+    cachedStaticModelCosts = Object.entries(importedData)
+      .map(([key, value]) => ({
+        projectId: "",
+        model: key,
+        regex: value.regex,
+        inputCostPerToken: value.inputCostPerToken,
+        outputCostPerToken: value.outputCostPerToken,
+      }))
+      // Sort by the matched model suffix, not raw registry key length,
+      // because vendor prefixes are optional in the generated regex.
+      .sort((a, b) => {
+        const aKey = getStaticSpecificityKey(a.model);
+        const bKey = getStaticSpecificityKey(b.model);
+
+        return (
+          bKey.length - aKey.length ||
+          Number(a.model.includes("/")) - Number(b.model.includes("/"))
+        );
+      });
+  }
+  return cachedStaticModelCosts;
+};
+
 export const getLLMModelCosts = async ({
   projectId,
 }: {
   projectId: string;
 }): Promise<MaybeStoredLLMModelCost[]> => {
-  const importedData = getImportedModelCosts();
   const llmModelCostsCustomData = await prisma.customLLMModelCost.findMany({
     where: { projectId },
   });
 
-  const data = llmModelCostsCustomData
+  const customCosts = llmModelCostsCustomData
     .map(
       (record) =>
         ({
@@ -115,16 +159,7 @@ export const getLLMModelCosts = async ({
           createdAt: record.createdAt,
         }) as MaybeStoredLLMModelCost,
     )
-    .sort((a, b) => b.createdAt!.getTime() - a.createdAt!.getTime())
-    .concat(
-      Object.entries(importedData).map(([key, value]) => ({
-        projectId,
-        model: key,
-        regex: value.regex,
-        inputCostPerToken: value.inputCostPerToken,
-        outputCostPerToken: value.outputCostPerToken,
-      })),
-    );
+    .sort((a, b) => b.createdAt!.getTime() - a.createdAt!.getTime());
 
-  return data;
+  return [...customCosts, ...getStaticModelCosts()];
 };

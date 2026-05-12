@@ -1,13 +1,13 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { checkOrganizationPermission, skipPermissionCheck } from "../rbac";
+import { checkOrganizationPermission } from "../rbac";
 import {
   type LicenseStatus,
   OrganizationNotFoundError,
   getPlanTemplate,
 } from "../../../../ee/licensing";
-import type { LicenseData, LicensePlanLimits } from "../../../../ee/licensing";
+import type { LicenseData } from "../../../../ee/licensing";
 import { signLicense, encodeLicenseKey, generateLicenseId } from "../../../../ee/licensing/signing";
 import { getLicenseHandler } from "~/server/subscriptionHandler";
 
@@ -18,7 +18,6 @@ const planLimitsSchema = z.object({
   maxTeams: z.number().int().positive("Plan limits must be positive numbers"),
   maxProjects: z.number().int().positive("Plan limits must be positive numbers"),
   maxMessagesPerMonth: z.number().int().positive("Plan limits must be positive numbers"),
-  evaluationsCredit: z.number().int().positive("Plan limits must be positive numbers"),
   maxWorkflows: z.number().int().positive("Plan limits must be positive numbers"),
   maxPrompts: z.number().int().positive("Plan limits must be positive numbers"),
   maxEvaluators: z.number().int().positive("Plan limits must be positive numbers"),
@@ -26,6 +25,7 @@ const planLimitsSchema = z.object({
   maxAgents: z.number().int().positive("Plan limits must be positive numbers"),
   maxExperiments: z.number().int().positive("Plan limits must be positive numbers"),
   canPublish: z.boolean(),
+  usageUnit: z.enum(["traces", "events"]),
 });
 
 /** Schema for license generation input */
@@ -166,7 +166,7 @@ export const licenseRouter = createTRPCRouter({
           maxTeams: plan.maxTeams,
           maxProjects: plan.maxProjects,
           maxMessagesPerMonth: plan.maxMessagesPerMonth,
-          evaluationsCredit: plan.evaluationsCredit,
+          evaluationsCredit: 0,
           maxWorkflows: plan.maxWorkflows,
           maxPrompts: plan.maxPrompts,
           maxEvaluators: plan.maxEvaluators,
@@ -174,6 +174,7 @@ export const licenseRouter = createTRPCRouter({
           maxAgents: plan.maxAgents,
           maxExperiments: plan.maxExperiments,
           canPublish: plan.canPublish,
+          usageUnit: plan.usageUnit,
         },
       };
 

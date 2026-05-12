@@ -1,11 +1,14 @@
 import { type Job, Worker } from "bullmq";
+import { BullMQOtel } from "bullmq-otel";
 import type { TopicClusteringJob } from "~/server/background/types";
+import { withJobContext } from "../../context/asyncContext";
 import { createLogger } from "../../../utils/logger/server";
 import {
   captureException,
   withScope,
 } from "../../../utils/posthogErrorCapture";
 import {
+  recordJobWaitDuration,
   getJobProcessingCounter,
   getJobProcessingDurationHistogram,
 } from "../../metrics";
@@ -18,6 +21,7 @@ const logger = createLogger("langwatch:workers:topicClusteringWorker");
 export async function runTopicClusteringJob(
   job: Job<TopicClusteringJob, void, string>,
 ) {
+  recordJobWaitDuration(job, "topic_clustering");
   getJobProcessingCounter("topic_clustering", "processing").inc();
   const start = Date.now();
   logger.info({ jobId: job.id, data: job.data }, "processing job");
@@ -36,10 +40,11 @@ export const startTopicClusteringWorker = () => {
 
   const topicClusteringWorker = new Worker<TopicClusteringJob, void, string>(
     TOPIC_CLUSTERING_QUEUE.NAME,
-    runTopicClusteringJob,
+    withJobContext(runTopicClusteringJob),
     {
       connection,
       concurrency: 3,
+      telemetry: new BullMQOtel(TOPIC_CLUSTERING_QUEUE.NAME),
     },
   );
 

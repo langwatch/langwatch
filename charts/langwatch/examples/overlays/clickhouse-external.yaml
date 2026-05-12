@@ -1,0 +1,16 @@
+# clickhouse-external.yaml — Use an external ClickHouse instance.
+#
+# Stack with any size overlay:
+#   helm install lw . \
+#     -f examples/overlays/size-prod.yaml \
+#     -f examples/overlays/access-ingress.yaml \
+#     -f examples/overlays/clickhouse-external.yaml \
+#     --set 'clickhouse.external.url.value=http://user:pass@my-clickhouse:8123/langwatch'
+
+clickhouse:
+  chartManaged: false
+  external:
+    url:
+      value: "http://<username>:<password>@my-clickhouse:8123/langwatch"
+    # Set cluster name if your external ClickHouse is replicated:
+    # cluster: "my_cluster"

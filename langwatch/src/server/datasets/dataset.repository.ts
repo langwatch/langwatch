@@ -1,4 +1,4 @@
-import type { Dataset, Prisma, PrismaClient } from "@prisma/client";
+import type { Dataset, DatasetRecord, Prisma, PrismaClient } from "@prisma/client";
 
 /**
  * Input types derived from Prisma for type safety
@@ -71,8 +71,14 @@ export class DatasetRepository {
   /**
    * Creates a new dataset.
    */
-  async create(input: CreateDatasetInput): Promise<Dataset> {
-    return await this.prisma.dataset.create({
+  async create(
+    input: CreateDatasetInput,
+    options?: {
+      tx?: Prisma.TransactionClient;
+    },
+  ): Promise<Dataset> {
+    const client = options?.tx ?? this.prisma;
+    return await client.dataset.create({
       data: input,
     });
   }
@@ -143,4 +149,48 @@ export class DatasetRepository {
       select: { slug: true },
     });
   }
+
+  /**
+   * Finds a dataset by slug or id within a project, excluding archived datasets.
+   */
+  async findBySlugOrId(input: {
+    slugOrId: string;
+    projectId: string;
+  }): Promise<Dataset | null> {
+    return await this.prisma.dataset.findFirst({
+      where: {
+        projectId: input.projectId,
+        archivedAt: null,
+        OR: [{ slug: input.slugOrId }, { id: input.slugOrId }],
+      },
+    });
+  }
+
+  /**
+   * Lists non-archived datasets for a project with pagination and record counts.
+   */
+  async listPaginated(input: {
+    projectId: string;
+    skip: number;
+    take: number;
+  }): Promise<{
+    datasets: Array<Dataset & { _count: { datasetRecords: number } }>;
+    total: number;
+  }> {
+    const where = { projectId: input.projectId, archivedAt: null };
+
+    const [datasets, total] = await Promise.all([
+      this.prisma.dataset.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        include: { _count: { select: { datasetRecords: true } } },
+        skip: input.skip,
+        take: input.take,
+      }),
+      this.prisma.dataset.count({ where }),
+    ]);
+
+    return { datasets, total };
+  }
+
 }

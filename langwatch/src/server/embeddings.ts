@@ -1,5 +1,5 @@
 import { DEFAULT_EMBEDDINGS_MODEL } from "../utils/constants";
-import { getProjectModelProviders } from "./api/routers/modelProviders";
+import { getProjectModelProviders } from "./api/routers/modelProviders.utils";
 import { prisma } from "./db";
 
 export const getProjectEmbeddingsModel = async (projectId: string) => {

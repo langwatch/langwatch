@@ -1,1 +1,3 @@
 prompts/.materialized
+!prompts.json
+!prompts-lock.json

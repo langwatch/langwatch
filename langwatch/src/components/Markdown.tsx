@@ -5,6 +5,7 @@ import { createLogger } from "~/utils/logger";
 import { stringifyIfObject } from "~/utils/stringifyIfObject";
 import { RenderCode } from "./code/RenderCode";
 import { getProxiedImageUrl } from "./ExternalImage";
+import { Prose } from "./ui/prose";
 
 const logger = createLogger("langwatch:components:Markdown");
 
@@ -36,35 +37,36 @@ function MarkdownWithPluginsAndProxy({
     url.startsWith("data:") ? url : defaultUrlTransform(url);
 
   return (
-    <ReactMarkdown
-      remarkPlugins={[remarkGfm]}
-      className={className}
-      urlTransform={urlTransform}
-      components={{
-        code(props) {
-          const { children, className, ...rest } = props;
-          const match = /language-(\w+)/.exec(className ?? "");
-          const code = String(children).replace(/\n$/, "");
+    <Prose className={className} fontSize="14px" maxWidth="none">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        urlTransform={urlTransform}
+        components={{
+          code(props) {
+            const { children, className, ...rest } = props;
+            const match = /language-(\w+)/.exec(className ?? "");
+            const code = String(children).replace(/\n$/, "");
 
-          if (code.includes("\n")) {
-            return (
-              <RenderCode
-                language={match ? match[1]! : ""}
-                code={String(children).replace(/\n$/, "")}
-              />
-            );
-          } else {
-            return (
-              <code className={className} {...rest}>
-                {code}
-              </code>
-            );
-          }
-        },
-      }}
-    >
-      {proxyMarkdownImageUrls(stringifyIfObject(children))}
-    </ReactMarkdown>
+            if (code.includes("\n")) {
+              return (
+                <RenderCode
+                  language={match ? match[1]! : ""}
+                  code={String(children).replace(/\n$/, "")}
+                />
+              );
+            } else {
+              return (
+                <code className={className} {...rest}>
+                  {code}
+                </code>
+              );
+            }
+          },
+        }}
+      >
+        {proxyMarkdownImageUrls(stringifyIfObject(children))}
+      </ReactMarkdown>
+    </Prose>
   );
 }
 

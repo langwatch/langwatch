@@ -2,8 +2,6 @@ import "@testing-library/jest-dom/vitest";
 import dotenv from "dotenv";
 import { vi } from "vitest";
 import { TEST_PUBLIC_KEY } from "./ee/licensing/__tests__/fixtures/testKeys";
-import { initializeEventSourcingForTesting } from "~/server/event-sourcing";
-
 dotenv.config({ path: ".env" });
 
 // Mock recharts to avoid ESM/CJS compatibility issues with @reduxjs/toolkit in vmThreads pool.
@@ -49,7 +47,137 @@ vi.mock("recharts", () => {
 // This allows test licenses (signed with TEST_PRIVATE_KEY) to validate correctly.
 process.env.LANGWATCH_LICENSE_PUBLIC_KEY = TEST_PUBLIC_KEY;
 
-initializeEventSourcingForTesting();
+// Mock @copilotkit/react-ui to avoid @react-aria/interactions crash in vmThreads.
+// React-aria's useFocusVisible.mjs has a top-level side effect that patches
+// HTMLElement.prototype.focus, which fails in vmThreads external module context.
+// No tests exercise CopilotKit features, so this mock is safe.
+vi.mock("@copilotkit/react-ui", () => {
+  const Noop = () => null;
+  return {
+    CopilotChat: Noop,
+    AssistantMessage: Noop,
+    UserMessage: Noop,
+  };
+});
+
+// Mock the router compat layer for tests.
+// Components import useRouter from ~/utils/compat/next-router which
+// calls React Router hooks (useNavigate, useLocation, etc.) that require
+// <BrowserRouter> context. In tests, we provide a stub.
+const mockRouter = {
+  query: {},
+  pathname: "/",
+  asPath: "/",
+  isReady: true,
+  route: "/",
+  basePath: "",
+  locale: undefined,
+  locales: undefined,
+  defaultLocale: undefined,
+  isFallback: false,
+  events: { on: vi.fn(), off: vi.fn(), emit: vi.fn() },
+  push: vi.fn().mockResolvedValue(true),
+  replace: vi.fn().mockResolvedValue(true),
+  back: vi.fn(),
+  reload: vi.fn(),
+  prefetch: vi.fn().mockResolvedValue(undefined),
+  beforePopState: vi.fn(),
+};
+
+// To opt out of this global mock (e.g. when testing the compat layer itself
+// against a real react-router MemoryRouter), see the vi.unmock pattern in
+// src/components/suites/__tests__/RunsFilterUrlSync.integration.test.tsx.
+vi.mock("~/utils/compat/next-router", () => ({
+  useRouter: () => mockRouter,
+  default: mockRouter,
+  // Re-export the type aliases
+  NextRouter: {},
+}));
+
+// Also mock the old next/router and next/navigation paths in case any test
+// mocks reference them directly
+vi.mock("next/router", () => ({
+  useRouter: () => mockRouter,
+  default: mockRouter,
+}));
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => mockRouter,
+  usePathname: () => "/",
+  useSearchParams: () => new URLSearchParams(),
+  useParams: () => ({}),
+  redirect: vi.fn(),
+  notFound: vi.fn(),
+}));
+
+vi.mock("~/utils/compat/next-navigation", () => ({
+  useRouter: () => mockRouter,
+  usePathname: () => "/",
+  useSearchParams: () => new URLSearchParams(),
+  useParams: () => ({}),
+  redirect: vi.fn(),
+  notFound: vi.fn(),
+}));
+
+// Mock Link components that use React Router (requires Router context).
+vi.mock("~/utils/compat/next-link", () => {
+  const React = require("react");
+  return {
+    default: React.forwardRef(function MockLink(
+      { children, href, ...props }: any,
+      ref: any
+    ) {
+      return React.createElement("a", { ref, href: typeof href === "string" ? href : href?.pathname ?? "/", ...props }, children);
+    }),
+  };
+});
+
+vi.mock("next/link", () => {
+  const React = require("react");
+  return {
+    default: React.forwardRef(function MockLink(
+      { children, href, ...props }: any,
+      ref: any
+    ) {
+      return React.createElement("a", { ref, href: typeof href === "string" ? href : href?.pathname ?? "/", ...props }, children);
+    }),
+  };
+});
+
+// Mock dynamic() (next-dynamic compat) to return a simple passthrough in tests.
+// The real implementation uses React.lazy() which suspends in jsdom when
+// dynamic imports don't resolve synchronously.
+vi.mock("~/utils/compat/next-dynamic", () => ({
+  default: (importFn: () => Promise<any>, options?: any) => {
+    const React = require("react");
+    const Loading = options?.loading ?? (() => null);
+    // Return a component that just renders the loading fallback.
+    // The actual dynamically-imported component doesn't matter for most tests.
+    return function DynamicMock(props: any) {
+      return React.createElement(Loading);
+    };
+  },
+}));
+
+// Polyfill window.matchMedia for Vitest/JSDOM (not implemented by default).
+// Prevents "TypeError: window.matchMedia is not a function" when components
+// or hooks call matchMedia at module or render time.
+if (typeof window !== "undefined" && typeof window.matchMedia !== "function") {
+  Object.defineProperty(window, "matchMedia", {
+    writable: true,
+    value: (query: string): MediaQueryList =>
+      ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        addListener: () => {},
+        removeListener: () => {},
+        dispatchEvent: () => false,
+      }) as unknown as MediaQueryList,
+  });
+}
 
 // Mock ResizeObserver for tests using floating-ui/popper (Chakra menus, tooltips, etc.)
 globalThis.ResizeObserver = class ResizeObserver {

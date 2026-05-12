@@ -8,14 +8,18 @@
 
 import type { AgentAdapter } from "@langwatch/scenario";
 import type {
+  CodeAgentData,
   HttpAgentData,
   LiteLLMParams,
   PromptConfigData,
   TargetAdapterData,
+  WorkflowAgentData,
 } from "./types";
 import {
+  SerializedCodeAgentAdapter,
   SerializedHttpAgentAdapter,
   SerializedPromptConfigAdapter,
+  SerializedWorkflowAgentAdapter,
 } from "./serialized.adapters";
 
 type AdapterFactory = (params: {
@@ -35,7 +39,20 @@ export const SERIALIZED_ADAPTER_FACTORIES: Record<string, AdapterFactory> = {
       modelParams,
       nlpServiceUrl,
     ),
-  http: ({ data }) => new SerializedHttpAgentAdapter(data as HttpAgentData),
+  http: ({ data }) =>
+    new SerializedHttpAgentAdapter(data as HttpAgentData),
+  code: ({ data, modelParams, nlpServiceUrl }) =>
+    new SerializedCodeAgentAdapter(
+      data as CodeAgentData,
+      nlpServiceUrl,
+      modelParams.api_key,
+    ),
+  workflow: ({ data, modelParams, nlpServiceUrl }) =>
+    new SerializedWorkflowAgentAdapter(
+      data as WorkflowAgentData,
+      nlpServiceUrl,
+      modelParams.api_key,
+    ),
 };
 
 /**

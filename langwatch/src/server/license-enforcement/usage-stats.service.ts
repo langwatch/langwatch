@@ -1,7 +1,10 @@
 import type { PrismaClient } from "@prisma/client";
-import { dependencies } from "../../injection/dependencies.server";
+import { UNLIMITED_MESSAGES } from "../../../ee/billing/planLimits";
+import type { PlanInfo } from "../../../ee/licensing/planInfo";
+import type { PlanProvider } from "../app-layer/subscription/plan-provider";
+import type { UsageUnit } from "../app-layer/usage/usage-meter-policy";
 import { formatNumber, formatPercent } from "../../utils/formatNumber";
-import { TraceUsageService } from "../traces/trace-usage.service";
+import { getApp } from "../app-layer/app";
 import {
   type ILicenseEnforcementRepository,
   LicenseEnforcementRepository,
@@ -32,7 +35,8 @@ export function getMessageLimitStatus(
   current: number,
   max: number,
 ): MessageLimitStatus {
-  if (max === 0 || max === Number.MAX_SAFE_INTEGER) return "ok";
+  if (max === 0 || max === Number.MAX_SAFE_INTEGER || max >= UNLIMITED_MESSAGES)
+    return "ok";
   if (current >= max) return "exceeded";
   if (current >= max * MESSAGE_LIMIT_WARNING_THRESHOLD) return "warning";
   return "ok";
@@ -45,14 +49,16 @@ export function buildMessageLimitInfo(
   current: number,
   max: number,
 ): MessageLimitInfo {
-  const percentage = max > 0 ? current / max : 0;
   const status = getMessageLimitStatus(current, max);
   const currentFormatted = formatNumber(current);
-  const maxFormatted = formatNumber(max);
+  const isUnlimited = max >= UNLIMITED_MESSAGES;
+  const maxFormatted = isUnlimited ? "Unlimited" : formatNumber(max);
+  const percentage = max > 0 && !isUnlimited ? current / max : 0;
   const percentageFormatted = formatPercent(percentage);
 
-  const message =
-    status === "exceeded"
+  const message = isUnlimited
+    ? `You have used ${currentFormatted} messages this month (Unlimited plan).`
+    : status === "exceeded"
       ? `You reached the limit of ${maxFormatted} messages for this month, new messages will not be processed.`
       : `You have used ${percentageFormatted} of your monthly message limit (${currentFormatted} / ${maxFormatted}).`;
 
@@ -72,7 +78,17 @@ export function buildMessageLimitInfo(
  * Follows Interface Segregation Principle - only what we need.
  */
 export interface ITraceUsageService {
-  getCurrentMonthCount(params: { organizationId: string }): Promise<number>;
+  getCurrentMonthCount(params: { organizationId: string }): Promise<number | "unlimited">;
+}
+
+/**
+ * Interface for resolving the usage unit (traces or events).
+ * Follows Interface Segregation Principle.
+ */
+export interface IUsageUnitResolver {
+  getResolvedUsageUnit(params: {
+    organizationId: string;
+  }): Promise<UsageUnit>;
 }
 
 /**
@@ -80,11 +96,9 @@ export interface ITraceUsageService {
  */
 export interface UsageStats {
   projectsCount: number;
-  currentMonthMessagesCount: number;
+  currentMonthMessagesCount: number | null;
   currentMonthCost: number;
-  activePlan: Awaited<
-    ReturnType<typeof dependencies.subscriptionHandler.getActivePlan>
-  >;
+  activePlan: PlanInfo;
   maxMonthlyUsageLimit: number;
   membersCount: number;
   membersLiteCount: number;
@@ -95,8 +109,8 @@ export interface UsageStats {
   evaluatorsCount: number;
   agentsCount: number;
   experimentsCount: number;
-  evaluationsCreditUsed: number;
   messageLimitInfo: MessageLimitInfo;
+  usageUnit: UsageUnit;
 }
 
 /**
@@ -104,8 +118,8 @@ export interface UsageStats {
  *
  * Coordinates between:
  * - LicenseEnforcementRepository (Prisma queries)
- * - TraceUsageService (Elasticsearch queries)
- * - SubscriptionHandler (plan info)
+ * - UsageService (orchestrated counting via meter policy)
+ * - PlanProvider (plan info)
  *
  * This is the proper service layer - routers call this instead of
  * manually wiring dependencies.
@@ -114,7 +128,8 @@ export class UsageStatsService {
   constructor(
     private readonly repository: ILicenseEnforcementRepository,
     private readonly traceUsageService: ITraceUsageService,
-    private readonly subscriptionHandler: typeof dependencies.subscriptionHandler,
+    private readonly planProvider: PlanProvider,
+    private readonly usageUnitResolver: IUsageUnitResolver,
   ) {}
 
   /**
@@ -122,12 +137,12 @@ export class UsageStatsService {
    * Routers should call this instead of manually wiring dependencies.
    */
   static create(prisma: PrismaClient): UsageStatsService {
-    const traceUsageService = TraceUsageService.create(prisma);
     const repository = new LicenseEnforcementRepository(prisma);
     return new UsageStatsService(
       repository,
-      traceUsageService,
-      dependencies.subscriptionHandler,
+      getApp().usage,
+      getApp().planProvider,
+      getApp().usage,
     );
   }
 
@@ -154,33 +169,35 @@ export class UsageStatsService {
       evaluatorsCount,
       agentsCount,
       experimentsCount,
-      evaluationsCreditUsed,
+      usageUnit,
     ] = await Promise.all([
       this.repository.getProjectCount(organizationId),
       this.traceUsageService.getCurrentMonthCount({ organizationId }),
       this.repository.getCurrentMonthCost(organizationId),
-      this.subscriptionHandler.getActivePlan(organizationId, user),
+      this.planProvider.getActivePlan({ organizationId, user }),
       this.getMaxMonthlyUsageLimit(organizationId),
       this.repository.getMemberCount(organizationId),
       this.repository.getMembersLiteCount(organizationId),
       this.repository.getTeamCount(organizationId),
       this.repository.getPromptCount(organizationId),
       this.repository.getWorkflowCount(organizationId),
-      this.repository.getScenarioCount(organizationId),
+      this.repository.getActiveScenarioCount(organizationId),
       this.repository.getEvaluatorCount(organizationId),
       this.repository.getAgentCount(organizationId),
       this.repository.getExperimentCount(organizationId),
-      this.repository.getEvaluationsCreditUsed(organizationId),
+      this.usageUnitResolver.getResolvedUsageUnit({ organizationId }),
     ]);
 
+    const resolvedCount = currentMonthMessagesCount === "unlimited" ? null : currentMonthMessagesCount;
+
     const messageLimitInfo = buildMessageLimitInfo(
-      currentMonthMessagesCount,
+      resolvedCount ?? 0,
       activePlan.maxMessagesPerMonth,
     );
 
     return {
       projectsCount,
-      currentMonthMessagesCount,
+      currentMonthMessagesCount: resolvedCount,
       currentMonthCost,
       activePlan,
       maxMonthlyUsageLimit,
@@ -193,8 +210,8 @@ export class UsageStatsService {
       evaluatorsCount,
       agentsCount,
       experimentsCount,
-      evaluationsCreditUsed,
       messageLimitInfo,
+      usageUnit,
     };
   }
 

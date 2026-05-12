@@ -129,6 +129,64 @@ export class AgentRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
   /**
+   * Find an agent by ID regardless of its archived status.
+   * Used for checking archived vs. missing status during suite run resolution.
+   */
+  async findByIdIncludingArchived(input: {
+    id: string;
+    projectId: string;
+  }): Promise<{ id: string; archivedAt: Date | null } | null> {
+    return this.prisma.agent.findFirst({
+      where: { id: input.id, projectId: input.projectId },
+      select: { id: true, archivedAt: true },
+    });
+  }
+
+  /**
+   * Find multiple agents by IDs regardless of archived status.
+   * Returns only id and archivedAt for lightweight classification.
+   */
+  async findManyIncludingArchived(input: {
+    ids: string[];
+    projectId: string;
+  }): Promise<{ id: string; archivedAt: Date | null }[]> {
+    return this.prisma.agent.findMany({
+      where: { id: { in: input.ids }, projectId: input.projectId },
+      select: { id: true, archivedAt: true },
+    });
+  }
+
+  /**
+   * Find agent names by IDs regardless of archived status.
+   * Used for displaying human-readable names in UI warnings.
+   */
+  async findNamesByIds(input: {
+    ids: string[];
+    projectId: string;
+  }): Promise<{ id: string; name: string }[]> {
+    return this.prisma.agent.findMany({
+      where: { id: { in: input.ids }, projectId: input.projectId },
+      select: { id: true, name: true },
+    });
+  }
+
+  /**
+   * Checks whether a non-archived agent exists for the given id and project.
+   * Lightweight: does NOT parse config through Zod.
+   */
+  async exists(input: { id: string; projectId: string }): Promise<boolean> {
+    const agent = await this.prisma.agent.findFirst({
+      where: {
+        id: input.id,
+        projectId: input.projectId,
+        archivedAt: null,
+      },
+      select: { id: true },
+    });
+    return agent !== null;
+  }
+
+  /**
    * Finds a single agent by id within a project.
    * Excludes archived agents by default.
    * Returns typed agent with parsed config.
@@ -169,6 +227,33 @@ export class AgentRepository {
     });
 
     return agents.map(parseAgent);
+  }
+
+  /**
+   * Finds agents for a project with pagination.
+   * Excludes archived agents. Orders by most recently updated.
+   */
+  async findAllPaginated(input: {
+    projectId: string;
+    page: number;
+    limit: number;
+  }): Promise<{ data: TypedAgent[]; total: number }> {
+    const where = {
+      projectId: input.projectId,
+      archivedAt: null,
+    };
+
+    const [agents, total] = await Promise.all([
+      this.prisma.agent.findMany({
+        where,
+        orderBy: { updatedAt: "desc" },
+        skip: (input.page - 1) * input.limit,
+        take: input.limit,
+      }),
+      this.prisma.agent.count({ where }),
+    ]);
+
+    return { data: agents.map(parseAgent), total };
   }
 
   /**
@@ -384,6 +469,8 @@ export type AgentWithWorkflow = Agent & {
     name: string;
     icon: string | null;
     description: string | null;
+    isEvaluator: boolean;
+    isComponent: boolean;
     latestVersion: { dsl: unknown } | null;
   } | null;
 };

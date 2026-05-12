@@ -18,9 +18,23 @@ vi.mock("~/server/scenarios/execution/data-prefetcher", () => ({
   prefetchScenarioData: vi.fn(),
 }));
 
-vi.mock("~/server/scenarios/scenario.queue", () => ({
+vi.mock("~/server/scenarios/scenario.ids", () => ({
   generateBatchRunId: vi.fn().mockReturnValue("batch_test_123"),
-  scheduleScenarioRun: vi.fn().mockResolvedValue({ id: "job_test_123" }),
+}));
+
+const mockQueueRun = vi.fn().mockResolvedValue(undefined);
+vi.mock("~/server/app-layer/app", () => ({
+  getApp: vi.fn().mockReturnValue({
+    simulations: {
+      queueRun: (...args: unknown[]) => mockQueueRun(...args),
+    },
+  }),
+}));
+
+vi.mock("@langwatch/ksuid", () => ({
+  generate: vi.fn().mockReturnValue({
+    toString: () => "scenariorun_test_456",
+  }),
 }));
 
 vi.mock("~/utils/logger/server", () => ({
@@ -51,12 +65,10 @@ vi.mock("~/server/auditLog", () => ({
 // Import mocked functions after mocking
 import { prefetchScenarioData } from "~/server/scenarios/execution/data-prefetcher";
 import { getOnPlatformSetId } from "~/server/scenarios/internal-set-id";
-import { scheduleScenarioRun } from "~/server/scenarios/scenario.queue";
 import { simulationRunnerRouter } from "../simulation-runner.router";
 import { createInnerTRPCContext } from "../../../trpc";
 
 const mockPrefetchScenarioData = vi.mocked(prefetchScenarioData);
-const mockScheduleScenarioRun = vi.mocked(scheduleScenarioRun);
 
 function createTestCaller() {
   const ctx = createInnerTRPCContext({
@@ -82,6 +94,7 @@ describe("simulationRunnerRouter.run", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockQueueRun.mockResolvedValue(undefined);
     caller = createTestCaller();
   });
 
@@ -94,25 +107,11 @@ describe("simulationRunnerRouter.run", () => {
     });
 
     describe("when run is called", () => {
-      it("throws TRPCError with BAD_REQUEST code", async () => {
-        await expect(caller.run(defaultInput)).rejects.toThrow(TRPCError);
-
-        try {
-          await caller.run(defaultInput);
-        } catch (error) {
-          expect(error).toBeInstanceOf(TRPCError);
-          expect((error as TRPCError).code).toBe("BAD_REQUEST");
-        }
-      });
-
-      it("returns error message about missing model", async () => {
-        try {
-          await caller.run(defaultInput);
-        } catch (error) {
-          expect((error as TRPCError).message).toBe(
-            "Project default model is not configured",
-          );
-        }
+      it("throws TRPCError with BAD_REQUEST code and missing model message", async () => {
+        await expect(caller.run(defaultInput)).rejects.toMatchObject({
+          code: "BAD_REQUEST",
+          message: "Project default model is not configured",
+        });
       });
 
       it("does not schedule the job", async () => {
@@ -121,7 +120,7 @@ describe("simulationRunnerRouter.run", () => {
         } catch {
           // Expected to throw
         }
-        expect(mockScheduleScenarioRun).not.toHaveBeenCalled();
+        expect(mockQueueRun).not.toHaveBeenCalled();
       });
     });
   });
@@ -145,12 +144,12 @@ describe("simulationRunnerRouter.run", () => {
       });
 
       it("returns error message containing not found", async () => {
-        try {
-          await caller.run({ ...defaultInput, scenarioId: "nonexistent" });
-        } catch (error) {
-          expect((error as TRPCError).code).toBe("BAD_REQUEST");
-          expect((error as TRPCError).message).toContain("not found");
-        }
+        await expect(
+          caller.run({ ...defaultInput, scenarioId: "nonexistent" }),
+        ).rejects.toMatchObject({
+          code: "BAD_REQUEST",
+          message: expect.stringContaining("not found"),
+        });
       });
 
       it("does not schedule the job", async () => {
@@ -159,7 +158,7 @@ describe("simulationRunnerRouter.run", () => {
         } catch {
           // Expected to throw
         }
-        expect(mockScheduleScenarioRun).not.toHaveBeenCalled();
+        expect(mockQueueRun).not.toHaveBeenCalled();
       });
     });
   });
@@ -183,12 +182,10 @@ describe("simulationRunnerRouter.run", () => {
       });
 
       it("returns error message containing not found", async () => {
-        try {
-          await caller.run(input);
-        } catch (error) {
-          expect((error as TRPCError).code).toBe("BAD_REQUEST");
-          expect((error as TRPCError).message).toContain("not found");
-        }
+        await expect(caller.run(input)).rejects.toMatchObject({
+          code: "BAD_REQUEST",
+          message: expect.stringContaining("not found"),
+        });
       });
 
       it("does not schedule the job", async () => {
@@ -197,7 +194,101 @@ describe("simulationRunnerRouter.run", () => {
         } catch {
           // Expected to throw
         }
-        expect(mockScheduleScenarioRun).not.toHaveBeenCalled();
+        expect(mockQueueRun).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given code agent does not exist", () => {
+    beforeEach(() => {
+      mockPrefetchScenarioData.mockResolvedValue({
+        success: false,
+        error: "Code agent nonexistent not found",
+      });
+    });
+
+    describe("when run is called with code agent target", () => {
+      const input = {
+        ...defaultInput,
+        target: { type: "code" as const, referenceId: "nonexistent" },
+      };
+
+      it("throws TRPCError with BAD_REQUEST code", async () => {
+        await expect(caller.run(input)).rejects.toThrow(TRPCError);
+      });
+
+      it("returns error message containing Code agent and not found", async () => {
+        await expect(caller.run(input)).rejects.toMatchObject({
+          code: "BAD_REQUEST",
+          message: expect.stringMatching(/Code agent.*not found/),
+        });
+      });
+
+      it("does not schedule the job", async () => {
+        try {
+          await caller.run(input);
+        } catch {
+          // Expected to throw
+        }
+        expect(mockQueueRun).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given validation passes but queueRun command fails", () => {
+    beforeEach(() => {
+      mockPrefetchScenarioData.mockResolvedValue({
+        success: true,
+        data: {
+          context: {
+            projectId: "proj_123",
+            scenarioId: "scen_123",
+            setId: "default",
+            batchRunId: "batch_test_123",
+          },
+          scenario: {
+            id: "scen_123",
+            name: "Test Scenario",
+            situation: "User asks a question",
+            criteria: ["Must respond politely"],
+            labels: [],
+          },
+          adapterData: {
+            type: "prompt",
+            promptId: "prompt_123",
+            systemPrompt: "You are helpful",
+            messages: [],
+          },
+          modelParams: {
+            api_key: "test-key",
+            model: "openai/gpt-4",
+          },
+          nlpServiceUrl: "http://localhost:8080",
+          target: { type: "prompt", referenceId: "prompt_123" },
+        },
+        telemetry: {
+          endpoint: "http://localhost:3000",
+          apiKey: "test-api-key",
+        },
+      });
+    });
+
+    describe("when queueRun command fails", () => {
+      beforeEach(() => {
+        mockQueueRun.mockRejectedValue(new Error("ClickHouse write failed"));
+      });
+
+      it("throws TRPCError with INTERNAL_SERVER_ERROR code", async () => {
+        await expect(caller.run(defaultInput)).rejects.toMatchObject({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to queue scenario run",
+        });
+      });
+
+      it("propagates the error as INTERNAL_SERVER_ERROR", async () => {
+        await expect(caller.run(defaultInput)).rejects.toMatchObject({
+          code: "INTERNAL_SERVER_ERROR",
+        });
       });
     });
   });
@@ -231,6 +322,7 @@ describe("simulationRunnerRouter.run", () => {
             model: "openai/gpt-4",
           },
           nlpServiceUrl: "http://localhost:8080",
+          target: { type: "prompt", referenceId: "prompt_123" },
         },
         telemetry: {
           endpoint: "http://localhost:3000",
@@ -240,47 +332,72 @@ describe("simulationRunnerRouter.run", () => {
     });
 
     describe("when run is called without explicit setId", () => {
-      it("schedules the scenario run with internal on-platform set ID", async () => {
+      it("dispatches queueRun command before scheduling", async () => {
         await caller.run(defaultInput);
 
         const expectedSetId = getOnPlatformSetId(defaultInput.projectId);
-        expect(mockScheduleScenarioRun).toHaveBeenCalledWith({
-          projectId: "proj_123",
-          scenarioId: "scen_123",
-          target: { type: "prompt", referenceId: "prompt_123" },
-          setId: expectedSetId,
-          batchRunId: "batch_test_123",
-        });
+        expect(mockQueueRun).toHaveBeenCalledWith(
+          expect.objectContaining({
+            tenantId: "proj_123",
+            scenarioRunId: "scenariorun_test_456",
+            scenarioId: "scen_123",
+            batchRunId: "batch_test_123",
+            scenarioSetId: expectedSetId,
+            occurredAt: expect.any(Number),
+          }),
+        );
       });
 
-      it("returns scheduled job info with internal set ID", async () => {
+      it("passes the pre-generated scenarioRunId to queueRun", async () => {
+        await caller.run(defaultInput);
+
+        expect(mockQueueRun).toHaveBeenCalledWith(
+          expect.objectContaining({
+            scenarioRunId: "scenariorun_test_456",
+          }),
+        );
+      });
+
+      it("returns scenarioRunId alongside existing fields", async () => {
         const result = await caller.run(defaultInput);
 
         const expectedSetId = getOnPlatformSetId(defaultInput.projectId);
         expect(result).toEqual({
           scheduled: true,
-          jobId: "job_test_123",
           setId: expectedSetId,
           batchRunId: "batch_test_123",
+          scenarioRunId: "scenariorun_test_456",
         });
       });
     });
 
     describe("when run is called with explicit setId", () => {
-      it("preserves the user-provided set ID", async () => {
+      it("preserves the user-provided set ID in queueRun", async () => {
         const inputWithSetId = {
           ...defaultInput,
           setId: "production-tests",
         };
         await caller.run(inputWithSetId);
 
-        expect(mockScheduleScenarioRun).toHaveBeenCalledWith({
-          projectId: "proj_123",
-          scenarioId: "scen_123",
-          target: { type: "prompt", referenceId: "prompt_123" },
+        expect(mockQueueRun).toHaveBeenCalledWith(
+          expect.objectContaining({
+            scenarioSetId: "production-tests",
+          }),
+        );
+      });
+
+      it("dispatches queueRun with user-provided set ID", async () => {
+        const inputWithSetId = {
+          ...defaultInput,
           setId: "production-tests",
-          batchRunId: "batch_test_123",
-        });
+        };
+        await caller.run(inputWithSetId);
+
+        expect(mockQueueRun).toHaveBeenCalledWith(
+          expect.objectContaining({
+            scenarioSetId: "production-tests",
+          }),
+        );
       });
 
       it("returns scheduled job info with user-provided set ID", async () => {
@@ -292,9 +409,9 @@ describe("simulationRunnerRouter.run", () => {
 
         expect(result).toEqual({
           scheduled: true,
-          jobId: "job_test_123",
           setId: "production-tests",
           batchRunId: "batch_test_123",
+          scenarioRunId: "scenariorun_test_456",
         });
       });
     });

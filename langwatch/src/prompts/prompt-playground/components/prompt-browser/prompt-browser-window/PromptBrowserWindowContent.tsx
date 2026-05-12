@@ -1,4 +1,4 @@
-import { Box, HStack } from "@chakra-ui/react";
+import { Box, HStack, Skeleton, VStack } from "@chakra-ui/react";
 import cloneDeep from "lodash.clonedeep";
 import debounce from "lodash.debounce";
 import {
@@ -52,6 +52,13 @@ export function PromptBrowserWindowContent() {
       };
     },
   );
+
+  // Show loading skeleton while tab data is being fetched — no form initialization
+  if (tab?.data.loading) {
+    const layoutMode: LayoutMode = isSingleWindow ? "horizontal" : "vertical";
+    return <PromptTabLoadingSkeleton layoutMode={layoutMode} />;
+  }
+
   const currentValues = tab?.data.form.currentValues;
   const versionNumber = tab?.data.meta.versionNumber;
   const initialConfigValues = useMemo(
@@ -379,5 +386,60 @@ function PromptBrowserWindowInner(props: {
         </Box>
       </FormProvider>
     </LayoutModeContext.Provider>
+  );
+}
+
+/**
+ * Loading skeleton displayed while a tab's data is being fetched.
+ * Shows placeholder content on both prompt and chat/variables panels.
+ */
+function PromptTabLoadingSkeleton({ layoutMode }: { layoutMode: LayoutMode }) {
+  const skeletonLines = (
+    <VStack gap={3} width="full" padding={4} alignItems="flex-start">
+      <Skeleton height="20px" width="40%" />
+      <Skeleton height="80px" width="full" />
+      <Skeleton height="20px" width="70%" />
+      <Skeleton height="20px" width="55%" />
+    </VStack>
+  );
+
+  const rightSkeletonLines = (
+    <VStack gap={3} width="full" padding={4} alignItems="flex-start">
+      <Skeleton height="20px" width="30%" />
+      <Skeleton height="40px" width="80%" />
+      <Skeleton height="40px" width="60%" />
+    </VStack>
+  );
+
+  if (layoutMode === "horizontal") {
+    return (
+      <HStack height="full" width="full" gap={0} alignItems="stretch">
+        <Box
+          width="50%"
+          minWidth="300px"
+          maxWidth="600px"
+          borderRight="1px solid"
+          borderColor="border.muted"
+          display="flex"
+          flexDirection="column"
+        >
+          {skeletonLines}
+        </Box>
+        <Box flex={1} display="flex" flexDirection="column">
+          {rightSkeletonLines}
+        </Box>
+      </HStack>
+    );
+  }
+
+  return (
+    <VStack height="full" width="full" gap={0} alignItems="stretch">
+      <Box width="full" maxWidth="768px" paddingX={3}>
+        {skeletonLines}
+      </Box>
+      <Box width="full" maxWidth="768px" paddingX={3}>
+        {rightSkeletonLines}
+      </Box>
+    </VStack>
   );
 }

@@ -27,7 +27,6 @@ export default defineConfig({
       ...configDefaults.exclude,
       ".next/**/*",
       ".next-saas/**/*",
-      "saas-src/**/*",
     ],
     testTimeout: 60_000, // 60 seconds for testcontainers startup and processing
     hookTimeout: 60_000, // 60 seconds for beforeAll/afterAll hooks
@@ -45,14 +44,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "~/": join(__dirname, "./src/"),
-      "@injected-dependencies.client": join(
-        __dirname,
-        "./src/injection/injection.client.ts",
-      ),
-      "@injected-dependencies.server": join(
-        __dirname,
-        "./src/injection/injection.server.ts",
-      ),
+      "@app/": join(__dirname, "./src/server/app-layer/"),
     },
   },
 });

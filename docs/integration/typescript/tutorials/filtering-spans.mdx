@@ -1,0 +1,171 @@
+---
+title: Filtering Spans in TypeScript
+sidebarTitle: Filtering Spans
+icon: filter
+description: Filter which spans are exported to LangWatch using presets or explicit criteria.
+keywords: langwatch, typescript, javascript, filtering, spans, traces, observability, presets, criteria, DSL
+---
+
+You don’t need every span. Filter out the noise and ship the useful bits. LangWatch lets you keep AI and business spans while dropping framework chatter.
+
+<Info>
+Introduced in `langwatch@0.8.0`.
+</Info>
+
+## Defaults
+
+By default we exclude HTTP request spans.
+
+<CodeGroup>
+```typescript With setupObservability
+import { setupObservability } from "langwatch/observability/node";
+import { LangWatchTraceExporter } from "langwatch";
+
+setupObservability({
+  // We are specifying a custom trace exporter, so we need to disable default
+  // integration to prevent double exporting
+  langwatch: "disabled",
+  traceExporter: new LangWatchTraceExporter(),
+});
+```
+
+```typescript Creating an exporter
+import { LangWatchTraceExporter } from "langwatch";
+
+// Default: excludes HTTP request spans
+const exporter = new LangWatchTraceExporter();
+```
+</CodeGroup>
+
+<Note>
+Default is equivalent to `{ filters: [{ preset: "excludeHttpRequests" }] }`. You can set `filters: null` or `filters: []` to send all spans.
+</Note>
+
+## Quick start
+
+<CodeGroup>
+```typescript Disable filtering
+new LangWatchTraceExporter({ filters: [] });
+```
+
+```typescript Only Vercel AI spans
+new LangWatchTraceExporter({ filters: [{ preset: "vercelAIOnly" }] });
+```
+
+```typescript Explicit default
+new LangWatchTraceExporter({ filters: [{ preset: "excludeHttpRequests" }] });
+```
+</CodeGroup>
+
+## Custom filters
+
+Use `include` to keep matches; use `exclude` to drop matches. Criteria support:
+- `instrumentationScopeName`
+- `name`
+
+```typescript
+// Keep only spans from the 'ai' scope
+new LangWatchTraceExporter({
+  filters: [{ include: { instrumentationScopeName: [{ equals: "ai" }] } }]
+});
+
+// Drop internal spans by name prefix
+new LangWatchTraceExporter({
+  filters: [{ exclude: { name: [{ startsWith: "internal." }] } }]
+});
+```
+
+## Matching
+
+Matchers are case-sensitive unless you set `ignoreCase: true`.
+
+```typescript
+// equals (exact)
+{ name: [{ equals: "chat.completion" }] }
+
+// startsWith (prefix)
+{ name: [{ startsWith: "chat." }] }
+
+// matches (RegExp)
+{ name: [{ matches: /^(GET|POST)\b/ }] }
+
+// case-insensitive
+{ name: [{ equals: "Chat.Completion", ignoreCase: true }] }
+```
+
+## Logic
+
+- OR within a field: multiple matchers are alternatives
+- AND across fields: all specified fields must match
+
+```typescript
+// name starts with chat. OR llm.
+{ include: { name: [{ startsWith: "chat." }, { startsWith: "llm." }] } }
+
+// scope is ai AND name starts with chat.
+{ include: { instrumentationScopeName: [{ equals: "ai" }], name: [{ startsWith: "chat." }] } }
+```
+
+## Pipelines (sequential AND)
+
+Filters run in order; each step narrows the set.
+
+```typescript
+new LangWatchTraceExporter({
+  filters: [
+    { include: { instrumentationScopeName: [{ equals: "ai" }] } },
+    { preset: "excludeHttpRequests" },
+    { exclude: { name: [{ matches: /test/ }] } }
+  ]
+});
+```
+
+## Integrate with setupObservability
+
+```typescript
+import { setupObservability } from "langwatch/observability/node";
+import { LangWatchTraceExporter } from "langwatch";
+
+setupObservability({
+  // We are specifying a custom trace exporter, so we need to disable default
+  // integration to prevent double exporting
+  langwatch: "disabled",
+  traceExporter: new LangWatchTraceExporter({
+    filters: [{ preset: "excludeHttpRequests" }]
+  })
+});
+```
+
+```typescript Via BatchSpanProcessor
+import { setupObservability } from "langwatch/observability/node";
+import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
+import { LangWatchTraceExporter } from "langwatch";
+
+setupObservability({
+  // We are specifying a custom trace exporter, so we need to disable default
+  // integration to prevent double exporting
+  langwatch: "disabled",
+  spanProcessors: [
+    new BatchSpanProcessor(
+      new LangWatchTraceExporter({ filters: [{ preset: "vercelAIOnly" }] })
+    ),
+  ],
+});
+```
+
+## Troubleshooting
+
+- Nothing exported: try `filters: []`, then add rules back
+- Too much noise: apply `excludeHttpRequests`, add specific `exclude` rules
+- Case surprises: add `ignoreCase: true` where needed
+- Check values: log `span.name` and `span.instrumentationScope.name` in dev
+
+## Types
+
+```typescript
+import type { TraceFilter, Criteria, Match } from "langwatch";
+```
+
+<Tip>
+Use simple matchers (`equals`, `startsWith`) where possible; regex is powerful but slower and harder to read.
+</Tip>

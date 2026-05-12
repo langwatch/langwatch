@@ -6,16 +6,21 @@ import {
   BookText,
   Bot,
   CheckSquare,
-  FileText,
+  Drama,
+  Bird,
+  FolderOpen,
   Home,
+  KeyRound,
   ListTree,
   type LucideIcon,
   Pencil,
   Percent,
   Play,
   PlayCircle,
+  Scan,
   Settings,
   Table,
+  TrainFront,
   TrendingUp,
   Workflow,
 } from "lucide-react";
@@ -24,9 +29,11 @@ export type FeatureKey =
   | "home"
   | "analytics"
   | "traces"
+  | "traces_v2"
   | "simulations"
   | "scenarios"
   | "simulation_runs"
+  | "suites"
   | "evaluations"
   | "workflows"
   | "prompts"
@@ -34,7 +41,8 @@ export type FeatureKey =
   | "annotations"
   | "settings"
   | "agents"
-  | "evaluators";
+  | "evaluators"
+  | "gateway";
 
 export type FeatureConfig = {
   icon: LucideIcon;
@@ -62,13 +70,18 @@ export const featureIcons: Record<FeatureKey, FeatureConfig> = {
     color: "blue.500",
     label: "Traces",
   },
+  traces_v2: {
+    icon: Bird,
+    color: "blue.500",
+    label: "Trace Explorer",
+  },
   simulations: {
     icon: Play,
     color: "pink.500",
     label: "Simulations",
   },
   scenarios: {
-    icon: FileText,
+    icon: Drama,
     color: "pink.500",
     label: "Scenarios",
   },
@@ -77,14 +90,19 @@ export const featureIcons: Record<FeatureKey, FeatureConfig> = {
     color: "pink.500",
     label: "Runs",
   },
+  suites: {
+    icon: FolderOpen,
+    color: "pink.500",
+    label: "Run Plans",
+  },
   evaluations: {
     icon: CheckSquare,
-    color: "orange.500",
+    color: "green.500",
     label: "Evaluations",
   },
   workflows: {
     icon: Workflow,
-    color: "green.500",
+    color: "blue.500",
     label: "Workflows",
   },
   prompts: {
@@ -114,8 +132,13 @@ export const featureIcons: Record<FeatureKey, FeatureConfig> = {
   },
   evaluators: {
     icon: Percent,
-    color: "orange.500",
+    color: "green.500",
     label: "Evaluators",
+  },
+  gateway: {
+    icon: TrainFront,
+    color: "orange.500",
+    label: "AI Gateway",
   },
 };
 

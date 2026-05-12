@@ -20,20 +20,16 @@ export {
   getCurrentContext,
   runWithContext,
   updateCurrentContext,
-  generateTraceId,
-  generateSpanId,
 } from "./core";
 
 // Re-export adapters
 export { createContextFromHono } from "./adapters/hono";
 export { createContextFromTRPC } from "./adapters/trpc";
 export {
-  createContextFromNextRequest,
-  createContextFromNextApiRequest,
-} from "./adapters/nextjs";
-export {
   createContextFromJobData,
   getJobContextMetadata,
+  withJobContext,
+  type JobDataWithContext,
 } from "./adapters/bullmq";
 
 // Re-export logging utilities

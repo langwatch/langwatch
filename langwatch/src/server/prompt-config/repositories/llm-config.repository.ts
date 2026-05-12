@@ -23,6 +23,22 @@ import {
 const logger = createLogger("langwatch:prompt-config:llm-config.repository");
 
 /**
+ * Recursively sort all object keys for deterministic JSON serialization.
+ * Arrays preserve element order but their object elements get sorted keys.
+ */
+function sortKeysDeep(obj: unknown): unknown {
+  if (Array.isArray(obj)) return obj.map(sortKeysDeep);
+  if (obj && typeof obj === "object" && obj !== null) {
+    return Object.fromEntries(
+      Object.entries(obj)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([k, v]) => [k, sortKeysDeep(v)]),
+    );
+  }
+  return obj;
+}
+
+/**
  * Interface for LLM Config data transfer objects
  */
 export type CreateLlmConfigParams = Omit<
@@ -73,6 +89,7 @@ export class LlmConfigRepository {
   }): Promise<LlmConfigWithLatestVersion[]> {
     const configs = await this.prisma.llmPromptConfig.findMany({
       where: {
+        deletedAt: null,
         OR: [{ projectId }, { organizationId, scope: "ORGANIZATION" }],
       },
       orderBy: { updatedAt: "desc" },
@@ -199,6 +216,7 @@ export class LlmConfigRepository {
 
     const config = await this.prisma.llmPromptConfig.findFirst({
       where: {
+        deletedAt: null,
         OR: [
           {
             projectId,
@@ -384,9 +402,32 @@ export class LlmConfigRepository {
       );
     }
 
-    // This will error if the projectId !== config.projectId
-    await this.prisma.llmPromptConfig.delete({
+    // Soft-delete: set deletedAt instead of hard-deleting, so existing
+    // suite references can still identify the prompt as deleted.
+    //
+    // Null out handle to free it for reuse — the @@unique([handle]) constraint
+    // treats NULL as distinct per row in Postgres, so future prompts can
+    // reclaim the same handle. Preserve the existing display name; only fall
+    // back to the (unprefixed) handle when the stored name is empty, so any
+    // custom title the user gave the prompt survives archival in suite/history
+    // listings.
+    const displayName = this.removeHandlePrefixes(
+      config.handle,
+      projectId,
+      organizationId,
+    );
+    const archivedName =
+      config.name && config.name.trim() !== ""
+        ? config.name
+        : (displayName ?? config.name);
+
+    await this.prisma.llmPromptConfig.update({
       where: { id: config.id, projectId },
+      data: {
+        deletedAt: new Date(),
+        handle: null,
+        name: archivedName,
+      },
     });
 
     return { success: true };
@@ -664,17 +705,18 @@ export class LlmConfigRepository {
       const normalized1 = parseResult1.data;
       const normalized2 = parseResult2.data;
 
+      // Strip response_format before comparison — it is derived from outputs
+      // at read time and never stored in new data. Older CLIs may still send it
+      // alongside outputs, causing a false diff against the server's
+      // remoteConfigData which never includes it.
+      delete normalized1.response_format;
+      delete normalized2.response_format;
+
       // Compare normalized configs using deterministic JSON serialization
-      const json1 = JSON.stringify(
-        normalized1,
-        Object.keys(normalized1).sort(),
-        2,
-      );
-      const json2 = JSON.stringify(
-        normalized2,
-        Object.keys(normalized2).sort(),
-        2,
-      );
+      // Deep-sort all keys so nested objects (messages, inputs, outputs)
+      // are compared correctly regardless of property order.
+      const json1 = JSON.stringify(sortKeysDeep(normalized1));
+      const json2 = JSON.stringify(sortKeysDeep(normalized2));
 
       const isEqual = json1 === json2;
 
@@ -737,6 +779,81 @@ export class LlmConfigRepository {
     }
   }
 
+  /**
+   * Checks whether a non-deleted LLM prompt config exists for the given id,
+   * accessible from the specified project or organization (org-scoped).
+   */
+  async existsForProjectOrOrg(params: {
+    id: string;
+    projectId: string;
+    organizationId: string;
+  }): Promise<boolean> {
+    const config = await this.prisma.llmPromptConfig.findFirst({
+      where: {
+        id: params.id,
+        deletedAt: null,
+        OR: [
+          { projectId: params.projectId },
+          { organizationId: params.organizationId, scope: "ORGANIZATION" },
+        ],
+      },
+      select: { id: true },
+    });
+    return config !== null;
+  }
+
+  /**
+   * Find which of the given IDs exist as non-deleted configs accessible
+   * from the specified project or organization.
+   * Returns the set of IDs that exist.
+   */
+  async findExistingIds(params: {
+    ids: string[];
+    projectId: string;
+    organizationId: string;
+  }): Promise<Set<string>> {
+    const configs = await this.prisma.llmPromptConfig.findMany({
+      where: {
+        id: { in: params.ids },
+        deletedAt: null,
+        OR: [
+          { projectId: params.projectId },
+          { organizationId: params.organizationId, scope: "ORGANIZATION" },
+        ],
+      },
+      select: { id: true },
+    });
+    return new Set(configs.map((c) => c.id));
+  }
+
+  /**
+   * Find prompt config names by IDs regardless of deleted status.
+   * Uses handle (slug) as display name when available.
+   */
+  async findNamesByIds(input: {
+    ids: string[];
+    projectId: string;
+    organizationId: string;
+  }): Promise<{ id: string; name: string }[]> {
+    const configs = await this.prisma.llmPromptConfig.findMany({
+      where: {
+        id: { in: input.ids },
+        OR: [
+          { projectId: input.projectId },
+          { organizationId: input.organizationId, scope: "ORGANIZATION" },
+        ],
+      },
+      select: { id: true, name: true, handle: true },
+    });
+    return configs.map((c) => ({
+      id: c.id,
+      name:
+        c.handle
+          ? this.removeHandlePrefixes(c.handle, input.projectId, input.organizationId) ?? c.name ?? c.id
+          : c.name ?? c.id,
+    }));
+  }
+
   private generateConfigId() {
     return `prompt_${nanoid()}`;
   }
@@ -745,11 +862,10 @@ export class LlmConfigRepository {
    * Build a default version base for a config
    */
   private buildDefaultVersionConfigData(
-    params: Record<string, unknown>,
+    params: { model: string } & Record<string, unknown>,
   ): CreateLlmConfigVersionParams["configData"] {
     return {
       prompt: "You are a helpful assistant",
-      model: "openai/gpt-5.2",
       messages: [
         {
           role: "user",

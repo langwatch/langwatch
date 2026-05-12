@@ -1,0 +1,41 @@
+{{- if gt (int .Values.replicas) 1 }}
+{{- $replicas := .Values.replicas | int }}
+{{- $fullname := include "clickhouse-serverless.fullname" . }}
+---
+# ConfigMap: Keeper raft config template.
+# Pod-specific values (__SERVER_ID__) are substituted by a simple init container.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $fullname }}-keeper-raft
+  labels:
+    {{- include "clickhouse-serverless.keeperLabels" . | nindent 4 }}
+data:
+  keeper_config.xml: |
+    <clickhouse>
+        <logger>
+            <level>warning</level>
+            <console>1</console>
+        </logger>
+        <listen_host>0.0.0.0</listen_host>
+        <keeper_server>
+            <tcp_port>9181</tcp_port>
+            <server_id>__SERVER_ID__</server_id>
+            <log_storage_path>/var/lib/clickhouse-keeper/log</log_storage_path>
+            <snapshot_storage_path>/var/lib/clickhouse-keeper/snapshots</snapshot_storage_path>
+            <coordination_settings>
+                <operation_timeout_ms>10000</operation_timeout_ms>
+                <session_timeout_ms>30000</session_timeout_ms>
+                <startup_timeout>60000</startup_timeout>
+                <raft_logs_level>warning</raft_logs_level>
+                <snapshot_distance>100000</snapshot_distance>
+                <reserved_log_items>100000</reserved_log_items>
+            </coordination_settings>
+            <raft_configuration>
+{{- range $i := until $replicas }}
+                <server><id>{{ add1 $i }}</id><hostname>{{ $fullname }}-keeper-{{ $i }}.{{ $fullname }}-keeper-headless.{{ $.Release.Namespace }}.svc.cluster.local</hostname><port>9234</port></server>
+{{- end }}
+            </raft_configuration>
+        </keeper_server>
+    </clickhouse>
+{{- end }}

@@ -8,9 +8,9 @@ import {
   type WorkflowStore,
   type State as WorkflowStoreState,
   store as workflowStore,
-} from "../../../../../optimization_studio/hooks/useWorkflowStore";
+} from "../../../../../optimization_studio/hooks/workflowStoreCore";
 import type { Workflow } from "../../../../../optimization_studio/types/dsl";
-import { checkPreconditionsSchema } from "../../../../../server/evaluations/types.generated";
+import { checkPreconditionsSchema } from "../../../../../server/evaluations/types";
 import { mappingStateSchema } from "../../../../../server/tracer/tracesMapping";
 
 import {
@@ -105,7 +105,7 @@ export const workbenchStateSchema = z.object({
     .object({
       mapping: z.record(
         z.object({
-          source: z.enum(["", "thread_id", "traces"]),
+          source: z.enum(["", "thread_id", "traces", "formatted_traces"]),
           selectedFields: z.array(z.string()).optional(),
         }),
       ),

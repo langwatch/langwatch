@@ -1,0 +1,19 @@
+# postgres-external.yaml — Use an external PostgreSQL (RDS, Cloud SQL, etc.).
+#
+# Prerequisites:
+#   kubectl create secret generic langwatch-db -n <namespace> \
+#     --from-literal=connectionString="postgresql://user:pass@host:5432/langwatch"
+#
+# Usage:
+#   helm install lw . \
+#     -f examples/overlays/size-prod.yaml \
+#     -f examples/overlays/access-ingress.yaml \
+#     -f examples/overlays/postgres-external.yaml
+
+postgresql:
+  chartManaged: false
+  external:
+    connectionString:
+      secretKeyRef:
+        name: "langwatch-db"
+        key: "connectionString"

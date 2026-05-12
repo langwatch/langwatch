@@ -25,7 +25,7 @@ import { CascadeArchiveDialog } from "~/components/CascadeArchiveDialog";
 import { Drawer } from "~/components/ui/drawer";
 import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
-import { getComplexProps, useDrawer } from "~/hooks/useDrawer";
+import { getComplexProps, getFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import { api } from "~/utils/api";
@@ -52,14 +52,21 @@ export function AgentListDrawer(props: AgentListDrawerProps) {
   const complexProps = getComplexProps();
   const utils = api.useContext();
 
-  const onClose = props.onClose ?? closeDrawer;
+  // Get flow callbacks for this drawer (set by parent flows like useAgentPickerFlow)
+  const flowCallbacks = getFlowCallbacks("agentList");
+
+  const onClose =
+    props.onClose ?? flowCallbacks?.onClose ?? closeDrawer;
   const onSelect =
     props.onSelect ??
+    flowCallbacks?.onSelect ??
     (complexProps.onSelect as AgentListDrawerProps["onSelect"]);
   const onEdit =
     props.onEdit ?? (complexProps.onEdit as AgentListDrawerProps["onEdit"]);
   const onCreateNew =
-    props.onCreateNew ?? (() => openDrawer("agentTypeSelector"));
+    props.onCreateNew ??
+    flowCallbacks?.onCreateNew ??
+    (() => openDrawer("agentTypeSelector"));
   const isOpen = props.open !== false && props.open !== undefined;
 
   // State for tracking which agent is being deleted
@@ -113,14 +120,18 @@ export function AgentListDrawer(props: AgentListDrawerProps) {
   const handleEditAgent = (agent: TypedAgent) => {
     if (onEdit) {
       onEdit(agent);
-    } else {
-      // Default: open appropriate editor drawer based on agent type
-      if (agent.type === "http") {
-        openDrawer("agentHttpEditor", { agentId: agent.id });
-      } else {
-        openDrawer("agentCodeEditor", { agentId: agent.id });
-      }
+      return;
     }
+    // Default: open appropriate editor drawer based on agent type
+    if (agent.type === "http") {
+      openDrawer("agentHttpEditor", { agentId: agent.id });
+      return;
+    }
+    if (agent.type === "workflow") {
+      openDrawer("agentWorkflowEditor", { agentId: agent.id });
+      return;
+    }
+    openDrawer("agentCodeEditor", { agentId: agent.id });
   };
 
   const handleDeleteAgent = (agent: TypedAgent) => {
@@ -170,6 +181,7 @@ export function AgentListDrawer(props: AgentListDrawerProps) {
         open={isOpen}
         onOpenChange={({ open }) => !open && onClose()}
         size="md"
+        modal={false}
       >
         <Drawer.Content>
           <Drawer.CloseTrigger />

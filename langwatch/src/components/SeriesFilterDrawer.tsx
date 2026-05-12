@@ -7,14 +7,16 @@ import { FieldsFilters } from "./filters/FieldsFilters";
 import { HorizontalFormControl } from "./HorizontalFormControl";
 import { Drawer } from "./ui/drawer";
 
+const emptyFilters = {} as Record<FilterField, FilterParam>;
+
 export function SeriesFiltersDrawer({
   onClose,
   filters: formFilters,
   onChange,
 }: {
   onClose?: () => void;
-  filters: Record<FilterField, FilterParam>;
-  onChange: ({
+  filters?: Record<FilterField, FilterParam>;
+  onChange?: ({
     filters,
   }: {
     filters: Record<FilterField, FilterParam>;
@@ -23,10 +25,10 @@ export function SeriesFiltersDrawer({
   const { closeDrawer } = useDrawer();
   const onClose_ = onClose ?? closeDrawer;
 
-  const [filters, setFilters] = useState(formFilters);
+  const [filters, setFilters] = useState(formFilters ?? emptyFilters);
 
   useEffect(() => {
-    setFilters(formFilters);
+    setFilters(formFilters ?? emptyFilters);
   }, [formFilters]);
 
   return (
@@ -55,7 +57,7 @@ export function SeriesFiltersDrawer({
                     ([_, value]) => value !== undefined,
                   ),
                 ) as Record<FilterField, FilterParam>;
-                onChange({
+                onChange?.({
                   filters: updatedFilters,
                 });
                 setFilters(updatedFilters);

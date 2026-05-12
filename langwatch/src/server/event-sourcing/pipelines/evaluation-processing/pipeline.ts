@@ -1,37 +1,64 @@
-import { definePipeline } from "../../library";
-import { CompleteEvaluationCommand } from "./commands/completeEvaluation.command";
-import { ScheduleEvaluationCommand } from "./commands/scheduleEvaluation.command";
-import { StartEvaluationCommand } from "./commands/startEvaluation.command";
-import { EvaluationStateProjectionHandler } from "./projections";
+import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
+import { definePipeline } from "../../";
+import type { FoldProjectionStore } from "../../projections/foldProjection.types";
+import type { ReactorDefinition } from "../../reactors/reactor.types";
+import {
+  StartEvaluationCommand,
+  CompleteEvaluationCommand,
+  ReportEvaluationCommand,
+} from "./commands";
+import { ExecuteEvaluationCommand } from "./commands/executeEvaluation.command";
+import { EvaluationRunFoldProjection } from "./projections/evaluationRun.foldProjection";
 import type { EvaluationProcessingEvent } from "./schemas/events";
 
+export interface EvaluationProcessingPipelineDeps {
+  evalRunStore: FoldProjectionStore<EvaluationRunData>;
+  executeEvaluationCommand: ExecuteEvaluationCommand;
+  esSyncReactor: ReactorDefinition<EvaluationProcessingEvent, EvaluationRunData>;
+  evaluationAlertTriggerReactor: ReactorDefinition<EvaluationProcessingEvent, EvaluationRunData>;
+  customerIoEvaluationSyncReactor?: ReactorDefinition<EvaluationProcessingEvent, EvaluationRunData>;
+}
+
 /**
- * Evaluation processing pipeline definition (static, no runtime dependencies).
+ * Creates the evaluation processing pipeline definition.
  *
  * This pipeline uses evaluation-level aggregates (aggregateId = evaluationId).
- * It tracks the lifecycle of individual evaluations (scheduled → started → completed)
+ * It tracks the lifecycle of individual evaluations (scheduled -> completed)
  * and enables detection of stuck evaluations.
  *
  * Commands:
- * - scheduleEvaluation: Emits EvaluationScheduledEvent when job is queued
- * - startEvaluation: Emits EvaluationStartedEvent when execution begins
- * - completeEvaluation: Emits EvaluationCompletedEvent when execution finishes
- *
- * This is a static definition that can be safely imported without triggering
- * ClickHouse/Redis connections. It gets registered with the runtime in
- * the eventSourcing.ts file.
+ * - executeEvaluation: Preconditions + sampling + run eval + ES write + emit events (reactor path)
+ * - startEvaluation: Records eval start to CH (API handler path)
+ * - completeEvaluation: Records eval result to CH (API handler path)
  */
-export const evaluationProcessingPipelineDefinition =
-  definePipeline<EvaluationProcessingEvent>()
+export function createEvaluationProcessingPipeline(deps: EvaluationProcessingPipelineDeps) {
+  let builder = definePipeline<EvaluationProcessingEvent>()
     .withName("evaluation_processing")
     .withAggregateType("evaluation")
-    .withProjection("evaluationState", EvaluationStateProjectionHandler, {
-      // Dedupe by aggregate to process only the latest event per evaluation
-      deduplication: "aggregate",
-      // Small delay to batch multiple rapid updates to the same evaluation
-      delay: 500,
+    .withFoldProjection("evaluationRun", new EvaluationRunFoldProjection({
+      store: deps.evalRunStore,
+    }))
+    .withReactor("evaluationRun", "evaluationEsSync", deps.esSyncReactor)
+    .withReactor("evaluationRun", "evaluationAlertTrigger", deps.evaluationAlertTriggerReactor);
+
+  if (deps.customerIoEvaluationSyncReactor) {
+    builder = builder.withReactor(
+      "evaluationRun",
+      "customerIoEvaluationSync",
+      deps.customerIoEvaluationSyncReactor,
+    );
+  }
+
+  return builder
+    .withCommandInstance("executeEvaluation", ExecuteEvaluationCommand, deps.executeEvaluationCommand, {
+      delay: 30_000,
+      deduplication: {
+        makeId: ExecuteEvaluationCommand.makeJobId,
+        ttlMs: 30_000,
+      },
     })
-    .withCommand("scheduleEvaluation", ScheduleEvaluationCommand)
     .withCommand("startEvaluation", StartEvaluationCommand)
     .withCommand("completeEvaluation", CompleteEvaluationCommand)
+    .withCommand("reportEvaluation", ReportEvaluationCommand)
     .build();
+}

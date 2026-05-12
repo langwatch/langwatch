@@ -1,4 +1,4 @@
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import { useEffect, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useOrganizationTeamProject } from "../../../../hooks/useOrganizationTeamProject";
@@ -54,6 +54,9 @@ export const useInitialLoadExperiment = () => {
       },
       {
         enabled: !!project && !!initialLoadExperimentSlug,
+        // One-shot bootstrap: result is hydrated into the Zustand wizard store
+        // (setDSL/setExperimentId/setExperimentSlug below) and the user edits
+        // from there. A background refetch would clobber unsaved edits.
         refetchOnMount: false,
         refetchOnWindowFocus: false,
         refetchOnReconnect: false,

@@ -1,0 +1,9 @@
+# values-clickhouse-external.yaml — Overlay: use an external ClickHouse instance.
+# Stack with any base: ./helm-safe.sh install lw . -f examples/values-local.yaml -f examples/values-clickhouse-external.yaml
+clickhouse:
+  chartManaged: false
+  external:
+    url:
+      value: "http://<username>:<password>@my-clickhouse:8123/langwatch"
+    # Set cluster name if your external ClickHouse is replicated:
+    # cluster: "my_cluster"

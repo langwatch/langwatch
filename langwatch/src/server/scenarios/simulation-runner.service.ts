@@ -1,6 +1,5 @@
 import ScenarioRunner, { type AgentAdapter } from "@langwatch/scenario";
 import type { PrismaClient } from "@prisma/client";
-import { nanoid } from "nanoid";
 import { env } from "~/env.mjs";
 import { DEFAULT_MODEL } from "~/utils/constants";
 import { createLogger } from "~/utils/logger/server";
@@ -9,12 +8,10 @@ import { getVercelAIModel } from "../modelProviders/utils";
 import { PromptService } from "../prompt-config/prompt.service";
 import { HttpAgentAdapter } from "./adapters/http-agent.adapter";
 import { PromptConfigAdapter } from "./adapters/prompt-config.adapter";
+import { bridgeTraceIdFromAdapterToJudge } from "./execution/bridge-trace-id";
+import { RemoteSpanJudgeAgent } from "./execution/remote-span-judge-agent";
+import { createTraceApiSpanQuery } from "./execution/trace-api-span-query";
 import { ScenarioService } from "./scenario.service";
-
-/** Generates a unique batch run ID for grouping scenario executions */
-export function generateBatchRunId(): string {
-  return `scenariobatch_${nanoid()}`;
-}
 
 const logger = createLogger("SimulationRunnerService");
 
@@ -78,7 +75,7 @@ export class SimulationRunnerService {
         { targetType: target.type, referenceId: target.referenceId, projectId },
         "Resolving target to adapter",
       );
-      const adapter = this.resolveAdapter(target, projectId);
+      const adapter = this.resolveAdapter(target, projectId, batchRunId);
       logger.debug(
         { adapterName: adapter.name, adapterRole: adapter.role },
         "Adapter resolved",
@@ -109,6 +106,34 @@ export class SimulationRunnerService {
       // Run in headless mode on server (don't open browser tabs)
       process.env.SCENARIO_HEADLESS = "true";
 
+      // For HTTP targets, use remote span judge to collect spans from the
+      // user's agent. For other targets, use standard in-process judge.
+      const langwatchEndpoint = this.getLangWatchEndpoint();
+      let remoteSpanJudge: RemoteSpanJudgeAgent | undefined;
+      const judgeAgentInstance =
+        target.type === "http"
+          ? (() => {
+              remoteSpanJudge = new RemoteSpanJudgeAgent({
+                criteria: scenario.criteria,
+                model: judgeModel,
+                projectId,
+                querySpans: createTraceApiSpanQuery({
+                  endpoint: langwatchEndpoint,
+                  apiKey: project.apiKey,
+                }),
+              });
+              return remoteSpanJudge;
+            })()
+          : ScenarioRunner.judgeAgent({
+              model: judgeModel,
+              criteria: scenario.criteria,
+            });
+
+      // Hook trace ID capture: after adapter calls, pass trace ID to judge
+      if (remoteSpanJudge && adapter instanceof HttpAgentAdapter) {
+        bridgeTraceIdFromAdapterToJudge({ adapter, judge: remoteSpanJudge });
+      }
+
       const result = await ScenarioRunner.run(
         {
           id: scenarioId,
@@ -118,17 +143,14 @@ export class SimulationRunnerService {
           agents: [
             adapter,
             ScenarioRunner.userSimulatorAgent({ model: simulatorModel }),
-            ScenarioRunner.judgeAgent({
-              model: judgeModel,
-              criteria: scenario.criteria,
-            }),
+            judgeAgentInstance,
           ],
           verbose: true,
         },
         {
           batchRunId,
           langwatch: {
-            endpoint: this.getLangWatchEndpoint(),
+            endpoint: langwatchEndpoint,
             apiKey: project.apiKey,
           },
         },
@@ -153,13 +175,17 @@ export class SimulationRunnerService {
   }
 
   private getLangWatchEndpoint(): string {
-    // Use BASE_HOST if available (self-referencing), otherwise default
-    return env.BASE_HOST ?? "https://app.langwatch.ai";
+    const endpoint = process.env.LANGWATCH_ENDPOINT;
+    if (!endpoint) {
+      throw new Error("LANGWATCH_ENDPOINT env var is required but not set");
+    }
+    return endpoint;
   }
 
   private resolveAdapter(
     target: SimulationTarget,
     projectId: string,
+    batchRunId?: string,
   ): AgentAdapter {
     switch (target.type) {
       case "prompt":
@@ -174,6 +200,18 @@ export class SimulationRunnerService {
           projectId,
           prisma: this.prisma,
         });
+      // Code agents execute in a child process (see scenario-child-process.ts + data-prefetcher.ts),
+      // which bypasses this in-process adapter resolver. SuiteRunService.startRun routes code targets
+      // through that path; this branch only fires if something incorrectly calls resolveAdapter for a
+      // code target, which is a bug — throw loudly.
+      case "code":
+        throw new Error(
+          "Code agent targets are only supported via the child process execution path",
+        );
+      case "workflow":
+        throw new Error(
+          "Workflow agent targets are only supported via the child process execution path",
+        );
       default: {
         const _exhaustive: never = target.type;
         throw new Error(`Unknown target type: ${_exhaustive}`);

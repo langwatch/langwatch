@@ -21,10 +21,12 @@ import {
 import type { WorkflowVersion } from "@prisma/client";
 import { GitCompare, X } from "lucide-react";
 
+import { useMemo } from "react";
 import { Tooltip } from "~/components/ui/tooltip";
-import { FormatMoney } from "~/optimization_studio/components/FormatMoney";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { getColorForString } from "~/utils/rotatingColors";
+import { getRunDisplayName } from "./getRunDisplayName";
+import { INTERRUPTED_THRESHOLD_MS, isRunFinished } from "./isRunFinished";
 
 /**
  * Summary data for a single evaluation run
@@ -36,10 +38,10 @@ export type BatchRunSummary = {
     "id" | "version" | "commitMessage"
   > | null;
   timestamps: {
-    created_at: number;
-    updated_at?: number | null;
-    finished_at?: number | null;
-    stopped_at?: number | null;
+    createdAt: number;
+    updatedAt?: number | null;
+    finishedAt?: number | null;
+    stoppedAt?: number | null;
   };
   progress?: number | null;
   total?: number | null;
@@ -84,29 +86,6 @@ type BatchRunsSidebarProps = {
   runColors?: Record<string, string>;
 };
 
-/** Time in milliseconds after which a run without updates is considered interrupted */
-const INTERRUPTED_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
-
-/**
- * Check if a run is finished (completed, stopped, or interrupted)
- */
-const isRunFinished = (timestamps: BatchRunSummary["timestamps"]): boolean => {
-  // Explicitly finished or stopped
-  if (timestamps.finished_at ?? timestamps.stopped_at) {
-    return true;
-  }
-
-  // Consider interrupted if no updates for 5 minutes
-  if (timestamps.updated_at) {
-    const timeSinceUpdate = Date.now() - timestamps.updated_at;
-    if (timeSinceUpdate > INTERRUPTED_THRESHOLD_MS) {
-      return true;
-    }
-  }
-
-  return false;
-};
-
 /**
  * Check if a run was interrupted (no explicit finish/stop but stale)
  */
@@ -114,13 +93,13 @@ const isRunInterrupted = (
   timestamps: BatchRunSummary["timestamps"],
 ): boolean => {
   // Has explicit finish or stop - not interrupted
-  if (timestamps.finished_at ?? timestamps.stopped_at) {
+  if (timestamps.finishedAt ?? timestamps.stoppedAt) {
     return false;
   }
 
   // No updates for 5 minutes - considered interrupted
-  if (timestamps.updated_at) {
-    const timeSinceUpdate = Date.now() - timestamps.updated_at;
+  if (timestamps.updatedAt) {
+    const timeSinceUpdate = Date.now() - timestamps.updatedAt;
     return timeSinceUpdate > INTERRUPTED_THRESHOLD_MS;
   }
 
@@ -171,6 +150,20 @@ export function BatchRunsSidebar({
 }: BatchRunsSidebarProps) {
   const canCompare = runs.length >= 2;
 
+  // Sort runs newest-first for display, and build a chronological index map
+  // so "Run #N" numbering stays stable (Run #1 = oldest, Run #N = newest)
+  const { sortedRuns, chronologicalIndexMap } = useMemo(() => {
+    const sorted = [...runs].sort(
+      (a, b) => b.timestamps.createdAt - a.timestamps.createdAt,
+    );
+    const chronological = [...runs].sort(
+      (a, b) => a.timestamps.createdAt - b.timestamps.createdAt,
+    );
+    const indexMap = new Map<string, number>();
+    chronological.forEach((run, i) => void indexMap.set(run.runId, i));
+    return { sortedRuns: sorted, chronologicalIndexMap: indexMap };
+  }, [runs]);
+
   // Handle click with shift key for compare mode
   const handleRunClick = (runId: string, event: React.MouseEvent) => {
     // Prevent text selection on shift+click
@@ -216,39 +209,37 @@ export function BatchRunsSidebar({
           Experiment Runs
         </Text>
         {onToggleCompareMode && (
-          <>
-            {compareMode ? (
+          compareMode ? (
+            <Button
+              size="xs"
+              variant="outline"
+              onClick={onToggleCompareMode}
+              data-testid="exit-compare-button"
+            >
+              <X size={14} />
+              Exit
+            </Button>
+          ) : (
+            <Tooltip
+              content={
+                canCompare
+                  ? "Compare runs (or Shift+click another run)"
+                  : "Need at least 2 runs to compare"
+              }
+              positioning={{ placement: "right" }}
+            >
               <Button
                 size="xs"
                 variant="outline"
                 onClick={onToggleCompareMode}
-                data-testid="exit-compare-button"
+                disabled={!canCompare}
+                data-testid="compare-button"
               >
-                <X size={14} />
-                Exit
+                <GitCompare size={14} />
+                Compare
               </Button>
-            ) : (
-              <Tooltip
-                content={
-                  canCompare
-                    ? "Compare runs (or Shift+click another run)"
-                    : "Need at least 2 runs to compare"
-                }
-                positioning={{ placement: "right" }}
-              >
-                <Button
-                  size="xs"
-                  variant="outline"
-                  onClick={onToggleCompareMode}
-                  disabled={!canCompare}
-                  data-testid="compare-button"
-                >
-                  <GitCompare size={14} />
-                  Compare
-                </Button>
-              </Tooltip>
-            )}
-          </>
+            </Tooltip>
+          )
         )}
       </HStack>
 
@@ -256,6 +247,7 @@ export function BatchRunsSidebar({
       {isLoading && (
         <VStack gap={0.5} align="stretch" paddingX={2}>
           {Array.from({ length: 6 }).map((_, index) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: Its for skeleton data
             <HStack key={index} paddingX={2} paddingY={2} gap={2}>
               <VStack align="start" gap={1} flex={1} minWidth={0}>
                 {/* Line 1: Color square + name + version */}
@@ -292,17 +284,20 @@ export function BatchRunsSidebar({
       <VStack gap={0.5} align="stretch" paddingX={2}>
         {!isLoading &&
           !error &&
-          runs.map((run) => {
+          sortedRuns.map((run) => {
             const isSelected = selectedRunId === run.runId;
             const isFinished = isRunFinished(run.timestamps);
             const _runCost =
               (run.summary.datasetCost ?? 0) +
               (run.summary.evaluationsCost ?? 0);
 
-            // Build the name - prefer commit message, then just run ID
-            const runName = run.workflowVersion?.commitMessage
-              ? run.workflowVersion.commitMessage
-              : run.runId;
+            const chronologicalIndex =
+              chronologicalIndexMap.get(run.runId) ?? 0;
+            const runName = getRunDisplayName({
+              commitMessage: run.workflowVersion?.commitMessage,
+              runId: run.runId,
+              index: chronologicalIndex,
+            });
 
             // Build summary line: evaluator scores + cost (filter out "-" values)
             const summaryParts: string[] = [];
@@ -320,7 +315,7 @@ export function BatchRunsSidebar({
 
             // Use stable color from parent (based on position in full runs list)
             // Override with red for stopped runs, orange for interrupted
-            const runColor = run.timestamps.stopped_at
+            const runColor = run.timestamps.stoppedAt
               ? "red.400"
               : interrupted
                 ? "orange.400"
@@ -336,26 +331,26 @@ export function BatchRunsSidebar({
                 role="button"
                 bg={
                   compareMode && isSelectedForComparison
-                    ? "blue.50"
+                    ? "blue.subtle"
                     : isSelected
-                      ? "blue.50"
+                      ? "blue.subtle"
                       : "transparent"
                 }
                 color={
                   compareMode && isSelectedForComparison
-                    ? "blue.700"
+                    ? "blue.fg"
                     : isSelected
-                      ? "blue.700"
-                      : "gray.700"
+                      ? "blue.fg"
+                      : "fg"
                 }
                 borderRadius="md"
                 _hover={{
                   bg:
                     compareMode && isSelectedForComparison
-                      ? "blue.100"
+                      ? "blue.muted"
                       : isSelected
-                        ? "blue.100"
-                        : "gray.100",
+                        ? "blue.muted"
+                        : "bg.muted",
                 }}
                 onClick={(e) => handleRunClick(run.runId, e)}
                 gap={2}
@@ -420,10 +415,10 @@ export function BatchRunsSidebar({
 
                   {/* Line 2: Time ago + status */}
                   <Text color="fg.muted" fontSize="12px">
-                    {run.timestamps.created_at
-                      ? formatTimeAgo(run.timestamps.created_at)
+                    {run.timestamps.createdAt
+                      ? formatTimeAgo(run.timestamps.createdAt)
                       : "..."}
-                    {run.timestamps.stopped_at && " · stopped"}
+                    {run.timestamps.stoppedAt && " · stopped"}
                     {interrupted && " · interrupted"}
                   </Text>
                 </VStack>

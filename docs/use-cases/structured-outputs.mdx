@@ -1,0 +1,169 @@
+---
+title: Evaluating Structured Data Extraction
+description: Evaluate structured data extraction using LangWatch to validate output correctness and strengthen AI agent testing pipelines.
+keywords: structured data extraction, evaluation, LangWatch, ground truth
+---
+
+This guide walks you through evaluating an LLM that powers a taxi booking chatbot. The goal is to see how well the model extracts structured data (like pickup addresses and passenger counts) from vague, real-world customer messages.
+
+We'll use LangWatch to create a simple, repeatable evaluation script to measure and track the model's accuracy.
+
+### **1. The Problem**
+
+Our LLM's job is to interpret short chat messages and extract key details for a ride booking.
+
+* **Input:** A vague user message like `"Schiphol, 2 people"` or `"Herengracht 500 now"`.
+* **Output:** A structured JSON object with the booking details.
+
+We need to evaluate how accurately our model can extract fields like `pickup_address`, `airport_found`, and `passenger_count`, even when the input is incomplete.
+
+### **2. Setup and Data Preparation**
+
+First, let's set up our environment and create a simple dataset for the evaluation. Our dataset will be a pandas DataFrame with the `user_message` and a `ground_truth` column containing the expected JSON output.
+
+```python
+import langwatch
+import pandas as pd
+import json
+
+# Authenticate with LangWatch
+# Sign up at app.langwatch.ai and find your API key in your project settings.
+langwatch.login()
+
+# Create a sample evaluation dataset
+data = {
+    "user_message": [
+        "Amsterdam Herengracht 500, Now",
+        "Schiphol airport, 2 people, 1 big suitcase",
+        "Central station please",
+        "Need a ride to Keizersgracht 123 from my current location",
+    ],
+    "ground_truth": [
+        '{"pickup_address": "Herengracht 500, Amsterdam", "destination_address": null, "airport_found": false, "passenger_count": 1}',
+        '{"pickup_address": "Schiphol Airport", "destination_address": null, "airport_found": true, "passenger_count": 2}',
+        '{"pickup_address": "Amsterdam Central Station", "destination_address": null, "airport_found": false, "passenger_count": 1}',
+        '{"pickup_address": null, "destination_address": "Keizersgracht 123, Amsterdam", "airport_found": false, "passenger_count": 1}',
+    ]
+}
+df = pd.DataFrame(data)
+
+print(df)
+```
+
+### **3. Define the Extraction Logic**
+
+Next, we'll define a placeholder function, `extract_booking_details()`, that simulates our LLM pipeline. This function takes a user message and returns a JSON object with the extracted details.
+
+This is where you would integrate your actual LLM calls (e.g., using OpenAI, Anthropic, or a local model).
+
+```python
+from pydantic import BaseModel
+from typing import Optional
+from openai import OpenAI
+
+class BookingDetails(BaseModel):
+    pickup_address: Optional[str]
+    destination_address: Optional[str] = None
+    airport_found: bool
+    passenger_count: Optional[int]
+
+client = OpenAI()
+
+def extract_booking_details(message: str) -> BookingDetails:
+    response = client.responses.parse(
+        model="gpt-5",
+        instructions="Extract structured booking details from the user message. Only include fields you are confident about.",
+        response_format=BookingDetails,
+        input=[{"role": "user", "content": message}],
+    )
+    return response.output
+```
+
+### **4. Implementing the Evaluation Script**
+
+Now, let's tie it all together with LangWatch. We'll initialize an evaluation, loop through our dataset, call our model, and log custom metrics to track the accuracy of each extracted field.
+
+This script gives us a precise, field-by-field view of our model's performance.
+
+```python
+# Initialize a new evaluation run in LangWatch
+evaluation = langwatch.experiment.init("taxi-bot-extraction-v2")
+
+# Use evaluation.loop() to iterate over our dataset
+for idx, row in evaluation.loop(df.iterrows()):
+    user_message = row["user_message"]
+    ground_truth = json.loads(row["ground_truth"])
+
+    # 1. Run our model to get the extracted data
+    extracted_data = extract_booking_details(user_message)
+
+    # 2. Compare extracted data to ground truth and log metrics
+
+    # Check if the pickup address was extracted correctly
+    pickup_correct = extracted_data.pickup_address == ground_truth.get("pickup_address")
+    evaluation.log(
+        "pickup_address_correct",
+        index=idx,
+        passed=pickup_correct,
+        data={
+            "output": extracted_data.pickup_address,
+            "expected": ground_truth.get("pickup_address")
+        }
+    )
+
+    # Check if 'airport_found' flag is correct
+    airport_flag_correct = extracted_data.airport_found == ground_truth.get("airport_found")
+    evaluation.log(
+        "airport_found_correct",
+        index=idx,
+        passed=airport_flag_correct,
+        data={
+            "output": extracted_data.airport_found,
+            "expected": ground_truth.get("airport_found")
+        }
+    )
+
+    # Check for hallucinations (fields that shouldn't exist)
+    hallucinated_destination = "destination_address" in extracted_data and ground_truth.get("destination_address") is None
+    evaluation.log(
+        "hallucination_check",
+        index=idx,
+        passed=not hallucinated_destination, # Pass if no hallucination
+        data={
+            "output": extracted_data.destination_address
+        }
+    )
+
+    # 3. Log a summary for the entire sample
+    is_fully_correct = pickup_correct and airport_flag_correct and not hallucinated_destination
+    evaluation.log(
+        "overall_correctness",
+        index=idx,
+        passed=is_fully_correct,
+        data={
+            "input": user_message,
+            "output_json": extracted_data,
+            "expected_json": ground_truth,
+        }
+    )
+
+print("Evaluation complete! Check your results in the LangWatch dashboard.")
+```
+
+### **5. Analyzing the Results**
+
+After running the script, you can navigate to the LangWatch dashboard to see your results. You'll get:
+
+* **High-Level Metrics**: An overview of correctness scores across your dataset.
+* **Sample-by-Sample Breakdown**: The ability to inspect each user message, see the model's output vs. the expected output, and identify exactly where it failed.
+* **Historical Tracking**: A record of all your evaluation runs, so you can easily compare model versions and track improvements over time.
+
+For example, you could quickly filter for all samples where `hallucination_check` failed to debug why your model is inventing a destination_address. This level of detail is crucial for iterating on your prompts and improving model reliability.
+
+### **6. Conclusion**
+
+By implementing this evaluation-driven approach with LangWatch, you can systematically measure and improve the accuracy of your structured data extraction for your chatbot. The detailed field-by-field analysis helps identify specific areas for improvement, whether it's handling incomplete addresses, detecting airport mentions, or preventing hallucinations. With continuous monitoring, you can ensure your booking system remains reliable as it processes real-world, unstructured user messages.
+
+### **7. Optimizing Your Extraction**
+
+Now that you've set up evaluation for your structured data extraction, you can use the [Optimization Studio](/optimization-studio/optimizing) to fine-tune and improve your extraction pipeline. The Optimization Studio provides powerful tools to analyze patterns in model failures, test different prompt variations, and track improvements over time.

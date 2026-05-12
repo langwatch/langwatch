@@ -7,7 +7,6 @@ import {
   fireEvent,
   render,
   screen,
-  waitFor,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -114,8 +113,9 @@ describe("VariablesSection", () => {
       const onChange = vi.fn();
       renderComponent({ variables: [], onChange });
 
-      const addButton = screen.getByRole("button");
-      await user.click(addButton);
+      // Open the type picker menu and select "Text"
+      await user.click(screen.getByTestId("add-variable-button"));
+      await user.click(screen.getByRole("menuitem", { name: /Text/ }));
 
       expect(onChange).toHaveBeenCalledWith([
         { identifier: "input", type: "str" },
@@ -128,10 +128,9 @@ describe("VariablesSection", () => {
       const variables: Variable[] = [{ identifier: "input", type: "str" }];
       renderComponent({ variables, onChange });
 
-      // First button is the + button
-      const buttons = screen.getAllByRole("button");
-      const addButton = buttons[0]!;
-      await user.click(addButton);
+      // Open the type picker menu and select "Text"
+      await user.click(screen.getByTestId("add-variable-button"));
+      await user.click(screen.getByRole("menuitem", { name: /Text/ }));
 
       expect(onChange).toHaveBeenCalledWith([
         { identifier: "input", type: "str" },
@@ -410,9 +409,9 @@ describe("VariablesSection", () => {
         mappings,
       });
 
-      // Should show a tag with the field name
+      // Should show a tag with the source prefix and field name
       expect(screen.getByTestId("source-mapping-tag")).toBeInTheDocument();
-      expect(screen.getByText("input")).toBeInTheDocument();
+      expect(screen.getByText("dataset-1.input")).toBeInTheDocument();
     });
   });
 

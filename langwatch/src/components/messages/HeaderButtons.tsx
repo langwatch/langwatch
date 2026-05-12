@@ -1,5 +1,5 @@
 import { Box, Button, HStack } from "@chakra-ui/react";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import { useEffect, useState } from "react";
 import { List, Table } from "react-feather";
 import { LuTrendingUp } from "react-icons/lu";
@@ -20,6 +20,7 @@ export function useTableView() {
   const setView = (view: "table" | "list") => () => {
     void router.push(
       {
+        pathname: router.pathname,
         query: {
           ...router.query,
           view,
@@ -31,22 +32,30 @@ export function useTableView() {
     setLocalStorageTableView(view);
   };
 
+  // Keep view= in the URL for shareability. Reacts to router.asPath so it
+  // appends view to whatever params are already there (e.g. after saved view
+  // restore pushes filters), instead of clobbering them.
   useEffect(() => {
     if (!project || !router.pathname.includes("/messages")) return;
 
-    if (router.query.view === undefined) {
-      void router.replace({
+    if (router.query.view !== undefined) {
+      setLocalStorageTableView(isTableView ? "table" : "list");
+      return;
+    }
+
+    void router.replace(
+      {
+        pathname: router.pathname,
         query: {
           ...router.query,
-          project: project.slug,
           view: localStorageTableView ?? "table",
         },
-      });
-    } else {
-      setLocalStorageTableView(isTableView ? "table" : "list");
-    }
+      },
+      undefined,
+      { shallow: true },
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [project]);
+  }, [router.asPath, project]);
 
   return { isTableView, setView };
 }
@@ -128,16 +137,11 @@ export function ToggleAnalytics() {
       <PageLayout.HeaderButton
         variant="ghost"
         onClick={() => {
-          void router.push(
-            {
-              pathname: `/${project?.slug}`,
-              query: {
-                ...router.query,
-              },
-            },
-            undefined,
-            { shallow: true },
-          );
+          const { project: _project, view: _view, ...query } = router.query;
+          void router.push({
+            pathname: `/${project?.slug}/analytics`,
+            query,
+          });
         }}
       >
         <LuTrendingUp />

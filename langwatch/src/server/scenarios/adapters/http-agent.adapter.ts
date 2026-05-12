@@ -9,11 +9,28 @@ import {
   AgentRepository,
   type AgentRepository as AgentRepositoryType,
 } from "../../agents/agent.repository";
+import {
+  buildTemplateContext,
+  renderBodyTemplate,
+  renderUrlTemplate,
+} from "../execution/http-template-engine";
+import { injectTraceContextHeaders } from "../execution/trace-context-headers";
 import { applyAuthentication } from "./auth.strategies";
 
 const logger = createLogger("HttpAgentAdapter");
 
-const DEFAULT_SCENARIO_THREAD_ID = "scenario-test";
+/**
+ * Extract scheme + host from a URL for logging.
+ * Paths and query strings can contain interpolated PII after URL templating;
+ * the origin is config-level and safe to emit at any log level.
+ */
+function safeOrigin(url: string): string {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return "<unparseable>";
+  }
+}
 
 interface HttpAgentAdapterParams {
   agentId: string;
@@ -31,6 +48,7 @@ export class HttpAgentAdapter extends AgentAdapter {
   private readonly agentId: string;
   private readonly projectId: string;
   private readonly agentRepository: AgentRepositoryType;
+  private capturedTraceId: string | undefined;
 
   constructor({ agentId, projectId, agentRepository }: HttpAgentAdapterParams) {
     super();
@@ -38,6 +56,11 @@ export class HttpAgentAdapter extends AgentAdapter {
     this.agentId = agentId;
     this.projectId = projectId;
     this.agentRepository = agentRepository;
+  }
+
+  /** Returns the trace ID captured during the most recent HTTP request. */
+  getTraceId(): string | undefined {
+    return this.capturedTraceId;
   }
 
   static create({
@@ -64,16 +87,31 @@ export class HttpAgentAdapter extends AgentAdapter {
 
     try {
       const config = await this.fetchAgentConfig();
+      const templateContext = buildTemplateContext({
+        input,
+        scenarioMappings: config.scenarioMappings,
+      });
+      const url = renderUrlTemplate({ template: config.url, context: templateContext });
       const headers = this.buildRequestHeaders(config);
-      const body = this.buildRequestBody(config.bodyTemplate, input);
-      const responseData = await this.executeHttpRequest(config, headers, body);
+      const body = this.buildRequestBody(config.bodyTemplate, input, templateContext);
+      const responseData = await this.executeHttpRequest(
+        url,
+        config.method,
+        headers,
+        body,
+      );
       const result = this.extractResponseContent(
         responseData,
         config.outputPath,
       );
 
       logger.info(
-        { agentId: this.agentId, url: config.url, resultLength: result.length },
+        {
+          agentId: this.agentId,
+          origin: safeOrigin(url),
+          urlTemplate: config.url,
+          resultLength: result.length,
+        },
         "HttpAgentAdapter.call completed",
       );
 
@@ -126,6 +164,8 @@ export class HttpAgentAdapter extends AgentAdapter {
     };
     this.applyCustomHeaders(headers, config.headers);
     this.applyAuthenticationHeaders(headers, config.auth);
+    const { traceId } = injectTraceContextHeaders({ headers });
+    this.capturedTraceId = traceId;
     return headers;
   }
 
@@ -151,19 +191,17 @@ export class HttpAgentAdapter extends AgentAdapter {
   }
 
   private async executeHttpRequest(
-    config: HttpComponentConfig,
+    url: string,
+    method: HttpComponentConfig["method"],
     headers: Record<string, string>,
     body: string,
   ): Promise<unknown> {
-    logger.debug(
-      { url: config.url, method: config.method },
-      "Making HTTP request",
-    );
+    logger.debug({ origin: safeOrigin(url), method }, "Making HTTP request");
 
-    const response = await ssrfSafeFetch(config.url, {
-      method: config.method,
+    const response = await ssrfSafeFetch(url, {
+      method,
       headers,
-      body: config.method !== "GET" ? body : undefined,
+      body: method !== "GET" ? body : undefined,
     });
 
     logger.debug(
@@ -210,33 +248,12 @@ export class HttpAgentAdapter extends AgentAdapter {
   private buildRequestBody(
     template: string | undefined,
     input: AgentInput,
+    context: Record<string, unknown>,
   ): string {
     if (!template) {
       return JSON.stringify({ messages: input.messages });
     }
 
-    let body = template;
-
-    body = body.replace(
-      /\{\{\s*messages\s*\}\}/g,
-      JSON.stringify(input.messages),
-    );
-
-    body = body.replace(
-      /\{\{\s*threadId\s*\}\}/g,
-      input.threadId ?? DEFAULT_SCENARIO_THREAD_ID,
-    );
-
-    const lastUserMessage = input.messages.findLast((m) => m.role === "user");
-    if (lastUserMessage) {
-      body = body.replace(
-        /\{\{\s*input\s*\}\}/g,
-        typeof lastUserMessage.content === "string"
-          ? lastUserMessage.content
-          : JSON.stringify(lastUserMessage.content),
-      );
-    }
-
-    return body;
+    return renderBodyTemplate({ template, context });
   }
 }

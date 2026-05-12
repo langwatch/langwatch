@@ -31,6 +31,15 @@ export type ExecutionScope =
       targetOutput?: unknown;
       /** Existing trace ID to reuse for evaluator execution */
       traceId?: string;
+    }
+  | {
+      type: "evaluator-all-rows";
+      targetId: string;
+      evaluatorId: string;
+      /** Pre-computed target outputs by row index (only rows with outputs) */
+      precomputedTargetOutputs: Record<number, unknown>;
+      /** Existing trace IDs by row index for reuse */
+      traceIds: Record<number, string | undefined>;
     };
 
 /**
@@ -95,6 +104,13 @@ export const executionRequestSchema = z.object({
       targetOutput: z.unknown().optional(),
       traceId: z.string().optional(),
     }),
+    z.object({
+      type: z.literal("evaluator-all-rows"),
+      targetId: z.string(),
+      evaluatorId: z.string(),
+      precomputedTargetOutputs: z.record(z.coerce.number(), z.unknown()),
+      traceIds: z.record(z.coerce.number(), z.string().optional()),
+    }),
   ]),
   concurrency: z.number().min(1).max(24).optional(),
 });
@@ -112,6 +128,8 @@ export type ExecutionSummary = {
   completedCells: number;
   failedCells: number;
   duration: number;
+  /** Number of CH dispatches that failed (non-zero means CH data may be incomplete) */
+  chDispatchFailures?: number;
   timestamps: {
     startedAt: number;
     finishedAt?: number;

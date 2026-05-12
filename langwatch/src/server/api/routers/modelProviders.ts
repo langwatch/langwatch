@@ -1,47 +1,31 @@
 import { z } from "zod";
-import { dependencies } from "../../../injection/dependencies.server";
-import { KEY_CHECK, MASKED_KEY_PLACEHOLDER } from "../../../utils/constants";
-import { prisma } from "../../db";
-import type {
-  LLMModelEntry,
-  ReasoningConfig,
-} from "../../modelProviders/llmModels.types";
-import { translateModelIdForLitellm } from "../../modelProviders/modelIdBoundary";
+import { customModelUpdateInputSchema } from "../../modelProviders/customModel.schema";
 import { ModelProviderService } from "../../modelProviders/modelProvider.service";
 import {
-  getAllModels,
-  getParameterConstraints,
-  getProviderModelOptions,
-  type MaybeStoredModelProvider,
-  modelProviders,
-  type ParameterConstraints,
-} from "../../modelProviders/registry";
-import { checkProjectPermission, hasProjectPermission } from "../rbac";
+  checkProjectPermission,
+  checkOrganizationPermission,
+  hasProjectPermission,
+} from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import {
   validateKeyWithCustomUrl,
   validateProviderApiKey,
 } from "./providerValidation";
+import {
+  getProjectModelProviders,
+  getProjectModelProvidersForFrontend,
+} from "./modelProviders.utils";
+import { isManagedProvider } from "../../../../ee/managed-providers/managedBedrockConfig";
 
-/**
- * Simplified model metadata for frontend consumption
- */
-export type ModelMetadataForFrontend = {
-  id: string;
-  name: string;
-  provider: string;
-  supportedParameters: string[];
-  contextLength: number;
-  maxCompletionTokens: number | null;
-  defaultParameters: Record<string, unknown> | null;
-  supportsImageInput: boolean;
-  supportsAudioInput: boolean;
-  pricing: LLMModelEntry["pricing"];
-  /** Reasoning/thinking configuration for reasoning models */
-  reasoningConfig?: ReasoningConfig;
-  /** Provider-level parameter constraints (e.g., temperature max for Anthropic) */
-  parameterConstraints?: ParameterConstraints;
-};
+export type { ModelMetadataForFrontend } from "./modelProviders.utils";
+export {
+  getProjectModelProviders,
+  getModelMetadataForFrontend,
+  mergeCustomModelMetadata,
+  getProjectModelProvidersForFrontend,
+  prepareEnvKeys,
+  prepareLitellmParams,
+} from "./modelProviders.utils";
 
 export const modelProviderRouter = createTRPCRouter({
   getAllForProject: protectedProcedure
@@ -79,34 +63,64 @@ export const modelProviderRouter = createTRPCRouter({
         id: z.string().optional(),
         projectId: z.string(),
         provider: z.string(),
+        // Human-readable label shown in the settings list and the model
+        // selector group headers. Defaults to the humanized provider name
+        // (e.g. "openai" → "OpenAI") when omitted. Iter 109 added the
+        // column; now exposing it on the write path so operators can
+        // distinguish multiple same-provider instances at different
+        // scopes.
+        name: z.string().trim().min(1).max(128).optional(),
         enabled: z.boolean(),
         customKeys: z.object({}).passthrough().optional().nullable(),
-        customModels: z.array(z.string()).optional().nullable(),
-        customEmbeddingsModels: z.array(z.string()).optional().nullable(),
+        customModels: customModelUpdateInputSchema.optional().nullable(),
+        customEmbeddingsModels: customModelUpdateInputSchema.optional().nullable(),
         extraHeaders: z
           .array(z.object({ key: z.string(), value: z.string() }))
           .optional()
           .nullable(),
         defaultModel: z.string().optional(),
+        // Multi-scope writes (iter 109). `scopes` is the canonical shape;
+        // `scopeType`/`scopeId` remain for the transition period so older
+        // callers still compile. When both arrive, `scopes` wins. The
+        // service runs the fail-closed authz check on every entry before
+        // persisting — any non-manageable scope aborts the whole write.
+        scopes: z
+          .array(
+            z.object({
+              scopeType: z.enum(["ORGANIZATION", "TEAM", "PROJECT"]),
+              scopeId: z.string().min(1),
+            }),
+          )
+          .min(1, "At least one scope must be selected.")
+          .optional(),
+        scopeType: z.enum(["ORGANIZATION", "TEAM", "PROJECT"]).optional(),
+        scopeId: z.string().optional(),
       }),
     )
     .use(checkProjectPermission("project:update"))
     .mutation(async ({ input, ctx }) => {
       const service = ModelProviderService.create(ctx.prisma);
-      return await service.updateModelProvider({
-        id: input.id,
-        projectId: input.projectId,
-        provider: input.provider,
-        enabled: input.enabled,
-        customKeys: input.customKeys as
-          | Record<string, unknown>
-          | null
-          | undefined,
-        customModels: input.customModels,
-        customEmbeddingsModels: input.customEmbeddingsModels,
-        extraHeaders: input.extraHeaders,
-        defaultModel: input.defaultModel,
-      });
+      return await service.updateModelProvider(
+        {
+          id: input.id,
+          projectId: input.projectId,
+          provider: input.provider,
+          name: input.name,
+          enabled: input.enabled,
+          customKeys: input.customKeys as
+            | Record<string, unknown>
+            | null
+            | undefined,
+          customModels: input.customModels,
+          customEmbeddingsModels: input.customEmbeddingsModels,
+          extraHeaders: input.extraHeaders,
+          defaultModel: input.defaultModel,
+          scopes: input.scopes,
+          scopeType: input.scopeType,
+          scopeId: input.scopeId,
+        },
+        { prisma: ctx.prisma, session: ctx.session },
+      );
     }),
 
   delete: protectedProcedure
@@ -119,16 +133,11 @@ export const modelProviderRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("project:delete"))
     .mutation(async ({ input, ctx }) => {
-      const { id, projectId, provider } = input;
-      if (id) {
-        return await ctx.prisma.modelProvider.delete({
-          where: { id, projectId },
-        });
-      } else {
-        return await ctx.prisma.modelProvider.deleteMany({
-          where: { provider, projectId },
-        });
-      }
+      const service = ModelProviderService.create(ctx.prisma);
+      return await service.deleteModelProvider(input, {
+        prisma: ctx.prisma,
+        session: ctx.session,
+      });
     }),
 
   /**
@@ -147,6 +156,18 @@ export const modelProviderRouter = createTRPCRouter({
     .query(async ({ input }) => {
       const { provider, customKeys } = input;
       return validateProviderApiKey(provider, customKeys);
+    }),
+
+  isManagedProvider: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        provider: z.string(),
+      }),
+    )
+    .use(checkOrganizationPermission("organization:view"))
+    .query(({ input }) => {
+      return { managed: isManagedProvider(input.organizationId, input.provider) };
     }),
 
   /**
@@ -173,341 +194,3 @@ export const modelProviderRouter = createTRPCRouter({
     }),
 });
 
-export const getProjectModelProviders = async (
-  projectId: string,
-  includeKeys = true,
-) => {
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-  });
-
-  if (!project) {
-    throw new Error("Project not found");
-  }
-
-  const defaultModelProviders: Record<string, MaybeStoredModelProvider> =
-    Object.fromEntries(
-      Object.entries(modelProviders)
-        .filter(([_providerKey, modelProvider]) => {
-          return modelProvider.enabledSince;
-        })
-        .map(([providerKey, modelProvider]) => {
-          const enabled =
-            modelProvider.enabledSince < project.createdAt &&
-            !!process.env[modelProvider.apiKey] &&
-            (providerKey !== "vertex_ai" || !!process.env.VERTEXAI_PROJECT);
-
-          const modelProvider_: MaybeStoredModelProvider = {
-            provider: providerKey,
-            enabled,
-            disabledByDefault: !enabled,
-            customKeys: null,
-            models: getProviderModelOptions(providerKey, "chat").map(
-              (m) => m.value,
-            ),
-            embeddingsModels: getProviderModelOptions(
-              providerKey,
-              "embedding",
-            ).map((m) => m.value),
-            deploymentMapping: null,
-            extraHeaders: [],
-          };
-          return [providerKey, modelProvider_];
-        }),
-    );
-
-  const savedModelProviders = (
-    await prisma.modelProvider.findMany({
-      where: { projectId },
-    })
-  )
-    .filter((modelProvider) => {
-      // Keep if has custom keys
-      if (modelProvider.customKeys) return true;
-
-      // Keep if enabled status differs from default
-      const defaultProvider = defaultModelProviders[modelProvider.provider];
-      if (modelProvider.enabled !== defaultProvider?.enabled) return true;
-
-      // Keep if has custom models or embeddings (not default)
-      const customModels = modelProvider.customModels as string[] | null;
-      const customEmbeddings = modelProvider.customEmbeddingsModels as
-        | string[]
-        | null;
-      const hasCustomModels = customModels && customModels.length > 0;
-      const hasCustomEmbeddings =
-        customEmbeddings && customEmbeddings.length > 0;
-
-      return hasCustomModels || hasCustomEmbeddings;
-    })
-    .reduce(
-      (acc, modelProvider) => {
-        const modelProvider_: MaybeStoredModelProvider = {
-          id: modelProvider.id,
-          provider: modelProvider.provider,
-          enabled: modelProvider.enabled,
-          customKeys: modelProvider.customKeys,
-          models: modelProvider.customModels as string[] | null,
-          embeddingsModels: modelProvider.customEmbeddingsModels as
-            | string[]
-            | null,
-          deploymentMapping: modelProvider.deploymentMapping,
-          disabledByDefault:
-            defaultModelProviders[modelProvider.provider]?.disabledByDefault,
-          extraHeaders: modelProvider.extraHeaders as
-            | { key: string; value: string }[]
-            | null,
-        };
-
-        if (!includeKeys) {
-          modelProvider_.customKeys = null;
-        }
-
-        return {
-          ...acc,
-          [modelProvider.provider]: modelProvider_,
-        };
-      },
-      {} as Record<string, MaybeStoredModelProvider>,
-    );
-
-  return {
-    ...defaultModelProviders,
-    ...savedModelProviders,
-  };
-};
-
-/**
- * Get model metadata for all models, formatted for frontend consumption
- */
-export const getModelMetadataForFrontend = (): Record<
-  string,
-  ModelMetadataForFrontend
-> => {
-  const allModels = getAllModels();
-
-  return Object.fromEntries(
-    Object.entries(allModels).map(([id, model]) => [
-      id,
-      {
-        id: model.id,
-        name: model.name,
-        provider: model.provider,
-        supportedParameters: model.supportedParameters,
-        contextLength: model.contextLength,
-        maxCompletionTokens: model.maxCompletionTokens,
-        defaultParameters: model.defaultParameters,
-        supportsImageInput: model.supportsImageInput,
-        supportsAudioInput: model.supportsAudioInput,
-        pricing: model.pricing,
-        reasoningConfig: model.reasoningConfig,
-        parameterConstraints: getParameterConstraints(model.id),
-      },
-    ]),
-  );
-};
-
-// Frontend-only function that masks API keys for security and includes model metadata
-export const getProjectModelProvidersForFrontend = async (
-  projectId: string,
-  includeKeys = true,
-) => {
-  const modelProvidersData = await getProjectModelProviders(
-    projectId,
-    includeKeys,
-  );
-
-  // Mask only API keys, keep URLs visible
-  const maskedProviders = { ...modelProvidersData };
-  if (includeKeys) {
-    for (const [provider, config] of Object.entries(maskedProviders)) {
-      if (config.customKeys) {
-        maskedProviders[provider] = {
-          ...config,
-          customKeys: Object.fromEntries(
-            Object.entries(config.customKeys).map(([key, value]) => [
-              key,
-              // Only mask values that look like API keys (contain "_KEY" pattern)
-              KEY_CHECK.some((k) => key.includes(k))
-                ? MASKED_KEY_PLACEHOLDER
-                : value,
-            ]),
-          ),
-        };
-      }
-    }
-  }
-
-  // Include model metadata for all models
-  const modelMetadata = getModelMetadataForFrontend();
-
-  return {
-    providers: maskedProviders,
-    modelMetadata,
-  };
-};
-
-const getModelOrDefaultEnvKey = (
-  modelProvider: MaybeStoredModelProvider,
-  envKey: string,
-) => {
-  return (
-    // Allow env var to be set to empty string '' on purpose to fallback to process.env defined one
-    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-    (modelProvider.customKeys as Record<string, string>)?.[envKey] ||
-    process.env[envKey]
-  );
-};
-
-const getModelOrDefaultApiKey = (modelProvider: MaybeStoredModelProvider) => {
-  const providerDefinition =
-    modelProviders[modelProvider.provider as keyof typeof modelProviders];
-  if (!providerDefinition) {
-    return undefined;
-  }
-  return getModelOrDefaultEnvKey(modelProvider, providerDefinition.apiKey);
-};
-
-const getModelOrDefaultEndpointKey = (
-  modelProvider: MaybeStoredModelProvider,
-) => {
-  const providerDefinition =
-    modelProviders[modelProvider.provider as keyof typeof modelProviders];
-  if (!providerDefinition) {
-    return undefined;
-  }
-  return (
-    providerDefinition.endpointKey &&
-    getModelOrDefaultEnvKey(modelProvider, providerDefinition.endpointKey)
-  );
-};
-
-export const prepareEnvKeys = (modelProvider: MaybeStoredModelProvider) => {
-  const providerDefinition =
-    modelProviders[modelProvider.provider as keyof typeof modelProviders];
-  if (!providerDefinition) {
-    return {};
-  }
-
-  // TODO: add AZURE_DEPLOYMENT_NAME and AZURE_EMBEDDINGS_DEPLOYMENT_NAME for deployment name mapping
-
-  const getSchemaShape = (schema: any) => {
-    if ("innerType" in schema) {
-      return schema.innerType().shape;
-    }
-    if ("shape" in schema) {
-      return schema.shape;
-    }
-    return {};
-  };
-
-  return Object.fromEntries(
-    Object.keys(getSchemaShape(providerDefinition.keysSchema))
-      .map((key) => [key, getModelOrDefaultEnvKey(modelProvider, key)])
-      .map(([key, value]) => {
-        if (key === "CUSTOM_API_KEY") {
-          return ["OPENAI_API_KEY", value];
-        }
-        if (key === "CUSTOM_BASE_URL") {
-          return ["OPENAI_BASE_URL", value];
-        }
-        return [key, value];
-      })
-      .filter(([_key, value]) => !!value),
-  );
-};
-
-export const prepareLitellmParams = async ({
-  model,
-  modelProvider,
-  projectId,
-}: {
-  model: string;
-  modelProvider: MaybeStoredModelProvider;
-  projectId: string;
-}) => {
-  const params: Record<string, string> = {};
-
-  // Translate model ID for LiteLLM (e.g., "anthropic/claude-opus-4.5" -> "anthropic/claude-opus-4-5")
-  // Custom models use OpenAI-compatible API format, so we replace the prefix.
-  // LiteLLM routes "openai/" prefixed models through its OpenAI-compatible handler.
-  params.model = translateModelIdForLitellm(model).replace(
-    "custom/",
-    "openai/",
-  );
-
-  const apiKey = getModelOrDefaultApiKey(modelProvider);
-  if (apiKey && modelProvider.provider !== "vertex_ai") {
-    params.api_key = apiKey;
-  }
-  const endpoint = getModelOrDefaultEndpointKey(modelProvider);
-  if (endpoint) {
-    // Strip trailing /v1 for Anthropic - LiteLLM adds it internally
-    if (modelProvider.provider === "anthropic") {
-      params.api_base = endpoint.replace(/\/v1\/?$/, "");
-    } else {
-      params.api_base = endpoint;
-    }
-  }
-
-  if (modelProvider.provider === "vertex_ai") {
-    params.vertex_credentials = apiKey ?? "invalid";
-    params.vertex_project =
-      getModelOrDefaultEnvKey(modelProvider, "VERTEXAI_PROJECT") ?? "invalid";
-    params.vertex_location =
-      getModelOrDefaultEnvKey(modelProvider, "VERTEXAI_LOCATION") ?? "invalid";
-  }
-
-  if (modelProvider.provider === "bedrock") {
-    delete params.api_key;
-    params.aws_access_key_id =
-      getModelOrDefaultEnvKey(modelProvider, "AWS_ACCESS_KEY_ID") ?? "invalid";
-    params.aws_secret_access_key =
-      getModelOrDefaultEnvKey(modelProvider, "AWS_SECRET_ACCESS_KEY") ??
-      "invalid";
-    params.aws_region_name =
-      getModelOrDefaultEnvKey(modelProvider, "AWS_REGION_NAME") ?? "invalid";
-  }
-
-  // Handle Azure API Gateway configuration
-  if (modelProvider.provider === "azure") {
-    const gatewayBaseUrl = getModelOrDefaultEnvKey(
-      modelProvider,
-      "AZURE_API_GATEWAY_BASE_URL",
-    );
-    const gatewayVersion =
-      getModelOrDefaultEnvKey(modelProvider, "AZURE_API_GATEWAY_VERSION") ??
-      "2024-05-01-preview";
-
-    // If API Gateway is configured, route through the gateway endpoint
-    if (gatewayBaseUrl) {
-      params.api_base = gatewayBaseUrl;
-      params.use_azure_gateway = "true";
-      params.api_version = gatewayVersion;
-    }
-
-    // Pass through all extra headers
-    if (modelProvider.extraHeaders) {
-      const extraHeaders = modelProvider.extraHeaders as {
-        key: string;
-        value: string;
-      }[];
-      params.extra_headers = JSON.stringify(
-        Object.fromEntries(extraHeaders.map(({ key, value }) => [key, value])),
-      );
-    }
-  }
-
-  if (dependencies.managedModelProviderLitellmParams) {
-    return await dependencies.managedModelProviderLitellmParams({
-      params,
-      projectId,
-      model,
-      modelProvider,
-    });
-  }
-
-  // TODO: add azure deployment as params.model as azure/<deployment-name>
-
-  return params;
-};

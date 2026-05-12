@@ -198,9 +198,9 @@ const InputOutputExecutablePanelComponent = forwardRef(
             position: "absolute",
             top: 0,
             right: 0,
-            background: "white",
+            background: "var(--chakra-colors-bg-panel)",
             border: "1px solid",
-            borderColor: "var(--chakra-colors-gray-350)",
+            borderColor: "var(--chakra-colors-border-emphasized)",
             zIndex: 100,
             overflowY: "auto",
           }}
@@ -311,7 +311,7 @@ const Panel = ({
         }}
       >
         <Box
-          background="white"
+          background="bg.panel"
           height="full"
           padding={6}
           border="1px solid"

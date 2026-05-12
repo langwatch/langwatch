@@ -7,7 +7,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import NextLink from "next/link";
+import NextLink from "~/utils/compat/next-link";
 import type React from "react";
 import {
   LuBell,
@@ -142,7 +142,7 @@ const IntegrationChecksCard: React.FC = () => {
   const slug = project?.slug ?? "";
 
   return (
-    <Box minH="160px" boxShadow="sm" borderRadius="xl" bg="white" p={4}>
+    <Box minH="160px" boxShadow="sm" borderRadius="xl" bg="bg.panel" p={4}>
       <HStack
         mb={3}
         gap={1}

@@ -27,6 +27,7 @@ import type {
 } from "../server/datasets/types";
 import { datasetRecordFormSchema } from "../server/datasets/types.generated";
 import { api } from "../utils/api";
+import { isHandledByGlobalHandler } from "../utils/trpcError";
 import { DatasetSlugDisplay } from "./datasets/DatasetSlugDisplay";
 import type { InMemoryDataset } from "./datasets/DatasetTable";
 import { useDatasetSlugValidation } from "./datasets/useDatasetSlugValidation";
@@ -216,6 +217,7 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
           void trpc.dataset.getAll.invalidate();
         },
         onError: (error) => {
+          if (isHandledByGlobalHandler(error)) return;
           // Check if it's a slug conflict error from backend
           const isConflictError =
             error.message.includes("already exists") ||

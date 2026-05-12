@@ -1,4 +1,5 @@
 import {
+  EmptyState,
   Heading,
   HStack,
   Separator,
@@ -6,7 +7,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import React, { useEffect, useRef, useState } from "react";
 import { HelpCircle } from "react-feather";
 import { useFilterParams } from "../../hooks/useFilterParams";
@@ -23,16 +24,22 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
   const { filterParams, queryOpts } = useFilterParams();
 
   useEffect(() => {
-    if (router.query.topics) {
-      setSelectedTopics((router.query.topics as string).split(","));
+    const topics = router.query.topics;
+    if (topics) {
+      setSelectedTopics(
+        Array.isArray(topics) ? topics : topics.split(","),
+      );
     } else {
       setSelectedTopics([]);
     }
   }, [router.query.topics]);
 
   useEffect(() => {
-    if (router.query.subtopics) {
-      setSelectedSubtopics((router.query.subtopics as string).split(","));
+    const subtopics = router.query.subtopics;
+    if (subtopics) {
+      setSelectedSubtopics(
+        Array.isArray(subtopics) ? subtopics : subtopics.split(","),
+      );
     } else {
       setSelectedSubtopics([]);
     }
@@ -95,20 +102,18 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
       : selectedSubtopics.filter((t) => t !== subtopicId);
     const subtopicsQuery =
       newSubtopics.length > 0 ? newSubtopics.join(",") : undefined;
-    setTimeout(() => {
-      void router.push(
-        {
-          query: {
-            ...router.query,
-            subtopics: subtopicsQuery,
-          },
-        },
-        undefined,
-        { shallow: true },
-      );
-    }, 0);
-
     setSelectedSubtopics(newSubtopics);
+
+    void router.push(
+      {
+        query: {
+          ...router.query,
+          subtopics: subtopicsQuery,
+        },
+      },
+      undefined,
+      { shallow: true },
+    );
   };
 
   const topicSelectorRef = useRef<HTMLDivElement>(null);
@@ -130,7 +135,7 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
       width="full"
       gap={4}
       ref={topicSelectorRef}
-      minHeight={`${minHeight}px`}
+      minHeight={minHeight ? `${minHeight}px` : undefined}
     >
       {showTitle && (
         <Heading fontSize="sm" as="h2">
@@ -147,14 +152,15 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
         ) : topicCountsQuery.data ? (
           topicCountsQuery.data.topicCounts.length > 0 ? (
             topicCountsQuery.data.topicCounts
-              .sort((a, b) => (a.name > b.name ? 1 : -1))
-              .sort((a, b) => (a.count > b.count ? -1 : 1))
+              .toSorted((a, b) => (a.name > b.name ? 1 : -1))
+              .toSorted((a, b) => (a.count > b.count ? -1 : 1))
               .map((topic) => (
                 <React.Fragment key={topic.id}>
                   <HStack
                     gap={1}
                     width="full"
                     paddingX={2}
+                    cursor="pointer"
                     fontWeight={
                       selectedTopics.includes(topic.id) ? "500" : "normal"
                     }
@@ -183,8 +189,8 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
                   </HStack>
                   {selectedTopics.includes(topic.id) &&
                     topicCountsQuery.data.subtopicCounts
-                      .sort((a, b) => (a.name > b.name ? 1 : -1))
-                      .sort((a, b) => (a.count > b.count ? -1 : 1))
+                      .toSorted((a, b) => (a.name > b.name ? 1 : -1))
+                      .toSorted((a, b) => (a.count > b.count ? -1 : 1))
                       .filter((subtopic) => subtopic.parentId === topic.id)
                       .map((subtopic) => (
                         <HStack
@@ -193,6 +199,7 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
                           width="full"
                           paddingX={2}
                           paddingLeft={8}
+                          cursor="pointer"
                           fontWeight="normal"
                         >
                           <Checkbox
@@ -227,15 +234,23 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
                 </React.Fragment>
               ))
           ) : (
-            <HStack>
-              <Text>No topics found</Text>
-              <Tooltip content="Topics are assigned automatically to a group of messages. If you already have enough messages, it may take a day topics to be generated">
-                <HelpCircle width="14px" />
-              </Tooltip>
-            </HStack>
+            <EmptyState.Root size="sm">
+              <EmptyState.Content>
+                <VStack textAlign="center">
+                  <EmptyState.Title textStyle="sm">No topics found</EmptyState.Title>
+                  <EmptyState.Description textStyle="xs">
+                    Topics are assigned automatically after enough messages are collected.{" "}
+                  </EmptyState.Description>
+                </VStack>
+              </EmptyState.Content>
+            </EmptyState.Root>
           )
         ) : (
-          <Text>No topics found</Text>
+          <EmptyState.Root size="sm">
+            <EmptyState.Content>
+              <EmptyState.Title textStyle="sm">No topics found</EmptyState.Title>
+            </EmptyState.Content>
+          </EmptyState.Root>
         )}
       </VStack>
     </VStack>

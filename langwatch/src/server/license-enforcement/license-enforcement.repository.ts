@@ -1,12 +1,13 @@
 import {
   INVITE_STATUS,
   OrganizationUserRole,
+  type Prisma,
   type PrismaClient,
 } from "@prisma/client";
 import { getCurrentMonthStart } from "../utils/dateUtils";
 import {
   isFullMember,
-  isMemberLite,
+  isLiteMember,
   isViewOnlyCustomRole,
 } from "./member-classification";
 
@@ -16,7 +17,7 @@ export {
   isViewOnlyCustomRole,
   classifyMemberType,
   isFullMember,
-  isMemberLite,
+  isLiteMember,
 } from "./member-classification";
 
 /**
@@ -43,37 +44,6 @@ interface MemberClassificationContext {
 }
 
 /**
- * Minimal interface for cost checking operations.
- * Follows Interface Segregation Principle - callers only depend on what they need.
- * Used by workers and API routes that just need to check cost limits.
- */
-export interface ICostChecker {
-  getCurrentMonthCost(organizationId: string): Promise<number>;
-  maxMonthlyUsageLimit(organizationId: string): Promise<number>;
-}
-
-/**
- * Factory function to create a minimal cost checker.
- * Used by callers that only need cost checking (evaluate.ts, evaluationsWorker.ts, topicClustering.ts).
- */
-export function createCostChecker(prisma: PrismaClient): ICostChecker {
-  const repository = new LicenseEnforcementRepository(prisma);
-  return {
-    getCurrentMonthCost: (organizationId: string) =>
-      repository.getCurrentMonthCost(organizationId),
-    /**
-     * Get the maximum monthly usage limit for the organization.
-     * FIXME: This was recently changed to return Infinity,
-     * but still takes the organizationId as a parameter.
-     *
-     * Either we remove the organizationId parameter from all the calls to this function,
-     * or we use to get the plan and return it correctly.
-     */
-    maxMonthlyUsageLimit: (_organizationId: string) => Promise.resolve(Infinity),
-  };
-}
-
-/**
  * Repository interface for license enforcement.
  * Defines the contract for counting resources - allows for easy testing
  * and follows Dependency Inversion Principle (DIP).
@@ -86,7 +56,7 @@ export interface ILicenseEnforcementRepository {
   getWorkflowCount(organizationId: string): Promise<number>;
   getPromptCount(organizationId: string): Promise<number>;
   getEvaluatorCount(organizationId: string): Promise<number>;
-  getScenarioCount(organizationId: string): Promise<number>;
+  getActiveScenarioCount(organizationId: string): Promise<number>;
   getProjectCount(organizationId: string): Promise<number>;
   getTeamCount(organizationId: string): Promise<number>;
   getMemberCount(organizationId: string): Promise<number>;
@@ -98,7 +68,6 @@ export interface ILicenseEnforcementRepository {
   getDashboardCount(organizationId: string): Promise<number>;
   getCustomGraphCount(organizationId: string): Promise<number>;
   getAutomationCount(organizationId: string): Promise<number>;
-  getEvaluationsCreditUsed(organizationId: string): Promise<number>;
   getCurrentMonthCost(organizationId: string): Promise<number>;
   getCurrentMonthCostForProjects(projectIds: string[]): Promise<number>;
 }
@@ -110,7 +79,7 @@ export interface ILicenseEnforcementRepository {
 export class LicenseEnforcementRepository
   implements ILicenseEnforcementRepository
 {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly prisma: PrismaClient | Prisma.TransactionClient) {}
 
   /**
    * Counts active (non-archived) workflows for license enforcement.
@@ -126,12 +95,11 @@ export class LicenseEnforcementRepository
   }
 
   /**
-   * Counts all prompts for license enforcement.
-   * Prompts do not support archival - all prompts count against limits.
+   * Counts active (non-deleted) prompts for license enforcement.
    */
   async getPromptCount(organizationId: string): Promise<number> {
     return this.prisma.llmPromptConfig.count({
-      where: { project: { team: { organizationId } } },
+      where: { project: { team: { organizationId } }, deletedAt: null },
     });
   }
 
@@ -148,21 +116,24 @@ export class LicenseEnforcementRepository
   }
 
   /**
-   * Counts all scenarios for license enforcement.
-   * Scenarios do not support archival - all count against limits.
+   * Counts active (non-archived) scenarios for license enforcement.
+   * Only active scenarios count against the license limit.
    */
-  async getScenarioCount(organizationId: string): Promise<number> {
+  async getActiveScenarioCount(organizationId: string): Promise<number> {
     return this.prisma.scenario.count({
-      where: { project: { team: { organizationId } } },
+      where: {
+        project: { team: { organizationId } },
+        archivedAt: null,
+      },
     });
   }
 
   /**
-   * Counts all projects in organization.
+   * Counts non-archived projects in organization.
    */
   async getProjectCount(organizationId: string): Promise<number> {
     return this.prisma.project.count({
-      where: { team: { organizationId } },
+      where: { team: { organizationId }, archivedAt: null },
     });
   }
 
@@ -179,8 +150,8 @@ export class LicenseEnforcementRepository
    * Counts full members in organization:
    * - Users with ADMIN or MEMBER org role
    * - Users with EXTERNAL role BUT have a custom role with ANY non-view permission
-   * - Pending invites (not expired) with ADMIN or MEMBER role
-   * - Pending invites (not expired) with custom role that has non-view permissions
+   * - PENDING and WAITING_APPROVAL invites (not expired, or no expiration) with ADMIN or MEMBER role
+   * - PENDING and WAITING_APPROVAL invites with custom role that has non-view permissions
    */
   async getMemberCount(organizationId: string): Promise<number> {
     const context = await this.getMemberClassificationContext(organizationId);
@@ -190,11 +161,11 @@ export class LicenseEnforcementRepository
   /**
    * Counts Lite Member users in organization:
    * - Users with EXTERNAL role AND (no custom role OR view-only custom role)
-   * - Pending invites (not expired) with EXTERNAL role AND (no custom role OR view-only custom role)
+   * - PENDING and WAITING_APPROVAL invites (not expired, or no expiration) with EXTERNAL role AND (no custom role OR view-only custom role)
    */
   async getMembersLiteCount(organizationId: string): Promise<number> {
     const context = await this.getMemberClassificationContext(organizationId);
-    return this.countMembersByType(context, isMemberLite);
+    return this.countMembersByType(context, isLiteMember);
   }
 
   /**
@@ -219,8 +190,8 @@ export class LicenseEnforcementRepository
     const pendingInvites = await this.prisma.organizationInvite.findMany({
       where: {
         organizationId,
-        status: INVITE_STATUS.PENDING,
-        expiration: { gt: new Date() },
+        status: { in: [INVITE_STATUS.PENDING, INVITE_STATUS.WAITING_APPROVAL] },
+        OR: [{ expiration: { gt: new Date() } }, { expiration: null }],
       },
       select: { role: true, teamAssignments: true },
     });
@@ -386,8 +357,10 @@ export class LicenseEnforcementRepository
   }
 
   /**
-   * Counts all experiments for license enforcement.
-   * Experiments do not support archival - all experiments count against limits.
+   * Counts non-real-time experiments for license enforcement.
+   * Excludes experiments where `workbenchState.task === "real_time"` because
+   * those are online evaluations already counted under `maxOnlineEvaluations`
+   * via `getOnlineEvaluationCount`. Including them here would double-count.
    *
    * Note: Experiment model has RLS policy requiring direct projectId filter,
    * so we first get project IDs then filter by them.
@@ -399,6 +372,12 @@ export class LicenseEnforcementRepository
     return this.prisma.experiment.count({
       where: {
         projectId: { in: projectIds },
+        NOT: {
+          workbenchState: {
+            path: ["task"],
+            equals: "real_time",
+          },
+        },
       },
     });
   }
@@ -491,20 +470,6 @@ export class LicenseEnforcementRepository
       where: {
         projectId: { in: projectIds },
         deleted: false,
-      },
-    });
-  }
-
-  /**
-   * Counts evaluations credit used for the current month.
-   * Counts BatchEvaluation records created since the start of the month.
-   */
-  async getEvaluationsCreditUsed(organizationId: string): Promise<number> {
-    const startOfMonth = getCurrentMonthStart();
-    return this.prisma.batchEvaluation.count({
-      where: {
-        project: { team: { organizationId } },
-        createdAt: { gte: startOfMonth },
       },
     });
   }

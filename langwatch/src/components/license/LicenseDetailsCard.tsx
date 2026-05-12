@@ -3,10 +3,12 @@ import {
   Box,
   Button,
   HStack,
+  Link,
   Text,
   VStack,
 } from "@chakra-ui/react";
 import type { LicenseStatus } from "../../../ee/licensing/client";
+import { CONTACT_SALES_URL } from "../../../ee/licensing/constants";
 import { isLicenseExpired, formatLicenseDate, hasLicenseMetadata, isCorruptedLicense } from "./licenseStatusUtils";
 
 interface LicenseDetailsCardProps {
@@ -67,6 +69,15 @@ export function LicenseDetailsCard({
             >
               Remove License
             </Button>
+            <Button
+              asChild
+              variant="outline"
+              size="sm"
+            >
+              <Link href={CONTACT_SALES_URL} target="_blank">
+                Contact Sales
+              </Link>
+            </Button>
           </HStack>
         </VStack>
       </Box>
@@ -117,6 +128,15 @@ export function LicenseDetailsCard({
 
           <HStack>
             <Text fontSize="sm" color="fg.muted" width="120px">
+              Seats:
+            </Text>
+            <Text fontSize="sm" fontWeight="medium">
+              {status.currentMembers} / {status.maxMembers}
+            </Text>
+          </HStack>
+
+          <HStack>
+            <Text fontSize="sm" color="fg.muted" width="120px">
               Expires:
             </Text>
             <Text
@@ -154,6 +174,15 @@ export function LicenseDetailsCard({
             disabled={isRemoving}
           >
             Remove License
+          </Button>
+          <Button
+            asChild
+            variant="outline"
+            size="sm"
+          >
+            <Link href={CONTACT_SALES_URL} target="_blank">
+              Contact Sales
+            </Link>
           </Button>
         </HStack>
       </VStack>

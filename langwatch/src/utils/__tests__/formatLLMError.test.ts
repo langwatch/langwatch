@@ -99,4 +99,22 @@ describe("parseLLMError", () => {
       message: "ValueError\nInvalid input",
     });
   });
+
+  it("handles backslashes in Python error message without throwing", () => {
+    const raw = "ValueError('C:\\\\Users\\\\foo\\\\file.txt not found')";
+
+    expect(parseLLMError(raw)).toEqual({
+      type: "unknown",
+      message: "ValueError\nC:\\Users\\foo\\file.txt not found",
+    });
+  });
+
+  it("handles escaped single quotes in Python error message", () => {
+    const raw = "ValueError('it\\'s broken')";
+
+    expect(parseLLMError(raw)).toEqual({
+      type: "unknown",
+      message: "ValueError\nit's broken",
+    });
+  });
 });

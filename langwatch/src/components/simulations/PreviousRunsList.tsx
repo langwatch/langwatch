@@ -8,8 +8,9 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import React, { useMemo } from "react";
-import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/enums";
-import type { ScenarioRunData } from "~/app/api/scenario-events/[[...route]]/types";
+import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import { SCENARIO_RUN_STATUS_CONFIG } from "./scenario-run-status-config";
+import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { ScenarioRunStatusIcon } from "~/components/simulations/ScenarioRunStatusIcon";
 
 import "@copilotkit/react-ui/styles.css";
@@ -19,23 +20,12 @@ import { useSimulationRouter } from "~/hooks/simulations";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
-function getStatusBadgeProps(status: string): {
+export function getStatusBadgeProps(status: ScenarioRunStatus): {
   colorPalette: string;
   label: string;
 } {
-  switch (status) {
-    case ScenarioRunStatus.SUCCESS:
-      return { colorPalette: "green", label: "completed" };
-    case ScenarioRunStatus.FAILED:
-    case ScenarioRunStatus.ERROR:
-      return { colorPalette: "red", label: "failed" };
-    case ScenarioRunStatus.CANCELLED:
-      return { colorPalette: "gray", label: "cancelled" };
-    case ScenarioRunStatus.IN_PROGRESS:
-    case ScenarioRunStatus.PENDING:
-    default:
-      return { colorPalette: "orange", label: "running" };
-  }
+  const { colorPalette, label } = SCENARIO_RUN_STATUS_CONFIG[status];
+  return { colorPalette, label };
 }
 
 function calculateAccuracyPercentage(

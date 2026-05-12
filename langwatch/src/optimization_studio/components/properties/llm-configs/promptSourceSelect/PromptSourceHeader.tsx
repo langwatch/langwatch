@@ -114,7 +114,7 @@ export function PromptSourceHeader({
           borderColor="border"
           borderRadius="md"
           padding={2}
-          background="gray.50"
+          background="bg.subtle"
         >
           <EditablePromptHandleField />
           <Spacer />

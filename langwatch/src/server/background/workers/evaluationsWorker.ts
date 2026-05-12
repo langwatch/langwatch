@@ -1,6 +1,8 @@
 import { CostReferenceType, CostType } from "@prisma/client";
 import { type Job, Worker } from "bullmq";
+import { BullMQOtel } from "bullmq-otel";
 import { nanoid } from "nanoid";
+import { withJobContext } from "../../context/asyncContext";
 import { getProtectionsForProject } from "~/server/api/utils";
 import type { EvaluationJob } from "~/server/background/types";
 import type { Protections } from "~/server/elasticsearch/protections";
@@ -33,12 +35,8 @@ class UserConfigError extends Error {
     this.name = "UserConfigError";
   }
 }
-import { createCostChecker } from "../../license-enforcement/license-enforcement.repository";
-import {
-  getProjectModelProviders,
-  prepareEnvKeys,
-  prepareLitellmParams,
-} from "../../api/routers/modelProviders";
+import { EvaluatorConfigError } from "~/server/app-layer/evaluations/errors";
+import { setupModelEnv } from "~/server/app-layer/evaluations/evaluation-execution.factories";
 import { prisma } from "../../db";
 import {
   DEFAULT_MAPPINGS,
@@ -46,18 +44,31 @@ import {
 } from "../../evaluations/evaluationMappings";
 import {
   evaluationDurationHistogram,
+  recordJobWaitDuration,
   getEvaluationStatusCounter,
   getJobProcessingCounter,
   getJobProcessingDurationHistogram,
 } from "../../metrics";
 import { connection } from "../../redis";
 import {
+  hasThreadMappings,
+  resolveThreadMappingsIntoData,
+} from "../../evaluations/threadMappingResolver";
+import {
   type MappingState,
   mapTraceToDatasetEntry,
+  SERVER_ONLY_THREAD_SOURCES,
+  SERVER_ONLY_TRACE_SOURCES,
   THREAD_MAPPINGS,
   type TRACE_MAPPINGS,
   tryAndConvertTo,
 } from "../../tracer/tracesMapping";
+import { formatSpansDigest } from "../../tracer/spanToReadableSpan";
+import {
+  AZURE_SAFETY_NOT_CONFIGURED_MESSAGE,
+  isAzureEvaluatorType,
+} from "../../app-layer/evaluations/azure-safety-env";
+import { getAzureSafetyEnvFromProject } from "../../app-layer/evaluations/azure-safety-env.server";
 import { runEvaluationWorkflow } from "../../workflows/runWorkflow";
 import {
   EVALUATIONS_QUEUE,
@@ -110,19 +121,6 @@ export async function runEvaluationJob(
 }
 
 /**
- * Check if any mapping has type "thread"
- * Single Responsibility: Detect if thread-based mappings are present
- */
-const hasThreadMappings = (mappingState: MappingState | null): boolean => {
-  if (!mappingState) {
-    return false;
-  }
-  return Object.values(mappingState.mapping).some(
-    (mapping) => "type" in mapping && mapping.type === "thread",
-  );
-};
-
-/**
  * Build thread-based data for evaluation
  * Single Responsibility: Extract and format thread data according to thread mappings
  */
@@ -145,7 +143,7 @@ const buildThreadData = async (
   logger.info(
     {
       threadId,
-      traceId: trace.trace_id,
+      observedTraceId: trace.trace_id,
       projectId,
     },
     "Fetching thread traces",
@@ -174,7 +172,16 @@ const buildThreadData = async (
   for (const [targetField, mappingConfig] of Object.entries(
     mappingState.mapping,
   )) {
-    if ("type" in mappingConfig && mappingConfig.type === "thread") {
+    const isThreadMapping =
+      ("type" in mappingConfig && mappingConfig.type === "thread") ||
+      // Backward compat: source in THREAD_MAPPINGS without explicit type
+      ("source" in mappingConfig &&
+        (mappingConfig.source in THREAD_MAPPINGS ||
+          (SERVER_ONLY_THREAD_SOURCES as readonly string[]).includes(
+            mappingConfig.source,
+          )));
+
+    if (isThreadMapping && "source" in mappingConfig) {
       const source = mappingConfig.source;
 
       // Skip empty source
@@ -182,41 +189,66 @@ const buildThreadData = async (
         continue;
       }
 
-      // Use the mapping function from THREAD_MAPPINGS dynamically
-      const selectedFields = mappingConfig.selectedFields ?? [];
-      result[targetField] = THREAD_MAPPINGS[source].mapping(
-        { thread_id: threadId, traces: threadTraces },
-        selectedFields as (keyof typeof TRACE_MAPPINGS)[],
-      );
+      // Handle server-only thread sources (e.g. formatted_traces)
+      if (
+        (SERVER_ONLY_THREAD_SOURCES as readonly string[]).includes(source)
+      ) {
+        if (source === "formatted_traces") {
+          result[targetField] = (await Promise.all(threadTraces.map((t) => formatSpansDigest(t.spans ?? []))))
+            .join("\n\n---\n\n");
+        }
+      } else {
+        // Use the mapping function from THREAD_MAPPINGS dynamically
+        const threadSource = source as keyof typeof THREAD_MAPPINGS;
+        const selectedFields =
+          ("selectedFields" in mappingConfig
+            ? mappingConfig.selectedFields
+            : undefined) ?? [];
+        result[targetField] = THREAD_MAPPINGS[threadSource].mapping(
+          { thread_id: threadId, traces: threadTraces },
+          selectedFields as (keyof typeof TRACE_MAPPINGS)[],
+        );
 
-      logger.info(
-        {
-          targetField,
-          source,
-          ...(selectedFields.length > 0 && { selectedFields }),
-          ...(source === "traces" && {
-            traceCount: (result[targetField] as any[]).length,
-          }),
-        },
-        "Mapped thread field",
-      );
+        logger.info(
+          {
+            targetField,
+            source,
+            ...(selectedFields.length > 0 && { selectedFields }),
+            ...(source === "traces" && {
+              traceCount: (result[targetField] as any[]).length,
+            }),
+          },
+          "Mapped thread field",
+        );
+      }
     } else {
       // Regular trace mapping - use current trace
       // Type guard ensures mappingConfig.source is from TRACE_MAPPINGS
       if ("source" in mappingConfig) {
-        const traceMappingConfig = {
-          source: mappingConfig.source,
-          key: mappingConfig.key,
-          subkey: mappingConfig.subkey,
-        };
-        const mapped = mapTraceToDatasetEntry(
-          trace,
-          { [targetField]: traceMappingConfig as any },
-          new Set(),
-          undefined,
-          undefined,
-        )[0];
-        result[targetField] = mapped?.[targetField];
+        // Handle server-only trace sources (e.g. formatted_trace)
+        if (
+          (SERVER_ONLY_TRACE_SOURCES as readonly string[]).includes(
+            mappingConfig.source,
+          )
+        ) {
+          if (mappingConfig.source === "formatted_trace") {
+            result[targetField] = await formatSpansDigest(trace.spans ?? []);
+          }
+        } else {
+          const traceMappingConfig = {
+            source: mappingConfig.source,
+            key: mappingConfig.key,
+            subkey: mappingConfig.subkey,
+          };
+          const mapped = mapTraceToDatasetEntry(
+            trace,
+            { [targetField]: traceMappingConfig as any },
+            new Set(),
+            undefined,
+            undefined,
+          )[0];
+          result[targetField] = mapped?.[targetField];
+        }
         logger.info(
           {
             targetField,
@@ -298,10 +330,10 @@ const buildDataForEvaluation = async (
   logger.info(
     {
       evaluatorType,
-      traceId: trace.trace_id,
+      observedTraceId: trace.trace_id,
       threadId: trace.metadata?.thread_id,
       isThreadLevel,
-      mappingKeys: mappings ? Object.keys(mappings.mapping) : [],
+      mappingKeys: mappings?.mapping ? Object.keys(mappings.mapping) : [],
     },
     "Building data for evaluation",
   );
@@ -310,7 +342,7 @@ const buildDataForEvaluation = async (
     // Use thread-based data extraction
     logger.info(
       {
-        traceId: trace.trace_id,
+        observedTraceId: trace.trace_id,
         threadId: trace.metadata?.thread_id,
       },
       "Using thread-based data extraction",
@@ -320,7 +352,7 @@ const buildDataForEvaluation = async (
     // Use regular trace-based mapping
     logger.info(
       {
-        traceId: trace.trace_id,
+        observedTraceId: trace.trace_id,
       },
       "Using regular trace-based mapping",
     );
@@ -328,7 +360,40 @@ const buildDataForEvaluation = async (
     if (!mappedData) {
       throw new Error("No mapped data found to run evaluator");
     }
+
+    // Fill in server-only trace sources that mapTraceToDatasetEntry doesn't handle
+    if (mappings?.mapping) {
+      for (const [field, config] of Object.entries(mappings.mapping)) {
+        if (
+          "source" in config &&
+          (SERVER_ONLY_TRACE_SOURCES as readonly string[]).includes(
+            config.source,
+          )
+        ) {
+          if (config.source === "formatted_trace") {
+            mappedData[field] = await formatSpansDigest(trace.spans ?? []);
+          }
+        }
+      }
+    }
+
     data = mappedData;
+
+    // Resolve any thread-typed mappings mixed into trace-level evaluations
+    if (mappings && hasThreadMappings(mappings)) {
+      await resolveThreadMappingsIntoData({
+        data: data as Record<string, unknown>,
+        trace,
+        mappings,
+        getThreadTraces: (threadId) =>
+          getTracesGroupedByThreadId({
+            connConfig: { projectId },
+            threadId,
+            protections,
+            includeSpans: true,
+          }),
+      });
+    }
   }
 
   // Workflow evaluators and custom evaluators pass data through as-is
@@ -441,27 +506,6 @@ export const runEvaluation = async ({
   workflowId?: string | null;
   retries?: number;
 }): Promise<SingleEvaluationResult> => {
-  const project = await prisma.project.findUnique({
-    where: { id: projectId, archivedAt: null },
-    include: { team: true },
-  });
-  if (!project) {
-    throw new Error("Project not found");
-  }
-  const costChecker = createCostChecker(prisma);
-  const maxMonthlyUsage = await costChecker.maxMonthlyUsageLimit(
-    project.team.organizationId,
-  );
-  const getCurrentCost = await costChecker.getCurrentMonthCost(
-    project.team.organizationId,
-  );
-  if (getCurrentCost >= maxMonthlyUsage) {
-    return {
-      status: "skipped",
-      details: "Monthly usage limit exceeded",
-    };
-  }
-
   if (data.type === "custom") {
     return customEvaluation(
       projectId,
@@ -473,83 +517,33 @@ export const runEvaluation = async ({
   }
 
   // At this point, evaluatorType is a built-in evaluator (not "workflow" or "custom/*")
-  const builtInEvaluatorType = evaluatorType as EvaluatorTypes;
-  const evaluator = AVAILABLE_EVALUATORS[builtInEvaluatorType];
+  const builtInEvaluatorType = (
+    Object.keys(AVAILABLE_EVALUATORS) as EvaluatorTypes[]
+  ).find((k) => k === evaluatorType);
 
-  if (!evaluator) {
+  if (!builtInEvaluatorType) {
     throw new Error(`Evaluator ${evaluatorType} not found`);
   }
 
-  let evaluatorEnv: Record<string, string> = Object.fromEntries(
-    (evaluator.envVars ?? []).map((envVar) => [envVar, process.env[envVar]!]),
-  );
+  const evaluator = AVAILABLE_EVALUATORS[builtInEvaluatorType];
 
-  const setupModelEnv = async (
-    model: string,
-    embeddings: boolean,
-    settings?: Record<string, unknown>,
-  ) => {
-    const modelProviders = await getProjectModelProviders(projectId);
-    const provider = model.split("/")[0]!;
-    const modelProvider = modelProviders[provider];
-    if (!modelProvider) {
-      throw `Provider ${provider} is not configured`;
+  // Hard cutover: Azure Content Safety evaluators never read from process.env.
+  // Require per-project azure_safety Model Provider credentials.
+  let evaluatorEnv: Record<string, string>;
+  if (isAzureEvaluatorType(builtInEvaluatorType)) {
+    const azureEnv = await getAzureSafetyEnvFromProject(projectId);
+    if (!azureEnv) {
+      return {
+        status: "skipped",
+        details: AZURE_SAFETY_NOT_CONFIGURED_MESSAGE,
+      };
     }
-    if (!modelProvider.enabled) {
-      throw new UserConfigError(`Provider ${provider} is not enabled`);
-    }
-    const model_ = model.split("/").slice(1).join("/");
-    const modelList = embeddings
-      ? modelProvider.embeddingsModels
-      : modelProvider.models;
-    if (modelList && modelList.length > 0 && !modelList.includes(model_)) {
-      throw new UserConfigError(
-        `Model ${model_} is not in the ${
-          embeddings ? "embedding models" : "models"
-        } list for ${provider}, please select another model for running this evaluation`,
-      );
-    }
-    const params = await prepareLitellmParams({
-      model,
-      modelProvider,
-      projectId,
-    });
-
-    let env = Object.fromEntries(
-      Object.entries(params).map(([key, value]) => [
-        embeddings ? `X_LITELLM_EMBEDDINGS_${key}` : `X_LITELLM_${key}`,
-        value,
-      ]),
+    evaluatorEnv = azureEnv;
+  } else {
+    evaluatorEnv = Object.fromEntries(
+      (evaluator.envVars ?? []).map((envVar) => [envVar, process.env[envVar]!]),
     );
-
-    // Add generation params from settings (temperature, max_tokens, reasoning_effort, etc.)
-    // These will be injected by litellm_patch.py in langevals
-    const generationParams = [
-      "temperature",
-      "max_tokens",
-      "top_p",
-      "frequency_penalty",
-      "presence_penalty",
-      "seed",
-      "reasoning_effort",
-    ];
-    for (const param of generationParams) {
-      const value = settings?.[param];
-      if (value !== undefined && value !== null) {
-        const envKey = embeddings
-          ? `X_LITELLM_EMBEDDINGS_${param}`
-          : `X_LITELLM_${param}`;
-        env[envKey] = String(value);
-      }
-    }
-
-    // TODO: adapt embeddings_model_to_langchain on langevals to also use litellm and not need this
-    if (embeddings) {
-      env = { ...env, ...prepareEnvKeys(modelProvider) };
-    }
-
-    return env;
-  };
+  }
 
   if (
     settings &&
@@ -559,7 +553,7 @@ export const runEvaluation = async ({
   ) {
     evaluatorEnv = {
       ...evaluatorEnv,
-      ...(await setupModelEnv(settings.model, false, settings)),
+      ...(await setupModelEnv(settings.model, false, projectId, settings)),
     };
   }
 
@@ -570,7 +564,12 @@ export const runEvaluation = async ({
   ) {
     evaluatorEnv = {
       ...evaluatorEnv,
-      ...(await setupModelEnv(settings.embeddings_model, true, settings)),
+      ...(await setupModelEnv(
+        settings.embeddings_model,
+        true,
+        projectId,
+        settings,
+      )),
     };
   }
 
@@ -609,6 +608,7 @@ export const runEvaluation = async ({
     );
   } catch (error) {
     if (error instanceof Error && error.message.includes("fetch failed")) {
+      console.error({ error, path: `${env.LANGEVALS_ENDPOINT}/${builtInEvaluatorType}/evaluate` });
       throw new Error("Evaluator cannot be reached");
     }
     throw error;
@@ -639,11 +639,17 @@ export const runEvaluation = async ({
     }
   }
 
-  const result = ((await response.json()) as BatchEvaluationResult)[0];
-  if (!result) {
+  const raw = ((await response.json()) as BatchEvaluationResult)[0];
+  if (!raw) {
     getEvaluationStatusCounter(builtInEvaluatorType, "error").inc();
     throw "Unexpected response: empty results";
   }
+
+  const result: typeof raw = {
+    ...raw,
+    ...("score" in raw && { score: typeof raw.score === "number" ? raw.score : undefined }),
+    ...("passed" in raw && { passed: typeof raw.passed === "boolean" ? raw.passed : undefined }),
+  };
 
   getEvaluationStatusCounter(builtInEvaluatorType, result.status).inc();
 
@@ -662,120 +668,124 @@ export const startEvaluationsWorker = (
 
   const traceChecksWorker = new Worker<EvaluationJob, any, EvaluatorTypes>(
     EVALUATIONS_QUEUE.NAME,
-    async (job) => {
-      if (
-        env.NODE_ENV !== "test" &&
-        job.data.trace.trace_id.includes("test-trace")
-      ) {
-        return;
-      }
+    withJobContext(
+      async (job) => {
+        recordJobWaitDuration(job, "evaluations");
+        if (
+          env.NODE_ENV !== "test" &&
+          job.data.trace.trace_id.includes("test-trace")
+        ) {
+          return;
+        }
 
-      getJobProcessingCounter("evaluation", "processing").inc();
-      const start = Date.now();
+        getJobProcessingCounter("evaluations", "processing").inc();
+        const start = Date.now();
 
-      try {
-        logger.info({ jobId: job.id, data: job.data }, "processing job");
+        try {
+          logger.info({ jobId: job.id, data: job.data }, "processing job");
 
-        let processed = false;
-        const timeout = new Promise((resolve, reject) => {
-          setTimeout(
-            () => {
-              if (processed) {
-                resolve(undefined);
-              } else {
-                reject(new Error("Job timed out after 5 minutes"));
-              }
-            },
-            5 * 60 * 1000,
-          );
-        });
-
-        const result = (await Promise.race([
-          processFn(job),
-          timeout,
-        ])) as EvaluationResultWithThreadId;
-        processed = true;
-
-        if ("cost" in result && result.cost) {
-          await prisma.cost.create({
-            data: {
-              id: `cost_${nanoid()}`,
-              projectId: job.data.trace.project_id,
-              costType: CostType.TRACE_CHECK,
-              costName: job.data.check.name,
-              referenceType: CostReferenceType.CHECK,
-              referenceId: job.data.check.evaluator_id,
-              amount: result.cost.amount,
-              currency: result.cost.currency,
-              extraInfo: {
-                evaluation_id: job.data.check.evaluation_id,
+          let processed = false;
+          const timeout = new Promise((resolve, reject) => {
+            setTimeout(
+              () => {
+                if (processed) {
+                  resolve(undefined);
+                } else {
+                  reject(new Error("Job timed out after 5 minutes"));
+                }
               },
-            },
+              5 * 60 * 1000,
+            );
           });
-        }
 
-        await updateEvaluationStatusInES({
-          check: job.data.check,
-          trace: job.data.trace,
-          status: result.status,
-          ...(result.evaluation_thread_id && {
-            evaluation_thread_id: result.evaluation_thread_id,
-          }),
-          ...(result.inputs && { inputs: result.inputs }),
-          ...(result.status === "error"
-            ? {
-                error: {
-                  message: result.details,
-                  stack: result.traceback,
+          const result = (await Promise.race([
+            processFn(job),
+            timeout,
+          ])) as EvaluationResultWithThreadId;
+          processed = true;
+
+          if ("cost" in result && result.cost) {
+            await prisma.cost.create({
+              data: {
+                id: `cost_${nanoid()}`,
+                projectId: job.data.trace.project_id,
+                costType: CostType.TRACE_CHECK,
+                costName: job.data.check.name,
+                referenceType: CostReferenceType.CHECK,
+                referenceId: job.data.check.evaluator_id,
+                amount: result.cost.amount,
+                currency: result.cost.currency,
+                extraInfo: {
+                  evaluation_id: job.data.check.evaluation_id,
                 },
-              }
-            : {}),
-          ...(result.status === "processed"
-            ? {
-                score: result.score,
-                passed: result.passed,
-                label: result.label,
-              }
-            : {}),
-          details: "details" in result ? (result.details ?? "") : "",
-        });
-        logger.info({ jobId: job.id }, "successfully processed job");
+              },
+            });
+          }
 
-        const duration = Date.now() - start;
-        getJobProcessingDurationHistogram("evaluation").observe(duration);
-        getJobProcessingCounter("evaluation", "completed").inc();
-      } catch (error) {
-        await updateEvaluationStatusInES({
-          check: job.data.check,
-          trace: job.data.trace,
-          status: "error",
-          error: error,
-        });
-        // Note: Logging is handled by the 'failed' event handler to avoid double logging
+          await updateEvaluationStatusInES({
+            check: job.data.check,
+            trace: job.data.trace,
+            status: result.status,
+            ...(result.evaluation_thread_id && {
+              evaluation_thread_id: result.evaluation_thread_id,
+            }),
+            ...(result.inputs && { inputs: result.inputs }),
+            ...(result.status === "error"
+              ? {
+                  error: {
+                    message: result.details,
+                    stack: result.traceback,
+                  },
+                }
+              : {}),
+            ...(result.status === "processed"
+              ? {
+                  score: result.score,
+                  passed: result.passed,
+                  label: result.label,
+                }
+              : {}),
+            details: "details" in result ? (result.details ?? "") : "",
+          });
+          logger.info({ jobId: job.id }, "successfully processed job");
 
-        if (
-          typeof error === "object" &&
-          (error as any).message?.includes("504 Gateway Timeout")
-        ) {
+          const duration = Date.now() - start;
+          getJobProcessingDurationHistogram("evaluations").observe(duration);
+          getJobProcessingCounter("evaluations", "completed").inc();
+        } catch (error) {
+          await updateEvaluationStatusInES({
+            check: job.data.check,
+            trace: job.data.trace,
+            status: "error",
+            error: error,
+          });
+          // Note: Logging is handled by the 'failed' event handler to avoid double logging
+
+          if (
+            typeof error === "object" &&
+            (error as any).message?.includes("504 Gateway Timeout")
+          ) {
+            throw error;
+          }
+
+          if (
+            (typeof (error as any).status === "number" &&
+              (error as any).status >= 400 &&
+              (error as any).status < 500) ||
+            (error as any).toString().startsWith("422")
+          ) {
+            throw error;
+          }
+
           throw error;
         }
-
-        if (
-          (typeof (error as any).status === "number" &&
-            (error as any).status >= 400 &&
-            (error as any).status < 500) ||
-          (error as any).toString().startsWith("422")
-        ) {
-          throw error;
-        }
-
-        throw error;
-      }
-    },
+      },
+    ),
     {
       connection,
       concurrency: 3,
       stalledInterval: 10 * 60 * 1000, // 10 minutes
+      telemetry: new BullMQOtel(EVALUATIONS_QUEUE.NAME),
     },
   );
 
@@ -784,8 +794,8 @@ export const startEvaluationsWorker = (
   });
 
   traceChecksWorker.on("failed", async (job, err) => {
-    getJobProcessingCounter("evaluation", "failed").inc();
-    if (err instanceof UserConfigError) {
+    getJobProcessingCounter("evaluations", "failed").inc();
+    if (err instanceof UserConfigError || err instanceof EvaluatorConfigError) {
       logger.warn({ jobId: job?.id, error: err }, "job failed due to user configuration");
     } else {
       logger.error({ jobId: job?.id, error: err }, "job failed");

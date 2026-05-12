@@ -7,18 +7,19 @@ config();
 export default defineConfig({
   test: {
     watch: false,
-    pool: "vmThreads", // ~25% faster than threads for evaluations-v3 tests
+    pool: "vmThreads",
     maxWorkers: "50%", // Low default for local dev; CI overrides with VITEST_MAX_WORKERS
+    vmMemoryLimit: "512MB", // Recycle workers aggressively — vmThreads leaks memory by design
     testTimeout: 30000, // 30s default to handle slower CI runners
     setupFiles: ["./test-setup.ts"],
     exclude: [
       ...configDefaults.exclude,
       "**/*.integration.test.ts",
       "**/*.stress.test.ts",
+      "**/*.browser.test.{ts,tsx}",
       ".next/**/*",
       ".next-saas/**/*",
       "**/e2e/**/*",
-      "saas-src/**/*",
     ],
     env: {
       /*
@@ -41,14 +42,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "~/": join(__dirname, "./src/"),
-      "@injected-dependencies.client": join(
-        __dirname,
-        "./src/injection/injection.client.ts",
-      ),
-      "@injected-dependencies.server": join(
-        __dirname,
-        "./src/injection/injection.server.ts",
-      ),
+      "@app/": join(__dirname, "./src/server/app-layer/"),
     },
   },
 });

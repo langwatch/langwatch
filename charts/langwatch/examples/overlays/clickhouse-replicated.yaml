@@ -1,0 +1,11 @@
+# clickhouse-replicated.yaml — Upgrade chart-managed ClickHouse to 3-node replicated.
+#
+# Stack with any size overlay:
+#   helm install lw . \
+#     -f examples/overlays/size-prod.yaml \
+#     -f examples/overlays/access-ingress.yaml \
+#     -f examples/overlays/clickhouse-replicated.yaml
+
+clickhouse:
+  chartManaged: true
+  replicas: 3

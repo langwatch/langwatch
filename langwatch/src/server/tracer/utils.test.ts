@@ -54,4 +54,29 @@ describe("utils test", () => {
     );
     expect(contexts).toEqual(["Foo", "Bar", "Baz"]);
   });
+
+  describe("when no rag span is present", () => {
+    it("throws with no-rag-span error", () => {
+      expect(() => getRAGInfo([])).toThrow("No 'rag' type span available");
+    });
+  });
+
+  describe("when rag span has no contexts", () => {
+    it("throws with no-contexts error", () => {
+      const spanWithNoContexts = {
+        output: { type: "text" as const, value: "output" },
+        input: { type: "text" as const, value: "input" },
+        trace_id: "t",
+        span_id: "s",
+        project_id: "p",
+        parent_id: null,
+        timestamps: { finished_at: 0, updated_at: 0, started_at: 0, inserted_at: 0 },
+        contexts: [],
+        type: "rag" as const,
+      };
+      expect(() => getRAGInfo([spanWithNoContexts])).toThrow(
+        "RAG span does not have contexts",
+      );
+    });
+  });
 });

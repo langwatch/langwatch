@@ -1,17 +1,13 @@
 import { nanoid } from "nanoid";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { toaster } from "../../components/ui/toaster";
 import type { StudioClientEvent } from "../types/events";
+import { mergeLocalConfigsIntoDsl } from "../utils/mergeLocalConfigs";
 import { usePostEvent } from "./usePostEvent";
 import { useWorkflowStore } from "./useWorkflowStore";
 
 export const useEvaluationExecution = () => {
   const { postEvent, socketStatus } = usePostEvent();
-
-  const [triggerTimeout, setTriggerTimeout] = useState<{
-    run_id: string;
-    timeout_on_status: "waiting" | "running";
-  } | null>(null);
 
   const { getWorkflow, setEvaluationState, setOpenResultsPanelRequest } =
     useWorkflowStore((state) => ({
@@ -19,6 +15,12 @@ export const useEvaluationExecution = () => {
       setEvaluationState: state.setEvaluationState,
       setOpenResultsPanelRequest: state.setOpenResultsPanelRequest,
     }));
+
+  const getWorkflowRef = useRef(getWorkflow);
+  getWorkflowRef.current = getWorkflow;
+
+  const setEvaluationStateRef = useRef(setEvaluationState);
+  setEvaluationStateRef.current = setEvaluationState;
 
   const socketAvailable = useCallback(() => {
     if (socketStatus !== "connected") {
@@ -35,32 +37,53 @@ export const useEvaluationExecution = () => {
     return true;
   }, [socketStatus]);
 
+  const timeoutIdsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+
   useEffect(() => {
-    const workflow = getWorkflow();
-    if (
-      triggerTimeout &&
-      workflow.state.evaluation?.run_id === triggerTimeout.run_id &&
-      workflow.state.evaluation?.status === triggerTimeout.timeout_on_status
-    ) {
-      setEvaluationState({
-        status: "error",
-        error: "Timeout",
-        timestamps: { finished_at: Date.now() },
-      });
-      toaster.create({
-        title: `Timeout ${
-          triggerTimeout.timeout_on_status === "waiting"
-            ? "starting"
-            : "stopping"
-        } evaluation execution`,
-        type: "error",
-        duration: 5000,
-        meta: {
-          closable: true,
-        },
-      });
-    }
-  }, [triggerTimeout, setEvaluationState, getWorkflow]);
+    return () => {
+      timeoutIdsRef.current.forEach(clearTimeout);
+      timeoutIdsRef.current = [];
+    };
+  }, []);
+
+  const scheduleTimeout = useCallback(
+    ({
+      run_id,
+      timeout_on_status,
+      delayMs,
+    }: {
+      run_id: string;
+      timeout_on_status: "waiting" | "running";
+      delayMs: number;
+    }) => {
+      const timeoutId = setTimeout(() => {
+        const workflow = getWorkflowRef.current();
+        if (
+          workflow.state.evaluation?.run_id === run_id &&
+          workflow.state.evaluation?.status === timeout_on_status
+        ) {
+          setEvaluationStateRef.current({
+            status: "error",
+            error: "Timeout",
+            timestamps: { finished_at: Date.now() },
+          });
+          toaster.create({
+            title: `Timeout ${
+              timeout_on_status === "waiting" ? "starting" : "stopping"
+            } evaluation execution`,
+            type: "error",
+            duration: 5000,
+            meta: {
+              closable: true,
+            },
+          });
+        }
+      }, delayMs);
+
+      timeoutIdsRef.current.push(timeoutId);
+    },
+    [],
+  );
 
   const startEvaluationExecution = useCallback(
     ({
@@ -86,21 +109,28 @@ export const useEvaluationExecution = () => {
         total: 0,
       });
 
+      const workflow = getWorkflow();
       const payload: StudioClientEvent = {
         type: "execute_evaluation",
         payload: {
           run_id,
-          workflow: getWorkflow(),
+          workflow: {
+            ...workflow,
+            nodes: mergeLocalConfigsIntoDsl(workflow.nodes),
+          },
           workflow_version_id,
           evaluate_on,
           dataset_entry,
+          origin: "evaluation",
         },
       };
       postEvent(payload);
 
-      setTimeout(() => {
-        setTriggerTimeout({ run_id, timeout_on_status: "waiting" });
-      }, 20_000);
+      scheduleTimeout({
+        run_id,
+        timeout_on_status: "waiting",
+        delayMs: 20_000,
+      });
     },
     [
       socketAvailable,
@@ -108,6 +138,7 @@ export const useEvaluationExecution = () => {
       setEvaluationState,
       getWorkflow,
       postEvent,
+      scheduleTimeout,
     ],
   );
 
@@ -129,18 +160,23 @@ export const useEvaluationExecution = () => {
 
       const payload: StudioClientEvent = {
         type: "stop_evaluation_execution",
-        payload: { workflow: workflow, run_id },
+        payload: {
+          workflow: {
+            ...workflow,
+            nodes: mergeLocalConfigsIntoDsl(workflow.nodes),
+          },
+          run_id,
+        },
       };
       postEvent(payload);
 
-      setTimeout(() => {
-        setTriggerTimeout({
-          run_id,
-          timeout_on_status: "running",
-        });
-      }, 10_000);
+      scheduleTimeout({
+        run_id,
+        timeout_on_status: "running",
+        delayMs: 10_000,
+      });
     },
-    [socketAvailable, setEvaluationState, postEvent, getWorkflow],
+    [socketAvailable, setEvaluationState, postEvent, getWorkflow, scheduleTimeout],
   );
 
   return {

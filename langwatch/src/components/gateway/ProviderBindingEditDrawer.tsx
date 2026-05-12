@@ -1,0 +1,215 @@
+import {
+  Badge,
+  Button,
+  Field,
+  HStack,
+  Input,
+  NativeSelect,
+  Spacer,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
+import { useEffect, useState } from "react";
+
+import { Drawer } from "~/components/ui/drawer";
+import { toaster } from "~/components/ui/toaster";
+import { api } from "~/utils/api";
+
+import { FieldInfoTooltip } from "./FieldInfoTooltip";
+
+type ProviderBindingRow = {
+  id: string;
+  modelProviderName: string;
+  slot: string;
+  rateLimitRpm: number | null;
+  rateLimitTpm: number | null;
+  rateLimitRpd: number | null;
+  rotationPolicy: string;
+  fallbackPriorityGlobal: number | null;
+};
+
+type ProviderBindingEditDrawerProps = {
+  projectId: string;
+  binding: ProviderBindingRow | null;
+  onOpenChange: (open: boolean) => void;
+  onSaved: () => void;
+};
+
+// Rotation policy: v1 is manual-only (see iter 56 dogfood). The
+// column stays in the DB defaulted to MANUAL so v1.1 scheduled
+// rotation + external-secret-store can land additively.
+
+export function ProviderBindingEditDrawer({
+  projectId,
+  binding,
+  onOpenChange,
+  onSaved,
+}: ProviderBindingEditDrawerProps) {
+  const [slot, setSlot] = useState("primary");
+  const [rateLimitRpm, setRateLimitRpm] = useState("");
+  const [rateLimitRpd, setRateLimitRpd] = useState("");
+  const [fallbackPriority, setFallbackPriority] = useState("");
+
+  useEffect(() => {
+    if (!binding) return;
+    setSlot(binding.slot);
+    setRateLimitRpm(binding.rateLimitRpm?.toString() ?? "");
+    setRateLimitRpd(binding.rateLimitRpd?.toString() ?? "");
+    setFallbackPriority(binding.fallbackPriorityGlobal?.toString() ?? "");
+  }, [binding]);
+
+  const utils = api.useContext();
+  const updateMutation = api.gatewayProviders.update.useMutation({
+    onSuccess: async () => {
+      await utils.gatewayProviders.list.invalidate({ projectId });
+    },
+  });
+
+  const close = () => {
+    if (updateMutation.isPending) return;
+    onOpenChange(false);
+  };
+
+  const submit = async () => {
+    if (!binding) return;
+    try {
+      await updateMutation.mutateAsync({
+        projectId,
+        id: binding.id,
+        slot: slot || undefined,
+        rateLimitRpm: rateLimitRpm ? Number.parseInt(rateLimitRpm, 10) : null,
+        rateLimitRpd: rateLimitRpd ? Number.parseInt(rateLimitRpd, 10) : null,
+        fallbackPriorityGlobal: fallbackPriority
+          ? Number.parseInt(fallbackPriority, 10)
+          : null,
+      });
+      onSaved();
+      onOpenChange(false);
+    } catch (error) {
+      toaster.create({
+        title:
+          error instanceof Error ? error.message : "Failed to update binding",
+        type: "error",
+      });
+    }
+  };
+
+  return (
+    <Drawer.Root
+      open={!!binding}
+      onOpenChange={() => close()}
+      placement="end"
+      size="md"
+    >
+      <Drawer.Content>
+        <Drawer.Header>
+          <Drawer.Title>Edit provider binding</Drawer.Title>
+          <Drawer.CloseTrigger />
+        </Drawer.Header>
+        <Drawer.Body>
+          <VStack align="stretch" gap={4}>
+            <Field.Root>
+              <Field.Label>Provider</Field.Label>
+              <Text fontSize="sm" color="fg.muted">
+                {binding?.modelProviderName} (immutable — rebind to change)
+              </Text>
+            </Field.Root>
+            <Field.Root>
+              <Field.Label>
+                Slot
+                <FieldInfoTooltip
+                  description="Free-text tag used by virtual keys to reference this binding in their fallback chain. Typical names: primary, fallback-1, eu-region, canary."
+                  docHref="/ai-gateway/provider-bindings#slot"
+                />
+              </Field.Label>
+              <Input
+                value={slot}
+                onChange={(e) => setSlot(e.target.value)}
+                placeholder="e.g. primary, fallback-1"
+              />
+              <Field.HelperText>
+                Logical name used in the VK fallback chain.
+              </Field.HelperText>
+            </Field.Root>
+            {/* Rotation policy intentionally omitted — v1 is MANUAL-only.
+                Column stays on the DB defaulted to MANUAL so v1.1 scheduled
+                rotation + external-secret-store can land additively. */}
+            <HStack gap={4} align="flex-start">
+              <Field.Root flex={1}>
+                <Field.Label>
+                  Rate limit (rpm){" "}
+                  <Badge colorPalette="gray" fontSize="2xs" ml={1}>
+                    per-binding
+                  </Badge>
+                  <FieldInfoTooltip
+                    description="Requests Per Minute ceiling on this binding. Sliding window; 429 + Retry-After emitted at breach. Blank = unlimited (upstream provider limits still apply)."
+                    docHref="/ai-gateway/rate-limits#rpm"
+                  />
+                </Field.Label>
+                <Input
+                  value={rateLimitRpm}
+                  onChange={(e) => setRateLimitRpm(e.target.value)}
+                  placeholder="unlimited"
+                  inputMode="numeric"
+                />
+              </Field.Root>
+              <Field.Root flex={1}>
+                <Field.Label>
+                  Rate limit (rpd)
+                  <FieldInfoTooltip
+                    description="Rolling-24h request cap. Works jointly with rpm — whichever trips first blocks. Useful for 'daily quota' budgets independent of instantaneous burst."
+                    docHref="/ai-gateway/rate-limits#rpd"
+                  />
+                </Field.Label>
+                <Input
+                  value={rateLimitRpd}
+                  onChange={(e) => setRateLimitRpd(e.target.value)}
+                  placeholder="unlimited"
+                  inputMode="numeric"
+                />
+              </Field.Root>
+            </HStack>
+            <Field.Root>
+              <Field.Label>
+                Fallback priority (global)
+                <FieldInfoTooltip
+                  description="Tiebreaker when multiple bindings are eligible for the same VK slot; lower = higher priority. Leave blank to rely only on per-VK fallback chain ordering."
+                  docHref="/ai-gateway/provider-bindings#fallback-priority-global"
+                />
+              </Field.Label>
+              <Input
+                value={fallbackPriority}
+                onChange={(e) => setFallbackPriority(e.target.value)}
+                placeholder="none — ordered only via VK fallback chain"
+                inputMode="numeric"
+              />
+              <Field.HelperText>
+                Lower numbers tried first when a VK leaves the slot unset.
+                Leave blank to rely only on per-VK fallback ordering.
+              </Field.HelperText>
+            </Field.Root>
+          </VStack>
+        </Drawer.Body>
+        <Drawer.Footer>
+          <HStack width="full">
+            <Spacer />
+            <Button
+              variant="ghost"
+              onClick={close}
+              disabled={updateMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              colorPalette="orange"
+              onClick={submit}
+              loading={updateMutation.isPending}
+            >
+              Save changes
+            </Button>
+          </HStack>
+        </Drawer.Footer>
+      </Drawer.Content>
+    </Drawer.Root>
+  );
+}

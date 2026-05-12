@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useDrawer } from "~/hooks/useDrawer";
 import { Drawer } from "../components/ui/drawer";
 import { useAnnotationCommentStore } from "../hooks/useAnnotationCommentStore";
+import { NewTracesPromo } from "./messages/NewTracesPromo";
 import { TraceDetails } from "./traces/TraceDetails";
 
 interface TraceDetailsDrawerProps {
@@ -11,7 +12,7 @@ interface TraceDetailsDrawerProps {
 }
 
 export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
-  const { closeDrawer } = useDrawer();
+  const { goBack } = useDrawer();
   const commentState = useAnnotationCommentStore();
 
   const [traceView, setTraceView] = useState<"span" | "full">("span");
@@ -27,7 +28,7 @@ export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
       placement="end"
       size={traceView === "full" ? "full" : "xl"}
       onOpenChange={() => {
-        closeDrawer();
+        goBack();
         commentState.resetComment();
       }}
     >
@@ -41,6 +42,7 @@ export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
           overflowY="auto"
           id="conversation-scroll-container"
         >
+          <NewTracesPromo variant="compact" traceId={props.traceId} />
           <TraceDetails
             traceId={props.traceId}
             selectedTab={props.selectedTab}

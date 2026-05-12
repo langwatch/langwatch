@@ -37,11 +37,12 @@ test.describe("Scenario Library", () => {
     await thenISeeTheScenariosListPage(page);
     await thenISeeNewScenarioButton(page);
 
-    // Verify either empty state or table is shown
+    // Verify either welcome screen, empty state, or table is shown
+    const welcomeScreen = page.getByRole("heading", { name: /welcome to scenarios/i });
     const emptyState = page.getByText("No scenarios yet");
     const table = page.getByRole("table");
 
     // One of these should be visible
-    await emptyState.or(table).first().waitFor({ state: "visible", timeout: 10000 });
+    await welcomeScreen.or(emptyState).or(table).first().waitFor({ state: "visible", timeout: 10000 });
   });
 });

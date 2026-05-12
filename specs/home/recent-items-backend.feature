@@ -15,6 +15,7 @@ Feature: Recent Items Backend
     Then I should receive an empty array
 
   # Filtering
+  @unimplemented
   Scenario: Returns items from AuditLog filtered by user and project
     Given user "other-user" has audit log entries for project "project-456"
     And I have audit log entries for project "other-project"
@@ -23,6 +24,7 @@ Feature: Recent Items Backend
     Then I should only receive items from my audit log entries for project "project-456"
 
   # Entity extraction - Prompts
+  @unimplemented
   Scenario: Extracts prompt IDs from prompts.update actions
     Given I have an audit log entry for action "prompts.update" with args:
       | configId | prompt-123 |
@@ -33,6 +35,7 @@ Feature: Recent Items Backend
       | id   | prompt-123   |
       | name | My Prompt    |
 
+  @unimplemented
   Scenario: Extracts prompt IDs from prompts.create actions
     Given I have an audit log entry for action "prompts.create" with args:
       | configId | prompt-456 |
@@ -44,6 +47,7 @@ Feature: Recent Items Backend
       | name | New Prompt   |
 
   # Entity extraction - Workflows
+  @unimplemented
   Scenario: Extracts workflow IDs from workflow.update actions
     Given I have an audit log entry for action "workflow.update" with args:
       | workflowId | workflow-123 |
@@ -55,6 +59,7 @@ Feature: Recent Items Backend
       | name | My Workflow  |
       | icon | 🔄           |
 
+  @unimplemented
   Scenario: Extracts workflow IDs from workflow.create actions
     Given I have an audit log entry for action "workflow.create" with args:
       | workflowId | workflow-456 |
@@ -67,6 +72,7 @@ Feature: Recent Items Backend
       | icon | ⚡           |
 
   # Entity extraction - Datasets
+  @unimplemented
   Scenario: Extracts dataset IDs from dataset.update actions
     Given I have an audit log entry for action "dataset.update" with args:
       | datasetId | dataset-123 |
@@ -77,6 +83,7 @@ Feature: Recent Items Backend
       | id   | dataset-123  |
       | name | My Dataset   |
 
+  @unimplemented
   Scenario: Extracts dataset IDs from dataset.create actions
     Given I have an audit log entry for action "dataset.create" with args:
       | datasetId | dataset-456 |
@@ -88,6 +95,7 @@ Feature: Recent Items Backend
       | name | New Dataset  |
 
   # Entity extraction - Evaluations (Monitors)
+  @unimplemented
   Scenario: Extracts evaluation IDs from monitors.update actions
     Given I have an audit log entry for action "monitors.update" with args:
       | checkId | monitor-123 |
@@ -99,6 +107,7 @@ Feature: Recent Items Backend
       | name | My Evaluation |
 
   # Entity extraction - Annotation Queues
+  @unimplemented
   Scenario: Extracts annotation queue IDs from annotation.createQueue actions
     Given I have an audit log entry for action "annotation.createQueue" with args:
       | annotationQueueId | queue-123 |
@@ -110,6 +119,7 @@ Feature: Recent Items Backend
       | name | My Queue   |
 
   # Hydration
+  @unimplemented
   Scenario: Hydrates items with entity name and updatedAt
     Given I have an audit log entry for action "workflow.update" with args:
       | workflowId | workflow-789 |
@@ -122,6 +132,7 @@ Feature: Recent Items Backend
       | updatedAt | 2024-01-15T10:30:00Z |
 
   # Deleted entities
+  @unimplemented
   Scenario: Excludes deleted entities from results
     Given I have an audit log entry for action "prompts.update" with args:
       | configId | deleted-prompt |
@@ -137,11 +148,13 @@ Feature: Recent Items Backend
     Then I should not receive an item with id "archived-workflow"
 
   # Limits and ordering
+  @unimplemented
   Scenario: Limits results to requested count
     Given I have 20 audit log entries for different prompts
     When I request recent items with limit 5
     Then I should receive exactly 5 items
 
+  @unimplemented
   Scenario: Orders by most recently touched first
     Given I have an audit log entry for action "prompts.update" at "2024-01-10T10:00:00Z" with args:
       | configId | old-prompt |
@@ -153,6 +166,7 @@ Feature: Recent Items Backend
     And the second item should have id "old-prompt"
 
   # Deduplication
+  @unimplemented
   Scenario: Deduplicates same entity touched multiple times
     Given I have an audit log entry for action "prompts.update" at "2024-01-10T10:00:00Z" with args:
       | configId | prompt-123 |
@@ -164,6 +178,7 @@ Feature: Recent Items Backend
     And its timestamp should reflect the most recent touch
 
   # Deep links
+  @unimplemented
   Scenario: Returns correct deep link URL for prompts
     Given I have an audit log entry for action "prompts.update" with args:
       | configId | prompt-123 |
@@ -171,6 +186,7 @@ Feature: Recent Items Backend
     When I request recent items with limit 12
     Then the item should have href containing "/prompts" and "prompt-123"
 
+  @unimplemented
   Scenario: Returns correct deep link URL for workflows
     Given I have an audit log entry for action "workflow.update" with args:
       | workflowId | workflow-123 |
@@ -178,6 +194,7 @@ Feature: Recent Items Backend
     When I request recent items with limit 12
     Then the item should have href "/project-456/studio/workflow-123"
 
+  @unimplemented
   Scenario: Returns correct deep link URL for datasets
     Given I have an audit log entry for action "dataset.update" with args:
       | datasetId | dataset-123 |
@@ -185,6 +202,7 @@ Feature: Recent Items Backend
     When I request recent items with limit 12
     Then the item should have href "/project-456/datasets/dataset-123"
 
+  @unimplemented
   Scenario: Returns correct deep link URL for evaluations
     Given I have an audit log entry for action "monitors.update" with args:
       | checkId | monitor-123 |
@@ -192,6 +210,7 @@ Feature: Recent Items Backend
     When I request recent items with limit 12
     Then the item should have href "/project-456/evaluations"
 
+  @unimplemented
   Scenario: Returns correct deep link URL for annotation queues
     Given I have an audit log entry for action "annotation.createQueue" with args:
       | annotationQueueId | queue-123 |

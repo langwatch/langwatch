@@ -1,38 +1,23 @@
+/**
+ * Theme system definition for LangWatch.
+ * This file only exports the Chakra UI `system` — the app shell (providers,
+ * routing, NProgress) now lives in src/AppProviders.tsx and src/main.tsx.
+ */
 import {
-  ChakraProvider,
   createSystem,
   defaultConfig,
   defineRecipe,
   defineSlotRecipe,
 } from "@chakra-ui/react";
-import type { AppType } from "next/app";
-import type { Session } from "next-auth";
-import { SessionProvider } from "next-auth/react";
-import "~/styles/globals.scss";
-import "~/styles/markdown.scss";
+import { colorSystem } from "../components/ui/color-mode";
 
-import { Inter } from "next/font/google";
-import Head from "next/head";
-import { useRouter } from "next/router";
-import NProgress from "nprogress";
-import { PostHogProvider } from "posthog-js/react";
-import { useEffect, useState } from "react";
-import { AnalyticsProvider } from "react-contextual-analytics";
-import { usePublicEnv } from "~/hooks/usePublicEnv";
-import { createAppAnalyticsClient } from "~/utils/analyticsClient";
-import { api } from "~/utils/api";
-import { ColorModeProvider, colorSystem } from "../components/ui/color-mode";
-import { Toaster } from "../components/ui/toaster";
-import { usePostHog } from "../hooks/usePostHog";
-import { dependencies } from "../injection/dependencies.client";
-import { CommandBarProvider } from "../features/command-bar";
-
-const inter = Inter({ subsets: ["latin"] });
+// Inter font loaded via CSS @import in globals.scss (no more next/font/google)
+const interFontFamily = "'Inter', sans-serif";
 
 export const system = createSystem(defaultConfig, {
   globalCss: {
     body: {
-      background: { _light: "{colors.gray.100}", _dark: "{colors.gray.900}" },
+      background: { _light: "{colors.gray.100}", _dark: "{colors.zinc.900}" },
       fontSize: "14px",
       color: { _light: "{colors.gray.900}", _dark: "{colors.gray.50}" },
     },
@@ -41,15 +26,28 @@ export const system = createSystem(defaultConfig, {
       // @ts-expect-error
       bg: null,
     },
+    // Chakra's `CodeBlock` paints highlighted lines via an absolutely
+    // positioned `::after` pseudo on `[data-line][data-highlight]`,
+    // backed by the `--highlight-bg` custom property and a hardcoded
+    // gray inline-start border. Override both globally so every code
+    // block (env-block in onboarding, pinned attributes in the trace
+    // drawer, …) lights up in the LangWatch tracing orange.
+    "[data-line][data-highlight], [data-line][data-diff]": {
+      "--highlight-bg": "rgba(237, 137, 38, 0.18)",
+    },
+    "[data-line][data-highlight]::after, [data-line][data-diff]::after": {
+      borderInlineStartColor: "#ED8926 !important",
+      background: 'color-mix(in srgb, var(--chakra-colors-orange-emphasized) 20%, transparent) !important',
+    },
   },
   theme: {
     tokens: {
       fonts: {
         heading: {
-          value: inter.style.fontFamily,
+          value: interFontFamily,
         },
         body: {
-          value: inter.style.fontFamily,
+          value: interFontFamily,
         },
       },
       colors: colorSystem,
@@ -83,22 +81,22 @@ export const system = createSystem(defaultConfig, {
         // Palette-specific semantic tokens
         gray: {
           solid: {
-            value: { _light: "{colors.gray.200}", _dark: "{colors.gray.700}" },
+            value: { _light: "{colors.gray.200}", _dark: "{colors.zinc.700}" },
           },
           hover: {
-            value: { _light: "{colors.gray.300}", _dark: "{colors.gray.600}" },
+            value: { _light: "{colors.gray.300}", _dark: "{colors.zinc.600}" },
           },
           contrast: {
             value: { _light: "{colors.gray.800}", _dark: "{colors.gray.100}" },
           },
           subtle: {
-            value: { _light: "{colors.gray.50}", _dark: "{colors.gray.800}" },
+            value: { _light: "{colors.gray.50}", _dark: "{colors.zinc.800}" },
           },
           muted: {
-            value: { _light: "{colors.gray.100}", _dark: "{colors.gray.700}" },
+            value: { _light: "{colors.gray.100}", _dark: "{colors.zinc.700}" },
           },
           emphasized: {
-            value: { _light: "{colors.gray.375}", _dark: "{colors.gray.600}" },
+            value: { _light: "{colors.gray.400}", _dark: "{colors.zinc.600}" },
           },
           fg: {
             value: { _light: "{colors.gray.700}", _dark: "{colors.gray.200}" },
@@ -177,10 +175,10 @@ export const system = createSystem(defaultConfig, {
         },
         blue: {
           solid: {
-            value: { _light: "{colors.blue.500}", _dark: "{colors.blue.400}" },
+            value: { _light: "{colors.blue.500}", _dark: "{colors.blue.500}" },
           },
           hover: {
-            value: { _light: "{colors.blue.600}", _dark: "{colors.blue.500}" },
+            value: { _light: "{colors.blue.600}", _dark: "{colors.blue.400}" },
           },
           subtle: {
             value: { _light: "{colors.blue.50}", _dark: "{colors.blue.900}" },
@@ -189,10 +187,10 @@ export const system = createSystem(defaultConfig, {
             value: { _light: "{colors.blue.100}", _dark: "{colors.blue.800}" },
           },
           emphasized: {
-            value: { _light: "{colors.blue.400}", _dark: "{colors.blue.700}" },
+            value: { _light: "{colors.blue.400}", _dark: "{colors.blue.600}" },
           },
           fg: {
-            value: { _light: "{colors.blue.700}", _dark: "{colors.blue.200}" },
+            value: { _light: "{colors.blue.700}", _dark: "{colors.blue.300}" },
           },
           focusRing: { value: "rgb(49, 130, 206)" },
         },
@@ -390,16 +388,16 @@ export const system = createSystem(defaultConfig, {
         // Navigation semantic tokens - for sidebar menu items
         nav: {
           fg: {
-            value: { _light: "{colors.gray.700}", _dark: "{colors.gray.200}" },
+            value: { _light: "{colors.gray.700}", _dark: "{colors.gray.300}" },
           },
           fgMuted: {
             value: { _light: "{colors.gray.600}", _dark: "{colors.gray.400}" },
           },
           bgActive: {
-            value: { _light: "{colors.gray.200}", _dark: "{colors.gray.700}" },
+            value: { _light: "{colors.gray.200}", _dark: "{colors.zinc.700}" },
           },
           bgHover: {
-            value: { _light: "{colors.gray.200}", _dark: "{colors.gray.700}" },
+            value: { _light: "{colors.gray.200}", _dark: "{colors.zinc.800}" },
           },
         },
 
@@ -415,81 +413,82 @@ export const system = createSystem(defaultConfig, {
 
         // Background semantic tokens - custom light theme, dark theme with inverted hierarchy
         bg: {
-          // Page/sidebar background - lighter gray in dark mode
+          // Page/sidebar background
           page: {
-            value: { _light: "{colors.gray.100}", _dark: "{colors.gray.900}" },
+            value: { _light: "{colors.gray.100}", _dark: "{colors.zinc.900}" },
           },
-          // Main content area - darkest in dark mode
-          surface: { value: { _light: "white", _dark: "{colors.gray.950}" } },
-          // Cards and panels - same as surface (darkest)
-          panel: { value: { _light: "white", _dark: "{colors.gray.950}" } },
+          // Main content area - deepest in dark mode
+          surface: { value: { _light: "white", _dark: "{colors.zinc.950}" } },
+          // Cards and panels - float above surface
+          panel: { value: { _light: "white", _dark: "{colors.zinc.800}" } },
           // Muted background for hover states, selections
           muted: {
-            value: { _light: "{colors.gray.100}", _dark: "{colors.gray.800}" },
+            value: { _light: "{colors.gray.100}", _dark: "{colors.zinc.850}" },
           },
           // Emphasized background for active states
           emphasized: {
-            value: { _light: "{colors.gray.200}", _dark: "{colors.gray.700}" },
+            value: { _light: "{colors.gray.200}", _dark: "{colors.zinc.600}" },
           },
-          // Subtle background for table headers, etc.
+          // Subtle background for table headers, zebra rows
           subtle: {
-            value: { _light: "{colors.gray.50}", _dark: "{colors.gray.900}" },
+            value: { _light: "{colors.gray.50}", _dark: "{colors.zinc.900}" },
           },
-          // Form inputs
+          // Softer hover/open lift — sits between subtle and muted, used when
+          // bg.muted reads too heavy (e.g. accordion triggers).
+          softHover: {
+            value: { _light: "{colors.gray.100}", _dark: "{colors.zinc.850}" },
+          },
+          // Form inputs - sunken below panel in dark
           input: {
-            value: { _light: "{colors.gray.200}", _dark: "{colors.gray.800}" },
+            value: { _light: "{colors.gray.200}", _dark: "{colors.zinc.900}" },
           },
           inputHover: {
-            value: { _light: "white", _dark: "{colors.gray.700}" },
+            value: { _light: "white", _dark: "{colors.zinc.800}" },
           },
         },
 
         // Foreground semantic tokens - proper contrast in dark mode
         fg: {
           DEFAULT: {
-            value: { _light: "{colors.gray.900}", _dark: "{colors.gray.50}" },
+            value: { _light: "{colors.gray.900}", _dark: "{colors.gray.100}" },
           },
           muted: {
-            value: { _light: "{colors.gray.600}", _dark: "{colors.gray.400}" },
+            value: { _light: "{colors.gray.600}", _dark: "{colors.gray.300}" },
           },
           subtle: {
-            value: { _light: "{colors.gray.500}", _dark: "{colors.gray.500}" },
+            value: { _light: "{colors.gray.500}", _dark: "{colors.gray.400}" },
           },
-          inverted: { value: { _light: "white", _dark: "{colors.gray.900}" } },
+          inverted: { value: { _light: "white", _dark: "{colors.gray.950}" } },
         },
 
-        // Border semantic tokens - subtle borders in dark mode
+        // Border semantic tokens - visible in dark mode
         border: {
           DEFAULT: {
-            value: { _light: "{colors.gray.200}", _dark: "{colors.gray.800}" },
+            value: { _light: "{colors.gray.200}", _dark: "{colors.zinc.600}" },
           },
           muted: {
-            value: { _light: "{colors.gray.100}", _dark: "{colors.gray.800}" },
+            value: { _light: "{colors.gray.100}", _dark: "{colors.zinc.700}" },
           },
           subtle: {
-            value: { _light: "{colors.gray.100}", _dark: "{colors.gray.900}" },
+            value: { _light: "{colors.gray.100}", _dark: "{colors.zinc.800}" },
           },
           emphasized: {
-            value: { _light: "{colors.gray.300}", _dark: "{colors.gray.700}" },
+            value: { _light: "{colors.gray.300}", _dark: "{colors.zinc.500}" },
           },
-        },
-      },
-      shadows: {
-        "2xs": {
-          value:
-            "0 0 0 0 #000, 0 0 0 0 #000, 0px 1px 2px 0px rgba(0, 0, 0, 0.03)",
-        },
-        sm: {
-          value:
-            "1px 1px 2px color-mix(in srgb, var(--chakra-colors-gray-900) 15%, transparent),0px 0px 1px color-mix(in srgb, var(--chakra-colors-gray-900) 30%, transparent)",
-        },
-        xs: {
-          value:
-            "0 0 0 0 #000, 0 0 0 0 #000, 0px 1px 5px 0px rgba(0, 0, 0, 0.05)",
         },
       },
     },
     recipes: {
+      skeleton: defineRecipe({
+        base: {
+          "--skeleton-from": "{colors.gray.100}",
+          "--skeleton-to": "{colors.gray.200}",
+          _dark: {
+            "--skeleton-from": "{colors.gray.800}",
+            "--skeleton-to": "{colors.gray.700}",
+          },
+        },
+      }),
       heading: defineRecipe({
         base: {
           fontWeight: "500",
@@ -655,6 +654,29 @@ export const system = createSystem(defaultConfig, {
       }),
     },
     slotRecipes: {
+      tooltip: defineSlotRecipe({
+        slots: ["content", "arrow", "arrowTip"],
+        base: {
+          content: {
+            bg: "bg.panel/85",
+            backdropFilter: "blur(8px)",
+            color: "fg",
+            border: "1px solid",
+            borderColor: "border",
+            borderRadius: "md",
+            boxShadow: "lg",
+            px: "3",
+            py: "2",
+            textStyle: "xs",
+          },
+          arrow: {
+            "--arrow-background": "colors.bg.panel",
+          },
+          arrowTip: {
+            borderColor: "colors.bg.panel",
+          },
+        },
+      }),
       card: defineSlotRecipe({
         slots: ["root"],
         base: {
@@ -797,6 +819,10 @@ export const system = createSystem(defaultConfig, {
         base: {
           content: {
             background: "bg.panel",
+            border: "1px solid",
+            borderColor: "border",
+            borderRadius: "lg",
+            boxShadow: "lg",
           },
           item: {
             cursor: "pointer",
@@ -965,8 +991,17 @@ export const system = createSystem(defaultConfig, {
           body: {
             pt: "3",
           },
+          title: {
+            textStyle: "md",
+            fontWeight: "500",
+          },
           content: {
-            background: "bg.surface",
+            background: "bg.surface/60",
+            backdropFilter: "blur(12px)",
+            border: "1px solid",
+            borderColor: "border",
+            borderRadius: "lg",
+            boxShadow: "lg",
             "& button:not([data-variant=ghost]):not([data-part])": {
               boxShadow: "md",
             },
@@ -995,8 +1030,12 @@ export const system = createSystem(defaultConfig, {
             background: "bg.surface/65",
           },
           content: {
-            background: "bg.panel",
+            background: "bg.panel/75",
+            backdropFilter: "blur(8px)",
+            border: "1px solid",
+            borderColor: "border",
             borderRadius: "lg",
+            boxShadow: "lg",
           },
           item: {
             borderRadius: "lg",
@@ -1044,6 +1083,10 @@ export const system = createSystem(defaultConfig, {
         base: {
           content: {
             background: "bg.panel",
+            border: "1px solid",
+            borderColor: "border",
+            borderRadius: "lg",
+            boxShadow: "lg",
           },
         },
       }),
@@ -1065,7 +1108,11 @@ export const system = createSystem(defaultConfig, {
         base: {
           content: {
             maxWidth: "70%",
-            background: "bg.surface",
+            background: "bg.surface/80",
+            backdropFilter: "blur(25px)",
+            border: "1px solid",
+            borderColor: "border",
+            borderRadius: "lg",
           },
           header: {
             paddingY: 4,
@@ -1088,12 +1135,66 @@ export const system = createSystem(defaultConfig, {
         slots: ["root"],
         base: {
           root: {
-            borderRadius: "lg",
+            borderRadius: "xl",
+            backdropFilter: "blur(12px)",
+            border: "1px solid",
+            boxShadow: "lg",
             "&[data-type=info]": {
-              bg: "blue.solid",
-              color: "blue.contrast",
+              bg: {
+                _light: "blue.solid/85",
+                _dark: "rgba(37, 99, 235, 0.8)",
+              },
+              borderColor: {
+                _light: "blue.solid/30",
+                _dark: "rgba(96, 165, 250, 0.25)",
+              },
+              color: "white",
               "--toast-trigger-bg": "{white/10}",
               "--toast-border-color": "{white/40}",
+            },
+            "&[data-type=success]": {
+              bg: {
+                _light: "green.solid/85",
+                _dark: "rgba(22, 163, 74, 0.8)",
+              },
+              borderColor: {
+                _light: "green.solid/30",
+                _dark: "rgba(74, 222, 128, 0.25)",
+              },
+              color: "white",
+            },
+            "&[data-type=error]": {
+              bg: {
+                _light: "red.solid/88",
+                _dark: "rgba(220, 38, 38, 0.8)",
+              },
+              borderColor: {
+                _light: "red.solid/30",
+                _dark: "rgba(248, 113, 113, 0.25)",
+              },
+              color: "white",
+            },
+            "&[data-type=warning]": {
+              bg: {
+                _light: "yellow.solid/88",
+                _dark: "rgba(217, 119, 6, 0.8)",
+              },
+              borderColor: {
+                _light: "yellow.solid/30",
+                _dark: "rgba(251, 191, 36, 0.25)",
+              },
+              color: "white",
+            },
+            "&[data-type=loading]": {
+              bg: {
+                _light: "white/80",
+                _dark: "rgba(30, 30, 36, 0.8)",
+              },
+              borderColor: {
+                _light: "black/8",
+                _dark: "rgba(255, 255, 255, 0.1)",
+              },
+              color: { _light: "gray.800", _dark: "gray.100" },
             },
           },
         },
@@ -1130,120 +1231,7 @@ export const system = createSystem(defaultConfig, {
   },
 });
 
-let handleChangeStartTimeout: NodeJS.Timeout | null = null;
-let nProgressEnabled = false;
-setTimeout(() => {
-  nProgressEnabled = true;
-}, 1000);
-
-const LangWatch: AppType<{
-  session: Session | null;
-  injected?: string | undefined;
-}> = ({ Component, pageProps: { session, ...pageProps } }) => {
-  const router = useRouter();
-  const postHog = usePostHog();
-  const publicEnv = usePublicEnv();
-
-  const [previousFeatureFlagQueryParams, setPreviousFeatureFlagQueryParams] =
-    useState<{ key: string; value: string }[]>([]);
-
-  useEffect(() => {
-    const featureFlagQueryParams = Object.entries(router.query ?? {})
-      .filter(
-        ([key]) =>
-          key.startsWith("NEXT_PUBLIC_FEATURE_") &&
-          typeof router.query[key] === "string",
-      )
-      .map(([key, value]) => ({ key, value: value as string }));
-    setPreviousFeatureFlagQueryParams(featureFlagQueryParams);
-  }, [router.query]);
-
-  // Little hack to keep the feature flags on the url the same when navigating to a different page
-  const keepSameFeatureFlags = () => {
-    if (Object.keys(previousFeatureFlagQueryParams).length > 0) {
-      const parsedUrl = new URL(window.location.href);
-      let updated = false;
-      for (const { key, value } of previousFeatureFlagQueryParams) {
-        if (parsedUrl.searchParams.get(key) !== value) {
-          parsedUrl.searchParams.set(key, value);
-          updated = true;
-        }
-      }
-      if (updated) {
-        void router.replace(parsedUrl.toString(), undefined, {
-          shallow: true,
-        });
-      }
-    }
-  };
-
-  useEffect(() => {
-    NProgress.configure({ showSpinner: false });
-    const handleChangeDone = () => {
-      keepSameFeatureFlags();
-      if (handleChangeStartTimeout) {
-        clearTimeout(handleChangeStartTimeout);
-        handleChangeStartTimeout = null;
-      }
-      NProgress.done();
-    };
-    const handleChangeStart_ = () => {
-      if (nProgressEnabled && !handleChangeStartTimeout) {
-        handleChangeStartTimeout = setTimeout(() => {
-          NProgress.start();
-          handleChangeStartTimeout = null;
-        }, 100);
-      }
-    };
-
-    router.events.on("routeChangeStart", handleChangeStart_);
-    router.events.on("routeChangeComplete", handleChangeDone);
-    router.events.on("routeChangeError", handleChangeDone);
-
-    return () => {
-      router.events.off("routeChangeStart", handleChangeStart_);
-      router.events.off("routeChangeComplete", handleChangeDone);
-      router.events.off("routeChangeError", handleChangeDone);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router, keepSameFeatureFlags]);
-
-  return (
-    <SessionProvider
-      session={session}
-      refetchInterval={0}
-      refetchOnWindowFocus={false}
-    >
-      <ChakraProvider value={system}>
-        <ColorModeProvider>
-          <Head>
-            <title>LangWatch</title>
-          </Head>
-          <CommandBarProvider>
-            <AnalyticsProvider
-              client={createAppAnalyticsClient({
-                isSaaS: Boolean(publicEnv.data?.IS_SAAS),
-                posthogClient: postHog,
-              })}
-            >
-              {postHog ? (
-                <PostHogProvider client={postHog}>
-                  <Component {...pageProps} />
-                </PostHogProvider>
-              ) : (
-                <Component {...pageProps} />
-              )}
-            </AnalyticsProvider>
-            <Toaster />
-          </CommandBarProvider>
-
-          {dependencies.ExtraFooterComponents && (
-            <dependencies.ExtraFooterComponents />
-          )}
-        </ColorModeProvider>
-      </ChakraProvider>
-    </SessionProvider>
-  );
-};
-
-export default api.withTRPC(LangWatch);
+// The LangWatch app shell (providers, routing, NProgress) has moved to:
+// - src/AppProviders.tsx (provider hierarchy)
+// - src/main.tsx (entry point with RouterProvider)
+// - src/routes.tsx (route definitions)

@@ -4,6 +4,13 @@ Feature: Workflow agent editor with workflow link
   I want to access the underlying workflow from the agent editor
   So that I can modify the agent logic
 
+  # The workflow-link / studio-navigation scenarios in this file describe
+  # page-level UI flows on the agent-editor + workflow-studio crossover and
+  # need a Next.js integration harness or Playwright E2E to drive end-to-end.
+  # Aspirational pending that harness. Editor-side checks that don't cross
+  # into the studio (e.g. read-only field rendering) are bindable directly
+  # and don't share this caveat.
+
   Background:
     Given I am logged in to a project
     And I have a workflow "Complex Pipeline" in the project
@@ -13,6 +20,7 @@ Feature: Workflow agent editor with workflow link
   # Edit Workflow button visibility
   # ============================================================================
 
+  @unimplemented
   Scenario: Configure button for workflow agent shows workflow link
     Given I am on the agents page
     When I click "Configure" on agent "Pipeline Agent"
@@ -20,12 +28,14 @@ Feature: Workflow agent editor with workflow link
     And I should see an "Edit Workflow" button
     And the button should link to /[project]/studio/[workflow-id]
 
+  @unimplemented
   Scenario: Code agent does not show workflow link
     Given I have a code agent "Python Processor"
     When I click "Configure" on agent "Python Processor"
     Then I should see the code editor
     And I should NOT see an "Edit Workflow" button
 
+  @unimplemented
   Scenario: HTTP agent does not show workflow link
     Given I have an HTTP agent "API Connector"
     When I click "Configure" on agent "API Connector"
@@ -36,12 +46,14 @@ Feature: Workflow agent editor with workflow link
   # Navigation to workflow
   # ============================================================================
 
+  @unimplemented
   Scenario: Click Edit Workflow navigates to studio
     Given I am editing workflow agent "Pipeline Agent"
     When I click "Edit Workflow"
     Then I should be navigated to the workflow studio
     And the URL should be /[project]/studio/[workflow-id]
 
+  @unimplemented
   Scenario: Workflow link includes correct workflow ID
     Given workflow "Complex Pipeline" has ID "wf_456def"
     When I open the editor for agent "Pipeline Agent"
@@ -51,12 +63,14 @@ Feature: Workflow agent editor with workflow link
   # Workflow agent editor content
   # ============================================================================
 
+  @unimplemented
   Scenario: Workflow agent shows name and workflow selection
     Given I open the editor for agent "Pipeline Agent"
     Then I should see the agent name field
     And I should see the linked workflow "Complex Pipeline"
     And I should see the "Edit Workflow" button
 
+  @unimplemented
   Scenario: Can rename workflow agent without changing workflow
     Given I open the editor for agent "Pipeline Agent"
     When I change the name to "Renamed Pipeline Agent"
@@ -68,6 +82,7 @@ Feature: Workflow agent editor with workflow link
   # Edge cases
   # ============================================================================
 
+  @unimplemented
   Scenario: Workflow agent with deleted workflow shows warning
     Given workflow "Deleted Pipeline" has been deleted
     And agent "Orphan Agent" still references it

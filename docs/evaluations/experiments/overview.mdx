@@ -1,0 +1,173 @@
+---
+title: Experiments Overview
+sidebarTitle: Overview
+description: Run batch tests on your LLM applications to measure quality, compare configurations, and catch regressions before production.
+---
+
+<Tip>
+  **Let your agent set this up.** [Copy the evaluations prompt](/skills/code-prompts#set-up-evaluations) into your coding agent to get started automatically.
+</Tip>
+
+Experiments let you systematically test your LLM applications before deploying to production. Run your prompts, models, or agents against datasets and measure quality with evaluators.
+
+## What is an Experiment?
+
+An experiment consists of three components:
+
+1. **Dataset** - A collection of test cases with inputs (and optionally expected outputs)
+2. **Target** - What you're testing: a prompt, model, API endpoint, or custom code
+3. **Evaluators** - Scoring functions that assess output quality
+
+When you run an experiment, LangWatch executes your target on each dataset row and scores the results with your selected evaluators.
+
+## When to Use Experiments
+
+- **Before deploying** - Validate prompt changes don't regress quality
+- **Comparing options** - Test different models, prompts, or configurations side-by-side
+- **CI/CD gates** - Automatically block deployments that fail quality thresholds
+- **Benchmarking** - Track quality metrics over time across experiment runs
+
+## Getting Started
+
+Choose your preferred approach:
+
+<CardGroup cols={2}>
+  <Card
+    title="Experiments via UI"
+    description="Visual interface for building and running experiments without code."
+    icon="window"
+    href="/evaluations/experiments/ui/answer-correctness"
+  />
+  <Card
+    title="Experiments via SDK"
+    description="Run experiments programmatically from notebooks or scripts."
+    icon="code"
+    href="/evaluations/experiments/sdk"
+  />
+</CardGroup>
+
+## Quick Example
+
+<Tabs>
+  <Tab title="Python">
+```python
+import langwatch
+
+# Load your dataset
+df = langwatch.dataset.get_dataset("my-dataset").to_pandas()
+
+# Initialize experiment
+evaluation = langwatch.experiment.init("prompt-v2-test")
+
+# Run through dataset
+for idx, row in evaluation.loop(df.iterrows()):
+    # Execute your LLM
+    response = my_llm(row["input"])
+
+    # Run evaluators
+    evaluation.evaluate(
+        "ragas/faithfulness",
+        index=idx,
+        data={
+            "input": row["input"],
+            "output": response,
+            "contexts": row["contexts"],
+        },
+    )
+```
+  </Tab>
+  <Tab title="TypeScript">
+```typescript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+
+// Load dataset
+const dataset = await langwatch.datasets.get("my-dataset");
+
+// Initialize experiment
+const evaluation = await langwatch.experiments.init("prompt-v2-test");
+
+// Run through dataset
+await evaluation.run(
+  dataset.entries.map(e => e.entry),
+  async ({ item, index }) => {
+    // Execute your LLM
+    const response = await myLLM(item.input);
+
+    // Run evaluators
+    await evaluation.evaluate("ragas/faithfulness", {
+      index,
+      data: {
+        input: item.input,
+        output: response,
+        contexts: item.contexts,
+      },
+    });
+  },
+  { concurrency: 4 }
+);
+```
+  </Tab>
+</Tabs>
+
+## Experiment Results
+
+After running an experiment, you can:
+
+- **Compare runs** - See how different configurations perform side-by-side
+- **Drill into failures** - Inspect individual test cases that scored poorly
+- **Track trends** - Monitor quality metrics across experiment runs over time
+- **Export data** - Download results for further analysis
+
+<Frame>
+<img src="/images/offline-evaluation/Screenshot_2025-04-17_at_16.53.38.png" alt="Experiment results showing comparison between runs" style={{ maxWidth: '600px' }} />
+</Frame>
+
+## CI/CD Integration
+
+Run experiments automatically in your deployment pipeline:
+
+```yaml
+# GitHub Actions example
+- name: Run quality experiments
+  run: |
+    python -c "
+    import langwatch
+    result = langwatch.experiment.run('my-experiment')
+    result.print_summary()
+    "
+  env:
+    LANGWATCH_API_KEY: ${{ secrets.LANGWATCH_API_KEY }}
+```
+
+Learn more about [CI/CD integration](/evaluations/experiments/ci-cd).
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Answer Correctness Tutorial"
+    description="Learn to evaluate if your LLM generates correct answers."
+    icon="check"
+    href="/evaluations/experiments/ui/answer-correctness"
+  />
+  <Card
+    title="LLM-as-a-Judge Tutorial"
+    description="Evaluate quality when you don't have defined answers."
+    icon="gavel"
+    href="/evaluations/experiments/ui/llm-as-a-judge"
+  />
+  <Card
+    title="Available Evaluators"
+    description="Browse all evaluators you can use in experiments."
+    icon="list"
+    href="/evaluations/evaluators/list"
+  />
+  <Card
+    title="Datasets"
+    description="Create and manage test datasets."
+    icon="table"
+    href="/datasets/overview"
+  />
+</CardGroup>

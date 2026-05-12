@@ -99,9 +99,6 @@ doc_mapping:
         - name: value
           type: text
           stored: true
-        - name: satisfaction_score
-          type: f64
-          stored: true
         # Note: Vector embeddings might need a different approach in Quickwit
         - name: embeddings
           type: json

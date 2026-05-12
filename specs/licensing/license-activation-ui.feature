@@ -1,4 +1,12 @@
 Feature: License Activation UI
+
+  # All scenarios in this file describe page-level UX of the License
+  # activation flow (file dropzone, textarea, method-toggle checkboxes,
+  # success/error states). They require either a page-level integration
+  # test against the rendered LicenseActivationForm or Playwright E2E
+  # driving the file-upload/textarea flow. No such harness exists yet —
+  # all aspirational pending the page-test fixture.
+
   As a self-hosted user
   I want to activate a license by uploading a file or entering a key
   So that I can easily enable my LangWatch license using my preferred method
@@ -9,13 +17,13 @@ Feature: License Activation UI
     And no license is currently installed
 
   # Settings menu navigation - License option visibility
-  @e2e
+  @e2e @unimplemented
   Scenario: License menu item visible in self-hosted mode
     When I navigate to the settings page
     Then I see "License" in the settings sidebar menu
     And when I click "License" I am navigated to /settings/license
 
-  @integration
+  @integration @unimplemented
   Scenario: License menu item hidden in SaaS mode
     Given the platform is deployed in SaaS mode (IS_SAAS=true)
     When I navigate to the settings page
@@ -23,7 +31,7 @@ Feature: License Activation UI
     And I see "Subscription" in the settings sidebar menu instead
 
   # License activation - dual input method UI
-  @e2e
+  @e2e @unimplemented
   Scenario: Default activation method is file upload
     Given I am on the license settings page at /settings/license
     Then I see the "Activate a license" section
@@ -32,7 +40,7 @@ Feature: License Activation UI
     And the "Enter license key" checkbox is unchecked
     And the license key textarea is not visible
 
-  @e2e
+  @e2e @unimplemented
   Scenario: Switch to license key input method
     Given I am on the license settings page at /settings/license
     When I click the "Enter license key" checkbox
@@ -41,7 +49,7 @@ Feature: License Activation UI
     And the file dropzone is hidden
     And I see the license key textarea with placeholder "Paste your license key"
 
-  @e2e
+  @e2e @unimplemented
   Scenario: Switch back to file upload method
     Given I am on the license settings page at /settings/license
     And I have selected the "Enter license key" method
@@ -52,7 +60,7 @@ Feature: License Activation UI
     And I see the file dropzone with text "Drop your license here"
 
   # Checkbox behavior - mutually exclusive selection
-  @integration
+  @integration @unimplemented
   Scenario: Only one activation method can be selected at a time
     Given I am on the license settings page
     When I check "Enter license key"
@@ -60,7 +68,7 @@ Feature: License Activation UI
     When I check "Upload license file"
     Then "Enter license key" is automatically unchecked
 
-  @integration
+  @integration @unimplemented
   Scenario: Cannot uncheck both methods - at least one must be selected
     Given I am on the license settings page
     And "Upload license file" is checked
@@ -69,7 +77,7 @@ Feature: License Activation UI
     And a validation ensures at least one method is always selected
 
   # File upload flow
-  @e2e
+  @e2e @unimplemented
   Scenario: Upload license file via dropzone
     Given I am on the license settings page
     And the file upload method is selected
@@ -79,7 +87,7 @@ Feature: License Activation UI
     And I see a remove button to clear the uploaded file
     And the "Activate License" button becomes enabled
 
-  @e2e
+  @e2e @unimplemented
   Scenario: Upload license file via click to browse
     Given I am on the license settings page
     And the file upload method is selected
@@ -87,7 +95,7 @@ Feature: License Activation UI
     Then a file browser dialog opens
     And I can select a ".langwatch-license" file
 
-  @integration
+  @integration @unimplemented
   Scenario: File dropzone accepts only .langwatch-license files
     Given I am on the license settings page
     And the file upload method is selected
@@ -96,7 +104,7 @@ Feature: License Activation UI
     Then the file is rejected
     And I see an error message indicating only .langwatch-license files are accepted
 
-  @integration
+  @integration @unimplemented
   Scenario: Remove uploaded license file
     Given I have uploaded a license file
     When I click the remove button on the uploaded file
@@ -105,22 +113,14 @@ Feature: License Activation UI
     And the "Activate License" button becomes disabled
 
   # License key input flow
-  @e2e
+  @e2e @unimplemented
   Scenario: Enter license key in textarea
     Given I am on the license settings page
     And I have selected the "Enter license key" method
     When I paste a license key into the textarea
     Then the "Activate License" button becomes enabled
 
-  @integration
-  Scenario: License key textarea trims whitespace
-    Given I am on the license settings page
-    And I have selected the "Enter license key" method
-    When I paste a license key with leading and trailing whitespace
-    And I click "Activate License"
-    Then the whitespace is trimmed before activation
-
-  @integration
+  @integration @unimplemented
   Scenario: Activate License button disabled when textarea is empty
     Given I am on the license settings page
     And I have selected the "Enter license key" method
@@ -128,7 +128,7 @@ Feature: License Activation UI
     Then the "Activate License" button is disabled
 
   # License activation
-  @e2e
+  @e2e @unimplemented
   Scenario: Successfully activate license via file upload
     Given I am on the license settings page
     And I have uploaded a valid license file
@@ -137,7 +137,7 @@ Feature: License Activation UI
     And I see the license details card showing plan information
     And I see a success toast "License activated successfully"
 
-  @e2e
+  @e2e @unimplemented
   Scenario: Successfully activate license via key input
     Given I am on the license settings page
     And I have selected the "Enter license key" method
@@ -147,7 +147,7 @@ Feature: License Activation UI
     And I see the license details card showing plan information
     And I see a success toast "License activated successfully"
 
-  @integration
+  @integration @unimplemented
   Scenario: Show loading state during license activation
     Given I am on the license settings page
     And I have provided a license (file or key)
@@ -156,37 +156,20 @@ Feature: License Activation UI
     And the button is disabled during activation
     And the input method selection is disabled during activation
 
-  @integration
-  Scenario: Handle invalid license file
-    Given I am on the license settings page
-    And I have uploaded an invalid license file
-    When I click "Activate License"
-    Then I see an error toast with title "Failed to activate license"
-    And the error message explains the license is invalid or tampered
-
-  @integration
-  Scenario: Handle expired license file
-    Given I am on the license settings page
-    And I have uploaded an expired license file
-    When I click "Activate License"
-    Then I see an error toast with title "Failed to activate license"
-    And the error message explains the license has expired
-
-  # UI styling and layout
-  @integration
+  @integration @unimplemented
   Scenario: Checkbox inputs use platform checkbox component
     Given I am on the license settings page
     Then the activation method checkboxes use the Checkbox component from "~/components/ui/checkbox"
     And the checkboxes are styled consistently with the platform design
 
-  @integration
+  @integration @unimplemented
   Scenario: File dropzone matches platform dropzone styling
     Given I am on the license settings page
     Then the file dropzone uses dashed border styling
     And the dropzone has borderRadius "lg"
     And the dropzone border color changes on hover/drag
 
-  @integration
+  @integration @unimplemented
   Scenario: License key textarea uses platform textarea styling
     Given I am on the license settings page
     And I have selected the "Enter license key" method
@@ -195,30 +178,24 @@ Feature: License Activation UI
     And the textarea has appropriate row count for the license key format
 
   # Unit tests for activation method logic
-  @unit
+  @unit @unimplemented
   Scenario: Activation method state defaults to file upload
     Given the license activation component initializes
     Then the activationMethod state is "file"
     And showFileUpload is true
     And showKeyInput is false
 
-  @unit
+  @unit @unimplemented
   Scenario: Switching activation method updates visibility flags
     Given the activation method is "file"
     When setActivationMethod is called with "key"
     Then showFileUpload becomes false
     And showKeyInput becomes true
 
-  @unit
+  @unit @unimplemented
   Scenario: License file content is read and passed to activation API
     Given a license file is uploaded
     When the file is read
     Then the file content is extracted as text
     And the content is passed to the license activation mutation
 
-  @unit
-  Scenario: License key normalization handles different input formats
-    Given a license key input
-    When normalizeKeyForActivation is called
-    Then leading/trailing whitespace is trimmed
-    And the normalized key is returned for API submission

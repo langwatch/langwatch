@@ -4,10 +4,12 @@
  * All magic values extracted to named constants for clarity and maintainability.
  */
 
+import { makeQueueName } from "../background/queues/makeQueueName";
+
 /** Queue configuration */
 export const SCENARIO_QUEUE = {
   /** Queue name for BullMQ - scoped under simulations domain */
-  NAME: "simulations/scenarios/executions",
+  NAME: makeQueueName("simulations/scenarios/executions"),
   /** Job name for queue.add() */
   JOB: "scenario",
   /** How long to keep completed jobs (seconds) */
@@ -33,5 +35,5 @@ export const SCENARIO_WORKER = {
 /** Child process configuration */
 export const CHILD_PROCESS = {
   /** Timeout for scenario child process execution (ms) */
-  TIMEOUT_MS: 5 * 60 * 1000, // 5 minutes
+  TIMEOUT_MS: 15 * 60 * 1000, // 15 minutes
 } as const;

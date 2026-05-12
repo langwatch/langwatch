@@ -8,12 +8,14 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { PublicShare } from "@prisma/client";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import qs from "qs";
 import { useCallback, useEffect, useState } from "react";
 import { Maximize2, Minimize2 } from "react-feather";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useAnnotationCommentStore } from "../../hooks/useAnnotationCommentStore";
+import { useLiteMemberGuard } from "../../hooks/useLiteMemberGuard";
+import { useDejaViewLink } from "../../hooks/useDejaViewLink";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
 import { api } from "../../utils/api";
@@ -45,6 +47,11 @@ export function TraceDetails(props: {
   onToggleView?: () => void;
 }) {
   const { project, hasPermission } = useOrganizationTeamProject();
+  const dejaView = useDejaViewLink({
+    aggregateId: props.traceId,
+    tenantId: project?.id,
+  });
+  const { isLiteMember } = useLiteMemberGuard();
   const [threadId, setThreadId] = useState<string | undefined>(undefined);
   const router = useRouter();
   const queryClient = api.useContext();
@@ -52,10 +59,12 @@ export function TraceDetails(props: {
   const canViewMessages = true;
 
   const { openDrawer, closeDrawer } = useDrawer();
+  const { trace } = useTraceDetailsState(props.traceId);
 
   const [evaluationsCheckInterval, setEvaluationsCheckInterval] = useState<
     number | undefined
   >();
+  const [evaluationsPollingStart] = useState(() => Date.now());
 
   const evaluations = api.traces.getEvaluations.useQuery(
     { projectId: project?.id ?? "", traceId: props.traceId },
@@ -67,27 +76,43 @@ export function TraceDetails(props: {
   );
 
   useEffect(() => {
-    if (evaluations.data) {
-      const pendingChecks = evaluations.data.filter(
-        (check) =>
-          (check.status == "scheduled" || check.status == "in_progress") &&
-          (check.timestamps.inserted_at ?? 0) >
-            new Date().getTime() - 1000 * 60 * 60 * 1,
-      );
-      if (pendingChecks.length > 0) {
-        setEvaluationsCheckInterval(2000);
-      } else {
-        setEvaluationsCheckInterval(undefined);
-      }
+    if (!evaluations.data) return;
+
+    const now = Date.now();
+    const pollingTooLong = now - evaluationsPollingStart > 5 * 60 * 1000;
+
+    // Give up after 5 minutes of polling
+    if (pollingTooLong) {
+      setEvaluationsCheckInterval(undefined);
+      return;
     }
-  }, [evaluations.data]);
+
+    const hasPendingEvals = evaluations.data.some(
+      (check) =>
+        (check.status === "scheduled" || check.status === "in_progress") &&
+        (check.timestamps.inserted_at ?? 0) > now - 1000 * 60 * 60,
+    );
+
+    const traceIsFresh =
+      trace.data?.timestamps.inserted_at &&
+      now - trace.data.timestamps.inserted_at < 2 * 60 * 1000;
+
+    const noEvalsYetOnFreshTrace =
+      evaluations.data.length === 0 && traceIsFresh;
+
+    if (hasPendingEvals || noEvalsYetOnFreshTrace) {
+      setEvaluationsCheckInterval(2000);
+    } else {
+      setEvaluationsCheckInterval(undefined);
+    }
+  }, [evaluations.data, evaluationsPollingStart, trace.data?.timestamps.inserted_at]);
 
   const anyGuardrails = !!evaluations.data?.some((x) => x.is_guardrail);
 
   const availableTabs = [
     ...(canViewMessages ? ["messages"] : []),
-    "traceDetails",
-    "sequenceDiagram",
+    ...(!isLiteMember ? ["traceDetails"] : []),
+    ...(!isLiteMember ? ["sequenceDiagram"] : []),
     ...(anyGuardrails ? ["guardrails"] : []),
     "evaluations",
     "events",
@@ -104,19 +129,19 @@ export function TraceDetails(props: {
       setTimeout(() => {
         void router.replace(
           "?" +
-            qs.stringify(
-              {
-                ...Object.fromEntries(
-                  Object.entries(router.query).filter(
-                    ([key]) => !key.startsWith("drawer.selectedTab"),
-                  ),
+          qs.stringify(
+            {
+              ...Object.fromEntries(
+                Object.entries(router.query).filter(
+                  ([key]) => !key.startsWith("drawer.selectedTab"),
                 ),
-                drawer: {
-                  selectedTab: tab,
-                },
+              ),
+              drawer: {
+                selectedTab: tab,
               },
-              { allowDots: true },
-            ),
+            },
+            { allowDots: true },
+          ),
         );
       }, 100);
     },
@@ -131,7 +156,6 @@ export function TraceDetails(props: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.selectedTab]);
 
-  const { trace } = useTraceDetailsState(props.traceId);
   const queueDrawerOpen = useDisclosure();
 
   const queueItem = api.annotation.createQueueItem.useMutation();
@@ -256,13 +280,15 @@ export function TraceDetails(props: {
                       <Popover.Arrow />
                       <Popover.CloseTrigger />
                       <Popover.Body>
-                        <AddParticipants
-                          annotators={annotators}
-                          setAnnotators={setAnnotators}
-                          queueDrawerOpen={queueDrawerOpen}
-                          sendToQueue={sendToQueue}
-                          isLoading={queueItem.isLoading}
-                        />
+                        {open && (
+                          <AddParticipants
+                            annotators={annotators}
+                            setAnnotators={setAnnotators}
+                            queueDrawerOpen={queueDrawerOpen}
+                            sendToQueue={sendToQueue}
+                            isLoading={queueItem.isLoading}
+                          />
+                        )}
                       </Popover.Body>
                     </Popover.Content>
                   </Popover.Root>
@@ -285,6 +311,13 @@ export function TraceDetails(props: {
               )}
               {project && (
                 <ShareButton project={project} traceId={props.traceId} />
+              )}
+              {dejaView.href && (
+                <Link href={dejaView.href}>
+                  <Button data-scope="header" colorPalette="gray" size="sm">
+                    DejaView
+                  </Button>
+                </Link>
               )}
               {props.onToggleView && (
                 <>
@@ -313,8 +346,12 @@ export function TraceDetails(props: {
             {canViewMessages && (
               <Tabs.Trigger value="messages">Thread</Tabs.Trigger>
             )}
-            <Tabs.Trigger value="traceDetails">Trace Details</Tabs.Trigger>
-            <Tabs.Trigger value="sequenceDiagram">Sequence</Tabs.Trigger>
+            {!isLiteMember && (
+              <Tabs.Trigger value="traceDetails">Trace Details</Tabs.Trigger>
+            )}
+            {!isLiteMember && (
+              <Tabs.Trigger value="sequenceDiagram">Sequence</Tabs.Trigger>
+            )}
             {anyGuardrails && (
               <Tabs.Trigger value="guardrails">
                 Guardrails
@@ -340,7 +377,7 @@ export function TraceDetails(props: {
               />
             </Tabs.Trigger>
             <Tabs.Trigger value="events">
-              Events
+              User Events
               {trace.data?.events && trace.data.events.length > 0 && (
                 <Text
                   borderRadius={"md"}
@@ -409,11 +446,13 @@ export function TraceDetails(props: {
         </Tabs.Content>
       </Tabs.Root>
 
-      <AddAnnotationQueueDrawer
-        open={queueDrawerOpen.open}
-        onClose={queueDrawerOpen.onClose}
-        onOverlayClick={queueDrawerOpen.onClose}
-      />
+      {queueDrawerOpen.open && (
+        <AddAnnotationQueueDrawer
+          open={queueDrawerOpen.open}
+          onClose={queueDrawerOpen.onClose}
+          onOverlayClick={queueDrawerOpen.onClose}
+        />
+      )}
     </VStack>
   );
 }

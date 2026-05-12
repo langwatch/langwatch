@@ -1,4 +1,11 @@
 Feature: Plan Management Navigation
+
+  # All scenarios in this file describe deployment-mode-conditional
+  # navigation on the Usage page and from limit-reached banners (SaaS →
+  # /subscription, self-hosted → /license). Need a page-level integration
+  # test (or Playwright E2E) against the rendered Usage page in both
+  # deployment modes — no such harness exists yet.
+
   As a user
   I want plan management links to redirect me based on deployment type
   So that I can manage my plan or license appropriately
@@ -7,14 +14,14 @@ Feature: Plan Management Navigation
     Given I am logged in as an administrator
 
   # Usage page plan change redirect
-  @e2e
+  @e2e @unimplemented
   Scenario: Usage page change plan redirects to Subscription in SaaS mode
     Given the platform is deployed in SaaS mode (IS_SAAS=true)
     And I am on the usage settings page at /settings/usage
     When I click the "Change plan" button
     Then I am redirected to /settings/subscription
 
-  @e2e
+  @e2e @unimplemented
   Scenario: Usage page change plan redirects to License in self-hosted mode
     Given the platform is deployed in self-hosted mode (IS_SAAS=false)
     And license enforcement is enabled
@@ -23,14 +30,14 @@ Feature: Plan Management Navigation
     Then I am redirected to /settings/license
 
   # Project limit reached redirects
-  @e2e
+  @e2e @unimplemented
   Scenario: Project limit reached redirects to Subscription in SaaS mode
     Given the platform is deployed in SaaS mode
     And the organization has reached the maximum number of projects
     When I try to create a new project
     Then the upgrade link redirects to /settings/subscription
 
-  @e2e
+  @e2e @unimplemented
   Scenario: Project limit reached redirects to License in self-hosted mode
     Given the platform is deployed in self-hosted mode
     And the organization has reached the maximum number of projects
@@ -38,37 +45,27 @@ Feature: Plan Management Navigation
     Then the upgrade link redirects to /settings/license
 
   # Message limit reached redirects
-  @e2e
+  @e2e @unimplemented
   Scenario: Message limit banner redirects to Subscription in SaaS mode
     Given the platform is deployed in SaaS mode
     And the organization has reached the maximum messages for the month
     When I see the limit warning banner
     Then the upgrade link redirects to /settings/subscription
 
-  @e2e
+  @e2e @unimplemented
   Scenario: Message limit banner redirects to License in self-hosted mode
     Given the platform is deployed in self-hosted mode
     And the organization has reached the maximum messages for the month
     When I see the limit warning banner
     Then the upgrade link redirects to /settings/license
 
-  # Publish feature upgrade redirect
-  @e2e
-  Scenario: Publish upgrade redirects to Subscription in SaaS mode
-    Given the platform is deployed in SaaS mode
-    And the organization plan does not allow publishing
-    When I try to publish from the studio
-    Then the upgrade button redirects to /settings/subscription
-
-  @e2e
-  Scenario: Publish upgrade redirects to License in self-hosted mode
-    Given the platform is deployed in self-hosted mode
-    And the organization plan does not allow publishing
-    When I try to publish from the studio
-    Then the upgrade button redirects to /settings/license
+  # Publish feature upgrade redirect — REMOVED.
+  # The studio publish menu is no longer gated by plan.canPublish; resource
+  # count limits (max workflows/evaluators) are the only blockers.
+  # See specs/studio/publish-not-gated.feature
 
   # Settings menu visibility
-  @integration
+  @integration @unimplemented
   Scenario: Settings menu shows appropriate items based on deployment type
     Given the platform deployment type is determined
     When I view the settings menu
@@ -81,15 +78,7 @@ Feature: Plan Management Navigation
       | Subscription | false   |
       | License      | true    |
 
-  @integration
-  Scenario: Platform provides hook for determining plan management URL
-    Given a component needs to link to plan management
-    When it calls the getPlanManagementUrl helper
-    Then in SaaS mode it returns "/settings/subscription"
-    And in self-hosted mode it returns "/settings/license"
-
-  # Resource limits display on Usage page
-  @e2e
+  @e2e @unimplemented
   Scenario: Usage page shows resource limits in self-hosted mode with license
     Given the platform is deployed in self-hosted mode
     And a valid license is installed
@@ -104,7 +93,7 @@ Feature: Plan Management Navigation
       | Scenarios   |
       | Evaluators  |
 
-  @e2e
+  @e2e @unimplemented
   Scenario: Usage page shows FREE tier limits in self-hosted mode without license
     Given the platform is deployed in self-hosted mode
     And no license is installed
@@ -121,7 +110,7 @@ Feature: Plan Management Navigation
       | Evaluators  | 3     |
     And I see a "Manage license" button to upgrade
 
-  @e2e
+  @e2e @unimplemented
   Scenario: Usage page shows trace usage in SaaS mode
     Given the platform is deployed in SaaS mode
     When I view the usage page
@@ -129,7 +118,7 @@ Feature: Plan Management Navigation
     And I see the message count vs monthly limit
     And I see the "Change plan" button
 
-  @integration
+  @integration @unimplemented
   Scenario: Usage page conditionally renders sections based on deployment type
     Given the platform deployment type is determined
     Then in SaaS mode:
@@ -148,7 +137,7 @@ Feature: Plan Management Navigation
       | Manage license    | true    |
       | Trace Usage       | false   |
 
-  @integration
+  @integration @unimplemented
   Scenario: Usage page shows FREE tier defaults when no license installed
     Given the platform is deployed in self-hosted mode
     And no license is installed
@@ -166,7 +155,7 @@ Feature: Plan Management Navigation
     And each resource row shows current usage count
 
   # Button label consistency
-  @integration
+  @integration @unimplemented
   Scenario: Plan management button uses appropriate label
     Given the usage page is displayed
     When in SaaS mode

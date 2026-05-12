@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AgentTypeSelectorDrawer } from "../AgentTypeSelectorDrawer";
 
 // Mock dependencies
-vi.mock("next/router", () => ({
+vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     push: vi.fn(),
     query: {},
@@ -69,6 +69,8 @@ describe("AgentTypeSelectorDrawer", () => {
       });
     });
 
+    /** @scenario AgentTypeSelectorDrawer shows two options */
+    /** @scenario Agent types available */
     it("shows only code and workflow agent type options", async () => {
       renderDrawer();
       await waitFor(() => {
@@ -97,6 +99,7 @@ describe("AgentTypeSelectorDrawer", () => {
   });
 
   describe("Type selection", () => {
+    /** @scenario Selecting type navigates to appropriate editor */
     it("calls onSelect with 'code' and opens code editor when clicking Code Agent", async () => {
       const user = userEvent.setup();
       renderDrawer();

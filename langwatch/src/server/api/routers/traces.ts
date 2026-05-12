@@ -1,36 +1,28 @@
-import { on } from "node:events";
 import { PublicShareResourceTypes } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import shuffle from "lodash-es/shuffle";
+import { on } from "node:events";
 import { z } from "zod";
 import {
   createTRPCRouter,
   protectedProcedure,
   publicProcedure,
 } from "~/server/api/trpc";
-import { sseService } from "~/server/services/sse.service";
+import { getApp } from "~/server/app-layer/app";
+import { formatSpansDigest } from "~/server/tracer/spanToReadableSpan";
 import { TraceService } from "~/server/traces/trace.service";
 import { createLogger } from "~/utils/logger/server";
-import { sharedFiltersInputSchema } from "../../analytics/types";
 import { evaluatorsSchema } from "../../evaluations/evaluators.zod.generated";
-import { evaluatePreconditions } from "../../evaluations/preconditions";
-import { checkPreconditionSchema } from "../../evaluations/types.generated";
-import { checkPermissionOrPubliclyShared } from "../rbac";
-import { checkProjectPermission } from "../rbac";
+import { evaluatePreconditions, buildPreconditionTraceDataFromTrace, checkEvaluatorRequiredFields } from "../../evaluations/preconditions";
+import { checkPreconditionSchema } from "../../evaluations/types";
+import { checkPermissionOrPubliclyShared, checkProjectPermission } from "../rbac";
 import { getUserProtectionsForProject } from "../utils";
+import {
+  getAllForProjectInput,
+  tracesFilterInput,
+} from "./traces.schemas";
 
-const tracesFilterInput = sharedFiltersInputSchema.extend({
-  pageOffset: z.number().optional(),
-  pageSize: z.number().optional(),
-});
-
-export const getAllForProjectInput = tracesFilterInput.extend({
-  groupBy: z.string().optional(),
-  sortBy: z.string().optional(),
-  sortDirection: z.string().optional(),
-  updatedAt: z.number().optional(),
-  scrollId: z.string().optional().nullable(),
-});
+export { getAllForProjectInput };
 
 const logger = createLogger("langwatch:traces:sse-subscription");
 
@@ -44,7 +36,9 @@ export const tracesRouter = createTRPCRouter({
       });
 
       const traceService = TraceService.create(ctx.prisma);
-      return traceService.getAllTracesForProject(input, protections);
+      return traceService.getAllTracesForProject(input, protections, {
+        scrollId: input.scrollId,
+      });
     }),
 
   getById: publicProcedure
@@ -242,6 +236,29 @@ export const tracesRouter = createTRPCRouter({
       return traceService.getTracesWithSpans(projectId, traceIds, protections);
     }),
 
+  getFormattedSpansDigest: protectedProcedure
+    .input(
+      z.object({ projectId: z.string(), traceIds: z.array(z.string()) }),
+    )
+    .use(checkProjectPermission("traces:view"))
+    .query(async ({ input, ctx }) => {
+      const { projectId, traceIds } = input;
+      const protections = await getUserProtectionsForProject(ctx, {
+        projectId,
+      });
+
+      const traceService = TraceService.create(ctx.prisma);
+      const traces = await traceService.getTracesWithSpans(
+        projectId,
+        traceIds,
+        protections,
+      );
+
+      return Object.fromEntries(
+        await Promise.all(traces.map(async (t) => [t.trace_id, await formatSpansDigest(t.spans ?? [])])),
+      );
+    }),
+
   getTracesWithSpansByThreadIds: protectedProcedure
     .input(z.object({ projectId: z.string(), threadIds: z.array(z.string()) }))
     .use(checkProjectPermission("traces:view"))
@@ -298,6 +315,24 @@ export const tracesRouter = createTRPCRouter({
       );
     }),
 
+  getFieldNames: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        startDate: z.number(),
+        endDate: z.number(),
+      }),
+    )
+    .use(checkProjectPermission("traces:view"))
+    .query(async ({ ctx, input }) => {
+      const traceService = TraceService.create(ctx.prisma);
+      return traceService.getDistinctFieldNames(
+        input.projectId,
+        input.startDate,
+        input.endDate,
+      );
+    }),
+
   getSampleTraces: protectedProcedure
     .input(
       tracesFilterInput.extend({
@@ -344,14 +379,21 @@ export const tracesRouter = createTRPCRouter({
       );
 
       const passedPreconditions = traceWithSpans.filter(
-        (trace) =>
-          evaluatorType &&
-          evaluatePreconditions(
+        (trace) => {
+          if (!evaluatorType) return false;
+          const spans = trace.spans ?? [];
+          const requiredFieldsMet = checkEvaluatorRequiredFields({
             evaluatorType,
-            trace,
-            trace.spans ?? [],
+            spans,
+            expectedOutput: trace.expected_output,
+          });
+          if (!requiredFieldsMet) return false;
+          const traceData = buildPreconditionTraceDataFromTrace({ trace, spans });
+          return evaluatePreconditions({
+            traceData,
             preconditions,
-          ),
+          });
+        },
       );
       const passedPreconditionsTraceIds = passedPreconditions?.map(
         (trace) => trace.trace_id,
@@ -408,7 +450,7 @@ export const tracesRouter = createTRPCRouter({
     .use(checkProjectPermission("traces:view"))
     .subscription(async function* (opts) {
       const { projectId } = opts.input;
-      const emitter = sseService.getTenantEmitter(projectId);
+      const emitter = getApp().broadcast.getTenantEmitter(projectId);
 
       logger.info({ projectId }, "SSE subscription started");
 
@@ -426,7 +468,7 @@ export const tracesRouter = createTRPCRouter({
         logger.info({ projectId }, "SSE subscription ended normally");
       } finally {
         logger.debug({ projectId }, "SSE subscription cleanup");
-        sseService.cleanupTenantEmitter(projectId);
+        getApp().broadcast.cleanupTenantEmitter(projectId);
       }
     }),
 });

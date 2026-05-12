@@ -1,0 +1,144 @@
+---
+title: Capturing Metadata and Attributes
+sidebarTitle: Python
+description: Learn how to enrich your traces and spans with custom metadata and attributes using the LangWatch Python SDK.
+icon: python
+keywords: langwatch, python, metadata, attributes, tracing, spans, traces
+---
+
+Metadata and attributes are key-value pairs that allow you to add custom contextual information to your traces and spans. This enrichment is invaluable for debugging, analysis, filtering, and gaining deeper insights into your LLM application's behavior.
+
+LangWatch distinguishes between two main types of custom data:
+
+*   **Trace Metadata**: Information that applies to the entire lifecycle of a request or a complete operation.
+*   **Span Attributes**: Information specific to a particular unit of work or step within a trace.
+
+This tutorial will guide you through capturing both types using the Python SDK.
+
+## Trace Metadata
+
+Trace metadata provides context for the entire trace. It's ideal for information that remains constant throughout the execution of a traced operation, such as:
+
+*   User identifiers (`user_id`)
+*   Session or conversation identifiers (`thread_id`) - see [Tracking Conversations](/integration/python/tutorials/tracking-conversations)
+*   Application version (`app_version`)
+*   Environment (`env: "production"`)
+*   A/B testing flags or variant names
+*   Labels for filtering and categorization
+
+### Setting Trace Metadata
+
+Inside any function decorated with `@langwatch.trace()`, use `langwatch.get_current_trace().update()` to attach metadata:
+
+```python
+import langwatch
+from openai import OpenAI
+
+client = OpenAI()
+
+@langwatch.trace()
+def handle_message(user_id: str, message: str):
+    langwatch.get_current_trace().update(metadata={
+        "user_id": user_id,
+        "environment": "production",
+    })
+
+    # your LLM pipeline logic here...
+```
+
+You can call `.update()` multiple times throughout your function as more context becomes available:
+
+```python
+@langwatch.trace()
+def handle_message(user_id: str, message: str):
+    trace = langwatch.get_current_trace()
+
+    trace.update(metadata={"user_id": user_id})
+
+    # After detecting the language
+    detected_language = detect_language(message)
+    trace.update(metadata={"language": detected_language})
+
+    # After classifying intent
+    intent = classify_intent(message)
+    trace.update(metadata={"intent": intent})
+
+    # process the message...
+```
+
+### Adding Labels to Traces
+
+Labels are a special type of trace metadata that allows you to organize, filter, and categorize your traces in the LangWatch dashboard:
+
+```python
+@langwatch.trace()
+def handle_message(user_id: str, request_type: str):
+    trace = langwatch.get_current_trace()
+
+    if request_type == "support":
+        trace.update(metadata={"labels": ["customer_support", "high_priority"]})
+    elif request_type == "sales":
+        trace.update(metadata={"labels": ["sales_inquiry"]})
+
+    # process the request...
+```
+
+## Span Attributes
+
+Span attributes provide context for a specific operation or unit of work *within* a trace. They are useful for details that are relevant only to that particular step. Examples include:
+
+*   For an LLM call span: `model_name`, `prompt_template_version`, `temperature`
+*   For a tool call span: `tool_name`, `api_endpoint`, specific input parameters
+*   For a RAG span: `retrieved_document_ids`, `chunk_count`
+*   Custom business logic flags or intermediate results specific to that span.
+
+### Setting Span Attributes
+
+Use `langwatch.get_current_span().update()` or the span context manager to set attributes on a specific span:
+
+```python
+import langwatch
+
+@langwatch.trace(name="ArticleGenerator")
+def generate_article(topic: str):
+    with langwatch.span(name="FetchResearchData", type="tool") as research_span:
+        research_data = fetch_data(topic)
+        research_span.update(
+            source="internal_db",
+            query_complexity="medium",
+            items_retrieved=10
+        )
+
+    with langwatch.span(name="GenerateText", type="llm") as llm_span:
+        llm_span.update(model="gpt-5", prompt_length=len(topic))
+        article_text = generate(topic, research_data)
+        llm_span.update(output_length=len(article_text), tokens_used=150)
+
+    return article_text
+```
+
+## Key Differences: Trace Metadata vs. Span Attributes
+
+| Feature         | Trace Metadata                                  | Span Attributes                                        |
+|-----------------|-------------------------------------------------|--------------------------------------------------------|
+| **Scope**       | Entire trace (e.g., a whole user request)       | Specific span (e.g., one LLM call, one tool use)       |
+| **Granularity** | Coarse-grained, applies to the overall operation | Fine-grained, applies to a specific part of the operation |
+| **Purpose**     | General context for the entire operation        | Specific details about a particular step or action     |
+| **Examples**    | `user_id`, `thread_id`, `app_version`           | `model_name`, `tool_parameters`, `retrieved_chunk_id`    |
+| **SDK Access**  | `langwatch.get_current_trace().update(metadata={...})` | `span.update(key=value, ...)` or `span.set_attributes({...})` |
+
+**When to use which:**
+
+*   Use **Trace Metadata** for information that you'd want to associate with every single span within that trace, or that defines the overarching context of the request (e.g., who initiated it, what version of the service is running).
+*   Use **Span Attributes** for details specific to the execution of that particular span. This helps in understanding the parameters, behavior, and outcome of individual components within your trace.
+
+## Viewing in LangWatch
+
+All captured trace metadata and span attributes will be visible in the LangWatch UI.
+- **Trace Metadata** is typically displayed in the trace details view, providing an overview of the entire operation.
+- **Span Attributes** are shown when you inspect individual spans within a trace.
+
+This rich contextual data allows you to:
+- **Filter and search** for traces and spans based on specific metadata or attribute values.
+- **Analyze performance** by correlating metrics with different metadata/attributes (e.g., comparing latencies for different `user_id`s or `model_name`s).
+- **Debug issues** by quickly understanding the context and parameters of a failed or slow operation.

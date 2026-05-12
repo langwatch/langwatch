@@ -3,26 +3,19 @@ import { EvaluationExecutionMode } from "@prisma/client";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
 import {
   evaluatePreconditions,
-  type PreconditionTrace,
+  buildPreconditionTraceDataFromTrace,
+  checkEvaluatorRequiredFields,
 } from "../../../../server/evaluations/preconditions";
 import type { CheckPreconditions } from "../../../../server/evaluations/types";
 import { createLogger } from "../../../../utils/logger/server";
-import { slugify } from "../../../../utils/slugify";
 import { prisma } from "../../../db";
-import type { ElasticSearchEvaluation, Span } from "../../../tracer/types";
+import type { ElasticSearchEvaluation, ElasticSearchTrace, Span } from "../../../tracer/types";
 import { elasticSearchEvaluationSchema } from "../../../tracer/types.generated";
 import { scheduleEvaluation } from "../../queues/evaluationsQueue";
 import type { CollectorJob, EvaluationJob } from "../../types";
+import { evaluationNameAutoslug } from "./evaluationNameAutoslug";
 
 const _logger = createLogger("langwatch:workers:collector:evaluations");
-
-export const evaluationNameAutoslug = (name: string) => {
-  const autoslug = slugify(name || "unnamed", {
-    lower: true,
-    strict: true,
-  }).replace(/[^a-z0-9]/g, "_");
-  return `customeval_${autoslug}`;
-};
 
 export const mapEvaluations = (
   data: CollectorJob,
@@ -67,7 +60,10 @@ export const mapEvaluations = (
 };
 
 export const scheduleEvaluations = async (
-  trace: EvaluationJob["trace"] & PreconditionTrace,
+  trace: EvaluationJob["trace"] & Pick<ElasticSearchTrace, "input" | "output" | "metadata" | "expected_output"> & {
+    origin?: string | null;
+    error?: import("../../../tracer/types").ErrorCapture | null;
+  },
   spans: Span[],
 ) => {
   const isOutputEmpty = !trace.output?.value;
@@ -88,16 +84,23 @@ export const scheduleEvaluations = async (
     },
   });
 
+  const traceData = buildPreconditionTraceDataFromTrace({ trace, spans });
+
   const traceChecksSchedulings = [];
   for (const check of checks) {
     if (Math.random() <= check.sample) {
-      const preconditions = (check.preconditions ?? []) as CheckPreconditions;
-      const preconditionsMet = evaluatePreconditions(
-        check.checkType,
-        trace,
+      const requiredFieldsMet = checkEvaluatorRequiredFields({
+        evaluatorType: check.checkType,
         spans,
+        expectedOutput: trace.expected_output,
+      });
+      if (!requiredFieldsMet) continue;
+
+      const preconditions = (check.preconditions ?? []) as CheckPreconditions;
+      const preconditionsMet = evaluatePreconditions({
+        traceData,
         preconditions,
-      );
+      });
       if (preconditionsMet) {
         // Check if this is a thread-level evaluation with idle timeout
         const hasThreadIdleTimeout =

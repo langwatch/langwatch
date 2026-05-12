@@ -334,14 +334,13 @@ describe("Span Integration Tests", () => {
       expect(inputData.value.nested.key).toBe("value");
       expect(inputData.value.nullValue).toBe(null);
 
-      // Verify RAG contexts format
+      // Verify RAG contexts format (plain array, no wrapper)
       const ragData = JSON.parse(
         span.attributes[semconv.ATTR_LANGWATCH_RAG_CONTEXTS] as string,
       );
-      expect(ragData.type).toBe("json");
-      expect(ragData.value).toHaveLength(2);
-      expect(ragData.value[0].document_id).toBe("doc-1");
-      expect(ragData.value[1].document_id).toBe("doc-2");
+      expect(ragData).toHaveLength(2);
+      expect(ragData[0].document_id).toBe("doc-1");
+      expect(ragData[1].document_id).toBe("doc-2");
 
       // Verify metrics format
       const metricsData = JSON.parse(
@@ -419,26 +418,24 @@ describe("Span Integration Tests", () => {
         throw new Error("Expected both RAG context spans to be exported");
       }
 
-      // Verify single RAG context
+      // Verify single RAG context (plain array, no wrapper)
       const singleRagData = JSON.parse(
         singleSpan.attributes[semconv.ATTR_LANGWATCH_RAG_CONTEXTS] as string,
       );
-      expect(singleRagData.type).toBe("json");
-      expect(singleRagData.value).toHaveLength(1);
-      expect(singleRagData.value[0].document_id).toBe("doc-789");
-      expect(singleRagData.value[0].chunk_id).toBe("chunk-012");
-      expect(singleRagData.value[0].content).toContain("🔍");
-      expect(singleRagData.value[0].metadata.score).toBe(0.95);
+      expect(singleRagData).toHaveLength(1);
+      expect(singleRagData[0].document_id).toBe("doc-789");
+      expect(singleRagData[0].chunk_id).toBe("chunk-012");
+      expect(singleRagData[0].content).toContain("🔍");
+      expect(singleRagData[0].metadata.score).toBe(0.95);
 
-      // Verify multiple RAG contexts
+      // Verify multiple RAG contexts (plain array, no wrapper)
       const multipleRagData = JSON.parse(
         multipleSpan.attributes[semconv.ATTR_LANGWATCH_RAG_CONTEXTS] as string,
       );
-      expect(multipleRagData.type).toBe("json");
-      expect(multipleRagData.value).toHaveLength(3);
-      expect(multipleRagData.value[0].document_id).toBe("doc-001");
-      expect(multipleRagData.value[1].document_id).toBe("doc-002");
-      expect(multipleRagData.value[2].document_id).toBe("doc-003");
+      expect(multipleRagData).toHaveLength(3);
+      expect(multipleRagData[0].document_id).toBe("doc-001");
+      expect(multipleRagData[1].document_id).toBe("doc-002");
+      expect(multipleRagData[2].document_id).toBe("doc-003");
     });
 
     it("should handle metrics data with various number types", async () => {

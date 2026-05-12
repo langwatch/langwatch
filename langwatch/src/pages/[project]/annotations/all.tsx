@@ -3,7 +3,7 @@ import type { Annotation, User } from "@prisma/client";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import Parse from "papaparse";
 import { Download } from "react-feather";
 import AnnotationsLayout from "~/components/AnnotationsLayout";
@@ -40,7 +40,9 @@ export default function Annotations() {
 
   const {
     period: { startDate, endDate },
+    mode,
     setPeriod,
+    setRelativePeriod,
   } = usePeriodSelector();
 
   type RouterOutput = inferRouterOutputs<AppRouter>;
@@ -183,14 +185,18 @@ export default function Annotations() {
       </Heading>
       <Spacer />
       <Button
-        colorPalette="black"
         minWidth="fit-content"
         variant="ghost"
         onClick={() => downloadCSV()}
       >
         Export all <Download style={{ marginLeft: "8px" }} />
       </Button>
-      <PeriodSelector period={{ startDate, endDate }} setPeriod={setPeriod} />
+      <PeriodSelector
+        period={{ startDate, endDate }}
+        mode={mode}
+        setPeriod={setPeriod}
+        setRelativePeriod={setRelativePeriod}
+      />
     </HStack>
   );
 
@@ -200,7 +206,6 @@ export default function Annotations() {
         maxW={"calc(100vw - 330px)"}
         padding={0}
         margin={0}
-        backgroundColor="white"
       >
         <AnnotationsTable
           groupedAnnotations={groupedAnnotations}

@@ -1,9 +1,18 @@
 import type { Experiment, ExperimentType, Project } from "@prisma/client";
 import { nanoid } from "nanoid";
-import type { NextApiRequest, NextApiResponse } from "next";
+import type { NextApiRequest, NextApiResponse } from "~/types/next-stubs";
 import { z } from "zod";
 import { fromZodError, type ZodError } from "zod-validation-error";
 import { prisma } from "~/server/db";
+import { createLicenseEnforcementService } from "~/server/license-enforcement";
+import { LimitExceededError } from "~/server/license-enforcement/errors";
+import { buildResourceLimitMessage } from "~/server/license-enforcement/limit-message";
+import {
+  enforcePatCeiling,
+  extractCredentials,
+  patCeilingDenialResponse,
+} from "~/server/pat/auth-middleware";
+import { TokenResolver } from "~/server/pat/token-resolver";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { slugify } from "~/utils/slugify";
 import { createLogger } from "../../../utils/logger/server";
@@ -37,21 +46,43 @@ export default async function handler(
     return res.status(405).end(); // Only accept POST requests
   }
 
-  const authToken = req.headers["x-auth-token"];
-
-  if (!authToken) {
-    return res
-      .status(401)
-      .json({ message: "X-Auth-Token header is required." });
+  const credentials = extractCredentials((name) => {
+    const value = req.headers[name.toLowerCase()];
+    if (Array.isArray(value)) return value[0];
+    return value ?? undefined;
+  });
+  if (!credentials) {
+    return res.status(401).json({
+      message:
+        "Authentication token is required. Use X-Auth-Token header, Authorization: Bearer token, or Authorization: Basic base64(projectId:token).",
+    });
   }
 
-  const project = await prisma.project.findUnique({
-    where: { apiKey: authToken as string },
+  const tokenResolver = TokenResolver.create(prisma);
+  const resolved = await tokenResolver.resolve({
+    token: credentials.token,
+    projectId: credentials.projectId,
   });
-
-  if (!project) {
+  if (!resolved) {
     return res.status(401).json({ message: "Invalid auth token." });
   }
+
+  // TODO(pat): introduce a dedicated `experiments:manage` permission once
+  // the RBAC catalog grows beyond workflows. Experiments are created/owned
+  // by workflows today, so `workflows:manage` is the closest existing
+  // ceiling — VIEWER is correctly blocked, ADMIN/MEMBER pass through.
+  try {
+    await enforcePatCeiling({
+      prisma,
+      resolved,
+      permission: "workflows:manage",
+    });
+  } catch (error) {
+    const denial = patCeilingDenialResponse(error);
+    return res.status(denial.status).json({ message: denial.message });
+  }
+
+  const project = resolved.project;
 
   let params: z.infer<typeof dspyInitParamsSchema>;
   try {
@@ -68,13 +99,51 @@ export default async function handler(
     return res.status(400).json({ error: validationError.message });
   }
 
-  const experiment = await findOrCreateExperiment({
-    project,
-    experiment_slug: params.experiment_slug,
-    experiment_type: params.experiment_type,
-    experiment_name: params.experiment_name,
-    workflowId: params.workflowId,
-  });
+  let experiment: Experiment;
+  try {
+    experiment = await findOrCreateExperiment({
+      project,
+      experiment_slug: params.experiment_slug,
+      experiment_type: params.experiment_type,
+      experiment_name: params.experiment_name,
+      workflowId: params.workflowId,
+    });
+  } catch (error) {
+    if (error instanceof LimitExceededError) {
+      let message = error.message;
+      try {
+        const organizationId = await resolveOrganizationId(project.teamId);
+        if (organizationId) {
+          message = await buildResourceLimitMessage({
+            organizationId,
+            limitType: error.limitType,
+            max: error.max,
+          });
+        }
+      } catch {
+        logger.warn(
+          { projectId: project.id },
+          "Failed to build resource limit message",
+        );
+      }
+
+      return res.status(403).json({
+        error: error.kind,
+        message,
+        limitType: error.limitType,
+        current: error.current,
+        max: error.max,
+      });
+    }
+    throw error;
+  }
+
+  // Late markUsed: response has been fully built, the PAT was genuinely used
+  // for a successful request. Fire-and-forget; a DB hiccup must not mask the
+  // experiment creation.
+  if (resolved.type === "pat") {
+    tokenResolver.markUsed({ patId: resolved.patId });
+  }
 
   return res.status(200).json({
     path: `/${project.slug}/experiments/${experiment.slug}`,
@@ -121,6 +190,12 @@ export const findOrCreateExperiment = async ({
   }
 
   if (!experiment && slug_) {
+    const organizationId = await resolveOrganizationId(project.teamId);
+    if (organizationId) {
+      const enforcement = createLicenseEnforcementService(prisma);
+      await enforcement.enforceLimit(organizationId, "experiments");
+    }
+
     experiment = await prisma.experiment.create({
       data: {
         id: `experiment_${nanoid()}`,
@@ -143,3 +218,18 @@ export const findOrCreateExperiment = async ({
   }
   return experiment;
 };
+
+/**
+ * Resolves the organizationId from a teamId.
+ * Returns null if the team or organization is not found.
+ */
+async function resolveOrganizationId(
+  teamId: string,
+): Promise<string | null> {
+  const team = await prisma.team.findUnique({
+    where: { id: teamId },
+    select: { organizationId: true },
+  });
+
+  return team?.organizationId ?? null;
+}

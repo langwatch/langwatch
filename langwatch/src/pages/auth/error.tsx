@@ -8,16 +8,46 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import type { Session } from "next-auth";
+import Link from "~/utils/compat/next-link";
+import { useSearchParams } from "~/utils/compat/next-navigation";
+import { useSession } from "~/utils/auth-client";
 import { useEffect } from "react";
 import { LogoIcon } from "../../components/icons/LogoIcon";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
 
-export default function Error({ session }: { session: Session | null }) {
+/**
+ * BetterAuth emits granular low-level error codes (e.g. `email_doesn't_match`,
+ * `LINKING_DIFFERENT_EMAILS_NOT_ALLOWED`) from the link-account flow. Map
+ * them back to the friendly uppercase codes this UI already handles, so
+ * the same error page works for both the NextAuth-era codes we throw from
+ * hooks and the BetterAuth-native ones coming out of the OAuth callback.
+ *
+ * Exported for unit testing.
+ */
+export const normalizeErrorCode = (
+  error: string | null | undefined,
+): string | null => {
+  if (!error) return null;
+  if (
+    error === "email_doesn't_match" ||
+    error === "LINKING_DIFFERENT_EMAILS_NOT_ALLOWED"
+  ) {
+    return "DIFFERENT_EMAIL_NOT_ALLOWED";
+  }
+  if (
+    error === "account_already_linked_to_different_user" ||
+    error === "account_not_linked" ||
+    error === "OAuthAccountNotLinked"
+  ) {
+    return "OAuthAccountNotLinked";
+  }
+  return error;
+};
+
+export default function Error() {
+  const { data: session } = useSession();
   const query = useSearchParams();
-  const error = query?.get("error");
+  const error = normalizeErrorCode(query?.get("error"));
   const publicEnv = usePublicEnv();
   const isAuth0 = publicEnv.data?.NEXTAUTH_PROVIDER === "auth0";
   const isAzureAD = publicEnv.data?.NEXTAUTH_PROVIDER === "azure-ad";
@@ -28,7 +58,11 @@ export default function Error({ session }: { session: Session | null }) {
 
     if (
       error &&
-      ["DIFFERENT_EMAIL_NOT_ALLOWED", "OAuthAccountNotLinked"].includes(error)
+      [
+        "DIFFERENT_EMAIL_NOT_ALLOWED",
+        "OAuthAccountNotLinked",
+        "SSO_PROVIDER_NOT_ALLOWED",
+      ].includes(error)
     ) {
       return;
     }
@@ -65,9 +99,10 @@ export default function Error({ session }: { session: Session | null }) {
   );
 }
 
-export function SignInError({ error }: { error: string }) {
+export function SignInError({ error: rawError }: { error: string }) {
   const query = useSearchParams();
   const callbackUrl = query?.get("callbackUrl") ?? undefined;
+  const error = normalizeErrorCode(rawError) ?? rawError;
 
   return (
     <Container maxW="container.md" paddingTop="calc(40vh - 164px)">
@@ -86,20 +121,26 @@ export function SignInError({ error }: { error: string }) {
           >
             <Alert.Indicator />
             <Alert.Content gap={4}>
-              <Alert.Title fontWeight="bold">{error}</Alert.Title>
+              <Alert.Title fontWeight="bold">
+                {error === "OAuthAccountNotLinked"
+                  ? "Account already exists"
+                  : error}
+              </Alert.Title>
               {error === "OAuthAccountNotLinked" ? (
                 <Alert.Description>
                   <VStack gap={1} align="start">
                     <Text>
-                      It might be that an account using this email already
-                      exists but it&apos;s not linked with this authentication
-                      method. <br />
-                      Please sign in with email/password or the other provider
-                      you used before and go to the <b>Settings</b> page to link
-                      this one.
+                      An account with this email already exists but was created
+                      with a different sign-in method (e.g. Google, GitHub).
+                      <br />
+                      <br />
+                      To link this method, sign in with the method you used
+                      originally, then go to{" "}
+                      <b>Settings &gt; Authentication</b> to link additional
+                      sign-in methods.
                     </Text>
                     <Button asChild marginTop={4} color="white">
-                      <Link href="/settings/authentication">
+                      <Link href="/auth/signin">
                         Sign in with another method
                       </Link>
                     </Button>
@@ -123,9 +164,9 @@ export function SignInError({ error }: { error: string }) {
                 <Alert.Description>
                   <VStack gap={1} align="start">
                     <Text>
-                      You cannot sign in with this authentication method. Please
-                      sign in via email first in order to login via your
-                      company&apos;s SSO provider.
+                      Your organization requires SSO login. Please go back
+                      and sign in by entering your company email address in
+                      the login form.
                     </Text>
                     <Button asChild marginTop={4} color="white">
                       <Link href="/">Back to Login</Link>

@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar, Union, cast
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -19,7 +21,7 @@ class PostIndexResponse200:
     """
     Attributes:
         id (str):
-        handle (Union[None, str]):
+        handle (None | str):
         scope (PostIndexResponse200Scope):
         name (str):
         updated_at (str):
@@ -30,12 +32,12 @@ class PostIndexResponse200:
         version_created_at (str):
         model (str):
         prompt (str):
-        messages (list['PostIndexResponse200MessagesItem']):
-        response_format (Union['PostIndexResponse200ResponseFormatType0', None]):
+        messages (list[PostIndexResponse200MessagesItem]):
+        response_format (None | PostIndexResponse200ResponseFormatType0):
     """
 
     id: str
-    handle: Union[None, str]
+    handle: None | str
     scope: PostIndexResponse200Scope
     name: str
     updated_at: str
@@ -46,8 +48,8 @@ class PostIndexResponse200:
     version_created_at: str
     model: str
     prompt: str
-    messages: list["PostIndexResponse200MessagesItem"]
-    response_format: Union["PostIndexResponse200ResponseFormatType0", None]
+    messages: list[PostIndexResponse200MessagesItem]
+    response_format: None | PostIndexResponse200ResponseFormatType0
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -55,7 +57,7 @@ class PostIndexResponse200:
 
         id = self.id
 
-        handle: Union[None, str]
+        handle: None | str
         handle = self.handle
 
         scope = self.scope.value
@@ -83,7 +85,7 @@ class PostIndexResponse200:
             messages_item = messages_item_data.to_dict()
             messages.append(messages_item)
 
-        response_format: Union[None, dict[str, Any]]
+        response_format: dict[str, Any] | None
         if isinstance(self.response_format, PostIndexResponse200ResponseFormatType0):
             response_format = self.response_format.to_dict()
         else:
@@ -120,10 +122,10 @@ class PostIndexResponse200:
         d = dict(src_dict)
         id = d.pop("id")
 
-        def _parse_handle(data: object) -> Union[None, str]:
+        def _parse_handle(data: object) -> None | str:
             if data is None:
                 return data
-            return cast(Union[None, str], data)
+            return cast(None | str, data)
 
         handle = _parse_handle(d.pop("handle"))
 
@@ -154,7 +156,7 @@ class PostIndexResponse200:
 
             messages.append(messages_item)
 
-        def _parse_response_format(data: object) -> Union["PostIndexResponse200ResponseFormatType0", None]:
+        def _parse_response_format(data: object) -> None | PostIndexResponse200ResponseFormatType0:
             if data is None:
                 return data
             try:
@@ -163,9 +165,9 @@ class PostIndexResponse200:
                 response_format_type_0 = PostIndexResponse200ResponseFormatType0.from_dict(data)
 
                 return response_format_type_0
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
-            return cast(Union["PostIndexResponse200ResponseFormatType0", None], data)
+            return cast(None | PostIndexResponse200ResponseFormatType0, data)
 
         response_format = _parse_response_format(d.pop("response_format"))
 

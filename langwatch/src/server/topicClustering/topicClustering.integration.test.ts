@@ -150,6 +150,7 @@ describe.skip("Topic Clustering Integration Test", () => {
 
   it("cluster tracers into topics", async () => {
     const result = await fetchTopicsBatchClustering("project_id", {
+      project_id: "project_id",
       litellm_params: {
         model: "openai/gpt-5",
         api_key: process.env.OPENAI_API_KEY!,

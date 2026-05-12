@@ -1,0 +1,17 @@
+{
+  "$schema": "./embeds.versions.schema.json",
+  "_doc": "Single source of truth for portable postgres/redis binaries hosted at https://embeds.langwatch.ai. Read by both packages/server/src/predeps/{postgres,redis}.ts (URL construction) and .github/workflows/embedded-binaries-publish.yml (build matrix). Bump versions here, run the publish workflow, predeps auto-pick the new tarballs on next CLI run.",
+  "_url_pattern": "https://embeds.langwatch.ai/<binary>-<version>-<platform>.tar.gz (and .sha256 sidecar)",
+  "_platforms": ["darwin-arm64", "darwin-x64", "linux-arm64", "linux-x64", "linux-arm64-musl", "linux-x64-musl"],
+  "postgres": {
+    "version": "18.0",
+    "_source": "https://ftp.postgresql.org/pub/source/v18.0/postgresql-18.0.tar.bz2",
+    "_install_layout": "tarball strips to bin/postgres + lib/ + share/ rooted at <paths.bin>/postgres/"
+  },
+  "redis": {
+    "version": "7.4.5",
+    "_source": "https://github.com/redis/redis/archive/refs/tags/7.4.5.tar.gz",
+    "_install_layout": "tarball contains a single redis-server binary at <paths.bin>/redis-server",
+    "_license_note": "7.4.x is BSD-3-Clause. Redis 8.x switched to AGPLv3+RSAL — pinning to 7.4 keeps embedding terms simple for self-hosters."
+  }
+}

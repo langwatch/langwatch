@@ -1,12 +1,15 @@
 """
 Core PromptData structure for prompts.
 
-This module contains only the PromptData TypedDict with conversion methods,
+This module contains the PromptData Pydantic model with conversion methods,
 following the TypeScript PromptData interface structure.
 """
 
-from typing import TypedDict, Literal, Optional, List, Union
+from typing import Literal, Optional, List, Union
 
+from pydantic import BaseModel, ConfigDict
+
+from langwatch.generated.langwatch_rest_api_client.types import Unset
 from langwatch.generated.langwatch_rest_api_client.models.get_api_prompts_by_id_response_200 import (
     GetApiPromptsByIdResponse200,
 )
@@ -17,32 +20,34 @@ from langwatch.generated.langwatch_rest_api_client.models.post_api_prompts_respo
     PostApiPromptsResponse200,
 )
 
-from .structures import MessageDict, ResponseFormatDict
+from .structures import Message, ResponseFormat
 
 
-class PromptData(TypedDict, total=False):
+class PromptData(BaseModel):
     """
     Core data structure for prompts, matching the TypeScript PromptData interface.
 
     Contains both core functionality fields and optional metadata for identification/tracing.
     """
 
+    model_config = ConfigDict(extra="ignore")
+
     # === Core functionality (required) ===
-    model: str
-    messages: List[MessageDict]  # Use standardized message structure
+    model: str = ""
+    messages: List[Message] = []
 
     # === Optional core fields ===
-    prompt: Optional[str]
-    temperature: Optional[float]
-    max_tokens: Optional[int]  # Note: using snake_case to match Python conventions
-    response_format: Optional[ResponseFormatDict]  # Use standardized response format
+    prompt: Optional[str] = None
+    temperature: Optional[float] = None
+    max_tokens: Optional[int] = None
+    response_format: Optional[ResponseFormat] = None
 
     # === Optional identification (for tracing) ===
-    id: Optional[str]
-    handle: Optional[str]
-    version: Optional[int]
-    version_id: Optional[str]
-    scope: Optional[Literal["PROJECT", "ORGANIZATION"]]
+    id: Optional[str] = None
+    handle: Optional[str] = None
+    version: Optional[int] = None
+    version_id: Optional[str] = None
+    scope: Optional[Literal["PROJECT", "ORGANIZATION"]] = None
 
     @staticmethod
     def from_api_response(
@@ -56,38 +61,45 @@ class PromptData(TypedDict, total=False):
         Create PromptData from API response object.
 
         Args:
-            response: GetApiPromptsByIdResponse200 object from API
+            response: API response object
 
         Returns:
-            PromptData dictionary with converted fields
+            PromptData instance with converted fields
         """
-        # Import standardized structures here to avoid circular imports
-        from .structures import MessageDict, ResponseFormatDict
+        def _unset_to_none(value):
+            """Convert UNSET sentinel values to None."""
+            return None if isinstance(value, Unset) else value
 
         messages = []
-        if response.messages:
+        raw_messages = _unset_to_none(response.messages)
+        if raw_messages:
             messages = [
-                MessageDict(role=msg.role.value, content=msg.content)
-                for msg in response.messages
+                Message(role=msg.role.value, content=msg.content)
+                for msg in raw_messages
             ]
 
         # Convert response format if present
         response_format = None
-        if hasattr(response, "response_format") and response.response_format:
-            response_format = ResponseFormatDict(
-                type="json_schema", json_schema=response.response_format
+        raw_response_format = _unset_to_none(
+            getattr(response, "response_format", None)
+        )
+        if raw_response_format:
+            response_format = ResponseFormat(
+                type="json_schema", json_schema=raw_response_format.json_schema
             )
 
+        raw_version = _unset_to_none(response.version)
+
         return PromptData(
-            id=response.id,
-            handle=response.handle,
+            id=_unset_to_none(response.id),
+            handle=_unset_to_none(response.handle),
             model=response.model,
             messages=messages,
-            prompt=response.prompt,
-            temperature=response.temperature,
-            max_tokens=response.max_tokens,
+            prompt=_unset_to_none(response.prompt),
+            temperature=_unset_to_none(response.temperature),
+            max_tokens=_unset_to_none(response.max_tokens),
             response_format=response_format,
-            version=response.version,
-            version_id=response.version_id,
-            scope=response.scope.value if response.scope else None,
+            version=int(raw_version) if raw_version is not None else None,
+            version_id=_unset_to_none(response.version_id),
+            scope=response.scope.value if response.scope and not isinstance(response.scope, Unset) else None,
         )

@@ -1,7 +1,17 @@
+import { generate } from "@langwatch/ksuid";
 import { z } from "zod";
 import { studioBackendPostEvent } from "~/app/api/workflows/post_event/post-event";
+import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
+import { KSUID_RESOURCES } from "~/utils/constants";
+import { trackServerEvent } from "~/server/posthog";
+
 import { createLogger } from "~/utils/logger/server";
+import {
+  AZURE_SAFETY_ENV_VARS,
+  isAzureEvaluatorType,
+} from "../../app-layer/evaluations/azure-safety-env";
+import { getAzureSafetyEnvFromProject } from "../../app-layer/evaluations/azure-safety-env.server";
 import { runEvaluationForTrace } from "../../background/workers/evaluationsWorker";
 import {
   AVAILABLE_EVALUATORS,
@@ -13,21 +23,31 @@ import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { getUserProtectionsForProject } from "../utils";
 
-const logger = createLogger("langwatch:evaluations:warmup");
+const logger = createLogger("langwatch:evaluations");
 
 export const evaluationsRouter = createTRPCRouter({
   availableEvaluators: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .use(checkProjectPermission("evaluations:view"))
-    .query(async () => {
+    .query(async ({ input }) => {
+      // Azure Safety evaluators are gated by the per-project azure_safety
+      // Model Provider — we no longer read process.env for those. Compute
+      // once and reuse for all three Azure evaluator types.
+      const azureSafetyEnv = await getAzureSafetyEnvFromProject(
+        input.projectId,
+      );
+      const azureMissingEnvVars = azureSafetyEnv
+        ? []
+        : [...AZURE_SAFETY_ENV_VARS];
+
       return Object.fromEntries(
         Object.entries(AVAILABLE_EVALUATORS).map(([key, evaluator]) => [
           key,
           {
             ...evaluator,
-            missingEnvVars: evaluator.envVars.filter(
-              (envVar) => !process.env[envVar],
-            ),
+            missingEnvVars: isAzureEvaluatorType(key)
+              ? azureMissingEnvVars
+              : evaluator.envVars.filter((envVar) => !process.env[envVar]),
           },
         ]),
       );
@@ -66,9 +86,45 @@ export const evaluationsRouter = createTRPCRouter({
         traceId: input.traceId,
         evaluatorType: input.evaluatorType as EvaluatorTypes,
         settings: input.settings,
-        mappings: input.mappings ?? {},
+        mappings: input.mappings ?? null,
         protections,
       });
+
+      // Dispatch to evaluation processing pipeline when flag is ON
+      if (result) {
+        trackServerEvent({
+          userId: ctx.session.user.id,
+          event: "evaluation_ran",
+          projectId: input.projectId,
+        });
+      }
+
+      // Dispatch to evaluation processing pipeline
+      if (result) {
+        const evaluationId = generate(KSUID_RESOURCES.EVALUATION).toString();
+        try {
+          const app = getApp();
+          await app.evaluations.reportEvaluation({
+            tenantId: input.projectId,
+            evaluationId,
+            evaluatorId: input.evaluatorType,
+            evaluatorType: input.evaluatorType,
+            traceId: input.traceId,
+            status: result.status,
+            score: result.status === "processed" && typeof result.score === 'number' ? result.score : undefined,
+            passed: result.status === "processed" ? (result.passed ?? undefined) : undefined,
+            label: result.status === "processed" ? (result.label ?? undefined) : undefined,
+            details: result.status === "error" ? result.details : result.status === "processed" ? (result.details ?? undefined) : undefined,
+            error: result.status === "error" ? result.details : undefined,
+            occurredAt: Date.now(),
+          });
+        } catch (error) {
+          logger.warn(
+            { error, evaluationId, evaluatorType: input.evaluatorType },
+            "Failed to dispatch single re-eval to evaluation processing pipeline",
+          );
+        }
+      }
 
       return result;
     }),

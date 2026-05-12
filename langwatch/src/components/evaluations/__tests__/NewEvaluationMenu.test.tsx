@@ -25,9 +25,10 @@ const mockPush = vi.fn((url: string) => {
   return Promise.resolve(true);
 });
 
-vi.mock("next/router", () => ({
+vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     query: mockQuery,
+    pathname: "",
     asPath:
       Object.keys(mockQuery).length > 0
         ? "/test?" + new URLSearchParams(mockQuery).toString()

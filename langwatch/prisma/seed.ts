@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import { nanoid } from "nanoid";
+import { ENTERPRISE_LICENSE_KEY } from "../ee/licensing/__tests__/fixtures/testLicenses";
 
 const prisma = new PrismaClient();
 
@@ -12,11 +13,12 @@ async function main() {
 
   console.log(`🌱 Seeding database with API key: ${apiKey}`);
 
-  // Create organization
+  // Create organization with enterprise license to avoid free plan limits in E2E tests
   const organization = await prisma.organization.create({
     data: {
       name: "CI Test Organization",
       slug: `ci-test-org-${nanoid()}`,
+      license: ENTERPRISE_LICENSE_KEY,
     },
   });
 

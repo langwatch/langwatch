@@ -1,15 +1,15 @@
 /**
- * HistoryButton - Navigate to evaluation run history
+ * HistoryButton - Navigate to evaluation results
  *
  * Shows a button in the V3 workbench header that links to the experiment
- * history page showing all past runs stored in Elasticsearch.
+ * results page showing all past runs stored in Elasticsearch.
  *
  * Enabled when:
  * - User has run an evaluation this session, OR
  * - There are existing runs from a previous session (checked on page load)
  */
 import { Button } from "@chakra-ui/react";
-import { Clock } from "react-feather";
+import { BarChart2 } from "react-feather";
 import { Link } from "~/components/ui/link";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useEvaluationsV3Store } from "~/evaluations-v3/hooks/useEvaluationsV3Store";
@@ -53,7 +53,7 @@ export function HistoryButton({ disabled = false }: HistoryButtonProps) {
 
   return (
     <Tooltip
-      content={hasRuns ? "View run history" : "No runs yet"}
+      content={hasRuns ? "View results" : "No runs yet"}
       showArrow
       positioning={{ placement: "bottom" }}
       openDelay={100}
@@ -62,12 +62,12 @@ export function HistoryButton({ disabled = false }: HistoryButtonProps) {
         size="xs"
         variant="ghost"
         disabled={disabled || !hasRuns || isLoading}
-        aria-label="View run history"
+        aria-label="View results"
         asChild
       >
         <Link href={`/${project.slug}/experiments/${experimentSlug}`}>
-          <Clock size={14} />
-          History
+          <BarChart2 size={14} />
+          Results
         </Link>
       </Button>
     </Tooltip>

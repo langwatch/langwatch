@@ -1,0 +1,190 @@
+---
+title: Security
+description: "Security model, encryption, secrets management, and hardening for LangWatch"
+---
+
+This page covers the security features and best practices for self-hosted LangWatch deployments.
+
+## Authentication & Authorization
+
+**NextAuth.js** handles user authentication with support for:
+- Email/password (default)
+- SSO providers: Azure AD, Okta, Auth0, AWS Cognito, Google, GitHub, GitLab
+
+See [SSO Configuration](/self-hosting/configuration/sso) for setup guides.
+
+**Role-Based Access Control (RBAC)** controls what users can do within a project:
+- Organization-level roles (owner, admin, member)
+- Project-level permissions
+
+**SCIM provisioning** (Enterprise) enables automated user lifecycle management from your identity provider.
+
+**API tokens** are signed with JWT (`API_TOKEN_JWT_SECRET`) for SDK authentication.
+
+## Encryption
+
+### At Rest
+
+| Data Store | Encryption Method |
+|------------|------------------|
+| PostgreSQL | Provider-level encryption (RDS: AES-256, Cloud SQL: AES-256) |
+| ClickHouse | Encrypted volumes (EBS encryption, PD encryption) |
+| S3 | Server-side encryption (SSE-S3 or SSE-KMS) |
+| Stored credentials | Application-level encryption via `CREDENTIALS_SECRET` |
+
+The `CREDENTIALS_SECRET` environment variable is used to encrypt API keys and credentials stored in PostgreSQL (e.g., LLM provider keys configured in the UI). This is application-level encryption on top of database-level encryption.
+
+### In Transit
+
+| Path | Encryption |
+|------|-----------|
+| Client to App | TLS at Ingress / Load Balancer |
+| App to PostgreSQL | TLS (configure via connection string: `?sslmode=require`) |
+| App to ClickHouse | HTTPS (configure ClickHouse with TLS certificates) |
+| App to Redis | TLS (configure via connection string: `rediss://...`) |
+| Inter-service (App, Workers, NLP, LangEvals) | Plain HTTP within cluster (use a service mesh for mTLS) |
+
+<Tip>
+For inter-service encryption, deploy a service mesh like Istio or Linkerd. This adds mTLS between all pods without application changes.
+</Tip>
+
+## Secrets Management
+
+### Development (Auto-Generated)
+
+For development, enable `autogen.enabled: true` in the Helm chart. This generates random secrets automatically. Not suitable for production — secrets change on reinstall.
+
+### Production (Kubernetes Secrets)
+
+Create secrets manually and reference them in the Helm chart:
+
+```bash
+kubectl create secret generic langwatch-secrets \
+  --namespace langwatch \
+  --from-literal=credentialsEncryptionKey=$(openssl rand -hex 32) \
+  --from-literal=nextAuthSecret=$(openssl rand -hex 32) \
+  --from-literal=cronApiKey=$(openssl rand -hex 32)
+```
+
+Reference in `values.yaml`:
+
+```yaml
+secrets:
+  existingSecret: langwatch-secrets
+```
+
+### Production (External Secret Managers)
+
+For tighter security, use an external secrets operator to sync secrets from your cloud provider:
+
+- **AWS Secrets Manager** — via [External Secrets Operator](https://external-secrets.io/)
+- **HashiCorp Vault** — via [Vault Secrets Operator](https://developer.hashicorp.com/vault/docs/platform/k8s/vso)
+- **Azure Key Vault** — via [Azure Key Vault Provider](https://azure.github.io/secrets-store-csi-driver-provider-azure/)
+
+The Helm chart's `secretKeyRef` pattern works with any Kubernetes Secret, regardless of how it was created.
+
+## Network Security
+
+### Recommended Network Architecture
+
+- **Only the LangWatch App should be exposed externally** via Ingress or Load Balancer
+- All other components (Workers, NLP, LangEvals, PostgreSQL, ClickHouse, Redis) should be on internal networks only (ClusterIP services)
+- Place databases in private subnets with no internet access
+- Use VPC endpoints / PrivateLink for S3 access
+
+### Kubernetes Network Policies
+
+Restrict traffic between pods:
+
+```yaml
+# Example: only allow app and workers to reach ClickHouse
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: clickhouse-access
+  namespace: langwatch
+spec:
+  podSelector:
+    matchLabels:
+      app: clickhouse
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: app
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: workers
+      ports:
+        - port: 8123
+```
+
+### Firewall Rules
+
+| Source | Destination | Port | Protocol |
+|--------|-------------|------|----------|
+| Internet / VPN | App (Ingress) | 443 | HTTPS |
+| App | PostgreSQL | 5432 | TCP |
+| App, Workers | ClickHouse | 8123 | HTTP |
+| App, Workers | Redis | 6379 | TCP |
+| Workers | NLP | 5561 | HTTP |
+| Workers | LangEvals | 5562 | HTTP |
+| NLP, LangEvals | External LLMs | 443 | HTTPS |
+| CronJobs | App | 5560 | HTTP |
+
+## Pod Security
+
+The Helm chart applies secure defaults to all pods:
+
+```yaml
+# Pod-level (applied via global.podSecurityContext)
+runAsNonRoot: true
+runAsUser: 1000
+fsGroup: 1000
+
+# Container-level (applied via global.containerSecurityContext)
+allowPrivilegeEscalation: false
+capabilities:
+  drop:
+    - ALL
+readOnlyRootFilesystem: true
+```
+
+These ensure:
+- No containers run as root
+- No privilege escalation is possible
+- Containers cannot modify their own filesystem
+- All Linux capabilities are dropped
+
+## PII Redaction
+
+LangWatch includes a built-in PII redaction pipeline step that automatically detects and masks personally identifiable information in traces before storage.
+
+- **Enabled by default** in the Helm chart
+- Disable with `app.features.disablePiiRedaction: true` (not recommended)
+- Runs as part of the event sourcing pipeline in workers
+
+## Multitenancy
+
+LangWatch enforces tenant isolation at the application level:
+
+- Every ClickHouse query includes `WHERE TenantId = ...` as the first predicate
+- PostgreSQL queries include `projectId` in WHERE clauses
+- API tokens are scoped to a specific project
+- Cross-tenant data access is prevented at the query layer
+
+## Production Hardening Checklist
+
+- [ ] `autogen.enabled: false` — use manually created secrets
+- [ ] All secrets stored in a secrets manager (not inline in values.yaml)
+- [ ] TLS enabled on Ingress (HTTPS only)
+- [ ] Database connections use TLS (`?sslmode=require`)
+- [ ] PostgreSQL, ClickHouse, Redis in private subnets (no public access)
+- [ ] Network policies restrict pod-to-pod traffic
+- [ ] S3 buckets have public access blocked
+- [ ] ClickHouse backups enabled and tested
+- [ ] Monitoring and alerting configured
+- [ ] Secret rotation procedure documented
+- [ ] Pod security contexts verified (non-root, read-only filesystem)
+- [ ] Ingress rate limiting configured
+- [ ] Audit logs enabled (Enterprise)

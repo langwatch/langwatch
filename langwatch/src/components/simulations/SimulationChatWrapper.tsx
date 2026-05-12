@@ -1,4 +1,4 @@
-import type { ScenarioRunData } from "~/app/api/scenario-events/[[...route]]/types";
+import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
@@ -43,7 +43,7 @@ export const SimulationChatWrapper: React.FC<
     },
     {
       enabled: !!project && !!scenarioRunId,
-      refetchInterval: 1000,
+      refetchInterval: 30_000,
     },
   );
 

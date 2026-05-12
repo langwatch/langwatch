@@ -1,41 +1,98 @@
-import { definePipeline } from "../../library";
+import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import { definePipeline } from "../../";
+import type { FoldProjectionStore } from "../../projections/foldProjection.types";
+import type { AppendStore } from "../../projections/mapProjection.types";
+import type { ReactorDefinition } from "../../reactors/reactor.types";
+import { AddAnnotationCommand, BulkSyncAnnotationsCommand, RemoveAnnotationCommand } from "./commands/annotationCommands";
 import { AssignTopicCommand } from "./commands/assignTopicCommand";
+import { RecordLogCommand } from "./commands/recordLogCommand";
+import { RecordMetricCommand } from "./commands/recordMetricCommand";
 import { RecordSpanCommand } from "./commands/recordSpanCommand";
-import { SpanStorageEventHandler } from "./handlers";
-import { TraceSummaryProjectionHandler } from "./projections";
-import { SPAN_RECEIVED_EVENT_TYPE } from "./schemas/constants";
+import { ResolveOriginCommand } from "./commands/resolveOriginCommand";
+import { LogRecordStorageMapProjection } from "./projections/logRecordStorage.mapProjection";
+import { MetricRecordStorageMapProjection } from "./projections/metricRecordStorage.mapProjection";
+import { SpanStorageMapProjection } from "./projections/spanStorage.mapProjection";
+import { TraceSummaryFoldProjection } from "./projections/traceSummary.foldProjection";
 import type { TraceProcessingEvent } from "./schemas/events";
+import type { NormalizedLogRecord } from "./schemas/logRecords";
+import type { NormalizedMetricRecord } from "./schemas/metricRecords";
+import type { NormalizedSpan } from "./schemas/spans";
+
+export interface TraceProcessingPipelineDeps {
+  spanAppendStore: AppendStore<NormalizedSpan>;
+  logRecordAppendStore: AppendStore<NormalizedLogRecord>;
+  metricRecordAppendStore: AppendStore<NormalizedMetricRecord>;
+  traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
+  originGateReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
+  evaluationTriggerReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
+  customEvaluationSyncReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
+  traceUpdateBroadcastReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
+  projectMetadataReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
+  simulationMetricsSyncReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
+  experimentMetricsSyncReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
+  alertTriggerReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
+  spanStorageBroadcastReactor: ReactorDefinition<TraceProcessingEvent>;
+  customerIoTraceSyncReactor?: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
+  gatewayBudgetSyncReactor?: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
+}
 
 /**
- * Trace processing pipeline definition (static, no runtime dependencies).
+ * Creates the trace processing pipeline definition.
  *
  * This pipeline uses trace-level aggregates (aggregateId = traceId).
- * It aggregates span events into trace summary metrics and writes individual
- * spans to the stored_spans table via an event handler.
- *
- * This is a static definition that can be safely imported without triggering
- * ClickHouse/Redis connections. It gets registered with the runtime in
- * the pipeline's index.ts file.
+ * It aggregates span events into trace summary metrics (fold projection) and writes
+ * individual spans to the stored_spans table (map projection).
  */
-export const traceProcessingPipelineDefinition =
-  definePipeline<TraceProcessingEvent>()
+export function createTraceProcessingPipeline(deps: TraceProcessingPipelineDeps) {
+  let builder = definePipeline<TraceProcessingEvent>()
     .withName("trace_processing")
     .withAggregateType("trace")
-    .withProjection("traceSummary", TraceSummaryProjectionHandler, {
-      // Dedupe by aggregate to process only the latest event per trace
-      deduplication: "aggregate",
-      // This reduces strain of computationally heavy trace summary projections being done
-      // unnecessarily due to the burst-heavy nature of span collection.
-      delay: 1500,
-    })
-    .withEventHandler("spanStorage", SpanStorageEventHandler, {
-      eventTypes: [SPAN_RECEIVED_EVENT_TYPE],
-    })
-    // .withEventHandler("observabilityPush", ObservabilityPushEventHandler, {
-    //   eventTypes: [SPAN_RECEIVED_EVENT_TYPE],
-    //   // dependsOn: ["spanStorage", "traceSummary"],
-    //   // delay: 200,
-    // })
+    .withFoldProjection("traceSummary", new TraceSummaryFoldProjection({
+      store: deps.traceSummaryStore,
+    }))
+    .withMapProjection("spanStorage", new SpanStorageMapProjection({
+      store: deps.spanAppendStore,
+    }))
+    .withMapProjection("logRecordStorage", new LogRecordStorageMapProjection({
+      store: deps.logRecordAppendStore,
+    }))
+    .withMapProjection("metricRecordStorage", new MetricRecordStorageMapProjection({
+      store: deps.metricRecordAppendStore,
+    }))
+    .withReactor("traceSummary", "originGate", deps.originGateReactor)
+    .withReactor("traceSummary", "evaluationTrigger", deps.evaluationTriggerReactor)
+    .withReactor("traceSummary", "customEvaluationSync", deps.customEvaluationSyncReactor)
+    .withReactor("traceSummary", "traceUpdateBroadcast", deps.traceUpdateBroadcastReactor)
+    .withReactor("traceSummary", "projectMetadata", deps.projectMetadataReactor)
+    .withReactor("traceSummary", "simulationMetricsSync", deps.simulationMetricsSyncReactor)
+    .withReactor("traceSummary", "experimentMetricsSync", deps.experimentMetricsSyncReactor)
+    .withReactor("traceSummary", "alertTrigger", deps.alertTriggerReactor)
+    .withReactor("spanStorage", "spanStorageBroadcast", deps.spanStorageBroadcastReactor);
+
+  if (deps.customerIoTraceSyncReactor) {
+    builder = builder.withReactor(
+      "traceSummary",
+      "customerIoTraceSync",
+      deps.customerIoTraceSyncReactor,
+    );
+  }
+
+  if (deps.gatewayBudgetSyncReactor) {
+    builder = builder.withReactor(
+      "traceSummary",
+      "gatewayBudgetSync",
+      deps.gatewayBudgetSyncReactor,
+    );
+  }
+
+  return builder
     .withCommand("recordSpan", RecordSpanCommand)
     .withCommand("assignTopic", AssignTopicCommand)
+    .withCommand("recordLog", RecordLogCommand)
+    .withCommand("recordMetric", RecordMetricCommand)
+    .withCommand("resolveOrigin", ResolveOriginCommand)
+    .withCommand("addAnnotation", AddAnnotationCommand)
+    .withCommand("removeAnnotation", RemoveAnnotationCommand)
+    .withCommand("bulkSyncAnnotations", BulkSyncAnnotationsCommand)
     .build();
+}

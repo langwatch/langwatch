@@ -1,4 +1,5 @@
 from typing import Optional
+import contextvars
 import litellm
 import numpy as np
 from scipy.spatial.distance import cdist
@@ -51,7 +52,7 @@ def _generate_single_embedding(
             target_dim=dimensions,
         )
     except Exception as e:
-        logger.warning(f"Error generating single embedding: {e} | Text: {text[:100]}...")
+        logger.warning("Error generating single embedding", error=str(e), text_preview=text[:100])
         raise e  # Re-raise the exception to be handled by the caller
 
 
@@ -73,16 +74,17 @@ def generate_embeddings_threaded(
     # Process in smaller chunks to handle errors properly
     chunk_size = 20
     total_chunks = (len(texts) + chunk_size - 1) // chunk_size
-    logger.info(f"Generating embeddings (threaded) for {len(texts)} texts in {total_chunks} chunks...")
+    logger.info("Generating embeddings (threaded)", text_count=len(texts), chunk_count=total_chunks)
 
     for chunk_idx, i in enumerate(range(0, len(texts), chunk_size)):
         chunk = texts[i:i + chunk_size]
         futures = []
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-            # Submit all tasks
+            # Submit all tasks, propagating log context to threads
             for text in chunk:
-                futures.append(executor.submit(_generate_single_embedding, text, params_copy, dimensions))
+                ctx = contextvars.copy_context()
+                futures.append(executor.submit(ctx.run, _generate_single_embedding, text, params_copy, dimensions))
 
             # Process results as they complete
             for future in futures:
@@ -93,16 +95,16 @@ def generate_embeddings_threaded(
                     embeddings.append(None)
                     errors += 1
                     last_error = e
-                    logger.warning(f"Error generating embedding: {e}")
+                    logger.warning("Error generating embedding", error=str(e))
                     if errors >= 3:
-                        logger.warning("Too many errors generating embeddings, reraising")
+                        logger.error("Too many errors generating embeddings, reraising", error_count=errors)
                         raise e
 
         if (chunk_idx + 1) % 5 == 0 or chunk_idx == total_chunks - 1:
-            logger.info(f"Embeddings progress (threaded): {chunk_idx + 1}/{total_chunks} chunks")
+            logger.info("Embeddings progress (threaded)", chunks_processed=chunk_idx + 1, total_chunks=total_chunks)
 
     if last_error and errors == len(texts):
-        logger.warning("All embeddings failed to generate, reraising last error")
+        logger.error("All embeddings failed to generate, reraising last error", error_count=errors, error=str(last_error))
         raise last_error
 
     return embeddings
@@ -118,17 +120,18 @@ def generate_embeddings(
     total_batches = len(batches)
 
     dimensions = int(embeddings_litellm_params.get("dimensions", 1536))
-    if "dimensions" in embeddings_litellm_params:
+    params_copy = embeddings_litellm_params.copy()
+    if "dimensions" in params_copy:
         # TODO: target_dim is throwing errors for text-embedding-3-small because litellm drop_params is also not working for some reason
-        del embeddings_litellm_params["dimensions"]
+        del params_copy["dimensions"]
 
-    logger.info(f"Generating embeddings for {len(texts)} texts in {total_batches} batches...")
+    logger.info("Generating embeddings", text_count=len(texts), batch_count=total_batches)
 
     for batch_idx, i in enumerate(batches):
         batch = [t if t else "<empty>" for t in texts[i : i + batch_size]]
         try:
             response = litellm.embedding(
-                **embeddings_litellm_params,  # type: ignore
+                **params_copy,  # type: ignore
                 input=batch if batch_size > 1 else batch[0],
             )
             embeddings += [
@@ -140,7 +143,11 @@ def generate_embeddings(
             ]
         except Exception as e:
             if batch_size > 1:
-                # Instead of falling back to batch_size=1, use threaded implementation
+                # Don't fallback for auth errors — same key will fail for every individual request
+                if isinstance(e, litellm.exceptions.AuthenticationError):
+                    logger.warning("Embedding authentication failed, not retrying", error=str(e))
+                    raise
+                # For other errors, fall back to threaded implementation
                 logger.info("Batch embedding failed, falling back to threaded implementation")
                 return generate_embeddings_threaded(texts, embeddings_litellm_params)
 
@@ -148,17 +155,17 @@ def generate_embeddings(
 
             errors += 1
             last_error = e
-            logger.warning(f"Error generating embeddings: {e} | Batch: {batch[:3]}...")
+            logger.warning("Error generating embeddings", error=str(e), batch_preview=batch[:3])
             if errors >= 3:
-                logger.warning("Too many errors generating embeddings, reraising")
+                logger.error("Too many errors generating embeddings, reraising", error_count=errors)
                 raise e
 
         # Log progress every 5 batches or at the end
         if (batch_idx + 1) % 5 == 0 or batch_idx == total_batches - 1:
-            logger.info(f"Embeddings progress: {batch_idx + 1}/{total_batches} batches ({len(embeddings)}/{len(texts)} texts)")
+            logger.info("Embeddings progress", batches_processed=batch_idx + 1, total_batches=total_batches, embeddings_generated=len(embeddings), total_texts=len(texts))
 
     if last_error and errors == len(batches):
-        logger.warning("All embeddings failed to generate, reraising last error")
+        logger.error("All embeddings failed to generate, reraising last error", error_count=errors, error=str(last_error))
         raise last_error
 
     return embeddings

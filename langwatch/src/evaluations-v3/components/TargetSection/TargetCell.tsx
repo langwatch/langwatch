@@ -18,10 +18,11 @@ import {
   LuSquare,
 } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
+import { TraceIdPeek } from "~/features/traces-v2/components/TraceIdPeek";
 import type { FieldMapping as UIFieldMapping } from "~/components/variables";
 import { parseLLMError } from "~/utils/formatLLMError";
 import { formatTargetOutput } from "~/utils/formatTargetOutput";
-import { useDrawer } from "~/hooks/useDrawer";
+import { setFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
 import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
 import { useTargetName } from "../../hooks/useTargetName";
 import type { EvaluatorConfig, TargetConfig } from "../../types";
@@ -30,6 +31,7 @@ import {
   convertFromUIMapping,
   convertToUIMapping,
 } from "../../utils/fieldMappingConverters";
+import { createEvaluatorEditorCallbacks } from "../../utils/evaluatorEditorCallbacks";
 import { evaluatorHasMissingMappings } from "../../utils/mappingValidation";
 import { EvaluatorChip } from "../TargetSection/EvaluatorChip";
 
@@ -61,6 +63,10 @@ type TargetCellContentProps = {
   onStopCell?: () => void;
   /** Handler for re-running a specific evaluator on this cell */
   onRerunEvaluator?: (evaluatorId: string) => void;
+  /** Handler for running an evaluator on all rows with target outputs */
+  onRunEvaluatorOnAllRows?: (evaluatorId: string) => void;
+  /** Whether any row has a target output for this target */
+  hasAnyTargetOutputs?: boolean;
 };
 
 export function TargetCellContent({
@@ -76,6 +82,8 @@ export function TargetCellContent({
   onRunCell,
   onStopCell,
   onRerunEvaluator,
+  onRunEvaluatorOnAllRows,
+  hasAnyTargetOutputs,
 }: TargetCellContentProps) {
   const { openDrawer } = useDrawer();
   const targetName = useTargetName(target);
@@ -84,6 +92,7 @@ export function TargetCellContent({
     activeDatasetId,
     datasets,
     removeEvaluator,
+    updateEvaluator,
     setEvaluatorMapping,
     removeEvaluatorMapping,
   } = useEvaluationsV3Store((state) => ({
@@ -91,6 +100,7 @@ export function TargetCellContent({
     activeDatasetId: state.activeDatasetId,
     datasets: state.datasets,
     removeEvaluator: state.removeEvaluator,
+    updateEvaluator: state.updateEvaluator,
     setEvaluatorMapping: state.setEvaluatorMapping,
     removeEvaluatorMapping: state.removeEvaluatorMapping,
   }));
@@ -162,12 +172,11 @@ export function TargetCellContent({
     return missing;
   }, [evaluators, activeDatasetId, target.id]);
 
-  // Helper to create mappingsConfig for an evaluator
-  const createMappingsConfig = useCallback(
+  // Build the serializable `mappingsConfig` for an evaluator. Stays
+  // serializable because it goes through the drawer's ephemeral complexProps
+  // path (cleared on ErrorBoundary remount — see issue #3087).
+  const buildMappingsConfig = useCallback(
     (evaluator: EvaluatorConfig) => {
-      const datasetIds = new Set(datasets.map((d) => d.id));
-      const isDatasetSource = (sourceId: string) => datasetIds.has(sourceId);
-
       // Build available sources
       const activeDataset = datasets.find((d) => d.id === activeDatasetId);
       const availableSources = [];
@@ -202,37 +211,42 @@ export function TargetCellContent({
         initialMappings[key] = convertToUIMapping(mapping);
       }
 
-      return {
-        availableSources,
-        initialMappings,
-        onMappingChange: (
-          identifier: string,
-          mapping: UIFieldMapping | undefined,
-        ) => {
-          if (mapping) {
-            const storeMapping = convertFromUIMapping(mapping, isDatasetSource);
-            setEvaluatorMapping(
-              evaluator.id,
-              activeDatasetId,
-              target.id,
-              identifier,
-              storeMapping,
-            );
-          } else {
-            removeEvaluatorMapping(
-              evaluator.id,
-              activeDatasetId,
-              target.id,
-              identifier,
-            );
-          }
-        },
+      return { availableSources, initialMappings };
+    },
+    [datasets, activeDatasetId, target, targetName],
+  );
+
+  // Build the durable `onMappingChange` callback for an evaluator. Lives
+  // separately from `mappingsConfig` because it must survive the drawer's
+  // complexProps clears — registered via `setFlowCallbacks` instead (#3441).
+  const buildOnMappingChange = useCallback(
+    (evaluator: EvaluatorConfig) => {
+      const datasetIds = new Set(datasets.map((d) => d.id));
+      const isDatasetSource = (sourceId: string) => datasetIds.has(sourceId);
+      return (identifier: string, mapping: UIFieldMapping | undefined) => {
+        if (mapping) {
+          const storeMapping = convertFromUIMapping(mapping, isDatasetSource);
+          setEvaluatorMapping(
+            evaluator.id,
+            activeDatasetId,
+            target.id,
+            identifier,
+            storeMapping,
+          );
+        } else {
+          removeEvaluatorMapping(
+            evaluator.id,
+            activeDatasetId,
+            target.id,
+            identifier,
+          );
+        }
       };
     },
     [
       datasets,
       activeDatasetId,
-      target,
+      target.id,
       setEvaluatorMapping,
       removeEvaluatorMapping,
     ],
@@ -385,17 +399,44 @@ export function TargetCellContent({
           result={evaluatorResults[evaluator.id]}
           hasMissingMappings={missingMappingsSet.has(evaluator.id)}
           isRunning={isEvaluatorRunning?.(evaluator.id) ?? false}
+          hasTargetOutput={output !== undefined && output !== null}
+          hasAnyTargetOutputs={hasAnyTargetOutputs}
+          targetType={target.type}
           onEdit={() => {
-            const mappingsConfig = createMappingsConfig(evaluator);
+            // Route all non-serializable callbacks through setFlowCallbacks.
+            // onMappingChange + onLocalConfigChange must live here (not in
+            // mappingsConfig) so the drawer's mappings section renders — see
+            // issue #3441.
+            //
+            // We use the direct `onLocalConfigChange` form (not the
+            // target-bound `targetId + updateTarget` convenience) because
+            // the chip's local config persists onto the evaluator, not the
+            // target.
+            setFlowCallbacks(
+              "evaluatorEditor",
+              createEvaluatorEditorCallbacks({
+                onLocalConfigChange: (localEvaluatorConfig) => {
+                  updateEvaluator(evaluator.id, { localEvaluatorConfig });
+                },
+                onMappingChange: buildOnMappingChange(evaluator),
+              }),
+            );
+
             openDrawer("evaluatorEditor", {
               evaluatorId: evaluator.dbEvaluatorId,
               evaluatorType: evaluator.evaluatorType,
-              mappingsConfig,
+              mappingsConfig: buildMappingsConfig(evaluator),
+              initialLocalConfig: evaluator.localEvaluatorConfig,
             });
           }}
           onRemove={() => removeEvaluator(evaluator.id)}
           onRerun={
             onRerunEvaluator ? () => onRerunEvaluator(evaluator.id) : undefined
+          }
+          onRunOnAllRows={
+            onRunEvaluatorOnAllRows
+              ? () => onRunEvaluatorOnAllRows(evaluator.id)
+              : undefined
           }
         />
       ))}
@@ -486,6 +527,7 @@ export function TargetCellContent({
           </Button>
         </Tooltip>
       )}
+      {traceId && <TraceIdPeek traceId={traceId} />}
       {/* Copy button - shows when there's output */}
       {rawOutput && (
         <Tooltip

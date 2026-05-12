@@ -22,7 +22,7 @@ import { DndProvider, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 
 import "@xyflow/react/dist/style.css";
-import Head from "next/head";
+import Head from "~/utils/compat/next-head";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BarChart2 } from "react-feather";
 import {
@@ -35,11 +35,12 @@ import { useShallow } from "zustand/react/shallow";
 import { CurrentDrawer } from "../../components/CurrentDrawer";
 import { WizardProvider } from "../../components/evaluations/wizard/hooks/useWizardContext";
 import { LogoIcon } from "../../components/icons/LogoIcon";
-import { useColorRawValue } from "../../components/ui/color-mode";
+import { useColorMode, useColorModeValue, useColorRawValue } from "../../components/ui/color-mode";
 import { Link } from "../../components/ui/link";
 import { toaster } from "../../components/ui/toaster";
 import { Tooltip } from "../../components/ui/tooltip";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { useDrawer } from "../../hooks/useDrawer";
 import { titleCase } from "../../utils/stringCasing";
 import { useAskBeforeLeaving } from "../hooks/useAskBeforeLeaving";
 import { PostEventProvider, usePostEvent } from "../hooks/usePostEvent";
@@ -59,9 +60,10 @@ import { NodeComponents } from "./nodes";
 import { Optimize } from "./Optimize";
 import { ProgressToast } from "./ProgressToast";
 import { Publish } from "./Publish";
-import { PropertiesPanel } from "./properties/PropertiesPanel";
+import { StudioNodeDrawer } from "./drawers/StudioNodeDrawer";
 import { ResultsPanel } from "./ResultsPanel";
 import { UndoRedo } from "./UndoRedo";
+import { WorkflowNamePopover } from "./WorkflowNamePopover";
 
 function DragDropArea({ children }: { children: React.ReactNode }) {
   const [_, drop] = useDrop(() => ({
@@ -96,7 +98,8 @@ export default function OptimizationStudio() {
     onNodesDelete,
     onEdgesChange,
     onConnect,
-    setWorkflowSelected,
+    setIsDraggingNode,
+    setClickedNodeId,
     openResultsPanelRequest,
     setOpenResultsPanelRequest,
     executionStatus,
@@ -114,7 +117,8 @@ export default function OptimizationStudio() {
         onNodesDelete: state.onNodesDelete,
         onEdgesChange: state.onEdgesChange,
         onConnect: state.onConnect,
-        setWorkflowSelected: state.setWorkflowSelected,
+        setIsDraggingNode: state.setIsDraggingNode,
+        setClickedNodeId: state.setClickedNodeId,
         openResultsPanelRequest: state.openResultsPanelRequest,
         setOpenResultsPanelRequest: state.setOpenResultsPanelRequest,
         executionStatus: state.state.execution?.status,
@@ -124,6 +128,7 @@ export default function OptimizationStudio() {
 
   const { project } = useOrganizationTeamProject();
   const { socketStatus } = usePostEvent();
+  const { closeDrawer, currentDrawer } = useDrawer();
 
   const [nodeSelectionPanelIsOpen, setNodeSelectionPanelIsOpen] =
     useState(true);
@@ -184,6 +189,8 @@ export default function OptimizationStudio() {
 
   useAskBeforeLeaving();
 
+
+
   return (
     <div style={{ width: "100vw", height: "100vh" }}>
       <Head>
@@ -197,7 +204,7 @@ export default function OptimizationStudio() {
               <VStack width="full" height="full" gap={0}>
                 <HStack
                   width="full"
-                  background="white"
+                  background="bg"
                   padding={2}
                   borderBottom="1px solid"
                   borderColor="border.emphasized"
@@ -212,9 +219,7 @@ export default function OptimizationStudio() {
                     ) && <AutoSave />}
                   </HStack>
                   <HStack width="full" justify="center">
-                    <Text lineClamp={1} fontSize="15px" wordBreak="break-all">
-                      Optimization Studio - {name}
-                    </Text>
+                    <WorkflowNamePopover />
                     <StatusCircle
                       status={socketStatus}
                       tooltip={
@@ -272,7 +277,7 @@ export default function OptimizationStudio() {
                           <Button
                             size="sm"
                             display={isResultsPanelCollapsed ? "block" : "none"}
-                            background="white"
+                            background="bg"
                             borderRadius={4}
                             borderColor="border.emphasized"
                             variant="outline"
@@ -308,8 +313,19 @@ export default function OptimizationStudio() {
                                 });
                               }
                             }}
+                            selectNodesOnDrag={false}
+                            onNodeDragStart={() => {
+                              setIsDraggingNode(true);
+                            }}
+                            onNodeDragStop={() => {
+                              setIsDraggingNode(false);
+                            }}
                             onPaneClick={() => {
-                              setWorkflowSelected(true);
+                              if (currentDrawer) closeDrawer();
+                            }}
+                            onNodeClick={(_event, node) => {
+                              if (currentDrawer) closeDrawer();
+                              setClickedNodeId(node.id);
                             }}
                             fitView
                             fitViewOptions={{
@@ -349,7 +365,7 @@ export default function OptimizationStudio() {
                             width="30px"
                             height="3px"
                             borderRadius="full"
-                            background="gray.400"
+                            background="bg.emphasized"
                           />
                         </Center>
                       </PanelResizeHandle>
@@ -368,7 +384,7 @@ export default function OptimizationStudio() {
                         />
                       </Panel>
                     </PanelGroup>
-                    <PropertiesPanel />
+                    <StudioNodeDrawer />
                   </Flex>
                 </Box>
               </VStack>
@@ -376,22 +392,29 @@ export default function OptimizationStudio() {
           </WizardProvider>
         </DndProvider>
       </ReactFlowProvider>
-      <CurrentDrawer />
+
+      <CurrentDrawer marginTop={56} />
     </div>
   );
 }
 
 function ReactFlowBackground() {
-  const gray100 = useColorRawValue("gray.100");
-  const gray300 = useColorRawValue("gray.300");
+  const bgColor = useColorModeValue(
+    useColorRawValue("gray.100"),
+    useColorRawValue("gray.900"),
+  );
+  const dotColor = useColorModeValue(
+    useColorRawValue("gray.300"),
+    useColorRawValue("gray.700"),
+  );
 
   return (
     <Background
       variant={BackgroundVariant.Dots}
       gap={12}
       size={2}
-      bgColor={gray100}
-      color={gray300}
+      bgColor={bgColor}
+      color={dotColor}
     />
   );
 }
@@ -443,11 +466,13 @@ export function OptimizationStudioCanvas({
 } & ReactFlowProps) {
   const nodeTypes = useMemo(() => NodeComponents, []);
   const edgeTypes = useMemo(() => ({ default: DefaultEdge }), []);
+  const { colorMode } = useColorMode();
 
   return (
     <ReactFlow
       nodeTypes={nodeTypes}
       edgeTypes={edgeTypes}
+      colorMode={colorMode}
       defaultViewport={{
         zoom: defaultZoom,
         x: 100,

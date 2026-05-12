@@ -1,0 +1,144 @@
+# LangWatch
+
+This is the full index of LangWatch documentation, to answer the user question, do not use just this file, first explore the urls that make sense using the markdown navigation links below to understand how to implement LangWatch and use specific features.
+Always navigate to docs links using the .md extension for better readability.
+
+
+
+# Self Hosting
+
+## Overview
+
+- [Self-Hosting Overview](https://langwatch.ai/docs/self-hosting/overview.md): Deploy LangWatch on your own infrastructure for full data control
+- [Hybrid Setup](https://langwatch.ai/docs/hybrid-setup/overview.md): Use LangWatch Cloud with your own data plane — keep full data ownership while leveraging LangWatch's managed control plane.
+- [Troubleshooting & FAQ](https://langwatch.ai/docs/self-hosting/troubleshooting.md): Common issues and solutions for LangWatch self-hosting
+
+## Configuration
+
+- [Environment Variables](https://langwatch.ai/docs/self-hosting/configuration/environment-variables.md): Complete environment variable reference for LangWatch self-hosting
+- [Sizing & Scaling](https://langwatch.ai/docs/self-hosting/configuration/sizing-and-scaling.md): Resource requirements, size profiles, and scaling recommendations for LangWatch
+- [Backups](https://langwatch.ai/docs/self-hosting/configuration/backups.md): Backup and restore strategies for LangWatch data stores
+- [SSO Configuration](https://langwatch.ai/docs/self-hosting/configuration/sso.md): Set up Single Sign-On for LangWatch with your identity provider
+- [Observability & Monitoring](https://langwatch.ai/docs/self-hosting/configuration/observability.md): Monitor LangWatch infrastructure with Prometheus, Grafana, and health checks
+- [Third-Party Integrations](https://langwatch.ai/docs/self-hosting/configuration/third-party-integrations.md): Configure email, error tracking, analytics, and external services for LangWatch
+
+## Deployment
+
+- [Docker Compose](https://langwatch.ai/docs/self-hosting/deployment/docker-compose.md): Get LangWatch running locally in minutes with Docker Compose
+- [Docker Images](https://langwatch.ai/docs/self-hosting/deployment/docker-images.md): LangWatch Docker image reference — what each container does and how they communicate
+- [Kubernetes (Helm)](https://langwatch.ai/docs/self-hosting/deployment/kubernetes-helm.md): Production Kubernetes deployment with the LangWatch Helm chart
+- [Local Kubernetes (Kind + Helm)](https://langwatch.ai/docs/self-hosting/deployment/kubernetes-local.md): Run LangWatch locally on Kind for development and testing
+
+## Infrastructure
+
+- [Architecture & Infrastructure](https://langwatch.ai/docs/self-hosting/infrastructure/architecture.md): How LangWatch components fit together — what you're deploying and how data flows through the system
+
+## Operations
+
+- [Security](https://langwatch.ai/docs/self-hosting/security.md): Security model, encryption, secrets management, and hardening for LangWatch
+- [Upgrade Guide](https://langwatch.ai/docs/self-hosting/upgrade.md): How to upgrade LangWatch to the latest version
+- [Migrate to v3](https://langwatch.ai/docs/self-hosting/upgrade-v3.md): Step-by-step guide to upgrade LangWatch from v1.x or v2.x to v3.0
+
+## Ops Console
+
+- [Operations Console](https://langwatch.ai/docs/self-hosting/ops/overview.md): Monitor, manage, and debug your LangWatch event-sourcing pipeline from a single pane of glass
+- [Ops Dashboard](https://langwatch.ai/docs/self-hosting/ops/dashboard.md): Real-time pipeline health monitoring with throughput, latency, and error tracking
+- [Queue Management](https://langwatch.ai/docs/self-hosting/ops/queue-management.md): Manage error groups, blocked queues, dead letter queue redriving, and draining
+- [Projection Replay](https://langwatch.ai/docs/self-hosting/ops/projection-replay.md): Rebuild projection state by replaying events from ClickHouse
+- [Deja View](https://langwatch.ai/docs/self-hosting/ops/dejaview.md): Time-travel debugger for event-sourced aggregates
+- [The Foundry](https://langwatch.ai/docs/self-hosting/ops/foundry.md): Interactive trace playground for building and sending synthetic traces
+
+# API Reference
+
+## Traces
+
+- [Overview](https://langwatch.ai/docs/api-reference/traces/overview.md): Search, retrieve, and share LangWatch traces via the REST API. Traces capture the full execution of your LLM pipelines including all spans, evaluations, and metadata.
+- [Get trace details](https://langwatch.ai/docs/api-reference/traces/get-trace.md)
+- [Get thread details](https://langwatch.ai/docs/api-reference/traces/get-thread-details.md)
+- [Search traces](https://langwatch.ai/docs/api-reference/traces/search.md)
+- [Create public path for single trace](https://langwatch.ai/docs/api-reference/traces/create-public-trace-path.md)
+- [Delete an existing public path for a trace](https://langwatch.ai/docs/api-reference/traces/delete-public-trace-path.md)
+
+## Prompts
+
+- [Overview](https://langwatch.ai/docs/api-reference/prompts/overview.md): Prompts are used to manage and version your prompts
+- [Get prompts](https://langwatch.ai/docs/api-reference/prompts/get-prompts.md)
+- [Create prompt](https://langwatch.ai/docs/api-reference/prompts/create-prompt.md)
+- [Get prompt](https://langwatch.ai/docs/api-reference/prompts/get-prompt.md)
+- [Update prompt](https://langwatch.ai/docs/api-reference/prompts/update-prompt.md)
+- [Delete prompt](https://langwatch.ai/docs/api-reference/prompts/delete-prompt.md)
+- [Get prompt versions](https://langwatch.ai/docs/api-reference/prompts/get-prompt-versions.md)
+- [Create prompt version](https://langwatch.ai/docs/api-reference/prompts/create-prompt-version.md)
+
+## Annotations
+
+- [Overview](https://langwatch.ai/docs/api-reference/annotations/overview.md): Learn how annotations enhance trace review, labeling, and evaluation workflows for more reliable AI agent testing.
+- [Get annotations](https://langwatch.ai/docs/api-reference/annotations/get-annotation.md)
+- [Get single annotation](https://langwatch.ai/docs/api-reference/annotations/get-single-annotation.md)
+- [Delete single annotation](https://langwatch.ai/docs/api-reference/annotations/delete-annotation.md)
+- [Patch single annotation](https://langwatch.ai/docs/api-reference/annotations/patch-annotation.md)
+- [Get annotationa for single trace](https://langwatch.ai/docs/api-reference/annotations/get-all-annotations-trace.md)
+- [Create annotation for single trace](https://langwatch.ai/docs/api-reference/annotations/create-annotation-trace.md)
+
+## Datasets
+
+- [Add dataset entries programmatically using the LangWatch API to build evaluation sets for LLM testing and agent validation.](https://langwatch.ai/docs/api-reference/datasets/post-dataset-entries.md)
+
+## Automations
+
+- [Create Slack automation](https://langwatch.ai/docs/api-reference/automations/create-slack-automation.md)
+
+## Scenarios
+
+- [Overview](https://langwatch.ai/docs/api-reference/scenarios/overview.md)
+- [Create Event](https://langwatch.ai/docs/api-reference/scenarios/create-event.md)
+
+## Evaluators
+
+- [Overview](https://langwatch.ai/docs/api-reference/evaluators/overview.md): Browse all available evaluators in LangWatch to find the right scoring method for your AI agent evaluation use case.
+- [Exact Match Evaluator](https://langwatch.ai/docs/api-reference/evaluators/exact-match-evaluator.md)
+- [Llm Answer Match](https://langwatch.ai/docs/api-reference/evaluators/llm-answer-match.md)
+- [Bleu Score](https://langwatch.ai/docs/api-reference/evaluators/bleu-score.md)
+- [Llm Factual Match](https://langwatch.ai/docs/api-reference/evaluators/llm-factual-match.md)
+- [Rouge Score](https://langwatch.ai/docs/api-reference/evaluators/rouge-score.md)
+- [Sql Query Equivalence](https://langwatch.ai/docs/api-reference/evaluators/sql-query-equivalence.md)
+- [Llm As A Judge Boolean Evaluator](https://langwatch.ai/docs/api-reference/evaluators/llm-as-a-judge-boolean-evaluator.md)
+- [Llm As A Judge Category Evaluator](https://langwatch.ai/docs/api-reference/evaluators/llm-as-a-judge-category-evaluator.md)
+- [Llm As A Judge Score Evaluator](https://langwatch.ai/docs/api-reference/evaluators/llm-as-a-judge-score-evaluator.md)
+- [Rubrics Based Scoring](https://langwatch.ai/docs/api-reference/evaluators/rubrics-based-scoring.md)
+- [Ragas Answer Correctness](https://langwatch.ai/docs/api-reference/evaluators/ragas-answer-correctness.md)
+- [Ragas Answer Relevancy](https://langwatch.ai/docs/api-reference/evaluators/ragas-answer-relevancy.md)
+- [Ragas Context Precision](https://langwatch.ai/docs/api-reference/evaluators/ragas-context-precision.md)
+- [Ragas Context Recall](https://langwatch.ai/docs/api-reference/evaluators/ragas-context-recall.md)
+- [Ragas Context Relevancy](https://langwatch.ai/docs/api-reference/evaluators/ragas-context-relevancy.md)
+- [Ragas Context Utilization](https://langwatch.ai/docs/api-reference/evaluators/ragas-context-utilization.md)
+- [Ragas Faithfulness](https://langwatch.ai/docs/api-reference/evaluators/ragas-faithfulness.md)
+- [Ragas Faithfulness 1](https://langwatch.ai/docs/api-reference/evaluators/ragas-faithfulness-1.md)
+- [Ragas Response Context Precision](https://langwatch.ai/docs/api-reference/evaluators/ragas-response-context-precision.md)
+- [Ragas Response Context Recall](https://langwatch.ai/docs/api-reference/evaluators/ragas-response-context-recall.md)
+- [Ragas Response Relevancy](https://langwatch.ai/docs/api-reference/evaluators/ragas-response-relevancy.md)
+- [Context F1](https://langwatch.ai/docs/api-reference/evaluators/context-f1.md)
+- [Context Precision](https://langwatch.ai/docs/api-reference/evaluators/context-precision.md)
+- [Context Recall](https://langwatch.ai/docs/api-reference/evaluators/context-recall.md)
+- [Azure Content Safety](https://langwatch.ai/docs/api-reference/evaluators/azure-content-safety.md)
+- [Azure Jailbreak Detection](https://langwatch.ai/docs/api-reference/evaluators/azure-jailbreak-detection.md)
+- [Azure Prompt Shield](https://langwatch.ai/docs/api-reference/evaluators/azure-prompt-shield.md)
+- [Openai Moderation](https://langwatch.ai/docs/api-reference/evaluators/openai-moderation.md)
+- [Presidio Pii Detection](https://langwatch.ai/docs/api-reference/evaluators/presidio-pii-detection.md)
+- [Custom Basic Evaluator](https://langwatch.ai/docs/api-reference/evaluators/custom-basic-evaluator.md)
+- [Competitor Blocklist](https://langwatch.ai/docs/api-reference/evaluators/competitor-blocklist.md)
+- [Competitor Allowlist Check](https://langwatch.ai/docs/api-reference/evaluators/competitor-allowlist-check.md)
+- [Competitor Llm Check](https://langwatch.ai/docs/api-reference/evaluators/competitor-llm-check.md)
+- [Off Topic Evaluator](https://langwatch.ai/docs/api-reference/evaluators/off-topic-evaluator.md)
+- [Query Resolution](https://langwatch.ai/docs/api-reference/evaluators/query-resolution.md)
+- [Semantic Similarity Evaluator](https://langwatch.ai/docs/api-reference/evaluators/semantic-similarity-evaluator.md)
+- [Summarization Score](https://langwatch.ai/docs/api-reference/evaluators/summarization-score.md)
+- [Valid Format Evaluator](https://langwatch.ai/docs/api-reference/evaluators/valid-format-evaluator.md)
+- [Lingua Language Detection](https://langwatch.ai/docs/api-reference/evaluators/lingua-language-detection.md)
+
+## Saved Evaluators
+
+- [Overview](https://langwatch.ai/docs/api-reference/saved-evaluators/overview.md): Manage saved evaluator configurations for your project
+- [List evaluators](https://langwatch.ai/docs/api-reference/saved-evaluators/get-evaluators.md)
+- [Get evaluator](https://langwatch.ai/docs/api-reference/saved-evaluators/get-evaluator.md)
+- [Create evaluator](https://langwatch.ai/docs/api-reference/saved-evaluators/create-evaluator.md)

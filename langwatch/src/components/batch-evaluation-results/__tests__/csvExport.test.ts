@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ESBatchEvaluation } from "~/server/experiments/types";
+import type { ExperimentRunWithItems } from "~/server/evaluations-v3/services/types";
 import {
   buildCsvData,
   buildCsvHeaders,
@@ -613,15 +613,14 @@ describe("csvExport", () => {
 
   describe("multi-target CSV export from ES data", () => {
     const createESData = (
-      overrides: Partial<ESBatchEvaluation> = {},
-    ): ESBatchEvaluation => ({
-      project_id: "project-1",
-      experiment_id: "exp-1",
-      run_id: "run-1",
+      overrides: Partial<ExperimentRunWithItems> = {},
+    ): ExperimentRunWithItems => ({
+      experimentId: "exp-1",
+      runId: "run-1",
+      projectId: "project-1",
       timestamps: {
-        created_at: 1705320000000,
-        inserted_at: 1705320000000,
-        updated_at: 1705320000000,
+        createdAt: 1705320000000,
+        updatedAt: 1705320000000,
       },
       targets: [],
       dataset: [],
@@ -656,21 +655,21 @@ describe("csvExport", () => {
           // All targets at index 0 with their own predictions
           {
             index: 0,
-            target_id: "gpt-4",
+            targetId: "gpt-4",
             entry: { question: "Q1" },
             predicted: { output: "GPT-4 answer" },
             duration: 500,
           },
           {
             index: 0,
-            target_id: "gpt-3.5",
+            targetId: "gpt-3.5",
             entry: { question: "Q1" },
             predicted: { output: "GPT-3.5 answer" },
             duration: 200,
           },
           {
             index: 0,
-            target_id: "claude",
+            targetId: "claude",
             entry: { question: "Q1" },
             predicted: { output: "Claude answer" },
             duration: 300,
@@ -680,7 +679,7 @@ describe("csvExport", () => {
           {
             evaluator: "quality",
             name: "Quality",
-            target_id: "gpt-4",
+            targetId: "gpt-4",
             index: 0,
             status: "processed",
             score: 0.9,
@@ -688,7 +687,7 @@ describe("csvExport", () => {
           {
             evaluator: "quality",
             name: "Quality",
-            target_id: "gpt-3.5",
+            targetId: "gpt-3.5",
             index: 0,
             status: "processed",
             score: 0.8,
@@ -696,7 +695,7 @@ describe("csvExport", () => {
           {
             evaluator: "quality",
             name: "Quality",
-            target_id: "claude",
+            targetId: "claude",
             index: 0,
             status: "processed",
             score: 0.85,
@@ -763,26 +762,26 @@ describe("csvExport", () => {
           // Row 0
           {
             index: 0,
-            target_id: "gpt-4",
+            targetId: "gpt-4",
             entry: { question: "Q1" },
             predicted: { answer: "GPT-4 answer 1" },
           },
           {
             index: 0,
-            target_id: "claude",
+            targetId: "claude",
             entry: { question: "Q1" },
             predicted: { answer: "Claude answer 1" },
           },
           // Row 1
           {
             index: 1,
-            target_id: "gpt-4",
+            targetId: "gpt-4",
             entry: { question: "Q2" },
             predicted: { answer: "GPT-4 answer 2" },
           },
           {
             index: 1,
-            target_id: "claude",
+            targetId: "claude",
             entry: { question: "Q2" },
             predicted: { answer: "Claude answer 2" },
           },
@@ -810,20 +809,20 @@ describe("csvExport", () => {
           // Row 0 - both targets have predictions
           {
             index: 0,
-            target_id: "gpt-4",
+            targetId: "gpt-4",
             entry: { question: "Q1" },
             predicted: { answer: "GPT-4 answer" },
           },
           {
             index: 0,
-            target_id: "claude",
+            targetId: "claude",
             entry: { question: "Q1" },
             predicted: { answer: "Claude answer" },
           },
           // Row 1 - only GPT-4 has prediction (Claude is still processing or errored)
           {
             index: 1,
-            target_id: "gpt-4",
+            targetId: "gpt-4",
             entry: { question: "Q2" },
             predicted: { answer: "GPT-4 answer 2" },
           },

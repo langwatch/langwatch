@@ -5,6 +5,7 @@ import {
   validateLicense,
   verifySignature,
 } from "../validation";
+import { LicensePlanLimitsSchema } from "../types";
 import {
   BASE_LICENSE,
   VALID_LICENSE_KEY,
@@ -17,7 +18,31 @@ import {
 } from "./fixtures/testLicenses";
 import { TEST_PUBLIC_KEY, WRONG_PUBLIC_KEY } from "./fixtures/testKeys";
 
+describe("LicensePlanLimitsSchema", () => {
+  /** @scenario License schema accepts maxMembersLite as optional field */
+  it("accepts a license payload with maxMembersLite set to 5", () => {
+    const payload = {
+      type: "PRO",
+      name: "Pro",
+      maxMembers: 5,
+      maxMembersLite: 5,
+      maxProjects: 10,
+      maxMessagesPerMonth: 50000,
+      maxWorkflows: 25,
+      canPublish: true,
+    };
+
+    const result = LicensePlanLimitsSchema.safeParse(payload);
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.maxMembersLite).toBe(5);
+    }
+  });
+});
+
 describe("parseLicenseKey", () => {
+  /** @scenario Parses valid base64-encoded license key */
   it("parses valid base64-encoded license key", () => {
     const result = parseLicenseKey(VALID_LICENSE_KEY);
 
@@ -26,18 +51,21 @@ describe("parseLicenseKey", () => {
     expect(result?.signature).toBeDefined();
   });
 
+  /** @scenario Returns null for malformed base64 input */
   it("returns null for malformed base64 input", () => {
     const result = parseLicenseKey(MALFORMED_BASE64);
 
     expect(result).toBeNull();
   });
 
+  /** @scenario Returns null for valid base64 but invalid JSON */
   it("returns null for valid base64 but invalid JSON", () => {
     const result = parseLicenseKey(INVALID_JSON_BASE64);
 
     expect(result).toBeNull();
   });
 
+  /** @scenario Returns null for empty license key */
   it("returns null for empty license key", () => {
     const result = parseLicenseKey("");
 
@@ -62,6 +90,7 @@ describe("parseLicenseKey", () => {
 });
 
 describe("verifySignature", () => {
+  /** @scenario Verifies valid RSA-SHA256 signature */
   it("verifies valid RSA-SHA256 signature", () => {
     const signedLicense = parseLicenseKey(VALID_LICENSE_KEY);
 
@@ -72,6 +101,7 @@ describe("verifySignature", () => {
     expect(result).toBe(true);
   });
 
+  /** @scenario Rejects tampered license data */
   it("rejects tampered license data", () => {
     const signedLicense = parseLicenseKey(TAMPERED_LICENSE_KEY);
 
@@ -92,6 +122,7 @@ describe("verifySignature", () => {
     expect(result).toBe(false);
   });
 
+  /** @scenario Rejects license with empty signature */
   it("rejects license with empty signature", () => {
     const signedLicense = parseLicenseKey(EMPTY_SIGNATURE_KEY);
 
@@ -146,6 +177,7 @@ describe("isExpired", () => {
 });
 
 describe("validateLicense", () => {
+  /** @scenario Validates complete license successfully */
   it("validates complete license successfully", () => {
     const result = validateLicense(VALID_LICENSE_KEY, TEST_PUBLIC_KEY);
 
@@ -246,11 +278,15 @@ describe("validateLicense", () => {
       }
     });
 
-    it("extracts plan.evaluationsCredit", () => {
+    it("validates old licenses that include evaluationsCredit (backward compat)", () => {
+      // VALID_LICENSE_KEY contains evaluationsCredit in the signed payload.
+      // After making the field optional, old licenses must still parse and
+      // pass signature verification without error.
       const result = validateLicense(VALID_LICENSE_KEY, TEST_PUBLIC_KEY);
 
       expect(result.valid).toBe(true);
       if (result.valid) {
+        // The field is declared as optional on the schema, so Zod preserves its value on parse.
         expect(result.licenseData.plan.evaluationsCredit).toBe(BASE_LICENSE.plan.evaluationsCredit);
       }
     });

@@ -8,15 +8,7 @@
  * SSRF protection has its own dedicated unit tests. This allows us to
  * focus on testing the HTTP proxy functionality.
  */
-import {
-  afterEach,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { getTestUser } from "../../../../utils/testUtils";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
@@ -40,10 +32,6 @@ describe("HTTP Proxy", () => {
       },
     });
     caller = appRouter.createCaller(ctx);
-  });
-
-  beforeEach(() => {
-    mockSsrfSafeFetch.mockReset();
   });
 
   afterEach(() => {

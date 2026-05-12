@@ -49,8 +49,6 @@ const baseResourceFields = {
   maxAutomations: 10,
   currentMessagesPerMonth: 500,
   maxMessagesPerMonth: 10000,
-  currentEvaluationsCredit: 25,
-  maxEvaluationsCredit: 100,
 } as const;
 
 /**
@@ -185,6 +183,7 @@ describe("isCorruptedLicense", () => {
 });
 
 describe("formatLimitOrUnlimited", () => {
+  /** @scenario License details card handles Infinity display */
   it("returns 'Unlimited' for Infinity", () => {
     expect(formatLimitOrUnlimited(Infinity)).toBe("Unlimited");
   });

@@ -50,13 +50,13 @@ export const getFirstInputAsText = (spans: Span[]): string => {
     }
     return topmostSpan?.name ?? "";
   }
-  const text = typedValueToText(input, true);
+  const text = typedValueToText(input, true, "user");
   if (
     !text &&
     topmostInputs[0]?.name?.startsWith("RunnableSequence") &&
     topmostInputs[1]?.input
   ) {
-    return typedValueToText(topmostInputs[1].input, true);
+    return typedValueToText(topmostInputs[1].input, true, "user");
   }
   return text;
 };
@@ -106,34 +106,56 @@ export const getLastOutputAsText = (spans: Span[]): string => {
   }
 
   // If the top-level node has no output, then for getting the best text that represents the output,
-  // we try to find the last span to finish, this is likely the one that came up with the final answer
+  // we try to find the last span to finish, this is likely the one that came up with the final answer.
+  // Walk the finish-ordered list and return the first span whose output actually renders to non-empty
+  // text — the latest-finishing span may have an output whose type or shape collapses to "" (e.g. an
+  // unhandled type, a `list` with unstructured items, or a json whose "special key" is itself empty),
+  // in which case we fall back to the next candidate instead of showing an empty trace output.
   const spansInFinishOrderDesc = spans
     .toSorted((a, b) => b.timestamps.finished_at - a.timestamps.finished_at)
     .filter(nonEmptySpan);
 
-  const outputs = spansInFinishOrderDesc[0]?.output;
-  if (!outputs) {
-    const topmostSpan = flattenSpanTree(
-      organizeSpansIntoTree(spans),
-      "outside-in",
-    ).filter((span) => !span.parent_id)[0];
-    if (topmostSpan?.params?.http?.status_code) {
-      return topmostSpan.params.http.status_code.toString();
+  for (const span of spansInFinishOrderDesc) {
+    if (!span.output) continue;
+    const text = typedValueToText(span.output, true);
+    if (text) {
+      return text;
     }
-    return "";
-  }
-  const firstOutput = outputs;
-  if (!firstOutput) {
-    return "";
   }
 
-  return typedValueToText(firstOutput, true);
+  const topmostSpan = flattenSpanTree(
+    organizeSpansIntoTree(spans),
+    "outside-in",
+  ).filter((span) => !span.parent_id)[0];
+  if (topmostSpan?.params?.http?.status_code) {
+    return topmostSpan.params.http.status_code.toString();
+  }
+  return "";
+};
+
+/**
+ * Extract text from a content block, handling both OpenAI/Anthropic style
+ * ({type:"text", text:"..."}) and pi-ai/Vercel AI SDK style ({type:"text", content:"..."}).
+ */
+const textFromContentBlock = (c: any): string => {
+  if ("text" in c && typeof c.text === "string") return c.text;
+  if ("content" in c && typeof c.content === "string") return c.content;
+  return JSON.stringify(c);
+};
+
+/**
+ * Get the content array from a message, checking both `content` and `parts`
+ * fields (Vercel AI SDK / pi-ai use `parts` instead of `content`).
+ */
+const getMessageContent = (message: any): unknown => {
+  return message.content ?? message.parts;
 };
 
 // TODO: test
 export const typedValueToText = (
   typed: SpanInputOutput,
   last = false,
+  preferRole?: string,
 ): string => {
   const stringified = (value_: any) => {
     if (typeof value_ === "string") {
@@ -151,76 +173,107 @@ export const typedValueToText = (
   } else if (typed.type == "chat_messages") {
     if (last) {
       const lastMessage = typed.value[typed.value.length - 1];
-      return lastMessage
-        ? typeof lastMessage.content === "string"
-          ? lastMessage.content
-          : Array.isArray(lastMessage.content)
-            ? lastMessage.content
-                .map((c) => ("text" in c ? c.text : JSON.stringify(c)))
-                .join("")
-            : JSON.stringify(lastMessage)
-        : "";
+      if (!lastMessage) return "";
+      const content = getMessageContent(lastMessage);
+      return typeof content === "string"
+        ? content
+        : Array.isArray(content)
+          ? content.map(textFromContentBlock).join("")
+          : JSON.stringify(lastMessage);
     } else {
       return typed.value
-        .map((message) => message.content ?? JSON.stringify(message))
+        .map((message) => {
+          const content = getMessageContent(message);
+          return content ?? JSON.stringify(message);
+        })
         .join("");
     }
   } else if (typed.type == "json") {
+    // A candidate value is "meaningful" when it's defined and not an empty
+    // string/array/object — applied RECURSIVELY so a shell like
+    // `{ output: { content: "" } }` is treated as empty at the top-level
+    // special-key check, letting the loop fall through to the next sibling
+    // key (e.g. `answer`). Without recursion, any object with keys short-
+    // circuited specialKeysMapping and the real payload on the next key was
+    // never seen. `seen` guards against circular references.
+    const hasNonEmptyValue = (
+      value: unknown,
+      seen: WeakSet<object> = new WeakSet(),
+    ): boolean => {
+      if (value === undefined || value === null) return false;
+      if (typeof value === "string") return value.length > 0;
+      if (typeof value === "object") {
+        if (seen.has(value)) return false;
+        seen.add(value);
+        const values = Array.isArray(value)
+          ? value
+          : Object.values(value as Record<string, unknown>);
+        return values.some((item) => hasNonEmptyValue(item, seen));
+      }
+      return true;
+    };
+
     const specialKeysMapping = (json: any): string | undefined => {
       // TODO: test those
-      if (json.text !== undefined) {
+      if (hasNonEmptyValue(json.text)) {
         return json.text;
       }
-      if (json.input !== undefined) {
+      if (hasNonEmptyValue(json.input)) {
         return json.input;
       }
-      if (json.question !== undefined) {
+      if (hasNonEmptyValue(json.question)) {
         return json.question;
       }
-      if (json.user_query !== undefined) {
+      if (hasNonEmptyValue(json.user_query)) {
         return json.user_query;
       }
-      if (json.query !== undefined) {
-        return json.user_query;
+      if (hasNonEmptyValue(json.query)) {
+        return json.query;
       }
-      if (json.message !== undefined && typeof json.message === "string") {
+      if (hasNonEmptyValue(json.message) && typeof json.message === "string") {
         return json.message;
       }
       // Langflow
-      if (json.input_value !== undefined) {
+      if (hasNonEmptyValue(json.input_value)) {
         return json.input_value;
       }
       // TODO: test this happens for finding outputs
-      if (json.output !== undefined) {
+      if (hasNonEmptyValue(json.output)) {
         return json.output;
       }
 
-      if (json.answer !== undefined) {
+      if (hasNonEmptyValue(json.answer)) {
         return json.answer;
       }
 
       // Chainlit
-      if (json.content !== undefined) {
+      if (hasNonEmptyValue(json.content)) {
         return json.content;
       }
 
       // Haystack
-      if (json.prompt !== undefined) {
+      if (hasNonEmptyValue(json.prompt)) {
         return json.prompt;
       }
 
       // Langgraph on Flowise
       if (
         json.messages?.length > 0 &&
-        json.messages?.[json.messages?.length - 1]?.content !== undefined
+        hasNonEmptyValue(
+          json.messages?.[json.messages?.length - 1]?.content,
+        )
       ) {
         return json.messages[json.messages?.length - 1].content;
       }
-      if (json.return_values?.output !== undefined) {
+      if (hasNonEmptyValue(json.return_values?.output)) {
         return json.return_values.output;
       }
 
       // LangChain
+      // NOTE: we intentionally keep the old `!== undefined` check (not hasNonEmptyValue)
+      // for the `inputs`/`outputs` wrapper paths. `RunnableSequence` legitimately produces
+      // `{ inputs: { input: "" } }` and the caller (getFirstInputAsText) relies on the
+      // returned "" to trigger a fallback to the next span in the sequence.
       if (typeof json.inputs === "object" && json.inputs.input !== undefined) {
         return json.inputs.input;
       }
@@ -294,6 +347,42 @@ export const typedValueToText = (
     try {
       const json = typed.value as any;
 
+      // Handle arrays that look like chat messages (objects with "role" property)
+      // This covers cases where validation doesn't match chat_messages due to
+      // non-standard roles like "toolResult"
+      if (
+        Array.isArray(json) &&
+        json.length > 0 &&
+        typeof json[0] === "object" &&
+        json[0] !== null &&
+        "role" in json[0]
+      ) {
+        if (last) {
+          const preferredMessage = preferRole
+            ? json.findLast((m: any) => m?.role === preferRole)
+            : undefined;
+          const lastMessage = preferredMessage ?? json[json.length - 1];
+          const content = getMessageContent(lastMessage);
+          if (typeof content === "string") {
+            return content;
+          }
+          if (Array.isArray(content)) {
+            return content.map(textFromContentBlock).join("");
+          }
+          return lastMessage ? JSON.stringify(lastMessage) : "";
+        }
+        return json
+          .map((message: any) => {
+            const content = getMessageContent(message);
+            return typeof content === "string"
+              ? content
+              : Array.isArray(content)
+                ? content.map(textFromContentBlock).join("")
+                : JSON.stringify(message);
+          })
+          .join("");
+      }
+
       const value =
         Array.isArray(json) && json.length == 1
           ? typeof json[0] === "string"
@@ -308,6 +397,19 @@ export const typedValueToText = (
     } catch (_e) {
       return typed.value?.toString() ?? "";
     }
+  } else if (typed.type == "list") {
+    if (Array.isArray(typed.value) && typed.value.length > 0) {
+      const item = last
+        ? typed.value[typed.value.length - 1]
+        : typed.value[0];
+      // Only recurse into structured SpanInputOutput items (have "type" and "value").
+      // Non-structured list items (primitives, arbitrary objects) cannot be
+      // meaningfully represented as text and are intentionally ignored.
+      if (item && typeof item === "object" && "type" in item && "value" in item) {
+        return typedValueToText(item as SpanInputOutput, last, preferRole);
+      }
+    }
+    return "";
   } else if (typed.type == "raw") {
     return stringified(typed.value);
   }

@@ -1,0 +1,329 @@
+---
+title: Production runbook
+description: Diagnose p99 spikes, goroutine leaks, memory growth, and other "why is the gateway slow?" incidents using the loopback-bound pprof admin listener.
+sidebarTitle: Production runbook
+---
+
+When the gateway is slow, stuck, or chewing memory — and the LangWatch trace for a specific bad request has already been checked — this runbook is the next stop. Every recipe here relies on the pprof admin listener, which is bound to `127.0.0.1:6060` by default and therefore never reachable from outside the pod.
+
+<Note>**Don't expose the admin port without a token.** `GATEWAY_ADMIN_ADDR` binds to loopback by default. If you genuinely need direct (non-port-forward) access — e.g. non-k8s deploys, or from a corporate VPN — you MUST also set `GATEWAY_ADMIN_AUTH_TOKEN`. The gateway refuses to start otherwise. See [Helm → Admin listener](/ai-gateway/self-hosting/helm#admin-listener) for the three deployment postures. `kubectl port-forward` remains the simplest option for k8s — it tunnels through the API server and is auditable in Kubernetes audit logs.</Note>
+
+## Prerequisites
+
+One-time setup on your operator laptop:
+
+```bash
+# Go toolchain with pprof (matches gateway's Go version)
+go version  # expect 1.26+
+
+# Pick one pod to focus on
+POD=$(kubectl get pod -n langwatch -l app=langwatch-gateway -o jsonpath='{.items[0].metadata.name}')
+
+# Open the tunnel in one terminal and leave it running
+kubectl port-forward -n langwatch "$POD" 6060:6060
+```
+
+All subsequent `go tool pprof` commands target `http://localhost:6060`.
+
+### Enabling pprof via Helm
+
+The LangWatch Helm chart exposes the admin listener via a top-level `admin` stanza on the gateway sub-chart. The loopback-bound default is what you want in production — if you widen it to `0.0.0.0`, also set `admin.existingAuthSecretName` so the built-in bearer-token guard protects pprof. The gateway refuses to start in the bind-non-loopback-without-token configuration.
+
+```yaml
+gateway:
+  admin:
+    addr: "127.0.0.1:6060"   # default — reachable only via kubectl port-forward
+    # addr: ""               # disable pprof entirely (advised for compliance-regulated envs)
+```
+
+Shipped in current chart versions. Older chart versions pre-date the field — upgrade the chart before troubleshooting, or set the env var directly via `gateway.env.GATEWAY_ADMIN_ADDR`.
+
+## Recipe 1 — p99 latency spike
+
+**Symptom:** `gateway_http_request_duration_seconds{quantile="0.99"}` jumps from ~300 ms to several seconds. Traces show no single slow upstream.
+
+**Diagnose:**
+
+```bash
+# 30-second CPU profile while the spike is live
+go tool pprof http://localhost:6060/debug/pprof/profile?seconds=30
+
+# Inside pprof:
+(pprof) top20
+(pprof) web     # opens an SVG flame graph in your browser
+```
+
+**What to look for:**
+
+- A single function using > 50% of CPU that's not one of: `tls.conn.Handshake`, `net/http.(*conn).serve`, `json.Decoder.Decode`. Those are expected under load.
+- Lock contention on `internal/auth` or `internal/fallback` — hot in `sync.(*Mutex).Lock`. Usually means the L1 cache is evicting faster than it's filling; consider raising `LW_GATEWAY_AUTH_CACHE_L1_SIZE`.
+- RE2 compilation in `internal/blocked` on every request — means the bundle isn't caching compiled regexes. Check for frequent `/changes` churn (revision bumps on every request ≠ normal).
+
+## Recipe 2 — Goroutine leak
+
+**Symptom:** `go_goroutines` climbs monotonically over hours, never GCs. Memory follows.
+
+**Diagnose:**
+
+```bash
+# Live goroutine dump as SVG
+go tool pprof -svg http://localhost:6060/debug/pprof/goroutine > /tmp/goroutines.svg
+open /tmp/goroutines.svg
+
+# Or aggregate counts by creation site
+curl -s http://localhost:6060/debug/pprof/goroutine?debug=1 | head -100
+```
+
+**What to look for:**
+
+- Hundreds of goroutines parked in `chan receive` inside `internal/fallback.Walk` — means a fallback attempt is hanging on a context that never cancels. Check `LW_GATEWAY_UPSTREAM_TIMEOUT_MS`.
+- Goroutines stuck in `internal/guardrails.CheckChunk` — likely a guardrail evaluator that never returns and exceeds the 50 ms budget. Check the evaluator service logs.
+- Streaming goroutines (`internal/dispatch.streamSSE`) that outlive their request context — client disconnect without `ctx.Done()` firing usually points at a missing `close` somewhere.
+
+Fix options: restart the offending pod (workaround), or file a bug with the `/tmp/goroutines.svg` attached.
+
+## Recipe 3 — Memory growth
+
+**Symptom:** RSS climbs from 200 MB to > 1 GB over a day. OOM eventually follows.
+
+**Diagnose:**
+
+```bash
+# Live heap snapshot
+go tool pprof http://localhost:6060/debug/pprof/heap
+
+# Inside pprof:
+(pprof) top20 -cum
+(pprof) list internal/auth    # source-level attribution
+```
+
+**What to look for:**
+
+- `internal/auth.(*Cache).Put` holding more than ~1 MB per cached bundle — unusual, a bundle should be ≤ 50 KB. Oversized `policy_rules.urls.allow` with thousands of entries can trigger this.
+- `internal/dispatch` buffered responses — if streaming responses are being accumulated instead of flushed per-chunk, every request consumes full response size. Check for `bufio.NewWriter` wrapping a streaming writer anywhere.
+- Outbox shelving (`LW_GATEWAY_BUDGET_DEBIT_SHELF_BYTES`) — a long control-plane outage can push debits to disk. Check the outbox directory size.
+
+## Recipe 4 — Mutex or block profiling for contention
+
+**Symptom:** CPU is low, request rate is low, but latency is up. Suggests blocking, not computation.
+
+Enable on a specific pod (requires a restart with `LW_GATEWAY_PPROF_BLOCK_RATE=1` and `LW_GATEWAY_PPROF_MUTEX_FRACTION=1` in the env — off by default because they have measurable overhead).
+
+```bash
+# Top mutex holders
+go tool pprof http://localhost:6060/debug/pprof/mutex
+
+# Top blockers (I/O, channels, locks)
+go tool pprof http://localhost:6060/debug/pprof/block
+```
+
+**What to look for:**
+
+- Contention on `internal/ratelimit.(*Bucket).Allow` — means a VK's RPM is bursting past the token-bucket refill rate and every request is waiting. Raise RPM or investigate the caller.
+- Contention on the L1 auth cache — see Recipe 1.
+
+## Recipe 5 — Allocation churn (GC pressure)
+
+**Symptom:** `go_gc_pause_seconds_sum` is growing too fast; p99 spikes correlate with GC.
+
+**Diagnose:**
+
+```bash
+# Alloc-only heap (who's creating the most garbage)
+go tool pprof http://localhost:6060/debug/pprof/allocs
+
+(pprof) top20 -cum
+```
+
+**What to look for:**
+
+- JSON encoding of large `/v1/messages` requests — expected, but if it dominates consider enabling `LW_GATEWAY_MAX_BODY_BYTES` enforcement to reject pathologically large bodies earlier.
+- Per-request compilation of the same regex — should never happen; if it does, Lane A has a caching regression.
+
+## Recipe 6 — Debit outbox backlog
+
+**Symptom:** `gateway_budget_debit_outbox_depth` climbing, or `_4xx_drops_total` increasing, or `_flush_failures_total` non-zero. Budgets may drift from actual spend.
+
+The outbox is the gateway's async spend-accounting path: every request produces a debit that batches into a ring buffer and flushes to the control plane. Four failure classes exist, each with its own signal:
+
+| Signal | Metric | Severity | Meaning |
+|---|---|---|---|
+| Depth rising | `gateway_budget_debit_outbox_depth` / `_capacity` | warn | Normal under burst; watch fill-pct |
+| Flush failures | `gateway_budget_debit_outbox_flush_failures_total` | warn | Control-plane is slow/unreachable; events re-enqueued, depth climbs slowly |
+| 4xx drops | `gateway_budget_debit_outbox_4xx_drops_total` | **page** | Silent data loss — signing or payload bug, terminally rejected |
+| Capacity drops | `gateway_budget_debit_outbox_dropped_total` | warn | Ring is full, newest events being evicted — fill-pct was already at 100% |
+
+**Diagnose, in order:**
+
+```bash
+# 1. Fill percentage right now
+kubectl exec -n langwatch deploy/langwatch-gateway -- \
+  wget -qO- http://127.0.0.1:5590/metrics | \
+  grep -E '^gateway_budget_debit_outbox_(depth|capacity)'
+
+# 2. Last 15 min of flush failures (delta)
+# Graph this in Grafana with:
+#   rate(gateway_budget_debit_outbox_flush_failures_total[5m])
+
+# 3. 4xx drops — any non-zero delta is a page
+#   increase(gateway_budget_debit_outbox_4xx_drops_total[15m])
+```
+
+**Interpretation ladder:**
+
+- **Only depth is rising, flush_failures is 0**: normal burst. Fill-pct will self-heal when traffic subsides. Only page if sustained > 80% for > 10m.
+- **flush_failures > 0 and depth is rising**: control plane is unavailable or slow. Check control-plane `/api/internal/gateway/budget` handler latency and error rate. Debits are safe (re-enqueued); they'll drain once the control plane recovers.
+- **4xx_drops > 0**: immediate page. Likely causes, in order of probability:
+  1. HMAC secret drift between gateway and control plane (`LW_GATEWAY_INTERNAL_SECRET` mismatch after rotation).
+  2. Payload schema drift (gateway and control plane deployed with incompatible contract versions).
+  3. Rare: control plane returning 4xx for a specific tenant (archived organization, deleted project).
+- **dropped_total > 0**: the ring filled up and the oldest pending events were evicted before they could flush. Always follows a prolonged control-plane outage. Lost debits are unrecoverable — document the outage window for post-hoc spend reconciliation.
+
+**Fix:**
+
+| Cause | Action |
+|---|---|
+| HMAC drift | Check both env vars point at the same secret; rotate via the dual-secret overlap window described in [Config → Secrets](/ai-gateway/self-hosting/config#secrets) |
+| Control-plane slow | Scale the control plane; ratchet up `LW_GATEWAY_BUDGET_DEBIT_RETRY_MAX` as a temporary buffer |
+| Payload drift | Pin gateway + control-plane to matching versions per the compatibility matrix |
+
+**Alerting** (wire these directly into Alertmanager, see [Prometheus alerts](/ai-gateway/cookbooks/prometheus-alerts)):
+
+- `rate(gateway_budget_debit_outbox_4xx_drops_total[5m]) > 0` → **page** (silent data loss).
+- `rate(gateway_budget_debit_outbox_flush_failures_total[5m]) > 0 for 5m` → **warn**.
+- `(max(gateway_budget_debit_outbox_depth) / max(gateway_budget_debit_outbox_capacity)) > 0.5 for 5m` → **warn**.
+
+## Recipe 7 — Stuck drain
+
+**Symptom:** A pod stays in `Terminating` for the full `terminationGracePeriodSeconds`, then gets SIGKILLed. In-flight requests ended abruptly. Alertmanager fires on the `gateway_draining` gauge being 1 for > grace.
+
+The pod received SIGTERM but at least one request handler never returned before `shutdown.timeout` expired. The drain pipeline exposes this via two gauges:
+
+| Metric | During healthy drain | During stuck drain |
+|---|---|---|
+| `gateway_draining{pod}` | 1 → 0 at shutdown | 1 until SIGKILL |
+| `gateway_in_flight_requests{pod}` | monotonically → 0 | flat at N > 0 for > grace |
+
+**Diagnose:**
+
+```bash
+# 1. Which pod is stuck, and how many handlers are hanging?
+kubectl get pod -n langwatch -l app=langwatch-gateway \
+  --field-selector=status.phase=Running -o wide | grep Terminating
+
+# 2. Goroutine dump — stuck handlers will show up in Go runtime state
+POD=<terminating pod name>
+kubectl port-forward -n langwatch "$POD" 6060:6060 &
+go tool pprof -top http://localhost:6060/debug/pprof/goroutine
+
+# 3. Find the handler that's not returning
+curl -s http://localhost:6060/debug/pprof/goroutine?debug=1 | \
+  grep -A 20 'internal/dispatch.*streamSSE\|internal/auth\|internal/guardrails'
+```
+
+**Common causes, in order of likelihood:**
+
+1. **Upstream dial hanging without a deadline.** Streaming fallback into a dead region that never returns TLS handshake. `LW_GATEWAY_UPSTREAM_TIMEOUT_MS` should be < `shutdown.timeout`; if it is, the handler should cancel on its own.
+2. **Guardrail evaluator hanging past its budget.** `pre`/`post` have a `guardrail.preTimeout` / `postTimeout` of 1500 ms, but a misconfigured evaluator can still hang if it doesn't respect context cancellation. Check the evaluator service's own SLO.
+3. **A breaker with `open` state but no surrounding deadline.** Rare; closed previously, but worth ruling out if the stack shows `internal/circuit` waiting.
+4. **Slow custom middleware.** If you've forked the gateway and added middleware that does I/O without context propagation, that's where to look first.
+
+**Fix:**
+
+| Cause | Action |
+|---|---|
+| Upstream hang | Lower `LW_GATEWAY_UPSTREAM_TIMEOUT_MS` below `shutdown.timeout`. Default 60 s — bump `shutdown.timeout` to 65 s + `terminationGracePeriodSeconds` to 80 s if you genuinely need 60 s upstream calls |
+| Guardrail hang | Raise evaluator SLO or set `guardrails.request_fail_open: true` on the VK to fall through on timeout |
+| Custom middleware | Thread `r.Context()` through every I/O call |
+
+**Temporary workaround:** bump `shutdown.timeout` + `terminationGracePeriodSeconds` to give the hanging request time to complete. Only appropriate while you diagnose the root cause — long grace periods slow down rolling deploys and make HPA scale-downs feel sluggish.
+
+## Recipe 8 — Control-plane outage / stale-while-error
+
+**Symptom:** The LangWatch control plane is unreachable (deployment incident, DNS hiccup, network partition). The gateway's L1 auth cache is full of valid resolved-key bundles, but `/api/internal/gateway/resolve-key` is returning errors. Operator wants to know: are customers being rejected, or is the gateway riding through?
+
+The gateway's auth resolver runs **stale-while-error** by default: when the cached entry's JWT crosses its natural expiry AND the control-plane refresh fails for **transport-class reasons** (network error, dial timeout, 5xx, connection refused, malformed/unparseable response, JWT verify failure), it bumps the soft expiry by `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP` (default `5m`) and serves the cached bundle. This continues every refresh attempt up to the hard cap of `LW_GATEWAY_AUTH_CACHE_HARD_GRACE` past the JWT exp (default `6h`). The hard cap is deliberately generous — the soft-bump path runs on **every** refresh attempt without a successful response, so the hard cap is the true outage backstop, not a steady-state knob.
+
+**Auth-class rejections** — explicit `401` / `403` / `404` from `/resolve-key` — bypass the grace window entirely and evict immediately. A revoked credential never gets stale-served.
+
+**Diagnose:**
+
+```bash
+# 1. Are stale-serve INFO logs firing? (= grace is active and serving traffic)
+kubectl logs -n langwatch -l app=langwatch-gateway --tail=200 | \
+  grep auth_cache_serve_stale
+
+# 2. Are transport-class refresh failures spewing? (= control plane unreachable)
+kubectl logs -n langwatch -l app=langwatch-gateway --tail=200 | \
+  grep auth_cache_refresh_transport_failure
+
+# 3. Are hard evictions firing? (= grace exhausted, rejection mode)
+kubectl logs -n langwatch -l app=langwatch-gateway --tail=500 | \
+  grep auth_cache_hard_evict
+```
+
+The three log lines form a ladder operators read in order:
+
+| Log line | Level | Meaning | Operator action |
+|---|---|---|---|
+| `auth_cache_serve_stale` | INFO | Grace is active; cached bundle is being served past JWT exp | None — this is expected behaviour during outage. Includes `vk_id`, `stale_for`, `hard_grace_remaining`, `refresh_error_class` |
+| `auth_cache_refresh_transport_failure` | WARN | Each refresh attempt is failing; soft expiry bumped. Includes `error`, `error_class`, `new_soft_expires_at` | Investigate control plane (this is the actual outage signal). Stop bumping once CP returns |
+| `auth_cache_hard_evict` | ERROR | Grace cap exceeded OR auth rejection. `reason` field disambiguates: `hard_cap_exceeded` (outage too long) vs `auth_rejection` (real bad-credential evict) vs `auth_rejection_async` / `hard_cap_exceeded_on_lookup` | If `hard_cap_exceeded`, customers start seeing 401s. Bump `LW_GATEWAY_AUTH_CACHE_HARD_GRACE` if outage is ongoing and you'd rather extend than reject |
+
+**Customer-facing behaviour during the grace window:**
+
+- Requests against any VK that resolved successfully **before** the outage continue to work transparently.
+- Requests against any VK **never seen by this pod** (cold) still fail — the gateway has no bundle to fall back to. Today's mitigation is Redis L2 (`GATEWAY_REDIS_URL`): HPA-scaled pods inherit the warm set from L2 even while the control plane is unreachable. (`GATEWAY_CACHE_BOOTSTRAP_ALL_KEYS=true` is a planned v1.1 enhancement to also pre-warm L1 from a `/bootstrap` snapshot on startup; the flag is reserved in env wiring but has no Go-side implementation today, so setting it is currently a no-op.)
+- Requests against any VK whose JWT was **revoked just before the outage** but the revocation `/changes` event hadn't propagated yet — these stay served until the cache entry crosses its hard cap. Acceptable trade-off for the grace; auth rejections from a healthy CP still evict instantly via `auth_cache_hard_evict reason=auth_rejection`.
+
+**Tune:**
+
+| Knob | When to lower | When to raise |
+|---|---|---|
+| `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP` | If you want refresh attempts to back off less aggressively (e.g. 1m for tighter retry density) | If your control plane is consistently slow under load and you want to reduce refresh-attempt churn during partial degradation |
+| `LW_GATEWAY_AUTH_CACHE_HARD_GRACE` | If you have strict revocation-latency SLOs (compliance / regulated deployments) and would rather hard-fail than serve a long-stale bundle | If your control plane has known multi-hour planned-maintenance windows and you'd rather ride through |
+| `LW_GATEWAY_AUTH_CACHE_HARD_GRACE=0s` | **Restores legacy behaviour:** any refresh failure past JWT exp evicts immediately. Pick this if you operate under a security regime where stale-while-error is unacceptable | n/a (zero is the disable signal) |
+
+**Alert pattern (log-based, no metric infra required):**
+
+```bash
+# Fire if hard_evict reason=hard_cap_exceeded appears more than N times in 5 min
+# Indicates the outage exceeded the configured grace and customers are now being rejected.
+kubectl logs -n langwatch -l app=langwatch-gateway --since=5m | \
+  grep -c 'auth_cache_hard_evict.*reason=hard_cap_exceeded'
+```
+
+A non-zero count is the page-worthy signal; the WARN spew alone (`auth_cache_refresh_transport_failure`) is informational while customers are still being served.
+
+See [Config → Auth cache](/ai-gateway/self-hosting/config#auth-cache) for the env-var contract.
+
+## Graceful degradation — what survives what
+
+The gateway is a cache of the control plane, so a surprising amount continues to work when pieces go down. Quick reference:
+
+| Component down | Customer impact | How long gateway stays up | Notes |
+|---|---|---|---|
+| LangWatch control plane | None for cached VKs | ~15 min JWT exp + `LW_GATEWAY_AUTH_CACHE_HARD_GRACE` (default 6 h) of stale-while-error; bootstrap cache + Redis L2 extend coverage to cold-for-pod VKs | Outbox re-enqueues debits safely; they flush on recovery. New VK creation is blocked until control plane returns. See [Recipe 8](#recipe-8--control-plane-outage--stale-while-error) for the operator runbook |
+| One upstream provider | None for VKs with fallback; 502/504 for VKs without | Indefinite — circuit breaker + fallback chain absorb it | `gateway_circuit_state{credential_id}` shows which provider is down |
+| Redis L2 cache | +~30 ms on cold-for-pod VKs | Indefinite — L1 + `/resolve-key` cover the miss | Fail-open by design (poison entries `DEL`, network errors log and miss) |
+| Gateway pod (crash / eviction) | None — HPA replaces, PDB holds ≥ 2 replicas | N/A | Stateless; new pod warms from Redis L2 + `/bootstrap` |
+
+For multi-region deployments with shared control plane: a gateway region down is handled by Route53 latency-based failover. See [Scaling → Regional placement](/ai-gateway/self-hosting/scaling#regional-placement).
+
+## Writing findings back
+
+When you find something worth filing:
+
+1. Grab the `.pb.gz` with `go tool pprof -symbolize=remote -proto http://localhost:6060/debug/pprof/heap > /tmp/heap.pb.gz`.
+2. Attach it to the issue along with:
+   - Pod name + image digest (`kubectl get pod -n langwatch -o yaml | grep image`).
+   - `X-LangWatch-Request-Id` from one exemplar bad request.
+   - `kubectl top pod` output around the spike.
+3. For urgent escalation, post in `#ai-gateway-support` with the request id.
+
+## See also
+
+- [Config → Admin / operator endpoints](/ai-gateway/self-hosting/config#admin--operator-endpoints) — env-var reference.
+- [Health Checks](/ai-gateway/self-hosting/health-checks) — `/readyz` output to interpret alongside pprof.
+- [Troubleshooting](/ai-gateway/troubleshooting) — symptom-first diagnostic index for non-pprof issues (401 / 403 / 429 / 502).
+- [Prometheus alerts](/ai-gateway/cookbooks/prometheus-alerts) — alert rules that tell you *when* to reach for this runbook.

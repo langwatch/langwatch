@@ -1,23 +1,24 @@
 import type { Project } from "@prisma/client";
+import { SpanStatusCode, trace } from "@opentelemetry/api";
 import { Worker } from "bullmq";
+import { BullMQOtel } from "bullmq-otel";
 import type {
   CollectorCheckAndAdjustJob,
   CollectorJob,
 } from "~/server/background/types";
 import {
   getTraceById,
-  searchTraces,
   searchTracesWithInternals,
 } from "~/server/elasticsearch/traces";
 import { env } from "../../../env.mjs";
 import { createLogger } from "../../../utils/logger/server";
+import { withJobContext } from "../../context/asyncContext";
 import {
   captureException,
   getCurrentScope,
   startSpan,
   withScope,
 } from "../../../utils/posthogErrorCapture";
-import { safeTruncate } from "../../../utils/truncate";
 import {
   flattenObjectKeys,
   getInternalProtectionsForProject,
@@ -25,7 +26,7 @@ import {
 import { prisma } from "../../db";
 import { esClient, TRACE_INDEX, traceIndexId } from "../../elasticsearch";
 import {
-  collectorIndexDelayHistogram,
+  recordJobWaitDuration,
   getJobProcessingCounter,
   getJobProcessingDurationHistogram,
   getPayloadSizeHistogram,
@@ -52,17 +53,32 @@ import {
 } from "./collector/metrics";
 import { cleanupPIIs } from "./collector/piiCheck";
 import { addInputAndOutputForRAGs } from "./collector/rag";
-import { scoreSatisfactionFromInput } from "./collector/satisfaction";
 
 const logger = createLogger("langwatch:workers:collectorWorker");
+const tracer = trace.getTracer("langwatch:collector");
+
+const withSpan = <T>(name: string, fn: () => Promise<T>): Promise<T> =>
+  tracer.startActiveSpan(name, async (span) => {
+    try {
+      const result = await fn();
+      span.end();
+      return result;
+    } catch (error) {
+      span.recordException(error as Error);
+      span.setStatus({ code: SpanStatusCode.ERROR });
+      span.end();
+      throw error;
+    }
+  });
 
 export const scheduleTraceCollectionWithFallback = async (
   collectorJob: CollectorJob,
   forceSync = false,
+  payloadSize?: number,
 ) => {
   traceSpanCountHistogram.observe(collectorJob.spans?.length ?? 0);
   getPayloadSizeHistogram("collector").observe(
-    JSON.stringify(collectorJob).length,
+    payloadSize ?? estimatePayloadSize(collectorJob),
   );
 
   if (forceSync || !collectorQueue) {
@@ -245,7 +261,7 @@ const processCollectorJob_ = async (
   logger.info(
     {
       jobId: id,
-      ...(data.traceId && { traceId: data.traceId }),
+      ...(data.traceId && { observedTraceId: data.traceId }),
       ...(data.projectId && { projectId: data.projectId }),
       ...(data.spans?.length && { spanCount: data.spans.length }),
     },
@@ -277,7 +293,9 @@ const processCollectorJob_ = async (
 
   spans = addGuardrailCosts(spans);
   try {
-    spans = await addLLMTokensCount(projectId, spans);
+    spans = await withSpan("addLLMTokensCount", () =>
+      addLLMTokensCount(projectId, spans),
+    );
   } catch (error) {
     logger.debug(
       { error, projectId: project.id, traceId },
@@ -308,7 +326,7 @@ const processCollectorJob_ = async (
     };
     if (esSpan.params && typeof span.params === "object") {
       esSpan.params = {
-        ...safeTruncate(esSpan.params),
+        ...esSpan.params,
         _keys: flattenObjectKeys(esSpan.params),
       };
     } else {
@@ -325,24 +343,26 @@ const processCollectorJob_ = async (
   );
 
   if (existingTrace?.inserted_at) {
-    // TODO: check for quickwit
-    const protections = await getInternalProtectionsForProject(prisma, {
-      projectId: project.id,
-    });
-    const existingTraceResponse = await getTraceById({
-      connConfig: { projectId: project.id },
-      traceId: traceId,
-      protections,
-      includeEvaluations: true,
-      includeSpans: true,
-    });
-    if (existingTraceResponse) {
-      existingSpans.push(...existingTraceResponse.spans);
+    await withSpan("fetchExistingTrace", async () => {
+      // TODO: check for quickwit
+      const protections = await getInternalProtectionsForProject(prisma, {
+        projectId: project.id,
+      });
+      const existingTraceResponse = await getTraceById({
+        connConfig: { projectId: project.id },
+        traceId: traceId,
+        protections,
+        includeEvaluations: true,
+        includeSpans: true,
+      });
+      if (existingTraceResponse) {
+        existingSpans.push(...existingTraceResponse.spans);
 
-      if (existingTraceResponse.evaluations) {
-        existingEvaluations.push(...existingTraceResponse.evaluations);
+        if (existingTraceResponse.evaluations) {
+          existingEvaluations.push(...existingTraceResponse.evaluations);
+        }
       }
-    }
+    });
   }
 
   // Combine all spans for accurate metrics calculation
@@ -389,10 +409,10 @@ const processCollectorJob_ = async (
       ...reservedTraceMetadata,
       ...(Object.keys(customMetadata).length > 0
         ? {
-            custom: safeTruncate({
+            custom: {
               ...customExistingMetadata,
               ...customMetadata,
-            }),
+            },
           }
         : {}),
       all_keys: Array.from(
@@ -433,57 +453,17 @@ const processCollectorJob_ = async (
     project.piiRedactionLevel !== "DISABLED"
   ) {
     const piiEnforced = env.NODE_ENV === "production";
-    await cleanupPIIs(trace, esSpans, {
-      piiRedactionLevel: project.piiRedactionLevel,
-      enforced: piiEnforced,
-    });
+    await withSpan("cleanupPIIs", () =>
+      cleanupPIIs(trace, esSpans, {
+        piiRedactionLevel: project.piiRedactionLevel,
+        enforced: piiEnforced,
+      }),
+    );
   }
 
-  await startSpan({ name: "updateTrace" }, async () => {
-    await updateTrace(trace, esSpans, evaluations);
-  });
-
-  if (!existingTrace?.inserted_at) {
-    const delay = Date.now() - data.collectedAt;
-    collectorIndexDelayHistogram.observe(delay);
-  }
+  // ES writes are disabled — ClickHouse handles all trace persistence via event sourcing.
 
   void markProjectFirstMessage(project, trace.metadata);
-
-  if (env.IS_QUICKWIT) {
-    // Skip check and adjust for quickwit
-    return;
-  }
-
-  const checkAndAdjust = async (postfix = "") => {
-    return collectorQueue.add(
-      "collector",
-      {
-        action: "check_and_adjust",
-        traceId,
-        projectId,
-      },
-      {
-        jobId: `collector_${traceId}_check_and_adjust${postfix}`,
-        delay: 3000,
-      },
-    );
-  };
-
-  const job = await checkAndAdjust();
-  try {
-    // Push it forward if two traces are processed at the same time
-    await job?.changeDelay(3000);
-  } catch {
-    try {
-      // Remove the existing job and start a new one to rerun adjust
-      await job?.remove();
-      await checkAndAdjust();
-    } catch {
-      // If that fails too because adjust is running, start a new job with different id for later
-      await checkAndAdjust("_2");
-    }
-  }
 };
 
 const updateTrace = async (
@@ -765,124 +745,11 @@ const updateTrace = async (
 };
 
 export const processCollectorCheckAndAdjustJob = async (
-  id: string | undefined,
-  data: CollectorCheckAndAdjustJob,
+  _id: string | undefined,
+  _data: CollectorCheckAndAdjustJob,
 ) => {
-  logger.debug({ jobId: id }, "post-processing job");
-  const { traceId, projectId } = data;
-  const client = await esClient({ projectId });
-  const protections = await getInternalProtectionsForProject(prisma, {
-    projectId,
-  });
-  const existingTraceResponse = await searchTraces({
-    connConfig: { projectId },
-    search: {
-      size: 1,
-      query: {
-        bool: {
-          must: [
-            { term: { trace_id: traceId } },
-            { term: { project_id: projectId } },
-          ],
-          should: void 0,
-          must_not: void 0,
-        },
-      },
-      _source: [
-        "spans",
-        "timestamps.inserted_at",
-        "metadata",
-        "expected_output",
-      ],
-    },
-    protections,
-  });
-  const existingTrace = existingTraceResponse[0];
-  if (!existingTrace) {
-    return;
-  }
-
-  const spans = existingTrace.spans;
-  const [input, output] = await Promise.all([
-    { value: getFirstInputAsText(spans) },
-    { value: getLastOutputAsText(spans) },
-  ]);
-  const error = getLastOutputError(spans);
-
-  const trace: Pick<
-    ElasticSearchTrace,
-    | "trace_id"
-    | "project_id"
-    | "input"
-    | "output"
-    | "error"
-    | "metadata"
-    | "expected_output"
-  > = {
-    trace_id: traceId,
-    project_id: projectId,
-    input,
-    output,
-    error,
-    metadata: existingTrace.metadata,
-    expected_output: existingTrace.expected_output,
-  };
-
-  await client.update({
-    index: TRACE_INDEX.alias,
-    id: traceIndexId({ traceId, projectId }),
-    retry_on_conflict: 10,
-    body: {
-      script: {
-        source: `
-          if (params.input != null && params.input.value != null && params.input.value != "") {
-            ctx._source.input = params.input;
-          }
-          if (params.output != null && params.output.value != null && params.output.value != "") {
-            ctx._source.output = params.output;
-          }
-          if (params.error != null) {
-            ctx._source.error = params.error;
-          }
-        `,
-        lang: "painless",
-        params: {
-          input: input ?? null,
-          output: output ?? null,
-          error: error ?? null,
-        },
-      },
-    },
-    refresh: true,
-  });
-
-  const customMetadata = existingTrace.metadata.custom;
-  const isCustomMetadataObject =
-    typeof customMetadata === "object" &&
-    customMetadata !== null &&
-    !Array.isArray(customMetadata);
-
-  if (
-    // Does not re-schedule trace checks for too old traces being resynced
-    (!existingTrace?.timestamps?.inserted_at ||
-      existingTrace.timestamps.inserted_at > Date.now() - 60 * 60 * 1000) &&
-    // Does not schedule evaluations for traces that are not from the studio in development
-    (!isCustomMetadataObject || // If it's not an object, proceed with evaluations
-      customMetadata?.platform !== "optimization_studio" ||
-      customMetadata?.environment !== "development")
-  ) {
-    await scheduleEvaluations(trace, spans);
-  }
-
-  try {
-    await scoreSatisfactionFromInput({
-      traceId,
-      projectId,
-      input,
-    });
-  } catch {
-    logger.debug({ traceId }, "failed to score satisfaction for");
-  }
+  // ES trace writes are globally disabled — this job only reads/writes ES, so it's a no-op.
+  return;
 };
 
 export const startCollectorWorker = () => {
@@ -895,27 +762,31 @@ export const startCollectorWorker = () => {
 
   const collectorWorker = new Worker<CollectorJob, void, string>(
     COLLECTOR_QUEUE.NAME,
-    async (job) => {
-      const jobLog = (message: string) => {
-        void job.log(message);
-      };
+    withJobContext(
+      async (job) => {
+        recordJobWaitDuration(job, "collector");
+        const jobLog = (message: string) => {
+          void job.log(message);
+        };
 
-      jobLog(
-        `Processing trace ${job.data.traceId} (${job.data.spans?.length ?? 0} spans)`,
-      );
+        jobLog(
+          `Processing trace ${job.data.traceId} (${job.data.spans?.length ?? 0} spans)`,
+        );
 
-      try {
-        await processCollectorJob(job.id, job.data);
-        jobLog(`Completed successfully`);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        jobLog(`Failed: ${message}`);
-        throw error;
-      }
-    },
+        try {
+          await processCollectorJob(job.id, job.data);
+          jobLog(`Completed successfully`);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          jobLog(`Failed: ${message}`);
+          throw error;
+        }
+      },
+    ),
     {
       connection,
       concurrency: 20,
+      telemetry: new BullMQOtel(COLLECTOR_QUEUE.NAME),
     },
   );
 
@@ -1012,6 +883,9 @@ export const fetchExistingMD5s = async (
     }
   | undefined
 > => {
+  // Dedup check only works when ES is configured — without it, treat every trace as new
+  if (!env.ELASTICSEARCH_NODE_URL) return undefined;
+
   const existingTracesWithInternals = await searchTracesWithInternals({
     connConfig: { projectId },
     protections: {
@@ -1050,3 +924,45 @@ export const fetchExistingMD5s = async (
     version,
   };
 };
+
+/**
+ * Lightweight estimation of payload size in bytes.
+ * Avoids JSON.stringify() which causes massive allocations and GC pressure.
+ */
+function estimatePayloadSize(obj: unknown): number {
+  if (obj === null || obj === undefined) return 0;
+  let bytes = 0;
+  const seen = new WeakSet<object>();
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const stack: any[] = [obj];
+  while (stack.length > 0) {
+    const value = stack.pop();
+
+    if (typeof value === "string") {
+      bytes += value.length * 2; // UTF-16
+    } else if (typeof value === "number") {
+      bytes += 8;
+    } else if (typeof value === "boolean") {
+      bytes += 4;
+    } else if (typeof value === "object" && value !== null) {
+      if (seen.has(value)) continue;
+      seen.add(value);
+      if (Array.isArray(value)) {
+        for (let i = 0; i < value.length; i++) {
+          stack.push(value[i]);
+        }
+      } else {
+        const record = value as Record<string, unknown>;
+        for (const key in record) {
+          if (Object.prototype.hasOwnProperty.call(record, key)) {
+            bytes += key.length * 2;
+            stack.push(record[key]);
+          }
+        }
+      }
+    }
+  }
+
+  return bytes;
+}

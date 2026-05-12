@@ -25,6 +25,8 @@ export type Contexts = {
 export interface ChatMessage {
   role?: ChatRole;
   content?: string | ChatRichContent[] | null;
+  /** Vercel AI SDK / pi-ai use `parts` instead of `content` */
+  parts?: ChatRichContent[];
   function_call?: FunctionCall | null;
   tool_calls?: ToolCall[] | null;
   tool_call_id?: string | null;
@@ -36,6 +38,11 @@ export type ChatRichContent =
   | {
       type: "text";
       text?: string;
+    }
+  | {
+      /** pi-ai uses `content` instead of `text` inside text blocks */
+      type: "text";
+      content?: string;
     }
   | {
       text: string;
@@ -134,6 +141,8 @@ export interface SpanMetrics {
   prompt_tokens?: number | null;
   completion_tokens?: number | null;
   reasoning_tokens?: number | null;
+  cache_read_input_tokens?: number | null;
+  cache_creation_input_tokens?: number | null;
   tokens_estimated?: boolean | null;
   cost?: number | null;
 }
@@ -255,7 +264,6 @@ export type ElasticSearchSpan = Omit<
 
 export type TraceInput = {
   value: string;
-  satisfaction_score?: number;
 };
 
 export type TraceOutput = {
@@ -310,6 +318,8 @@ export type Trace = {
     prompt_tokens?: number | null;
     completion_tokens?: number | null;
     reasoning_tokens?: number | null;
+    cache_read_input_tokens?: number | null;
+    cache_creation_input_tokens?: number | null;
     total_cost?: number | null;
     tokens_estimated?: boolean | null;
   };
@@ -434,7 +444,7 @@ export type TrackEventRESTParamsValidator = Omit<
   "event_id" | "project_id" | "timestamps" | "event_details"
 > & {
   event_id?: string; // auto generated unless you want to guarantee idempotency
-  event_details?: Record<string, string>;
+  event_details?: Record<string, string | null>;
   timestamp?: number; // The timestamp when the event occurred
 };
 

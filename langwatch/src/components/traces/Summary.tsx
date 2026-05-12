@@ -1,5 +1,5 @@
 import { Alert, Box, HStack, Skeleton, VStack } from "@chakra-ui/react";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import numeral from "numeral";
 import qs from "qs";
 import React, { type PropsWithChildren } from "react";

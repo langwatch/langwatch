@@ -1,0 +1,352 @@
+import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import type { WithDateWrites } from "~/server/clickhouse/types";
+import {
+	classifyClickHouseError,
+	SecurityError,
+	StoreError,
+	ValidationError,
+} from "~/server/event-sourcing/services/errorHandling";
+import type {
+	Projection,
+	ProjectionStoreReadContext,
+	ProjectionStoreWriteContext,
+} from "../../../";
+import { createTenantId, EventUtils } from "../../../";
+import { createLogger } from "../../../../../utils/logger";
+import type {
+	ExperimentRunState,
+	ExperimentRunStateData,
+} from "../projections/experimentRunState.foldProjection";
+import type { ExperimentRunStateRepository } from "./experimentRunState.repository";
+import { makeExperimentRunKey, parseExperimentRunKey } from "../utils/compositeKey";
+
+const TABLE_NAME = "experiment_runs" as const;
+
+const logger = createLogger(
+  "langwatch:experiment-run-processing:run-state-repository",
+);
+
+interface ClickHouseExperimentRunRecord {
+  ProjectionId: string;
+  TenantId: string;
+  RunId: string;
+  ExperimentId: string;
+  WorkflowVersionId: string | null;
+  Version: string;
+  Total: number;
+  Progress: number;
+  CompletedCount: number;
+  FailedCount: number;
+  TotalCost: number | null;
+  TotalDurationMs: string | null;
+  AvgScoreBps: number | null;
+  PassRateBps: number | null;
+  Targets: string;
+  CreatedAt: number;
+  UpdatedAt: number;
+  StartedAt: number | null;
+  FinishedAt: number | null;
+  StoppedAt: number | null;
+  LastProcessedEventId: string;
+  TotalScoreSum: number;
+  ScoreCount: number;
+  PassedCount: number;
+  GradedCount: number;
+  LastEventOccurredAt: number;
+}
+
+type ClickHouseExperimentRunWriteRecord = WithDateWrites<
+  ClickHouseExperimentRunRecord,
+  "CreatedAt" | "UpdatedAt" | "StartedAt" | "FinishedAt" | "StoppedAt" | "LastEventOccurredAt"
+>;
+
+export class ExperimentRunStateRepositoryClickHouse<
+  ProjectionType extends Projection = Projection,
+> implements ExperimentRunStateRepository<ProjectionType>
+{
+  constructor(private readonly resolveClient: ClickHouseClientResolver) {}
+
+  private mapClickHouseRecordToProjectionData(
+    record: ClickHouseExperimentRunRecord,
+  ): ExperimentRunStateData {
+    return {
+      RunId: record.RunId,
+      ExperimentId: record.ExperimentId,
+      WorkflowVersionId: record.WorkflowVersionId,
+      Total: record.Total,
+      Progress: record.Progress,
+      CompletedCount: record.CompletedCount,
+      FailedCount: record.FailedCount,
+      TotalCost: record.TotalCost,
+      TotalDurationMs: record.TotalDurationMs
+        ? parseInt(record.TotalDurationMs, 10)
+        : null,
+      AvgScoreBps: record.AvgScoreBps,
+      PassRateBps: record.PassRateBps,
+      Targets: record.Targets,
+      CreatedAt: Number(record.CreatedAt),
+      UpdatedAt: Number(record.UpdatedAt),
+      StartedAt: record.StartedAt === null ? null : Number(record.StartedAt),
+      FinishedAt: record.FinishedAt === null ? null : Number(record.FinishedAt),
+      StoppedAt: record.StoppedAt === null ? null : Number(record.StoppedAt),
+      TotalScoreSum: record.TotalScoreSum ?? 0,
+      ScoreCount: record.ScoreCount ?? 0,
+      PassedCount: record.PassedCount ?? 0,
+      GradedCount: record.GradedCount ?? 0,
+      LastEventOccurredAt: Number(record.LastEventOccurredAt ?? 0),
+      TraceMetrics: {},
+    };
+  }
+
+  private mapProjectionDataToClickHouseRecord(
+    data: ExperimentRunStateData,
+    tenantId: string,
+    projectionId: string,
+    projectionVersion: string,
+    lastProcessedEventId: string,
+    runId: string,
+  ): ClickHouseExperimentRunWriteRecord {
+    return {
+      ProjectionId: projectionId,
+      TenantId: tenantId,
+      RunId: data.RunId || runId,
+      ExperimentId: data.ExperimentId,
+      WorkflowVersionId: data.WorkflowVersionId,
+      Version: projectionVersion,
+      Total: data.Total,
+      Progress: data.Progress,
+      CompletedCount: data.CompletedCount,
+      FailedCount: data.FailedCount,
+      TotalCost: data.TotalCost,
+      TotalDurationMs: data.TotalDurationMs?.toString() ?? null,
+      AvgScoreBps: data.AvgScoreBps,
+      PassRateBps: data.PassRateBps,
+      Targets: data.Targets,
+      CreatedAt: new Date(data.CreatedAt),
+      UpdatedAt: new Date(data.UpdatedAt),
+      StartedAt: new Date(data.StartedAt ?? data.CreatedAt),
+      FinishedAt: data.FinishedAt != null ? new Date(data.FinishedAt) : null,
+      StoppedAt: data.StoppedAt != null ? new Date(data.StoppedAt) : null,
+      LastProcessedEventId: lastProcessedEventId,
+      TotalScoreSum: data.TotalScoreSum,
+      ScoreCount: data.ScoreCount,
+      PassedCount: data.PassedCount,
+      GradedCount: data.GradedCount,
+      LastEventOccurredAt: data.LastEventOccurredAt ? new Date(data.LastEventOccurredAt) : new Date(0),
+    };
+  }
+
+  async getProjection(
+    aggregateId: string,
+    context: ProjectionStoreReadContext,
+  ): Promise<ProjectionType | null> {
+    EventUtils.validateTenantId(
+      context,
+      "ExperimentRunStateRepositoryClickHouse.getProjection",
+    );
+
+    // aggregateId is the composite key (experimentId:runId) — parse to raw values
+    const { experimentId, runId } = parseExperimentRunKey(String(aggregateId));
+
+    try {
+      const client = await this.resolveClient(context.tenantId);
+      // IN-tuple dedup over the ReplacingMergeTree (see
+      // dev/docs/best_practices/clickhouse-queries.md). UpdatedAt is
+      // referenced via table alias because it's also projected as
+      // `toUnixTimestamp64Milli(...) AS UpdatedAt` — without the alias the
+      // IN-tuple comparison resolves to the projected UInt64 instead of the
+      // raw DateTime64.
+      const result = await client.query({
+        query: `
+          SELECT
+            t.ProjectionId AS ProjectionId, t.TenantId AS TenantId,
+            t.RunId AS RunId, t.ExperimentId AS ExperimentId,
+            t.WorkflowVersionId AS WorkflowVersionId, t.Version AS Version,
+            t.Total AS Total, t.Progress AS Progress,
+            t.CompletedCount AS CompletedCount, t.FailedCount AS FailedCount,
+            t.TotalCost AS TotalCost,
+            toString(t.TotalDurationMs) AS TotalDurationMs,
+            t.AvgScoreBps AS AvgScoreBps, t.PassRateBps AS PassRateBps,
+            t.Targets AS Targets,
+            toUnixTimestamp64Milli(t.CreatedAt) AS CreatedAt,
+            toUnixTimestamp64Milli(t.UpdatedAt) AS UpdatedAt,
+            toUnixTimestamp64Milli(t.StartedAt) AS StartedAt,
+            toUnixTimestamp64Milli(t.FinishedAt) AS FinishedAt,
+            toUnixTimestamp64Milli(t.StoppedAt) AS StoppedAt,
+            t.LastProcessedEventId AS LastProcessedEventId,
+            t.TotalScoreSum AS TotalScoreSum, t.ScoreCount AS ScoreCount,
+            t.PassedCount AS PassedCount, t.GradedCount AS GradedCount,
+            toUnixTimestamp64Milli(t.LastEventOccurredAt) AS LastEventOccurredAt
+          FROM ${TABLE_NAME} AS t
+          WHERE t.TenantId = {tenantId:String}
+            AND t.RunId = {runId:String}
+            AND t.ExperimentId = {experimentId:String}
+            AND (t.TenantId, t.RunId, t.ExperimentId, t.UpdatedAt) IN (
+              SELECT TenantId, RunId, ExperimentId, max(UpdatedAt)
+              FROM ${TABLE_NAME}
+              WHERE TenantId = {tenantId:String}
+                AND RunId = {runId:String}
+                AND ExperimentId = {experimentId:String}
+              GROUP BY TenantId, RunId, ExperimentId
+            )
+          LIMIT 1
+        `,
+        query_params: { tenantId: context.tenantId, runId, experimentId },
+        format: "JSONEachRow",
+      });
+
+      const rows = await result.json<ClickHouseExperimentRunRecord>();
+      const row = rows[0];
+      if (!row) return null;
+
+      const projection: ExperimentRunState = {
+        id: row.ProjectionId,
+        aggregateId: makeExperimentRunKey(experimentId, runId),
+        tenantId: createTenantId(context.tenantId),
+        version: row.Version,
+        data: this.mapClickHouseRecordToProjectionData(row),
+      };
+
+      return projection as ProjectionType;
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      logger.error({ runId, tenantId: context.tenantId, error: errorMessage },
+        "Failed to get projection from ClickHouse");
+      throw new StoreError(
+        "getProjection",
+        "ExperimentRunStateRepositoryClickHouse",
+        `Failed to get projection for run ${runId}: ${errorMessage}`,
+        classifyClickHouseError(error),
+        { runId },
+        error,
+      );
+    }
+  }
+
+  async storeProjection(
+    projection: ProjectionType,
+    context: ProjectionStoreWriteContext,
+  ): Promise<void> {
+    EventUtils.validateTenantId(
+      context,
+      "ExperimentRunStateRepositoryClickHouse.storeProjection",
+    );
+
+    if (!EventUtils.isValidProjection(projection)) {
+      throw new ValidationError(
+        "Invalid projection: projection must have id, aggregateId, tenantId, version, and data",
+        "projection",
+        projection,
+      );
+    }
+
+    if (projection.tenantId !== context.tenantId) {
+      throw new SecurityError(
+        "storeProjection",
+        `Projection has tenantId '${projection.tenantId}' that does not match context tenantId '${context.tenantId}'`,
+        projection.tenantId,
+        { contextTenantId: context.tenantId },
+      );
+    }
+
+    try {
+      const client = await this.resolveClient(context.tenantId);
+      const { runId } = parseExperimentRunKey(String(projection.aggregateId));
+      const projectionRecord = this.mapProjectionDataToClickHouseRecord(
+        projection.data as ExperimentRunStateData,
+        String(context.tenantId),
+        projection.id,
+        projection.version,
+        projection.id,
+        runId,
+      );
+
+      await client.insert({
+        table: TABLE_NAME,
+        values: [projectionRecord],
+        format: "JSONEachRow",
+        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+      });
+
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      logger.error({
+        tenantId: context.tenantId,
+        runId: String(projection.aggregateId),
+        projectionId: projection.id,
+        error: errorMessage,
+      }, "Failed to store projection in ClickHouse");
+      throw new StoreError(
+        "storeProjection",
+        "ExperimentRunStateRepositoryClickHouse",
+        `Failed to store projection ${projection.id} for run ${projection.aggregateId}: ${errorMessage}`,
+        classifyClickHouseError(error),
+        { projectionId: projection.id, runId: String(projection.aggregateId) },
+        error,
+      );
+    }
+  }
+
+  async storeProjectionBatch(
+    projections: ProjectionType[],
+    context: ProjectionStoreWriteContext,
+  ): Promise<void> {
+    if (projections.length === 0) return;
+
+    EventUtils.validateTenantId(
+      context,
+      "ExperimentRunStateRepositoryClickHouse.storeProjectionBatch",
+    );
+
+    for (const projection of projections) {
+      if (projection.tenantId !== context.tenantId) {
+        throw new SecurityError(
+          "storeProjectionBatch",
+          `Projection has tenantId '${projection.tenantId}' that does not match context tenantId '${context.tenantId}'`,
+          projection.tenantId,
+          { contextTenantId: context.tenantId },
+        );
+      }
+    }
+
+    try {
+      const records = projections.map((projection) => {
+        const { runId } = parseExperimentRunKey(String(projection.aggregateId));
+        return this.mapProjectionDataToClickHouseRecord(
+          projection.data as ExperimentRunStateData,
+          String(context.tenantId),
+          projection.id,
+          projection.version,
+          projection.id,
+          runId,
+        );
+      });
+
+      const client = await this.resolveClient(context.tenantId);
+      await client.insert({
+        table: TABLE_NAME,
+        values: records,
+        format: "JSONEachRow",
+        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+      });
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      logger.error({
+        tenantId: context.tenantId,
+        count: projections.length,
+        error: errorMessage,
+      }, "Failed to batch store projections in ClickHouse");
+      throw new StoreError(
+        "storeProjectionBatch",
+        "ExperimentRunStateRepositoryClickHouse",
+        `Failed to batch store ${projections.length} projections: ${errorMessage}`,
+        classifyClickHouseError(error),
+        { count: projections.length },
+        error,
+      );
+    }
+  }
+}

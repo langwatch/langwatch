@@ -79,17 +79,20 @@ describe("reasoningBoundary", () => {
     // The function translates provider-specific names from model registry to reasoning_effort
 
     describe("uses reasoning_effort for all providers (LiteLLM requirement)", () => {
+      /** @scenario Maps reasoning to reasoning_effort for OpenAI models */
       it("maps reasoning to reasoning_effort for OpenAI models", () => {
         const result = mapReasoningToProvider("openai/gpt-5", "high");
         expect(result).toEqual({ reasoning_effort: "high" });
       });
 
+      /** @scenario Maps reasoning to reasoning_effort for Gemini models */
       it("maps reasoning to reasoning_effort for Gemini models", () => {
         // Model registry returns thinkingLevel, but function translates to reasoning_effort
         const result = mapReasoningToProvider("gemini/gemini-3-flash", "low");
         expect(result).toEqual({ reasoning_effort: "low" });
       });
 
+      /** @scenario Maps reasoning to reasoning_effort for Anthropic models */
       it("maps reasoning to reasoning_effort for Anthropic models", () => {
         // Model registry returns effort, but function translates to reasoning_effort
         const result = mapReasoningToProvider(
@@ -152,6 +155,7 @@ describe("reasoningBoundary", () => {
         expect(result).toBeUndefined();
       });
 
+      /** @scenario Returns undefined when reasoning is empty string */
       it("returns undefined when reasoning is empty string", () => {
         const result = mapReasoningToProvider("openai/gpt-5", "");
         expect(result).toBeUndefined();
@@ -188,6 +192,7 @@ describe("reasoningBoundary", () => {
     });
 
     describe("when normalizing provider-specific fields", () => {
+      /** @scenario Normalizes reasoning_effort to reasoning */
       it("normalizes reasoning_effort to reasoning", () => {
         const result = normalizeReasoningFromProviderFields({
           reasoning_effort: "high",
@@ -195,6 +200,7 @@ describe("reasoningBoundary", () => {
         expect(result).toBe("high");
       });
 
+      /** @scenario Normalizes thinkingLevel to reasoning */
       it("normalizes thinkingLevel to reasoning", () => {
         const result = normalizeReasoningFromProviderFields({
           thinkingLevel: "low",
@@ -202,6 +208,7 @@ describe("reasoningBoundary", () => {
         expect(result).toBe("low");
       });
 
+      /** @scenario Normalizes effort to reasoning */
       it("normalizes effort to reasoning", () => {
         const result = normalizeReasoningFromProviderFields({
           effort: "medium",

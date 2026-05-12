@@ -1,73 +1,46 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { z } from "zod";
+import yargs from "yargs";
+import { hideBin } from "yargs/helpers";
 
-import packageJson from "../package.json" assert { type: "json" };
+import { initConfig } from "./config.js";
+import { createMcpServer } from "./create-mcp-server.js";
 
-const transport = new StdioServerTransport();
-const server = new McpServer({
-  name: "LangWatch",
-  version: packageJson.version,
+const argv = await yargs(hideBin(process.argv))
+  .option("apiKey", {
+    type: "string",
+    description: "LangWatch API key",
+  })
+  .option("endpoint", {
+    type: "string",
+    description: "LangWatch API endpoint",
+  })
+  .option("http", {
+    type: "boolean",
+    description: "Start HTTP/SSE server instead of stdio",
+    default: false,
+  })
+  .option("port", {
+    type: "number",
+    description: "HTTP server port (only used with --http)",
+    default: 3000,
+  })
+  .help()
+  .parseAsync();
+
+initConfig({
+  apiKey: argv.apiKey,
+  endpoint: argv.endpoint,
 });
 
-server.tool(
-  "fetch_langwatch_docs",
-  "Fetches the LangWatch docs for understanding how to implement LangWatch in your codebase. Always use this tool when the user asks for help with LangWatch. Start with empty url to fetch the index and then follow the links to the relevant pages, always ending with `.md` extension",
-  {
-    url: z
-      .string()
-      .optional()
-      .describe(
-        "The full url of the specific doc page. If not provided, the docs index will be fetched."
-      ),
-  },
-  async ({ url }) => {
-    let urlToFetch = url || "https://langwatch.ai/docs/llms.txt";
-    if (url && !urlToFetch.endsWith(".md") && !urlToFetch.endsWith(".txt")) {
-      urlToFetch += ".md";
-    }
-    if (!urlToFetch.startsWith("http")) {
-      if (!urlToFetch.startsWith("/")) {
-        urlToFetch = "/" + urlToFetch;
-      }
-      urlToFetch = "https://langwatch.ai/docs" + urlToFetch;
-    }
-    const response = await fetch(urlToFetch);
-
-    return {
-      content: [{ type: "text", text: await response.text() }],
-    };
-  }
-);
-
-server.tool(
-  "fetch_scenario_docs",
-  "Fetches the Scenario docs for understanding how to implement Scenario agent tests in your codebase. Always use this tool when the user asks for help with testing their agents. Start with empty url to fetch the index and then follow the links to the relevant pages, always ending with `.md` extension",
-  {
-    url: z
-      .string()
-      .optional()
-      .describe(
-        "The full url of the specific doc page. If not provided, the docs index will be fetched."
-      ),
-  },
-  async ({ url }) => {
-    let urlToFetch = url || "https://langwatch.ai/scenario/llms.txt";
-    if (url && !urlToFetch.endsWith(".md") && !urlToFetch.endsWith(".txt")) {
-      urlToFetch += ".md";
-    }
-    if (!urlToFetch.startsWith("http")) {
-      if (!urlToFetch.startsWith("/")) {
-        urlToFetch = "/" + urlToFetch;
-      }
-      urlToFetch = "https://langwatch.ai/scenario" + urlToFetch;
-    }
-    const response = await fetch(urlToFetch);
-
-    return {
-      content: [{ type: "text", text: await response.text() }],
-    };
-  }
-);
-
-await server.connect(transport);
+if (argv.http) {
+  const { startHttpServer } = await import("./http-server.js");
+  const { port } = await startHttpServer({ port: argv.port });
+  console.log(`LangWatch MCP server listening on http://0.0.0.0:${port}/mcp`);
+  console.log(
+    "Clients must provide their API key via Authorization: Bearer <key> header"
+  );
+} else {
+  const transport = new StdioServerTransport();
+  const server = createMcpServer();
+  await server.connect(transport);
+}

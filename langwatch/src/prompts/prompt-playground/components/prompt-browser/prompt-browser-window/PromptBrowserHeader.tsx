@@ -4,6 +4,7 @@ import type { PromptConfigFormValues } from "~/prompts";
 import { PromptEditorHeader } from "~/prompts/components/PromptEditorHeader";
 import { useHandleSavePrompt } from "~/prompts/prompt-playground/hooks/useHandleSavePrompt";
 import { useHasUnsavedChanges } from "~/prompts/prompt-playground/hooks/useHasUnsavedChanges";
+import { useDraggableTabsBrowserStore } from "~/prompts/prompt-playground/prompt-playground-store/DraggableTabsBrowserStore";
 import { versionedPromptToPromptConfigFormValuesWithSystemMessage } from "~/prompts/utils/llmPromptConfigUtils";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import { useTabId } from "../ui/TabContext";
@@ -19,6 +20,10 @@ export function PromptBrowserHeader() {
   const { handleSaveVersion } = useHandleSavePrompt();
   const tabId = useTabId();
   const hasUnsavedChanges = useHasUnsavedChanges(tabId);
+  const openHistoryOnLoad = useDraggableTabsBrowserStore(({ windows }) => {
+    const tab = windows.flatMap((w) => w.tabs).find((t) => t.id === tabId);
+    return tab?.data.meta.openHistoryOnLoad;
+  });
 
   /**
    * handleOnRestore
@@ -37,6 +42,7 @@ export function PromptBrowserHeader() {
         onSave={handleSaveVersion}
         hasUnsavedChanges={hasUnsavedChanges}
         onVersionRestore={handleOnRestore}
+        openHistoryOnLoad={openHistoryOnLoad}
       />
     </Box>
   );

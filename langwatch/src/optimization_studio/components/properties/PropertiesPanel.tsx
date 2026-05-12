@@ -15,7 +15,9 @@ import { CodePropertiesPanel } from "./CodePropertiesPanel";
 import { CustomPropertiesPanel } from "./CustomPropertiesPanel";
 import { EndPropertiesPanel } from "./EndPropertiesPanel";
 import { EntryPointPropertiesPanel } from "./EntryPointPropertiesPanel";
+import { AgentPropertiesPanel } from "./AgentPropertiesPanel";
 import { EvaluatorPropertiesPanel } from "./EvaluatorPropertiesPanel";
+import { HttpPropertiesPanel } from "./HttpPropertiesPanel";
 import { SignaturePropertiesPanel } from "./llm-configs/signature-properties-panel/SignaturePropertiesPanel";
 import { PromptingTechniquePropertiesPanel } from "./PromptingTechniquePropertiesPanel";
 import { RetrievePropertiesPanel } from "./RetrievePropertiesPanel";
@@ -44,6 +46,8 @@ export function PropertiesPanel() {
     end: EndPropertiesPanel as React.FC<{ node: Node<Component> }>,
     signature: SignaturePropertiesPanel as React.FC<{ node: Node<Component> }>,
     code: CodePropertiesPanel,
+    http: HttpPropertiesPanel,
+    agent: AgentPropertiesPanel as React.FC<{ node: Node<Component> }>,
     custom: CustomPropertiesPanel,
     retriever: RetrievePropertiesPanel,
     prompting_technique: PromptingTechniquePropertiesPanel,
@@ -85,7 +89,7 @@ export function PropertiesPanel() {
         position={propertiesExpanded ? "absolute" : "relative"}
         top={0}
         right={0}
-        background="white"
+        background="bg"
         border="1px solid"
         borderColor="border.emphasized"
         borderTopWidth={0}
@@ -146,9 +150,9 @@ export function PropertiesPanel() {
           position: propertiesExpanded ? "absolute" : "relative",
           top: 0,
           right: 0,
-          background: "white",
+          background: "var(--chakra-colors-bg)",
           border: "1px solid",
-          borderColor: "var(--chakra-colors-gray-350)",
+          borderColor: "var(--chakra-colors-border-emphasized)",
           zIndex: 100,
           overflowY: "auto",
           overflowX: "hidden",

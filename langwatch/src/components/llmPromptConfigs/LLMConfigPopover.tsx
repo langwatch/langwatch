@@ -9,7 +9,7 @@ import {
   type OutputType,
 } from "../outputs/OutputsSection";
 import { Popover } from "../ui/popover";
-import { Switch } from "../ui/switch";
+
 
 import { ParameterRow } from "./ParameterRow";
 import {
@@ -25,6 +25,7 @@ import {
   getMaxTokenLimit,
   normalizeMaxTokens,
 } from "./utils/tokenUtils";
+import { clampMaxTokens } from "../../utils/clampMaxTokens";
 
 // Re-export types for backward compatibility
 export type { LLMConfigValues } from "./types";
@@ -106,6 +107,21 @@ export function LLMConfigPopover({
     return getMaxTokenLimit(currentModelMetadata);
   }, [currentModelMetadata]);
 
+  // Clamp saved maxTokens against the configured model ceiling.
+  // The configured max (from the custom-model dialog / model metadata) is the
+  // source of truth — a stale form value above it would otherwise display raw
+  // in the collapsed row while the popover silently clamps it, and get persisted
+  // out of bounds on save.
+  useEffect(() => {
+    if (!currentModelMetadata) return;
+    const currentMaxTokens = getParamValue(values, "max_tokens");
+    if (typeof currentMaxTokens !== "number") return;
+    const clamped = clampMaxTokens(currentMaxTokens, maxTokenLimit);
+    if (clamped !== undefined && clamped !== currentMaxTokens) {
+      onChange(normalizeMaxTokens(values, clamped));
+    }
+  }, [currentModelMetadata, maxTokenLimit, values, onChange]);
+
   // Handle parameter change - outputs camelCase keys for form compatibility
   const handleParamChange = (paramName: string, value: number | string) => {
     const formKey = toFormKey(paramName);
@@ -152,6 +168,8 @@ export function LLMConfigPopover({
 
   const handleStructuredOutputsToggle = (checked: boolean) => {
     if (!onOutputsChange) return;
+    // Guard against duplicate calls from nested click handlers
+    if (checked === isStructuredOutputsEnabled) return;
 
     userInitiatedToggleRef.current = true;
     setIsStructuredOutputsEnabled(checked);
@@ -161,7 +179,7 @@ export function LLMConfigPopover({
   };
 
   return (
-    <Popover.Content minWidth="260px" maxWidth="100%" zIndex={1401}>
+    <Popover.Content minWidth="260px" maxWidth="100%">
       <VStack paddingY={2} paddingX={2} width="full" align="start" gap={3}>
         {/* Model Selector */}
         <Box width="full">
@@ -272,18 +290,47 @@ export function LLMConfigPopover({
         {showStructuredOutputs && onOutputsChange && (
           <VStack width="full" gap={2}>
             <HStack width="full" justify="space-between" paddingX={2} paddingBottom={isStructuredOutputsEnabled ? 0 : 2}>
-              <HStack width="full" align="start" gap={0} justify="space-between">
+              <HStack
+                width="full"
+                align="start"
+                gap={0}
+                justify="space-between"
+                cursor="pointer"
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={() =>
+                  handleStructuredOutputsToggle(!isStructuredOutputsEnabled)
+                }
+              >
                 <Text fontSize="13px" fontWeight="medium" color="fg.subtle">
                   Structured Outputs
                 </Text>
-                <Switch
-                  size="sm"
+                <Box
+                  as="button"
+                  role="switch"
+                  aria-checked={isStructuredOutputsEnabled}
                   data-testid="structured-outputs-switch"
-                  checked={isStructuredOutputsEnabled}
-                  onCheckedChange={({ checked }) =>
-                    handleStructuredOutputsToggle(checked)
-                  }
-                />
+                  data-state={isStructuredOutputsEnabled ? "checked" : "unchecked"}
+                  display="flex"
+                  alignItems="center"
+                  justifyContent={isStructuredOutputsEnabled ? "flex-end" : "flex-start"}
+                  width="34px"
+                  height="20px"
+                  borderRadius="full"
+                  bg={isStructuredOutputsEnabled ? "blue.500" : "gray.300"}
+                  padding="2px"
+                  cursor="pointer"
+                  transition="background 0.2s"
+                  flexShrink={0}
+                >
+                  <Box
+                    width="16px"
+                    height="16px"
+                    borderRadius="full"
+                    bg="white"
+                    boxShadow="sm"
+                    transition="all 0.2s"
+                  />
+                </Box>
               </HStack>
             </HStack>
 

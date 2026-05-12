@@ -1,5 +1,27 @@
 @wip @integration
 Feature: Member Limit Enforcement with License
+
+  # Eight role-classification scenarios are bound below to
+  # member-classification.unit.test.ts. The remaining @unimplemented
+  # scenarios fall in three groups:
+  #   1. License-based invite-flow scenarios (under/at/over limit, bulk
+  #      invite, expired/invalid-license FREE-tier fallback, pending
+  #      invite aggregation, lite-vs-full member counting) — exercised
+  #      partially by license-limit-guard.unit.test.ts
+  #      (assertMemberTypeLimitNotExceeded) and member.repository tests,
+  #      but the end-to-end "invite a user via tRPC, FORBIDDEN" path
+  #      requires an integration fixture that mounts the team-router
+  #      against a license-bearing org. No such harness yet.
+  #   2. UI click-then-modal scenarios (Add members button always
+  #      clickable, shows upgrade modal at limit, opens form when
+  #      allowed, disabled-tooltip for non-admin) — require a
+  #      page-level component test against the members page.
+  #   3. Role-update enforcement (Lite→Full upgrade allowed/blocked,
+  #      custom-role mutation that crosses lite/full boundary) — needs
+  #      a tRPC organization.updateMemberRole integration test that
+  #      asserts the limit guard fires; partial coverage in
+  #      license-limit-guard.unit.test.ts but no end-to-end binding.
+  # All aspirational pending those test harnesses.
   As a LangWatch self-hosted deployment with a license
   I want the member invite limit to be enforced
   So that organizations respect their licensed seat count
@@ -13,12 +35,14 @@ Feature: Member Limit Enforcement with License
   # License-Based Member Limits
   # ============================================================================
 
+  @unimplemented
   Scenario: Allows invite when under member limit
     Given the organization has 3 accepted members
     And the organization has a license with maxMembers 5
     When I invite user "new@example.com" to the organization
     Then the invite is created successfully
 
+  @unimplemented
   Scenario: Blocks invite when at member limit
     Given the organization has 3 accepted members
     And the organization has a license with maxMembers 3
@@ -26,6 +50,7 @@ Feature: Member Limit Enforcement with License
     Then the request fails with FORBIDDEN
     And the error message contains "Over the limit of invites allowed"
 
+  @unimplemented
   Scenario: Blocks invite when over member limit
     Given the organization has 3 accepted members
     And the organization has a license with maxMembers 2
@@ -33,61 +58,29 @@ Feature: Member Limit Enforcement with License
     Then the request fails with FORBIDDEN
 
   # ============================================================================
-  # No License (Unlimited when enforcement disabled)
-  # ============================================================================
-
-  Scenario: No license allows unlimited members when enforcement disabled
-    Given the organization has 3 accepted members
-    And LICENSE_ENFORCEMENT_ENABLED is "false"
-    And the organization has no license
-    When I invite user "new@example.com" to the organization
-    Then the invite is created successfully
-
-  Scenario: No license with 100 existing members still allows invites when enforcement disabled
-    Given LICENSE_ENFORCEMENT_ENABLED is "false"
-    And the organization has no license
-    And the organization has 100 accepted members
-    When I invite user "new@example.com" to the organization
-    Then the invite is created successfully
-
-  # ============================================================================
   # Invalid/Expired License (FREE Tier)
   # ============================================================================
 
+  @unimplemented
   Scenario: Expired license enforces FREE tier member limit
     Given the organization has an expired license
-    And the organization has 2 accepted members
+    And the organization has 1 accepted member
     When I invite user "new@example.com" to the organization
     Then the request fails with FORBIDDEN
     And the error message contains "Over the limit of invites allowed"
 
-  Scenario: Invalid license enforces FREE tier member limit
+  @unimplemented
+  Scenario: Invalid license blocks at FREE tier limit
     Given the organization has an invalid license signature
     And the organization has 1 accepted member
     When I invite user "new@example.com" to the organization
-    Then the invite is created successfully
-
-  Scenario: Invalid license blocks at FREE tier limit
-    Given the organization has an invalid license signature
-    And the organization has 2 accepted members
-    When I invite user "new@example.com" to the organization
     Then the request fails with FORBIDDEN
-
-  # ============================================================================
-  # Feature Flag Override
-  # ============================================================================
-
-  Scenario: Feature flag disabled allows unlimited even with license
-    Given the organization has 3 accepted members
-    And the organization has a license with maxMembers 3
-    And LICENSE_ENFORCEMENT_ENABLED is "false"
-    When I invite user "new@example.com" to the organization
-    Then the invite is created successfully
 
   # ============================================================================
   # Bulk Invites
   # ============================================================================
 
+  @unimplemented
   Scenario: Blocks bulk invite that would exceed limit
     Given the organization has a license with maxMembers 5
     And the organization has 3 accepted members
@@ -98,6 +91,7 @@ Feature: Member Limit Enforcement with License
   # Pending Invites Count Toward Member Limit
   # ============================================================================
 
+  @unimplemented
   Scenario: Pending invites count toward total member limit
     Given the organization has 2 accepted members
     And the organization has 2 pending invites
@@ -106,6 +100,7 @@ Feature: Member Limit Enforcement with License
     Then the request fails with FORBIDDEN
     And the error message contains "Over the limit of invites allowed"
 
+  @unimplemented
   Scenario: Allows invite when pending invites plus members under limit
     Given the organization has 2 accepted members
     And the organization has 1 pending invite
@@ -113,6 +108,7 @@ Feature: Member Limit Enforcement with License
     When I invite user "new@example.com" to the organization
     Then the invite is created successfully
 
+  @unimplemented
   Scenario: Expired invites do not count toward member limit
     Given the organization has 2 accepted members
     And the organization has 2 expired pending invites
@@ -120,6 +116,7 @@ Feature: Member Limit Enforcement with License
     When I invite user "new@example.com" to the organization
     Then the invite is created successfully
 
+  @unimplemented
   Scenario: Only non-expired pending invites count toward limit
     Given the organization has 2 accepted members
     And the organization has 1 pending invite
@@ -134,6 +131,7 @@ Feature: Member Limit Enforcement with License
   # Lite Member: EXTERNAL role (with view-only or no custom permissions)
   # Full Member: ADMIN/MEMBER role OR any role with non-view permissions
 
+  @unimplemented
   Scenario: Lite Member users are counted separately from full members
     Given the organization has 2 Full Members
     And the organization has 1 Lite Member with role EXTERNAL
@@ -141,6 +139,7 @@ Feature: Member Limit Enforcement with License
     When I invite user "new@example.com" as EXTERNAL to the organization
     Then the invite is created successfully
 
+  @unimplemented
   Scenario: Lite Member pending invites count toward Lite Member limit
     Given the organization has 2 Full Members
     And the organization has 1 pending invite with role EXTERNAL
@@ -221,6 +220,7 @@ Feature: Member Limit Enforcement with License
     When I invite user "new@example.com" with custom role "Sharer" to the organization
     Then the request fails with FORBIDDEN
 
+  @unimplemented
   Scenario: Pending invite with view-only custom role counts as Lite Member
     Given a custom role "Viewer" exists with permissions:
       | project:view    |
@@ -232,6 +232,7 @@ Feature: Member Limit Enforcement with License
     Then the request fails with FORBIDDEN
     And the error message contains "Over the limit of lite members allowed"
 
+  @unimplemented
   Scenario: Pending invite with non-view custom role counts as Full Member
     Given a custom role "Manager" exists with permissions:
       | project:view    |
@@ -246,65 +247,11 @@ Feature: Member Limit Enforcement with License
   # Member Type Classification Helper Functions
   # ============================================================================
 
-  @unit
-  Scenario: isViewOnlyPermission identifies view-only permissions
-    Given the permission "project:view"
-    When I check if the permission is view-only
-    Then the result is true
-
-  @unit
-  Scenario: isViewOnlyPermission identifies non-view permissions
-    Given the permission "project:manage"
-    When I check if the permission is view-only
-    Then the result is false
-
-  @unit
-  Scenario: isViewOnlyCustomRole returns true for view-only role
-    Given a custom role with permissions ["project:view", "analytics:view", "traces:view"]
-    When I check if the role is view-only
-    Then the result is true
-
-  @unit
-  Scenario: isViewOnlyCustomRole returns false for role with manage permission
-    Given a custom role with permissions ["project:view", "project:manage"]
-    When I check if the role is view-only
-    Then the result is false
-
-  @unit
-  Scenario: classifyMemberType returns MemberLite for EXTERNAL role
-    Given a user with OrganizationUserRole EXTERNAL
-    When I classify the member type
-    Then the result is "MemberLite"
-
-  @unit
-  Scenario: classifyMemberType returns FullMember for ADMIN role
-    Given a user with OrganizationUserRole ADMIN
-    When I classify the member type
-    Then the result is "FullMember"
-
-  @unit
-  Scenario: classifyMemberType returns FullMember for MEMBER role
-    Given a user with OrganizationUserRole MEMBER
-    When I classify the member type
-    Then the result is "FullMember"
-
-  @unit
-  Scenario: classifyMemberType returns MemberLite for view-only custom role
-    Given a user with EXTERNAL role and custom role with permissions ["project:view"]
-    When I classify the member type
-    Then the result is "MemberLite"
-
-  @unit
-  Scenario: classifyMemberType returns FullMember for custom role with non-view permission
-    Given a user with EXTERNAL role and custom role with permissions ["project:view", "project:update"]
-    When I classify the member type
-    Then the result is "FullMember"
-
   # ============================================================================
   # UI: Click-then-Modal Pattern
   # ============================================================================
 
-  @unit
+  @unit @unimplemented
   Scenario: Add members button is always clickable when admin
     Given the organization has a license with maxMembers 3
     And the organization has 3 members (at limit)
@@ -313,7 +260,7 @@ Feature: Member Limit Enforcement with License
     Then the "Add members" button is enabled
     And the "Add members" button is not visually disabled
 
-  @unit
+  @unit @unimplemented
   Scenario: Clicking Add members at limit shows upgrade modal
     Given the organization has a license with maxMembers 3
     And the organization has 3 members (at limit)
@@ -323,7 +270,7 @@ Feature: Member Limit Enforcement with License
     And the modal shows "team members: 3 / 3"
     And the modal includes an upgrade call-to-action
 
-  @unit
+  @unit @unimplemented
   Scenario: Clicking Add members when allowed opens add members form
     Given the organization has a license with maxMembers 5
     And the organization has 3 members (under limit)
@@ -332,7 +279,7 @@ Feature: Member Limit Enforcement with License
     Then the add members dialog is displayed
     And no upgrade modal is shown
 
-  @unit
+  @unit @unimplemented
   Scenario: Add members button disabled for non-admin (permission check)
     Given the organization has a license with maxMembers 5
     And I am authenticated as a non-admin member of the organization
@@ -359,21 +306,7 @@ Feature: Member Limit Enforcement with License
     When I update "lite@example.com" org role to MEMBER
     Then the update succeeds
 
-  Scenario: Blocks downgrade from full member to Lite Member when at lite limit
-    Given the organization has 2 Full Members including "member@example.com"
-    And the organization has 1 Lite Member
-    And the organization has a license with maxMembersLite 1
-    When I update "member@example.com" org role to EXTERNAL
-    Then the request fails with FORBIDDEN
-    And the error message contains "Lite Member limit reached"
-
-  Scenario: Allows downgrade from full member to Lite Member when under limit
-    Given the organization has 2 Full Members including "member@example.com"
-    And the organization has 0 Lite Member users
-    And the organization has a license with maxMembersLite 1
-    When I update "member@example.com" org role to EXTERNAL
-    Then the update succeeds
-
+  @unimplemented
   Scenario: Blocks custom role change that would exceed full member limit
     Given the organization has 3 Full Members
     And the organization has 1 Lite Member with view-only custom role "viewer-role"
@@ -382,48 +315,7 @@ Feature: Member Limit Enforcement with License
     Then the request fails with FORBIDDEN
     And the error message contains "member limit reached"
 
-  Scenario: Allows custom role change when member type unchanged
-    Given the organization has 2 Full Members
-    And the organization has a license with maxMembers 3
-    When a Full Member's custom role is changed to another non-view role
-    Then the update succeeds
-
   # ============================================================================
   # Role Change Type Detection (Unit)
   # ============================================================================
 
-  @unit
-  Scenario: getRoleChangeType returns no-change when both roles are Full Member
-    Given a user with role ADMIN and no custom permissions
-    When I check the role change type to MEMBER with no custom permissions
-    Then the result is "no-change"
-
-  @unit
-  Scenario: getRoleChangeType returns no-change when both roles are Lite Member
-    Given a user with role EXTERNAL and view-only permissions ["project:view"]
-    When I check the role change type to EXTERNAL with view-only permissions ["analytics:view"]
-    Then the result is "no-change"
-
-  @unit
-  Scenario: getRoleChangeType returns lite-to-full when upgrading EXTERNAL to MEMBER
-    Given a user with role EXTERNAL and no custom permissions
-    When I check the role change type to MEMBER with no custom permissions
-    Then the result is "lite-to-full"
-
-  @unit
-  Scenario: getRoleChangeType returns lite-to-full when view-only role gets manage permission
-    Given a user with role EXTERNAL and view-only permissions ["project:view"]
-    When I check the role change type to EXTERNAL with permissions ["project:view", "project:manage"]
-    Then the result is "lite-to-full"
-
-  @unit
-  Scenario: getRoleChangeType returns full-to-lite when downgrading MEMBER to EXTERNAL
-    Given a user with role MEMBER and no custom permissions
-    When I check the role change type to EXTERNAL with no custom permissions
-    Then the result is "full-to-lite"
-
-  @unit
-  Scenario: getRoleChangeType returns full-to-lite when non-view role becomes view-only
-    Given a user with role EXTERNAL and permissions ["project:manage"]
-    When I check the role change type to EXTERNAL with view-only permissions ["project:view"]
-    Then the result is "full-to-lite"

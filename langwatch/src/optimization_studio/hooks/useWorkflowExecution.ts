@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { toaster } from "../../components/ui/toaster";
+import { createLogger } from "~/utils/logger";
 import { generateOtelTraceId } from "../../utils/trace";
 import type { StudioClientEvent } from "../types/events";
+import { mergeLocalConfigsIntoDsl } from "../utils/mergeLocalConfigs";
 import { usePostEvent } from "./usePostEvent";
 import { useWorkflowStore } from "./useWorkflowStore";
+
+const logger = createLogger("langwatch:studio:execution");
 
 export const useWorkflowExecution = () => {
   const { postEvent, socketStatus } = usePostEvent();
@@ -42,6 +46,13 @@ export const useWorkflowExecution = () => {
       workflow.state.execution?.trace_id === triggerTimeout.trace_id &&
       workflow.state.execution?.status === triggerTimeout.timeout_on_status
     ) {
+      logger.warn(
+        {
+          trace_id: triggerTimeout.trace_id,
+          timeout_on_status: triggerTimeout.timeout_on_status,
+        },
+        "workflow execution timeout triggered",
+      );
       setWorkflowExecutionState({
         status: "error",
         error: "Timeout",
@@ -75,6 +86,10 @@ export const useWorkflowExecution = () => {
       }
 
       const trace_id = generateOtelTraceId();
+      logger.info(
+        { trace_id, untilNodeId },
+        "workflow execution starting",
+      );
 
       setWorkflowExecutionState({
         status: "waiting",
@@ -82,14 +97,19 @@ export const useWorkflowExecution = () => {
         until_node_id: untilNodeId,
       });
 
+      const workflow = getWorkflow();
       const payload: StudioClientEvent = {
         type: "execute_flow",
         payload: {
           trace_id,
-          workflow: getWorkflow(),
+          workflow: {
+            ...workflow,
+            nodes: mergeLocalConfigsIntoDsl(workflow.nodes),
+          },
           until_node_id: untilNodeId,
           inputs: inputs,
           manual_execution_mode: true,
+          origin: "workflow",
         },
       };
       postEvent(payload);
@@ -106,6 +126,8 @@ export const useWorkflowExecution = () => {
       if (!socketAvailable()) {
         return;
       }
+
+      logger.info({ trace_id }, "workflow execution stopping");
 
       const workflow = getWorkflow();
       const current_state = workflow.state.execution?.status;

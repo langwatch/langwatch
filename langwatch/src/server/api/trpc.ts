@@ -15,20 +15,29 @@ import {
   type Simplify,
   TRPCError,
 } from "@trpc/server";
-import type { CreateNextContextOptions } from "@trpc/server/adapters/next";
+import { getHTTPStatusCodeFromError } from "@trpc/server/http";
+// Local type replacing CreateNextContextOptions from @trpc/server/adapters/next
+// to avoid pulling in the real `next` types.
+interface CreateNextContextOptions {
+  req: any;
+  res: any;
+}
 import type { Parser } from "@trpc-internal/parser";
 import type { UnsetMarker } from "@trpc-internal/utils";
-import type { NextApiRequest, NextApiResponse } from "next";
-import type { Session } from "next-auth";
+import type { NextApiRequest, NextApiResponse } from "~/types/next-stubs";
+import type { Session } from "~/server/auth";
 import superjson from "superjson";
 import { ZodError } from "zod";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
+import { DomainError } from "~/server/app-layer/domain-error";
 import { getLogLevelFromStatusCode } from "../middleware/requestLogging";
 import { createLogger } from "../../utils/logger/server";
 import { captureException } from "../../utils/posthogErrorCapture";
 import { auditLog } from "../auditLog";
+import type { OrganizationUserRole } from "@prisma/client";
 import type { PermissionMiddleware } from "./rbac";
+import type { OpsScope } from "./rbac";
 
 const logger = createLogger("langwatch:trpc");
 
@@ -46,6 +55,8 @@ interface CreateContextOptions {
   session: Session | null;
   permissionChecked?: boolean;
   publiclyShared?: boolean;
+  organizationRole?: OrganizationUserRole | null;
+  opsScope?: OpsScope;
 }
 
 /**
@@ -66,6 +77,8 @@ export const createInnerTRPCContext = (opts: CreateContextOptions) => {
     prisma,
     permissionChecked: opts.permissionChecked ?? false,
     publiclyShared: opts.publiclyShared ?? false,
+    organizationRole: opts.organizationRole ?? undefined,
+    opsScope: opts.opsScope,
   };
 };
 
@@ -78,7 +91,7 @@ export const createInnerTRPCContext = (opts: CreateContextOptions) => {
 export const createTRPCContext = async (opts: CreateNextContextOptions) => {
   const { req, res } = opts;
 
-  // Get the session from the server using the getServerSession wrapper function
+  // Get the session via the BetterAuth-backed compat helper.
   const session = await getServerAuthSession({ req, res });
 
   return createInnerTRPCContext({
@@ -113,6 +126,9 @@ const t = initTRPC.context<typeof createTRPCContext>().create({
         }
       : null;
 
+    const domainError =
+      error.cause instanceof DomainError ? error.cause.serialize() : null;
+
     return {
       ...shape,
       data: {
@@ -120,6 +136,7 @@ const t = initTRPC.context<typeof createTRPCContext>().create({
         zodError:
           error.cause instanceof ZodError ? error.cause.flatten() : null,
         cause: limitInfo,
+        domainError,
       },
     };
   },
@@ -180,6 +197,14 @@ const auditLogTRPCErrors = t.middleware(
         args: input,
         error: result.error,
         req: ctx.req,
+        // When an admin is impersonating, `session.user.id` reflects the
+        // impersonated user (correct for RBAC attribution). We stamp the
+        // real admin's identity in metadata so security forensics can
+        // filter on `metadata.impersonatorId` to find actions that were
+        // actually performed by an admin.
+        metadata: ctx.session.user.impersonator
+          ? { impersonatorId: ctx.session.user.impersonator.id }
+          : undefined,
       });
     }
 
@@ -207,11 +232,147 @@ const auditLogMutations = t.middleware(
       args: input,
       error: !result.ok ? result.error : undefined,
       req: ctx.req,
+      // Stamp the real admin id when the action is happening during
+      // impersonation. `userId` above is the impersonated target (the
+      // RBAC actor); metadata.impersonatorId is the human performing it.
+      metadata: ctx.session.user.impersonator
+        ? { impersonatorId: ctx.session.user.impersonator.id }
+        : undefined,
     });
 
     return result;
   },
 );
+
+export const tracerMiddleware = t.middleware(
+  async ({ path, type, next }) => {
+    const { trace, SpanKind, SpanStatusCode } = await import(
+      "@opentelemetry/api"
+    );
+
+    const tracer = trace.getTracer("langwatch:trpc");
+    const spanName = `trpc.${path}`;
+
+    return tracer.startActiveSpan(
+      spanName,
+      {
+        kind: SpanKind.SERVER,
+        attributes: {
+          "rpc.system": "trpc",
+          "rpc.method": path,
+          "rpc.type": type,
+        },
+      },
+      async (span) => {
+        // IMPORTANT: In tRPC v10, next() never throws. Downstream errors are
+        // returned as { ok: false, error } result objects — NOT thrown.
+        const result = await next();
+
+        if (!result.ok) {
+          const err = result.error;
+          span.recordException(err instanceof Error ? err : new Error(String(err)));
+          span.setStatus({
+            code: SpanStatusCode.ERROR,
+            message: err instanceof Error ? err.message : String(err),
+          });
+        }
+
+        span.end();
+        return result;
+      },
+    );
+  },
+);
+
+function domainErrorToTRPCCode(
+  error: DomainError,
+): TRPCError["code"] {
+  const map: Partial<Record<number, TRPCError["code"]>> = {
+    400: "BAD_REQUEST",
+    401: "UNAUTHORIZED",
+    403: "FORBIDDEN",
+    404: "NOT_FOUND",
+    409: "CONFLICT",
+    422: "UNPROCESSABLE_CONTENT",
+    429: "TOO_MANY_REQUESTS",
+  };
+  return map[error.httpStatus] ?? "INTERNAL_SERVER_ERROR";
+}
+
+/**
+ * Converts DomainErrors thrown in procedures to properly-coded TRPCErrors.
+ * Without this, DomainErrors fall through as INTERNAL_SERVER_ERROR.
+ * Placed inner to loggerMiddleware so the logger sees the correct code.
+ */
+const domainErrorMiddleware = t.middleware(async ({ next }) => {
+  const result = await next();
+  if (!result.ok && result.error.cause instanceof DomainError) {
+    const domainError = result.error.cause;
+    throw new TRPCError({
+      code: domainErrorToTRPCCode(domainError),
+      message: domainError.message,
+      cause: domainError,
+    });
+  }
+  return result;
+});
+
+/** Processes a tRPC call result and logs accordingly. Extracted for testability. */
+export function handleTrpcCallLogging({
+  result,
+  path,
+  type,
+  duration,
+  userAgent,
+  statusCode,
+  log,
+  capture,
+}: {
+  result: { ok: boolean; error?: unknown };
+  path: string;
+  type: string;
+  duration: number;
+  userAgent: string | null;
+  statusCode: number | null;
+  log: Pick<ReturnType<typeof createLogger>, "info" | "warn" | "error">;
+  capture: (error: unknown) => void;
+}): void {
+  const logData: Record<string, any> = {
+    path,
+    type,
+    duration,
+    userAgent,
+    statusCode,
+  };
+
+  if (!result.ok) {
+    logData.error = result.error;
+
+    // Derive HTTP status from the TRPCError code, not ctx.res.statusCode.
+    // The response status hasn't been set yet at middleware time — tRPC sets
+    // it later when serializing the response. So we map it ourselves.
+    const resolvedStatus =
+      result.error instanceof TRPCError
+        ? getHTTPStatusCodeFromError(result.error)
+        : 500;
+    logData.statusCode = resolvedStatus;
+
+    // Include domain error kind in log data for structured filtering
+    if (result.error instanceof TRPCError && result.error.cause instanceof DomainError) {
+      logData.domainErrorKind = result.error.cause.kind;
+    }
+
+    // Only capture 5xx errors (actual bugs)
+    if (resolvedStatus >= 500) {
+      capture(result.error);
+    }
+
+    const logLevel = getLogLevelFromStatusCode(resolvedStatus);
+    log[logLevel](logData, "trpc call");
+  } else {
+    log.info(logData, "trpc call");
+  }
+}
 
 export const loggerMiddleware = t.middleware(
   async ({ path, type, input, ctx, next }) => {
@@ -224,40 +385,24 @@ export const loggerMiddleware = t.middleware(
 
     return runWithContext(requestContext, async () => {
       const start = Date.now();
-      let error: unknown = null;
+      // IMPORTANT: In tRPC v10, next() never throws. Downstream errors are
+      // caught by callRecursive and returned as { ok: false, error } result
+      // objects. Use result.ok to detect errors — NOT try/catch.
+      const result = await next();
+      const duration = Date.now() - start;
 
-      try {
-        return await next();
-      } catch (err) {
-        error = err;
-        throw err;
-      } finally {
-        const duration = Date.now() - start;
-        // Logger automatically includes context (traceId, spanId, userId, projectId, organizationId)
-        const logData: Record<string, any> = {
-          path,
-          type,
-          duration,
-          userAgent: ctx.req?.headers["user-agent"] ?? null,
-          statusCode: ctx.res?.statusCode ?? null,
-        };
+      handleTrpcCallLogging({
+        result,
+        path,
+        type,
+        duration,
+        userAgent: ctx.req?.headers["user-agent"] ?? null,
+        statusCode: ctx.res?.statusCode ?? null,
+        log: logger,
+        capture: captureException,
+      });
 
-        if (error) {
-          logData.error =
-            error instanceof Error ? error : JSON.stringify(error);
-
-          // Only capture 5xx errors to Sentry (actual bugs)
-          const statusCode = logData.statusCode ?? 500;
-          if (statusCode >= 500) {
-            captureException(error);
-          }
-
-          const logLevel = getLogLevelFromStatusCode(statusCode);
-          logger[logLevel](logData, "trpc call");
-        } else {
-          logger.info(logData, "trpc call");
-        }
-      }
+      return result;
     });
   },
 );
@@ -317,7 +462,9 @@ const permissionProcedureBuilder = <TParams extends ProcedureParams>(
     },
     use: (middleware) => {
       return procedure
+        .use(tracerMiddleware as any)
         .use(loggerMiddleware as any)
+        .use(domainErrorMiddleware as any)
         .use(middleware as any)
         .use(enforcePermissionCheck as any)
         .use(auditLogMutations as any) as any;

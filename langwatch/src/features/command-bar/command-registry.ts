@@ -1,6 +1,8 @@
 import {
   Activity,
+  Anvil,
   Bell,
+  Bird,
   BookOpen,
   Bot,
   BookText,
@@ -26,6 +28,8 @@ import {
   ScrollText,
   Settings,
   Shield,
+  Terminal,
+  Stethoscope,
   Sun,
   Table,
   Tags,
@@ -35,13 +39,9 @@ import {
   FolderKanban,
   UserCog,
   Building2,
+  ToggleLeft,
 } from "lucide-react";
 import type { Command } from "./types";
-
-// Check if dark mode feature is enabled via build-time env var
-const isDarkModeEnabled =
-  process.env.NEXT_PUBLIC_FEATURE_DARK_MODE === "true" ||
-  process.env.NEXT_PUBLIC_FEATURE_DARK_MODE === "1";
 
 /**
  * Static navigation commands that map to main app routes.
@@ -74,6 +74,25 @@ export const navigationCommands: Command[] = [
     category: "navigation",
     keywords: ["messages", "logs", "requests", "history"],
     path: "/[project]/messages",
+  },
+  {
+    id: "nav-traces-v2",
+    label: "Trace Explorer",
+    description: "Open the new traces experience (beta)",
+    icon: Bird,
+    category: "navigation",
+    keywords: [
+      "traces",
+      "trace explorer",
+      "explorer",
+      "v2",
+      "evolved",
+      "new",
+      "beta",
+      "messages",
+      "logs",
+    ],
+    path: "/[project]/traces",
   },
   {
     id: "nav-simulations",
@@ -202,6 +221,71 @@ export const navigationCommands: Command[] = [
     path: "/[project]/automations",
   },
 
+  // Ops
+  {
+    id: "nav-ops",
+    label: "Ops Dashboard",
+    description: "Operations dashboard",
+    icon: Terminal,
+    category: "navigation",
+    keywords: ["ops", "operations", "skynet", "metrics", "throughput"],
+    path: "/ops",
+  },
+  {
+    id: "nav-ops-queues",
+    label: "Ops Pipelines",
+    description: "Ops → Queues & Pipelines",
+    icon: Terminal,
+    category: "navigation",
+    keywords: ["ops", "queues", "pipelines", "groups", "redis", "pending"],
+    path: "/ops/queues",
+  },
+  {
+    id: "nav-ops-blocked",
+    label: "Ops Blocked",
+    description: "Ops → Blocked Groups",
+    icon: Terminal,
+    category: "navigation",
+    keywords: ["ops", "blocked", "errors", "stuck", "failed"],
+    path: "/ops/queues",
+  },
+  {
+    id: "nav-ops-dlq",
+    label: "Ops Dead Letters",
+    description: "Ops → Dead Letter Queue",
+    icon: Terminal,
+    category: "navigation",
+    keywords: ["ops", "dlq", "dead", "letter", "queue", "redrive"],
+    path: "/ops/queues",
+  },
+  {
+    id: "nav-ops-projections",
+    label: "Projection Replay",
+    description: "Ops → Projection Replay",
+    icon: Terminal,
+    category: "navigation",
+    keywords: ["ops", "projections", "replay", "event", "sourcing"],
+    path: "/ops/projections",
+  },
+  {
+    id: "nav-ops-dejaview",
+    label: "Deja View",
+    description: "Ops → Deja View",
+    icon: Terminal,
+    category: "navigation",
+    keywords: ["ops", "dejaview", "deja", "view", "events", "aggregate", "replay", "debug", "inspect"],
+    path: "/ops/dejaview",
+  },
+  {
+    id: "nav-ops-foundry",
+    label: "The Foundry",
+    description: "Ops → The Foundry",
+    icon: Terminal,
+    category: "navigation",
+    keywords: ["ops", "foundry", "forge", "trace", "test", "otel", "playground", "send"],
+    path: "/ops/foundry",
+  },
+
   // Settings pages
   {
     id: "nav-settings",
@@ -237,7 +321,7 @@ export const navigationCommands: Command[] = [
     icon: FolderKanban,
     category: "navigation",
     keywords: ["project", "workspace"],
-    path: "/settings/projects",
+    path: "/settings/teams",
   },
   {
     id: "nav-settings-roles",
@@ -301,6 +385,15 @@ export const navigationCommands: Command[] = [
     category: "navigation",
     keywords: ["subscription", "billing", "plan", "payment"],
     path: "/settings/subscription",
+  },
+  {
+    id: "nav-settings-plans",
+    label: "Plans",
+    description: "Settings → Plans",
+    icon: CreditCard,
+    category: "navigation",
+    keywords: ["plans", "pricing", "compare", "billing"],
+    path: "/settings/plans",
   },
   {
     id: "nav-settings-authentication",
@@ -375,6 +468,39 @@ export const actionCommands: Command[] = [
     category: "actions",
     keywords: ["create", "add", "scenario", "test"],
   },
+  {
+    id: "action-send-trace",
+    label: "Forge a Trace",
+    description: "Open The Foundry to craft and send test traces",
+    icon: Anvil,
+    category: "actions",
+    keywords: ["forge", "trace", "foundry", "test", "otel", "send", "span", "anvil"],
+  },
+  {
+    id: "action-sdk-radar",
+    label: "SDK Radar",
+    description: "Check SDK version status",
+    icon: Stethoscope,
+    category: "actions",
+    keywords: ["sdk", "version", "update", "outdated", "radar", "upgrade"],
+  },
+  {
+    id: "action-feature-flags",
+    label: "Feature Flags (Dev)",
+    description: "Toggle feature flag overrides for this browser",
+    icon: ToggleLeft,
+    category: "actions",
+    keywords: [
+      "feature",
+      "flag",
+      "flags",
+      "toggle",
+      "dev",
+      "override",
+      "experiment",
+      "release",
+    ],
+  },
 ];
 
 /**
@@ -387,7 +513,14 @@ export const supportCommands: Command[] = [
     description: "Manage subscription or license",
     icon: CreditCard,
     category: "actions",
-    keywords: ["plan", "upgrade", "subscription", "billing", "license", "pricing"],
+    keywords: [
+      "plan",
+      "upgrade",
+      "subscription",
+      "billing",
+      "license",
+      "pricing",
+    ],
     // Path is set dynamically in useFilteredCommands based on IS_SAAS
   },
   {
@@ -414,7 +547,8 @@ export const supportCommands: Command[] = [
     icon: Github,
     category: "actions",
     keywords: ["github", "support", "help", "community"],
-    externalUrl: "https://github.com/orgs/langwatch/discussions/categories/support",
+    externalUrl:
+      "https://github.com/orgs/langwatch/discussions/categories/support",
   },
   {
     id: "action-discord",
@@ -441,7 +575,8 @@ export const supportCommands: Command[] = [
     icon: Lightbulb,
     category: "actions",
     keywords: ["feature", "request", "idea", "suggestion"],
-    externalUrl: "https://github.com/orgs/langwatch/discussions/categories/ideas",
+    externalUrl:
+      "https://github.com/orgs/langwatch/discussions/categories/ideas",
   },
   {
     id: "action-bug-report",
@@ -455,36 +590,34 @@ export const supportCommands: Command[] = [
 ];
 
 /**
- * Theme switching commands (only available when dark mode is enabled).
+ * Theme switching commands (only shown when dark mode feature flag is enabled).
  */
-export const themeCommands: Command[] = isDarkModeEnabled
-  ? [
-      {
-        id: "action-theme-light",
-        label: "Light Theme",
-        description: "Switch to light mode",
-        icon: Sun,
-        category: "actions",
-        keywords: ["theme", "light", "mode", "bright", "day"],
-      },
-      {
-        id: "action-theme-dark",
-        label: "Dark Theme",
-        description: "Switch to dark mode",
-        icon: Moon,
-        category: "actions",
-        keywords: ["theme", "dark", "mode", "night"],
-      },
-      {
-        id: "action-theme-system",
-        label: "System Theme",
-        description: "Use system preference",
-        icon: Monitor,
-        category: "actions",
-        keywords: ["theme", "system", "auto", "default"],
-      },
-    ]
-  : [];
+export const themeCommands: Command[] = [
+  {
+    id: "action-theme-light",
+    label: "Light Theme",
+    description: "Switch to light mode",
+    icon: Sun,
+    category: "actions",
+    keywords: ["theme", "light", "mode", "bright", "day"],
+  },
+  {
+    id: "action-theme-dark",
+    label: "Dark Theme",
+    description: "Switch to dark mode",
+    icon: Moon,
+    category: "actions",
+    keywords: ["theme", "dark", "mode", "night"],
+  },
+  {
+    id: "action-theme-system",
+    label: "System Theme",
+    description: "Use system preference",
+    icon: Monitor,
+    category: "actions",
+    keywords: ["theme", "system", "auto", "default"],
+  },
+];
 
 /**
  * Top-level navigation command IDs (shown by default).
@@ -493,6 +626,7 @@ const topLevelNavIds = new Set([
   "nav-home",
   "nav-analytics",
   "nav-traces",
+  "nav-traces-v2",
   "nav-simulations",
   "nav-evaluations",
   "nav-annotations",
@@ -509,7 +643,7 @@ const topLevelNavIds = new Set([
  * Top-level navigation commands (shown when query is empty).
  */
 export const topLevelNavigationCommands: Command[] = navigationCommands.filter(
-  (cmd) => topLevelNavIds.has(cmd.id)
+  (cmd) => topLevelNavIds.has(cmd.id),
 );
 
 /**
@@ -535,7 +669,7 @@ export function filterCommands(commands: Command[], query: string): Command[] {
       ?.toLowerCase()
       .includes(lowerQuery);
     const keywordMatch = cmd.keywords?.some((kw) =>
-      kw.toLowerCase().includes(lowerQuery)
+      kw.toLowerCase().includes(lowerQuery),
     );
     return labelMatch || descriptionMatch || keywordMatch;
   });

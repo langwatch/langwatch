@@ -170,7 +170,7 @@ describe("RBAC Permission System", () => {
         true,
       );
       expect(teamRoleHasPermission(TeamUserRole.MEMBER, "project:create")).toBe(
-        false,
+        true,
       );
       expect(teamRoleHasPermission(TeamUserRole.MEMBER, "project:delete")).toBe(
         false,
@@ -414,8 +414,8 @@ describe("RBAC Permission System", () => {
         expect(canCreate(TeamUserRole.ADMIN, Resources.PROJECT)).toBe(true);
       });
 
-      it("returns false for MEMBER role on project resource", () => {
-        expect(canCreate(TeamUserRole.MEMBER, Resources.PROJECT)).toBe(false);
+      it("returns true for MEMBER role on project resource", () => {
+        expect(canCreate(TeamUserRole.MEMBER, Resources.PROJECT)).toBe(true);
       });
 
       it("returns false for VIEWER role on project resource", () => {
@@ -454,6 +454,7 @@ describe("RBAC Permission System", () => {
 
   describe("Permission Retrieval Functions", () => {
     describe("getTeamRolePermissions", () => {
+      /** @scenario "Effective role maps to correct permission grants" */
       it("returns all permissions for ADMIN role", () => {
         const permissions = getTeamRolePermissions(TeamUserRole.ADMIN);
         expect(permissions).toContain("project:view");
@@ -470,7 +471,7 @@ describe("RBAC Permission System", () => {
         const permissions = getTeamRolePermissions(TeamUserRole.MEMBER);
         expect(permissions).toContain("project:view");
         expect(permissions).toContain("project:update");
-        expect(permissions).not.toContain("project:create");
+        expect(permissions).toContain("project:create");
         expect(permissions).not.toContain("project:delete");
         expect(permissions).not.toContain("project:manage");
         expect(permissions).toContain("workflows:view");
@@ -635,7 +636,7 @@ describe("RBAC Permission System", () => {
       // Should have limited project permissions
       expect(memberPermissions).toContain("project:view");
       expect(memberPermissions).toContain("project:update");
-      expect(memberPermissions).not.toContain("project:create");
+      expect(memberPermissions).toContain("project:create");
       expect(memberPermissions).not.toContain("project:delete");
       expect(memberPermissions).not.toContain("project:manage");
     });

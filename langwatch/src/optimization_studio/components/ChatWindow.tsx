@@ -56,7 +56,7 @@ export const PlaygroundButton = ({
           onClick={() => setPlaygroundOpen(true)}
           variant="outline"
           size="sm"
-          background="white"
+          background="bg"
           disabled={isDisabled}
         >
           <Play size={16} /> Playground
@@ -276,7 +276,7 @@ export const ChatBox = ({
                     mb={2}
                   >
                     <Box
-                      bg="gray.200"
+                      bg="bg.emphasized"
                       p={2}
                       borderRadius="lg"
                       whiteSpace="pre-wrap"

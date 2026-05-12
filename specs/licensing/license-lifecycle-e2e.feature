@@ -1,5 +1,14 @@
 @wip @e2e
 Feature: License Lifecycle End-to-End
+
+  # All scenarios in this file are full-stack walking-skeleton flows
+  # (login → upload license → invite members → remove license → fall
+  # back to FREE). Component-level paths are individually covered by
+  # license.integration / licenseHandler.integration / member-classification
+  # tests, but the end-to-end driver requires Playwright against the
+  # license settings page UI which does not exist yet. Aspirational
+  # pending the e2e harness.
+
   As a LangWatch self-hosted administrator
   I want to manage the complete license lifecycle
   So that I can activate, use, and remove licenses for my deployment
@@ -8,9 +17,9 @@ Feature: License Lifecycle End-to-End
   # Walking Skeleton: Complete Flow
   # ============================================================================
 
+  @unimplemented
   Scenario: Complete license activation and enforcement flow
     Given a fresh LangWatch self-hosted deployment
-    And LICENSE_ENFORCEMENT_ENABLED is "true"
     And an organization "Acme Corp" exists with 3 members and 2 projects
     And I am logged in as an admin of the organization
 
@@ -55,55 +64,27 @@ Feature: License Lifecycle End-to-End
   # Invalid License Handling
   # ============================================================================
 
-  Scenario: Attempting to upload invalid license
-    Given I am on the license settings page
-    And the organization has no license
-    When I paste "invalid-license-key-garbage" into the textarea
-    And I click "Activate License"
-    Then I see an error toast "Invalid license format"
-    And I still see "No license installed"
-
-  Scenario: Attempting to upload expired license
-    Given I am on the license settings page
-    And I have an expired PRO license
-    When I paste the expired license key
-    And I click "Activate License"
-    Then I see an error toast "License expired"
-    And I still see "No license installed"
-
   # ============================================================================
   # License Expiration Behavior
   # ============================================================================
 
+  @unimplemented
   Scenario: Organization with expired license falls to FREE tier
     Given the organization has a license that expired yesterday
     And the organization has 3 members and 3 projects
     When I check the active plan via API
     Then the plan type is "FREE"
-    And maxMembers is 2
+    And maxMembers is 1
     And maxProjects is 2
 
     When I try to invite a new member
     Then the invite fails because member limit is exceeded
 
   # ============================================================================
-  # Feature Flag Behavior
-  # ============================================================================
-
-  Scenario: Feature flag disables enforcement
-    Given the organization has a license with maxMembers 2
-    And the organization has 3 members
-    And LICENSE_ENFORCEMENT_ENABLED is "false"
-    When I try to invite a new member
-    Then the invite is created successfully
-
-    When I navigate to the license settings page
-    Then I still see the license status displayed
-
-  # ============================================================================
   # API Access with License
   # ============================================================================
 
+  @unimplemented
   Scenario: tRPC endpoints return correct license-based limits
     Given the organization has a GROWTH license with maxMembers 10
     When I call plan.getActivePlan via tRPC
@@ -118,10 +99,3 @@ Feature: License Lifecycle End-to-End
   # Settings Page Navigation
   # ============================================================================
 
-  @wip
-  Scenario: License menu item appears in settings
-    Given I am on any settings page
-    Then I see "License" in the settings menu
-    When I click on "License"
-    Then I am navigated to "/settings/license"
-    And the page title includes "License"

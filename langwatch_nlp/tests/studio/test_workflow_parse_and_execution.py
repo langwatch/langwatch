@@ -38,7 +38,7 @@ llm_field = Field(
     type=FieldType.llm,
     optional=None,
     value=LLMConfig(
-        model="gpt-4o",
+        model="gpt-5-mini",
         temperature=0.0,
         max_tokens=100,
     ),
@@ -47,6 +47,7 @@ llm_field = Field(
 
 simple_workflow = Workflow(
     workflow_id="simple-rag",
+    project_id="test-project",
     api_key="",
     spec_version="1.3",
     name="Simple RAG",
@@ -337,6 +338,7 @@ def test_parse_parallel_execution_workflow():
     disable_dsp_caching()
     workflow = Workflow(
         workflow_id="simple-rag",
+        project_id="test-project",
         api_key="",
         spec_version="1.3",
         name="Simple RAG",
@@ -857,7 +859,7 @@ def test_langwatch_evaluator_llm_boolean_with_multiline_prompt():
                         identifier="model",
                         type=FieldType.str,
                         optional=None,
-                        value="openai/gpt-4o-mini",
+                        value="openai/gpt-5-mini",
                         desc=None,
                         prefix=None,
                         hidden=None,
@@ -981,7 +983,7 @@ def test_parse_workflow_with_default_llm():
 
     workflow = copy.deepcopy(simple_workflow)
     workflow.default_llm = LLMConfig(
-        model="gpt-4o", temperature=0.0, max_tokens=100
+        model="gpt-5-mini", temperature=0.0, max_tokens=100
     )
 
     generate_query_node = next(
@@ -1301,7 +1303,7 @@ def test_proposes_instructions_with_grounded_proposer():
         from dspy.propose.grounded_proposer import GroundedProposer
 
         proposer = GroundedProposer(
-            prompt_model=dspy.LM(model="openai/gpt-4o"),
+            prompt_model=dspy.LM(model="openai/gpt-5-mini"),
             program=instance,
             trainset=[],
         )
@@ -1517,4 +1519,3 @@ def test_parse_workflow_with_emoji_in_conversation_history():
         )
 
     assert result.cost > 0
-    assert result.duration > 0

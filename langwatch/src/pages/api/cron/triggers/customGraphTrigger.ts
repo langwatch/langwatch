@@ -10,7 +10,10 @@ import type {
   TimeseriesInputType,
 } from "~/server/analytics/registry";
 import { getAnalyticsService } from "~/server/analytics/analytics.service";
-import type { TimeseriesResult } from "~/server/analytics/types";
+import type {
+  TimeseriesBucket,
+  TimeseriesResult,
+} from "~/server/analytics/types";
 import { prisma } from "~/server/db";
 import type { Trace } from "~/server/tracer/types";
 import { captureException } from "~/utils/posthogErrorCapture";
@@ -166,6 +169,7 @@ export const processCustomGraphTrigger = async (
       timeseriesResult,
       series,
       seriesName,
+      graphData.groupBy,
     );
 
     // Check threshold condition
@@ -294,10 +298,47 @@ export const processCustomGraphTrigger = async (
   }
 };
 
+/**
+ * Sum a metric across all groups in a grouped timeseries bucket.
+ *
+ * Grouped buckets nest values as:
+ *   { [groupBy]: { [groupKey]: { [seriesKey]: number } } }
+ *
+ * Returns undefined when no group contains the metric so the
+ * bucket is excluded from aggregation rather than counted as 0.
+ */
+export const sumMetricAcrossGroups = (
+  entry: TimeseriesBucket,
+  groupBy: string,
+  seriesKey: string,
+): number | undefined => {
+  const groupData = entry[groupBy];
+  if (
+    typeof groupData !== "object" ||
+    groupData === null ||
+    Array.isArray(groupData)
+  ) {
+    return undefined;
+  }
+
+  const groups = groupData as Record<string, Record<string, number>>;
+  let sum = 0;
+  let found = false;
+  for (const metrics of Object.values(groups)) {
+    const value = metrics[seriesKey];
+    if (typeof value === "number") {
+      found = true;
+      sum += value;
+    }
+  }
+  return found ? sum : undefined;
+};
+
 const calculateCurrentValue = (
   timeseriesResult: TimeseriesResult,
   series: CustomGraphInput["series"][number],
   seriesKey: string,
+  groupBy?: string,
 ): number => {
   let currentValue = 0;
 
@@ -307,12 +348,13 @@ const calculateCurrentValue = (
   if (dataPoints.length > 0) {
     const values = dataPoints
       .map((entry) => {
-        // Look up the value using the seriesKey (e.g., "0/metadata.trace_id/cardinality")
         const seriesValue = entry[seriesKey];
         if (typeof seriesValue === "number") {
           return seriesValue;
         }
-
+        if (groupBy) {
+          return sumMetricAcrossGroups(entry, groupBy, seriesKey);
+        }
         return 0;
       })
       .filter((v): v is number => typeof v === "number");

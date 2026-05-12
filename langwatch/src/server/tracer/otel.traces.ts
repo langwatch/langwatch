@@ -262,7 +262,7 @@ const addOpenTelemetrySpanAsSpan = (
         let input: LLMSpan["input"] = null;
         let output: LLMSpan["output"] = null;
         let params: Span["params"] = {};
-        let metadata = {};
+        let metadata: Record<string, unknown> = {};
         let started_at: Span["timestamps"]["started_at"] | undefined =
           parseTimestamp(incomingSpan.startTimeUnixNano);
         let finished_at: Span["timestamps"]["finished_at"] | undefined =
@@ -418,12 +418,19 @@ const addOpenTelemetrySpanAsSpan = (
           }
         }
 
-        // Strands chat LLM calls
+        // GenAI semantic convention chat LLM calls (Strands, OpenClaw, etc.)
+        // CLIENT span kind is standard for gen_ai LLM calls per the OTEL GenAI spec
         if (
-          type == "span" &&
+          (type === "span" || type === "client") &&
           attributesMap.gen_ai?.operation?.name === "chat"
         ) {
           type = "llm";
+        }
+        if (
+          (type === "span" || type === "client") &&
+          attributesMap.gen_ai?.operation?.name === "tool"
+        ) {
+          type = "tool";
         }
 
         // Extract metadata for agent spans from strands-agents
@@ -441,7 +448,10 @@ const addOpenTelemetrySpanAsSpan = (
         }
 
         // infer for others otel gen_ai spec
-        if (type === "span" && attributesMap.gen_ai?.response?.model) {
+        if (
+          (type === "span" || type === "client") &&
+          attributesMap.gen_ai?.response?.model
+        ) {
           type = "llm";
         }
 
@@ -476,6 +486,35 @@ const addOpenTelemetrySpanAsSpan = (
         }
 
         // Input
+
+        // GenAI semantic convention: gen_ai.input.messages (e.g. OpenClaw, OTEL GenAI spec)
+        // We assign directly as chat_messages without Zod validation to avoid
+        // stripping content fields that use provider-specific formats (e.g.
+        // Anthropic tool_use/tool_result content blocks).
+        if (
+          !input &&
+          attributesMap.gen_ai?.input?.messages &&
+          Array.isArray(attributesMap.gen_ai.input.messages)
+        ) {
+          const messages: ChatMessage[] = [];
+          // Prepend system instructions as a system message
+          if (attributesMap.gen_ai?.system_instructions) {
+            const raw = attributesMap.gen_ai.system_instructions;
+            // Keep the original value shape: string stays string, array stays array
+            const sysContent =
+              typeof raw === "string"
+                ? raw
+                : (raw as unknown as ChatMessage["content"]);
+            messages.push({ role: "system", content: sysContent });
+            delete (attributesMap as any).gen_ai.system_instructions;
+          }
+          messages.push(
+            ...(attributesMap.gen_ai.input.messages as ChatMessage[]),
+          );
+          input = { type: "chat_messages", value: messages };
+          delete (attributesMap as any).gen_ai.input.messages;
+        }
+
         if (
           attributesMap.llm?.input_messages &&
           Array.isArray(attributesMap.llm.input_messages)
@@ -659,6 +698,21 @@ const addOpenTelemetrySpanAsSpan = (
         }
 
         // Output
+
+        // GenAI semantic convention: gen_ai.output.messages (e.g. OpenClaw, OTEL GenAI spec)
+        // Assign directly without Zod validation to preserve all content fields.
+        if (
+          !output &&
+          attributesMap.gen_ai?.output?.messages &&
+          Array.isArray(attributesMap.gen_ai.output.messages)
+        ) {
+          output = {
+            type: "chat_messages",
+            value: attributesMap.gen_ai.output.messages as ChatMessage[],
+          };
+          delete (attributesMap as any).gen_ai.output.messages;
+        }
+
         if (
           attributesMap.llm?.output_messages &&
           Array.isArray(attributesMap.llm.output_messages)
@@ -861,14 +915,12 @@ const addOpenTelemetrySpanAsSpan = (
         if (attributesMap.gen_ai?.usage) {
           if (typeof attributesMap.gen_ai.usage.prompt_tokens === "number") {
             metrics.prompt_tokens = attributesMap.gen_ai.usage.prompt_tokens;
-            delete attributesMap.gen_ai.usage.prompt_tokens;
           }
           if (
             typeof attributesMap.gen_ai.usage.completion_tokens === "number"
           ) {
             metrics.completion_tokens =
               attributesMap.gen_ai.usage.completion_tokens;
-            delete attributesMap.gen_ai.usage.completion_tokens;
           }
           // Spring AI
           if (
@@ -878,7 +930,6 @@ const addOpenTelemetrySpanAsSpan = (
             metrics.prompt_tokens = Number(
               attributesMap.gen_ai.usage.input_tokens,
             );
-            delete attributesMap.gen_ai.usage.input_tokens;
           }
           if (
             attributesMap.gen_ai.usage.output_tokens &&
@@ -887,8 +938,34 @@ const addOpenTelemetrySpanAsSpan = (
             metrics.completion_tokens = Number(
               attributesMap.gen_ai.usage.output_tokens,
             );
-            delete attributesMap.gen_ai.usage.output_tokens;
-            delete attributesMap.gen_ai.usage.total_tokens;
+          }
+          // Reasoning tokens (Traceloop/OpenLLMetry convention: gen_ai.usage.reasoning_tokens)
+          if (
+            attributesMap.gen_ai.usage.reasoning_tokens != null &&
+            !isNaN(Number(attributesMap.gen_ai.usage.reasoning_tokens))
+          ) {
+            metrics.reasoning_tokens = Number(
+              attributesMap.gen_ai.usage.reasoning_tokens,
+            );
+          }
+          // Cache tokens (OTEL semconv: gen_ai.usage.cache_read.input_tokens / gen_ai.usage.cache_creation.input_tokens)
+          if (
+            attributesMap.gen_ai.usage.cache_read?.input_tokens != null &&
+            !isNaN(Number(attributesMap.gen_ai.usage.cache_read.input_tokens))
+          ) {
+            metrics.cache_read_input_tokens = Number(
+              attributesMap.gen_ai.usage.cache_read.input_tokens,
+            );
+          }
+          if (
+            attributesMap.gen_ai.usage.cache_creation?.input_tokens != null &&
+            !isNaN(
+              Number(attributesMap.gen_ai.usage.cache_creation.input_tokens),
+            )
+          ) {
+            metrics.cache_creation_input_tokens = Number(
+              attributesMap.gen_ai.usage.cache_creation.input_tokens,
+            );
           }
         }
 
@@ -925,6 +1002,14 @@ const addOpenTelemetrySpanAsSpan = (
         ) {
           trace.reservedTraceMetadata.thread_id = attributesMap.session.id;
           delete attributesMap.session.id;
+        }
+        if (
+          attributesMap.gen_ai?.conversation?.id &&
+          typeof attributesMap.gen_ai.conversation.id === "string"
+        ) {
+          trace.reservedTraceMetadata.thread_id =
+            attributesMap.gen_ai.conversation.id;
+          delete attributesMap.gen_ai.conversation.id;
         }
         if (attributesMap.tag?.tags && Array.isArray(attributesMap.tag.tags)) {
           trace.reservedTraceMetadata.labels = attributesMap.tag.tags;
@@ -1050,6 +1135,24 @@ const addOpenTelemetrySpanAsSpan = (
             trace.reservedTraceMetadata.customer_id =
               attributesMap.langwatch.customer.id;
             (attributesMap as any).langwatch.customer.id = void 0;
+          }
+          if (Array.isArray(attributesMap.langwatch.labels)) {
+            metadata = {
+              ...metadata,
+              labels: attributesMap.langwatch.labels,
+            };
+            (attributesMap as any).langwatch.labels = void 0;
+          }
+          // Backward compatibility for legacy "langwatch.tags" attribute
+          if (
+            !metadata.labels &&
+            Array.isArray((attributesMap as any).langwatch.tags)
+          ) {
+            metadata = {
+              ...metadata,
+              labels: (attributesMap as any).langwatch.tags,
+            };
+            (attributesMap as any).langwatch.tags = void 0;
           }
 
           if (attributesMap.langwatch.input) {
@@ -1210,55 +1313,17 @@ const addOpenTelemetrySpanAsSpan = (
   );
 };
 
-type RecursiveRecord = {
-  // biome-ignore lint/complexity/noBannedTypes: this is a trick to get rich key types + arbitrary strings
-  [key: string]: (RecursiveRecord & (string | {})) | undefined;
-};
-
-const isNumeric = (n: any) => !isNaN(parseFloat(n)) && isFinite(n);
-
 export function otelAttributesToNestedAttributes(
   attributes: DeepPartial<IKeyValue[]> | undefined,
-): RecursiveRecord {
-  const resolveOtelAnyValue = (anyValuePair?: DeepPartial<IAnyValue>): any => {
-    if (!anyValuePair) return void 0;
+): Record<string, any> {
+  const result: Record<string, any> = {};
 
-    if (anyValuePair.stringValue != null) {
-      if (isNumeric(anyValuePair.stringValue)) return anyValuePair.stringValue;
-
-      try {
-        return JSON.parse(anyValuePair.stringValue);
-      } catch {
-        return anyValuePair.stringValue;
-      }
-    }
-
-    if (anyValuePair.boolValue != null) return anyValuePair.boolValue;
-    if (anyValuePair.intValue != null)
-      return Long.isLong(anyValuePair.intValue)
-        ? anyValuePair.intValue.toInt()
-        : anyValuePair.intValue;
-    if (anyValuePair.doubleValue != null)
-      return Long.isLong(anyValuePair.doubleValue)
-        ? anyValuePair.doubleValue.toNumber()
-        : anyValuePair.doubleValue;
-    if (anyValuePair.bytesValue != null) return anyValuePair.bytesValue;
-
-    if (anyValuePair.kvlistValue)
-      return otelAttributesToNestedAttributes(anyValuePair.kvlistValue.values);
-
-    if (anyValuePair.arrayValue?.values)
-      return anyValuePair.arrayValue.values.map(resolveOtelAnyValue);
-
-    return void 0;
-  };
-
-  return (attributes ?? []).reduce<RecursiveRecord>((acc, kv) => {
-    if (!kv?.key) return acc;
+  for (const kv of attributes ?? []) {
+    if (!kv?.key) continue;
 
     const path = kv.key.split(".");
     const last = path.pop()!;
-    let cursor: any = acc;
+    let cursor: any = result;
 
     // walk the paths, and create every segment *except* the last
     path.forEach((seg, i) => {
@@ -1278,9 +1343,44 @@ export function otelAttributesToNestedAttributes(
     const key = leafIsIndex ? Number(last) : last;
 
     cursor[key] = resolveOtelAnyValue(kv.value);
+  }
 
-    return acc;
-  }, {});
+  return result;
+}
+
+const isNumeric = (n: any) => !isNaN(parseFloat(n)) && isFinite(n);
+
+function resolveOtelAnyValue(anyValuePair?: DeepPartial<IAnyValue>): any {
+  if (!anyValuePair) return void 0;
+
+  if (anyValuePair.stringValue != null) {
+    if (isNumeric(anyValuePair.stringValue)) return anyValuePair.stringValue;
+
+    try {
+      return JSON.parse(anyValuePair.stringValue);
+    } catch {
+      return anyValuePair.stringValue;
+    }
+  }
+
+  if (anyValuePair.boolValue != null) return anyValuePair.boolValue;
+  if (anyValuePair.intValue != null)
+    return Long.isLong(anyValuePair.intValue)
+      ? anyValuePair.intValue.toInt()
+      : anyValuePair.intValue;
+  if (anyValuePair.doubleValue != null)
+    return Long.isLong(anyValuePair.doubleValue)
+      ? anyValuePair.doubleValue.toNumber()
+      : anyValuePair.doubleValue;
+  if (anyValuePair.bytesValue != null) return anyValuePair.bytesValue;
+
+  if (anyValuePair.kvlistValue)
+    return otelAttributesToNestedAttributes(anyValuePair.kvlistValue.values);
+
+  if (anyValuePair.arrayValue?.values)
+    return anyValuePair.arrayValue.values.map(resolveOtelAnyValue);
+
+  return void 0;
 }
 
 const maybeConvertLongBits = (value: any): number => {

@@ -7,7 +7,7 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Dialog } from "../../../components/ui/dialog";
@@ -15,7 +15,7 @@ import { toaster } from "../../../components/ui/toaster";
 import { useLicenseEnforcement } from "../../../hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import { api } from "../../../utils/api";
-import { isHandledByGlobalLicenseHandler } from "../../../utils/trpcError";
+import { isHandledByGlobalHandler } from "../../../utils/trpcError";
 import { DEFAULT_MODEL } from "../../../utils/constants";
 import { trackEvent } from "../../../utils/tracking";
 import type { Workflow } from "../../types/dsl";
@@ -193,6 +193,7 @@ export const NewWorkflowForm = ({
 
     const newWorkflow: Workflow = {
       ...template,
+      version: "1",
       name: data.name,
       description: data.description,
       icon: data.icon ?? defaultIcon,
@@ -219,7 +220,7 @@ export const NewWorkflowForm = ({
           },
           onError: (error) => {
             // Skip toast if the global license handler already showed the upgrade modal
-            if (isHandledByGlobalLicenseHandler(error)) return;
+            if (isHandledByGlobalHandler(error)) return;
             toaster.create({
               title: "Error creating workflow",
               description: error.message,

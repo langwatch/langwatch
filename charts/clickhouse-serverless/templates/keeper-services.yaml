@@ -1,0 +1,42 @@
+{{- if gt (int .Values.replicas) 1 }}
+{{- $fullname := include "clickhouse-serverless.fullname" . }}
+# Headless service for Keeper pod discovery and raft communication
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullname }}-keeper-headless
+  labels:
+    {{- include "clickhouse-serverless.keeperLabels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  clusterIP: None
+  publishNotReadyAddresses: true
+  ports:
+    - name: keeper
+      port: 9181
+      targetPort: 9181
+      protocol: TCP
+    - name: raft
+      port: 9234
+      targetPort: 9234
+      protocol: TCP
+  selector:
+    {{- include "clickhouse-serverless.keeperSelectorLabels" . | nindent 4 }}
+---
+# ClusterIP service for ClickHouse nodes to connect to Keeper
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullname }}-keeper-client
+  labels:
+    {{- include "clickhouse-serverless.keeperLabels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: keeper
+      port: 9181
+      targetPort: 9181
+      protocol: TCP
+  selector:
+    {{- include "clickhouse-serverless.keeperSelectorLabels" . | nindent 4 }}
+{{- end }}

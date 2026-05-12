@@ -1,0 +1,71 @@
+---
+title: Strands Agents Instrumentation
+sidebarTitle: Strands Agents
+description: Instrument Strands Agents with LangWatch to capture decision flows and support repeatable AI agent testing.
+keywords: strands agents, python, sdk, instrumentation, langwatch, tracing
+---
+
+LangWatch integrates with Strands Agents to automatically capture traces of agent interactions, model calls, and tool executions through OpenTelemetry.
+
+## Installation
+
+<CodeGroup>
+```bash pip
+pip install langwatch strands-agents strands-agents-tools
+```
+
+```bash uv
+uv add langwatch strands-agents strands-agents-tools
+```
+</CodeGroup>
+
+## Usage
+
+<Info>
+The LangWatch API key is configured by default via the `LANGWATCH_API_KEY` environment variable.
+</Info>
+
+Initialize LangWatch and create your Strands Agent. All agent interactions will be automatically traced.
+
+```python
+import langwatch
+import os
+
+from strands import Agent
+from strands.models.litellm import LiteLLMModel
+
+langwatch.setup()
+
+
+class MyAgent:
+    def __init__(self):
+        # Configure the model using LiteLLM for provider flexibility
+        self.model = LiteLLMModel(
+            client_args={"api_key": os.getenv("OPENAI_API_KEY")},
+            model_id="openai/gpt-5-mini",
+        )
+
+        # Create the agent with tracing attributes
+        self.agent = Agent(
+            name="my-agent",
+            model=self.model,
+            system_prompt="You are a helpful AI assistant.",
+        )
+
+    def run(self, prompt: str):
+        return self.agent(prompt)
+
+
+agent = MyAgent()
+
+response = agent.run("Tell me a joke")
+print(response)
+```
+
+LangWatch automatically captures all agent interactions, model calls, and tool executions through Strands Agents' built-in OpenTelemetry support. Use `@langwatch.trace()` decorators to add custom traces and metadata as needed.
+
+## Related
+
+- [Capturing RAG](/integration/python/tutorials/capturing-rag) - Learn how to capture RAG data from retrievers and tools
+- [Capturing Metadata and Attributes](/integration/python/tutorials/capturing-metadata) - Add custom metadata and attributes to your traces and spans
+- [Capturing Evaluations & Guardrails](/integration/python/tutorials/capturing-evaluations-guardrails) - Log evaluations and implement guardrails in your Strands Agents applications

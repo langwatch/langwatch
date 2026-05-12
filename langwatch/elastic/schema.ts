@@ -117,6 +117,8 @@ const spanMapping: ElasticSearchMappingFrom<ElasticSearchSpan> = {
       prompt_tokens: { type: "integer" },
       completion_tokens: { type: "integer" },
       reasoning_tokens: { type: "integer" },
+      cache_read_input_tokens: { type: "long" },
+      cache_creation_input_tokens: { type: "long" },
       tokens_estimated: { type: "boolean" },
       cost: { type: "float" },
     },
@@ -229,7 +231,6 @@ export const traceMapping: ElasticSearchMappingFrom<ElasticSearchTrace> = {
   input: {
     properties: {
       value: { type: "text" },
-      satisfaction_score: { type: "float" },
     },
   },
   output: {
@@ -244,6 +245,8 @@ export const traceMapping: ElasticSearchMappingFrom<ElasticSearchTrace> = {
       prompt_tokens: { type: "integer" },
       completion_tokens: { type: "integer" },
       reasoning_tokens: { type: "integer" },
+      cache_read_input_tokens: { type: "long" },
+      cache_creation_input_tokens: { type: "long" },
       tokens_estimated: { type: "boolean" },
       total_cost: { type: "float" },
     },

@@ -3,6 +3,9 @@ import type {
   NormalizedSpan,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import { NormalizedStatusCode } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+import { coerceToNumber } from "~/utils/coerceToNumber";
+import { safeUnflatten } from "~/utils/safeUnflatten";
+import { computeSpanCost } from "~/server/app-layer/traces/model-cost-matching";
 import type {
   BaseSpan,
   ChatMessage,
@@ -22,6 +25,7 @@ type JsonSerializable =
   | null
   | Record<string, unknown>
   | unknown[];
+
 
 /**
  * Converts attribute values to JSON-serializable format.
@@ -45,52 +49,140 @@ function toJsonSerializable(value: unknown): JsonSerializable {
   return value as JsonSerializable;
 }
 
+const KNOWN_WRAPPER_TYPES = new Set([
+  "text",
+  "chat_messages",
+  "json",
+  "raw",
+  "list",
+  "evaluation_result",
+  "guardrail_result",
+]);
+
 /**
- * Extracts input from span attributes.
- * Looks for common semantic convention keys for input.
+ * Detects the legacy {type, value} wrapper format from the REST collector
+ * or preserved by canonicalization for chat_messages.
+ * After ClickHouse deserialization, these appear as objects with `type` and `value`.
+ */
+function isLegacyWrapper(
+  v: unknown,
+): v is { type: string; value: unknown } {
+  return (
+    typeof v === "object" &&
+    v !== null &&
+    !Array.isArray(v) &&
+    "type" in v &&
+    "value" in v &&
+    typeof (v as Record<string, unknown>).type === "string" &&
+    KNOWN_WRAPPER_TYPES.has((v as Record<string, unknown>).type as string)
+  );
+}
+
+/**
+ * Unwraps a {type, value} wrapper into a proper SpanInputOutput.
+ */
+function unwrapLegacyWrapper(
+  wrapper: { type: string; value: unknown },
+  spanAttributes: NormalizedAttributes,
+  attrKey: string,
+): SpanInputOutput {
+  const { type, value } = wrapper;
+  if (type === "chat_messages" && Array.isArray(value)) {
+    return { type: "chat_messages", value: toJsonSerializable(value) as ChatMessage[] };
+  }
+  if (type === "text") {
+    return { type: "text", value: typeof value === "string" ? value : JSON.stringify(value) };
+  }
+  if (type === "evaluation_result" || type === "guardrail_result") {
+    return { type, value: toJsonSerializable(value) } as unknown as SpanInputOutput;
+  }
+  return { type: "json", value: toJsonSerializable(value) };
+}
+
+/**
+ * Reads the annotated value type for a canonical key from
+ * langwatch.reserved.value_types (e.g. ["langwatch.input=chat_messages"]).
+ */
+function getAnnotatedType(
+  spanAttributes: NormalizedAttributes,
+  attrKey: string,
+): string | null {
+  let raw = spanAttributes["langwatch.reserved.value_types"];
+
+  // ClickHouse Map(String, String) stores arrays as JSON strings
+  if (typeof raw === "string") {
+    try {
+      raw = JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+
+  if (!Array.isArray(raw)) return null;
+
+  const prefix = `${attrKey}=`;
+  for (const entry of raw) {
+    if (typeof entry === "string" && entry.startsWith(prefix)) {
+      return entry.slice(prefix.length);
+    }
+  }
+  return null;
+}
+
+/**
+ * Extracts input from canonical span attributes only.
+ * After canonicalization, input is at:
+ * 1. gen_ai.input.messages (chat messages)
+ * 2. langwatch.input (text/json/structured)
  */
 function extractInput(
   spanAttributes: NormalizedAttributes,
 ): SpanInputOutput | null {
-  // Priority 1: gen_ai.input.messages (canonical GenAI semantic convention)
+  // Priority 1: gen_ai.input.messages → always chat_messages
   const genAiInputMessages = spanAttributes["gen_ai.input.messages"];
-  if (genAiInputMessages !== void 0) {
+  if (genAiInputMessages !== undefined) {
     return {
       type: "chat_messages",
       value: toJsonSerializable(genAiInputMessages) as ChatMessage[],
     };
   }
 
-  // Try legacy gen_ai semantic conventions
-  const genAiInput =
-    spanAttributes["gen_ai.prompt"] ??
-    spanAttributes["gen_ai.request.messages"];
-  if (genAiInput !== void 0) {
-    return {
-      type: "chat_messages",
-      value: toJsonSerializable(genAiInput) as ChatMessage[],
-    };
-  }
-
-  // Try LLM semantic conventions
-  const llmInput =
-    spanAttributes["llm.input_messages"] ?? spanAttributes["llm.prompts"];
-  if (llmInput !== void 0) {
-    return {
-      type: "json",
-      value: toJsonSerializable(llmInput),
-    };
-  }
-
-  // Try generic input attribute
-  const input = spanAttributes.input ?? spanAttributes["langwatch.input"];
-  if (input !== void 0) {
-    if (typeof input === "string") {
-      return { type: "text", value: input };
+  // Priority 2: langwatch.input → use annotated type or infer
+  let lwInput = spanAttributes["langwatch.input"];
+  if (lwInput !== undefined) {
+    // ClickHouse Map(String, String) stores objects as JSON strings
+    if (typeof lwInput === "string") {
+      try {
+        const parsed = JSON.parse(lwInput);
+        if (typeof parsed === "object" && parsed !== null) {
+          lwInput = parsed;
+        }
+      } catch {
+        // Not JSON — keep as string
+      }
+    }
+    // Unwrap {type, value} wrapper preserved by canonicalization (e.g. chat_messages)
+    if (isLegacyWrapper(lwInput)) {
+      return unwrapLegacyWrapper(lwInput, spanAttributes, "langwatch.input");
+    }
+    const annotatedType = getAnnotatedType(spanAttributes, "langwatch.input");
+    if (annotatedType === "chat_messages" && Array.isArray(lwInput)) {
+      return {
+        type: "chat_messages",
+        value: toJsonSerializable(lwInput) as ChatMessage[],
+      };
+    }
+    if (annotatedType === "text" || typeof lwInput === "string") {
+      // ClickHouse deserializeAttributes() may parse JSON-like strings back to
+      // objects/arrays (e.g. "[{\"role\":...}]" → Array). Re-stringify to avoid
+      // String([object Object]).
+      const textValue =
+        typeof lwInput === "string" ? lwInput : JSON.stringify(lwInput);
+      return { type: "text", value: textValue };
     }
     return {
       type: "json",
-      value: toJsonSerializable(input),
+      value: toJsonSerializable(lwInput),
     };
   }
 
@@ -98,128 +190,163 @@ function extractInput(
 }
 
 /**
- * Extracts output from span attributes.
- * Looks for common semantic convention keys for output.
+ * Extracts output from canonical span attributes only.
+ * After canonicalization, output is at:
+ * 1. gen_ai.output.messages (chat messages)
+ * 2. langwatch.output (text/json/structured)
  */
 function extractOutput(
   spanAttributes: NormalizedAttributes,
 ): SpanInputOutput | null {
-  // Priority 1: gen_ai.output.messages (canonical GenAI semantic convention)
+  // Priority 1: gen_ai.output.messages → always chat_messages
   const genAiOutputMessages = spanAttributes["gen_ai.output.messages"];
-  if (genAiOutputMessages !== void 0) {
+  if (genAiOutputMessages !== undefined) {
     return {
       type: "chat_messages",
       value: toJsonSerializable(genAiOutputMessages) as ChatMessage[],
     };
   }
 
-  // Try legacy gen_ai semantic conventions
-  const genAiOutput =
-    spanAttributes["gen_ai.completion"] ??
-    spanAttributes["gen_ai.response.messages"];
-  if (genAiOutput !== void 0) {
-    return {
-      type: "chat_messages",
-      value: toJsonSerializable(genAiOutput) as ChatMessage[],
-    };
-  }
-
-  // Try LLM semantic conventions
-  const llmOutput =
-    spanAttributes["llm.output_messages"] ?? spanAttributes["llm.completions"];
-  if (llmOutput !== void 0) {
-    return {
-      type: "json",
-      value: toJsonSerializable(llmOutput),
-    };
-  }
-
-  // Try generic output attribute
-  const output = spanAttributes.output ?? spanAttributes["langwatch.output"];
-  if (output !== void 0) {
-    if (typeof output === "string") {
-      return { type: "text", value: output };
+  // Priority 2: langwatch.output → use annotated type or infer
+  let lwOutput = spanAttributes["langwatch.output"];
+  if (lwOutput !== undefined) {
+    // ClickHouse Map(String, String) stores objects as JSON strings
+    if (typeof lwOutput === "string") {
+      try {
+        const parsed = JSON.parse(lwOutput);
+        if (typeof parsed === "object" && parsed !== null) {
+          lwOutput = parsed;
+        }
+      } catch {
+        // Not JSON — keep as string
+      }
+    }
+    // Unwrap {type, value} wrapper preserved by canonicalization (e.g. chat_messages)
+    if (isLegacyWrapper(lwOutput)) {
+      return unwrapLegacyWrapper(lwOutput, spanAttributes, "langwatch.output");
+    }
+    const annotatedType = getAnnotatedType(spanAttributes, "langwatch.output");
+    if (annotatedType === "chat_messages" && Array.isArray(lwOutput)) {
+      return {
+        type: "chat_messages",
+        value: toJsonSerializable(lwOutput) as ChatMessage[],
+      };
+    }
+    if (
+      annotatedType === "evaluation_result" ||
+      annotatedType === "guardrail_result"
+    ) {
+      return {
+        type: annotatedType,
+        value: toJsonSerializable(lwOutput),
+      } as unknown as SpanInputOutput;
+    }
+    if (annotatedType === "text" || typeof lwOutput === "string") {
+      const textValue =
+        typeof lwOutput === "string" ? lwOutput : JSON.stringify(lwOutput);
+      return { type: "text", value: textValue };
     }
     return {
       type: "json",
-      value: toJsonSerializable(output),
+      value: toJsonSerializable(lwOutput),
     };
   }
 
   return null;
 }
 
+
 /**
- * Extracts metrics from span attributes.
+ * Extracts metrics from canonical span attributes only.
+ * After canonicalization, tokens are at gen_ai.usage.input_tokens/output_tokens.
+ * Falls back to gen_ai.usage.prompt_tokens/completion_tokens for compat.
  */
 function extractMetrics(
   spanAttributes: NormalizedAttributes,
 ): SpanMetrics | null {
-  const promptTokens =
-    spanAttributes["gen_ai.usage.prompt_tokens"] ??
-    spanAttributes["llm.token_count.prompt"] ??
-    spanAttributes["llm.usage.prompt_tokens"];
+  const promptTokens = coerceToNumber(
+    spanAttributes["gen_ai.usage.input_tokens"] ??
+      spanAttributes["gen_ai.usage.prompt_tokens"],
+  );
 
-  const completionTokens =
-    spanAttributes["gen_ai.usage.completion_tokens"] ??
-    spanAttributes["llm.token_count.completion"] ??
-    spanAttributes["llm.usage.completion_tokens"];
+  const completionTokens = coerceToNumber(
+    spanAttributes["gen_ai.usage.output_tokens"] ??
+      spanAttributes["gen_ai.usage.completion_tokens"],
+  );
 
-  const cost =
-    spanAttributes["gen_ai.usage.cost"] ?? spanAttributes["llm.usage.cost"];
-  const tokensEstimated = spanAttributes["langwatch.tokens_estimated"];
+  const reasoningTokens = coerceToNumber(
+    spanAttributes["gen_ai.usage.reasoning_tokens"],
+  );
+  const tokensEstimated = spanAttributes["langwatch.tokens.estimated"];
+
+  // Canonical name with Mastra non-standard fallback
+  const cacheReadInputTokens = coerceToNumber(
+    spanAttributes["gen_ai.usage.cache_read.input_tokens"] ??
+      spanAttributes["gen_ai.usage.cached_input_tokens"],
+  );
+  const cacheCreationInputTokens = coerceToNumber(
+    spanAttributes["gen_ai.usage.cache_creation.input_tokens"],
+  );
+
+  const rawCost = computeSpanCost({ attrs: spanAttributes, promptTokens, completionTokens });
+  const cost = rawCost > 0 ? rawCost : null;
 
   if (
-    promptTokens === void 0 &&
-    completionTokens === void 0 &&
-    cost === void 0
+    promptTokens === null &&
+    completionTokens === null &&
+    reasoningTokens === null &&
+    cost === null &&
+    cacheReadInputTokens === null &&
+    cacheCreationInputTokens === null &&
+    typeof tokensEstimated !== "boolean"
   ) {
     return null;
   }
 
   return {
-    prompt_tokens: typeof promptTokens === "number" ? promptTokens : null,
-    completion_tokens:
-      typeof completionTokens === "number" ? completionTokens : null,
-    cost: typeof cost === "number" ? cost : null,
+    prompt_tokens: promptTokens,
+    completion_tokens: completionTokens,
+    reasoning_tokens: reasoningTokens,
+    cache_read_input_tokens: cacheReadInputTokens,
+    cache_creation_input_tokens: cacheCreationInputTokens,
+    cost: cost,
     tokens_estimated:
       typeof tokensEstimated === "boolean" ? tokensEstimated : null,
   };
 }
 
 /**
- * Extracts model name from span attributes.
+ * Extracts model name from canonical span attributes only.
+ * After canonicalization, model is at gen_ai.response.model / gen_ai.request.model.
  */
 function extractModel(spanAttributes: NormalizedAttributes): string | null {
   const model =
     spanAttributes["gen_ai.response.model"] ??
-    spanAttributes["gen_ai.request.model"] ??
-    spanAttributes["llm.model"] ??
-    spanAttributes["llm.request.model"];
+    spanAttributes["gen_ai.request.model"];
 
   return typeof model === "string" ? model : null;
 }
 
 /**
- * Extracts vendor from span attributes.
+ * Extracts vendor from canonical span attributes only.
+ * After canonicalization, vendor is at gen_ai.system / gen_ai.provider.name.
  */
 function extractVendor(spanAttributes: NormalizedAttributes): string | null {
   const vendor =
-    spanAttributes["gen_ai.system"] ??
-    spanAttributes["llm.vendor"] ??
-    spanAttributes["llm.provider"];
+    spanAttributes["gen_ai.provider.name"] ??
+    spanAttributes["gen_ai.system"];
 
   return typeof vendor === "string" ? vendor : null;
 }
 
 /**
- * Extracts RAG contexts from span attributes.
+ * Extracts RAG contexts from canonical span attributes only.
+ * After canonicalization, RAG contexts are at langwatch.rag.contexts.
  */
 function extractContexts(
   spanAttributes: NormalizedAttributes,
 ): RAGChunk[] | undefined {
-  const contexts =
-    spanAttributes["retrieval.documents"] ?? spanAttributes["rag.contexts"];
+  const contexts = spanAttributes["langwatch.rag.contexts"];
 
   if (!contexts || !Array.isArray(contexts)) {
     return undefined;
@@ -243,24 +370,54 @@ function extractContexts(
 }
 
 /**
- * Extracts error information from span status.
+ * Extracts error information from span status, preferring the OTel
+ * exception event's structured attributes over the span-level statusMessage.
+ *
+ * Priority (first hit wins):
+ *   1. Newest exception event's attributes["exception.message"]
+ *   2. Span-level attributes["exception.message"]
+ *   3. statusMessage
+ *   4. "Unknown error"
+ *
+ * Rationale: upstream instrumentors (incl. our Go gateway — see iter 68
+ * 86aad630d) attach rich actionable text on the exception event itself;
+ * statusMessage is often a short HTTP-status summary ("Bad Request") that
+ * loses the actionable detail.
  */
 function extractError(
   statusCode: NormalizedStatusCode | null,
   statusMessage: string | null,
   spanAttributes: NormalizedAttributes,
+  events: readonly { name: string; attributes: NormalizedAttributes }[],
 ): ErrorCapture | null {
   if (statusCode !== NormalizedStatusCode.ERROR) {
     return null;
   }
 
-  const errorMessage =
-    statusMessage ??
-    (typeof spanAttributes["exception.message"] === "string"
-      ? spanAttributes["exception.message"]
-      : "Unknown error");
+  const exceptionEvents = events.filter((e) => e.name === "exception");
+  const latestExceptionEvent =
+    exceptionEvents.length > 0
+      ? exceptionEvents[exceptionEvents.length - 1]
+      : undefined;
 
-  const stacktrace = spanAttributes["exception.stacktrace"];
+  const eventMessage = latestExceptionEvent?.attributes["exception.message"];
+  const attrMessage = spanAttributes["exception.message"];
+
+  const errorMessage =
+    (typeof eventMessage === "string" && eventMessage.length > 0
+      ? eventMessage
+      : undefined) ??
+    (typeof attrMessage === "string" && attrMessage.length > 0
+      ? attrMessage
+      : undefined) ??
+    statusMessage ??
+    "Unknown error";
+
+  const eventStacktrace = latestExceptionEvent?.attributes["exception.stacktrace"];
+  const attrStacktrace = spanAttributes["exception.stacktrace"];
+  const stacktrace =
+    (typeof eventStacktrace === "string" ? eventStacktrace : undefined) ??
+    (typeof attrStacktrace === "string" ? attrStacktrace : undefined);
   const stacktraceArray =
     typeof stacktrace === "string" ? stacktrace.split("\n") : [];
 
@@ -272,80 +429,19 @@ function extractError(
 }
 
 /**
- * Extracts params from span attributes.
- * Filters out known semantic convention keys to get custom params.
+ * Converts flat dot-notation keys into nested objects.
+ * e.g. {"gen_ai.usage.input_tokens": 100} → {"gen_ai": {"usage": {"input_tokens": 100}}}
+ * Keys without dots stay at top level. Leaf values (arrays, objects, scalars) stay as-is.
+ *
+ * Delegates to shared safeUnflatten utility which uses Object.create(null)
+ * and DANGEROUS_KEYS blocklist for prototype pollution protection.
+ *
+ * @internal Exported for unit testing
  */
-function _extractParams(
-  spanAttributes: NormalizedAttributes,
-): Record<string, unknown> | null {
-  const knownKeys = new Set([
-    "gen_ai.prompt",
-    "gen_ai.completion",
-    "gen_ai.request.messages",
-    "gen_ai.response.messages",
-    "gen_ai.request.model",
-    "gen_ai.response.model",
-    "gen_ai.system",
-    "gen_ai.usage.prompt_tokens",
-    "gen_ai.usage.completion_tokens",
-    "gen_ai.usage.cost",
-    "llm.input_messages",
-    "llm.output_messages",
-    "llm.prompts",
-    "llm.completions",
-    "llm.model",
-    "llm.request.model",
-    "llm.vendor",
-    "llm.provider",
-    "llm.token_count.prompt",
-    "llm.token_count.completion",
-    "llm.usage.prompt_tokens",
-    "llm.usage.completion_tokens",
-    "llm.usage.cost",
-    "input",
-    "output",
-    "langwatch.input",
-    "langwatch.output",
-    "langwatch.tokens_estimated",
-    "retrieval.documents",
-    "rag.contexts",
-    "exception.message",
-    "exception.stacktrace",
-    "exception.type",
-    "tool.name",
-    "agent.name",
-  ]);
-
-  // Extract LLM params
-  const params: Record<string, unknown> = {};
-
-  // Common LLM parameters
-  const temperature =
-    spanAttributes["gen_ai.request.temperature"] ??
-    spanAttributes["llm.temperature"];
-  if (temperature !== void 0) params.temperature = temperature;
-
-  const maxTokens =
-    spanAttributes["gen_ai.request.max_tokens"] ??
-    spanAttributes["llm.max_tokens"];
-  if (maxTokens !== void 0) params.max_tokens = maxTokens;
-
-  const topP =
-    spanAttributes["gen_ai.request.top_p"] ?? spanAttributes["llm.top_p"];
-  if (topP !== void 0) params.top_p = topP;
-
-  // Add any other non-known attributes as custom params
-  for (const [key, value] of Object.entries(spanAttributes)) {
-    if (
-      !knownKeys.has(key) &&
-      !key.startsWith("gen_ai.") &&
-      !key.startsWith("llm.")
-    ) {
-      params[key] = value;
-    }
-  }
-
-  return Object.keys(params).length > 0 ? params : null;
+export function unflattenDotNotation(
+  flat: NormalizedAttributes,
+): Record<string, unknown> {
+  return safeUnflatten(flat as Record<string, unknown>);
 }
 
 /**
@@ -356,7 +452,7 @@ export function mapNormalizedSpanToSpan(normalizedSpan: NormalizedSpan): Span {
   const timestamps: SpanTimestamps = {
     started_at: normalizedSpan.startTimeUnixMs,
     finished_at: normalizedSpan.endTimeUnixMs,
-    first_token_at: null, // Could be extracted from events if available
+    first_token_at: null,
   };
 
   // Check for first token event
@@ -383,10 +479,11 @@ export function mapNormalizedSpanToSpan(normalizedSpan: NormalizedSpan): Span {
       normalizedSpan.statusCode,
       normalizedSpan.statusMessage,
       normalizedSpan.spanAttributes,
+      normalizedSpan.events,
     ),
     timestamps,
     metrics: extractMetrics(normalizedSpan.spanAttributes),
-    params: normalizedSpan.spanAttributes,
+    params: unflattenDotNotation(normalizedSpan.spanAttributes),
   };
 
   // Add LLM-specific fields

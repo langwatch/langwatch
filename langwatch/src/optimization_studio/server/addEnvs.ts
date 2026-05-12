@@ -2,9 +2,10 @@ import crypto from "crypto";
 import {
   getProjectModelProviders,
   prepareLitellmParams,
-} from "../../server/api/routers/modelProviders";
+} from "../../server/api/routers/modelProviders.utils";
 import { prisma } from "../../server/db";
 import type { MaybeStoredModelProvider } from "../../server/modelProviders/registry";
+import { decrypt } from "../../utils/encryption";
 import { normalizeToSnakeCase } from "../components/properties/llm-configs/normalizeToSnakeCase";
 import type { LLMConfig, ServerWorkflow, Workflow } from "../types/dsl";
 import type { StudioClientEvent } from "../types/events";
@@ -17,7 +18,7 @@ export const addEnvs = async (
     return event;
   }
 
-  const [modelProviders, { apiKey }] = await Promise.all([
+  const [modelProviders, { apiKey }, projectSecrets] = await Promise.all([
     getProjectModelProviders(projectId),
     prisma.project.findUniqueOrThrow({
       where: {
@@ -27,7 +28,16 @@ export const addEnvs = async (
         apiKey: true,
       },
     }),
+    prisma.projectSecret.findMany({
+      where: { projectId },
+      select: { name: true, encryptedValue: true },
+    }),
   ]);
+
+  const secrets: Record<string, string> = {};
+  for (const secret of projectSecrets) {
+    secrets[secret.name] = decrypt(secret.encryptedValue);
+  }
 
   const workflow_id = event.payload.workflow.workflow_id;
   if (!workflow_id) {
@@ -55,6 +65,8 @@ export const addEnvs = async (
     ...(event.payload.workflow as Workflow),
     workflow_id,
     api_key: apiKey,
+    project_id: projectId,
+    secrets,
     nodes: await Promise.all(
       (event.payload.workflow.nodes as Workflow["nodes"]).map(async (node) => {
         const parameters = await Promise.all(
@@ -121,9 +133,6 @@ const addLiteLLMParams = async ({
     throw new Error(
       `${provider} model provider is disabled, go to settings to enable it`,
     );
-  }
-  if (customKeysOnly && !modelProvider.customKeys) {
-    throw new Error(`Custom API key required for ${provider}`);
   }
 
   // Normalize to snake_case format and preserve all parameters (OCP compliant)

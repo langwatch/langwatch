@@ -18,8 +18,7 @@ import {
   vi,
 } from "vitest";
 import { prisma } from "../../../../db";
-import type { PreconditionTrace } from "../../../../evaluations/preconditions";
-import type { Span } from "../../../../tracer/types";
+import type { ElasticSearchTrace, Span } from "../../../../tracer/types";
 import type { EvaluationJob } from "../../../types";
 import { scheduleEvaluations } from "../evaluations";
 
@@ -28,6 +27,13 @@ const mockScheduleEvaluation = vi.fn().mockResolvedValue(undefined);
 vi.mock("../../../queues/evaluationsQueue", () => ({
   scheduleEvaluation: (...args: any[]) => mockScheduleEvaluation(...args),
 }));
+
+/** Trace type expected by scheduleEvaluations */
+type TestTrace = EvaluationJob["trace"] &
+  Pick<ElasticSearchTrace, "input" | "output" | "metadata" | "expected_output"> & {
+    origin?: string | null;
+    error?: import("../../../../tracer/types").ErrorCapture | null;
+  };
 
 describe("scheduleEvaluations - thread idle timeout", () => {
   const projectId = `test-project-${nanoid()}`;
@@ -55,9 +61,7 @@ describe("scheduleEvaluations - thread idle timeout", () => {
     await prisma.monitor.deleteMany({ where: { projectId } }).catch(() => {});
   });
 
-  const createTestTrace = (
-    threadId?: string,
-  ): EvaluationJob["trace"] & PreconditionTrace => ({
+  const createTestTrace = (threadId?: string): TestTrace => ({
     trace_id: `trace-${nanoid()}`,
     project_id: projectId,
     thread_id: threadId,
@@ -66,6 +70,7 @@ describe("scheduleEvaluations - thread idle timeout", () => {
     labels: undefined,
     input: { value: "test input" },
     output: { value: "test output" },
+    expected_output: undefined,
     metadata: threadId ? { thread_id: threadId } : {},
   });
 
@@ -193,7 +198,7 @@ describe("scheduleEvaluations - thread idle timeout", () => {
 
     const threadId = `thread-from-metadata-${nanoid()}`;
     // Create trace with thread_id only in metadata
-    const trace: EvaluationJob["trace"] & PreconditionTrace = {
+    const trace: TestTrace = {
       trace_id: `trace-${nanoid()}`,
       project_id: projectId,
       thread_id: undefined, // Not set directly
@@ -202,6 +207,7 @@ describe("scheduleEvaluations - thread idle timeout", () => {
       labels: undefined,
       input: { value: "test input" },
       output: { value: "test output" },
+      expected_output: undefined,
       metadata: { thread_id: threadId }, // Set in metadata
     };
     const spans = createTestSpans();

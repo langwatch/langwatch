@@ -13,11 +13,13 @@ export const LlmConfigInputTypes = [
   "float",
   "bool",
   "image",
+  "list",
   "list[str]",
   "list[float]",
   "list[int]",
   "list[bool]",
   "dict",
+  "chat_messages",
 ] as const;
 export type LlmConfigInputType = (typeof LlmConfigInputTypes)[number];
 

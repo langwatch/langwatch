@@ -1,53 +1,67 @@
 import {
   Box,
-  Button,
-  Flex,
   HStack,
+  IconButton,
+  Spacer,
   Text,
-  useDisclosure,
 } from "@chakra-ui/react";
-import { LuPanelLeftClose, LuPanelLeftOpen } from "react-icons/lu";
+import { ArrowLeft } from "react-feather";
+import {
+  PeriodSelector,
+  type Period,
+  type PeriodMode,
+  type RelativePresetKey,
+} from "~/components/PeriodSelector";
 import { useSimulationRouter } from "~/hooks/simulations";
 import {
   isOnPlatformSet,
   ON_PLATFORM_DISPLAY_NAME,
 } from "~/server/scenarios/internal-set-id";
+import { Tooltip } from "../ui/tooltip";
 import { DashboardLayout } from "../DashboardLayout";
 import { SetRunHistorySidebar } from "./set-run-history-sidebar";
 
-// TODO: This file could be better organized.
 export const SimulationLayout = ({
   children,
+  period,
+  mode,
+  setPeriod,
+  setRelativePeriod,
 }: {
   children: React.ReactNode;
+  period: Period;
+  mode: PeriodMode;
+  setPeriod: (startDate: Date, endDate: Date) => void;
+  setRelativePeriod: (presetKey: RelativePresetKey) => void;
 }) => {
-  const { open: isHistorySidebarOpen, onToggle } = useDisclosure({
-    defaultOpen: true,
-  });
-
   return (
     <DashboardLayout>
       <Header
-        isHistorySidebarOpen={isHistorySidebarOpen}
-        onHistorySidebarOpenChange={onToggle}
+        period={period}
+        mode={mode}
+        setPeriod={setPeriod}
+        setRelativePeriod={setRelativePeriod}
       />
       <HStack w="full" h="full" alignItems="stretch" gap={0} bg="bg.surface">
         <Box
-          w={isHistorySidebarOpen ? "500px" : "0px"}
+          w="340px"
+          minW="340px"
           position="relative"
           h="full"
-          transition="width 0.2s"
         >
-          <SetRunHistorySidebar />
+          <SetRunHistorySidebar
+            startDate={period.startDate.getTime()}
+            endDate={period.endDate.getTime()}
+          />
         </Box>
         <Box
           w="full"
           position="relative"
           h="full"
-          borderTopLeftRadius={isHistorySidebarOpen ? "lg" : "0px"}
-          transition="border-top-left-radius 0.2s"
+          borderTopLeftRadius="lg"
           overflow="hidden"
           bg="bg.muted"
+          boxShadow="inset 3px 3px 10px 0 rgba(0, 0, 0, 0.05)"
         >
           {children}
         </Box>
@@ -57,40 +71,44 @@ export const SimulationLayout = ({
 };
 
 const Header = ({
-  isHistorySidebarOpen,
-  onHistorySidebarOpenChange,
+  period,
+  mode,
+  setPeriod,
+  setRelativePeriod,
 }: {
-  isHistorySidebarOpen: boolean;
-  onHistorySidebarOpenChange: (open: boolean) => void;
+  period: Period;
+  mode: PeriodMode;
+  setPeriod: (startDate: Date, endDate: Date) => void;
+  setRelativePeriod: (presetKey: RelativePresetKey) => void;
 }) => {
-  const { scenarioSetId } = useSimulationRouter();
+  const { scenarioSetId, goToSimulationSets } = useSimulationRouter();
   const displayName =
     scenarioSetId && isOnPlatformSet(scenarioSetId)
       ? ON_PLATFORM_DISPLAY_NAME
       : scenarioSetId ?? "unknown";
   return (
-    <Box w="full" p={4} borderBottom="1px" bg="bg.surface" borderColor="border">
-      <HStack>
-        <Button
-          size="sm"
-          bg={isHistorySidebarOpen ? "bg.emphasized" : "bg.muted"}
-          onClick={() => onHistorySidebarOpenChange(!isHistorySidebarOpen)}
-          title={isHistorySidebarOpen ? "Close History" : "Open History"}
-        >
-          {isHistorySidebarOpen ? (
-            <LuPanelLeftClose size={18} />
-          ) : (
-            <LuPanelLeftOpen size={18} />
-          )}
-        </Button>
-        <Flex alignItems="center" gap={1}>
-          <Text fontWeight="semibold">
-            <Text fontSize={"xs"} color={"fg.muted"} as="span">
-              Scenario Set ID:
-            </Text>{" "}
-            <code>{displayName}</code>
-          </Text>
-        </Flex>
+    <Box w="full" px={4} borderBottom="1px" bg="bg.surface" borderColor="border">
+      <HStack gap={2} minH="44px" align="center">
+        <Tooltip content="Back to simulations">
+          <IconButton
+            size="xs"
+            variant="ghost"
+            aria-label="Back to simulations"
+            onClick={() => goToSimulationSets()}
+          >
+            <ArrowLeft size={16} />
+          </IconButton>
+        </Tooltip>
+        <Text fontWeight="bold" fontSize="md">
+          {displayName}
+        </Text>
+        <Spacer />
+        <PeriodSelector
+          period={period}
+          mode={mode}
+          setPeriod={setPeriod}
+          setRelativePeriod={setRelativePeriod}
+        />
       </HStack>
     </Box>
   );

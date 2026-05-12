@@ -1,0 +1,592 @@
+---
+title: Multi-Turn Conversations
+description: Learn how to implement a simulation-based approach for evaluating multi-turn customer support agents using success criteria focused on outcomes rather than specific steps.
+keywords:
+  [
+    multi-turn evaluation,
+    conversation simulation,
+    customer support agents,
+    LLM evaluation,
+    success criteria,
+    tool usage,
+    simulated interactions,
+    outcome-based evaluation,
+  ]
+---
+
+In this cookbook, we'll explore a more effective approach to evaluating multi-turn customer support agents. Traditional evaluation methods that use a single input-output pair are insufficient for agents that need to adapt their tool usage as conversations evolve. Instead, we'll implement a simulation-based approach where an LLM evaluates our agent against specific success criteria.
+
+## The Problem with Traditional Evaluation
+
+Traditional evaluation methods for customer support agents often use a dataset where:
+
+- **Input**: Customer ticket/query
+- **Output**: Expected sequence of tool calls
+
+This approach has significant limitations:
+
+1. It assumes a fixed, predetermined path to resolution
+2. It doesn't account for new information discovered during the conversation
+3. It focuses on the exact sequence of tools rather than achieving the desired outcome
+
+## A Better Approach: Simulation-Based Evaluation
+
+Instead of predicting exact tool sequences, we'll define success criteria that focus on what the agent must accomplish, regardless of the specific path taken. For example:
+
+```python
+success_criteria = [
+    "Agent MUST call get_status(order_id)",
+    "Agent MUST inform user cancellation is possible IFF package.status != 'shipped'"
+]
+```
+
+This approach:
+
+- Focuses on outcomes rather than specific steps
+- Allows for multiple valid solution paths
+- Better reflects real-world customer support scenarios
+
+## Requirements
+
+Before we start, make sure you have the necessary packages installed:
+
+```python
+%pip install openai langwatch pydantic
+```
+
+## Define Tools
+
+Let's implement this simulation-based evaluation approach using mock tools for an e-commerce customer support scenario.
+
+```python
+import json
+from typing import Dict, Any, List, Tuple
+from openai import AsyncOpenAI
+import getpass
+import langwatch
+
+api_key = getpass.getpass("Enter your OpenAI API key: ")
+
+# Initialize OpenAI and LangWatch
+client = AsyncOpenAI(api_key=api_key)
+langwatch.login()
+
+# Mock database of orders
+ORDERS_DB = {
+    "ORD123": {"status": "processing", "customer_id": "CUST456", "items": ["Product A", "Product B"]},
+    "ORD456": {"status": "shipped", "customer_id": "CUST789", "items": ["Product C"]},
+    "ORD789": {"status": "delivered", "customer_id": "CUST456", "items": ["Product D"]}
+}
+
+# Mock database of customers
+CUSTOMERS_DB = {
+    "CUST456": {"email": "customer1@example.com", "name": "John Doe"},
+    "CUST789": {"email": "customer2@example.com", "name": "Jane Smith"}
+}
+
+# Tool definitions
+async def find_customer_by_email(email: str) -> Dict[str, Any]:
+    """Find a customer by their email address."""
+    for customer_id, customer in CUSTOMERS_DB.items():
+        if customer["email"] == email:
+            return {"customer_id": customer_id, **customer}
+    return {"error": "Customer not found"}
+
+async def get_orders_by_customer_id(customer_id: str) -> Dict[str, Any]:
+    """Get all orders for a specific customer."""
+    orders = []
+    for order_id, order in ORDERS_DB.items():
+        if order["customer_id"] == customer_id:
+            orders.append({"order_id": order_id, **order})
+    return {"orders": orders}
+
+async def get_order_status(order_id: str) -> Dict[str, Any]:
+    """Get the status of a specific order."""
+    if order_id in ORDERS_DB:
+        return {"order_id": order_id, "status": ORDERS_DB[order_id]["status"]}
+    return {"error": "Order not found"}
+
+async def update_ticket_status(ticket_id: str, status: str) -> Dict[str, Any]:
+    """Update the status of a support ticket."""
+    return {"ticket_id": ticket_id, "status": status, "updated": True}
+
+async def escalate_to_human() -> Dict[str, Any]:
+    """Escalate the current issue to a human agent."""
+    return {
+        "status": "escalated",
+        "message": "A human agent has been notified and will follow up shortly."
+    }
+
+# Dictionary mapping tool names to functions
+TOOL_MAP = {
+    "find_customer_by_email": find_customer_by_email,
+    "get_orders_by_customer_id": get_orders_by_customer_id,
+    "get_order_status": get_order_status,
+    "update_ticket_status": update_ticket_status,
+    "escalate_to_human": escalate_to_human
+}
+
+# Tool schemas for OpenAI API
+TOOL_SCHEMAS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "find_customer_by_email",
+            "description": "Find a customer by their email address.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "email": {"type": "string", "description": "Customer email address"}
+                },
+                "required": ["email"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_orders_by_customer_id",
+            "description": "Get all orders for a specific customer.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "customer_id": {"type": "string", "description": "Customer ID"}
+                },
+                "required": ["customer_id"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_order_status",
+            "description": "Get the status of a specific order.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "order_id": {"type": "string", "description": "Order ID"}
+                },
+                "required": ["order_id"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "update_ticket_status",
+            "description": "Update the status of a support ticket.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "ticket_id": {"type": "string", "description": "Ticket ID"},
+                    "status": {"type": "string", "description": "New status"}
+                },
+                "required": ["ticket_id", "status"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "escalate_to_human",
+            "description": "Escalate the current issue to a human agent.",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": []
+            }
+        }
+    }
+]
+```
+
+## Define Agents
+
+Now we'll define our agents. We'll create both a Planner and an Executor agent. The Planner agent is responsible for creating a plan to achieve the user's goal, while the Executor agent is responsible for executing the plan. We also define a helper function to generate a response from the tool outputs.
+
+```python
+class PlannerAgent:
+    def __init__(self, model: str = "gpt-5"):
+        self.model = model
+        self.client = AsyncOpenAI(api_key=api_key)
+
+    async def run(self, task_history: List[Dict[str, Any]]) -> Tuple[List, str]:
+        """Create a tool execution plan based on user input"""
+        # Call OpenAI to create a plan
+        response = await self.client.chat.completions.create(
+            model=self.model,
+            messages=task_history,
+            tools=TOOL_SCHEMAS,
+            tool_choice="auto"
+        )
+
+        message = response.choices[0].message
+        tool_calls = message.tool_calls or []
+        return tool_calls, message.content or ""
+
+    def initialize_history(self, ticket: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Start conversation history from a ticket."""
+        system_prompt = """You are a helpful customer support agent for an e-commerce company.
+        Your job is to help customers with their inquiries about orders, products, and returns.
+        Use the available tools to gather information and take actions on behalf of the customer.
+        Always be polite, professional, and helpful."""
+
+        return [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": str(ticket)}
+        ]
+
+# Simple implementation of the Executor Agent
+class ExecutorAgent:
+    async def run(self, tool_calls: List, task_history: List[Dict]) -> Dict[str, Any]:
+        """Execute tool calls and update conversation history"""
+        tool_outputs = []
+
+        for call in tool_calls:
+            tool_name = call.function.name
+            args = json.loads(call.function.arguments)
+
+            # Get the function from our tool map
+            func = TOOL_MAP.get(tool_name)
+            if func is None:
+                output = {"error": f"Tool '{tool_name}' not found"}
+                continue
+
+            try:
+                # Execute the tool
+                output = await func(**args)
+            except Exception as e:
+                output = {"error": str(e)}
+
+            # Add the tool call to history
+            task_history.append({
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [{
+                    "id": call.id,
+                    "type": "function",
+                    "function": {
+                        "name": tool_name,
+                        "arguments": call.function.arguments
+                    }
+                }]
+            })
+
+            # Add the tool response to history
+            task_history.append({
+                "role": "tool",
+                "tool_call_id": call.id,
+                "content": json.dumps(output)
+            })
+
+            tool_outputs.append({"tool_name": tool_name, "output": output})
+
+        return {"task_history": task_history, "tool_outputs": tool_outputs}
+
+# Generate a response from tool outputs
+async def generate_response(tool_outputs: List[Dict], model: str = "gpt-5") -> str:
+    """Generate a human-readable response based on tool outputs"""
+    client = AsyncOpenAI(api_key=api_key)
+
+    system_prompt = """You are a helpful customer support agent. IMPORTANT GUIDELINES:
+    1. When a customer asks about cancellation, ALWAYS check the order status first
+    2. EXPLICITLY inform the customer if cancellation is possible based on the status:
+    - If status is 'processing' or 'pending', tell them cancellation IS possible
+    - If status is 'shipped' or 'delivered', tell them cancellation is NOT possible
+    3. Always be polite, professional, and helpful"""
+
+    # Prepare a prompt that includes the tool outputs
+    prompt = "Based on the tool outputs, generate a helpful response to the customer:\n\n"
+    for output in tool_outputs:
+        prompt += f"{output['tool_name']} result: {json.dumps(output['output'])}\n"
+
+    # Call OpenAI to generate the response
+    response = await client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": prompt}
+        ]
+    )
+
+    return response.choices[0].message.content
+```
+
+## Evaluator Agent
+
+The Evaluator Agent evaluates our multi-turn agent behavior using binary success criteria over full simulated conversations. This method moves beyond traditional input/output (I/O) pair evaluation, addressing the stochastic and flexible nature of agent workflows.
+
+```python
+from pydantic import BaseModel
+
+class Verdict(BaseModel):
+    criterion: str
+    passed: bool
+    explanation: str
+
+class VerdictList(BaseModel):
+    verdicts: list[Verdict]
+
+async def evaluate_conversation(conversation: List[Dict], tools_used: List[str], criteria: List[str], model: str = "gpt-5") -> Dict[str, Any]:
+    """Evaluate a conversation against success criteria"""
+    client = AsyncOpenAI(api_key=api_key)
+
+    # Format the conversation for evaluation
+    conversation_text = ""
+    for message in conversation:
+        role = message.get("role", "")
+        content = message.get("content", "")
+        if role == "user":
+            conversation_text += f"Customer: {content}\n"
+        elif role == "assistant" and content:
+            conversation_text += f"Agent: {content}\n"
+        elif role == "tool":
+            conversation_text += f"Tool Output: {content}\n"
+
+    # Create the evaluation prompt
+    prompt = f"""
+    Please evaluate this customer support conversation against the success criteria.
+
+    Conversation:
+    {conversation_text}
+
+    Tools used: {', '.join(tools_used)}
+
+    Success Criteria:
+    {', '.join(f'- {criterion}' for criterion in criteria)}
+
+    For each criterion, determine if it was met (PASS) or not met (FAIL).
+    Provide a brief explanation for each verdict.
+    """
+
+    # Call OpenAI to evaluate
+    response = await client.responses.parse(
+        model=model,
+        input=[
+            {"role": "system", "content": "You are an objective evaluator of customer support conversations."},
+            {"role": "user", "content": prompt}
+        ],
+        text_format=VerdictList
+    )
+
+    # Process the evaluation response
+    eval_text = response.output_parsed
+
+    # Parse the evaluation into structured results
+    verdicts = eval_text.verdicts
+
+    return {"verdicts": verdicts, "raw_evaluation": eval_text}
+```
+
+## Simulation Function
+
+Below we define a method to simulate conversations between our agent and a user. The outputs will be evaluated by our Evaluator Agent.
+
+```python
+async def simulate_conversation(ticket: Dict[str, Any], criteria: List[str], max_turns: int = 5):
+    """Simulate a conversation with a customer and evaluate against criteria"""
+    # Initialize LangWatch evaluation
+    evaluation = langwatch.experiment.init("multi-turn-agent-evaluation")
+
+    # Initialize agents
+    planner = PlannerAgent()
+    executor = ExecutorAgent()
+
+    # Initialize conversation history
+    task_history = planner.initialize_history(ticket)
+
+    # Simulate the conversation
+    tools_used = []
+    turns = 0
+
+    print("\n🤖 Starting conversation simulation...")
+    print(f"📝 Ticket: {ticket['subject']}")
+    print(f"🎯 Success criteria: {', '.join(criteria)}")
+
+    while turns < max_turns:
+        turns += 1
+        print(f"\n--- Turn {turns} ---")
+
+        # Run the planner to decide what to do
+        tool_calls, assistant_reply = await planner.run(task_history)
+
+        # Handle the agent's response
+        if tool_calls:
+            # Agent wants to use tools
+            tool_names = [call.function.name for call in tool_calls]
+            print(f"🔧 Agent uses tools: {', '.join(tool_names)}")
+            tools_used.extend(tool_names)
+
+            # Log tool usage to LangWatch
+            for tool_name in tool_names:
+                evaluation.log(f"tool_usage_{tool_name}", index=turns, score=1.0, data={"turn": turns, "ticket_id": ticket["id"]})
+
+            # Execute the tools
+            result = await executor.run(tool_calls, task_history)
+
+            # Generate a response based on tool outputs
+            response_text = await generate_response(result["tool_outputs"])
+            print(f"🤖 Agent: {response_text}")
+
+            # Add the response to history
+            task_history.append({"role": "assistant", "content": response_text})
+
+            # Check if conversation should end
+            if "update_ticket_status" in tool_names:
+                print("\n✅ Ticket resolved — update_ticket_status was called.")
+
+                # Log resolution to LangWatch
+                evaluation.log("conversation_resolved", index=turns, score=1.0, data={"turns_to_resolution": turns, "ticket_id": ticket["id"]})
+                break
+        else:
+            # Agent responded directly without tools
+            print(f"🤖 Agent: {assistant_reply}")
+            task_history.append({"role": "assistant", "content": assistant_reply})
+
+        # Get simulated user input
+        if turns <= max_turns:
+            user_input = input("User: ")
+            print(f"👤 Customer: {user_input}")
+            task_history.append({"role": "user", "content": user_input})
+        else:
+            # If we run out of predefined responses, end the conversation
+            break
+
+    # Evaluate the conversation
+    print("\n📊 Evaluating conversation...")
+    eval_results = await evaluate_conversation(task_history, tools_used, criteria)
+
+    # Print evaluation results
+    print("\n--- Evaluation Results ---")
+    for i, verdict in enumerate(eval_results["verdicts"]):
+        status = "✅ PASS" if verdict.passed else "❌ FAIL"
+        print(f"{status}: {verdict.criterion}")
+
+        # Log each criterion result to LangWatch
+        evaluation.log(f"criterion_{verdict.criterion.replace(' ', '_')}",
+                        index=i,
+                        passed=verdict.passed,
+                        data={"explanation": verdict.explanation})
+
+    # Calculate overall score
+    passed = sum(1 for v in eval_results["verdicts"] if v.passed)
+    total = len(eval_results["verdicts"])
+    score = (passed / total) * 100
+
+    # Log overall score to LangWatch
+    evaluation.log("overall_score", index=0, score=score/100, data={"criteria_passed": passed, "total_criteria": total, "turns": turns, "tools_used": list(set(tools_used))})
+
+    print(f"\n📈 Overall Score: {score:.1f}% ({passed}/{total} criteria met)")
+    print(f"🔧 Tools Used: {', '.join(set(tools_used))}")
+    print(f"🔄 Conversation Length: {turns} turns")
+
+    return {
+        "conversation": task_history,
+        "tools_used": tools_used,
+        "evaluation": eval_results,
+        "turns": turns,
+        "score": score
+    }
+```
+
+## Running the Simulation
+
+Now, let's define a test ticket and our success criteria, then run the simulation:
+
+```python
+async def run_example():
+    # Define a test ticket
+    ticket = {
+        "id": "TICKET123",
+        "subject": "Order Cancellation Request",
+        "description": "I placed an order yesterday (ORD123) and would like to cancel it if it hasn't shipped yet.",
+        "status": "open",
+        "requester_id": "customer1@example.com"
+    }
+
+    # Define success criteria
+    criteria = [
+        "Agent MUST call get_order_status tool",
+        "Agent MUST inform user cancellation is possible IFF order.status != 'shipped'"
+    ]
+
+    # Run the simulation
+    await simulate_conversation(ticket, criteria)
+
+await run_example()
+```
+
+## Simulation Output
+
+Here's an example of the output you would see when running this simulation:
+
+```text
+Follow the results at: https://app.langwatch.ai/langwatch-nESIjE/experiments/multi-turn-agent-evaluation?runId=garrulous-vegan-bandicoot
+
+🤖 Starting conversation simulation...
+📝 Ticket: Order Cancellation Request
+🎯 Success criteria: Agent MUST call get_order_status tool, Agent MUST inform user cancellation is possible IFF order.status != 'shipped'
+
+--- Turn 1 ---
+🔧 Agent uses tools: find_customer_by_email
+🤖 Agent: Hello John Doe,
+
+Thank you for reaching out to us. How can I assist you with your account or order today? If you have any questions or need assistance with an order, feel free to let me know!
+
+Best regards,
+[Your Name]
+👤 Customer: pls help
+
+--- Turn 2 ---
+🔧 Agent uses tools: get_orders_by_customer_id
+🤖 Agent: Hello! Thank you for reaching out. I see that you have two orders with us. Here are the details:
+
+1. **Order ID: ORD123**
+   - Status: Processing
+   - Items: Product A, Product B
+
+2. **Order ID: ORD789**
+   - Status: Delivered
+   - Items: Product D
+
+If you are looking to cancel an order, I would like to inform you that cancellation is possible for Order ID: ORD123, as it is currently in a 'processing' status. Unfortunately, for Order ID: ORD789, which has been delivered, cancellation is not possible.
+
+Please let me know how you would like to proceed or if there's anything else I can assist you with!
+👤 Customer: ah ok no worries
+
+--- Turn 3 ---
+🔧 Agent uses tools: update_ticket_status
+🤖 Agent: Hello,
+
+Thank you for reaching out. I wanted to inform you that your ticket with the ID TICKET123 has been successfully updated and is now closed. If you have any further questions or need additional assistance, please feel free to contact us. We're here to help!
+
+Best regards,
+[Your Name]
+
+✅ Ticket resolved — update_ticket_status was called.
+
+📊 Evaluating conversation...
+
+--- Evaluation Results ---
+✅ PASS: Agent MUST call get_order_status tool
+✅ PASS: Agent MUST inform user cancellation is possible IFF order.status != 'shipped'
+
+📈 Overall Score: 100.0% (2/2 criteria met)
+🔧 Tools Used: get_orders_by_customer_id, find_customer_by_email, update_ticket_status
+🔄 Conversation Length: 3 turns
+```
+
+## Conclusion
+
+Traditional evaluation methods that rely on fixed input-output pairs are insufficient for multi-turn conversational agents. By simulating complete conversations and evaluating against outcome-based criteria, we can better assess an agent's ability to handle real-world customer support scenarios.
+
+Key benefits of this approach include:
+
+1. **Flexibility in solution paths**: The agent can take different valid approaches to solve the same problem
+2. **Focus on outcomes**: Evaluation is based on what the agent accomplishes, not how it gets there
+3. **Adaptability to new information**: The agent can adjust its strategy based on information discovered during the conversation
+4. **Realistic assessment**: The evaluation better reflects how agents would perform in real-world scenarios
+
+As you develop your own multi-turn agents, consider implementing this simulation-based evaluation approach to get a more accurate picture of their performance and to identify specific areas for improvement.
+
+For the full notebook, check it out on: [GitHub](https://github.com/langwatch/cookbooks/blob/main/notebooks/multi-turn-agents.ipynb).

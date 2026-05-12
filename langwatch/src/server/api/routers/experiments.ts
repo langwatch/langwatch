@@ -1,8 +1,4 @@
-import type {
-  AggregationsAggregate,
-  QueryDslBoolQuery,
-  SearchResponse,
-} from "@elastic/elasticsearch/lib/api/types";
+import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
 import { generate } from "@langwatch/ksuid";
 import {
   EvaluationExecutionMode,
@@ -11,6 +7,7 @@ import {
 } from "@prisma/client";
 import type { JsonValue } from "@prisma/client/runtime/library";
 import { TRPCError } from "@trpc/server";
+import { DomainError } from "../../app-layer/domain-error";
 import type { Node } from "@xyflow/react";
 import { nanoid } from "nanoid";
 import { z } from "zod";
@@ -27,14 +24,18 @@ import {
   workflowJsonSchema,
 } from "../../../optimization_studio/types/dsl";
 import { slugify } from "../../../utils/slugify";
+import { coerceMonitorMappings } from "../../tracer/tracesMapping";
+import { getClickHouseClientForProject } from "../../clickhouse/clickhouseClient";
 import { DatasetService } from "../../datasets/dataset.service";
 import { prisma } from "../../db";
 import {
   BATCH_EVALUATION_INDEX,
-  batchEvaluationId,
-  DSPY_STEPS_INDEX,
   esClient,
 } from "../../elasticsearch";
+import { getApp } from "../../app-layer/app";
+import { DspyStepNotFoundError } from "../../app-layer/dspy-steps/errors";
+import { ExperimentRunService } from "../../evaluations-v3/services/experiment-run.service";
+import { getVersionMap } from "../../evaluations-v3/services/getVersionMap";
 import type {
   DSPyRunsSummary,
   DSPyStep,
@@ -55,6 +56,20 @@ import { enforceLicenseLimit } from "../../license-enforcement";
 
 type TRPCContext = ReturnType<typeof createInnerTRPCContext>;
 
+/** Maps experiment domain errors to TRPCError using kind discriminant. */
+const mapExperimentError = (error: unknown): never => {
+  if (
+    error instanceof DomainError &&
+    error.kind === "experiment_not_found"
+  ) {
+    throw new TRPCError({ code: "NOT_FOUND", message: error.message });
+  }
+  throw error;
+};
+
+/** Experiment service from app dependency container. */
+const experimentService = () => getApp().experiments;
+
 export const experimentsRouter = createTRPCRouter({
   saveExperiment: protectedProcedure
     .input(
@@ -68,6 +83,8 @@ export const experimentsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("workflows:create"))
     .mutation(async ({ ctx, input }) => {
+      const experiments = experimentService();
+
       // Enforce experiment limit only when creating new experiments
       if (!input.experimentId) {
         await enforceLicenseLimit(ctx, input.projectId, "experiments");
@@ -75,8 +92,15 @@ export const experimentsRouter = createTRPCRouter({
 
       let workflowId = input.dsl.workflow_id;
       const name =
-        input.workbenchState.name ?? (await findNextDraftName(input.projectId));
-      const slug = slugify(name);
+        input.workbenchState.name ??
+        (await experiments.findNextDraftName({
+          projectId: input.projectId,
+        }));
+      const slug = await experiments.generateUniqueSlug({
+        baseSlug: slugify(name),
+        projectId: input.projectId,
+        excludeExperimentId: input.experimentId,
+      });
 
       if (input.experimentId) {
         const currentExperiment = await prisma.experiment.findUnique({
@@ -167,25 +191,30 @@ export const experimentsRouter = createTRPCRouter({
       });
 
       const experimentId = input.experimentId ?? `experiment_${nanoid()}`;
-      const experimentData = {
-        name,
-        slug,
-        projectId: input.projectId,
-        type: ExperimentType.BATCH_EVALUATION_V2,
-        workflowId,
-        workbenchState: input.workbenchState,
-      };
 
-      await prisma.experiment.upsert({
-        where: {
-          id: experimentId,
-          projectId: input.projectId,
+      await experiments.saveWithSlugRetry({
+        initialSlug: slug,
+        execute: (s) => {
+          const data = {
+            name,
+            slug: s,
+            projectId: input.projectId,
+            type: ExperimentType.BATCH_EVALUATION_V2,
+            workflowId,
+            workbenchState: input.workbenchState,
+          };
+          return prisma.experiment.upsert({
+            where: { id: experimentId, projectId: input.projectId },
+            update: data,
+            create: { ...data, id: experimentId },
+          });
         },
-        update: experimentData,
-        create: {
-          ...experimentData,
-          id: experimentId,
-        },
+        regenerateSlug: () =>
+          experiments.generateUniqueSlug({
+            baseSlug: slugify(name),
+            projectId: input.projectId,
+            excludeExperimentId: input.experimentId,
+          }),
       });
 
       // For some reason, prisma upsert sometimes return not an experiment but {count: 0}, so we need to refetch it
@@ -216,6 +245,7 @@ export const experimentsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("workflows:create"))
     .mutation(async ({ ctx, input }) => {
+      const experiments = experimentService();
       const experimentId =
         input.experimentId ?? generate(KSUID_RESOURCES.EXPERIMENT).toString();
 
@@ -231,41 +261,49 @@ export const experimentsRouter = createTRPCRouter({
         await enforceLicenseLimit(ctx, input.projectId, "experiments");
       }
 
-      // For new experiments, use the ID as the slug (guaranteed unique)
+      // For new experiments, deduplicate the slug to avoid constraint violations
       // For existing experiments, keep the same slug to avoid breaking URLs
       const name =
-        input.state.name || (await findNextDraftName(input.projectId));
+        input.state.name ||
+        (await experiments.findNextDraftName({
+          projectId: input.projectId,
+        }));
 
+      const rawSlug = input.state.experimentSlug ?? experimentId.slice(-8);
       let slug: string;
       if (isNewExperiment) {
-        // New experiment: prefer the slug from state (set by frontend redirect),
-        // otherwise use last 8 chars of the ID for a shorter, cleaner URL
-        slug = input.state.experimentSlug ?? experimentId.slice(-8);
+        slug = await experiments.generateUniqueSlug({
+          baseSlug: rawSlug,
+          projectId: input.projectId,
+        });
       } else {
-        // Existing experiment: keep the same slug to avoid breaking URLs
         slug = existing.slug;
       }
 
       // Convert to plain JSON for Prisma storage
       const workbenchStateJson = JSON.parse(JSON.stringify(input.state));
-      const experimentData = {
-        name,
-        slug,
-        projectId: input.projectId,
-        type: ExperimentType.EVALUATIONS_V3,
-        workbenchState: workbenchStateJson,
-      };
 
-      await prisma.experiment.upsert({
-        where: {
-          id: experimentId,
-          projectId: input.projectId,
+      await experiments.saveWithSlugRetry({
+        initialSlug: slug,
+        execute: (s) => {
+          const data = {
+            name,
+            slug: s,
+            projectId: input.projectId,
+            type: ExperimentType.EVALUATIONS_V3,
+            workbenchState: workbenchStateJson,
+          };
+          return prisma.experiment.upsert({
+            where: { id: experimentId, projectId: input.projectId },
+            update: data,
+            create: { ...data, id: experimentId },
+          });
         },
-        update: experimentData,
-        create: {
-          ...experimentData,
-          id: experimentId,
-        },
+        regenerateSlug: () =>
+          experiments.generateUniqueSlug({
+            baseSlug: rawSlug,
+            projectId: input.projectId,
+          }),
       });
 
       const updatedExperiment = await prisma.experiment.findUnique({
@@ -294,10 +332,12 @@ export const experimentsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("workflows:view"))
     .query(async ({ input }) => {
-      const experiment = await getExperimentBySlug(
-        input.projectId,
-        input.experimentSlug,
-      );
+      const experiment = await experimentService()
+        .getBySlug({
+          projectId: input.projectId,
+          slug: input.experimentSlug,
+        })
+        .catch(mapExperimentError);
 
       if (experiment.type !== ExperimentType.EVALUATIONS_V3) {
         throw new TRPCError({
@@ -372,7 +412,7 @@ export const experimentsRouter = createTRPCRouter({
             param.value,
           ]),
         ) as Record<string, any>,
-        mappings: workbenchState.realTimeTraceMappings ?? {},
+        mappings: coerceMonitorMappings(workbenchState.realTimeTraceMappings),
         sample: workbenchState.realTimeExecution?.sample ?? 1,
         enabled: true,
         executionMode: EvaluationExecutionMode.ON_MESSAGE,
@@ -406,28 +446,19 @@ export const experimentsRouter = createTRPCRouter({
     .use(checkProjectPermission("workflows:view"))
     .query(async ({ input }) => {
       if (input.experimentId) {
-        const experiment = await prisma.experiment.findFirst({
-          where: {
-            id: input.experimentId,
+        return await experimentService()
+          .getById({
             projectId: input.projectId,
-          },
-        });
-
-        if (!experiment) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Experiment not found",
-          });
-        }
-
-        return experiment;
+            id: input.experimentId,
+          })
+          .catch(mapExperimentError);
       } else if (input.experimentSlug) {
-        const experiment = await getExperimentBySlug(
-          input.projectId,
-          input.experimentSlug,
-        );
-
-        return experiment;
+        return await experimentService()
+          .getBySlug({
+            projectId: input.projectId,
+            slug: input.experimentSlug,
+          })
+          .catch(mapExperimentError);
       }
 
       throw new TRPCError({
@@ -446,10 +477,12 @@ export const experimentsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("workflows:view"))
     .query(async ({ input }) => {
-      const experiment = await getExperimentBySlug(
-        input.projectId,
-        input.experimentSlug,
-      );
+      const experiment = await experimentService()
+        .getBySlug({
+          projectId: input.projectId,
+          slug: input.experimentSlug,
+        })
+        .catch(mapExperimentError);
 
       const workflow = experiment.workflowId
         ? await prisma.workflow.findUnique({
@@ -473,13 +506,9 @@ export const experimentsRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string() }))
     .use(checkProjectPermission("workflows:view"))
     .query(async ({ input }) => {
-      const experiments = await prisma.experiment.findMany({
-        where: {
-          projectId: input.projectId,
-        },
+      return await experimentService().getAll({
+        projectId: input.projectId,
       });
-
-      return experiments;
     }),
 
   getAllForEvaluationsList: protectedProcedure
@@ -561,16 +590,17 @@ export const experimentsRouter = createTRPCRouter({
         ).map((dataset) => [dataset.id, dataset]),
       );
 
-      const runsByExperimentId = await getExperimentBatchEvaluationRuns(
-        input.projectId,
-        experiments.map((experiment) => experiment.id),
-      );
+      const experimentRunService = ExperimentRunService.create(prisma);
+      const runsByExperimentId = await experimentRunService.listRuns({
+        projectId: input.projectId,
+        experimentIds: experiments.map((experiment) => experiment.id),
+      });
 
       const experimentsWithDatasetsAndRuns = experiments
         .map((experiment) => {
           const runs = runsByExperimentId[experiment.id] ?? [];
           const latestRun = runs.sort(
-            (a, b) => b.timestamps.created_at - a.timestamps.created_at,
+            (a, b) => b.timestamps.createdAt - a.timestamps.createdAt,
           )[0];
           const primaryMetric = latestRun
             ? Object.values(latestRun?.summary.evaluations)[0]
@@ -593,7 +623,7 @@ export const experimentsRouter = createTRPCRouter({
                 getDatasetId(experiment.workflow?.currentVersion?.dsl) ?? ""
               ],
             updatedAt:
-              latestRun?.timestamps.created_at ??
+              latestRun?.timestamps.createdAt ??
               experiment.updatedAt.getTime(),
           };
         })
@@ -609,108 +639,60 @@ export const experimentsRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string(), experimentSlug: z.string() }))
     .use(checkProjectPermission("workflows:view"))
     .query(async ({ input }) => {
-      const experiment = await getExperimentBySlug(
-        input.projectId,
-        input.experimentSlug,
-      );
-      const client = await esClient({ projectId: input.projectId });
+      const experiment = await experimentService()
+        .getBySlug({
+          projectId: input.projectId,
+          slug: input.experimentSlug,
+        })
+        .catch(mapExperimentError);
 
-      const dspySteps = await client.search<DSPyStep>({
-        index: DSPY_STEPS_INDEX.alias,
-        size: 10_000,
-        body: {
-          query: {
-            bool: {
-              must: [
-                { term: { experiment_id: experiment.id } },
-                { term: { project_id: input.projectId } },
-              ] as QueryDslBoolQuery["must"],
-            } as QueryDslBoolQuery,
-          },
-          _source: [
-            "run_id",
-            "index",
-            "score",
-            "label",
-            "workflow_version_id",
-            "optimizer.name",
-            "llm_calls.completion_tokens",
-            "llm_calls.prompt_tokens",
-            "llm_calls.cost",
-            "timestamps.created_at",
-          ],
-          aggs: {
-            runs: {
-              terms: { field: "run_id", size: 1_000 },
-            },
-          },
-        },
+      const steps = await getApp().dspySteps.steps.getStepsByExperiment({
+        tenantId: input.projectId,
+        experimentId: experiment.id,
       });
 
-      const versionIds = dspySteps.hits.hits
-        .map((hit) => hit._source?.workflow_version_id)
+      const versionIds = steps
+        .map((s) => s.workflowVersionId)
         .filter((id): id is string => Boolean(id));
 
-      const versionsMap = await getVersionMap(input.projectId, versionIds);
+      const versionsMap = await getVersionMap({ prisma, projectId: input.projectId, versionIds });
 
-      const result: DSPyRunsSummary[] = (
-        dspySteps.aggregations?.runs as any
-      ).buckets
-        .map((bucket: any) => {
-          const steps = dspySteps.hits.hits.filter(
-            (hit) => hit._source?.run_id === bucket.key,
-          );
-          const versionId = steps.filter(
-            (step) => step._source?.workflow_version_id,
-          )[0]?._source?.workflow_version_id;
+      // Group by runId
+      const runMap = new Map<string, typeof steps>();
+      for (const step of steps) {
+        let group = runMap.get(step.runId);
+        if (!group) {
+          group = [];
+          runMap.set(step.runId, group);
+        }
+        group.push(step);
+      }
 
+      const result: DSPyRunsSummary[] = Array.from(runMap.entries())
+        .map(([runId, runSteps]) => {
+          const versionId = runSteps.find((s) => s.workflowVersionId)?.workflowVersionId;
           return {
-            runId: bucket.key,
-            workflow_version: versionId ? versionsMap[versionId] : null,
-            steps: steps
-              .map((hit) => {
-                const source = hit._source!;
-                const llmCalls = source.llm_calls ?? [];
-
-                return {
-                  run_id: source.run_id,
-                  index: source.index,
-                  score: source.score,
-                  label: source.label,
-                  optimizer: {
-                    name: source.optimizer.name,
-                  },
-                  llm_calls_summary: {
-                    total: llmCalls.length,
-                    total_tokens: llmCalls.reduce(
-                      (acc, curr) =>
-                        acc +
-                        (curr.completion_tokens ?? 0) +
-                        (curr.prompt_tokens ?? 0),
-                      0,
-                    ),
-                    total_cost: llmCalls.reduce(
-                      (acc, curr) => acc + (curr?.cost ?? 0),
-                      0,
-                    ),
-                  },
-                  timestamps: {
-                    created_at: source.timestamps.created_at,
-                  },
-                } as DSPyStepSummary;
-              })
-              .sort(
-                (a, b) => a.timestamps.created_at - b.timestamps.created_at,
-              ),
-            created_at: Math.min(
-              ...steps.map((hit) => hit._source?.timestamps.created_at ?? 0),
-            ),
+            runId,
+            workflow_version: (versionId ? versionsMap[versionId] : undefined) as DSPyRunsSummary["workflow_version"],
+            steps: runSteps
+              .map((s) => ({
+                run_id: s.runId,
+                index: s.stepIndex,
+                score: s.score,
+                label: s.label,
+                optimizer: { name: s.optimizerName },
+                llm_calls_summary: {
+                  total: s.llmCallsTotal,
+                  total_tokens: s.llmCallsTotalTokens,
+                  total_cost: s.llmCallsTotalCost,
+                },
+                timestamps: { created_at: s.createdAt },
+              } as DSPyStepSummary))
+              .sort((a, b) => a.timestamps.created_at - b.timestamps.created_at),
+            created_at: Math.min(...runSteps.map((s) => s.createdAt)),
           };
         })
-        .sort(
-          (a: DSPyRunsSummary, b: DSPyRunsSummary) =>
-            b.created_at - a.created_at,
-        );
+        .sort((a, b) => b.created_at - a.created_at);
 
       return result;
     }),
@@ -726,53 +708,72 @@ export const experimentsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("workflows:view"))
     .query(async ({ input }) => {
-      const experiment = await getExperimentBySlug(
-        input.projectId,
-        input.experimentSlug,
-      );
+      const experiment = await experimentService()
+        .getBySlug({
+          projectId: input.projectId,
+          slug: input.experimentSlug,
+        })
+        .catch(mapExperimentError);
 
-      const client = await esClient({ projectId: input.projectId });
-      const dspyStep = await client.search<DSPyStep>({
-        index: DSPY_STEPS_INDEX.alias,
-        size: 10_000,
-        body: {
-          query: {
-            bool: {
-              must: [
-                { term: { experiment_id: experiment.id } },
-                { term: { project_id: input.projectId } },
-                { term: { run_id: input.runId } },
-                { term: { index: input.index } },
-              ] as QueryDslBoolQuery["must"],
-            } as QueryDslBoolQuery,
-          },
-        },
-      });
-
-      const result = dspyStep.hits.hits[0];
-      if (!result?._source) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "DSPy step not found",
+      try {
+        const step = await getApp().dspySteps.steps.getStep({
+          tenantId: input.projectId,
+          experimentId: experiment.id,
+          runId: input.runId,
+          stepIndex: input.index,
         });
-      }
 
-      return result._source;
+        // Map camelCase domain type to snake_case DSPyStep for frontend
+        const result: DSPyStep = {
+          project_id: step.tenantId,
+          run_id: step.runId,
+          workflow_version_id: step.workflowVersionId,
+          experiment_id: step.experimentId,
+          index: step.stepIndex,
+          score: step.score,
+          label: step.label,
+          optimizer: {
+            name: step.optimizerName,
+            parameters: step.optimizerParameters as Record<string, any>,
+          },
+          predictors: step.predictors as DSPyStep["predictors"],
+          examples: step.examples as DSPyStep["examples"],
+          llm_calls: step.llmCalls as DSPyStep["llm_calls"],
+          timestamps: {
+            created_at: step.createdAt,
+            inserted_at: step.insertedAt,
+            updated_at: step.updatedAt,
+          },
+        };
+
+        return result;
+      } catch (error) {
+        if (error instanceof DspyStepNotFoundError) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "DSPy step not found",
+          });
+        }
+        throw error;
+      }
     }),
 
   getExperimentBatchEvaluationRuns: protectedProcedure
     .input(z.object({ projectId: z.string(), experimentId: z.string() }))
     .use(checkProjectPermission("workflows:view"))
     .query(async ({ input }) => {
-      const experiment = await getExperimentById(
-        input.projectId,
-        input.experimentId,
-      );
+      const experiment = await experimentService()
+        .getById({
+          projectId: input.projectId,
+          id: input.experimentId,
+        })
+        .catch(mapExperimentError);
 
-      const runsByExperimentId = await getExperimentBatchEvaluationRuns(
-        input.projectId,
-        [experiment.id],
-      );
+      const experimentRunService = ExperimentRunService.create(prisma);
+      const runsByExperimentId = await experimentRunService.listRuns({
+        projectId: input.projectId,
+        experimentIds: [experiment.id],
+      });
 
       return { runs: runsByExperimentId[experiment.id] ?? [] };
     }),
@@ -787,49 +788,19 @@ export const experimentsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("workflows:view"))
     .query(async ({ input }) => {
-      const experiment = await getExperimentById(
-        input.projectId,
-        input.experimentId,
-      );
+      const experiment = await experimentService()
+        .getById({
+          projectId: input.projectId,
+          id: input.experimentId,
+        })
+        .catch(mapExperimentError);
 
-      const id = batchEvaluationId({
+      const experimentRunService = ExperimentRunService.create(prisma);
+      return experimentRunService.getRun({
         projectId: input.projectId,
         experimentId: experiment.id,
         runId: input.runId,
       });
-
-      const client = await esClient({ projectId: input.projectId });
-      let batchEvaluationRun: SearchResponse<
-        ESBatchEvaluation,
-        Record<string, AggregationsAggregate>
-      > | null = null;
-      let attempts = 0;
-      while (attempts < 3) {
-        batchEvaluationRun = await client.search<ESBatchEvaluation>({
-          index: BATCH_EVALUATION_INDEX.alias,
-          body: {
-            query: {
-              term: { _id: id },
-            },
-          },
-          size: 1,
-        });
-        await new Promise((resolve) => setTimeout(resolve, 1_000));
-        attempts++;
-        if (batchEvaluationRun.hits.hits.length > 0) {
-          break;
-        }
-      }
-
-      const result = batchEvaluationRun?.hits.hits[0]?._source;
-      if (!result) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Batch evaluation run not found",
-        });
-      }
-
-      return result;
     }),
 
   deleteExperiment: protectedProcedure
@@ -856,7 +827,7 @@ export const experimentsRouter = createTRPCRouter({
         });
       }
 
-      // Perform the deletion in a transaction to ensure consistency
+      // Perform the Prisma deletion in a transaction to ensure consistency
       await prisma.$transaction(async (tx) => {
         // Delete workflow versions if a workflow exists
         if (experiment.workflowId) {
@@ -924,9 +895,11 @@ export const experimentsRouter = createTRPCRouter({
             projectId: input.projectId,
           },
         });
+      });
 
-        // At last, delete experiment-related data in Elasticsearch
-        const client = await esClient({ projectId: input.projectId });
+      // Best-effort cleanup of ES and CH data outside the transaction
+      // (these are not atomic with Prisma and should not cause rollback)
+      const esCleanup = esClient({ projectId: input.projectId }).then(async (client) => {
         await client.deleteByQuery({
           index: BATCH_EVALUATION_INDEX.alias,
           body: {
@@ -940,22 +913,40 @@ export const experimentsRouter = createTRPCRouter({
             },
           },
         });
-
-        // And delete DSPy steps in ES if applicable
-        await client.deleteByQuery({
-          index: DSPY_STEPS_INDEX.alias,
-          body: {
-            query: {
-              bool: {
-                must: [
-                  { term: { experiment_id: input.experimentId } },
-                  { term: { project_id: input.projectId } },
-                ] as QueryDslBoolQuery["must"],
-              } as QueryDslBoolQuery,
-            },
-          },
-        });
+      }).catch((err) => {
+        console.error("Best-effort ES cleanup failed for experiment deletion", { experimentId: input.experimentId, err });
       });
+
+      const chCleanup = Promise.resolve().then(async () => {
+        const chClient = await getClickHouseClientForProject(input.projectId);
+        if (!chClient) return;
+        await Promise.all([
+          chClient.command({
+            query: `DELETE FROM experiment_runs WHERE TenantId = {tenantId:String} AND ExperimentId = {experimentId:String}`,
+            query_params: {
+              tenantId: input.projectId,
+              experimentId: input.experimentId,
+            },
+          }),
+          chClient.command({
+            query: `DELETE FROM experiment_run_items WHERE TenantId = {tenantId:String} AND ExperimentId = {experimentId:String}`,
+            query_params: {
+              tenantId: input.projectId,
+              experimentId: input.experimentId,
+            },
+          }),
+        ]);
+      }).catch((err) => {
+        console.error("Best-effort CH cleanup failed for experiment deletion", { experimentId: input.experimentId, err });
+      });
+
+      const dspyCleanup = getApp().dspySteps.steps
+        .deleteByExperiment({ tenantId: input.projectId, experimentId: input.experimentId })
+        .catch((err) => {
+          console.error("Best-effort DSPy step cleanup failed for experiment deletion", { experimentId: input.experimentId, err });
+        });
+
+      await Promise.allSettled([esCleanup, chCleanup, dspyCleanup]);
 
       return { success: true };
     }),
@@ -1036,6 +1027,8 @@ export const experimentsRouter = createTRPCRouter({
           name: experiment.workflow.name,
           icon: experiment.workflow.icon,
           description: experiment.workflow.description,
+          isEvaluator: experiment.workflow.isEvaluator,
+          isComponent: experiment.workflow.isComponent,
           latestVersion: experiment.workflow.latestVersion,
         },
         targetProjectId: input.projectId,
@@ -1072,48 +1065,34 @@ export const experimentsRouter = createTRPCRouter({
 
       // Create new experiment with unique slug
       const experimentName = experiment.name ?? experiment.slug;
-      const baseSlug = slugify(experimentName);
+      const experiments = experimentService();
+      const initialSlug = await experiments.generateUniqueSlug({
+        baseSlug: slugify(experimentName),
+        projectId: input.projectId,
+      });
 
-      // Find a unique slug by appending -2, -3, etc. if needed
-      const MAX_ATTEMPTS = 100;
-      let newSlug = baseSlug;
-      let index = 2;
-      let attempts = 0;
-
-      while (attempts < MAX_ATTEMPTS) {
-        const existingExperiment = await ctx.prisma.experiment.findFirst({
-          where: {
-            projectId: input.projectId,
-            slug: newSlug,
-          },
-        });
-
-        if (!existingExperiment) {
-          break;
-        }
-
-        newSlug = `${baseSlug}-${index}`;
-        index++;
-        attempts++;
-      }
-
-      // Fallback to random suffix if we hit the limit (should never happen in practice)
-      if (attempts >= MAX_ATTEMPTS) {
-        newSlug = `${baseSlug}-${nanoid(8)}`;
-      }
-
-      const newExperiment = await ctx.prisma.experiment.create({
-        data: {
-          id: `experiment_${nanoid()}`,
-          name: experimentName,
-          slug: newSlug,
-          projectId: input.projectId,
-          type: experiment.type,
-          workflowId,
-          ...(experiment.workbenchState && {
-            workbenchState: experiment.workbenchState as Prisma.InputJsonValue,
+      const { result: newExperiment } = await experiments.saveWithSlugRetry({
+        initialSlug,
+        execute: (s) =>
+          ctx.prisma.experiment.create({
+            data: {
+              id: `experiment_${nanoid()}`,
+              name: experimentName,
+              slug: s,
+              projectId: input.projectId,
+              type: experiment.type,
+              workflowId,
+              ...(experiment.workbenchState && {
+                workbenchState:
+                  experiment.workbenchState as Prisma.InputJsonValue,
+              }),
+            },
           }),
-        },
+        regenerateSlug: () =>
+          experiments.generateUniqueSlug({
+            baseSlug: slugify(experimentName),
+            projectId: input.projectId,
+          }),
       });
 
       return { experiment: newExperiment, workflow: newWorkflow };
@@ -1126,323 +1105,11 @@ export const experimentsRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string() }))
     .use(checkProjectPermission("workflows:view"))
     .query(async ({ input }) => {
-      const experiment = await prisma.experiment.findFirst({
-        where: { projectId: input.projectId },
-        orderBy: { createdAt: "desc" },
+      return await experimentService().getLatest({
+        projectId: input.projectId,
       });
-
-      return experiment;
     }),
 });
-
-const getExperimentBySlug = async (
-  projectId: string,
-  experimentSlug: string,
-) => {
-  const experiment = await prisma.experiment.findFirst({
-    where: {
-      projectId: projectId,
-      slug: experimentSlug,
-    },
-  });
-
-  if (!experiment) {
-    throw new TRPCError({
-      code: "NOT_FOUND",
-      message: "Experiment not found",
-    });
-  }
-
-  return experiment;
-};
-
-const getExperimentById = async (projectId: string, experimentId: string) => {
-  const experiment = await prisma.experiment.findFirst({
-    where: {
-      projectId: projectId,
-      id: experimentId,
-    },
-  });
-
-  if (!experiment) {
-    throw new TRPCError({
-      code: "NOT_FOUND",
-      message: "Experiment not found",
-    });
-  }
-
-  return experiment;
-};
-
-const getVersionMap = async (projectId: string, versionIds: string[]) => {
-  const versions = await prisma.workflowVersion.findMany({
-    where: {
-      projectId: projectId,
-      id: {
-        in: versionIds,
-      },
-    },
-    select: {
-      id: true,
-      version: true,
-      commitMessage: true,
-      author: {
-        select: {
-          name: true,
-          image: true,
-        },
-      },
-    },
-  });
-
-  const versionsMap = versions.reduce(
-    (acc, version) => {
-      acc[version.id] = version;
-      return acc;
-    },
-    {} as Record<string, (typeof versions)[number]>,
-  );
-
-  return versionsMap;
-};
-
-const findNextDraftName = async (projectId: string) => {
-  const experiments = await prisma.experiment.findMany({
-    select: {
-      name: true,
-      slug: true,
-    },
-    where: {
-      projectId: projectId,
-    },
-  });
-
-  const draftCount = experiments.filter((draft) =>
-    draft.name?.startsWith("Draft"),
-  ).length;
-
-  const slugs = new Set(experiments.map((experiment) => experiment.slug));
-
-  let draftName;
-  let index = draftCount + 1;
-  while (true) {
-    draftName = `Draft Evaluation (${index})`;
-    if (!slugs.has(slugify(draftName))) {
-      break;
-    }
-    index++;
-  }
-
-  return draftName;
-};
-
-const getExperimentBatchEvaluationRuns = async (
-  projectId: string,
-  experimentIds: string[],
-) => {
-  type ESBatchEvaluationRunInfo = Pick<
-    ESBatchEvaluation,
-    | "experiment_id"
-    | "run_id"
-    | "workflow_version_id"
-    | "timestamps"
-    | "progress"
-    | "total"
-  >;
-
-  const client = await esClient({ projectId });
-  const batchEvaluationRuns = await client.search<ESBatchEvaluationRunInfo>({
-    index: BATCH_EVALUATION_INDEX.alias,
-    size: 10_000,
-    body: {
-      _source: [
-        "experiment_id",
-        "run_id",
-        "workflow_version_id",
-        "timestamps.created_at",
-        "timestamps.updated_at",
-        "timestamps.finished_at",
-        "timestamps.stopped_at",
-        "progress",
-        "total",
-      ],
-      query: {
-        bool: {
-          must: [
-            { terms: { experiment_id: experimentIds } },
-            { term: { project_id: projectId } },
-          ] as QueryDslBoolQuery["must"],
-        } as QueryDslBoolQuery,
-      },
-      sort: [{ "timestamps.created_at": "desc" }],
-      aggs: {
-        runs: {
-          terms: { field: "run_id", size: 1_000 },
-          aggs: {
-            dataset_cost: {
-              sum: {
-                field: "dataset.cost",
-              },
-            },
-            evaluations_cost: {
-              nested: {
-                path: "evaluations",
-              },
-              aggs: {
-                cost: {
-                  sum: {
-                    field: "evaluations.cost",
-                  },
-                },
-                average_cost: {
-                  avg: {
-                    field: "evaluations.cost",
-                  },
-                },
-                average_duration: {
-                  avg: {
-                    field: "evaluations.duration",
-                  },
-                },
-              },
-            },
-            dataset_average_cost: {
-              avg: {
-                field: "dataset.cost",
-              },
-            },
-            dataset_average_duration: {
-              avg: {
-                field: "dataset.duration",
-              },
-            },
-            evaluations: {
-              nested: {
-                path: "evaluations",
-              },
-              aggs: {
-                child: {
-                  terms: { field: "evaluations.evaluator", size: 100 },
-                  aggs: {
-                    name: {
-                      terms: { field: "evaluations.name", size: 100 },
-                    },
-                    processed_evaluations: {
-                      filter: {
-                        term: { "evaluations.status": "processed" },
-                      },
-                      aggs: {
-                        average_score: {
-                          avg: {
-                            field: "evaluations.score",
-                          },
-                        },
-                        has_passed: {
-                          filter: {
-                            bool: {
-                              should: [
-                                { term: { "evaluations.passed": true } },
-                                { term: { "evaluations.passed": false } },
-                              ],
-                            },
-                          },
-                        },
-                        average_passed: {
-                          avg: {
-                            field: "evaluations.passed",
-                          },
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-    },
-  });
-
-  const versionIds = batchEvaluationRuns.hits.hits
-    .map((hit) => hit._source?.workflow_version_id)
-    .filter((id): id is string => Boolean(id));
-
-  const versionsMap = await getVersionMap(projectId, versionIds);
-
-  const runs = batchEvaluationRuns.hits.hits.map((hit) => {
-    const source = hit._source!;
-
-    const runAgg = (batchEvaluationRuns.aggregations?.runs as any).buckets.find(
-      (bucket: any) => bucket.key === source.run_id,
-    );
-
-    return {
-      experiment_id: source.experiment_id,
-      run_id: source.run_id,
-      workflow_version: source.workflow_version_id
-        ? versionsMap[source.workflow_version_id]
-        : null,
-      timestamps: source.timestamps,
-      progress: source.progress,
-      total: source.total,
-      summary: {
-        dataset_cost: runAgg?.dataset_cost.value as number | undefined,
-        evaluations_cost: runAgg?.evaluations_cost.cost.value as
-          | number
-          | undefined,
-        dataset_average_cost: runAgg?.dataset_average_cost.value as
-          | number
-          | undefined,
-        dataset_average_duration: runAgg?.dataset_average_duration.value as
-          | number
-          | undefined,
-        evaluations_average_cost: runAgg?.evaluations_cost.average_cost.value as
-          | number
-          | undefined,
-        evaluations_average_duration: runAgg?.evaluations_cost.average_duration
-          .value as number | undefined,
-        evaluations: Object.fromEntries(
-          runAgg?.evaluations.child.buckets.map((bucket: any) => {
-            return [
-              bucket.key,
-              {
-                name: bucket.name.buckets[0]?.key ?? bucket.key,
-                average_score: bucket.processed_evaluations.average_score.value,
-                ...(bucket.processed_evaluations.has_passed.doc_count > 0
-                  ? {
-                      average_passed:
-                        bucket.processed_evaluations.average_passed.value,
-                    }
-                  : {}),
-              },
-            ];
-          }),
-        ) as Record<
-          string,
-          {
-            name: string;
-            average_score: number;
-            average_passed?: number;
-          }
-        >,
-      },
-    };
-  });
-
-  const runsByExperimentId = runs.reduce(
-    (acc, run) => {
-      if (!(run.experiment_id in acc)) {
-        acc[run.experiment_id] = [];
-      }
-      acc[run.experiment_id]?.push(run);
-      return acc;
-    },
-    {} as Record<string, (typeof runs)[number][]>,
-  );
-
-  return runsByExperimentId;
-};
 
 /**
  * Copies an EVALUATIONS_V3 experiment to another project.
@@ -1520,45 +1187,30 @@ const copyEvaluationsV3Experiment = async ({
 
   // Generate unique slug for the new experiment
   const experimentName = experiment.name ?? experiment.slug;
-  const baseSlug = slugify(experimentName);
+  const experiments = experimentService();
+  const initialSlug = await experiments.generateUniqueSlug({
+    baseSlug: slugify(experimentName),
+    projectId: targetProjectId,
+  });
 
-  const MAX_ATTEMPTS = 100;
-  let newSlug = baseSlug;
-  let index = 2;
-  let attempts = 0;
-
-  while (attempts < MAX_ATTEMPTS) {
-    const existingExperiment = await ctx.prisma.experiment.findFirst({
-      where: {
+  const { result: newExperiment } = await experiments.saveWithSlugRetry({
+    initialSlug,
+    execute: (s) =>
+      ctx.prisma.experiment.create({
+        data: {
+          id: generate("eval").toString(),
+          name: experimentName,
+          slug: s,
+          projectId: targetProjectId,
+          type: ExperimentType.EVALUATIONS_V3,
+          workbenchState: workbenchState as Prisma.InputJsonValue,
+        },
+      }),
+    regenerateSlug: () =>
+      experiments.generateUniqueSlug({
+        baseSlug: slugify(experimentName),
         projectId: targetProjectId,
-        slug: newSlug,
-      },
-    });
-
-    if (!existingExperiment) {
-      break;
-    }
-
-    newSlug = `${baseSlug}-${index}`;
-    index++;
-    attempts++;
-  }
-
-  // Fallback to random suffix if we hit the limit
-  if (attempts >= MAX_ATTEMPTS) {
-    newSlug = `${baseSlug}-${nanoid(8)}`;
-  }
-
-  // Create the new experiment
-  const newExperiment = await ctx.prisma.experiment.create({
-    data: {
-      id: generate("eval").toString(),
-      name: experimentName,
-      slug: newSlug,
-      projectId: targetProjectId,
-      type: ExperimentType.EVALUATIONS_V3,
-      workbenchState: workbenchState as Prisma.InputJsonValue,
-    },
+      }),
   });
 
   return { experiment: newExperiment, workflow: null };

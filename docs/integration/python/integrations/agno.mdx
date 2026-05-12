@@ -1,0 +1,62 @@
+---
+title: Agno Instrumentation
+sidebarTitle: Agno
+description: Instrument Agno agents with LangWatch’s Python SDK to send traces, analyze behaviors, and strengthen AI agent testing and evaluations.
+keywords: agno, openinference, langwatch, python, tracing, observability
+---
+
+<Tip>
+  **Quick setup?** Instead of following these steps manually, [copy a prompt](/skills/code-prompts#instrument-my-code) into your coding agent and it will set this up for you automatically.
+</Tip>
+
+LangWatch integrates with Agno through OpenInference instrumentation to capture traces from your Agno agents automatically.
+
+## Installation
+
+<CodeGroup>
+```bash pip
+pip install langwatch agno openai openinference-instrumentation-agno
+```
+
+```bash uv
+uv add langwatch agno openai openinference-instrumentation-agno
+```
+</CodeGroup>
+
+## Usage
+
+<Info>
+The LangWatch API key is configured by default via the `LANGWATCH_API_KEY` environment variable.
+</Info>
+
+Use the OpenInference instrumentation for Agno by passing `AgnoInstrumentor` to `langwatch.setup()`.
+
+```python
+import langwatch
+import os
+
+from agno.agent import Agent
+from agno.models.openai import OpenAIChat
+from openinference.instrumentation.agno import AgnoInstrumentor
+
+langwatch.setup(instrumentors=[AgnoInstrumentor()])
+
+# Create and configure your Agno agent
+agent = Agent(
+    name="A helpful AI Assistant",
+    model=OpenAIChat(id="gpt-5"),
+    tools=[],
+    instructions="You are a helpful AI Assistant.",
+    debug_mode=True,
+)
+
+agent.print_response("Tell me a joke.")
+```
+
+The `AgnoInstrumentor` automatically captures all Agno agent activity. All traces will be sent to your LangWatch dashboard without requiring manual OpenTelemetry configuration.
+
+## Related
+
+- [Capturing RAG](/integration/python/tutorials/capturing-rag) - Learn how to capture RAG data from retrievers and tools
+- [Capturing Metadata and Attributes](/integration/python/tutorials/capturing-metadata) - Add custom metadata and attributes to your traces and spans
+- [Capturing Evaluations & Guardrails](/integration/python/tutorials/capturing-evaluations-guardrails) - Log evaluations and implement guardrails in your Agno applications

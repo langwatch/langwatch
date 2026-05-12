@@ -1,27 +1,40 @@
 import { Popover as ChakraPopover, Portal } from "@chakra-ui/react";
 import * as React from "react";
 import { CloseButton } from "./close-button";
+import { OverlayDepthContext, useOverlayZIndex } from "~/hooks/useOverlayZIndex";
 
 interface PopoverContentProps extends ChakraPopover.ContentProps {
   portalled?: boolean;
   portalRef?: React.RefObject<HTMLElement>;
+  positionerProps?: ChakraPopover.PositionerProps;
 }
 
 export const PopoverContent = React.forwardRef<
   HTMLDivElement,
   PopoverContentProps
 >(function PopoverContent(props, ref) {
-  const { portalled = true, portalRef, ...rest } = props;
+  const { portalled = true, portalRef, positionerProps, ...rest } = props;
+  const { zIndex, depth } = useOverlayZIndex();
   return (
     <Portal disabled={!portalled} container={portalRef}>
-      <ChakraPopover.Positioner>
-        <ChakraPopover.Content
-          borderRadius="lg"
-          background="bg.panel/75"
-          backdropFilter="blur(8px)"
-          ref={ref}
-          {...rest}
-        />
+      <ChakraPopover.Positioner
+        {...positionerProps}
+        ref={(node: HTMLElement | null) => {
+          if (node) {
+            // Zag.js sets --z-index inline based on layer stack order, which
+            // can place popovers behind drawers. Force it higher. See #2390.
+            node.style.setProperty("z-index", zIndex, "important");
+          }
+        }}
+      >
+        <OverlayDepthContext.Provider value={depth}>
+          <ChakraPopover.Content
+            ref={ref}
+            borderRadius="lg"
+            background="bg.panel"
+            {...rest}
+          />
+        </OverlayDepthContext.Provider>
       </ChakraPopover.Positioner>
     </Portal>
   );
@@ -32,7 +45,11 @@ export const PopoverArrow = React.forwardRef<
   ChakraPopover.ArrowProps
 >(function PopoverArrow(props, ref) {
   return (
-    <ChakraPopover.Arrow {...props} ref={ref}>
+    <ChakraPopover.Arrow
+      {...props}
+      ref={ref}
+      css={{ "--arrow-size": "12px", "--arrow-background": "var(--popover-bg)" }}
+    >
       <ChakraPopover.ArrowTip />
     </ChakraPopover.Arrow>
   );
@@ -65,6 +82,7 @@ export const PopoverHeader = ChakraPopover.Header;
 export const PopoverRoot = ChakraPopover.Root;
 export const PopoverBody = ChakraPopover.Body;
 export const PopoverTrigger = ChakraPopover.Trigger;
+export const PopoverAnchor = ChakraPopover.Anchor;
 
 export const Popover = {
   Root: PopoverRoot,
@@ -78,4 +96,5 @@ export const Popover = {
   Body: PopoverBody,
   Trigger: PopoverTrigger,
   ArrowTip: PopoverArrowTip,
+  Anchor: PopoverAnchor,
 };

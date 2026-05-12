@@ -1,0 +1,20 @@
+# redis-external.yaml — Use an external Redis (ElastiCache, Memorystore, etc.).
+#
+# Prerequisites:
+#   kubectl create secret generic langwatch-redis -n <namespace> \
+#     --from-literal=connectionString="redis://:password@host:6379"
+#
+# Usage:
+#   helm install lw . \
+#     -f examples/overlays/size-prod.yaml \
+#     -f examples/overlays/access-ingress.yaml \
+#     -f examples/overlays/redis-external.yaml
+
+redis:
+  chartManaged: false
+  external:
+    architecture: standalone
+    connectionString:
+      secretKeyRef:
+        name: "langwatch-redis"
+        key: "connectionString"

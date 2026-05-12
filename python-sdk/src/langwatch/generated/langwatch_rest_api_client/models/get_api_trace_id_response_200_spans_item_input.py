@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar, Union
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -19,20 +21,20 @@ T = TypeVar("T", bound="GetApiTraceIdResponse200SpansItemInput")
 class GetApiTraceIdResponse200SpansItemInput:
     """
     Attributes:
-        type_ (Union[Unset, str]):  Example: chat_messages.
-        value (Union[Unset, list['GetApiTraceIdResponse200SpansItemInputValueItem']]):  Example: [{'role': 'system',
-            'content': 'You are a helpful assistant that only reply in short tweet-like responses, using lots of emojis.'},
-            {'role': 'user', 'content': 'hi'}].
+        type_ (str | Unset):  Example: chat_messages.
+        value (list[GetApiTraceIdResponse200SpansItemInputValueItem] | Unset):  Example: [{'role': 'system', 'content':
+            'You are a helpful assistant that only reply in short tweet-like responses, using lots of emojis.'}, {'role':
+            'user', 'content': 'hi'}].
     """
 
-    type_: Union[Unset, str] = UNSET
-    value: Union[Unset, list["GetApiTraceIdResponse200SpansItemInputValueItem"]] = UNSET
+    type_: str | Unset = UNSET
+    value: list[GetApiTraceIdResponse200SpansItemInputValueItem] | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         type_ = self.type_
 
-        value: Union[Unset, list[dict[str, Any]]] = UNSET
+        value: list[dict[str, Any]] | Unset = UNSET
         if not isinstance(self.value, Unset):
             value = []
             for value_item_data in self.value:
@@ -58,12 +60,14 @@ class GetApiTraceIdResponse200SpansItemInput:
         d = dict(src_dict)
         type_ = d.pop("type", UNSET)
 
-        value = []
         _value = d.pop("value", UNSET)
-        for value_item_data in _value or []:
-            value_item = GetApiTraceIdResponse200SpansItemInputValueItem.from_dict(value_item_data)
+        value: list[GetApiTraceIdResponse200SpansItemInputValueItem] | Unset = UNSET
+        if _value is not UNSET:
+            value = []
+            for value_item_data in _value:
+                value_item = GetApiTraceIdResponse200SpansItemInputValueItem.from_dict(value_item_data)
 
-            value.append(value_item)
+                value.append(value_item)
 
         get_api_trace_id_response_200_spans_item_input = cls(
             type_=type_,

@@ -36,20 +36,35 @@ export const fixed64Schema = z.union([longBitsSchema, z.string(), z.number()]);
 
 export const bytesSchema = z.instanceof(Uint8Array);
 
-export const idSchema = z.union([
-  z.string(),
-  // Transform Uint8Array to hex string for JSON serialization safety
-  bytesSchema.transform((bytes) => Buffer.from(bytes).toString("hex")),
-  // This is needed, because JSON.stringify converts Uint8Array to an object, lol.
-  z
-    .record(z.string(), z.number())
-    .transform((obj) => {
-      const values = Object.entries(obj)
-        .sort(([a], [b]) => Number(a) - Number(b))
-        .map(([, v]) => v);
-      return Buffer.from(new Uint8Array(values)).toString("hex");
-    }),
-]);
+const NUMERIC_KEY = /^\d+$/;
+
+/** Checks whether an object looks like a JSON-serialized Uint8Array ({"0":1,"1":2,...}). */
+function isSerializedUint8Array(obj: Record<string, unknown>): obj is Record<string, number> {
+  return Object.entries(obj).every(
+    ([k, v]) => NUMERIC_KEY.test(k) && typeof v === "number" && Number.isInteger(v) && v >= 0 && v <= 255,
+  );
+}
+
+/** Sorts a validated serialized-Uint8Array object by numeric key and returns the byte values. */
+function sortedByteValues(obj: Record<string, number>): number[] {
+  return Object.entries(obj)
+    .sort(([a], [b]) => Number(a) - Number(b))
+    .map(([, v]) => v);
+}
+
+// Normalize Uint8Array / JSON-serialized Uint8Array to hex string before validating
+export const idSchema = z.preprocess((val) => {
+  if (val instanceof Uint8Array) {
+    return Buffer.from(val).toString("hex");
+  }
+  if (val != null && typeof val === "object") {
+    const obj = val as Record<string, unknown>;
+    if (isSerializedUint8Array(obj)) {
+      return Buffer.from(new Uint8Array(sortedByteValues(obj))).toString("hex");
+    }
+  }
+  return val;
+}, z.string());
 
 /**
  * AnyValue + friends 🤗
@@ -57,7 +72,8 @@ export const idSchema = z.union([
  * OTLP AnyValue is effectively "oneof". This schema accepts any object that matches at
  * least one of the optional fields, but does NOT enforce exclusivity.
  */
-export const anyValueSchema: z.ZodType<OtlpAnyValue> = z.object({
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Input type widened to accept JSON-serialized bytesValue
+export const anyValueSchema: z.ZodType<OtlpAnyValue, z.ZodTypeDef, any> = z.object({
   stringValue: z.string().nullable().optional(),
   boolValue: z.union([z.boolean(), z.string()]).nullable().optional(),
   intValue: z
@@ -73,19 +89,31 @@ export const anyValueSchema: z.ZodType<OtlpAnyValue> = z.object({
     .lazy(() => keyValueListSchema)
     .optional()
     .nullable(),
-  bytesValue: bytesSchema.optional().nullable(),
+  // JSON.stringify converts Uint8Array to {"0":1,"1":2,...} — reconstruct before validating
+  bytesValue: z.preprocess((val) => {
+    if (val != null && typeof val === "object" && !(val instanceof Uint8Array)) {
+      const obj = val as Record<string, unknown>;
+      if (isSerializedUint8Array(obj)) {
+        return new Uint8Array(sortedByteValues(obj));
+      }
+    }
+    return val;
+  }, bytesSchema).optional().nullable(),
 });
 
-export const keyValueSchema: z.ZodType<OtlpKeyValue> = z.object({
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const keyValueSchema: z.ZodType<OtlpKeyValue, z.ZodTypeDef, any> = z.object({
   key: z.string(),
   value: anyValueSchema,
 });
 
-export const arrayValueSchema: z.ZodType<OtlpArrayValue> = z.object({
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const arrayValueSchema: z.ZodType<OtlpArrayValue, z.ZodTypeDef, any> = z.object({
   values: z.array(anyValueSchema),
 });
 
-export const keyValueListSchema: z.ZodType<OtlpKeyValueList> = z.object({
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const keyValueListSchema: z.ZodType<OtlpKeyValueList, z.ZodTypeDef, any> = z.object({
   values: z.array(keyValueSchema),
 });
 
@@ -164,7 +192,11 @@ export const spanSchema = z.object({
   attributes: z.array(keyValueSchema),
   events: z.array(eventSchema).optional().default([]),
   links: z.array(linkSchema).optional().default([]),
-  status: statusSchema,
+  status: statusSchema
+    .nullable()
+    .optional()
+    .default({ message: null, code: null })
+    .transform((v) => v ?? { message: null, code: null }),
   flags: z.number().optional().nullable(),
   droppedAttributesCount: z.number().optional().nullable().default(0),
   droppedEventsCount: z.number().optional().nullable().default(0),

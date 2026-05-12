@@ -93,6 +93,20 @@ export function deepStrict<T extends ZodTypeAny>(
   return deepApplyObject(schema, (s) => s.strict(error)) as DeepStrict<T>;
 }
 
+/**
+ * Maps Zod issues to a structured log-friendly format.
+ * Extracts path, code, and message for consistent logging.
+ */
+export function mapZodIssuesToLogContext(
+  issues: Array<{ path: (string | number)[]; code: string; message: string }>,
+): Array<{ path: string; code: string; message: string }> {
+  return issues.map((issue) => ({
+    path: issue.path.join("."),
+    code: issue.code,
+    message: issue.message,
+  }));
+}
+
 export interface ZodIssue {
   code: string;
   expected?: string;

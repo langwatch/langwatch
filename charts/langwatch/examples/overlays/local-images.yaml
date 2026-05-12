@@ -1,0 +1,26 @@
+# local-images.yaml — Use locally-built images (Kind / minikube).
+#
+# Images must be pre-loaded into the cluster:
+#   kind load docker-image langwatch/langwatch:local --name <cluster>
+#
+# Usage:
+#   helm install lw . \
+#     -f examples/overlays/size-dev.yaml \
+#     -f examples/overlays/access-nodeport.yaml \
+#     -f examples/overlays/local-images.yaml \
+#     --set autogen.enabled=true
+
+images:
+  app:
+    tag: local
+    pullPolicy: Never
+  langwatch_nlp:
+    tag: local
+    pullPolicy: Never
+  langevals:
+    tag: local
+    pullPolicy: Never
+
+clickhouse:
+  image:
+    pullPolicy: Never

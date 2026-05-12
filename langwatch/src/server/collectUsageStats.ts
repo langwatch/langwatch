@@ -1,5 +1,6 @@
+import type { ClickHouseClient } from "@clickhouse/client";
+import { getClickHouseClientForOrganization } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
-import { esClient, SCENARIO_EVENTS_INDEX, TRACE_INDEX } from "./elasticsearch";
 
 export async function collectUsageStats(instanceId: string) {
   const organizationId = instanceId.split("__")[1];
@@ -8,14 +9,15 @@ export async function collectUsageStats(instanceId: string) {
     throw new Error("Invalid instance ID");
   }
 
-  const projectIds = await prisma.project
-    .findMany({
-      where: {
-        team: { organizationId },
-      },
-      select: { id: true },
-    })
-    .then((projects) => projects.map((project) => project.id));
+  const projects = await prisma.project.findMany({
+    where: {
+      team: { organizationId },
+    },
+    select: {
+      id: true,
+    },
+  });
+  const projectIds = projects.map((p) => p.id);
 
   // Get total counts for each table that has projectId
   const [
@@ -66,8 +68,10 @@ export async function collectUsageStats(instanceId: string) {
     }),
   ]);
 
-  const { totalTraces } = await getTraceCount();
-  const { totalScenarioEvents } = await getScenariosCount();
+  const clickhouse = await getClickHouseClientForOrganization(organizationId);
+
+  const totalTraces = await getTraceCount(projects, clickhouse);
+  const totalScenarioEvents = await getScenariosCount(projects, clickhouse);
 
   return {
     totalTraces,
@@ -87,42 +91,62 @@ export async function collectUsageStats(instanceId: string) {
   };
 }
 
-const getTraceCount = async () => {
-  const client = await esClient();
+async function getTraceCount(
+  projects: Array<{ id: string }>,
+  clickhouse: ClickHouseClient | null,
+): Promise<number> {
+  if (!clickhouse || projects.length === 0) return 0;
+  return getChTraceCount(clickhouse, projects.map((p) => p.id));
+}
 
-  const result = await client.count({
-    index: TRACE_INDEX.all,
-    body: {
-      query: {
-        match_all: {}, // Get all documents without any filter
-      },
-    },
+async function getChTraceCount(
+  clickhouse: ClickHouseClient,
+  projectIds: string[],
+): Promise<number> {
+  const result = await clickhouse.query({
+    query: `
+      SELECT toString(count(DISTINCT TraceId)) AS Total
+      FROM trace_summaries
+      WHERE TenantId IN ({projectIds:Array(String)})
+    `,
+    query_params: { projectIds },
+    format: "JSONEachRow",
   });
 
-  return {
-    totalTraces:
-      (result as { body?: { count?: number } }).body?.count ??
-      result.count ??
-      0,
-  };
-};
+  const rows = (await result.json()) as Array<{ Total: string }>;
+  return parseInt(rows[0]?.Total ?? "0", 10);
+}
 
-const getScenariosCount = async () => {
-  const client = await esClient();
+async function getScenariosCount(
+  projects: Array<{ id: string }>,
+  clickhouse: ClickHouseClient | null,
+): Promise<number> {
+  if (!clickhouse || projects.length === 0) return 0;
+  return getChScenariosCount(clickhouse, projects.map((p) => p.id));
+}
 
-  const result = await client.count({
-    index: SCENARIO_EVENTS_INDEX.alias,
-    body: {
-      query: {
-        match_all: {}, // Get all documents without any filter
-      },
-    },
+async function getChScenariosCount(
+  clickhouse: ClickHouseClient,
+  projectIds: string[],
+): Promise<number> {
+  const result = await clickhouse.query({
+    query: `
+      SELECT toString(count()) AS Total
+      FROM simulation_runs AS t
+      WHERE t.TenantId IN ({projectIds:Array(String)})
+        AND t.ArchivedAt IS NULL
+        AND (t.TenantId, t.ScenarioSetId, t.BatchRunId, t.ScenarioRunId, t.UpdatedAt) IN (
+          SELECT TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, max(UpdatedAt)
+          FROM simulation_runs
+          WHERE TenantId IN ({projectIds:Array(String)})
+          GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
+        )
+    `,
+    query_params: { projectIds },
+    format: "JSONEachRow",
   });
 
-  return {
-    totalScenarioEvents:
-      (result as { body?: { count?: number } }).body?.count ??
-      result.count ??
-      0,
-  };
-};
+  const rows = (await result.json()) as Array<{ Total: string }>;
+  return parseInt(rows[0]?.Total ?? "0", 10);
+}
+

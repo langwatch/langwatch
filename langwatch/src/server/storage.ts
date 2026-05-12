@@ -5,9 +5,8 @@ import {
 } from "@aws-sdk/client-s3";
 import fs from "fs/promises";
 import path from "path";
-import { decrypt } from "~/utils/encryption";
 import { env } from "../env.mjs";
-import { prisma } from "./db";
+import { getS3ConfigForProject } from "./dataplane-s3";
 
 export class StorageService {
   private async getLocalStoragePath(projectId: string, key: string) {
@@ -105,63 +104,20 @@ export class StorageService {
 }
 
 export const createS3Client = async (projectId: string) => {
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-  });
+  const privateConfig = await getS3ConfigForProject(projectId);
 
-  if (!project) {
-    throw new Error("Project not found");
-  }
-
-  const organization = await prisma.organization.findFirst({
-    where: {
-      teams: {
-        some: {
-          projects: {
-            some: { id: projectId },
-          },
-        },
-      },
-    },
-  });
-
-  if (!organization) {
-    throw new Error("Organization not found");
-  }
-
-  const s3Bucket =
-    project.s3Bucket && project.s3Bucket.trim() !== ""
-      ? project.s3Bucket
-      : organization?.s3Bucket && organization.s3Bucket.trim() !== ""
-        ? organization.s3Bucket
-        : env.S3_BUCKET_NAME && env.S3_BUCKET_NAME.trim() !== ""
-          ? env.S3_BUCKET_NAME
-          : "langwatch";
-
-  const s3Config = {
-    endpoint: project.s3Endpoint
-      ? decrypt(project.s3Endpoint)
-      : organization?.s3Endpoint
-        ? decrypt(organization.s3Endpoint)
-        : env.S3_ENDPOINT!,
-    accessKeyId: project.s3AccessKeyId
-      ? decrypt(project.s3AccessKeyId)
-      : organization?.s3AccessKeyId
-        ? decrypt(organization.s3AccessKeyId)
-        : env.S3_ACCESS_KEY_ID!,
-    secretAccessKey: project.s3SecretAccessKey
-      ? decrypt(project.s3SecretAccessKey)
-      : organization?.s3SecretAccessKey
-        ? decrypt(organization.s3SecretAccessKey)
-        : env.S3_SECRET_ACCESS_KEY!,
-  };
+  const s3Bucket = privateConfig?.bucket
+    ?? (env.S3_BUCKET_NAME && env.S3_BUCKET_NAME.trim() !== ""
+      ? env.S3_BUCKET_NAME
+      : "langwatch");
 
   const s3Client = new S3Client({
     region: "auto",
-    endpoint: s3Config.endpoint,
+    endpoint: privateConfig?.endpoint ?? env.S3_ENDPOINT!,
     credentials: {
-      accessKeyId: s3Config.accessKeyId,
-      secretAccessKey: s3Config.secretAccessKey,
+      accessKeyId: privateConfig?.accessKeyId ?? env.S3_ACCESS_KEY_ID!,
+      secretAccessKey:
+        privateConfig?.secretAccessKey ?? env.S3_SECRET_ACCESS_KEY!,
     },
     forcePathStyle: true,
   });

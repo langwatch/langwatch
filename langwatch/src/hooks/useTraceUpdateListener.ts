@@ -1,116 +1,189 @@
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "~/utils/api";
-import { usePageVisibility } from "./usePageVisibility";
+import type { ConnectionState } from "./useSSESubscription";
 import { useSSESubscription } from "./useSSESubscription";
 
 interface UseTraceUpdateListenerOptions {
   projectId: string;
-  refetch?: () => void | Promise<void>;
+  traceId?: string;
+  onSpanStored?: (traceIds: string[]) => void | Promise<void>;
+  onTraceSummaryUpdated?: (traceIds: string[]) => void | Promise<void>;
   enabled?: boolean;
   debounceMs?: number;
-  pageOffset?: number;
-  cursorPageNumber?: number;
+  /**
+   * Maximum time (ms) between callback fires during continuous events.
+   * Without this, trailing-edge debounce never fires during active ingestion
+   * because each event resets the timer.
+   *
+   * When set, the first event starts a maxWait timer that fires regardless
+   * of whether new events keep arriving. After firing, the cycle resets.
+   * If omitted, pure trailing-edge debounce is used (existing behavior).
+   */
+  maxWaitMs?: number;
+}
+
+interface TraceBroadcastPayload {
+  event: string;
+  traceId?: string;
 }
 
 /**
  * Hook for subscribing to real-time trace updates via tRPC subscriptions.
- * Automatically connects to SSE when enabled and calls refetch when traces are updated.
- * Includes optimizations to reduce unnecessary updates based on page visibility and pagination.
+ * Differentiates between span storage events and trace summary updates
+ * so callers can refetch only the relevant data.
  *
- * @param options - Configuration options
- * @param options.projectId - The project/tenant ID to subscribe to
- * @param options.refetch - Function to call when traces are updated (usually a query refetch function)
- * @param options.enabled - Whether the subscription should be active (default: true)
- * @param options.debounceMs - Debounce delay in milliseconds (default: 1000)
- * @param options.pageOffset - Current page offset for offset-based pagination
- * @param options.cursorPageNumber - Current page number for cursor-based pagination
+ * Supports two modes:
+ * - **Trailing-edge debounce** (default): events accumulate traceIds during the
+ *   window, callback fires only after `debounceMs` of silence.
+ * - **Throttle with maxWait**: callback fires at most every `maxWaitMs` during
+ *   continuous events, ensuring updates are visible during active ingestion.
  */
 export function useTraceUpdateListener({
   projectId,
-  refetch,
+  traceId,
+  onSpanStored,
+  onTraceSummaryUpdated,
   enabled = true,
-  debounceMs = 1000,
-  pageOffset,
-  cursorPageNumber,
+  debounceMs = 5000,
+  maxWaitMs,
 }: UseTraceUpdateListenerOptions) {
-  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const isVisible = usePageVisibility();
+  // Stable refs for callbacks to avoid stale closures in timers
+  const onSpanStoredRef = useRef(onSpanStored);
+  onSpanStoredRef.current = onSpanStored;
 
-  // Check if we should process updates based on optimization conditions
-  const shouldProcessUpdate = useMemo(() => {
-    // Don't process if tab is not visible
-    if (!isVisible) return false;
+  const onTraceSummaryUpdatedRef = useRef(onTraceSummaryUpdated);
+  onTraceSummaryUpdatedRef.current = onTraceSummaryUpdated;
 
-    // only update if on first page
-    if (pageOffset !== void 0 && pageOffset > 0) return false;
-    // only update if on first page
-    if (cursorPageNumber !== void 0 && cursorPageNumber > 1) return false;
+  // Debounce/throttle state for span events
+  const spanDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const spanMaxWaitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const spanTraceIdsRef = useRef<Set<string>>(new Set());
 
-    return true;
-  }, [isVisible, pageOffset, cursorPageNumber]);
+  // Debounce/throttle state for summary events
+  const summaryDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const summaryMaxWaitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const summaryTraceIdsRef = useRef<Set<string>>(new Set());
 
-  // Debounced update handler
-  const debouncedUpdate = useCallback(() => {
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-      debounceTimerRef.current = null;
+  const flushSpanUpdate = useCallback(() => {
+    if (spanDebounceTimerRef.current) {
+      clearTimeout(spanDebounceTimerRef.current);
+      spanDebounceTimerRef.current = null;
     }
+    if (spanMaxWaitTimerRef.current) {
+      clearTimeout(spanMaxWaitTimerRef.current);
+      spanMaxWaitTimerRef.current = null;
+    }
+    const ids = [...spanTraceIdsRef.current];
+    spanTraceIdsRef.current = new Set();
+    if (ids.length > 0) {
+      void onSpanStoredRef.current?.(ids);
+    }
+  }, []);
 
-    debounceTimerRef.current = setTimeout(() => {
-      if (shouldProcessUpdate && refetch) {
-        void refetch();
+  const flushSummaryUpdate = useCallback(() => {
+    if (summaryDebounceTimerRef.current) {
+      clearTimeout(summaryDebounceTimerRef.current);
+      summaryDebounceTimerRef.current = null;
+    }
+    if (summaryMaxWaitTimerRef.current) {
+      clearTimeout(summaryMaxWaitTimerRef.current);
+      summaryMaxWaitTimerRef.current = null;
+    }
+    const ids = [...summaryTraceIdsRef.current];
+    summaryTraceIdsRef.current = new Set();
+    if (ids.length > 0) {
+      void onTraceSummaryUpdatedRef.current?.(ids);
+    }
+  }, []);
+
+  const scheduleSpanUpdate = useCallback(
+    (eventTraceId: string | undefined) => {
+      if (eventTraceId) {
+        spanTraceIdsRef.current.add(eventTraceId);
       }
-    }, debounceMs);
-  }, [shouldProcessUpdate, debounceMs, refetch]);
 
-  // Cleanup debounce timer on unmount
+      // Reset trailing-edge debounce timer
+      if (spanDebounceTimerRef.current) {
+        clearTimeout(spanDebounceTimerRef.current);
+      }
+      spanDebounceTimerRef.current = setTimeout(flushSpanUpdate, debounceMs);
+
+      // Start maxWait timer on first event in this cycle (if maxWaitMs is set)
+      if (maxWaitMs != null && !spanMaxWaitTimerRef.current) {
+        spanMaxWaitTimerRef.current = setTimeout(flushSpanUpdate, maxWaitMs);
+      }
+    },
+    [debounceMs, maxWaitMs, flushSpanUpdate],
+  );
+
+  const scheduleSummaryUpdate = useCallback(
+    (eventTraceId: string | undefined) => {
+      if (eventTraceId) {
+        summaryTraceIdsRef.current.add(eventTraceId);
+      }
+
+      // Reset trailing-edge debounce timer
+      if (summaryDebounceTimerRef.current) {
+        clearTimeout(summaryDebounceTimerRef.current);
+      }
+      summaryDebounceTimerRef.current = setTimeout(flushSummaryUpdate, debounceMs);
+
+      // Start maxWait timer on first event in this cycle (if maxWaitMs is set)
+      if (maxWaitMs != null && !summaryMaxWaitTimerRef.current) {
+        summaryMaxWaitTimerRef.current = setTimeout(flushSummaryUpdate, maxWaitMs);
+      }
+    },
+    [debounceMs, maxWaitMs, flushSummaryUpdate],
+  );
+
+  // Cleanup timers on unmount
   useEffect(() => {
     return () => {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-      }
+      if (spanDebounceTimerRef.current) clearTimeout(spanDebounceTimerRef.current);
+      if (spanMaxWaitTimerRef.current) clearTimeout(spanMaxWaitTimerRef.current);
+      if (summaryDebounceTimerRef.current) clearTimeout(summaryDebounceTimerRef.current);
+      if (summaryMaxWaitTimerRef.current) clearTimeout(summaryMaxWaitTimerRef.current);
     };
   }, []);
 
-  useSSESubscription<
+  const [lastEventAt, setLastEventAt] = useState<number>(0);
+
+  const sse = useSSESubscription<
     { event: string; timestamp: number },
     { projectId: string }
   >(
-    // @ts-expect-error - tRPC subscription type is not compatible with the useSSESubscription hook
-    // it's 6:30am and i do not care anymore
+    // @ts-expect-error - tRPC subscription type mismatch with useSSESubscription hook
     api.traces.onTraceUpdate,
     { projectId },
     {
-      enabled: Boolean(enabled && projectId), // Ensure we have a projectId
+      enabled: Boolean(enabled && projectId),
       onData: (data) => {
-        console.log("📨 Trace update received via SSE:", data, {
-          projectId,
-          shouldProcessUpdate,
-          timestamp: new Date().toISOString(),
-        });
-        if (data.event === "trace_updated") {
-          console.log("🔄 Triggering debounced update for trace_updated event");
-          debouncedUpdate();
+        if (!data.event) return;
+
+        try {
+          const payload: TraceBroadcastPayload =
+            typeof data.event === "string"
+              ? JSON.parse(data.event)
+              : data.event;
+
+          if (traceId && payload.traceId !== traceId) return;
+
+          setLastEventAt(Date.now());
+
+          if (payload.event === "span_stored") {
+            scheduleSpanUpdate(payload.traceId);
+          } else if (payload.event === "trace_summary_updated") {
+            scheduleSummaryUpdate(payload.traceId);
+          }
+        } catch {
+          // Non-JSON payload — ignore
         }
-      },
-      onError: (error) => {
-        console.error("❌ Trace SSE subscription error:", error, { projectId });
-      },
-      onConnected: () => {
-        console.log("✅ Trace SSE subscription connected", {
-          projectId,
-          timestamp: new Date().toISOString(),
-        });
-      },
-      onDisconnected: () => {
-        console.log("🔌 Trace SSE subscription disconnected", { projectId });
-      },
-      onStarted: () => {
-        console.log("▶️ Trace SSE subscription started", { projectId });
-      },
-      onStopped: () => {
-        console.log("⏹️ Trace SSE subscription stopped", { projectId });
       },
     },
   );
+
+  return {
+    connectionState: sse.connectionState,
+    lastEventAt,
+  };
 }

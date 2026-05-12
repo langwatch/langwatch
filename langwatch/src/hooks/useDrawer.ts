@@ -1,4 +1,4 @@
-import Router, { useRouter } from "next/router";
+import Router, { useRouter } from "~/utils/compat/next-router";
 import qs from "qs";
 import { useCallback, useMemo } from "react";
 import {
@@ -142,6 +142,51 @@ export const navigateToDrawer = (
 // ============================================================================
 
 /**
+ * Update individual `drawer.<key>` params in the URL without touching the
+ * rest of the query or replacing the open drawer. Returns a setter that
+ * accepts a partial update map; pass `undefined` to remove a key.
+ *
+ * Use `push: true` (default) so each call adds a browser history entry —
+ * back / forward then walks through the user's tab navigation. Pass
+ * `push: false` for silent updates (e.g. mirroring local state on mount).
+ */
+export const useUpdateDrawerParams = () => {
+  const router = useRouter();
+  return useCallback(
+    (
+      updates: Record<string, string | undefined>,
+      options: { push?: boolean } = {},
+    ) => {
+      const push = options.push ?? true;
+      const { path, queryString, hash } = splitAsPath(router.asPath);
+      const parsed = qs.parse(queryString, {
+        allowDots: true,
+        comma: true,
+        allowEmptyArrays: true,
+      }) as Record<string, unknown>;
+      const drawer = ((parsed.drawer as Record<string, unknown>) ?? {}) as Record<
+        string,
+        unknown
+      >;
+      for (const [key, value] of Object.entries(updates)) {
+        if (value === undefined) delete drawer[key];
+        else drawer[key] = value;
+      }
+      parsed.drawer = drawer;
+      const newQs = qs.stringify(parsed, {
+        allowDots: true,
+        arrayFormat: "comma",
+        // @ts-ignore - allowEmptyArrays exists
+        allowEmptyArrays: true,
+      });
+      const url = buildUrl(path, newQs, hash);
+      void router[push ? "push" : "replace"](url, undefined, { shallow: true });
+    },
+    [router],
+  );
+};
+
+/**
  * Get simple (serializable) drawer params from URL query.
  * Call this inside a component to get params like `category`, `evaluatorType`, etc.
  */
@@ -158,6 +203,77 @@ export const useDrawerParams = () => {
 
   return params;
 };
+
+// ============================================================================
+// Serialization Helpers
+// ============================================================================
+
+/**
+ * Determines whether a value can be safely serialized into a URL query string.
+ *
+ * Primitives (string, number, boolean, null, undefined) are always serializable.
+ * Arrays of primitives are serializable via qs's `arrayFormat: "comma"`.
+ *
+ * Note: single-element arrays round-trip as plain strings through qs
+ * (e.g., `["a"]` → `"a"`). Consumers must handle both `T` and `T[]`.
+ *
+ * Functions, plain objects, Dates, and arrays containing objects are NOT serializable
+ * and go to `complexProps` (module-level ephemeral store).
+ */
+/**
+ * Split a Next.js asPath into (path, query, hash). Handles both `?q#h` and
+ * `#h?q` orderings — important for lens routes like `/traces#conversations`
+ * where naive concatenation can leave drawer query params parked after the
+ * hash, which Next's `router.query` (backed by `location.search`) cannot see.
+ */
+function splitAsPath(asPath: string): {
+  path: string;
+  queryString: string;
+  hash: string;
+} {
+  const queryIdx = asPath.indexOf("?");
+  const hashIdx = asPath.indexOf("#");
+  let pathEnd = asPath.length;
+  if (queryIdx !== -1) pathEnd = Math.min(pathEnd, queryIdx);
+  if (hashIdx !== -1) pathEnd = Math.min(pathEnd, hashIdx);
+  const path = asPath.slice(0, pathEnd);
+  const rest = asPath.slice(pathEnd);
+  if (rest.startsWith("?")) {
+    const h = rest.indexOf("#");
+    if (h === -1) return { path, queryString: rest.slice(1), hash: "" };
+    return { path, queryString: rest.slice(1, h), hash: rest.slice(h + 1) };
+  }
+  if (rest.startsWith("#")) {
+    const q = rest.indexOf("?");
+    if (q === -1) return { path, queryString: "", hash: rest.slice(1) };
+    return { path, queryString: rest.slice(q + 1), hash: rest.slice(1, q) };
+  }
+  return { path, queryString: "", hash: "" };
+}
+
+function buildUrl(path: string, queryString: string, hash: string): string {
+  let url = path;
+  if (queryString) url += `?${queryString}`;
+  if (hash) url += `#${hash}`;
+  return url;
+}
+
+function isUrlSerializable(value: unknown): boolean {
+  if (value === null || value === undefined) return true;
+  if (typeof value === "function") return false;
+  if (typeof value !== "object") return true; // string, number, boolean
+
+  // Arrays of primitives can be comma-serialized by qs
+  if (Array.isArray(value)) {
+    return value.every(
+      (item) =>
+        item === null ||
+        (typeof item !== "object" && typeof item !== "function"),
+    );
+  }
+
+  return false; // Plain objects, Dates, etc.
+}
 
 // ============================================================================
 // Main Hook
@@ -190,41 +306,46 @@ export const useDrawer = () => {
       const nonSerializableProps: Record<string, unknown> = {};
 
       for (const [key, value] of Object.entries(props ?? {})) {
-        if (typeof value === "function" || typeof value === "object") {
-          // Functions and objects go to complexProps (not URL)
-          nonSerializableProps[key] = value;
-        } else {
-          // Primitives (string, number, boolean, null, undefined) go to URL
+        if (isUrlSerializable(value)) {
           serializableProps[key] = value;
+        } else {
+          nonSerializableProps[key] = value;
         }
       }
 
       complexProps = nonSerializableProps;
 
+      // Build query from the actual browser URL (router.asPath), not
+      // router.query which may be stale after (url, as) shallow pushes.
+      // This preserves filter params that only exist in the asPath URL.
+      const { path, queryString, hash } = splitAsPath(router.asPath);
+      const currentQueryOnly = Object.fromEntries(
+        Object.entries(
+          qs.parse(queryString, {
+            allowDots: true,
+            comma: true,
+            allowEmptyArrays: true,
+          }),
+        ).filter(([key]) => !key.startsWith("drawer")),
+      );
+
+      const newQuery = qs.stringify(
+        {
+          ...currentQueryOnly,
+          drawer: {
+            open: drawer,
+            ...serializableProps,
+          },
+        },
+        {
+          allowDots: true,
+          arrayFormat: "comma",
+          allowEmptyArrays: true,
+        },
+      );
+
       void router[options.replace ? "replace" : "push"](
-        "?" +
-          qs.stringify(
-            {
-              ...Object.fromEntries(
-                Object.entries(router.query).filter(
-                  ([key, value]) =>
-                    !key.startsWith("drawer.") &&
-                    typeof value !== "function" &&
-                    typeof value !== "object",
-                ),
-              ),
-              drawer: {
-                open: drawer,
-                ...serializableProps, // Only serializable props go to URL
-              },
-            },
-            {
-              allowDots: true,
-              arrayFormat: "comma",
-              // @ts-ignore - allowEmptyArrays exists
-              allowEmptyArrays: true,
-            },
-          ),
+        buildUrl(path, newQuery, hash),
         undefined,
         { shallow: true },
       );
@@ -299,6 +420,20 @@ export const useDrawer = () => {
         if (drawerStack.length === 0 && currentDrawerNow) {
           drawerStack.push({ drawer: currentDrawerNow, params: {} });
         }
+
+        // Snapshot current URL params for the top-of-stack drawer so goBack
+        // restores the full state (e.g. selectedTab set after initial open)
+        const topEntry = drawerStack[drawerStack.length - 1];
+        if (topEntry && topEntry.drawer === currentDrawerNow) {
+          const currentUrlParams: Record<string, unknown> = {};
+          for (const [key, value] of Object.entries(router.query)) {
+            if (key.startsWith("drawer.") && key !== "drawer.open") {
+              currentUrlParams[key.replace("drawer.", "")] = value;
+            }
+          }
+          topEntry.params = currentUrlParams;
+        }
+
         drawerStack.push({ drawer, params: allParams });
       }
 
@@ -329,24 +464,29 @@ export const useDrawer = () => {
     clearFlowCallbacks();
     complexProps = {};
 
-    void router.push(
-      "?" +
-        qs.stringify(
-          Object.fromEntries(
-            Object.entries(router.query).filter(
-              ([key]) => !key.startsWith("drawer.") && key !== "span",
-            ),
-          ),
-          {
-            allowDots: true,
-            arrayFormat: "comma",
-            // @ts-ignore - allowEmptyArrays exists
-            allowEmptyArrays: true,
-          },
-        ),
-      undefined,
-      { shallow: true },
+    // Build clean URL from asPath (not router.query which may be stale
+    // after (url, as) shallow pushes and misses filter params).
+    const { path, queryString: currentQs, hash } = splitAsPath(router.asPath);
+    const parsedQuery = qs.parse(currentQs, {
+      allowDots: true,
+      comma: true,
+      allowEmptyArrays: true,
+    });
+    const cleanQuery = Object.fromEntries(
+      Object.entries(parsedQuery).filter(
+        ([key]) => !key.startsWith("drawer") && key !== "span",
+      ),
     );
+    const newQueryString = qs.stringify(cleanQuery, {
+      allowDots: true,
+      arrayFormat: "comma",
+      // @ts-ignore - allowEmptyArrays exists
+      allowEmptyArrays: true,
+    });
+
+    void router.push(buildUrl(path, newQueryString, hash), undefined, {
+      shallow: true,
+    });
   }, [router]);
 
   /**

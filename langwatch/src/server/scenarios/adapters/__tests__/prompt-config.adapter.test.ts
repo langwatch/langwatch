@@ -1,18 +1,18 @@
 import { type AgentInput, AgentRole } from "@langwatch/scenario";
-import type { CoreMessage } from "ai";
+import type { ModelMessage } from "ai";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PromptService } from "../../../prompt-config/prompt.service";
 import { PromptConfigAdapter } from "../prompt-config.adapter";
 
 const createAgentInput = (
-  messages: CoreMessage[],
+  messages: ModelMessage[],
   overrides: Partial<AgentInput> = {},
 ): AgentInput => ({
   threadId: "test-thread-id",
   messages,
   newMessages: messages,
   requestedRole: AgentRole.AGENT,
-  judgmentRequest: false,
+
   scenarioState: {} as AgentInput["scenarioState"],
   scenarioConfig: {} as AgentInput["scenarioConfig"],
   ...overrides,

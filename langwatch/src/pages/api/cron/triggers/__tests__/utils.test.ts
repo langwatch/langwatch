@@ -1,6 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
-import type { TraceGroups } from "../types";
-import { checkThreshold, getLatestUpdatedAt } from "../utils";
+import { describe, expect, it } from "vitest";
+import { checkThreshold } from "../utils";
 
 describe("checkThreshold", () => {
   describe("when operator is 'gt'", () => {
@@ -76,81 +75,6 @@ describe("checkThreshold", () => {
   describe("when operator is unknown", () => {
     it("returns false", () => {
       expect(checkThreshold(10, 5, "unknown")).toBe(false);
-    });
-  });
-});
-
-describe("getLatestUpdatedAt", () => {
-  describe("when traces have multiple groups", () => {
-    it("returns the most recent timestamp", () => {
-      const traces: TraceGroups = {
-        groups: [
-          [
-            {
-              trace_id: "1",
-              timestamps: { updated_at: 1000 },
-            } as any,
-            {
-              trace_id: "2",
-              timestamps: { updated_at: 2000 },
-            } as any,
-          ],
-          [
-            {
-              trace_id: "3",
-              timestamps: { updated_at: 3000 },
-            } as any,
-          ],
-        ],
-      };
-
-      expect(getLatestUpdatedAt(traces)).toBe(3000);
-    });
-  });
-
-  describe("when traces have one group", () => {
-    it("returns the latest timestamp from that group", () => {
-      const traces: TraceGroups = {
-        groups: [
-          [
-            {
-              trace_id: "1",
-              timestamps: { updated_at: 1000 },
-            } as any,
-            {
-              trace_id: "2",
-              timestamps: { updated_at: 5000 },
-            } as any,
-          ],
-        ],
-      };
-
-      expect(getLatestUpdatedAt(traces)).toBe(5000);
-    });
-  });
-
-  describe("when traces are in descending order", () => {
-    it("returns the first (latest) timestamp", () => {
-      const traces: TraceGroups = {
-        groups: [
-          [
-            {
-              trace_id: "1",
-              timestamps: { updated_at: 5000 },
-            } as any,
-            {
-              trace_id: "2",
-              timestamps: { updated_at: 3000 },
-            } as any,
-            {
-              trace_id: "3",
-              timestamps: { updated_at: 1000 },
-            } as any,
-          ],
-        ],
-      };
-
-      expect(getLatestUpdatedAt(traces)).toBe(5000);
     });
   });
 });

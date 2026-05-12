@@ -1,8 +1,8 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { LicenseEnforcementService } from "../license-enforcement.service";
 import type { ILicenseEnforcementRepository } from "../license-enforcement.repository";
-import type { PlanProvider } from "../license-enforcement.service";
-import type { PlanInfo } from "../../subscriptionHandler";
+import type { PlanProvider } from "../../app-layer/subscription/plan-provider";
+import type { PlanInfo } from "../../../../ee/licensing/planInfo";
 import { LimitExceededError } from "../errors";
 import type { LimitType } from "../types";
 
@@ -22,6 +22,7 @@ describe("LicenseEnforcementService", () => {
   let mockPlanProvider: PlanProvider;
 
   const basePlan: PlanInfo = {
+    planSource: "subscription",
     type: "test",
     name: "Test Plan",
     free: false,
@@ -41,7 +42,6 @@ describe("LicenseEnforcementService", () => {
     maxDashboards: 5,
     maxCustomGraphs: 10,
     maxAutomations: 5,
-    evaluationsCredit: 100,
     canPublish: true,
     prices: { USD: 0, EUR: 0 },
   };
@@ -51,7 +51,7 @@ describe("LicenseEnforcementService", () => {
       getWorkflowCount: vi.fn().mockResolvedValue(0),
       getPromptCount: vi.fn().mockResolvedValue(0),
       getEvaluatorCount: vi.fn().mockResolvedValue(0),
-      getScenarioCount: vi.fn().mockResolvedValue(0),
+      getActiveScenarioCount: vi.fn().mockResolvedValue(0),
       getAgentCount: vi.fn().mockResolvedValue(0),
       getExperimentCount: vi.fn().mockResolvedValue(0),
       getOnlineEvaluationCount: vi.fn().mockResolvedValue(0),
@@ -63,7 +63,6 @@ describe("LicenseEnforcementService", () => {
       getTeamCount: vi.fn().mockResolvedValue(0),
       getMemberCount: vi.fn().mockResolvedValue(0),
       getMembersLiteCount: vi.fn().mockResolvedValue(0),
-      getEvaluationsCreditUsed: vi.fn().mockResolvedValue(0),
       getCurrentMonthCost: vi.fn().mockResolvedValue(0),
       getCurrentMonthCostForProjects: vi.fn().mockResolvedValue(0),
     };
@@ -132,10 +131,10 @@ describe("LicenseEnforcementService", () => {
 
       await service.checkLimit("org-123", "workflows", user);
 
-      expect(mockPlanProvider.getActivePlan).toHaveBeenCalledWith(
-        "org-123",
-        user
-      );
+      expect(mockPlanProvider.getActivePlan).toHaveBeenCalledWith({
+        organizationId: "org-123",
+        user: expect.objectContaining({ id: "user-123" }),
+      });
     });
 
     describe("handles all limit types", () => {
@@ -147,7 +146,7 @@ describe("LicenseEnforcementService", () => {
         { type: "workflows", repoMethod: "getWorkflowCount", planField: "maxWorkflows" },
         { type: "prompts", repoMethod: "getPromptCount", planField: "maxPrompts" },
         { type: "evaluators", repoMethod: "getEvaluatorCount", planField: "maxEvaluators" },
-        { type: "scenarios", repoMethod: "getScenarioCount", planField: "maxScenarios" },
+        { type: "scenarios", repoMethod: "getActiveScenarioCount", planField: "maxScenarios" },
         { type: "projects", repoMethod: "getProjectCount", planField: "maxProjects" },
         { type: "members", repoMethod: "getMemberCount", planField: "maxMembers" },
         { type: "teams", repoMethod: "getTeamCount", planField: "maxTeams" },
@@ -177,6 +176,7 @@ describe("LicenseEnforcementService", () => {
   });
 
   describe("enforceLimit", () => {
+    /** @scenario Allows workflow creation when under limit */
     it("does not throw when limit is not exceeded", async () => {
       vi.mocked(mockRepository.getWorkflowCount).mockResolvedValue(2);
 
@@ -185,6 +185,7 @@ describe("LicenseEnforcementService", () => {
       ).resolves.toBeUndefined();
     });
 
+    /** @scenario Blocks workflow creation when at limit */
     it("throws LimitExceededError when limit is reached", async () => {
       vi.mocked(mockRepository.getWorkflowCount).mockResolvedValue(3);
 
@@ -193,7 +194,8 @@ describe("LicenseEnforcementService", () => {
       );
     });
 
-    it("includes current and max in LimitExceededError", async () => {
+    /** @scenario Blocks prompt creation when at limit */
+    it("includes current, max, and prompts label in LimitExceededError", async () => {
       vi.mocked(mockRepository.getPromptCount).mockResolvedValue(5);
 
       try {
@@ -205,6 +207,7 @@ describe("LicenseEnforcementService", () => {
         expect(limitError.limitType).toBe("prompts");
         expect(limitError.current).toBe(5);
         expect(limitError.max).toBe(5);
+        expect(limitError.message).toContain("maximum number of prompts");
       }
     });
 
@@ -214,10 +217,10 @@ describe("LicenseEnforcementService", () => {
 
       await service.enforceLimit("org-123", "workflows", user);
 
-      expect(mockPlanProvider.getActivePlan).toHaveBeenCalledWith(
-        "org-123",
-        user
-      );
+      expect(mockPlanProvider.getActivePlan).toHaveBeenCalledWith({
+        organizationId: "org-123",
+        user: expect.objectContaining({ id: "user-123" }),
+      });
     });
 
     it("does not throw when overrideAddingLimitations is set", async () => {
@@ -227,6 +230,72 @@ describe("LicenseEnforcementService", () => {
 
       await expect(
         service.enforceLimit("org-123", "workflows")
+      ).resolves.toBeUndefined();
+    });
+  });
+
+  describe("enforceLimitByOrganization", () => {
+    it("delegates to enforceLimit with the provided arguments", async () => {
+      const user = { id: "user-123", email: "test@example.com", name: "Test" };
+      vi.mocked(mockRepository.getProjectCount).mockResolvedValue(0);
+
+      await service.enforceLimitByOrganization({
+        organizationId: "org-456",
+        limitType: "projects",
+        user,
+      });
+
+      expect(mockPlanProvider.getActivePlan).toHaveBeenCalledWith({
+        organizationId: "org-456",
+        user: expect.objectContaining({ id: "user-123" }),
+      });
+      expect(mockRepository.getProjectCount).toHaveBeenCalledWith("org-456");
+    });
+
+    /** @scenario Blocks team creation when at limit */
+    it("throws LimitExceededError mentioning teams when team limit is reached", async () => {
+      vi.mocked(mockRepository.getTeamCount).mockResolvedValue(5);
+
+      await expect(
+        service.enforceLimitByOrganization({
+          organizationId: "org-123",
+          limitType: "teams",
+        })
+      ).rejects.toThrow(/maximum number of teams/);
+    });
+
+    /** @scenario Allows project creation when under limit */
+    it("does not throw when project count is below project limit", async () => {
+      vi.mocked(mockRepository.getProjectCount).mockResolvedValue(2);
+
+      await expect(
+        service.enforceLimitByOrganization({
+          organizationId: "org-123",
+          limitType: "projects",
+        })
+      ).resolves.toBeUndefined();
+    });
+
+    /** @scenario Blocks project creation when over limit */
+    it("throws LimitExceededError when project count exceeds project limit", async () => {
+      vi.mocked(mockRepository.getProjectCount).mockResolvedValue(11);
+
+      await expect(
+        service.enforceLimitByOrganization({
+          organizationId: "org-123",
+          limitType: "projects",
+        })
+      ).rejects.toThrow(LimitExceededError);
+    });
+
+    it("does not require user parameter", async () => {
+      vi.mocked(mockRepository.getWorkflowCount).mockResolvedValue(0);
+
+      await expect(
+        service.enforceLimitByOrganization({
+          organizationId: "org-123",
+          limitType: "workflows",
+        })
       ).resolves.toBeUndefined();
     });
   });

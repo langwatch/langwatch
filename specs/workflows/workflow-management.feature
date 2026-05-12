@@ -3,6 +3,14 @@ Feature: Workflow Management UI
   I want to manage my workflows through the UI
   So that I can organize and maintain my workflow library
 
+  # All scenarios in this file describe a delete-confirmation dialog
+  # interaction on the WorkflowCard. They need a JSDOM/component test
+  # for the confirmation dialog (no such test file exists today —
+  # `CascadeArchiveDialog.test.tsx` covers a different surface).
+  # The behavioral piece (delete mutation success/failure) is covered
+  # by the Workflow REST API tests in
+  # `langwatch/src/app/api/workflows/__tests__/`.
+
   Background:
     Given I am authenticated as a project member
     And the project has existing workflows
@@ -11,7 +19,7 @@ Feature: Workflow Management UI
   # Workflow Deletion
   # ============================================================================
 
-  @unit
+  @unit @unimplemented
   Scenario: Delete confirmation dialog captures keyboard input
     Given I am on the workflows page
     And I open the workflow card menu
@@ -21,7 +29,7 @@ Feature: Workflow Management UI
     And I should remain on the workflows page
     And no navigation should occur
 
-  @unit
+  @unit @unimplemented
   Scenario: Delete confirmation dialog allows full text entry
     Given I am on the workflows page
     And I open the workflow card menu
@@ -31,7 +39,7 @@ Feature: Workflow Management UI
     And the Delete button should be enabled
     And I should remain on the workflows page
 
-  @unit
+  @unit @unimplemented
   Scenario: Delete confirmation dialog Enter key submits when valid
     Given I am on the workflows page
     And I open the workflow card menu
@@ -41,7 +49,7 @@ Feature: Workflow Management UI
     Then the workflow should be deleted
     And the dialog should close
 
-  @unit
+  @unit @unimplemented
   Scenario: Delete confirmation dialog Enter key does nothing when invalid
     Given I am on the workflows page
     And I open the workflow card menu
@@ -51,7 +59,7 @@ Feature: Workflow Management UI
     Then the workflow should not be deleted
     And the dialog should remain open
 
-  @unit
+  @unit @unimplemented
   Scenario: Delete confirmation dialog keyboard events do not propagate
     Given I am on the workflows page
     And the WorkflowCard is wrapped in a navigation Link

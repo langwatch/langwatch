@@ -1,77 +1,103 @@
-import { Box, Text, VStack } from "@chakra-ui/react";
-import { AlertCircle, Check, X } from "react-feather";
-import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/enums";
+import { Box } from "@chakra-ui/react";
+import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import { SCENARIO_RUN_STATUS_CONFIG } from "./scenario-run-status-config";
 import { useColorModeValue } from "../ui/color-mode";
 
+const GRADIENT_LIGHT = {
+  pass: `
+    radial-gradient(ellipse at 0% 100%, rgba(134, 239, 172, 0.55) 0%, transparent 50%),
+    radial-gradient(ellipse at 100% 50%, rgba(72, 187, 120, 0.5) 0%, transparent 45%),
+    radial-gradient(ellipse at 70% 0%, rgba(56, 161, 105, 0.55) 0%, transparent 50%),
+    linear-gradient(160deg, rgba(56, 161, 105, 0.58) 0%, rgba(104, 211, 145, 0.52) 100%)
+  `,
+  cancelled: `
+    radial-gradient(ellipse at 0% 100%, rgba(226, 232, 240, 0.55) 0%, transparent 50%),
+    radial-gradient(ellipse at 100% 50%, rgba(160, 174, 192, 0.5) 0%, transparent 45%),
+    radial-gradient(ellipse at 70% 0%, rgba(113, 128, 150, 0.55) 0%, transparent 50%),
+    linear-gradient(160deg, rgba(113, 128, 150, 0.58) 0%, rgba(160, 174, 192, 0.52) 100%)
+  `,
+  fail: `
+    radial-gradient(ellipse at 0% 100%, rgba(254, 178, 178, 0.55) 0%, transparent 50%),
+    radial-gradient(ellipse at 100% 50%, rgba(245, 101, 101, 0.5) 0%, transparent 45%),
+    radial-gradient(ellipse at 70% 0%, rgba(229, 62, 62, 0.55) 0%, transparent 50%),
+    linear-gradient(160deg, rgba(229, 62, 62, 0.58) 0%, rgba(252, 129, 129, 0.52) 100%)
+  `,
+  stalled: `
+    radial-gradient(ellipse at 0% 100%, rgba(251, 211, 141, 0.55) 0%, transparent 50%),
+    radial-gradient(ellipse at 100% 50%, rgba(236, 201, 75, 0.5) 0%, transparent 45%),
+    radial-gradient(ellipse at 70% 0%, rgba(214, 158, 46, 0.55) 0%, transparent 50%),
+    linear-gradient(160deg, rgba(214, 158, 46, 0.58) 0%, rgba(236, 201, 75, 0.52) 100%)
+  `,
+} as const;
+
+const GRADIENT_DARK = {
+  pass: `
+    radial-gradient(ellipse at 0% 100%, rgba(74, 222, 128, 0.55) 0%, transparent 55%),
+    radial-gradient(ellipse at 100% 50%, rgba(34, 197, 94, 0.42) 0%, transparent 50%),
+    linear-gradient(160deg, rgba(22, 163, 74, 0.48) 0%, rgba(74, 222, 128, 0.32) 100%)
+  `,
+  cancelled: `
+    radial-gradient(ellipse at 0% 100%, rgba(161, 161, 170, 0.4) 0%, transparent 55%),
+    radial-gradient(ellipse at 100% 50%, rgba(113, 113, 122, 0.3) 0%, transparent 50%),
+    linear-gradient(160deg, rgba(82, 82, 91, 0.38) 0%, rgba(161, 161, 170, 0.28) 100%)
+  `,
+  fail: `
+    radial-gradient(ellipse at 0% 100%, rgba(248, 113, 113, 0.55) 0%, transparent 55%),
+    radial-gradient(ellipse at 100% 50%, rgba(239, 68, 68, 0.42) 0%, transparent 50%),
+    linear-gradient(160deg, rgba(220, 38, 38, 0.48) 0%, rgba(248, 113, 113, 0.32) 100%)
+  `,
+  stalled: `
+    radial-gradient(ellipse at 0% 100%, rgba(251, 191, 36, 0.55) 0%, transparent 55%),
+    radial-gradient(ellipse at 100% 50%, rgba(245, 158, 11, 0.42) 0%, transparent 50%),
+    linear-gradient(160deg, rgba(217, 119, 6, 0.48) 0%, rgba(251, 191, 36, 0.32) 100%)
+  `,
+} as const;
+
+type GradientKey = keyof typeof GRADIENT_LIGHT;
+
+const OVERLAY_GRADIENTS: Record<ScenarioRunStatus, GradientKey> = {
+  [ScenarioRunStatus.SUCCESS]: "pass",
+  [ScenarioRunStatus.FAILED]: "fail",
+  [ScenarioRunStatus.ERROR]: "fail",
+  [ScenarioRunStatus.CANCELLED]: "cancelled",
+  [ScenarioRunStatus.STALLED]: "stalled",
+  [ScenarioRunStatus.IN_PROGRESS]: "cancelled",
+  [ScenarioRunStatus.PENDING]: "cancelled",
+  [ScenarioRunStatus.QUEUED]: "cancelled",
+  [ScenarioRunStatus.RUNNING]: "cancelled",
+};
+
+interface OverlayConfig {
+  isComplete: boolean;
+  gradientLight: string;
+  gradientDark: string;
+}
+
+/** Returns overlay configuration for a given scenario run status. */
+export function getOverlayConfig(status: ScenarioRunStatus): OverlayConfig {
+  const gradientKey = OVERLAY_GRADIENTS[status];
+  return {
+    isComplete: SCENARIO_RUN_STATUS_CONFIG[status].isComplete,
+    gradientLight: GRADIENT_LIGHT[gradientKey],
+    gradientDark: GRADIENT_DARK[gradientKey],
+  };
+}
+
+/**
+ * Subtle background tint overlay for completed simulation cards.
+ * Only rendered for terminal states — running cards have no overlay.
+ */
 export function SimulationStatusOverlay({
   status,
 }: {
   status: ScenarioRunStatus;
 }) {
-  const isComplete =
-    status === ScenarioRunStatus.SUCCESS ||
-    status === ScenarioRunStatus.FAILED ||
-    status === ScenarioRunStatus.ERROR ||
-    status === ScenarioRunStatus.CANCELLED;
-
-  const isPass = status === ScenarioRunStatus.SUCCESS;
-  const isCancelled = status === ScenarioRunStatus.CANCELLED;
-
-  // Light mode gradients - original mesh style
-  const passGradientLight = `
-    radial-gradient(ellipse at 0% 100%, rgba(134, 239, 172, 0.8) 0%, transparent 50%),
-    radial-gradient(ellipse at 100% 50%, rgba(72, 187, 120, 0.75) 0%, transparent 45%),
-    radial-gradient(ellipse at 70% 0%, rgba(56, 161, 105, 0.8) 0%, transparent 50%),
-    linear-gradient(160deg, rgba(56, 161, 105, 0.82) 0%, rgba(104, 211, 145, 0.78) 100%)
-  `;
-  const cancelledGradientLight = `
-    radial-gradient(ellipse at 0% 100%, rgba(226, 232, 240, 0.8) 0%, transparent 50%),
-    radial-gradient(ellipse at 100% 50%, rgba(160, 174, 192, 0.75) 0%, transparent 45%),
-    radial-gradient(ellipse at 70% 0%, rgba(113, 128, 150, 0.8) 0%, transparent 50%),
-    linear-gradient(160deg, rgba(113, 128, 150, 0.82) 0%, rgba(160, 174, 192, 0.78) 100%)
-  `;
-  const failGradientLight = `
-    radial-gradient(ellipse at 0% 100%, rgba(254, 178, 178, 0.8) 0%, transparent 50%),
-    radial-gradient(ellipse at 100% 50%, rgba(245, 101, 101, 0.75) 0%, transparent 45%),
-    radial-gradient(ellipse at 70% 0%, rgba(229, 62, 62, 0.8) 0%, transparent 50%),
-    linear-gradient(160deg, rgba(229, 62, 62, 0.82) 0%, rgba(252, 129, 129, 0.78) 100%)
-  `;
-
-  // Dark mode gradients - softer, less intense for dark backgrounds
-  const passGradientDark = `
-    radial-gradient(ellipse at 0% 100%, rgba(74, 222, 128, 0.35) 0%, transparent 50%),
-    radial-gradient(ellipse at 100% 50%, rgba(34, 197, 94, 0.3) 0%, transparent 45%),
-    radial-gradient(ellipse at 70% 0%, rgba(22, 163, 74, 0.35) 0%, transparent 50%),
-    linear-gradient(160deg, rgba(22, 163, 74, 0.5) 0%, rgba(74, 222, 128, 0.45) 100%)
-  `;
-  const cancelledGradientDark = `
-    radial-gradient(ellipse at 0% 100%, rgba(161, 161, 170, 0.35) 0%, transparent 50%),
-    radial-gradient(ellipse at 100% 50%, rgba(113, 113, 122, 0.3) 0%, transparent 45%),
-    radial-gradient(ellipse at 70% 0%, rgba(82, 82, 91, 0.35) 0%, transparent 50%),
-    linear-gradient(160deg, rgba(82, 82, 91, 0.5) 0%, rgba(161, 161, 170, 0.45) 100%)
-  `;
-  const failGradientDark = `
-    radial-gradient(ellipse at 0% 100%, rgba(248, 113, 113, 0.35) 0%, transparent 50%),
-    radial-gradient(ellipse at 100% 50%, rgba(239, 68, 68, 0.3) 0%, transparent 45%),
-    radial-gradient(ellipse at 70% 0%, rgba(220, 38, 38, 0.35) 0%, transparent 50%),
-    linear-gradient(160deg, rgba(220, 38, 38, 0.5) 0%, rgba(248, 113, 113, 0.45) 100%)
-  `;
-
-  const passGradient = useColorModeValue(passGradientLight, passGradientDark);
-  const cancelledGradient = useColorModeValue(
-    cancelledGradientLight,
-    cancelledGradientDark,
+  const isComplete = SCENARIO_RUN_STATUS_CONFIG[status].isComplete;
+  const gradientKey = OVERLAY_GRADIENTS[status];
+  const bgGradient = useColorModeValue(
+    GRADIENT_LIGHT[gradientKey],
+    GRADIENT_DARK[gradientKey],
   );
-  const failGradient = useColorModeValue(failGradientLight, failGradientDark);
-
-  const bgGradient = isPass
-    ? passGradient
-    : isCancelled
-      ? cancelledGradient
-      : failGradient;
-
-  const Icon = isPass ? Check : isCancelled ? AlertCircle : X;
-  const statusText = isPass ? "Pass" : isCancelled ? "Cancelled" : "Fail";
 
   if (!isComplete) return null;
 
@@ -83,28 +109,8 @@ export function SimulationStatusOverlay({
       right={0}
       bottom={0}
       background={bgGradient}
-      display="flex"
-      alignItems="center"
-      justifyContent="center"
-      zIndex={20}
-      borderRadius="xl"
-    >
-      <VStack gap={3}>
-        <Box
-          bg="blackAlpha.200"
-          borderRadius="full"
-          boxShadow="lg"
-          p={3}
-          display="flex"
-          alignItems="center"
-          justifyContent="center"
-        >
-          <Icon size={32} color="white" strokeWidth={2.5} />
-        </Box>
-        <Text fontSize="md" fontWeight="semibold" color="white">
-          {statusText}
-        </Text>
-      </VStack>
-    </Box>
+      zIndex={1}
+      pointerEvents="none"
+    />
   );
 }

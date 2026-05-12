@@ -10,12 +10,14 @@ export const EVALUATION_EVENT_TYPES = {
   SCHEDULED: "lw.evaluation.scheduled",
   STARTED: "lw.evaluation.started",
   COMPLETED: "lw.evaluation.completed",
+  REPORTED: "lw.evaluation.reported",
 } as const;
 
 // Legacy exports for backwards compatibility
 export const EVALUATION_SCHEDULED_EVENT_TYPE = EVALUATION_EVENT_TYPES.SCHEDULED;
 export const EVALUATION_STARTED_EVENT_TYPE = EVALUATION_EVENT_TYPES.STARTED;
 export const EVALUATION_COMPLETED_EVENT_TYPE = EVALUATION_EVENT_TYPES.COMPLETED;
+export const EVALUATION_REPORTED_EVENT_TYPE = EVALUATION_EVENT_TYPES.REPORTED;
 
 /**
  * Event schema versions using calendar versioning (YYYY-MM-DD).
@@ -35,6 +37,8 @@ export const EVALUATION_EVENT_VERSIONS = {
   STARTED: "2025-01-14",
   /** Initial schema version introduced with event sourcing feature */
   COMPLETED: "2025-01-14",
+  /** Initial schema version for single-event custom SDK evaluations */
+  REPORTED: "2025-01-14",
 } as const;
 
 // Legacy exports for backwards compatibility
@@ -44,11 +48,14 @@ export const EVALUATION_STARTED_EVENT_VERSION_LATEST =
   EVALUATION_EVENT_VERSIONS.STARTED;
 export const EVALUATION_COMPLETED_EVENT_VERSION_LATEST =
   EVALUATION_EVENT_VERSIONS.COMPLETED;
+export const EVALUATION_REPORTED_EVENT_VERSION_LATEST =
+  EVALUATION_EVENT_VERSIONS.REPORTED;
 
 export const EVALUATION_PROCESSING_EVENT_TYPES = [
   EVALUATION_EVENT_TYPES.SCHEDULED,
   EVALUATION_EVENT_TYPES.STARTED,
   EVALUATION_EVENT_TYPES.COMPLETED,
+  EVALUATION_EVENT_TYPES.REPORTED,
 ] as const;
 
 export type EvaluationProcessingEventType =
@@ -59,22 +66,28 @@ export type EvaluationProcessingEventType =
  * Format: "lw.<domain>.<action>"
  */
 export const EVALUATION_COMMAND_TYPES = {
-  SCHEDULE: "lw.evaluation.schedule",
+  EXECUTE: "lw.evaluation.execute",
   START: "lw.evaluation.start",
   COMPLETE: "lw.evaluation.complete",
+  REPORT: "lw.evaluation.report",
 } as const;
 
 // Legacy exports for backwards compatibility
-export const SCHEDULE_EVALUATION_COMMAND_TYPE =
-  EVALUATION_COMMAND_TYPES.SCHEDULE;
 export const START_EVALUATION_COMMAND_TYPE = EVALUATION_COMMAND_TYPES.START;
 export const COMPLETE_EVALUATION_COMMAND_TYPE =
   EVALUATION_COMMAND_TYPES.COMPLETE;
 
+export const EXECUTE_EVALUATION_COMMAND_TYPE =
+  EVALUATION_COMMAND_TYPES.EXECUTE;
+
+export const REPORT_EVALUATION_COMMAND_TYPE =
+  EVALUATION_COMMAND_TYPES.REPORT;
+
 export const EVALUATION_PROCESSING_COMMAND_TYPES = [
-  EVALUATION_COMMAND_TYPES.SCHEDULE,
+  EVALUATION_COMMAND_TYPES.EXECUTE,
   EVALUATION_COMMAND_TYPES.START,
   EVALUATION_COMMAND_TYPES.COMPLETE,
+  EVALUATION_COMMAND_TYPES.REPORT,
 ] as const;
 
 export type EvaluationProcessingCommandType =
@@ -93,9 +106,9 @@ export const EVALUATION_PROJECTION_VERSIONS = {
 } as const;
 
 // Legacy export for backwards compatibility
-export const EVALUATION_STATE_PROJECTION_VERSION_LATEST =
+export const EVALUATION_RUN_PROJECTION_VERSION_LATEST =
   EVALUATION_PROJECTION_VERSIONS.STATE;
 
-export const EVALUATION_STATE_PROJECTION_VERSIONS = [
+export const EVALUATION_RUN_PROJECTION_VERSIONS = [
   EVALUATION_PROJECTION_VERSIONS.STATE,
 ] as const;

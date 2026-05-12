@@ -7,7 +7,7 @@ import { DashboardLayout } from "../../components/DashboardLayout";
 function AnnotationsContent() {
   return (
     <AnnotationsLayout>
-      <Box backgroundColor="white" width="full" overflowX="auto">
+      <Box width="full" overflowX="auto">
         <AnnotationsTable
           showQueueAndUser={true}
           heading="Inbox"

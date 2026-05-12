@@ -1,6 +1,6 @@
 import { Box, Card, HStack, Text, VStack } from "@chakra-ui/react";
 import { Settings } from "lucide-react";
-import type { ScenarioSetData } from "~/app/api/scenario-events/[[...route]]/types";
+import type { ScenarioSetData } from "~/server/scenarios/scenario-event.types";
 import {
   isOnPlatformSet,
   ON_PLATFORM_DISPLAY_NAME,
@@ -40,10 +40,7 @@ export function SetCard({
       p="5"
       _hover={{
         borderColor: "border.emphasized",
-        transform: "translateY(-1px)",
-        shadow: "xl",
       }}
-      transition="all 0.15s ease"
       cursor="pointer"
       onClick={onClick}
       position="relative"

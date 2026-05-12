@@ -672,13 +672,18 @@ class TestHttpNodeTimeout:
 
 
 class TestHttpNodeSsrfProtection:
-    """HTTP node blocks requests to localhost and internal networks (SSRF protection)"""
+    """HTTP node blocks requests to localhost and internal networks (SSRF protection).
+
+    Behavior is governed by BLOCK_LOCAL_HTTP_CALLS, mirroring the TS validator
+    in langwatch/src/utils/ssrfProtection.ts. Cloud metadata is ALWAYS blocked
+    regardless of the toggle or allowlist.
+    """
 
     @pytest.mark.integration
     @pytest.mark.asyncio
-    async def test_blocks_localhost(self, monkeypatch):
-        """Blocks requests to localhost."""
-        # Clear any ALLOWED_PROXY_HOSTS from .env
+    async def test_blocks_localhost_when_toggle_on(self, monkeypatch):
+        """Blocks requests to localhost when BLOCK_LOCAL_HTTP_CALLS is on."""
+        monkeypatch.setenv("BLOCK_LOCAL_HTTP_CALLS", "true")
         monkeypatch.delenv("ALLOWED_PROXY_HOSTS", raising=False)
 
         config = HttpNodeConfig(
@@ -692,8 +697,9 @@ class TestHttpNodeSsrfProtection:
 
     @pytest.mark.integration
     @pytest.mark.asyncio
-    async def test_blocks_127_0_0_1(self, monkeypatch):
-        """Blocks requests to 127.0.0.1."""
+    async def test_blocks_127_0_0_1_when_toggle_on(self, monkeypatch):
+        """Blocks requests to 127.0.0.1 when BLOCK_LOCAL_HTTP_CALLS is on."""
+        monkeypatch.setenv("BLOCK_LOCAL_HTTP_CALLS", "true")
         monkeypatch.delenv("ALLOWED_PROXY_HOSTS", raising=False)
 
         config = HttpNodeConfig(
@@ -707,8 +713,9 @@ class TestHttpNodeSsrfProtection:
 
     @pytest.mark.integration
     @pytest.mark.asyncio
-    async def test_blocks_private_ip_10_network(self, monkeypatch):
-        """Blocks requests to 10.x.x.x private network."""
+    async def test_blocks_private_ip_10_network_when_toggle_on(self, monkeypatch):
+        """Blocks requests to 10.x.x.x private network when BLOCK_LOCAL_HTTP_CALLS is on."""
+        monkeypatch.setenv("BLOCK_LOCAL_HTTP_CALLS", "true")
         monkeypatch.delenv("ALLOWED_PROXY_HOSTS", raising=False)
 
         config = HttpNodeConfig(
@@ -722,8 +729,9 @@ class TestHttpNodeSsrfProtection:
 
     @pytest.mark.integration
     @pytest.mark.asyncio
-    async def test_blocks_private_ip_192_168_network(self, monkeypatch):
-        """Blocks requests to 192.168.x.x private network."""
+    async def test_blocks_private_ip_192_168_network_when_toggle_on(self, monkeypatch):
+        """Blocks requests to 192.168.x.x private network when BLOCK_LOCAL_HTTP_CALLS is on."""
+        monkeypatch.setenv("BLOCK_LOCAL_HTTP_CALLS", "true")
         monkeypatch.delenv("ALLOWED_PROXY_HOSTS", raising=False)
 
         config = HttpNodeConfig(
@@ -737,8 +745,9 @@ class TestHttpNodeSsrfProtection:
 
     @pytest.mark.integration
     @pytest.mark.asyncio
-    async def test_blocks_private_ip_172_network(self, monkeypatch):
-        """Blocks requests to 172.16-31.x.x private network."""
+    async def test_blocks_private_ip_172_network_when_toggle_on(self, monkeypatch):
+        """Blocks requests to 172.16-31.x.x private network when BLOCK_LOCAL_HTTP_CALLS is on."""
+        monkeypatch.setenv("BLOCK_LOCAL_HTTP_CALLS", "true")
         monkeypatch.delenv("ALLOWED_PROXY_HOSTS", raising=False)
 
         config = HttpNodeConfig(
@@ -752,8 +761,9 @@ class TestHttpNodeSsrfProtection:
 
     @pytest.mark.integration
     @pytest.mark.asyncio
-    async def test_blocks_metadata_endpoint(self, monkeypatch):
+    async def test_blocks_metadata_endpoint_when_toggle_on(self, monkeypatch):
         """Always blocks cloud metadata endpoint."""
+        monkeypatch.setenv("BLOCK_LOCAL_HTTP_CALLS", "true")
         monkeypatch.delenv("ALLOWED_PROXY_HOSTS", raising=False)
 
         config = HttpNodeConfig(
@@ -767,8 +777,57 @@ class TestHttpNodeSsrfProtection:
 
     @pytest.mark.integration
     @pytest.mark.asyncio
+    async def test_blocks_metadata_endpoint_when_toggle_off(self, monkeypatch):
+        """Cloud metadata is blocked even when BLOCK_LOCAL_HTTP_CALLS is off (security-critical)."""
+        monkeypatch.delenv("BLOCK_LOCAL_HTTP_CALLS", raising=False)
+        monkeypatch.delenv("ALLOWED_PROXY_HOSTS", raising=False)
+
+        config = HttpNodeConfig(
+            url="http://169.254.169.254/latest/meta-data/",
+            method="GET",
+        )
+        result = await execute_http_node(config, {})
+
+        assert result.success is False
+        assert "Blocked URL" in (result.error or "")
+
+    @pytest.mark.integration
+    @pytest.mark.asyncio
+    async def test_allows_localhost_when_toggle_unset(self, monkeypatch, httpx_mock: HTTPXMock):
+        """Default permissive: when BLOCK_LOCAL_HTTP_CALLS is unset, localhost is allowed."""
+        monkeypatch.delenv("BLOCK_LOCAL_HTTP_CALLS", raising=False)
+        monkeypatch.delenv("ALLOWED_PROXY_HOSTS", raising=False)
+        httpx_mock.add_response(json={"result": "ok"})
+
+        config = HttpNodeConfig(
+            url="http://localhost:8000/api",
+            method="POST",
+        )
+        result = await execute_http_node(config, {})
+
+        assert result.success is True
+
+    @pytest.mark.integration
+    @pytest.mark.asyncio
+    async def test_allows_private_ip_when_toggle_off(self, monkeypatch, httpx_mock: HTTPXMock):
+        """Explicit BLOCK_LOCAL_HTTP_CALLS=false allows private IPs."""
+        monkeypatch.setenv("BLOCK_LOCAL_HTTP_CALLS", "false")
+        monkeypatch.delenv("ALLOWED_PROXY_HOSTS", raising=False)
+        httpx_mock.add_response(json={"result": "ok"})
+
+        config = HttpNodeConfig(
+            url="http://10.0.5.3:8000/api",
+            method="POST",
+        )
+        result = await execute_http_node(config, {})
+
+        assert result.success is True
+
+    @pytest.mark.integration
+    @pytest.mark.asyncio
     async def test_allows_localhost_when_in_allowed_hosts(self, monkeypatch, httpx_mock: HTTPXMock):
         """Allows localhost when listed in ALLOWED_PROXY_HOSTS env var."""
+        monkeypatch.setenv("BLOCK_LOCAL_HTTP_CALLS", "true")
         monkeypatch.setenv("ALLOWED_PROXY_HOSTS", "localhost")
         httpx_mock.add_response(json={"result": "ok"})
 
@@ -784,6 +843,7 @@ class TestHttpNodeSsrfProtection:
     @pytest.mark.asyncio
     async def test_allows_multiple_hosts_in_allowed_list(self, monkeypatch, httpx_mock: HTTPXMock):
         """Allows multiple hosts when comma-separated in ALLOWED_PROXY_HOSTS."""
+        monkeypatch.setenv("BLOCK_LOCAL_HTTP_CALLS", "true")
         monkeypatch.setenv("ALLOWED_PROXY_HOSTS", "localhost,127.0.0.1,api.local")
         httpx_mock.add_response(json={"result": "ok"})
 
@@ -799,6 +859,7 @@ class TestHttpNodeSsrfProtection:
     @pytest.mark.asyncio
     async def test_metadata_always_blocked_even_with_allowed_hosts(self, monkeypatch):
         """Metadata endpoints are ALWAYS blocked even when in allowed hosts."""
+        monkeypatch.setenv("BLOCK_LOCAL_HTTP_CALLS", "true")
         monkeypatch.setenv("ALLOWED_PROXY_HOSTS", "169.254.169.254")
 
         config = HttpNodeConfig(

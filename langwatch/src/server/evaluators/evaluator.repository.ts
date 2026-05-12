@@ -159,4 +159,37 @@ export class EvaluatorRepository {
       },
     });
   }
+
+  /**
+   * Finds audit log entries related to a specific evaluator.
+   */
+  async findAuditLogs(input: {
+    evaluatorId: string;
+    projectId: string;
+    limit: number;
+  }) {
+    return await this.prisma.auditLog.findMany({
+      where: {
+        projectId: input.projectId,
+        action: { startsWith: "evaluators." },
+        OR: [
+          { args: { path: ["id"], equals: input.evaluatorId } },
+          { args: { path: ["evaluatorId"], equals: input.evaluatorId } },
+          { args: { path: ["newEvaluatorId"], equals: input.evaluatorId } },
+        ],
+      },
+      orderBy: { createdAt: "desc" },
+      take: input.limit,
+    });
+  }
+
+  /**
+   * Finds users by their IDs with minimal fields for display.
+   */
+  async findUsersByIds(userIds: string[]) {
+    return await this.prisma.user.findMany({
+      where: { id: { in: userIds } },
+      select: { id: true, name: true, email: true },
+    });
+  }
 }

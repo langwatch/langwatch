@@ -23,12 +23,14 @@ class IsAlive(BaseModel):
 
 class ExecuteComponentPayload(BaseModel):
     trace_id: str
+    thread_id: Optional[str] = None
     workflow: Workflow
     node_id: str
     workflow_id: Optional[str] = None
     version_id: Optional[str] = None
     published_id: Optional[str] = None
     inputs: Dict[str, Any]
+    origin: Optional[str] = None
 
 
 class ExecuteComponent(BaseModel):
@@ -54,6 +56,7 @@ class ExecuteFlowPayload(BaseModel):
     manual_execution_mode: Optional[bool] = None
     do_not_trace: bool = False
     run_evaluations: bool = True
+    origin: Optional[str] = None
 
 
 class ExecuteFlow(BaseModel):
@@ -67,6 +70,7 @@ class ExecuteEvaluationPayload(BaseModel):
     workflow_version_id: str
     evaluate_on: Literal["full", "test", "train", "specific"]
     dataset_entry: Optional[int] = None
+    origin: Optional[str] = None
 
 
 class ExecuteEvaluation(BaseModel):
@@ -283,3 +287,10 @@ def get_trace_id(event: StudioClientEvent):
             else None
         )
     )
+
+
+def get_project_id(event: StudioClientEvent) -> Optional[str]:
+    """Extract project_id from event workflow if available."""
+    if hasattr(event.payload, "workflow") and hasattr(event.payload.workflow, "project_id"):
+        return event.payload.workflow.project_id  # type: ignore
+    return None

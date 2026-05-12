@@ -1,15 +1,14 @@
 import { useCallback } from "react";
 import { AICreateModal, type ExampleTemplate } from "../shared/AICreateModal";
+import { ModelProviderRequiredModal } from "./ModelProviderRequiredModal";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useModelProvidersSettings } from "~/hooks/useModelProvidersSettings";
 import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
-import { api } from "~/utils/api";
-import { isHandledByGlobalLicenseHandler } from "~/utils/trpcError";
-import { toaster } from "../ui/toaster";
-import { DEFAULT_MODEL } from "~/utils/constants";
-import { allModelOptions, useModelSelectionOptions } from "../ModelSelector";
+import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { generateScenarioWithAI } from "./services/scenarioGeneration";
+import type { ScenarioFormData, ScenarioInitialData } from "./ScenarioForm";
+import { getDefaultModelState } from "./utils/defaultModelState";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -30,7 +29,6 @@ const MODAL_TITLE = "Create new scenario";
 const MODAL_PLACEHOLDER =
   "Explain your agent, its goals and what behavior you want to test.";
 const GENERATING_TEXT = "Generating scenario...";
-const DEFAULT_SCENARIO_NAME = "Untitled";
 
 const EXAMPLE_TEMPLATES: ExampleTemplate[] = [
   {
@@ -54,51 +52,38 @@ const EXAMPLE_TEMPLATES: ExampleTemplate[] = [
 /**
  * Modal for creating a new scenario with AI assistance.
  *
- * Uses AICreateModal with scenario-specific configuration:
- * - onGenerate: Generates scenario with AI, creates it, then navigates to editor
- * - onSkip: Creates an empty scenario, then navigates to editor
+ * Opens the ScenarioFormDrawer with initial data via complexProps.
+ * No DB record is created until the user clicks "Save" in the drawer.
  */
 export function ScenarioCreateModal({ open, onClose }: ScenarioCreateModalProps) {
   const { project } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();
-  const utils = api.useContext();
   const { checkAndProceed } = useLicenseEnforcement("scenarios");
 
   // Check if any model providers are configured
-  const { hasEnabledProviders } = useModelProvidersSettings({
+  const { hasEnabledProviders, providers } = useModelProvidersSettings({
     projectId: project?.id,
   });
 
-  // Check if the default model has API keys configured
-  const defaultModel = project?.defaultModel ?? DEFAULT_MODEL;
-  const { modelOption } = useModelSelectionOptions(
-    allModelOptions,
-    defaultModel,
-    "chat"
-  );
-  const isModelDisabled = modelOption?.isDisabled ?? false;
-
-  const createMutation = api.scenarios.create.useMutation({
-    onSuccess: () => {
-      void utils.scenarios.getAll.invalidate({ projectId: project?.id ?? "" });
-    },
+  const defaultModelState = getDefaultModelState({
+    hasEnabledProviders,
+    providers,
+    defaultModel: project?.defaultModel,
   });
 
-  const createScenario = useCallback(
-    async (data: { name: string; situation: string; criteria: string[]; labels: string[] }) => {
-      if (!project?.id) {
-        throw new Error("No project selected");
-      }
-
-      return createMutation.mutateAsync({
-        projectId: project.id,
-        name: data.name || DEFAULT_SCENARIO_NAME,
-        situation: data.situation || "",
-        criteria: data.criteria || [],
-        labels: data.labels || [],
-      });
+  const openEditorWithData = useCallback(
+    (formData: Partial<ScenarioFormData>) => {
+      const initialData: ScenarioInitialData = { initialFormData: formData };
+      openDrawer(
+        "scenarioEditor",
+        {
+          ...initialData,
+        },
+        { resetStack: true }
+      );
+      onClose();
     },
-    [project?.id, createMutation]
+    [openDrawer, onClose]
   );
 
   const handleGenerate = useCallback(
@@ -107,75 +92,34 @@ export function ScenarioCreateModal({ open, onClose }: ScenarioCreateModalProps)
         throw new Error("No project selected");
       }
 
-      // Check if API keys are configured
-      if (isModelDisabled) {
-        throw new Error(
-          "API keys not configured. Please go to Settings → Model Providers to add your API keys."
-        );
-      }
-
       try {
-        // Generate scenario with AI
         const generatedData = await generateScenarioWithAI(description, project.id);
-
-        // Create scenario with generated content
-        const scenario = await createScenario(generatedData);
-
-        // Navigate to editor
-        openDrawer(
-          "scenarioEditor",
-          {
-            urlParams: {
-              scenarioId: scenario.id,
-            },
-          },
-          { resetStack: true }
-        );
-
-        onClose();
+        openEditorWithData(generatedData);
       } catch (error) {
-        // Prevent toast if global handler already showed upgrade modal
-        if (isHandledByGlobalLicenseHandler(error)) return;
+        if (isHandledByGlobalHandler(error)) return;
         throw error;
       }
     },
-    [project?.id, isModelDisabled, createScenario, openDrawer, onClose]
+    [project?.id, openEditorWithData]
   );
 
-  const handleSkip = useCallback(async () => {
-    try {
-      const scenario = await createScenario({
-        name: DEFAULT_SCENARIO_NAME,
-        situation: "",
-        criteria: [],
-        labels: [],
-      });
+  const handleSkip = useCallback(() => {
+    openEditorWithData({
+      name: "",
+      situation: "",
+      criteria: [],
+    });
+  }, [openEditorWithData]);
 
-      // Navigate to editor
-      openDrawer(
-        "scenarioEditor",
-        {
-          urlParams: {
-            scenarioId: scenario.id,
-          },
-        },
-        { resetStack: true }
-      );
-
-      onClose();
-    } catch (error) {
-      // Prevent toast if global handler already showed upgrade modal
-      if (isHandledByGlobalLicenseHandler(error)) return;
-
-      toaster.create({
-        title: "Failed to create scenario",
-        description:
-          error instanceof Error ? error.message : "An unexpected error occurred",
-        type: "error",
-        meta: { closable: true },
-      });
-    }
-  }, [createScenario, openDrawer, onClose]);
+  if (!defaultModelState.ok) {
+    return (
+      <ModelProviderRequiredModal
+        open={open}
+        onClose={onClose}
+        onProceedAnyway={() => checkAndProceed(handleSkip)}
+      />
+    );
+  }
 
   return (
     <AICreateModal
@@ -187,7 +131,6 @@ export function ScenarioCreateModal({ open, onClose }: ScenarioCreateModalProps)
       onGenerate={(desc) => checkAndProceed(() => handleGenerate(desc))}
       onSkip={() => checkAndProceed(handleSkip)}
       generatingText={GENERATING_TEXT}
-      hasModelProviders={hasEnabledProviders}
     />
   );
 }

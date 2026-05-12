@@ -16,7 +16,7 @@ import type { Experiment, Project } from "@prisma/client";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Download, ExternalLink } from "react-feather";
 import { Link } from "../../components/ui/link";
@@ -24,9 +24,11 @@ import { Tooltip } from "../../components/ui/tooltip";
 import { FormatMoney } from "../../optimization_studio/components/FormatMoney";
 import { VersionBox } from "../../optimization_studio/components/History";
 import type { AppRouter } from "../../server/api/root";
+import { useDejaViewLink } from "../../hooks/useDejaViewLink";
 import { api } from "../../utils/api";
 import { formatTimeAgo } from "../../utils/formatTimeAgo";
 import { getColorForString } from "../../utils/rotatingColors";
+import { getRunDisplayName } from "../batch-evaluation-results/getRunDisplayName";
 import { OverflownTextWithTooltip } from "../OverflownText";
 import {
   BatchEvaluationV2EvaluationSummary,
@@ -61,6 +63,11 @@ export function BatchEvaluationV2({
     experiment,
     runId: selectedRunId,
     isFinished,
+  });
+
+  const dejaView = useDejaViewLink({
+    aggregateId: selectedRunId,
+    tenantId: project.id,
   });
 
   return (
@@ -111,6 +118,17 @@ export function BatchEvaluationV2({
                 </Button>
               </Link>
             )}
+            {dejaView.href && (
+              <Link href={dejaView.href}>
+                <Button
+                  size="sm"
+                  colorPalette="gray"
+                  marginBottom="-6px"
+                >
+                  DejaView
+                </Button>
+              </Link>
+            )}
           </HStack>
           {batchEvaluationRuns.isLoading ||
           (batchEvaluationRuns.error &&
@@ -128,7 +146,7 @@ export function BatchEvaluationV2({
               <Card.Root width="100%" overflow="hidden">
                 <Card.Header>
                   <Heading as="h2" size="md">
-                    {selectedRun?.workflow_version?.commitMessage ??
+                    {selectedRun?.workflowVersion?.commitMessage ??
                       "Evaluation Results"}
                   </Heading>
                 </Card.Header>
@@ -136,7 +154,7 @@ export function BatchEvaluationV2({
                   <BatchEvaluationV2EvaluationResults
                     project={project}
                     experiment={experiment}
-                    runId={selectedRun?.run_id}
+                    runId={selectedRun?.runId}
                     isFinished={isFinished}
                   />
                 </Card.Body>
@@ -184,9 +202,9 @@ export const useBatchEvaluationState = ({
     const selectedRunId_ =
       selectedRunId ??
       (typeof router.query.runId === "string" ? router.query.runId : null) ??
-      batchEvaluationRuns.data?.runs[0]?.run_id;
+      batchEvaluationRuns.data?.runs[0]?.runId;
     const selectedRun = batchEvaluationRuns.data?.runs.find(
-      (r) => r.run_id === selectedRunId_,
+      (r) => r.runId === selectedRunId_,
     );
     return { selectedRunId_, selectedRun };
   }, [selectedRunId, router.query.runId, batchEvaluationRuns.data?.runs]);
@@ -268,7 +286,7 @@ export function BatchEvaluationV2RunList({
   size?: "sm" | "md";
 } & StackProps) {
   const hasAnyVersion = batchEvaluationRuns.data?.runs.some(
-    (run) => run.workflow_version,
+    (run) => run.workflowVersion,
   );
 
   return (
@@ -311,7 +329,7 @@ export function BatchEvaluationV2RunList({
       ) : (
         <>
           {!batchEvaluationRuns.data?.runs.find(
-            (r) => r.run_id === selectedRunId,
+            (r) => r.runId === selectedRunId,
           ) && (
             <HStack
               paddingX={size === "sm" ? 2 : 4}
@@ -335,47 +353,50 @@ export function BatchEvaluationV2RunList({
               </VStack>
             </HStack>
           )}
-          {batchEvaluationRuns.data?.runs.map((run) => {
+          {batchEvaluationRuns.data?.runs.map((run, index) => {
             const runCost =
-              (run.summary.dataset_cost ?? 0) +
-              (run.summary.evaluations_cost ?? 0);
-            const runName = run.workflow_version?.commitMessage ?? run.run_id;
+              (run.summary.datasetCost ?? 0) +
+              (run.summary.evaluationsCost ?? 0);
+            const runName = getRunDisplayName({
+              commitMessage: run.workflowVersion?.commitMessage,
+              index,
+            });
 
             return (
               <HStack
-                key={run?.run_id ?? "new"}
+                key={run?.runId ?? "new"}
                 paddingX={size === "sm" ? 2 : 4}
                 paddingY={size === "sm" ? 2 : 3}
                 width="100%"
                 cursor="pointer"
                 role="button"
                 background={
-                  selectedRun?.run_id === run.run_id ? "gray.200" : "none"
+                  selectedRun?.runId === run.runId ? "gray.200" : "none"
                 }
                 _hover={{
                   background:
-                    selectedRun?.run_id === run.run_id
+                    selectedRun?.runId === run.runId
                       ? "gray.200"
                       : "gray.100",
                 }}
                 onClick={(e) => {
                   e.stopPropagation();
-                  setSelectedRunId(run.run_id);
+                  setSelectedRunId(run.runId);
                 }}
                 gap={3}
               >
-                {run.workflow_version ? (
+                {run.workflowVersion ? (
                   <VersionBox
-                    version={run.workflow_version}
+                    version={run.workflowVersion}
                     minWidth={hasAnyVersion ? "48px" : "0"}
                   />
                 ) : (
                   <VersionBox
                     minWidth={hasAnyVersion ? "48px" : "0"}
                     backgroundColor={
-                      run.timestamps.stopped_at
+                      run.timestamps.stoppedAt
                         ? "red.200"
-                        : getColorForString("colors", run.run_id).color
+                        : getColorForString("colors", run.runId).color
                     }
                   />
                 )}
@@ -436,15 +457,15 @@ export function BatchEvaluationV2RunList({
                     fontSize={size === "sm" ? "12px" : "13px"}
                   >
                     <Text whiteSpace="nowrap" lineClamp={1}>
-                      {run.timestamps.created_at
+                      {run.timestamps.createdAt
                         ? formatTimeAgo(
-                            run.timestamps.created_at,
+                            run.timestamps.createdAt,
                             "yyyy-MM-dd HH:mm",
                             5,
                           )
                         : "Waiting for steps..."}
                     </Text>
-                    {run.timestamps.stopped_at && (
+                    {run.timestamps.stoppedAt && (
                       <Box
                         width="6px"
                         height="6px"

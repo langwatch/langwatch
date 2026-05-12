@@ -27,7 +27,7 @@ ensure-uv:
 start: install
 	@echo "Starting the server..."
 	@uv run --no-sync watchmedo auto-restart -p 'none' --signal SIGTERM -- \
-		uvicorn langwatch_nlp.main:app --host 0.0.0.0 --port 5561 --timeout-keep-alive 70 \
+		uvicorn langwatch_nlp.main:app --host 0.0.0.0 --port 5561 --timeout-keep-alive $${NLP_UVICORN_KEEP_ALIVE_SECONDS:-70} \
 		--reload --reload-dir . --reload-dir ../python-sdk $(filter-out $@,$(MAKECMDGOALS))
 
 licenses:

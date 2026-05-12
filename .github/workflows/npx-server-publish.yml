@@ -1,0 +1,292 @@
+# Publish `@langwatch/server` to npm. Hooked to the same release-please flow
+# as the rest of the repo (see release-please-sdks.yml + release-please-config.json).
+#
+# Trigger policy:
+# - `release.published` whose tag starts with `langwatch@` (the main langwatch
+#   release tag — release-please uses `<component>@<version>`). Releases for
+#   other components (sdk-go@*, typescript-sdk@*, mcp-server@*, etc.) are
+#   filtered out by the `if:` guard on the publish job.
+# - `workflow_dispatch` from main for break-glass / first publish / beta
+#   bumps. The dispatched run reads the version from package.json — it does
+#   NOT require a release tag.
+#
+# Version lock: root package.json and langwatch/package.json must match.
+# Both are auto-bumped in lockstep by release-please-config.json (the `.`
+# package's extra-files list). The pre-publish step verifies it.
+#
+# npm dist-tag is auto-derived from the package version:
+#   3.1.0          → @latest
+#   3.1.0-beta.0   → @prerelease (so beta/rc don't auto-rollout to existing users)
+# Same convention as the scenario JS workflow.
+#
+# Trusted Publishers (npm OIDC, recommended after first manual publish):
+# Configure at npmjs.com → @langwatch/server → settings → Trusted Publishers,
+# add provider `GitHub Actions` with:
+#   Repository:        langwatch/langwatch
+#   Workflow filename: npx-server-publish.yml
+#   Environment:       (leave empty — we don't use job environments)
+# Once configured, the NPM_API_TOKEN secret can be deleted; the
+# `id-token: write` permission below is sufficient for npm to mint a
+# short-lived publish token from the OIDC token.
+
+name: npx-server-publish
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write # for creating/updating GH release with aigateway monobinaries
+  id-token: write # for npm provenance + Trusted Publishers OIDC exchange
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    if: |
+      (github.event_name == 'release' && startsWith(github.event.release.tag_name, 'langwatch@')) ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v4
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+
+      - uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4
+        with:
+          run_install: false
+
+      - name: Resolve and verify versions
+        id: versions
+        run: |
+          set -e
+          pkg_version="$(node -p "require('./package.json').version")"
+          app_version="$(node -p "require('./langwatch/package.json').version")"
+          tag="${GITHUB_REF_NAME:-}"
+          echo "package.json version:           $pkg_version"
+          echo "langwatch/package.json version: $app_version"
+          echo "release tag (if any):           $tag"
+
+          if [ "$pkg_version" != "$app_version" ]; then
+            echo "✗ version mismatch: root=$pkg_version langwatch=$app_version"
+            echo "  release-please should keep these in lockstep — check release-please-config.json"
+            exit 1
+          fi
+
+          if [ "${{ github.event_name }}" = "release" ]; then
+            # Release-please tag format: langwatch@v3.2.0 (component@vX.Y.Z,
+            # `tag-separator: @` in release-please-config.json — release-please
+            # itself prepends the `v` to semver tags). Strip the
+            # `langwatch@v` prefix so what's left matches package.json's version.
+            tag_version="${tag#langwatch@v}"
+            if [ "$tag_version" != "$pkg_version" ]; then
+              echo "✗ version mismatch: tag=$tag (parsed=$tag_version) package.json=$pkg_version"
+              exit 1
+            fi
+          fi
+
+          # Auto-derive npm dist-tag from version: any `-` suffix (beta, rc,
+          # alpha, next, etc.) → `prerelease`; clean semver → `latest`.
+          # Same convention as scenario js (.github/workflows/javascript-publish.yml).
+          if [[ "$pkg_version" == *"-"* ]]; then
+            npm_tag="prerelease"
+          else
+            npm_tag="latest"
+          fi
+          echo "resolved npm dist-tag:          $npm_tag"
+
+          echo "version=$pkg_version" >> "$GITHUB_OUTPUT"
+          echo "npm_tag=$npm_tag" >> "$GITHUB_OUTPUT"
+
+      - name: Install pnpm dependencies (workspace)
+        run: pnpm install --frozen-lockfile
+
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
+        with:
+          go-version-file: "go.mod"
+          cache: true
+
+      # Build the aigateway monobinary for all 4 platforms and create a
+      # GitHub release with them attached at tag v$VERSION. The aigateway
+      # predep at runtime fetches:
+      #   https://github.com/langwatch/langwatch/releases/download/v$VERSION/aigateway-$PLATFORM
+      # Without this step npx installs hit HTTP 404 and either fail or fall
+      # through to the dev-only LANGWATCH_AIGATEWAY_DEV_BUILD=1 path.
+      #
+      # We always create a `v$VERSION` tag for the npx flow even when
+      # release-please cuts a separate `langwatch@v$VERSION` release —
+      # release-please's component-prefixed tag format is awkward to URL-
+      # encode and tying the gateway artifact tag to a single, stable
+      # `v$VERSION` is simpler.
+      - name: Build aigateway monobinaries (4 platforms)
+        run: |
+          set -e
+          mkdir -p _pack
+          for tp in linux-amd64 linux-arm64 darwin-amd64 darwin-arm64; do
+            os="${tp%-*}"; arch="${tp#*-}"
+            echo "→ building aigateway-$tp"
+            GOOS="$os" GOARCH="$arch" CGO_ENABLED=0 go build \
+              -ldflags="-s -w -X main.Version=$VERSION" \
+              -o "_pack/aigateway-$tp" \
+              ./cmd/service
+          done
+          ls -lh _pack/aigateway-*
+        env:
+          VERSION: ${{ steps.versions.outputs.version }}
+
+      - name: Create GH release v$VERSION with aigateway binaries
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.versions.outputs.version }}
+        run: |
+          set -e
+          tag="v$VERSION"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "→ release $tag exists, uploading binaries (clobber)"
+            gh release upload "$tag" _pack/aigateway-* --clobber
+          else
+            echo "→ creating release $tag"
+            prerelease_flag=""
+            if [[ "$VERSION" == *"-"* ]]; then prerelease_flag="--prerelease"; fi
+            gh release create "$tag" \
+              --title "v$VERSION" \
+              --notes "@langwatch/server@$VERSION — aigateway monobinaries" \
+              $prerelease_flag \
+              _pack/aigateway-*
+          fi
+
+      - name: Build @langwatch/server CLI
+        run: pnpm --filter @langwatch/server-cli build
+
+      # Pre-build the langwatch app (vite client + scenario-child-process +
+      # mcp-server) so the published tarball ships dist/ artifacts. Without
+      # this, end users see vite chunder past at startup on first run —
+      # exactly the bureaucracy we're trying to eliminate.
+      #
+      # langwatch/ is its own pnpm workspace (not in the root pnpm-workspace
+      # `packages/*` glob), so we install + build it explicitly here.
+      # node_modules/ is excluded from the tarball by langwatch/.npmignore,
+      # so end users still run `pnpm install` once on first start (which
+      # generates the platform-specific Prisma client via prisma's
+      # postinstall hook).
+      - name: Install langwatch app deps
+        run: pnpm -C langwatch install --frozen-lockfile --prod=false
+
+      - name: Build langwatch app (vite + scenario + mcp + generated types)
+        run: pnpm -C langwatch run build
+        env:
+          NODE_ENV: production
+
+      - name: Pack the npm tarball (with Apache-2.0 LICENSE swapped in)
+        id: pack
+        # scripts/pack-npm.sh swaps /LICENSE.md (BSL — for GitHub repo
+        # display) with /LICENSE-NPM.txt (Apache-2.0 — for the npm tarball)
+        # for the duration of `pnpm pack`, then restores. See the script
+        # for details.
+        run: |
+          mkdir -p _pack
+          bash scripts/pack-npm.sh --pack-destination "$GITHUB_WORKSPACE/_pack"
+          tarball="$(ls "$GITHUB_WORKSPACE/_pack"/langwatch-server-*.tgz | head -n1)"
+          echo "tarball=$tarball" >> "$GITHUB_OUTPUT"
+          echo "tarball size:"; ls -lh "$tarball"
+          echo ""
+          echo "first 50 paths in tarball:"
+          tar -tzf "$tarball" | head -n 50
+
+      - name: Sanity-check tarball contents
+        run: |
+          set -e
+          tarball="${{ steps.pack.outputs.tarball }}"
+          required=(
+            "package/packages/server/dist/cli.cjs"
+            "package/langwatch/package.json"
+            "package/langwatch/dist/client/index.html"
+            "package/langwatch/dist/scenario-child-process.js"
+            "package/langwatch_nlp/pyproject.toml"
+            "package/langevals/pyproject.toml"
+            # langwatch_nlp pins the python SDK via `editable = "../python-sdk"`
+            # so the tarball must ship python-sdk/pyproject.toml + src/.
+            "package/python-sdk/pyproject.toml"
+            "package/python-sdk/src"
+            # langwatch's pnpm-workspace.yaml lists "../mcp-server" as a
+            # workspace package; without the prebuilt dist the langwatch app
+            # crashes loading "@langwatch/mcp-server/create-mcp-server".
+            "package/mcp-server/package.json"
+            "package/mcp-server/dist/create-mcp-server.js"
+          )
+          forbidden=(
+            "package/langwatch/node_modules"
+            "package/langwatch_nlp/.venv"
+            "package/langwatch/.next/cache"
+            "package/.env"
+          )
+          listing="$(mktemp)"
+          tar -tzf "$tarball" > "$listing"
+          for path in "${required[@]}"; do
+            if ! grep -qE "^${path}(/|$)" "$listing"; then
+              echo "✗ tarball missing required path: $path"; exit 1
+            fi
+          done
+          for path in "${forbidden[@]}"; do
+            if grep -qE "^${path}(/|$)" "$listing"; then
+              echo "✗ tarball contains forbidden path: $path"; exit 1
+            fi
+          done
+          # Tarball gzipped should be < 300 MB.
+          size_bytes="$(stat -c%s "$tarball" 2>/dev/null || stat -f%z "$tarball")"
+          echo "size=$size_bytes bytes"
+          if [ "$size_bytes" -gt $((300 * 1024 * 1024)) ]; then
+            echo "✗ tarball too large (>300 MB)"; exit 1
+          fi
+
+          # The license swap should have produced an Apache-2.0 LICENSE in
+          # the tarball, NOT the BSL one. Catch a regression where someone
+          # bypasses scripts/pack-npm.sh and runs pnpm pack directly.
+          extract_dir="$(mktemp -d)"
+          tar -xzf "$tarball" -C "$extract_dir" package/LICENSE.md
+          if grep -q "Apache License" "$extract_dir/package/LICENSE.md"; then
+            echo "✓ tarball ships Apache-2.0 LICENSE.md"
+          elif grep -q "Business Source License" "$extract_dir/package/LICENSE.md"; then
+            echo "✗ tarball ships BSL LICENSE.md — license swap was not applied"
+            echo "  (use scripts/pack-npm.sh, not pnpm pack directly)"
+            exit 1
+          else
+            echo "✗ tarball LICENSE.md is unrecognized — neither Apache-2.0 nor BSL"
+            head -5 "$extract_dir/package/LICENSE.md"
+            exit 1
+          fi
+          rm -rf "$extract_dir"
+
+      - name: Publish to npm with provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_API_TOKEN }}
+        run: |
+          set -e
+          tarball="${{ steps.pack.outputs.tarball }}"
+          npm publish "$tarball" \
+            --access public \
+            --provenance \
+            --tag "${{ steps.versions.outputs.npm_tag }}"
+
+      - name: Notify Slack
+        if: always() && github.event_name == 'release'
+        env:
+          SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
+          STATUS: ${{ job.status }}
+          VERSION: ${{ steps.versions.outputs.version }}
+          NPM_TAG: ${{ steps.versions.outputs.npm_tag }}
+        run: |
+          if [ -z "$SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL" ]; then exit 0; fi
+          if [ "$STATUS" = "success" ]; then
+            text="✅ @langwatch/server@${VERSION} published to npm (tag: ${NPM_TAG}) — \`npx @langwatch/server\` ready"
+          else
+            text="✗ @langwatch/server@${VERSION} publish failed — see ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          fi
+          curl -sS -X POST -H 'Content-Type: application/json' \
+            -d "$(printf '{"text":"%s"}' "$text")" \
+            "$SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL"

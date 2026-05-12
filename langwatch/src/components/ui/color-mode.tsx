@@ -1,6 +1,6 @@
 "use client";
 
-import type { IconButtonProps, SpanProps } from "@chakra-ui/react";
+import type { IconButtonProps, SpanProps, Tokens } from "@chakra-ui/react";
 import { ClientOnly, IconButton, Skeleton, Span } from "@chakra-ui/react";
 import type { ThemeProviderProps } from "next-themes";
 import { ThemeProvider, useTheme } from "next-themes";
@@ -9,17 +9,29 @@ import { LuMoon, LuSun } from "react-icons/lu";
 
 export const colorSystem = {
   gray: {
-    800: { value: "#090F1D" },
-    700: { value: "#1F2937" },
-    600: { value: "#213B41" },
-    500: { value: "#51676C" },
+    950: { value: "#09090b" },
+    900: { value: "#111113" },
+    800: { value: "#1a1a2e" },
+    700: { value: "#2d2d3d" },
+    600: { value: "#3d3d4d" },
+    500: { value: "#5c5c6e" },
+    450: { value: "#7B8394" },
     400: { value: "#9CA3AF" },
-    375: { value: "#B8BDBD" },
-    350: { value: "#DDDDDD" },
-    300: { value: "#E0E2E6" },
-    200: { value: "#E8EBF2" },
-    100: { value: "#F2F4F8" },
-    50: { value: "#F7FAFC" },
+    300: { value: "#cbd5e1" },
+    200: { value: "#e2e8f0" },
+    100: { value: "#f1f5f9" },
+    50: { value: "#f8fafc" },
+  },
+  // Used on _dark sides only; near-neutral with the smallest indigo tint.
+  zinc: {
+    500: { value: "#565664" },
+    600: { value: "#3a3a44" },
+    700: { value: "#282832" },
+    750: { value: "#20202a" },
+    800: { value: "#1a1a24" },
+    850: { value: "#15151e" },
+    900: { value: "#10101a" },
+    950: { value: "#080812" },
   },
   red: {
     50: { value: "#FFF5F5" },
@@ -134,18 +146,13 @@ export const colorSystem = {
 // eslint-disable-next-line @typescript-eslint/no-empty-interface
 export interface ColorModeProviderProps extends ThemeProviderProps {}
 
-// Check if dark mode feature is enabled via build-time env var
-const isDarkModeEnabled =
-  process.env.NEXT_PUBLIC_FEATURE_DARK_MODE === "true" ||
-  process.env.NEXT_PUBLIC_FEATURE_DARK_MODE === "1";
-
 export function ColorModeProvider(props: ColorModeProviderProps) {
   // When dark mode feature is disabled, force light mode
   // When enabled, use system preference for automatic light/dark switching
   // Chakra v3 uses ".dark &" selector for dark mode, so we need attribute="class"
   return (
     <>
-      <style jsx global>{`
+      <style>{`
         html {
           transition: background-color 0.3s ease, color 0.3s ease;
         }
@@ -158,12 +165,11 @@ export function ColorModeProvider(props: ColorModeProviderProps) {
       `}</style>
       <ThemeProvider
         attribute="class"
-        defaultTheme={isDarkModeEnabled ? "system" : "light"}
+        defaultTheme="light"
         disableTransitionOnChange={false}
-        enableSystem={isDarkModeEnabled}
-        enableColorScheme={isDarkModeEnabled}
-        forcedTheme={isDarkModeEnabled ? undefined : "light"}
-        themes={isDarkModeEnabled ? ["light", "dark", "system"] : ["light"]}
+        enableSystem
+        enableColorScheme
+        themes={["light", "dark", "system"]}
         {...props}
       />
     </>
@@ -230,7 +236,7 @@ export function useColorRawValue(variable: string): string {
   return getRawColorValue(variable);
 }
 
-export function useColorModeValue<T>(light: T, dark: T) {
+export function useColorModeValue<T = Tokens["colors"]>(light: T, dark: T) {
   const { colorMode } = useColorMode();
   return colorMode === "dark" ? dark : light;
 }

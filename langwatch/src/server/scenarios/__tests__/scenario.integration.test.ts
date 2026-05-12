@@ -49,18 +49,20 @@ describe("ScenarioService", () => {
     await prisma.scenario.deleteMany({ where: { projectId: otherProjectId } });
   });
 
-  it("creates a scenario", async () => {
-    const result = await service.create({
-      projectId,
-      name: "Refund Test",
-      situation: "User requests refund",
-      criteria: ["Acknowledges issue"],
-      labels: ["support"],
-    });
+  describe("when creating a scenario", () => {
+    it("creates a scenario", async () => {
+      const result = await service.create({
+        projectId,
+        name: "Refund Test",
+        situation: "User requests refund",
+        criteria: ["Acknowledges issue"],
+        labels: ["support"],
+      });
 
-    expect(result.id).toMatch(/^scen_/);
-    expect(result.name).toBe("Refund Test");
-    expect(result.projectId).toBe(projectId);
+      expect(result.id).toMatch(/^scenario_/);
+      expect(result.name).toBe("Refund Test");
+      expect(result.projectId).toBe(projectId);
+    });
   });
 
   it("gets all scenarios for project", async () => {
@@ -115,6 +117,67 @@ describe("ScenarioService", () => {
 
     expect(result.name).toBe("Updated");
     expect(result.situation).toBe("Updated situation");
+  });
+
+  describe("getByIdIncludingArchived()", () => {
+    describe("when the scenario has been archived", () => {
+      it("returns the scenario with archivedAt set", async () => {
+        const created = await service.create({
+          projectId,
+          name: "Archived Runner",
+          situation: "Test archived scenario",
+          criteria: [],
+          labels: [],
+        });
+
+        // Archive the scenario
+        await prisma.scenario.update({
+          where: { id: created.id },
+          data: { archivedAt: new Date() },
+        });
+
+        const result = await service.getByIdIncludingArchived({
+          id: created.id,
+          projectId,
+        });
+
+        expect(result).not.toBeNull();
+        expect(result?.id).toBe(created.id);
+        expect(result?.archivedAt).not.toBeNull();
+      });
+    });
+
+    describe("when the scenario is not archived", () => {
+      it("returns the scenario with archivedAt null", async () => {
+        const created = await service.create({
+          projectId,
+          name: "Active Scenario",
+          situation: "Test active scenario",
+          criteria: [],
+          labels: [],
+        });
+
+        const result = await service.getByIdIncludingArchived({
+          id: created.id,
+          projectId,
+        });
+
+        expect(result).not.toBeNull();
+        expect(result?.id).toBe(created.id);
+        expect(result?.archivedAt).toBeNull();
+      });
+    });
+
+    describe("when the scenario does not exist", () => {
+      it("returns null", async () => {
+        const result = await service.getByIdIncludingArchived({
+          id: "scen_nonexistent",
+          projectId,
+        });
+
+        expect(result).toBeNull();
+      });
+    });
   });
 
   it("isolates scenarios by project", async () => {

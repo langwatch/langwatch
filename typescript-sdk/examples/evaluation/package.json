@@ -14,6 +14,7 @@
   "license": "MIT",
   "dependencies": {
     "@ai-sdk/openai": "^2.0.6",
+    "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/context-async-hooks": "^2.0.1",
     "@opentelemetry/sdk-node": "^0.203.0",
     "ai": "^5.0.8",

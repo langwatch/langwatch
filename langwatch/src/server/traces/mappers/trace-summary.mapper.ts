@@ -1,6 +1,11 @@
-import type { TraceSummaryData } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummaryProjection";
+import type { TraceSummaryData } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.foldProjection";
+import {
+  extractLastUserMessageText,
+  extractMessageContentText,
+} from "~/server/app-layer/traces/canonicalisation/extractors/_messages";
 import type {
   ErrorCapture,
+  Event,
   Span,
   Trace,
   TraceInput,
@@ -12,14 +17,11 @@ import type {
  * Known attribute keys that map to reserved TraceMetadata fields.
  */
 const RESERVED_ATTRIBUTE_MAPPINGS: Record<string, keyof TraceMetadata> = {
-  "thread.id": "thread_id",
-  "langwatch.thread_id": "thread_id",
-  "langgraph.thread_id": "thread_id",
+  // Canonical keys (set by canonicalization)
   "gen_ai.conversation.id": "thread_id",
-  "user.id": "user_id",
   "langwatch.user_id": "user_id",
-  "customer.id": "customer_id",
   "langwatch.customer_id": "customer_id",
+  // SDK info (extracted from resource attributes)
   "sdk.name": "sdk_name",
   "sdk.version": "sdk_version",
   "sdk.language": "sdk_language",
@@ -29,7 +31,16 @@ const RESERVED_ATTRIBUTE_MAPPINGS: Record<string, keyof TraceMetadata> = {
 };
 
 /**
- * Maps TraceSummaryData.Attributes to the legacy TraceMetadata format.
+ * Lower-priority attribute mappings: only applied if the target metadata
+ * field is not already set by a primary mapping above.
+ */
+const FALLBACK_ATTRIBUTE_MAPPINGS: Record<string, keyof TraceMetadata> = {
+  // LangGraph thread ID — gen_ai.conversation.id takes precedence
+  "langgraph.thread_id": "thread_id",
+};
+
+/**
+ * Maps TraceSummaryData.attributes to the legacy TraceMetadata format.
  *
  * The Attributes map in ClickHouse stores various metadata using semantic
  * convention keys. These need to be mapped to the flat TraceMetadata structure.
@@ -41,12 +52,22 @@ export function mapAttributesToMetadata(
 ): TraceMetadata {
   const metadata: TraceMetadata = {};
 
-  // Map known attributes to reserved fields
+  // Map known attributes to reserved fields (primary — last-wins within this set)
   for (const [attrKey, metadataKey] of Object.entries(
     RESERVED_ATTRIBUTE_MAPPINGS,
   )) {
     const value = attributes[attrKey];
     if (value !== void 0) {
+      metadata[metadataKey] = value;
+    }
+  }
+
+  // Map fallback attributes (only if target field not already set)
+  for (const [attrKey, metadataKey] of Object.entries(
+    FALLBACK_ATTRIBUTE_MAPPINGS,
+  )) {
+    const value = attributes[attrKey];
+    if (value !== void 0 && metadata[metadataKey] === undefined) {
       metadata[metadataKey] = value;
     }
   }
@@ -89,6 +110,7 @@ export function mapAttributesToMetadata(
   // Add remaining attributes as custom metadata
   const knownKeys = new Set([
     ...Object.keys(RESERVED_ATTRIBUTE_MAPPINGS),
+    ...Object.keys(FALLBACK_ATTRIBUTE_MAPPINGS),
     "langwatch.labels",
     "labels",
     "langwatch.prompt_ids",
@@ -96,10 +118,10 @@ export function mapAttributesToMetadata(
   ]);
 
   for (const [key, value] of Object.entries(attributes)) {
-    if (!knownKeys.has(key)) {
-      // Store as custom metadata
-      metadata[key] = value;
-    }
+    if (knownKeys.has(key)) continue;
+    // Strip internal metadata. prefix so API returns bare keys (e.g., "user" not "metadata.user")
+    const bareKey = key.startsWith("metadata.") ? key.slice("metadata.".length) : key;
+    if (bareKey && metadata[bareKey] === undefined) metadata[bareKey] = value;
   }
 
   return metadata;
@@ -135,56 +157,47 @@ const OUTPUT_FIELD_NAMES = [
 ] as const;
 
 /**
+ * Maximum recursion depth for state-object text extraction. Real-world payloads
+ * are shallow (~3-5 levels); 32 is generous while still protecting against
+ * pathological / adversarial deeply-nested JSON.
+ */
+const MAX_STATE_OBJECT_RECURSION_DEPTH = 32;
+
+/**
  * Extracts text from a state object by looking for common field names.
  *
  * @param obj - The state object to extract from
  * @param fieldNames - Array of field names to try (in priority order)
+ * @param depth - Internal recursion counter; callers should leave at default
  * @returns The extracted text, or null if not found
  */
 function extractTextFromStateObject(
   obj: Record<string, unknown>,
   fieldNames: readonly string[],
+  depth = 0,
 ): string | null {
+  if (depth >= MAX_STATE_OBJECT_RECURSION_DEPTH) return null;
+
   for (const field of fieldNames) {
     const value = obj[field];
     if (typeof value === "string" && value.trim().length > 0) {
       return value;
     }
   }
-  return null;
-}
 
-/**
- * Extracts text content from a single message object.
- * Handles various message formats: OpenAI, Anthropic, generic.
- *
- * @param msg - The message object to extract content from
- * @returns The extracted text content, or null if not found
- */
-function extractMessageContent(msg: unknown): string | null {
-  if (typeof msg !== "object" || msg === null) return null;
-  const obj = msg as Record<string, unknown>;
-
-  // Check for content field (OpenAI format)
-  if (typeof obj.content === "string") return obj.content;
-
-  // Check for text field
-  if (typeof obj.text === "string") return obj.text;
-
-  // Handle content array (multimodal messages)
-  if (Array.isArray(obj.content)) {
-    const texts = obj.content
-      .filter(
-        (p: unknown): p is Record<string, unknown> =>
-          typeof p === "object" && p !== null,
-      )
-      .map((p) => {
-        if (typeof p.text === "string") return p.text;
-        if (typeof p.content === "string") return p.content;
-        return null;
-      })
-      .filter((t): t is string => typeof t === "string");
-    return texts.length > 0 ? texts.join("\n") : null;
+  // Single-key wrapper fallback (e.g. `{ data: { content: "..." } }`,
+  // `{ result: { answer: "..." } }`). Recurse into the inner object so the
+  // fixed field-name loop above gets a chance against the unwrapped payload.
+  const entries = Object.entries(obj);
+  if (entries.length === 1) {
+    const [, only] = entries[0]!;
+    if (only && typeof only === "object" && !Array.isArray(only)) {
+      return extractTextFromStateObject(
+        only as Record<string, unknown>,
+        fieldNames,
+        depth + 1,
+      );
+    }
   }
 
   return null;
@@ -223,9 +236,14 @@ function extractTextFromMessages(
     const { type, value } = data;
 
     if (type === "chat_messages" && Array.isArray(value)) {
-      // Extract text from chat messages array
+      // For input mode, extract only the last user message
+      if (mode === "input") {
+        const lastUserText = extractLastUserMessageText(value);
+        if (lastUserText) return lastUserText;
+      }
+      // Fallback: concatenate all messages
       const texts = value
-        .map((msg) => extractMessageContent(msg))
+        .map((msg) => extractMessageContentText(msg))
         .filter((t): t is string => t !== null);
       return texts.length > 0 ? texts.join("\n") : null;
     }
@@ -248,37 +266,77 @@ function extractTextFromMessages(
 
   // Handle array of messages directly
   if (Array.isArray(data)) {
+    // For input mode, extract only the last user message
+    if (mode === "input") {
+      const lastUserText = extractLastUserMessageText(data);
+      if (lastUserText) return lastUserText;
+    }
+    // Fallback: concatenate all messages
     const texts = data
-      .map((msg) => extractMessageContent(msg))
+      .map((msg) => extractMessageContentText(msg))
       .filter((t): t is string => t !== null);
     return texts.length > 0 ? texts.join("\n") : null;
   }
 
   // Handle single message object
   if (typeof data === "object" && data !== null) {
-    return extractMessageContent(data);
+    return extractMessageContentText(data);
   }
 
   return null;
 }
 
 /**
+ * Reads annotated value types from the trace summary attributes.
+ * Returns true if the given attribute key has the specified type.
+ */
+function hasAnnotatedType(
+  attributes: Record<string, string>,
+  attrKey: string,
+  type: string,
+): boolean {
+  const raw = attributes["langwatch.reserved.value_types"];
+  if (!raw) return false;
+  try {
+    const arr: string[] = JSON.parse(raw);
+    return arr.includes(`${attrKey}=${type}`);
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Parses the computed input string to TraceInput format.
- * Attempts to extract text from chat message formats.
+ * Uses value type annotations from attributes when available to avoid
+ * heuristic guessing.
  *
  * @param computedInput - The computed input string from ClickHouse
+ * @param attributes - Trace summary attributes (for value type hints)
  * @returns TraceInput with extracted text value
  */
 function parseComputedInput(
   computedInput: string | null,
+  attributes: Record<string, string>,
 ): TraceInput | undefined {
   if (!computedInput) {
     return void 0;
   }
 
+  // Check value type annotation for a hint
+  const isChatMessages =
+    hasAnnotatedType(attributes, "gen_ai.input.messages", "chat_messages") ||
+    hasAnnotatedType(attributes, "langwatch.input", "chat_messages");
+
   // Try to parse as JSON and extract text from chat messages
   try {
     const parsed = JSON.parse(computedInput);
+
+    // If annotated as chat_messages, treat as message array
+    if (isChatMessages && Array.isArray(parsed)) {
+      const text = extractTextFromMessages(parsed, "input");
+      if (text) return { value: text };
+    }
+
     const text = extractTextFromMessages(parsed, "input");
     if (text) {
       return { value: text };
@@ -294,21 +352,36 @@ function parseComputedInput(
 
 /**
  * Parses the computed output string to TraceOutput format.
- * Attempts to extract text from chat message formats.
+ * Uses value type annotations from attributes when available to avoid
+ * heuristic guessing.
  *
  * @param computedOutput - The computed output string from ClickHouse
+ * @param attributes - Trace summary attributes (for value type hints)
  * @returns TraceOutput with extracted text value
  */
 function parseComputedOutput(
   computedOutput: string | null,
+  attributes: Record<string, string>,
 ): TraceOutput | undefined {
   if (!computedOutput) {
     return void 0;
   }
 
+  // Check value type annotation for a hint
+  const isChatMessages =
+    hasAnnotatedType(attributes, "gen_ai.output.messages", "chat_messages") ||
+    hasAnnotatedType(attributes, "langwatch.output", "chat_messages");
+
   // Try to parse as JSON and extract text from chat messages
   try {
     const parsed = JSON.parse(computedOutput);
+
+    // If annotated as chat_messages, treat as message array
+    if (isChatMessages && Array.isArray(parsed)) {
+      const text = extractTextFromMessages(parsed, "output");
+      if (text) return { value: text };
+    }
+
     const text = extractTextFromMessages(parsed, "output");
     if (text) {
       return { value: text };
@@ -341,6 +414,73 @@ function createError(
 }
 
 /**
+ * Extracts Event objects from spans that have event.type in their attributes.
+ * Events are stored in ClickHouse as spans with event.* span attributes.
+ * After unflattening, these appear as params.event.type, params.event.metrics.*, etc.
+ */
+export function extractEventsFromSpans({
+  spans,
+  projectId,
+  traceId,
+}: {
+  spans: Span[];
+  projectId: string;
+  traceId: string;
+}): Event[] {
+  const events: Event[] = [];
+
+  for (const span of spans) {
+    const eventObj = span.params?.event;
+    if (typeof eventObj !== "object" || eventObj === null) continue;
+
+    const eventRecord = eventObj as Record<string, unknown>;
+    const eventType = eventRecord.type;
+    if (typeof eventType !== "string" || !eventType) continue;
+
+    const metrics: Record<string, number> = {};
+    const rawMetrics = eventRecord.metrics;
+    if (typeof rawMetrics === "object" && rawMetrics !== null) {
+      for (const [key, value] of Object.entries(
+        rawMetrics as Record<string, unknown>,
+      )) {
+        const num = Number(value);
+        if (Number.isFinite(num)) {
+          metrics[key] = num;
+        }
+      }
+    }
+
+    const eventDetails: Record<string, string> = {};
+    const rawDetails = eventRecord.details;
+    if (typeof rawDetails === "object" && rawDetails !== null) {
+      for (const [key, value] of Object.entries(
+        rawDetails as Record<string, unknown>,
+      )) {
+        if (typeof value === "string") {
+          eventDetails[key] = value;
+        }
+      }
+    }
+
+    events.push({
+      event_id: span.span_id,
+      event_type: eventType,
+      project_id: projectId,
+      metrics,
+      event_details: eventDetails,
+      trace_id: traceId,
+      timestamps: {
+        started_at: span.timestamps.started_at,
+        inserted_at: span.timestamps.started_at,
+        updated_at: span.timestamps.finished_at,
+      },
+    });
+  }
+
+  return events;
+}
+
+/**
  * Maps a TraceSummaryData (from ClickHouse trace_summaries) and its associated spans
  * to the legacy Trace type used by the Elasticsearch-based system.
  */
@@ -350,31 +490,38 @@ export function mapTraceSummaryToTrace(
   projectId: string,
 ): Trace {
   const metadata = mapAttributesToMetadata(
-    summary.Attributes,
-    summary.TopicId,
-    summary.SubTopicId,
+    summary.attributes,
+    summary.topicId,
+    summary.subTopicId,
   );
 
+  const events = extractEventsFromSpans({
+    spans,
+    projectId,
+    traceId: summary.traceId,
+  });
+
   const trace: Trace = {
-    trace_id: summary.TraceId,
+    trace_id: summary.traceId,
     project_id: projectId,
     metadata,
     timestamps: {
-      started_at: summary.CreatedAt,
-      inserted_at: summary.CreatedAt,
-      updated_at: summary.LastUpdatedAt,
+      started_at: summary.occurredAt,
+      inserted_at: summary.createdAt,
+      updated_at: summary.updatedAt,
     },
-    input: parseComputedInput(summary.ComputedInput),
-    output: parseComputedOutput(summary.ComputedOutput),
+    input: parseComputedInput(summary.computedInput, summary.attributes),
+    output: parseComputedOutput(summary.computedOutput, summary.attributes),
     metrics: {
-      first_token_ms: summary.TimeToFirstTokenMs,
-      total_time_ms: summary.TotalDurationMs,
-      prompt_tokens: summary.TotalPromptTokenCount,
-      completion_tokens: summary.TotalCompletionTokenCount,
-      total_cost: summary.TotalCost,
-      tokens_estimated: summary.TokensEstimated,
+      first_token_ms: summary.timeToFirstTokenMs,
+      total_time_ms: summary.totalDurationMs,
+      prompt_tokens: summary.totalPromptTokenCount,
+      completion_tokens: summary.totalCompletionTokenCount,
+      total_cost: summary.totalCost,
+      tokens_estimated: summary.tokensEstimated,
     },
-    error: createError(summary.ContainsErrorStatus, summary.ErrorMessage),
+    error: createError(summary.containsErrorStatus, summary.errorMessage),
+    events: events.length > 0 ? events : undefined,
     spans,
   };
 

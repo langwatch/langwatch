@@ -1,21 +1,35 @@
-import { HStack, Text } from "@chakra-ui/react";
-import { formatResourceUsage } from "./licenseStatusUtils";
+import { Text, VStack } from "@chakra-ui/react";
+import { formatLimitOrUnlimited } from "./licenseStatusUtils";
 
 export interface ResourceLimitRowProps {
   label: string;
   current: number;
-  max: number;
+  max?: number;
 }
 
 export function ResourceLimitRow({ label, current, max }: ResourceLimitRowProps) {
   return (
-    <HStack width="full" justify="space-between">
-      <Text fontSize="sm" color="fg.muted">
-        {label}:
+    <VStack
+      align="start"
+      gap={1}
+      paddingY={4}
+      paddingX={5}
+      borderWidth="1px"
+      borderColor="border"
+      borderRadius="lg"
+      bg="bg.subtle"
+    >
+      <Text fontSize="xs" color="fg.muted" fontWeight="medium" textTransform="uppercase" letterSpacing="wide">
+        {label}
       </Text>
-      <Text fontSize="sm" fontWeight="medium">
-        {formatResourceUsage(current, max)}
+      <Text fontSize="xl" fontWeight="semibold" color="fg">
+        {current.toLocaleString()}
+        {max != null && (
+          <Text as="span" fontSize="sm" fontWeight="normal" color="fg.muted">
+            {" "}/ {formatLimitOrUnlimited(max)}
+          </Text>
+        )}
       </Text>
-    </HStack>
+    </VStack>
   );
 }

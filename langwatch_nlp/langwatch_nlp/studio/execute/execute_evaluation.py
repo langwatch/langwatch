@@ -1,3 +1,5 @@
+import logging
+import os
 import time
 from typing import Optional, cast
 import dspy
@@ -23,6 +25,7 @@ from langwatch_nlp.studio.types.events import (
 from langwatch_nlp.studio.utils import (
     disable_dsp_caching,
     get_input_keys,
+    optional_langwatch_trace,
     transpose_inline_dataset_to_object_list,
 )
 
@@ -31,6 +34,8 @@ from dspy.utils.asyncify import asyncify
 from sklearn.model_selection import train_test_split
 
 import langwatch
+
+eval_logger = logging.getLogger(__name__)
 
 
 async def execute_evaluation(
@@ -45,6 +50,11 @@ async def execute_evaluation(
 
         disable_dsp_caching()
 
+        eval_logger.info(
+            "Starting evaluation: run_id=%s, workflow_id=%s, evaluate_on=%s",
+            run_id, workflow.workflow_id, event.evaluate_on,
+        )
+
         # TODO: handle workflow errors here throwing an special event showing the error was during the execution of the workflow?
         yield start_evaluation_event(run_id)
         valid = True
@@ -58,7 +68,12 @@ async def execute_evaluation(
             module = Module(run_evaluations=True)
             module.prevent_crashes()
 
-            langwatch.setup(workflow.api_key)
+            langwatch.setup(
+                api_key=workflow.api_key,
+                endpoint_url=os.environ.get("LANGWATCH_ENDPOINT"),
+            )
+
+            origin = event.origin or "evaluation"
 
             entry_node = cast(
                 EntryNode,
@@ -141,10 +156,29 @@ async def execute_evaluation(
                 queue=queue,
                 weighting="mean",
             )
+            eval_logger.info(
+                "Evaluation setup complete: run_id=%s, %d examples, "
+                "api_key=%s, endpoint=%s",
+                run_id, len(examples),
+                "set" if workflow.api_key else "MISSING",
+                langwatch.get_endpoint(),
+            )
             # Send initial empty batch to create the experiment in LangWatch
             reporting.send_batch()
-            await asyncify(evaluator)(module, metric=reporting.evaluate_and_report)  # type: ignore
+            with optional_langwatch_trace(
+                name="execute_evaluation",
+                type="evaluation",
+                origin=origin,
+            ):
+                await asyncify(evaluator)(module, metric=reporting.evaluate_and_report)  # type: ignore
+            eval_logger.info(
+                "Evaluation execution complete, waiting for batch sends: run_id=%s",
+                run_id,
+            )
             await reporting.wait_for_completion()
+            eval_logger.info(
+                "All evaluation batches sent: run_id=%s", run_id
+            )
     except Exception as e:
         yield error_evaluation_event(run_id, str(e), stopped_at=int(time.time() * 1000))
         if valid:

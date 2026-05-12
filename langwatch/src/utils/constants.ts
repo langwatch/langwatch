@@ -17,16 +17,28 @@ export const MIN_MAX_TOKENS = 256;
 export const FALLBACK_MAX_TOKENS = 4096;
 
 export const KSUID_RESOURCES = {
+  BATCH_RESULT: "batchresult",
   COST: "cost",
   EVALUATION: "eval",
   EVENT: "event",
   EXPERIMENT: "experiment",
+  EXPERIMENT_RUN_RESULT: "exprunresult",
+  MODEL_PROVIDER: "provider",
   MONITOR: "monitor",
   ORGANIZATION: "organization",
   PROJECT: "project",
+  SCENARIO: "scenario",
   SCENARIO_BATCH: "scenariobatch",
+  SCENARIO_RUN: "scenariorun",
   SPAN: "span",
+  TEAM: "team",
+  LOG_RECORD: "logrecord",
+  METRIC_RECORD: "metricrecord",
   TRACE_SUMMARY: "tracesummary",
   TRACKED_EVENT: "trackedevent",
   USER: "user",
+  PROMPT_PLAYGROUND_THREAD: "promptthread",
+  DATASET_RECORD: "dsrecord",
+  GROUP: "group",
+  ROLE_BINDING: "rolebinding",
 } as const;

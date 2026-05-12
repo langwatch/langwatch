@@ -1,5 +1,5 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
-import type { ScenarioResults } from "~/app/api/scenario-events/[[...route]]/schemas";
+import type { ScenarioResults } from "~/server/scenarios/schemas";
 
 // Component for displaying the verdict with proper styling
 function VerdictSection({ verdict }: { verdict: string }) {

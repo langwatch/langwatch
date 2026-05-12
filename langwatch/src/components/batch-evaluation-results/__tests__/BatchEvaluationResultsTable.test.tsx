@@ -19,6 +19,12 @@ vi.mock("~/hooks/useDrawer", () => ({
   }),
 }));
 
+// TraceIdPeek (rendered transitively) calls useFeatureFlag → tRPC, which has
+// no withTRPC wrapper in these tests.
+vi.mock("~/hooks/useFeatureFlag", () => ({
+  useFeatureFlag: () => ({ enabled: false, isLoading: false }),
+}));
+
 // Wrapper with Chakra provider
 const Wrapper = ({ children }: { children: ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

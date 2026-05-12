@@ -6,6 +6,7 @@
  * server-side code when client components import from ee/licensing.
  */
 export type PlanInfo = {
+  planSource: "license" | "subscription" | "free";
   type: string;
   name: string;
   free: boolean;
@@ -17,7 +18,6 @@ export type PlanInfo = {
   maxTeams: number;
   maxProjects: number;
   maxMessagesPerMonth: number;
-  evaluationsCredit: number;
   maxWorkflows: number;
   maxPrompts: number;
   maxEvaluators: number;
@@ -30,6 +30,7 @@ export type PlanInfo = {
   maxCustomGraphs: number;
   maxAutomations: number;
   canPublish: boolean;
+  usageUnit?: string;
   userPrice?: {
     USD: number;
     EUR: number;

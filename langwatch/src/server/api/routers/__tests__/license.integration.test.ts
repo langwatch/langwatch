@@ -28,7 +28,8 @@ import {
 } from "../../../../../ee/licensing/__tests__/fixtures/testLicenses";
 import { TEST_PUBLIC_KEY, TEST_PRIVATE_KEY } from "../../../../../ee/licensing/__tests__/fixtures/testKeys";
 import { parseLicenseKey, verifySignature, PRO_TEMPLATE, ENTERPRISE_TEMPLATE } from "../../../../../ee/licensing";
-import { OrganizationUserRole } from "@prisma/client";
+import { OrganizationUserRole, RoleBindingScopeType, TeamUserRole } from "@prisma/client";
+import { nanoid } from "nanoid";
 
 // Mock getLicenseHandler to use test public key
 vi.mock("../../../subscriptionHandler", async (importOriginal) => {
@@ -91,6 +92,21 @@ describe("License Router Integration", () => {
       },
     });
 
+    // Grant admin user an org-scoped ADMIN RoleBinding so permission checks pass
+    await prisma.roleBinding.deleteMany({
+      where: { organizationId, userId: adminUser.id },
+    });
+    await prisma.roleBinding.create({
+      data: {
+        id: `rb-lic-admin-${nanoid(8)}`,
+        organizationId,
+        userId: adminUser.id,
+        role: TeamUserRole.ADMIN,
+        scopeType: RoleBindingScopeType.ORGANIZATION,
+        scopeId: organizationId,
+      },
+    });
+
     // Create member user
     const memberUser = await prisma.user.upsert({
       where: { email: "license-router-member@test.com" },
@@ -117,6 +133,21 @@ describe("License Router Integration", () => {
       },
     });
 
+    // Grant member an org-scoped MEMBER RoleBinding so organization:view checks pass
+    await prisma.roleBinding.deleteMany({
+      where: { organizationId, userId: memberUser.id },
+    });
+    await prisma.roleBinding.create({
+      data: {
+        id: `rb-lic-member-${nanoid(8)}`,
+        organizationId,
+        userId: memberUser.id,
+        role: TeamUserRole.MEMBER,
+        scopeType: RoleBindingScopeType.ORGANIZATION,
+        scopeId: organizationId,
+      },
+    });
+
     // Create admin caller
     const adminCtx = createInnerTRPCContext({
       session: {
@@ -138,6 +169,7 @@ describe("License Router Integration", () => {
 
   afterAll(async () => {
     // Cleanup
+    await prisma.roleBinding.deleteMany({ where: { organizationId } });
     await prisma.organizationUser.deleteMany({
       where: { organizationId },
     });
@@ -170,6 +202,7 @@ describe("License Router Integration", () => {
   // ==========================================================================
 
   describe("getStatus", () => {
+    /** @scenario Gets license status for organization without license */
     it("returns hasLicense=false when org has no license", async () => {
       const status = await adminCaller.license.getStatus({ organizationId });
 
@@ -200,6 +233,7 @@ describe("License Router Integration", () => {
       expect(status.hasLicense).toBe(false);
     });
 
+    /** @scenario Rejects request for unauthorized organization */
     it("throws UNAUTHORIZED for non-existent organization", async () => {
       // User is not a member of non-existent org, so permission check fails before NOT_FOUND can be thrown
       await expect(
@@ -285,6 +319,7 @@ describe("License Router Integration", () => {
     });
   });
 
+
   // ==========================================================================
   // remove Tests
   // ==========================================================================
@@ -356,7 +391,6 @@ describe("License Router Integration", () => {
         maxTeams: 10,
         maxProjects: 20,
         maxMessagesPerMonth: 100000,
-        evaluationsCredit: 500,
         maxWorkflows: 50,
         maxPrompts: 50,
         maxEvaluators: 50,
@@ -364,6 +398,7 @@ describe("License Router Integration", () => {
         maxAgents: 50,
         maxExperiments: 50,
         canPublish: true,
+        usageUnit: "traces" as const,
       },
     });
 
@@ -434,7 +469,6 @@ describe("License Router Integration", () => {
           maxTeams: ENTERPRISE_TEMPLATE.maxTeams ?? 100,
           maxProjects: ENTERPRISE_TEMPLATE.maxProjects,
           maxMessagesPerMonth: ENTERPRISE_TEMPLATE.maxMessagesPerMonth,
-          evaluationsCredit: ENTERPRISE_TEMPLATE.evaluationsCredit,
           maxWorkflows: ENTERPRISE_TEMPLATE.maxWorkflows,
           maxPrompts: ENTERPRISE_TEMPLATE.maxPrompts ?? 1000,
           maxEvaluators: ENTERPRISE_TEMPLATE.maxEvaluators ?? 1000,
@@ -442,6 +476,7 @@ describe("License Router Integration", () => {
           maxAgents: ENTERPRISE_TEMPLATE.maxAgents ?? 1000,
           maxExperiments: ENTERPRISE_TEMPLATE.maxExperiments ?? 1000,
           canPublish: true,
+          usageUnit: "traces" as const,
         },
       });
 
@@ -487,6 +522,25 @@ describe("License Router Integration", () => {
           },
         })
       ).rejects.toThrow();
+    });
+
+    it("includes usageUnit in generated license", async () => {
+      const result = await adminCaller.license.generate(getValidInput());
+
+      const parsedLicense = parseLicenseKey(result.licenseKey);
+      expect(parsedLicense?.data.plan.usageUnit).toBe("traces");
+    });
+
+    it("generates license with events usageUnit", async () => {
+      const input = {
+        ...getValidInput(),
+        plan: { ...getValidInput().plan, usageUnit: "events" as const },
+      };
+
+      const result = await adminCaller.license.generate(input);
+
+      const parsedLicense = parseLicenseKey(result.licenseKey);
+      expect(parsedLicense?.data.plan.usageUnit).toBe("events");
     });
 
     it("throws UNAUTHORIZED when member tries to generate", async () => {

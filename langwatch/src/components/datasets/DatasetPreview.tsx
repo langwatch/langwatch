@@ -104,7 +104,7 @@ export function DatasetPreview({
                 </Text>
                 {process.env.NODE_ENV === "development" && (
                   <Text fontSize="sm" color="red.600">
-                    {error.message}
+                    {error instanceof Error ? error.message : String(error)}
                   </Text>
                 )}
               </Box>

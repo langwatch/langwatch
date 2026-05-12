@@ -3,6 +3,14 @@ Feature: Unified Reasoning Form Field
   I want to see a single "Reasoning" field in forms
   So that I have a consistent experience across all providers
 
+  # The mapReasoningToProvider / normalizeReasoningFromProviderFields
+  # functions are bound via existing `reasoningBoundary.unit.test.ts`.
+  # The remaining @unimplemented scenarios cover form-schema validation
+  # and form-to-save-params helpers that need targeted unit tests in
+  # `langwatch/src/prompts/utils/__tests__/llmPromptConfigUtils.test.ts`
+  # — which exercises the same family of converters but not these
+  # specific reasoning-field invariants.
+
   # Form Schema Validation
   @unit
   Scenario: Form schema accepts reasoning field with valid value
@@ -59,7 +67,7 @@ Feature: Unified Reasoning Form Field
     Then the form should have llm.reasoning undefined
 
   # Round-trip Consistency
-  @integration
+  @integration @unimplemented
   Scenario: Form values round-trip preserves reasoning
     Given form values with llm.reasoning "medium"
     When converting to save params and back to form values

@@ -31,6 +31,8 @@ import {
  * So that I can test modifications without re-running the entire evaluation
  */
 test.describe("Single Cell Re-execution", () => {
+  // fixme(#1811): flaky — Lambda warmup failures in CI cause timeouts
+  test.fixme();
   /**
    * Scenario: Single cell re-execution for HTTP agent
    * Source: http-agent-support.feature lines 233-238

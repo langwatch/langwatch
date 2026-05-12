@@ -7,21 +7,25 @@ Feature: Welcome Header
   Background:
     Given I am logged in as a user
 
+  @unimplemented
   Scenario: Displays greeting with user's first name
     Given my name is "John Doe"
     When I view the home page
     Then I should see "Hello, John"
 
+  @unimplemented
   Scenario: Extracts first name from full name
     Given my name is "Jane Maria Smith"
     When I view the home page
     Then I should see "Hello, Jane"
 
+  @unimplemented
   Scenario: Displays friendly fallback when name unavailable
     Given my name is not set
     When I view the home page
     Then I should see "Hello 👋"
 
+  @unimplemented
   Scenario: Displays friendly fallback when name is just email
     Given my name is "johndoe@example.com"
     When I view the home page

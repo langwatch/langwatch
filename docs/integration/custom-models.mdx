@@ -1,0 +1,63 @@
+---
+title: Custom Models
+sidebarTitle: Custom Models
+description: Configure and use custom LLM models in LangWatch, including local inference servers and external endpoints like Databricks.
+keywords: custom models, local llm, databricks, vllm, tgi, ollama, openai-compatible, langwatch, configuration
+---
+
+LangWatch supports connecting to any model that exposes an OpenAI-compatible API, including local inference servers (Ollama, vLLM, TGI), cloud deployments (Databricks, Azure ML), and custom APIs.
+
+## Adding a Custom Model
+
+1. Navigate to **Settings** in your project dashboard
+2. Select **Model Provider** from the settings menu
+3. Enable **Custom model**
+4. Configure your model:
+
+| Field | Description |
+|-------|-------------|
+| **Model Name** | A descriptive name for your model (e.g., `llama-3.1-70b`) |
+| **Base URL** | The endpoint URL for your model's API |
+| **API Key** | Authentication key (if required) |
+
+<Tip>
+For local models that don't require authentication, enter any non-empty string as the API key.
+</Tip>
+
+### Example Configurations
+
+**Ollama**
+| Field | Value |
+|-------|-------|
+| Base URL | `http://localhost:11434/v1` |
+| API Key | `ollama` |
+
+**vLLM**
+| Field | Value |
+|-------|-------|
+| Base URL | `http://localhost:8000/v1` |
+| API Key | Your configured token |
+
+**Databricks**
+| Field | Value |
+|-------|-------|
+| Base URL | `https://<workspace>.cloud.databricks.com/serving-endpoints` |
+| API Key | Your Databricks personal access token |
+
+## Using Custom Models
+
+Once configured, your custom models appear in the model selector throughout LangWatch, including the Prompt Playground and when configuring scenarios.
+
+When referencing your custom model in code or API calls, use the format:
+
+```
+custom/<your-model-name>
+```
+
+For example, if you configured a model named `llama-3.1-70b`, reference it as `custom/llama-3.1-70b`.
+
+## Related
+
+- [LiteLLM Integration](/integration/python/integrations/lite-llm) - Unified interface for multiple providers
+- [Tracking LLM Costs](/integration/python/tutorials/tracking-llm-costs) - Configure cost tracking
+- [Prompt Playground](/prompt-management/prompt-playground) - Test prompts with custom models

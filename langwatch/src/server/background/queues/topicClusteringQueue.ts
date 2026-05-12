@@ -9,7 +9,7 @@ import { QueueWithFallback } from "./queueWithFallback";
 
 export { TOPIC_CLUSTERING_QUEUE } from "./constants";
 
-const topicClusteringQueue = new QueueWithFallback<
+export const topicClusteringQueue = new QueueWithFallback<
   TopicClusteringJob,
   void,
   string

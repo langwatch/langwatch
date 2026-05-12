@@ -1,0 +1,38 @@
+---
+title: Tracking Tool Calls
+sidebarTitle: Python
+description: Track tool calls in Python-based agent applications with LangWatch to improve debugging and evaluation completeness.
+icon: python
+keywords: langwatch, python, tools, agent, tracking, instrumentation
+---
+
+<Note>
+Most agent frameworks automatically track tool calls for you. If you're using [OpenAI Agents, Agno, Mastra, or other supported frameworks](/integration/overview#frameworks), tool calls are already being captured automatically. You only need manual instrumentation for custom tools or unsupported frameworks.
+</Note>
+
+## Manual Tool Tracking
+
+If you have custom tools that aren't automatically tracked, you can manually instrument them using the `@langwatch.span(type="tool")` decorator:
+
+```python
+import langwatch
+import os
+
+langwatch.setup(api_key=os.getenv("LANGWATCH_API_KEY"))
+
+@langwatch.trace()
+def agent_call(query: str):
+    # Your agent logic here
+    result = my_custom_tool(query)
+    return result
+
+@langwatch.span(type="tool")
+def my_custom_tool(query: str):
+    # Your custom tool implementation
+    result = f"Tool result for: {query}"
+    return result
+
+agent_call("What's the weather?")
+```
+
+This will display the tool call with a tool icon in the trace visualization and include it in tool call analytics in the LangWatch dashboard.

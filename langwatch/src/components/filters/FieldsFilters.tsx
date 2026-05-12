@@ -24,7 +24,9 @@ import { Search } from "lucide-react";
 import { LuZap } from "react-icons/lu";
 import { useDebounceValue } from "usehooks-ts";
 import { useDrawer } from "~/hooks/useDrawer";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import {
+	useOrganizationTeamProject,
+} from "~/hooks/useOrganizationTeamProject";
 import { type FilterParam, useFilterParams } from "../../hooks/useFilterParams";
 import { filterOutEmptyFilters } from "../../server/analytics/utils";
 import type { AppRouter } from "../../server/api/root";
@@ -38,16 +40,17 @@ import { InputGroup } from "../ui/input-group";
 import { Popover } from "../ui/popover";
 import { Slider } from "../ui/slider";
 import { Tooltip } from "../ui/tooltip";
+import { SaveAsViewButton } from "./SaveAsViewButton";
 
 export function QueryStringFieldsFilters({
 	hideTriggerButton = false,
 }: {
 	hideTriggerButton?: boolean;
 }) {
-	const { nonEmptyFilters, setFilters } = useFilterParams();
+	const { nonEmptyFilters, setFilters, filterParams } = useFilterParams();
 
 	const { openDrawer } = useDrawer();
-	const { hasPermission } = useOrganizationTeamProject();
+	const { project, hasPermission } = useOrganizationTeamProject();
 
 	const hasAnyFilters = Object.keys(nonEmptyFilters).length > 0;
 
@@ -55,19 +58,26 @@ export function QueryStringFieldsFilters({
 		<FieldsFilters
 			filters={nonEmptyFilters}
 			setFilters={(filters) => setFilters(filterOutEmptyFilters(filters))}
+			negated={!!filterParams.negateFilters}
 			actionButton={
-				hasPermission("triggers:manage") && !hideTriggerButton ? (
-					<Tooltip content="Create a filter to add an automation.">
-						<Button
-							colorPalette="gray"
-							onClick={() => openDrawer("automation", undefined)}
-							disabled={!hasAnyFilters}
-						>
-							<LuZap />
-							Add Automation
-						</Button>
-					</Tooltip>
-				) : undefined
+				<HStack gap={1}>
+					{hasAnyFilters && (
+						<SaveAsViewButton />
+					)}
+					{hasPermission("triggers:manage") && !hideTriggerButton && (
+						<Tooltip content="Create a filter to add an automation.">
+							<Button
+								size="xs"
+								variant="outline"
+								onClick={() => openDrawer("automation", undefined)}
+								disabled={!hasAnyFilters}
+							>
+								<LuZap />
+								Add Automation
+							</Button>
+						</Tooltip>
+					)}
+				</HStack>
 			}
 		/>
 	);
@@ -77,18 +87,24 @@ export function FieldsFilters({
 	filters,
 	setFilters,
 	actionButton,
+	negated = false,
 }: {
 	filters: Record<FilterField, FilterParam>;
 	setFilters: (filters: Partial<Record<FilterField, FilterParam>>) => void;
 	actionButton?: React.ReactNode;
+	negated?: boolean;
 }) {
 	const filterKeys: FilterField[] = [
+		"traces.origin",
+		"traces.name",
 		"metadata.prompt_ids",
+		"spans.type",
 		"spans.model",
 		"metadata.labels",
 		"evaluations.passed",
 		"evaluations.score",
 		"evaluations.label",
+		"events.event_type",
 		"events.metrics.value",
 		"metadata.user_id",
 		"metadata.thread_id",
@@ -121,6 +137,7 @@ export function FieldsFilters({
 						filter={filter}
 						filters={filters}
 						setFilters={setFilters}
+						negated={negated}
 					/>
 				))}
 			</VStack>
@@ -131,6 +148,7 @@ export function FieldsFilters({
 // Filter types that should NOT allow custom values
 const BOOLEAN_FILTER_IDS: FilterField[] = [
 	"evaluations.passed",
+	"traces.origin",
 	"traces.error",
 	"annotations.hasAnnotation",
 	"evaluations.state",
@@ -141,11 +159,13 @@ function FieldsFilter({
 	filter,
 	filters,
 	setFilters,
+	negated = false,
 }: {
 	filterId: FilterField;
 	filter: FilterDefinition;
 	filters: Record<FilterField, FilterParam>;
 	setFilters: (filters: Partial<Record<FilterField, FilterParam>>) => void;
+	negated?: boolean;
 }) {
 	const gray400 = useColorRawValue("gray.400");
 
@@ -158,9 +178,18 @@ function FieldsFilter({
 
 	const searchRef = React.useRef<HTMLInputElement | null>(null);
 	const [query, setQuery] = useDebounceValue("", 300);
+	// Cancel pending debounced setState on unmount. Without this, a trailing
+	// fire after teardown (e.g. in vitest workers tearing down jsdom) calls
+	// setState on an unmounted tree → "ReferenceError: window is not defined"
+	// inside react-dom's debounced scheduler.
+	useEffect(() => {
+		return () => {
+			setQuery.cancel();
+		};
+	}, [setQuery]);
 	const [immediateQuery, setImmediateQuery] = useState("");
 	const { open, setOpen } = useDisclosure();
-	const current = filters[filterId] ?? [];
+	const current = filters?.[filterId] ?? [];
 
 	// Keyboard navigation state
 	const [highlightedIndex, setHighlightedIndex] = useState(-1);
@@ -170,12 +199,18 @@ function FieldsFilter({
 	// Ref for selecting the highlighted option from keyboard
 	const selectHighlightedRef = React.useRef<(() => void) | null>(null);
 
-	// Reset keyboard nav state when popover closes
+	// Reset state when popover closes
 	useEffect(() => {
 		if (!open) {
 			setHighlightedIndex(-1);
 			setIsKeyboardNav(false);
+			setQuery("");
+			setImmediateQuery("");
+			if (searchRef.current) {
+				searchRef.current.value = "";
+			}
 		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [open]);
 
 	const currentStringList = Array.isArray(current)
@@ -216,13 +251,30 @@ function FieldsFilter({
 				<Popover.Trigger asChild>
 					<Button
 						variant="subtle"
-						backgroundColor="bg.muted"
+						backgroundColor={
+							currentStringList.length > 0 && negated
+								? "red.subtle"
+								: currentStringList.length > 0
+									? "blue.subtle"
+									: "bg.muted"
+						}
 						size="sm"
 						width="100%"
 						fontWeight="normal"
 					>
 						<HStack width="full" gap={1}>
-							<Text color="fg.muted" fontWeight="500" paddingRight={4}>
+							<Text
+								color={
+									currentStringList.length > 0 && negated
+										? "red.fg"
+										: currentStringList.length > 0
+											? "blue.fg"
+											: "fg.muted"
+								}
+								fontWeight="500"
+								paddingRight={4}
+							>
+								{currentStringList.length > 0 && negated ? "NOT " : ""}
 								{filter.name}
 							</Text>
 							{currentStringList.length > 0 ? (
@@ -234,6 +286,7 @@ function FieldsFilter({
 											justifyContent="center"
 											display="flex"
 											flexShrink={0}
+											colorPalette={negated ? "red" : "blue"}
 										>
 											<Tag.Label>{currentStringList.length}</Tag.Label>
 										</Tag.Root>
@@ -408,7 +461,7 @@ function NestedListSelection({
 					current_[lastKey] = values;
 				} else {
 					for (const key of Object.keys(current_)) {
-						if (!(key in values)) {
+						if (!values.includes(key)) {
 							delete current_[key];
 						}
 					}
@@ -609,11 +662,11 @@ function ListSelection({
 	// Handle mouse hover on options
 	const handleMouseMove = useCallback(
 		(index: number) => {
-			if (isKeyboardNav || highlightedIndex === index) return;
+			if (highlightedIndex === index) return;
 			onKeyboardNavChange?.(false);
 			onHighlightChange?.(index);
 		},
-		[isKeyboardNav, highlightedIndex, onKeyboardNavChange, onHighlightChange],
+		[highlightedIndex, onKeyboardNavChange, onHighlightChange],
 	);
 
 	if (
@@ -677,10 +730,7 @@ function ListSelection({
 
 					const isHighlighted = virtualItem.index === highlightedIndex;
 
-					const onChange_ = (e: any) => {
-						e.preventDefault();
-						e.stopPropagation();
-
+					const onChange_ = () => {
 						if (currentValues.includes(field.toString())) {
 							onChange(
 								currentValues.filter((v) => v.toString() !== field.toString()),
@@ -704,10 +754,12 @@ function ListSelection({
 						>
 							<HStack
 								width="full"
+								cursor="pointer"
 								background={isHighlighted ? "bg.muted" : undefined}
 								borderRadius="md"
 								paddingX={2}
 								onMouseMove={() => handleMouseMove(virtualItem.index)}
+								onClick={onChange_}
 							>
 								<Checkbox
 									width="full"
@@ -715,8 +767,6 @@ function ListSelection({
 									gap={2}
 									size="sm"
 									checked={currentValues.includes(field.toString())}
-									onClick={onChange_}
-									onChange={onChange_}
 								>
 									<VStack width="full" align="start" gap={0}>
 										{details && (
@@ -760,12 +810,14 @@ function ListSelection({
 						top={0}
 						left={0}
 						transform={`translateY(${virtualizer.getTotalSize()}px)`}
+						cursor="pointer"
 						background={
 							highlightedIndex === customValueIndex ? "bg.muted" : undefined
 						}
 						borderRadius="md"
 						paddingX={2}
 						onMouseMove={() => handleMouseMove(customValueIndex)}
+						onClick={handleCustomValueSelect}
 					>
 						<Checkbox
 							width="full"
@@ -773,8 +825,6 @@ function ListSelection({
 							gap={2}
 							size="sm"
 							checked={currentValues.includes(customValueQuery)}
-							onClick={handleCustomValueSelect}
-							onChange={handleCustomValueSelect}
 						>
 							<OverflownTextWithTooltip
 								fontSize="sm"
@@ -846,25 +896,20 @@ function RangeFilter({
 		min = 0;
 	}
 
+	const initializedRef = React.useRef(false);
+
 	useEffect(() => {
-		if (filterData.data) {
-			onChange([min.toString(), max.toString()]);
-		}
+		if (!filterData.data || initializedRef.current) return;
+		initializedRef.current = true;
+		// Skip initialization if the user already has a selected range
+		// (e.g. from a saved view or popover re-open)
+		if (currentValues.length === 2) return;
+		onChange([min.toString(), max.toString()]);
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [min, max, !!filterData.data]);
+	}, [!!filterData.data]);
 
 	return (
-		<HStack width="full" gap={3} paddingX={3} paddingY={2}>
-			<Input
-				width="56px"
-				paddingX={1}
-				textAlign="center"
-				size="sm"
-				value={currentValues[0]}
-				onChange={(e) => {
-					onChange([e.target.value, currentValues[1] ?? max.toString()]);
-				}}
-			/>
+		<VStack width="full" gap={2} paddingX={3} paddingY={3}>
 			<Slider.Root
 				width="full"
 				min={min}
@@ -872,7 +917,10 @@ function RangeFilter({
 				step={0.1}
 				value={
 					currentValues && currentValues.length == 2
-						? currentValues?.map((v) => +v)
+						? currentValues.map((v, i) => {
+								const n = +v;
+								return isNaN(n) ? (i === 0 ? min : max) : n;
+							})
 						: [min, max]
 				}
 				onValueChange={(values) => {
@@ -892,17 +940,30 @@ function RangeFilter({
 					</Slider.Thumb>
 				</Slider.Control>
 			</Slider.Root>
-			<Input
-				width="56px"
-				paddingX={1}
-				textAlign="center"
-				size="sm"
-				value={currentValues[1]}
-				onChange={(e) => {
-					onChange([currentValues[0] ?? min.toString(), e.target.value]);
-				}}
-			/>
-		</HStack>
+			<HStack width="full" gap={2}>
+				<Input
+					width="full"
+					paddingX={2}
+					textAlign="center"
+					size="sm"
+					value={currentValues[0]}
+					onChange={(e) => {
+						onChange([e.target.value, currentValues[1] ?? max.toString()]);
+					}}
+				/>
+				<Text color="fg.subtle" fontSize="xs" flexShrink={0}>to</Text>
+				<Input
+					width="full"
+					paddingX={2}
+					textAlign="center"
+					size="sm"
+					value={currentValues[1]}
+					onChange={(e) => {
+						onChange([currentValues[0] ?? min.toString(), e.target.value]);
+					}}
+				/>
+			</HStack>
+		</VStack>
 	);
 }
 
@@ -932,7 +993,7 @@ function ThumbsUpDownVoteFilter({
 			].map(({ field, label }) => {
 				const isChecked = !!(min && max && min <= field && max >= field);
 				return (
-					<HStack key={field} width="full" paddingX={1}>
+					<HStack key={field} width="full" paddingX={1} cursor="pointer">
 						<Checkbox
 							width="full"
 							paddingY="4px"
@@ -948,16 +1009,13 @@ function ThumbsUpDownVoteFilter({
 									]);
 								} else {
 									const other = field === -1 ? 1 : -1;
-									onChange([
-										((min ?? 0) === field && (max ?? 0) === field
-											? undefined
-											: other
-										)?.toString() ?? "",
-										((min ?? 0) === field && (max ?? 0) === field
-											? undefined
-											: other
-										)?.toString() ?? "",
-									]);
+									const isLast =
+										(min ?? 0) === field && (max ?? 0) === field;
+									if (isLast) {
+										onChange([]);
+									} else {
+										onChange([other.toString(), other.toString()]);
+									}
 								}
 							}}
 						>

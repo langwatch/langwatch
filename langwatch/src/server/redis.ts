@@ -1,7 +1,11 @@
 import IORedis, { Cluster } from "ioredis";
-import { PHASE_PRODUCTION_BUILD } from "next/constants";
+// PHASE_PRODUCTION_BUILD was "phase-production-build" from next/constants
+const PHASE_PRODUCTION_BUILD = "phase-production-build";
 import { env } from "../env.mjs";
 import { createLogger } from "../utils/logger/server";
+import { parseRedisDbIndex } from "./redis-db-index";
+
+export { parseRedisDbIndex } from "./redis-db-index";
 
 const logger = createLogger("langwatch:redis");
 
@@ -43,10 +47,22 @@ function parseClusterEndpoints(endpointsStr: string) {
 
 export let connection: IORedis | Cluster | undefined;
 
+// Dev-only isolation: `pnpm dev` at PORT=5570 lands on DB 1, PORT=5580 on DB 2,
+// etc. Prevents multiple worktrees from contending on the same BullMQ queues
+// and GroupQueue streams. Cluster mode ignores this (cluster supports only
+// DB 0) — we warn below if it's set in that combination.
+
 if (!isBuildOrNoRedis) {
   // Use validated env inside this block since Redis is definitely needed
+  const redisDbIndex = parseRedisDbIndex(env.REDIS_DB_INDEX);
   const useCluster = !!env.REDIS_CLUSTER_ENDPOINTS;
   if (useCluster) {
+    if (redisDbIndex !== 0) {
+      logger.warn(
+        { redisDbIndex },
+        "REDIS_DB_INDEX is set but REDIS_CLUSTER_ENDPOINTS is active — cluster mode only supports DB 0, ignoring",
+      );
+    }
     const clusterEndpoints = parseClusterEndpoints(
       env.REDIS_CLUSTER_ENDPOINTS ?? "",
     );
@@ -70,16 +86,17 @@ if (!isBuildOrNoRedis) {
     connection = new IORedis(env.REDIS_URL ?? "", {
       maxRetriesPerRequest: null,
       offlineQueue: false,
+      db: redisDbIndex,
       tls: env.REDIS_URL?.includes("tls.rejectUnauthorized=false")
         ? { rejectUnauthorized: false }
         : (env.REDIS_URL?.includes("rediss://") as any),
     });
 
     connection.on("connect", () => {
-      logger.info("connected");
+      logger.info({ db: redisDbIndex }, "connected");
     });
     connection.on("ready", () => {
-      logger.info("ready to accept commands");
+      logger.info({ db: redisDbIndex }, "ready to accept commands");
     });
   }
 
@@ -96,4 +113,52 @@ if (!isBuildOrNoRedis) {
 } else {
   // During build time or missing env, disable connection
   connection = undefined;
+}
+
+/**
+ * Block server boot until Redis answers a PING, or exit loudly on timeout.
+ *
+ * When Redis is down (forgot to start compose, wrong REDIS_URL, host port
+ * not published) the auth layer swallows the error and the user sees an
+ * endless "Redirecting to Sign in..." loop — ten minutes of head-scratching
+ * per new contributor. Surfacing the error here converts that into an
+ * obvious boot-time failure the developer can action immediately.
+ *
+ * No-ops in build/test modes where {@link isBuildOrNoRedis} is true.
+ */
+// 15s, not 3s: ElastiCache with TLS+AUTH can take longer than 3s on a cold
+// connection under load (observed twice on 2026-05-11 during a routine
+// langwatch-workers restart cycle — PING timed out, process.exit(1) fired,
+// and the pod crashlooped right when the event-sourcing dispatcher needed
+// to come back online). The boot guard is still useful for dev surface
+// errors; it just shouldn't trip on a real-world TLS handshake.
+export async function verifyRedisReady(timeoutMs = 15_000): Promise<void> {
+  if (isBuildOrNoRedis || !connection) return;
+  const target =
+    env.REDIS_CLUSTER_ENDPOINTS ??
+    env.REDIS_URL ??
+    "(unset)";
+  try {
+    await Promise.race([
+      connection.ping(),
+      new Promise<never>((_, reject) =>
+        setTimeout(
+          () => reject(new Error(`PING timeout after ${timeoutMs}ms`)),
+          timeoutMs,
+        ),
+      ),
+    ]);
+    logger.info({ target }, "redis ready");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error(
+      { error, target },
+      `redis unreachable at boot — ${message}\n` +
+        `  REDIS_URL / REDIS_CLUSTER_ENDPOINTS points at: ${target}\n` +
+        `  Hybrid dev? 'pnpm dev' on host + docker redis needs the host port published (6379).\n` +
+        `  Full-compose dev? Run 'make dev' instead of 'pnpm dev'.`,
+    );
+    // Don't throw in build phase — some tools import start.ts at build time.
+    process.exit(1);
+  }
 }

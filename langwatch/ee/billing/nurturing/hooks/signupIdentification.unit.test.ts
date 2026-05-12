@@ -1,0 +1,327 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { fireSignupNurturingCalls } from "./signupIdentification";
+
+// Suppress logger output
+vi.mock("../../../../src/utils/logger/server", () => ({
+  createLogger: () => ({
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+  }),
+}));
+vi.mock("../../../../src/utils/posthogErrorCapture", () => ({
+  captureException: vi.fn(),
+}));
+
+const mockNurturing = {
+  identifyUser: vi.fn().mockResolvedValue(undefined),
+  trackEvent: vi.fn().mockResolvedValue(undefined),
+  groupUser: vi.fn().mockResolvedValue(undefined),
+  batch: vi.fn().mockResolvedValue(undefined),
+};
+
+let currentNurturing: typeof mockNurturing | undefined = mockNurturing;
+
+vi.mock("../../../../src/server/app-layer/app", () => ({
+  getApp: () => ({
+    get nurturing() {
+      return currentNurturing;
+    },
+  }),
+}));
+
+describe("Signup identification hook", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    currentNurturing = mockNurturing;
+  });
+
+  describe("when the onboarding flow completes", () => {
+    const baseArgs = {
+      userId: "user-123",
+      email: "jane@example.com",
+      name: "Jane Doe",
+      organizationId: "org-456",
+      organizationName: "Acme Corp",
+      signUpData: {
+        yourRole: "engineer",
+        companySize: "11-50",
+        usage: "monitoring",
+        solution: "llm-ops",
+        featureUsage: "evaluations",
+        utmCampaign: "launch-week",
+        howDidYouHearAboutUs: "twitter",
+      },
+    };
+
+    /** @scenario 'New signup identifies user with traits in Customer.io' */
+    it("identifies user in Customer.io with email, name, role, and company_size", () => {
+      fireSignupNurturingCalls(baseArgs);
+
+      expect(mockNurturing.identifyUser).toHaveBeenCalledWith({
+        userId: "user-123",
+        traits: expect.objectContaining({
+          email: "jane@example.com",
+          name: "Jane Doe",
+          role: "engineer",
+          company_size: "11-50",
+        }),
+      });
+    });
+
+    it("includes has_traces false and has_evaluations false in traits", () => {
+      fireSignupNurturingCalls(baseArgs);
+
+      expect(mockNurturing.identifyUser).toHaveBeenCalledWith({
+        userId: "user-123",
+        traits: expect.objectContaining({
+          has_traces: false,
+          has_evaluations: false,
+        }),
+      });
+    });
+
+    /** @scenario 'Signup defaults include has_prompts and has_simulations as false' */
+    it("includes has_prompts false and has_simulations false in traits", () => {
+      fireSignupNurturingCalls(baseArgs);
+
+      expect(mockNurturing.identifyUser).toHaveBeenCalledWith({
+        userId: "user-123",
+        traits: expect.objectContaining({
+          has_prompts: false,
+          has_simulations: false,
+        }),
+      });
+    });
+
+    it("includes signup_usage, signup_solution, and signup_feature_usage in traits", () => {
+      fireSignupNurturingCalls(baseArgs);
+
+      expect(mockNurturing.identifyUser).toHaveBeenCalledWith({
+        userId: "user-123",
+        traits: expect.objectContaining({
+          signup_usage: "monitoring",
+          signup_solution: "llm-ops",
+          signup_feature_usage: "evaluations",
+        }),
+      });
+    });
+
+    /** @scenario 'Signup identification includes optional marketing fields when present' */
+    it("includes utm_campaign and how_heard when present", () => {
+      fireSignupNurturingCalls(baseArgs);
+
+      expect(mockNurturing.identifyUser).toHaveBeenCalledWith({
+        userId: "user-123",
+        traits: expect.objectContaining({
+          utm_campaign: "launch-week",
+          how_heard: "twitter",
+        }),
+      });
+    });
+
+    it("includes createdAt as an ISO 8601 timestamp", () => {
+      fireSignupNurturingCalls(baseArgs);
+
+      const args = mockNurturing.identifyUser.mock.calls[0]![0];
+      expect(args.traits.createdAt).toBeDefined();
+      expect(new Date(args.traits.createdAt).toISOString()).toBe(args.traits.createdAt);
+    });
+
+    /** @scenario 'New signup associates user with organization via group call' */
+    it("associates user with organization via group call", () => {
+      fireSignupNurturingCalls(baseArgs);
+
+      expect(mockNurturing.groupUser).toHaveBeenCalledWith({
+        userId: "user-123",
+        groupId: "org-456",
+        traits: expect.objectContaining({
+          name: "Acme Corp",
+          company_size: "11-50",
+          plan: "free",
+        }),
+      });
+    });
+
+    /** @scenario 'New signup tracks signed_up event' */
+    it("tracks signed_up event with signup metadata", () => {
+      fireSignupNurturingCalls(baseArgs);
+
+      expect(mockNurturing.trackEvent).toHaveBeenCalledWith({
+        userId: "user-123",
+        event: "signed_up",
+        properties: expect.objectContaining({
+          yourRole: "engineer",
+          companySize: "11-50",
+        }),
+      });
+    });
+  });
+
+  describe("when signup data has no optional marketing fields", () => {
+    it("omits utm_campaign and how_heard from traits", () => {
+      fireSignupNurturingCalls({
+        userId: "user-123",
+        email: "jane@example.com",
+        name: "Jane Doe",
+        organizationId: "org-456",
+        organizationName: "Acme Corp",
+        signUpData: {
+          yourRole: "engineer",
+          companySize: "11-50",
+        },
+      });
+
+      const args = mockNurturing.identifyUser.mock.calls[0]![0];
+      expect(args.traits.utm_campaign).toBeUndefined();
+      expect(args.traits.how_heard).toBeUndefined();
+    });
+
+    /** @scenario 'Signup without attribution omits those fields from Customer.io traits' */
+    it("omits lead_source, utm_source, utm_medium, utm_term, utm_content, and referrer from traits", () => {
+      fireSignupNurturingCalls({
+        userId: "user-123",
+        email: "jane@example.com",
+        name: "Jane Doe",
+        organizationId: "org-456",
+        organizationName: "Acme Corp",
+        signUpData: {
+          yourRole: "engineer",
+          companySize: "11-50",
+        },
+      });
+
+      const args = mockNurturing.identifyUser.mock.calls[0]![0];
+      expect(args.traits.lead_source).toBeUndefined();
+      expect(args.traits.utm_source).toBeUndefined();
+      expect(args.traits.utm_medium).toBeUndefined();
+      expect(args.traits.utm_term).toBeUndefined();
+      expect(args.traits.utm_content).toBeUndefined();
+      expect(args.traits.referrer).toBeUndefined();
+    });
+  });
+
+  describe("when signup data includes first-touch attribution", () => {
+    const attributionArgs = {
+      userId: "user-123",
+      email: "jane@example.com",
+      name: "Jane Doe",
+      organizationId: "org-456",
+      organizationName: "Acme Corp",
+      signUpData: {
+        yourRole: "engineer",
+        leadSource: "website",
+        utmSource: "newsletter",
+        utmMedium: "email",
+        utmCampaign: "apr2026",
+        utmTerm: "agents",
+        utmContent: "cta",
+        referrer: "https://www.langwatch.ai/",
+      },
+    };
+
+    /** @scenario 'Signup with ref in URL sends lead_source trait and event property to Customer.io' */
+    it("maps leadSource to lead_source identify trait", () => {
+      fireSignupNurturingCalls(attributionArgs);
+
+      expect(mockNurturing.identifyUser).toHaveBeenCalledWith({
+        userId: "user-123",
+        traits: expect.objectContaining({
+          lead_source: "website",
+        }),
+      });
+    });
+
+    /** @scenario 'Signup forwards utm tuple to Customer.io' */
+    it("maps the utm tuple to snake_case identify traits", () => {
+      fireSignupNurturingCalls(attributionArgs);
+
+      expect(mockNurturing.identifyUser).toHaveBeenCalledWith({
+        userId: "user-123",
+        traits: expect.objectContaining({
+          utm_source: "newsletter",
+          utm_medium: "email",
+          utm_campaign: "apr2026",
+          utm_term: "agents",
+          utm_content: "cta",
+        }),
+      });
+    });
+
+    it("includes referrer in identify traits", () => {
+      fireSignupNurturingCalls(attributionArgs);
+
+      expect(mockNurturing.identifyUser).toHaveBeenCalledWith({
+        userId: "user-123",
+        traits: expect.objectContaining({
+          referrer: "https://www.langwatch.ai/",
+        }),
+      });
+    });
+
+    it("forwards attribution fields as signed_up event properties", () => {
+      fireSignupNurturingCalls(attributionArgs);
+
+      expect(mockNurturing.trackEvent).toHaveBeenCalledWith({
+        userId: "user-123",
+        event: "signed_up",
+        properties: expect.objectContaining({
+          leadSource: "website",
+          utmSource: "newsletter",
+          utmMedium: "email",
+          utmCampaign: "apr2026",
+          utmTerm: "agents",
+          utmContent: "cta",
+          referrer: "https://www.langwatch.ai/",
+        }),
+      });
+    });
+  });
+
+  describe("when Customer.io API is unavailable", () => {
+    /** @scenario 'Customer.io failure during signup does not block onboarding' */
+    it("does not throw (fire-and-forget)", async () => {
+      const { captureException } = await import(
+        "../../../../src/utils/posthogErrorCapture"
+      );
+      mockNurturing.identifyUser.mockRejectedValueOnce(
+        new Error("CIO unavailable"),
+      );
+
+      expect(() =>
+        fireSignupNurturingCalls({
+          userId: "user-123",
+          email: "jane@example.com",
+          name: "Jane Doe",
+          organizationId: "org-456",
+          organizationName: "Acme Corp",
+        }),
+      ).not.toThrow();
+
+      // Wait for the rejected promise to be caught
+      await vi.waitFor(() => {
+        expect(captureException).toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("when nurturing is undefined (no Customer.io key)", () => {
+    /** @scenario 'Signup with no Customer.io key configured completes without errors' */
+    it("silently skips without calling any nurturing methods", () => {
+      currentNurturing = undefined;
+
+      fireSignupNurturingCalls({
+        userId: "user-123",
+        email: "jane@example.com",
+        name: "Jane Doe",
+        organizationId: "org-456",
+        organizationName: "Acme Corp",
+      });
+
+      expect(mockNurturing.identifyUser).not.toHaveBeenCalled();
+      expect(mockNurturing.groupUser).not.toHaveBeenCalled();
+      expect(mockNurturing.trackEvent).not.toHaveBeenCalled();
+    });
+  });
+});

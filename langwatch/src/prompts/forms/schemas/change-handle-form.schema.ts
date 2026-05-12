@@ -12,7 +12,7 @@ export const changeHandleFormSchema = z.object({
       message:
         "Handle should be in the 'identifier' or 'namespace/identifier' format. Only lowercase letters, numbers, hyphens, underscores and up to one slash are allowed.",
     }),
-  scope: z.nativeEnum(PromptScope).default("PROJECT"),
+  scope: z.nativeEnum(PromptScope),
 });
 
 export type ChangeHandleFormValues = z.infer<typeof changeHandleFormSchema>;

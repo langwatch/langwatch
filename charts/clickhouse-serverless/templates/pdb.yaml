@@ -1,0 +1,31 @@
+{{- if gt (int .Values.replicas) 1 }}
+{{- $replicas := .Values.replicas | int }}
+{{- $minAvailable := add1 (div $replicas 2) }}
+{{- $fullname := include "clickhouse-serverless.fullname" . }}
+# ClickHouse PodDisruptionBudget — maintain quorum
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $fullname }}-pdb
+  labels:
+    {{- include "clickhouse-serverless.selectorLabels" . | nindent 4 }}
+    {{- include "clickhouse-serverless.labels" . | nindent 4 }}
+spec:
+  minAvailable: {{ $minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "clickhouse-serverless.selectorLabels" . | nindent 6 }}
+---
+# Keeper PodDisruptionBudget — maintain raft quorum
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $fullname }}-keeper-pdb
+  labels:
+    {{- include "clickhouse-serverless.keeperLabels" . | nindent 4 }}
+spec:
+  minAvailable: {{ $minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "clickhouse-serverless.keeperSelectorLabels" . | nindent 6 }}
+{{- end }}

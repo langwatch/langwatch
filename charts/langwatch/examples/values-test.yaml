@@ -1,0 +1,78 @@
+# values-test.yaml — CI smoke test. Renders and installs but uses absolute minimum resources.
+# namespace: lw-test
+# Usage: ./examples/helm-safe.sh install lw-test . -f examples/values-test.yaml --wait --timeout 5m
+autogen:
+  enabled: true
+
+app:
+  replicaCount: 1
+  http:
+    baseHost: "http://localhost:5560"
+    publicUrl: "http://localhost:5560"
+  features:
+    skipEnvValidation: true
+  resources:
+    requests: { cpu: 50m, memory: 256Mi }
+    limits:   { cpu: 250m, memory: 512Mi }
+
+workers:
+  replicaCount: 1
+  resources:
+    requests: { cpu: 50m, memory: 256Mi }
+    limits:   { cpu: 250m, memory: 512Mi }
+
+langwatch_nlp:
+  replicaCount: 1
+  resources:
+    requests: { cpu: 50m, memory: 256Mi }
+    limits:   { cpu: 250m, memory: 512Mi }
+
+langevals:
+  replicaCount: 1
+  resources:
+    requests: { cpu: 50m, memory: 256Mi }
+    limits:   { cpu: 250m, memory: 512Mi }
+
+clickhouse:
+  chartManaged: true
+  replicas: 1
+  memory: 512Mi
+  cpu: 1
+  storage:
+    size: 1Gi
+
+postgresql:
+  chartManaged: true
+  auth:
+    password: ""  # autogen handles it
+    database: "langwatch"
+  primary:
+    persistence:
+      size: 1Gi
+    resources:
+      requests: { cpu: 50m, memory: 128Mi }
+      limits:   { cpu: 250m, memory: 256Mi }
+
+redis:
+  chartManaged: true
+  auth:
+    password: ""  # autogen handles it
+  master:
+    persistence:
+      size: 1Gi
+    resources:
+      requests: { cpu: 25m, memory: 32Mi }
+      limits:   { cpu: 100m, memory: 128Mi }
+
+prometheus:
+  chartManaged: true
+  server:
+    retention: 1d
+    persistentVolume:
+      size: 1Gi
+    resources:
+      requests: { cpu: 25m, memory: 64Mi }
+      limits:   { cpu: 100m, memory: 256Mi }
+
+cronjobs:
+  enabled: false

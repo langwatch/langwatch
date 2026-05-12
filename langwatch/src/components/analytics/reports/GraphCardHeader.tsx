@@ -1,8 +1,8 @@
-import { Box, Button, HStack, Spacer, Text } from "@chakra-ui/react";
+import { Box, Button, Heading, HStack, Spacer } from "@chakra-ui/react";
 import type { DraggableAttributes } from "@dnd-kit/core";
 import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
 import { BarChart2, Bell } from "lucide-react";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import type { CustomGraphInput } from "~/components/analytics/CustomGraph";
 import { Tooltip } from "~/components/ui/tooltip";
@@ -20,6 +20,7 @@ interface GraphCardHeaderProps {
   name: string;
   graph: unknown;
   projectSlug: string;
+  dashboardId?: string;
   colSpan: number;
   rowSpan: number;
   filters: unknown;
@@ -41,6 +42,7 @@ export function GraphCardHeader({
   name,
   graph,
   projectSlug,
+  dashboardId,
   colSpan,
   rowSpan,
   filters,
@@ -54,15 +56,45 @@ export function GraphCardHeader({
 }: GraphCardHeaderProps) {
   const { openDrawer } = useDrawer();
 
+  // Generate fallback title from graph series if name is missing
+  const displayName = useMemo(() => {
+    if (name && name.trim()) {
+      return name;
+    }
+    
+    // Try to generate a title from the graph data
+    if (graph && typeof graph === "object" && "series" in graph) {
+      const graphInput = graph as CustomGraphInput;
+      if (graphInput.series && graphInput.series.length > 0) {
+        const seriesNames = graphInput.series
+          .map((s) => s.name)
+          .filter(Boolean)
+          .join(", ");
+        if (seriesNames) {
+          return seriesNames.replace(/,([^,]*)$/, " and$1");
+        }
+      }
+    }
+    
+    return "Untitled Graph";
+  }, [name, graph]);
+
   // Create form instance from graph data for the alert drawer
   const form = useForm<CustomGraphFormData>({
     defaultValues: graph
       ? {
           ...customGraphInputToFormData(graph as CustomGraphInput),
-          title: name,
+          title: displayName,
         }
       : undefined,
   });
+
+  // Update form title when displayName changes to keep drawer in sync
+  useEffect(() => {
+    if (graph) {
+      form.setValue("title", displayName);
+    }
+  }, [displayName, form, graph]);
 
   const hasFilters = useMemo(
     () =>
@@ -86,9 +118,9 @@ export function GraphCardHeader({
       cursor={isDragging ? "grabbing" : "grab"}
     >
       <BarChart2 color="orange" />
-      <Text marginLeft={2} fontSize="md" fontWeight="bold">
-        {name}
-      </Text>
+      <Heading size="sm" marginLeft={2}>
+        {displayName}
+      </Heading>
       <Spacer />
 
       {isSavedGraph && (
@@ -144,6 +176,7 @@ export function GraphCardHeader({
       <GraphCardMenu
         graphId={graphId}
         projectSlug={projectSlug}
+        dashboardId={dashboardId}
         colSpan={colSpan}
         rowSpan={rowSpan}
         onSizeChange={onSizeChange}

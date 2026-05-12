@@ -20,7 +20,7 @@ async def main(message: cl.Message):
     )
 
     completion = client.chat.completions.create(
-        model="gpt-5",
+        model="gpt-5-mini",
         messages=[
             {
                 "role": "system",
@@ -45,7 +45,7 @@ async def main(message: cl.Message):
 @langwatch.span(type="evaluation")
 def useful_message_evaluation(question: str, answer: str):
     completion = client.chat.completions.create(
-        model="gpt-5",
+        model="gpt-5-mini",
         messages=[
             {
                 "role": "system",

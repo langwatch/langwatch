@@ -1,5 +1,5 @@
 import { Alert, Box, HStack, Spacer, VStack } from "@chakra-ui/react";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import { useEffect } from "react";
 
 import { DashboardLayout } from "~/components/DashboardLayout";

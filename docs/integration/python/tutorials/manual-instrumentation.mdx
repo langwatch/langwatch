@@ -1,0 +1,116 @@
+---
+title: Manual Instrumentation
+description: Learn manual instrumentation with the LangWatch Python SDK for full control over tracing, evaluations, and agent testing.
+keywords: manual instrumentation, context managers, span, trace, async, synchronous, LangWatch, Python
+---
+
+While decorators offer a concise way to instrument functions, you might prefer or need to manually manage trace and span lifecycles. This is useful in asynchronous contexts, for finer control, or when decorators are inconvenient. The LangWatch Python SDK provides two primary ways to do this manually:
+
+### Using Context Managers (`with`/`async with`)
+
+The `langwatch.trace()` and `langwatch.span()` functions can be used directly as asynchronous (`async with`) or synchronous (`with`) context managers. This is the recommended approach for manual instrumentation as it automatically handles ending the trace/span, even if errors occur.
+
+Here's how you can achieve the same instrumentation as the decorator examples, but using context managers:
+
+```python
+import langwatch
+from langwatch.types import RAGChunk
+from langwatch.attributes import AttributeKey # For semantic attribute keys
+import asyncio # Assuming async operation
+
+langwatch.setup()
+
+async def rag_retrieval_manual(query: str):
+    # Use async with for the span, instead of a decorator
+    async with langwatch.span(type="rag", name="RAG Document Retrieval") as span:
+        # ... your async retrieval logic ...
+        await asyncio.sleep(0.05) # Simulate async work
+        search_results = [
+            {"id": "doc-1", "content": "Content for doc 1."},
+            {"id": "doc-2", "content": "Content for doc 2."},
+        ]
+
+        # Update the span with input, context, metadata, and output
+        span.update(
+            input=query,
+            contexts=[
+                RAGChunk(document_id=doc["id"], content=doc["content"])
+                for doc in search_results
+            ],
+            output=search_results,
+            strategy="manual_vector_search"
+        )
+        return search_results
+
+async def handle_user_query_manual(query: str):
+    # Use async with for the trace
+    async with langwatch.trace(name="Manual User Query Handling", metadata={"user_id": "manual-user", "query": query}) as trace:
+        # Call the manually instrumented RAG function
+        retrieved_docs = await rag_retrieval_manual(query)
+
+        # --- Simulate LLM Call Step (manual span) ---
+        llm_response = ""
+        async with langwatch.span(type="llm", name="Manual LLM Generation") as llm_span:
+            llm_input = {"role": "user", "content": f"Context: {retrieved_docs}\nQuery: {query}"}
+            llm_metadata = {"model_name": "gpt-5"}
+
+            # ... your async LLM call logic ...
+            await asyncio.sleep(0.1)
+            llm_response = "This is the manual LLM response."
+            llm_output = {"role": "assistant", "content": llm_response}
+
+            # Set input, metadata and output via update
+            llm_span.update(
+                input=llm_input,
+                output=llm_output
+                llm_metadata=llm_metadata,
+            )
+
+        # Set final trace output via update
+        trace.update(output=llm_response)
+        return llm_response
+
+# Example execution (in an async context)
+async def main():
+    result = await handle_user_query_manual("Tell me about manual tracing with context managers.")
+    print(result)
+asyncio.run(main())
+```
+
+Key points for manual instrumentation with context managers:
+
+- Use `with langwatch.trace(...)` or `async with langwatch.trace(...)` to start a trace.
+- Use `with langwatch.span(...)` or `async with langwatch.span(...)` inside a trace block to create nested spans.
+- The trace or span object is available in the `as trace:` or `as span:` part of the `with` statement.
+- Use methods like `span.add_event()`, and primarily `span.update(...)` / `trace.update(...)` to add details. The `update()` method is flexible for adding structured data like `input`, `output`, `metadata`, and `contexts`.
+- This approach gives explicit control over the start and end of each instrumented block, as the context manager handles ending the span automatically.
+
+### Direct Span Creation (`span.end()`)
+
+Alternatively, you can manage span and trace lifecycles completely manually. Call `langwatch.span()` or `langwatch.trace()` directly to start them, and then explicitly call the `end()` method on the returned object (`span.end()` or `trace.end()`) when the operation finishes. **This requires careful handling to ensure `end()` is always called, even if errors occur (e.g., using `try...finally`).** Context managers are generally preferred as they handle this automatically.
+
+```python
+import langwatch
+import time
+
+# Assume langwatch.setup() and a trace context exist
+
+def process_data_manually(data):
+    span = langwatch.span(name="Manual Data Processing") # Start the span
+    try:
+        span.update(input=data)
+        # ... synchronous processing logic ...
+        time.sleep(0.02)
+        result = f"Processed: {data}"
+        span.update(output=result)
+        return result
+    except Exception as e:
+        span.record_exception(e) # Record exceptions
+        span.set_status("error", description=str(e))
+        raise # Re-raise the exception
+    finally:
+        span.end() # CRITICAL: Ensure the span is ended
+
+# with langwatch.trace(): # Needs to be within a trace
+#     processed = process_data_manually("some data")
+```

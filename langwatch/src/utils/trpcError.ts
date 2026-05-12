@@ -52,6 +52,60 @@ export interface LimitExceededInfo {
  * Extracts limit exceeded info from a TRPC error.
  * Returns the info if the error is a FORBIDDEN error with limit data, null otherwise.
  */
+// --- Lite member restriction dedup ---
+const handledLiteMemberErrors = new WeakSet<Error>();
+
+export function markAsHandledByLiteMemberHandler(error: Error): void {
+  handledLiteMemberErrors.add(error);
+}
+
+export function isHandledByLiteMemberHandler(error: unknown): boolean {
+  return error instanceof Error && handledLiteMemberErrors.has(error);
+}
+
+/**
+ * Check if an error was already handled by any global error handler
+ * (license limit or lite member restriction).
+ * Use this single check in component-level onError callbacks to avoid
+ * showing duplicate error messages (toast + modal).
+ *
+ * @example
+ * ```tsx
+ * const mutation = api.prompts.create.useMutation({
+ *   onError: (error) => {
+ *     if (isHandledByGlobalHandler(error)) return;
+ *     toaster.create({ title: "Error", description: error.message });
+ *   },
+ * });
+ * ```
+ */
+export function isHandledByGlobalHandler(error: unknown): boolean {
+  return (
+    isHandledByGlobalLicenseHandler(error) ||
+    isHandledByLiteMemberHandler(error)
+  );
+}
+
+// --- Lite member restriction extractor ---
+export interface LiteMemberRestrictionInfo {
+  resource?: string;
+}
+
+export function extractLiteMemberRestrictionInfo(
+  error: unknown,
+): LiteMemberRestrictionInfo | null {
+  if (!(error instanceof TRPCClientError)) return null;
+  if (error.data?.code !== "UNAUTHORIZED") return null;
+
+  const domainError = error.data?.domainError as
+    | { kind?: string; meta?: { resource?: string } }
+    | undefined;
+
+  if (domainError?.kind !== "lite_member_restricted") return null;
+
+  return { resource: domainError.meta?.resource };
+}
+
 export function extractLimitExceededInfo(
   error: unknown,
 ): LimitExceededInfo | null {

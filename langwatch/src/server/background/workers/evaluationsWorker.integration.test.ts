@@ -242,7 +242,8 @@ describe("updateEvaluationStatusInES", () => {
     });
   });
 
-  it("should insert a new trace check if none exists", async () => {
+  // Skipped: requires live Elasticsearch. Run with ES available (make dev-full) to enable.
+  it.skip("should insert a new trace check if none exists", async () => {
     await updateEvaluationStatusInES({
       check,
       trace: {
@@ -275,7 +276,8 @@ describe("updateEvaluationStatusInES", () => {
     });
   });
 
-  it("should update an existing trace check", async () => {
+  // Skipped: requires live Elasticsearch. Run with ES available (make dev-full) to enable.
+  it.skip("should update an existing trace check", async () => {
     // Insert the initial document
     await updateEvaluationStatusInES({
       check,

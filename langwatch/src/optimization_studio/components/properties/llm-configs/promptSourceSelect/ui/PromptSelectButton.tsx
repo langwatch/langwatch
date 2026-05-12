@@ -19,7 +19,7 @@ export function PromptSelectionButton({ onClick }: PromptSelectionButtonProps) {
         onClick={onClick}
         justifyContent="space-between"
         variant="outline"
-        background="white"
+        background="bg"
       >
         <LuFolder size={16} />
       </Button>

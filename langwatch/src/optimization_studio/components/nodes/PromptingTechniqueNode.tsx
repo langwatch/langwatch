@@ -4,6 +4,7 @@ import type { Ref } from "react";
 import { forwardRef } from "react";
 import { useDrop } from "react-dnd";
 import { MoreHorizontal, Trash2 } from "react-feather";
+import { useColorModeValue } from "../../../components/ui/color-mode";
 import { Menu } from "../../../components/ui/menu";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
 import type { ComponentType, PromptingTechnique } from "../../types/dsl";
@@ -74,6 +75,10 @@ export function PromptingTechniqueWrapper({
     }),
   );
   const hovered = false;
+  const wrapperShadow = useColorModeValue(
+    "0px 0px 4px 0px rgba(0, 0, 0, 0.1)",
+    "0px 0px 4px 0px rgba(0, 0, 0, 0.3)",
+  );
 
   if (!node) {
     return children;
@@ -83,14 +88,14 @@ export function PromptingTechniqueWrapper({
     <VStack
       position="relative"
       padding="2px"
-      backgroundColor="#F7FAFC"
+      backgroundColor="bg.subtle"
       borderRadius="12px"
       color="fg.muted"
       fontSize="10px"
-      boxShadow={`0px 0px 4px 0px rgba(0, 0, 0, 0.1)`}
+      boxShadow={wrapperShadow}
       outline={!!node.selected || hovered ? "1.5px solid" : "none"}
       outlineColor={
-        node.selected ? selectionColor : hovered ? "gray.300" : "none"
+        node.selected ? selectionColor : hovered ? "gray.emphasized" : "none"
       }
       gap={0}
       onClick={(e) => {
@@ -110,7 +115,7 @@ export function PromptingTechniqueWrapper({
         <Menu.Root positioning={{ placement: "top-start" }}>
           <Menu.Trigger asChild>
             <Box
-              background="white"
+              background="bg"
               position="absolute"
               top="-26px"
               right={1}

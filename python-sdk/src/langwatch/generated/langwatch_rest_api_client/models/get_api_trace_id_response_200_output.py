@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import Any, TypeVar, Union
+from typing import Any, TypeVar
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -13,10 +15,10 @@ T = TypeVar("T", bound="GetApiTraceIdResponse200Output")
 class GetApiTraceIdResponse200Output:
     """
     Attributes:
-        value (Union[Unset, str]):  Example: Hey there! 👋😊.
+        value (str | Unset):  Example: Hey there! 👋😊.
     """
 
-    value: Union[Unset, str] = UNSET
+    value: str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:

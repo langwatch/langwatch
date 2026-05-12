@@ -18,11 +18,12 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { type Experiment, ExperimentType, type Project } from "@prisma/client";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { BarChart2, Download, ExternalLink } from "react-feather";
 
 import { Link } from "~/components/ui/link";
+import { useLiteMemberGuard } from "~/hooks/useLiteMemberGuard";
 import { api } from "~/utils/api";
 import { PageLayout } from "../ui/layouts/PageLayout";
 import {
@@ -33,16 +34,19 @@ import {
 import { type BatchRunSummary, BatchRunsSidebar } from "./BatchRunsSidebar";
 import { ComparisonCharts, type XAxisOption } from "./ComparisonCharts";
 import { downloadCsv } from "./csvExport";
+import { getRunDisplayName } from "./getRunDisplayName";
 import { TableSkeleton } from "./TableSkeleton";
 import {
   type BatchEvaluationData,
   transformBatchEvaluationData,
 } from "./types";
 import { useComparisonMode } from "./useComparisonMode";
+import { isRunFinished } from "./isRunFinished";
 import {
   RUN_COLORS,
   useMultiRunData,
 } from "./useMultiRunData";
+import React from "react";
 
 type BatchEvaluationResultsProps = {
   project?: Project;
@@ -55,35 +59,6 @@ type BatchEvaluationResultsProps = {
   onSelectRunId?: (runId: string) => void;
 };
 
-/** Time in milliseconds after which a run without updates is considered interrupted */
-const INTERRUPTED_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
-
-/**
- * Check if a run is finished based on timestamps
- * A run is considered finished if it has finished_at, stopped_at,
- * or hasn't been updated in 5 minutes (interrupted)
- */
-const isRunFinished = (timestamps: {
-  finished_at?: number | null;
-  stopped_at?: number | null;
-  updated_at?: number;
-}): boolean => {
-  // Explicitly finished or stopped
-  if (timestamps.finished_at ?? timestamps.stopped_at) {
-    return true;
-  }
-
-  // Consider interrupted if no updates for 5 minutes
-  if (timestamps.updated_at) {
-    const timeSinceUpdate = Date.now() - timestamps.updated_at;
-    if (timeSinceUpdate > INTERRUPTED_THRESHOLD_MS) {
-      return true;
-    }
-  }
-
-  return false;
-};
-
 /** Grace period after run finishes to continue refetching for final results */
 const REFETCH_GRACE_PERIOD_MS = 3000; // 3 seconds
 
@@ -94,6 +69,8 @@ export function BatchEvaluationResults({
   selectedRunId: externalSelectedRunId,
   onSelectRunId,
 }: BatchEvaluationResultsProps) {
+  const { isLiteMember } = useLiteMemberGuard();
+
   // Track if any run is still in progress
   const [isSomeRunning, setIsSomeRunning] = useState(false);
 
@@ -138,7 +115,7 @@ export function BatchEvaluationResults({
 
   // Determine which run ID to use (priority: external prop > URL query > first run)
   const selectedRunId =
-    externalSelectedRunId ?? queryRunId ?? runsQuery.data?.runs[0]?.run_id;
+    externalSelectedRunId ?? queryRunId ?? runsQuery.data?.runs[0]?.runId;
 
   // Handle run selection - updates URL query param
   const handleSelectRun = useCallback(
@@ -162,7 +139,7 @@ export function BatchEvaluationResults({
 
   // Find selected run
   const selectedRun = useMemo(
-    () => runsQuery.data?.runs.find((r) => r.run_id === selectedRunId),
+    () => runsQuery.data?.runs.find((r) => r.runId === selectedRunId),
     [runsQuery.data?.runs, selectedRunId],
   );
 
@@ -251,21 +228,21 @@ export function BatchEvaluationResults({
   const sidebarRuns: BatchRunSummary[] = useMemo(() => {
     if (!runsQuery.data?.runs) return [];
     return runsQuery.data.runs.map((run) => ({
-      runId: run.run_id,
-      workflowVersion: run.workflow_version,
+      runId: run.runId,
+      workflowVersion: run.workflowVersion,
       timestamps: run.timestamps,
       progress: run.progress,
       total: run.total,
       summary: {
-        datasetCost: run.summary.dataset_cost,
-        evaluationsCost: run.summary.evaluations_cost,
+        datasetCost: run.summary.datasetCost,
+        evaluationsCost: run.summary.evaluationsCost,
         evaluations: Object.fromEntries(
           Object.entries(run.summary.evaluations).map(([id, ev]) => [
             id,
             {
               name: ev.name,
-              averageScore: ev.average_score,
-              averagePassed: ev.average_passed,
+              averageScore: ev.averageScore,
+              averagePassed: ev.averagePassed,
             },
           ]),
         ),
@@ -276,12 +253,20 @@ export function BatchEvaluationResults({
   // Comparison mode
   const runIds = useMemo(() => sidebarRuns.map((r) => r.runId), [sidebarRuns]);
 
-  // Map runId to human-readable name (commit message or runId)
+  // Map runId to human-readable name (commit message or "Run #N")
+  // Sort chronologically so fallback "Run #N" numbering is stable
   const runNameMap = useMemo(() => {
-    const map: Record<string, string> = {};
-    for (const run of sidebarRuns) {
-      map[run.runId] = run.workflowVersion?.commitMessage ?? run.runId;
-    }
+    const map: Record<string, string | React.ReactNode> = {};
+    const sorted = [...sidebarRuns].sort(
+      (a, b) => a.timestamps.createdAt - b.timestamps.createdAt,
+    );
+    sorted.forEach((run, index) => {
+      map[run.runId] = getRunDisplayName({
+        commitMessage: run.workflowVersion?.commitMessage,
+        runId: run.runId,
+        index,
+      });
+    });
     return map;
   }, [sidebarRuns]);
 
@@ -423,7 +408,7 @@ export function BatchEvaluationResults({
   const runColors = stableRunColorMap;
 
   // Find sidebar run for selected
-  const _sidebarSelectedRun = sidebarRuns.find(
+  const sidebarSelectedRun = sidebarRuns.find(
     (r) => r.runId === selectedRunId,
   );
 
@@ -472,16 +457,24 @@ export function BatchEvaluationResults({
       </Box>
 
       {/* Main content - flex column that fills available space */}
-      <VStack flex={1} minWidth={0} height="full" gap={0} align="stretch">
+      <VStack flex={1} minWidth={0} height="full" gap={0} align="stretch" overflow="auto">
         {/* Header - fixed height */}
         <PageLayout.Header paddingX={2} withBorder={false} flexShrink={0}>
-          <Heading>
-            {experiment ? (
-              (experiment.name ?? experiment.slug)
-            ) : (
-              <Skeleton width="100%" height="28px" />
+          <HStack gap={1} minWidth={0} overflow="hidden" flexShrink={1}>
+            <Heading whiteSpace="nowrap" flexShrink={0}>
+              {experiment ? (
+                experiment.name ?? experiment.slug
+              ) : (
+                <Skeleton width="200px" height="28px" />
+              )}
+            </Heading>
+            {experiment && sidebarSelectedRun && (
+              <Text textStyle={"xs"} color={"fg.muted"} whiteSpace="nowrap" overflow="hidden" textOverflow="ellipsis" flexShrink={1} minWidth={0}>
+                {'// '}
+                {sidebarSelectedRun.runId}
+              </Text>
             )}
-          </Heading>
+          </HStack>
           <Spacer />
           {/* Charts toggle - show when charts are available */}
           {canShowCharts && (
@@ -502,14 +495,16 @@ export function BatchEvaluationResults({
               onToggle={toggleColumn}
             />
           )}
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={handleDownloadCSV}
-            disabled={!isDownloadCSVEnabled}
-          >
-            <Download size={16} /> Export to CSV
-          </Button>
+          {!isLiteMember && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleDownloadCSV}
+              disabled={!isDownloadCSVEnabled}
+            >
+              <Download size={16} /> Export to CSV
+            </Button>
+          )}
           {experiment?.workflowId && (
             <Link
               target="_blank"
@@ -547,9 +542,9 @@ export function BatchEvaluationResults({
         {runsQuery.isLoading ? (
           <Box
             flex={1}
-            minHeight={0}
+            minHeight="300px"
             overflow="auto"
-            paddingRight={2}
+            paddingX={2}
             paddingBottom={2}
           >
             <TableSkeleton withCard />
@@ -557,7 +552,7 @@ export function BatchEvaluationResults({
         ) : sidebarRuns.length === 0 ? (
           <Text padding={4}>Waiting for results...</Text>
         ) : (
-          <Box flex={1} minHeight={0} paddingRight={2} paddingBottom={2}>
+          <Box flex={1} minHeight="300px" paddingX={2} paddingBottom={2}>
             <Card.Root width="100%" height="100%" overflow="hidden">
               <Card.Body padding={0} height="100%">
                 <BatchEvaluationResultsTable

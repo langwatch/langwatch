@@ -14,7 +14,6 @@ import {
   getProviderModelOptions,
   getRegistryMetadata,
   hasVariantSuffix,
-  KNOWN_VARIANT_SUFFIXES,
   modelProviders,
 } from "../registry";
 
@@ -188,7 +187,7 @@ describe("Backward Compatibility", () => {
     });
 
     it("includes standard models without suffixes", () => {
-      expect(allLitellmModels["anthropic/claude-3.5-sonnet"]).toBeDefined();
+      expect(allLitellmModels["anthropic/claude-3.7-sonnet"]).toBeDefined();
       expect(allLitellmModels["openai/gpt-4o"]).toBeDefined();
     });
   });
@@ -472,18 +471,21 @@ describe("Parameter Constraints", () => {
       expect(constraints?.temperature).toEqual({ min: 0, max: 1 });
     });
 
+    /** @scenario "OpenAI provider uses global defaults" */
     it("returns undefined for OpenAI models (no constraints defined)", () => {
       const constraints = getParameterConstraints("openai/gpt-4.1");
 
       expect(constraints).toBeUndefined();
     });
 
+    /** @scenario "Unknown provider returns undefined constraints" */
     it("returns undefined for unknown provider", () => {
-      const constraints = getParameterConstraints("unknown-provider/model");
+      const constraints = getParameterConstraints("unknown-provider/some-model");
 
       expect(constraints).toBeUndefined();
     });
 
+    /** @scenario "Model ID without provider prefix returns undefined" */
     it("returns undefined for model ID without provider prefix", () => {
       const constraints = getParameterConstraints("standalone-model");
 

@@ -9,6 +9,9 @@ import {
   Text,
 } from "@chakra-ui/react";
 import { BarChart2 } from "lucide-react";
+import { useRouter } from "~/utils/compat/next-router";
+import { useCallback } from "react";
+import qs from "qs";
 import {
   CustomGraph,
   type CustomGraphInput,
@@ -26,18 +29,66 @@ import { getEvaluatorDefinitions } from "../../../server/evaluations/getEvaluato
 const MINUTES_IN_DAY = 24 * 60; // 1440 minutes in a day
 const ONE_DAY = MINUTES_IN_DAY;
 
-const renderGridItems = (checks: any) => {
+const aggregateHealthSummary: CustomGraphInput = {
+  graphId: "evaluationsHealthSummary",
+  graphType: "summary",
+  series: [
+    {
+      name: "Total evaluation runs",
+      metric: "evaluations.evaluation_runs",
+      aggregation: "cardinality",
+      key: "",
+      colorSet: "tealTones",
+    },
+  ],
+  includePrevious: true,
+  timeScale: ONE_DAY,
+  height: 200,
+};
+
+const aggregatePassFailTrend: CustomGraphInput = {
+  graphId: "evaluationsPassFailTrend",
+  graphType: "stacked_bar",
+  series: [
+    {
+      name: "Evaluations",
+      metric: "evaluations.evaluation_runs",
+      aggregation: "cardinality",
+      key: "",
+      colorSet: "positiveNegativeNeutral",
+    },
+  ],
+  groupBy: "evaluations.evaluation_passed",
+  includePrevious: false,
+  timeScale: ONE_DAY,
+  height: 200,
+};
+
+const renderGridItems = (
+  checks: any,
+  onGraphClick: (params: {
+    evaluatorId: string;
+    groupKey?: string;
+    date?: string;
+    startDate?: string;
+    endDate?: string;
+    checkType: string;
+    isGuardrail: boolean;
+  }) => void,
+) => {
   return checks.map((check: any) => {
     let checksAverage = {};
     let checksSummary = {};
+    let passRateTrend: CustomGraphInput | null = null;
     const traceCheck = getEvaluatorDefinitions(check.checkType);
 
     const isCategoryEvaluator = check.checkType === "langevals/llm_category";
 
     if (traceCheck?.isGuardrail) {
       // Boolean/guardrail evaluators: show pass/fail distribution
+      // Filter to only show processed evaluations (exclude error, scheduled, etc.)
       checksSummary = {
-        graphId: "custom",
+        graphId: `evalSummary_${check.id}`,
         graphType: "donnut",
         series: [
           {
@@ -46,6 +97,11 @@ const renderGridItems = (checks: any) => {
             metric: "evaluations.evaluation_runs",
             aggregation: "cardinality",
             key: check.id,
+            filters: {
+              "evaluations.state": {
+                [check.id]: ["processed"],
+              },
+            },
           },
         ],
         groupBy: "evaluations.evaluation_passed",
@@ -56,7 +112,7 @@ const renderGridItems = (checks: any) => {
       };
 
       checksAverage = {
-        graphId: "custom",
+        graphId: `evalTimeline_${check.id}`,
         graphType: "stacked_bar",
         series: [
           {
@@ -69,6 +125,11 @@ const renderGridItems = (checks: any) => {
               aggregation: "sum",
             },
             key: check.id,
+            filters: {
+              "evaluations.state": {
+                [check.id]: ["processed"],
+              },
+            },
           },
         ],
         groupBy: "evaluations.evaluation_passed",
@@ -77,10 +138,33 @@ const renderGridItems = (checks: any) => {
         timeScale: ONE_DAY,
         height: 300,
       };
+
+      passRateTrend = {
+        graphId: `evalPassRate_${check.id}`,
+        graphType: "line",
+        series: [
+          {
+            name: "Pass rate",
+            colorSet: "tealTones",
+            metric: "evaluations.evaluation_pass_rate",
+            aggregation: "avg",
+            key: check.id,
+            filters: {
+              "evaluations.state": {
+                [check.id]: ["processed"],
+              },
+            },
+          },
+        ],
+        includePrevious: false,
+        timeScale: ONE_DAY,
+        height: 200,
+      };
     } else if (isCategoryEvaluator) {
       // Category evaluators: show category distribution
+      // Filter to only show processed evaluations (exclude error, scheduled, etc.)
       checksSummary = {
-        graphId: "custom",
+        graphId: `evalSummary_${check.id}`,
         graphType: "donnut",
         series: [
           {
@@ -88,6 +172,11 @@ const renderGridItems = (checks: any) => {
             colorSet: "colors",
             metric: "metadata.trace_id",
             aggregation: "cardinality",
+            filters: {
+              "evaluations.state": {
+                [check.id]: ["processed"],
+              },
+            },
           },
         ],
         groupBy: "evaluations.evaluation_label",
@@ -98,7 +187,7 @@ const renderGridItems = (checks: any) => {
       };
 
       checksAverage = {
-        graphId: "custom",
+        graphId: `evalTimeline_${check.id}`,
         graphType: "horizontal_bar",
         series: [
           {
@@ -106,6 +195,11 @@ const renderGridItems = (checks: any) => {
             colorSet: "colors",
             metric: "metadata.trace_id",
             aggregation: "cardinality",
+            filters: {
+              "evaluations.state": {
+                [check.id]: ["processed"],
+              },
+            },
           },
         ],
         groupBy: "evaluations.evaluation_label",
@@ -116,8 +210,9 @@ const renderGridItems = (checks: any) => {
       };
     } else {
       // Score-based evaluators: show average score
+      // Filter to only show processed evaluations (exclude error, scheduled, etc.)
       checksSummary = {
-        graphId: "custom",
+        graphId: `evalSummary_${check.id}`,
         graphType: "summary",
         series: [
           {
@@ -126,6 +221,11 @@ const renderGridItems = (checks: any) => {
             metric: "evaluations.evaluation_score",
             aggregation: "avg",
             key: check.id,
+            filters: {
+              "evaluations.state": {
+                [check.id]: ["processed"],
+              },
+            },
           },
         ],
         includePrevious: false,
@@ -134,7 +234,7 @@ const renderGridItems = (checks: any) => {
       };
 
       checksAverage = {
-        graphId: "custom",
+        graphId: `evalTimeline_${check.id}`,
         graphType: "line",
         series: [
           {
@@ -143,6 +243,11 @@ const renderGridItems = (checks: any) => {
             metric: "evaluations.evaluation_score",
             aggregation: "avg",
             key: check.id,
+            filters: {
+              "evaluations.state": {
+                [check.id]: ["processed"],
+              },
+            },
           },
         ],
         includePrevious: false,
@@ -167,7 +272,17 @@ const renderGridItems = (checks: any) => {
               )}
             </Card.Header>
             <Card.Body>
-              <CustomGraph input={checksSummary as CustomGraphInput} />
+              <CustomGraph
+                input={checksSummary as CustomGraphInput}
+                onDataPointClick={(params) => {
+                  onGraphClick({
+                    evaluatorId: check.id,
+                    groupKey: params.groupKey,
+                    checkType: check.checkType,
+                    isGuardrail: traceCheck?.isGuardrail ?? false,
+                  });
+                }}
+              />
             </Card.Body>
           </Card.Root>
         </GridItem>
@@ -188,10 +303,38 @@ const renderGridItems = (checks: any) => {
               )}
             </Card.Header>
             <Card.Body>
-              <CustomGraph input={checksAverage as CustomGraphInput} />
+              <CustomGraph
+                input={checksAverage as CustomGraphInput}
+                onDataPointClick={(params) => {
+                  onGraphClick({
+                    evaluatorId: check.id,
+                    groupKey: params.groupKey,
+                    date: params.date,
+                    startDate: params.startDate,
+                    endDate: params.endDate,
+                    checkType: check.checkType,
+                    isGuardrail: traceCheck?.isGuardrail ?? false,
+                  });
+                }}
+              />
             </Card.Body>
           </Card.Root>
         </GridItem>
+        {passRateTrend && (
+          <GridItem colSpan={4} display="inline-grid">
+            <Card.Root>
+              <Card.Header>
+                <HStack gap={2}>
+                  <BarChart2 color="orange" />
+                  <Heading size="sm">{check.name} - Pass Rate Trend</Heading>
+                </HStack>
+              </Card.Header>
+              <Card.Body>
+                <CustomGraph input={passRateTrend} />
+              </Card.Body>
+            </Card.Root>
+          </GridItem>
+        )}
       </>
     );
   });
@@ -199,11 +342,81 @@ const renderGridItems = (checks: any) => {
 
 function EvaluationsContent() {
   const { project } = useOrganizationTeamProject();
+  const router = useRouter();
   const checks = api.monitors.getAllForProject.useQuery(
     {
       projectId: project?.id ?? "",
     },
     { enabled: !!project },
+  );
+
+  const handleGraphClick = useCallback(
+    (params: {
+      evaluatorId: string;
+      groupKey?: string;
+      date?: string;
+      startDate?: string;
+      endDate?: string;
+      checkType: string;
+      isGuardrail: boolean;
+    }) => {
+      if (!project || !params.evaluatorId) {
+        return;
+      }
+
+      const isCategoryEvaluator = params.checkType === "langevals/llm_category";
+
+      // Build filter parameters using dot notation with evaluator ID as key
+      // Format: evaluation_passed.{evaluatorId}=0|1 and evaluation_run.{evaluatorId}=processed
+      const filterParams: Record<string, string | string[]> = {
+        [`evaluation_run.${params.evaluatorId}`]: ["processed"], // Only show processed evaluations (excludes error, scheduled, etc.)
+      };
+
+      // Add appropriate filter based on evaluator type
+      // Note: We filter by status="processed" first to exclude error/scheduled,
+      // then add the specific filter (passed/label) which should only apply to processed evaluations
+      if (params.isGuardrail && params.groupKey) {
+        // For guardrail evaluators, filter by passed/failed
+        // The groupKey comes from the graph which only shows processed evaluations with passed=true/false
+        // groupKey can be "passed", "failed", "1", "0", "true", "false", "positive", "negative"
+        const passed =
+          params.groupKey === "passed" ||
+          params.groupKey === "true" ||
+          params.groupKey === "positive" ||
+          params.groupKey === "1";
+        const failed =
+          params.groupKey === "failed" ||
+          params.groupKey === "false" ||
+          params.groupKey === "negative" ||
+          params.groupKey === "0";
+
+        if (passed) {
+          filterParams[`evaluation_passed.${params.evaluatorId}`] = "1";
+        } else if (failed) {
+          filterParams[`evaluation_passed.${params.evaluatorId}`] = "0";
+        }
+      } else if (isCategoryEvaluator && params.groupKey) {
+        // For category evaluators, filter by label
+        filterParams[`evaluation_label.${params.evaluatorId}`] = params.groupKey;
+      }
+
+      // Add date range filter if provided (for bar chart drill-down)
+      if (params.startDate && params.endDate) {
+        filterParams.startDate = params.startDate;
+        filterParams.endDate = params.endDate;
+      }
+
+      // Navigate to messages page with query parameters
+      void router.push(
+        {
+          pathname: `/${project.slug}/messages`,
+          query: filterParams,
+        },
+        undefined,
+        { shallow: false },
+      );
+    },
+    [project, router],
   );
 
   return (
@@ -231,14 +444,39 @@ function EvaluationsContent() {
       )}
       <HStack alignItems="start" gap={4}>
         <SimpleGrid templateColumns="repeat(4, 1fr)" gap={5} width="100%">
+          {checks.data && checks.data.length > 0 && (
+            <>
+              <GridItem colSpan={1} display="inline-grid">
+                <Card.Root>
+                  <Card.Header>
+                    <Heading size="sm">Overall Health</Heading>
+                  </Card.Header>
+                  <Card.Body>
+                    <CustomGraph input={aggregateHealthSummary} />
+                  </Card.Body>
+                </Card.Root>
+              </GridItem>
+              <GridItem colSpan={3} display="inline-grid">
+                <Card.Root>
+                  <Card.Header>
+                    <Heading size="sm">Pass / Fail Trend</Heading>
+                  </Card.Header>
+                  <Card.Body>
+                    <CustomGraph input={aggregatePassFailTrend} />
+                  </Card.Body>
+                </Card.Root>
+              </GridItem>
+            </>
+          )}
           {checks.data
             ? renderGridItems(
-                [...checks.data].sort((a, b) => {
-                  // Enabled items first (true > false when comparing booleans)
-                  if (a.enabled === b.enabled) return 0;
-                  return a.enabled ? -1 : 1;
-                }),
-              )
+              [...checks.data].sort((a, b) => {
+                // Enabled items first (true > false when comparing booleans)
+                if (a.enabled === b.enabled) return 0;
+                return a.enabled ? -1 : 1;
+              }),
+              handleGraphClick,
+            )
             : null}
         </SimpleGrid>
         <Box padding={3}>

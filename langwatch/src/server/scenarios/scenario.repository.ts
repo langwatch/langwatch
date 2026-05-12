@@ -1,7 +1,8 @@
+import { generate } from "@langwatch/ksuid";
 import { SpanKind } from "@opentelemetry/api";
 import type { Prisma, PrismaClient, Scenario } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
-import { nanoid } from "nanoid";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import { createLogger } from "~/utils/logger/server";
 
 const tracer = getLangWatchTracer("langwatch.scenarios.repository");
@@ -35,7 +36,7 @@ export class ScenarioRepository {
         logger.debug({ projectId: input.projectId, operation: "INSERT" }, "Inserting scenario");
         const result = await this.prisma.scenario.create({
           data: {
-            id: `scen_${nanoid()}`,
+            id: generate(KSUID_RESOURCES.SCENARIO).toString(),
             ...input,
           },
         });
@@ -76,6 +77,80 @@ export class ScenarioRepository {
     );
   }
 
+  /**
+   * Find a scenario by ID regardless of its archived status.
+   * Used for viewing run results of scenarios that may have been archived.
+   */
+  async findByIdIncludingArchived(input: {
+    id: string;
+    projectId: string;
+  }): Promise<Scenario | null> {
+    return tracer.withActiveSpan(
+      "ScenarioRepository.findByIdIncludingArchived",
+      {
+        kind: SpanKind.CLIENT,
+        attributes: {
+          "db.system": "postgresql",
+          "db.operation": "SELECT",
+          "db.table": "Scenario",
+          "tenant.id": input.projectId,
+          "scenario.id": input.id,
+        },
+      },
+      async (span) => {
+        logger.debug(
+          { projectId: input.projectId, scenarioId: input.id, operation: "SELECT" },
+          "Finding scenario by id including archived",
+        );
+        const result = await this.prisma.scenario.findFirst({
+          where: {
+            id: input.id,
+            projectId: input.projectId,
+          },
+        });
+        span.setAttribute("result.found", result !== null);
+        return result;
+      },
+    );
+  }
+
+  /**
+   * Find multiple scenarios by IDs regardless of archived status.
+   * Returns only id and archivedAt for lightweight classification.
+   */
+  async findManyIncludingArchived(input: {
+    ids: string[];
+    projectId: string;
+  }): Promise<{ id: string; archivedAt: Date | null }[]> {
+    return tracer.withActiveSpan(
+      "ScenarioRepository.findManyIncludingArchived",
+      {
+        kind: SpanKind.CLIENT,
+        attributes: {
+          "db.system": "postgresql",
+          "db.operation": "SELECT",
+          "db.table": "Scenario",
+          "tenant.id": input.projectId,
+        },
+      },
+      async (span) => {
+        logger.debug(
+          { projectId: input.projectId, idCount: input.ids.length, operation: "SELECT" },
+          "Finding scenarios by ids including archived",
+        );
+        const results = await this.prisma.scenario.findMany({
+          where: {
+            id: { in: input.ids },
+            projectId: input.projectId,
+          },
+          select: { id: true, archivedAt: true },
+        });
+        span.setAttribute("result.count", results.length);
+        return results;
+      },
+    );
+  }
+
   async findAll(input: { projectId: string }): Promise<Scenario[]> {
     return tracer.withActiveSpan(
       "ScenarioRepository.findAll",
@@ -103,6 +178,20 @@ export class ScenarioRepository {
     );
   }
 
+  /**
+   * Find scenario names by IDs regardless of archived status.
+   * Used for displaying human-readable names in UI warnings.
+   */
+  async findNamesByIds(input: {
+    ids: string[];
+    projectId: string;
+  }): Promise<{ id: string; name: string }[]> {
+    return this.prisma.scenario.findMany({
+      where: { id: { in: input.ids }, projectId: input.projectId },
+      select: { id: true, name: true },
+    });
+  }
+
   async update(
     id: string,
     projectId: string,
@@ -126,6 +215,52 @@ export class ScenarioRepository {
           where: { id, projectId },
           data,
         });
+      },
+    );
+  }
+
+  /**
+   * Soft-archive a scenario by setting its archivedAt timestamp.
+   * Returns the updated scenario, or null if not found for the given project.
+   */
+  async archive({
+    id,
+    projectId,
+  }: {
+    id: string;
+    projectId: string;
+  }): Promise<Scenario | null> {
+    return tracer.withActiveSpan(
+      "ScenarioRepository.archive",
+      {
+        kind: SpanKind.CLIENT,
+        attributes: {
+          "db.system": "postgresql",
+          "db.operation": "UPDATE",
+          "db.table": "Scenario",
+          "tenant.id": projectId,
+          "scenario.id": id,
+        },
+      },
+      async (span) => {
+        logger.debug(
+          { projectId, scenarioId: id, operation: "UPDATE" },
+          "Archiving scenario",
+        );
+        const scenario = await this.prisma.scenario.findFirst({
+          where: { id, projectId },
+        });
+        if (!scenario) {
+          span.setAttribute("result.found", false);
+          return null;
+        }
+        // Idempotent: if already archived, preserve the original timestamp
+        const result = await this.prisma.scenario.update({
+          where: { id, projectId },
+          data: { archivedAt: scenario.archivedAt ?? new Date() },
+        });
+        span.setAttribute("result.found", true);
+        return result;
       },
     );
   }

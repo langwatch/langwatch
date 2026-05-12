@@ -1,7 +1,7 @@
 import type { AgGridReact } from "@ag-grid-community/react";
 import { Box, Button, Card, HStack, Tabs, VStack } from "@chakra-ui/react";
 import { Controls, useUpdateNodeInternals } from "@xyflow/react";
-import { memo, useEffect, useRef } from "react";
+import { memo, useEffect, useMemo, useRef } from "react";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { LuArrowUpRight } from "react-icons/lu";
@@ -16,9 +16,15 @@ import { OptimizationStudioCanvas } from "../../../optimization_studio/component
 import { EvaluationResults } from "../../../optimization_studio/components/ResultsPanel";
 import { EvaluationManualIntegration } from "../../checks/EvaluationManualIntegration";
 import { DatasetTable } from "../../datasets/DatasetTable";
+import { useColorMode } from "../../ui/color-mode";
 import { Link } from "../../ui/link";
 import { toaster } from "../../ui/toaster";
 import { ImportFromProduction } from "./components/ImportFromProduction";
+
+const LIGHT_PATTERN =
+  "url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjE2IiBoZWlnaHQ9IjE2IiBmaWxsPSIjRjJGNEY4Ii8+CjxyZWN0IHg9IjE0IiB5PSIxNCIgd2lkdGg9IjIiIGhlaWdodD0iMiIgZmlsbD0iI0U1RTdFQiIvPgo8L3N2Zz4K)";
+const DARK_PATTERN =
+  "url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjE2IiBoZWlnaHQ9IjE2IiBmaWxsPSIjMTkxOTFkIi8+CjxyZWN0IHg9IjE0IiB5PSIxNCIgd2lkdGg9IjIiIGhlaWdodD0iMiIgZmlsbD0iIzIzMjQyOSIvPgo8L3N2Zz4K)";
 
 export const WizardWorkspace = memo(function WizardWorkspace() {
   const {
@@ -57,6 +63,8 @@ export const WizardWorkspace = memo(function WizardWorkspace() {
 
   const datasetGridRef = useRef<AgGridReact<any>>(null);
   const { project } = useOrganizationTeamProject();
+  const { colorMode } = useColorMode();
+  const bgPattern = colorMode === "dark" ? DARK_PATTERN : LIGHT_PATTERN;
 
   const hasDataset = !!getDatasetId();
   const hasResults = hasDataset && hasWorkflow;
@@ -92,7 +100,7 @@ export const WizardWorkspace = memo(function WizardWorkspace() {
 
   return (
     <VStack
-      background="url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjE2IiBoZWlnaHQ9IjE2IiBmaWxsPSIjRjJGNEY4Ii8+CjxyZWN0IHg9IjE0IiB5PSIxNCIgd2lkdGg9IjIiIGhlaWdodD0iMiIgZmlsbD0iI0U1RTdFQiIvPgo8L3N2Zz4K)"
+      background={bgPattern}
       padding={6}
       width="full"
       height="100%"

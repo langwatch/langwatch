@@ -35,9 +35,12 @@ export function useLicenseEnforcement(limitType: LimitType) {
     { enabled: !!organization?.id },
   );
 
+  const reportBlocked = api.licenseEnforcement.reportLimitBlocked.useMutation();
+
   /**
    * Check if the action is allowed, and either proceed or show upgrade modal.
    * Returns the result of onAllowed if allowed, undefined if blocked.
+   * When blocked, fires a fire-and-forget notification to the backend.
    * @param onAllowed - Callback to execute if the action is allowed
    */
   const checkAndProceed = useCallback(
@@ -51,10 +54,17 @@ export function useLicenseEnforcement(limitType: LimitType) {
         return onAllowed();
       } else {
         openUpgradeModal(limitType, checkResult.data.current, checkResult.data.max);
+        // Fire-and-forget: notify backend that a UI pre-check blocked the user
+        if (organization?.id) {
+          reportBlocked.mutate({
+            organizationId: organization.id,
+            limitType,
+          });
+        }
         return undefined;
       }
     },
-    [checkResult.data, openUpgradeModal, limitType],
+    [checkResult.data, openUpgradeModal, limitType, organization?.id, reportBlocked],
   );
 
   return {

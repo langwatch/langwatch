@@ -91,7 +91,7 @@ vi.mock("~/server/evaluations/evaluators.generated", () => ({
 }));
 
 // Mock dependencies
-vi.mock("next/router", () => ({
+vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     push: vi.fn(),
     query: {},
@@ -113,6 +113,23 @@ vi.mock("~/hooks/useDrawer", () => ({
   }),
   getComplexProps: () => ({}),
   useDrawerParams: () => ({}),
+}));
+
+vi.mock("~/hooks/useOrganizationTeamProject", () => ({
+  useOrganizationTeamProject: () => ({
+    project: { id: "proj-test", slug: "test-project" },
+    organization: { id: "org-test" },
+  }),
+}));
+
+vi.mock("~/utils/api", () => ({
+  api: {
+    evaluations: {
+      availableEvaluators: {
+        useQuery: () => ({ data: undefined, isLoading: false }),
+      },
+    },
+  },
 }));
 
 // Wrapper with Chakra provider
@@ -153,6 +170,8 @@ describe("EvaluatorTypeSelectorDrawer", () => {
       });
     });
 
+    /** @scenario Each category contains specific evaluators */
+    /** @scenario EvaluatorTypeSelectorDrawer shows evaluators in category */
     it("shows evaluators for the selected category", async () => {
       renderDrawer({ category: "expected_answer" });
 
@@ -175,7 +194,26 @@ describe("EvaluatorTypeSelectorDrawer", () => {
   });
 
   describe("Navigation", () => {
-    it("opens evaluator editor when selecting an evaluator", async () => {
+    /** @scenario Select evaluator type opens editor */
+    it("opens evaluator editor when selecting an evaluator (no onSelect provided)", async () => {
+      const user = userEvent.setup();
+      renderDrawer();
+
+      await waitFor(() => {
+        expect(screen.getByText("Exact Match")).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByText("Exact Match"));
+
+      expect(mockOpenDrawer).toHaveBeenCalledWith(
+        "evaluatorEditor",
+        expect.objectContaining({
+          evaluatorType: expect.stringContaining("exact_match"),
+        }),
+      );
+    });
+
+    it("delegates to onSelect (and skips openDrawer) when a handler is provided", async () => {
       const user = userEvent.setup();
       renderDrawer({ onSelect: mockOnSelect });
 
@@ -185,12 +223,12 @@ describe("EvaluatorTypeSelectorDrawer", () => {
 
       await user.click(screen.getByText("Exact Match"));
 
-      // Should open evaluator editor drawer
-      expect(mockOpenDrawer).toHaveBeenCalledWith(
+      expect(mockOnSelect).toHaveBeenCalledWith(
+        expect.stringContaining("exact_match"),
+      );
+      expect(mockOpenDrawer).not.toHaveBeenCalledWith(
         "evaluatorEditor",
-        expect.objectContaining({
-          evaluatorType: expect.stringContaining("exact_match"),
-        }),
+        expect.anything(),
       );
     });
   });

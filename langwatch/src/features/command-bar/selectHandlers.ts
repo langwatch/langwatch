@@ -1,4 +1,3 @@
-import type { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import type { DrawerType } from "~/components/drawerRegistry";
 import type { Command, RecentItem, SearchResult } from "./types";
 
@@ -21,7 +20,7 @@ export type AddRecentItem = (item: Omit<RecentItem, "accessedAt">) => void;
  */
 export type OpenDrawer = (
   drawer: DrawerType,
-  params?: Record<string, string>
+  params?: Record<string, string>,
 ) => void;
 
 /**
@@ -46,7 +45,7 @@ export function handleCommandSelect(
   projectSlug: string,
   ctx: NavigationContext,
   addRecentItem: AddRecentItem,
-  openDrawer: OpenDrawer
+  openDrawer: OpenDrawer,
 ) {
   const navigate = createNavigate(ctx);
 
@@ -72,6 +71,14 @@ export function handleCommandSelect(
     return;
   }
 
+  // Generic action callback. Used by dynamically synthesized commands that
+  // own their own behavior (e.g. dev-mode feature flag toggles). The bar
+  // stays open so a user can fire several toggles in a row.
+  if (cmd.action) {
+    cmd.action();
+    return;
+  }
+
   switch (cmd.id) {
     case "action-new-agent":
       ctx.close();
@@ -92,6 +99,18 @@ export function handleCommandSelect(
     case "action-new-scenario":
       navigate(`/${projectSlug}/simulations/scenarios`);
       break;
+    case "action-sdk-radar":
+      ctx.close();
+      openDrawer("sdkRadar");
+      break;
+    case "action-send-trace":
+      ctx.close();
+      openDrawer("foundry");
+      break;
+    case "action-feature-flags":
+      ctx.close();
+      openDrawer("featureFlags");
+      break;
   }
 }
 
@@ -103,7 +122,7 @@ export function handleSearchResultSelect(
   projectSlug: string,
   ctx: NavigationContext,
   addRecentItem: AddRecentItem,
-  openDrawer: OpenDrawer
+  openDrawer: OpenDrawer,
 ) {
   const navigate = createNavigate(ctx);
 
@@ -113,8 +132,7 @@ export function handleSearchResultSelect(
       id: result.id,
       type: result.type === "trace" ? "trace" : "entity",
       label: result.label,
-      description:
-        result.type.charAt(0).toUpperCase() + result.type.slice(1),
+      description: result.type.charAt(0).toUpperCase() + result.type.slice(1),
       path: result.path,
       iconName: result.type,
       projectSlug,
@@ -141,7 +159,7 @@ export function handleRecentItemSelect(
   item: RecentItem,
   ctx: NavigationContext,
   addRecentItem: AddRecentItem,
-  openDrawer: OpenDrawer
+  openDrawer: OpenDrawer,
 ) {
   const navigate = createNavigate(ctx);
 
@@ -175,7 +193,7 @@ export function handleRecentItemSelect(
 export function handleProjectSelect(
   project: { slug: string; name: string },
   ctx: NavigationContext,
-  addRecentItem: AddRecentItem
+  addRecentItem: AddRecentItem,
 ) {
   const navigate = createNavigate(ctx);
 

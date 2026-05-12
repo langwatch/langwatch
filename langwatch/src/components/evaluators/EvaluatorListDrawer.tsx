@@ -118,6 +118,7 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
       open={isOpen}
       onOpenChange={({ open }) => !open && onClose()}
       size="md"
+      modal={false}
     >
       <Drawer.Content>
         <Drawer.CloseTrigger />
@@ -312,7 +313,7 @@ function EvaluatorCard({
               <LuEllipsisVertical />
             </IconButton>
           </Menu.Trigger>
-          <Menu.Content zIndex="popover">
+          <Menu.Content>
             <Menu.Item
               value="edit"
               onClick={(e) => {

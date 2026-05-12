@@ -478,6 +478,7 @@ def test_cache_ttl_caches_versions_independently(clean_langwatch):
     THEN it's a cache miss
     """
     from langwatch.prompts.prompt_facade import PromptsFacade
+    from langwatch.prompts.types import PromptData, Message
     from unittest.mock import Mock, patch
     import time
 
@@ -485,45 +486,31 @@ def test_cache_ttl_caches_versions_independently(clean_langwatch):
     mock_client = Mock()
     facade = PromptsFacade(mock_client)
 
-    # Mock API responses for different versions
-    version_1_response = {
-        "id": "my-prompt",
-        "handle": "my-prompt",
-        "scope": "PROJECT",
-        "name": "Test Prompt",
-        "version": 1,
-        "versionId": "version_123",
-        "model": "openai/gpt-4",
-        "messages": [{"role": "system", "content": "Version 1"}],
-        "inputs": [],
-        "outputs": [],
-        "createdAt": "2023-01-01T00:00:00Z",
-        "updatedAt": "2023-01-01T00:00:00Z",
-        "projectId": "project_1",
-        "organizationId": "org_1",
-        "prompt": "Version 1 content",
-    }
+    # Mock API responses for different versions using PromptData models
+    version_1_response = PromptData(
+        id="my-prompt",
+        handle="my-prompt",
+        scope="PROJECT",
+        version=1,
+        version_id="version_123",
+        model="openai/gpt-4",
+        messages=[Message(role="system", content="Version 1")],
+        prompt="Version 1 content",
+    )
 
-    version_2_response = {
-        "id": "my-prompt",
-        "handle": "my-prompt",
-        "scope": "PROJECT",
-        "name": "Test Prompt",
-        "version": 2,
-        "versionId": "version_456",
-        "model": "openai/gpt-4",
-        "messages": [{"role": "system", "content": "Version 2"}],
-        "inputs": [],
-        "outputs": [],
-        "createdAt": "2023-01-01T00:00:00Z",
-        "updatedAt": "2023-01-01T00:00:00Z",
-        "projectId": "project_1",
-        "organizationId": "org_1",
-        "prompt": "Version 2 content",
-    }
+    version_2_response = PromptData(
+        id="my-prompt",
+        handle="my-prompt",
+        scope="PROJECT",
+        version=2,
+        version_id="version_456",
+        model="openai/gpt-4",
+        messages=[Message(role="system", content="Version 2")],
+        prompt="Version 2 content",
+    )
 
     # Mock the API service to return different responses based on version
-    def mock_get(prompt_id, version_number=None):
+    def mock_get(prompt_id, version_number=None, tag=None):
         if version_number == 1:
             return version_1_response
         elif version_number == 2:
@@ -539,7 +526,7 @@ def test_cache_ttl_caches_versions_independently(clean_langwatch):
         )
 
     # Verify it called the API for version 1
-    facade._api_service.get.assert_called_with("my-prompt", 1)
+    facade._api_service.get.assert_called_with("my-prompt", 1, tag=None)
     assert result1.version == 1
 
     # Second request for version 2 - should be a cache miss and hit API again
@@ -550,11 +537,11 @@ def test_cache_ttl_caches_versions_independently(clean_langwatch):
         )
 
     # Verify it called the API again for version 2
-    facade._api_service.get.assert_called_with("my-prompt", 2)
+    facade._api_service.get.assert_called_with("my-prompt", 2, tag=None)
     assert result2.version == 2
 
     # Verify different versions are cached separately
-    assert "my-prompt::version:1" in facade._cache
-    assert "my-prompt::version:2" in facade._cache
-    assert facade._cache["my-prompt::version:1"]["data"]["version"] == 1
-    assert facade._cache["my-prompt::version:2"]["data"]["version"] == 2
+    assert "my-prompt::version:1::tag:" in facade._cache
+    assert "my-prompt::version:2::tag:" in facade._cache
+    assert facade._cache["my-prompt::version:1::tag:"]["data"].version == 1
+    assert facade._cache["my-prompt::version:2::tag:"]["data"].version == 2

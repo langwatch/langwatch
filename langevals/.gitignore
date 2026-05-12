@@ -1,0 +1,14 @@
+.pytest_cache
+langevals.code-workspace
+.env
+__pycache__
+dist
+openapi.json
+.venv
+*/**/.venv
+.DS_Store
+notebooks/data/**/*
+!notebooks/data/.gitkeep
+!notebooks/data/samsung-questions.csv
+notebooks/local_cache
+langevals_licenses.json

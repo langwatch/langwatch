@@ -114,10 +114,11 @@ describe("EvaluationsFacade", () => {
         "https://api.langwatch.ai/api/evaluations/presidio/pii_detection/evaluate",
         expect.objectContaining({
           method: "POST",
-          headers: {
+          headers: expect.objectContaining({
             "Content-Type": "application/json",
-            "X-Auth-Token": "test-api-key",
-          },
+            authorization: "Bearer test-api-key",
+            "x-auth-token": "test-api-key",
+          }),
           body: expect.any(String),
         })
       );

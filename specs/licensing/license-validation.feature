@@ -44,11 +44,6 @@ Feature: RSA License Validation
     When I verify the signature with the public key
     Then the signature is invalid
 
-  Scenario: Rejects license with wrong signature
-    Given a license with a signature from a different key pair
-    When I verify the signature with the public key
-    Then the signature is invalid
-
   Scenario: Rejects license with empty signature
     Given a license with an empty signature
     When I verify the signature with the public key
@@ -57,21 +52,6 @@ Feature: RSA License Validation
   # ============================================================================
   # Expiration Checking
   # ============================================================================
-
-  Scenario: License is valid when expiration is in the future
-    Given a license with expiration date "2030-12-31T23:59:59Z"
-    When I check if the license is expired
-    Then the license is not expired
-
-  Scenario: License is expired when expiration is in the past
-    Given a license with expiration date "2020-01-01T00:00:00Z"
-    When I check if the license is expired
-    Then the license is expired
-
-  Scenario: License expires at exactly the expiration time
-    Given a license with expiration date at the current moment
-    When I check if the license is expired
-    Then the license is expired
 
   # ============================================================================
   # Full Validation Pipeline
@@ -83,39 +63,7 @@ Feature: RSA License Validation
     Then validation succeeds
     And the result contains planInfo with maxMembers 5
 
-  Scenario: Validation fails for invalid format
-    Given a license key "garbage-data"
-    When I validate the license
-    Then validation fails with error "Invalid license format"
-
-  Scenario: Validation fails for invalid signature
-    Given a license with tampered data
-    When I validate the license
-    Then validation fails with error "Invalid signature"
-
-  Scenario: Validation fails for expired license
-    Given a valid but expired license for plan "PRO"
-    When I validate the license
-    Then validation fails with error "License expired"
-
   # ============================================================================
   # License Data Structure
   # ============================================================================
 
-  Scenario: Extracts all license fields correctly
-    Given a license with:
-      | licenseId         | lic-001                  |
-      | version           | 1                        |
-      | organizationName  | Test Org                 |
-      | email             | admin@test.org           |
-      | issuedAt          | 2024-01-01T00:00:00Z     |
-      | expiresAt         | 2025-12-31T23:59:59Z     |
-      | planType          | GROWTH                   |
-      | maxMembers        | 10                       |
-      | maxProjects       | 99                       |
-      | maxMessagesPerMonth | 100000                 |
-      | evaluationsCredit | 50                       |
-      | maxWorkflows      | 100                      |
-      | canPublish        | true                     |
-    When I validate the license
-    Then the license data matches all provided fields

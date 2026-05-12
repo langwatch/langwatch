@@ -1,4 +1,3 @@
-import { isBuildOrNoRedis, connection as redisConnection } from "../redis";
 import { TtlCache } from "../utils/ttlCache";
 
 interface CacheEntry {
@@ -8,21 +7,9 @@ interface CacheEntry {
 }
 
 /**
- * Hybrid Redis/in-memory cache with stale-while-revalidate pattern.
+ * Cache with stale-while-revalidate pattern for feature flags.
  *
- * This cache provides fast, resilient caching for feature flags with automatic
- * fallback from Redis to in-memory storage when Redis is unavailable.
- *
- * ## Cache Strategy
- *
- * 1. **Redis first**: When available, uses Redis for cross-instance cache sharing
- * 2. **Memory fallback**: Falls back to in-memory TtlCache when Redis is down
- * 3. **Stale-while-revalidate**: Returns cached data immediately, refreshes in background
- *
- * ## Key Structure
- *
- * Redis keys are prefixed with `feature_flag:` followed by a composite key:
- * `{flagKey}:{distinctId}:{projectId}:{organizationId}`
+ * Uses TtlCache (Redis-backed) for cross-instance sharing.
  *
  * ## TTL Configuration
  *
@@ -31,116 +18,81 @@ interface CacheEntry {
  * - Reduced PostHog API calls (one call per 5 seconds per unique key)
  * - Resilience to PostHog outages (serves cached values while down)
  *
- * @see docs/adr/005-feature-flags.md for architecture decisions
+ * @see dev/docs/adr/005-feature-flags.md for architecture decisions
  * @see FEATURE_FLAG_CACHE_TTL_MS for TTL configuration
  */
 export class StaleWhileRevalidateCache {
-  private readonly staleThresholdMs: number; // How long before considering data stale
-  private readonly refreshThresholdMs: number; // How long before triggering background refresh
-  private readonly prefix = "feature_flag:";
+  private readonly staleThresholdMs: number;
+  private readonly refreshThresholdMs: number;
+  private readonly maxTtlMs: number;
+  private readonly cache: TtlCache<CacheEntry>;
 
-  // In-memory cache for fast access and Redis fallback
-  private readonly memoryCache: TtlCache<CacheEntry>;
-
-  constructor(staleThresholdMs: number, refreshThresholdMs: number) {
+  /**
+   * @param staleThresholdMs default staleness threshold (returned to callers
+   *   that don't pass an override). Frontend flags use this.
+   * @param refreshThresholdMs background refresh threshold.
+   * @param maxTtlMs underlying storage TTL — must be >= the longest
+   *   per-call ttlOverrideMs any caller might pass, so Redis doesn't evict
+   *   the entry before the override window expires. Defaults to staleThresholdMs.
+   */
+  constructor(
+    staleThresholdMs: number,
+    refreshThresholdMs: number,
+    maxTtlMs: number = staleThresholdMs,
+  ) {
     this.staleThresholdMs = staleThresholdMs;
     this.refreshThresholdMs = refreshThresholdMs;
-
-    // Memory cache TTL matches stale threshold
-    this.memoryCache = new TtlCache<CacheEntry>(staleThresholdMs);
+    this.maxTtlMs = Math.max(staleThresholdMs, maxTtlMs);
+    this.cache = new TtlCache<CacheEntry>(this.maxTtlMs, "feature_flag:");
   }
 
-  async get(key: string): Promise<CacheEntry | undefined> {
-    // Try Redis first if available
-    if (redisConnection && !isBuildOrNoRedis) {
-      try {
-        const result = await redisConnection.get(`${this.prefix}${key}`);
-        if (result !== null) {
-          const entry: CacheEntry = JSON.parse(result);
-          // Redis TTL handles expiration, so if it exists it's valid
-          return entry;
-        }
-      } catch (_error) {
-        // Redis failed, fall through to memory cache
-      }
+  /**
+   * @param key cache key
+   * @param ttlOverrideMs optional caller-provided staleness threshold. Used by
+   *   hot-path callers (kill switches) to extend the cache window without
+   *   changing the global default that user-facing flags rely on.
+   *
+   * Eviction rule: physically delete only when the absolute storage TTL
+   * (maxTtlMs) is exceeded. For shorter per-caller thresholds, return
+   * `undefined` silently — that way a short-window caller hitting a still-
+   * valid entry doesn't evict it from under a long-window caller. This
+   * matters if the same cache key is read from both a 5 s consumer and a
+   * 60 s consumer; without it, the short-window read would defeat the
+   * override the long-window caller asked for.
+   */
+  async get(
+    key: string,
+    ttlOverrideMs?: number,
+  ): Promise<CacheEntry | undefined> {
+    const entry = await this.cache.get(key);
+    if (!entry) return undefined;
+    const age = Date.now() - entry.timestamp;
+    if (age > this.maxTtlMs) {
+      await this.cache.delete(key);
+      return undefined;
     }
-
-    // Fall back to memory cache
-    const entry = this.memoryCache.get(key);
-    // Check if memory cache entry is stale
-    if (entry && this.isStale(entry)) {
-      this.memoryCache.delete(key);
+    const threshold = ttlOverrideMs ?? this.staleThresholdMs;
+    if (age > threshold) {
       return undefined;
     }
     return entry;
   }
 
   async set(key: string, value: boolean): Promise<void> {
-    const entry: CacheEntry = {
+    await this.cache.set(key, {
       value,
       timestamp: Date.now(),
-    };
-
-    // Try Redis first if available
-    if (redisConnection && !isBuildOrNoRedis) {
-      try {
-        // Store for stale threshold (convert ms to seconds)
-        const ttlSeconds = Math.ceil(this.staleThresholdMs / 1000);
-        await redisConnection.setex(
-          `${this.prefix}${key}`,
-          ttlSeconds,
-          JSON.stringify(entry),
-        );
-      } catch (_error) {
-        // Redis failed, fall through to memory cache
-      }
-    }
-
-    // Always set in memory cache
-    this.memoryCache.set(key, entry);
+    });
   }
 
   async delete(key: string): Promise<void> {
-    // Try Redis first if available
-    if (redisConnection && !isBuildOrNoRedis) {
-      try {
-        await redisConnection.del(`${this.prefix}${key}`);
-      } catch (_error) {
-        // Redis failed, continue to memory cache
-      }
-    }
-
-    // Always delete from memory cache
-    this.memoryCache.delete(key);
+    await this.cache.delete(key);
   }
 
-  async clear(): Promise<void> {
-    // Try Redis first if available
-    if (redisConnection && !isBuildOrNoRedis) {
-      try {
-        const keys = await redisConnection.keys(`${this.prefix}*`);
-        if (keys.length > 0) {
-          await redisConnection.del(...keys);
-        }
-      } catch (_error) {
-        // Redis failed, continue to memory cache
-      }
-    }
-
-    // Always clear memory cache
-    this.memoryCache.clear();
-  }
-
-  /**
-   * Check if entry is stale (needs background refresh).
-   */
   isStale(entry: CacheEntry): boolean {
     return Date.now() - entry.timestamp > this.staleThresholdMs;
   }
 
-  /**
-   * Check if entry should trigger background refresh.
-   */
   shouldRefresh(entry: CacheEntry): boolean {
     return (
       Date.now() - entry.timestamp > this.refreshThresholdMs &&
@@ -148,18 +100,8 @@ export class StaleWhileRevalidateCache {
     );
   }
 
-  /**
-   * Mark entry as being refreshed.
-   */
   async markRefreshing(key: string, entry: CacheEntry): Promise<void> {
     entry.isRefreshing = true;
-    await this.set(key, entry.value); // This will update the timestamp too
-  }
-
-  /**
-   * Check if Redis is available.
-   */
-  isRedisAvailable(): boolean {
-    return !isBuildOrNoRedis && !!redisConnection;
+    await this.set(key, entry.value);
   }
 }

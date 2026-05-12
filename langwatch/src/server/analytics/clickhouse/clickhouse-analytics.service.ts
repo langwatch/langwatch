@@ -7,7 +7,7 @@
 
 import type { ClickHouseClient } from "@clickhouse/client";
 import { getLangWatchTracer } from "langwatch";
-import { getClickHouseClient } from "../../clickhouse/client";
+import { getClickHouseClientForProject, isClickHouseEnabled } from "../../clickhouse/clickhouseClient";
 import type { FilterField } from "../../filters/types";
 import type { TimeseriesInputType, SeriesInputType } from "../registry";
 import { currentVsPreviousDates } from "../../api/routers/analytics/common";
@@ -35,6 +35,22 @@ const MINUTES_PER_DAY = 24 * 60;
 /** Milliseconds per minute for time calculations */
 const MS_PER_MINUTE = 1000 * 60;
 
+/**
+ * Default ClickHouse settings applied to all analytics queries.
+ *
+ * max_memory_usage is intentionally omitted: the ClickHouse server profile
+ * already enforces a per-query memory cap via Terraform (1.5–2 GiB depending
+ * on cluster). Setting it client-side would override that cap upward, which
+ * is counterproductive.
+ *
+ * max_bytes_before_external_group_by: When GROUP BY intermediate state exceeds
+ * this threshold (500 MB), ClickHouse spills to disk instead of failing with OOM.
+ * This acts as a safety net for large GROUP BY operations under concurrent load.
+ */
+export const ANALYTICS_CLICKHOUSE_SETTINGS: Record<string, number> = {
+  max_bytes_before_external_group_by: 500_000_000,
+};
+
 // Re-export types for backward compatibility
 export type {
   TimeseriesResult,
@@ -49,21 +65,23 @@ export type {
  * Provides analytics queries using ClickHouse.
  */
 export class ClickHouseAnalyticsService {
-  private readonly clickHouseClient: ClickHouseClient | null;
   private readonly logger = createLogger("langwatch:analytics:clickhouse");
   private readonly tracer = getLangWatchTracer(
     "langwatch.analytics.clickhouse",
   );
 
-  constructor() {
-    this.clickHouseClient = getClickHouseClient();
+  /**
+   * Resolve the ClickHouse client for a given project.
+   */
+  private async resolveClient(projectId: string): Promise<ClickHouseClient | null> {
+    return getClickHouseClientForProject(projectId);
   }
 
   /**
-   * Check if ClickHouse client is available
+   * Check if the shared ClickHouse instance is configured (sync, for AnalyticsBackend interface).
    */
   isAvailable(): boolean {
-    return this.clickHouseClient !== null;
+    return isClickHouseEnabled();
   }
 
   /**
@@ -74,7 +92,8 @@ export class ClickHouseAnalyticsService {
       "ClickHouseAnalyticsService.getTimeseries",
       { attributes: { "tenant.id": input.projectId } },
       async (span) => {
-        if (!this.clickHouseClient) {
+        const clickHouseClient = await this.resolveClient(input.projectId);
+        if (!clickHouseClient) {
           throw new Error("ClickHouse client not available");
         }
 
@@ -93,6 +112,9 @@ export class ClickHouseAnalyticsService {
           if (estimatedBuckets > MAX_TIMESERIES_BUCKETS) {
             adjustedTimeScale = MINUTES_PER_DAY;
           }
+        } else if (input.timeScale === undefined) {
+          // Default to daily granularity to match ES behavior (fixed_interval: "1d")
+          adjustedTimeScale = MINUTES_PER_DAY;
         }
 
         // Build the query
@@ -112,10 +134,11 @@ export class ClickHouseAnalyticsService {
         this.logger.debug({ sql, params }, "Executing timeseries query");
 
         try {
-          const result = await this.clickHouseClient.query({
+          const result = await clickHouseClient.query({
             query: sql,
             query_params: params,
             format: "JSONEachRow",
+            clickhouse_settings: ANALYTICS_CLICKHOUSE_SETTINGS,
           });
 
           const rows = (await result.json()) as Array<Record<string, unknown>>;
@@ -322,18 +345,17 @@ export class ClickHouseAnalyticsService {
     currentPeriod: TimeseriesBucket[],
     groupBy?: string,
   ): void {
-    // Collect all metric keys from both periods (including nested grouped metrics)
+    // Collect all top-level metric keys from both periods
     const allMetricKeys = new Set<string>();
-    const allGroupedMetricKeys = new Map<string, Set<string>>(); // groupBy key -> metric keys
+    // Collect all metric sub-keys across all groups (union of metric names)
+    const allGroupedMetricSubKeys = new Set<string>();
 
     for (const bucket of [...previousPeriod, ...currentPeriod]) {
       for (const key of Object.keys(bucket)) {
-        // Skip 'date' key
         if (key === "date") continue;
 
         const value = bucket[key];
 
-        // Handle grouped metrics (nested objects)
         if (
           groupBy &&
           key === groupBy &&
@@ -341,13 +363,9 @@ export class ClickHouseAnalyticsService {
           value !== null
         ) {
           const groupData = value as Record<string, Record<string, number>>;
-          for (const [groupKey, metrics] of Object.entries(groupData)) {
-            if (!allGroupedMetricKeys.has(groupKey)) {
-              allGroupedMetricKeys.set(groupKey, new Set());
-            }
-            const keySet = allGroupedMetricKeys.get(groupKey)!;
+          for (const metrics of Object.values(groupData)) {
             for (const metricKey of Object.keys(metrics)) {
-              keySet.add(metricKey);
+              allGroupedMetricSubKeys.add(metricKey);
             }
           }
         } else {
@@ -365,20 +383,18 @@ export class ClickHouseAnalyticsService {
         }
       }
 
-      // Normalize grouped metrics
+      // Normalize grouped metrics: only fill in missing metric sub-keys
+      // for groups that already exist in this bucket. Do NOT create new
+      // groups from the other period — that would bleed stale dimension
+      // values across periods.
       if (groupBy && bucket[groupBy] && typeof bucket[groupBy] === "object") {
         const groupData = bucket[groupBy] as Record<
           string,
           Record<string, number>
         >;
 
-        // Ensure all group keys exist
-        for (const [groupKey, metricKeys] of allGroupedMetricKeys) {
-          if (!groupData[groupKey]) {
-            groupData[groupKey] = {};
-          }
-          // Ensure all metric keys exist within each group
-          for (const metricKey of metricKeys) {
+        for (const groupKey of Object.keys(groupData)) {
+          for (const metricKey of allGroupedMetricSubKeys) {
             if (groupData[groupKey]![metricKey] === undefined) {
               groupData[groupKey]![metricKey] = 0;
             }
@@ -412,7 +428,8 @@ export class ClickHouseAnalyticsService {
       "ClickHouseAnalyticsService.getDataForFilter",
       { attributes: { "tenant.id": projectId, "filter.field": field } },
       async (span) => {
-        if (!this.clickHouseClient) {
+        const clickHouseClient = await this.resolveClient(projectId);
+        if (!clickHouseClient) {
           throw new Error("ClickHouse client not available");
         }
 
@@ -430,10 +447,11 @@ export class ClickHouseAnalyticsService {
         this.logger.debug({ sql, params }, "Executing dataForFilter query");
 
         try {
-          const result = await this.clickHouseClient.query({
+          const result = await clickHouseClient.query({
             query: sql,
             query_params: params,
             format: "JSONEachRow",
+            clickhouse_settings: ANALYTICS_CLICKHOUSE_SETTINGS,
           });
 
           const rows = (await result.json()) as Array<{
@@ -485,7 +503,8 @@ export class ClickHouseAnalyticsService {
       "ClickHouseAnalyticsService.getTopUsedDocuments",
       { attributes: { "tenant.id": projectId } },
       async (span) => {
-        if (!this.clickHouseClient) {
+        const clickHouseClient = await this.resolveClient(projectId);
+        if (!clickHouseClient) {
           throw new Error("ClickHouse client not available");
         }
 
@@ -511,15 +530,17 @@ export class ClickHouseAnalyticsService {
 
           // Execute both queries
           const [topDocsResult, totalResult] = await Promise.all([
-            this.clickHouseClient.query({
+            clickHouseClient.query({
               query: topDocsSql,
               query_params: params,
               format: "JSONEachRow",
+              clickhouse_settings: ANALYTICS_CLICKHOUSE_SETTINGS,
             }),
-            this.clickHouseClient.query({
+            clickHouseClient.query({
               query: totalSql,
               query_params: params,
               format: "JSONEachRow",
+              clickhouse_settings: ANALYTICS_CLICKHOUSE_SETTINGS,
             }),
           ]);
 
@@ -582,7 +603,8 @@ export class ClickHouseAnalyticsService {
       "ClickHouseAnalyticsService.getFeedbacks",
       { attributes: { "tenant.id": projectId } },
       async (span) => {
-        if (!this.clickHouseClient) {
+        const clickHouseClient = await this.resolveClient(projectId);
+        if (!clickHouseClient) {
           throw new Error("ClickHouse client not available");
         }
 
@@ -596,10 +618,11 @@ export class ClickHouseAnalyticsService {
         this.logger.debug({ sql, params }, "Executing feedbacks query");
 
         try {
-          const result = await this.clickHouseClient.query({
+          const result = await clickHouseClient.query({
             query: sql,
             query_params: params,
             format: "JSONEachRow",
+            clickhouse_settings: ANALYTICS_CLICKHOUSE_SETTINGS,
           });
 
           const rows = (await result.json()) as Array<{

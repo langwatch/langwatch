@@ -47,7 +47,7 @@ export const EditModelProviderDrawer = (
           closeDrawer();
         }
       }}
-      onInteractOutside={closeDrawer}
+      modal={false}
     >
       <Drawer.Content>
         <Drawer.Header>

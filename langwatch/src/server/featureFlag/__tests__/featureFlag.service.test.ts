@@ -127,5 +127,85 @@ describe("FeatureFlagService", () => {
         });
       });
     });
+
+    describe("when FEATURE_FLAG_FORCE_ENABLE is set", () => {
+      const originalEnv = process.env;
+
+      beforeEach(() => {
+        process.env = { ...originalEnv };
+      });
+
+      afterEach(() => {
+        process.env = originalEnv;
+      });
+
+      it("forces matching flag on regardless of underlying service", async () => {
+        process.env.FEATURE_FLAG_FORCE_ENABLE = "some_flag,other_flag";
+        const service = FeatureFlagService.create();
+        const mockSub = { isEnabled: vi.fn().mockResolvedValue(false) };
+        vi.spyOn(service as any, "service", "get").mockReturnValue(mockSub);
+
+        const result = await service.isEnabled("some_flag", "user-1", false);
+
+        expect(result).toBe(true);
+        expect(mockSub.isEnabled).not.toHaveBeenCalled();
+      });
+
+      it("does not force flags that are not in the list", async () => {
+        process.env.FEATURE_FLAG_FORCE_ENABLE = "only_this_flag";
+        const service = FeatureFlagService.create();
+        const mockSub = { isEnabled: vi.fn().mockResolvedValue(false) };
+        vi.spyOn(service as any, "service", "get").mockReturnValue(mockSub);
+
+        const result = await service.isEnabled("different_flag", "u", false);
+
+        expect(result).toBe(false);
+        expect(mockSub.isEnabled).toHaveBeenCalled();
+      });
+
+      it("trims whitespace in the comma-separated list", async () => {
+        process.env.FEATURE_FLAG_FORCE_ENABLE = "  spaced_flag  , other ";
+        const service = FeatureFlagService.create();
+        const mockSub = { isEnabled: vi.fn().mockResolvedValue(false) };
+        vi.spyOn(service as any, "service", "get").mockReturnValue(mockSub);
+
+        const result = await service.isEnabled("spaced_flag", "u", false);
+
+        expect(result).toBe(true);
+      });
+
+      it("runs at the top level so dev memory sub-service is bypassed", async () => {
+        process.env.FEATURE_FLAG_FORCE_ENABLE = "release_ui_ai_gateway_menu_enabled";
+        delete process.env.POSTHOG_KEY;
+        const service = FeatureFlagService.create();
+        const mockMemorySub = { isEnabled: vi.fn().mockResolvedValue(false) };
+        vi.spyOn(service as any, "service", "get").mockReturnValue(
+          mockMemorySub,
+        );
+
+        const result = await service.isEnabled(
+          "release_ui_ai_gateway_menu_enabled",
+          "u",
+          false,
+        );
+
+        expect(result).toBe(true);
+        expect(mockMemorySub.isEnabled).not.toHaveBeenCalled();
+      });
+
+      it("per-flag envOverride takes precedence over FEATURE_FLAG_FORCE_ENABLE", async () => {
+        process.env.RELEASE_UI_SIMULATIONS_MENU_ENABLED = "0";
+        process.env.FEATURE_FLAG_FORCE_ENABLE = "release_ui_simulations_menu_enabled";
+        const service = FeatureFlagService.create();
+
+        const result = await service.isEnabled(
+          "release_ui_simulations_menu_enabled",
+          "u",
+          true,
+        );
+
+        expect(result).toBe(false);
+      });
+    });
   });
 });

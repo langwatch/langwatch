@@ -1,17 +1,16 @@
 import { createTRPCRouter } from "~/server/api/trpc";
-
-import { dependencies } from "../../injection/dependencies.server";
-
 import { agentsRouter } from "./routers/agents";
 import { analyticsRouter } from "./routers/analytics";
 import { annotationRouter } from "./routers/annotation";
 import { annotationScoreRouter } from "./routers/annotationScore";
 import { batchRecordRouter } from "./routers/batchRecord";
 import { costsRouter } from "./routers/costs";
+import { currencyRouter } from "./routers/currency";
 import { dashboardsRouter } from "./routers/dashboards";
 import { datasetRouter } from "./routers/dataset";
 import { datasetRecordRouter } from "./routers/datasetRecord";
 import { evaluationsRouter } from "./routers/evaluations";
+import { exportRouter } from "./routers/export";
 import { featureFlagRouter } from "./routers/featureFlag";
 import { evaluatorsRouter } from "./routers/evaluators";
 import { licenseRouter } from "./routers/license";
@@ -29,26 +28,40 @@ import { onboardingRouter } from "./routers/onboarding/onboarding.router";
 import { optimizationRouter } from "./routers/optimization";
 import { organizationRouter } from "./routers/organization";
 import { planRouter } from "./routers/plan";
+import { presenceRouter } from "./routers/presence";
 import { projectRouter } from "./routers/project";
 import { promptsRouter } from "./routers/prompts";
+import { promptTagsRouter } from "./routers/prompt-tags.trpc-router";
 import { publicEnvRouter } from "./routers/publicEnv";
 import { roleRouter } from "./routers/role";
+import { subscriptionRouter } from "./routers/subscription";
+import { savedViewsRouter } from "./routers/savedViews";
 import { scenarioRouter } from "./routers/scenarios";
+import { sdkRadarRouter } from "./routers/sdkRadar";
+import { secretsRouter } from "./routers/secrets";
+import { suiteRouter } from "./routers/suites";
 import { shareRouter } from "./routers/share";
 import { spansRouter } from "./routers/spans";
 import { teamRouter } from "./routers/team";
 import { topicsRouter } from "./routers/topics";
 import { tracesRouter } from "./routers/traces";
+import { tracesV2Router } from "./routers/tracesV2";
 import { translateRouter } from "./routers/translate";
 import { automationRouter } from "./routers/automations";
+import { scimTokenRouter } from "./routers/scimToken";
+import { roleBindingRouter } from "./routers/roleBinding";
+import { personalAccessTokenRouter } from "./routers/personalAccessToken";
+import { groupRouter } from "./routers/group";
 import { userRouter } from "./routers/user";
+import { gatewayBudgetsRouter } from "./routers/gatewayBudgets";
+import { gatewayCacheRulesRouter } from "./routers/gatewayCacheRules";
+import { gatewayUsageRouter } from "./routers/gatewayUsage";
+import { gatewayProvidersRouter } from "./routers/gatewayProviders";
+import { virtualKeysRouter } from "./routers/virtualKeys";
 import { workflowRouter } from "./routers/workflows";
-/**
- * This is the primary router for your server.
- *
- * All routers added in /api/routers should be manually added here.
- */
-export const appRouter = createTRPCRouter({
+import { opsRouter } from "./routers/ops";
+
+const coreRouters = {
   agents: agentsRouter,
   evaluators: evaluatorsRouter,
   httpProxy: httpProxyRouter,
@@ -56,11 +69,13 @@ export const appRouter = createTRPCRouter({
   project: projectRouter,
   team: teamRouter,
   traces: tracesRouter,
+  tracesV2: tracesV2Router,
   spans: spansRouter,
   analytics: analyticsRouter,
   monitors: monitorsRouter,
   costs: costsRouter,
   plan: planRouter,
+  presence: presenceRouter,
   topics: topicsRouter,
   dataset: datasetRouter,
   datasetRecord: datasetRecordRouter,
@@ -68,6 +83,7 @@ export const appRouter = createTRPCRouter({
   dashboards: dashboardsRouter,
   home: homeRouter,
   evaluations: evaluationsRouter,
+  export: exportRouter,
   batchRecord: batchRecordRouter,
   limits: limitsRouter,
   automation: automationRouter,
@@ -86,11 +102,40 @@ export const appRouter = createTRPCRouter({
   integrationsChecks: integrationsChecksRouter,
   onboarding: onboardingRouter,
   scenarios: scenarioRouter,
+  suites: suiteRouter,
   role: roleRouter,
   prompts: promptsRouter,
+  promptTags: promptTagsRouter,
+  savedViews: savedViewsRouter,
+  sdkRadar: sdkRadarRouter,
+  secrets: secretsRouter,
   license: licenseRouter,
   licenseEnforcement: licenseEnforcementRouter,
-  ...(dependencies.extraTRPCRoutes?.() ?? {}),
+  scimToken: scimTokenRouter,
+  roleBinding: roleBindingRouter,
+  personalAccessToken: personalAccessTokenRouter,
+  group: groupRouter,
+  ops: opsRouter,
+  virtualKeys: virtualKeysRouter,
+  gatewayProviders: gatewayProvidersRouter,
+  gatewayBudgets: gatewayBudgetsRouter,
+  gatewayCacheRules: gatewayCacheRulesRouter,
+  gatewayUsage: gatewayUsageRouter,
+};
+
+const eeRouters = {
+  subscription: subscriptionRouter,
+  currency: currencyRouter,
+};
+
+/**
+ * This is the primary router for your server.
+ *
+ * All routers added in /api/routers should be manually added here.
+ */
+export const appRouter = createTRPCRouter({
+  ...coreRouters,
+  ...eeRouters,
 });
 
 // export type definition of API

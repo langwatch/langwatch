@@ -31,6 +31,7 @@ import { ColorfulBlockIcon } from "~/optimization_studio/components/ColorfulBloc
 import { transposeColumnsFirstToRowsFirstWithId } from "~/optimization_studio/utils/datasetUtils";
 import { VersionBadge } from "~/prompts/components/ui/VersionBadge";
 import { useLatestPromptVersion } from "~/prompts/hooks/useLatestPromptVersion";
+import { TARGET_MISSING_MAPPING_TOOLTIP } from "../../constants";
 import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
 import { useTargetName } from "../../hooks/useTargetName";
 import type { TargetConfig } from "../../types";
@@ -81,19 +82,25 @@ export const TargetHeader = memo(function TargetHeader({
   onStop,
   isRunning = false,
 }: TargetHeaderProps) {
-  // First check if prop has localPromptConfig (for direct prop usage)
+  // First check if prop has localPromptConfig or localEvaluatorConfig (for direct prop usage)
   const propHasUnpublished =
-    target.type === "prompt" && !!target.localPromptConfig;
+    (target.type === "prompt" && !!target.localPromptConfig) ||
+    (target.type === "evaluator" && !!target.localEvaluatorConfig);
 
   // Subscribe directly to just this target's unpublished state from store
-  // This is used when the table passes targets without localPromptConfig in props
+  // This is used when the table passes targets without localPromptConfig/localEvaluatorConfig in props
   // (e.g., when using useShallow which doesn't deep-compare)
   const storeHasUnpublished = useEvaluationsV3Store((state) => {
-    if (target.type !== "prompt") return false;
     const currentTarget = state.targets.find((r) => r.id === target.id);
-    return (
-      currentTarget?.type === "prompt" && !!currentTarget.localPromptConfig
-    );
+    if (!currentTarget) return false;
+    if (currentTarget.type === "prompt" && !!currentTarget.localPromptConfig)
+      return true;
+    if (
+      currentTarget.type === "evaluator" &&
+      !!currentTarget.localEvaluatorConfig
+    )
+      return true;
+    return false;
   });
 
   // Use prop value if available, otherwise use store value
@@ -308,7 +315,7 @@ export const TargetHeader = memo(function TargetHeader({
             )}
             {hasMissingMappings && (
               <Tooltip
-                content="Missing variable mappings - Click to configure"
+                content={TARGET_MISSING_MAPPING_TOOLTIP}
                 positioning={{ placement: "top" }}
                 openDelay={0}
                 showArrow

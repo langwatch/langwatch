@@ -1,0 +1,20 @@
+/**
+ * @see specs/features/suites/rename-suites-to-runs.feature - Feature icon label scenarios
+ */
+import { describe, expect, it } from "vitest";
+import { featureIcons } from "../featureIcons";
+
+describe("featureIcons", () => {
+  describe("when the suites feature icon configuration is read", () => {
+    /** @scenario 'Feature icon label for suites is "Run Plans"' */
+    it("has label 'Run Plans'", () => {
+      expect(featureIcons.suites.label).toBe("Run Plans");
+    });
+  });
+
+  describe("when the simulation runs feature icon configuration is read", () => {
+    it("has label 'Runs'", () => {
+      expect(featureIcons.simulation_runs.label).toBe("Runs");
+    });
+  });
+});

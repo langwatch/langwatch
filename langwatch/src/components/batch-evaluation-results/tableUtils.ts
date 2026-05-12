@@ -2,6 +2,7 @@
  * Shared utilities for batch evaluation result tables
  */
 import type { SystemStyleObject } from "@chakra-ui/react";
+import { getImageUrl } from "~/components/ExternalImage";
 
 /** Estimated row height for virtualization */
 export const ROW_HEIGHT = 180;
@@ -29,18 +30,18 @@ export const getTableStyles = (minTableWidth: number): SystemStyleObject => ({
   "& th": {
     position: "sticky",
     top: 0,
-    background: "white",
-    borderBottom: "1px solid var(--chakra-colors-gray-200)",
+    background: "var(--chakra-colors-bg-panel)",
+    borderBottom: "1px solid var(--chakra-colors-border)",
     padding: "8px 12px",
     textAlign: "left",
     fontSize: "12px",
     fontWeight: "600",
-    color: "var(--chakra-colors-gray-600)",
+    color: "var(--chakra-colors-fg-muted)",
     whiteSpace: "nowrap",
     zIndex: 1,
   },
   "& td": {
-    borderBottom: "1px solid var(--chakra-colors-gray-100)",
+    borderBottom: "1px solid var(--chakra-colors-border-muted)",
     padding: "12px",
     verticalAlign: "top",
     fontSize: "13px",
@@ -51,7 +52,7 @@ export const getTableStyles = (minTableWidth: number): SystemStyleObject => ({
     width: "40px",
   },
   "& tr:hover td": {
-    background: "var(--chakra-colors-gray-50)",
+    background: "var(--chakra-colors-bg-muted)",
   },
   "& td:hover .cell-action-btn": {
     opacity: 1,
@@ -59,7 +60,8 @@ export const getTableStyles = (minTableWidth: number): SystemStyleObject => ({
 });
 
 /**
- * Infer column type from a value for display purposes
+ * Infer column type from a value for display purposes.
+ * Handles native types and string-encoded values (booleans, numbers, images).
  */
 export const inferColumnType = (value: unknown): string => {
   if (value === null || value === undefined) return "string";
@@ -77,6 +79,19 @@ export const inferColumnType = (value: unknown): string => {
       return "chat_messages";
     }
     return "json";
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed === "") return "string";
+
+    // Check for image URLs
+    if (getImageUrl(trimmed)) return "image";
+
+    // Check for boolean strings
+    if (trimmed === "true" || trimmed === "false") return "boolean";
+
+    // Check for number strings
+    if (/^-?\d+(\.\d+)?$/.test(trimmed)) return "number";
   }
   return "string";
 };

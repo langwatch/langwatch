@@ -1,9 +1,10 @@
 import {
   type PrismaClient,
   ProjectSensitiveDataVisibilityLevel,
+  RoleBindingScopeType,
   TeamUserRole,
 } from "@prisma/client";
-import type { Session } from "next-auth";
+import type { Session } from "~/server/auth";
 import type { Protections } from "../elasticsearch/protections";
 import { hasProjectPermission, isDemoProject } from "./rbac";
 
@@ -52,10 +53,13 @@ export async function getProtectionsForProject(
   prisma: PrismaClient,
   { projectId }: { projectId: string } & Record<string, unknown>,
 ): Promise<Protections> {
-  return await getUserProtectionsForProject(
+  const protections = await getUserProtectionsForProject(
     { prisma, session: null, publiclyShared: false },
     { projectId },
   );
+
+  // API key holders have full project access — all roles grant cost:view
+  return { ...protections, canSeeCosts: true };
 }
 
 // New function for internal operations that need full access
@@ -87,6 +91,7 @@ export async function getUserProtectionsForProject(
   const project = await ctx.prisma.project.findUniqueOrThrow({
     where: { id: projectId, archivedAt: null },
     select: {
+      teamId: true,
       capturedInputVisibility: true,
       capturedOutputVisibility: true,
     },
@@ -110,40 +115,35 @@ export async function getUserProtectionsForProject(
     };
   }
 
-  // For signed in users, check their team permissions
-  const teamsWithAccess = await ctx.prisma.teamUser.findMany({
+  // For signed in users, check their team permissions via RoleBinding
+  const bindings = await ctx.prisma.roleBinding.findMany({
     where: {
       userId: ctx.session.user.id,
-      team: {
-        projects: {
-          some: {
-            id: projectId,
-          },
-        },
-      },
+      scopeType: RoleBindingScopeType.TEAM,
+      scopeId: project.teamId,
     },
     select: {
       role: true,
     },
   });
 
-  const isAdminInAnyTeam = teamsWithAccess.some(
-    (team) => team.role === TeamUserRole.ADMIN,
+  const isAdminForTeam = bindings.some(
+    (binding) => binding.role === TeamUserRole.ADMIN,
   );
-  const isMemberInAnyTeam = teamsWithAccess.length > 0;
+  const isMemberOfTeam = bindings.length > 0;
 
   const obtainVisibilityLevel = (
     visibility: ProjectSensitiveDataVisibilityLevel,
   ): boolean => {
     switch (true) {
-      case !isMemberInAnyTeam:
+      case !isMemberOfTeam:
         return false;
       case visibility === ProjectSensitiveDataVisibilityLevel.REDACTED_TO_ALL:
         return false;
       case visibility === ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL:
         return true;
       case visibility === ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ADMIN:
-        return isAdminInAnyTeam;
+        return isAdminForTeam;
       default:
         console.error("Unexpected state for visibility:", visibility);
         return false;

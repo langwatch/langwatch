@@ -83,6 +83,13 @@ export const entityRegistry: EntityConfig[] = [
     pathBuilder: (id, p) => `/${p}/workflows/${id}`,
   },
   {
+    prefix: "scenario_",
+    type: "workflow",
+    icon: Play,
+    label: "Scenario",
+    pathBuilder: (id, p) => `/${p}/simulations/scenarios/${id}`,
+  },
+  {
     prefix: "scen_",
     type: "workflow",
     icon: Play,

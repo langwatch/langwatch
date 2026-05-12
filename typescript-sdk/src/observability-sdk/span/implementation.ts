@@ -99,10 +99,7 @@ class LangWatchSpanInternal implements LangWatchSpan {
   setRAGContexts(ragContexts: LangWatchSpanRAGContext[]): this {
     return this.setAttribute(
       intSemconv.ATTR_LANGWATCH_RAG_CONTEXTS,
-      JSON.stringify({
-        type: "json",
-        value: ragContexts,
-      })
+      JSON.stringify(ragContexts)
     );
   }
 

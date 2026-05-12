@@ -1,0 +1,153 @@
+---
+title: Local Kubernetes (Kind + Helm)
+description: "Run LangWatch locally on Kind for development and testing"
+---
+
+Run the full LangWatch stack locally on a [Kind](https://kind.sigs.k8s.io/) cluster. This is useful for testing the Helm chart, evaluating LangWatch in a Kubernetes environment, or developing against a production-like setup.
+
+> **Looking for production deployment?** If you want to deploy LangWatch to a real cluster with prebuilt images (no local build required), see [Kubernetes (Helm)](/self-hosting/deployment/kubernetes-helm) instead. This page covers the local Kind workflow which builds images from source.
+
+> **Developing LangWatch itself?** The `make dev` commands in the repo root use docker-compose and are faster for day-to-day development. This Kind workflow is for testing the Helm chart packaging and Kubernetes-specific behavior.
+
+## Prerequisites
+
+- [Docker](https://docs.docker.com/get-docker/) (running, with at least **16 GB RAM** and **20 GB free disk** allocated)
+- [Kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation) v0.20+
+- [kubectl](https://kubernetes.io/docs/tasks/tools/)
+- [Helm](https://helm.sh/docs/intro/install/) 3.12+
+- `make` (included on macOS and most Linux distributions)
+
+> **Note:** The first image build (especially the Next.js app) is memory-intensive and can take 15-30 minutes. Subsequent builds reuse Docker cache and are much faster.
+
+## Quick Start
+
+```bash
+git clone https://github.com/langwatch/langwatch.git
+cd langwatch/charts/langwatch
+make example-up
+```
+
+This will:
+1. Create a Kind cluster named `lw-local` (if it doesn't exist)
+2. Build all Docker images locally (if not already built — first build takes 15-30 min)
+3. Load images into the Kind cluster
+4. Install the Helm chart with `values-local.yaml` into the `lw-local` namespace
+
+Access LangWatch at **http://localhost:30560**.
+
+## Manual Setup
+
+If you prefer to run each step manually:
+
+### 1. Create a Kind Cluster
+
+```bash
+kind create cluster --name lw-local \
+  --config charts/lib/kind-config.yaml \
+  --wait 60s
+```
+
+The Kind config maps port 30560 on your host to a NodePort inside the cluster.
+
+### 2. Build and Load Images
+
+```bash
+cd charts/langwatch
+
+# Build all images
+make images
+
+# Load into Kind
+make images-local
+```
+
+This builds four images:
+- `langwatch/langwatch:local` — App
+- `langwatch/langwatch_nlp:local` — NLP service
+- `langwatch/langevals:local` — Evaluators
+- `langwatch/clickhouse-serverless:next` — ClickHouse
+
+### 3. Install the Helm Chart
+
+```bash
+# Update chart dependencies
+make deps
+
+# Install with local values
+helm upgrade --install lw . \
+  -f examples/values-local.yaml \
+  --wait --timeout 10m
+```
+
+### 4. Verify
+
+```bash
+# Check pod status
+make example-status
+
+# Or directly:
+kubectl -n lw-local get pods
+```
+
+All pods should reach `Running` status within a few minutes.
+
+## Profiles
+
+The Makefile supports multiple profiles via the `PROFILE` variable:
+
+```bash
+make example-up PROFILE=local           # Default: all-in-one local dev
+make example-up PROFILE=hosted-dev      # Simulates cloud dev environment
+make example-up PROFILE=hosted-prod     # Simulates production (requires external DBs)
+make example-up PROFILE=scalable-prod   # Simulates HA production
+make example-up PROFILE=test            # CI integration testing
+```
+
+Each profile uses the corresponding `examples/values-{profile}.yaml` file.
+
+## What's Included
+
+The `values-local.yaml` profile deploys:
+
+| Component | Replicas | Notes |
+|-----------|----------|-------|
+| LangWatch App | 1 | NodePort on 30560 |
+| LangWatch Workers | 1 | Separate pod |
+| LangWatch NLP | 1 | |
+| LangEvals | 1 | |
+| PostgreSQL | 1 | Chart-managed |
+| ClickHouse | 1 | Chart-managed, standalone |
+| Redis | 1 | Chart-managed |
+
+- `autogen.enabled: true` — secrets are auto-generated
+- `pullPolicy: Never` — uses locally-built images
+- Prometheus is disabled to save resources
+
+## Teardown
+
+```bash
+# Remove the Helm release
+make example-down
+
+# Delete the Kind cluster entirely
+make clean
+```
+
+## Troubleshooting
+
+**Pods stuck in `ImagePullBackOff`:**
+Images haven't been loaded into Kind. Run `make images-local`.
+
+**Port 30560 not accessible:**
+Ensure the Kind cluster was created with the port mapping config (`charts/lib/kind-config.yaml`). Recreate the cluster if needed: `make clean && make example-up`.
+
+**Pods stuck in `Pending`:**
+Check if your Docker daemon has enough resources. Kind needs at least 4 CPU and 8 GB RAM allocated to Docker (16 GB if building images locally).
+
+**Slow startup:**
+First-time image builds take several minutes. Subsequent `make example-up` runs reuse cached images and are much faster.
+
+## Next Steps
+
+- [Production Kubernetes deployment](/self-hosting/deployment/kubernetes-helm) — Deploy to a real cluster
+- [Sizing & Scaling](/self-hosting/configuration/sizing-and-scaling) — Resource recommendations

@@ -1,5 +1,6 @@
 .PHONY: start sync-all-openapi user-delete-dry-run user-delete es-delete-dry-run es-delete
-.PHONY: dev dev-nlp dev-scenarios dev-full down logs clean ps quickstart
+.PHONY: dev dev-nlp dev-scenarios dev-full down logs clean ps quickstart worktree
+.PHONY: dev-up dev-down dev-logs setup-hooks service service-watch
 
 # =============================================================================
 # DOCKER DEV ENVIRONMENT (compose.dev.yml)
@@ -9,29 +10,64 @@
 
 COMPOSE = docker compose -f compose.dev.yml
 
-# Minimal: postgres + redis + app (no opensearch)
-dev:
-	$(COMPOSE) up
+# Sources scripts/lib/sanitize-dev-env.sh and rewrites stale localhost-pinned
+# NEXTAUTH_URL / BASE_HOST exports to the compose-derived APP_PORT (default
+# 5560). Real overrides like boxd-proxy URLs are left untouched. Prepended
+# to every dev `up` recipe so `make dev*` paths can't silently 403 on login
+# if a previous session leaked the env (lw#3453).
+SANITIZE_DEV_ENV = APP_PORT=$${APP_PORT:-5560} . scripts/lib/sanitize-dev-env.sh && sanitize_localhost_dev_env
 
-# + opensearch (for traces/search features)
-dev-search:
-	$(COMPOSE) --profile search up
+# Install git hooks (idempotent, runs automatically before dev targets)
+setup-hooks:
+	@git config core.hooksPath .githooks 2>/dev/null || true
+
+# Run a Go service via the mono-binary.
+# Usage: make service svc=aigateway
+#
+# Sources every var from langwatch/.env into the Go process's environment.
+# The gateway + control-plane intentionally share secrets (LW_GATEWAY_*,
+# LW_VIRTUAL_KEY_PEPPER etc.) — one flat .env is simpler than namespace
+# prefixes. Vars the Go service doesn't need are ignored.
+DEV_ENV_FILE ?= langwatch/.env
+service:
+	@test -n "$(svc)" || (echo "usage: make service svc=<name>" && exit 1)
+	@test -f $(DEV_ENV_FILE) || (echo "$(DEV_ENV_FILE) not found — seed langwatch/.env first" && exit 1)
+	@set -a && . $(DEV_ENV_FILE) && set +a && \
+		export LOG_FORMAT=pretty && \
+		exec go run ./cmd/service $(svc)
+
+# Run a Go service with live reload on file changes.
+# Usage: make service-watch svc=aigateway
+service-watch:
+	@test -n "$(svc)" || (echo "usage: make watch svc=<name>" && exit 1)
+	@test -f $(DEV_ENV_FILE) || (echo "$(DEV_ENV_FILE) not found — seed langwatch/.env first" && exit 1)
+	@which air > /dev/null 2>&1 || (echo "Installing air..." && go install github.com/air-verse/air@latest)
+	@set -a && . $(DEV_ENV_FILE) && set +a && \
+		export LOG_FORMAT=pretty && \
+		air --build.cmd "go build -o ./tmp/$(svc) ./cmd/service" \
+			--build.bin "./tmp/$(svc) $(svc)" \
+			--build.include_ext "go" \
+			--build.exclude_dir "tmp,vendor,node_modules"
+
+# Minimal: postgres + redis + clickhouse + app
+dev:
+	@$(SANITIZE_DEV_ENV) && $(COMPOSE) up
 
 # + NLP service + langevals (for evaluations)
 dev-nlp:
-	$(COMPOSE) --profile nlp up
+	@$(SANITIZE_DEV_ENV) && $(COMPOSE) --profile nlp up
 
-# + scenario worker + bullboard + NLP (no opensearch needed)
+# + scenario worker + bullboard + NLP
 dev-scenarios:
-	$(COMPOSE) --profile scenarios up
+	@$(SANITIZE_DEV_ENV) && $(COMPOSE) --profile scenarios up
 
 # + AI test server (for HTTP agent testing)
 dev-test:
-	$(COMPOSE) --profile test up
+	@$(SANITIZE_DEV_ENV) && $(COMPOSE) --profile test up
 
 # Everything
 dev-full:
-	$(COMPOSE) --profile full up
+	@$(SANITIZE_DEV_ENV) && $(COMPOSE) --profile full up
 
 # Stop all services
 down:
@@ -60,12 +96,6 @@ install:
 start:
 	cd langwatch && pnpm concurrently --kill-others 'pnpm dev' 'cd ../langwatch_nlp && make start'
 
-python-build:
-	uv pip install build && uv run python -m build
-
-python-install:
-	pip install --no-cache-dir --force-reinstall dist/langwatch_server-*-py3-none-any.whl
-
 start/postgres:
 	@echo "Starting Postgres..."
 	@docker compose up -d postgres
@@ -76,6 +106,34 @@ tsc-watch:
 # Interactive profile chooser
 quickstart:
 	@./scripts/dev.sh
+
+# =============================================================================
+# ISOLATED DEV INSTANCES (for AI agents / parallel worktrees)
+# =============================================================================
+# Each worktree gets its own containers, volumes, and ports.
+# Port info saved to .dev-port for agent/skill discovery.
+
+# Start isolated instance (detached). Usage: make dev-up [PROFILE=scenarios]
+dev-up:
+	@./scripts/dev-up.sh $(PROFILE)
+
+# Stop isolated instance
+dev-down:
+	@./scripts/dev-down.sh
+
+# Tail logs for isolated instance
+dev-logs:
+	@if [ -f .dev-port ]; then . ./.dev-port && COMPOSE_PROJECT_NAME=$$COMPOSE_PROJECT_NAME VOLUME_PREFIX=$$VOLUME_PREFIX docker compose -f compose.dev.yml --profile full logs -f; \
+	else echo "No .dev-port found. Is the instance running?"; fi
+
+# Create a git worktree from issue number or feature name
+# Usage: make worktree 1663  or  make worktree add-dark-mode
+ifeq (worktree,$(firstword $(MAKECMDGOALS)))
+  WORKTREE_ARG := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
+  $(eval $(WORKTREE_ARG):;@:)
+endif
+worktree:
+	@./scripts/worktree.sh $(WORKTREE_ARG)
 
 sync-all-openapi:
 	pnpm run task generateOpenAPISpec

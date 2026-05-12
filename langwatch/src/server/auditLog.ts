@@ -1,4 +1,4 @@
-import type { NextApiRequest } from "next";
+import type { NextApiRequest } from "~/types/next-stubs";
 import { getClientIp } from "../utils/getClientIp";
 import { safeTruncate } from "../utils/truncate";
 import { prisma } from "./db";

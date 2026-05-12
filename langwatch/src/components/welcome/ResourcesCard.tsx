@@ -130,7 +130,7 @@ const ResourceButton: React.FC<ResourceButtonProps> = ({
 const ResourcesCard: React.FC = () => {
   const { project } = useOrganizationTeamProject();
   return (
-    <Box minH="120px" boxShadow="sm" borderRadius="xl" bg="white" p={4}>
+    <Box minH="120px" boxShadow="sm" borderRadius="xl" bg="bg.panel" p={4}>
       <VStack align="start" gap={4} w="full">
         <VStack gap={0} alignItems="flex-start" justifyContent="flex-start">
           <Heading size="md" textAlign="left">

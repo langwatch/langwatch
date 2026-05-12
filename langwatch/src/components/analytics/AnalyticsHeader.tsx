@@ -1,6 +1,6 @@
 import { Box, Button, Heading, HStack, Input, Spacer } from "@chakra-ui/react";
 import { Edit2 } from "lucide-react";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import { useEffect, useRef, useState } from "react";
 import { LuListTree } from "react-icons/lu";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
@@ -30,7 +30,9 @@ export function AnalyticsHeader({
 
   const {
     period: { startDate, endDate },
+    mode,
     setPeriod,
+    setRelativePeriod,
   } = usePeriodSelector();
 
   useEffect(() => {
@@ -98,7 +100,12 @@ export function AnalyticsHeader({
       <Spacer />
       <HStack gap={2}>
         <FilterToggle />
-        <PeriodSelector period={{ startDate, endDate }} setPeriod={setPeriod} />
+        <PeriodSelector
+          period={{ startDate, endDate }}
+          mode={mode}
+          setPeriod={setPeriod}
+          setRelativePeriod={setRelativePeriod}
+        />
         <Tooltip content="Show traces behind those metrics">
           <PageLayout.HeaderButton
             variant="ghost"

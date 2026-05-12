@@ -13,15 +13,24 @@ import {
 } from "@chakra-ui/react";
 import { EvaluationExecutionMode } from "@prisma/client";
 import type { EvaluatorWithFields } from "~/server/evaluators/evaluator.service";
-import { AlertTriangle, HelpCircle, Spool, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AlertTriangle, ArrowLeft, HelpCircle, Spool, X } from "lucide-react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useForm } from "react-hook-form";
 import { LuListTree } from "react-icons/lu";
 import { Drawer } from "~/components/ui/drawer";
 import type { FieldMapping as UIFieldMapping } from "~/components/variables";
+import { createEvaluatorEditorCallbacks } from "~/evaluations-v3/utils/evaluatorEditorCallbacks";
 import { validateEvaluatorMappingsWithFields } from "~/evaluations-v3/utils/mappingValidation";
 import {
   getComplexProps,
+  getDrawerStack,
   navigateToDrawer,
   setFlowCallbacks,
   useDrawer,
@@ -30,13 +39,29 @@ import {
 import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
-import type { CheckPrecondition } from "~/server/evaluations/types";
+import type {
+  CheckPrecondition,
+  CheckPreconditionFields,
+  CheckPreconditionRule,
+} from "~/server/evaluations/types";
+import {
+  DEFAULT_PRECONDITION,
+  RULE_LABELS,
+  getAllowedRulesForField,
+  fieldRequiresKey,
+  getFieldOptionsByCategory,
+  getFieldValueType,
+  isDefaultOnlyPrecondition,
+  isRuleAllowedForField,
+} from "~/components/preconditions/preconditionFieldUtils";
 import {
   type MappingState,
   TRACE_MAPPINGS,
 } from "~/server/tracer/tracesMapping";
+import { deserializeMappingStateToUI } from "./utils/deserializeMappingStateToUI";
+import { serializeMappingsToMappingState } from "./utils/serializeMappingsToMappingState";
 import { api } from "~/utils/api";
-import type { EvaluatorMappingsConfig } from "../evaluators/EvaluatorEditorDrawer";
+import type { EvaluatorMappingsConfig } from "../evaluators/EvaluatorEditorShared";
 import { HorizontalFormControl } from "../HorizontalFormControl";
 import { SmallLabel } from "../SmallLabel";
 import { Tooltip } from "../ui/tooltip";
@@ -104,19 +129,6 @@ function autoInferMappings(
   return mappings;
 }
 
-// Precondition options
-const ruleOptions: Record<CheckPrecondition["rule"], string> = {
-  not_contains: "does not contain",
-  contains: "contains",
-  matches_regex: "matches regex",
-};
-
-const fieldOptions: Record<string, string> = {
-  output: "output",
-  input: "input",
-  "metadata.labels": "metadata.labels",
-};
-
 // Module-level state to persist across drawer navigation (component unmounts/remounts)
 let onlineEvaluationDrawerState: {
   level: EvaluationLevel; // Can be null (no selection), "trace", or "thread"
@@ -134,13 +146,50 @@ export const clearOnlineEvaluationDrawerState = () => {
   onlineEvaluationDrawerState = null;
 };
 
+/** Set persisted drawer state (for testing) */
+export const setOnlineEvaluationDrawerState = (
+  state: typeof onlineEvaluationDrawerState,
+) => {
+  onlineEvaluationDrawerState = state;
+};
+
+/**
+ * Drawers that are part of the online evaluation flow.
+ * When navigating TO these drawers, module-level state should be preserved.
+ * When the component mounts and the stack does NOT contain onlineEvaluation
+ * (meaning we're not returning from a flow sub-drawer), stale state is cleared.
+ */
+const FLOW_SUB_DRAWERS = new Set([
+  "evaluatorList",
+  "evaluatorEditor",
+  "evaluatorCategorySelector",
+]);
+
+/**
+ * Check if the drawer stack indicates we're in an active evaluation flow.
+ * This is true when the stack contains "onlineEvaluation" as a parent entry
+ * (navigated to sub-drawer and coming back), OR when flow sub-drawers are
+ * still in the stack (flow is in progress).
+ *
+ * When `closeDrawer()` is called (e.g., user closes a sub-drawer entirely),
+ * the stack is emptied — so this correctly returns false for abandoned flows.
+ */
+function isInActiveEvaluationFlow(): boolean {
+  const stack = getDrawerStack();
+  return stack.some(
+    (entry) =>
+      entry.drawer === "onlineEvaluation" ||
+      FLOW_SUB_DRAWERS.has(entry.drawer),
+  );
+}
+
 /**
  * Drawer for creating/editing online evaluations (monitors).
  * Allows selecting an evaluator, configuring sampling, preconditions, and mappings.
  */
 export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
   const { project } = useOrganizationTeamProject();
-  const { closeDrawer, openDrawer } = useDrawer();
+  const { closeDrawer, openDrawer, canGoBack, goBack } = useDrawer();
   const complexProps = getComplexProps();
   const drawerParams = useDrawerParams();
   const utils = api.useContext();
@@ -177,7 +226,9 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
       level: onlineEvaluationDrawerState?.level ?? null,
       name: onlineEvaluationDrawerState?.name ?? "",
       sample: onlineEvaluationDrawerState?.sample ?? 1.0,
-      preconditions: onlineEvaluationDrawerState?.preconditions ?? [],
+      preconditions: onlineEvaluationDrawerState?.preconditions ?? [
+        DEFAULT_PRECONDITION,
+      ],
       threadIdleTimeout: onlineEvaluationDrawerState?.threadIdleTimeout ?? 300,
     },
   });
@@ -200,6 +251,21 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
 
   // Track if the form has been modified (dirty state)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+  // Clear module-level state on unmount, unless we're in an active evaluation flow.
+  // This catches: page navigation, sub-drawer closed entirely, etc.
+  // Uses isInActiveEvaluationFlow() instead of checking just the last stack entry,
+  // because React StrictMode double-mounts effects — during the simulated cleanup,
+  // the stack may contain "onlineEvaluation" (which isn't in FLOW_SUB_DRAWERS)
+  // and we must preserve state to avoid losing pendingEvaluatorId.
+  useLayoutEffect(() => {
+    return () => {
+      if (!isInActiveEvaluationFlow()) {
+        onlineEvaluationDrawerState = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Skip the first watch trigger (initial render)
   const isInitialRenderRef = useRef(true);
@@ -268,6 +334,12 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
       void utils.monitors.getAllForProject.invalidate({
         projectId: project?.id ?? "",
       });
+      if (monitorId) {
+        void utils.monitors.getById.invalidate({
+          id: monitorId,
+          projectId: project?.id ?? "",
+        });
+      }
       // Clear persisted state after successful save
       onlineEvaluationDrawerState = null;
       onSave?.();
@@ -320,13 +392,23 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
   // This effect must run BEFORE the persist effect to check the state before it's updated
   const prevIsOpenRef = useRef(false); // Start as false so first open is detected
   useEffect(() => {
-    // If drawer is opening (was closed, now open) and there's no persisted state, reset form
-    if (!prevIsOpenRef.current && isOpen && !onlineEvaluationDrawerState) {
+    // If drawer is opening (was closed, now open), check if we need to reset.
+    // Reset when: no persisted state, OR stale state from a previous abandoned session.
+    // Stale state = module-level state exists but we're NOT returning from a flow sub-drawer
+    // (the drawer stack would have "onlineEvaluation" if we're returning from evaluator list/editor).
+    const hasStaleState =
+      !!onlineEvaluationDrawerState && !isInActiveEvaluationFlow();
+    if (
+      !prevIsOpenRef.current &&
+      isOpen &&
+      (!onlineEvaluationDrawerState || hasStaleState)
+    ) {
+      onlineEvaluationDrawerState = null;
       form.reset({
         level: null, // Start with no level selected for progressive disclosure
         name: "",
         sample: 1.0,
-        preconditions: [],
+        preconditions: [DEFAULT_PRECONDITION],
         threadIdleTimeout: 300,
       });
       setSelectedEvaluator(null);
@@ -381,8 +463,12 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
     onlineEvaluationDrawerState = null;
     setHasUnsavedChanges(false);
     monitorDataLoadedRef.current = false; // Reset so data reloads next time
-    onClose();
-  }, [onClose, hasUnsavedChanges]);
+    if (canGoBack) {
+      goBack();
+    } else {
+      onClose();
+    }
+  }, [onClose, hasUnsavedChanges, canGoBack, goBack]);
 
   // Load existing monitor data - only once when data first becomes available
   // Skip if we already have persisted state for this monitor (user navigated away and back)
@@ -423,22 +509,11 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
       // Load existing mappings
       const existingMappings = monitorQuery.data
         .mappings as MappingState | null;
-      const uiMappings: Record<string, UIFieldMapping> = {};
       if (existingMappings?.mapping) {
-        for (const [field, mapping] of Object.entries(
-          existingMappings.mapping,
-        )) {
-          if (mapping.source) {
-            const pathParts: string[] = [mapping.source as string];
-            if (mapping.key) pathParts.push(mapping.key);
-            if (mapping.subkey) pathParts.push(mapping.subkey);
-            uiMappings[field] = {
-              type: "source",
-              sourceId: monitorLevel === "trace" ? "trace" : "thread",
-              path: pathParts,
-            };
-          }
-        }
+        const uiMappings = deserializeMappingStateToUI(
+          existingMappings,
+          monitorLevel as "trace" | "thread",
+        );
         setMappings(uiMappings);
       }
 
@@ -558,10 +633,14 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
   const openEvaluatorEditorForMappings = useCallback(() => {
     if (!selectedEvaluator) return;
 
+    setFlowCallbacks(
+      "evaluatorEditor",
+      createEvaluatorEditorCallbacks({ onMappingChange: handleMappingChange }),
+    );
+
     const mappingsConfig: EvaluatorMappingsConfig = {
       level: level ?? undefined,
       initialMappings: mappings,
-      onMappingChange: handleMappingChange,
     };
 
     openDrawer("evaluatorEditor", {
@@ -608,11 +687,17 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
           threadIdleTimeout,
         };
 
-        // Build mappings config and navigate to evaluator editor
+        // Build mappings config and navigate to evaluator editor.
+        // onMappingChange goes through flowCallbacks (durable) — never inside
+        // mappingsConfig (ephemeral complexProps, lost on ErrorBoundary remount).
+        setFlowCallbacks(
+          "evaluatorEditor",
+          createEvaluatorEditorCallbacks({ onMappingChange: handleMappingChange }),
+        );
+
         const newMappingsConfig: EvaluatorMappingsConfig = {
           level: level ?? undefined,
           initialMappings: autoMappings,
-          onMappingChange: handleMappingChange,
         };
 
         // Use "Select Evaluator" button text since we're selecting a different evaluator
@@ -628,10 +713,14 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
       },
     });
 
+    setFlowCallbacks(
+      "evaluatorEditor",
+      createEvaluatorEditorCallbacks({ onMappingChange: handleMappingChange }),
+    );
+
     const mappingsConfig: EvaluatorMappingsConfig = {
       level: level ?? undefined,
       initialMappings: mappings,
-      onMappingChange: handleMappingChange,
     };
 
     // Open the evaluator editor directly - use default "Save Changes" text
@@ -680,11 +769,17 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
         threadIdleTimeout,
       };
 
+      // onMappingChange goes through flowCallbacks (durable) — never inside
+      // mappingsConfig (ephemeral complexProps, lost on ErrorBoundary remount).
+      setFlowCallbacks(
+        "evaluatorEditor",
+        createEvaluatorEditorCallbacks({ onMappingChange: handleMappingChange }),
+      );
+
       // Build mappings config for the evaluator editor
       const mappingsConfig: EvaluatorMappingsConfig = {
         level: level ?? undefined,
         initialMappings: autoMappings,
-        onMappingChange: handleMappingChange,
       };
 
       // Open evaluator editor immediately (replaceCurrentInStack replaces evaluatorList with evaluatorEditor)
@@ -710,33 +805,36 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
       const capturedPreconditions = preconditions;
       const capturedThreadIdleTimeout = threadIdleTimeout;
 
-      setFlowCallbacks("evaluatorEditor", {
-        onSave: (savedEvaluator: { id: string; name: string }) => {
-          // Store the new evaluator info in module-level state
-          // The evaluator will be loaded when the online evaluation drawer reopens
-          const newName = capturedName || savedEvaluator.name;
+      setFlowCallbacks(
+        "evaluatorEditor",
+        createEvaluatorEditorCallbacks({
+          onSave: (savedEvaluator) => {
+            // Store the new evaluator info in module-level state.
+            // The evaluator will be loaded when the online evaluation drawer reopens.
+            const newName = capturedName || savedEvaluator.name;
 
-          // Persist state with the new evaluator ID (the full evaluator will be loaded via query)
-          onlineEvaluationDrawerState = {
-            level: capturedLevel,
-            name: newName,
-            selectedEvaluator: null, // Will be loaded via query
-            sample: capturedSample,
-            mappings: {},
-            preconditions: capturedPreconditions,
-            threadIdleTimeout: capturedThreadIdleTimeout,
-            // Store the new evaluator ID to load it when the drawer reopens
-            pendingEvaluatorId: savedEvaluator.id,
-          };
+            // Persist state with the new evaluator ID (the full evaluator will be loaded via query)
+            onlineEvaluationDrawerState = {
+              level: capturedLevel,
+              name: newName,
+              selectedEvaluator: null, // Will be loaded via query
+              sample: capturedSample,
+              mappings: {},
+              preconditions: capturedPreconditions,
+              threadIdleTimeout: capturedThreadIdleTimeout,
+              // Store the new evaluator ID to load it when the drawer reopens
+              pendingEvaluatorId: savedEvaluator.id,
+            };
 
-          // Navigate directly to online evaluation drawer (resetting the stack)
-          // Use module-level navigation since the component may not be mounted
-          navigateToDrawer("onlineEvaluation", { resetStack: true });
+            // Navigate directly to online evaluation drawer (resetting the stack).
+            // Use module-level navigation since the component may not be mounted.
+            navigateToDrawer("onlineEvaluation", { resetStack: true });
 
-          // Return true to indicate we handled navigation (prevents default goBack())
-          return true;
-        },
-      });
+            // Return true to indicate we handled navigation (prevents default goBack())
+            return true;
+          },
+        }),
+      );
     };
 
     // Set flow callback for evaluator selection (when user selects an existing evaluator)
@@ -799,36 +897,70 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
     [selectedEvaluator, allFields, form],
   );
 
+  // Track whether preconditions are expanded (user clicked "Add precondition")
+  const [preconditionsExpanded, setPreconditionsExpanded] = useState(false);
+
   // Precondition handlers
   const addPrecondition = useCallback(() => {
     const current = form.getValues("preconditions");
     form.setValue("preconditions", [
       ...current,
-      { field: "output", rule: "contains", value: "" },
+      { field: "metadata.labels", rule: "contains", value: "" },
     ]);
+    setPreconditionsExpanded(true);
   }, [form]);
 
   const removePrecondition = useCallback(
     (index: number) => {
       const current = form.getValues("preconditions");
-      form.setValue(
-        "preconditions",
-        current.filter((_, i) => i !== index),
-      );
+      const updated = current.filter((_, i) => i !== index);
+      form.setValue("preconditions", updated);
+      // Collapse back to summary if only default precondition remains
+      if (isDefaultOnlyPrecondition(updated)) {
+        setPreconditionsExpanded(false);
+      }
     },
     [form],
   );
 
   const updatePrecondition = useCallback(
-    (index: number, field: keyof CheckPrecondition, value: string) => {
+    (index: number, key: keyof CheckPrecondition, value: string) => {
       const current = form.getValues("preconditions");
-      form.setValue(
-        "preconditions",
-        current.map((p, i) => (i === index ? { ...p, [field]: value } : p)),
-      );
+      const updated = current.map((p, i) => {
+        if (i !== index) return p;
+        if (key === "field") {
+          const newField = value as CheckPreconditionFields;
+          const currentRule = p.rule as CheckPreconditionRule;
+          const updates: Partial<CheckPrecondition> = { field: newField };
+
+          // Reset rule if not allowed for new field
+          if (!isRuleAllowedForField(newField, currentRule)) {
+            const allowed = getAllowedRulesForField(newField);
+            updates.rule = allowed[0] ?? "is";
+          }
+
+          // Reset value when switching between boolean and non-boolean fields
+          const newType = getFieldValueType(newField);
+          const oldType = getFieldValueType(p.field as CheckPreconditionFields);
+          if (newType !== oldType) {
+            updates.value = newType === "boolean" ? "true" : "";
+          }
+
+          // Clear key/subkey when switching fields
+          updates.key = undefined;
+          updates.subkey = undefined;
+
+          return { ...p, ...updates };
+        }
+        return { ...p, [key]: value };
+      });
+      form.setValue("preconditions", updated);
     },
     [form],
   );
+
+  // Compute field groups for the dropdown
+  const fieldGroups = useMemo(() => getFieldOptionsByCategory(), []);
 
   const handleSave = useCallback(() => {
     if (!selectedEvaluator || !project?.id || !name.trim()) return;
@@ -850,20 +982,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
     const settings = evaluatorConfig?.settings ?? {};
 
     // Convert UIFieldMapping to MappingState format
-    const mappingState: MappingState = {
-      mapping: {},
-      expansions: [],
-    };
-    for (const [field, mapping] of Object.entries(mappings)) {
-      if (mapping.type === "source" && mapping.path.length > 0) {
-        const parts = mapping.path;
-        mappingState.mapping[field] = {
-          source: parts[0] as keyof typeof TRACE_MAPPINGS,
-          key: parts[1],
-          subkey: parts[2],
-        };
-      }
-    }
+    const mappingState = serializeMappingsToMappingState(mappings);
 
     if (monitorId) {
       // Update existing monitor
@@ -936,9 +1055,22 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
       <Drawer.Content>
         <Drawer.CloseTrigger />
         <Drawer.Header>
-          <Heading size="md">
-            {monitorId ? "Edit Online Evaluation" : "New Online Evaluation"}
-          </Heading>
+          <HStack gap={2}>
+            {canGoBack && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={goBack}
+                padding={1}
+                minWidth="auto"
+              >
+                <ArrowLeft size={20} />
+              </Button>
+            )}
+            <Heading size="md">
+              {monitorId ? "Edit Online Evaluation" : "New Online Evaluation"}
+            </Heading>
+          </HStack>
         </Drawer.Header>
         <Drawer.Body>
           <VStack gap={0} align="stretch">
@@ -967,7 +1099,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
                   <StepRadio
                     value="thread"
                     title="Thread Level"
-                    description="Evaluate all traces in a conversation thread together"
+                    description="Evaluate all traces in a thread together"
                     icon={<Spool />}
                     width="full"
                   />
@@ -1069,106 +1201,177 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
                 helper="Only run this evaluation when certain conditions are met"
               >
                 <VStack align="start" gap={3}>
-                  {preconditions.map((precondition, index) => (
-                    <Box
-                      key={index}
-                      borderLeft="4px solid"
-                      borderLeftColor="blue.400"
-                      width="full"
-                    >
-                      <VStack
-                        padding={3}
-                        width="full"
-                        align="start"
-                        position="relative"
-                      >
-                        <Button
-                          position="absolute"
-                          right={0}
-                          top={0}
-                          padding={0}
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => removePrecondition(index)}
-                          color="gray.400"
-                        >
-                          <X size={16} />
-                        </Button>
-                        <SmallLabel>{index === 0 ? "When" : "and"}</SmallLabel>
-                        <HStack gap={2} flexWrap="wrap">
-                          <NativeSelect.Root minWidth="fit-content">
-                            <NativeSelect.Field
-                              value={precondition.field}
-                              onChange={(e) =>
-                                updatePrecondition(
-                                  index,
-                                  "field",
-                                  e.target.value,
-                                )
-                              }
-                            >
-                              {Object.entries(fieldOptions).map(
-                                ([value, label]) => (
-                                  <option key={value} value={value}>
-                                    {label}
-                                  </option>
-                                ),
-                              )}
-                            </NativeSelect.Field>
-                            <NativeSelect.Indicator />
-                          </NativeSelect.Root>
+                  {isDefaultOnlyPrecondition(preconditions) &&
+                  !preconditionsExpanded ? (
+                    <>
+                      <Text color="gray.500" fontStyle="italic">
+                        This evaluation will run on every application trace
+                      </Text>
+                      <Button variant="outline" onClick={addPrecondition}>
+                        Add Precondition
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      {preconditions.map((precondition, index) => {
+                        const currentField =
+                          precondition.field as CheckPreconditionFields;
+                        const allowedRules =
+                          getAllowedRulesForField(currentField);
+                        const valueType = getFieldValueType(currentField);
+                        const keyInfo = fieldRequiresKey(currentField);
 
-                          <NativeSelect.Root minWidth="fit-content">
-                            <NativeSelect.Field
-                              value={precondition.rule}
-                              onChange={(e) =>
-                                updatePrecondition(
-                                  index,
-                                  "rule",
-                                  e.target.value,
-                                )
-                              }
+                        return (
+                          <Box
+                            key={index}
+                            borderLeft="4px solid"
+                            borderLeftColor="blue.400"
+                            width="full"
+                          >
+                            <VStack
+                              padding={3}
+                              width="full"
+                              align="start"
+                              position="relative"
                             >
-                              {Object.entries(ruleOptions).map(
-                                ([value, label]) => (
-                                  <option key={value} value={value}>
-                                    {label}
-                                  </option>
-                                ),
-                              )}
-                            </NativeSelect.Field>
-                            <NativeSelect.Indicator />
-                          </NativeSelect.Root>
-                        </HStack>
-                        <HStack width="full">
-                          {precondition.rule.includes("regex") && (
-                            <Text fontSize="16px">{"/"}</Text>
-                          )}
-                          <Input
-                            value={precondition.value}
-                            onChange={(e) =>
-                              updatePrecondition(index, "value", e.target.value)
-                            }
-                            placeholder={
-                              precondition.rule.includes("regex")
-                                ? "regex"
-                                : "text"
-                            }
-                          />
-                          {precondition.rule.includes("regex") && (
-                            <Text fontSize="16px">{"/gi"}</Text>
-                          )}
-                        </HStack>
-                      </VStack>
-                    </Box>
-                  ))}
-                  <Text color="gray.500" fontStyle="italic">
-                    This evaluation will run on {runOnText}
-                    {preconditions.length > 0 && " matching the preconditions"}
-                  </Text>
-                  <Button variant="outline" onClick={addPrecondition}>
-                    Add Precondition
-                  </Button>
+                              <Button
+                                aria-label={`Remove precondition ${index + 1}`}
+                                position="absolute"
+                                right={0}
+                                top={0}
+                                padding={0}
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => removePrecondition(index)}
+                                color="gray.400"
+                              >
+                                <X size={16} />
+                              </Button>
+                              <SmallLabel>
+                                {index === 0 ? "When" : "and"}
+                              </SmallLabel>
+                              <HStack gap={2} flexWrap="wrap">
+                                <NativeSelect.Root minWidth="fit-content">
+                                  <NativeSelect.Field
+                                    value={precondition.field}
+                                    onChange={(e) =>
+                                      updatePrecondition(
+                                        index,
+                                        "field",
+                                        e.target.value,
+                                      )
+                                    }
+                                  >
+                                    {fieldGroups.map((group) => (
+                                      <optgroup
+                                        key={group.category}
+                                        label={group.category}
+                                      >
+                                        {group.fields.map((f) => (
+                                          <option key={f.value} value={f.value}>
+                                            {f.label}
+                                          </option>
+                                        ))}
+                                      </optgroup>
+                                    ))}
+                                  </NativeSelect.Field>
+                                  <NativeSelect.Indicator />
+                                </NativeSelect.Root>
+
+                                {keyInfo && (
+                                  <Input
+                                    value={precondition.key ?? ""}
+                                    onChange={(e) =>
+                                      updatePrecondition(
+                                        index,
+                                        "key",
+                                        e.target.value,
+                                      )
+                                    }
+                                    placeholder={keyInfo.label}
+                                    minWidth="120px"
+                                    maxWidth="200px"
+                                  />
+                                )}
+
+                                <NativeSelect.Root minWidth="fit-content">
+                                  <NativeSelect.Field
+                                    value={precondition.rule}
+                                    onChange={(e) =>
+                                      updatePrecondition(
+                                        index,
+                                        "rule",
+                                        e.target.value,
+                                      )
+                                    }
+                                  >
+                                    {allowedRules.map((rule) => (
+                                      <option key={rule} value={rule}>
+                                        {RULE_LABELS[rule]}
+                                      </option>
+                                    ))}
+                                  </NativeSelect.Field>
+                                  <NativeSelect.Indicator />
+                                </NativeSelect.Root>
+                              </HStack>
+                              <HStack width="full">
+                                {valueType === "boolean" ? (
+                                  <NativeSelect.Root minWidth="fit-content">
+                                    <NativeSelect.Field
+                                      value={precondition.value}
+                                      onChange={(e) =>
+                                        updatePrecondition(
+                                          index,
+                                          "value",
+                                          e.target.value,
+                                        )
+                                      }
+                                    >
+                                      <option value="true">true</option>
+                                      <option value="false">false</option>
+                                    </NativeSelect.Field>
+                                    <NativeSelect.Indicator />
+                                  </NativeSelect.Root>
+                                ) : (
+                                  <>
+                                    {precondition.rule.includes("regex") && (
+                                      <Text fontSize="16px">{"/"}</Text>
+                                    )}
+                                    <Input
+                                      value={precondition.value}
+                                      onChange={(e) =>
+                                        updatePrecondition(
+                                          index,
+                                          "value",
+                                          e.target.value,
+                                        )
+                                      }
+                                      placeholder={
+                                        precondition.rule.includes("regex")
+                                          ? "regex"
+                                          : "text"
+                                      }
+                                    />
+                                    {precondition.rule.includes("regex") && (
+                                      <Text fontSize="16px">{"/gi"}</Text>
+                                    )}
+                                  </>
+                                )}
+                              </HStack>
+                            </VStack>
+                          </Box>
+                        );
+                      })}
+                      <Text color="gray.500" fontStyle="italic">
+                        This evaluation will run on {runOnText}
+                        {preconditions.length > 0 &&
+                          " matching the preconditions"}
+                      </Text>
+                      <Button variant="outline" onClick={addPrecondition}>
+                        Add Precondition
+                      </Button>
+                    </>
+                  )}
                 </VStack>
               </HorizontalFormControl>
             )}
@@ -1213,8 +1416,8 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
               <HorizontalFormControl
                 label={
                   <HStack>
-                    Conversation Idle Time
-                    <Tooltip content="Wait for the conversation to be idle (no new messages) before running the evaluation. This prevents re-evaluating on every single message in a conversation.">
+                    Thread Idle Time
+                    <Tooltip content="Wait for the thread to be idle (no new messages) before running the evaluation. This prevents re-evaluating on every single message in a thread.">
                       <HelpCircle size={14} />
                     </Tooltip>
                   </HStack>

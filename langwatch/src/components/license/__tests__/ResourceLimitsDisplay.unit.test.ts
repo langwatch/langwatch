@@ -4,7 +4,7 @@ import {
   mapUsageToLimits,
   type ResourceLimits,
 } from "../ResourceLimitsDisplay";
-import type { PlanInfo } from "~/server/subscriptionHandler";
+import type { PlanInfo } from "../../../../ee/licensing/planInfo";
 
 /**
  * Pure unit tests for ResourceLimitsDisplay mapping functions.
@@ -35,8 +35,6 @@ describe("mapLicenseStatusToLimits", () => {
     maxExperiments: 50,
     currentMessagesPerMonth: 1500,
     maxMessagesPerMonth: 10000,
-    currentEvaluationsCredit: 50,
-    maxEvaluationsCredit: 100,
   };
 
   it("maps all license status fields to ResourceLimits format", () => {
@@ -54,7 +52,6 @@ describe("mapLicenseStatusToLimits", () => {
       agents: { current: 7, max: 50 },
       experiments: { current: 10, max: 50 },
       messagesPerMonth: { current: 1500, max: 10000 },
-      evaluationsCredit: { current: 50, max: 100 },
     } satisfies ResourceLimits);
   });
 
@@ -82,8 +79,6 @@ describe("mapLicenseStatusToLimits", () => {
       maxExperiments: 0,
       currentMessagesPerMonth: 0,
       maxMessagesPerMonth: 0,
-      currentEvaluationsCredit: 0,
-      maxEvaluationsCredit: 0,
     };
 
     const result = mapLicenseStatusToLimits(zeroStatus);
@@ -116,8 +111,6 @@ describe("mapLicenseStatusToLimits", () => {
       maxExperiments: 50,
       currentMessagesPerMonth: 1500,
       maxMessagesPerMonth: 10000,
-      currentEvaluationsCredit: 50,
-      maxEvaluationsCredit: 100,
     };
 
     const result = mapLicenseStatusToLimits(unlimitedStatus);
@@ -140,10 +133,10 @@ describe("mapUsageToLimits", () => {
     agentsCount: 7,
     experimentsCount: 10,
     currentMonthMessagesCount: 1500,
-    evaluationsCreditUsed: 50,
   };
 
   const basePlan: PlanInfo = {
+    planSource: "subscription",
     type: "test-plan",
     name: "Test Plan",
     free: false,
@@ -163,7 +156,6 @@ describe("mapUsageToLimits", () => {
     maxCustomGraphs: 100,
     maxAutomations: 50,
     maxMessagesPerMonth: 10000,
-    evaluationsCredit: 100,
     canPublish: true,
     prices: { USD: 0, EUR: 0 },
   };
@@ -183,7 +175,6 @@ describe("mapUsageToLimits", () => {
       agents: { current: 7, max: 50 },
       experiments: { current: 10, max: 50 },
       messagesPerMonth: { current: 1500, max: 10000 },
-      evaluationsCredit: { current: 50, max: 100 },
     } satisfies ResourceLimits);
   });
 
@@ -200,7 +191,6 @@ describe("mapUsageToLimits", () => {
       agentsCount: 0,
       experimentsCount: 0,
       currentMonthMessagesCount: 0,
-      evaluationsCreditUsed: 0,
     };
 
     const result = mapUsageToLimits(zeroUsage, basePlan);
@@ -212,13 +202,14 @@ describe("mapUsageToLimits", () => {
 
   it("handles free plan with limited resources", () => {
     const freePlan: PlanInfo = {
+      planSource: "free",
       type: "free",
       name: "Free",
       free: true,
       maxMembers: 1,
       maxMembersLite: 0,
       maxTeams: 1,
-      maxProjects: 1,
+      maxProjects: 2,
       maxPrompts: 1,
       maxWorkflows: 1,
       maxScenarios: 1,
@@ -231,7 +222,6 @@ describe("mapUsageToLimits", () => {
       maxCustomGraphs: 3,
       maxAutomations: 3,
       maxMessagesPerMonth: 1000,
-      evaluationsCredit: 10,
       canPublish: false,
       prices: { USD: 0, EUR: 0 },
     };
@@ -239,13 +229,13 @@ describe("mapUsageToLimits", () => {
     const result = mapUsageToLimits(baseUsage, freePlan);
 
     expect(result.members.max).toBe(1);
-    expect(result.projects.max).toBe(1);
+    expect(result.projects.max).toBe(2);
     expect(result.messagesPerMonth.max).toBe(1000);
-    expect(result.evaluationsCredit.max).toBe(10);
   });
 
   it("handles unlimited plan values", () => {
     const unlimitedPlan: PlanInfo = {
+      planSource: "subscription",
       type: "test-plan",
       name: "Test Plan",
       free: false,
@@ -265,7 +255,6 @@ describe("mapUsageToLimits", () => {
       maxCustomGraphs: 100,
       maxAutomations: 50,
       maxMessagesPerMonth: 10000,
-      evaluationsCredit: 100,
       canPublish: true,
       prices: { USD: 0, EUR: 0 },
     };
@@ -289,7 +278,6 @@ describe("mapUsageToLimits", () => {
       agentsCount: 7,
       experimentsCount: 10,
       currentMonthMessagesCount: 1500,
-      evaluationsCreditUsed: 50,
     };
 
     const result = mapUsageToLimits(overLimitUsage, basePlan);

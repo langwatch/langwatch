@@ -1,21 +1,49 @@
-
-import { Mastra } from '@mastra/core/mastra';
-import { PinoLogger } from '@mastra/loggers';
-import { LibSQLStore } from '@mastra/libsql';
-import { weatherAgent } from './agents/weather-agent.js';
+import { Mastra } from "@mastra/core/mastra";
+import { LibSQLStore } from "@mastra/libsql";
+import { PinoLogger } from "@mastra/loggers";
+import { Observability } from "@mastra/observability";
+import { OtelExporter } from "@mastra/otel-exporter";
+import { weatherAgent } from "./agents/weather-agent";
+import {
+  completenessScorer,
+  toolCallAppropriatenessScorer,
+  translationScorer,
+} from "./scorers/weather-scorer";
+import { weatherWorkflow } from "./workflows/weather-workflow";
 
 export const mastra = new Mastra({
+  workflows: { weatherWorkflow },
   agents: { weatherAgent },
+  scorers: {
+    toolCallAppropriatenessScorer,
+    completenessScorer,
+    translationScorer,
+  },
   storage: new LibSQLStore({
-    // stores telemetry, evals, ... into memory storage, if it needs to persist, change to file:../mastra.db
-    url: ":memory:",
+    id: "mastra-storage",
+    url: "file:./mastra.db",
   }),
   logger: new PinoLogger({
-    name: 'Mastra',
-    level: 'info',
+    name: "Mastra",
+    level: "info",
   }),
-  telemetry: {
-    enabled: true,
-    serviceName: "mastra-example",
-  },
+  observability: new Observability({
+    configs: {
+      default: {
+        serviceName: "mastra-example",
+        exporters: [
+          new OtelExporter({
+            provider: {
+              custom: {
+                endpoint: `${process.env.LANGWATCH_ENDPOINT ?? "https://app.langwatch.ai"}/api/otel/v1/traces`,
+                headers: {
+                  Authorization: `Bearer ${process.env.LANGWATCH_API_KEY}`,
+                },
+              },
+            },
+          }),
+        ],
+      },
+    },
+  }),
 });

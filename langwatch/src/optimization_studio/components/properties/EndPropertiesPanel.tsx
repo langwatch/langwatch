@@ -16,11 +16,6 @@ export const evaluatorInputs: Field[] = [
     identifier: "passed",
     optional: true,
   },
-  {
-    type: "str",
-    identifier: "details",
-    optional: true,
-  },
 ];
 
 export function EndPropertiesPanel({ node: initialNode }: { node: Node<End> }) {

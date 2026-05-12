@@ -1,23 +1,23 @@
 import { useMemo } from "react";
-import { TRACE_MAPPINGS } from "../server/tracer/tracesMapping";
+import { reservedTraceMetadataSchema } from "../server/tracer/types.generated";
 import { api } from "../utils/api";
 
 /**
- * Hook to fetch and extract unique span names and metadata keys from a project's recent traces.
- * Used by both Online Evaluation and Dataset mapping UIs to show dynamic field options.
+ * Hook to fetch distinct span names and metadata keys for a project.
+ * Uses a dedicated ES aggregation endpoint instead of loading full traces.
  *
- * @param projectId - The project ID to fetch traces from
+ * @param projectId - The project ID to fetch field names from
  * @returns Object with spanNames, metadataKeys arrays, isLoading state, and error if any
  */
 export function useProjectSpanNames(projectId: string | undefined) {
-  // Use last 30 days as default date range for fetching sample traces
+  // Use last 30 days as default date range
   const endDate = useMemo(() => Date.now(), []);
   const startDate = useMemo(
     () => endDate - 30 * 24 * 60 * 60 * 1000,
     [endDate]
   );
 
-  const sampleTraces = api.traces.getSampleTracesDataset.useQuery(
+  const fieldNames = api.traces.getFieldNames.useQuery(
     {
       projectId: projectId ?? "",
       startDate,
@@ -30,24 +30,26 @@ export function useProjectSpanNames(projectId: string | undefined) {
     }
   );
 
-  const spanNames = useMemo(() => {
-    if (!sampleTraces.data || sampleTraces.data.length === 0) {
-      return [];
-    }
-    return TRACE_MAPPINGS.spans.keys(sampleTraces.data);
-  }, [sampleTraces.data]);
-
   const metadataKeys = useMemo(() => {
-    if (!sampleTraces.data || sampleTraces.data.length === 0) {
+    if (!fieldNames.data) {
       return [];
     }
-    return TRACE_MAPPINGS.metadata.keys(sampleTraces.data);
-  }, [sampleTraces.data]);
+
+    // Merge ES results with reserved keys (which should always appear)
+    const reservedKeys = Object.keys(reservedTraceMetadataSchema.shape);
+    const esKeys = fieldNames.data.metadataKeys.map((k) => k.key);
+    const allKeys = Array.from(new Set([...esKeys, ...reservedKeys]));
+
+    const excludedKeys = ["custom", "all_keys"];
+    return allKeys
+      .filter((key) => !excludedKeys.includes(key))
+      .map((key) => ({ key, label: key }));
+  }, [fieldNames.data]);
 
   return {
-    spanNames,
+    spanNames: fieldNames.data?.spanNames ?? [],
     metadataKeys,
-    isLoading: sampleTraces.isLoading,
-    error: sampleTraces.error,
+    isLoading: fieldNames.isLoading,
+    error: fieldNames.error,
   };
 }

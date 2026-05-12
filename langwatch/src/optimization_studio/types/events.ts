@@ -8,9 +8,11 @@ export const studioClientEventSchema = z.discriminatedUnion("type", [
     type: z.literal("execute_component"),
     payload: z.object({
       trace_id: z.string(),
+      thread_id: z.string().optional(),
       workflow: workflowJsonSchema,
       node_id: z.string(),
       inputs: z.record(z.string(), z.any()),
+      origin: z.string().optional(),
     }),
   }),
   z.object({
@@ -30,6 +32,7 @@ export const studioClientEventSchema = z.discriminatedUnion("type", [
       manual_execution_mode: z.boolean().optional(),
       do_not_trace: z.boolean().optional(),
       run_evaluations: z.boolean().optional(),
+      origin: z.string().optional(),
     }),
   }),
   z.object({
@@ -40,6 +43,7 @@ export const studioClientEventSchema = z.discriminatedUnion("type", [
       workflow_version_id: z.string(),
       evaluate_on: z.enum(["full", "test", "train", "specific"]),
       dataset_entry: z.number().optional(),
+      origin: z.string().optional(),
     }),
   }),
   z.object({
@@ -85,6 +89,12 @@ export type StudioServerEvent =
       type: "execution_state_change";
       payload: {
         execution_state: Workflow["state"]["execution"];
+      };
+    }
+  | {
+      type: "evaluation_run_change";
+      payload: {
+        evaluation_run: Workflow["state"]["evaluation"];
       };
     }
   | {

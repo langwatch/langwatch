@@ -2,12 +2,16 @@ import type { Node } from "@xyflow/react";
 import { nanoid } from "nanoid";
 import { useCallback, useEffect, useState } from "react";
 import { toaster } from "../../components/ui/toaster";
+import { createLogger } from "~/utils/logger";
 import { generateOtelTraceId } from "../../utils/trace";
 import type { BaseComponent, Component, Field } from "../types/dsl";
 import type { StudioClientEvent } from "../types/events";
+import { mergeLocalConfigsIntoDsl } from "../utils/mergeLocalConfigs";
 import { useAlertOnComponent } from "./useAlertOnComponent";
 import { usePostEvent } from "./usePostEvent";
 import { useWorkflowStore } from "./useWorkflowStore";
+
+const logger = createLogger("langwatch:studio:componentExecution");
 
 export const useComponentExecution = () => {
   const { postEvent, socketStatus } = usePostEvent();
@@ -43,6 +47,14 @@ export const useComponentExecution = () => {
       node.data.execution_state?.trace_id === triggerTimeout.trace_id &&
       node.data.execution_state?.status === triggerTimeout.timeout_on_status
     ) {
+      logger.warn(
+        {
+          componentId: node.id,
+          trace_id: triggerTimeout.trace_id,
+          timeout_on_status: triggerTimeout.timeout_on_status,
+        },
+        "component execution timeout triggered",
+      );
       const execution_state: BaseComponent["execution_state"] = {
         status: "error",
         error: "Timeout",
@@ -84,6 +96,13 @@ export const useComponentExecution = () => {
         inputs,
       });
       if (missingFields.length > 0) {
+        logger.warn(
+          {
+            nodeId: node.id,
+            missingFields: missingFields.map((f) => f.identifier),
+          },
+          "component execution blocked: required fields missing",
+        );
         setSelectedNode(node.id);
         setPropertiesExpanded(true);
         setTriggerValidation(true);
@@ -91,6 +110,7 @@ export const useComponentExecution = () => {
       }
 
       const trace_id = generateOtelTraceId();
+      logger.info({ nodeId: node.id, trace_id }, "component execution starting");
 
       setComponentExecutionState(node.id, {
         status: "waiting",
@@ -100,13 +120,18 @@ export const useComponentExecution = () => {
         timestamps: undefined,
       });
 
+      const workflow = getWorkflow();
       const payload: StudioClientEvent = {
         type: "execute_component",
         payload: {
           trace_id,
-          workflow: getWorkflow(),
+          workflow: {
+            ...workflow,
+            nodes: mergeLocalConfigsIntoDsl(workflow.nodes),
+          },
           node_id: node.id,
           inputs: inputs_,
+          origin: "workflow",
         },
       };
 
@@ -144,6 +169,8 @@ export const useComponentExecution = () => {
       if (!socketAvailable()) {
         return;
       }
+
+      logger.info({ nodeId: node_id, trace_id }, "component execution stopping");
 
       if (current_state?.status === "waiting") {
         setComponentExecutionState(node_id, {

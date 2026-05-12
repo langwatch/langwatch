@@ -1,3 +1,6 @@
+# Always-run workflow with internal path gating + aggregator. See #3223.
+# Branch protection requires `sdk-go-complete`; upstream jobs skip when
+# paths don't match, and `alls-green` reports the consolidated status.
 name: sdk-go-ci
 
 on:
@@ -5,20 +8,48 @@ on:
     branches:
       - main
   pull_request:
-    paths:
-      - 'sdk-go/**'
-      - ".github/.release-please-manifest.json"
+  pull_request_target:
+    types: [labeled]
+  merge_group:
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      relevant: ${{ steps.detect.outputs.relevant }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: ./.github/actions/detect-changes
+        id: detect
+        with:
+          filters: |
+            relevant:
+              - 'sdk-go/**'
+              - '.github/workflows/sdk-go-ci.yml'
+              - '.github/.release-please-manifest.json'
+
   test:
+    needs: changes
+    if: >
+      needs.changes.outputs.relevant == 'true'
+      && (github.event_name != 'pull_request_target'
+          || (github.event.label.name == 'approved-ci'
+              && github.event.pull_request.user.login == 'dependabot[bot]'))
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Set up Go
-        uses: actions/setup-go@v5
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
-          go-version: '1.24'
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Go
+        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
+        with:
+          go-version: '1.25'
           cache: true
 
       - name: Install dependencies
@@ -42,6 +73,7 @@ jobs:
         run: go mod download
 
       - name: Run e2e examples
+        if: github.event_name != 'pull_request' || github.actor != 'dependabot[bot]'
         working-directory: ./sdk-go/e2e
         run: go run cmd/main.go --ci run-examples
         env:
@@ -49,19 +81,33 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.GO_SDK_OPENAI_API_KEY }}
 
   typecheck:
+    needs: changes
+    if: >
+      needs.changes.outputs.relevant == 'true'
+      && (github.event_name != 'pull_request_target'
+          || (github.event.label.name == 'approved-ci'
+              && github.event.pull_request.user.login == 'dependabot[bot]'))
     runs-on: ubuntu-latest
     steps:
       - run: echo "no typechecking is needed for go"
 
   build:
+    needs: changes
+    if: >
+      needs.changes.outputs.relevant == 'true'
+      && (github.event_name != 'pull_request_target'
+          || (github.event.label.name == 'approved-ci'
+              && github.event.pull_request.user.login == 'dependabot[bot]'))
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
         with:
-          go-version: '1.24'
+          go-version: '1.25'
           cache: true
 
       - name: Install dependencies
@@ -71,3 +117,13 @@ jobs:
       - name: Build
         working-directory: ./sdk-go
         run: go build -v ./...
+
+  sdk-go-complete:
+    needs: [changes, test, typecheck, build]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: re-actors/alls-green@05ac9388f0aebcb5727afa17fcccfecd6f8ec5fe # v1.2.2
+        with:
+          jobs: ${{ toJSON(needs) }}
+          allowed-skips: test, typecheck, build

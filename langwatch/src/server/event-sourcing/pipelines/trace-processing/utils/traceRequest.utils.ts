@@ -1,4 +1,5 @@
 import { TraceState } from "@opentelemetry/core";
+import { safeUnflatten } from "~/utils/safeUnflatten";
 import type { Fixed64 } from "@opentelemetry/otlp-transformer-next/build/esm/common/internal-types";
 import {
   ESpanKind,
@@ -57,7 +58,9 @@ const scalar = (v: OtlpAnyValue): AttributeScalar | undefined => {
     v.arrayValue &&
     Array.isArray(v.arrayValue?.values)
   ) {
-    return JSON.stringify(v.arrayValue.values);
+    return JSON.stringify(
+      v.arrayValue.values.map((item) => scalar(item) ?? item),
+    );
   }
   if ("bytesValue" in v && v.bytesValue) {
     if (typeof v.bytesValue === "string") {
@@ -296,7 +299,7 @@ const INDEXED_KEY_REGEX = /^(.+?)\.(\d+)\.(.+)$/;
 
 type ArrayPatternMap = Map<
   string,
-  Map<number, Map<string, NormalizedAttributes[string]>>
+  Map<number, Map<string, unknown>>
 >;
 
 /**
@@ -352,7 +355,7 @@ const detectArrayPatterns = (
  * 2. Same set of relative keys across all items
  */
 const isValidArrayPattern = (
-  indexMap: Map<number, Map<string, NormalizedAttributes[string]>>,
+  indexMap: Map<number, Map<string, unknown>>,
 ): boolean => {
   const indices = Array.from(indexMap.keys()).sort((a, b) => a - b);
 
@@ -377,6 +380,7 @@ const isValidArrayPattern = (
 
 /**
  * Reconstructs a nested object from flattened key-value pairs.
+ * Delegates to shared safeUnflatten for prototype pollution protection.
  *
  * For input:
  *   Map { "message.content" => "hello", "message.role" => "user" }
@@ -385,27 +389,13 @@ const isValidArrayPattern = (
  *   { message: { content: "hello", role: "user" } }
  */
 const unflattenObject = (
-  flatMap: Map<string, NormalizedAttributes[string]>,
+  flatMap: Map<string, unknown>,
 ): Record<string, unknown> => {
-  const result: Record<string, unknown> = {};
-
-  for (const [path, value] of flatMap) {
-    const parts = path.split(SEP);
-    let current: Record<string, unknown> = result;
-
-    for (let i = 0; i < parts.length - 1; i++) {
-      const part = parts[i]!;
-      if (!(part in current)) {
-        current[part] = {};
-      }
-      current = current[part] as Record<string, unknown>;
-    }
-
-    const lastPart = parts[parts.length - 1]!;
-    current[lastPart] = value;
+  const record: Record<string, unknown> = Object.create(null);
+  for (const [k, v] of flatMap) {
+    record[k] = v;
   }
-
-  return result;
+  return safeUnflatten(record);
 };
 
 /**
@@ -417,7 +407,7 @@ const unflattenObject = (
  *   "llm.input_messages.1.message.content" => "hi"
  *
  * Into:
- *   "llm.input_messages" => '[{"message":{"content":"hello","role":"user"}},{"message":{"content":"hi"}}]'
+ *   "llm.input_messages" => [{message:{content:"hello",role:"user"}},{message:{content:"hi"}}]
  */
 const reconstructFlattenedArrays = (
   attrs: NormalizedAttributes,
@@ -461,8 +451,83 @@ const reconstructFlattenedArrays = (
       arrayItems.push(item);
     }
 
-    // Store as JSON string
-    result[prefix] = JSON.stringify(arrayItems);
+    // Store as real array (not JSON string)
+    result[prefix] = arrayItems;
+  }
+
+  return result;
+};
+
+/**
+ * Maximum string size to attempt synchronous JSON parsing.
+ * Strings larger than this are left as-is to avoid blocking the event loop.
+ */
+const MAX_JSON_PARSE_SIZE = 2_000_000;
+
+/**
+ * Fixes invalid JSON escape sequences introduced by PII redaction.
+ * PII redaction replaces content with `<PII_TYPE>` tokens (e.g. `<US_DRIVER_LICENSE>`).
+ * When this happens inside a JSON string value, it can create invalid escapes
+ * like `\<` if the replacement lands right after a backslash.
+ *
+ * Specifically targets `\<` and `\>` which are the known invalid escapes
+ * from PII redaction tokens like `<US_DRIVER_LICENSE>`.
+ */
+/** @internal Exported for unit testing */
+export function sanitizeInvalidJsonEscapes(json: string): string {
+  return json.replace(/\\([<>])/g, "$1");
+}
+
+/**
+ * Parses string values that look like JSON into their parsed form.
+ * Scalars and already-parsed values pass through unchanged.
+ *
+ * Fast-path: only attempts parse if the trimmed string starts with `{` or `[`.
+ */
+/** @internal Exported for unit testing */
+export const parseJsonStringValues = (
+  attrs: NormalizedAttributes,
+): NormalizedAttributes => {
+  const result: NormalizedAttributes = {};
+
+  for (const [key, value] of Object.entries(attrs)) {
+    if (typeof value !== "string") {
+      result[key] = value;
+      continue;
+    }
+
+    const trimmed = value.trim();
+    if (trimmed.length < 2 || trimmed.length > MAX_JSON_PARSE_SIZE) {
+      result[key] = value;
+      continue;
+    }
+
+    const looksJson =
+      (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
+      (trimmed.startsWith("[") && trimmed.endsWith("]"));
+
+    if (!looksJson) {
+      result[key] = value;
+      continue;
+    }
+
+    try {
+      result[key] = JSON.parse(trimmed);
+    } catch {
+      // PII redaction can introduce invalid JSON escapes like \<US_DRIVER_LICENSE>
+      // because it replaces content with <PII_TYPE> tokens inside JSON strings.
+      // Try to fix known invalid escapes before giving up.
+      const sanitized = sanitizeInvalidJsonEscapes(trimmed);
+      if (sanitized !== trimmed) {
+        try {
+          result[key] = JSON.parse(sanitized);
+          continue;
+        } catch {
+          // still broken, fall through
+        }
+      }
+      result[key] = value;
+    }
   }
 
   return result;
@@ -484,8 +549,9 @@ const normalizeOtlpAttributes = (
     }
   }
 
-  // Post-process to reconstruct flattened arrays into JSON strings
-  return reconstructFlattenedArrays(normalizedAttributes);
+  // Post-process: reconstruct flattened arrays, then parse JSON string values
+  const reconstructed = reconstructFlattenedArrays(normalizedAttributes);
+  return parseJsonStringValues(reconstructed);
 };
 
 const convertUnixNanoToUnixMs = (unixNano: number): number => {
@@ -555,6 +621,46 @@ const parseTraceState = (
   };
 };
 
+/**
+ * Normalizes raw OTLP attribute arrays into serialized string maps.
+ * Shared utility for log and metric collection services.
+ */
+export function normalizeOtlpAttributeMap(
+  attributes: unknown,
+): Record<string, string> {
+  if (!Array.isArray(attributes)) return {};
+
+  // Filter to only valid {key, value} entries to guard against malformed OTLP data
+  const validEntries = attributes.filter(
+    (attr): attr is OtlpKeyValue =>
+      typeof attr === "object" && attr !== null && "key" in attr && "value" in attr,
+  );
+  const normalized = normalizeOtlpAttributes(validEntries);
+  const result: Record<string, string> = {};
+  for (const [key, value] of Object.entries(normalized)) {
+    if (value === null || value === undefined) continue;
+    if (typeof value === "string") {
+      result[key] = value;
+    } else if (
+      typeof value === "number" ||
+      typeof value === "boolean" ||
+      typeof value === "bigint"
+    ) {
+      result[key] = String(value);
+    } else {
+      try {
+        const serialized = JSON.stringify(value);
+        if (typeof serialized === "string") {
+          result[key] = serialized;
+        }
+      } catch {
+        // Skip unserializable values
+      }
+    }
+  }
+  return result;
+}
+
 export const TraceRequestUtils = {
   normalizeOtlpId,
   normalizeOtlpSpanIds,
@@ -567,4 +673,6 @@ export const TraceRequestUtils = {
   convertUnixNanoToUnixMs,
   parseTraceFlags,
   parseTraceState,
+  /** @internal Exported for unit testing */
+  reconstructFlattenedArrays,
 };

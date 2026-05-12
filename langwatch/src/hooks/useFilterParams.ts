@@ -1,4 +1,4 @@
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import qs from "qs";
 import { usePeriodSelector } from "../components/PeriodSelector";
 import { filterOutEmptyFilters } from "../server/analytics/utils";
@@ -73,80 +73,148 @@ export const useFilterParams = () => {
     }
   }
 
+  // Saved view fallback: when the URL has no filter/date/query params and a
+  // saved view is stored in localStorage, use the view's filters so the first
+  // query already has the correct filters. Layout params like project, view,
+  // group_by are fine — only filter keys, dates, and search prevent fallback.
+  const hasUrlFilterOrDateParams =
+    Object.values(availableFilters).some(
+      (f) => queryParams[f.urlKey] !== undefined,
+    ) ||
+    !!queryParams.query ||
+    !!queryParams.startDate ||
+    !!queryParams.endDate;
+
+  if (!hasUrlFilterOrDateParams && project?.id) {
+    try {
+      const viewId =
+        localStorage.getItem(
+          `langwatch-saved-views-selected-${project.id}`,
+        ) ??
+        localStorage.getItem(`langwatch-selected-view-${project.id}`);
+
+      if (viewId && viewId !== "all-traces") {
+        const raw = localStorage.getItem(
+          `langwatch-saved-views-cache-${project.id}`,
+        );
+        if (raw) {
+          const cached = JSON.parse(raw) as Array<{
+            id: string;
+            filters?: Record<string, FilterParam>;
+          }>;
+          const view = cached.find((v) => v.id === viewId);
+          if (view?.filters) {
+            for (const [key, value] of Object.entries(view.filters)) {
+              if (key in availableFilters) {
+                filters[key as FilterField] = value;
+              }
+            }
+          }
+        }
+      }
+    } catch {
+      // localStorage unavailable or corrupt — ignore
+    }
+  }
+
+  // Shallow-push helper that works on every page, including those with
+  // dynamic route params beyond [project] (e.g. /[project]/analytics/custom/[id]).
+  //
+  // The string form router.push("?" + qs) fails on dynamic-route pages in
+  // Next.js 15 Pages Router — the relative "?" URL isn't resolved correctly
+  // for shallow navigation, so the push silently does nothing.
+  //
+  // The (url, as) overload avoids this:
+  //   url  = { pathname, query: { ...routeParams, ...parsed } }
+  //   as   = currentPath + "?" + newQs
+  //
+  // The url's query is built from parsed newQs + dynamic route params only
+  // (not router.query which may carry stale keys). This ensures:
+  //   - Next.js detects a route change → re-renders components using useRouter()
+  //   - Deleted keys (e.g. cleared filters) are actually removed
+  const shallowPush = (newQs: string) => {
+    const currentPath = router.asPath.split("?")[0] ?? router.asPath;
+    const pathParamKeys = new Set(
+      (router.pathname.match(/\[(\w+)\]/g) ?? []).map((m) => m.slice(1, -1)),
+    );
+    const routeParams = Object.fromEntries(
+      Object.entries(router.query).filter(([key]) => pathParamKeys.has(key)),
+    );
+    const parsed = qs.parse(newQs, {
+      allowDots: true,
+      comma: true,
+      allowEmptyArrays: true,
+    });
+    void router.push(
+      { pathname: router.pathname, query: { ...routeParams, ...parsed } },
+      currentPath + "?" + newQs,
+      { shallow: true, scroll: false },
+    );
+  };
+
+  const qsOpts = {
+    allowDots: true,
+    arrayFormat: "comma" as const,
+    // @ts-ignore of course it exists
+    allowEmptyArrays: true,
+  };
+
   const setFilter = (filter: FilterField, params: FilterParam) => {
     const filterUrl = availableFilters[filter].urlKey;
-    void router.push(
-      "?" +
-        qs.stringify(
-          {
-            ...Object.fromEntries(
-              Object.entries(router.query).filter(
-                ([key]) => !key.startsWith(filterUrl),
-              ),
+    shallowPush(
+      qs.stringify(
+        {
+          ...Object.fromEntries(
+            Object.entries(queryParams).filter(
+              ([key]) =>
+                key !== filterUrl && !key.startsWith(filterUrl + "."),
             ),
-            [filterUrl]: params,
-          },
-          {
-            allowDots: true,
-            arrayFormat: "comma",
-            // @ts-ignore of course it exists
-            allowEmptyArrays: true,
-          },
-        ),
-      undefined,
-      { shallow: true, scroll: false },
+          ),
+          [filterUrl]: params,
+        },
+        qsOpts,
+      ),
     );
   };
 
   const setFilters = (filtersToSet: Record<FilterField, FilterParam>) => {
-    void router.push(
-      "?" +
-        qs.stringify(
-          {
-            ...Object.fromEntries(
-              Object.entries(router.query).filter(
-                ([key]) =>
-                  !Object.values(availableFilters).some((f) =>
-                    key.startsWith(f.urlKey),
-                  ),
-              ),
+    shallowPush(
+      qs.stringify(
+        {
+          ...Object.fromEntries(
+            Object.entries(queryParams).filter(
+              ([key]) =>
+                !Object.values(availableFilters).some(
+                  (f) => key === f.urlKey || key.startsWith(f.urlKey + "."),
+                ),
             ),
-            ...Object.entries(filtersToSet).reduce(
-              (acc, [filter, params]) => ({
-                ...acc,
-                [availableFilters[filter as keyof typeof availableFilters]
-                  .urlKey]: params,
-              }),
-              {},
-            ),
-          },
-          {
-            allowDots: true,
-            arrayFormat: "comma",
-            // @ts-ignore of course it exists
-            allowEmptyArrays: true,
-          },
-        ),
-      undefined,
-      { shallow: true, scroll: false },
+          ),
+          ...Object.entries(filtersToSet).reduce(
+            (acc, [filter, params]) => ({
+              ...acc,
+              [availableFilters[filter as keyof typeof availableFilters]
+                .urlKey]: params,
+            }),
+            {},
+          ),
+        },
+        qsOpts,
+      ),
     );
   };
 
   const clearFilters = () => {
-    void router.push(
-      {
-        query: Object.fromEntries(
-          Object.entries(router.query).filter(
-            ([key]) =>
-              !Object.values(availableFilters).some((filter) =>
-                key.startsWith(filter.urlKey),
-              ),
+    const cleared = Object.fromEntries(
+      Object.entries(queryParams).filter(
+        ([key]) =>
+          key !== "query" &&
+          !Object.values(availableFilters).some(
+            (filter) =>
+              key === filter.urlKey || key.startsWith(filter.urlKey + "."),
           ),
-        ),
-      },
-      undefined,
-      { shallow: true, scroll: false },
+      ),
     );
+    shallowPush(qs.stringify(cleared, qsOpts));
   };
 
   const filterParams = {
@@ -163,14 +231,14 @@ export const useFilterParams = () => {
   };
 
   const setNegateFilters = (negateFilters: boolean) => {
-    void router.push(
-      "?" +
-        qs.stringify({
-          ...router.query,
+    shallowPush(
+      qs.stringify(
+        {
+          ...queryParams,
           negateFilters: negateFilters ? "true" : "false",
-        }),
-      undefined,
-      { shallow: true, scroll: false },
+        },
+        qsOpts,
+      ),
     );
   };
 
@@ -189,7 +257,12 @@ export const useFilterParams = () => {
     filterCount,
     hasAnyFilters,
     queryOpts: {
-      enabled: !!project && !!startDate && !!endDate,
+      enabled:
+        !!project &&
+        !!startDate &&
+        !isNaN(startDate.getTime()) &&
+        !!endDate &&
+        !isNaN(endDate.getTime()),
       refetchOnMount: false,
       refetchOnWindowFocus: false,
       trpc: {

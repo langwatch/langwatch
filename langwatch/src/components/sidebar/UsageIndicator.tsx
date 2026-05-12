@@ -1,5 +1,7 @@
 import { Box, HStack, Progress, Text, VStack } from "@chakra-ui/react";
+import { PricingModel } from "@prisma/client";
 import { Info } from "lucide-react";
+import type { UsageUnit } from "../../server/app-layer/usage/usage-meter-policy";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
 import { api } from "../../utils/api";
@@ -7,6 +9,44 @@ import { Link } from "../ui/link";
 import { Tooltip } from "../ui/tooltip";
 
 const MENU_ITEM_HEIGHT = "32px";
+
+export type UsageDisplay =
+  | { visible: true; unitLabel: string }
+  | { visible: false };
+
+/**
+ * Determines whether the sidebar usage bar is visible and which unit label
+ * to display.
+ *
+ * The unit label is read directly from the API via `usageUnit` rather than
+ * being derived from the pricing model on the frontend.
+ *
+ * Visibility rules:
+ * - Self-hosted: always visible
+ * - SaaS + SEAT_EVENT + paid: not visible
+ * - All other SaaS: visible
+ */
+export function getUsageDisplay({
+  isSaaS,
+  pricingModel,
+  isFree,
+  usageUnit,
+}: {
+  isSaaS: boolean;
+  pricingModel: PricingModel | undefined | null;
+  isFree: boolean;
+  usageUnit: UsageUnit;
+}): UsageDisplay {
+  if (!isSaaS) {
+    return { visible: true, unitLabel: usageUnit };
+  }
+
+  if (pricingModel === PricingModel.SEAT_EVENT && !isFree) {
+    return { visible: false };
+  }
+
+  return { visible: true, unitLabel: usageUnit };
+}
 
 export type UsageIndicatorProps = {
   showLabel?: boolean;
@@ -26,12 +66,24 @@ export const UsageIndicator = ({ showLabel = true }: UsageIndicatorProps) => {
     },
   );
 
-  if (!usage.data || !isSaaS) {
+  if (!usage.data) {
     return null;
   }
 
+  const display = getUsageDisplay({
+    isSaaS: !!isSaaS,
+    pricingModel: organization?.pricingModel,
+    isFree: usage.data.activePlan.free,
+    usageUnit: usage.data.usageUnit ?? "events",
+  });
+  if (!display.visible) return null;
+
+  // When currentMonthMessagesCount is null (unlimited plan), don't show the usage bar
+  const currentCount = usage.data.currentMonthMessagesCount;
+  if (currentCount === null) return null;
+
   const percentage = Math.min(
-    (usage.data.currentMonthMessagesCount /
+    (currentCount /
       usage.data.activePlan.maxMessagesPerMonth) *
       100,
     100,
@@ -39,7 +91,7 @@ export const UsageIndicator = ({ showLabel = true }: UsageIndicatorProps) => {
 
   return (
     <Tooltip
-      content={`You have used ${usage.data.currentMonthMessagesCount.toLocaleString()} traces out of ${usage.data.activePlan.maxMessagesPerMonth.toLocaleString()} this month.`}
+      content={`You have used ${currentCount.toLocaleString()} ${display.unitLabel} out of ${usage.data.activePlan.maxMessagesPerMonth.toLocaleString()} this month.`}
       positioning={{ placement: "right", offset: { mainAxis: 8 } }}
     >
       <Link href="/settings/usage" width={showLabel ? "full" : "auto"}>
@@ -70,7 +122,7 @@ export const UsageIndicator = ({ showLabel = true }: UsageIndicatorProps) => {
                 </Text>
               </HStack>
               <Progress.Root
-                value={Math.min(usage.data.currentMonthMessagesCount, usage.data.activePlan.maxMessagesPerMonth)}
+                value={Math.min(currentCount, usage.data.activePlan.maxMessagesPerMonth)}
                 max={usage.data.activePlan.maxMessagesPerMonth}
                 colorPalette="orange"
                 width="full"

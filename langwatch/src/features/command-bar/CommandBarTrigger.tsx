@@ -16,7 +16,7 @@ export function CommandBarTrigger() {
       aria-label="Open command bar"
       variant="ghost"
       borderRadius="full"
-      backgroundColor="bg.input"
+      backgroundColor="bg.input/70"
       paddingLeft={3}
       paddingRight={3}
       height="32px"

@@ -3,11 +3,15 @@ import { PromptScope } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
 import type { VersionedPrompt } from "~/server/prompt-config";
 import {
+  formValuesToTriggerSaveVersionParams,
+  nodeDataToLocalPromptConfig,
   promptConfigFormValuesToOptimizationStudioNodeData,
   safeOptimizationStudioNodeDataToPromptConfigFormInitialValues,
   versionedPromptToPromptConfigFormValues,
   versionedPromptToPromptConfigFormValuesWithSystemMessage,
 } from "../llmPromptConfigUtils";
+import { buildDefaultFormValues } from "../buildDefaultFormValues";
+import { formSchema } from "~/prompts/schemas/form-schema";
 
 describe("safeOptimizationStudioNodeDataToPromptConfigFormInitialValues", () => {
   describe("when LLM value is an object", () => {
@@ -301,6 +305,7 @@ describe("versionedPromptToPromptConfigFormValues", () => {
     outputs: [{ identifier: "output", type: "str" }],
     updatedAt: new Date(),
     createdAt: new Date(),
+    tags: [],
   });
 
   describe("when prompt handle has no prefix", () => {
@@ -368,6 +373,30 @@ describe("versionedPromptToPromptConfigFormValues", () => {
       expect(result.handle).toBeNull();
     });
   });
+
+  describe("when prompt has reasoning set", () => {
+    /** @scenario "versionedPromptToPromptConfigFormValues maps reasoning correctly" */
+    it("maps reasoning 'high' onto form values llm.reasoning", () => {
+      const prompt = createMockPrompt("test-prompt");
+      prompt.reasoning = "high";
+
+      const result = versionedPromptToPromptConfigFormValues(prompt);
+
+      expect(result.version.configData.llm.reasoning).toBe("high");
+    });
+  });
+
+  describe("when prompt has no reasoning", () => {
+    /** @scenario "versionedPromptToPromptConfigFormValues handles missing reasoning" */
+    it("leaves form values llm.reasoning undefined", () => {
+      const prompt = createMockPrompt("test-prompt");
+      // reasoning intentionally not set
+
+      const result = versionedPromptToPromptConfigFormValues(prompt);
+
+      expect(result.version.configData.llm.reasoning).toBeUndefined();
+    });
+  });
 });
 
 describe("versionedPromptToPromptConfigFormValuesWithSystemMessage", () => {
@@ -396,6 +425,7 @@ describe("versionedPromptToPromptConfigFormValuesWithSystemMessage", () => {
     outputs: [{ identifier: "output", type: "str" }],
     updatedAt: new Date(),
     createdAt: new Date(),
+    tags: [],
     ...overrides,
   });
 
@@ -502,6 +532,278 @@ describe("versionedPromptToPromptConfigFormValuesWithSystemMessage", () => {
 
       // BUG: The system prompt is LOST
       expect(instructionsParam?.value).toBe("");
+    });
+  });
+});
+
+describe("nodeDataToLocalPromptConfig()", () => {
+  describe("when node has full inline parameters", () => {
+    it("extracts LLM config from parameters array", () => {
+      const nodeData = {
+        parameters: [
+          {
+            identifier: "llm",
+            type: "llm" as const,
+            value: {
+              model: "openai/gpt-4",
+              temperature: 0.7,
+              max_tokens: 1000,
+            },
+          },
+          {
+            identifier: "instructions",
+            type: "str" as const,
+            value: "You are a helpful assistant.",
+          },
+          {
+            identifier: "messages",
+            type: "chat_messages" as const,
+            value: [{ role: "user", content: "{{input}}" }],
+          },
+        ],
+        inputs: [{ identifier: "input", type: "str" }],
+        outputs: [{ identifier: "output", type: "str" }],
+      } as any;
+
+      const result = nodeDataToLocalPromptConfig(nodeData);
+
+      expect(result).not.toBeUndefined();
+      expect(result!.llm.model).toBe("openai/gpt-4");
+      expect(result!.llm.temperature).toBe(0.7);
+      expect(result!.llm.maxTokens).toBe(1000);
+      expect(result!.messages).toEqual([
+        { role: "system", content: "You are a helpful assistant." },
+        { role: "user", content: "{{input}}" },
+      ]);
+      expect(result!.inputs).toEqual([{ identifier: "input", type: "str" }]);
+      expect(result!.outputs).toEqual([{ identifier: "output", type: "str" }]);
+    });
+  });
+
+  describe("when node has no parameters array", () => {
+    it("returns undefined", () => {
+      const nodeData = {
+        inputs: [{ identifier: "input", type: "str" }],
+        outputs: [{ identifier: "output", type: "str" }],
+      } as any;
+
+      const result = nodeDataToLocalPromptConfig(nodeData);
+
+      expect(result).toBeUndefined();
+    });
+  });
+
+  describe("when node has empty parameters array", () => {
+    it("returns undefined", () => {
+      const nodeData = {
+        parameters: [],
+        inputs: [{ identifier: "input", type: "str" }],
+        outputs: [{ identifier: "output", type: "str" }],
+      } as any;
+
+      const result = nodeDataToLocalPromptConfig(nodeData);
+
+      expect(result).toBeUndefined();
+    });
+  });
+
+  describe("when node has legacy string LLM value", () => {
+    it("migrates to object format with model field", () => {
+      const consoleWarnSpy = vi
+        .spyOn(console, "warn")
+        .mockImplementation(() => {});
+      const nodeData = {
+        parameters: [
+          {
+            identifier: "llm",
+            type: "llm" as const,
+            value: "openai/gpt-4-0125-preview",
+          },
+          {
+            identifier: "instructions",
+            type: "str" as const,
+            value: "Be helpful.",
+          },
+        ],
+        inputs: [],
+        outputs: [{ identifier: "output", type: "str" }],
+      } as any;
+
+      const result = nodeDataToLocalPromptConfig(nodeData);
+
+      expect(result).not.toBeUndefined();
+      expect(result!.llm.model).toBe("openai/gpt-4-0125-preview");
+      consoleWarnSpy.mockRestore();
+    });
+  });
+
+  describe("when node has instructions but no messages parameter", () => {
+    it("creates system message from instructions", () => {
+      const nodeData = {
+        parameters: [
+          {
+            identifier: "llm",
+            type: "llm" as const,
+            value: { model: "openai/gpt-4" },
+          },
+          {
+            identifier: "instructions",
+            type: "str" as const,
+            value: "You are a cat.",
+          },
+        ],
+        inputs: [{ identifier: "query", type: "str" }],
+        outputs: [{ identifier: "answer", type: "str" }],
+      } as any;
+
+      const result = nodeDataToLocalPromptConfig(nodeData);
+
+      expect(result).not.toBeUndefined();
+      expect(result!.messages).toEqual([
+        { role: "system", content: "You are a cat." },
+      ]);
+    });
+  });
+
+  describe("when node has all LLM sampling parameters", () => {
+    it("maps snake_case DSL fields to camelCase LocalPromptConfig fields", () => {
+      const nodeData = {
+        parameters: [
+          {
+            identifier: "llm",
+            type: "llm" as const,
+            value: {
+              model: "openai/gpt-4",
+              temperature: 0.5,
+              max_tokens: 2000,
+              top_p: 0.9,
+              frequency_penalty: 0.3,
+              presence_penalty: 0.1,
+              seed: 42,
+              top_k: 50,
+              min_p: 0.05,
+              repetition_penalty: 1.1,
+              reasoning: "high",
+              verbosity: "verbose",
+            },
+          },
+          {
+            identifier: "instructions",
+            type: "str" as const,
+            value: "",
+          },
+        ],
+        inputs: [],
+        outputs: [{ identifier: "output", type: "str" }],
+      } as any;
+
+      const result = nodeDataToLocalPromptConfig(nodeData);
+
+      expect(result).not.toBeUndefined();
+      expect(result!.llm).toEqual({
+        model: "openai/gpt-4",
+        temperature: 0.5,
+        maxTokens: 2000,
+        topP: 0.9,
+        frequencyPenalty: 0.3,
+        presencePenalty: 0.1,
+        seed: 42,
+        topK: 50,
+        minP: 0.05,
+        repetitionPenalty: 1.1,
+        reasoning: "high",
+        verbosity: "verbose",
+      });
+    });
+  });
+
+  describe("when node has parameters with only llm (no instructions)", () => {
+    it("creates config with empty system message", () => {
+      const nodeData = {
+        parameters: [
+          {
+            identifier: "llm",
+            type: "llm" as const,
+            value: { model: "openai/gpt-4" },
+          },
+        ],
+        inputs: [],
+        outputs: [{ identifier: "output", type: "str" }],
+      } as any;
+
+      const result = nodeDataToLocalPromptConfig(nodeData);
+
+      expect(result).not.toBeUndefined();
+      expect(result!.messages).toEqual([{ role: "system", content: "" }]);
+    });
+  });
+});
+
+describe("formValuesToTriggerSaveVersionParams", () => {
+  describe("when form values include reasoning", () => {
+    /** @scenario "formValuesToTriggerSaveVersionParams includes reasoning" */
+    it("propagates reasoning 'high' and omits legacy provider-specific fields", () => {
+      const formValues = buildDefaultFormValues({
+        version: { configData: { llm: { reasoning: "high" } } },
+      });
+
+      const result = formValuesToTriggerSaveVersionParams(formValues);
+
+      expect(result.reasoning).toBe("high");
+      // Unified field is the canonical sink; legacy provider-specific
+      // names must not leak through.
+      expect(result).not.toHaveProperty("reasoningEffort");
+      expect(result).not.toHaveProperty("thinkingLevel");
+      expect(result).not.toHaveProperty("effort");
+    });
+  });
+
+  describe("when form values omit reasoning", () => {
+    /** @scenario "formValuesToTriggerSaveVersionParams handles undefined reasoning" */
+    it("returns reasoning undefined and no legacy fields", () => {
+      const formValues = buildDefaultFormValues();
+
+      const result = formValuesToTriggerSaveVersionParams(formValues);
+
+      expect(result.reasoning).toBeUndefined();
+      expect(result).not.toHaveProperty("reasoningEffort");
+    });
+  });
+});
+
+describe("formSchema reasoning validation", () => {
+  describe("when llm.reasoning is set to a valid value", () => {
+    /** @scenario "Form schema accepts reasoning field with valid value" */
+    it("accepts 'high'", () => {
+      const values = buildDefaultFormValues({
+        version: { configData: { llm: { reasoning: "high" } } },
+      });
+      expect(formSchema.safeParse(values).success).toBe(true);
+    });
+
+    /** @scenario Form schema accepts reasoning field with "low" value */
+    it("accepts 'low'", () => {
+      const values = buildDefaultFormValues({
+        version: { configData: { llm: { reasoning: "low" } } },
+      });
+      expect(formSchema.safeParse(values).success).toBe(true);
+    });
+
+    /** @scenario Form schema accepts reasoning field with "medium" value */
+    it("accepts 'medium'", () => {
+      const values = buildDefaultFormValues({
+        version: { configData: { llm: { reasoning: "medium" } } },
+      });
+      expect(formSchema.safeParse(values).success).toBe(true);
+    });
+  });
+
+  describe("when llm.reasoning is not set", () => {
+    /** @scenario "Form schema accepts undefined reasoning" */
+    it("accepts undefined reasoning", () => {
+      const values = buildDefaultFormValues();
+      expect(formSchema.safeParse(values).success).toBe(true);
+      expect(values.version.configData.llm.reasoning).toBeUndefined();
     });
   });
 });

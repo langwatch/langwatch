@@ -2,7 +2,13 @@ import { AlertType, TriggerAction } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
+import { getApp } from "~/server/app-layer/app";
 import { enforceLicenseLimit } from "../../license-enforcement";
+import {
+  sanitizeTriggerFilters,
+  triggerFiltersSchema,
+  triggerFiltersPermissiveSchema,
+} from "../../filters/types";
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { extractCheckKeys } from "../utils";
@@ -14,7 +20,7 @@ export const automationRouter = createTRPCRouter({
         projectId: z.string(),
         name: z.string(),
         action: z.nativeEnum(TriggerAction),
-        filters: z.any(),
+        filters: triggerFiltersSchema,
         actionParams: z.object({
           createdByUserId: z.string().optional(),
           members: z.string().array().optional(),
@@ -96,7 +102,7 @@ export const automationRouter = createTRPCRouter({
         }
       }
 
-      return ctx.prisma.trigger.create({
+      const trigger = await ctx.prisma.trigger.create({
         data: {
           id: nanoid(),
           name: input.name,
@@ -107,6 +113,10 @@ export const automationRouter = createTRPCRouter({
           lastRunAt: new Date().getTime(),
         },
       });
+
+      await getApp().triggers.invalidate(input.projectId);
+
+      return trigger;
     }),
   deleteById: protectedProcedure
     .input(z.object({ projectId: z.string(), triggerId: z.string() }))
@@ -122,6 +132,8 @@ export const automationRouter = createTRPCRouter({
           active: false,
         },
       });
+
+      await getApp().triggers.invalidate(input.projectId);
 
       return { success: true };
     }),
@@ -140,7 +152,7 @@ export const automationRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("triggers:update"))
     .mutation(async ({ ctx, input }) => {
-      return ctx.prisma.trigger.update({
+      const trigger = await ctx.prisma.trigger.update({
         where: { id: input.triggerId, projectId: input.projectId },
         data: {
           message: input.message,
@@ -148,6 +160,10 @@ export const automationRouter = createTRPCRouter({
           name: input.name,
         },
       });
+
+      await getApp().triggers.invalidate(input.projectId);
+
+      return trigger;
     }),
   getTriggers: protectedProcedure
     .input(z.object({ projectId: z.string() }))
@@ -217,7 +233,7 @@ export const automationRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("triggers:update"))
     .mutation(async ({ ctx, input }) => {
-      return ctx.prisma.trigger.update({
+      const trigger = await ctx.prisma.trigger.update({
         where: {
           id: input.triggerId,
           projectId: input.projectId,
@@ -226,6 +242,10 @@ export const automationRouter = createTRPCRouter({
           active: input.active,
         },
       });
+
+      await getApp().triggers.invalidate(input.projectId);
+
+      return trigger;
     }),
   getTriggerById: protectedProcedure
     .input(z.object({ triggerId: z.string(), projectId: z.string() }))
@@ -240,16 +260,32 @@ export const automationRouter = createTRPCRouter({
       z.object({
         triggerId: z.string(),
         projectId: z.string(),
-        filters: z.any(),
+        filters: triggerFiltersPermissiveSchema,
       }),
     )
     .use(checkProjectPermission("triggers:update"))
     .mutation(async ({ ctx, input }) => {
-      return ctx.prisma.trigger.update({
+      const { sanitized, unknownFields } = sanitizeTriggerFilters(
+        input.filters,
+      );
+
+      if (unknownFields.length > 0 && Object.keys(sanitized).length === 0) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            "This automation only contains unsupported legacy filters. Add at least one supported filter before saving.",
+        });
+      }
+
+      const trigger = await ctx.prisma.trigger.update({
         where: { id: input.triggerId, projectId: input.projectId },
         data: {
-          filters: JSON.stringify(input.filters),
+          filters: JSON.stringify(sanitized),
         },
       });
+
+      await getApp().triggers.invalidate(input.projectId);
+
+      return trigger;
     }),
 });
