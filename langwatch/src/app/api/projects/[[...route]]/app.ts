@@ -134,7 +134,7 @@ export const app = new Hono<{ Variables: Variables }>()
       const organization = c.get("organization") as Organization;
       const body = c.req.valid("json");
       const service = c.get("projectService") as ProjectService;
-      const userId = c.get("apiKeyUserId") as string;
+      const userId = c.get("apiKeyUserId") as string | null;
 
       let project;
       try {

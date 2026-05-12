@@ -49,7 +49,7 @@ export class TeamNotInOrganizationError extends Error {
 
 export interface CreateProjectParams {
   organizationId: string;
-  userId: string;
+  userId?: string | null;
   teamId?: string;
   newTeamName?: string;
   name: string;
@@ -91,14 +91,23 @@ export class ProjectService {
         "-" +
         newTeamId.substring(0, 6);
 
-      await this.repo.createTeamWithRoleBinding({
-        teamId: newTeamId,
-        teamName,
-        teamSlug,
-        organizationId: params.organizationId,
-        roleBindingId: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-        userId: params.userId,
-      });
+      if (params.userId) {
+        await this.repo.createTeamWithRoleBinding({
+          teamId: newTeamId,
+          teamName,
+          teamSlug,
+          organizationId: params.organizationId,
+          roleBindingId: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+          userId: params.userId,
+        });
+      } else {
+        await this.repo.createTeam({
+          teamId: newTeamId,
+          teamName,
+          teamSlug,
+          organizationId: params.organizationId,
+        });
+      }
 
       teamId = newTeamId;
     }

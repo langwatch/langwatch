@@ -89,6 +89,7 @@ export interface ProjectRepository {
   findBySlugInTeam(params: { slug: string; teamId: string }): Promise<Project | null>;
   teamBelongsToOrganization(params: { teamId: string; organizationId: string }): Promise<boolean>;
   createTeamWithRoleBinding(input: CreateTeamWithBindingInput): Promise<{ id: string }>;
+  createTeam(input: { teamId: string; teamName: string; teamSlug: string; organizationId: string }): Promise<{ id: string }>;
 }
 
 export class NullProjectRepository implements ProjectRepository {
@@ -150,5 +151,9 @@ export class NullProjectRepository implements ProjectRepository {
 
   async createTeamWithRoleBinding(_input: CreateTeamWithBindingInput): Promise<{ id: string }> {
     throw new Error("NullProjectRepository.createTeamWithRoleBinding not implemented");
+  }
+
+  async createTeam(_input: { teamId: string; teamName: string; teamSlug: string; organizationId: string }): Promise<{ id: string }> {
+    throw new Error("NullProjectRepository.createTeam not implemented");
   }
 }

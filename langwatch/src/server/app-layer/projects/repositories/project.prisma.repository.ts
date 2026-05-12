@@ -212,4 +212,20 @@ export class PrismaProjectRepository implements ProjectRepository {
 
     return team;
   }
+
+  async createTeam(input: {
+    teamId: string;
+    teamName: string;
+    teamSlug: string;
+    organizationId: string;
+  }): Promise<{ id: string }> {
+    return this.prisma.team.create({
+      data: {
+        id: input.teamId,
+        name: input.teamName,
+        slug: input.teamSlug,
+        organizationId: input.organizationId,
+      },
+    });
+  }
 }

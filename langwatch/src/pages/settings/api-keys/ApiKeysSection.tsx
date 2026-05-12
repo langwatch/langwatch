@@ -87,7 +87,18 @@ export function ApiKeysSection({
   const [apiKeyToEdit, setApiKeyToEdit] = useState<ApiKeyRow | null>(null);
 
   const handleCreate = (input: CreateApiKeyInput): void => {
-    if (input.keyType === "personal" && input.bindings.length === 0) {
+    if (input.permissionMode === "restricted" && input.bindings.length === 0) {
+      toaster.create({
+        title: "No projects selected",
+        description:
+          "Select at least one project for a restricted key.",
+        type: "error",
+        duration: 5000,
+        meta: { closable: true },
+      });
+      return;
+    }
+    if (input.keyType === "personal" && input.permissionMode !== "restricted" && input.bindings.length === 0) {
       toaster.create({
         title: "No permissions to grant",
         description:

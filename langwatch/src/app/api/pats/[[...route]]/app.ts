@@ -22,21 +22,32 @@ patchZodOpenapi();
 
 type Variables = OrgAuthMiddlewareVariables;
 
-const createApiKeySchema = z.object({
+const bindingSchema = z.object({
+  role: z.enum(["ADMIN", "MEMBER", "VIEWER"]),
+  scopeType: z.enum(["ORGANIZATION", "TEAM", "PROJECT"]),
+  scopeId: z.string().min(1),
+});
+
+const createPersonalKeySchema = z.object({
+  keyType: z.literal("personal").default("personal"),
   name: z.string().min(1).max(100),
   description: z.string().max(500).optional(),
   expiresAt: z.coerce.date().optional(),
-  bindings: z
-    .array(
-      z.object({
-        role: z.enum(["ADMIN", "MEMBER", "VIEWER"]),
-        scopeType: z.enum(["ORGANIZATION", "TEAM", "PROJECT"]),
-        scopeId: z.string().min(1),
-      }),
-    )
-    .min(1)
-    .max(20),
+  bindings: z.array(bindingSchema).min(1).max(20),
 });
+
+const createServiceKeySchema = z.object({
+  keyType: z.literal("service"),
+  name: z.string().min(1).max(100),
+  description: z.string().max(500).optional(),
+  expiresAt: z.coerce.date().optional(),
+  projectIds: z.array(z.string().min(1)).max(50).optional(),
+});
+
+const createApiKeySchema = z.discriminatedUnion("keyType", [
+  createPersonalKeySchema,
+  createServiceKeySchema,
+]);
 
 function validationHook(
   result: {
@@ -76,13 +87,12 @@ export const app = new Hono<{ Variables: Variables }>()
     requireOrgPermission("organization:view"),
     async (c) => {
       const organization = c.get("organization") as Organization;
-      const userId = c.get("apiKeyUserId") as string;
+      const userId = c.get("apiKeyUserId") as string | null;
       const service = ApiKeyService.create(prisma);
 
-      const keys = await service.list({
-        userId,
-        organizationId: organization.id,
-      });
+      const keys = userId
+        ? await service.list({ userId, organizationId: organization.id })
+        : await service.listAll({ organizationId: organization.id });
 
       return c.json({
         data: keys.map((key) => ({
@@ -113,20 +123,31 @@ export const app = new Hono<{ Variables: Variables }>()
     zValidator("json", createApiKeySchema, validationHook),
     async (c) => {
       const organization = c.get("organization") as Organization;
-      const userId = c.get("apiKeyUserId") as string;
+      const callerUserId = c.get("apiKeyUserId") as string | null;
       const body = c.req.valid("json");
       const service = ApiKeyService.create(prisma);
+
+      const isService = body.keyType === "service";
+      const bindings = isService
+        ? (body.projectIds ?? []).map((projectId: string) => ({
+            role: "ADMIN" as const,
+            scopeType: "PROJECT" as const,
+            scopeId: projectId,
+          }))
+        : body.bindings;
 
       try {
         const result = await service.create({
           name: body.name,
           description: body.description,
-          userId,
-          createdByUserId: userId,
+          userId: isService ? null : callerUserId,
+          createdByUserId: callerUserId,
           organizationId: organization.id,
           expiresAt: body.expiresAt,
-          permissionMode: "scoped",
-          bindings: body.bindings,
+          permissionMode: isService
+            ? (bindings.length === 0 ? "all" : "restricted")
+            : "scoped",
+          bindings,
         });
 
         return c.json(
@@ -161,13 +182,13 @@ export const app = new Hono<{ Variables: Variables }>()
     async (c) => {
       const { id } = c.req.param();
       const organization = c.get("organization") as Organization;
-      const userId = c.get("apiKeyUserId") as string;
+      const userId = c.get("apiKeyUserId") as string | null;
       const service = ApiKeyService.create(prisma);
 
       try {
         await service.revoke({
           id,
-          callerUserId: userId,
+          callerUserId: userId ?? "",
           callerIsAdmin: true,
           organizationId: organization.id,
         });

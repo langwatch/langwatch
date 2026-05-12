@@ -331,7 +331,7 @@ export const apiKeyRouter = createTRPCRouter({
           createdByUserId,
           organizationId: input.organizationId,
           expiresAt: input.expiresAt,
-          permissionMode: isService ? "all" : input.permissionMode,
+          permissionMode: input.permissionMode,
           bindings: input.bindings,
         });
 
@@ -343,7 +343,7 @@ export const apiKeyRouter = createTRPCRouter({
             apiKeyId: apiKey.id,
             name: input.name,
             keyType: input.keyType,
-            permissionMode: isService ? "all" : input.permissionMode,
+            permissionMode: input.permissionMode,
             assignedToUserId: targetUserId,
           },
         });
