@@ -9,7 +9,7 @@ dependencies = [
     "pytest>=8.1.2",
     "fastapi>=0.115.11",
     "pydantic>=2.4.0",
-    "python-dotenv==1.0.1",
+    "python-dotenv==1.2.2",
     "mangum>=0.17.0",
     "pandas>=2.2.2",
     "markdown>=3.6",
