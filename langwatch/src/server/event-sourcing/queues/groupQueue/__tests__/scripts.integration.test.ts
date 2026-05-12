@@ -1794,6 +1794,116 @@ describe("GroupStagingScripts", () => {
     });
   });
 
+  describe("drainTenant bulk scoping", () => {
+    let repo: QueueRedisRepository;
+    beforeAll(() => {
+      repo = new QueueRedisRepository(redis);
+    });
+
+    /** @scenario drainTenant supports an optional groupIdContains substring filter */
+    it("with groupIdContains filter, drains only matching groupIds within the tenant", async () => {
+      // Stage groups across two projections for the same tenant + one group
+      // for a different tenant. Filter should hit only fold/projectDailySdkUsage.
+      await scripts.stage(
+        makeJob({
+          stagedJobId: "fold-a",
+          groupId: "project_X/fold/projectDailySdkUsage/key-1",
+          dispatchAfterMs: 100,
+          jobDataJson: JSON.stringify({}),
+        }),
+      );
+      await scripts.stage(
+        makeJob({
+          stagedJobId: "fold-b",
+          groupId: "project_X/fold/projectDailySdkUsage/key-2",
+          dispatchAfterMs: 100,
+          jobDataJson: JSON.stringify({}),
+        }),
+      );
+      await scripts.stage(
+        makeJob({
+          stagedJobId: "cmd-c",
+          groupId: "project_X/command/recordSpan/trace:t1",
+          dispatchAfterMs: 100,
+          jobDataJson: JSON.stringify({}),
+        }),
+      );
+      await scripts.stage(
+        makeJob({
+          stagedJobId: "other-tenant",
+          groupId: "project_Y/fold/projectDailySdkUsage/key-1",
+          dispatchAfterMs: 100,
+          jobDataJson: JSON.stringify({}),
+        }),
+      );
+
+      const result = await repo.drainTenant({
+        queueName: QUEUE_NAME,
+        tenantId: "project_X",
+        groupIdContains: "/fold/projectDailySdkUsage/",
+      });
+
+      expect(result.groupsDrained).toBe(2); // only the two fold groups for project_X
+      expect(result.jobsDrained).toBe(2);
+
+      // Untouched groups still hold their jobs
+      const cmdJobs = await inspectGroupJobs("project_X/command/recordSpan/trace:t1");
+      expect(cmdJobs.filter((s) => !s.match(/^\d+$/))).toContain("cmd-c");
+      const otherTenantJobs = await inspectGroupJobs("project_Y/fold/projectDailySdkUsage/key-1");
+      expect(otherTenantJobs.filter((s) => !s.match(/^\d+$/))).toContain("other-tenant");
+    });
+
+    it("without groupIdContains, drains every group for the tenant", async () => {
+      await scripts.stage(
+        makeJob({
+          stagedJobId: "a",
+          groupId: "project_All/fold/x/key-1",
+          dispatchAfterMs: 100,
+          jobDataJson: JSON.stringify({}),
+        }),
+      );
+      await scripts.stage(
+        makeJob({
+          stagedJobId: "b",
+          groupId: "project_All/map/y/key-1",
+          dispatchAfterMs: 100,
+          jobDataJson: JSON.stringify({}),
+        }),
+      );
+
+      const result = await repo.drainTenant({
+        queueName: QUEUE_NAME,
+        tenantId: "project_All",
+      });
+
+      expect(result.groupsDrained).toBe(2);
+      expect(result.jobsDrained).toBe(2);
+    });
+
+    it("ignores groupIds that match the filter but belong to a different tenant", async () => {
+      await scripts.stage(
+        makeJob({
+          stagedJobId: "wrong-tenant",
+          groupId: "project_Z/fold/somethingShared/key-1",
+          dispatchAfterMs: 100,
+          jobDataJson: JSON.stringify({}),
+        }),
+      );
+
+      const result = await repo.drainTenant({
+        queueName: QUEUE_NAME,
+        tenantId: "project_NotZ",
+        groupIdContains: "/fold/somethingShared/",
+      });
+
+      expect(result.groupsDrained).toBe(0);
+      expect(result.jobsDrained).toBe(0);
+
+      const survivors = await inspectGroupJobs("project_Z/fold/somethingShared/key-1");
+      expect(survivors.filter((s) => !s.match(/^\d+$/))).toContain("wrong-tenant");
+    });
+  });
+
   describe("signal list cap", () => {
     it("trims signal list to max 1000 entries", async () => {
       // Stage many jobs to trigger many LPUSH signals

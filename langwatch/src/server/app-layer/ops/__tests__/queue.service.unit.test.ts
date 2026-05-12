@@ -452,6 +452,24 @@ describe("QueueService", () => {
 
         expect(result).toEqual({ groupsDrained: 3, jobsDrained: 12 });
       });
+
+      /** @scenario drainTenant supports an optional groupIdContains substring filter */
+      it("forwards groupIdContains substring filter to the repository", async () => {
+        const repo = createMockRepo();
+        const service = new QueueService(repo);
+
+        await service.drainTenant({
+          queueName: "q1",
+          tenantId: "project_X",
+          groupIdContains: "/fold/projectDailySdkUsage/",
+        });
+
+        expect(repo.drainTenant).toHaveBeenCalledWith({
+          queueName: "q1",
+          tenantId: "project_X",
+          groupIdContains: "/fold/projectDailySdkUsage/",
+        });
+      });
     });
   });
 });

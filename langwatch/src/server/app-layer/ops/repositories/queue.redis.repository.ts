@@ -758,9 +758,22 @@ export class QueueRedisRepository implements QueueRepository {
   }
 
   // Bulk-drain every group whose ID starts with "<tenantId>/" for the given
-  // queue. Returns the total group count and total job count drained.
+  // queue, optionally narrowed by a substring filter on the groupId.
+  // Returns the total group count and total job count drained.
   // Added post-2026-05-11 incident — clicking 500K Drain buttons by hand
   // wasn't feasible.
+  //
+  // `groupIdContains`: optional plain-text fragment that the groupId
+  // must contain in addition to starting with `<tenantId>/`. Use this to
+  // scope a drain to part of a tenant's groups — for example:
+  //   - "/fold/projectDailySdkUsage/" → drop only that fold's groups
+  //   - "/reactor/customEvaluationSync/" → drop only this reactor's groups
+  //   - "/map/spanStorage/" → drop only the span-storage map groups
+  // Honest substring semantics (matches the operator's mental model of
+  // what they see in the Groups table): no fancy resolution to pipeline
+  // names — those live in job data which would require an HGET per group
+  // and dominate the latency. Document the groupId shape so operators
+  // know what to type.
   //
   // Performance: ZSCAN pages 1000 groupIds at a time, then ALL matching
   // DRAIN_GROUP_LUA EVALs for that page are issued as a single Redis
@@ -771,11 +784,13 @@ export class QueueRedisRepository implements QueueRepository {
   async drainTenant(params: {
     queueName: string;
     tenantId: string;
+    groupIdContains?: string;
   }): Promise<{ groupsDrained: number; jobsDrained: number }> {
     const prefix = `${params.queueName}:gq:`;
     const readyKey = `${prefix}ready`;
     const totalPendingKey = `${prefix}stats:total-pending`;
     const tenantPrefix = `${params.tenantId}/`;
+    const contains = params.groupIdContains ?? null;
 
     let cursor = "0";
     let groupsDrained = 0;
@@ -792,11 +807,14 @@ export class QueueRedisRepository implements QueueRepository {
       cursor = next;
 
       // members alternates [groupId, score, groupId, score, ...] — collect
-      // just the groupIds that match our tenant prefix.
+      // just the groupIds that match our tenant prefix (and the optional
+      // groupIdContains fragment, if set).
       const matched: string[] = [];
       for (let i = 0; i < members.length; i += 2) {
         const groupId = members[i]!;
-        if (groupId.startsWith(tenantPrefix)) matched.push(groupId);
+        if (!groupId.startsWith(tenantPrefix)) continue;
+        if (contains && !groupId.includes(contains)) continue;
+        matched.push(groupId);
       }
       if (matched.length === 0) continue;
 

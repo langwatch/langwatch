@@ -198,6 +198,7 @@ export class QueueService {
   async drainTenant(params: {
     queueName: string;
     tenantId: string;
+    groupIdContains?: string;
   }): Promise<{ groupsDrained: number; jobsDrained: number }> {
     return this.repo.drainTenant(params);
   }

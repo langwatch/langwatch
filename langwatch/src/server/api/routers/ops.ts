@@ -238,6 +238,9 @@ export const opsRouter = createTRPCRouter({
       z.object({
         queueName: z.string(),
         tenantId: z.string().min(1),
+        // Optional substring filter on groupId. Honest substring semantics —
+        // see drainTenant repo doc for example fragments to type.
+        groupIdContains: z.string().optional(),
       }),
     )
     .mutation(async ({ input }) => {

@@ -11,14 +11,21 @@ Feature: Tenant-scoped bulk drain (post-2026-05-11 incident)
   # DRAIN_GROUP_LUA script in a loop — an action that can't be performed
   # by non-engineers during an outage.
   #
-  # ops.queues.drainTenant({ queueName, tenantId }) pages through the
-  # ready zset in batches of 1000 via ZSCAN, filters groupIds that start
-  # with `<tenantId>/`, and pipelines DRAIN_GROUP_LUA EVALs for that
-  # page in a single Redis round-trip. Drains everything for the tenant
-  # across every pipeline / projection / reactor — same blast radius as
-  # the in-prod shell loop we ran during the incident, just safe and
-  # one-click. There is no pipeline scoping: the only realistic use
-  # case for this endpoint is "drop everything for this runaway tenant".
+  # ops.queues.drainTenant({ queueName, tenantId, groupIdContains? })
+  # pages through the ready zset in batches of 1000 via ZSCAN, filters
+  # groupIds that start with `<tenantId>/`, and pipelines DRAIN_GROUP_LUA
+  # EVALs for that page in a single Redis round-trip.
+  #
+  # `groupIdContains` is an optional plain-text fragment that the groupId
+  # must also contain. Honest substring semantics — what the operator
+  # sees in the Groups table is exactly what they match against. The
+  # `pipeline name` (e.g. `trace_processing`) is NOT in the groupId
+  # (it lives in job data) — we deliberately do not pretend otherwise.
+  # Use the groupId-fragment patterns operators actually see:
+  #   "/fold/projectDailySdkUsage/" — only this fold's groups
+  #   "/reactor/customEvaluationSync/" — only this reactor's groups
+  #   "/map/spanStorage/" — only the span-storage map groups
+  # No filter = drop everything for that tenant.
 
   @integration @v1 @bulk-drain
   Scenario: drainTenant bulk-drains all groups for a tenantId
@@ -35,3 +42,11 @@ Feature: Tenant-scoped bulk drain (post-2026-05-11 incident)
     Then stats:total-pending decreases by N (the staged jobs)
     And if a group also had an active job, total-pending decreases by 1 more
     And total-pending never silently leaks after bulk drain
+
+  @integration @v1 @bulk-drain
+  Scenario: drainTenant supports an optional groupIdContains substring filter
+    Given tenant A has groups across multiple projections
+    When the operator calls drainTenant with groupIdContains="/fold/projectDailySdkUsage/"
+    Then only groups whose groupId contains that substring are drained
+    And groups in tenant A's other projections are preserved
+    And the filter is a plain substring match (no pretense of pipeline-name resolution)

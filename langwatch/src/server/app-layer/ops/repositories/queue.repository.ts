@@ -100,6 +100,7 @@ export interface QueueRepository {
   drainTenant(params: {
     queueName: string;
     tenantId: string;
+    groupIdContains?: string;
   }): Promise<{ groupsDrained: number; jobsDrained: number }>;
 
   moveToDlq(params: {
