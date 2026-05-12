@@ -83,6 +83,22 @@ vi.mock("~/server/db", () => ({
   },
 }));
 
+const mockBuildLangyTelemetrySettings = vi.fn();
+vi.mock("~/server/observability/langy-tracer", async () => {
+  const actual = await vi.importActual<
+    typeof import("~/server/observability/langy-tracer")
+  >("~/server/observability/langy-tracer");
+  return {
+    ...actual,
+    buildLangyTelemetrySettings: (
+      ...args: Parameters<typeof actual.buildLangyTelemetrySettings>
+    ) => {
+      mockBuildLangyTelemetrySettings(...args);
+      return actual.buildLangyTelemetrySettings(...args);
+    },
+  };
+});
+
 vi.mock("~/server/services/langy", () => ({
   LangyConversationService: {
     create: () => ({
@@ -335,6 +351,32 @@ describe("POST /api/langy/chat streaming — binds langy-baseline.feature § str
           }),
         });
         expect(mockGetVercelAIModel).toHaveBeenCalledWith("proj_demo");
+      });
+
+      it("attaches Langy self-observability metadata to streamText — binds PR-1.3", async () => {
+        await app.request("/api/langy/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            projectId: "proj_demo",
+            messages: [
+              {
+                id: "m1",
+                role: "user",
+                parts: [{ type: "text", text: "Hi" }],
+              },
+            ],
+          }),
+        });
+        // The route must build telemetry from the request's projectId,
+        // session userId, and the ensured conversation id. The dogfood
+        // project filters on these — see langy-tracer.ts.
+        expect(mockBuildLangyTelemetrySettings).toHaveBeenCalledWith({
+          userProjectId: "proj_demo",
+          userId: "user_42",
+          conversationId: "conv_test_abc",
+          mode: "non-expert",
+        });
       });
 
       it("persists the user message via LangyMessageService.append", async () => {

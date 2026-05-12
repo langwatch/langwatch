@@ -34,6 +34,7 @@ import { parseEvaluationResult } from "~/utils/evaluationResults";
 import { createLogger } from "~/utils/logger/server";
 import { auditLog } from "~/server/auditLog";
 import { TiktokenClient } from "~/server/app-layer/clients/tokenizer/tiktoken.client";
+import { buildLangyTelemetrySettings } from "~/server/observability/langy-tracer";
 import {
   LangyConversationService,
   LangyMessageService,
@@ -1216,15 +1217,12 @@ app.post("/langy/chat", async (c) => {
     tools,
     stopWhen: stepCountIs(LANGY_TOOL_CALLS_PER_MESSAGE),
     maxRetries: 2,
-    experimental_telemetry: {
-      isEnabled: true,
-      functionId: "langy.chat",
-      metadata: {
-        "langwatch.project_id": projectId,
-        "langwatch.user_id": session.user.id,
-        "langy.conversation_id": conversation.id,
-      },
-    },
+    experimental_telemetry: buildLangyTelemetrySettings({
+      userProjectId: projectId,
+      userId: session.user.id,
+      conversationId: conversation.id,
+      mode: prefs.mode,
+    }),
     onError: (error) => {
       logger.error({ error }, "error in langy chat stream");
     },
@@ -1491,6 +1489,13 @@ app.post("/langy/project-memory/refresh", async (c) => {
         content: `Project snapshot (JSON):\n\n${snapshot}`,
       },
     ],
+    // Memory-refresh is a one-shot, not a conversation; synthesise a stable
+    // id so the dogfood project can group all refresh traces per project.
+    experimental_telemetry: buildLangyTelemetrySettings({
+      userProjectId: body.projectId,
+      userId: guard.session!.user.id,
+      conversationId: `memory-refresh:${body.projectId}`,
+    }),
     onFinish: async ({ text }) => {
       try {
         const memoryService = LangyProjectMemoryService.create(prisma);

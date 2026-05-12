@@ -1,26 +1,30 @@
 /**
  * Self-observability for Langy. Per implementation-plan.md § PR-1.3.
  *
- * Every Langy LLM call should emit a trace to a dedicated "dogfood"
- * LangWatch project so the team can grade Langy's own behaviour with
- * the same tools we ship to customers. Configuration lives in env:
+ * **Design note (revised from the original plan):** LangWatch already wires
+ * a global OTEL pipeline in `src/instrumentation.node.ts` that ships every
+ * span to LangWatch whenever `LANGWATCH_API_KEY` is set — the project is
+ * identified by the API key. So "dogfood Langy's own traces" reduces to:
+ *   1. Set `LANGWATCH_API_KEY` (and `LANGWATCH_ENDPOINT`) in the app's
+ *      `.env` to credentials for a dedicated dogfood project.
+ *   2. Attach Langy-specific metadata to every `streamText` call so the
+ *      dogfood project can filter for `langy.dogfood = "true"` traces.
  *
- *   LANGY_DOGFOOD_PROJECT_ID   — the LangWatch project id traces ship to
- *   LANGY_DOGFOOD_API_KEY      — its api key
- *   LANGY_DOGFOOD_ENABLED      — optional "true"/"false" kill switch;
- *                                defaults to enabled when both values
- *                                above are present.
+ * The original plan envisaged separate `LANGY_DOGFOOD_*` env vars and a
+ * second exporter, but `setupObservability` does not currently support
+ * per-span routing across projects. If/when we want simultaneous
+ * customer-facing + dogfood observability from the same process, we'll
+ * stand up a custom `SpanProcessor` — that work belongs in a later phase.
  *
- * Wiring this into `streamText`'s `experimental_telemetry` option lives
- * in a follow-up PR. This module supplies the pure helpers that the
- * route will consume, plus the metadata schema the dogfood project
- * filters on.
+ * This module supplies pure helpers that the route consumes:
+ *   - `buildLangyTelemetrySettings(input)` — the
+ *     `experimental_telemetry` object to hand to `streamText({ ... })`.
+ *   - `isLangyDogfoodConfigured(env)` — true when `LANGWATCH_API_KEY` is
+ *     set, i.e. when the global OTEL pipeline is actually going to ship
+ *     spans somewhere. Tests and diagnostics use this; the route does not
+ *     (it always attaches metadata so traces are well-formed even if
+ *     observability is off).
  */
-
-export interface LangyDogfoodConfig {
-  projectId: string;
-  apiKey: string;
-}
 
 export interface LangyTelemetryInput {
   /** Project the *user* is in (the project Langy is helping with). */
@@ -47,35 +51,25 @@ export interface LangyTelemetrySettings {
 }
 
 /**
- * Reads the dogfood project credentials from env, returning null if
- * either is missing or if `LANGY_DOGFOOD_ENABLED` is explicitly "false".
- * Pure read; safe to call in tests.
+ * True when the global OTEL pipeline is configured to ship to LangWatch
+ * (i.e. `LANGWATCH_API_KEY` is set in env). Pure read; safe to call in
+ * tests.
  */
-export function getLangyDogfoodConfig(
+export function isLangyDogfoodConfigured(
   env: Partial<Record<string, string | undefined>> = process.env,
-): LangyDogfoodConfig | null {
-  const explicit = env.LANGY_DOGFOOD_ENABLED;
-  if (explicit === "false") return null;
-
-  const projectId = env.LANGY_DOGFOOD_PROJECT_ID;
-  const apiKey = env.LANGY_DOGFOOD_API_KEY;
-  if (!projectId || !apiKey) return null;
-
-  return { projectId, apiKey };
+): boolean {
+  return Boolean(env.LANGWATCH_API_KEY);
 }
 
 /**
- * Build the telemetry settings object to attach to `streamText({
- * experimental_telemetry: ... })`. Returns null when the dogfood project
- * is not configured — callers should fall back to the previous inline
- * telemetry config in that case.
+ * Build the `experimental_telemetry` object to attach to every Langy
+ * `streamText({ ... })` call. Always returns enabled telemetry — if the
+ * global OTEL pipeline isn't configured the spans are simply dropped, so
+ * there's no downside to attaching metadata unconditionally.
  */
 export function buildLangyTelemetrySettings(
   input: LangyTelemetryInput,
-  env: Partial<Record<string, string | undefined>> = process.env,
-): LangyTelemetrySettings | null {
-  if (!getLangyDogfoodConfig(env)) return null;
-
+): LangyTelemetrySettings {
   return {
     isEnabled: true,
     functionId: "langy.chat",
