@@ -95,6 +95,16 @@ export class ApiKeyService {
 
     const { token, lookupId, hashedSecret } = generateApiKeyToken();
 
+    // Service keys get an ORG-scoped ADMIN binding so the ceiling check
+    // grants full access through the standard binding path.
+    const effectiveBindings: RoleBindingInput[] = !userId
+      ? [{
+          role: "ADMIN",
+          scopeType: "ORGANIZATION",
+          scopeId: organizationId,
+        }]
+      : bindings;
+
     const apiKey = await this.prisma.$transaction(async (tx) => {
       const txRepo = ApiKeyRepository.create(tx);
 
@@ -110,11 +120,11 @@ export class ApiKeyService {
         expiresAt,
       });
 
-      if (bindings.length > 0) {
+      if (effectiveBindings.length > 0) {
         await txRepo.createRoleBindings({
           apiKeyId: created.id,
           organizationId,
-          bindings,
+          bindings: effectiveBindings,
         });
       }
 

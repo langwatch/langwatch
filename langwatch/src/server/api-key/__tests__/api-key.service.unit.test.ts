@@ -163,6 +163,45 @@ describe("ApiKeyService", () => {
         expect(result.apiKey.userId).toBeNull();
         expect(prisma.organizationUser.findFirst).not.toHaveBeenCalled();
       });
+
+      it("auto-creates an ORG-scoped ADMIN binding for full access", async () => {
+        prisma._mockTx.apiKey.create.mockResolvedValue({
+          id: "ak_svc",
+          name: "Service Key",
+          userId: null,
+          organizationId: "org_1",
+          lookupId: "testlookup1234",
+          hashedSecret: "hashedsecret123",
+          permissionMode: "all",
+          createdByUserId: "admin_1",
+          expiresAt: null,
+          revokedAt: null,
+          lastUsedAt: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+
+        await service.create({
+          name: "Service Key",
+          userId: null,
+          createdByUserId: "admin_1",
+          organizationId: "org_1",
+          permissionMode: "all",
+          bindings: [],
+        });
+
+        expect(prisma._mockTx.roleBinding.createMany).toHaveBeenCalledWith({
+          data: [
+            expect.objectContaining({
+              organizationId: "org_1",
+              apiKeyId: "ak_svc",
+              role: "ADMIN",
+              scopeType: "ORGANIZATION",
+              scopeId: "org_1",
+            }),
+          ],
+        });
+      });
     });
   });
 

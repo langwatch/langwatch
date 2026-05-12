@@ -1,4 +1,5 @@
 import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
+import type { PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
@@ -29,6 +30,27 @@ function mapApiKeyDomainError(error: unknown): never {
   throw error;
 }
 
+async function assertOrgMembership({
+  prisma,
+  userId,
+  organizationId,
+}: {
+  prisma: PrismaClient;
+  userId: string;
+  organizationId: string;
+}): Promise<void> {
+  const membership = await prisma.organizationUser.findFirst({
+    where: { userId, organizationId },
+    select: { userId: true },
+  });
+  if (!membership) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Not a member of this organization",
+    });
+  }
+}
+
 const roleBindingSchema = z.object({
   role: z.nativeEnum(TeamUserRole),
   customRoleId: z.string().nullish(),
@@ -49,6 +71,12 @@ export const apiKeyRouter = createTRPCRouter({
       }),
     )
     .query(async ({ ctx, input }) => {
+      await assertOrgMembership({
+        prisma: ctx.prisma,
+        userId: ctx.session.user.id,
+        organizationId: input.organizationId,
+      });
+
       const bindings = await ctx.prisma.roleBinding.findMany({
         where: {
           userId: ctx.session.user.id,
@@ -134,6 +162,12 @@ export const apiKeyRouter = createTRPCRouter({
       }),
     )
     .query(async ({ ctx, input }) => {
+      await assertOrgMembership({
+        prisma: ctx.prisma,
+        userId: ctx.session.user.id,
+        organizationId: input.organizationId,
+      });
+
       const apiKeyService = ApiKeyService.create(ctx.prisma);
       const callerIsAdmin = await apiKeyService.isOrgAdmin({
         userId: ctx.session.user.id,
@@ -262,6 +296,12 @@ export const apiKeyRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      await assertOrgMembership({
+        prisma: ctx.prisma,
+        userId: ctx.session.user.id,
+        organizationId: input.organizationId,
+      });
+
       const apiKeyService = ApiKeyService.create(ctx.prisma);
       const isService = input.keyType === "service";
 
@@ -338,6 +378,12 @@ export const apiKeyRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      await assertOrgMembership({
+        prisma: ctx.prisma,
+        userId: ctx.session.user.id,
+        organizationId: input.organizationId,
+      });
+
       const apiKeyService = ApiKeyService.create(ctx.prisma);
       const callerIsAdmin = await apiKeyService.isOrgAdmin({
         userId: ctx.session.user.id,
@@ -390,6 +436,12 @@ export const apiKeyRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      await assertOrgMembership({
+        prisma: ctx.prisma,
+        userId: ctx.session.user.id,
+        organizationId: input.organizationId,
+      });
+
       const apiKeyService = ApiKeyService.create(ctx.prisma);
       const callerIsAdmin = await apiKeyService.isOrgAdmin({
         userId: ctx.session.user.id,
@@ -427,6 +479,12 @@ export const apiKeyRouter = createTRPCRouter({
       }),
     )
     .query(async ({ ctx, input }) => {
+      await assertOrgMembership({
+        prisma: ctx.prisma,
+        userId: ctx.session.user.id,
+        organizationId: input.organizationId,
+      });
+
       return ctx.prisma.project.findMany({
         where: {
           team: { organizationId: input.organizationId },
@@ -448,6 +506,12 @@ export const apiKeyRouter = createTRPCRouter({
       }),
     )
     .query(async ({ ctx, input }) => {
+      await assertOrgMembership({
+        prisma: ctx.prisma,
+        userId: ctx.session.user.id,
+        organizationId: input.organizationId,
+      });
+
       const apiKeyService = ApiKeyService.create(ctx.prisma);
       const callerIsAdmin = await apiKeyService.isOrgAdmin({
         userId: ctx.session.user.id,
