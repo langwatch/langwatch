@@ -9,7 +9,7 @@ import {
 } from "@chakra-ui/react";
 import debounce from "lodash-es/debounce";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FormProvider, useFieldArray } from "react-hook-form";
+import { FormProvider, useFieldArray, useWatch } from "react-hook-form";
 import { LuArrowLeft, LuPencil } from "react-icons/lu";
 import { getMaxTokenLimit } from "~/components/llmPromptConfigs/utils/tokenUtils";
 import { FormOutputsSection } from "~/components/outputs/FormOutputsSection";
@@ -729,8 +729,27 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
   });
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
-  // Form is always valid for the save button - actual validation happens when saving
-  const isValid = true;
+
+  /**
+   * Reactive validity of the system-prompt-required rule (#3196).
+   * Watch the messages array so the Save button (and inline error) react
+   * as the user types. The rule mirrors the Zod refinement in
+   * `formSchemaForSave` so client and server stay in sync — a non-empty
+   * trimmed system message must exist.
+   */
+  const messages = useWatch({
+    control: methods.control,
+    name: "version.configData.messages",
+  });
+  const hasSystemPrompt =
+    Array.isArray(messages) &&
+    messages.some(
+      (m: { role?: string; content?: string }) =>
+        m?.role === "system" &&
+        typeof m?.content === "string" &&
+        m.content.trim() !== "",
+    );
+  const isValid = hasSystemPrompt;
 
   // State for save version dialog (asks for commit message when updating existing prompt)
   const [saveVersionDialogOpen, setSaveVersionDialogOpen] = useState(false);
@@ -746,12 +765,18 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
   const validateAndPrepare = useCallback(async () => {
     if (!project?.id) return false;
 
-    // Validate form
-    const formValid = await methods.trigger("version.configData.llm");
+    // Validate the full form so the save-time refinement (#3196:
+    // system prompt required) fires alongside the LLM config rules.
+    const formValid = await methods.trigger();
     if (!formValid) {
+      const messagesError = methods.formState.errors.version?.configData
+        ?.messages as { message?: string } | undefined;
+      const description =
+        messagesError?.message ??
+        "Please fix the configuration errors before saving";
       toaster.create({
         title: "Validation error",
-        description: "Please fix the LLM configuration errors before saving",
+        description,
         type: "error",
       });
       return false;

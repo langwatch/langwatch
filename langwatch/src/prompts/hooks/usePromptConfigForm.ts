@@ -5,6 +5,7 @@ import { type DeepPartial, type Resolver, useForm } from "react-hook-form";
 import { useModelLimits } from "~/hooks/useModelLimits";
 import {
   formSchema,
+  formSchemaForSave,
   type PromptConfigFormValues,
   refinedFormSchemaWithModelLimits,
 } from "~/prompts";
@@ -40,8 +41,12 @@ export const usePromptConfigForm = ({
     }
   }, [initialConfigValues]);
 
-  // Store schema in ref so resolver can access it
-  const schemaRef = useRef(formSchema);
+  // Store schema in ref so resolver can access it.
+  // Uses the save-time schema so the system-prompt-required refinement
+  // (#3196) fires when methods.trigger() is called from the Save handler.
+  const schemaRef = useRef<typeof formSchema>(
+    formSchemaForSave as unknown as typeof formSchema,
+  );
   /**
    * Parse initial values once with schema defaults applied.
    * Memoized to avoid re-parsing on every render.
@@ -80,7 +85,12 @@ export const usePromptConfigForm = ({
 
   // Update schema ref when limits change
   useEffect(() => {
-    schemaRef.current = dynamicSchema as typeof formSchema;
+    // dynamicSchema is `ZodEffects` (wraps the limit-refined ZodObject); the
+    // ref is typed against the plain `ZodObject` formSchema. The two-step
+    // `as unknown as` is the convention used elsewhere when assigning a
+    // ZodEffects to a ZodObject-typed ref. Resolver only calls `.parse`,
+    // which both shapes support.
+    schemaRef.current = dynamicSchema as unknown as typeof formSchema;
 
     // Clamp max_tokens to model limit when limits change (prevents validation error)
     if (modelLimits?.maxOutputTokens) {
