@@ -9,6 +9,8 @@ import {
   TeamNotInOrganizationError,
   type ProjectService,
 } from "~/server/app-layer/projects/project.service";
+import { ApiKeyService } from "~/server/api-key/api-key.service";
+import { prisma } from "~/server/db";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import type { OrgAuthMiddlewareVariables } from "../../middleware/org-auth";
 import { orgAuthMiddleware, requireOrgPermission } from "../../middleware/org-auth";
@@ -160,10 +162,28 @@ export const app = new Hono<{ Variables: Variables }>()
         throw error;
       }
 
+      const apiKeyService = ApiKeyService.create(prisma);
+      const serviceKey = await apiKeyService.create({
+        name: `${project.name} Service Key`,
+        userId: null,
+        createdByUserId: userId,
+        organizationId: organization.id,
+        permissionMode: "restricted",
+        bindings: [
+          {
+            role: "ADMIN",
+            scopeType: "PROJECT",
+            scopeId: project.id,
+          },
+        ],
+      });
+
       return c.json(
         {
           ...projectResponse(project),
           apiKey: project.apiKey,
+          serviceApiKey: serviceKey.token,
+          serviceApiKeyId: serviceKey.apiKey.id,
         },
         201,
       );
