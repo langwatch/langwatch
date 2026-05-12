@@ -18,6 +18,7 @@ describe("Feature: API Keys REST API", () => {
 
   let testOrganization: Organization;
   let testTeam: Team;
+  let testProjectId: string;
   let bootstrapToken: string;
   let userId: string;
 
@@ -89,6 +90,19 @@ describe("Feature: API Keys REST API", () => {
         scopeId: testOrganization.id,
       },
     });
+
+    const project = await prisma.project.create({
+      data: {
+        id: `project_${nanoid()}`,
+        name: "API Keys Test Project",
+        slug: `--test-project-${ns}`,
+        language: "typescript",
+        framework: "other",
+        apiKey: `sk-lw-${nanoid(48)}`,
+        teamId: testTeam.id,
+      },
+    });
+    testProjectId = project.id;
 
     const apiKeyService = ApiKeyService.create(prisma);
     const created = await apiKeyService.create({
@@ -302,6 +316,41 @@ describe("Feature: API Keys REST API", () => {
     it("returns 404 for non-existent API key", async () => {
       const res = await api.delete("/api/api-keys/nonexistent-key-id");
       expect(res.status).toBe(404);
+    });
+  });
+
+  describe("POST /api/api-keys (service keys)", () => {
+    it("creates a service key with full org access (no projectIds)", async () => {
+      const res = await api.post("/api/api-keys", {
+        keyType: "service",
+        name: `Service Full ${nanoid(6)}`,
+      });
+      expect(res.status).toBe(201);
+
+      const body = await res.json();
+      expect(body.token).toMatch(/^sk-lw-/);
+      expect(body.apiKey.id).toBeDefined();
+    });
+
+    it("creates a service key scoped to specific projects", async () => {
+      const res = await api.post("/api/api-keys", {
+        keyType: "service",
+        name: `Service Scoped ${nanoid(6)}`,
+        projectIds: [testProjectId],
+      });
+      expect(res.status).toBe(201);
+
+      const body = await res.json();
+      expect(body.token).toMatch(/^sk-lw-/);
+    });
+
+    it("returns 403 when project does not belong to org", async () => {
+      const res = await api.post("/api/api-keys", {
+        keyType: "service",
+        name: "Bad Project",
+        projectIds: ["project_nonexistent"],
+      });
+      expect(res.status).toBe(403);
     });
   });
 });
