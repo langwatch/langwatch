@@ -22,6 +22,40 @@ import {
 
 const logger = createLogger("langwatch:better-auth");
 
+const SENSITIVE_LOG_KEYS = new Set([
+  "access_token",
+  "refresh_token",
+  "id_token",
+  "token",
+  "accessToken",
+  "refreshToken",
+  "idToken",
+  "client_secret",
+  "clientSecret",
+  "authorization",
+  "Authorization",
+  "password",
+  "secret",
+]);
+
+const redactSensitive = (value: unknown): unknown => {
+  if (value instanceof Error) {
+    return { name: value.name, message: value.message, stack: value.stack };
+  }
+  if (Array.isArray(value)) {
+    return value.map(redactSensitive);
+  }
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, v]) => [
+        key,
+        SENSITIVE_LOG_KEYS.has(key) ? "[redacted]" : redactSensitive(v),
+      ]),
+    );
+  }
+  return value;
+};
+
 /**
  * Derives a user display name from an OAuth profile, falling back through
  * progressively less-preferred fields. BetterAuth's base User schema requires
@@ -465,11 +499,29 @@ export const auth = betterAuth({
     },
   },
 
-  // BetterAuth logger wiring
   logger: {
     disabled: false,
+    disableColors: true,
+    level: env.NODE_ENV === "development" ? "debug" : "info",
     log: (level, message, ...args) => {
-      (logger as any)[level]?.({ args }, message);
+      const payload =
+        args.length === 0 ? {} : { args: args.map(redactSensitive) };
+      switch (level) {
+        case "error":
+          logger.error(payload, message);
+          return;
+        case "warn":
+          logger.warn(payload, message);
+          return;
+        case "info":
+          logger.info(payload, message);
+          return;
+        case "debug":
+          logger.debug(payload, message);
+          return;
+        default:
+          logger.info(payload, message);
+      }
     },
   },
 
