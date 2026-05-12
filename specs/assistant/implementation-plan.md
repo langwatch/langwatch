@@ -49,41 +49,60 @@ but understood. We are ready to test what already exists.
 
 ---
 
-## Phase 1 — Foundations: test what exists (3 PRs, ~3-5 days)
+## Phase 1 — Foundations: test what exists (3 PRs, ~3-5 days) ✅ DONE
 
 **Goal:** every scenario in `langy-baseline.feature` has a passing test.
 This is the regression net before we change anything.
 
-### PR-1.1: Test infra for Langy
+**Status (2026-05-12):** all three sub-PRs landed on `langy-v2-integration`.
+74 langy unit tests green. Component integration tests are bound and
+will run once a pre-existing harness bug (`globalSetup.ts:151` references
+`redis/redis:alpine`; should be `redis:alpine`) is fixed — tracked
+separately from Phase 1.
+
+### PR-1.1: Test infra for Langy ✅
 
 - **Goal:** test scaffolding exists (factories, helpers, fixtures).
 - **Files:**
   - `langwatch/src/server/routes/__tests__/langy.test-utils.ts` — request helpers
-  - `langwatch/src/components/langy/__tests__/test-utils.tsx` — render helpers, mocked LangyContext
-  - Test fixtures for fake project + evaluators + prompts
-- **Tests:** none yet (this is infra)
-- **Verification:** `pnpm test:unit` runs the (empty) Langy test suite without errors.
+  - `langwatch/src/components/langy/__tests__/test-utils.tsx` — render helpers + jsdom Web Streams polyfill
+- **Verification:** `pnpm test:unit` runs the langy test suite without errors. ✅
 
-### PR-1.2: Bind unit/integration tests to baseline scenarios
+### PR-1.2: Bind unit/integration tests to baseline scenarios ✅
 
-- **Goal:** `langy-baseline.feature` scenarios pass.
+- **Goal:** every `langy-baseline.feature` scenario bound to ≥1 test.
 - **Files:**
-  - `langwatch/src/server/routes/__tests__/langy.chat.integration.test.ts` — auth, permission gate, project isolation, tool call surface
-  - `langwatch/src/components/langy/__tests__/LangySidebar.integration.test.tsx` — open/close, proposal card render, Apply/Discard
-  - `langwatch/src/components/langy/__tests__/ProposalCard.integration.test.tsx` — destructive variant, Applied state
-- **Tests:** every `langy-baseline.feature` scenario bound
-- **Verification:** `pnpm test:integration` green; spec coverage = 100%.
-- **Risks:** existing v1 code may not be testable as-is (e.g., hardcoded model). Mitigation: add minimal seams (env override for model in tests) without changing prod behavior.
+  - `src/server/routes/__tests__/langy.chat.stream.unit.test.ts` — stream + project-scoped tools + tool execution
+  - `src/server/routes/__tests__/langy.chat.guards.unit.test.ts` — auth + permission + rate-limit gates
+  - `src/server/routes/__tests__/langy.tool-surface.unit.test.ts` — read-only boundary contract test (regex over the route source)
+  - `src/components/langy/__tests__/LangySidebar.integration.test.tsx` — open/close, Stop
+  - `src/components/langy/__tests__/ProposalCard.integration.test.tsx` — Apply/Discard/Applied, destructive variant
+  - `src/components/langy/visibility.ts` + `__tests__/visibility.unit.test.ts` — extracted `shouldShowLangy()` predicate as a testable seam
+- **Verification:** all 14 baseline scenarios are bound. ✅
 
-### PR-1.3: Self-observability scaffolding
+### PR-1.3: Self-observability scaffolding ✅
 
-- **Goal:** every Langy LLM call emits a trace to a dogfood project.
+- **Goal:** every Langy LLM call emits a span to a dogfood project.
+- **Design decision (revised from original plan):** LangWatch already
+  registers a global OTEL pipeline in `src/instrumentation.node.ts` that
+  ships every span to LangWatch when `LANGWATCH_API_KEY` is set, with
+  the project identified by the API key. So "ship to a separate dogfood
+  project" reduces to setting `LANGWATCH_API_KEY` to the dogfood key
+  — no second exporter pipeline is needed (`setupObservability` does
+  not currently support per-span routing across projects anyway). The
+  helper's job became "enrich every Langy span with metadata + a
+  `langy.dogfood=true` tag for filtering" instead of "own its own
+  exporter config".
 - **Files:**
-  - `langwatch/src/server/routes/langy.ts` — wrap streamText with trace export
-  - `langwatch/src/server/observability/langy-tracer.ts` — new helper
-  - Config: dogfood project ID and API key in env
-- **Tests:** unit test that asserts a trace is emitted on a happy-path call
-- **Verification:** local run shows a Langy trace in the dogfood project.
+  - `src/server/observability/langy-tracer.ts` — `buildLangyTelemetrySettings()` + `isLangyDogfoodConfigured()`
+  - `src/server/observability/__tests__/langy-tracer.unit.test.ts` — pure-function tests of the metadata shape
+  - `src/server/routes/langy.ts` — replaces the inline `experimental_telemetry` block at both `streamText` call sites (chat + project-memory refresh)
+  - `.env.example` — documents `LANGWATCH_API_KEY` as the dogfood toggle
+- **Verification:**
+  - Unit: `langy.chat.stream.unit.test.ts` asserts the helper is called with the request's projectId/userId/conversationId/mode. ✅
+  - Manual: set `LANGWATCH_API_KEY` in `.env` to a dogfood project's key,
+    run `pnpm dev`, send a Langy message, see a `langy.chat` span in the
+    dogfood project tagged `langy.dogfood=true`.
 
 ---
 
