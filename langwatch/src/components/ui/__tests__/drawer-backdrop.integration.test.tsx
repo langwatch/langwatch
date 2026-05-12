@@ -17,7 +17,7 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
 function renderDrawer() {
   render(
     <Drawer.Root open={true} placement="end">
-      <Drawer.Content>
+      <Drawer.Content bg="bg">
         <Drawer.Body>Content</Drawer.Body>
       </Drawer.Content>
     </Drawer.Root>,

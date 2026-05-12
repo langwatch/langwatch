@@ -233,7 +233,7 @@ export default function SecretsPage() {
             }
           }}
         >
-          <Dialog.Content>
+          <Dialog.Content bg="bg">
             <Dialog.Header>
               <Dialog.Title>Add Secret</Dialog.Title>
             </Dialog.Header>
@@ -288,7 +288,7 @@ export default function SecretsPage() {
             }
           }}
         >
-          <Dialog.Content>
+          <Dialog.Content bg="bg">
             <Dialog.Header>
               <Dialog.Title>
                 Delete {secretToDelete?.name ?? ""}?
@@ -325,7 +325,7 @@ export default function SecretsPage() {
             }
           }}
         >
-          <Dialog.Content>
+          <Dialog.Content bg="bg">
             <Dialog.Header>
               <Dialog.Title>
                 Update Value for {secretToUpdate?.name ?? ""}

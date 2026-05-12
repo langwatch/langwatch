@@ -48,7 +48,7 @@ export function UpgradeModal({ open, onClose, variant }: UpgradeModalProps) {
   }>;
   return (
     <Dialog.Root open={open} onOpenChange={(e) => !e.open && onClose()}>
-      <Dialog.Content>
+      <Dialog.Content bg="bg">
         <Dialog.CloseTrigger />
         <Content variant={variant} onClose={onClose} open={open} />
       </Dialog.Content>

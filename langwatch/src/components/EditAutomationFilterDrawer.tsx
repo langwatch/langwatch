@@ -294,7 +294,7 @@ export function EditAutomationFilterDrawer({ automationId }: { automationId?: st
       size="lg"
       onOpenChange={({ open }) => !open && closeDrawer()}
     >
-      <Drawer.Content>
+      <Drawer.Content bg="bg">
         <Drawer.Header>
           <Drawer.CloseTrigger />
           <Heading>Edit Automation Filter</Heading>

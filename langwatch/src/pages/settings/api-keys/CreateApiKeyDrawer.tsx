@@ -195,7 +195,7 @@ export function CreateApiKeyDrawer({
         }
       }}
     >
-      <Drawer.Content>
+      <Drawer.Content bg="bg">
         <Drawer.Header>
           <Heading size="md">Create new secret key</Heading>
           <Drawer.CloseTrigger />

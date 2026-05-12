@@ -88,7 +88,7 @@ export const ChatWindow = ({
       }}
       size="5xl"
     >
-      <Dialog.Content height="65vh" overflowY="auto">
+      <Dialog.Content bg="bg" height="65vh" overflowY="auto">
         <Dialog.Header>
           <Dialog.Title>Test Message</Dialog.Title>
           <Dialog.CloseTrigger />

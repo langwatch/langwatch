@@ -25,7 +25,7 @@ export function SuiteArchiveDialog({
 }) {
   return (
     <Dialog.Root open={open} onOpenChange={onClose} placement="center">
-      <Dialog.Content maxWidth="500px" onClick={(e) => e.stopPropagation()}>
+      <Dialog.Content bg="bg" maxWidth="500px" onClick={(e) => e.stopPropagation()}>
         <Dialog.CloseTrigger />
         <Dialog.Header>
           <Dialog.Title fontSize="md" fontWeight="500">

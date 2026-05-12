@@ -171,7 +171,7 @@ export const SyntaxHelpDrawerHost: React.FC = () => {
       size="md"
       modal
     >
-      <Drawer.Content>
+      <Drawer.Content bg="bg">
         <Drawer.Header>
           <Drawer.Title>Query syntax</Drawer.Title>
           <Drawer.CloseTrigger />

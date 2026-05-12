@@ -129,7 +129,7 @@ export function VirtualKeyCreateDrawer({
       placement="end"
       size="md"
     >
-      <Drawer.Content>
+      <Drawer.Content bg="bg">
         <Drawer.Header>
           <Drawer.Title>New virtual key</Drawer.Title>
           <Drawer.CloseTrigger />

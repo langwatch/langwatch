@@ -344,7 +344,7 @@ export function CommandBar() {
       placement="top"
       motionPreset="slide-in-top"
     >
-      <Dialog.Content
+      <Dialog.Content bg="bg"
         width={COMMAND_BAR_MAX_WIDTH}
         maxWidth="90vw"
         marginTop={COMMAND_BAR_TOP_MARGIN}

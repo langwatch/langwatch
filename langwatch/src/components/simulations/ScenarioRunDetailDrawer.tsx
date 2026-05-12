@@ -201,7 +201,7 @@ export function ScenarioRunDetailDrawer({
         placement="end"
         size="lg"
       >
-        <Drawer.Content paddingX={0} maxWidth="720px" overflow="hidden">
+        <Drawer.Content bg="bg" paddingX={0} maxWidth="720px" overflow="hidden">
           {!scenarioState && open && (
             <Drawer.Body>
               {runStateError ? (
@@ -457,7 +457,7 @@ export function ScenarioRunDetailDrawer({
         size="xl"
         modal={true}
       >
-        <Drawer.Content paddingX={0} maxWidth="70%">
+        <Drawer.Content bg="bg" paddingX={0} maxWidth="70%">
           <Drawer.CloseTrigger zIndex={10} />
           <Drawer.Body paddingY={0} paddingX={0} overflowY="auto">
             {traceDrawerTraceId && (

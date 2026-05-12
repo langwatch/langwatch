@@ -38,7 +38,7 @@ export function SuiteRunConfirmationDialog({
       }}
       placement="center"
     >
-      <Dialog.Content maxWidth="500px" onClick={(e) => e.stopPropagation()}>
+      <Dialog.Content bg="bg" maxWidth="500px" onClick={(e) => e.stopPropagation()}>
         {!isLoading && <Dialog.CloseTrigger />}
         <Dialog.Header>
           <Dialog.Title>{suiteName}</Dialog.Title>

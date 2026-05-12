@@ -346,7 +346,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
       onOpenChange={({ open }) => !open && onClose()}
       size="xl"
     >
-      <Drawer.Content>
+      <Drawer.Content bg="bg">
         <Drawer.CloseTrigger />
         <Drawer.Header borderBottomWidth="1px">
           <Heading size="md">

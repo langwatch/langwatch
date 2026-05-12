@@ -239,7 +239,7 @@ function GroupsSettings() {
         open={!!groupToDelete}
         onOpenChange={(e) => { if (!e.open) setGroupToDelete(null); }}
       >
-        <Dialog.Content maxWidth="440px">
+        <Dialog.Content bg="bg" maxWidth="440px">
           <Dialog.Header>
             <Dialog.Title>Delete group</Dialog.Title>
           </Dialog.Header>

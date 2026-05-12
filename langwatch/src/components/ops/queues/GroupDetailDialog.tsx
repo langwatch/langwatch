@@ -33,7 +33,7 @@ export function GroupDetailDialog({
 
   return (
     <Dialog.Root open={!!group} onOpenChange={(e) => !e.open && onClose()} size="lg">
-      <Dialog.Content>
+      <Dialog.Content bg="bg">
         <Dialog.Header>
           <Dialog.Title>
             <Text textStyle="sm" fontFamily="mono" wordBreak="break-all">{group?.groupId}</Text>

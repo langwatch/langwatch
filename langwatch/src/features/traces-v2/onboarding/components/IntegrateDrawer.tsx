@@ -134,7 +134,7 @@ export function IntegrateDrawer({
       size="xl"
       placement="end"
     >
-      <Drawer.Content>
+      <Drawer.Content bg="bg">
         <Drawer.Header>
           <VStack align="stretch" gap={1}>
             <Drawer.Title>Send your own traces</Drawer.Title>

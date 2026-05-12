@@ -131,7 +131,7 @@ export function EditApiKeyDrawer({
         if (!open) onClose();
       }}
     >
-      <Drawer.Content>
+      <Drawer.Content bg="bg">
         <Drawer.Header>
           <Heading size="md">Edit API key</Heading>
           <Drawer.CloseTrigger />

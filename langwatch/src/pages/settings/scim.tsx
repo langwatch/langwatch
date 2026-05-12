@@ -214,7 +214,7 @@ function ScimSettingsContent({
           }
         }}
       >
-        <Dialog.Content>
+        <Dialog.Content bg="bg">
           <Dialog.Header>
             <Dialog.Title>
               <Heading size="md">Generate SCIM Token</Heading>
@@ -259,7 +259,7 @@ function ScimSettingsContent({
           }
         }}
       >
-        <Dialog.Content>
+        <Dialog.Content bg="bg">
           <Dialog.Header>
             <Dialog.Title>
               <Heading size="md">Token Generated</Heading>
@@ -286,7 +286,7 @@ function ScimSettingsContent({
           if (!open) setTokenToRevoke(null);
         }}
       >
-        <Dialog.Content>
+        <Dialog.Content bg="bg">
           <Dialog.Header>
             <Dialog.Title>
               <Heading size="md">Revoke Token</Heading>
