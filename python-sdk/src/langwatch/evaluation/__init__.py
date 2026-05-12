@@ -44,7 +44,7 @@ from langwatch.telemetry.context import get_current_span
 from langwatch.state import get_api_key, get_endpoint, get_instance
 from langwatch.attributes import AttributeKey
 from langwatch.utils.auth import build_auth_headers
-from langwatch.utils.exceptions import EvaluatorException, better_raise_for_status
+from langwatch.utils.exceptions import better_raise_for_status
 from pydantic import BaseModel
 
 from langwatch.types import (
@@ -192,7 +192,7 @@ def evaluate(
         def _post() -> httpx.Response:
             with httpx.Client(timeout=900) as client:
                 response = client.post(**request_params)
-                better_raise_for_status(response, cls=EvaluatorException)
+                better_raise_for_status(response)
                 return response
 
         try:
