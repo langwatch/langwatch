@@ -1064,14 +1064,20 @@ describe("GroupStagingScripts", () => {
         // Sanity: group is no longer in ready
         expect(await inspectReadySet()).toEqual([]);
 
-        // Heartbeat fires after blocking — must not reinsert the blocked group
+        // Heartbeat fires after blocking — must not reinsert the blocked group.
+        // Post-2026-05-11 tenant-soft-cap change: RESTAGE_AND_BLOCK_LUA now
+        // DEL's the activeKey atomically (so the tenant_active counter can
+        // be DECR'd in lockstep without TTL drift). Consequence: a heartbeat
+        // arriving AFTER restage sees no active lease and returns false.
+        // Either way, the ready set must stay empty — that's the safety
+        // property the test enforces.
         const ok = await scripts.refreshActiveKey({
           groupId: "group-a",
           stagedJobId: "j1",
           activeTtlSec: 60,
         });
 
-        expect(ok).toBe(true);
+        expect(ok).toBe(false);
         expect(await inspectReadySet()).toEqual([]);
       });
     });
