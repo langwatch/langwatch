@@ -57,16 +57,65 @@ export const getEntryInputs = (
   return entryInputs;
 };
 
-export const getInputsOutputs = (edges: Edge[], nodes: Node[]) => {
-  const entryInputs = getEntryInputs(edges, nodes);
+/**
+ * Derives mappable entry inputs from the entry node's declared outputs,
+ * overlaying the optional flag based on edge connectivity.
+ *
+ * A declared output is marked optional when every downstream edge from that
+ * output leads exclusively to evaluator nodes. Declared outputs with no edges
+ * (unwired) are included without the optional flag — they are real workflow
+ * inputs that simply haven't been connected yet.
+ *
+ * Falls back to edge-based derivation (same as getEntryInputs) when the entry
+ * node is absent or declares no outputs, preserving backwards compatibility
+ * with DSLs that omit the entry node entirely.
+ */
+export const getDeclaredEntryInputs = (
+  edges: Edge[],
+  nodes: Node[],
+): Array<{ identifier: string; type: string; optional?: boolean }> => {
+  const entryNode = nodes.find(
+    (node: Node) => node.type === "entry" || node.id === "entry",
+  );
+  const declaredOutputs: Array<{ identifier: string; type: string }> =
+    Array.isArray(entryNode?.data?.outputs) ? entryNode.data.outputs : [];
 
-  const inputs = entryInputs.map((edge) => {
-    return {
-      identifier: edge.sourceHandle?.split(".")[1],
+  if (declaredOutputs.length === 0) {
+    // Fall back to edge-based derivation for DSLs without a declared entry node
+    return getEntryInputs(edges, nodes).map((edge) => ({
+      identifier: edge.sourceHandle?.split(".")[1] ?? "",
       type: "str",
       ...(edge.optional ? { optional: true } : {}),
+    }));
+  }
+
+  const evaluators = nodes.filter(checkIsEvaluator);
+  const evaluatorIds = new Set(evaluators.map((e: Node) => e.id));
+
+  return declaredOutputs.map(({ identifier, type }) => {
+    const fieldEdges = edges.filter(
+      (edge: Edge) =>
+        edge.source === "entry" &&
+        edge.sourceHandle === `outputs.${identifier}`,
+    );
+
+    const hasNonEvaluatorTarget =
+      fieldEdges.length > 0 &&
+      fieldEdges.some((edge: Edge) => !evaluatorIds.has(edge.target));
+
+    const evaluatorOnly =
+      fieldEdges.length > 0 && !hasNonEvaluatorTarget;
+
+    return {
+      identifier,
+      type: typeof type === "string" ? type : "str",
+      ...(evaluatorOnly ? { optional: true } : {}),
     };
   });
+};
+
+export const getInputsOutputs = (edges: Edge[], nodes: Node[]) => {
+  const inputs = getDeclaredEntryInputs(edges, nodes);
 
   const outputs = nodes.find(
     (node: Node) => node.type === "end" || node.id === "end",
