@@ -89,6 +89,7 @@ vi.mock("@paper-design/shaders-react", () => ({
 }));
 
 import { LangyDrawer } from "../LangySidebar";
+import { LangyProvider } from "../LangyContext";
 import { toaster } from "~/components/ui/toaster";
 
 // ---------------------------------------------------------------------------
@@ -96,7 +97,9 @@ import { toaster } from "~/components/ui/toaster";
 // ---------------------------------------------------------------------------
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+  <ChakraProvider value={defaultSystem}>
+    <LangyProvider>{children}</LangyProvider>
+  </ChakraProvider>
 );
 
 interface ApiConversation {
