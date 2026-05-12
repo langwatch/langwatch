@@ -9,7 +9,7 @@
  * Uses dependency injection for clean, fast tests without vi.mock.
  */
 
-import { describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { DEFAULT_MODEL } from "~/utils/constants";
 import {
   prefetchScenarioData,
@@ -33,6 +33,22 @@ vi.mock("~/env.mjs", () => ({
 }));
 
 describe("prefetchScenarioData", () => {
+  // Tests run under NODE_ENV=test, which does not set LANGWATCH_ENDPOINT.
+  // The prefetcher requires it at the telemetry boundary, so default it for
+  // the suite and restore the original value afterwards. Individual scenarios
+  // that need to assert the missing-env-var behaviour override locally.
+  const previousLangwatchEndpoint = process.env.LANGWATCH_ENDPOINT;
+  beforeAll(() => {
+    process.env.LANGWATCH_ENDPOINT = "http://localhost:3000";
+  });
+  afterAll(() => {
+    if (previousLangwatchEndpoint === undefined) {
+      delete process.env.LANGWATCH_ENDPOINT;
+    } else {
+      process.env.LANGWATCH_ENDPOINT = previousLangwatchEndpoint;
+    }
+  });
+
   const defaultContext: ExecutionContext = {
     projectId: "proj_123",
     scenarioId: "scen_123",
@@ -359,6 +375,40 @@ describe("prefetchScenarioData", () => {
       });
     });
 
+    describe("given LANGWATCH_ENDPOINT is not set", () => {
+      describe("when prefetching scenario data", () => {
+        it("throws a clear error instead of returning undefined endpoint", async () => {
+          const promptWithModel = {
+            id: "prompt_123",
+            prompt: "You are helpful",
+            messages: [],
+            model: "openai/gpt-4",
+          };
+
+          const suiteValue = process.env.LANGWATCH_ENDPOINT;
+          delete process.env.LANGWATCH_ENDPOINT;
+
+          try {
+            const deps = createMockDeps({
+              promptFetcher: {
+                getPromptByIdOrHandle: vi.fn().mockResolvedValue(promptWithModel),
+              },
+            });
+
+            const target: TargetConfig = { type: "prompt", referenceId: "prompt_123" };
+
+            await expect(
+              prefetchScenarioData(defaultContext, target, deps),
+            ).rejects.toThrow("LANGWATCH_ENDPOINT env var is required but not set");
+          } finally {
+            if (suiteValue !== undefined) {
+              process.env.LANGWATCH_ENDPOINT = suiteValue;
+            }
+          }
+        });
+      });
+    });
+
     describe("given model params preparation fails", () => {
       const promptWithModel = {
         id: "prompt_123",
@@ -511,42 +561,30 @@ describe("prefetchScenarioData", () => {
       describe("when prefetching scenario data", () => {
         /** @scenario "Return success with LiteLLM params on valid configuration" */
         it("returns success with complete data", async () => {
-          // The source reads process.env.LANGWATCH_ENDPOINT directly (not via env.mjs)
-          const previousLangwatchEndpoint = process.env.LANGWATCH_ENDPOINT;
-          process.env.LANGWATCH_ENDPOINT = "http://localhost:3000";
+          const deps = createMockDeps({
+            promptFetcher: {
+              getPromptByIdOrHandle: vi.fn().mockResolvedValue(promptWithModel),
+            },
+          });
 
-          try {
-            const deps = createMockDeps({
-              promptFetcher: {
-                getPromptByIdOrHandle: vi.fn().mockResolvedValue(promptWithModel),
-              },
+          const target: TargetConfig = { type: "prompt", referenceId: "prompt_123" };
+          const result = await prefetchScenarioData(defaultContext, target, deps);
+
+          expect(result.success).toBe(true);
+          if (result.success) {
+            expect(result.data.context).toEqual(defaultContext);
+            expect(result.data.scenario).toEqual(defaultScenario);
+            expect(result.data.adapterData).toMatchObject({
+              type: "prompt",
+              promptId: "prompt_123",
+              systemPrompt: "You are helpful",
             });
-
-            const target: TargetConfig = { type: "prompt", referenceId: "prompt_123" };
-            const result = await prefetchScenarioData(defaultContext, target, deps);
-
-            expect(result.success).toBe(true);
-            if (result.success) {
-              expect(result.data.context).toEqual(defaultContext);
-              expect(result.data.scenario).toEqual(defaultScenario);
-              expect(result.data.adapterData).toMatchObject({
-                type: "prompt",
-                promptId: "prompt_123",
-                systemPrompt: "You are helpful",
-              });
-              expect(result.data.modelParams).toEqual(defaultModelParams);
-              expect(result.data.target).toEqual({ type: "prompt", referenceId: "prompt_123" });
-              expect(result.telemetry).toEqual({
-                endpoint: "http://localhost:3000",
-                apiKey: "test-api-key",
-              });
-            }
-          } finally {
-            if (previousLangwatchEndpoint === undefined) {
-              delete process.env.LANGWATCH_ENDPOINT;
-            } else {
-              process.env.LANGWATCH_ENDPOINT = previousLangwatchEndpoint;
-            }
+            expect(result.data.modelParams).toEqual(defaultModelParams);
+            expect(result.data.target).toEqual({ type: "prompt", referenceId: "prompt_123" });
+            expect(result.telemetry).toEqual({
+              endpoint: "http://localhost:3000",
+              apiKey: "test-api-key",
+            });
           }
         });
       });

@@ -235,6 +235,11 @@ export async function prefetchScenarioData(
   }
   const modelParams = modelParamsResult.params;
 
+  const langwatchEndpoint = process.env.LANGWATCH_ENDPOINT;
+  if (!langwatchEndpoint) {
+    throw new Error("LANGWATCH_ENDPOINT env var is required but not set");
+  }
+
   logger.debug(
     { projectId: context.projectId, scenarioId: context.scenarioId, targetType: target.type },
     "Prefetch complete",
@@ -251,7 +256,7 @@ export async function prefetchScenarioData(
       target,
     },
     telemetry: {
-      endpoint: process.env.LANGWATCH_ENDPOINT!,
+      endpoint: langwatchEndpoint,
       apiKey: project.apiKey,
     },
   };
