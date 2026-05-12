@@ -16,6 +16,7 @@ from .structures import (
     Message,
     Input,
     Output,
+    PromptTag,
     ResponseFormat,
     # Backward compatibility aliases
     MessageDict,
@@ -31,6 +32,7 @@ __all__ = [
     "Message",
     "Input",
     "Output",
+    "PromptTag",
     "ResponseFormat",
     # Backward compatibility aliases
     "MessageDict",

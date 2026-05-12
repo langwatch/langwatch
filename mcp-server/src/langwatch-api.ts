@@ -74,19 +74,27 @@ export interface AnalyticsTimeseriesResponse {
   previousPeriod: AnalyticsBucket[];
 }
 
+export interface PromptTagAssignment {
+  name: string;
+  versionId: string;
+}
+
 export interface PromptSummary {
   id?: string;
   handle?: string;
   name?: string;
   latestVersionNumber?: number;
   version?: number;
+  tags?: PromptTagAssignment[];
 }
 
 export interface PromptVersion {
   version?: number;
+  versionId?: string;
   commitMessage?: string;
   model?: string;
   messages?: Array<{ role: string; content: string }>;
+  tags?: PromptTagAssignment[];
 }
 
 export interface PromptDetailResponse extends PromptSummary {

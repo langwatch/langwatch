@@ -3,6 +3,7 @@ import type { paths } from "@/internal/generated/openapi/api-client";
 import {
   type corePromptDataSchema,
   type promptMetadataSchema,
+  type promptTagSchema,
   type promptDataSchema
 } from "./schema";
 
@@ -28,6 +29,13 @@ export type PromptMetadata = z.infer<typeof promptMetadataSchema>;
  * Combined type for creating prompts
  */
 export type PromptData = z.infer<typeof promptDataSchema>;
+
+/**
+ * Tag pointing at a specific prompt version (e.g. "production", "staging",
+ * or the built-in "latest"). `versionId` is the version this tag currently
+ * resolves to.
+ */
+export type PromptTag = z.infer<typeof promptTagSchema>;
 
 // Extract API types from OpenAPI schema for backwards compatibility
 export type CreatePromptBody = NonNullable<

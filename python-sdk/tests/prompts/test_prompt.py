@@ -140,3 +140,59 @@ def test_from_api_response_handles_none_response_format():
     result = PromptData.from_api_response(mock_response)
 
     assert result.response_format is None
+
+
+def test_from_api_response_extracts_tags_from_additional_properties():
+    """
+    GIVEN an API response carrying a `tags` array via additional_properties
+    WHEN PromptData.from_api_response() is called
+    THEN the returned PromptData exposes typed PromptTag entries
+    """
+    mock_response = Mock()
+    mock_response.id = "prompt_1"
+    mock_response.handle = "my-prompt"
+    mock_response.model = "openai/gpt-4"
+    mock_response.version_id = "v1"
+    mock_response.version = 1
+    mock_response.scope = PostApiPromptsResponse200Scope.PROJECT
+    mock_response.prompt = "Test"
+    mock_response.temperature = None
+    mock_response.max_tokens = None
+    mock_response.messages = []
+    mock_response.response_format = None
+    mock_response.additional_properties = {
+        "tags": [
+            {"name": "latest", "versionId": "v1"},
+            {"name": "production", "versionId": "v1"},
+        ]
+    }
+
+    result = PromptData.from_api_response(mock_response)
+
+    assert [t.name for t in result.tags] == ["latest", "production"]
+    assert all(t.version_id == "v1" for t in result.tags)
+
+
+def test_from_api_response_returns_empty_tags_when_missing():
+    """
+    GIVEN an API response without any `tags` field
+    WHEN PromptData.from_api_response() is called
+    THEN result.tags defaults to an empty list
+    """
+    mock_response = Mock()
+    mock_response.id = "prompt_1"
+    mock_response.handle = "my-prompt"
+    mock_response.model = "openai/gpt-4"
+    mock_response.version_id = "v1"
+    mock_response.version = 1
+    mock_response.scope = PostApiPromptsResponse200Scope.PROJECT
+    mock_response.prompt = "Test"
+    mock_response.temperature = None
+    mock_response.max_tokens = None
+    mock_response.messages = []
+    mock_response.response_format = None
+    mock_response.additional_properties = {}
+
+    result = PromptData.from_api_response(mock_response)
+
+    assert result.tags == []

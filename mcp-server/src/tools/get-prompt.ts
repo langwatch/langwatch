@@ -22,6 +22,9 @@ export async function handleGetPrompt(params: {
   if (prompt.id) lines.push(`**ID**: ${prompt.id}`);
   if (prompt.latestVersionNumber != null)
     lines.push(`**Latest Version**: v${prompt.latestVersionNumber}`);
+  if (prompt.tags && prompt.tags.length > 0) {
+    lines.push(`**Tags**: ${prompt.tags.map((t) => t.name).join(", ")}`);
+  }
 
   // Show model config
   const version = prompt.versions?.[0] ?? prompt;

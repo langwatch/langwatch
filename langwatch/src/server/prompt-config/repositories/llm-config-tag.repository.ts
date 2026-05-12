@@ -123,19 +123,27 @@ export class PromptTagAssignmentRepository {
 
   /**
    * Returns every tag assignment (with its PromptTag) that points at any of
-   * the given versionIds within the project. Used by read paths that need
-   * to surface tags alongside the returned version(s) without loading the
-   * entire tag history for the config.
+   * the given versionIds within the caller's organization. Used by read
+   * paths that need to surface tags alongside the returned version(s) without
+   * loading the entire tag history for the config.
+   *
+   * Why filter on the tag's organizationId rather than the caller's projectId:
+   * for org-scoped prompts, the assignment row's `projectId` is the config
+   * owner's project (not the caller's). Tags are an org-level resource, so
+   * the natural multitenancy boundary here is `promptTag.organizationId`.
+   * Filtering by the caller's projectId hid tags for org-scoped prompts
+   * viewed from a sibling project (regression covered by
+   * prompt-tags-on-response.integration.test.ts).
    */
   async findByVersionIds(params: {
     versionIds: string[];
-    projectId: string;
+    organizationId: string;
   }): Promise<(PromptTagAssignment & { promptTag: PromptTag })[]> {
     if (params.versionIds.length === 0) return [];
     return this.prisma.promptTagAssignment.findMany({
       where: {
-        projectId: params.projectId,
         versionId: { in: params.versionIds },
+        promptTag: { organizationId: params.organizationId },
       },
       include: { promptTag: true },
       orderBy: { createdAt: "asc" },

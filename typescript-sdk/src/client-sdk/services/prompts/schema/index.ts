@@ -3,5 +3,6 @@ export {
   responseFormatSchema,
   corePromptDataSchema,
   promptMetadataSchema,
+  promptTagSchema,
   promptDataSchema,
 } from "./prompt.schema";

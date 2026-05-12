@@ -150,7 +150,7 @@ export class PromptService {
       .filter((id): id is string => !!id);
     const tagsByVersionId = await this.getTagsByVersionIds({
       versionIds: latestVersionIds,
-      projectId,
+      organizationId,
     });
 
     return configs.map((config) => {
@@ -278,7 +278,7 @@ export class PromptService {
     );
     const tagsByVersionId = await this.getTagsByVersionIds({
       versionIds: versionIdsToQuery,
-      projectId,
+      organizationId,
     });
 
     return this.transformToVersionedPrompt(
@@ -329,7 +329,7 @@ export class PromptService {
       .filter((id): id is string => !!id);
     const tagsByVersionId = await this.getTagsByVersionIds({
       versionIds,
-      projectId: params.projectId,
+      organizationId,
     });
 
     // Repo returns versions sorted by createdAt desc, so versions[0] is latest.
@@ -552,9 +552,10 @@ export class PromptService {
     )) as LatestConfigVersionSchema;
 
     const latestVersionId = latestVersion.id ?? "";
+    const organizationId = await this.getOrganizationIdFromProjectId(projectId);
     const tagsByVersionId = await this.getTagsByVersionIds({
       versionIds: latestVersionId ? [latestVersionId] : [],
-      projectId,
+      organizationId,
     });
 
     return this.transformToVersionedPrompt(
@@ -1226,10 +1227,14 @@ export class PromptService {
    * grouped by versionId. Delegates to the repository so the service keeps
    * no raw Prisma access. Callers should pass only the versionIds they
    * actually need (not the full history of a config) to keep this bounded.
+   *
+   * Tags are an org-level resource, so multitenancy is enforced by
+   * `organizationId` (not the caller's projectId). This is what makes
+   * org-scoped prompts surface their tags when read from a sibling project.
    */
   private async getTagsByVersionIds(params: {
     versionIds: string[];
-    projectId: string;
+    organizationId: string;
   }): Promise<Map<string, Array<{ name: string; versionId: string }>>> {
     const map = new Map<string, Array<{ name: string; versionId: string }>>();
 
@@ -1237,7 +1242,7 @@ export class PromptService {
 
     const assignments = await this.tagRepository.findByVersionIds({
       versionIds: params.versionIds,
-      projectId: params.projectId,
+      organizationId: params.organizationId,
     });
 
     for (const assignment of assignments) {

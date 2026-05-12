@@ -20,7 +20,7 @@ from langwatch.generated.langwatch_rest_api_client.models.post_api_prompts_respo
     PostApiPromptsResponse200,
 )
 
-from .structures import Message, ResponseFormat
+from .structures import Message, PromptTag, ResponseFormat
 
 
 class PromptData(BaseModel):
@@ -48,6 +48,10 @@ class PromptData(BaseModel):
     version: Optional[int] = None
     version_id: Optional[str] = None
     scope: Optional[Literal["PROJECT", "ORGANIZATION"]] = None
+
+    # Tags currently pointing at the returned version (includes the built-in
+    # "latest" tag when this response represents the prompt's latest version).
+    tags: List[PromptTag] = []
 
     @staticmethod
     def from_api_response(
@@ -90,6 +94,26 @@ class PromptData(BaseModel):
 
         raw_version = _unset_to_none(response.version)
 
+        # The OpenAPI generator hasn't picked up the response-side `tags` field
+        # yet, so it lands in `additional_properties` as raw dicts. Parse it
+        # into typed PromptTag entries so SDK consumers see real objects.
+        additional = getattr(response, "additional_properties", None)
+        raw_tags = additional.get("tags") if isinstance(additional, dict) else None
+        if not isinstance(raw_tags, list):
+            raw_tags = []
+        tags: List[PromptTag] = []
+        for raw_tag in raw_tags:
+            if isinstance(raw_tag, PromptTag):
+                tags.append(raw_tag)
+                continue
+            if not isinstance(raw_tag, dict):
+                continue
+            name = raw_tag.get("name")
+            version_id_value = raw_tag.get("versionId") or raw_tag.get("version_id")
+            if name is None or version_id_value is None:
+                continue
+            tags.append(PromptTag(name=name, version_id=version_id_value))
+
         return PromptData(
             id=_unset_to_none(response.id),
             handle=_unset_to_none(response.handle),
@@ -102,4 +126,5 @@ class PromptData(BaseModel):
             version=int(raw_version) if raw_version is not None else None,
             version_id=_unset_to_none(response.version_id),
             scope=response.scope.value if response.scope and not isinstance(response.scope, Unset) else None,
+            tags=tags,
         )

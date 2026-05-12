@@ -34,6 +34,17 @@ export const corePromptDataSchema = z.object({
 });
 
 /**
+ * Tag pointing at a specific prompt version. Mirrors the server-side
+ * apiResponsePromptTagSchema so SDK consumers can see which tags currently
+ * resolve to the version they're working with (including the built-in
+ * "latest" tag when this is the prompt's newest version).
+ */
+export const promptTagSchema = z.object({
+  name: z.string(),
+  versionId: z.string(),
+});
+
+/**
  * Zod schema for prompt metadata - optional fields for identification and tracing
  */
 export const promptMetadataSchema = z.object({
@@ -42,6 +53,7 @@ export const promptMetadataSchema = z.object({
   version: z.number().min(0).optional(),
   versionId: z.string().optional(),
   scope: z.enum(PromptScope).optional(),
+  tags: z.array(promptTagSchema).default([]),
 });
 
 /**

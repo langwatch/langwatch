@@ -39,6 +39,19 @@ class ResponseFormat(BaseModel):
     json_schema: Optional[Dict[str, Any]] = None
 
 
+class PromptTag(BaseModel):
+    """
+    Tag pointing at a specific prompt version.
+
+    Mirrors the server-side apiResponsePromptTagSchema: a tag's name plus the
+    versionId it currently resolves to. The built-in "latest" tag is included
+    when the response represents the prompt's latest version.
+    """
+
+    name: str
+    version_id: str
+
+
 # Backward compatibility aliases
 MessageDict = Message
 InputDict = Input

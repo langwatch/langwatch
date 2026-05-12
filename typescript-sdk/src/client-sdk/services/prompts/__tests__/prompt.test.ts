@@ -50,4 +50,32 @@ describe("Prompt", () => {
       }).toThrow(PromptCompilationError);
     });
   });
+
+  describe("tags exposure", () => {
+    describe("when API response includes tags", () => {
+      it("exposes them on the Prompt instance", () => {
+        const prompt = new Prompt(
+          promptResponseFactory.build({
+            tags: [
+              { name: "latest", versionId: "v123" },
+              { name: "production", versionId: "v123" },
+            ],
+          }),
+        );
+        expect(prompt.tags).toEqual([
+          { name: "latest", versionId: "v123" },
+          { name: "production", versionId: "v123" },
+        ]);
+      });
+    });
+
+    describe("when API response omits tags", () => {
+      it("defaults to an empty array", () => {
+        const data = promptResponseFactory.build();
+        delete (data as { tags?: unknown }).tags;
+        const prompt = new Prompt(data);
+        expect(prompt.tags).toEqual([]);
+      });
+    });
+  });
 });

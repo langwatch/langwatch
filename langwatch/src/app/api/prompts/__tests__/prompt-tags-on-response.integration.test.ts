@@ -250,3 +250,158 @@ describe("Prompt tags appear in prompt responses", () => {
     });
   });
 });
+
+/**
+ * Org-scoped prompt visibility: a prompt with scope=ORGANIZATION created in
+ * project A must surface its tag assignments when read from a sibling project
+ * B in the same organization. The write-side (tag assign) at
+ * langwatch/src/app/api/prompts/[[...route]]/app.v1.ts:111-189 scopes
+ * PromptTagAssignment by the config's projectId; the read path must mirror
+ * this so the same tags become visible across the organization. Without
+ * this coverage the read path could silently filter assignments by the
+ * caller's projectId and hide tags for org-scoped prompts.
+ */
+describe("Prompt tags for org-scoped prompts across sibling projects", () => {
+  let testOrganization: Organization;
+  let testTeam: Team;
+  let projectA: Project;
+  let projectB: Project;
+  let projectBApiKey: string;
+  let orgConfig: LlmPromptConfig;
+  let orgVersion: LlmPromptConfigVersion;
+  let canaryTag: PromptTag;
+
+  async function getFromProjectB(path: string) {
+    return app.request(path, {
+      headers: { "X-Auth-Token": projectBApiKey },
+    });
+  }
+
+  beforeEach(async () => {
+    const slug = nanoid();
+
+    testOrganization = await prisma.organization.create({
+      data: { name: "Test Org", slug: `test-org-${slug}` },
+    });
+
+    testTeam = await prisma.team.create({
+      data: {
+        name: "Test Team",
+        slug: `test-team-${slug}`,
+        organizationId: testOrganization.id,
+      },
+    });
+
+    projectA = await prisma.project.create({
+      data: {
+        ...projectFactory.build({ slug: `test-project-a-${slug}` }),
+        teamId: testTeam.id,
+      },
+    });
+    projectB = await prisma.project.create({
+      data: {
+        ...projectFactory.build({ slug: `test-project-b-${slug}` }),
+        teamId: testTeam.id,
+      },
+    });
+    projectBApiKey = projectB.apiKey;
+
+    const configData = llmPromptConfigFactory.build({
+      projectId: projectA.id,
+      organizationId: testOrganization.id,
+      handle: `org-prompt-${nanoid()}`,
+    });
+    orgConfig = await prisma.llmPromptConfig.create({
+      data: {
+        id: configData.id,
+        name: configData.name,
+        projectId: projectA.id,
+        organizationId: testOrganization.id,
+        handle: `${testOrganization.id}/${configData.handle}`,
+        scope: "ORGANIZATION",
+      },
+    });
+
+    const versionData = llmPromptConfigVersionFactory.build({
+      configId: orgConfig.id,
+      projectId: projectA.id,
+    });
+    orgVersion = await prisma.llmPromptConfigVersion.create({
+      data: {
+        id: versionData.id,
+        configId: orgConfig.id,
+        projectId: projectA.id,
+        version: 1,
+        schemaVersion: versionData.schemaVersion,
+        configData: versionData.configData as any,
+        commitMessage: "initial",
+      },
+    });
+
+    canaryTag = await prisma.promptTag.create({
+      data: {
+        id: `ptag_${nanoid()}`,
+        organizationId: testOrganization.id,
+        name: "canary",
+      },
+    });
+
+    // Assignment is scoped by the config's projectId (project A) — see the
+    // write-path comment about org-scoped prompts.
+    await prisma.promptTagAssignment.create({
+      data: {
+        id: `vtag_${nanoid()}`,
+        configId: orgConfig.id,
+        versionId: orgVersion.id,
+        tagId: canaryTag.id,
+        projectId: projectA.id,
+      },
+    });
+  });
+
+  afterEach(async () => {
+    await prisma.promptTagAssignment.deleteMany({
+      where: { projectId: { in: [projectA.id, projectB.id] } },
+    });
+    await prisma.promptTag.deleteMany({
+      where: { organizationId: testOrganization.id },
+    });
+    await prisma.llmPromptConfig.deleteMany({
+      where: { organizationId: testOrganization.id },
+    });
+    await prisma.project.delete({ where: { id: projectA.id } });
+    await prisma.project.delete({ where: { id: projectB.id } });
+    await prisma.team.delete({ where: { id: testTeam.id } });
+    await prisma.organization.delete({ where: { id: testOrganization.id } });
+  });
+
+  describe("when reading from a sibling project", () => {
+    it("GET /api/prompts surfaces tags for the org-scoped prompt", async () => {
+      const res = await getFromProjectB("/api/prompts");
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as Array<{
+        id: string;
+        tags: Array<{ name: string; versionId: string }>;
+      }>;
+
+      const row = body.find((p) => p.id === orgConfig.id);
+      expect(row).toBeDefined();
+      expect(row?.tags).toEqual([
+        { name: "latest", versionId: orgVersion.id },
+        { name: "canary", versionId: orgVersion.id },
+      ]);
+    });
+
+    it("GET /api/prompts/:id surfaces tags for the org-scoped prompt", async () => {
+      const res = await getFromProjectB(`/api/prompts/${orgConfig.id}`);
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as {
+        tags: Array<{ name: string; versionId: string }>;
+      };
+      expect(body.tags).toEqual([
+        { name: "latest", versionId: orgVersion.id },
+        { name: "canary", versionId: orgVersion.id },
+      ]);
+    });
+  });
+});

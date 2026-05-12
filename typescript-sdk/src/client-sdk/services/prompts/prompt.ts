@@ -2,11 +2,11 @@ import { Liquid } from "liquidjs";
 import { PromptTracingDecorator, tracer } from "./tracing";
 import { createTracingProxy } from "@/client-sdk/tracing/create-tracing-proxy";
 import { promptDataSchema } from "./schema";
-import { type TemplateVariables, type PromptData, type CorePromptData, type PromptScope } from "./types";
+import { type TemplateVariables, type PromptData, type CorePromptData, type PromptScope, type PromptTag } from "./types";
 import { PromptCompilationError, PromptValidationError } from "./errors";
 
 // Re-export types and errors for convenience
-export type { TemplateVariables, PromptData, CorePromptData, PromptMetadata } from "./types";
+export type { TemplateVariables, PromptData, CorePromptData, PromptMetadata, PromptTag } from "./types";
 export { PromptCompilationError, PromptValidationError } from "./errors";
 
 // Global Liquid instance - shared across all prompts for efficiency
@@ -39,6 +39,13 @@ export class Prompt {
   public readonly version?: number;
   public readonly versionId?: string;
   public readonly scope?: PromptScope;
+
+  /**
+   * Tags currently pointing at this prompt's returned version. Includes the
+   * built-in "latest" tag when this is the prompt's newest version, plus any
+   * custom tags assigned to that version.
+   */
+  public readonly tags!: PromptTag[];
 
   constructor(data: PromptData) {
     // Validate input using Zod
