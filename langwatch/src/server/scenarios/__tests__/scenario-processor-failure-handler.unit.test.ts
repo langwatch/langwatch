@@ -43,6 +43,7 @@ describe("handleFailedJobResult", () => {
   });
 
   describe("calls failure handler with job data", () => {
+    /** @scenario Include job metadata in failure events */
     it("calls ensureFailureEventsEmitted with correct parameters", async () => {
       // Given: a failed job result with an error message
       const error = "Prefetch failed: Scenario not found";
@@ -152,6 +153,7 @@ describe("Worker integration behavior (documented contract)", () => {
    * to prevent crashing. This contract is tested in integration tests.
    */
 
+  /** @scenario Failure handler errors do not crash worker */
   it("documents that worker catches errors from handleFailedJobResult", () => {
     // This is a documentation test - the actual behavior is:
     // worker.on("completed", async (job, result) => {
@@ -166,6 +168,7 @@ describe("Worker integration behavior (documented contract)", () => {
     expect(true).toBe(true);
   });
 
+  /** @scenario Worker does not call failure handler on success */
   it("documents that worker only calls handleFailedJobResult for failed jobs", () => {
     // The worker checks result.success === false before calling handleFailedJobResult
     // Successful jobs (result.success === true) do not trigger failure handling

@@ -3,6 +3,14 @@ Feature: Simulation Runner Service
   I need to orchestrate scenario execution
   So that scenarios can be run against various targets
 
+  # Per AUDIT_MANIFEST.md: 25 scenarios → 16 DUPLICATE (now bound or already
+  # covered elsewhere via @scenario JSDoc against simulation-runner.router,
+  # orchestrator, http-agent.adapter, prompt-config.adapter, scenario.processor.*,
+  # scenario-event.service tests) + 2 UPDATE + 7 KEEP. The 8 remaining
+  # @unimplemented scenarios are mostly load-scenario flow + return-immediate
+  # error variants pending tests in PR #3458. "Pass labels to SDK for tracing"
+  # is covered via OTEL_RESOURCE_ATTRIBUTES env (otel-isolation test:153).
+
   # ============================================================================
   # Initialization
   # ============================================================================
@@ -40,7 +48,7 @@ Feature: Simulation Runner Service
     When SimulationRunnerService executes
     Then the SDK receives the criteria for judge evaluation
 
-  @unit @unimplemented
+  @unit
   Scenario: Pass labels to SDK for tracing
     Given scenario with labels ["support", "billing"]
     When SimulationRunnerService executes

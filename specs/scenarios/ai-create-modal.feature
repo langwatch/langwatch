@@ -3,6 +3,14 @@ Feature: AI Create Modal for Scenarios
   I want an AI-assisted modal for creating scenarios
   So that I can quickly generate scenario templates based on my description
 
+  # Per AUDIT_MANIFEST.md: 30 scenarios → 19 DUPLICATE (now bound via @scenario
+  # JSDoc against AICreateModal.test.tsx + ScenarioCreateModal.test.tsx) +
+  # 2 DELETE (Manual scenario creation when no providers, and initialPrompt URL
+  # parameter — both contradict implementation) + 2 UPDATE + 7 KEEP. The 9
+  # remaining @unimplemented scenarios are E2E + KEEP-need-test for full open-
+  # from-list flow, end-to-end generation, skip from error, navigation behavior
+  # — tracked in PR #3458.
+
   Background:
     Given I am logged into project "my-project"
     And I am on the scenarios list page

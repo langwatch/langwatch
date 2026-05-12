@@ -7,6 +7,12 @@ Feature: Scenario editor new agent flow
     Given I am logged into project "my-project"
     And I am on the scenario editor
 
+  # Per AUDIT_MANIFEST.md: 7 scenarios → 4 DUPLICATE (now bound via @scenario
+  # JSDoc against AgentTypeSelectorDrawer.test.tsx + ScenarioFormDrawer.integration.test.tsx)
+  # + 3 KEEP. The remaining 3 KEEP scenarios stay @unimplemented pending integration
+  # test coverage for HTTP agent type, save-and-run menu trigger, and Cancel flow
+  # — tracked in PR #3458.
+
   # ============================================================================
   # Core: Agent type selection from scenario editor
   # ============================================================================
