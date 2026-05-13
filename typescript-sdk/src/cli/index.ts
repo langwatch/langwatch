@@ -1568,4 +1568,126 @@ recordsCmd
     const { recordsDeleteCommand } = await import("./commands/dataset/records-delete.js");
     await recordsDeleteCommand(slugOrId, recordIds);
   });
+// Add projects command group (org-level)
+const projectsCmd = program
+  .command("projects")
+  .description("Manage organization projects (requires LANGWATCH_ORG_API_KEY)");
+
+projectsCmd
+  .command("list")
+  .description("List all projects in the organization")
+  .option("--page <page>", "Page number", "1")
+  .option("--limit <limit>", "Items per page", "50")
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (options: { page?: string; limit?: string; format?: string }) => {
+    const { listProjectsCommand: impl } = await import("./commands/projects/list.js");
+    await impl({
+      page: options.page ? Number(options.page) : undefined,
+      limit: options.limit ? Number(options.limit) : undefined,
+      format: options.format,
+    });
+  });
+
+projectsCmd
+  .command("get <id>")
+  .description("Show details for a project")
+  .option("-f, --format <format>", "Output format: text (default) or json", "text")
+  .action(async (id: string, options: { format?: string }) => {
+    const { getProjectCommand: impl } = await import("./commands/projects/get.js");
+    await impl(id, options);
+  });
+
+projectsCmd
+  .command("create")
+  .description("Create a new project (returns a one-time service API key)")
+  .requiredOption("--name <name>", "Project name")
+  .requiredOption("--language <lang>", "Programming language (e.g. python, typescript)")
+  .requiredOption("--framework <fw>", "Framework (e.g. langchain, openai, vercel-ai)")
+  .option("--team-id <id>", "Existing team ID to assign the project to")
+  .option("--new-team-name <name>", "Create a new team with this name")
+  .option("-f, --format <format>", "Output format: text (default) or json", "text")
+  .action(async (options: {
+    name: string;
+    language: string;
+    framework: string;
+    teamId?: string;
+    newTeamName?: string;
+    format?: string;
+  }) => {
+    const { createProjectCommand: impl } = await import("./commands/projects/create.js");
+    await impl(options);
+  });
+
+projectsCmd
+  .command("update <id>")
+  .description("Update a project's metadata")
+  .option("--name <name>", "New project name")
+  .option("--language <lang>", "New language")
+  .option("--framework <fw>", "New framework")
+  .option("--pii-redaction-level <level>", "PII redaction: STRICT, ESSENTIAL, or DISABLED")
+  .option("-f, --format <format>", "Output format: text (default) or json", "text")
+  .action(async (id: string, options: {
+    name?: string;
+    language?: string;
+    framework?: string;
+    piiRedactionLevel?: "STRICT" | "ESSENTIAL" | "DISABLED";
+    format?: string;
+  }) => {
+    const { updateProjectCommand: impl } = await import("./commands/projects/update.js");
+    await impl(id, options);
+  });
+
+projectsCmd
+  .command("delete <id>")
+  .description("Archive a project (soft-delete)")
+  .option("-f, --format <format>", "Output format: text (default) or json", "text")
+  .action(async (id: string, options: { format?: string }) => {
+    const { deleteProjectCommand: impl } = await import("./commands/projects/delete.js");
+    await impl(id, options);
+  });
+
+// Add api-keys command group (org-level)
+const apiKeysCmd = program
+  .command("api-keys")
+  .description("Manage organization API keys (requires LANGWATCH_ORG_API_KEY)");
+
+apiKeysCmd
+  .command("list")
+  .description("List all API keys in the organization")
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (options: { format?: string }) => {
+    const { listApiKeysCommand: impl } = await import("./commands/api-keys/list.js");
+    await impl(options);
+  });
+
+apiKeysCmd
+  .command("create")
+  .description("Create a new API key (token is shown once)")
+  .requiredOption("--name <name>", "Human-readable name for the key")
+  .option("--key-type <type>", "Key type: personal or service", "service")
+  .option("--description <desc>", "Optional description")
+  .option("--expires-at <date>", "Expiration date (ISO 8601)")
+  .option("--project-id <id...>", "Project IDs to scope the key to (service keys only, repeatable)")
+  .option("-f, --format <format>", "Output format: text (default) or json", "text")
+  .action(async (options: {
+    name: string;
+    keyType?: "personal" | "service";
+    description?: string;
+    expiresAt?: string;
+    projectId?: string[];
+    format?: string;
+  }) => {
+    const { createApiKeyCommand: impl } = await import("./commands/api-keys/create.js");
+    await impl(options);
+  });
+
+apiKeysCmd
+  .command("revoke <id>")
+  .description("Revoke an API key (cannot be reactivated)")
+  .option("-f, --format <format>", "Output format: text (default) or json", "text")
+  .action(async (id: string, options: { format?: string }) => {
+    const { revokeApiKeyCommand: impl } = await import("./commands/api-keys/revoke.js");
+    await impl(id, options);
+  });
+
 program.parse(process.argv);
