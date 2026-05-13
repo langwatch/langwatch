@@ -43,7 +43,7 @@ export class Prompt {
   public readonly versionId?: string;
   public readonly scope?: PromptScope;
 
-  constructor(data: PromptData) {
+  constructor(data: PromptData | Record<string, unknown>) {
     // Validate input using Zod
     const validationResult = promptDataSchema.strip().safeParse(data);
 
