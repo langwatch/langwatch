@@ -1,12 +1,31 @@
-import { tool } from "ai";
 import { z } from "zod";
+import { defineLangyTool } from "../defineLangyTool";
 import type { LangyToolContext } from "./types";
 
+const promptErrorSchema = z.object({ error: z.string() });
+
+const messageSchema = z.object({
+  role: z.enum(["system", "user", "assistant"]),
+  content: z.string(),
+});
+
 export function makeListPrompts(ctx: LangyToolContext) {
-  return tool({
+  return defineLangyTool({
+    name: "list_prompts",
     description:
       "Lists the prompts defined in the caller's project. Returns handle, name, model, and a short preview.",
     inputSchema: z.object({}),
+    outputSchema: z.object({
+      items: z.array(
+        z.object({
+          id: z.string(),
+          handle: z.string(),
+          name: z.string(),
+          model: z.string().nullable().optional(),
+          scope: z.string().nullable().optional(),
+        }),
+      ),
+    }),
     execute: async () => {
       const prompts = await ctx.promptService.getAllPrompts({
         projectId: ctx.projectId,
@@ -18,11 +37,11 @@ export function makeListPrompts(ctx: LangyToolContext) {
       }
       return {
         items: prompts.map((p: Record<string, unknown>) => ({
-          id: p.id,
-          handle: p.handle,
-          name: p.name ?? p.handle,
-          model: p.model,
-          scope: p.scope,
+          id: p.id as string,
+          handle: p.handle as string,
+          name: (p.name ?? p.handle) as string,
+          model: p.model as string | null | undefined,
+          scope: p.scope as string | null | undefined,
         })),
       };
     },
@@ -30,7 +49,8 @@ export function makeListPrompts(ctx: LangyToolContext) {
 }
 
 export function makeGetPromptDetails(ctx: LangyToolContext) {
-  return tool({
+  return defineLangyTool({
+    name: "get_prompt_details",
     description:
       "Fetch the full config for a single prompt by handle or id: model, temperature, maxTokens, message templates, and declared inputs/outputs.",
     inputSchema: z.object({
@@ -38,6 +58,21 @@ export function makeGetPromptDetails(ctx: LangyToolContext) {
         .string()
         .describe("The prompt id or handle, as returned by list_prompts."),
     }),
+    outputSchema: z.union([
+      promptErrorSchema,
+      z.object({
+        id: z.string(),
+        handle: z.string(),
+        scope: z.unknown(),
+        model: z.unknown(),
+        temperature: z.unknown(),
+        maxTokens: z.unknown(),
+        messages: z.unknown(),
+        inputs: z.unknown(),
+        outputs: z.unknown(),
+        version: z.unknown(),
+      }),
+    ]),
     execute: async ({ idOrHandle }) => {
       const prompt = await ctx.promptService.getPromptByIdOrHandle({
         idOrHandle,
@@ -48,8 +83,8 @@ export function makeGetPromptDetails(ctx: LangyToolContext) {
       }
       const p = prompt as Record<string, unknown>;
       return {
-        id: p.id,
-        handle: p.handle,
+        id: p.id as string,
+        handle: p.handle as string,
         scope: p.scope,
         model: p.model,
         temperature: p.temperature,
@@ -64,12 +99,22 @@ export function makeGetPromptDetails(ctx: LangyToolContext) {
 }
 
 export function makeSearchPrompts(ctx: LangyToolContext) {
-  return tool({
+  return defineLangyTool({
+    name: "search_prompts",
     description:
       "Search prompts in this project by handle/name keyword. Use when looking for an existing prompt to reference or update.",
     inputSchema: z.object({
       query: z.string().min(1),
       limit: z.number().int().min(1).max(20).default(10),
+    }),
+    outputSchema: z.object({
+      items: z.array(
+        z.object({
+          id: z.string(),
+          handle: z.string(),
+          name: z.string(),
+        }),
+      ),
     }),
     execute: async ({ query, limit }) => {
       const rows = await ctx.promptService.searchByKeyword({
@@ -92,8 +137,23 @@ export function makeSearchPrompts(ctx: LangyToolContext) {
   });
 }
 
+const promptCreateProposalSchema = z.object({
+  langyProposal: z.literal(true),
+  kind: z.literal("prompts.create"),
+  summary: z.string(),
+  rationale: z.string(),
+  payload: z.object({
+    handle: z.string(),
+    messages: z.array(messageSchema),
+    model: z.string().optional(),
+    temperature: z.number().optional(),
+    maxTokens: z.number().optional(),
+  }),
+});
+
 export function makeProposeCreatePrompt(_ctx: LangyToolContext) {
-  return tool({
+  return defineLangyTool({
+    name: "propose_create_prompt",
     description:
       "Propose creating a new prompt in the project. Returns a card the user approves to commit. The handle must be unique within the project; use kebab-case or snake_case.",
     inputSchema: z.object({
@@ -105,12 +165,7 @@ export function makeProposeCreatePrompt(_ctx: LangyToolContext) {
           "Unique, URL-safe prompt handle (e.g. 'rag-qa', 'support-triage').",
         ),
       messages: z
-        .array(
-          z.object({
-            role: z.enum(["system", "user", "assistant"]),
-            content: z.string(),
-          }),
-        )
+        .array(messageSchema)
         .min(1)
         .describe("Chat-style message templates that define the prompt."),
       model: z
@@ -127,6 +182,7 @@ export function makeProposeCreatePrompt(_ctx: LangyToolContext) {
           "One short sentence explaining why this prompt fits the user's goal.",
         ),
     }),
+    outputSchema: promptCreateProposalSchema,
     execute: async ({
       handle,
       messages,
@@ -136,8 +192,8 @@ export function makeProposeCreatePrompt(_ctx: LangyToolContext) {
       rationale,
     }) => {
       return {
-        langyProposal: true,
-        kind: "prompts.create",
+        langyProposal: true as const,
+        kind: "prompts.create" as const,
         summary: `Create prompt "${handle}"`,
         rationale,
         payload: {
@@ -152,8 +208,24 @@ export function makeProposeCreatePrompt(_ctx: LangyToolContext) {
   });
 }
 
+const promptUpdateProposalSchema = z.object({
+  langyProposal: z.literal(true),
+  kind: z.literal("prompts.update"),
+  summary: z.string(),
+  rationale: z.string(),
+  payload: z.object({
+    id: z.string(),
+    commitMessage: z.string(),
+    messages: z.array(messageSchema).optional(),
+    model: z.string().optional(),
+    temperature: z.number().optional(),
+    maxTokens: z.number().optional(),
+  }),
+});
+
 export function makeProposeUpdatePrompt(ctx: LangyToolContext) {
-  return tool({
+  return defineLangyTool({
+    name: "propose_update_prompt",
     description:
       "Propose updating an existing prompt by creating a new version. A commitMessage is required. Call get_prompt_details first so you only send fields you actually want to change.",
     inputSchema: z.object({
@@ -164,19 +236,13 @@ export function makeProposeUpdatePrompt(ctx: LangyToolContext) {
         .string()
         .min(1)
         .describe("Short description of what this revision changes."),
-      messages: z
-        .array(
-          z.object({
-            role: z.enum(["system", "user", "assistant"]),
-            content: z.string(),
-          }),
-        )
-        .optional(),
+      messages: z.array(messageSchema).optional(),
       model: z.string().optional(),
       temperature: z.number().min(0).max(2).optional(),
       maxTokens: z.number().int().positive().optional(),
       rationale: z.string(),
     }),
+    outputSchema: z.union([promptErrorSchema, promptUpdateProposalSchema]),
     execute: async ({
       id,
       commitMessage,
@@ -199,8 +265,8 @@ export function makeProposeUpdatePrompt(ctx: LangyToolContext) {
         return { error: `No prompt found with id '${id}'.` };
       }
       return {
-        langyProposal: true,
-        kind: "prompts.update",
+        langyProposal: true as const,
+        kind: "prompts.update" as const,
         summary: `Update prompt "${(existing as { handle?: string }).handle ?? id}"`,
         rationale,
         payload: {
