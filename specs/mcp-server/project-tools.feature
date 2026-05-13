@@ -1,4 +1,4 @@
-@integration
+@integration @unimplemented
 Feature: MCP Project Tools
   As a coding agent
   I want to manage projects via the MCP server

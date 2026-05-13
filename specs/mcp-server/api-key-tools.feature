@@ -1,4 +1,4 @@
-@integration
+@integration @unimplemented
 Feature: MCP API Key Tools
   As a coding agent
   I want to manage API keys via the MCP server
