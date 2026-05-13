@@ -217,6 +217,7 @@ describe("given an HTTP agent target pointed at a stub returning 422 with a JSON
       await expect(adapter.call(baseInput)).rejects.toThrow("422");
     });
 
+    /** @scenario HTTP agent error includes response body, URL, and upstream request id */
     it("includes the response body in the thrown error", async () => {
       const adapter = new SerializedHttpAgentAdapter(
         makeConfig(stub.url),
@@ -256,6 +257,7 @@ describe("given an HTTP agent target pointed at a stub returning 500 with a body
   });
 
   describe("when the adapter calls the stub", () => {
+    /** @scenario HTTP agent error truncates large response bodies */
     it("includes a truncated portion of the body in the thrown error", async () => {
       const adapter = new SerializedHttpAgentAdapter(
         makeConfig(stub.url),
@@ -308,6 +310,7 @@ describe("given an HTTP agent target pointed at a stub returning 502 with a plai
   });
 
   describe("when the adapter calls the stub", () => {
+    /** @scenario HTTP agent error reads non-JSON response bodies as text */
     it("includes the plain-text body content in the thrown error", async () => {
       const adapter = new SerializedHttpAgentAdapter(
         makeConfig(stub.url),
@@ -339,6 +342,7 @@ describe("given an HTTP agent target returning 422 with x-amzn-requestid (no x-r
   });
 
   describe("when the adapter calls the stub", () => {
+    /** @scenario HTTP agent error surfaces alternate upstream identifier headers */
     it("includes the x-amzn-requestid header value in the thrown error", async () => {
       const adapter = new SerializedHttpAgentAdapter(
         makeConfig(stub.url),
@@ -368,6 +372,7 @@ describe("given a request that sets Authorization and x-api-key headers", () => 
   });
 
   describe("when the adapter formats those request headers for logging or error context", () => {
+    /** @scenario HTTP agent error redacts sensitive request headers */
     it("replaces the values of Authorization and x-api-key with a redacted placeholder", async () => {
       const config = makeConfig(stub.url, {
         headers: [{ key: "x-api-key", value: "my-secret-key" }],
@@ -428,6 +433,7 @@ describe("given an HTTP agent target pointed at a stub returning 200 (for diagno
   });
 
   describe("when the adapter calls the stub", () => {
+    /** @scenario HTTP agent emits one diagnostic log line per successful call */
     it("emits a structured diagnostic log line on success", async () => {
       const adapter = new SerializedHttpAgentAdapter(
         makeConfig(stub.url),
@@ -526,6 +532,7 @@ describe("given an HTTP agent target pointed at a stub returning 422 (for diagno
   });
 
   describe("when the adapter calls the stub", () => {
+    /** @scenario HTTP agent emits one diagnostic log line per failing call */
     it("emits a structured diagnostic log line for a failing call", async () => {
       const adapter = new SerializedHttpAgentAdapter(
         makeConfig(stub.url),
@@ -595,6 +602,7 @@ describe("given an HTTP agent target pointed at a stub returning a JSON 200 resp
       expect(collectEntries(logger).length).toBeGreaterThanOrEqual(1);
     });
 
+    /** @scenario Diagnostic log preserves response body for the success path */
     it("still returns the parsed JSON response to its caller after logging", async () => {
       // Verifies the response value pipeline is unaffected by logging.
       const logger = makeFakeLogger();
@@ -632,6 +640,7 @@ describe("given a request that sets Authorization and x-api-key headers (diagnos
   });
 
   describe("when the diagnostic log line is emitted for that request", () => {
+    /** @scenario Diagnostic log redacts sensitive request headers */
     it("does not include the Authorization or x-api-key values in the log line", async () => {
       const logger = makeFakeLogger();
       const config = makeConfig(stub.url, {
