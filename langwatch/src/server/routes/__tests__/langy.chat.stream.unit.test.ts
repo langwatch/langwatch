@@ -903,5 +903,58 @@ describe("POST /api/langy/chat — Mastra path (PR-4.3 spike behind feature flag
       });
       expect(res.headers.get("x-langy-conversation-id")).toBe("conv_test_abc");
     });
+
+    describe("when the Mastra path takes over (PR-4.4 part a — assistant-message persistence)", () => {
+      it("forwards an onFinish callback so assistant turns persist (no longer dropped silently)", async () => {
+        await app.request("/api/langy/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            projectId: "proj_demo",
+            messages: [
+              {
+                id: "m1",
+                role: "user",
+                parts: [{ type: "text", text: "hello" }],
+              },
+            ],
+          }),
+        });
+
+        expect(mockStreamLangyMastraResponse).toHaveBeenCalledWith(
+          expect.objectContaining({
+            onFinish: expect.any(Function),
+          }),
+        );
+
+        // And the callback wires through to the same persistence path the
+        // legacy onFinish uses — invoking it should land an assistant
+        // append + a conversation touch.
+        const lastCall =
+          mockStreamLangyMastraResponse.mock.calls[
+            mockStreamLangyMastraResponse.mock.calls.length - 1
+          ]!;
+        const onFinish = (lastCall[0] as { onFinish: (a: unknown) => Promise<void> })
+          .onFinish;
+
+        mockAppendMessage.mockClear();
+        mockTouchConversation.mockClear();
+
+        await onFinish({
+          text: "ok",
+          response: { messages: [{ role: "assistant", content: "ok" }] },
+        });
+
+        expect(mockAppendMessage).toHaveBeenCalledWith(
+          expect.objectContaining({
+            role: "assistant",
+            projectId: "proj_demo",
+          }),
+        );
+        expect(mockTouchConversation).toHaveBeenCalledWith(
+          expect.objectContaining({ projectId: "proj_demo" }),
+        );
+      });
+    });
   });
 });

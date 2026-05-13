@@ -121,6 +121,79 @@ async function persistAssistantMessage(opts: {
   });
 }
 
+/**
+ * Minimal shape we read from the `onFinish` args. Both AI-SDK's
+ * `StreamTextOnFinishCallback` args and Mastra's `MastraOnFinishCallbackArgs`
+ * are supersets of this — they each add a long tail of extra fields
+ * (usage, finishReason, steps, totalUsage, runId, …) that we ignore here.
+ */
+interface LangyOnFinishArgs {
+  text: string;
+  response: {
+    messages?: ReadonlyArray<{
+      role: string;
+      content: string | ReadonlyArray<Record<string, unknown>>;
+    }>;
+  };
+}
+
+/**
+ * Builds the `onFinish` callback used at the end of a Langy chat stream
+ * to persist the assistant's response and touch the conversation.
+ *
+ * The returned callback is typed `(args: any) => Promise<void>` because
+ * it is wired into both the AI-SDK `StreamTextOnFinishCallback` slot
+ * (with a deeply-generic tools parameter) and Mastra's
+ * `MastraOnFinishCallback` slot. TS function-variance does not allow a
+ * single concrete callback signature to satisfy both, and chasing the
+ * exact generics adds noise without value — the body only reads two
+ * fields and is internally type-checked against `LangyOnFinishArgs`.
+ *
+ * Persistence failures are logged but never thrown — losing a follow-up
+ * persistence call must not surface as a 500 to a user whose stream has
+ * already completed.
+ */
+export function buildLangyAssistantOnFinish(opts: {
+  conversationId: string;
+  projectId: string;
+  model: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+}): (args: any) => Promise<void> {
+  return async (rawArgs) => {
+    const args = rawArgs as LangyOnFinishArgs;
+    try {
+      const messages = args.response.messages ?? [];
+      const assistantMessages = messages.filter(
+        (m) => m.role === "assistant" || m.role === "tool",
+      );
+      // Return type widened to `unknown[]` because the AI SDK content
+      // union (text/file/image/tool-call/…) doesn't unify with the
+      // literal text-shape we synthesise from string content.
+      // persistAssistantMessage takes `parts: unknown`.
+      const parts = assistantMessages.flatMap((m): unknown[] => {
+        if (typeof m.content === "string") {
+          return m.content
+            ? [{ type: "text", text: m.content, role: m.role }]
+            : [];
+        }
+        if (Array.isArray(m.content)) {
+          return m.content.map((c) => ({ ...c, role: m.role }));
+        }
+        return [];
+      });
+      await persistAssistantMessage({
+        conversationId: opts.conversationId,
+        projectId: opts.projectId,
+        parts,
+        text: args.text,
+        model: opts.model,
+      });
+    } catch (error) {
+      logger.error({ error }, "failed to persist langy assistant message");
+    }
+  };
+}
+
 async function persistUserMessage(opts: {
   conversationId: string;
   projectId: string;
@@ -287,6 +360,15 @@ app.post("/langy/chat", async (c) => {
     false,
     { projectId },
   );
+  // Phase 4 safety note: the Mastra path now persists assistant messages
+  // (PR-4.4 part a). Still missing vs the legacy path:
+  //   - `experimental_telemetry` parity (no Mastra equivalent yet — Mastra
+  //     uses its own observability stack; bridging is a follow-up).
+  //   - Mastra's Memory primitive (Thread/Resource model) is NOT adopted
+  //     yet; we persist via our own LangyMessageService instead. Adapter
+  //     comes in PR-4.4b before PR-4.5 cutover.
+  // The flag `release_ui_langy_mastra_enabled` should remain default-off
+  // in prod until both gaps close.
   if (useMastra) {
     logger.info(
       { projectId, userId: session.user.id, conversationId: conversation.id },
@@ -298,8 +380,11 @@ app.post("/langy/chat", async (c) => {
       systemPrompt,
       messages: modelMessages,
       maxSteps: LANGY_TOOL_CALLS_PER_MESSAGE,
-      // Assistant-message persistence + telemetry stay on the legacy path
-      // until PR-4.4 (memory adapter). The spike's job is SSE parity.
+      onFinish: buildLangyAssistantOnFinish({
+        conversationId: conversation.id,
+        projectId,
+        model: LANGY_FALLBACK_MODEL,
+      }),
     });
     const headers = new Headers(mastraResponse.headers);
     headers.set("x-langy-conversation-id", conversation.id);
@@ -325,37 +410,11 @@ app.post("/langy/chat", async (c) => {
     onError: (error) => {
       logger.error({ error }, "error in langy chat stream");
     },
-    onFinish: async ({ text, response }) => {
-      try {
-        const assistantMessages = response.messages.filter(
-          (m) => m.role === "assistant" || m.role === "tool",
-        );
-        // Return type is annotated as `unknown[]` because the AI SDK content
-        // union (text/file/image/tool-call/…) doesn't unify with the literal
-        // text-shape we synthesise from string content. persistAssistantMessage
-        // takes `parts: unknown`, so we lose nothing by widening here.
-        const parts = assistantMessages.flatMap((m): unknown[] => {
-          if (typeof m.content === "string") {
-            return m.content
-              ? [{ type: "text", text: m.content, role: m.role }]
-              : [];
-          }
-          if (Array.isArray(m.content)) {
-            return m.content.map((c) => ({ ...c, role: m.role }));
-          }
-          return [];
-        });
-        await persistAssistantMessage({
-          conversationId: conversation.id,
-          projectId,
-          parts,
-          text,
-          model: LANGY_FALLBACK_MODEL,
-        });
-      } catch (error) {
-        logger.error({ error }, "failed to persist langy assistant message");
-      }
-    },
+    onFinish: buildLangyAssistantOnFinish({
+      conversationId: conversation.id,
+      projectId,
+      model: LANGY_FALLBACK_MODEL,
+    }),
   });
 
   const response = result.toUIMessageStreamResponse();
