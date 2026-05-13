@@ -16,43 +16,50 @@ export const langyToolErrorEnvelope = z.object({
 
 export type LangyToolErrorEnvelope = z.infer<typeof langyToolErrorEnvelope>;
 
-export function defineLangyTool<TInput, TOutput>({
-  name,
-  description,
-  inputSchema,
-  outputSchema,
-  execute,
-}: {
+// Two casts at the SDK boundary — one to make `tool()`'s overload set accept
+// our generic-typed object literal (it can't infer through our wrapper's
+// generics), one to preserve the precise `Tool<Input, Output>` shape on the
+// way back out. Both are local to this function: callers of defineLangyTool
+// see fully-typed inputs and outputs.
+export function defineLangyTool<
+  TInputSchema extends z.ZodType,
+  TOutput,
+>(args: {
   name: string;
   description: string;
-  inputSchema: z.ZodType<TInput>;
+  inputSchema: TInputSchema;
   outputSchema: z.ZodType<TOutput>;
-  execute: (input: TInput) => Promise<TOutput>;
-}) {
-  const execWithValidation = async (input: TInput) => {
-    const raw = await execute(input);
-    const parsed = outputSchema.safeParse(raw);
+  execute: (input: z.infer<TInputSchema>) => Promise<TOutput>;
+}): Tool<z.infer<TInputSchema>, TOutput> {
+  type Input = z.infer<TInputSchema>;
 
-    if (!parsed.success) {
-      logger.warn(
-        { tool: name, issues: parsed.error.issues },
-        "langy tool output failed schema validation",
-      );
-      return {
-        error: {
-          code: LANGY_TOOL_OUTPUT_INVALID_CODE,
-          message: "Tool returned data in an unexpected shape.",
-          issues: parsed.error.issues,
-        },
-      } as LangyToolErrorEnvelope;
-    }
+  const definition = {
+    description: args.description,
+    inputSchema: args.inputSchema,
+    execute: async (input: Input): Promise<TOutput> => {
+      const raw = await args.execute(input);
+      const parsed = args.outputSchema.safeParse(raw);
 
-    return parsed.data;
+      if (!parsed.success) {
+        logger.warn(
+          { tool: args.name, issues: parsed.error.issues },
+          "langy tool output failed schema validation",
+        );
+        const envelope: LangyToolErrorEnvelope = {
+          error: {
+            code: LANGY_TOOL_OUTPUT_INVALID_CODE,
+            message: "Tool returned data in an unexpected shape.",
+            issues: parsed.error.issues,
+          },
+        };
+        return envelope as unknown as TOutput;
+      }
+
+      return parsed.data;
+    },
   };
 
-  return tool({
-    description,
-    inputSchema: inputSchema as unknown as z.ZodType<TInput>,
-    execute: execWithValidation,
-  } as unknown as Parameters<typeof tool<TInput, TOutput | LangyToolErrorEnvelope>>[0]) as Tool<TInput, TOutput | LangyToolErrorEnvelope>;
+  return tool(
+    definition as unknown as Parameters<typeof tool<Input, TOutput>>[0],
+  ) as Tool<Input, TOutput>;
 }

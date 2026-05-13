@@ -1,19 +1,22 @@
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import {
-  defineLangyTool,
-  LANGY_TOOL_OUTPUT_INVALID_CODE,
-  langyToolErrorEnvelope,
-} from "../defineLangyTool";
+
+const { warnSpy } = vi.hoisted(() => ({ warnSpy: vi.fn() }));
 
 vi.mock("~/utils/logger/server", () => ({
   createLogger: () => ({
-    warn: vi.fn(),
+    warn: warnSpy,
     info: vi.fn(),
     error: vi.fn(),
     debug: vi.fn(),
   }),
 }));
+
+import {
+  defineLangyTool,
+  LANGY_TOOL_OUTPUT_INVALID_CODE,
+  langyToolErrorEnvelope,
+} from "../defineLangyTool";
 
 const inputSchema = z.object({ q: z.string() });
 const outputSchema = z.object({
@@ -101,6 +104,30 @@ describe("defineLangyTool", () => {
       };
       expect(Array.isArray(result.error.issues)).toBe(true);
       expect((result.error.issues ?? []).length).toBeGreaterThan(0);
+    });
+
+    it("logs a warning with the tool name and zod issues", async () => {
+      warnSpy.mockClear();
+      const tool = defineLangyTool({
+        name: "list_things_named",
+        description: "lists things",
+        inputSchema,
+        outputSchema,
+        execute: async () =>
+          null as unknown as { items: Array<{ id: string }> },
+      });
+
+      await invokeTool(tool, { q: "x" });
+
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      const [meta, message] = warnSpy.mock.calls[0] ?? [];
+      expect(meta).toEqual(
+        expect.objectContaining({
+          tool: "list_things_named",
+          issues: expect.any(Array),
+        }),
+      );
+      expect(message).toContain("failed schema validation");
     });
   });
 
