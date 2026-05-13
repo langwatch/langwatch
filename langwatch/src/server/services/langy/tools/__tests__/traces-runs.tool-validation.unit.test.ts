@@ -23,25 +23,25 @@ import {
 import { makeSearchPastRuns } from "../runs";
 import { makeSearchTraces } from "../traces";
 import { ConversationToolIdSet } from "../../toolIdValidator";
-import type { LangyToolContext } from "../types";
+import type { LangyConversationContext } from "../types";
 
 function makeCtx(opts: {
   experimentServiceLike?: Record<string, unknown>;
   batchEvaluationServiceLike?: Record<string, unknown>;
-} = {}): LangyToolContext {
+} = {}): LangyConversationContext {
   return {
     projectId: "project-1",
     seenIds: new ConversationToolIdSet(),
     batchEvaluationService:
       (opts.batchEvaluationServiceLike ??
-        {}) as unknown as LangyToolContext["batchEvaluationService"],
-    datasetService: {} as LangyToolContext["datasetService"],
-    evaluatorService: {} as LangyToolContext["evaluatorService"],
+        {}) as unknown as LangyConversationContext["batchEvaluationService"],
+    datasetService: {} as LangyConversationContext["datasetService"],
+    evaluatorService: {} as LangyConversationContext["evaluatorService"],
     experimentService:
       (opts.experimentServiceLike ??
-        {}) as unknown as LangyToolContext["experimentService"],
-    projectService: {} as LangyToolContext["projectService"],
-    promptService: {} as LangyToolContext["promptService"],
+        {}) as unknown as LangyConversationContext["experimentService"],
+    projectService: {} as LangyConversationContext["projectService"],
+    promptService: {} as LangyConversationContext["promptService"],
   };
 }
 

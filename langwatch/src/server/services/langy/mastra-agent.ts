@@ -17,25 +17,32 @@ import type { LanguageModel } from "ai";
 import { createUIMessageStreamResponse, type ModelMessage } from "ai";
 import { Agent } from "@mastra/core/agent";
 import { toAISdkV5Stream } from "@mastra/ai-sdk";
-import type { LangyToolContext } from "./tools";
+import type { LangyConversationContext } from "./tools";
 import { buildLangyTools } from "./tools";
 
 export interface StreamLangyMastraOptions {
-  ctx: LangyToolContext;
+  ctx: LangyConversationContext;
   model: LanguageModel;
   systemPrompt: string;
   messages: ModelMessage[];
   maxSteps: number;
-  onFinish?: (result: {
-    text?: string;
-    response?: unknown;
-  }) => void | Promise<void>;
+  /**
+   * Optional persistence/telemetry callback fired when the stream completes.
+   * Typed `(args: any) => …` because Mastra's `MastraOnFinishCallback<OUTPUT>`
+   * carries a deep generic (`LLMStepResult<OUTPUT>`) whose extras (steps,
+   * usage, runId, etc.) the Langy callback doesn't consume — chasing the
+   * exact type adds noise without value. The actual shape we read is
+   * `{ text: string; response: { messages?: [...] } }` and the route's
+   * `buildLangyAssistantOnFinish` is the canonical implementation.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  onFinish?: (args: any) => void | Promise<void>;
 }
 
 /**
  * Per-request Agent. Mastra's `Agent` is cheap to construct (no I/O in the
  * ctor — just config), so we build a fresh one per chat POST. This keeps
- * `tools` bound to the per-request `LangyToolContext` (projectId, seenIds,
+ * `tools` bound to the per-request `LangyConversationContext` (projectId, seenIds,
  * etc.) without juggling per-call tool overrides on a shared instance.
  */
 export async function streamLangyMastraResponse({

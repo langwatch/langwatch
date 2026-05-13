@@ -21,23 +21,23 @@ import {
   makeSearchPrompts,
 } from "../prompts";
 import { ConversationToolIdSet } from "../../toolIdValidator";
-import type { LangyToolContext } from "../types";
+import type { LangyConversationContext } from "../types";
 
 function makeCtx(opts: {
   promptServiceLike?: Record<string, unknown>;
   seenIds?: ConversationToolIdSet;
-} = {}): LangyToolContext {
+} = {}): LangyConversationContext {
   return {
     projectId: "project-1",
     seenIds: opts.seenIds ?? new ConversationToolIdSet(),
-    batchEvaluationService: {} as LangyToolContext["batchEvaluationService"],
-    datasetService: {} as LangyToolContext["datasetService"],
-    evaluatorService: {} as LangyToolContext["evaluatorService"],
-    experimentService: {} as LangyToolContext["experimentService"],
-    projectService: {} as LangyToolContext["projectService"],
+    batchEvaluationService: {} as LangyConversationContext["batchEvaluationService"],
+    datasetService: {} as LangyConversationContext["datasetService"],
+    evaluatorService: {} as LangyConversationContext["evaluatorService"],
+    experimentService: {} as LangyConversationContext["experimentService"],
+    projectService: {} as LangyConversationContext["projectService"],
     promptService:
       (opts.promptServiceLike ??
-        {}) as unknown as LangyToolContext["promptService"],
+        {}) as unknown as LangyConversationContext["promptService"],
   };
 }
 

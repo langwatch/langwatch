@@ -2,7 +2,7 @@ import { z } from "zod";
 import { persistedEvaluationsV3StateSchema } from "~/evaluations-v3/types/persistence";
 import { parseEvaluationResult } from "~/utils/evaluationResults";
 import { defineLangyTool } from "../defineLangyTool";
-import type { LangyToolContext } from "./types";
+import type { LangyConversationContext } from "./types";
 
 type ParsedState = ReturnType<typeof persistedEvaluationsV3StateSchema.parse>;
 
@@ -255,7 +255,7 @@ const workbenchSummarySchema = z.object({
     .nullable(),
 });
 
-export function makeGetWorkbenchState(ctx: LangyToolContext) {
+export function makeGetWorkbenchState(ctx: LangyConversationContext) {
   return defineLangyTool({
     name: "get_workbench_state",
     description:
@@ -322,7 +322,7 @@ const failingRowsSchema = z.object({
   total: z.number(),
 });
 
-export function makeFindFailingRows(ctx: LangyToolContext) {
+export function makeFindFailingRows(ctx: LangyConversationContext) {
   return defineLangyTool({
     name: "find_failing_rows",
     description:
@@ -399,7 +399,7 @@ const workbenchRunProposalSchema = z.object({
   payload: z.object({}),
 });
 
-export function makeProposeRunWorkbench(_ctx: LangyToolContext) {
+export function makeProposeRunWorkbench(_ctx: LangyConversationContext) {
   return defineLangyTool({
     name: "propose_run_workbench",
     description:

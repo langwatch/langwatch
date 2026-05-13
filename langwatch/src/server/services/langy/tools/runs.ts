@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { defineLangyTool } from "../defineLangyTool";
-import type { LangyToolContext } from "./types";
+import type { LangyConversationContext } from "./types";
 
-export function makeSearchPastRuns(ctx: LangyToolContext) {
+export function makeSearchPastRuns(ctx: LangyConversationContext) {
   return defineLangyTool({
     name: "search_past_runs",
     description:

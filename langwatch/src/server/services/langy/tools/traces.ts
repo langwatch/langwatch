@@ -2,11 +2,11 @@ import { z } from "zod";
 import { esClient, TRACE_INDEX } from "~/server/elasticsearch";
 import { createLogger } from "~/utils/logger/server";
 import { defineLangyTool } from "../defineLangyTool";
-import type { LangyToolContext } from "./types";
+import type { LangyConversationContext } from "./types";
 
 const logger = createLogger("langwatch:langy:tools:traces");
 
-export function makeSearchTraces(ctx: LangyToolContext) {
+export function makeSearchTraces(ctx: LangyConversationContext) {
   return defineLangyTool({
     name: "search_traces",
     description:

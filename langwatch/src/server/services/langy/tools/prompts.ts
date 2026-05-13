@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { defineLangyTool } from "../defineLangyTool";
-import type { LangyToolContext } from "./types";
+import type { LangyConversationContext } from "./types";
 
 const promptErrorSchema = z.object({ error: z.string() });
 
@@ -9,7 +9,7 @@ const messageSchema = z.object({
   content: z.string(),
 });
 
-export function makeListPrompts(ctx: LangyToolContext) {
+export function makeListPrompts(ctx: LangyConversationContext) {
   return defineLangyTool({
     name: "list_prompts",
     description:
@@ -48,7 +48,7 @@ export function makeListPrompts(ctx: LangyToolContext) {
   });
 }
 
-export function makeGetPromptDetails(ctx: LangyToolContext) {
+export function makeGetPromptDetails(ctx: LangyConversationContext) {
   return defineLangyTool({
     name: "get_prompt_details",
     description:
@@ -98,7 +98,7 @@ export function makeGetPromptDetails(ctx: LangyToolContext) {
   });
 }
 
-export function makeSearchPrompts(ctx: LangyToolContext) {
+export function makeSearchPrompts(ctx: LangyConversationContext) {
   return defineLangyTool({
     name: "search_prompts",
     description:
@@ -151,7 +151,7 @@ const promptCreateProposalSchema = z.object({
   }),
 });
 
-export function makeProposeCreatePrompt(_ctx: LangyToolContext) {
+export function makeProposeCreatePrompt(_ctx: LangyConversationContext) {
   return defineLangyTool({
     name: "propose_create_prompt",
     description:
@@ -223,7 +223,7 @@ const promptUpdateProposalSchema = z.object({
   }),
 });
 
-export function makeProposeUpdatePrompt(ctx: LangyToolContext) {
+export function makeProposeUpdatePrompt(ctx: LangyConversationContext) {
   return defineLangyTool({
     name: "propose_update_prompt",
     description:

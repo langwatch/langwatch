@@ -5,7 +5,7 @@ import {
   getEvaluatorDefinitions,
 } from "~/server/evaluations/getEvaluator";
 import { defineLangyTool } from "../defineLangyTool";
-import type { LangyToolContext } from "./types";
+import type { LangyConversationContext } from "./types";
 
 const evaluatorErrorSchema = z.object({ error: z.string() });
 
@@ -29,7 +29,7 @@ const builtinEvaluatorListItemSchema = z.object({
   optionalFields: z.array(z.string()).optional(),
 });
 
-export function makeListEvaluators(ctx: LangyToolContext) {
+export function makeListEvaluators(ctx: LangyConversationContext) {
   return defineLangyTool({
     name: "list_evaluators",
     description:
@@ -117,7 +117,7 @@ const builtinEvaluatorDetailsSchema = z.object({
   docsUrl: z.string().optional(),
 });
 
-export function makeGetEvaluatorDetails(ctx: LangyToolContext) {
+export function makeGetEvaluatorDetails(ctx: LangyConversationContext) {
   return defineLangyTool({
     name: "get_evaluator_details",
     description:
@@ -210,7 +210,7 @@ const evaluatorCreateProposalSchema = z.object({
   }),
 });
 
-export function makeProposeCreateEvaluator(ctx: LangyToolContext) {
+export function makeProposeCreateEvaluator(ctx: LangyConversationContext) {
   return defineLangyTool({
     name: "propose_create_evaluator",
     description:
@@ -301,7 +301,7 @@ const evaluatorUpdateProposalSchema = z.object({
   }),
 });
 
-export function makeProposeUpdateEvaluator(ctx: LangyToolContext) {
+export function makeProposeUpdateEvaluator(ctx: LangyConversationContext) {
   return defineLangyTool({
     name: "propose_update_evaluator",
     description:
@@ -378,7 +378,7 @@ const evaluatorDeleteProposalSchema = z.object({
   }),
 });
 
-export function makeProposeDeleteEvaluator(ctx: LangyToolContext) {
+export function makeProposeDeleteEvaluator(ctx: LangyConversationContext) {
   return defineLangyTool({
     name: "propose_delete_evaluator",
     description:
@@ -436,7 +436,7 @@ const workbenchAddEvaluatorProposalSchema = z.object({
   }),
 });
 
-export function makeProposeAddEvaluatorToWorkbench(ctx: LangyToolContext) {
+export function makeProposeAddEvaluatorToWorkbench(ctx: LangyConversationContext) {
   return defineLangyTool({
     name: "propose_add_evaluator_to_workbench",
     description:

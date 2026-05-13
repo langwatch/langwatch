@@ -1,10 +1,10 @@
 import { z } from "zod";
 import { defineLangyTool } from "../defineLangyTool";
-import type { LangyToolContext } from "./types";
+import type { LangyConversationContext } from "./types";
 
 const datasetErrorSchema = z.object({ error: z.string() });
 
-export function makeListDatasets(ctx: LangyToolContext) {
+export function makeListDatasets(ctx: LangyConversationContext) {
   return defineLangyTool({
     name: "list_datasets",
     description:
@@ -39,7 +39,7 @@ export function makeListDatasets(ctx: LangyToolContext) {
   });
 }
 
-export function makeGetDatasetDetails(ctx: LangyToolContext) {
+export function makeGetDatasetDetails(ctx: LangyConversationContext) {
   return defineLangyTool({
     name: "get_dataset_details",
     description:
@@ -108,7 +108,7 @@ const datasetCreateProposalSchema = z.object({
   }),
 });
 
-export function makeProposeCreateDataset(_ctx: LangyToolContext) {
+export function makeProposeCreateDataset(_ctx: LangyConversationContext) {
   return defineLangyTool({
     name: "propose_create_dataset",
     description:
@@ -169,7 +169,7 @@ const datasetAddRowsProposalSchema = z.object({
   }),
 });
 
-export function makeProposeAddDatasetRows(ctx: LangyToolContext) {
+export function makeProposeAddDatasetRows(ctx: LangyConversationContext) {
   return defineLangyTool({
     name: "propose_add_dataset_rows",
     description:
