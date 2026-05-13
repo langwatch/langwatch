@@ -28920,7 +28920,7 @@ The Projects API requires an **organization-level API key** (created in Settings
 Authorization: Bearer sk-lw-<id>_<secret>
 ```
 
-Legacy project API keys (`X-Auth-Token`) cannot be used — they lack organization context.
+Project API keys (`X-Auth-Token`) cannot be used here — they lack organization context.
 
 ## Endpoints
 
