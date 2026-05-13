@@ -208,8 +208,9 @@ export function makeGetWorkbenchState(ctx: LangyToolContext) {
             "No experiment is currently open. The caller did not pass experimentSlug.",
         };
       }
-      const experiment = await ctx.prisma.experiment.findFirst({
-        where: { projectId: ctx.projectId, slug: ctx.experimentSlug },
+      const experiment = await ctx.experimentService.findBySlug({
+        projectId: ctx.projectId,
+        slug: ctx.experimentSlug,
       });
       if (!experiment) {
         return {
@@ -258,8 +259,9 @@ export function makeFindFailingRows(ctx: LangyToolContext) {
       if (!ctx.experimentSlug) {
         return { error: "No experiment is currently open." };
       }
-      const experiment = await ctx.prisma.experiment.findFirst({
-        where: { projectId: ctx.projectId, slug: ctx.experimentSlug },
+      const experiment = await ctx.experimentService.findBySlug({
+        projectId: ctx.projectId,
+        slug: ctx.experimentSlug,
       });
       if (!experiment?.workbenchState) {
         return {

@@ -127,6 +127,19 @@ export class PromptService {
   }
 
   /**
+   * Lightweight keyword search over project-scoped prompts. Returns just
+   * id/handle/name for each match — meant for "did you mean" lookups by
+   * callers that don't need the full versioned prompt payload.
+   */
+  async searchByKeyword(params: {
+    projectId: string;
+    query: string;
+    limit: number;
+  }) {
+    return await this.repository.searchByKeyword(params);
+  }
+
+  /**
    * Get all prompts for a project
    */
   async getAllPrompts(params: {

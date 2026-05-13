@@ -72,16 +72,10 @@ export function makeSearchPrompts(ctx: LangyToolContext) {
       limit: z.number().int().min(1).max(20).default(10),
     }),
     execute: async ({ query, limit }) => {
-      const rows = await ctx.prisma.llmPromptConfig.findMany({
-        where: {
-          projectId: ctx.projectId,
-          OR: [
-            { handle: { contains: query, mode: "insensitive" } },
-            { name: { contains: query, mode: "insensitive" } },
-          ],
-        },
-        orderBy: { updatedAt: "desc" },
-        take: limit,
+      const rows = await ctx.promptService.searchByKeyword({
+        projectId: ctx.projectId,
+        query,
+        limit,
       });
       for (const r of rows) {
         ctx.seenIds.record("prompt_id", r.id);

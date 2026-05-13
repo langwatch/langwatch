@@ -19,7 +19,12 @@ import { tracerMiddleware } from "~/app/api/middleware/tracer";
 import { hasProjectPermission } from "~/server/api/rbac";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
+import { ProjectService } from "~/server/app-layer/projects/project.service";
+import { PrismaProjectRepository } from "~/server/app-layer/projects/repositories/project.prisma.repository";
+import { DatasetService } from "~/server/datasets/dataset.service";
+import { BatchEvaluationService } from "~/server/evaluations/batch-evaluation.service";
 import { EvaluatorService } from "~/server/evaluators/evaluator.service";
+import { ExperimentService } from "~/server/experiments/experiment.service";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
 import { PromptService } from "~/server/prompt-config/prompt.service";
 import { createLogger } from "~/utils/logger/server";
@@ -245,18 +250,27 @@ app.post("/langy/chat", async (c) => {
     });
   }
 
+  const batchEvaluationService = BatchEvaluationService.create(prisma);
+  const datasetService = DatasetService.create(prisma);
   const evaluatorService = EvaluatorService.create(prisma);
+  const experimentService = ExperimentService.create(prisma);
+  const projectService = new ProjectService(new PrismaProjectRepository(prisma));
   const promptService = new PromptService(prisma);
   const seenIds = new ConversationToolIdSet();
 
-  const tools = buildLangyTools({
+  const toolCtx = {
     projectId,
     experimentSlug,
+    batchEvaluationService,
+    datasetService,
     evaluatorService,
+    experimentService,
+    projectService,
     promptService,
     seenIds,
-    prisma,
-  });
+  };
+
+  const tools = buildLangyTools(toolCtx);
 
   const systemPrompt = buildSystemPrompt({
     projectMemory,
@@ -279,14 +293,7 @@ app.post("/langy/chat", async (c) => {
       "langy.chat: serving via Mastra path",
     );
     const mastraResponse = await streamLangyMastraResponse({
-      ctx: {
-        projectId,
-        experimentSlug,
-        evaluatorService,
-        promptService,
-        seenIds,
-        prisma,
-      },
+      ctx: toolCtx,
       model,
       systemPrompt,
       messages: modelMessages,

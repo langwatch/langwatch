@@ -193,4 +193,27 @@ export class DatasetRepository {
     return { datasets, total };
   }
 
+  async findAllNonArchivedWithCounts(input: {
+    projectId: string;
+  }): Promise<Array<Dataset & { _count: { datasetRecords: number } }>> {
+    return await this.prisma.dataset.findMany({
+      where: { projectId: input.projectId, archivedAt: null },
+      orderBy: { updatedAt: "desc" },
+      include: { _count: { select: { datasetRecords: true } } },
+    });
+  }
+
+  async findByIdNonArchivedWithCounts(input: {
+    id: string;
+    projectId: string;
+  }): Promise<(Dataset & { _count: { datasetRecords: number } }) | null> {
+    return await this.prisma.dataset.findFirst({
+      where: {
+        id: input.id,
+        projectId: input.projectId,
+        archivedAt: null,
+      },
+      include: { _count: { select: { datasetRecords: true } } },
+    });
+  }
 }

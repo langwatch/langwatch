@@ -12,10 +12,13 @@ const ALLOWED_PREFIXES = ["list_", "get_", "find_", "search_", "propose_"];
 const stubCtx = {
   projectId: "proj-test",
   experimentSlug: undefined,
+  batchEvaluationService: {} as never,
+  datasetService: {} as never,
   evaluatorService: {} as never,
+  experimentService: {} as never,
+  projectService: {} as never,
   promptService: {} as never,
   seenIds: new ConversationToolIdSet(),
-  prisma: {} as never,
 };
 
 const toolNames = Object.keys(buildLangyTools(stubCtx));

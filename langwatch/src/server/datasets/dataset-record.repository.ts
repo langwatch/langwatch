@@ -101,6 +101,27 @@ export class DatasetRecordRepository {
   }
 
   /**
+   * Returns the first N records of a dataset by createdAt ascending.
+   * Selects only id and entry — used for surfacing a sample to consumers
+   * (e.g. an AI assistant) without paying for full row data.
+   */
+  async findSample(input: {
+    datasetId: string;
+    projectId: string;
+    limit: number;
+  }): Promise<Array<Pick<DatasetRecord, "id" | "entry">>> {
+    return await this.prisma.datasetRecord.findMany({
+      where: {
+        datasetId: input.datasetId,
+        projectId: input.projectId,
+      },
+      orderBy: { createdAt: "asc" },
+      take: input.limit,
+      select: { id: true, entry: true },
+    });
+  }
+
+  /**
    * Finds a single record by id within a dataset and project.
    */
   async findOne(input: {
