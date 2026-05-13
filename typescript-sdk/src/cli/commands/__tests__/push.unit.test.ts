@@ -1,3 +1,4 @@
+import type fs from "fs";
 import * as yaml from "js-yaml";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { PromptsConfig, PromptsLock, SyncResult } from "../../types";
@@ -7,7 +8,7 @@ const { mockWriteFileSync } = vi.hoisted(() => ({
   mockWriteFileSync: vi.fn(),
 }));
 vi.mock("fs", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("fs")>();
+  const actual = await importOriginal<typeof fs>();
   return { ...actual, writeFileSync: mockWriteFileSync };
 });
 
