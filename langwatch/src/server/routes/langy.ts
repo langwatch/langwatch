@@ -45,6 +45,7 @@ import {
 import { ConversationToolIdSet } from "~/server/services/langy/toolIdValidator";
 import { buildLangyTools } from "~/server/services/langy/tools";
 import { streamLangyMastraResponse } from "~/server/services/langy/mastra-agent";
+import { LangyMastraMemory } from "~/server/services/langy/langy-mastra-memory";
 import { featureFlagService } from "~/server/featureFlag";
 import {
   LANGY_TOOL_CALLS_PER_MESSAGE,
@@ -314,15 +315,6 @@ app.post("/langy/chat", async (c) => {
     );
   }
 
-  if (lastUserMessage?.role === "user") {
-    await persistUserMessage({
-      conversationId: conversation.id,
-      projectId,
-      message: lastUserMessage,
-      model: LANGY_FALLBACK_MODEL,
-    });
-  }
-
   const batchEvaluationService = BatchEvaluationService.create(prisma);
   const datasetService = DatasetService.create(prisma);
   const evaluatorService = EvaluatorService.create(prisma);
@@ -360,37 +352,68 @@ app.post("/langy/chat", async (c) => {
     false,
     { projectId },
   );
-  // Phase 4 safety note: the Mastra path now persists assistant messages
-  // (PR-4.4 part a). Still missing vs the legacy path:
+  // Phase 4 safety note: the Mastra path now uses Mastra's Memory primitive
+  // (PR-4.4b — `LangyMastraMemory` adapter is the sole writer of assistant
+  // + tool + user turns on this branch; the legacy `onFinish` hook is NOT
+  // attached). Still missing vs the legacy path:
   //   - `experimental_telemetry` parity (no Mastra equivalent yet — Mastra
   //     uses its own observability stack; bridging is a follow-up).
-  //   - Mastra's Memory primitive (Thread/Resource model) is NOT adopted
-  //     yet; we persist via our own LangyMessageService instead. Adapter
-  //     comes in PR-4.4b before PR-4.5 cutover.
-  // The flag `release_ui_langy_mastra_enabled` should remain default-off
-  // in prod until both gaps close.
+  //   - Working memory / semantic recall (deliberately out of scope for the
+  //     adapter; see `langy-mastra-memory.ts`). Stays default-off until the
+  //     telemetry bridge lands ahead of PR-4.5 cutover.
   if (useMastra) {
     logger.info(
       { projectId, userId: session.user.id, conversationId: conversation.id },
       "langy.chat: serving via Mastra path",
     );
+    if (!lastUserMessage || lastUserMessage.role !== "user") {
+      return c.json(
+        { error: "Missing user message" },
+        { status: 400 },
+      );
+    }
+    const memory = new LangyMastraMemory({
+      messageService: LangyMessageService.create(prisma),
+      conversationService: LangyConversationService.create(prisma),
+      projectId,
+      userId: session.user.id,
+    });
+    const lastUserModelMessage = (
+      await convertToModelMessages([lastUserMessage])
+    )[0];
+    if (!lastUserModelMessage) {
+      return c.json(
+        { error: "Could not convert user message to model format" },
+        { status: 400 },
+      );
+    }
     const mastraResponse = await streamLangyMastraResponse({
       ctx: toolCtx,
       model,
       systemPrompt,
-      messages: modelMessages,
+      message: lastUserModelMessage,
       maxSteps: LANGY_TOOL_CALLS_PER_MESSAGE,
-      onFinish: buildLangyAssistantOnFinish({
-        conversationId: conversation.id,
-        projectId,
-        model: LANGY_FALLBACK_MODEL,
-      }),
+      memory,
+      threadId: conversation.id,
+      resourceId: projectId,
     });
     const headers = new Headers(mastraResponse.headers);
     headers.set("x-langy-conversation-id", conversation.id);
     return new Response(mastraResponse.body, {
       status: mastraResponse.status,
       headers,
+    });
+  }
+
+  // Legacy path only: persist the user turn up-front so mid-stream failures
+  // don't lose it. The Mastra branch above leaves user persistence to
+  // Mastra's Memory.saveMessages (called at stream completion).
+  if (lastUserMessage?.role === "user") {
+    await persistUserMessage({
+      conversationId: conversation.id,
+      projectId,
+      message: lastUserMessage,
+      model: LANGY_FALLBACK_MODEL,
     });
   }
 

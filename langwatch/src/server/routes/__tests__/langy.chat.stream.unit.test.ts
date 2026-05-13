@@ -904,8 +904,8 @@ describe("POST /api/langy/chat — Mastra path (PR-4.3 spike behind feature flag
       expect(res.headers.get("x-langy-conversation-id")).toBe("conv_test_abc");
     });
 
-    describe("when the Mastra path takes over (PR-4.4 part a — assistant-message persistence)", () => {
-      it("forwards an onFinish callback so assistant turns persist (no longer dropped silently)", async () => {
+    describe("when the Mastra path takes over (PR-4.4b — Mastra memory adapter owns persistence)", () => {
+      it("forwards memory + threadId + resourceId — and does NOT pass onFinish (memory is the sole writer)", async () => {
         await app.request("/api/langy/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -923,37 +923,76 @@ describe("POST /api/langy/chat — Mastra path (PR-4.3 spike behind feature flag
 
         expect(mockStreamLangyMastraResponse).toHaveBeenCalledWith(
           expect.objectContaining({
-            onFinish: expect.any(Function),
+            memory: expect.any(Object),
+            threadId: "conv_test_abc",
+            resourceId: "proj_demo",
           }),
         );
-
-        // And the callback wires through to the same persistence path the
-        // legacy onFinish uses — invoking it should land an assistant
-        // append + a conversation touch.
         const lastCall =
           mockStreamLangyMastraResponse.mock.calls[
             mockStreamLangyMastraResponse.mock.calls.length - 1
           ]!;
-        const onFinish = (lastCall[0] as { onFinish: (a: unknown) => Promise<void> })
-          .onFinish;
+        expect((lastCall[0] as Record<string, unknown>).onFinish).toBeUndefined();
+      });
 
-        mockAppendMessage.mockClear();
-        mockTouchConversation.mockClear();
-
-        await onFinish({
-          text: "ok",
-          response: { messages: [{ role: "assistant", content: "ok" }] },
+      it("forwards only the latest user ModelMessage (history flows via memory.recall)", async () => {
+        await app.request("/api/langy/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            projectId: "proj_demo",
+            messages: [
+              {
+                id: "m1",
+                role: "user",
+                parts: [{ type: "text", text: "older turn" }],
+              },
+              {
+                id: "m2",
+                role: "user",
+                parts: [{ type: "text", text: "the latest turn" }],
+              },
+            ],
+          }),
         });
 
-        expect(mockAppendMessage).toHaveBeenCalledWith(
-          expect.objectContaining({
-            role: "assistant",
+        const lastCall =
+          mockStreamLangyMastraResponse.mock.calls[
+            mockStreamLangyMastraResponse.mock.calls.length - 1
+          ]!;
+        const payload = lastCall[0] as {
+          message: { role: string; content: unknown };
+          messages?: unknown;
+        };
+        expect(payload.message.role).toBe("user");
+        expect(payload.messages).toBeUndefined();
+        // Body content of the last turn should round-trip through.
+        const content = JSON.stringify(payload.message.content);
+        expect(content).toContain("the latest turn");
+        expect(content).not.toContain("older turn");
+      });
+
+      it("does NOT call persistUserMessage on the Mastra branch (memory.saveMessages handles it)", async () => {
+        mockAppendMessage.mockClear();
+
+        await app.request("/api/langy/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
             projectId: "proj_demo",
+            messages: [
+              {
+                id: "m1",
+                role: "user",
+                parts: [{ type: "text", text: "hello" }],
+              },
+            ],
           }),
-        );
-        expect(mockTouchConversation).toHaveBeenCalledWith(
-          expect.objectContaining({ projectId: "proj_demo" }),
-        );
+        });
+
+        // Legacy branch calls LangyMessageService.append with role 'user' up-front;
+        // Mastra branch defers persistence to the (mocked) streamLangyMastraResponse.
+        expect(mockAppendMessage).not.toHaveBeenCalled();
       });
     });
   });
