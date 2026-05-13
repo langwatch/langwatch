@@ -11,6 +11,14 @@ vi.mock("../rbac", () => ({
   isDemoProject: vi.fn(() => false),
 }));
 
+const mockOrgService = {
+  getUserOrgRoleByTeamId: vi.fn(),
+};
+
+vi.mock("~/server/app-layer/app", () => ({
+  getApp: () => ({ organizations: mockOrgService }),
+}));
+
 const mockPrisma = {
   project: {
     findUniqueOrThrow: vi.fn(),
@@ -123,7 +131,7 @@ describe("getUserProtectionsForProject", () => {
     });
   });
 
-  describe("when user has no RoleBinding", () => {
+  describe("when user has no team RoleBinding and no org membership", () => {
     beforeEach(() => {
       mockPrisma.project.findUniqueOrThrow.mockResolvedValue({
         teamId: "team-1",
@@ -134,6 +142,118 @@ describe("getUserProtectionsForProject", () => {
       });
 
       mockPrisma.roleBinding.findMany.mockResolvedValue([]);
+      mockOrgService.getUserOrgRoleByTeamId.mockResolvedValue(null);
+    });
+
+    it("denies visibility for VISIBLE_TO_ALL", async () => {
+      const result = await getUserProtectionsForProject(
+        { prisma: mockPrisma, session: mockSession },
+        { projectId: "project-1" },
+      );
+
+      expect(result.canSeeCapturedInput).toBe(false);
+      expect(result.canSeeCapturedOutput).toBe(false);
+    });
+  });
+
+  describe("when user has no team RoleBinding but is org MEMBER", () => {
+    beforeEach(() => {
+      mockPrisma.project.findUniqueOrThrow.mockResolvedValue({
+        teamId: "team-1",
+        capturedInputVisibility:
+          ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
+        capturedOutputVisibility:
+          ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
+      });
+
+      mockPrisma.roleBinding.findMany.mockResolvedValue([]);
+      mockOrgService.getUserOrgRoleByTeamId.mockResolvedValue("MEMBER");
+    });
+
+    it("grants visibility for VISIBLE_TO_ALL via org fallback", async () => {
+      const result = await getUserProtectionsForProject(
+        { prisma: mockPrisma, session: mockSession },
+        { projectId: "project-1" },
+      );
+
+      expect(result.canSeeCapturedInput).toBe(true);
+      expect(result.canSeeCapturedOutput).toBe(true);
+    });
+
+    it("denies visibility for VISIBLE_TO_ADMIN", async () => {
+      mockPrisma.project.findUniqueOrThrow.mockResolvedValue({
+        teamId: "team-1",
+        capturedInputVisibility:
+          ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ADMIN,
+        capturedOutputVisibility:
+          ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ADMIN,
+      });
+
+      const result = await getUserProtectionsForProject(
+        { prisma: mockPrisma, session: mockSession },
+        { projectId: "project-1" },
+      );
+
+      expect(result.canSeeCapturedInput).toBe(false);
+      expect(result.canSeeCapturedOutput).toBe(false);
+    });
+  });
+
+  describe("when user has no team RoleBinding but is org ADMIN", () => {
+    beforeEach(() => {
+      mockPrisma.project.findUniqueOrThrow.mockResolvedValue({
+        teamId: "team-1",
+        capturedInputVisibility:
+          ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ADMIN,
+        capturedOutputVisibility:
+          ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ADMIN,
+      });
+
+      mockPrisma.roleBinding.findMany.mockResolvedValue([]);
+      mockOrgService.getUserOrgRoleByTeamId.mockResolvedValue("ADMIN");
+    });
+
+    it("grants visibility for VISIBLE_TO_ADMIN via org admin fallback", async () => {
+      const result = await getUserProtectionsForProject(
+        { prisma: mockPrisma, session: mockSession },
+        { projectId: "project-1" },
+      );
+
+      expect(result.canSeeCapturedInput).toBe(true);
+      expect(result.canSeeCapturedOutput).toBe(true);
+    });
+
+    it("denies visibility for REDACTED_TO_ALL even as org admin", async () => {
+      mockPrisma.project.findUniqueOrThrow.mockResolvedValue({
+        teamId: "team-1",
+        capturedInputVisibility:
+          ProjectSensitiveDataVisibilityLevel.REDACTED_TO_ALL,
+        capturedOutputVisibility:
+          ProjectSensitiveDataVisibilityLevel.REDACTED_TO_ALL,
+      });
+
+      const result = await getUserProtectionsForProject(
+        { prisma: mockPrisma, session: mockSession },
+        { projectId: "project-1" },
+      );
+
+      expect(result.canSeeCapturedInput).toBe(false);
+      expect(result.canSeeCapturedOutput).toBe(false);
+    });
+  });
+
+  describe("when user has no team RoleBinding but is org EXTERNAL", () => {
+    beforeEach(() => {
+      mockPrisma.project.findUniqueOrThrow.mockResolvedValue({
+        teamId: "team-1",
+        capturedInputVisibility:
+          ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
+        capturedOutputVisibility:
+          ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
+      });
+
+      mockPrisma.roleBinding.findMany.mockResolvedValue([]);
+      mockOrgService.getUserOrgRoleByTeamId.mockResolvedValue("EXTERNAL");
     });
 
     it("denies visibility even for VISIBLE_TO_ALL", async () => {
