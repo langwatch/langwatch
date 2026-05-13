@@ -10,9 +10,18 @@ import { getProjectionMetadata, getReactorMetadata } from "~/server/event-sourci
 import { AnomalyStateStore } from "~/server/observability/anomalyState";
 import { connection } from "~/server/redis";
 
-const opsViewPermission = checkOpsPermission("ops:view");
+const opsViewPermission = checkOpsPermission({ permission: "ops:view" });
 
-const opsManagePermission = checkOpsPermission("ops:manage");
+// Status-probe variant of the ops:view middleware — populates `ctx.opsScope`
+// (with `kind: "none"` for non-ops users) without throwing FORBIDDEN. Lets
+// `getScope` be a probe that the global menu can poll on every page load
+// without spamming the console (lw#3584).
+const opsViewProbe = checkOpsPermission({
+  permission: "ops:view",
+  throwOnDeny: false,
+});
+
+const opsManagePermission = checkOpsPermission({ permission: "ops:manage" });
 
 function requireOps() {
   const ops = getApp().ops;
@@ -26,8 +35,29 @@ function requireOps() {
 }
 
 export const opsRouter = createTRPCRouter({
-  getScope: protectedProcedure.use(opsViewPermission).query(({ ctx }) => {
-    return { scope: ctx.opsScope! };
+  /**
+   * Status probe — returns the calling user's ops scope. Always succeeds for
+   * any authenticated user; non-ops users get `{ scope: { kind: "none" } }`
+   * instead of FORBIDDEN. The hook (`useOpsPermission`) derives `hasAccess`
+   * from `scope.kind !== "none"` so the global menu can hide ops UI without
+   * spamming the console with permission errors on every page load
+   * (lw#3584).
+   *
+   * The mutating ops endpoints below still go through the throw-on-deny
+   * variant of `checkOpsPermission` — only this status probe relaxes it.
+   */
+  getScope: protectedProcedure.use(opsViewProbe).query(({ ctx }) => {
+    // The opsViewProbe middleware (checkOpsPermission with throwOnDeny=false)
+    // always populates ctx.opsScope before calling next(). The runtime guard
+    // here is belt-and-suspenders — if it ever fires, the middleware contract
+    // has been violated and we want to know, not silently return undefined.
+    if (!ctx.opsScope) {
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "opsScope not populated by middleware (probable bug)",
+      });
+    }
+    return { scope: ctx.opsScope };
   }),
 
   getDashboardSnapshot: protectedProcedure
