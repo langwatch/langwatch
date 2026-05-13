@@ -244,16 +244,16 @@ describe("matchModelCostWithFallbacks", () => {
       );
     });
 
-    it("matches real anthropic/claude-opus-4.5 entry by hyphenated version", () => {
+    it("matches real anthropic/claude-opus-4-5 entry by dotted version", () => {
       expect(
-        matchModelCostWithFallbacks("claude-opus-4-5", realCosts)?.model
-      ).toBe("anthropic/claude-opus-4.5");
+        matchModelCostWithFallbacks("claude-opus-4.5", realCosts)?.model
+      ).toBe("anthropic/claude-opus-4-5");
     });
 
-    it("matches real anthropic/claude-opus-4.6 entry by hyphenated version", () => {
+    it("matches real anthropic/claude-opus-4-6 entry by dotted version", () => {
       expect(
-        matchModelCostWithFallbacks("claude-opus-4-6", realCosts)?.model
-      ).toBe("anthropic/claude-opus-4.6");
+        matchModelCostWithFallbacks("claude-opus-4.6", realCosts)?.model
+      ).toBe("anthropic/claude-opus-4-6");
     });
 
     it("matches real deepseek/deepseek-v3.2 via deepseek-ai/ alias", () => {
