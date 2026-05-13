@@ -134,6 +134,7 @@ teardown() {
 
 # --- _boxd_fork_impl orchestration ---
 
+# @scenario "fork-issue creates a fork with branch checked out, env uploaded, and tmux running"
 @test "fork-issue: full happy path calls fork, cp, proxy, tmux in order" {
   run boxd_fork_issue 4242
   [ "$status" -eq 0 ]
@@ -151,6 +152,7 @@ teardown() {
   grep -q "tmux new-session -d -s 'claude-issue4242'" "$CALL_LOG"
 }
 
+# @scenario "fork-issue errors when the VM already exists"
 @test "fork-issue: errors when VM already exists (AC#15)" {
   cat > "$TEST_DIR/vms" <<EOF
 [{"name":"langwatch-issue4242","status":"running"}]
@@ -199,6 +201,7 @@ MOCKEOF
   [[ "$output" == *"git push -u origin feat/no-upstream"* ]]
 }
 
+# @scenario "fork-pr resolves the PR head ref via gh and forks for that branch"
 @test "fork-pr: resolves head ref via gh and forks (AC#16)" {
   echo "feat/from-fork" > "$TEST_DIR/gh_pr_branch"
   run boxd_fork_pr 1234
@@ -221,6 +224,7 @@ MOCKEOF
 
 # --- connect-* ---
 
+# @scenario "connect-issue errors clearly when the VM does not exist"
 @test "connect: errors clearly when VM does not exist (AC#19)" {
   echo "[]" > "$TEST_DIR/vms"
   run boxd_connect issue 4242
@@ -228,6 +232,7 @@ MOCKEOF
   [[ "$output" == *"does not exist"* ]]
 }
 
+# @scenario "connect-issue errors when the tmux session is missing"
 @test "connect: errors when tmux session is missing (AC#18)" {
   cat > "$TEST_DIR/vms" <<EOF
 [{"name":"langwatch-issue4242","status":"running"}]
@@ -238,6 +243,7 @@ EOF
   [[ "$output" == *"no claude session"* ]]
 }
 
+# @scenario "connect-issue wakes a suspended VM before attaching"
 @test "connect: wakes a suspended VM before attaching (AC#20)" {
   cat > "$TEST_DIR/vms" <<EOF
 [{"name":"langwatch-issue4242","status":"standby"}]
@@ -288,6 +294,7 @@ EOF
   grep -q "boxd new --name=test--langwatch-golden" "$CALL_LOG"
 }
 
+# @scenario "golden-reset refuses without explicit confirmation"
 @test "golden-reset: refuses without BOXD_FORK_YES=1 (AC#4)" {
   cat > "$TEST_DIR/vms" <<EOF
 [{"name":"test--langwatch-golden","status":"running"}]
@@ -297,6 +304,7 @@ EOF
   [[ "$output" == *"BOXD_FORK_YES=1"* ]]
 }
 
+# @scenario "golden-reset destroys + recreates with confirmation"
 @test "golden-reset: destroys + recreates with BOXD_FORK_YES=1" {
   cat > "$TEST_DIR/vms" <<EOF
 [{"name":"test--langwatch-golden","status":"running"}]

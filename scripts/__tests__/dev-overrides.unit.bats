@@ -19,6 +19,7 @@ teardown() {
 
 # --- intent-based mode names (scripts/dev.sh) ---
 
+# @scenario "frontend-only mode starts no compose containers"
 @test "frontend-only writes only NEXTAUTH_PROVIDER (no infra URL overrides)" {
   write_dev_overrides frontend-only "$OUT"
   result=$(cat "$OUT")
@@ -29,6 +30,7 @@ teardown() {
   [[ "$result" != *"LANGWATCH_NLP_SERVICE"* ]]
 }
 
+# @scenario "backend-shared overrides only DATABASE_URL, REDIS_URL, CLICKHOUSE_URL"
 @test "backend-shared rewrites DATABASE_URL, REDIS_URL, CLICKHOUSE_URL only" {
   write_dev_overrides backend-shared "$OUT"
   result=$(cat "$OUT")
@@ -39,6 +41,7 @@ teardown() {
   [[ "$result" != *"LANGEVALS_ENDPOINT"* ]]
 }
 
+# @scenario "migration uses localhost host-port URLs for prisma migrate from host"
 @test "migration uses localhost host-port URLs (not docker-network names)" {
   write_dev_overrides migration "$OUT"
   result=$(cat "$OUT")
@@ -47,6 +50,7 @@ teardown() {
   [[ "$result" != *"REDIS_URL"* ]]
 }
 
+# @scenario "nlp adds LANGWATCH_NLP_SERVICE and LANGEVALS_ENDPOINT on top of backend"
 @test "nlp adds LANGWATCH_NLP_SERVICE and LANGEVALS_ENDPOINT on top of backend" {
   write_dev_overrides nlp "$OUT"
   result=$(cat "$OUT")
@@ -57,6 +61,7 @@ teardown() {
   [[ "$result" == *"LANGEVALS_ENDPOINT=http://langevals:5562"* ]]
 }
 
+# @scenario "full-local overrides every infrastructure URL"
 @test "full-local writes all five infrastructure URLs" {
   write_dev_overrides full-local "$OUT"
   result=$(cat "$OUT")
@@ -67,6 +72,7 @@ teardown() {
   [[ "$result" == *"LANGEVALS_ENDPOINT"* ]]
 }
 
+# @scenario "write_overrides replaces langwatch/.env.dev-up — does not append"
 @test "second call replaces (not appends) langwatch/.env.dev-up" {
   write_dev_overrides backend-shared "$OUT"
   write_dev_overrides frontend-only "$OUT"

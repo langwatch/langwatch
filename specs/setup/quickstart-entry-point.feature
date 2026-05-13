@@ -7,9 +7,11 @@ Feature: make quickstart is the single dev environment entry point with intent-b
   # names + env_file overlay + host port overlay), `Makefile` (deprecation
   # wrappers + positional MODE arg pass-through), and `scripts/dev.sh`
   # (intent-based prompt + write_overrides + fail-fast + collision detection).
-  # Pure-shell helpers (write_overrides) covered by
-  # scripts/__tests__/dev-overrides.unit.bats; the wider end-to-end behavior
-  # is shell + docker so scenarios stay `@unimplemented` for parity tracking.
+  # The `write_overrides` URL rewrite scenarios are bound to
+  # `scripts/__tests__/dev-overrides.unit.bats`. End-to-end shell+docker
+  # scenarios (intent prompt UX, idempotency, cross-worktree volume sharing,
+  # singleton redis, deprecation warnings) remain `@unimplemented` until a
+  # docker-aware integration suite exists.
 
   # --- Single entry point (#3860 AC#1) ---
 
@@ -46,7 +48,7 @@ Feature: make quickstart is the single dev environment entry point with intent-b
 
   # --- Default = fastest path (#3860 AC#3) ---
 
-  @unit @unimplemented
+  @unit
   Scenario: frontend-only mode starts no compose containers
     When I run "make quickstart frontend-only"
     Then no compose services are brought up
@@ -60,7 +62,7 @@ Feature: make quickstart is the single dev environment entry point with intent-b
 
   # --- URL rewrite per mode (#3860 AC#6) ---
 
-  @unit @unimplemented
+  @unit
   Scenario: backend-shared overrides only DATABASE_URL, REDIS_URL, CLICKHOUSE_URL
     When write_overrides is called with mode=backend-shared
     Then langwatch/.env.dev-up contains DATABASE_URL pointing at postgres:5432
@@ -68,21 +70,21 @@ Feature: make quickstart is the single dev environment entry point with intent-b
     And CLICKHOUSE_URL pointing at clickhouse:8123
     And it does NOT contain LANGWATCH_NLP_SERVICE or LANGEVALS_ENDPOINT
 
-  @unit @unimplemented
+  @unit
   Scenario: migration uses localhost host-port URLs for prisma migrate from host
     When write_overrides is called with mode=migration
     Then DATABASE_URL points at localhost:5432
     And CLICKHOUSE_URL points at localhost:8123
     And REDIS_URL is not overridden
 
-  @unit @unimplemented
+  @unit
   Scenario: nlp adds LANGWATCH_NLP_SERVICE and LANGEVALS_ENDPOINT on top of backend
     When write_overrides is called with mode=nlp
     Then LANGWATCH_NLP_SERVICE points at langwatch_nlp:5561
     And LANGEVALS_ENDPOINT points at langevals:5562
     And the three backend URLs are also overridden
 
-  @unit @unimplemented
+  @unit
   Scenario: full-local overrides every infrastructure URL
     When write_overrides is called with mode=full-local
     Then all five URLs (DATABASE_URL, REDIS_URL, CLICKHOUSE_URL, LANGWATCH_NLP_SERVICE, LANGEVALS_ENDPOINT) are present
@@ -94,7 +96,7 @@ Feature: make quickstart is the single dev environment entry point with intent-b
     Then OPENAI_API_KEY in the running container is the value from .env
     And LANGWATCH_NLP_SERVICE is the value from .env (no override for this mode)
 
-  @unit @unimplemented
+  @unit
   Scenario: write_overrides replaces langwatch/.env.dev-up — does not append
     Given a previous run wrote backend-shared overrides
     When write_overrides runs again with mode=frontend-only

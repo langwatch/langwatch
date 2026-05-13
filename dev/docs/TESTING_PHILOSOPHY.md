@@ -196,6 +196,15 @@ it("renders error badge on ClickHouse memory limit", () => {
 });
 ```
 
+Shell behavior tested with [bats](https://github.com/bats-core/bats-core) (e.g. `scripts/__tests__/*.bats`) uses the same `@scenario` token, expressed as a hash-comment directly above the `@test` line:
+
+```bash
+# @scenario "Stale localhost NEXTAUTH_URL is rewritten to the fork's proxy URL"
+@test "boxd_rewrite_env: rewrites NEXTAUTH_URL allowlist key" {
+  # ...
+}
+```
+
 Titles must match verbatim. Annotations that reference a title not present in any feature file fail CI as `unknownAnnotations` — typos and stale bindings are caught immediately rather than silently rotting.
 
 ### Polarity: enforce-all, with `LEGACY_UNBOUND`

@@ -13,6 +13,7 @@ setup() {
 
 # --- boxd_slug ---
 
+# @scenario "Slugifier lowercases and strips punctuation"
 @test "boxd_slug: lowercases and dashes a simple title" {
   result=$(boxd_slug "feat/Foo Bar!")
   [ "$result" = "feat-foo-bar" ]
@@ -32,6 +33,7 @@ setup() {
   [[ "$result" != *--* ]]
 }
 
+# @scenario "Slugifier truncates to 40 characters with no trailing hyphen"
 @test "boxd_slug: truncates to 40 chars" {
   result=$(boxd_slug "this-is-a-very-long-branch-name-that-should-get-truncated-eventually")
   [ "${#result}" -le 40 ]
@@ -64,6 +66,7 @@ setup() {
   [ "$result" = "langwatch-feat-dark-mode" ]
 }
 
+# @scenario "fork-issue uses the literal langwatch-issue<N> form"
 @test "boxd_vm_name: issue always uses langwatch-issue<N> regardless of slug" {
   # AC#14 collision rule: fork-issue uses literal langwatch-issue<N>
   result=$(boxd_vm_name "issue" "3891")
@@ -90,6 +93,7 @@ setup() {
 
 # --- boxd_branch_issue_collision_warning ---
 
+# @scenario "fork-branch with issue-shaped slug warns and uses langwatch-issue<N>-<rest>"
 @test "boxd_branch_issue_collision_warning: warns when slug starts with issueNNN-" {
   run boxd_branch_issue_collision_warning "issue42-foo-bar"
   [ "$status" -eq 0 ]
@@ -140,6 +144,7 @@ teardown_env_fixture() {
   teardown_env_fixture
 }
 
+# @scenario ".env discovery excludes example/template/sample/local suffixes"
 @test "boxd_env_files: excludes .env.example, .template, .sample, .local" {
   setup_env_fixture
   result=$(boxd_env_files)
@@ -150,6 +155,7 @@ teardown_env_fixture() {
   teardown_env_fixture
 }
 
+# @scenario ".env discovery excludes node_modules, .next, dist, build, vendor, coverage, .git"
 @test "boxd_env_files: excludes node_modules, .next, dist, build, vendor, coverage" {
   setup_env_fixture
   result=$(boxd_env_files)
@@ -164,6 +170,7 @@ teardown_env_fixture() {
 
 # --- boxd_rewrite_env (hostname rewrite, allowlist + value-pattern) ---
 
+# @scenario "Stale localhost NEXTAUTH_URL is rewritten to the fork's proxy URL"
 @test "boxd_rewrite_env: rewrites NEXTAUTH_URL allowlist key" {
   result=$(printf 'NEXTAUTH_URL=http://localhost:5560\n' \
     | boxd_rewrite_env "langwatch-issue42")
@@ -176,6 +183,7 @@ teardown_env_fixture() {
   [ "$result" = 'BASE_HOST="https://langwatch-issue42.boxd.sh"' ]
 }
 
+# @scenario "LW_GATEWAY_BASE_URL routes to the aigw subdomain"
 @test "boxd_rewrite_env: rewrites LW_GATEWAY_BASE_URL to aigw subdomain" {
   result=$(printf 'LW_GATEWAY_BASE_URL=http://localhost:5563\n' \
     | boxd_rewrite_env "langwatch-issue42")
@@ -209,6 +217,7 @@ teardown_env_fixture() {
   [[ "$result" == *"KEY=value"* ]]
 }
 
+# @scenario "A real boxd-proxy URL is left untouched"
 @test "boxd_rewrite_env: leaves a real boxd-proxy URL alone" {
   result=$(printf 'NEXTAUTH_URL=https://langwatch-other.boxd.sh\n' \
     | boxd_rewrite_env "langwatch-issue42")
