@@ -35,7 +35,7 @@
       "protobufjs"
     ],
     "overrides": {
-      "protobufjs": ">=7.5.5 <8.0.0 || >=8.0.1",
+      "protobufjs": ">=7.5.6 <8.0.0 || >=8.0.2",
       "fast-uri@<3.1.2": "3.1.2"
     }
   }
