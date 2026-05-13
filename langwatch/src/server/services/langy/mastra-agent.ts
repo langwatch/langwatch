@@ -26,10 +26,17 @@ export interface StreamLangyMastraOptions {
   systemPrompt: string;
   messages: ModelMessage[];
   maxSteps: number;
-  onFinish?: (result: {
-    text?: string;
-    response?: unknown;
-  }) => void | Promise<void>;
+  /**
+   * Optional persistence/telemetry callback fired when the stream completes.
+   * Typed `(args: any) => …` because Mastra's `MastraOnFinishCallback<OUTPUT>`
+   * carries a deep generic (`LLMStepResult<OUTPUT>`) whose extras (steps,
+   * usage, runId, etc.) the Langy callback doesn't consume — chasing the
+   * exact type adds noise without value. The actual shape we read is
+   * `{ text: string; response: { messages?: [...] } }` and the route's
+   * `buildLangyAssistantOnFinish` is the canonical implementation.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  onFinish?: (args: any) => void | Promise<void>;
 }
 
 /**
