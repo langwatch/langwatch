@@ -171,6 +171,16 @@ Feature: Langy in-product AI assistant — baseline (v1)
     And the envelope does not include raw stack traces
     And the failure is logged for telemetry with the tool name
 
+  Scenario: search_traces output is shape-validated before the model sees it
+    Given the trace search tool returns a payload that does not match its declared shape
+    When Langy receives the tool result
+    Then the model receives a "tool_output_invalid" error envelope instead of the raw payload
+
+  Scenario: search_past_runs output is shape-validated before the model sees it
+    Given the past-runs search tool returns rows that do not match their declared shape
+    When Langy receives the tool result
+    Then the model receives a "tool_output_invalid" error envelope instead of the raw rows
+
   # ============================================================================
   # Read-only boundary (v1)
   # ============================================================================

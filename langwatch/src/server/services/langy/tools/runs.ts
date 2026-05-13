@@ -1,14 +1,29 @@
-import { tool } from "ai";
 import { z } from "zod";
+import { defineLangyTool } from "../defineLangyTool";
 import type { LangyToolContext } from "./types";
 
 export function makeSearchPastRuns(ctx: LangyToolContext) {
-  return tool({
+  return defineLangyTool({
+    name: "search_past_runs",
     description:
       "Search past evaluation runs (BatchEvaluation) for this project, optionally filtered by experiment slug, ordered by recency.",
     inputSchema: z.object({
       experimentSlug: z.string().optional(),
       limit: z.number().int().min(1).max(20).default(10),
+    }),
+    outputSchema: z.object({
+      items: z.array(
+        z.object({
+          id: z.string(),
+          experimentId: z.string(),
+          createdAt: z.date(),
+          status: z.string(),
+          score: z.number(),
+          passed: z.boolean(),
+          evaluation: z.string(),
+        }),
+      ),
+      error: z.string().optional(),
     }),
     execute: async ({ experimentSlug, limit }) => {
       const where: Record<string, unknown> = { projectId: ctx.projectId };

@@ -1,13 +1,14 @@
-import { tool } from "ai";
 import { z } from "zod";
 import { esClient, TRACE_INDEX } from "~/server/elasticsearch";
 import { createLogger } from "~/utils/logger/server";
+import { defineLangyTool } from "../defineLangyTool";
 import type { LangyToolContext } from "./types";
 
 const logger = createLogger("langwatch:langy:tools:traces");
 
 export function makeSearchTraces(ctx: LangyToolContext) {
-  return tool({
+  return defineLangyTool({
+    name: "search_traces",
     description:
       "Keyword search over recent traces in this project (BM25 over input/output text and error messages — not semantic). Use when the user asks to 'find traces' with specific words or phrases in them ('error', 'timeout', a particular customer name). Returns a small list of trace ids with brief context. Tool result is per-turn only — do not persist or recall ids across conversations.",
     inputSchema: z.object({
@@ -16,6 +17,16 @@ export function makeSearchTraces(ctx: LangyToolContext) {
         .min(1)
         .describe("Free-text query (e.g. 'hallucinations', 'rag failures')."),
       limit: z.number().int().min(1).max(20).default(10),
+    }),
+    outputSchema: z.object({
+      items: z.array(
+        z.object({
+          traceId: z.string(),
+          startedAt: z.number().nullable(),
+          snippet: z.string().nullable(),
+        }),
+      ),
+      error: z.string().optional(),
     }),
     execute: async ({ query, limit }) => {
       try {
