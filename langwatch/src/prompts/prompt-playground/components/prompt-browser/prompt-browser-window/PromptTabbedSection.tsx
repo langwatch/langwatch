@@ -6,6 +6,7 @@ import { useDebounceCallback } from "usehooks-ts";
 import { Tooltip } from "~/components/ui/tooltip";
 import { type Variable, VariablesSection } from "~/components/variables";
 import { transposeColumnsFirstToRowsFirstWithId } from "~/optimization_studio/utils/datasetUtils";
+import { RuntimeConfigReadonly } from "~/prompts/forms/fields/RuntimeConfigField";
 import type { PromptConfigFormValues } from "~/prompts/types";
 import type { LlmConfigInputType } from "~/types";
 import { useDraggableTabsBrowserStore } from "../../../prompt-playground-store/DraggableTabsBrowserStore";
@@ -30,6 +31,7 @@ enum PromptTab {
   Conversation = "conversation",
   Variables = "variables",
   Demonstrations = "demonstrations",
+  Config = "config",
 }
 
 export type PromptTabbedSectionProps = {
@@ -58,6 +60,7 @@ export function PromptTabbedSection({
   const form = useFormContext<PromptConfigFormValues>();
   const tabId = useTabId();
   const inputs = form.watch("version.configData.inputs") ?? [];
+  const runtimeConfig = form.watch("version.config") ?? {};
   const demonstrations = form.watch("version.configData.demonstrations");
 
   // Get variable values from persisted store
@@ -176,6 +179,7 @@ export function PromptTabbedSection({
               Demonstrations
             </Tabs.Trigger>
           )}
+          <Tabs.Trigger value={PromptTab.Config}>Config</Tabs.Trigger>
           <Tabs.Context>
             {(tabs) => (
               <>
@@ -280,6 +284,22 @@ export function PromptTabbedSection({
             </Box>
           </Tabs.Content>
         )}
+        <Tabs.Content
+          value={PromptTab.Config}
+          flex={1}
+          width="full"
+          height="full"
+        >
+          <Box
+            height="full"
+            width="full"
+            maxWidth={layoutMode === "horizontal" ? "full" : "768px"}
+            margin="0 auto"
+            padding={3}
+          >
+            <RuntimeConfigReadonly value={runtimeConfig} />
+          </Box>
+        </Tabs.Content>
       </HStack>
     </Tabs.Root>
   );

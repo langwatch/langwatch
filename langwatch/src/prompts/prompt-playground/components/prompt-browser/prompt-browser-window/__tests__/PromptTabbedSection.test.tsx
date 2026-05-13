@@ -423,15 +423,23 @@ vi.mock("@copilotkit/react-ui", () => ({
 /**
  * Wrapper component that provides FormContext
  */
-function FormWrapper({ children }: { children: React.ReactNode }) {
+function FormWrapper({
+  children,
+  defaultValues,
+}: {
+  children: React.ReactNode;
+  defaultValues?: Partial<PromptConfigFormValues>;
+}) {
   const methods = useForm<PromptConfigFormValues>({
     defaultValues: {
       version: {
+        config: {},
         configData: {
           inputs: [],
           demonstrations: { inline: { records: {} } },
         },
       },
+      ...defaultValues,
     },
   });
 
@@ -440,6 +448,7 @@ function FormWrapper({ children }: { children: React.ReactNode }) {
 
 const renderPromptTabbedSection = (
   props: Partial<Parameters<typeof PromptTabbedSection>[0]> = {},
+  formValues?: Partial<PromptConfigFormValues>,
 ) => {
   const defaultProps = {
     layoutMode: "vertical" as const,
@@ -452,7 +461,7 @@ const renderPromptTabbedSection = (
 
   return render(
     <ChakraProvider value={defaultSystem}>
-      <FormWrapper>
+      <FormWrapper defaultValues={formValues}>
         <PromptTabbedSection {...defaultProps} />
       </FormWrapper>
     </ChakraProvider>,
@@ -537,6 +546,31 @@ describe("PromptTabbedSection Layout Modes", () => {
       expect(
         screen.getByRole("button", { name: /reset chat/i }),
       ).toBeInTheDocument();
+    });
+
+    it("shows runtime config as read-only version data", async () => {
+      /**
+       * @scenario Prompt playground shows runtime config as read-only version data
+       */
+      const user = userEvent.setup();
+      renderPromptTabbedSection(
+        { layoutMode: "vertical" },
+        {
+          version: {
+            config: { readonly: true },
+            configData: {
+              inputs: [],
+              demonstrations: { inline: { records: {} } },
+            },
+          } as any,
+        },
+      );
+
+      await user.click(screen.getByRole("tab", { name: /config/i }));
+
+      expect(screen.getByTestId("runtime-config-readonly")).toHaveTextContent(
+        '"readonly": true',
+      );
     });
   });
 });

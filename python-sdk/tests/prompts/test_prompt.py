@@ -140,3 +140,48 @@ def test_from_api_response_handles_none_response_format():
     result = PromptData.from_api_response(mock_response)
 
     assert result.response_format is None
+
+
+def test_from_api_response_extracts_runtime_config():
+    """
+    @scenario Python prompt models expose runtime config
+    """
+    mock_response = Mock()
+    mock_response.id = "prompt_1"
+    mock_response.handle = "my-prompt"
+    mock_response.model = "openai/gpt-4"
+    mock_response.version_id = "v1"
+    mock_response.version = 1
+    mock_response.scope = PostApiPromptsResponse200Scope.PROJECT
+    mock_response.prompt = "Test"
+    mock_response.temperature = None
+    mock_response.max_tokens = None
+    mock_response.messages = []
+    mock_response.response_format = None
+    mock_response.config = {"sdk": True}
+
+    result = PromptData.from_api_response(mock_response)
+
+    assert result.config == {"sdk": True}
+
+
+def test_from_api_response_defaults_missing_runtime_config_to_empty_dict():
+    """
+    @scenario Python prompt models expose runtime config
+    """
+    mock_response = Mock()
+    mock_response.id = "prompt_1"
+    mock_response.handle = "my-prompt"
+    mock_response.model = "openai/gpt-4"
+    mock_response.version_id = "v1"
+    mock_response.version = 1
+    mock_response.scope = PostApiPromptsResponse200Scope.PROJECT
+    mock_response.prompt = "Test"
+    mock_response.temperature = None
+    mock_response.max_tokens = None
+    mock_response.messages = []
+    mock_response.response_format = None
+
+    result = PromptData.from_api_response(mock_response)
+
+    assert result.config == {}

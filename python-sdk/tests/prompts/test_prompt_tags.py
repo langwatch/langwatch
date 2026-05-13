@@ -472,6 +472,53 @@ class TestPromptApiServiceCreateUpdateWithTags:
             body_arg = mock_module.sync_detailed.call_args[1]["body"]
             assert body_arg.tags == ["staging", "canary"]
 
+    def test_create_includes_config_in_request_body(self):
+        """
+        @scenario Python prompt API writes runtime config on create and update
+        """
+        parsed = _make_api_response_200()
+        mock_resp = _mock_sync_detailed_response(parsed)
+
+        with patch(
+            "langwatch.prompts.prompt_api_service.post_api_prompts"
+        ) as mock_module, patch(
+            "langwatch.prompts.prompt_api_service.unwrap_response",
+            return_value=parsed,
+        ):
+            mock_module.sync_detailed.return_value = mock_resp
+            client = Mock()
+            service = PromptApiService(client)
+            service.create(handle="pizza-prompt", config={"sdk_write": True})
+
+            body_arg = mock_module.sync_detailed.call_args[1]["body"]
+            assert body_arg.to_dict()["config"] == {"sdk_write": True}
+
+    def test_update_includes_config_in_request_body(self):
+        """
+        @scenario Python prompt API writes runtime config on create and update
+        """
+        parsed = _make_api_response_200()
+        mock_resp = _mock_sync_detailed_response(parsed)
+
+        with patch(
+            "langwatch.prompts.prompt_api_service.put_api_prompts_by_id"
+        ) as mock_module, patch(
+            "langwatch.prompts.prompt_api_service.unwrap_response",
+            return_value=parsed,
+        ):
+            mock_module.sync_detailed.return_value = mock_resp
+            client = Mock()
+            service = PromptApiService(client)
+            service.update(
+                prompt_id_or_handle="pizza-prompt",
+                scope="PROJECT",
+                commit_message="update config",
+                config={"sdk_write": True},
+            )
+
+            body_arg = mock_module.sync_detailed.call_args[1]["body"]
+            assert body_arg.to_dict()["config"] == {"sdk_write": True}
+
 
 # ---------------------------------------------------------------------------
 # PromptsFacade.get() -- tag parameter

@@ -78,6 +78,7 @@ export const llmPromptConfigVersionFactory = Factory.define<
     schemaVersion,
     createdAt: new Date(),
     projectId: nanoid(), // This should be overridden with an actual project ID when used
+    runtimeConfig: params?.runtimeConfig ?? {},
   } as LlmPromptConfigVersion & {
     configData: z.infer<
       (typeof schemaValidators)[typeof LATEST_SCHEMA_VERSION]

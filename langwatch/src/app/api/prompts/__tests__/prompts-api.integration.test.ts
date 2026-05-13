@@ -210,7 +210,7 @@ describe("Prompts API", () => {
           data: llmPromptConfigVersionFactory.build({
             configId: config.id,
             projectId: testProjectId,
-          }),
+          }) as any,
         });
       });
 

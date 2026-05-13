@@ -1,4 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import * as fs from "fs";
+import * as yaml from "js-yaml";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { PromptsConfig, PromptsLock, SyncResult } from "../../types";
 import type { PromptsApiService } from "@/client-sdk/services/prompts";
 
@@ -36,6 +38,10 @@ describe("pushPrompts", () => {
       sync: mockSync,
       update: mockUpdate,
     } as unknown as PromptsApiService;
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   describe("when local config has response_format with schema", () => {
@@ -294,6 +300,104 @@ describe("pushPrompts", () => {
 
       const syncCall = mockSync.mock.calls[0]![0];
       expect(syncCall.configData.temperature).toBeUndefined();
+    });
+  });
+
+  describe("when local config has runtime config", () => {
+    it("sends config to prompt sync", async () => {
+      /**
+       * @scenario TypeScript local prompt files preserve runtime config
+       */
+      vi.mocked(FileManager.loadLocalPrompt).mockReturnValue({
+        model: "openai/gpt-4o",
+        messages: [{ role: "system", content: "test" }],
+        config: { cli: true },
+      } as any);
+
+      mockSync.mockResolvedValue({
+        action: "created",
+        prompt: { version: 1, versionId: "v1" },
+      });
+
+      const config: PromptsConfig = {
+        prompts: { "runtime-config": "file:prompts/runtime.prompt.yaml" },
+      };
+      const lock: PromptsLock = { lockfileVersion: 1, prompts: {} };
+      const result: SyncResult = {
+        fetched: [],
+        pushed: [],
+        unchanged: [],
+        cleaned: [],
+        errors: [],
+      };
+
+      await pushPrompts({ config, lock, promptsApiService, result });
+
+      expect(mockSync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          config: { cli: true },
+        }),
+      );
+    });
+
+    it("writes remote config when resolving a conflict with remote", async () => {
+      /**
+       * @scenario Syncing a local prompt detects runtime config conflicts
+       */
+      vi.mocked(FileManager.loadLocalPrompt).mockReturnValue({
+        model: "openai/gpt-4o",
+        messages: [{ role: "system", content: "local" }],
+        config: { local: true },
+      } as any);
+
+      mockSync.mockResolvedValue({
+        action: "conflict",
+        conflictInfo: {
+          localVersion: 1,
+          remoteVersion: 1,
+          differences: ["config changed"],
+          remoteConfigData: {
+            model: "openai/gpt-4o",
+            prompt: "remote",
+            messages: [],
+          },
+          remoteConfig: { remote: true },
+        },
+      });
+
+      const config: PromptsConfig = {
+        prompts: { "runtime-config": "file:prompts/runtime.prompt.yaml" },
+      };
+      const lock: PromptsLock = {
+        lockfileVersion: 1,
+        prompts: {
+          "runtime-config": {
+            version: 1,
+            versionId: "v1",
+            materialized: "prompts/runtime.prompt.yaml",
+          },
+        },
+      };
+      const result: SyncResult = {
+        fetched: [],
+        pushed: [],
+        unchanged: [],
+        cleaned: [],
+        errors: [],
+      };
+
+      await pushPrompts({
+        config,
+        lock,
+        promptsApiService,
+        result,
+        forceResolution: "remote",
+      });
+
+      const writtenYaml = mockWriteFileSync.mock.calls[0]?.[1] as string;
+      expect(yaml.load(writtenYaml)).toMatchObject({
+        config: { remote: true },
+      });
     });
   });
 });

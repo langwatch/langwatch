@@ -306,6 +306,7 @@ describe("versionedPromptToPromptConfigFormValues", () => {
     updatedAt: new Date(),
     createdAt: new Date(),
     tags: [],
+    config: {},
   });
 
   describe("when prompt handle has no prefix", () => {
@@ -397,6 +398,20 @@ describe("versionedPromptToPromptConfigFormValues", () => {
       expect(result.version.configData.llm.reasoning).toBeUndefined();
     });
   });
+
+  describe("when prompt has runtime config", () => {
+    it("maps runtime config onto form values", () => {
+      /**
+       * @scenario Prompt form values preserve runtime config during API mapping
+       */
+      const prompt = createMockPrompt("test-prompt");
+      prompt.config = { mapped: true };
+
+      const result = versionedPromptToPromptConfigFormValues(prompt);
+
+      expect(result.version.config).toEqual({ mapped: true });
+    });
+  });
 });
 
 describe("versionedPromptToPromptConfigFormValuesWithSystemMessage", () => {
@@ -426,6 +441,7 @@ describe("versionedPromptToPromptConfigFormValuesWithSystemMessage", () => {
     updatedAt: new Date(),
     createdAt: new Date(),
     tags: [],
+    config: {},
     ...overrides,
   });
 
@@ -769,6 +785,21 @@ describe("formValuesToTriggerSaveVersionParams", () => {
       expect(result).not.toHaveProperty("reasoningEffort");
     });
   });
+
+  describe("when form values include runtime config", () => {
+    it("propagates config to the save payload", () => {
+      /**
+       * @scenario Prompt form values preserve runtime config during API mapping
+       */
+      const formValues = buildDefaultFormValues({
+        version: { config: { mapped: true } },
+      });
+
+      const result = formValuesToTriggerSaveVersionParams(formValues);
+
+      expect(result.config).toEqual({ mapped: true });
+    });
+  });
 });
 
 describe("formSchema reasoning validation", () => {
@@ -804,6 +835,37 @@ describe("formSchema reasoning validation", () => {
       const values = buildDefaultFormValues();
       expect(formSchema.safeParse(values).success).toBe(true);
       expect(values.version.configData.llm.reasoning).toBeUndefined();
+    });
+  });
+});
+
+describe("formSchema runtime config validation", () => {
+  describe("when config is object JSON", () => {
+    it("accepts nested object values", () => {
+      /**
+       * @scenario Runtime config validation accepts object JSON values
+       */
+      const values = buildDefaultFormValues({
+        version: {
+          config: { nested: { array: [1, true, { leaf: "value" }] } },
+        },
+      });
+
+      expect(formSchema.safeParse(values).success).toBe(true);
+    });
+  });
+
+  describe("when config root is not an object", () => {
+    it("rejects non-object values", () => {
+      /**
+       * @scenario Runtime config validation rejects non-object root values
+       */
+      for (const config of [null, [1, 2], "value", 1, true]) {
+        const values = buildDefaultFormValues({
+          version: { config: config as any },
+        });
+        expect(formSchema.safeParse(values).success).toBe(false);
+      }
     });
   });
 });

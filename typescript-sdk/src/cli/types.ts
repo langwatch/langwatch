@@ -11,6 +11,8 @@ export type PromptsConfig = {
   prompts: Record<string, PromptDependency>;
 };
 
+export type RuntimeConfig = Record<string, unknown>;
+
 // Zod schema for local prompt config with permissive validation
 export const localPromptConfigSchema = z
   .object({
@@ -32,6 +34,7 @@ export const localPromptConfigSchema = z
           .loose(),
       )
       .min(1, "At least one message is required"),
+    config: z.record(z.string(), z.unknown()).optional().default({}),
   })
   .loose();
 
@@ -52,6 +55,7 @@ export type MaterializedPrompt = {
   maxTokens?: number;
   inputs?: any;
   outputs?: any;
+  config: RuntimeConfig;
   updatedAt: string;
 };
 

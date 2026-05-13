@@ -14,6 +14,7 @@ export const DEFAULT_FORM_VALUES: PromptConfigFormValues = {
   handle: null,
   scope: PromptScope.PROJECT,
   version: {
+    config: {},
     configData: {
       llm: {
         model: DEFAULT_MODEL,

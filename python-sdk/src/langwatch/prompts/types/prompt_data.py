@@ -5,9 +5,9 @@ This module contains the PromptData Pydantic model with conversion methods,
 following the TypeScript PromptData interface structure.
 """
 
-from typing import Literal, Optional, List, Union
+from typing import Any, Dict, Literal, Optional, List, Union
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from langwatch.generated.langwatch_rest_api_client.types import Unset
 from langwatch.generated.langwatch_rest_api_client.models.get_api_prompts_by_id_response_200 import (
@@ -41,6 +41,7 @@ class PromptData(BaseModel):
     temperature: Optional[float] = None
     max_tokens: Optional[int] = None
     response_format: Optional[ResponseFormat] = None
+    config: Dict[str, Any] = Field(default_factory=dict)
 
     # === Optional identification (for tracing) ===
     id: Optional[str] = None
@@ -89,6 +90,7 @@ class PromptData(BaseModel):
             )
 
         raw_version = _unset_to_none(response.version)
+        raw_config = _read_runtime_config(response)
 
         return PromptData(
             id=_unset_to_none(response.id),
@@ -99,7 +101,22 @@ class PromptData(BaseModel):
             temperature=_unset_to_none(response.temperature),
             max_tokens=_unset_to_none(response.max_tokens),
             response_format=response_format,
+            config=raw_config,
             version=int(raw_version) if raw_version is not None else None,
             version_id=_unset_to_none(response.version_id),
             scope=response.scope.value if response.scope and not isinstance(response.scope, Unset) else None,
         )
+
+
+def _read_runtime_config(response: object) -> Dict[str, Any]:
+    additional_properties = getattr(response, "additional_properties", None)
+    if isinstance(additional_properties, dict):
+        config = additional_properties.get("config")
+    else:
+        config = getattr(response, "__dict__", {}).get("config")
+
+    if isinstance(config, Unset) or config is None:
+        return {}
+    if isinstance(config, dict):
+        return config
+    return {}

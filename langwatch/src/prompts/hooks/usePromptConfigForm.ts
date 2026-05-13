@@ -189,6 +189,11 @@ export const usePromptConfigForm = ({
     if (methods.formState.isDirty) return;
 
     disableOnChangeRef.current = true;
+    const currentRuntimeConfig = methods.getValues("version.config");
+    const nextRuntimeConfig = parsedInitialValues?.version?.config ?? {};
+    if (!isEqual(currentRuntimeConfig, nextRuntimeConfig)) {
+      methods.setValue("version.config", nextRuntimeConfig);
+    }
     // Use parsed values to ensure defaults are applied
     for (const [key, value] of Object.entries(
       parsedInitialValues?.version?.configData ?? {},

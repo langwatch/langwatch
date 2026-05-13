@@ -293,6 +293,7 @@ describe("WorkflowBuilder", () => {
       createdAt: new Date(),
       updatedAt: new Date(),
       tags: [],
+      config: {},
     });
 
     it("builds signature node from database prompt", () => {

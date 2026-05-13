@@ -133,6 +133,21 @@ export function deriveResponseFormatFromOutputs(
   };
 }
 
+const jsonValue: z.ZodType<unknown> = z.lazy(() =>
+  z.union([
+    z.string(),
+    z.number(),
+    z.boolean(),
+    z.null(),
+    z.array(jsonValue),
+    z.record(z.string(), jsonValue),
+  ]),
+);
+
+export const runtimeConfigSchema = z
+  .record(z.string(), jsonValue)
+  .default({});
+
 /**
  * Extended runtime input schema including a value for execution time.
  * Single Responsibility: Add value-carrying variant of inputs for runtime usage.

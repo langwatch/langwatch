@@ -5,7 +5,11 @@ import {
   FALLBACK_MAX_TOKENS,
   MIN_MAX_TOKENS,
 } from "~/utils/constants";
-import { handleSchema, scopeSchema } from "./field-schemas";
+import {
+  handleSchema,
+  runtimeConfigSchema,
+  scopeSchema,
+} from "./field-schemas";
 import { versionMetadataSchema } from "./version-metadata-schema";
 
 const latestConfigVersionSchema = getLatestConfigVersionSchema();
@@ -45,6 +49,7 @@ const baseFormSchema = z.object({
   handle: handleSchema.nullable(),
   scope: scopeSchema,
   version: z.object({
+    config: runtimeConfigSchema,
     configData: z.object({
       messages: latestConfigVersionSchema.shape.configData.shape.messages.removeDefault(),
       inputs: latestConfigVersionSchema.shape.configData.shape.inputs.removeDefault(),
