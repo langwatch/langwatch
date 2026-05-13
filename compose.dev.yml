@@ -134,6 +134,13 @@ services:
     working_dir: /app
     volumes:
       - ./langwatch:/app
+      # The repo-root pnpm-workspace.yaml + package.json define the
+      # outer workspace pnpm walks up to from /app. Without these two
+      # bind-mounts, pnpm stops at /app/pnpm-workspace.yaml and computes
+      # a different effective overrides config than the lockfile was
+      # generated against, breaking `pnpm install --frozen-lockfile`.
+      - ./pnpm-workspace.yaml:/pnpm-workspace.yaml:ro
+      - ./package.json:/package.json:ro
       - ./mcp-server:/mcp-server
       - ./langevals:/langevals
       - ./typescript-sdk:/typescript-sdk:ro
@@ -175,6 +182,13 @@ services:
     working_dir: /app
     volumes:
       - ./langwatch:/app
+      # The repo-root pnpm-workspace.yaml + package.json define the
+      # outer workspace pnpm walks up to from /app. Without these two
+      # bind-mounts, pnpm stops at /app/pnpm-workspace.yaml and computes
+      # a different effective overrides config than the lockfile was
+      # generated against, breaking `pnpm install --frozen-lockfile`.
+      - ./pnpm-workspace.yaml:/pnpm-workspace.yaml:ro
+      - ./package.json:/package.json:ro
       - ./mcp-server:/mcp-server
       - ./langevals:/langevals
       - ./typescript-sdk:/typescript-sdk:ro
@@ -237,6 +251,13 @@ services:
     profiles: [workers, scenarios, full]
     volumes:
       - ./langwatch:/app
+      # The repo-root pnpm-workspace.yaml + package.json define the
+      # outer workspace pnpm walks up to from /app. Without these two
+      # bind-mounts, pnpm stops at /app/pnpm-workspace.yaml and computes
+      # a different effective overrides config than the lockfile was
+      # generated against, breaking `pnpm install --frozen-lockfile`.
+      - ./pnpm-workspace.yaml:/pnpm-workspace.yaml:ro
+      - ./package.json:/package.json:ro
       - ./mcp-server:/mcp-server
       - ./langevals:/langevals
       - ./typescript-sdk:/typescript-sdk:ro
@@ -330,6 +351,13 @@ services:
     profiles: [test, scenarios, full]
     volumes:
       - ./langwatch:/app
+      # The repo-root pnpm-workspace.yaml + package.json define the
+      # outer workspace pnpm walks up to from /app. Without these two
+      # bind-mounts, pnpm stops at /app/pnpm-workspace.yaml and computes
+      # a different effective overrides config than the lockfile was
+      # generated against, breaking `pnpm install --frozen-lockfile`.
+      - ./pnpm-workspace.yaml:/pnpm-workspace.yaml:ro
+      - ./package.json:/package.json:ro
       - ./mcp-server:/mcp-server
       - ./langevals:/langevals
       - ./typescript-sdk:/typescript-sdk:ro
