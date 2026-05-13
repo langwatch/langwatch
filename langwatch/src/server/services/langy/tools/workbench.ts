@@ -1,7 +1,7 @@
-import { tool } from "ai";
 import { z } from "zod";
 import { persistedEvaluationsV3StateSchema } from "~/evaluations-v3/types/persistence";
 import { parseEvaluationResult } from "~/utils/evaluationResults";
+import { defineLangyTool } from "../defineLangyTool";
 import type { LangyConversationContext } from "./types";
 
 type ParsedState = ReturnType<typeof persistedEvaluationsV3StateSchema.parse>;
@@ -196,11 +196,76 @@ function extractRowInputs(
   return undefined;
 }
 
+const workbenchErrorSchema = z.object({
+  error: z.string(),
+  details: z.string().optional(),
+});
+
+const workbenchEmptyStateSchema = z.object({
+  experimentName: z.string(),
+  message: z.string(),
+});
+
+const workbenchSummarySchema = z.object({
+  experimentName: z.string(),
+  activeDatasetId: z.string().nullable().optional(),
+  datasets: z.array(
+    z.object({
+      id: z.string(),
+      type: z.string(),
+      columns: z.array(z.string().optional()),
+      datasetId: z.string().optional(),
+    }),
+  ),
+  targets: z.array(
+    z.object({
+      id: z.string(),
+      type: z.string().optional(),
+      name: z.string(),
+    }),
+  ),
+  evaluators: z.array(
+    z.object({
+      id: z.string(),
+      evaluatorType: z.string(),
+      name: z.string(),
+      dbEvaluatorId: z.string().nullable().optional(),
+    }),
+  ),
+  results: z
+    .array(
+      z.object({
+        targetId: z.string(),
+        rowsEvaluated: z.number(),
+        errors: z.number(),
+        perEvaluator: z.array(
+          z.object({
+            evaluatorId: z.string(),
+            evaluatorName: z.string(),
+            passed: z.number(),
+            failed: z.number(),
+            processed: z.number(),
+            error: z.number(),
+            skipped: z.number(),
+            pending: z.number(),
+          }),
+        ),
+      }),
+    )
+    .nullable(),
+});
+
 export function makeGetWorkbenchState(ctx: LangyConversationContext) {
-  return tool({
+  return defineLangyTool({
+    name: "get_workbench_state",
     description:
       "Inspect the current experiment workbench: what datasets, targets, and evaluators are configured, plus summary statistics from the last run (pass/fail/error counts per target). Call this before answering any question about the current experiment's setup or results.",
     inputSchema: z.object({}),
+    outputSchema: z.union([
+      workbenchErrorSchema,
+      workbenchEmptyStateSchema,
+      workbenchSummarySchema,
+    ]),
     execute: async () => {
       if (!ctx.experimentSlug) {
         return {
@@ -238,8 +303,28 @@ export function makeGetWorkbenchState(ctx: LangyConversationContext) {
   });
 }
 
+const failingRowsSchema = z.object({
+  rows: z.array(
+    z.object({
+      targetId: z.string(),
+      rowIndex: z.number(),
+      inputs: z.record(z.string(), z.unknown()).optional(),
+      failingEvaluators: z.array(
+        z.object({
+          evaluatorId: z.string(),
+          evaluatorName: z.string(),
+          status: z.string(),
+          details: z.string().optional(),
+        }),
+      ),
+    }),
+  ),
+  total: z.number(),
+});
+
 export function makeFindFailingRows(ctx: LangyConversationContext) {
-  return tool({
+  return defineLangyTool({
+    name: "find_failing_rows",
     description:
       "Return rows from the current workbench where an evaluator reported a failed or error status. Use this to investigate why an experiment is underperforming. Returns at most `limit` rows with their input values and which evaluators flagged them.",
     inputSchema: z.object({
@@ -255,6 +340,7 @@ export function makeFindFailingRows(ctx: LangyConversationContext) {
         .describe("Optional: restrict to a single target id."),
       limit: z.number().int().min(1).max(20).default(10),
     }),
+    outputSchema: z.union([workbenchErrorSchema, failingRowsSchema]),
     execute: async ({ evaluatorSlug, targetId, limit }) => {
       if (!ctx.experimentSlug) {
         return { error: "No experiment is currently open." };
@@ -305,8 +391,17 @@ export function makeFindFailingRows(ctx: LangyConversationContext) {
   });
 }
 
+const workbenchRunProposalSchema = z.object({
+  langyProposal: z.literal(true),
+  kind: z.literal("workbench.run"),
+  summary: z.string(),
+  rationale: z.string(),
+  payload: z.object({}),
+});
+
 export function makeProposeRunWorkbench(_ctx: LangyConversationContext) {
-  return tool({
+  return defineLangyTool({
+    name: "propose_run_workbench",
     description:
       "Propose running the current experiment (kicks off all target × evaluator cells). Returns a proposal card the user clicks Apply to execute. Use this when the user asks to 'run', 'evaluate', 'execute', or 'kick off' the experiment.",
     inputSchema: z.object({
@@ -316,10 +411,11 @@ export function makeProposeRunWorkbench(_ctx: LangyConversationContext) {
           "One short sentence explaining why running now makes sense (e.g. 'all mappings look configured, ready to run').",
         ),
     }),
+    outputSchema: workbenchRunProposalSchema,
     execute: async ({ rationale }) => {
       return {
-        langyProposal: true,
-        kind: "workbench.run",
+        langyProposal: true as const,
+        kind: "workbench.run" as const,
         summary: "Run the evaluation on all targets and evaluators",
         rationale,
         payload: {},

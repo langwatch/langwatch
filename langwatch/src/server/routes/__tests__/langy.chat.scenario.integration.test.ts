@@ -165,7 +165,7 @@ describe("Langy Scenario DSL coverage", () => {
       setId: "langy-workbench-personas",
       name: "Langy persona streaming coverage",
       description: `Persona prompt coverage: ${prompt}`,
-      agents: [langyAdapter],
+      agents: [langyAdapter, scenario.userSimulatorAgent()],
       script: [scenario.user(prompt), scenario.agent(), scenario.succeed()],
     });
     expect(result.success).toBe(true);
@@ -198,7 +198,7 @@ describe("Langy Scenario DSL coverage", () => {
       setId: "langy-chat-api",
       name: "Langy first turn streams",
       description: "First user message should stream and create conversation id.",
-      agents: [langyAdapter],
+      agents: [langyAdapter, scenario.userSimulatorAgent()],
       script: [
         scenario.user("What evaluators are available?"),
         scenario.agent(),
@@ -249,7 +249,7 @@ describe("Langy Scenario DSL coverage", () => {
       setId: "langy-chat-api",
       name: "Langy follow-up keeps conversation id",
       description: "Follow-up message should continue the same conversation.",
-      agents: [langyAdapter],
+      agents: [langyAdapter, scenario.userSimulatorAgent()],
       script: [
         scenario.user("Explain the first evaluator."),
         scenario.agent(),
@@ -290,7 +290,7 @@ describe("Langy Scenario DSL coverage", () => {
       setId: "langy-personas",
       name: "Langy non-expert persona",
       description: "Non-expert user with evaluations:view gets normal streaming chat.",
-      agents: [langyAdapter],
+      agents: [langyAdapter, scenario.userSimulatorAgent()],
       script: [scenario.user("Help me pick an evaluator."), scenario.agent(), scenario.succeed()],
     });
 
@@ -327,7 +327,7 @@ describe("Langy Scenario DSL coverage", () => {
       setId: "langy-personas",
       name: "Langy expert persona",
       description: "Expert user with evaluations:view gets normal streaming chat.",
-      agents: [langyAdapter],
+      agents: [langyAdapter, scenario.userSimulatorAgent()],
       script: [scenario.user("Give me a detailed evaluator plan."), scenario.agent(), scenario.succeed()],
     });
 
@@ -362,7 +362,7 @@ describe("Langy Scenario DSL coverage", () => {
       setId: "langy-personas",
       name: "Langy unauthorized persona",
       description: "User without evaluations:view must be blocked.",
-      agents: [langyAdapter],
+      agents: [langyAdapter, scenario.userSimulatorAgent()],
       script: [scenario.user("List evaluators in this project."), scenario.agent(), scenario.succeed()],
     });
 

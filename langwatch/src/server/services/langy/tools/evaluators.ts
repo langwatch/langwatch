@@ -1,14 +1,37 @@
-import { tool } from "ai";
 import { z } from "zod";
 import { AVAILABLE_EVALUATORS } from "~/server/evaluations/evaluators.generated";
 import {
   getEvaluatorDefaultSettings,
   getEvaluatorDefinitions,
 } from "~/server/evaluations/getEvaluator";
+import { defineLangyTool } from "../defineLangyTool";
 import type { LangyConversationContext } from "./types";
 
+const evaluatorErrorSchema = z.object({ error: z.string() });
+
+const projectEvaluatorListItemSchema = z.object({
+  source: z.literal("project"),
+  id: z.string(),
+  slug: z.string().nullable(),
+  name: z.string(),
+  type: z.string(),
+  inputs: z.array(z.string()),
+});
+
+const builtinEvaluatorListItemSchema = z.object({
+  source: z.literal("built_in"),
+  evaluatorType: z.string(),
+  name: z.string(),
+  description: z.string().optional(),
+  category: z.string().optional(),
+  isGuardrail: z.boolean().optional(),
+  requiredFields: z.array(z.string()).optional(),
+  optionalFields: z.array(z.string()).optional(),
+});
+
 export function makeListEvaluators(ctx: LangyConversationContext) {
-  return tool({
+  return defineLangyTool({
+    name: "list_evaluators",
     description:
       "Lists evaluators available to the caller's project. Returns both the custom project evaluators and the built-in catalog. Use this before suggesting or explaining any evaluator.",
     inputSchema: z.object({
@@ -18,6 +41,14 @@ export function makeListEvaluators(ctx: LangyConversationContext) {
         .describe(
           "Which set to return: the user's project evaluators, the built-in catalog, or both.",
         ),
+    }),
+    outputSchema: z.object({
+      items: z.array(
+        z.union([
+          projectEvaluatorListItemSchema,
+          builtinEvaluatorListItemSchema,
+        ]),
+      ),
     }),
     execute: async ({ scope }) => {
       const items: Array<Record<string, unknown>> = [];
@@ -63,8 +94,32 @@ export function makeListEvaluators(ctx: LangyConversationContext) {
   });
 }
 
+const projectEvaluatorDetailsSchema = z.object({
+  source: z.literal("project"),
+  id: z.string(),
+  slug: z.string().nullable(),
+  name: z.string(),
+  type: z.string(),
+  fields: z.unknown(),
+  outputFields: z.unknown(),
+});
+
+const builtinEvaluatorDetailsSchema = z.object({
+  source: z.literal("built_in"),
+  evaluatorType: z.string(),
+  name: z.string(),
+  description: z.string().optional(),
+  category: z.string().optional(),
+  isGuardrail: z.boolean().optional(),
+  requiredFields: z.array(z.string()).optional(),
+  optionalFields: z.array(z.string()).optional(),
+  result: z.unknown(),
+  docsUrl: z.string().optional(),
+});
+
 export function makeGetEvaluatorDetails(ctx: LangyConversationContext) {
-  return tool({
+  return defineLangyTool({
+    name: "get_evaluator_details",
     description:
       "Fetches details for a single evaluator, either by project slug (for custom project evaluators) or by built-in type key (for catalog entries). Provide exactly one of `slug` or `evaluatorType`.",
     inputSchema: z.object({
@@ -79,6 +134,11 @@ export function makeGetEvaluatorDetails(ctx: LangyConversationContext) {
           "Built-in evaluator type key, for example 'ragas/answer_relevancy'.",
         ),
     }),
+    outputSchema: z.union([
+      evaluatorErrorSchema,
+      projectEvaluatorDetailsSchema,
+      builtinEvaluatorDetailsSchema,
+    ]),
     execute: async ({ slug, evaluatorType }) => {
       if (slug) {
         const evaluator = await ctx.evaluatorService.getBySlug({
@@ -94,7 +154,7 @@ export function makeGetEvaluatorDetails(ctx: LangyConversationContext) {
         ctx.seenIds.record("evaluator_slug", evaluator.slug);
         const enriched = await ctx.evaluatorService.enrichWithFields(evaluator);
         return {
-          source: "project",
+          source: "project" as const,
           id: enriched.id,
           slug: enriched.slug,
           name: enriched.name,
@@ -115,7 +175,7 @@ export function makeGetEvaluatorDetails(ctx: LangyConversationContext) {
           };
         }
         return {
-          source: "built_in",
+          source: "built_in" as const,
           evaluatorType,
           name: def.name,
           description: def.description,
@@ -135,8 +195,24 @@ export function makeGetEvaluatorDetails(ctx: LangyConversationContext) {
   });
 }
 
+const evaluatorCreateProposalSchema = z.object({
+  langyProposal: z.literal(true),
+  kind: z.literal("evaluators.create"),
+  summary: z.string(),
+  rationale: z.string(),
+  payload: z.object({
+    name: z.string(),
+    type: z.literal("evaluator"),
+    config: z.object({
+      evaluatorType: z.string(),
+      settings: z.record(z.string(), z.unknown()),
+    }),
+  }),
+});
+
 export function makeProposeCreateEvaluator(ctx: LangyConversationContext) {
-  return tool({
+  return defineLangyTool({
+    name: "propose_create_evaluator",
     description:
       "Propose creating a new evaluator in the project. The user will see a preview card and click Apply to commit. Use this when the user asks for a new evaluator that doesn't yet exist.",
     inputSchema: z.object({
@@ -151,7 +227,7 @@ export function makeProposeCreateEvaluator(ctx: LangyConversationContext) {
           "The built-in evaluator type key, e.g. 'ragas/answer_relevancy'. Must match one you found via list_evaluators('built_in').",
         ),
       settings: z
-        .record(z.unknown())
+        .record(z.string(), z.unknown())
         .optional()
         .describe(
           "Optional settings override. Leave empty to use defaults from the evaluator definition.",
@@ -162,6 +238,10 @@ export function makeProposeCreateEvaluator(ctx: LangyConversationContext) {
           "One short sentence explaining why this evaluator fits the user's goal.",
         ),
     }),
+    outputSchema: z.union([
+      evaluatorErrorSchema,
+      evaluatorCreateProposalSchema,
+    ]),
     execute: async ({ name, evaluatorType, settings, rationale }) => {
       if (!ctx.seenIds.has("evaluator_type", evaluatorType)) {
         return {
@@ -189,8 +269,8 @@ export function makeProposeCreateEvaluator(ctx: LangyConversationContext) {
           ? mergedSettings.model
           : undefined;
       return {
-        langyProposal: true,
-        kind: "evaluators.create",
+        langyProposal: true as const,
+        kind: "evaluators.create" as const,
         summary: `Create evaluator "${name}" (${evaluatorType})`,
         rationale: chosenModel
           ? `${rationale} Uses ${chosenModel} (project default).`
@@ -208,21 +288,39 @@ export function makeProposeCreateEvaluator(ctx: LangyConversationContext) {
   });
 }
 
+const evaluatorUpdateProposalSchema = z.object({
+  langyProposal: z.literal(true),
+  kind: z.literal("evaluators.update"),
+  summary: z.string(),
+  rationale: z.string(),
+  payload: z.object({
+    id: z.string(),
+    evaluatorType: z.string().optional(),
+    name: z.string().optional(),
+    config: z.record(z.string(), z.unknown()),
+  }),
+});
+
 export function makeProposeUpdateEvaluator(ctx: LangyConversationContext) {
-  return tool({
+  return defineLangyTool({
+    name: "propose_update_evaluator",
     description:
       "Propose updating an existing project evaluator's name or settings. Call get_evaluator_details first so you only override what you actually want to change. Settings are merged over the evaluator's current config.",
     inputSchema: z.object({
       slug: z.string().describe("Slug of the project evaluator to update."),
       name: z.string().min(1).max(255).optional(),
       settings: z
-        .record(z.unknown())
+        .record(z.string(), z.unknown())
         .optional()
         .describe(
           "Partial settings to merge over the evaluator's current settings object.",
         ),
       rationale: z.string(),
     }),
+    outputSchema: z.union([
+      evaluatorErrorSchema,
+      evaluatorUpdateProposalSchema,
+    ]),
     execute: async ({ slug, name, settings, rationale }) => {
       if (!ctx.seenIds.has("evaluator_slug", slug)) {
         return {
@@ -250,8 +348,8 @@ export function makeProposeUpdateEvaluator(ctx: LangyConversationContext) {
       if (name && name !== evaluator.name) changedFields.push("name");
       if (settings) changedFields.push(...Object.keys(settings));
       return {
-        langyProposal: true,
-        kind: "evaluators.update",
+        langyProposal: true as const,
+        kind: "evaluators.update" as const,
         summary: `Update evaluator "${evaluator.name}"${
           changedFields.length ? ` (${changedFields.join(", ")})` : ""
         }`,
@@ -268,8 +366,21 @@ export function makeProposeUpdateEvaluator(ctx: LangyConversationContext) {
   });
 }
 
+const evaluatorDeleteProposalSchema = z.object({
+  langyProposal: z.literal(true),
+  kind: z.literal("evaluators.delete"),
+  destructive: z.literal(true),
+  summary: z.string(),
+  rationale: z.string(),
+  payload: z.object({
+    id: z.string(),
+    name: z.string(),
+  }),
+});
+
 export function makeProposeDeleteEvaluator(ctx: LangyConversationContext) {
-  return tool({
+  return defineLangyTool({
+    name: "propose_delete_evaluator",
     description:
       "Propose archiving (soft-deleting) an existing project evaluator. This is a destructive action — only propose it when the user explicitly asks. Existing workbench references to this evaluator will break once archived.",
     inputSchema: z.object({
@@ -280,6 +391,10 @@ export function makeProposeDeleteEvaluator(ctx: LangyConversationContext) {
           "Why the user wants to delete this evaluator, or a short confirmation of what they asked.",
         ),
     }),
+    outputSchema: z.union([
+      evaluatorErrorSchema,
+      evaluatorDeleteProposalSchema,
+    ]),
     execute: async ({ slug, rationale }) => {
       if (!ctx.seenIds.has("evaluator_slug", slug)) {
         return {
@@ -294,9 +409,9 @@ export function makeProposeDeleteEvaluator(ctx: LangyConversationContext) {
         return { error: `No project evaluator with slug '${slug}'.` };
       }
       return {
-        langyProposal: true,
-        kind: "evaluators.delete",
-        destructive: true,
+        langyProposal: true as const,
+        kind: "evaluators.delete" as const,
+        destructive: true as const,
         summary: `Archive evaluator "${evaluator.name}"`,
         rationale,
         payload: {
@@ -308,8 +423,22 @@ export function makeProposeDeleteEvaluator(ctx: LangyConversationContext) {
   });
 }
 
+const workbenchAddEvaluatorProposalSchema = z.object({
+  langyProposal: z.literal(true),
+  kind: z.literal("workbench.addEvaluator"),
+  summary: z.string(),
+  rationale: z.string(),
+  payload: z.object({
+    dbEvaluatorId: z.string(),
+    evaluatorType: z.string(),
+    name: z.string(),
+    fields: z.unknown(),
+  }),
+});
+
 export function makeProposeAddEvaluatorToWorkbench(ctx: LangyConversationContext) {
-  return tool({
+  return defineLangyTool({
+    name: "propose_add_evaluator_to_workbench",
     description:
       "Propose adding an existing project evaluator as a column in the current experiment workbench. Only works for evaluators that already exist in the project (use propose_create_evaluator first if needed).",
     inputSchema: z.object({
@@ -318,6 +447,10 @@ export function makeProposeAddEvaluatorToWorkbench(ctx: LangyConversationContext
         .describe("Slug of the existing project evaluator to add."),
       rationale: z.string(),
     }),
+    outputSchema: z.union([
+      evaluatorErrorSchema,
+      workbenchAddEvaluatorProposalSchema,
+    ]),
     execute: async ({ slug, rationale }) => {
       if (!ctx.seenIds.has("evaluator_slug", slug)) {
         return {
@@ -336,8 +469,8 @@ export function makeProposeAddEvaluatorToWorkbench(ctx: LangyConversationContext
         (enriched.config as { evaluatorType?: string } | null)?.evaluatorType ??
         `custom/${enriched.slug}`;
       return {
-        langyProposal: true,
-        kind: "workbench.addEvaluator",
+        langyProposal: true as const,
+        kind: "workbench.addEvaluator" as const,
         summary: `Add "${enriched.name}" to this workbench`,
         rationale,
         payload: {

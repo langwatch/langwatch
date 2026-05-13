@@ -1,12 +1,26 @@
-import { tool } from "ai";
 import { z } from "zod";
+import { defineLangyTool } from "../defineLangyTool";
 import type { LangyConversationContext } from "./types";
 
+const datasetErrorSchema = z.object({ error: z.string() });
+
 export function makeListDatasets(ctx: LangyConversationContext) {
-  return tool({
+  return defineLangyTool({
+    name: "list_datasets",
     description:
       "Lists the datasets in the caller's project with their column schema and row count.",
     inputSchema: z.object({}),
+    outputSchema: z.object({
+      items: z.array(
+        z.object({
+          id: z.string(),
+          slug: z.string(),
+          name: z.string(),
+          columnTypes: z.unknown(),
+          rowCount: z.number(),
+        }),
+      ),
+    }),
     execute: async () => {
       const datasets = await ctx.datasetService.listAllNonArchivedWithCounts({
         projectId: ctx.projectId,
@@ -26,7 +40,8 @@ export function makeListDatasets(ctx: LangyConversationContext) {
 }
 
 export function makeGetDatasetDetails(ctx: LangyConversationContext) {
-  return tool({
+  return defineLangyTool({
+    name: "get_dataset_details",
     description:
       "Fetch a dataset's schema and a sample of its rows so you can understand its content before proposing additions or changes.",
     inputSchema: z.object({
@@ -35,6 +50,19 @@ export function makeGetDatasetDetails(ctx: LangyConversationContext) {
         .describe("The dataset id as returned by list_datasets."),
       sampleRowLimit: z.number().int().min(0).max(20).default(5),
     }),
+    outputSchema: z.union([
+      datasetErrorSchema,
+      z.object({
+        id: z.string(),
+        slug: z.string(),
+        name: z.string(),
+        columnTypes: z.unknown(),
+        rowCount: z.number(),
+        sampleRows: z.array(
+          z.object({ id: z.string(), entry: z.unknown() }),
+        ),
+      }),
+    ]),
     execute: async ({ datasetId, sampleRowLimit }) => {
       const dataset = await ctx.datasetService.findByIdNonArchivedWithCounts({
         id: datasetId,
@@ -63,8 +91,26 @@ export function makeGetDatasetDetails(ctx: LangyConversationContext) {
   });
 }
 
+const datasetCreateProposalSchema = z.object({
+  langyProposal: z.literal(true),
+  kind: z.literal("datasets.create"),
+  summary: z.string(),
+  rationale: z.string(),
+  payload: z.object({
+    name: z.string(),
+    columnTypes: z.array(
+      z.object({
+        name: z.string(),
+        type: z.enum(["string", "boolean", "number", "date", "list", "json"]),
+      }),
+    ),
+    initialRows: z.array(z.record(z.string(), z.unknown())),
+  }),
+});
+
 export function makeProposeCreateDataset(_ctx: LangyConversationContext) {
-  return tool({
+  return defineLangyTool({
+    name: "propose_create_dataset",
     description:
       "Propose creating a new dataset with a schema (column names + types) and optional seed rows you author inline. Use this before propose_add_dataset_rows if the dataset does not yet exist.",
     inputSchema: z.object({
@@ -86,17 +132,18 @@ export function makeProposeCreateDataset(_ctx: LangyConversationContext) {
         .min(1)
         .describe("Schema: column name + value type."),
       initialRows: z
-        .array(z.record(z.unknown()))
+        .array(z.record(z.string(), z.unknown()))
         .optional()
         .describe(
           "Optional seed rows. Each row is an object mapping column name to value. Keep values consistent with declared column types.",
         ),
       rationale: z.string(),
     }),
+    outputSchema: datasetCreateProposalSchema,
     execute: async ({ name, columns, initialRows, rationale }) => {
       return {
-        langyProposal: true,
-        kind: "datasets.create",
+        langyProposal: true as const,
+        kind: "datasets.create" as const,
         summary: `Create dataset "${name}"${
           initialRows?.length ? ` with ${initialRows.length} row(s)` : ""
         }`,
@@ -111,19 +158,32 @@ export function makeProposeCreateDataset(_ctx: LangyConversationContext) {
   });
 }
 
+const datasetAddRowsProposalSchema = z.object({
+  langyProposal: z.literal(true),
+  kind: z.literal("datasets.addRows"),
+  summary: z.string(),
+  rationale: z.string(),
+  payload: z.object({
+    datasetId: z.string(),
+    rows: z.array(z.record(z.string(), z.unknown())),
+  }),
+});
+
 export function makeProposeAddDatasetRows(ctx: LangyConversationContext) {
-  return tool({
+  return defineLangyTool({
+    name: "propose_add_dataset_rows",
     description:
       "Propose appending rows to an existing dataset. Each row is an object mapping column name to value. Values must be consistent with the dataset's column types (call get_dataset_details first to confirm).",
     inputSchema: z.object({
       datasetId: z.string(),
       rows: z
-        .array(z.record(z.unknown()))
+        .array(z.record(z.string(), z.unknown()))
         .min(1)
         .max(50)
         .describe("Up to 50 rows; each row is { columnName: value }."),
       rationale: z.string(),
     }),
+    outputSchema: z.union([datasetErrorSchema, datasetAddRowsProposalSchema]),
     execute: async ({ datasetId, rows, rationale }) => {
       if (!ctx.seenIds.has("dataset_id", datasetId)) {
         return {
@@ -138,8 +198,8 @@ export function makeProposeAddDatasetRows(ctx: LangyConversationContext) {
         return { error: `No dataset found with id '${datasetId}'.` };
       }
       return {
-        langyProposal: true,
-        kind: "datasets.addRows",
+        langyProposal: true as const,
+        kind: "datasets.addRows" as const,
         summary: `Add ${rows.length} row(s) to "${dataset.name}"`,
         rationale,
         payload: {
