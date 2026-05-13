@@ -87,7 +87,18 @@ export function ApiKeysSection({
   const [apiKeyToEdit, setApiKeyToEdit] = useState<ApiKeyRow | null>(null);
 
   const handleCreate = (input: CreateApiKeyInput): void => {
-    if (input.keyType === "personal" && input.bindings.length === 0) {
+    if (input.permissionMode === "restricted" && input.bindings.length === 0) {
+      toaster.create({
+        title: "No projects selected",
+        description:
+          "Select at least one project for a restricted key.",
+        type: "error",
+        duration: 5000,
+        meta: { closable: true },
+      });
+      return;
+    }
+    if (input.keyType === "personal" && input.permissionMode !== "restricted" && input.bindings.length === 0) {
       toaster.create({
         title: "No permissions to grant",
         description:
@@ -213,16 +224,16 @@ export function ApiKeysSection({
     return "Active";
   };
 
-  const getPermissionLabel = (mode: string) => {
+  const getPermissionBadge = (mode: string) => {
     switch (mode) {
       case "all":
-        return "All";
+        return <Badge size="sm" colorPalette="blue">All</Badge>;
       case "readonly":
-        return "Read only";
+        return <Badge size="sm" colorPalette="gray">Read only</Badge>;
       case "restricted":
-        return "Restricted";
+        return <Badge size="sm" colorPalette="orange">Restricted</Badge>;
       default:
-        return mode;
+        return <Badge size="sm">{mode}</Badge>;
     }
   };
 
@@ -284,7 +295,7 @@ export function ApiKeysSection({
                       <Text fontSize="sm" color="fg.muted">—</Text>
                     </Table.Cell>
                     <Table.Cell>
-                      <Text fontSize="sm">Project only</Text>
+                      <Badge size="sm" colorPalette="teal">Project</Badge>
                     </Table.Cell>
                     <Table.Cell>
                       <ProjectKeyActions apiKey={projectApiKey} />
@@ -354,9 +365,7 @@ export function ApiKeysSection({
                       )}
                     </Table.Cell>
                     <Table.Cell>
-                      <Text fontSize="sm">
-                        {getPermissionLabel(apiKey.permissionMode)}
-                      </Text>
+                      {getPermissionBadge(apiKey.permissionMode)}
                     </Table.Cell>
                     <Table.Cell>
                       {/* Owner or admin can edit/revoke; service keys (no userId) require admin */}

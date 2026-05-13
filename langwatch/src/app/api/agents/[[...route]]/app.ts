@@ -10,7 +10,7 @@ import {
 import { patchZodOpenapi } from "../../../../utils/extend-zod-openapi";
 import {
   type AuthMiddlewareVariables,
-  authMiddleware,
+  authMiddleware, requirePermission,
   resourceLimitMiddleware,
 } from "../../middleware";
 import {
@@ -110,6 +110,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── List Agents (paginated) ──────────────────────────────────
   .get(
     "/",
+    requirePermission("project:view"),
     describeRoute({
       description: "List all non-archived agents for the project (paginated)",
     }),
@@ -138,9 +139,11 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── Create Agent ─────────────────────────────────────────────
   .post(
     "/",
+    requirePermission("project:update"),
     describeRoute({
       description: "Create a new agent",
     }),
+    requirePermission("project:update"),
     resourceLimitMiddleware("agents"),
     zValidator("json", createAgentSchema, validationHook),
     async (c) => {
@@ -180,6 +183,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── Get Single Agent ─────────────────────────────────────────
   .get(
     "/:id",
+    requirePermission("project:view"),
     describeRoute({
       description: "Get an agent by its id",
     }),
@@ -216,6 +220,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── Update Agent ─────────────────────────────────────────────
   .patch(
     "/:id",
+    requirePermission("project:update"),
     describeRoute({
       description: "Update an agent by its id",
     }),
@@ -265,6 +270,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── Delete (Archive) Agent ───────────────────────────────────
   .delete(
     "/:id",
+    requirePermission("project:delete"),
     describeRoute({
       description: "Archive an agent (soft-delete)",
     }),

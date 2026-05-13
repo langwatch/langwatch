@@ -120,11 +120,20 @@ export function CreateApiKeyDrawer({
   const buildBindings = () => {
     if (!myBindings.data) return [];
 
-    // Service keys get no bindings — they have full org access
-    if (keyType === "service") return [];
+    if (keyType === "service") {
+      if (permissionMode === "all") return [];
+      // Restricted service keys: ADMIN on each selected project
+      return orgProjects
+        .filter((p) => (projectRoles[p.id] ?? "NONE") !== "NONE")
+        .map((p) => ({
+          role: "ADMIN" as const,
+          customRoleId: null,
+          scopeType: "PROJECT" as const,
+          scopeId: p.id,
+        }));
+    }
 
     if (permissionMode === "all") {
-      // Mirror user's bindings 1:1
       return myBindings.data.map((b) => ({
         role: b.role,
         customRoleId: b.customRoleId,
@@ -134,7 +143,6 @@ export function CreateApiKeyDrawer({
     }
 
     if (permissionMode === "readonly") {
-      // All bindings as VIEWER
       return myBindings.data.map((b) => ({
         role: "VIEWER" as const,
         customRoleId: null,
@@ -172,7 +180,7 @@ export function CreateApiKeyDrawer({
       name,
       description,
       expiresAt,
-      permissionMode: keyType === "service" ? "all" : permissionMode,
+      permissionMode,
       keyType,
       assignedToUserId,
       bindings,
@@ -254,8 +262,8 @@ export function CreateApiKeyDrawer({
                 )}
                 {keyType === "service" && (
                   <Text fontSize="xs" color="fg.muted">
-                    Not tied to any user. Has full organization access and
-                    cannot be revoked when a user leaves.
+                    Not tied to any user. Cannot be revoked when a user
+                    leaves. Set permissions below.
                   </Text>
                 )}
               </VStack>
@@ -291,64 +299,60 @@ export function CreateApiKeyDrawer({
               />
             </VStack>
 
-            {/* Permissions — hidden for service keys (full access) */}
-            {keyType !== "service" && (
-              <VStack gap={2} align="start" width="full">
-                <Text fontWeight="600" fontSize="sm">
-                  Permissions
-                </Text>
-                <SegmentGroup.Root
-                  size="sm"
-                  value={permissionMode}
-                  onValueChange={(e) =>
-                    setPermissionMode(e.value as PermissionMode)
-                  }
-                >
-                  <SegmentGroup.Indicator />
-                  <SegmentGroup.Item value="all">
-                    <SegmentGroup.ItemText>All</SegmentGroup.ItemText>
-                    <SegmentGroup.ItemHiddenInput />
-                  </SegmentGroup.Item>
-                  <SegmentGroup.Item value="restricted">
-                    <SegmentGroup.ItemText>Restricted</SegmentGroup.ItemText>
-                    <SegmentGroup.ItemHiddenInput />
-                  </SegmentGroup.Item>
+            {/* Permissions */}
+            <VStack gap={2} align="start" width="full">
+              <Text fontWeight="600" fontSize="sm">
+                Permissions
+              </Text>
+              <SegmentGroup.Root
+                size="sm"
+                value={permissionMode}
+                onValueChange={(e) =>
+                  setPermissionMode(e.value as PermissionMode)
+                }
+              >
+                <SegmentGroup.Indicator />
+                <SegmentGroup.Item value="all">
+                  <SegmentGroup.ItemText>All</SegmentGroup.ItemText>
+                  <SegmentGroup.ItemHiddenInput />
+                </SegmentGroup.Item>
+                <SegmentGroup.Item value="restricted">
+                  <SegmentGroup.ItemText>Restricted</SegmentGroup.ItemText>
+                  <SegmentGroup.ItemHiddenInput />
+                </SegmentGroup.Item>
+                {keyType !== "service" && (
                   <SegmentGroup.Item value="readonly">
                     <SegmentGroup.ItemText>Read only</SegmentGroup.ItemText>
                     <SegmentGroup.ItemHiddenInput />
                   </SegmentGroup.Item>
-                </SegmentGroup.Root>
+                )}
+              </SegmentGroup.Root>
 
-                {permissionMode === "restricted" && (
-                  <Box
-                    width="full"
-                    padding={3}
-                    borderWidth="1px"
-                    borderColor="border"
-                    borderRadius="md"
-                    background="bg.subtle"
-                  >
-                    <Text fontSize="sm" marginBottom={2}>
-                      Set a role for each project:
+              {permissionMode === "restricted" && (
+                <Box
+                  width="full"
+                  padding={3}
+                  borderWidth="1px"
+                  borderColor="border"
+                  borderRadius="md"
+                  background="bg.subtle"
+                >
+                  <Text fontSize="sm" marginBottom={2}>
+                    {keyType === "service"
+                      ? "Select projects this key can access (admin on each):"
+                      : "Set a role for each project:"}
+                  </Text>
+                  {orgProjects.length === 0 ? (
+                    <Text fontSize="xs" color="fg.muted">
+                      No projects found in this organization.
                     </Text>
-                    {orgProjects.length === 0 ? (
-                      <Text fontSize="xs" color="fg.muted">
-                        No projects found in this organization.
-                      </Text>
-                    ) : (
-                      <VStack align="stretch" gap={2}>
-                        {orgProjects.map((project) => {
-                          const effectiveRole = projectRoles[project.id] ?? "NONE";
-                          const roleOptions = createListCollection({
-                            items: [
-                              ...STANDARD_ROLES.map((r) => ({
-                                label: ROLE_LABELS[r] ?? r,
-                                value: r,
-                              })),
-                              { label: "None", value: "NONE" },
-                            ],
-                          });
+                  ) : (
+                    <VStack align="stretch" gap={2}>
+                      {orgProjects.map((project) => {
+                        const effectiveRole = projectRoles[project.id] ?? "NONE";
 
+                        if (keyType === "service") {
+                          const isSelected = effectiveRole !== "NONE";
                           return (
                             <HStack
                               key={project.id}
@@ -356,7 +360,32 @@ export function CreateApiKeyDrawer({
                               fontSize="sm"
                               width="full"
                               align="center"
+                              cursor="pointer"
+                              onClick={() =>
+                                setProjectRoles((prev) => ({
+                                  ...prev,
+                                  [project.id]: isSelected ? "NONE" : "ADMIN",
+                                }))
+                              }
                             >
+                              <Box
+                                width="16px"
+                                height="16px"
+                                borderWidth="1px"
+                                borderColor={isSelected ? "blue.500" : "border"}
+                                borderRadius="sm"
+                                background={isSelected ? "blue.500" : "transparent"}
+                                display="flex"
+                                alignItems="center"
+                                justifyContent="center"
+                                flexShrink={0}
+                              >
+                                {isSelected && (
+                                  <Text color="white" fontSize="xs" lineHeight="1">
+                                    ✓
+                                  </Text>
+                                )}
+                              </Box>
                               <Text
                                 color="fg"
                                 flex="1"
@@ -365,48 +394,79 @@ export function CreateApiKeyDrawer({
                               >
                                 {project.name}
                               </Text>
-                              <Select.Root
-                                collection={roleOptions}
-                                size="sm"
-                                value={[effectiveRole]}
-                                onValueChange={(details) => {
-                                  const val = details.value[0];
-                                  if (val) {
-                                    setProjectRoles((prev) => ({
-                                      ...prev,
-                                      [project.id]: val,
-                                    }));
-                                  }
-                                }}
-                                width="140px"
-                              >
-                                <Select.Trigger
-                                  width="140px"
-                                  aria-label={`Role for ${project.name}`}
-                                >
-                                  <Select.ValueText />
-                                </Select.Trigger>
-                                <Select.Content>
-                                  {roleOptions.items.map((opt) => (
-                                    <Select.Item key={opt.value} item={opt}>
-                                      {opt.label}
-                                    </Select.Item>
-                                  ))}
-                                </Select.Content>
-                              </Select.Root>
                             </HStack>
                           );
-                        })}
-                      </VStack>
-                    )}
+                        }
+
+                        const roleOptions = createListCollection({
+                          items: [
+                            ...STANDARD_ROLES.map((r) => ({
+                              label: ROLE_LABELS[r] ?? r,
+                              value: r,
+                            })),
+                            { label: "None", value: "NONE" },
+                          ],
+                        });
+
+                        return (
+                          <HStack
+                            key={project.id}
+                            gap={3}
+                            fontSize="sm"
+                            width="full"
+                            align="center"
+                          >
+                            <Text
+                              color="fg"
+                              flex="1"
+                              fontWeight="500"
+                              lineHeight="32px"
+                            >
+                              {project.name}
+                            </Text>
+                            <Select.Root
+                              collection={roleOptions}
+                              size="sm"
+                              value={[effectiveRole]}
+                              onValueChange={(details) => {
+                                const val = details.value[0];
+                                if (val) {
+                                  setProjectRoles((prev) => ({
+                                    ...prev,
+                                    [project.id]: val,
+                                  }));
+                                }
+                              }}
+                              width="140px"
+                            >
+                              <Select.Trigger
+                                width="140px"
+                                aria-label={`Role for ${project.name}`}
+                              >
+                                <Select.ValueText />
+                              </Select.Trigger>
+                              <Select.Content>
+                                {roleOptions.items.map((opt) => (
+                                  <Select.Item key={opt.value} item={opt}>
+                                    {opt.label}
+                                  </Select.Item>
+                                ))}
+                              </Select.Content>
+                            </Select.Root>
+                          </HStack>
+                        );
+                      })}
+                    </VStack>
+                  )}
+                  {keyType !== "service" && (
                     <Text fontSize="xs" color="fg.muted" marginTop={3}>
                       Your access acts as a ceiling. If your role is later
                       reduced, the key loses those permissions automatically.
                     </Text>
-                  </Box>
-                )}
-              </VStack>
-            )}
+                  )}
+                </Box>
+              )}
+            </VStack>
 
             {/* Expiration */}
             <VStack gap={1} align="start" width="full">

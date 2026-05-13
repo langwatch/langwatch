@@ -15,6 +15,8 @@ import { app as gatewayPlatformApp } from "../app/api/gateway-platform/[[...rout
 import { app as graphsApp } from "../app/api/graphs/[[...route]]/app";
 import { app as modelProvidersApp } from "../app/api/model-providers/[[...route]]/app";
 import { app as monitorsApp } from "../app/api/monitors/[[...route]]/app";
+import { app as apiKeysApp } from "../app/api/api-keys/[[...route]]/app";
+import { app as projectsApp } from "../app/api/projects/[[...route]]/app";
 import { app as promptsApp } from "../app/api/prompts/[[...route]]/app";
 import { app as scenarioEventsApp } from "../app/api/scenario-events/[[...route]]/app";
 import { app as scenariosApp } from "../app/api/scenarios/[[...route]]/app";
@@ -79,6 +81,8 @@ export function createApiRouter() {
   api.route("/", graphsApp);
   api.route("/", modelProvidersApp);
   api.route("/", monitorsApp);
+  api.route("/", apiKeysApp);
+  api.route("/", projectsApp);
   api.route("/", promptsApp);
   api.route("/", scenarioEventsApp);
   api.route("/", scenariosApp);

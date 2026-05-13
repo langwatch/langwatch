@@ -83,7 +83,6 @@ export class ApiKeyService {
     permissionMode: string;
     bindings: RoleBindingInput[];
   }): Promise<{ token: string; apiKey: ApiKey }> {
-    // Service keys (no userId) skip user-level checks
     if (userId) {
       await this.assertOrgMembership({ userId, organizationId });
       await this.assertBindingsWithinCeiling({
@@ -91,19 +90,22 @@ export class ApiKeyService {
         organizationId,
         bindings,
       });
+    } else if (bindings.length > 0) {
+      for (const binding of bindings) {
+        await this.resolveAndValidateScope({ binding, organizationId });
+      }
     }
 
     const { token, lookupId, hashedSecret } = generateApiKeyToken();
 
-    // Service keys get an ORG-scoped ADMIN binding so the ceiling check
-    // grants full access through the standard binding path.
-    const effectiveBindings: RoleBindingInput[] = !userId
-      ? [{
-          role: "ADMIN",
-          scopeType: "ORGANIZATION",
-          scopeId: organizationId,
-        }]
-      : bindings;
+    const effectiveBindings: RoleBindingInput[] =
+      !userId && bindings.length === 0
+        ? [{
+            role: "ADMIN",
+            scopeType: "ORGANIZATION",
+            scopeId: organizationId,
+          }]
+        : bindings;
 
     const apiKey = await this.prisma.$transaction(async (tx) => {
       const txRepo = ApiKeyRepository.create(tx);
@@ -179,13 +181,16 @@ export class ApiKeyService {
 
     if (existing.revokedAt) throw new ApiKeyAlreadyRevokedError(id);
 
-    // Validate new bindings against the key owner's ceiling (skip for service keys)
     if (bindings && existing.userId) {
       await this.assertBindingsWithinCeiling({
         ceilingUserId: existing.userId,
         organizationId,
         bindings,
       });
+    } else if (bindings && !existing.userId) {
+      for (const binding of bindings) {
+        await this.resolveAndValidateScope({ binding, organizationId });
+      }
     }
 
     return this.prisma.$transaction(async (tx) => {

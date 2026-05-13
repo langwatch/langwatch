@@ -11,7 +11,7 @@ import { getApp } from "~/server/app-layer/app";
 import { createLogger } from "~/utils/logger/server";
 import {
   type AuthMiddlewareVariables,
-  authMiddleware,
+  authMiddleware, requirePermission,
   resourceLimitMiddleware,
 } from "../../middleware";
 import { loggerMiddleware } from "../../middleware/logger";
@@ -106,6 +106,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── List Triggers ──────────────────────────────────────────
   .get(
     "/",
+    requirePermission("triggers:view"),
     describeRoute({
       description: "List all active triggers (automations) for the project",
       responses: {
@@ -142,6 +143,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── Get Trigger ────────────────────────────────────────────
   .get(
     "/:id",
+    requirePermission("triggers:view"),
     describeRoute({
       description: "Get a trigger by its ID",
       responses: {
@@ -188,6 +190,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── Create Trigger ─────────────────────────────────────────
   .post(
     "/",
+    requirePermission("triggers:manage"),
     resourceLimitMiddleware("automations"),
     describeRoute({
       description: "Create a new trigger (automation)",
@@ -238,6 +241,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── Update Trigger ─────────────────────────────────────────
   .patch(
     "/:id",
+    requirePermission("triggers:manage"),
     describeRoute({
       description: "Update a trigger (name, active state, message, filters)",
       responses: {
@@ -301,6 +305,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── Delete Trigger ─────────────────────────────────────────
   .delete(
     "/:id",
+    requirePermission("triggers:manage"),
     describeRoute({
       description: "Delete (soft-delete) a trigger",
       responses: {

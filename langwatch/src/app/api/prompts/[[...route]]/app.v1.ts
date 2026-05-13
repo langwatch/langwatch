@@ -27,6 +27,7 @@ import {
   type AuthMiddlewareVariables,
   type OrganizationMiddlewareVariables,
   organizationMiddleware,
+  requirePermission,
   resourceLimitMiddleware,
 } from "../../middleware";
 import {
@@ -68,6 +69,7 @@ app.use("/*", promptServiceMiddleware);
 // Get all prompts
 app.get(
   "/",
+  requirePermission("prompts:view"),
   describeRoute({
     description: "Get all prompts for a project",
     responses: {
@@ -117,6 +119,7 @@ const assignTagResponseSchema = z.object({
 
 app.put(
   "/:id{.+?}/tags/:tag",
+  requirePermission("prompts:manage"),
   describeRoute({
     description:
       'Assign a tag (e.g. "production", "staging") to a specific prompt version',
@@ -209,6 +212,7 @@ app.put(
 // List all tag definitions for the org
 app.get(
   "/tags",
+  requirePermission("prompts:view"),
   describeRoute({
     description: "List all prompt tag definitions for the organization",
     responses: {
@@ -249,6 +253,7 @@ app.get(
 // Create a tag definition
 app.post(
   "/tags",
+  requirePermission("prompts:manage"),
   describeRoute({
     description: "Create a custom prompt tag definition for the organization",
     responses: {
@@ -302,6 +307,7 @@ app.post(
 // Rename a tag definition
 app.put(
   "/tags/:tag",
+  requirePermission("prompts:manage"),
   describeRoute({
     description: "Rename a prompt tag definition",
     responses: {
@@ -363,6 +369,7 @@ app.put(
 // Delete a tag definition
 app.delete(
   "/tags/:tag",
+  requirePermission("prompts:manage"),
   describeRoute({
     description: "Delete a prompt tag definition and cascade to assignments",
     responses: {
@@ -405,6 +412,7 @@ app.delete(
 // Get versions
 app.get(
   "/:id{.+?}/versions",
+  requirePermission("prompts:view"),
   describeRoute({
     description:
       "Get all versions for a prompt. Does not include base prompt data, only versioned data.",
@@ -458,6 +466,7 @@ app.get(
 // Restore (rollback to) a specific version
 app.post(
   "/:id{.+?}/versions/:versionId/restore",
+  requirePermission("prompts:manage"),
   describeRoute({
     description:
       "Restore a prompt to a previous version. Creates a new version with the same config data as the specified version.",
@@ -516,6 +525,7 @@ app.post(
 // Get prompt by ID
 app.get(
   "/:id{.+}",
+  requirePermission("prompts:view"),
   describeRoute({
     description:
       "Get a specific prompt by slug, with optional shorthand syntax for tags and versions. " +
@@ -646,6 +656,7 @@ app.get(
 // Create prompt with initial version
 app.post(
   "/",
+  requirePermission("prompts:manage"),
   resourceLimitMiddleware("prompts"),
   describeRoute({
     description: "Create a new prompt with default initial version",
@@ -745,6 +756,7 @@ app.post(
 // Sync endpoint for upsert operations
 app.post(
   "/:id{.+?}/sync",
+  requirePermission("prompts:manage"),
   describeRoute({
     description: "Sync/upsert a prompt with local content",
     responses: {
@@ -868,6 +880,7 @@ app.post(
 // Update prompt
 app.put(
   "/:id{.+}",
+  requirePermission("prompts:manage"),
   describeRoute({
     description: "Update a prompt",
     responses: {
@@ -991,6 +1004,7 @@ app.put(
 // Delete prompt
 app.delete(
   "/:id{.+}",
+  requirePermission("prompts:manage"),
   describeRoute({
     description: "Delete a prompt",
     responses: {

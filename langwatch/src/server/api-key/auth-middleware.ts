@@ -1,6 +1,6 @@
-import type { PrismaClient, Project } from "@prisma/client";
+import type { Organization, PrismaClient, Project } from "@prisma/client";
 import type { MiddlewareHandler } from "hono";
-import { TokenResolver, type ResolvedToken } from "./token-resolver";
+import { TokenResolver, type OrgResolvedToken, type ResolvedToken } from "./token-resolver";
 import { ApiKeyPermissionDeniedError } from "./errors";
 import type { Permission } from "~/server/api/rbac";
 import { resolveApiKeyPermission } from "~/server/rbac/role-binding-resolver";
@@ -187,6 +187,104 @@ export function createUnifiedAuthMiddleware({
 export { extractCredentials };
 
 /**
+ * Variables set by the org-level auth middleware.
+ */
+export type OrgAuthVariables = {
+  organization: Organization;
+  apiKeyId: string;
+  apiKeyUserId: string | null;
+  apiKeyOrganizationId: string;
+  orgResolvedToken: OrgResolvedToken;
+};
+
+/**
+ * Org-level Hono auth middleware for endpoints that operate at the
+ * organization level (e.g. project CRUD). Only accepts API key tokens —
+ * legacy project keys are rejected since they lack org context.
+ *
+ * Sets `organization`, `apiKeyId`, `apiKeyUserId`, `apiKeyOrganizationId` on context.
+ * Does NOT set `project` — callers that need project context should use
+ * the standard project-scoped auth middleware instead.
+ */
+export function createOrgAuthMiddleware({
+  prisma,
+}: {
+  prisma: PrismaClient;
+}): MiddlewareHandler {
+  const resolver = TokenResolver.create(prisma);
+  const orgLogger = createLogger("langwatch:api:org-auth");
+
+  return async (c, next) => {
+    const credentials = extractCredentials((name) => c.req.header(name));
+    const diag = collectAuthDiagnostics(c);
+
+    if (!credentials) {
+      orgLogger.warn(diag, "Org auth failed: no credentials");
+      return c.json(
+        {
+          error: "Unauthorized",
+          message:
+            "Authentication required. Use Authorization: Bearer <api-key>.",
+        },
+        401,
+      );
+    }
+
+    let resolved: OrgResolvedToken | null;
+    try {
+      resolved = await resolver.resolveOrgOnly({ token: credentials.token });
+    } catch (error) {
+      orgLogger.error({ ...diag, error }, "Database error during org auth");
+      return c.json(
+        { error: "Internal Server Error", message: "Authentication service error" },
+        500,
+      );
+    }
+
+    if (!resolved) {
+      orgLogger.warn(
+        { ...diag, hasToken: true },
+        "Org auth failed: invalid credentials",
+      );
+      return c.json(
+        {
+          error: "Unauthorized",
+          message: "Invalid credentials. Organization-level endpoints require an admin API key created in Settings > API Keys. Project API keys cannot be used here.",
+        },
+        401,
+      );
+    }
+
+    const organization = await prisma.organization.findUnique({
+      where: { id: resolved.organizationId },
+    });
+
+    if (!organization) {
+      orgLogger.warn(
+        { ...diag, organizationId: resolved.organizationId },
+        "Org auth failed: organization not found",
+      );
+      return c.json(
+        { error: "Unauthorized", message: "Organization not found" },
+        401,
+      );
+    }
+
+    c.set("organization", organization);
+    c.set("apiKeyId", resolved.apiKeyId);
+    c.set("apiKeyUserId", resolved.userId);
+    c.set("apiKeyOrganizationId", resolved.organizationId);
+    c.set("orgResolvedToken", resolved);
+
+    await next();
+
+    if (c.res.status >= 200 && c.res.status < 300) {
+      resolver.markUsed({ apiKeyId: resolved.apiKeyId });
+    }
+  };
+}
+
+/**
  * Diagnostic fields safe to emit on auth failure. Captures enough request
  * fingerprint to attribute 401s to a specific customer/SDK in CloudWatch
  * without leaking credentials or request bodies. `traceparent` lets us join
@@ -305,10 +403,8 @@ export function requireApiKeyPermission({
   return async (c, next) => {
     const resolved = c.get("resolvedToken") as ResolvedToken | undefined;
     if (!resolved) {
-      return c.json(
-        { error: "Unauthorized", message: "Authentication required" },
-        401,
-      );
+      await next();
+      return;
     }
 
     try {

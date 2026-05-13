@@ -28256,6 +28256,97 @@ openapi: 'PATCH /api/annotations/{id}'
 
 ---
 
+# FILE: ./api-reference/api-keys/create-api-key.mdx
+
+---
+title: "Create API key"
+openapi: "POST /api/api-keys"
+---
+
+---
+
+# FILE: ./api-reference/api-keys/list-api-keys.mdx
+
+---
+title: "List API keys"
+openapi: "GET /api/api-keys"
+---
+
+---
+
+# FILE: ./api-reference/api-keys/overview.mdx
+
+---
+title: 'Overview'
+description: 'Create and manage API keys programmatically. Supports personal keys (user-scoped) and service keys (project-scoped, for automation).'
+---
+
+## Intro
+
+The API Keys API lets you create, list, and revoke API keys for your organization. Two key types are supported:
+
+- **Personal keys** — tied to a user, inherit the user's RBAC permissions
+- **Service keys** — no user association, scoped to specific projects with ADMIN access. Ideal for CI/CD, scaffolding tools, and service-to-service integrations
+
+## Authentication
+
+Requires an **organization-level API key** with `organization:manage` permission. Pass it as a Bearer token:
+
+```
+Authorization: Bearer sk-lw-<id>_<secret>
+```
+
+## Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/api-keys` | List all API keys in the organization |
+| `POST` | `/api/api-keys` | Create a new API key |
+| `DELETE` | `/api/api-keys/{id}` | Revoke an API key |
+
+## Key Types
+
+### Personal Keys
+
+Created for a specific user. The key's effective permissions are the intersection of the key's bindings and the user's own role bindings (the "ceiling" model).
+
+```json
+{
+  "keyType": "personal",
+  "name": "My dev key",
+  "bindings": [
+    { "role": "ADMIN", "scopeType": "ORGANIZATION", "scopeId": "<orgId>" }
+  ]
+}
+```
+
+### Service Keys
+
+Created without a user association (`userId: null`). Scoped to specific projects via `projectIds`. Each project gets an ADMIN binding automatically.
+
+```json
+{
+  "keyType": "service",
+  "name": "CI pipeline key",
+  "projectIds": ["project_abc123", "project_def456"]
+}
+```
+
+<Info>
+Service keys without `projectIds` get org-wide ADMIN access. Always scope to specific projects when possible.
+</Info>
+
+---
+
+# FILE: ./api-reference/api-keys/revoke-api-key.mdx
+
+---
+title: "Revoke API key"
+openapi: "DELETE /api/api-keys/{id}"
+---
+
+---
+
 # FILE: ./api-reference/automations/create-slack-automation.mdx
 
 ---
@@ -28770,6 +28861,102 @@ openapi: post /ragas/summarization_score/evaluate
 ---
 openapi: post /langevals/valid_format/evaluate
 ---
+---
+
+# FILE: ./api-reference/projects/archive-project.mdx
+
+---
+title: "Archive project"
+openapi: "DELETE /api/projects/{id}"
+---
+
+---
+
+# FILE: ./api-reference/projects/create-project.mdx
+
+---
+title: "Create project"
+openapi: "POST /api/projects"
+---
+
+---
+
+# FILE: ./api-reference/projects/get-project.mdx
+
+---
+title: "Get project"
+openapi: "GET /api/projects/{id}"
+---
+
+---
+
+# FILE: ./api-reference/projects/list-projects.mdx
+
+---
+title: "List projects"
+openapi: "GET /api/projects"
+---
+
+---
+
+# FILE: ./api-reference/projects/overview.mdx
+
+---
+title: 'Overview'
+description: 'Create, list, update, and archive LangWatch projects programmatically. Designed for automated scaffolding and CI/CD pipelines.'
+---
+
+## Intro
+
+The Projects API lets you manage LangWatch projects via REST. When you create a project, a project-scoped service API key is automatically generated and returned — ready to use for sending traces.
+
+This API is designed for service-to-service automation (e.g. an internal tool that scaffolds new projects), not for end-user access.
+
+## Authentication
+
+The Projects API requires an **organization-level API key** (created in Settings > API Keys). Pass it as a Bearer token:
+
+```
+Authorization: Bearer sk-lw-<id>_<secret>
+```
+
+Legacy project API keys (`X-Auth-Token`) cannot be used — they lack organization context.
+
+## Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/projects` | List all projects in the organization |
+| `POST` | `/api/projects` | Create a new project (returns a service API key) |
+| `GET` | `/api/projects/{id}` | Get project details |
+| `PATCH` | `/api/projects/{id}` | Update project fields |
+| `DELETE` | `/api/projects/{id}` | Archive a project |
+
+## Typical Flow
+
+1. Create an admin API key in Settings > API Keys with `organization:manage` permission
+2. Call `POST /api/projects` with the project name and team
+3. Store the returned `serviceApiKey` and project `id`
+4. Use both values in your application:
+
+```bash
+LANGWATCH_API_KEY=<serviceApiKey>
+LANGWATCH_PROJECT_ID=<project id>
+```
+
+<Info>
+The `serviceApiKey` is shown only once in the create response. Store it securely — you cannot retrieve it later.
+</Info>
+
+---
+
+# FILE: ./api-reference/projects/update-project.mdx
+
+---
+title: "Update project"
+openapi: "PATCH /api/projects/{id}"
+---
+
 ---
 
 # FILE: ./api-reference/prompts/create-prompt-version.mdx

@@ -10,7 +10,7 @@ import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createLogger } from "~/utils/logger/server";
 import {
   type AuthMiddlewareVariables,
-  authMiddleware,
+  authMiddleware, requirePermission,
   resourceLimitMiddleware,
 } from "../../middleware";
 import { loggerMiddleware } from "../../middleware/logger";
@@ -81,6 +81,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── List Graphs ────────────────────────────────────────────
   .get(
     "/",
+    requirePermission("analytics:view"),
     describeRoute({
       description: "List all custom graphs, optionally filtered by dashboard",
       responses: {
@@ -120,6 +121,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── Get Graph ──────────────────────────────────────────────
   .get(
     "/:id",
+    requirePermission("analytics:view"),
     describeRoute({
       description: "Get a custom graph by its ID",
       responses: {
@@ -159,6 +161,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── Create Graph ───────────────────────────────────────────
   .post(
     "/",
+    requirePermission("analytics:manage"),
     resourceLimitMiddleware("customGraphs"),
     describeRoute({
       description: "Create a custom graph on a dashboard",
@@ -211,6 +214,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── Update Graph ───────────────────────────────────────────
   .patch(
     "/:id",
+    requirePermission("analytics:manage"),
     describeRoute({
       description: "Update a custom graph's name, definition, or filters",
       responses: {
@@ -261,6 +265,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── Delete Graph ───────────────────────────────────────────
   .delete(
     "/:id",
+    requirePermission("analytics:manage"),
     describeRoute({
       description: "Delete a custom graph",
       responses: {

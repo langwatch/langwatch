@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { type AuthMiddlewareVariables, authMiddleware, handleError } from "../../middleware";
+import { type AuthMiddlewareVariables, authMiddleware, requirePermission, handleError } from "../../middleware";
 import { loggerMiddleware } from "../../middleware/logger";
 import { tracerMiddleware } from "../../middleware/tracer";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";

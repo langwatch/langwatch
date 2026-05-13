@@ -696,6 +696,26 @@
         "icon": "code",
         "groups": [
           {
+            "group": "Projects",
+            "pages": [
+              "api-reference/projects/overview",
+              "api-reference/projects/list-projects",
+              "api-reference/projects/create-project",
+              "api-reference/projects/get-project",
+              "api-reference/projects/update-project",
+              "api-reference/projects/archive-project"
+            ]
+          },
+          {
+            "group": "API Keys",
+            "pages": [
+              "api-reference/api-keys/overview",
+              "api-reference/api-keys/list-api-keys",
+              "api-reference/api-keys/create-api-key",
+              "api-reference/api-keys/revoke-api-key"
+            ]
+          },
+          {
             "group": "Traces",
             "pages": [
               "api-reference/traces/overview",

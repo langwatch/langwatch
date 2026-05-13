@@ -9,7 +9,7 @@ import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createLogger } from "~/utils/logger/server";
 import {
   type AuthMiddlewareVariables,
-  authMiddleware,
+  authMiddleware, requirePermission,
 } from "../../middleware";
 import { loggerMiddleware } from "../../middleware/logger";
 import { tracerMiddleware } from "../../middleware/tracer";
@@ -60,6 +60,7 @@ export const app = new Hono<{ Variables: Variables }>()
 
   .get(
     "/",
+    requirePermission("workflows:view"),
     describeRoute({
       description: "List all non-archived workflows for the project",
       responses: {
@@ -95,6 +96,7 @@ export const app = new Hono<{ Variables: Variables }>()
 
   .get(
     "/:id",
+    requirePermission("workflows:view"),
     describeRoute({
       description: "Get a workflow by its ID",
       responses: {
@@ -140,6 +142,7 @@ export const app = new Hono<{ Variables: Variables }>()
 
   .patch(
     "/:id",
+    requirePermission("workflows:manage"),
     describeRoute({
       description: "Update a workflow's metadata (name, icon, description)",
       responses: {
@@ -196,6 +199,7 @@ export const app = new Hono<{ Variables: Variables }>()
 
   .delete(
     "/:id",
+    requirePermission("workflows:manage"),
     describeRoute({
       description: "Archive (soft-delete) a workflow",
       responses: {

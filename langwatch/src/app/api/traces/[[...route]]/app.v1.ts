@@ -14,7 +14,7 @@ import {
   TraceService,
 } from "~/server/traces/trace.service";
 import { createLogger } from "~/utils/logger/server";
-import type { AuthMiddlewareVariables } from "../../middleware";
+import { type AuthMiddlewareVariables, requirePermission } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
 import { platformUrl } from "../../shared/platform-url";
 import { coerceToEpoch, flexibleDateSchema } from "../../shared/schemas";
@@ -61,6 +61,7 @@ const traceSearchBodySchema = getAllForProjectInput
 // POST /search - Search traces for a project
 app.post(
   "/search",
+  requirePermission("traces:view"),
   describeRoute({
     description: "Search traces for a project",
     responses: {
@@ -164,6 +165,7 @@ app.post(
 // GET /:traceId - Get a single trace by ID
 app.get(
   "/:traceId",
+  requirePermission("traces:view"),
   describeRoute({
     description: "Get a single trace by ID.",
     parameters: [
