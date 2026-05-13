@@ -13,6 +13,7 @@ vi.mock("../../tracing", () => ({
 describe("OrganizationService", () => {
   const mockRepo: OrganizationRepository = {
     getOrganizationIdByTeamId: vi.fn(),
+    getUserOrgRole: vi.fn(),
     getProjectIds: vi.fn(),
     getFeature: vi.fn(),
     findWithAdmins: vi.fn(),

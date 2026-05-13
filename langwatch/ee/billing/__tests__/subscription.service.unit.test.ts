@@ -73,6 +73,7 @@ const createMockOrganizationRepository = (): {
   [K in keyof OrganizationRepository]: ReturnType<typeof vi.fn>;
 } => ({
   getOrganizationIdByTeamId: vi.fn(),
+  getUserOrgRole: vi.fn(),
   getProjectIds: vi.fn(),
   getFeature: vi.fn(),
   findWithAdmins: vi.fn(),

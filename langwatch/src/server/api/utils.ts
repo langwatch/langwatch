@@ -8,6 +8,7 @@ import {
 import type { Session } from "~/server/auth";
 import type { Protections } from "../elasticsearch/protections";
 import { hasProjectPermission, isDemoProject } from "./rbac";
+import { getApp } from "~/server/app-layer/app";
 
 export const extractCheckKeys = (
   inputObject: Record<string, any>,
@@ -134,23 +135,20 @@ export async function getUserProtectionsForProject(
   let isMemberOfTeam = teamBindings.length > 0;
 
   if (!isMemberOfTeam) {
-    const team = await ctx.prisma.team.findUnique({
-      where: { id: project.teamId },
-      select: { organizationId: true },
-    });
+    const orgService = getApp().organizations;
+    const organizationId = await orgService.getOrganizationIdByTeamId(
+      project.teamId,
+    );
 
-    if (team) {
-      const orgUser = await ctx.prisma.organizationUser.findFirst({
-        where: {
-          userId: ctx.session.user.id,
-          organizationId: team.organizationId,
-        },
-        select: { role: true },
+    if (organizationId) {
+      const orgRole = await orgService.getUserOrgRole({
+        userId: ctx.session.user.id,
+        organizationId,
       });
 
-      if (orgUser && orgUser.role !== OrganizationUserRole.EXTERNAL) {
+      if (orgRole && orgRole !== OrganizationUserRole.EXTERNAL) {
         isMemberOfTeam = true;
-        if (orgUser.role === OrganizationUserRole.ADMIN) {
+        if (orgRole === OrganizationUserRole.ADMIN) {
           isAdminForTeam = true;
         }
       }
