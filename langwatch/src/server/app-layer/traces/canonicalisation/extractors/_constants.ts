@@ -164,6 +164,18 @@ export const ATTR_KEYS = {
   OPENINFERENCE_USER_ID: "user.id",
   OPENINFERENCE_SESSION_ID: "session.id",
   OPENINFERENCE_TAG_TAGS: "tag.tags",
+  // OpenInference token-usage attributes (llm.token_count.*) — emitted by
+  // openinference.instrumentation.{openai,anthropic,langchain,...}.
+  // Mapped to canonical gen_ai.usage.* by OpenInferenceExtractor.
+  OPENINFERENCE_LLM_TOKEN_COUNT_PROMPT: "llm.token_count.prompt",
+  OPENINFERENCE_LLM_TOKEN_COUNT_COMPLETION: "llm.token_count.completion",
+  OPENINFERENCE_LLM_TOKEN_COUNT_TOTAL: "llm.token_count.total",
+  OPENINFERENCE_LLM_TOKEN_COUNT_COMPLETION_DETAILS_REASONING:
+    "llm.token_count.completion_details.reasoning",
+  OPENINFERENCE_LLM_TOKEN_COUNT_PROMPT_DETAILS_CACHE_READ:
+    "llm.token_count.prompt_details.cache_read",
+  OPENINFERENCE_LLM_TOKEN_COUNT_PROMPT_DETAILS_CACHE_WRITE:
+    "llm.token_count.prompt_details.cache_write",
 
   // Haystack attributes
   RETRIEVAL_DOCUMENTS: "retrieval.documents",
