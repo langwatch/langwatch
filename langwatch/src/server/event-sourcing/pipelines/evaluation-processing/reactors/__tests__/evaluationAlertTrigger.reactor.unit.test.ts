@@ -23,6 +23,14 @@ vi.mock("~/utils/posthogErrorCapture", () => ({
   captureException: vi.fn(),
 }));
 
+vi.mock("~/server/mailer/triggerEmail", () => ({
+  sendTriggerEmail: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock("~/server/triggers/sendSlackWebhook", () => ({
+  sendSlackWebhook: vi.fn().mockResolvedValue(undefined),
+}));
+
 function createEvalFoldState(
   overrides: Partial<EvaluationRunData> = {},
 ): EvaluationRunData {
