@@ -1,6 +1,6 @@
 {
   "charts/clickhouse-serverless": "0.2.0",
-  "sdk-go": "0.2.0",
+  "sdk-go": "0.3.0",
   "typescript-sdk": "0.27.0",
   "python-sdk": "0.22.0",
   "mcp-server": "0.7.0",
