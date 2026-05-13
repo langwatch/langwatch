@@ -1,5 +1,6 @@
 import {
   type PrismaClient,
+  OrganizationUserRole,
   ProjectSensitiveDataVisibilityLevel,
   RoleBindingScopeType,
   TeamUserRole,
@@ -147,9 +148,9 @@ export async function getUserProtectionsForProject(
         select: { role: true },
       });
 
-      if (orgUser) {
+      if (orgUser && orgUser.role !== OrganizationUserRole.EXTERNAL) {
         isMemberOfTeam = true;
-        if (orgUser.role === "ADMIN") {
+        if (orgUser.role === OrganizationUserRole.ADMIN) {
           isAdminForTeam = true;
         }
       }

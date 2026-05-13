@@ -253,6 +253,36 @@ describe("getUserProtectionsForProject", () => {
     });
   });
 
+  describe("when user has no team RoleBinding but is org EXTERNAL", () => {
+    beforeEach(() => {
+      mockPrisma.project.findUniqueOrThrow.mockResolvedValue({
+        teamId: "team-1",
+        capturedInputVisibility:
+          ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
+        capturedOutputVisibility:
+          ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
+      });
+
+      mockPrisma.roleBinding.findMany.mockResolvedValue([]);
+      mockPrisma.team.findUnique.mockResolvedValue({
+        organizationId: "org-1",
+      });
+      mockPrisma.organizationUser.findFirst.mockResolvedValue({
+        role: "EXTERNAL",
+      });
+    });
+
+    it("denies visibility even for VISIBLE_TO_ALL", async () => {
+      const result = await getUserProtectionsForProject(
+        { prisma: mockPrisma, session: mockSession },
+        { projectId: "project-1" },
+      );
+
+      expect(result.canSeeCapturedInput).toBe(false);
+      expect(result.canSeeCapturedOutput).toBe(false);
+    });
+  });
+
   describe("when visibility is REDACTED_TO_ALL", () => {
     beforeEach(() => {
       mockPrisma.project.findUniqueOrThrow.mockResolvedValue({
