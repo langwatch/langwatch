@@ -18,6 +18,12 @@ const mockPrisma = {
   roleBinding: {
     findMany: vi.fn(),
   },
+  team: {
+    findUnique: vi.fn(),
+  },
+  organizationUser: {
+    findFirst: vi.fn(),
+  },
 } as any;
 
 const mockSession = {
@@ -123,7 +129,7 @@ describe("getUserProtectionsForProject", () => {
     });
   });
 
-  describe("when user has no RoleBinding", () => {
+  describe("when user has no team RoleBinding and no org membership", () => {
     beforeEach(() => {
       mockPrisma.project.findUniqueOrThrow.mockResolvedValue({
         teamId: "team-1",
@@ -134,9 +140,109 @@ describe("getUserProtectionsForProject", () => {
       });
 
       mockPrisma.roleBinding.findMany.mockResolvedValue([]);
+      mockPrisma.team.findUnique.mockResolvedValue({
+        organizationId: "org-1",
+      });
+      mockPrisma.organizationUser.findFirst.mockResolvedValue(null);
     });
 
-    it("denies visibility even for VISIBLE_TO_ALL", async () => {
+    it("denies visibility for VISIBLE_TO_ALL", async () => {
+      const result = await getUserProtectionsForProject(
+        { prisma: mockPrisma, session: mockSession },
+        { projectId: "project-1" },
+      );
+
+      expect(result.canSeeCapturedInput).toBe(false);
+      expect(result.canSeeCapturedOutput).toBe(false);
+    });
+  });
+
+  describe("when user has no team RoleBinding but is org MEMBER", () => {
+    beforeEach(() => {
+      mockPrisma.project.findUniqueOrThrow.mockResolvedValue({
+        teamId: "team-1",
+        capturedInputVisibility:
+          ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
+        capturedOutputVisibility:
+          ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
+      });
+
+      mockPrisma.roleBinding.findMany.mockResolvedValue([]);
+      mockPrisma.team.findUnique.mockResolvedValue({
+        organizationId: "org-1",
+      });
+      mockPrisma.organizationUser.findFirst.mockResolvedValue({
+        role: "MEMBER",
+      });
+    });
+
+    it("grants visibility for VISIBLE_TO_ALL via org fallback", async () => {
+      const result = await getUserProtectionsForProject(
+        { prisma: mockPrisma, session: mockSession },
+        { projectId: "project-1" },
+      );
+
+      expect(result.canSeeCapturedInput).toBe(true);
+      expect(result.canSeeCapturedOutput).toBe(true);
+    });
+
+    it("denies visibility for VISIBLE_TO_ADMIN", async () => {
+      mockPrisma.project.findUniqueOrThrow.mockResolvedValue({
+        teamId: "team-1",
+        capturedInputVisibility:
+          ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ADMIN,
+        capturedOutputVisibility:
+          ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ADMIN,
+      });
+
+      const result = await getUserProtectionsForProject(
+        { prisma: mockPrisma, session: mockSession },
+        { projectId: "project-1" },
+      );
+
+      expect(result.canSeeCapturedInput).toBe(false);
+      expect(result.canSeeCapturedOutput).toBe(false);
+    });
+  });
+
+  describe("when user has no team RoleBinding but is org ADMIN", () => {
+    beforeEach(() => {
+      mockPrisma.project.findUniqueOrThrow.mockResolvedValue({
+        teamId: "team-1",
+        capturedInputVisibility:
+          ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ADMIN,
+        capturedOutputVisibility:
+          ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ADMIN,
+      });
+
+      mockPrisma.roleBinding.findMany.mockResolvedValue([]);
+      mockPrisma.team.findUnique.mockResolvedValue({
+        organizationId: "org-1",
+      });
+      mockPrisma.organizationUser.findFirst.mockResolvedValue({
+        role: "ADMIN",
+      });
+    });
+
+    it("grants visibility for VISIBLE_TO_ADMIN via org admin fallback", async () => {
+      const result = await getUserProtectionsForProject(
+        { prisma: mockPrisma, session: mockSession },
+        { projectId: "project-1" },
+      );
+
+      expect(result.canSeeCapturedInput).toBe(true);
+      expect(result.canSeeCapturedOutput).toBe(true);
+    });
+
+    it("denies visibility for REDACTED_TO_ALL even as org admin", async () => {
+      mockPrisma.project.findUniqueOrThrow.mockResolvedValue({
+        teamId: "team-1",
+        capturedInputVisibility:
+          ProjectSensitiveDataVisibilityLevel.REDACTED_TO_ALL,
+        capturedOutputVisibility:
+          ProjectSensitiveDataVisibilityLevel.REDACTED_TO_ALL,
+      });
+
       const result = await getUserProtectionsForProject(
         { prisma: mockPrisma, session: mockSession },
         { projectId: "project-1" },

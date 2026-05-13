@@ -115,8 +115,8 @@ export async function getUserProtectionsForProject(
     };
   }
 
-  // For signed in users, check their team permissions via RoleBinding
-  const bindings = await ctx.prisma.roleBinding.findMany({
+  // Check team-level role bindings
+  const teamBindings = await ctx.prisma.roleBinding.findMany({
     where: {
       userId: ctx.session.user.id,
       scopeType: RoleBindingScopeType.TEAM,
@@ -127,10 +127,34 @@ export async function getUserProtectionsForProject(
     },
   });
 
-  const isAdminForTeam = bindings.some(
+  let isAdminForTeam = teamBindings.some(
     (binding) => binding.role === TeamUserRole.ADMIN,
   );
-  const isMemberOfTeam = bindings.length > 0;
+  let isMemberOfTeam = teamBindings.length > 0;
+
+  if (!isMemberOfTeam) {
+    const team = await ctx.prisma.team.findUnique({
+      where: { id: project.teamId },
+      select: { organizationId: true },
+    });
+
+    if (team) {
+      const orgUser = await ctx.prisma.organizationUser.findFirst({
+        where: {
+          userId: ctx.session.user.id,
+          organizationId: team.organizationId,
+        },
+        select: { role: true },
+      });
+
+      if (orgUser) {
+        isMemberOfTeam = true;
+        if (orgUser.role === "ADMIN") {
+          isAdminForTeam = true;
+        }
+      }
+    }
+  }
 
   const obtainVisibilityLevel = (
     visibility: ProjectSensitiveDataVisibilityLevel,
