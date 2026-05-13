@@ -27612,7 +27612,7 @@
       "admin_api_key": {
         "type": "http",
         "scheme": "bearer",
-        "description": "Admin API key for organization-level operations (managing projects, API keys). Create one in Settings > API Keys or via POST /api/api-keys. Format: sk-lw-{id}_{secret} or pat-lw-... (legacy)."
+        "description": "Admin API key for organization-level operations (managing projects, API keys). Create one in Settings > API Keys or via POST /api/api-keys. Format: sk-lw-{id}_{secret}."
       }
     }
   }

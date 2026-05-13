@@ -144,16 +144,16 @@ describe("Feature: Projects REST API", () => {
       expect(res.status).toBe(401);
     });
 
-    it("returns 401 with legacy project key (not a PAT)", async () => {
+    it("returns 401 with project API key (org-level endpoint)", async () => {
       const res = await app.request("/api/projects", {
         headers: { "X-Auth-Token": "sk-lw-invalid-key" },
       });
       expect(res.status).toBe(401);
     });
 
-    it("returns 401 with invalid PAT", async () => {
+    it("returns 401 with invalid API key", async () => {
       const res = await app.request("/api/projects", {
-        headers: { Authorization: "Bearer pat-lw-invalid_token" },
+        headers: { Authorization: "Bearer sk-lw-invalid_token" },
       });
       expect(res.status).toBe(401);
     });

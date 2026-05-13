@@ -1,0 +1,46 @@
+---
+title: 'Overview'
+description: 'Create, list, update, and archive LangWatch projects programmatically. Designed for automated scaffolding and CI/CD pipelines.'
+---
+
+## Intro
+
+The Projects API lets you manage LangWatch projects via REST. When you create a project, a project-scoped service API key is automatically generated and returned — ready to use for sending traces.
+
+This API is designed for service-to-service automation (e.g. an internal tool that scaffolds new projects), not for end-user access.
+
+## Authentication
+
+The Projects API requires an **organization-level API key** (created in Settings > API Keys). Pass it as a Bearer token:
+
+```
+Authorization: Bearer sk-lw-<id>_<secret>
+```
+
+Legacy project API keys (`X-Auth-Token`) cannot be used — they lack organization context.
+
+## Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/projects` | List all projects in the organization |
+| `POST` | `/api/projects` | Create a new project (returns a service API key) |
+| `GET` | `/api/projects/{id}` | Get project details |
+| `PATCH` | `/api/projects/{id}` | Update project fields |
+| `DELETE` | `/api/projects/{id}` | Archive a project |
+
+## Typical Flow
+
+1. Create an admin API key in Settings > API Keys with `organization:manage` permission
+2. Call `POST /api/projects` with the project name and team
+3. Store the returned `serviceApiKey` and project `id`
+4. Use both values in your application:
+
+```bash
+LANGWATCH_API_KEY=<serviceApiKey>
+LANGWATCH_PROJECT_ID=<project id>
+```
+
+<Info>
+The `serviceApiKey` is shown only once in the create response. Store it securely — you cannot retrieve it later.
+</Info>
