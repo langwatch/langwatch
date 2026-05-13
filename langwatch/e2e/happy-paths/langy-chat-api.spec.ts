@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type APIResponse } from "@playwright/test";
 
 test.use({
   storageState: "./e2e/auth.json",
@@ -10,24 +10,9 @@ test.setTimeout(120000);
 const PROJECT_ID = "fyes-lT_hZ2";
 const LANGY_CHAT_URL = "http://localhost:5560/api/langy/chat";
 
-async function readStreamBody(res: Awaited<ReturnType<typeof fetchLike>>) {
+async function readStreamBody(res: APIResponse) {
   return await res.text();
 }
-
-type fetchLike = (
-  url: string,
-  init: {
-    method: string;
-    data: unknown;
-    headers: Record<string, string>;
-    timeout: number;
-  },
-) => Promise<{
-  ok(): boolean;
-  status(): number;
-  headers(): Record<string, string>;
-  text(): Promise<string>;
-}>;
 
 test("Langy chat streams a response and returns a conversation id", async ({
   request,
