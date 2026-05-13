@@ -628,35 +628,64 @@ app.get("/runs/:runId/results", async (c) => {
   }
   const { project, markUsed } = authResult;
 
-  // Look up experiment by slug or find the experiment that owns this runId
-  const experimentSlug = c.req.query("experimentSlug");
+  // Resolve the owning experiment. ClickHouse storage is keyed on
+  // (TenantId, ExperimentId, RunId) — runId alone is not unique across
+  // experiments (SDK callers can reuse a stable run_id) — so we must know
+  // the experimentId before we query results.
+  //
+  // Two sources, tried in order:
+  //   1. runStateManager (Redis, 24h TTL) — covers fresh runs.
+  //   2. experimentSlug query param → prisma lookup — covers older runs
+  //      whose run state has expired but whose ClickHouse rows remain.
+  //
+  // The previous "most recently updated experiment in the project"
+  // fallback was unsafe: it returned cryptic 404s whenever the user had
+  // edited any other experiment after the one that owned this run.
+  const runState = await runStateManager.getRunState(runId);
+  const slugFromState =
+    runState && runState.projectId === project.id
+      ? runState.experimentSlug
+      : undefined;
+  const experimentIdFromState =
+    runState && runState.projectId === project.id
+      ? runState.experimentId
+      : undefined;
 
-  let experiment;
-  if (experimentSlug) {
-    experiment = await prisma.experiment.findFirst({
+  const experimentSlug = c.req.query("experimentSlug") ?? slugFromState;
+  let experimentId = experimentIdFromState;
+
+  if (!experimentId && experimentSlug) {
+    const experiment = await prisma.experiment.findFirst({
       where: { projectId: project.id, slug: experimentSlug },
+      select: { id: true },
     });
+    experimentId = experiment?.id;
   }
 
-  if (!experiment) {
-    // Try to find experiment by scanning runs (fallback)
-    experiment = await prisma.experiment.findFirst({
-      where: { projectId: project.id },
-      orderBy: { updatedAt: "desc" },
-    });
-  }
-
-  if (!experiment) {
-    return c.json({ error: "Experiment not found" }, { status: 404 });
+  if (!experimentId) {
+    return c.json(
+      {
+        error:
+          "Run not found. Pass ?experimentSlug=<slug> if the run is older than 24h.",
+      },
+      { status: 404 },
+    );
   }
 
   try {
     const experimentRunService = ExperimentRunService.create(prisma);
     const run = await experimentRunService.getRun({
       projectId: project.id,
-      experimentId: experiment.id,
+      experimentId,
       runId,
     });
+
+    if (!run) {
+      return c.json(
+        { error: "Run not found or results not yet available" },
+        { status: 404 },
+      );
+    }
 
     markUsed();
     return c.json(run);
