@@ -83,6 +83,12 @@ langevals-presidio = { workspace = true }
 langevals-legacy = { workspace = true }
 langevals-topic_clustering = { workspace = true }
 
+[tool.uv]
+override-dependencies = [
+    "langchain>=0.3.30",
+    "langsmith>=0.8.0",
+]
+
 # PyTorch CPU index for Linux
 [[tool.uv.index]]
 name = "pytorch-cpu"
