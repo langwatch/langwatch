@@ -1,13 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import type * as EvaluationsApiModule from "@/client-sdk/services/evaluations/evaluations-api.service";
+import type * as EvaluationsApiModule from "@/client-sdk/services/experiments/experiments-api.service";
 
 vi.mock(
-  "@/client-sdk/services/evaluations/evaluations-api.service",
+  "@/client-sdk/services/experiments/experiments-api.service",
   async (importOriginal) => {
     const actual = await importOriginal<typeof EvaluationsApiModule>();
     return {
       ...actual,
-      EvaluationsApiService: vi.fn(),
+      ExperimentsApiService: vi.fn(),
     };
   },
 );
@@ -26,7 +26,7 @@ vi.mock("ora", () => ({
   }),
 }));
 
-import { EvaluationsApiService } from "@/client-sdk/services/evaluations/evaluations-api.service";
+import { ExperimentsApiService } from "@/client-sdk/services/experiments/experiments-api.service";
 import { experimentListCommand } from "../list";
 
 class ProcessExitError extends Error {
@@ -46,11 +46,11 @@ describe("experimentListCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockListExperiments = vi.fn();
-    vi.mocked(EvaluationsApiService).mockImplementation(
+    vi.mocked(ExperimentsApiService).mockImplementation(
       () =>
         ({
           listExperiments: mockListExperiments,
-        }) as unknown as EvaluationsApiService,
+        }) as unknown as ExperimentsApiService,
     );
     logSpy = vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);

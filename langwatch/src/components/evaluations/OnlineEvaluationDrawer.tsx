@@ -26,8 +26,8 @@ import { useForm } from "react-hook-form";
 import { LuListTree } from "react-icons/lu";
 import { Drawer } from "~/components/ui/drawer";
 import type { FieldMapping as UIFieldMapping } from "~/components/variables";
-import { createEvaluatorEditorCallbacks } from "~/evaluations-v3/utils/evaluatorEditorCallbacks";
-import { validateEvaluatorMappingsWithFields } from "~/evaluations-v3/utils/mappingValidation";
+import { createEvaluatorEditorCallbacks } from "~/experiments-v3/utils/evaluatorEditorCallbacks";
+import { validateEvaluatorMappingsWithFields } from "~/experiments-v3/utils/mappingValidation";
 import {
   getComplexProps,
   getDrawerStack,

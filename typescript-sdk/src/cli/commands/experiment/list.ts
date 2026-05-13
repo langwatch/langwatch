@@ -1,9 +1,9 @@
 import chalk from "chalk";
 import ora from "ora";
 import {
-  EvaluationsApiService,
+  ExperimentsApiService,
   type ExperimentSummary,
-} from "@/client-sdk/services/evaluations/evaluations-api.service";
+} from "@/client-sdk/services/experiments/experiments-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import { formatTable, formatRelativeTime } from "../../utils/formatting";
@@ -28,7 +28,7 @@ export const experimentListCommand = async (
     return Math.min(parsed, MAX_PAGE_SIZE);
   })();
 
-  const service = new EvaluationsApiService();
+  const service = new ExperimentsApiService();
   const spinner = ora("Fetching experiments...").start();
 
   try {

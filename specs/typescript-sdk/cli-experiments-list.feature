@@ -1,7 +1,7 @@
 @integration
 Feature: List experiments and evaluation runs from the LangWatch CLI
   As a developer wiring CI scripts and ad-hoc queries
-  I want `langwatch experiment list` and `langwatch evaluation list-runs`
+  I want `langwatch experiment list` and `langwatch experiment list-runs`
   So that I can discover experiment slugs and run ids without opening the dashboard
 
   Background:
@@ -39,28 +39,28 @@ Feature: List experiments and evaluation runs from the LangWatch CLI
     And the output mentions "LANGWATCH_API_KEY"
 
   # ==========================================================================
-  # langwatch evaluation list-runs
+  # langwatch experiment list-runs
   # ==========================================================================
 
   Scenario: Listing runs requires --experiment
-    When I run "langwatch evaluation list-runs"
+    When I run "langwatch experiment list-runs"
     Then the exit code is non-zero
     And the output mentions "experiment"
 
   Scenario: Listing runs prints a table for a known slug
     Given the experiment "checkout-flow" has 2 completed runs
-    When I run "langwatch evaluation list-runs --experiment checkout-flow"
+    When I run "langwatch experiment list-runs --experiment checkout-flow"
     Then the exit code is 0
     And the output contains the headers "Run ID", "Status", "Started"
     And both run ids appear in the table
 
   Scenario: JSON format on runs dumps the raw payload
-    When I run "langwatch evaluation list-runs --experiment checkout-flow --format json"
+    When I run "langwatch experiment list-runs --experiment checkout-flow --format json"
     Then the exit code is 0
     And the output is valid JSON
 
   @unimplemented
   Scenario: Unknown experiment slug exits non-zero with a 404 message
-    When I run "langwatch evaluation list-runs --experiment does-not-exist"
+    When I run "langwatch experiment list-runs --experiment does-not-exist"
     Then the exit code is non-zero
     And the output mentions "404" or "not found"

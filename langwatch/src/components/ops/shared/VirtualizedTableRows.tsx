@@ -2,7 +2,7 @@
  * VirtualizedTableRows — render a long flat list of Chakra Table.Row elements
  * inside a scroll container without paying the cost of mounting every row.
  *
- * Mirrors the padding-row pattern used in evaluations-v3's VirtualizedTableBody:
+ * Mirrors the padding-row pattern used in experiments-v3's VirtualizedTableBody:
  * we render top/bottom spacer <tr>s sized to preserve scroll height and only
  * mount the rows currently in (or near) the viewport. Rows below a threshold
  * fall through to a non-virtualized render so small tables stay simple.

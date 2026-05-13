@@ -7,8 +7,8 @@ import {
   createDatasetSchema,
   datasetColumnDefinitionSchema,
 } from "./schemas/create-dataset.js";
-import { handleEvaluationResults } from "./tools/get-evaluation-results.js";
-import { handleEvaluationListRuns } from "./tools/list-evaluation-runs.js";
+import { handleExperimentResults } from "./tools/get-experiment-results.js";
+import { handleExperimentListRuns } from "./tools/list-experiment-runs.js";
 import { handleExperimentList } from "./tools/list-experiments.js";
 
 const modelSchema = z
@@ -1544,41 +1544,41 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     })
   );
 
-  // --- Platform Evaluation Execution Tools (require API key) ---
+  // --- Platform Experiment Execution Tools (require API key) ---
 
   server.tool(
-    "platform_run_evaluation",
-    "Start an evaluation run by slug. Returns a run ID for polling status.",
+    "platform_run_experiment",
+    "Start an experiment run by slug. Returns a run ID for polling status.",
     {
-      slug: z.string().describe("The evaluation slug to run"),
+      slug: z.string().describe("The experiment slug to run"),
     },
-    withToolLogging("platform_run_evaluation", async (params) => {
+    withToolLogging("platform_run_experiment", async (params) => {
       requireApiKey();
-      const { handleRunEvaluation } = await import("./tools/run-evaluation.js");
+      const { handleRunExperiment } = await import("./tools/run-experiment.js");
       return {
-        content: [{ type: "text", text: await handleRunEvaluation(params) }],
+        content: [{ type: "text", text: await handleRunExperiment(params) }],
       };
     })
   );
 
   server.tool(
-    "platform_evaluation_status",
-    "Check the status of an evaluation run. Returns progress and summary when completed.",
+    "platform_experiment_status",
+    "Check the status of an experiment run. Returns progress and summary when completed.",
     {
-      runId: z.string().describe("The run ID returned from platform_run_evaluation"),
+      runId: z.string().describe("The run ID returned from platform_run_experiment"),
     },
-    withToolLogging("platform_evaluation_status", async (params) => {
+    withToolLogging("platform_experiment_status", async (params) => {
       requireApiKey();
-      const { handleEvaluationStatus } = await import("./tools/run-evaluation.js");
+      const { handleExperimentStatus } = await import("./tools/run-experiment.js");
       return {
-        content: [{ type: "text", text: await handleEvaluationStatus(params) }],
+        content: [{ type: "text", text: await handleExperimentStatus(params) }],
       };
     })
   );
 
   server.tool(
     "platform_experiment_list",
-    "List experiments configured in the LangWatch project. Returns a markdown table with each experiment's slug, name, last-run timestamp, and run count. Use this to discover experiment slugs before drilling into runs with platform_evaluation_list_runs. Output is capped (default 25, max 100) to protect the agent's context window.",
+    "List experiments configured in the LangWatch project. Returns a markdown table with each experiment's slug, name, last-run timestamp, and run count. Use this to discover experiment slugs before drilling into runs with platform_experiment_list_runs. Output is capped (default 25, max 100) to protect the agent's context window.",
     {
       limit: z
         .number()
@@ -1599,8 +1599,8 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
   );
 
   server.tool(
-    "platform_evaluation_list_runs",
-    "List evaluation runs for a specific experiment slug. Returns a markdown table with each run's id, status, started/finished timestamps, and pass-rate summary. Use this to discover run ids before calling platform_evaluation_results. Output is capped (default 25, max 100) to protect the agent's context window.",
+    "platform_experiment_list_runs",
+    "List experiment runs for a specific experiment slug. Returns a markdown table with each run's id, status, started/finished timestamps, and pass-rate summary. Use this to discover run ids before calling platform_experiment_results. Output is capped (default 25, max 100) to protect the agent's context window.",
     {
       experimentSlug: z
         .string()
@@ -1617,21 +1617,21 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
           "Maximum number of runs to include (default 25, hard-capped at 100)",
         ),
     },
-    withToolLogging("platform_evaluation_list_runs", async (params) => {
+    withToolLogging("platform_experiment_list_runs", async (params) => {
       requireApiKey();
       return {
-        content: [{ type: "text", text: await handleEvaluationListRuns(params) }],
+        content: [{ type: "text", text: await handleExperimentListRuns(params) }],
       };
     })
   );
 
   server.tool(
-    "platform_evaluation_results",
-    "Fetch per-row results for a completed evaluation run so you can debug evaluator scores and missed rows. Returns a markdown report: per-evaluator averages plus row-by-row scores and failure details. Output is capped at 50 rows to protect the agent's context window — narrow with `filter: 'failed'` or `evaluator` to see what matters.",
+    "platform_experiment_results",
+    "Fetch per-row results for a completed experiment run so you can debug evaluator scores and missed rows. Returns a markdown report: per-evaluator averages plus row-by-row scores and failure details. Output is capped at 50 rows to protect the agent's context window — narrow with `filter: 'failed'` or `evaluator` to see what matters.",
     {
       runId: z
         .string()
-        .describe("The run ID returned from platform_run_evaluation"),
+        .describe("The run ID returned from platform_run_experiment"),
       filter: z
         .enum(["all", "failed"])
         .optional()
@@ -1652,11 +1652,11 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
           "Maximum number of rows to include in the markdown output (default 50, hard-capped at 50).",
         ),
     },
-    withToolLogging("platform_evaluation_results", async (params) => {
+    withToolLogging("platform_experiment_results", async (params) => {
       requireApiKey();
       return {
         content: [
-          { type: "text", text: await handleEvaluationResults(params) },
+          { type: "text", text: await handleExperimentResults(params) },
         ],
       };
     })

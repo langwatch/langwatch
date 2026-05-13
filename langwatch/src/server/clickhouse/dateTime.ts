@@ -26,7 +26,7 @@ export function parseClickHouseDateTime(s: string): Date {
 /**
  * Parse a ClickHouse DateTime64(3) string into Unix epoch milliseconds.
  * Returns 0 on parse failure, matching the prior behavior of the inline
- * implementation in `evaluations-v3/services/mappers.ts`.
+ * implementation in `experiments-v3/services/mappers.ts`.
  */
 export function parseClickHouseDateTimeMs(s: string): number {
   const ms = parseClickHouseDateTime(s).getTime();

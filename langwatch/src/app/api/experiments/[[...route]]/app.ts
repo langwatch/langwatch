@@ -2,7 +2,7 @@
  * Public REST API for experiments.
  *
  * Currently exposes only the list endpoint that complements the existing
- * `/api/evaluations/v3/{slug}/run` and `/runs/{runId}` routes:
+ * `/api/experiments/{slug}/run` and `/runs/{runId}` routes:
  *
  *   GET /api/experiments
  *
@@ -19,7 +19,7 @@ import { resolver } from "hono-openapi/zod";
 import { z } from "zod";
 import { prisma } from "~/server/db";
 import { ExperimentService } from "~/server/experiments/experiment.service";
-import { ExperimentRunService } from "~/server/evaluations-v3/services/experiment-run.service";
+import { ExperimentRunService } from "~/server/experiments-v3/services/experiment-run.service";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createLogger } from "~/utils/logger/server";
 import {

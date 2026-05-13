@@ -1,7 +1,7 @@
 /**
  * Compute aggregate statistics from batch evaluation data.
  *
- * Similar to evaluations-v3/utils/computeAggregates.ts but works with
+ * Similar to experiments-v3/utils/computeAggregates.ts but works with
  * the transformed BatchEvaluationData format.
  */
 import type { MetricStats } from "~/components/shared/MetricStatsTooltip";

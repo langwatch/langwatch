@@ -89,7 +89,7 @@ export async function handleExperimentList(params: {
 
   lines.push("");
   lines.push(
-    "> Use `platform_evaluation_list_runs` with one of these slugs to see its runs.",
+    "> Use `platform_experiment_list_runs` with one of these slugs to see its runs.",
   );
   return lines.join("\n");
 }

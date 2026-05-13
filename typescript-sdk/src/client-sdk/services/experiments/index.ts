@@ -25,6 +25,22 @@
 
 export { Experiment } from "./experiment";
 export { ExperimentsFacade } from "./experiments.facade";
+export {
+  ExperimentsApiService,
+  ExperimentsApiServiceError,
+} from "./experiments-api.service";
+export type {
+  ExperimentRunStartResponse,
+  ExperimentRunStatusResponse,
+  ExperimentSummary,
+  ExperimentListResponse,
+  ExperimentListPagination,
+  ExperimentRunSummaryEntry,
+  ExperimentRunsListResponse,
+  ExperimentRunDatasetEntry,
+  ExperimentRunEvaluation,
+  ExperimentRunResultsResponse,
+} from "./experiments-api.service";
 
 // SDK-defined experiment types
 export type {

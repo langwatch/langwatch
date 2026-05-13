@@ -7,8 +7,8 @@ config();
 import { Command } from "commander";
 import { parsePromptSpec } from "./types";
 import { formatApiErrorMessage } from "../client-sdk/services/_shared/format-api-error";
-import { evaluationListRunsCommand } from "./commands/evaluation/list-runs.js";
-import { evaluationResultsCommand } from "./commands/evaluation/results.js";
+import { experimentListRunsCommand } from "./commands/experiment/list-runs.js";
+import { experimentResultsCommand } from "./commands/experiment/results.js";
 import { experimentListCommand } from "./commands/experiment/list.js";
 
 declare const __CLI_VERSION__: string;
@@ -449,33 +449,42 @@ evaluatorCmd
     }
   });
 
-// Add evaluation command group
-const evaluationCmd = program
-  .command("evaluation")
-  .description("Run and monitor evaluations");
+// Add experiment command group — run, monitor, list, and inspect experiments
+const experimentCmd = program
+  .command("experiment")
+  .description("Run, monitor, list, and inspect experiments");
 
-evaluationCmd
+experimentCmd
+  .command("list")
+  .description("List experiments in the project")
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .option("--limit <n>", "Maximum experiments to fetch (default 50, max 200)", "50")
+  .action(async (options: { format?: string; limit?: string }) => {
+    await experimentListCommand(options);
+  });
+
+experimentCmd
   .command("run <slug>")
-  .description("Start an evaluation run by slug")
-  .option("--wait", "Wait for the evaluation to complete before returning")
+  .description("Start an experiment run by slug")
+  .option("--wait", "Wait for the experiment to complete before returning")
   .option("-f, --format <format>", "Output format: table (default) or json", "table")
   .action(async (slug: string, options: { wait?: boolean; format?: string }) => {
-    const { runEvaluationCommand: impl } = await import("./commands/evaluation/run.js");
+    const { runExperimentCommand: impl } = await import("./commands/experiment/run.js");
     await impl(slug, options);
   });
 
-evaluationCmd
+experimentCmd
   .command("status <runId>")
-  .description("Check the status of an evaluation run")
+  .description("Check the status of an experiment run")
   .option("-f, --format <format>", "Output format: table (default) or json", "table")
   .action(async (runId: string, options: { format?: string }) => {
-    const { evaluationStatusCommand: impl } = await import("./commands/evaluation/status.js");
+    const { experimentStatusCommand: impl } = await import("./commands/experiment/status.js");
     await impl(runId, options);
   });
 
-evaluationCmd
+experimentCmd
   .command("list-runs")
-  .description("List evaluation runs for an experiment by slug")
+  .description("List experiment runs for an experiment by slug")
   .requiredOption("--experiment <slug>", "Experiment slug to list runs for")
   .option("-f, --format <format>", "Output format: table (default) or json", "table")
   .option("--limit <n>", "Maximum runs to fetch (default 50, max 200)", "50")
@@ -485,14 +494,14 @@ evaluationCmd
       format?: string;
       limit?: string;
     }) => {
-      await evaluationListRunsCommand(options);
+      await experimentListRunsCommand(options);
     },
   );
 
-evaluationCmd
+experimentCmd
   .command("results <runId>")
   .description(
-    "Fetch per-row results for a completed evaluation run (debug evaluator scores and missed rows)",
+    "Fetch per-row results for a completed experiment run (debug evaluator scores and missed rows)",
   )
   .option("--filter <filter>", "Filter rows: failed | all (default)", "all")
   .option("--evaluator <name>", "Show only this evaluator's column")
@@ -508,23 +517,9 @@ evaluationCmd
         limit?: string;
       },
     ) => {
-      await evaluationResultsCommand({ runId, options });
+      await experimentResultsCommand({ runId, options });
     },
   );
-
-// Add experiment command group
-const experimentCmd = program
-  .command("experiment")
-  .description("List and inspect experiments");
-
-experimentCmd
-  .command("list")
-  .description("List experiments in the project")
-  .option("-f, --format <format>", "Output format: table (default) or json", "table")
-  .option("--limit <n>", "Maximum experiments to fetch (default 50, max 200)", "50")
-  .action(async (options: { format?: string; limit?: string }) => {
-    await experimentListCommand(options);
-  });
 
 
 // Add workflow command group

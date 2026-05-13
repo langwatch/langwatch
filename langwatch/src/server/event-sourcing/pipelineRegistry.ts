@@ -55,7 +55,7 @@ import {
 } from "./pipelines/trace-processing/reactors/gatewayBudgetSync.reactor";
 import type { ComputeExperimentRunMetricsCommandData } from "./pipelines/experiment-run-processing/schemas/commands";
 
-import { createElasticsearchBatchEvaluationRepository } from "../evaluations-v3/repositories/elasticsearchBatchEvaluation.repository";
+import { createElasticsearchBatchEvaluationRepository } from "../experiments-v3/repositories/elasticsearchBatchEvaluation.repository";
 import { Deferred, type CommandDispatcher } from "./deferred";
 import type { EventSourcing } from "./eventSourcing";
 import { mapCommands } from "./mapCommands";

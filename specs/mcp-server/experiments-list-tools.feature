@@ -1,7 +1,7 @@
 @integration
 Feature: MCP tools for listing experiments and evaluation runs
   As an LLM agent connected to the LangWatch MCP server
-  I want `platform_experiment_list` and `platform_evaluation_list_runs` tools
+  I want `platform_experiment_list` and `platform_experiment_list_runs` tools
   So that I can discover experiment slugs and run ids before drilling into results
 
   Background:
@@ -30,22 +30,22 @@ Feature: MCP tools for listing experiments and evaluation runs
     Then the call fails with a validation error mentioning the maximum limit of 100
 
   # ==========================================================================
-  # platform_evaluation_list_runs
+  # platform_experiment_list_runs
   # ==========================================================================
 
   @unimplemented
   Scenario: Listing runs requires experimentSlug
-    When the agent invokes platform_evaluation_list_runs without experimentSlug
+    When the agent invokes platform_experiment_list_runs without experimentSlug
     Then the call fails with a validation error mentioning "experimentSlug"
 
   Scenario: Lists runs for a known experiment
     Given the experiment "checkout-flow" has 2 completed runs
-    When the agent invokes platform_evaluation_list_runs with experimentSlug "checkout-flow"
+    When the agent invokes platform_experiment_list_runs with experimentSlug "checkout-flow"
     Then the response is markdown
     And the response lists each run id
     And each row reports status and started/finished timestamps
 
   Scenario: Unknown experiment slug returns a graceful not-found message
-    When the agent invokes platform_evaluation_list_runs with experimentSlug "does-not-exist"
+    When the agent invokes platform_experiment_list_runs with experimentSlug "does-not-exist"
     Then the response indicates the experiment was not found
     And the response suggests calling platform_experiment_list to discover slugs

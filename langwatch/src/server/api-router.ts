@@ -32,7 +32,7 @@ import { app as triggersApp } from "../app/api/triggers/[[...route]]/app";
 import { app as workflowsCrudApp } from "../app/api/workflows/[[...route]]/app";
 
 import { app as datasetGenerateApp } from "./routes/dataset-generate";
-import { app as evaluationsV3App } from "./routes/evaluations-v3";
+import { app as experimentsV3App } from "./routes/experiments-v3";
 import { app as gatewayInternalApp } from "./routes/gateway-internal";
 import { app as healthChecksApp } from "./routes/health-checks";
 import { app as otelApp } from "./routes/otel";
@@ -101,7 +101,7 @@ export function createApiRouter() {
   api.route("/", triggersApp);
   api.route("/", workflowsCrudApp);      // CRUD — complements workflowsApp (code-completion, post_event)
 
-  api.route("/", evaluationsV3App);
+  api.route("/", experimentsV3App);
   api.route("/", gatewayInternalApp);
   api.route("/", otelApp);
   api.route("/", playgroundApp);

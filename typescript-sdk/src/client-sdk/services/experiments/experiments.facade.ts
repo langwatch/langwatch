@@ -182,7 +182,7 @@ export class ExperimentsFacade {
    */
   private async startRun(slug: string): Promise<{ runId: string; total: number; runUrl?: string }> {
     const response = await this.config.langwatchApiClient.POST(
-      "/api/evaluations/v3/{slug}/run",
+      "/api/experiments/{slug}/run",
       {
         params: {
           path: { slug },
@@ -220,7 +220,7 @@ export class ExperimentsFacade {
     error?: string;
   }> {
     const response = await this.config.langwatchApiClient.GET(
-      "/api/evaluations/v3/runs/{runId}",
+      "/api/experiments/runs/{runId}",
       {
         params: {
           path: { runId },

@@ -2,7 +2,7 @@
  * BatchTargetCell - Displays a target's output and evaluator results in the batch results table
  *
  * This is a read-only version for displaying historical evaluation results.
- * For the interactive workbench version, see evaluations-v3/components/TargetSection/TargetCell.tsx
+ * For the interactive workbench version, see experiments-v3/components/TargetSection/TargetCell.tsx
  */
 
 import { Box, Button, HStack, Portal, Text, VStack } from "@chakra-ui/react";

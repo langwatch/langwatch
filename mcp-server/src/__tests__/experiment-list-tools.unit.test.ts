@@ -10,7 +10,7 @@ vi.mock("../langwatch-api.js", async (importOriginal) => {
 
 import { makeRequest } from "../langwatch-api.js";
 import { handleExperimentList } from "../tools/list-experiments.js";
-import { handleEvaluationListRuns } from "../tools/list-evaluation-runs.js";
+import { handleExperimentListRuns } from "../tools/list-experiment-runs.js";
 
 const mockMakeRequest = vi.mocked(makeRequest);
 
@@ -81,7 +81,7 @@ describe("handleExperimentList()", () => {
   });
 });
 
-describe("handleEvaluationListRuns()", () => {
+describe("handleExperimentListRuns()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -110,7 +110,7 @@ describe("handleEvaluationListRuns()", () => {
           },
         });
 
-        const out = await handleEvaluationListRuns({
+        const out = await handleExperimentListRuns({
           experimentSlug: "checkout-flow",
         });
         expect(out).toContain("# Evaluation Runs: checkout-flow");
@@ -127,7 +127,7 @@ describe("handleEvaluationListRuns()", () => {
           new Error("LangWatch API error 404: experiment not found"),
         );
 
-        const out = await handleEvaluationListRuns({
+        const out = await handleExperimentListRuns({
           experimentSlug: "does-not-exist",
         });
         expect(out).toContain("not found");
@@ -138,7 +138,7 @@ describe("handleEvaluationListRuns()", () => {
 
   describe("given the experiment exists but has no runs", () => {
     describe("when invoked", () => {
-      it("returns an empty-state message that points at platform_run_evaluation", async () => {
+      it("returns an empty-state message that points at platform_run_experiment", async () => {
         mockMakeRequest.mockResolvedValueOnce({
           experimentId: "exp_1",
           experimentSlug: "support-bot",
@@ -146,11 +146,11 @@ describe("handleEvaluationListRuns()", () => {
           pagination: { page: 1, pageSize: 25, totalHits: 0, hasMore: false },
         });
 
-        const out = await handleEvaluationListRuns({
+        const out = await handleExperimentListRuns({
           experimentSlug: "support-bot",
         });
         expect(out).toContain("no runs yet");
-        expect(out).toContain("platform_run_evaluation");
+        expect(out).toContain("platform_run_experiment");
       });
     });
   });

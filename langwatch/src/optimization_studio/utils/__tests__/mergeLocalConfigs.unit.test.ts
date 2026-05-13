@@ -1,6 +1,6 @@
 import type { Node } from "@xyflow/react";
 import { describe, expect, it } from "vitest";
-import type { LocalPromptConfig } from "~/evaluations-v3/types";
+import type { LocalPromptConfig } from "~/experiments-v3/types";
 import type {
   Component,
   Evaluator,
