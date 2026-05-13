@@ -35,6 +35,21 @@ export class ExperimentService {
     return experiment;
   }
 
+  /**
+   * Null-returning sibling of getBySlug for callers that prefer a missing
+   * experiment to be a value rather than a thrown exception (e.g. agent
+   * tools translating not-found into a friendly error message).
+   */
+  async findBySlug({
+    projectId,
+    slug,
+  }: {
+    projectId: string;
+    slug: string;
+  }): Promise<Experiment | null> {
+    return this.repository.findBySlug({ slug, projectId });
+  }
+
   async getById({
     projectId,
     id,

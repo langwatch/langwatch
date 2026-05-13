@@ -175,10 +175,7 @@ export function makeProposeCreateEvaluator(ctx: LangyToolContext) {
           error: `No built-in evaluator with type '${evaluatorType}'. Use list_evaluators('built_in') first.`,
         };
       }
-      const project = await ctx.prisma.project.findUnique({
-        where: { id: ctx.projectId },
-        select: { defaultModel: true, embeddingsModel: true },
-      });
+      const project = await ctx.projectService.getById(ctx.projectId);
       const defaults = getEvaluatorDefaultSettings(
         getEvaluatorDefinitions(evaluatorType),
         project ?? undefined,

@@ -458,6 +458,40 @@ export class DatasetService {
   }
 
   /**
+   * Lists every non-archived dataset for a project with record counts,
+   * ordered by most-recently-updated first. Unbounded — for callers that
+   * need the full surface (e.g. an AI assistant enumerating choices) rather
+   * than a paginated UI view.
+   */
+  async listAllNonArchivedWithCounts(params: { projectId: string }) {
+    return await this.repository.findAllNonArchivedWithCounts(params);
+  }
+
+  /**
+   * Resolves a non-archived dataset by id (id only — never slug) and
+   * returns it with its record count. Returns null when not found so the
+   * caller can map to a friendly error instead of a thrown exception.
+   */
+  async findByIdNonArchivedWithCounts(params: {
+    id: string;
+    projectId: string;
+  }) {
+    return await this.repository.findByIdNonArchivedWithCounts(params);
+  }
+
+  /**
+   * Returns the first N records of a dataset by createdAt ascending,
+   * containing only id and entry. For sample/preview use cases.
+   */
+  async listRecordsSample(params: {
+    datasetId: string;
+    projectId: string;
+    limit: number;
+  }) {
+    return await this.recordRepository.findSample(params);
+  }
+
+  /**
    * Lists non-archived datasets for a project with pagination and record counts.
    */
   async listDatasets(params: {

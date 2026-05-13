@@ -11,28 +11,19 @@ export function makeSearchPastRuns(ctx: LangyToolContext) {
       limit: z.number().int().min(1).max(20).default(10),
     }),
     execute: async ({ experimentSlug, limit }) => {
-      const where: Record<string, unknown> = { projectId: ctx.projectId };
+      let experimentId: string | undefined;
       if (experimentSlug) {
-        const exp = await ctx.prisma.experiment.findFirst({
-          where: { projectId: ctx.projectId, slug: experimentSlug },
-          select: { id: true },
+        const experiment = await ctx.experimentService.findBySlug({
+          projectId: ctx.projectId,
+          slug: experimentSlug,
         });
-        if (!exp) return { items: [], error: "experiment not found" };
-        where.experimentId = exp.id;
+        if (!experiment) return { items: [], error: "experiment not found" };
+        experimentId = experiment.id;
       }
-      const rows = await ctx.prisma.batchEvaluation.findMany({
-        where,
-        orderBy: { createdAt: "desc" },
-        take: limit,
-        select: {
-          id: true,
-          experimentId: true,
-          createdAt: true,
-          status: true,
-          score: true,
-          passed: true,
-          evaluation: true,
-        },
+      const rows = await ctx.batchEvaluationService.getRecentByExperiment({
+        projectId: ctx.projectId,
+        experimentId,
+        limit,
       });
       return {
         items: rows.map((r) => ({

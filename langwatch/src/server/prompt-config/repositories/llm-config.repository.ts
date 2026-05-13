@@ -807,6 +807,31 @@ export class LlmConfigRepository {
    * from the specified project or organization.
    * Returns the set of IDs that exist.
    */
+  /**
+   * Searches project-scoped prompt configs by case-insensitive substring
+   * match on handle or name. Used by lightweight lookup callers (e.g. an
+   * agent tool) that need a small "did you mean…" list — not a full
+   * prompts API view.
+   */
+  async searchByKeyword(params: {
+    projectId: string;
+    query: string;
+    limit: number;
+  }): Promise<Array<Pick<LlmPromptConfig, "id" | "handle" | "name">>> {
+    return await this.prisma.llmPromptConfig.findMany({
+      where: {
+        projectId: params.projectId,
+        OR: [
+          { handle: { contains: params.query, mode: "insensitive" } },
+          { name: { contains: params.query, mode: "insensitive" } },
+        ],
+      },
+      orderBy: { updatedAt: "desc" },
+      take: params.limit,
+      select: { id: true, handle: true, name: true },
+    });
+  }
+
   async findExistingIds(params: {
     ids: string[];
     projectId: string;
