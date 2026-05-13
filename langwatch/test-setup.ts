@@ -25,6 +25,16 @@ if (typeof globalThis.WritableStream === "undefined") {
   globalThis.WritableStream = NodeWritableStream as unknown as typeof WritableStream;
 }
 
+// @paper-design/shaders-react renders via WebGL, which jsdom does not
+// support. Without this mock, every test that imports a component containing
+// a shader (LangySidebar, TracesV2HomeBanner, etc.) emits unhandled-rejection
+// errors and trips Vitest's non-zero exit, even when all tests pass.
+// Shaders are purely cosmetic — stubbing them keeps the test env quiet.
+vi.mock("@paper-design/shaders-react", () => ({
+  MeshGradient: () => null,
+  GrainGradient: () => null,
+}));
+
 // Mock recharts to avoid ESM/CJS compatibility issues with @reduxjs/toolkit in vmThreads pool.
 // Tests don't need actual chart rendering - we're testing our logic, not recharts itself.
 vi.mock("recharts", () => {
