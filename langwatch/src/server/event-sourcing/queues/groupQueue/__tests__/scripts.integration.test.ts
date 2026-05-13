@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { Redis } from "ioredis";
 import {
   startTestContainers,
@@ -1907,6 +1907,326 @@ describe("GroupStagingScripts", () => {
 
       const survivors = await inspectGroupJobs("project_Z/fold/somethingShared/key-1");
       expect(survivors.filter((s) => !s.match(/^\d+$/))).toContain("wrong-tenant");
+    });
+  });
+
+  /**
+   * Post-2026-05-11 tenant soft-cap integration coverage.
+   *
+   * These tests drive the new Lua paths against a real Redis (via
+   * testcontainers) and prove:
+   *   - the `tenant_active:<tenantId>` counter stays consistent across
+   *     DISPATCH (INCR) → COMPLETE / RESTAGE_AND_BLOCK (DECR/DEL) and
+   *     REFRESH / RETRY_RESTAGE (TTL renewal)
+   *   - cap enforcement at the scheduler level
+   *   - widened scan budget keeps cross-tenant fairness when an
+   *     over-cap tenant dominates the head of the ready zset
+   *   - cap=0 (kill switch) leaves the counter machinery completely
+   *     inert — no `tenant_active:*` keys ever appear
+   *
+   * All scenarios mutate `LANGWATCH_DISPATCH_TENANT_CAP` per test
+   * (readTenantCap reads process.env at call time on purpose) and
+   * restore it in afterEach so test ordering is independent.
+   */
+  describe("tenant soft-cap (LANGWATCH_DISPATCH_TENANT_CAP)", () => {
+    const TENANT_CAP_ENV = "LANGWATCH_DISPATCH_TENANT_CAP";
+    let originalEnv: string | undefined;
+
+    beforeEach(() => {
+      originalEnv = process.env[TENANT_CAP_ENV];
+    });
+
+    afterEach(() => {
+      if (originalEnv === undefined) {
+        delete process.env[TENANT_CAP_ENV];
+      } else {
+        process.env[TENANT_CAP_ENV] = originalEnv;
+      }
+    });
+
+    function tenantCounterKey(tenantId: string) {
+      return `${keyPrefix()}tenant_active:${tenantId}`;
+    }
+
+    async function stageOne({
+      tenantId,
+      groupSuffix,
+      stagedJobId,
+      dispatchAfterMs = 1000,
+    }: {
+      tenantId: string;
+      groupSuffix: string;
+      stagedJobId: string;
+      dispatchAfterMs?: number;
+    }) {
+      const groupId = `${tenantId}/${groupSuffix}`;
+      await scripts.stage(
+        makeJob({ groupId, stagedJobId, dispatchAfterMs }),
+      );
+      return groupId;
+    }
+
+    /** @scenario Counter increments on dispatch, decrements on completion */
+    it("INCRs the tenant counter on dispatch and DELs it on completion", async () => {
+      process.env[TENANT_CAP_ENV] = "10";
+      const groupId = await stageOne({
+        tenantId: "proj_acme",
+        groupSuffix: "g1",
+        stagedJobId: "j1",
+      });
+
+      const dispatched = await scripts.dispatch({
+        nowMs: 2000,
+        activeTtlSec: 60,
+      });
+      expect(dispatched?.groupId).toBe(groupId);
+
+      // Counter at 1 after first dispatch
+      expect(await redis.get(tenantCounterKey("proj_acme"))).toBe("1");
+      // TTL is in lockstep with activeKey
+      const counterTtl = await redis.ttl(tenantCounterKey("proj_acme"));
+      const activeTtl = await redis.ttl(
+        `${keyPrefix()}group:${groupId}:active`,
+      );
+      expect(Math.abs(counterTtl - activeTtl)).toBeLessThanOrEqual(1);
+
+      // Completing the only in-flight group DELs the counter (n was 1)
+      await scripts.complete({
+        groupId,
+        stagedJobId: dispatched!.stagedJobId,
+      });
+      expect(await redis.exists(tenantCounterKey("proj_acme"))).toBe(0);
+    });
+
+    it("DECRs (does not DEL) when there are other in-flight groups for the same tenant", async () => {
+      process.env[TENANT_CAP_ENV] = "10";
+      await stageOne({
+        tenantId: "proj_acme",
+        groupSuffix: "g1",
+        stagedJobId: "j1",
+      });
+      await stageOne({
+        tenantId: "proj_acme",
+        groupSuffix: "g2",
+        stagedJobId: "j2",
+      });
+
+      const d1 = await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 });
+      const d2 = await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 });
+      expect(d1).not.toBeNull();
+      expect(d2).not.toBeNull();
+      expect(await redis.get(tenantCounterKey("proj_acme"))).toBe("2");
+
+      // Complete only one
+      await scripts.complete({
+        groupId: d1!.groupId,
+        stagedJobId: d1!.stagedJobId,
+      });
+      expect(await redis.get(tenantCounterKey("proj_acme"))).toBe("1");
+    });
+
+    /** @scenario RESTAGE_AND_BLOCK decrements the counter on exhausted retries */
+    it("RESTAGE_AND_BLOCK_LUA decrements the tenant counter (preventing slot leak on terminal failures)", async () => {
+      process.env[TENANT_CAP_ENV] = "10";
+      const groupId = await stageOne({
+        tenantId: "proj_acme",
+        groupSuffix: "g1",
+        stagedJobId: "j1",
+      });
+      await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 });
+      expect(await redis.get(tenantCounterKey("proj_acme"))).toBe("1");
+
+      await scripts.restageAndBlock({
+        groupId,
+        newStagedJobId: "j1-restaged",
+        score: 9999,
+        jobDataJson: JSON.stringify({ hello: "world" }),
+        errorMessage: "max retries",
+      });
+      expect(await redis.exists(tenantCounterKey("proj_acme"))).toBe(0);
+    });
+
+    /** @scenario REFRESH keeps the tenant counter TTL aligned with activeKey */
+    it("REFRESH_LUA renews the tenant counter TTL in lockstep with activeKey", async () => {
+      process.env[TENANT_CAP_ENV] = "10";
+      const groupId = await stageOne({
+        tenantId: "proj_acme",
+        groupSuffix: "g1",
+        stagedJobId: "j1",
+      });
+      const dispatched = await scripts.dispatch({
+        nowMs: 2000,
+        activeTtlSec: 60,
+      });
+
+      // Force the counter into a low-TTL state to prove EXPIRE renewal works
+      await redis.expire(tenantCounterKey("proj_acme"), 5);
+      const beforeRefresh = await redis.ttl(tenantCounterKey("proj_acme"));
+      expect(beforeRefresh).toBeLessThanOrEqual(5);
+
+      await scripts.refreshActiveKey({
+        groupId,
+        stagedJobId: dispatched!.stagedJobId,
+        activeTtlSec: 60,
+      });
+
+      const counterTtl = await redis.ttl(tenantCounterKey("proj_acme"));
+      const activeTtl = await redis.ttl(
+        `${keyPrefix()}group:${groupId}:active`,
+      );
+      expect(counterTtl).toBeGreaterThan(beforeRefresh);
+      expect(Math.abs(counterTtl - activeTtl)).toBeLessThanOrEqual(1);
+    });
+
+    /** @scenario RETRY_RESTAGE keeps the tenant counter TTL aligned through backoff */
+    it("RETRY_RESTAGE_LUA aligns the tenant counter TTL with the retry TTL", async () => {
+      process.env[TENANT_CAP_ENV] = "10";
+      const groupId = await stageOne({
+        tenantId: "proj_acme",
+        groupSuffix: "g1",
+        stagedJobId: "j1",
+      });
+      const dispatched = await scripts.dispatch({
+        nowMs: 2000,
+        activeTtlSec: 60,
+      });
+
+      await scripts.retryRestage({
+        groupId,
+        stagedJobId: dispatched!.stagedJobId,
+        newStagedJobId: "j1-retry",
+        dispatchAfterMs: 9999,
+        jobDataJson: JSON.stringify({ hello: "world" }),
+        backoffMs: 30_000,
+      });
+
+      const counterTtl = await redis.ttl(tenantCounterKey("proj_acme"));
+      const activeTtl = await redis.ttl(
+        `${keyPrefix()}group:${groupId}:active`,
+      );
+      // retryRestage sets activeKey TTL to ceil(backoffMs/1000)+2 = 32s
+      expect(counterTtl).toBeGreaterThan(0);
+      expect(Math.abs(counterTtl - activeTtl)).toBeLessThanOrEqual(2);
+    });
+
+    /** @scenario DISPATCH_LUA refuses to dispatch when tenant is at cap */
+    it("refuses to dispatch a group whose tenant is already at cap", async () => {
+      process.env[TENANT_CAP_ENV] = "2";
+      // Three groups, all same tenant, all eligible
+      await stageOne({
+        tenantId: "proj_noisy",
+        groupSuffix: "g1",
+        stagedJobId: "j1",
+      });
+      await stageOne({
+        tenantId: "proj_noisy",
+        groupSuffix: "g2",
+        stagedJobId: "j2",
+      });
+      await stageOne({
+        tenantId: "proj_noisy",
+        groupSuffix: "g3",
+        stagedJobId: "j3",
+      });
+
+      // First two dispatches OK
+      expect(await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 })).not.toBeNull();
+      expect(await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 })).not.toBeNull();
+      expect(await redis.get(tenantCounterKey("proj_noisy"))).toBe("2");
+
+      // Third dispatch must be refused — tenant is at cap=2
+      const third = await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 });
+      expect(third).toBeNull();
+      // Counter unchanged — over-cap groups don't INCR
+      expect(await redis.get(tenantCounterKey("proj_noisy"))).toBe("2");
+      // g3 is still on ready zset waiting
+      const ready = await inspectReadySet();
+      expect(ready.some((s) => s === "proj_noisy/g3")).toBe(true);
+    });
+
+    /** @scenario Over-cap tenant at the head of the zset does not starve other tenants */
+    it("widened scan budget walks past over-cap tenant's groups to serve a quiet tenant deeper in the zset", async () => {
+      process.env[TENANT_CAP_ENV] = "1";
+
+      // proj_noisy stages 50 groups at score=1000 (head of zset)
+      const noisyJobs = Array.from({ length: 50 }, (_, i) =>
+        makeJob({
+          groupId: `proj_noisy/g${i}`,
+          stagedJobId: `noisy-j${i}`,
+          dispatchAfterMs: 1000,
+        }),
+      );
+      await scripts.stageBatch(noisyJobs);
+
+      // proj_quiet stages 1 group at score=1001 (later in zset)
+      await stageOne({
+        tenantId: "proj_quiet",
+        groupSuffix: "only",
+        stagedJobId: "quiet-j1",
+        dispatchAfterMs: 1001,
+      });
+
+      // First dispatch: proj_noisy/g0 wins (counter goes 0→1)
+      const first = await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 });
+      expect(first?.groupId).toMatch(/^proj_noisy\//);
+      expect(await redis.get(tenantCounterKey("proj_noisy"))).toBe("1");
+
+      // Second dispatch: proj_noisy is at cap, scheduler MUST walk past
+      // its remaining 49 over-cap groups and find proj_quiet's one group.
+      const second = await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 });
+      expect(second).not.toBeNull();
+      expect(second!.groupId).toBe("proj_quiet/only");
+      expect(await redis.get(tenantCounterKey("proj_quiet"))).toBe("1");
+    });
+
+    /** @scenario cap=0 produces zero tenant counter keys (back-compat regression) */
+    it("when cap=0 (kill switch), no tenant_active:* keys are ever created", async () => {
+      process.env[TENANT_CAP_ENV] = "0";
+
+      const groupId = await stageOne({
+        tenantId: "proj_acme",
+        groupSuffix: "g1",
+        stagedJobId: "j1",
+      });
+      const dispatched = await scripts.dispatch({
+        nowMs: 2000,
+        activeTtlSec: 60,
+      });
+      expect(dispatched).not.toBeNull();
+
+      // Scan for any tenant_active:* keys — must be none.
+      const keysAfterDispatch = await redis.keys(`${keyPrefix()}tenant_active:*`);
+      expect(keysAfterDispatch).toEqual([]);
+
+      // Round-trip a full lifecycle to confirm no key is created at any
+      // step (COMPLETE attempts the DEL branch even with cap=0; that
+      // branch must not silently create keys).
+      await scripts.complete({
+        groupId,
+        stagedJobId: dispatched!.stagedJobId,
+      });
+      const keysAfterComplete = await redis.keys(`${keyPrefix()}tenant_active:*`);
+      expect(keysAfterComplete).toEqual([]);
+
+      // restageAndBlock path too — re-stage a fresh group and walk the
+      // failure path. Counter must still not appear.
+      await stageOne({
+        tenantId: "proj_acme",
+        groupSuffix: "g2",
+        stagedJobId: "j2",
+      });
+      const d2 = await scripts.dispatch({ nowMs: 3000, activeTtlSec: 60 });
+      await scripts.restageAndBlock({
+        groupId: d2!.groupId,
+        newStagedJobId: "j2-restaged",
+        score: 9999,
+        jobDataJson: JSON.stringify({}),
+        errorMessage: "boom",
+      });
+      const keysAfterRestage = await redis.keys(
+        `${keyPrefix()}tenant_active:*`,
+      );
+      expect(keysAfterRestage).toEqual([]);
     });
   });
 

@@ -1,11 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { readTenantCap } from "../scripts";
+import { DEFAULT_TENANT_CAP, readTenantCap } from "../scripts";
 
 /**
- * The tenant soft-cap is a kill-switched defense added post-2026-05-11
- * incident. These tests pin the env-var parsing contract — operators
- * flip the cap on per-environment by setting LANGWATCH_DISPATCH_TENANT_CAP.
- * Pinned here so a future refactor doesn't silently change the default.
+ * The tenant soft-cap is a defense added post-2026-05-11 incident.
+ * As of the noisy-neighbour follow-up it ships ON by default
+ * (DEFAULT_TENANT_CAP = 100) so every install gets baseline protection
+ * without explicit configuration. Operators retune or kill via
+ * LANGWATCH_DISPATCH_TENANT_CAP — these tests pin that contract so a
+ * future refactor cannot silently change the default.
  */
 describe("readTenantCap", () => {
   let originalEnv: string | undefined;
@@ -23,23 +25,25 @@ describe("readTenantCap", () => {
     }
   });
 
-  it("defaults to 0 (disabled) when env var is unset", () => {
-    expect(readTenantCap()).toBe(0);
+  /** @scenario Tenant cap defaults to 100 when env var is unset */
+  it("defaults to DEFAULT_TENANT_CAP when env var is unset", () => {
+    expect(readTenantCap()).toBe(DEFAULT_TENANT_CAP);
+    expect(DEFAULT_TENANT_CAP).toBe(100);
   });
 
-  it("returns 0 when env var is empty string", () => {
+  it("falls back to the default for empty string", () => {
     process.env.LANGWATCH_DISPATCH_TENANT_CAP = "";
-    expect(readTenantCap()).toBe(0);
+    expect(readTenantCap()).toBe(DEFAULT_TENANT_CAP);
   });
 
-  it("returns 0 for non-numeric values (graceful degradation)", () => {
+  it("falls back to the default for non-numeric values (graceful degradation)", () => {
     process.env.LANGWATCH_DISPATCH_TENANT_CAP = "not-a-number";
-    expect(readTenantCap()).toBe(0);
+    expect(readTenantCap()).toBe(DEFAULT_TENANT_CAP);
   });
 
-  it("returns 0 for negative values (disabled)", () => {
+  it("falls back to the default for negative values", () => {
     process.env.LANGWATCH_DISPATCH_TENANT_CAP = "-5";
-    expect(readTenantCap()).toBe(0);
+    expect(readTenantCap()).toBe(DEFAULT_TENANT_CAP);
   });
 
   it("returns the integer value when set to a positive number", () => {
@@ -47,7 +51,8 @@ describe("readTenantCap", () => {
     expect(readTenantCap()).toBe(50);
   });
 
-  it("returns 0 for zero (disabled is the default sentinel)", () => {
+  /** @scenario Explicit env=0 disables the tenant cap entirely (kill switch) */
+  it("returns 0 only when explicitly set to 0 — the kill switch", () => {
     process.env.LANGWATCH_DISPATCH_TENANT_CAP = "0";
     expect(readTenantCap()).toBe(0);
   });

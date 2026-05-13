@@ -177,8 +177,9 @@ local nowMs        = tonumber(ARGV[2])
 local activeTtlSec = tonumber(ARGV[3])
 -- Tenant soft-cap (post-2026-05-11 incident follow-up). When > 0, the
 -- scheduler refuses to dispatch a group whose tenant already has >=
--- tenantCap groups in flight. Default 0 = disabled (back-compat with
--- the existing scheduler). Set LANGWATCH_DISPATCH_TENANT_CAP to enable.
+-- tenantCap groups in flight. Defaults to 100 in TS (see
+-- DEFAULT_TENANT_CAP); operators can set LANGWATCH_DISPATCH_TENANT_CAP=0
+-- as an explicit kill switch, or to a higher integer to retune.
 -- The tenantId is derived from groupId prefix (segment before first '/').
 local tenantCap    = tonumber(ARGV[4]) or 0
 
@@ -711,17 +712,46 @@ export interface DispatchResult {
 }
 
 /**
- * Read the tenant soft-cap from the environment. 0 = disabled (default).
+ * Default tenant soft-cap when LANGWATCH_DISPATCH_TENANT_CAP is unset.
+ *
+ * Chosen as `GLOBAL_QUEUE_CONCURRENCY` (the per-worker-pod concurrency
+ * default — see groupQueue.ts), which means "no tenant can hold more
+ * than one pod's worth of in-flight slots". Sizing rationale:
+ *
+ *   - On a multi-pod cluster (e.g. 4 pods × 100 concurrency = 400
+ *     total slots), a single tenant is capped at 25% of cluster
+ *     capacity. Strong protection against noisy-neighbour starvation
+ *     like the 2026-05-11 incident, while leaving ample headroom for
+ *     legitimate single-tenant bursts at observed peak loads.
+ *
+ *   - On a 1-pod self-hosted install, the cap equals total cluster
+ *     capacity → effectively unlimited for normal use, but still bounds
+ *     a pathological runaway loop below catastrophic.
+ *
+ *   - Operators can still set LANGWATCH_DISPATCH_TENANT_CAP=0 to
+ *     disable entirely (incident kill-switch), or set a different
+ *     positive integer to retune.
+ */
+export const DEFAULT_TENANT_CAP = 100;
+
+/**
+ * Read the tenant soft-cap from the environment.
  * Post-2026-05-11 incident follow-up; see DISPATCH_LUA comment for design.
  * Symbol is captured in env-create.mjs for schema discoverability; we
  * read process.env directly at call time so tests can mutate it without
  * re-importing the frozen env module.
+ *
+ * Semantics:
+ *   - env unset / empty / non-numeric / negative → DEFAULT_TENANT_CAP (100)
+ *   - env = "0" → 0 (explicit kill switch — disable cap entirely)
+ *   - env = positive integer → that integer
  */
 export function readTenantCap(): number {
   const raw = process.env.LANGWATCH_DISPATCH_TENANT_CAP;
-  if (!raw) return 0;
+  if (raw === undefined || raw === "") return DEFAULT_TENANT_CAP;
   const n = Number.parseInt(raw, 10);
-  return Number.isFinite(n) && n > 0 ? n : 0;
+  if (!Number.isFinite(n) || n < 0) return DEFAULT_TENANT_CAP;
+  return n;
 }
 
 /**

@@ -101,8 +101,13 @@ export function createEnvConfig() {
       // Post-2026-05-11 loop-prevention kill-switch. Set to "1" to
       // bypass the reactor depth check; emergency rollback only.
       LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD: z.string().optional(),
-      // Post-2026-05-11 tenant soft-cap. Positive int = max in-flight
-      // groups per tenant; 0 / unset = disabled (default).
+      // Post-2026-05-11 tenant soft-cap: max in-flight event-sourcing
+      // groups per tenant in the DISPATCH_LUA scheduler.
+      // Default 100 (≈ one worker pod's concurrency) — every install
+      // gets noisy-neighbour protection out of the box. Set to "0" to
+      // disable entirely (incident kill switch). Set to a positive int
+      // to retune (e.g. raise for a legitimate heavy single-tenant
+      // workload).
       LANGWATCH_DISPATCH_TENANT_CAP: z.string().optional(),
       USE_S3_STORAGE: z.boolean().optional(),
       S3_ENDPOINT: z.string().optional(),
