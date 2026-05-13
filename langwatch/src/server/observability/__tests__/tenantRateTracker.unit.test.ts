@@ -31,6 +31,7 @@ describe("tenantIdFromGroupId", () => {
 function fakeRedis() {
   const hashes = new Map<string, Map<string, number>>();
   const sets = new Map<string, Set<string>>();
+  const strings = new Map<string, string>();
 
   const ops = {
     hincrby(key: string, field: string, delta: number) {
@@ -83,6 +84,13 @@ function fakeRedis() {
     },
     async smembers(key: string) {
       return ops.smembers(key);
+    },
+    async get(key: string) {
+      return strings.get(key) ?? null;
+    },
+    async set(key: string, value: string, ..._args: unknown[]) {
+      strings.set(key, value);
+      return "OK";
     },
   } as any;
 }
@@ -165,6 +173,83 @@ describe("TenantRateTracker", () => {
 
     const active = (await tracker.listActiveTenants()).sort();
     expect(active).toEqual(["proj_a", "proj_b"]);
+  });
+
+  describe("baseline cache", () => {
+    it("returns null when no baseline cached", async () => {
+      const redis = fakeRedis();
+      const tracker = new TenantRateTracker(redis, nowFn);
+      expect(await tracker.getCachedBaseline("proj_acme")).toBeNull();
+    });
+
+    it("round-trips a numeric baseline through Redis", async () => {
+      const redis = fakeRedis();
+      const tracker = new TenantRateTracker(redis, nowFn);
+      await tracker.setCachedBaseline("proj_acme", 42.5);
+      expect(await tracker.getCachedBaseline("proj_acme")).toBeCloseTo(42.5);
+    });
+
+    it("swallows Redis errors on read (returns null) so a flaky cache never breaks the tick", async () => {
+      const broken = {
+        async get() {
+          throw new Error("redis down");
+        },
+      } as any;
+      const tracker = new TenantRateTracker(broken, nowFn);
+      expect(await tracker.getCachedBaseline("proj_acme")).toBeNull();
+    });
+  });
+
+  describe("kill switch", () => {
+    /** @scenario Kill-switch FF makes the rate tracker record() a no-op on the hot path */
+    it("does not write to Redis when the FF is enabled for this tenant", async () => {
+      const redis = fakeRedis();
+      const featureFlagService = {
+        isEnabled: vi.fn().mockResolvedValue(true),
+      };
+      const tracker = new TenantRateTracker(
+        redis,
+        nowFn,
+        featureFlagService as any,
+      );
+
+      await tracker.record("proj_killed");
+
+      // tenant should NOT have been added to the active set
+      const active = await tracker.listActiveTenants();
+      expect(active).toEqual([]);
+      expect(featureFlagService.isEnabled).toHaveBeenCalledTimes(1);
+    });
+
+    it("still records when the FF is disabled", async () => {
+      const redis = fakeRedis();
+      const featureFlagService = {
+        isEnabled: vi.fn().mockResolvedValue(false),
+      };
+      const tracker = new TenantRateTracker(
+        redis,
+        nowFn,
+        featureFlagService as any,
+      );
+
+      await tracker.record("proj_normal");
+      expect(await tracker.currentWindowCount("proj_normal", 60)).toBe(1);
+    });
+
+    it("fails open when the FF service throws (PostHog outage must not silently disable observability)", async () => {
+      const redis = fakeRedis();
+      const featureFlagService = {
+        isEnabled: vi.fn().mockRejectedValue(new Error("posthog down")),
+      };
+      const tracker = new TenantRateTracker(
+        redis,
+        nowFn,
+        featureFlagService as any,
+      );
+
+      await tracker.record("proj_acme");
+      expect(await tracker.currentWindowCount("proj_acme", 60)).toBe(1);
+    });
   });
 
   it("perMinuteSeries returns oldest-first series of the requested length", async () => {

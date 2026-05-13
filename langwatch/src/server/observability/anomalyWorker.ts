@@ -1,4 +1,5 @@
 import { createLogger } from "../../utils/logger/server";
+import { featureFlagService } from "../featureFlag";
 import { connection } from "../redis";
 import { AnomalyDetector } from "./anomalyDetector";
 import { AnomalyStateStore } from "./anomalyState";
@@ -24,11 +25,16 @@ export function startAnomalyWorker(): AnomalyWorkerHandle | undefined {
     return undefined;
   }
 
-  const rateTracker = new TenantRateTracker(connection);
+  const rateTracker = new TenantRateTracker(
+    connection,
+    Date.now,
+    featureFlagService,
+  );
   const anomalyState = new AnomalyStateStore(connection);
   const detector = new AnomalyDetector({
     rateTracker,
     anomalyState,
+    featureFlagService,
     // The hard-tier auto-pause hook is wired here. Currently a no-op
     // (logs only) — pairing it with the per-tenant pause mechanism is
     // tracked separately. The detector still emits the hard-tier

@@ -1,8 +1,22 @@
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
 import { createLogger } from "../../utils/logger/server";
+import { KILL_SWITCH_CACHE_TTL_MS } from "../featureFlag/constants";
+import type { FeatureFlagServiceInterface } from "../featureFlag/types";
 
 const logger = createLogger("langwatch:observability:tenantRateTracker");
+
+/**
+ * PostHog feature-flag key. When this flag is enabled for a given
+ * tenant (or globally) the rate-tracker `record()` write becomes a
+ * no-op and the AnomalyWorker tick skips that tenant. Toggle in seconds
+ * via PostHog if anomaly detection ever causes load issues on Redis.
+ */
+export const ANOMALY_DETECTION_KILL_SWITCH_FLAG =
+  "es-observability-anomaly-detection-killswitch";
+
+/** Distinct ID used when checking the kill switch at the GLOBAL scope. */
+export const GLOBAL_KILL_SWITCH_DISTINCT_ID = "global";
 
 /**
  * Per-tenant rolling enqueue-rate tracker.
@@ -23,6 +37,9 @@ const logger = createLogger("langwatch:observability:tenantRateTracker");
  *    bounds memory.
  *  - The active-tenants index `obs:tenant_rate:active` is a SET — fast
  *    SMEMBERS for the periodic anomaly sweep, no key SCAN required.
+ *  - `obs:tenant_rate:baseline:<tenantId>` caches the computed p95
+ *    baseline for ~1h so the worker tick does not redo a 10080-field
+ *    HMGET for every tenant every minute.
  *
  * Why minute-bucketed (not per-event ZSET):
  *  - O(1) write per enqueue (HINCRBY) vs O(log N) for ZADD with random nonce
@@ -33,12 +50,45 @@ const logger = createLogger("langwatch:observability:tenantRateTracker");
 export class TenantRateTracker {
   private static readonly KEY_PREFIX = "obs:tenant_rate:";
   private static readonly ACTIVE_SET = "obs:tenant_rate:active";
+  private static readonly BASELINE_PREFIX = "obs:tenant_rate:baseline:";
   private static readonly TTL_SECONDS = 8 * 24 * 3600; // 8 days
+  /**
+   * Baseline cache TTL. The p95 of a 7-day window does not move
+   * meaningfully in an hour — caching this is the single biggest
+   * tick-cost reduction available, dropping per-tenant tick cost from
+   * one 10080-field HMGET to one HGET.
+   */
+  public static readonly BASELINE_TTL_SECONDS = 60 * 60; // 1h
 
   constructor(
     private readonly redis: IORedis | Cluster,
     private readonly nowFn: () => number = Date.now,
+    private readonly featureFlagService?: FeatureFlagServiceInterface,
   ) {}
+
+  /**
+   * Returns true when the kill-switch FF is enabled for this tenant (or
+   * globally). The 60s TTL of `isComponentDisabled` means the worst-case
+   * stampede on PostHog is one /flags request per tenant per minute when
+   * local evaluation is unavailable, and a per-process map lookup
+   * otherwise. Hot-path safe.
+   *
+   * Failures default to "feature on" so PostHog outage never silently
+   * kills observability.
+   */
+  private async isKilledForTenant(tenantId: string): Promise<boolean> {
+    if (!this.featureFlagService) return false;
+    try {
+      return await this.featureFlagService.isEnabled(
+        ANOMALY_DETECTION_KILL_SWITCH_FLAG,
+        tenantId,
+        false,
+        { cacheTtlMs: KILL_SWITCH_CACHE_TTL_MS },
+      );
+    } catch {
+      return false;
+    }
+  }
 
   /**
    * Record a single enqueue against a tenant. Called from the GroupQueue
@@ -48,6 +98,7 @@ export class TenantRateTracker {
    */
   async record(tenantId: string, count = 1): Promise<void> {
     if (!tenantId) return;
+    if (await this.isKilledForTenant(tenantId)) return;
     const minute = Math.floor(this.nowFn() / 60_000);
     const key = `${TenantRateTracker.KEY_PREFIX}${tenantId}`;
     try {
@@ -117,6 +168,47 @@ export class TenantRateTracker {
    */
   async listActiveTenants(): Promise<string[]> {
     return await this.redis.smembers(TenantRateTracker.ACTIVE_SET);
+  }
+
+  /**
+   * Read a previously-cached baseline for this tenant. Returns null when
+   * none cached or unparseable. Single HGET — cheap to call every tick.
+   */
+  async getCachedBaseline(tenantId: string): Promise<number | null> {
+    try {
+      const raw = await this.redis.get(
+        `${TenantRateTracker.BASELINE_PREFIX}${tenantId}`,
+      );
+      if (!raw) return null;
+      const n = Number.parseFloat(raw);
+      return Number.isFinite(n) ? n : null;
+    } catch (err) {
+      logger.debug(
+        { tenantId, err: err instanceof Error ? err.message : String(err) },
+        "TenantRateTracker.getCachedBaseline failed (non-fatal)",
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Persist a fresh baseline with the standard 1h TTL. Called once per
+   * tenant per tick at most when the cache is cold or stale.
+   */
+  async setCachedBaseline(tenantId: string, baseline: number): Promise<void> {
+    try {
+      await this.redis.set(
+        `${TenantRateTracker.BASELINE_PREFIX}${tenantId}`,
+        baseline.toString(),
+        "EX",
+        TenantRateTracker.BASELINE_TTL_SECONDS,
+      );
+    } catch (err) {
+      logger.debug(
+        { tenantId, err: err instanceof Error ? err.message : String(err) },
+        "TenantRateTracker.setCachedBaseline failed (non-fatal)",
+      );
+    }
   }
 }
 

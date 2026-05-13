@@ -12,12 +12,24 @@ import type { Anomaly } from "../anomalyState";
 
 function makeFakes() {
   const stored = new Map<string, Anomaly>();
+  const baselineCache = new Map<string, number>();
   return {
     rateTracker: {
       listActiveTenants: vi.fn().mockResolvedValue([]),
       currentWindowCount: vi.fn().mockResolvedValue(0),
       perMinuteSeries: vi.fn().mockResolvedValue([]),
+      getCachedBaseline: vi
+        .fn()
+        .mockImplementation(async (tid: string) =>
+          baselineCache.has(tid) ? baselineCache.get(tid)! : null,
+        ),
+      setCachedBaseline: vi
+        .fn()
+        .mockImplementation(async (tid: string, v: number) => {
+          baselineCache.set(tid, v);
+        }),
     } as any,
+    baselineCache,
     anomalyState: {
       upsert: vi.fn().mockImplementation(async (a: Anomaly) => {
         stored.set(`${a.kind}:${a.tenantId}`, a);
@@ -194,6 +206,123 @@ describe("AnomalyDetector.tick", () => {
 
     const arg = fakes.anomalyState.upsert.mock.calls[0]![0] as Anomaly;
     expect(arg.triggeredAt).toBe(triggeredAt);
+  });
+
+  describe("when the kill-switch feature flag is enabled for a tenant", () => {
+    /** @scenario Kill-switch FF disables anomaly detection for one tenant without a redeploy */
+    it("skips evaluation entirely and reports it in the tick result", async () => {
+      const fakes = makeFakes();
+      fakes.rateTracker.listActiveTenants.mockResolvedValue([
+        "proj_killed",
+        "proj_normal",
+      ]);
+      fakes.rateTracker.perMinuteSeries.mockResolvedValue(
+        Array.from({ length: 100 }, () => 10),
+      );
+      fakes.rateTracker.currentWindowCount.mockResolvedValue(500);
+
+      const featureFlagService = {
+        isEnabled: vi
+          .fn()
+          .mockImplementation(async (_flag: string, distinctId: string) =>
+            distinctId === "proj_killed",
+          ),
+      };
+
+      const detector = new AnomalyDetector({ ...fakes, featureFlagService });
+      const result = await detector.tick();
+
+      expect(result.skippedKillSwitch).toBe(1);
+      // proj_normal still got evaluated and surfaced
+      expect(result.surfaced).toBe(1);
+      const upserts = fakes.anomalyState.upsert.mock.calls.map(
+        (c: any[]) => (c[0] as Anomaly).tenantId,
+      );
+      expect(upserts).toEqual(["proj_normal"]);
+    });
+
+    /** @scenario Kill-switch fails open when PostHog is unavailable */
+    it("fails open when the feature-flag service throws", async () => {
+      const fakes = makeFakes();
+      fakes.rateTracker.listActiveTenants.mockResolvedValue(["proj_acme"]);
+      fakes.rateTracker.perMinuteSeries.mockResolvedValue(
+        Array.from({ length: 100 }, () => 10),
+      );
+      fakes.rateTracker.currentWindowCount.mockResolvedValue(500);
+
+      const featureFlagService = {
+        isEnabled: vi.fn().mockRejectedValue(new Error("posthog down")),
+      };
+
+      const detector = new AnomalyDetector({ ...fakes, featureFlagService });
+      const result = await detector.tick();
+
+      // Detector keeps running — PostHog outage must not silently disable
+      // observability.
+      expect(result.skippedKillSwitch).toBe(0);
+      expect(result.surfaced).toBe(1);
+    });
+  });
+
+  describe("baseline cache", () => {
+    /** @scenario Baseline cache miss triggers a fresh p95 computation and stores it */
+    it("computes p95 from the per-minute series and persists it on cache miss", async () => {
+      const fakes = makeFakes();
+      fakes.rateTracker.listActiveTenants.mockResolvedValue(["proj_acme"]);
+      fakes.rateTracker.perMinuteSeries.mockResolvedValue(
+        Array.from({ length: 100 }, () => 10),
+      );
+      fakes.rateTracker.currentWindowCount.mockResolvedValue(500);
+
+      const detector = new AnomalyDetector(fakes);
+      await detector.tick();
+
+      expect(fakes.rateTracker.perMinuteSeries).toHaveBeenCalledTimes(1);
+      expect(fakes.rateTracker.setCachedBaseline).toHaveBeenCalledTimes(1);
+      // Baseline of a stable 10/min series is 10
+      expect(fakes.baselineCache.get("proj_acme")).toBe(10);
+    });
+
+    /** @scenario Baseline cache hit avoids re-scanning the 7-day series */
+    it("uses the cached baseline on subsequent ticks (no HMGET re-scan)", async () => {
+      const fakes = makeFakes();
+      fakes.baselineCache.set("proj_acme", 10);
+      fakes.rateTracker.listActiveTenants.mockResolvedValue(["proj_acme"]);
+      fakes.rateTracker.currentWindowCount.mockResolvedValue(500);
+
+      const detector = new AnomalyDetector(fakes);
+      await detector.tick();
+
+      // Cache was warm → no series re-scan
+      expect(fakes.rateTracker.perMinuteSeries).not.toHaveBeenCalled();
+      expect(fakes.rateTracker.setCachedBaseline).not.toHaveBeenCalled();
+    });
+
+    it("skips evaluation when cached baseline is below MIN_BASELINE_RATE without re-scanning", async () => {
+      const fakes = makeFakes();
+      fakes.baselineCache.set("proj_quiet", 2); // below MIN_BASELINE_RATE=5
+      fakes.rateTracker.listActiveTenants.mockResolvedValue(["proj_quiet"]);
+
+      const detector = new AnomalyDetector(fakes);
+      const result = await detector.tick();
+
+      expect(result.surfaced).toBe(0);
+      // We must NOT have done the 7-day HMGET when a cached "too quiet"
+      // baseline already exists — that's the whole point of the cache.
+      expect(fakes.rateTracker.perMinuteSeries).not.toHaveBeenCalled();
+    });
+
+    /** @scenario Insufficient history is NOT cached so the tenant is re-checked soon */
+    it("does NOT cache when there is insufficient history (we want to retry soon)", async () => {
+      const fakes = makeFakes();
+      fakes.rateTracker.listActiveTenants.mockResolvedValue(["proj_new"]);
+      fakes.rateTracker.perMinuteSeries.mockResolvedValue([5, 10, 5]); // <60 min
+
+      const detector = new AnomalyDetector(fakes);
+      await detector.tick();
+
+      expect(fakes.rateTracker.setCachedBaseline).not.toHaveBeenCalled();
+    });
   });
 
   // Sanity-check threshold constants haven't drifted from the post-mortem spec.

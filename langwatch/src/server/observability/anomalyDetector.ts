@@ -1,7 +1,12 @@
 import { createLogger } from "../../utils/logger/server";
+import { KILL_SWITCH_CACHE_TTL_MS } from "../featureFlag/constants";
+import type { FeatureFlagServiceInterface } from "../featureFlag/types";
 import type { Anomaly } from "./anomalyState";
 import { AnomalyStateStore } from "./anomalyState";
-import { TenantRateTracker } from "./tenantRateTracker";
+import {
+  ANOMALY_DETECTION_KILL_SWITCH_FLAG,
+  TenantRateTracker,
+} from "./tenantRateTracker";
 
 const logger = createLogger("langwatch:observability:anomalyDetector");
 
@@ -22,6 +27,16 @@ const logger = createLogger("langwatch:observability:anomalyDetector");
  * lift the baseline and mask future spikes. The lookback is intentionally
  * wide so newly-onboarded tenants take time to develop a baseline (no
  * baseline → no anomaly, by design — startup traffic spikes are normal).
+ *
+ * Cost-shape: the 7-day baseline is cached for 1h in Redis. Tick-time
+ * cost for a stable tenant is one HGET; only on cold/stale cache do we
+ * do the 10080-field HMGET to recompute p95. At 1000s of tenants this
+ * keeps the worker comfortably under the Redis ops budget.
+ *
+ * Kill switch: per-tenant PostHog flag (see
+ * ANOMALY_DETECTION_KILL_SWITCH_FLAG). When set we skip evaluation for
+ * that tenant entirely so a single noisy neighbour can be silenced
+ * without redeploying.
  */
 
 export const SURFACE_TIER_MULTIPLIER = 10;
@@ -34,6 +49,7 @@ export const MIN_BASELINE_RATE = 5; // skip tenants with <5/min baseline (signal
 export interface AnomalyDetectorDeps {
   rateTracker: TenantRateTracker;
   anomalyState: AnomalyStateStore;
+  featureFlagService?: FeatureFlagServiceInterface;
   onHardTier?: (anomaly: Anomaly) => Promise<void>;
 }
 
@@ -41,49 +57,66 @@ export class AnomalyDetector {
   constructor(private readonly deps: AnomalyDetectorDeps) {}
 
   /** Runs one detection pass across all active tenants. Idempotent. */
-  async tick(): Promise<{ checked: number; surfaced: number; cleared: number }> {
+  async tick(): Promise<{
+    checked: number;
+    surfaced: number;
+    cleared: number;
+    skippedKillSwitch: number;
+  }> {
     const tenants = await this.deps.rateTracker.listActiveTenants();
     let surfaced = 0;
     let cleared = 0;
+    let skippedKillSwitch = 0;
 
     for (const tenantId of tenants) {
       const result = await this.evaluateTenant(tenantId);
       if (result === "surfaced") surfaced++;
       if (result === "cleared") cleared++;
+      if (result === "killed") skippedKillSwitch++;
     }
 
-    if (surfaced > 0 || cleared > 0) {
+    if (surfaced > 0 || cleared > 0 || skippedKillSwitch > 0) {
       logger.info(
-        { checked: tenants.length, surfaced, cleared },
+        { checked: tenants.length, surfaced, cleared, skippedKillSwitch },
         "AnomalyDetector tick complete",
       );
     }
-    return { checked: tenants.length, surfaced, cleared };
+    return {
+      checked: tenants.length,
+      surfaced,
+      cleared,
+      skippedKillSwitch,
+    };
+  }
+
+  /**
+   * Returns true when the per-tenant kill switch is engaged. Failures
+   * default to feature-on so PostHog outage never silently disables the
+   * anomaly worker.
+   */
+  private async isKilledForTenant(tenantId: string): Promise<boolean> {
+    if (!this.deps.featureFlagService) return false;
+    try {
+      return await this.deps.featureFlagService.isEnabled(
+        ANOMALY_DETECTION_KILL_SWITCH_FLAG,
+        tenantId,
+        false,
+        { cacheTtlMs: KILL_SWITCH_CACHE_TTL_MS },
+      );
+    } catch {
+      return false;
+    }
   }
 
   private async evaluateTenant(
     tenantId: string,
-  ): Promise<"surfaced" | "cleared" | "noop"> {
-    // Surface tier check: 5-min window rate vs baseline
-    const series = await this.deps.rateTracker.perMinuteSeries(
-      tenantId,
-      BASELINE_LOOKBACK_SECONDS,
-    );
-
-    // perMinuteSeries pads missing buckets with 0, so `series.length`
-    // always equals the lookback width. Filter to non-zero samples to
-    // skip tenants who haven't actually produced traffic.
-    const nonZero = series.filter((v) => v > 0);
-    if (nonZero.length < 60) {
-      // Less than 1h of actual activity — baseline would be noise. Skip.
-      return "noop";
+  ): Promise<"surfaced" | "cleared" | "killed" | "noop"> {
+    if (await this.isKilledForTenant(tenantId)) {
+      return "killed";
     }
 
-    const baseline = percentile({ values: nonZero, p: 95 });
-    if (baseline < MIN_BASELINE_RATE) {
-      // Too quiet to reliably detect anomalies.
-      return "noop";
-    }
+    const baseline = await this.resolveBaseline(tenantId);
+    if (baseline === null) return "noop";
 
     const recentSurface = await this.deps.rateTracker.currentWindowCount(
       tenantId,
@@ -164,6 +197,50 @@ export class AnomalyDetector {
     return "noop";
   }
 
+  /**
+   * Return the p95 baseline for a tenant. Uses the 1h Redis cache when
+   * fresh; on cache miss does a single 10080-field HMGET, computes the
+   * p95, persists it back, and returns it.
+   *
+   * Returns null when:
+   *   - tenant has not yet produced enough activity to form a baseline
+   *     (<60 non-zero minutes in the 7-day window)
+   *   - resulting baseline is too low to reliably detect anomalies
+   *     (<MIN_BASELINE_RATE per minute)
+   * In either case the caller should treat the tenant as not-yet-baselined
+   * and skip evaluation entirely — this matches the explicit design
+   * intent that new tenants ramp without false positives.
+   */
+  private async resolveBaseline(tenantId: string): Promise<number | null> {
+    const cached = await this.deps.rateTracker.getCachedBaseline(tenantId);
+    if (cached !== null) {
+      // Cached value below the floor still tells us "do not evaluate" —
+      // no need to re-scan 10080 fields just to confirm.
+      return cached < MIN_BASELINE_RATE ? null : cached;
+    }
+
+    const series = await this.deps.rateTracker.perMinuteSeries(
+      tenantId,
+      BASELINE_LOOKBACK_SECONDS,
+    );
+
+    // perMinuteSeries pads missing buckets with 0, so `series.length`
+    // always equals the lookback width. Filter to non-zero samples to
+    // skip tenants who haven't actually produced traffic.
+    const nonZero = series.filter((v) => v > 0);
+    if (nonZero.length < 60) {
+      // Less than 1h of actual activity — baseline would be noise. Skip,
+      // but DON'T cache: we want to re-check soon, not pin "no data"
+      // for an hour.
+      return null;
+    }
+
+    const baseline = percentile({ values: nonZero, p: 95 });
+    // Cache whatever we compute (including below-floor values) so the
+    // "too-quiet" tenants don't keep paying the HMGET cost every tick.
+    await this.deps.rateTracker.setCachedBaseline(tenantId, baseline);
+    return baseline < MIN_BASELINE_RATE ? null : baseline;
+  }
 }
 
 /**

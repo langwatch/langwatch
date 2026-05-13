@@ -42,6 +42,7 @@ import {
   TenantRateTracker,
   tenantIdFromGroupId,
 } from "../../../observability/tenantRateTracker";
+import { featureFlagService } from "../../../featureFlag";
 
 /**
  * Configuration for the group queue.
@@ -173,8 +174,15 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
 
     // Per-tenant rate tracker (post-2026-05-11 incident follow-up). Cheap
     // pipelined writes on the producer hot path. AnomalyDetector worker
-    // consumes the data; the tracker itself never blocks send().
-    this.rateTracker = new TenantRateTracker(this.redisConnection);
+    // consumes the data; the tracker itself never blocks send(). The
+    // PostHog feature-flag service is wired in so a runaway tracker can
+    // be killed in seconds without a redeploy (see
+    // ANOMALY_DETECTION_KILL_SWITCH_FLAG).
+    this.rateTracker = new TenantRateTracker(
+      this.redisConnection,
+      Date.now,
+      featureFlagService,
+    );
 
     // fastq promise-based queue — replaces BullMQ Queue + Worker
     this.processingQueue = fastq.promise(
