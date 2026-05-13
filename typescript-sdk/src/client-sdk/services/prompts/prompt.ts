@@ -33,14 +33,18 @@ export class Prompt {
   public readonly maxTokens?: number;
   public readonly responseFormat?: CorePromptData["responseFormat"];
 
+  // === Runtime config ===
+  public readonly config: Record<string, unknown> = {};
+
   // === Optional identification (for tracing) ===
   public readonly id?: string;
   public readonly handle?: string | null;
   public readonly version?: number;
   public readonly versionId?: string;
   public readonly scope?: PromptScope;
+  public readonly config!: Record<string, unknown>;
 
-  constructor(data: PromptData) {
+  constructor(data: PromptData | Record<string, unknown>) {
     // Validate input using Zod
     const validationResult = promptDataSchema.strip().safeParse(data);
 
