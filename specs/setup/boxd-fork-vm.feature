@@ -142,3 +142,26 @@ Feature: boxd Makefile orchestrates per-PR / per-branch / per-issue VM forks
     When I run "make boxd-golden-reset BOXD_FORK_YES=1"
     Then the existing VM is destroyed
     And a new VM is created with the same name
+
+  # --- Golden provisioning recipe (regression coverage for #4036) ---
+  # `boxd exec` evaluates remote commands under /bin/sh (dash on Ubuntu/Debian),
+  # which does not understand bashisms. The provisioning recipe needs explicit
+  # bash, a confirmed destroy, and root for /usr/bin/pnpm symlinks.
+
+  @unit
+  Scenario: provisioning recipe wraps remote command in bash -c
+    Given the boxd_golden provisioning recipe sends a multi-line command via "boxd exec"
+    When the recipe contains "set -o pipefail"
+    Then the invocation must wrap the recipe in "bash -c" so dash does not abort on bashisms
+
+  @unit
+  Scenario: boxd_golden_reset passes -y to non-interactive destroy
+    Given BOXD_FORK_YES=1 has already gated user-level consent
+    When boxd_golden_reset invokes "boxd destroy" on an existing VM
+    Then "-y" is passed so the destroy does not prompt and abort
+
+  @unit
+  Scenario: corepack enable is sudo'd so it can write /usr/bin/pnpm
+    Given the provisioning recipe runs as the VM's default non-root user
+    When the recipe enables corepack to install pnpm
+    Then "corepack enable" runs under sudo so the /usr/bin/pnpm symlink succeeds
