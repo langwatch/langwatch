@@ -281,17 +281,7 @@ export class PipelineRegistry {
       projects: this.deps.projects,
       traceSummaryStore,
       evaluationRuns: this.deps.evaluations.runs,
-      traceById: async (projectId, traceId) => {
-        const traceService = TraceService.create(this.deps.prisma);
-        const protections = await getProtectionsForProject(this.deps.prisma, { projectId });
-        return traceService.getById(projectId, traceId, protections);
-      },
-      addToAnnotationQueue: async (params) => {
-        await createOrUpdateQueueItems({ ...params, prisma: this.deps.prisma });
-      },
-      addToDataset: async (params) => {
-        await createManyDatasetRecords(params);
-      },
+      ...this.buildTraceReactorContext(),
     });
 
     return this.deps.eventSourcing.register(
@@ -329,17 +319,7 @@ export class PipelineRegistry {
     const alertTriggerReactor = createAlertTriggerReactor({
       triggers: this.deps.triggers,
       projects: this.deps.projects,
-      traceById: async (projectId, traceId) => {
-        const traceService = TraceService.create(this.deps.prisma);
-        const protections = await getProtectionsForProject(this.deps.prisma, { projectId });
-        return traceService.getById(projectId, traceId, protections);
-      },
-      addToAnnotationQueue: async (params) => {
-        await createOrUpdateQueueItems({ ...params, prisma: this.deps.prisma });
-      },
-      addToDataset: async (params) => {
-        await createManyDatasetRecords(params);
-      },
+      ...this.buildTraceReactorContext(),
     });
 
     const customEvaluationSyncReactor = createCustomEvaluationSyncReactor({

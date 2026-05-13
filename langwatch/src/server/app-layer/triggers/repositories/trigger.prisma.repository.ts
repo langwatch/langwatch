@@ -62,10 +62,13 @@ export class PrismaTriggerRepository implements TriggerRepository {
     });
   }
 
-  async updateLastRunAt(
-    triggerId: string,
-    projectId: string,
-  ): Promise<void> {
+  async updateLastRunAt({
+    triggerId,
+    projectId,
+  }: {
+    triggerId: string;
+    projectId: string;
+  }): Promise<void> {
     await this.prisma.trigger.update({
       where: { id: triggerId, projectId },
       data: { lastRunAt: Date.now() },

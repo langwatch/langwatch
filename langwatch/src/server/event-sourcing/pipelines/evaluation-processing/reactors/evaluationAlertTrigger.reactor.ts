@@ -159,6 +159,7 @@ export function createEvaluationAlertTriggerReactor(
             foldState: traceSummary,
           });
         } catch (error) {
+          // TODO(outbox): see alertTrigger.reactor — same silent-failure gap.
           logger.error(
             {
               tenantId,

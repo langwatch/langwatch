@@ -31,7 +31,10 @@ export interface TriggerRepository {
   }): Promise<void>;
 
   /** Updates the trigger's lastRunAt timestamp. */
-  updateLastRunAt(triggerId: string, projectId: string): Promise<void>;
+  updateLastRunAt(params: {
+    triggerId: string;
+    projectId: string;
+  }): Promise<void>;
 }
 
 export class NullTriggerRepository implements TriggerRepository {
@@ -53,8 +56,8 @@ export class NullTriggerRepository implements TriggerRepository {
     projectId: string;
   }): Promise<void> {}
 
-  async updateLastRunAt(
-    _triggerId: string,
-    _projectId: string,
-  ): Promise<void> {}
+  async updateLastRunAt(_params: {
+    triggerId: string;
+    projectId: string;
+  }): Promise<void> {}
 }

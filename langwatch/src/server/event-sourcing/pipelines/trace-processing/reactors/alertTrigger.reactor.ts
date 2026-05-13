@@ -115,6 +115,14 @@ export function createAlertTriggerReactor(
             foldState,
           });
         } catch (error) {
+          // TODO(outbox): silent failures here are invisible to operators —
+          // a dispatch error is logged + captured but the trigger UI shows
+          // no signal. Adopting a transactional outbox would give us:
+          //   1. durable retry with exponential backoff
+          //   2. a queryable "last delivery status" per (trigger, trace)
+          //   3. operator-facing surface for stuck/failed dispatches
+          // Today we trade visibility for simplicity; revisit once the
+          // event-sourcing outbox primitives land.
           logger.error(
             {
               tenantId,

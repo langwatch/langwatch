@@ -154,6 +154,7 @@ function createDeps(
     triggers: {
       getActiveTraceTriggersForProject: vi.fn().mockResolvedValue([]),
       hasSentForTrace: vi.fn().mockResolvedValue(false),
+      claimDispatchSlot: vi.fn().mockResolvedValue(true),
       recordSent: vi.fn().mockResolvedValue(undefined),
       updateLastRunAt: vi.fn().mockResolvedValue(undefined),
       invalidate: vi.fn(),
@@ -321,10 +322,10 @@ describe("evaluationAlertTrigger reactor", () => {
         traceId: "trace-1",
         projectId: "tenant-1",
       });
-      expect(deps.triggers.updateLastRunAt).toHaveBeenCalledWith(
-        "trigger-1",
-        "tenant-1",
-      );
+      expect(deps.triggers.updateLastRunAt).toHaveBeenCalledWith({
+        triggerId: "trigger-1",
+        projectId: "tenant-1",
+      });
     });
   });
 

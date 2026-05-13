@@ -65,6 +65,28 @@ export async function dispatchTriggerAction({
     return;
   }
 
+  // Redis SETNX claim — short-term in-flight dedup. Stops concurrent reactor
+  // invocations and rapid retries from double-sending email/Slack between the
+  // time `hasSentForTrace` returns false and `recordSent` commits.
+  //
+  // TODO: this is a stopgap. A transactional outbox pattern (record the
+  // dispatch intent in PG in the same tx that produces the event, then a
+  // worker drains the outbox with at-least-once + idempotency keys per
+  // provider) would give us durable delivery guarantees without the
+  // claim-vs-record race window.
+  const claimed = await deps.triggers.claimDispatchSlot({
+    triggerId: trigger.id,
+    traceId,
+    projectId: tenantId,
+  });
+  if (!claimed) {
+    logger.debug(
+      { tenantId, traceId, triggerId: trigger.id },
+      "Dispatch slot already claimed, skipping",
+    );
+    return;
+  }
+
   // Fetch full trace once — used by Slack (events), email (events), and ADD_TO_DATASET (mapping).
   // Best-effort: if trace not found, actions that only need input/output still work with a stub.
   const fullTrace = await deps.traceById(tenantId, traceId) ?? { trace_id: traceId } as Trace;
@@ -125,7 +147,10 @@ export async function dispatchTriggerAction({
     projectId: tenantId,
   });
 
-  await deps.triggers.updateLastRunAt(trigger.id, tenantId);
+  await deps.triggers.updateLastRunAt({
+    triggerId: trigger.id,
+    projectId: tenantId,
+  });
 
   logger.info(
     { tenantId, traceId, triggerId: trigger.id, action: trigger.action },
