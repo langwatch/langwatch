@@ -292,7 +292,6 @@ describe("Feature: Prompt runtime config", () => {
           prompt: "You are a sync assistant",
           model: "openai/gpt-5-mini",
           messages: [
-            { role: "system", content: "You are a sync assistant" },
             { role: "user", content: "{{input}}" },
           ],
           inputs: [{ identifier: "input", type: "str" as const }],
@@ -315,7 +314,6 @@ describe("Feature: Prompt runtime config", () => {
         prompt: "You are a conflict assistant",
         model: "openai/gpt-5-mini",
         messages: [
-          { role: "system" as const, content: "You are a conflict assistant" },
           { role: "user" as const, content: "{{input}}" },
         ],
         inputs: [{ identifier: "input", type: "str" as const }],

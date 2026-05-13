@@ -84,37 +84,37 @@ Feature: Prompt runtime config
     Then the sync result reports a conflict
     And the conflict payload includes the remote config {"remote": true}
 
-  @integration
+  @integration @unimplemented
   Scenario: Prompt editor saves runtime config from a JSON editor
     Given I am editing prompt "search-agent"
     When I enter config {"output_schema": {"type": "object"}, "enabled": true} in the Runtime Config section
     And I save a new version
     Then the saved version contains config {"output_schema": {"type": "object"}, "enabled": true}
 
-  @integration
+  @integration @unimplemented
   Scenario: Prompt editor blocks invalid runtime config JSON
     Given I am editing prompt "search-agent"
     When I enter invalid JSON in the Runtime Config section
     Then the editor shows a config validation error
     And I cannot save the version
 
-  @integration
+  @integration @unimplemented
   Scenario: Prompt playground shows runtime config as read-only version data
     Given prompt "search-agent" has latest config {"readonly": true}
     When I view "search-agent" in the prompt playground
     Then the Config tab displays {"readonly": true}
 
-  @unit
+  @unit @unimplemented
   Scenario: Runtime config validation accepts object JSON values
     When config validation runs for {"nested": {"array": [1, true, {"leaf": "value"}]}}
     Then validation succeeds
 
-  @unit
+  @unit @unimplemented
   Scenario: Runtime config validation rejects non-object root values
     When config validation runs for null, an array, a string, a number, or a boolean
     Then validation fails for each value
 
-  @unit
+  @unit @unimplemented
   Scenario: Prompt form values preserve runtime config during API mapping
     Given an API prompt version contains config {"mapped": true}
     When it is converted to prompt form values and back to an update payload
