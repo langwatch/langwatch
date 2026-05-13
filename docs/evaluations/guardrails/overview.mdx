@@ -63,27 +63,6 @@ Guardrails can run at two points:
   />
 </CardGroup>
 
-## Quick Example
-
-Add `as_guardrail=True` to any evaluation to make it block when it fails:
-
-```python
-import langwatch
-
-@langwatch.trace()
-def my_chatbot(user_input):
-    jailbreak = langwatch.evaluation.evaluate(
-        "azure/jailbreak",
-        as_guardrail=True,
-        data={"input": user_input},
-    )
-    if not jailbreak.passed:
-        return "I'm sorry, I can't help with that request."
-    return call_llm(user_input)
-```
-
-See [Code Integration](/evaluations/guardrails/code-integration) for the full pattern — input + output guardrails, TypeScript, async, parallel execution, and error handling.
-
 ## Best Practices
 
 ### 1. Layer your guardrails
