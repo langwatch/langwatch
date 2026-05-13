@@ -18226,73 +18226,6 @@ Choose your preferred approach:
   />
 </CardGroup>
 
-## Quick Example
-
-
-  ### Python
-
-```python
-import langwatch
-
-# Load your dataset
-df = langwatch.dataset.get_dataset("my-dataset").to_pandas()
-
-# Initialize experiment
-evaluation = langwatch.experiment.init("prompt-v2-test")
-
-# Run through dataset
-for idx, row in evaluation.loop(df.iterrows()):
-    # Execute your LLM
-    response = my_llm(row["input"])
-
-    # Run evaluators
-    evaluation.evaluate(
-        "ragas/faithfulness",
-        index=idx,
-        data={
-            "input": row["input"],
-            "output": response,
-            "contexts": row["contexts"],
-        },
-    )
-```
-
-  ### TypeScript
-
-```typescript
-import { LangWatch } from "langwatch";
-
-const langwatch = new LangWatch();
-
-// Load dataset
-const dataset = await langwatch.datasets.get("my-dataset");
-
-// Initialize experiment
-const evaluation = await langwatch.experiments.init("prompt-v2-test");
-
-// Run through dataset
-await evaluation.run(
-  dataset.entries.map(e => e.entry),
-  async ({ item, index }) => {
-    // Execute your LLM
-    const response = await myLLM(item.input);
-
-    // Run evaluators
-    await evaluation.evaluate("ragas/faithfulness", {
-      index,
-      data: {
-        input: item.input,
-        output: response,
-        contexts: item.contexts,
-      },
-    });
-  },
-  { concurrency: 4 }
-);
-```
-
-
-
 ## Experiment Results
 
 After running an experiment, you can:
@@ -19871,83 +19804,6 @@ Guardrails can run at two points:
   />
 </CardGroup>
 
-## Quick Example
-
-
-  ### Python
-
-```python
-import langwatch
-
-@langwatch.trace()
-def my_chatbot(user_input):
-    # Input guardrail - check for jailbreak attempts
-    jailbreak_check = langwatch.evaluation.evaluate(
-        "azure/jailbreak",
-        name="Jailbreak Detection",
-        as_guardrail=True,
-        data={"input": user_input},
-    )
-
-    if not jailbreak_check.passed:
-        return "I'm sorry, I can't help with that request."
-
-    # Generate response
-    response = call_llm(user_input)
-
-    # Output guardrail - check for PII
-    pii_check = langwatch.evaluation.evaluate(
-        "presidio/pii_detection",
-        name="PII Check",
-        as_guardrail=True,
-        data={"output": response},
-    )
-
-    if not pii_check.passed:
-        return "I apologize, but I cannot share that information."
-
-    return response
-```
-
-  ### TypeScript
-
-```typescript
-import { LangWatch } from "langwatch";
-
-const langwatch = new LangWatch();
-
-async function myChatbot(userInput: string): Promise<string> {
-  // Input guardrail - check for jailbreak attempts
-  const jailbreakCheck = await langwatch.evaluations.evaluate("azure/jailbreak", {
-    name: "Jailbreak Detection",
-    asGuardrail: true,
-    data: { input: userInput },
-  });
-
-  if (!jailbreakCheck.passed) {
-    return "I'm sorry, I can't help with that request.";
-  }
-
-  // Generate response
-  const response = await callLLM(userInput);
-
-  // Output guardrail - check for PII
-  const piiCheck = await langwatch.evaluations.evaluate("presidio/pii_detection", {
-    name: "PII Check",
-    asGuardrail: true,
-    data: { output: response },
-  });
-
-  if (!piiCheck.passed) {
-    return "I apologize, but I cannot share that information.";
-  }
-
-  return response;
-}
-```
-
-
-
 ## Best Practices
 
 ### 1. Layer your guardrails
@@ -20103,10 +19959,11 @@ Both use evaluators, but serve different purposes:
 
 | Monitors | Guardrails |
 |----------|------------|
-| **Measure** quality asynchronously | **Block** harmful content in real-time |
-| Run after the response is sent | Run before/during response generation |
-| Feed dashboards and alerts | Return errors or safe responses to users |
-| For observability | For enforcement |
+| **Measure** quality metrics | **Block** harmful content |
+| Run **asynchronously** after response | Run **synchronously** during request |
+| Feed dashboards and alerts | Return errors or safe responses |
+| No impact on response time | Add latency to requests |
+| For **observability** | For **enforcement** |
 
 If you need to block harmful content before it reaches users, see [Guardrails](/evaluations/guardrails/overview).
 
