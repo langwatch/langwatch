@@ -49,7 +49,7 @@ export const EditModelProviderDrawer = (
       }}
       modal={false}
     >
-      <Drawer.Content>
+      <Drawer.Content bg="bg">
         <Drawer.Header>
           <HStack>
             <Drawer.CloseTrigger />

@@ -420,7 +420,7 @@ function MembersList({
         open={isInviteLinkOpen}
         onOpenChange={({ open }) => (open ? undefined : onInviteModalClose())}
       >
-        <Dialog.Content>
+        <Dialog.Content bg="bg">
           <Dialog.Header>
             <Dialog.Title>
               <Heading>Invite Link</Heading>
@@ -462,7 +462,7 @@ function MembersList({
           open ? onAddMembersOpen() : onAddMembersClose()
         }
       >
-        <Dialog.Content width="100%" maxWidth="1024px">
+        <Dialog.Content bg="bg" width="100%" maxWidth="1024px">
           <Dialog.Header>
             <Dialog.Title>
               <Heading>Add members</Heading>

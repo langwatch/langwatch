@@ -144,7 +144,7 @@ export const NewWorkflowModal = ({
       onOpenChange={({ open }) => !open && onClose()}
       size="xl"
     >
-      <Dialog.Content paddingX={0}>
+      <Dialog.Content bg="bg" paddingX={0}>
         <Dialog.Header>
           <HStack gap={2}>
             {step.step === "create" && (

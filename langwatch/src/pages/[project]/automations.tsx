@@ -443,7 +443,7 @@ function Automations() {
         onOpenChange={({ open }) => (open ? onOpen() : handleCloseModal())}
         size="lg"
       >
-        <Drawer.Content>
+        <Drawer.Content bg="bg">
           <Drawer.Header>
             <Drawer.Title>Alert Message</Drawer.Title>
           </Drawer.Header>

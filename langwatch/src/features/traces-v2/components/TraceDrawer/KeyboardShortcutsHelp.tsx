@@ -77,7 +77,7 @@ export function KeyboardShortcutsHelp({
       }}
       size="lg"
     >
-      <Dialog.Content maxHeight="85vh" overflow="hidden">
+      <Dialog.Content bg="bg" maxHeight="85vh" overflow="hidden">
         <Dialog.Header
           paddingX={5}
           paddingY={4}

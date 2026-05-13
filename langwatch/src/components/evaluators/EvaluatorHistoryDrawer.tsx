@@ -46,7 +46,7 @@ export function EvaluatorHistoryDrawer({
 
   return (
     <Drawer.Root open={true} placement="end" size="md" onOpenChange={closeDrawer}>
-      <Drawer.Content>
+      <Drawer.Content bg="bg">
         <Drawer.Header>
           <Text fontWeight="semibold" fontSize="lg">
             {`${evaluatorName} history`}

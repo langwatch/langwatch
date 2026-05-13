@@ -1052,7 +1052,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
       onOpenChange={({ open }) => !open && handleClose()}
       size="lg"
     >
-      <Drawer.Content>
+      <Drawer.Content bg="bg">
         <Drawer.CloseTrigger />
         <Drawer.Header>
           <HStack gap={2}>

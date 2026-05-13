@@ -587,7 +587,7 @@ function PublishModalContent({
 
   if (!versions.data) {
     return (
-      <Dialog.Content borderTop="5px solid" borderColor="green.400">
+      <Dialog.Content bg="bg" borderTop="5px solid" borderColor="green.400">
         <Dialog.Header>
           <Dialog.Title fontWeight={600}>Publish Workflow</Dialog.Title>
         </Dialog.Header>
@@ -609,7 +609,7 @@ function PublishModalContent({
 
   return (
     <FormProvider {...form}>
-    <Dialog.Content
+    <Dialog.Content bg="bg"
       as="form"
       // eslint-disable-next-line @typescript-eslint/no-misused-promises
       onSubmit={form.handleSubmit(onSubmit)}
@@ -724,7 +724,7 @@ export const ApiModalContent = () => {
     2,
   );
   return (
-    <Dialog.Content>
+    <Dialog.Content bg="bg">
       <Dialog.Header>
         <Dialog.Title>Workflow API</Dialog.Title>
       </Dialog.Header>

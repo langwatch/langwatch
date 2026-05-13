@@ -211,7 +211,7 @@ export function EvaluatorCategorySelectorDrawer(
       size="lg"
       modal={false}
     >
-      <Drawer.Content>
+      <Drawer.Content bg="bg">
         <Drawer.CloseTrigger />
         <Drawer.Header>
           <HStack gap={2} minH="32px">

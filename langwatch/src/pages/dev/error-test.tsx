@@ -229,7 +229,7 @@ function InnerContent({
         open={dialogOpen}
         onOpenChange={({ open }) => setDialogOpen(open)}
       >
-        <Dialog.Content>
+        <Dialog.Content bg="bg">
           <Dialog.Header>
             <Dialog.Title>Test Dialog</Dialog.Title>
             <Dialog.CloseTrigger />
@@ -247,7 +247,7 @@ function InnerContent({
         open={drawerOpen}
         onOpenChange={({ open }) => setDrawerOpen(open)}
       >
-        <Drawer.Content>
+        <Drawer.Content bg="bg">
           <Drawer.Header>
             <Drawer.Title>Test Drawer</Drawer.Title>
             <Drawer.CloseTrigger />

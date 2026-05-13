@@ -18,7 +18,7 @@ import { SimulationConsole } from "../simulation-console/SimulationConsole";
 const DrawerWrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>
     <Drawer.Root open={true} placement="end">
-      <Drawer.Content>{children}</Drawer.Content>
+      <Drawer.Content bg="bg">{children}</Drawer.Content>
     </Drawer.Root>
   </ChakraProvider>
 );

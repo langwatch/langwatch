@@ -278,7 +278,7 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
       placement="end"
       size="lg"
     >
-      <Drawer.Content>
+      <Drawer.Content bg="bg">
         <Drawer.Header>
           <Drawer.Title>{title}</Drawer.Title>
           <Drawer.CloseTrigger />

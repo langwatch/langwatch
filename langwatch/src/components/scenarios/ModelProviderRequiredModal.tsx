@@ -22,7 +22,7 @@ export function ModelProviderRequiredModal({
 }: ModelProviderRequiredModalProps) {
   return (
     <Dialog.Root open={open} onOpenChange={(d) => !d.open && onClose()}>
-      <Dialog.Content>
+      <Dialog.Content bg="bg">
         <Dialog.CloseTrigger />
         <Dialog.Header>
           <Dialog.Title>Model provider not ready</Dialog.Title>

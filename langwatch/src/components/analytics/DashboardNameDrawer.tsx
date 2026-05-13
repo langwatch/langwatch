@@ -89,7 +89,7 @@ export function DashboardNameDrawer({
         }
       }}
     >
-      <Drawer.Content>
+      <Drawer.Content bg="bg">
         <Drawer.Header>
           <Drawer.CloseTrigger onClick={handleClose} />
           <Heading size="lg">Create Dashboard</Heading>

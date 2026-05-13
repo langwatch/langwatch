@@ -10,7 +10,7 @@ export function FeedbackLink() {
   return (
     <>
       <Dialog.Root open={open} onOpenChange={({ open }) => setOpen(open)}>
-        <Dialog.Content>
+        <Dialog.Content bg="bg">
           <Dialog.Header>
             <Dialog.Title>Feedback on LangWatch</Dialog.Title>
           </Dialog.Header>

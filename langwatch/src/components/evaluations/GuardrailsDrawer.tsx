@@ -236,7 +236,7 @@ EOF
       onOpenChange={({ open }) => !open && handleClose()}
       size="lg"
     >
-      <Drawer.Content>
+      <Drawer.Content bg="bg">
         <Drawer.CloseTrigger />
         <Drawer.Header>
           <Heading size="md">New Guardrail</Heading>

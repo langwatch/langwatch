@@ -1380,7 +1380,7 @@ export function MessagesTable({
                   </Button>
                 </Dialog.Trigger>
                 <Portal>
-                  <Dialog.Content>
+                  <Dialog.Content bg="bg">
                     <Dialog.Header>
                       <Dialog.Title>Add to Queue</Dialog.Title>
                     </Dialog.Header>
