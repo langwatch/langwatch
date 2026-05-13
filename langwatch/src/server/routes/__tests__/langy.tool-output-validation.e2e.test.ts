@@ -1,14 +1,14 @@
 /**
  * E2E test: drives the real Hono /api/langy/chat route with a
- * MockLanguageModelV3 that calls a tool whose downstream returns a
- * malformed payload. Asserts the validated `tool_output_invalid`
+ * MockLanguageModelV3 that calls a tool whose downstream service returns
+ * a malformed payload. Asserts the validated `tool_output_invalid`
  * envelope is what the model receives back as the tool result on its
  * second turn — i.e. the malformed payload never reaches the model.
  *
  * Named `.e2e.test.ts` for clarity (the test drives the full request
  * pipeline through Hono), but it runs under the regular `pnpm test:unit`
- * runner because no real services are involved — all downstreams are
- * mocked at the import boundary.
+ * runner because no real services are involved — all downstream
+ * services and external clients are mocked at the import boundary.
  */
 import { MockLanguageModelV3, simulateReadableStream } from "ai/test";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -31,12 +31,20 @@ const mockAppendMessage = vi.fn();
 const mockFeatureFlagIsEnabled = vi.fn();
 const mockStreamLangyMastraResponse = vi.fn();
 const mockEsSearch = vi.fn();
+
+// Service mocks (post-PR-4.1: tools go through service layer, not raw prisma)
 const mockEvaluatorGetAllWithFields = vi.fn();
 const mockEvaluatorGetBySlug = vi.fn();
-const mockExperimentFindFirst = vi.fn();
-const mockDatasetFindMany = vi.fn();
-const mockBatchEvaluationFindMany = vi.fn();
+const mockEvaluatorEnrichWithFields = vi.fn();
+const mockExperimentFindBySlug = vi.fn();
+const mockDatasetListAllNonArchivedWithCounts = vi.fn();
+const mockDatasetFindByIdNonArchivedWithCounts = vi.fn();
+const mockDatasetListRecordsSample = vi.fn();
+const mockBatchEvaluationGetRecentByExperiment = vi.fn();
+const mockProjectGetById = vi.fn();
 const mockPromptServiceGetAllPrompts = vi.fn();
+const mockPromptServiceGetPromptByIdOrHandle = vi.fn();
+const mockPromptServiceSearchByKeyword = vi.fn();
 
 vi.mock("~/server/auth", () => ({
   getServerAuthSession: (...args: unknown[]) =>
@@ -81,36 +89,74 @@ vi.mock("~/server/evaluators/evaluator.service", () => ({
       getAllWithFields: (...args: unknown[]) =>
         mockEvaluatorGetAllWithFields(...args),
       getBySlug: (...args: unknown[]) => mockEvaluatorGetBySlug(...args),
+      enrichWithFields: (...args: unknown[]) =>
+        mockEvaluatorEnrichWithFields(...args),
     }),
   },
 }));
+
+vi.mock("~/server/experiments/experiment.service", () => ({
+  ExperimentService: {
+    create: () => ({
+      findBySlug: (...args: unknown[]) => mockExperimentFindBySlug(...args),
+    }),
+  },
+}));
+
+vi.mock("~/server/datasets/dataset.service", () => ({
+  DatasetService: {
+    create: () => ({
+      listAllNonArchivedWithCounts: (...args: unknown[]) =>
+        mockDatasetListAllNonArchivedWithCounts(...args),
+      findByIdNonArchivedWithCounts: (...args: unknown[]) =>
+        mockDatasetFindByIdNonArchivedWithCounts(...args),
+      listRecordsSample: (...args: unknown[]) =>
+        mockDatasetListRecordsSample(...args),
+    }),
+  },
+}));
+
+vi.mock("~/server/evaluations/batch-evaluation.service", () => ({
+  BatchEvaluationService: {
+    create: () => ({
+      getRecentByExperiment: (...args: unknown[]) =>
+        mockBatchEvaluationGetRecentByExperiment(...args),
+    }),
+  },
+}));
+
+vi.mock("~/server/app-layer/projects/project.service", () => ({
+  ProjectService: class {
+    async getById(...args: unknown[]): Promise<unknown> {
+      return mockProjectGetById(...args);
+    }
+  },
+}));
+
+vi.mock(
+  "~/server/app-layer/projects/repositories/project.prisma.repository",
+  () => ({
+    PrismaProjectRepository: class {},
+  }),
+);
 
 vi.mock("~/server/prompt-config/prompt.service", () => ({
   PromptService: class {
     async getAllPrompts(...args: unknown[]): Promise<unknown> {
       return mockPromptServiceGetAllPrompts(...args);
     }
-    async getPromptByIdOrHandle(): Promise<null> {
-      return null;
+    async getPromptByIdOrHandle(...args: unknown[]): Promise<unknown> {
+      return mockPromptServiceGetPromptByIdOrHandle(...args);
+    }
+    async searchByKeyword(...args: unknown[]): Promise<unknown> {
+      return mockPromptServiceSearchByKeyword(...args);
     }
   },
 }));
 
 vi.mock("~/server/db", () => ({
   prisma: {
-    experiment: {
-      findFirst: (...args: unknown[]) => mockExperimentFindFirst(...args),
-    },
-    dataset: {
-      findMany: (...args: unknown[]) => mockDatasetFindMany(...args),
-      findFirst: vi.fn(),
-    },
-    datasetRecord: { findMany: vi.fn() },
-    batchEvaluation: {
-      findMany: (...args: unknown[]) => mockBatchEvaluationFindMany(...args),
-    },
-    llmPromptConfig: { findMany: vi.fn() },
-    project: { findUnique: vi.fn() },
+    experiment: { findFirst: vi.fn().mockResolvedValue(null) },
   },
 }));
 
@@ -232,12 +278,16 @@ async function readBody(res: Response): Promise<string> {
 }
 
 function findToolResultContent(captures: CapturedCall[]): string {
-  // Second-turn prompt contains a 'tool' message whose content is the
-  // tool's return value. We stringify the whole second-turn prompt and
-  // search for the envelope literal — robust to AI-SDK message shape
-  // changes.
   const second = captures[1];
   return second ? JSON.stringify(second.prompt ?? second) : "";
+}
+
+async function postChat(body: Record<string, unknown>): Promise<Response> {
+  return app.request("/api/langy/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -261,23 +311,21 @@ beforeEach(() => {
   mockAppendMessage.mockResolvedValue(undefined);
   mockEvaluatorGetAllWithFields.mockResolvedValue([]);
   mockEvaluatorGetBySlug.mockResolvedValue(null);
-  mockExperimentFindFirst.mockResolvedValue(null);
-  mockDatasetFindMany.mockResolvedValue([]);
-  mockBatchEvaluationFindMany.mockResolvedValue([]);
+  mockEvaluatorEnrichWithFields.mockResolvedValue({});
+  mockExperimentFindBySlug.mockResolvedValue(null);
+  mockDatasetListAllNonArchivedWithCounts.mockResolvedValue([]);
+  mockDatasetFindByIdNonArchivedWithCounts.mockResolvedValue(null);
+  mockDatasetListRecordsSample.mockResolvedValue([]);
+  mockBatchEvaluationGetRecentByExperiment.mockResolvedValue([]);
+  mockProjectGetById.mockResolvedValue(null);
   mockPromptServiceGetAllPrompts.mockResolvedValue([]);
+  mockPromptServiceGetPromptByIdOrHandle.mockResolvedValue(null);
+  mockPromptServiceSearchByKeyword.mockResolvedValue([]);
 });
 
 // ---------------------------------------------------------------------------
 // Scenarios
 // ---------------------------------------------------------------------------
-
-async function postChat(body: Record<string, unknown>): Promise<Response> {
-  return app.request("/api/langy/chat", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-}
 
 describe("POST /api/langy/chat — runtime tool-output validation E2E", () => {
   describe("when search_traces' elasticsearch downstream returns hits with non-string _id", () => {
@@ -312,9 +360,9 @@ describe("POST /api/langy/chat — runtime tool-output validation E2E", () => {
     });
   });
 
-  describe("when search_past_runs' prisma downstream returns a row with non-string id", () => {
+  describe("when search_past_runs' batchEvaluationService returns a row with non-string id", () => {
     it("hands the model a tool_output_invalid envelope", async () => {
-      mockBatchEvaluationFindMany.mockResolvedValueOnce([
+      mockBatchEvaluationGetRecentByExperiment.mockResolvedValueOnce([
         {
           id: 88888,
           experimentId: "exp-1",
@@ -349,9 +397,9 @@ describe("POST /api/langy/chat — runtime tool-output validation E2E", () => {
     });
   });
 
-  describe("when list_datasets' prisma downstream returns a row with non-string id", () => {
+  describe("when list_datasets' datasetService returns a row with non-string id", () => {
     it("hands the model a tool_output_invalid envelope", async () => {
-      mockDatasetFindMany.mockResolvedValueOnce([
+      mockDatasetListAllNonArchivedWithCounts.mockResolvedValueOnce([
         {
           id: 77777,
           slug: "ds-1",

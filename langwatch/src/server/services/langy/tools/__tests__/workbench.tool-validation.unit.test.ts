@@ -22,17 +22,24 @@ import { ConversationToolIdSet } from "../../toolIdValidator";
 import type { LangyToolContext } from "../types";
 
 function makeCtx(opts: {
-  prismaLike?: Record<string, unknown>;
+  experimentServiceLike?: Record<string, unknown>;
+  evaluatorServiceLike?: Record<string, unknown>;
   experimentSlug?: string;
 } = {}): LangyToolContext {
   return {
     projectId: "project-1",
     experimentSlug: opts.experimentSlug,
     seenIds: new ConversationToolIdSet(),
-    evaluatorService: {} as LangyToolContext["evaluatorService"],
+    batchEvaluationService: {} as LangyToolContext["batchEvaluationService"],
+    datasetService: {} as LangyToolContext["datasetService"],
+    evaluatorService:
+      (opts.evaluatorServiceLike ??
+        {}) as unknown as LangyToolContext["evaluatorService"],
+    experimentService:
+      (opts.experimentServiceLike ??
+        {}) as unknown as LangyToolContext["experimentService"],
+    projectService: {} as LangyToolContext["projectService"],
     promptService: {} as LangyToolContext["promptService"],
-    prisma:
-      (opts.prismaLike ?? {}) as unknown as LangyToolContext["prisma"],
   };
 }
 
@@ -61,16 +68,14 @@ describe("get_workbench_state tool-output validation", () => {
 
   describe("when the experiment has no saved workbench state", () => {
     it("returns the empty-state variant with experimentName + message", async () => {
-      const prismaLike = {
-        experiment: {
-          findFirst: vi.fn().mockResolvedValueOnce({
-            name: "My Experiment",
-            workbenchState: null,
-          }),
-        },
+      const experimentServiceLike = {
+        findBySlug: vi.fn().mockResolvedValueOnce({
+          name: "My Experiment",
+          workbenchState: null,
+        }),
       };
       const toolDef = makeGetWorkbenchState(
-        makeCtx({ prismaLike, experimentSlug: "exp-1" }),
+        makeCtx({ experimentServiceLike, experimentSlug: "exp-1" }),
       );
       const result = (await invokeTool(toolDef, {})) as {
         experimentName?: string;
@@ -84,16 +89,14 @@ describe("get_workbench_state tool-output validation", () => {
 
   describe("when the experiment record itself is shaped wrong", () => {
     it("returns the tool_output_invalid envelope", async () => {
-      const prismaLike = {
-        experiment: {
-          findFirst: vi.fn().mockResolvedValueOnce({
-            name: 999,
-            workbenchState: null,
-          }),
-        },
+      const experimentServiceLike = {
+        findBySlug: vi.fn().mockResolvedValueOnce({
+          name: 999,
+          workbenchState: null,
+        }),
       };
       const toolDef = makeGetWorkbenchState(
-        makeCtx({ prismaLike, experimentSlug: "exp-1" }),
+        makeCtx({ experimentServiceLike, experimentSlug: "exp-1" }),
       );
       const result = await invokeTool(toolDef, {});
 
@@ -116,13 +119,11 @@ describe("find_failing_rows tool-output validation", () => {
 
   describe("when the experiment has no workbench state", () => {
     it("returns the error variant", async () => {
-      const prismaLike = {
-        experiment: {
-          findFirst: vi.fn().mockResolvedValueOnce({ workbenchState: null }),
-        },
+      const experimentServiceLike = {
+        findBySlug: vi.fn().mockResolvedValueOnce({ workbenchState: null }),
       };
       const toolDef = makeFindFailingRows(
-        makeCtx({ prismaLike, experimentSlug: "exp-1" }),
+        makeCtx({ experimentServiceLike, experimentSlug: "exp-1" }),
       );
       const result = (await invokeTool(toolDef, { limit: 5 })) as {
         error?: string;

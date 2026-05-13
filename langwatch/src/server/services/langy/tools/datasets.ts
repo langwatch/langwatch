@@ -22,10 +22,8 @@ export function makeListDatasets(ctx: LangyToolContext) {
       ),
     }),
     execute: async () => {
-      const datasets = await ctx.prisma.dataset.findMany({
-        where: { projectId: ctx.projectId, archivedAt: null },
-        orderBy: { updatedAt: "desc" },
-        include: { _count: { select: { datasetRecords: true } } },
+      const datasets = await ctx.datasetService.listAllNonArchivedWithCounts({
+        projectId: ctx.projectId,
       });
       for (const d of datasets) ctx.seenIds.record("dataset_id", d.id);
       return {
@@ -66,20 +64,19 @@ export function makeGetDatasetDetails(ctx: LangyToolContext) {
       }),
     ]),
     execute: async ({ datasetId, sampleRowLimit }) => {
-      const dataset = await ctx.prisma.dataset.findFirst({
-        where: { id: datasetId, projectId: ctx.projectId, archivedAt: null },
-        include: { _count: { select: { datasetRecords: true } } },
+      const dataset = await ctx.datasetService.findByIdNonArchivedWithCounts({
+        id: datasetId,
+        projectId: ctx.projectId,
       });
       if (!dataset) {
         return { error: `No dataset found with id '${datasetId}'.` };
       }
       const sampleRows =
         sampleRowLimit > 0
-          ? await ctx.prisma.datasetRecord.findMany({
-              where: { datasetId, projectId: ctx.projectId },
-              orderBy: { createdAt: "asc" },
-              take: sampleRowLimit,
-              select: { id: true, entry: true },
+          ? await ctx.datasetService.listRecordsSample({
+              datasetId,
+              projectId: ctx.projectId,
+              limit: sampleRowLimit,
             })
           : [];
       return {
@@ -193,9 +190,9 @@ export function makeProposeAddDatasetRows(ctx: LangyToolContext) {
           error: `Dataset '${datasetId}' was not surfaced by list_datasets in this conversation. Call list_datasets first and reference one of those ids.`,
         };
       }
-      const dataset = await ctx.prisma.dataset.findFirst({
-        where: { id: datasetId, projectId: ctx.projectId, archivedAt: null },
-        select: { id: true, name: true, slug: true },
+      const dataset = await ctx.datasetService.findByIdNonArchivedWithCounts({
+        id: datasetId,
+        projectId: ctx.projectId,
       });
       if (!dataset) {
         return { error: `No dataset found with id '${datasetId}'.` };

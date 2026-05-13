@@ -25,15 +25,23 @@ import { makeSearchTraces } from "../traces";
 import { ConversationToolIdSet } from "../../toolIdValidator";
 import type { LangyToolContext } from "../types";
 
-function makeCtx(
-  prismaLike: Record<string, unknown> = {},
-): LangyToolContext {
+function makeCtx(opts: {
+  experimentServiceLike?: Record<string, unknown>;
+  batchEvaluationServiceLike?: Record<string, unknown>;
+} = {}): LangyToolContext {
   return {
     projectId: "project-1",
     seenIds: new ConversationToolIdSet(),
+    batchEvaluationService:
+      (opts.batchEvaluationServiceLike ??
+        {}) as unknown as LangyToolContext["batchEvaluationService"],
+    datasetService: {} as LangyToolContext["datasetService"],
     evaluatorService: {} as LangyToolContext["evaluatorService"],
+    experimentService:
+      (opts.experimentServiceLike ??
+        {}) as unknown as LangyToolContext["experimentService"],
+    projectService: {} as LangyToolContext["projectService"],
     promptService: {} as LangyToolContext["promptService"],
-    prisma: prismaLike as unknown as LangyToolContext["prisma"],
   };
 }
 
@@ -102,24 +110,24 @@ describe("search_traces tool-output validation", () => {
 });
 
 describe("search_past_runs tool-output validation", () => {
-  describe("when prisma returns a row whose id is not a string", () => {
+  describe("when batchEvaluationService returns a row whose id is not a string", () => {
     it("returns the tool_output_invalid envelope", async () => {
-      const prismaLike = {
-        batchEvaluation: {
-          findMany: vi.fn().mockResolvedValueOnce([
-            {
-              id: 123,
-              experimentId: "exp-1",
-              createdAt: new Date(),
-              status: "complete",
-              score: 1,
-              passed: true,
-              evaluation: "evaluation-name",
-            },
-          ]),
-        },
+      const batchEvaluationServiceLike = {
+        getRecentByExperiment: vi.fn().mockResolvedValueOnce([
+          {
+            id: 123,
+            experimentId: "exp-1",
+            createdAt: new Date(),
+            status: "complete",
+            score: 1,
+            passed: true,
+            evaluation: "evaluation-name",
+          },
+        ]),
       };
-      const toolDef = makeSearchPastRuns(makeCtx(prismaLike));
+      const toolDef = makeSearchPastRuns(
+        makeCtx({ batchEvaluationServiceLike }),
+      );
       const result = await invokeTool(toolDef, { limit: 5 });
 
       expect(langyToolErrorEnvelope.safeParse(result).success).toBe(true);
@@ -129,47 +137,47 @@ describe("search_past_runs tool-output validation", () => {
     });
 
     it("does not leak the malformed rows to the caller", async () => {
-      const prismaLike = {
-        batchEvaluation: {
-          findMany: vi.fn().mockResolvedValueOnce([
-            {
-              id: 123,
-              experimentId: "exp-1",
-              createdAt: new Date(),
-              status: "complete",
-              score: 1,
-              passed: true,
-              evaluation: "evaluation-name",
-            },
-          ]),
-        },
+      const batchEvaluationServiceLike = {
+        getRecentByExperiment: vi.fn().mockResolvedValueOnce([
+          {
+            id: 123,
+            experimentId: "exp-1",
+            createdAt: new Date(),
+            status: "complete",
+            score: 1,
+            passed: true,
+            evaluation: "evaluation-name",
+          },
+        ]),
       };
-      const toolDef = makeSearchPastRuns(makeCtx(prismaLike));
+      const toolDef = makeSearchPastRuns(
+        makeCtx({ batchEvaluationServiceLike }),
+      );
       const result = await invokeTool(toolDef, { limit: 5 });
 
       expect(result).not.toHaveProperty("items");
     });
   });
 
-  describe("when prisma returns well-formed rows", () => {
+  describe("when batchEvaluationService returns well-formed rows", () => {
     it("returns the parsed items array", async () => {
       const createdAt = new Date("2026-05-13T00:00:00Z");
-      const prismaLike = {
-        batchEvaluation: {
-          findMany: vi.fn().mockResolvedValueOnce([
-            {
-              id: "run-1",
-              experimentId: "exp-1",
-              createdAt,
-              status: "complete",
-              score: 0.8,
-              passed: true,
-              evaluation: "evaluation-name",
-            },
-          ]),
-        },
+      const batchEvaluationServiceLike = {
+        getRecentByExperiment: vi.fn().mockResolvedValueOnce([
+          {
+            id: "run-1",
+            experimentId: "exp-1",
+            createdAt,
+            status: "complete",
+            score: 0.8,
+            passed: true,
+            evaluation: "evaluation-name",
+          },
+        ]),
       };
-      const toolDef = makeSearchPastRuns(makeCtx(prismaLike));
+      const toolDef = makeSearchPastRuns(
+        makeCtx({ batchEvaluationServiceLike }),
+      );
       const result = (await invokeTool(toolDef, { limit: 5 })) as {
         items: Array<{ id: string }>;
       };

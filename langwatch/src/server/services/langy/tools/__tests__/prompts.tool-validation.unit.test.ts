@@ -24,19 +24,20 @@ import { ConversationToolIdSet } from "../../toolIdValidator";
 import type { LangyToolContext } from "../types";
 
 function makeCtx(opts: {
-  prismaLike?: Record<string, unknown>;
   promptServiceLike?: Record<string, unknown>;
   seenIds?: ConversationToolIdSet;
 } = {}): LangyToolContext {
   return {
     projectId: "project-1",
     seenIds: opts.seenIds ?? new ConversationToolIdSet(),
+    batchEvaluationService: {} as LangyToolContext["batchEvaluationService"],
+    datasetService: {} as LangyToolContext["datasetService"],
     evaluatorService: {} as LangyToolContext["evaluatorService"],
+    experimentService: {} as LangyToolContext["experimentService"],
+    projectService: {} as LangyToolContext["projectService"],
     promptService:
-      opts.promptServiceLike as unknown as LangyToolContext["promptService"] ??
-      ({} as LangyToolContext["promptService"]),
-    prisma:
-      (opts.prismaLike ?? {}) as unknown as LangyToolContext["prisma"],
+      (opts.promptServiceLike ??
+        {}) as unknown as LangyToolContext["promptService"],
   };
 }
 
@@ -132,16 +133,14 @@ describe("get_prompt_details tool-output validation", () => {
 });
 
 describe("search_prompts tool-output validation", () => {
-  describe("when prisma returns rows whose handle is null", () => {
+  describe("when promptService.searchByKeyword returns rows whose handle is null", () => {
     it("returns the tool_output_invalid envelope", async () => {
-      const prismaLike = {
-        llmPromptConfig: {
-          findMany: vi.fn().mockResolvedValueOnce([
-            { id: "p-1", handle: null, name: "Prompt 1" },
-          ]),
-        },
+      const promptServiceLike = {
+        searchByKeyword: vi.fn().mockResolvedValueOnce([
+          { id: "p-1", handle: null, name: "Prompt 1" },
+        ]),
       };
-      const toolDef = makeSearchPrompts(makeCtx({ prismaLike }));
+      const toolDef = makeSearchPrompts(makeCtx({ promptServiceLike }));
       const result = await invokeTool(toolDef, { query: "x", limit: 5 });
 
       expectInvalidEnvelope(result);

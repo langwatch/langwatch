@@ -45,19 +45,23 @@ import { ConversationToolIdSet } from "../../toolIdValidator";
 import type { LangyToolContext } from "../types";
 
 function makeCtx(opts: {
-  prismaLike?: Record<string, unknown>;
   evaluatorServiceLike?: Record<string, unknown>;
+  projectServiceLike?: Record<string, unknown>;
   seenIds?: ConversationToolIdSet;
 } = {}): LangyToolContext {
   return {
     projectId: "project-1",
     seenIds: opts.seenIds ?? new ConversationToolIdSet(),
+    batchEvaluationService: {} as LangyToolContext["batchEvaluationService"],
+    datasetService: {} as LangyToolContext["datasetService"],
     evaluatorService:
       (opts.evaluatorServiceLike ??
         {}) as unknown as LangyToolContext["evaluatorService"],
+    experimentService: {} as LangyToolContext["experimentService"],
+    projectService:
+      (opts.projectServiceLike ??
+        {}) as unknown as LangyToolContext["projectService"],
     promptService: {} as LangyToolContext["promptService"],
-    prisma:
-      (opts.prismaLike ?? {}) as unknown as LangyToolContext["prisma"],
   };
 }
 
@@ -148,16 +152,14 @@ describe("propose_create_evaluator tool-output validation", () => {
     it("returns the proposal envelope", async () => {
       const seen = new ConversationToolIdSet();
       seen.record("evaluator_type", "ragas/answer_relevancy");
-      const prismaLike = {
-        project: {
-          findUnique: vi.fn().mockResolvedValueOnce({
-            defaultModel: "openai/gpt-5-mini",
-            embeddingsModel: "openai/text-embedding-3-small",
-          }),
-        },
+      const projectServiceLike = {
+        getById: vi.fn().mockResolvedValueOnce({
+          defaultModel: "openai/gpt-5-mini",
+          embeddingsModel: "openai/text-embedding-3-small",
+        }),
       };
       const toolDef = makeProposeCreateEvaluator(
-        makeCtx({ prismaLike, seenIds: seen }),
+        makeCtx({ projectServiceLike, seenIds: seen }),
       );
       const result = (await invokeTool(toolDef, {
         name: "New",

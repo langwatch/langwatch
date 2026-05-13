@@ -22,16 +22,21 @@ import {
 import { ConversationToolIdSet } from "../../toolIdValidator";
 import type { LangyToolContext } from "../types";
 
-function makeCtx(
-  prismaLike: Record<string, unknown> = {},
-  seenIds: ConversationToolIdSet = new ConversationToolIdSet(),
-): LangyToolContext {
+function makeCtx(opts: {
+  datasetServiceLike?: Record<string, unknown>;
+  seenIds?: ConversationToolIdSet;
+} = {}): LangyToolContext {
   return {
     projectId: "project-1",
-    seenIds,
+    seenIds: opts.seenIds ?? new ConversationToolIdSet(),
+    batchEvaluationService: {} as LangyToolContext["batchEvaluationService"],
+    datasetService:
+      (opts.datasetServiceLike ??
+        {}) as unknown as LangyToolContext["datasetService"],
     evaluatorService: {} as LangyToolContext["evaluatorService"],
+    experimentService: {} as LangyToolContext["experimentService"],
+    projectService: {} as LangyToolContext["projectService"],
     promptService: {} as LangyToolContext["promptService"],
-    prisma: prismaLike as unknown as LangyToolContext["prisma"],
   };
 }
 
@@ -49,44 +54,40 @@ function expectInvalidEnvelope(result: unknown) {
 }
 
 describe("list_datasets tool-output validation", () => {
-  describe("when prisma returns a dataset row whose id is not a string", () => {
+  describe("when datasetService returns a row whose id is not a string", () => {
     it("returns the tool_output_invalid envelope", async () => {
-      const prismaLike = {
-        dataset: {
-          findMany: vi.fn().mockResolvedValueOnce([
-            {
-              id: 999,
-              slug: "ds-1",
-              name: "Dataset 1",
-              columnTypes: [],
-              _count: { datasetRecords: 0 },
-            },
-          ]),
-        },
+      const datasetServiceLike = {
+        listAllNonArchivedWithCounts: vi.fn().mockResolvedValueOnce([
+          {
+            id: 999,
+            slug: "ds-1",
+            name: "Dataset 1",
+            columnTypes: [],
+            _count: { datasetRecords: 0 },
+          },
+        ]),
       };
-      const toolDef = makeListDatasets(makeCtx(prismaLike));
+      const toolDef = makeListDatasets(makeCtx({ datasetServiceLike }));
       const result = await invokeTool(toolDef, {});
 
       expectInvalidEnvelope(result);
     });
   });
 
-  describe("when prisma returns a well-formed dataset row", () => {
+  describe("when datasetService returns a well-formed row", () => {
     it("returns the parsed items array", async () => {
-      const prismaLike = {
-        dataset: {
-          findMany: vi.fn().mockResolvedValueOnce([
-            {
-              id: "ds-1",
-              slug: "ds-1-slug",
-              name: "Dataset 1",
-              columnTypes: [{ name: "col", type: "string" }],
-              _count: { datasetRecords: 3 },
-            },
-          ]),
-        },
+      const datasetServiceLike = {
+        listAllNonArchivedWithCounts: vi.fn().mockResolvedValueOnce([
+          {
+            id: "ds-1",
+            slug: "ds-1-slug",
+            name: "Dataset 1",
+            columnTypes: [{ name: "col", type: "string" }],
+            _count: { datasetRecords: 3 },
+          },
+        ]),
       };
-      const toolDef = makeListDatasets(makeCtx(prismaLike));
+      const toolDef = makeListDatasets(makeCtx({ datasetServiceLike }));
       const result = (await invokeTool(toolDef, {})) as {
         items: Array<{ id: string }>;
       };
@@ -98,23 +99,21 @@ describe("list_datasets tool-output validation", () => {
 });
 
 describe("get_dataset_details tool-output validation", () => {
-  describe("when prisma returns a dataset but sampleRows has malformed id", () => {
+  describe("when datasetService returns a dataset but sampleRows has malformed id", () => {
     it("returns the tool_output_invalid envelope", async () => {
-      const prismaLike = {
-        dataset: {
-          findFirst: vi.fn().mockResolvedValueOnce({
-            id: "ds-1",
-            slug: "ds-1",
-            name: "ds-1",
-            columnTypes: [],
-            _count: { datasetRecords: 1 },
-          }),
-        },
-        datasetRecord: {
-          findMany: vi.fn().mockResolvedValueOnce([{ id: 42, entry: {} }]),
-        },
+      const datasetServiceLike = {
+        findByIdNonArchivedWithCounts: vi.fn().mockResolvedValueOnce({
+          id: "ds-1",
+          slug: "ds-1",
+          name: "ds-1",
+          columnTypes: [],
+          _count: { datasetRecords: 1 },
+        }),
+        listRecordsSample: vi
+          .fn()
+          .mockResolvedValueOnce([{ id: 42, entry: {} }]),
       };
-      const toolDef = makeGetDatasetDetails(makeCtx(prismaLike));
+      const toolDef = makeGetDatasetDetails(makeCtx({ datasetServiceLike }));
       const result = await invokeTool(toolDef, {
         datasetId: "ds-1",
         sampleRowLimit: 5,
@@ -126,10 +125,10 @@ describe("get_dataset_details tool-output validation", () => {
 
   describe("when the dataset is not found", () => {
     it("returns the error branch matching its union variant", async () => {
-      const prismaLike = {
-        dataset: { findFirst: vi.fn().mockResolvedValueOnce(null) },
+      const datasetServiceLike = {
+        findByIdNonArchivedWithCounts: vi.fn().mockResolvedValueOnce(null),
       };
-      const toolDef = makeGetDatasetDetails(makeCtx(prismaLike));
+      const toolDef = makeGetDatasetDetails(makeCtx({ datasetServiceLike }));
       const result = (await invokeTool(toolDef, {
         datasetId: "missing",
         sampleRowLimit: 0,
@@ -175,16 +174,16 @@ describe("propose_add_dataset_rows tool-output validation", () => {
     it("returns the proposal envelope", async () => {
       const seen = new ConversationToolIdSet();
       seen.record("dataset_id", "ds-1");
-      const prismaLike = {
-        dataset: {
-          findFirst: vi.fn().mockResolvedValueOnce({
-            id: "ds-1",
-            name: "Dataset 1",
-            slug: "ds-1",
-          }),
-        },
+      const datasetServiceLike = {
+        findByIdNonArchivedWithCounts: vi.fn().mockResolvedValueOnce({
+          id: "ds-1",
+          name: "Dataset 1",
+          slug: "ds-1",
+        }),
       };
-      const toolDef = makeProposeAddDatasetRows(makeCtx(prismaLike, seen));
+      const toolDef = makeProposeAddDatasetRows(
+        makeCtx({ datasetServiceLike, seenIds: seen }),
+      );
       const result = (await invokeTool(toolDef, {
         datasetId: "ds-1",
         rows: [{ col: "v" }],
