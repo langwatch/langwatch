@@ -1797,9 +1797,9 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     }
   );
 
-  // --- Platform Project Tools (require org-level API key) ---
+  // --- Platform Project Tools ---
   // These tools manage projects on the LangWatch platform via the REST API.
-  // They require an org-level API key (set via LANGWATCH_ORG_API_KEY or an API key with org permissions).
+  // They require an API key with org-level permissions.
 
   server.tool(
     "platform_list_projects",

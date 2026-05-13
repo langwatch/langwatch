@@ -1,7 +1,7 @@
 import chalk from "chalk";
 import ora from "ora";
 import { ProjectsApiService } from "@/client-sdk/services/projects/projects-api.service";
-import { checkOrgApiKey } from "../../utils/orgApiKey";
+import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 
 export interface CreateProjectOptions {
@@ -14,7 +14,7 @@ export interface CreateProjectOptions {
 }
 
 export const createProjectCommand = async (options: CreateProjectOptions): Promise<void> => {
-  const apiKey = checkOrgApiKey();
+  checkApiKey();
 
   if (!options.name) {
     console.error(chalk.red("Error: --name is required"));
@@ -33,7 +33,7 @@ export const createProjectCommand = async (options: CreateProjectOptions): Promi
     process.exit(1);
   }
 
-  const service = new ProjectsApiService({ apiKey });
+  const service = new ProjectsApiService();
   const spinner = ora(`Creating project "${options.name}"...`).start();
 
   try {
