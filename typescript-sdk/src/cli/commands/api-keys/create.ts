@@ -1,7 +1,7 @@
 import chalk from "chalk";
 import ora from "ora";
 import { ApiKeysApiService } from "@/client-sdk/services/api-keys/api-keys-api.service";
-import { checkOrgApiKey } from "../../utils/orgApiKey";
+import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 
 export interface CreateApiKeyOptions {
@@ -14,14 +14,14 @@ export interface CreateApiKeyOptions {
 }
 
 export const createApiKeyCommand = async (options: CreateApiKeyOptions): Promise<void> => {
-  const apiKey = checkOrgApiKey();
+  checkApiKey();
 
   if (!options.name) {
     console.error(chalk.red("Error: --name is required"));
     process.exit(1);
   }
 
-  const service = new ApiKeysApiService({ apiKey });
+  const service = new ApiKeysApiService();
   const keyType = options.keyType ?? "service";
   const spinner = ora(`Creating ${keyType} API key "${options.name}"...`).start();
 

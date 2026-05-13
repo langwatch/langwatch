@@ -1568,10 +1568,9 @@ recordsCmd
     const { recordsDeleteCommand } = await import("./commands/dataset/records-delete.js");
     await recordsDeleteCommand(slugOrId, recordIds);
   });
-// Add projects command group (org-level)
 const projectsCmd = program
   .command("projects")
-  .description("Manage organization projects (requires LANGWATCH_ORG_API_KEY)");
+  .description("Manage organization projects");
 
 projectsCmd
   .command("list")
@@ -1646,10 +1645,9 @@ projectsCmd
     await impl(id, options);
   });
 
-// Add api-keys command group (org-level)
 const apiKeysCmd = program
   .command("api-keys")
-  .description("Manage organization API keys (requires LANGWATCH_ORG_API_KEY)");
+  .description("Manage organization API keys");
 
 apiKeysCmd
   .command("list")

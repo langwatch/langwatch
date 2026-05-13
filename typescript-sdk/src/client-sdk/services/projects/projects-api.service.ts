@@ -66,7 +66,7 @@ export class ProjectsApiService {
 
   constructor(config?: { endpoint?: string; apiKey?: string }) {
     this.endpoint = (config?.endpoint ?? process.env.LANGWATCH_ENDPOINT ?? DEFAULT_ENDPOINT).replace(/\/+$/, "");
-    this.apiKey = config?.apiKey ?? process.env.LANGWATCH_ORG_API_KEY ?? "";
+    this.apiKey = config?.apiKey ?? process.env.LANGWATCH_API_KEY ?? "";
   }
 
   private headers(): Record<string, string> {

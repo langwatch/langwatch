@@ -232,7 +232,7 @@ Feature: Scenario tests for skills quality assurance
   @platform @projects @integration @unimplemented
   Scenario: Projects skill lists and creates projects via the CLI
     Given an empty temporary directory (no codebase)
-    And LANGWATCH_ORG_API_KEY is set
+    And LANGWATCH_API_KEY is set with org-level permissions
     When the agent receives "list my projects and create a new one called 'Test Project' with python/langchain"
     Then the agent runs `langwatch projects list` via the Bash tool
     And the agent runs `langwatch projects create` with --name, --language, --framework, and --new-team-name flags
@@ -242,7 +242,7 @@ Feature: Scenario tests for skills quality assurance
   @platform @api-keys @integration @unimplemented
   Scenario: API keys skill lists and creates API keys via the CLI
     Given an empty temporary directory (no codebase)
-    And LANGWATCH_ORG_API_KEY is set
+    And LANGWATCH_API_KEY is set with org-level permissions
     When the agent receives "list my API keys and create a new service key for CI"
     Then the agent runs `langwatch api-keys list` via the Bash tool
     And the agent runs `langwatch api-keys create` with a --name flag

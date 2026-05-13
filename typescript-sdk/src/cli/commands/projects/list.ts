@@ -1,7 +1,7 @@
 import chalk from "chalk";
 import ora from "ora";
 import { ProjectsApiService } from "@/client-sdk/services/projects/projects-api.service";
-import { checkOrgApiKey } from "../../utils/orgApiKey";
+import { checkApiKey } from "../../utils/apiKey";
 import { formatTable } from "../../utils/formatting";
 import { failSpinner } from "../../utils/spinnerError";
 
@@ -10,9 +10,9 @@ export const listProjectsCommand = async (options?: {
   limit?: number;
   format?: string;
 }): Promise<void> => {
-  const apiKey = checkOrgApiKey();
+  checkApiKey();
 
-  const service = new ProjectsApiService({ apiKey });
+  const service = new ProjectsApiService();
   const spinner = ora("Fetching projects...").start();
 
   try {

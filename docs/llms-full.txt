@@ -11396,7 +11396,7 @@ The LangWatch MCP is so powerful that it can help AI agents automatically instru
 
 ## MCP Tools Reference
 
-The MCP server provides 10 tools organized into three categories. Your AI assistant automatically chooses the right tools based on your request.
+The MCP server provides tools organized into categories. Your AI assistant automatically chooses the right tools based on your request.
 
 ### Documentation
 
@@ -11422,6 +11422,23 @@ The MCP server provides 10 tools organized into three categories. Your AI assist
 | `get_prompt` | Get a prompt with messages, model config, and version history |
 | `create_prompt` | Create a new prompt with messages and model configuration |
 | `update_prompt` | Update a prompt or create a new version |
+
+### Organization Management (requires org-level API key)
+
+| Tool | Description |
+|------|-------------|
+| `platform_list_projects` | List all projects in the organization |
+| `platform_get_project` | Get project details by ID |
+| `platform_create_project` | Create a new project (returns a one-time service API key) |
+| `platform_update_project` | Update a project's name, language, framework, or PII settings |
+| `platform_archive_project` | Archive a project (soft-delete) |
+| `platform_list_api_keys` | List all API keys in the organization |
+| `platform_create_api_key` | Create a personal or service API key |
+| `platform_revoke_api_key` | Revoke an API key |
+
+<Info>
+Organization management tools require an API key with org-level permissions. If the configured key lacks organization permissions, these tools will return a clear error message.
+</Info>
 
 ### Tool Details
 

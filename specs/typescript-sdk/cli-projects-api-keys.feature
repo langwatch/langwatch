@@ -5,7 +5,7 @@ Feature: CLI Projects and API Keys management
   So that I can programmatically set up and administer LangWatch without the web UI
 
   Background:
-    Given I have a valid org-level API key configured via LANGWATCH_ORG_API_KEY
+    Given I have a valid API key configured via LANGWATCH_API_KEY with org-level permissions
 
   # ── Projects ────────────────────────────────────────────────────
 
@@ -101,21 +101,11 @@ Feature: CLI Projects and API Keys management
     Then the output confirms the key was revoked
     And the CLI exits with status 0
 
-  # ── Auth fallback ───────────────────────────────────────────────
-
-  @integration
-  Scenario: Falls back to LANGWATCH_API_KEY with warning when LANGWATCH_ORG_API_KEY is not set
-    Given LANGWATCH_ORG_API_KEY is not set
-    And LANGWATCH_API_KEY is set to a valid key
-    When I run `langwatch projects list`
-    Then the output includes "falling back to LANGWATCH_API_KEY"
-    And the output includes "may fail if the key lacks organization-level permissions"
+  # ── Auth ─────────────────────────────────────────────────────────
 
   @integration
   Scenario: Fails with helpful message when no API key is set
-    Given LANGWATCH_ORG_API_KEY is not set
-    And LANGWATCH_API_KEY is not set
+    Given LANGWATCH_API_KEY is not set
     When I run `langwatch projects list`
-    Then the output includes "No API key found"
-    And the output includes "LANGWATCH_ORG_API_KEY"
+    Then the output includes "LANGWATCH_API_KEY not found"
     And the CLI exits with status 1

@@ -1,14 +1,14 @@
 import chalk from "chalk";
 import ora from "ora";
 import { ApiKeysApiService } from "@/client-sdk/services/api-keys/api-keys-api.service";
-import { checkOrgApiKey } from "../../utils/orgApiKey";
+import { checkApiKey } from "../../utils/apiKey";
 import { formatTable } from "../../utils/formatting";
 import { failSpinner } from "../../utils/spinnerError";
 
 export const listApiKeysCommand = async (options?: { format?: string }): Promise<void> => {
-  const apiKey = checkOrgApiKey();
+  checkApiKey();
 
-  const service = new ApiKeysApiService({ apiKey });
+  const service = new ApiKeysApiService();
   const spinner = ora("Fetching API keys...").start();
 
   try {

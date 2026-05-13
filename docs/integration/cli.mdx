@@ -220,6 +220,56 @@ Available resources include:
 
 Run `langwatch <resource> --help` on any of these for subcommand-level options, and `--format json` to get structured output for scripting.
 
+## Organization management
+
+These commands manage org-wide resources and require an API key with organization-level permissions.
+
+### Projects
+
+```bash
+# List all projects in your organization
+langwatch projects list
+langwatch projects list --format json
+
+# Create a project (returns a one-time service API key)
+langwatch projects create \
+  --name "My Agent Project" \
+  --language python \
+  --framework langchain \
+  --new-team-name "Engineering"
+
+# Get project details
+langwatch projects get proj_01HZX9K3MN...
+
+# Update project metadata
+langwatch projects update proj_01HZX9K3MN... --name "Renamed"
+
+# Archive a project (soft-delete)
+langwatch projects delete proj_01HZX9K3MN...
+```
+
+When creating a project, the CLI displays the service API key exactly once. Save it immediately — it cannot be retrieved later.
+
+### API keys
+
+```bash
+# List all API keys
+langwatch api-keys list
+langwatch api-keys list --format json
+
+# Create a service key (org-wide)
+langwatch api-keys create --name "CI Pipeline"
+
+# Create a service key scoped to specific projects
+langwatch api-keys create \
+  --name "Staging Key" \
+  --project-id proj_01HZX... \
+  --project-id proj_02ABC...
+
+# Revoke a key (cannot be undone)
+langwatch api-keys revoke key_01HZX...
+```
+
 ## Trigger experiments
 
 Experiments batch-run an agent or prompt against a dataset and produce an evaluation report:
@@ -335,6 +385,12 @@ Required token permissions map onto the [RBAC](/ai-gateway/rbac) grants:
 
 | Command group | Permission |
 |---|---|
+| `projects list|get` | `project:view` |
+| `projects create` | `project:create` |
+| `projects update` | `project:update` |
+| `projects delete` | `project:delete` |
+| `api-keys list` | `organization:view` |
+| `api-keys create|revoke` | `organization:manage` |
 | `virtual-keys list|get` | `virtualKeys:view` |
 | `virtual-keys create` | `virtualKeys:create` |
 | `virtual-keys rotate` | `virtualKeys:rotate` |

@@ -1,7 +1,7 @@
 import chalk from "chalk";
 import ora from "ora";
 import { ProjectsApiService } from "@/client-sdk/services/projects/projects-api.service";
-import { checkOrgApiKey } from "../../utils/orgApiKey";
+import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 
 export interface UpdateProjectOptions {
@@ -16,7 +16,7 @@ export const updateProjectCommand = async (
   id: string,
   options: UpdateProjectOptions,
 ): Promise<void> => {
-  const apiKey = checkOrgApiKey();
+  checkApiKey();
 
   const noFieldsProvided =
     options.name === undefined &&
@@ -33,7 +33,7 @@ export const updateProjectCommand = async (
     process.exit(1);
   }
 
-  const service = new ProjectsApiService({ apiKey });
+  const service = new ProjectsApiService();
   const spinner = ora(`Updating project "${id}"...`).start();
 
   try {
