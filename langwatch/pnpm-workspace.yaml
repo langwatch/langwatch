@@ -41,6 +41,9 @@ overrides:
   "fast-xml-builder@<1.1.7": "1.1.7"
   # Security: fast-uri path traversal + host confusion (#1031-#1042)
   "fast-uri@<3.1.2": "3.1.2"
+  # Security: protobufjs code execution, DoS, code injection (CVE-2026-44289/44290/44291/44293)
+  "protobufjs@<7.5.6": "7.5.6"
+  "protobufjs@>=8.0.0 <8.0.2": "8.0.2"
 
 packageExtensions:
   bullmq-otel:
