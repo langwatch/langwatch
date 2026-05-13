@@ -1,8 +1,8 @@
 import { tool } from "ai";
 import { z } from "zod";
-import type { LangyToolContext } from "./types";
+import type { LangyConversationContext } from "./types";
 
-export function makeListDatasets(ctx: LangyToolContext) {
+export function makeListDatasets(ctx: LangyConversationContext) {
   return tool({
     description:
       "Lists the datasets in the caller's project with their column schema and row count.",
@@ -25,7 +25,7 @@ export function makeListDatasets(ctx: LangyToolContext) {
   });
 }
 
-export function makeGetDatasetDetails(ctx: LangyToolContext) {
+export function makeGetDatasetDetails(ctx: LangyConversationContext) {
   return tool({
     description:
       "Fetch a dataset's schema and a sample of its rows so you can understand its content before proposing additions or changes.",
@@ -63,7 +63,7 @@ export function makeGetDatasetDetails(ctx: LangyToolContext) {
   });
 }
 
-export function makeProposeCreateDataset(_ctx: LangyToolContext) {
+export function makeProposeCreateDataset(_ctx: LangyConversationContext) {
   return tool({
     description:
       "Propose creating a new dataset with a schema (column names + types) and optional seed rows you author inline. Use this before propose_add_dataset_rows if the dataset does not yet exist.",
@@ -111,7 +111,7 @@ export function makeProposeCreateDataset(_ctx: LangyToolContext) {
   });
 }
 
-export function makeProposeAddDatasetRows(ctx: LangyToolContext) {
+export function makeProposeAddDatasetRows(ctx: LangyConversationContext) {
   return tool({
     description:
       "Propose appending rows to an existing dataset. Each row is an object mapping column name to value. Values must be consistent with the dataset's column types (call get_dataset_details first to confirm).",

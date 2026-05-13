@@ -5,9 +5,9 @@ import {
   getEvaluatorDefaultSettings,
   getEvaluatorDefinitions,
 } from "~/server/evaluations/getEvaluator";
-import type { LangyToolContext } from "./types";
+import type { LangyConversationContext } from "./types";
 
-export function makeListEvaluators(ctx: LangyToolContext) {
+export function makeListEvaluators(ctx: LangyConversationContext) {
   return tool({
     description:
       "Lists evaluators available to the caller's project. Returns both the custom project evaluators and the built-in catalog. Use this before suggesting or explaining any evaluator.",
@@ -63,7 +63,7 @@ export function makeListEvaluators(ctx: LangyToolContext) {
   });
 }
 
-export function makeGetEvaluatorDetails(ctx: LangyToolContext) {
+export function makeGetEvaluatorDetails(ctx: LangyConversationContext) {
   return tool({
     description:
       "Fetches details for a single evaluator, either by project slug (for custom project evaluators) or by built-in type key (for catalog entries). Provide exactly one of `slug` or `evaluatorType`.",
@@ -135,7 +135,7 @@ export function makeGetEvaluatorDetails(ctx: LangyToolContext) {
   });
 }
 
-export function makeProposeCreateEvaluator(ctx: LangyToolContext) {
+export function makeProposeCreateEvaluator(ctx: LangyConversationContext) {
   return tool({
     description:
       "Propose creating a new evaluator in the project. The user will see a preview card and click Apply to commit. Use this when the user asks for a new evaluator that doesn't yet exist.",
@@ -208,7 +208,7 @@ export function makeProposeCreateEvaluator(ctx: LangyToolContext) {
   });
 }
 
-export function makeProposeUpdateEvaluator(ctx: LangyToolContext) {
+export function makeProposeUpdateEvaluator(ctx: LangyConversationContext) {
   return tool({
     description:
       "Propose updating an existing project evaluator's name or settings. Call get_evaluator_details first so you only override what you actually want to change. Settings are merged over the evaluator's current config.",
@@ -268,7 +268,7 @@ export function makeProposeUpdateEvaluator(ctx: LangyToolContext) {
   });
 }
 
-export function makeProposeDeleteEvaluator(ctx: LangyToolContext) {
+export function makeProposeDeleteEvaluator(ctx: LangyConversationContext) {
   return tool({
     description:
       "Propose archiving (soft-deleting) an existing project evaluator. This is a destructive action — only propose it when the user explicitly asks. Existing workbench references to this evaluator will break once archived.",
@@ -308,7 +308,7 @@ export function makeProposeDeleteEvaluator(ctx: LangyToolContext) {
   });
 }
 
-export function makeProposeAddEvaluatorToWorkbench(ctx: LangyToolContext) {
+export function makeProposeAddEvaluatorToWorkbench(ctx: LangyConversationContext) {
   return tool({
     description:
       "Propose adding an existing project evaluator as a column in the current experiment workbench. Only works for evaluators that already exist in the project (use propose_create_evaluator first if needed).",

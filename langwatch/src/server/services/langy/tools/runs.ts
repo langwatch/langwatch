@@ -1,8 +1,8 @@
 import { tool } from "ai";
 import { z } from "zod";
-import type { LangyToolContext } from "./types";
+import type { LangyConversationContext } from "./types";
 
-export function makeSearchPastRuns(ctx: LangyToolContext) {
+export function makeSearchPastRuns(ctx: LangyConversationContext) {
   return tool({
     description:
       "Search past evaluation runs (BatchEvaluation) for this project, optionally filtered by experiment slug, ordered by recency.",

@@ -1,8 +1,8 @@
 import { tool } from "ai";
 import { z } from "zod";
-import type { LangyToolContext } from "./types";
+import type { LangyConversationContext } from "./types";
 
-export function makeListPrompts(ctx: LangyToolContext) {
+export function makeListPrompts(ctx: LangyConversationContext) {
   return tool({
     description:
       "Lists the prompts defined in the caller's project. Returns handle, name, model, and a short preview.",
@@ -29,7 +29,7 @@ export function makeListPrompts(ctx: LangyToolContext) {
   });
 }
 
-export function makeGetPromptDetails(ctx: LangyToolContext) {
+export function makeGetPromptDetails(ctx: LangyConversationContext) {
   return tool({
     description:
       "Fetch the full config for a single prompt by handle or id: model, temperature, maxTokens, message templates, and declared inputs/outputs.",
@@ -63,7 +63,7 @@ export function makeGetPromptDetails(ctx: LangyToolContext) {
   });
 }
 
-export function makeSearchPrompts(ctx: LangyToolContext) {
+export function makeSearchPrompts(ctx: LangyConversationContext) {
   return tool({
     description:
       "Search prompts in this project by handle/name keyword. Use when looking for an existing prompt to reference or update.",
@@ -92,7 +92,7 @@ export function makeSearchPrompts(ctx: LangyToolContext) {
   });
 }
 
-export function makeProposeCreatePrompt(_ctx: LangyToolContext) {
+export function makeProposeCreatePrompt(_ctx: LangyConversationContext) {
   return tool({
     description:
       "Propose creating a new prompt in the project. Returns a card the user approves to commit. The handle must be unique within the project; use kebab-case or snake_case.",
@@ -152,7 +152,7 @@ export function makeProposeCreatePrompt(_ctx: LangyToolContext) {
   });
 }
 
-export function makeProposeUpdatePrompt(ctx: LangyToolContext) {
+export function makeProposeUpdatePrompt(ctx: LangyConversationContext) {
   return tool({
     description:
       "Propose updating an existing prompt by creating a new version. A commitMessage is required. Call get_prompt_details first so you only send fields you actually want to change.",

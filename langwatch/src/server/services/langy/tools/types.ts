@@ -17,7 +17,7 @@ import type { ProjectService } from "~/server/app-layer/projects/project.service
 import type { PromptService } from "~/server/prompt-config/prompt.service";
 import type { ConversationToolIdSet } from "../toolIdValidator";
 
-export interface LangyToolContext {
+export interface LangyConversationContext {
   projectId: string;
   experimentSlug?: string;
   batchEvaluationService: BatchEvaluationService;

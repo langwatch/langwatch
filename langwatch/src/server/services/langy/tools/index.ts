@@ -2,7 +2,7 @@
  * Langy tool registry — per-tool factories assembled into the map the
  * runtime (currently Vercel AI SDK, Mastra in Phase 4.3+) consumes.
  *
- * Each `make<Tool>(ctx)` reads from `LangyToolContext` instead of free
+ * Each `make<Tool>(ctx)` reads from `LangyConversationContext` instead of free
  * variables, so the same definitions can be threaded through either
  * runtime without changes.
  */
@@ -34,11 +34,11 @@ import {
 } from "./workbench";
 import { makeSearchTraces } from "./traces";
 import { makeSearchPastRuns } from "./runs";
-import type { LangyToolContext } from "./types";
+import type { LangyConversationContext } from "./types";
 
-export type { LangyToolContext } from "./types";
+export type { LangyConversationContext } from "./types";
 
-export function buildLangyTools(ctx: LangyToolContext) {
+export function buildLangyTools(ctx: LangyConversationContext) {
   return {
     list_evaluators: makeListEvaluators(ctx),
     get_evaluator_details: makeGetEvaluatorDetails(ctx),

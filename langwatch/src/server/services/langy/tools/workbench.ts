@@ -2,7 +2,7 @@ import { tool } from "ai";
 import { z } from "zod";
 import { persistedEvaluationsV3StateSchema } from "~/evaluations-v3/types/persistence";
 import { parseEvaluationResult } from "~/utils/evaluationResults";
-import type { LangyToolContext } from "./types";
+import type { LangyConversationContext } from "./types";
 
 type ParsedState = ReturnType<typeof persistedEvaluationsV3StateSchema.parse>;
 
@@ -196,7 +196,7 @@ function extractRowInputs(
   return undefined;
 }
 
-export function makeGetWorkbenchState(ctx: LangyToolContext) {
+export function makeGetWorkbenchState(ctx: LangyConversationContext) {
   return tool({
     description:
       "Inspect the current experiment workbench: what datasets, targets, and evaluators are configured, plus summary statistics from the last run (pass/fail/error counts per target). Call this before answering any question about the current experiment's setup or results.",
@@ -238,7 +238,7 @@ export function makeGetWorkbenchState(ctx: LangyToolContext) {
   });
 }
 
-export function makeFindFailingRows(ctx: LangyToolContext) {
+export function makeFindFailingRows(ctx: LangyConversationContext) {
   return tool({
     description:
       "Return rows from the current workbench where an evaluator reported a failed or error status. Use this to investigate why an experiment is underperforming. Returns at most `limit` rows with their input values and which evaluators flagged them.",
@@ -305,7 +305,7 @@ export function makeFindFailingRows(ctx: LangyToolContext) {
   });
 }
 
-export function makeProposeRunWorkbench(_ctx: LangyToolContext) {
+export function makeProposeRunWorkbench(_ctx: LangyConversationContext) {
   return tool({
     description:
       "Propose running the current experiment (kicks off all target × evaluator cells). Returns a proposal card the user clicks Apply to execute. Use this when the user asks to 'run', 'evaluate', 'execute', or 'kick off' the experiment.",

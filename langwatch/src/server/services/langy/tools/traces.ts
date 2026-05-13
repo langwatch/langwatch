@@ -2,11 +2,11 @@ import { tool } from "ai";
 import { z } from "zod";
 import { esClient, TRACE_INDEX } from "~/server/elasticsearch";
 import { createLogger } from "~/utils/logger/server";
-import type { LangyToolContext } from "./types";
+import type { LangyConversationContext } from "./types";
 
 const logger = createLogger("langwatch:langy:tools:traces");
 
-export function makeSearchTraces(ctx: LangyToolContext) {
+export function makeSearchTraces(ctx: LangyConversationContext) {
   return tool({
     description:
       "Keyword search over recent traces in this project (BM25 over input/output text and error messages — not semantic). Use when the user asks to 'find traces' with specific words or phrases in them ('error', 'timeout', a particular customer name). Returns a small list of trace ids with brief context. Tool result is per-turn only — do not persist or recall ids across conversations.",
