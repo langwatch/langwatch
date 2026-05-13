@@ -7,19 +7,14 @@ import {
 } from "../api/routers/modelProviders.utils";
 import { prisma } from "../db";
 import { nlpgoProxyBaseURL } from "../nlpgo/nlpgoFetch";
-import { ProjectRepository } from "../repositories/project.repository";
 import type { MaybeStoredModelProvider } from "./registry";
 
-const defaultProjectRepository = ProjectRepository.create(prisma);
+export const getVercelAIModel = async (projectId: string, model?: string) => {
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+  });
 
-export const getVercelAIModel = async (
-  projectId: string,
-  model?: string,
-  projectRepository: ProjectRepository = defaultProjectRepository,
-) => {
-  const projectConfig = await projectRepository.getProjectConfig(projectId);
-
-  if (!projectConfig) {
+  if (!project) {
     throw new Error("Project not found");
   }
 
@@ -27,7 +22,7 @@ export const getVercelAIModel = async (
 
   const model_ = resolveModel({
     explicit: model,
-    projectDefault: projectConfig.defaultModel,
+    projectDefault: project.defaultModel,
     fallback: DEFAULT_MODEL,
     modelProviders,
   });
