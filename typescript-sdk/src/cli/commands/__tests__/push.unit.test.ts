@@ -1,8 +1,15 @@
-import * as fs from "fs";
 import * as yaml from "js-yaml";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { PromptsConfig, PromptsLock, SyncResult } from "../../types";
 import type { PromptsApiService } from "@/client-sdk/services/prompts";
+
+const { mockWriteFileSync } = vi.hoisted(() => ({
+  mockWriteFileSync: vi.fn(),
+}));
+vi.mock("fs", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("fs")>();
+  return { ...actual, writeFileSync: mockWriteFileSync };
+});
 
 // Mock FileManager before importing push
 vi.mock("../../utils/fileManager", () => ({
@@ -340,7 +347,7 @@ describe("pushPrompts", () => {
       );
     });
 
-    it.skip("writes remote config when resolving a conflict with remote", async () => {
+    it("writes remote config when resolving a conflict with remote", async () => {
       /**
        * @scenario Syncing a local prompt detects runtime config conflicts
        */
