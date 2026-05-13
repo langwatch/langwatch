@@ -134,11 +134,11 @@ export const experimentListRunsCommand = async (
     console.log();
     console.log(
       chalk.gray(
-        `Use ${chalk.cyan("langwatch evaluation status <runId>")} or ${chalk.cyan("langwatch evaluation results <runId>")} to drill into a run.`,
+        `Use ${chalk.cyan("langwatch experiment status <runId>")} or ${chalk.cyan("langwatch experiment results <runId>")} to drill into a run.`,
       ),
     );
   } catch (error) {
-    failSpinner({ spinner, error, action: "list evaluation runs" });
+    failSpinner({ spinner, error, action: "list experiment runs" });
     process.exit(1);
   }
 };

@@ -11,13 +11,13 @@ export const runExperimentCommand = async (
   checkApiKey();
 
   const service = new ExperimentsApiService();
-  const spinner = ora(`Starting evaluation "${slug}"...`).start();
+  const spinner = ora(`Starting experiment "${slug}"...`).start();
 
   try {
     const runResult = await service.startRun(slug);
 
     spinner.succeed(
-      `Evaluation started! Run ID: ${chalk.cyan(runResult.runId)} (${runResult.total} cells)`,
+      `Experiment started! Run ID: ${chalk.cyan(runResult.runId)} (${runResult.total} cells)`,
     );
 
     if (runResult.runUrl) {
@@ -37,7 +37,7 @@ export const runExperimentCommand = async (
 
       if (status.status === "completed") {
         pollSpinner.succeed(
-          `Evaluation completed! ${status.progress}/${status.total} cells`,
+          `Experiment completed! ${status.progress}/${status.total} cells`,
         );
 
         if (options.format === "json") {
@@ -60,17 +60,17 @@ export const runExperimentCommand = async (
         }
       } else if (status.status === "failed") {
         pollSpinner.fail(
-          `Evaluation failed after ${status.progress}/${status.total} cells`,
+          `Experiment failed after ${status.progress}/${status.total} cells`,
         );
         process.exit(1);
       } else {
-        pollSpinner.warn(`Evaluation ${status.status}`);
+        pollSpinner.warn(`Experiment ${status.status}`);
       }
     } else if (options.format === "json") {
       console.log(JSON.stringify(runResult, null, 2));
     }
   } catch (error) {
-    failSpinner({ spinner, error, action: "run evaluation" });
+    failSpinner({ spinner, error, action: "run experiment" });
     process.exit(1);
   }
 };

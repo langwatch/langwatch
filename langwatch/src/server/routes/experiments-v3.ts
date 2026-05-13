@@ -145,7 +145,7 @@ app.post("/execute", zValidator("json", executionRequestSchema), async (c) => {
 
   logger.info(
     { projectId, scope: request.scope },
-    "Starting evaluation execution",
+    "Starting experiment execution",
   );
 
   const session = await getServerAuthSession({ req: c.req.raw as any });
@@ -327,7 +327,7 @@ app.post("/:slug/run", async (c) => {
   });
 
   if (!experiment) {
-    return c.json({ error: "Evaluation not found" }, { status: 404 });
+    return c.json({ error: "Experiment not found" }, { status: 404 });
   }
 
   const parseResult = persistedEvaluationsV3StateSchema.safeParse(
@@ -338,7 +338,7 @@ app.post("/:slug/run", async (c) => {
       { slug, errors: parseResult.error.errors },
       "Invalid workbenchState",
     );
-    return c.json({ error: "Invalid evaluation configuration" }, { status: 400 });
+    return c.json({ error: "Invalid experiment configuration" }, { status: 400 });
   }
 
   const workbenchState = parseResult.data;
@@ -376,7 +376,7 @@ app.post("/:slug/run", async (c) => {
 
   logger.info(
     { projectId: project.id, slug, isSSE, rowCount: datasetRows.length },
-    "Starting CI/CD evaluation execution",
+    "Starting CI/CD experiment execution",
   );
 
   const totalCells = datasetRows.length * workbenchState.targets.length;

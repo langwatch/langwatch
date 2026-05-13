@@ -81,7 +81,7 @@ export const experimentListCommand = async (
     console.log();
     console.log(
       chalk.gray(
-        `Use ${chalk.cyan("langwatch evaluation list-runs --experiment <slug>")} to see runs for an experiment.`,
+        `Use ${chalk.cyan("langwatch experiment list-runs --experiment <slug>")} to see runs for an experiment.`,
       ),
     );
   } catch (error) {

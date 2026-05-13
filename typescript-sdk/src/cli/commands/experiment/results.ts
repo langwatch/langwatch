@@ -10,10 +10,10 @@ import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import { formatTable } from "../../utils/formatting";
 
-export type EvaluationResultsFilter = "failed" | "all";
-export type EvaluationResultsFormat = "table" | "json";
+export type ExperimentResultsFilter = "failed" | "all";
+export type ExperimentResultsFormat = "table" | "json";
 
-export interface EvaluationResultsOptions {
+export interface ExperimentResultsOptions {
   filter?: string;
   evaluator?: string;
   format?: string;
@@ -66,13 +66,13 @@ export const experimentResultsCommand = async ({
   options = {},
 }: {
   runId: string;
-  options?: EvaluationResultsOptions;
+  options?: ExperimentResultsOptions;
 }): Promise<void> => {
   checkApiKey();
 
-  const filter: EvaluationResultsFilter =
+  const filter: ExperimentResultsFilter =
     options.filter === "failed" ? "failed" : "all";
-  const format: EvaluationResultsFormat =
+  const format: ExperimentResultsFormat =
     options.format === "json" ? "json" : "table";
   const limit = (() => {
     const parsed = options.limit ? parseInt(options.limit, 10) : DEFAULT_LIMIT;
@@ -206,7 +206,7 @@ export const experimentResultsCommand = async ({
       );
     }
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch evaluation results" });
+    failSpinner({ spinner, error, action: "fetch experiment results" });
     process.exit(1);
   }
 };
