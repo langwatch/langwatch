@@ -196,6 +196,11 @@ Feature: Langy in-product AI assistant — baseline (v1)
     When Langy receives the tool result
     Then the model receives a "tool_output_invalid" error envelope instead of the raw payload
 
+  Scenario: evaluator tools output is shape-validated before the model sees it
+    Given an evaluator tool (list, get details, propose create, propose update, propose delete, propose add to workbench) returns a payload that does not match its declared shape
+    When Langy receives the tool result
+    Then the model receives a "tool_output_invalid" error envelope instead of the raw payload
+
   # ============================================================================
   # Read-only boundary (v1)
   # ============================================================================
