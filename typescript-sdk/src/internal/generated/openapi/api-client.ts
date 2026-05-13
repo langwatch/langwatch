@@ -8508,6 +8508,9 @@ export interface operations {
                             } | null;
                         };
                     };
+                    config?: {
+                        [key: string]: unknown;
+                    };
                     localVersion?: number;
                     commitMessage?: string;
                 };
@@ -8700,6 +8703,9 @@ export interface operations {
                                         };
                                     } | null;
                                 };
+                            };
+                            remoteConfig?: {
+                                [key: string]: unknown;
                             };
                         };
                     };

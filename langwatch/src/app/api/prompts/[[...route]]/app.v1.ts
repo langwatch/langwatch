@@ -789,6 +789,7 @@ const assignTagResponseSchema = z.object({
                     differences: z.array(z.string()),
                     remoteConfigData:
                       getLatestConfigVersionSchema().shape.configData,
+                    remoteConfig: z.record(z.string(), z.unknown()).optional(),
                   })
                   .optional(),
               }),
@@ -802,6 +803,7 @@ const assignTagResponseSchema = z.object({
     "json",
     z.object({
       configData: getLatestConfigVersionSchema().shape.configData,
+      config: z.record(z.string(), z.unknown()).optional(),
       localVersion: versionSchema.optional(),
       commitMessage: commitMessageSchema.optional(),
     }),
@@ -826,6 +828,7 @@ const assignTagResponseSchema = z.object({
         projectId: project.id,
         organizationId: organization.id,
         commitMessage: data.commitMessage,
+        config: data.config,
       });
 
       const response: any = {

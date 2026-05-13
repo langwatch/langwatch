@@ -14,7 +14,6 @@ import {
 import type {
   PromptsConfig,
   PromptsLock,
-  RuntimeConfig,
   SyncResult,
 } from "../types";
 import { FileManager } from "../utils/fileManager";
@@ -185,10 +184,7 @@ export const pushPrompts = async ({
                 },
                 ...(syncResult.conflictInfo.remoteConfigData.messages ?? []),
               ],
-              config:
-                (syncResult.conflictInfo.remoteConfigData as {
-                  config?: RuntimeConfig;
-                }).config ?? {},
+              config: syncResult.conflictInfo.remoteConfig ?? {},
             };
 
             const yamlContent = yaml.dump(remoteConfig, {

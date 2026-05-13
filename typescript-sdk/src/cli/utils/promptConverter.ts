@@ -37,7 +37,7 @@ export class PromptConverter {
       maxTokens: prompt.maxTokens,
       inputs: prompt.inputs,
       outputs: prompt.outputs,
-      config: (prompt as PromptResponse & { config?: RuntimeConfig }).config ?? {},
+      config: prompt.config ?? {},
       updatedAt: prompt.updatedAt,
     };
   }

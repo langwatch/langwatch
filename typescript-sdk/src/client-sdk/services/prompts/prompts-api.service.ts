@@ -55,7 +55,8 @@ export interface SyncResult {
     localVersion: number;
     remoteVersion: number;
     differences: string[];
-    remoteConfigData: ConfigData & { config?: RuntimeConfig };
+    remoteConfigData: ConfigData;
+    remoteConfig?: RuntimeConfig;
   };
 }
 
@@ -397,9 +398,7 @@ export class PromptsApiService {
             config: params.config ?? {},
             localVersion: params.localVersion,
             commitMessage: params.commitMessage,
-          } as NonNullable<
-            paths["/api/prompts/{id}/sync"]["post"]["requestBody"]
-          >["content"]["application/json"] & { config?: RuntimeConfig },
+          },
         },
       );
     } catch (error) {
