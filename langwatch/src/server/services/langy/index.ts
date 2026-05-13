@@ -20,3 +20,10 @@ export {
   LangyUserPreferencesRepository,
 } from "./LangyUserPreferencesService";
 export type { LangyMode } from "./LangyUserPreferencesService";
+export {
+  SUGGESTION_MARKER,
+  langySuggestionActionSchema,
+  langySuggestionSchema,
+  isLangySuggestion,
+} from "./suggestion";
+export type { LangySuggestion, LangySuggestionAction } from "./suggestion";

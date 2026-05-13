@@ -47,6 +47,11 @@ import {
 } from "./useLangyConversations";
 import { useLangy } from "./LangyContext";
 import { parseLangyErrorMessage } from "./parseLangyErrorMessage";
+import { SuggestionChip } from "./SuggestionChip";
+import {
+  isLangySuggestion,
+  type LangySuggestion,
+} from "~/server/services/langy/suggestion";
 
 const PANEL_WIDTH = 380;
 // The panel docks flush against the right edge of the viewport. Page
@@ -486,6 +491,16 @@ function LangyPanel({
   const [applyingProposals, setApplyingProposals] = useState<Set<string>>(
     new Set(),
   );
+  // Suggestion-chip state. Two layers:
+  // - dismissedSuggestionKinds: server-persisted "don't show this kind again"
+  //   list. Loaded from /api/langy/preferences when the panel opens.
+  // - sessionDismissedSuggestions: per-id in-session dismissals from clicking
+  //   "Dismiss" on a specific chip. Not persisted.
+  const [dismissedSuggestionKinds, setDismissedSuggestionKinds] = useState<
+    Set<string>
+  >(new Set());
+  const [sessionDismissedSuggestions, setSessionDismissedSuggestions] =
+    useState<Set<string>>(new Set());
   // L4 staleness signal: server flags memory older than 30 days; sidebar
   // surfaces a dismissible banner so users see it without visiting Settings.
   const [memoryIsStale, setMemoryIsStale] = useState(false);
@@ -566,6 +581,31 @@ function LangyPanel({
         if (!cancelled) setMemoryIsStale(Boolean(data.isStale));
       } catch {
         // staleness signal is non-critical; ignore network errors
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, projectId]);
+
+  useEffect(() => {
+    if (!isOpen || !projectId) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(
+          `/api/langy/preferences?projectId=${encodeURIComponent(projectId)}`,
+        );
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          preferences?: { dismissedSuggestionKinds?: string[] };
+        };
+        if (cancelled) return;
+        setDismissedSuggestionKinds(
+          new Set(data.preferences?.dismissedSuggestionKinds ?? []),
+        );
+      } catch {
+        // suggestion-dismissal preferences are non-critical; ignore errors
       }
     })();
     return () => {
@@ -661,6 +701,64 @@ function LangyPanel({
 
   const discardProposal = (proposalId: string) => {
     setDiscardedProposals((prev) => new Set(prev).add(proposalId));
+  };
+
+  const actOnSuggestion = (suggestion: LangySuggestion) => {
+    const action = suggestion.action;
+    if (action.type === "open_proposal") {
+      const target = document.querySelector(
+        `[data-langy-proposal-id="${CSS.escape(action.proposalId)}"]`,
+      );
+      if (target instanceof HTMLElement) {
+        target.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+      return;
+    }
+    if (action.type === "open_url") {
+      window.location.href = action.href;
+      return;
+    }
+    if (action.type === "ask_followup") {
+      void send(action.prompt);
+    }
+  };
+
+  const dismissSuggestion = (suggestionId: string) => {
+    setSessionDismissedSuggestions((prev) => new Set(prev).add(suggestionId));
+  };
+
+  const dontShowSuggestionAgain = async ({
+    suggestionId,
+    kind,
+  }: {
+    suggestionId: string;
+    kind: string;
+  }) => {
+    setSessionDismissedSuggestions((prev) => new Set(prev).add(suggestionId));
+    setDismissedSuggestionKinds((prev) => new Set(prev).add(kind));
+    if (!projectId) return;
+    const nextKinds = Array.from(
+      new Set([...Array.from(dismissedSuggestionKinds), kind]),
+    );
+    try {
+      const res = await fetch("/api/langy/preferences", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId,
+          dismissedSuggestionKinds: nextKinds,
+        }),
+      });
+      if (!res.ok) throw new Error(`Failed: ${res.status}`);
+    } catch {
+      toaster.create({
+        title: "Couldn't save preference",
+        description: "We'll keep this kind hidden for now and retry later.",
+        type: "error",
+        duration: 4000,
+        meta: { closable: true },
+      });
+    }
   };
 
   const subtitle = experimentSlug
@@ -761,6 +859,11 @@ function LangyPanel({
                   applyingProposals={applyingProposals}
                   onApply={applyProposal}
                   onDiscard={discardProposal}
+                  dismissedSuggestionKinds={dismissedSuggestionKinds}
+                  sessionDismissedSuggestions={sessionDismissedSuggestions}
+                  onActOnSuggestion={actOnSuggestion}
+                  onDismissSuggestion={dismissSuggestion}
+                  onDontShowSuggestionAgain={dontShowSuggestionAgain}
                 />
               ))}
               {isBusy && <ThinkingIndicator messages={messages} />}
@@ -1215,6 +1318,11 @@ function MessageContent({
   applyingProposals,
   onApply,
   onDiscard,
+  dismissedSuggestionKinds,
+  sessionDismissedSuggestions,
+  onActOnSuggestion,
+  onDismissSuggestion,
+  onDontShowSuggestionAgain,
 }: {
   message: UIMessage;
   appliedOutcomes: Record<
@@ -1225,6 +1333,14 @@ function MessageContent({
   applyingProposals: Set<string>;
   onApply: (proposalId: string, proposal: LangyProposal) => Promise<void>;
   onDiscard: (proposalId: string) => void;
+  dismissedSuggestionKinds: Set<string>;
+  sessionDismissedSuggestions: Set<string>;
+  onActOnSuggestion: (suggestion: LangySuggestion) => void;
+  onDismissSuggestion: (suggestionId: string) => void;
+  onDontShowSuggestionAgain: (args: {
+    suggestionId: string;
+    kind: string;
+  }) => Promise<void>;
 }) {
   const isUser = message.role === "user";
   const text = message.parts
@@ -1235,7 +1351,12 @@ function MessageContent({
     .join("");
 
   const proposals = extractProposals(message);
-  if (!text && proposals.length === 0) return null;
+  const suggestion = extractSuggestion(message);
+  const showSuggestion =
+    suggestion !== null &&
+    !dismissedSuggestionKinds.has(suggestion.suggestion.kind) &&
+    !sessionDismissedSuggestions.has(suggestion.id);
+  if (!text && proposals.length === 0 && !showSuggestion) return null;
 
   if (isUser) {
     return (
@@ -1286,6 +1407,7 @@ function MessageContent({
         {proposals.map(({ id, proposal }) => (
           <ProposalCard
             key={id}
+            proposalId={id}
             proposal={proposal}
             appliedOutcome={appliedOutcomes[id]}
             isDiscarded={discardedProposals.has(id)}
@@ -1294,12 +1416,26 @@ function MessageContent({
             onDiscard={() => onDiscard(id)}
           />
         ))}
+        {showSuggestion && suggestion && (
+          <SuggestionChip
+            suggestion={suggestion.suggestion}
+            onAct={() => onActOnSuggestion(suggestion.suggestion)}
+            onDismiss={() => onDismissSuggestion(suggestion.id)}
+            onDontShowAgain={() =>
+              void onDontShowSuggestionAgain({
+                suggestionId: suggestion.id,
+                kind: suggestion.suggestion.kind,
+              })
+            }
+          />
+        )}
       </VStack>
     </HStack>
   );
 }
 
 export function ProposalCard({
+  proposalId,
   proposal,
   appliedOutcome,
   isDiscarded,
@@ -1307,6 +1443,7 @@ export function ProposalCard({
   onApply,
   onDiscard,
 }: {
+  proposalId?: string;
   proposal: LangyProposal;
   appliedOutcome?: { href?: string; label?: string; onOpen?: () => void };
   isDiscarded: boolean;
@@ -1356,6 +1493,7 @@ export function ProposalCard({
 
   return (
     <Box
+      data-langy-proposal-id={proposalId}
       borderWidth="1px"
       borderColor="border.muted"
       borderRadius="md"
@@ -1527,4 +1665,22 @@ function isLangyProposal(value: unknown): value is LangyProposal {
     typeof v.kind === "string" &&
     typeof v.summary === "string"
   );
+}
+
+function extractSuggestion(
+  message: UIMessage,
+): { id: string; suggestion: LangySuggestion } | null {
+  let index = 0;
+  for (const part of message.parts) {
+    if (!part.type?.startsWith("tool-")) continue;
+    const output = (part as { output?: unknown }).output;
+    if (!isLangySuggestion(output)) {
+      index++;
+      continue;
+    }
+    const id =
+      (part as { toolCallId?: string }).toolCallId ?? `${message.id}:s${index}`;
+    return { id, suggestion: output };
+  }
+  return null;
 }

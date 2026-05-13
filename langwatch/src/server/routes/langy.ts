@@ -41,6 +41,7 @@ import {
   LANGY_EXPERT_MODE_SUFFIX,
   LANGY_NON_EXPERT_MODE_SUFFIX,
   LANGY_SYSTEM_PROMPT,
+  buildLangySuggestionInstructions,
 } from "~/server/services/langy/prompts";
 import { ConversationToolIdSet } from "~/server/services/langy/toolIdValidator";
 import { buildLangyTools } from "~/server/services/langy/tools";
@@ -64,12 +65,16 @@ const LANGY_FALLBACK_MODEL = "openai/gpt-5-mini";
 function buildSystemPrompt(opts: {
   projectMemory: string | null;
   mode: LangyMode;
+  suggestionInstructions?: string;
 }): string {
   const segments = [LANGY_SYSTEM_PROMPT];
   if (opts.mode === "expert") {
     segments.push(LANGY_EXPERT_MODE_SUFFIX);
   } else {
     segments.push(LANGY_NON_EXPERT_MODE_SUFFIX);
+  }
+  if (opts.suggestionInstructions) {
+    segments.push(opts.suggestionInstructions);
   }
   if (opts.projectMemory) {
     segments.push(
@@ -323,6 +328,27 @@ app.post("/langy/chat", async (c) => {
   const promptService = new PromptService(prisma);
   const seenIds = new ConversationToolIdSet();
 
+  // Phase 4 spike (PR-4.3): route a small slice of traffic through Mastra.
+  // Default-off; flip via PostHog or FEATURE_FLAG_FORCE_ENABLE. The legacy
+  // streamText path below stays the production default until PR-4.5 cutover.
+  const useMastra = await featureFlagService.isEnabled(
+    "release_ui_langy_mastra_enabled",
+    session.user.id,
+    false,
+    { projectId },
+  );
+
+  // Phase-5 producer (PR-5.1) is Mastra-only — the chip-emitting tool and
+  // the system-prompt instructions are both gated behind `useMastra` so the
+  // legacy path stays unchanged until cutover.
+  const suggestionsEnabled = useMastra;
+  const suggestionEmissionTracker = suggestionsEnabled
+    ? { count: 0 }
+    : undefined;
+  const dismissedSuggestionKinds = suggestionsEnabled
+    ? prefs.dismissedSuggestionKinds
+    : [];
+
   const toolCtx = {
     projectId,
     experimentSlug,
@@ -333,6 +359,9 @@ app.post("/langy/chat", async (c) => {
     projectService,
     promptService,
     seenIds,
+    suggestionsEnabled,
+    suggestionEmissionTracker,
+    dismissedSuggestionKinds,
   };
 
   const tools = buildLangyTools(toolCtx);
@@ -340,18 +369,13 @@ app.post("/langy/chat", async (c) => {
   const systemPrompt = buildSystemPrompt({
     projectMemory,
     mode: prefs.mode as LangyMode,
+    suggestionInstructions: suggestionsEnabled
+      ? buildLangySuggestionInstructions({
+          dismissedKinds: dismissedSuggestionKinds,
+        })
+      : undefined,
   });
   const modelMessages = await convertToModelMessages(messages);
-
-  // Phase 4 spike (PR-4.3): route a small slice of traffic through Mastra.
-  // Default-off; flip via PostHog or FEATURE_FLAG_FORCE_ENABLE. The legacy
-  // streamText path below stays the production default until PR-4.5 cutover.
-  const useMastra = await featureFlagService.isEnabled(
-    "release_ui_langy_mastra_enabled",
-    session.user.id,
-    false,
-    { projectId },
-  );
   // Phase 4 safety note: the Mastra path now uses Mastra's Memory primitive
   // (PR-4.4b — `LangyMastraMemory` adapter is the sole writer of assistant
   // + tool + user turns on this branch; the legacy `onFinish` hook is NOT
