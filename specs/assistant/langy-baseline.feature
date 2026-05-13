@@ -164,6 +164,13 @@ Feature: Langy in-product AI assistant — baseline (v1)
     When Langy proposes updating that evaluator
     Then the proposal is accepted and presented to me as a card
 
+  Scenario: Malformed tool output never reaches the model raw
+    Given a Langy tool returns data that does not match its declared schema
+    When the tool result is sent back to the model
+    Then the model receives a "tool_output_invalid" error envelope
+    And the envelope does not include raw stack traces
+    And the failure is logged for telemetry with the tool name
+
   # ============================================================================
   # Read-only boundary (v1)
   # ============================================================================
