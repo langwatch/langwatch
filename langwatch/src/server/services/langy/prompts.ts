@@ -51,6 +51,42 @@ export const LANGY_SYSTEM_PROMPT = `You are Langy, the in-product AI assistant f
 - If the user wants to choose a model, ask them which and then pass it in settings.model when proposing.
 - Mention the chosen model briefly in your reply so the user can catch it before applying.`;
 
+/**
+ * Producer half of Phase 5: instructs the agent to (optionally) emit one
+ * post-turn suggestion chip via the `propose_suggestion` tool. The renderer
+ * lives in `src/components/langy/SuggestionChip.tsx` (PR-5.2).
+ *
+ * Only injected on the Mastra path — the legacy AI-SDK path stays unchanged
+ * until the cutover lands. Parameterized by the user's saved
+ * `dismissedSuggestionKinds` so the agent knows which kinds to skip.
+ */
+export function buildLangySuggestionInstructions({
+  dismissedKinds,
+}: {
+  dismissedKinds: string[];
+}): string {
+  const hiddenList =
+    dismissedKinds.length === 0
+      ? "(none)"
+      : dismissedKinds.map((k) => `\`${k}\``).join(", ");
+  return `
+## Post-turn suggestions
+You MAY end a turn with at most one call to \`propose_suggestion\` — a small chip rendered below your answer with a single follow-up action.
+
+Hard rules:
+- AT MOST ONE \`propose_suggestion\` call per turn. Calling it twice in the same turn is a bug.
+- Call it LAST, after the answer is otherwise complete. Not as the first move.
+- Do NOT suggest when: the previous turn applied a proposal; the user is troubleshooting an error or stack trace; the user has asked you to stop suggesting.
+- Do NOT suggest a kind the user has hidden. Hidden kinds: ${hiddenList}.
+- The \`action\` must be concrete:
+  - \`open_proposal\` → reference a proposal ID you proposed in THIS turn.
+  - \`open_url\` → a path within this project.
+  - \`ask_followup\` → a question you would want the user to ask back.
+- \`label\` and \`rationale\` are each ONE short line. The chip is subtle — it's a nudge, not a card.
+
+Only suggest when there's a genuinely useful next step. If in doubt, skip it.`;
+}
+
 export const LANGY_EXPERT_MODE_SUFFIX = `
 ## Mode: expert
 - Be terse. Drop confirmations the user did not ask for. Skip restating the question. Use jargon freely.`;

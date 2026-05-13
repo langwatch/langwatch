@@ -34,12 +34,13 @@ import {
 } from "./workbench";
 import { makeSearchTraces } from "./traces";
 import { makeSearchPastRuns } from "./runs";
+import { makeProposeSuggestion } from "./suggestions";
 import type { LangyConversationContext } from "./types";
 
 export type { LangyConversationContext } from "./types";
 
 export function buildLangyTools(ctx: LangyConversationContext) {
-  return {
+  const base = {
     list_evaluators: makeListEvaluators(ctx),
     get_evaluator_details: makeGetEvaluatorDetails(ctx),
     list_prompts: makeListPrompts(ctx),
@@ -61,4 +62,6 @@ export function buildLangyTools(ctx: LangyConversationContext) {
     search_prompts: makeSearchPrompts(ctx),
     search_past_runs: makeSearchPastRuns(ctx),
   };
+  if (!ctx.suggestionsEnabled) return base;
+  return { ...base, propose_suggestion: makeProposeSuggestion(ctx) };
 }
