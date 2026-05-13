@@ -7,7 +7,6 @@ import {
   messageSchema,
   modelNameSchema,
   outputsSchema,
-  runtimeConfigSchema,
   schemaVersionSchema,
   scopeSchema,
 } from "~/prompts/schemas/field-schemas";
@@ -38,7 +37,7 @@ export const createPromptInputSchema = z.strictObject({
   schemaVersion: schemaVersionSchema.optional(),
   /** Tags to assign to the initial version (e.g. ["production", "staging", "canary"]) */
   tags: z.array(z.string().min(1)).optional(),
-  config: runtimeConfigSchema.optional(),
+  config: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const updatePromptInputSchema = createPromptInputSchema

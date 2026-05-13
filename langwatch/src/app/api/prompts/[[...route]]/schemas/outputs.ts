@@ -1,7 +1,6 @@
 import { PromptScope } from "@prisma/client";
 import { z } from "zod";
 
-import { runtimeConfigSchema } from "~/prompts/schemas/field-schemas";
 import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
 
 const configDataSchema = getLatestConfigVersionSchema().shape.configData;
@@ -54,7 +53,7 @@ const apiResponseVersionOutputSchema = z.object({
   promptingTechnique: configDataSchema.shape.prompting_technique,
   responseFormat: configDataSchema.shape.response_format,
   tags: z.array(apiResponsePromptTagSchema).default([]),
-  config: runtimeConfigSchema,
+  config: z.record(z.string(), z.unknown()).default({}),
 });
 
 /**
