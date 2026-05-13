@@ -52,7 +52,10 @@ const DEFAULT_TEST_ROOTS: string[] = [
  * token, expressed as a hash-comment directly above an `@test "..." {`
  * line.
  */
-const DEFAULT_BATS_TEST_ROOTS: string[] = ["scripts/__tests__"];
+const DEFAULT_BATS_TEST_ROOTS: string[] = [
+  "scripts/__tests__",
+  "langwatch/scripts/__tests__",
+];
 
 /**
  * Feature files whose unbound `@unit` / `@integration` scenarios are
@@ -283,8 +286,11 @@ function collectAllBindings(testRoots: string[]): CollectedBinding[] {
  * to mirror bats' own tolerance). Bare-word titles aren't supported here
  * because bash line-comments make it ambiguous where the title ends.
  */
+// CRLF tolerance: `\r` is included in the trailing-whitespace class so files
+// committed with Windows line endings still match. The capture groups also
+// exclude `\r` so the title doesn't pick up a trailing CR.
 const BATS_ANNOTATION_RE =
-  /^[ \t]*#[ \t]*@scenario[ \t]+(?:"([^"\n]+)"|'([^'\n]+)')[ \t]*$/;
+  /^[ \t]*#[ \t]*@scenario[ \t]+(?:"([^"\r\n]+)"|'([^'\r\n]+)')[ \t\r]*$/;
 
 function isNextLineBatsTest(lines: string[], startLineIdx: number): boolean {
   for (let i = startLineIdx; i < lines.length; i++) {
