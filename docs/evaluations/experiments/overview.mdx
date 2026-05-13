@@ -46,6 +46,24 @@ Choose your preferred approach:
   />
 </CardGroup>
 
+## Quick Example
+
+```python
+import langwatch
+
+evaluation = langwatch.experiment.init("prompt-v2-test")
+
+for idx, row in evaluation.loop(df.iterrows()):
+    response = my_llm(row["input"])
+    evaluation.evaluate(
+        "ragas/faithfulness",
+        index=idx,
+        data={"input": row["input"], "output": response, "contexts": row["contexts"]},
+    )
+```
+
+See [Experiments via SDK](/evaluations/experiments/sdk) for the full quickstart — TypeScript, parallel execution, target comparison for A/B tests, and CI/CD integration.
+
 ## Experiment Results
 
 After running an experiment, you can:

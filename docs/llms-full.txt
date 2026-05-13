@@ -18226,6 +18226,24 @@ Choose your preferred approach:
   />
 </CardGroup>
 
+## Quick Example
+
+```python
+import langwatch
+
+evaluation = langwatch.experiment.init("prompt-v2-test")
+
+for idx, row in evaluation.loop(df.iterrows()):
+    response = my_llm(row["input"])
+    evaluation.evaluate(
+        "ragas/faithfulness",
+        index=idx,
+        data={"input": row["input"], "output": response, "contexts": row["contexts"]},
+    )
+```
+
+See [Experiments via SDK](/evaluations/experiments/sdk) for the full quickstart — TypeScript, parallel execution, target comparison for A/B tests, and CI/CD integration.
+
 ## Experiment Results
 
 After running an experiment, you can:
@@ -19803,6 +19821,27 @@ Guardrails can run at two points:
     href="/evaluations/evaluators/list"
   />
 </CardGroup>
+
+## Quick Example
+
+Add `as_guardrail=True` to any evaluation to make it block when it fails:
+
+```python
+import langwatch
+
+@langwatch.trace()
+def my_chatbot(user_input):
+    jailbreak = langwatch.evaluation.evaluate(
+        "azure/jailbreak",
+        as_guardrail=True,
+        data={"input": user_input},
+    )
+    if not jailbreak.passed:
+        return "I'm sorry, I can't help with that request."
+    return call_llm(user_input)
+```
+
+See [Code Integration](/evaluations/guardrails/code-integration) for the full pattern — input + output guardrails, TypeScript, async, parallel execution, and error handling.
 
 ## Best Practices
 
