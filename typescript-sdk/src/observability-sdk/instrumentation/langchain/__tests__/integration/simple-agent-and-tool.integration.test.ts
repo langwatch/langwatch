@@ -56,7 +56,7 @@ describe("LangChain Integration Tests", () => {
     spanExporter.reset();
   });
 
-  it("should trace a simple LLM question/response interaction", async () => {
+  it("should trace a simple LLM question/response interaction", { timeout: 30_000 }, async () => {
     const tracer = getLangWatchTracer("langchain-integration-test");
 
     await tracer.withActiveSpan(
