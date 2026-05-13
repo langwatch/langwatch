@@ -661,10 +661,11 @@ export class ClickHouseTraceService {
             {
               projectId: input.projectId,
               error: error instanceof Error ? error.message : error,
+              stack: error instanceof Error ? error.stack : undefined,
             },
             "Failed to fetch all traces from ClickHouse",
           );
-          throw new Error("Failed to fetch all traces for project");
+          throw error;
         }
       },
     );
@@ -1361,13 +1362,13 @@ export class ClickHouseTraceService {
           ? ` AND (${searchableColumns.map((col) => `${col} LIKE {searchQuery:String}`).join(" OR ")})`
           : "";
 
-        // Keyset cursor condition — applied AFTER GROUP BY on deduped values
+        // Keyset cursor condition — inside WHERE for partition pruning
         let cursorCondition = "";
         if (cursor) {
           cursorCondition =
             sortDirection === "desc"
-              ? " WHERE (toUnixTimestamp64Milli(s._oa), s.TraceId) < ({lastTimestamp:UInt64}, {lastTraceId:String})"
-              : " WHERE (toUnixTimestamp64Milli(s._oa), s.TraceId) > ({lastTimestamp:UInt64}, {lastTraceId:String})";
+              ? " AND (toUnixTimestamp64Milli(ts.OccurredAt), ts.TraceId) < ({lastTimestamp:UInt64}, {lastTraceId:String})"
+              : " AND (toUnixTimestamp64Milli(ts.OccurredAt), ts.TraceId) > ({lastTimestamp:UInt64}, {lastTraceId:String})";
         }
 
         const orderDirection = sortDirection === "desc" ? "DESC" : "ASC";
@@ -1385,12 +1386,15 @@ export class ClickHouseTraceService {
             : {}),
         };
 
-        // Run count + data queries in parallel.
-        // Two-phase data query: inner subquery finds the target TraceIds using
-        // only lightweight columns (so the sort fits in memory), then the outer
-        // query fetches full data for just those IDs.
-        // uniq() uses HyperLogLog (~2 % error) which is fine for pagination.
-        const [countResult, summaryResult] = await Promise.all([
+        const cursorParams = {
+          lastTimestamp: cursor?.lastTimestamp ?? 0,
+          lastTraceId: cursor?.lastTraceId ?? "",
+        };
+
+        // Step 1: Find page trace IDs + count in parallel.
+        // The ID query is lightweight (no heavy columns), and the count uses
+        // HyperLogLog (~2% error) which is fine for pagination display.
+        const [countResult, idsResult] = await Promise.all([
           clickHouseClient.query({
             query: `
               SELECT uniq(ts.TraceId) as total
@@ -1407,83 +1411,97 @@ export class ClickHouseTraceService {
           }),
           clickHouseClient.query({
             query: `
-              SELECT
-                ts.TraceId AS ts_TraceId,
-                ts.SpanCount AS ts_SpanCount,
-                ts.TotalDurationMs AS ts_TotalDurationMs,
-                ts.ComputedIOSchemaVersion AS ts_ComputedIOSchemaVersion,
-                ts.TimeToFirstTokenMs AS ts_TimeToFirstTokenMs,
-                ts.TimeToLastTokenMs AS ts_TimeToLastTokenMs,
-                ts.TokensPerSecond AS ts_TokensPerSecond,
-                ts.ContainsErrorStatus AS ts_ContainsErrorStatus,
-                ts.ContainsOKStatus AS ts_ContainsOKStatus,
-                ts.ErrorMessage AS ts_ErrorMessage,
-                ts.Models AS ts_Models,
-                ts.TotalCost AS ts_TotalCost,
-                ts.TokensEstimated AS ts_TokensEstimated,
-                ts.TotalPromptTokenCount AS ts_TotalPromptTokenCount,
-                ts.TotalCompletionTokenCount AS ts_TotalCompletionTokenCount,
-                ts.TopicId AS ts_TopicId,
-                ts.SubTopicId AS ts_SubTopicId,
-                ts.HasAnnotation AS ts_HasAnnotation,
-                ts.AnnotationIds AS ts_AnnotationIds,
-                ts.ComputedInput AS ts_ComputedInput,
-                ts.ComputedOutput AS ts_ComputedOutput,
-                ts.Attributes AS ts_Attributes,
-                ts.TraceName AS ts_TraceName,
-                toUnixTimestamp64Milli(ts.OccurredAt) AS ts_OccurredAt,
-                toUnixTimestamp64Milli(ts.CreatedAt) AS ts_CreatedAt,
-                toUnixTimestamp64Milli(ts.UpdatedAt) AS ts_UpdatedAt
-              FROM trace_summaries ts
-              WHERE ts.TenantId = {tenantId:String}
-                AND ts.TraceId IN (
-                  SELECT s.TraceId
-                  FROM (
-                    SELECT ts.TraceId AS TraceId,
-                           argMax(ts.OccurredAt, ts.UpdatedAt) AS _oa
-                    FROM trace_summaries ts
-                    WHERE ts.TenantId = {tenantId:String}
-                      AND ts.OccurredAt >= fromUnixTimestamp64Milli({startDate:UInt64})
-                      AND ts.OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})
-                      ${extraFilters}
-                      ${traceIdFilter}
-                      ${searchFilter}
-                    GROUP BY ts.TraceId
-                  ) s
+              SELECT s.TraceId
+              FROM (
+                SELECT ts.TraceId AS TraceId,
+                       argMax(ts.OccurredAt, ts.UpdatedAt) AS _oa
+                FROM trace_summaries ts
+                WHERE ts.TenantId = {tenantId:String}
+                  AND ts.OccurredAt >= fromUnixTimestamp64Milli({startDate:UInt64})
+                  AND ts.OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})
+                  ${extraFilters}
+                  ${traceIdFilter}
+                  ${searchFilter}
                   ${cursorCondition}
-                  ORDER BY s._oa ${orderDirection}, s.TraceId ${orderDirection}
-                  LIMIT {pageSize:UInt32}
-                )
-                AND (ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (
-                  SELECT TenantId, TraceId, max(UpdatedAt)
-                  FROM trace_summaries
-                  WHERE TenantId = {tenantId:String}
-                    AND OccurredAt >= fromUnixTimestamp64Milli({startDate:UInt64})
-                    AND OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})
-                  GROUP BY TenantId, TraceId
-                )
-              ORDER BY ts.OccurredAt ${orderDirection}, ts.TraceId ${orderDirection}
+                GROUP BY ts.TraceId
+              ) s
+              ORDER BY s._oa ${orderDirection}, s.TraceId ${orderDirection}
+              LIMIT {pageSize:UInt32}
             `,
             query_params: {
               ...sharedParams,
-              lastTimestamp: cursor?.lastTimestamp ?? 0,
-              lastTraceId: cursor?.lastTraceId ?? "",
+              ...cursorParams,
               pageSize,
             },
             format: "JSONEachRow",
           }),
         ]);
 
-        const [countRows, summaryRows] = await Promise.all([
+        const [countRows, idRows] = await Promise.all([
           countResult.json() as Promise<Array<{ total: string }>>,
-          summaryResult.json() as Promise<TraceSummaryRow[]>,
+          idsResult.json() as Promise<Array<{ TraceId: string }>>,
         ]);
 
         const totalHits = parseInt(countRows[0]?.total ?? "0", 10);
+        const pageTraceIds = idRows.map((r) => r.TraceId);
 
-        if (summaryRows.length === 0) {
+        if (pageTraceIds.length === 0) {
           return { traces: [], totalHits, lastTrace: null };
         }
+
+        // Step 2: Fetch full data for just the page's trace IDs.
+        // The dedup subquery is scoped to pageTraceIds so it only reads
+        // N traces instead of the entire table.
+        const summaryResult = await clickHouseClient.query({
+          query: `
+            SELECT
+              ts.TraceId AS ts_TraceId,
+              ts.SpanCount AS ts_SpanCount,
+              ts.TotalDurationMs AS ts_TotalDurationMs,
+              ts.ComputedIOSchemaVersion AS ts_ComputedIOSchemaVersion,
+              ts.TimeToFirstTokenMs AS ts_TimeToFirstTokenMs,
+              ts.TimeToLastTokenMs AS ts_TimeToLastTokenMs,
+              ts.TokensPerSecond AS ts_TokensPerSecond,
+              ts.ContainsErrorStatus AS ts_ContainsErrorStatus,
+              ts.ContainsOKStatus AS ts_ContainsOKStatus,
+              ts.ErrorMessage AS ts_ErrorMessage,
+              ts.Models AS ts_Models,
+              ts.TotalCost AS ts_TotalCost,
+              ts.TokensEstimated AS ts_TokensEstimated,
+              ts.TotalPromptTokenCount AS ts_TotalPromptTokenCount,
+              ts.TotalCompletionTokenCount AS ts_TotalCompletionTokenCount,
+              ts.TopicId AS ts_TopicId,
+              ts.SubTopicId AS ts_SubTopicId,
+              ts.HasAnnotation AS ts_HasAnnotation,
+              ts.AnnotationIds AS ts_AnnotationIds,
+              ts.ComputedInput AS ts_ComputedInput,
+              ts.ComputedOutput AS ts_ComputedOutput,
+              ts.Attributes AS ts_Attributes,
+              ts.TraceName AS ts_TraceName,
+              toUnixTimestamp64Milli(ts.OccurredAt) AS ts_OccurredAt,
+              toUnixTimestamp64Milli(ts.CreatedAt) AS ts_CreatedAt,
+              toUnixTimestamp64Milli(ts.UpdatedAt) AS ts_UpdatedAt
+            FROM trace_summaries ts
+            WHERE ts.TenantId = {tenantId:String}
+              AND ts.TraceId IN ({pageTraceIds:Array(String)})
+              AND (ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (
+                SELECT TenantId, TraceId, max(UpdatedAt)
+                FROM trace_summaries
+                WHERE TenantId = {tenantId:String}
+                  AND TraceId IN ({pageTraceIds:Array(String)})
+                GROUP BY TenantId, TraceId
+              )
+            ORDER BY ts.OccurredAt ${orderDirection}, ts.TraceId ${orderDirection}
+          `,
+          query_params: {
+            tenantId: projectId,
+            pageTraceIds,
+          },
+          format: "JSONEachRow",
+        });
+
+        const summaryRows =
+          await summaryResult.json() as TraceSummaryRow[];
 
         const traces: Trace[] = summaryRows.map((row) => {
           const summary = this.rowToTraceSummaryData(row);

@@ -125,23 +125,29 @@ describe("ClickHouseTraceService", () => {
   });
 
   describe("getAllTracesForProject()", () => {
+    // Helper: set up the standard 4-mock sequence for fetchTracesWithPagination
+    // count → IDs → data → evaluations
+    const setupStandardMocks = (traceIds: string[]) => {
+      const summaryRows = traceIds.map((id) => makeSummaryRow(id));
+      const idRows = traceIds.map((id) => ({ TraceId: id }));
+      mockClickHouseQuery
+        .mockResolvedValueOnce({
+          json: () => Promise.resolve([{ total: String(traceIds.length) }]),
+        })
+        .mockResolvedValueOnce({
+          json: () => Promise.resolve(idRows),
+        })
+        .mockResolvedValueOnce({
+          json: () => Promise.resolve(summaryRows),
+        })
+        .mockResolvedValueOnce({
+          json: () => Promise.resolve([]),
+        });
+    };
+
     describe("when includeSpans is false or not provided", () => {
       it("returns traces with empty spans", async () => {
-        const summaryRow = makeSummaryRow("trace-1");
-
-        // First call: count query
-        mockClickHouseQuery
-          .mockResolvedValueOnce({
-            json: () => Promise.resolve([{ total: "1" }]),
-          })
-          // Second call: summary query
-          .mockResolvedValueOnce({
-            json: () => Promise.resolve([summaryRow]),
-          })
-          // Third call: evaluation query
-          .mockResolvedValueOnce({
-            json: () => Promise.resolve([]),
-          });
+        setupStandardMocks(["trace-1"]);
 
         const service = new ClickHouseTraceService({
           project: { findUnique: mockPrismaFindUnique },
@@ -161,18 +167,7 @@ describe("ClickHouseTraceService", () => {
 
     describe("when traceIds is provided", () => {
       it("includes TraceId IN clause in the queries", async () => {
-        const summaryRow = makeSummaryRow("trace-A");
-
-        mockClickHouseQuery
-          .mockResolvedValueOnce({
-            json: () => Promise.resolve([{ total: "1" }]),
-          })
-          .mockResolvedValueOnce({
-            json: () => Promise.resolve([summaryRow]),
-          })
-          .mockResolvedValueOnce({
-            json: () => Promise.resolve([]),
-          });
+        setupStandardMocks(["trace-A"]);
 
         const service = new ClickHouseTraceService({
           project: { findUnique: mockPrismaFindUnique },
@@ -200,7 +195,7 @@ describe("ClickHouseTraceService", () => {
           "trace-B",
         ]);
 
-        // Verify the data query (2nd call) contains the TraceId IN clause
+        // Verify the IDs query (2nd call) contains the TraceId IN clause
         const dataCall = mockClickHouseQuery.mock.calls[1]!;
         expect(dataCall[0].query).toContain(
           "ts.TraceId IN ({traceIds:Array(String)})",
@@ -212,18 +207,7 @@ describe("ClickHouseTraceService", () => {
       });
 
       it("returns only matching traces", async () => {
-        const summaryRow = makeSummaryRow("trace-A");
-
-        mockClickHouseQuery
-          .mockResolvedValueOnce({
-            json: () => Promise.resolve([{ total: "1" }]),
-          })
-          .mockResolvedValueOnce({
-            json: () => Promise.resolve([summaryRow]),
-          })
-          .mockResolvedValueOnce({
-            json: () => Promise.resolve([]),
-          });
+        setupStandardMocks(["trace-A"]);
 
         const service = new ClickHouseTraceService({
           project: { findUnique: mockPrismaFindUnique },
@@ -248,18 +232,7 @@ describe("ClickHouseTraceService", () => {
 
     describe("when traceIds is undefined", () => {
       it("does not include TraceId IN clause in the queries", async () => {
-        const summaryRow = makeSummaryRow("trace-1");
-
-        mockClickHouseQuery
-          .mockResolvedValueOnce({
-            json: () => Promise.resolve([{ total: "1" }]),
-          })
-          .mockResolvedValueOnce({
-            json: () => Promise.resolve([summaryRow]),
-          })
-          .mockResolvedValueOnce({
-            json: () => Promise.resolve([]),
-          });
+        setupStandardMocks(["trace-1"]);
 
         const service = new ClickHouseTraceService({
           project: { findUnique: mockPrismaFindUnique },
@@ -302,17 +275,7 @@ describe("ClickHouseTraceService", () => {
         ).toString("base64");
 
       const setupMocksForCursorTest = () => {
-        const summaryRow = makeSummaryRow("trace-1");
-        mockClickHouseQuery
-          .mockResolvedValueOnce({
-            json: () => Promise.resolve([{ total: "1" }]),
-          })
-          .mockResolvedValueOnce({
-            json: () => Promise.resolve([summaryRow]),
-          })
-          .mockResolvedValueOnce({
-            json: () => Promise.resolve([]),
-          });
+        setupStandardMocks(["trace-1"]);
       };
 
       describe("when scrollId is passed via options", () => {
@@ -335,7 +298,7 @@ describe("ClickHouseTraceService", () => {
           // The data query (2nd call) includes the keyset cursor condition on deduped values
           const dataCall = mockClickHouseQuery.mock.calls[1]!;
           expect(dataCall[0].query).toContain(
-            "(toUnixTimestamp64Milli(s._oa), s.TraceId) <",
+            "(toUnixTimestamp64Milli(ts.OccurredAt), ts.TraceId) <",
           );
           expect(dataCall[0].query_params.lastTimestamp).toBe(cursorTimestamp);
           expect(dataCall[0].query_params.lastTraceId).toBe(cursorTraceId);
@@ -366,10 +329,10 @@ describe("ClickHouseTraceService", () => {
           // input.scrollId is ignored — only options.scrollId is read
           const dataCall = mockClickHouseQuery.mock.calls[1]!;
           expect(dataCall[0].query).not.toContain(
-            "(toUnixTimestamp64Milli(s._oa), s.TraceId) <",
+            "(toUnixTimestamp64Milli(ts.OccurredAt), ts.TraceId) <",
           );
           expect(dataCall[0].query).not.toContain(
-            "(toUnixTimestamp64Milli(s._oa), s.TraceId) >",
+            "(toUnixTimestamp64Milli(ts.OccurredAt), ts.TraceId) >",
           );
         });
       });
@@ -392,10 +355,10 @@ describe("ClickHouseTraceService", () => {
           // The data query (2nd call) must NOT contain cursor condition
           const dataCall = mockClickHouseQuery.mock.calls[1]!;
           expect(dataCall[0].query).not.toContain(
-            "(toUnixTimestamp64Milli(s._oa), s.TraceId) <",
+            "(toUnixTimestamp64Milli(ts.OccurredAt), ts.TraceId) <",
           );
           expect(dataCall[0].query).not.toContain(
-            "(toUnixTimestamp64Milli(s._oa), s.TraceId) >",
+            "(toUnixTimestamp64Milli(ts.OccurredAt), ts.TraceId) >",
           );
         });
       });
@@ -419,10 +382,10 @@ describe("ClickHouseTraceService", () => {
           // The data query (2nd call) must NOT contain cursor condition
           const dataCall = mockClickHouseQuery.mock.calls[1]!;
           expect(dataCall[0].query).not.toContain(
-            "(toUnixTimestamp64Milli(s._oa), s.TraceId) <",
+            "(toUnixTimestamp64Milli(ts.OccurredAt), ts.TraceId) <",
           );
           expect(dataCall[0].query).not.toContain(
-            "(toUnixTimestamp64Milli(s._oa), s.TraceId) >",
+            "(toUnixTimestamp64Milli(ts.OccurredAt), ts.TraceId) >",
           );
         });
       });
@@ -448,10 +411,10 @@ describe("ClickHouseTraceService", () => {
 
           const dataCall = mockClickHouseQuery.mock.calls[1]!;
           expect(dataCall[0].query).not.toContain(
-            "(toUnixTimestamp64Milli(s._oa), s.TraceId) <",
+            "(toUnixTimestamp64Milli(ts.OccurredAt), ts.TraceId) <",
           );
           expect(dataCall[0].query).not.toContain(
-            "(toUnixTimestamp64Milli(s._oa), s.TraceId) >",
+            "(toUnixTimestamp64Milli(ts.OccurredAt), ts.TraceId) >",
           );
         });
       });
@@ -476,27 +439,17 @@ describe("ClickHouseTraceService", () => {
 
           const dataCall = mockClickHouseQuery.mock.calls[1]!;
           expect(dataCall[0].query).not.toContain(
-            "(toUnixTimestamp64Milli(s._oa), s.TraceId) <",
+            "(toUnixTimestamp64Milli(ts.OccurredAt), ts.TraceId) <",
           );
           expect(dataCall[0].query).not.toContain(
-            "(toUnixTimestamp64Milli(s._oa), s.TraceId) >",
+            "(toUnixTimestamp64Milli(ts.OccurredAt), ts.TraceId) >",
           );
         });
       });
     });
 
     const setupMocksForQueryTest = () => {
-      const summaryRow = makeSummaryRow("trace-1");
-      mockClickHouseQuery
-        .mockResolvedValueOnce({
-          json: () => Promise.resolve([{ total: "1" }]),
-        })
-        .mockResolvedValueOnce({
-          json: () => Promise.resolve([summaryRow]),
-        })
-        .mockResolvedValueOnce({
-          json: () => Promise.resolve([]),
-        });
+      setupStandardMocks(["trace-1"]);
     };
 
     describe("when query is provided", () => {
@@ -643,18 +596,7 @@ describe("ClickHouseTraceService", () => {
 
     describe("when query is too short", () => {
       it("does not include LIKE clause for queries under 3 characters", async () => {
-        const summaryRow = makeSummaryRow("trace-1");
-
-        mockClickHouseQuery
-          .mockResolvedValueOnce({
-            json: () => Promise.resolve([{ total: "1" }]),
-          })
-          .mockResolvedValueOnce({
-            json: () => Promise.resolve([summaryRow]),
-          })
-          .mockResolvedValueOnce({
-            json: () => Promise.resolve([]),
-          });
+        setupStandardMocks(["trace-1"]);
 
         const service = new ClickHouseTraceService({
           project: { findUnique: mockPrismaFindUnique },
@@ -673,18 +615,7 @@ describe("ClickHouseTraceService", () => {
 
     describe("when query is undefined", () => {
       it("does not include LIKE clause in queries", async () => {
-        const summaryRow = makeSummaryRow("trace-1");
-
-        mockClickHouseQuery
-          .mockResolvedValueOnce({
-            json: () => Promise.resolve([{ total: "1" }]),
-          })
-          .mockResolvedValueOnce({
-            json: () => Promise.resolve([summaryRow]),
-          })
-          .mockResolvedValueOnce({
-            json: () => Promise.resolve([]),
-          });
+        setupStandardMocks(["trace-1"]);
 
         const service = new ClickHouseTraceService({
           project: { findUnique: mockPrismaFindUnique },
@@ -713,23 +644,27 @@ describe("ClickHouseTraceService", () => {
         const spanRow = makeSpanRow("trace-1", "span-1");
 
         mockClickHouseQuery
-          // 1st call: count query (fetchTracesWithPagination)
+          // 1st call: count query
           .mockResolvedValueOnce({
             json: () => Promise.resolve([{ total: "1" }]),
           })
-          // 2nd call: summary query (fetchTracesWithPagination)
+          // 2nd call: IDs query
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve([{ TraceId: "trace-1" }]),
+          })
+          // 3rd call: data query (fetchTracesWithPagination)
           .mockResolvedValueOnce({
             json: () => Promise.resolve([summaryRow]),
           })
-          // 3rd call: trace summary query (fetchTracesWithSpansJoined - summaries)
+          // 4th call: trace summary query (fetchTracesWithSpansJoined - summaries)
           .mockResolvedValueOnce({
             json: () => Promise.resolve([summaryRow]),
           })
-          // 4th call: spans query (fetchTracesWithSpansJoined - spans)
+          // 5th call: spans query (fetchTracesWithSpansJoined - spans)
           .mockResolvedValueOnce({
             json: () => Promise.resolve([spanRow]),
           })
-          // 5th call: evaluation query
+          // 6th call: evaluation query
           .mockResolvedValueOnce({
             json: () => Promise.resolve([]),
           });
