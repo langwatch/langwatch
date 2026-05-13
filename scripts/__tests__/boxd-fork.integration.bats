@@ -152,6 +152,21 @@ teardown() {
   grep -q "tmux new-session -d -s 'claude-issue4242'" "$CALL_LOG"
 }
 
+@test "fork-pr: rejects non-numeric PR (injection guard)" {
+  run boxd_fork_pr "1; rm -rf /"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"positive integer"* ]]
+  # Must not have called gh / boxd with the tainted value.
+  ! grep -q "rm -rf" "$CALL_LOG"
+}
+
+@test "fork-issue: rejects non-numeric ISSUE (injection guard)" {
+  run boxd_fork_issue "42'; echo pwned; #"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"positive integer"* ]]
+  ! grep -q "echo pwned" "$CALL_LOG"
+}
+
 # @scenario "fork-issue errors when the VM already exists"
 @test "fork-issue: errors when VM already exists (AC#15)" {
   cat > "$TEST_DIR/vms" <<EOF

@@ -326,6 +326,17 @@ run_meta() {
       docker volume rm "${VOLUME_PREFIX:-langwatch}-app-modules" 2>/dev/null || true
       docker volume rm "${VOLUME_PREFIX:-langwatch}-bullboard-modules" 2>/dev/null || true
       docker volume rm "${VOLUME_PREFIX:-langwatch}-goose-bin" 2>/dev/null || true
+      # The menu text promises a restart after the rebuild — honor that by
+      # re-execing with the last selected mode. Falls back to the
+      # interactive prompt when no prior mode is remembered.
+      local last_mode=""
+      [ -f "$LAST_CHOICE_FILE" ] && last_mode=$(cat "$LAST_CHOICE_FILE")
+      if [ -n "$last_mode" ] && [ "$last_mode" != "rebuild" ]; then
+        echo "Restarting with last mode: $last_mode"
+        exec "$0" "$last_mode"
+      else
+        echo "No prior mode remembered — run a mode (e.g. 'scripts/dev.sh backend-shared') to start."
+      fi
       ;;
   esac
 }

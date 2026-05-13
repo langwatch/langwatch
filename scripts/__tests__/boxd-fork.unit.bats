@@ -11,6 +11,51 @@ setup() {
   source "$SCRIPT_DIR/boxd-fork.sh"
 }
 
+# --- _boxd_shell_quote ---
+
+@test "_boxd_shell_quote: wraps plain values in single quotes" {
+  result=$(_boxd_shell_quote "feat-foo")
+  [ "$result" = "'feat-foo'" ]
+}
+
+@test "_boxd_shell_quote: escapes embedded single quotes so injection fails" {
+  result=$(_boxd_shell_quote "x'; echo pwned; #")
+  # Embedded quote becomes '\'' — the closing ' ends the literal, \' is a
+  # literal quote in shell, then '' restarts the literal.
+  [ "$result" = "'x'\\''; echo pwned; #'" ]
+  # Eval-ing the quoted form should yield the original string back, with no
+  # side effects (no 'pwned' to stdout).
+  eval "echo $result" > /tmp/boxd-quote-test.out 2>&1
+  [ "$(cat /tmp/boxd-quote-test.out)" = "x'; echo pwned; #" ]
+  rm -f /tmp/boxd-quote-test.out
+}
+
+@test "_boxd_shell_quote: handles empty input" {
+  result=$(_boxd_shell_quote "")
+  [ "$result" = "''" ]
+}
+
+# --- input shape validation (defense in depth) ---
+
+@test "boxd_fork_pr rejects non-numeric input (injection guard)" {
+  run boxd_fork_pr "1; rm -rf /"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"positive integer"* ]]
+}
+
+@test "boxd_fork_issue rejects non-numeric input (injection guard)" {
+  run boxd_fork_issue "42'; echo pwned; #"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"positive integer"* ]]
+}
+
+@test "boxd_fork_branch rejects names failing git check-ref-format" {
+  # Space is invalid in git refs.
+  run boxd_fork_branch "feat/foo bar"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"not a valid git branch name"* ]]
+}
+
 # --- boxd_slug ---
 
 # @scenario "Slugifier lowercases and strips punctuation"
