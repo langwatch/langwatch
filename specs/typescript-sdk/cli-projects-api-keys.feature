@@ -1,3 +1,4 @@
+@unimplemented
 Feature: CLI Projects and API Keys management
   As an engineer or code assistant using the LangWatch CLI
   I want to manage projects and API keys via org-level commands

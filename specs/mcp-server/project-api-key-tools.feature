@@ -1,4 +1,4 @@
-@integration
+@integration @unimplemented
 Feature: MCP Project and API Key management tools
   As a coding agent using the LangWatch MCP server
   I want to manage projects and API keys via MCP tools
