@@ -134,6 +134,8 @@ services:
     working_dir: /app
     volumes:
       - ./langwatch:/app
+      - ./pnpm-workspace.yaml:/pnpm-workspace.yaml:ro
+      - ./package.json:/package.json:ro
       - ./mcp-server:/mcp-server
       - ./langevals:/langevals
       - ./typescript-sdk:/typescript-sdk:ro
@@ -175,6 +177,8 @@ services:
     working_dir: /app
     volumes:
       - ./langwatch:/app
+      - ./pnpm-workspace.yaml:/pnpm-workspace.yaml:ro
+      - ./package.json:/package.json:ro
       - ./mcp-server:/mcp-server
       - ./langevals:/langevals
       - ./typescript-sdk:/typescript-sdk:ro
@@ -237,6 +241,8 @@ services:
     profiles: [workers, scenarios, full]
     volumes:
       - ./langwatch:/app
+      - ./pnpm-workspace.yaml:/pnpm-workspace.yaml:ro
+      - ./package.json:/package.json:ro
       - ./mcp-server:/mcp-server
       - ./langevals:/langevals
       - ./typescript-sdk:/typescript-sdk:ro
@@ -330,6 +336,8 @@ services:
     profiles: [test, scenarios, full]
     volumes:
       - ./langwatch:/app
+      - ./pnpm-workspace.yaml:/pnpm-workspace.yaml:ro
+      - ./package.json:/package.json:ro
       - ./mcp-server:/mcp-server
       - ./langevals:/langevals
       - ./typescript-sdk:/typescript-sdk:ro
