@@ -14,7 +14,7 @@ export const checkOrgApiKey = (): string => {
 
   const orgKey = process.env.LANGWATCH_ORG_API_KEY;
   if (orgKey && orgKey.trim() !== "") {
-    return orgKey;
+    return orgKey.trim();
   }
 
   const projectKey = process.env.LANGWATCH_API_KEY;
@@ -25,7 +25,7 @@ export const checkOrgApiKey = (): string => {
     console.error(
       chalk.yellow("This may fail if the key lacks organization-level permissions."),
     );
-    return projectKey;
+    return projectKey.trim();
   }
 
   const authUrl = `${getEndpoint()}/authorize`;

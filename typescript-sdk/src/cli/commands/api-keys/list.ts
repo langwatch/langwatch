@@ -31,15 +31,25 @@ export const listApiKeysCommand = async (options?: { format?: string }): Promise
 
     console.log();
 
-    const tableData = keys.map((k) => ({
-      ID: k.id,
-      Name: k.name,
-      Status: k.revokedAt ? chalk.red("revoked") : chalk.green("active"),
-      Bindings: String(k.roleBindings.length),
-      Expires: k.expiresAt ? new Date(k.expiresAt).toLocaleDateString() : chalk.gray("never"),
-      "Last used": k.lastUsedAt ? new Date(k.lastUsedAt).toLocaleDateString() : chalk.gray("—"),
-      Created: new Date(k.createdAt).toLocaleDateString(),
-    }));
+    const now = Date.now();
+    const tableData = keys.map((k) => {
+      const isExpired = !!k.expiresAt && new Date(k.expiresAt).getTime() <= now;
+      const status = k.revokedAt
+        ? chalk.red("revoked")
+        : isExpired
+          ? chalk.yellow("expired")
+          : chalk.green("active");
+
+      return {
+        ID: k.id,
+        Name: k.name,
+        Status: status,
+        Bindings: String(k.roleBindings.length),
+        Expires: k.expiresAt ? new Date(k.expiresAt).toLocaleDateString() : chalk.gray("never"),
+        "Last used": k.lastUsedAt ? new Date(k.lastUsedAt).toLocaleDateString() : chalk.gray("—"),
+        Created: new Date(k.createdAt).toLocaleDateString(),
+      };
+    });
 
     formatTable({
       data: tableData,
