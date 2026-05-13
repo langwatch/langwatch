@@ -10,7 +10,7 @@ import {
 } from "@chakra-ui/react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { useFormContext } from "react-hook-form";
+import { useFormContext, useWatch } from "react-hook-form";
 import { runtimeConfigSchema } from "~/prompts/schemas/field-schemas";
 import type { PromptConfigFormValues } from "~/prompts/types";
 
@@ -18,7 +18,7 @@ const formatConfig = (value: unknown) => JSON.stringify(value ?? {}, null, 2);
 
 export function RuntimeConfigField() {
   const methods = useFormContext<PromptConfigFormValues>();
-  const config = methods.watch("version.config");
+  const config = useWatch({ control: methods.control, name: "version.config" });
   const error = methods.formState.errors.version?.config;
   const [open, setOpen] = useState(false);
   const [localValue, setLocalValue] = useState(formatConfig(config));

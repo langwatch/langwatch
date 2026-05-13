@@ -432,14 +432,15 @@ function FormWrapper({
 }) {
   const methods = useForm<PromptConfigFormValues>({
     defaultValues: {
+      ...defaultValues,
       version: {
         config: {},
         configData: {
           inputs: [],
           demonstrations: { inline: { records: {} } },
         },
+        ...(defaultValues?.version ?? {}),
       },
-      ...defaultValues,
     },
   });
 

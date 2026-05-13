@@ -79,7 +79,8 @@ describe("<RuntimeConfigField />", () => {
     const user = userEvent.setup();
     renderRuntimeConfigField();
 
-    await user.click(screen.getByRole("button", { name: /runtime config/i }));
+    const triggers = screen.getAllByRole("button", { name: /runtime config/i });
+    await user.click(triggers[0]!);
     const editor = screen.getByRole("textbox", {
       name: /runtime config json/i,
     });
