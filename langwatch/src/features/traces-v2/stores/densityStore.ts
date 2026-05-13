@@ -66,20 +66,11 @@ export interface DrawerDensityTokens {
   sectionTriggerY: number;
   /** Vertical padding around accordion section body content. */
   sectionContentY: number;
-  /**
-   * Approximate rendered pixel height of one accordion trigger row. Drives
-   * the sticky-stack offset between siblings — has to match the trigger's
-   * actual height (text line-height + 2 × paddingY + 1px border) or later
-   * sections pin too early (overlap) or too late (visible gap).
-   */
-  triggerHeightPx: number;
 }
 
 export function getDrawerDensityTokens(density: Density): DrawerDensityTokens {
   if (density === "compact") {
-    // 16px (2xs line-height) + 2 × 6px paddingY + 1px border = 29px.
-    return { sectionTriggerY: 1.5, sectionContentY: 1.5, triggerHeightPx: 29 };
+    return { sectionTriggerY: 1.5, sectionContentY: 1.5 };
   }
-  // comfortable: 16px + 2 × 10px + 1px = 37px.
-  return { sectionTriggerY: 2.5, sectionContentY: 2.5, triggerHeightPx: 37 };
+  return { sectionTriggerY: 2.5, sectionContentY: 2.5 };
 }

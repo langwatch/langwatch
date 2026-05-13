@@ -145,8 +145,15 @@ const traceColumnDefs = {
   evaluations: traceCol.accessor((row) => row.evaluations.length, {
     id: "evaluations",
     header: "Evals",
-    size: 400,
-    minSize: 200,
+    // Default sized for the common case (0–2 evaluator chips per row).
+    // With chips capped at ~120px each (name truncated to 80px + score +
+    // borders + gap), 280px fits the typical two-chip row without
+    // padding waste; long evaluator names truncate inside the chip and
+    // surface the full name on hover. `maxSize` keeps an over-eager
+    // resize from punching the trace column off-screen.
+    size: 280,
+    minSize: 160,
+    maxSize: 640,
     enableSorting: false,
   }),
   events: traceCol.accessor((row) => row.events.length, {

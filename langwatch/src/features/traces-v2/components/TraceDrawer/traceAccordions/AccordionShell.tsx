@@ -44,7 +44,6 @@ export function Section({
   empty,
   children,
   isFirst,
-  stackIndex,
   open,
 }: {
   value: string;
@@ -58,13 +57,6 @@ export function Section({
   empty?: boolean;
   children: ReactNode;
   isFirst?: boolean;
-  /**
-   * Position of this section in its accordion (0-based). Drives the sticky
-   * top offset so this section's trigger pins below all earlier sections'
-   * triggers as the user scrolls. Pass the iteration index. Falls back to 0
-   * when omitted, which collapses the stack into a single sticky line.
-   */
-  stackIndex?: number;
   /**
    * When provided, defers mounting `children` until the section has been
    * opened at least once. After first open, children stay mounted so toggling
@@ -102,15 +94,16 @@ export function Section({
         _hover={{ bg: "bg.softHover", color: "fg" }}
         _open={{ bg: "bg.softHover", color: "fg" }}
         cursor="pointer"
-        // Sticky stack: each trigger pins at a `top` offset that equals
-        // its position in the accordion times the trigger height, so as
-        // the user scrolls down the open section's body, every earlier
-        // trigger comes to rest above it (Notion-style). Inside-Item
-        // sticky scopes the stickiness to the Item's height — fine here
-        // because the Items are direct children of the same scroll
-        // container and their triggers occupy full width.
+        // Each trigger pins flush with the SpanTabBar (no per-section
+        // offset). The previous "Notion-style" stacking multiplied a
+        // per-section index against the trigger height, which left a
+        // visible gap above later sections whenever an earlier section
+        // had already scrolled out of view — `position: sticky` only
+        // pins within the Accordion.Item, so collapsed/scrolled-past
+        // sections never actually occupy the space the offset reserved
+        // for them. Same-top sticky gives a clean replacement on scroll.
         position="sticky"
-        top={`${SPAN_TAB_BAR_HEIGHT_PX + (stackIndex ?? 0) * tokens.triggerHeightPx}px`}
+        top={`${SPAN_TAB_BAR_HEIGHT_PX}px`}
         zIndex={1}
       >
         <HStack flex={1} gap={2}>

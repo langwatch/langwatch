@@ -114,7 +114,6 @@ export function TraceSummaryAccordions({
                 title="Input and Output"
                 empty={!hasIO}
                 isFirst={isFirst}
-                stackIndex={idx}
                 open={isOpen}
               >
                 {hasIO ? (
@@ -157,7 +156,6 @@ export function TraceSummaryAccordions({
                 count={attrCount}
                 empty={!hasAttributes && !resources.isLoading}
                 isFirst={isFirst}
-                stackIndex={idx}
                 open={isOpen}
               >
                 {hasAttributes ? (
@@ -185,7 +183,6 @@ export function TraceSummaryAccordions({
                 value="scope"
                 title="Instrumentation Scope"
                 isFirst={isFirst}
-                stackIndex={idx}
                 open={isOpen}
               >
                 <ScopeBlock scope={resources.scope} />
@@ -199,7 +196,6 @@ export function TraceSummaryAccordions({
                 value="exceptions"
                 title="Exceptions"
                 isFirst={isFirst}
-                stackIndex={idx}
                 open={isOpen}
               >
                 <HStack
@@ -244,7 +240,6 @@ export function TraceSummaryAccordions({
                   pendingCount === 0
                 }
                 isFirst={isFirst}
-                stackIndex={idx}
                 open={isOpen}
               >
                 {evalsLoading ? (
@@ -275,7 +270,6 @@ export function TraceSummaryAccordions({
               count={traceEvents.length > 0 ? traceEvents.length : undefined}
               empty={traceEvents.length === 0}
               isFirst={isFirst}
-                stackIndex={idx}
               open={isOpen}
             >
               {traceEvents.length > 0 ? (
