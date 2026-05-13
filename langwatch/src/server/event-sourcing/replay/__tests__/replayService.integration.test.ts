@@ -8,6 +8,10 @@ import {
 } from "../../__tests__/integration/testContainers";
 import { generateTestTenantId } from "../../__tests__/integration/testHelpers";
 import { ReplayService } from "../replayService";
+import type { RegisteredMapProjection } from "../types";
+import type { MapProjectionDefinition } from "../../projections/mapProjection.types";
+import { CUTOFF_KEY_PREFIX, COMPLETED_KEY_PREFIX } from "../replayConstants";
+import { aggregateKey } from "../replayMarkers";
 
 describe("ReplayService tenant-specific ClickHouse", () => {
   let tenantA: string;
@@ -247,5 +251,140 @@ describe("ReplayService tenant-specific ClickHouse", () => {
       expect(resultB.aggregates).toHaveLength(2);
       expect(resultB.aggregates.map((a) => a.aggregateId).sort()).toEqual(["trace-a1", "trace-b1"]);
     });
+  });
+
+  describe("replay map projection", () => {
+    function createMapProjection({
+      name,
+      bulkAppend,
+      append,
+    }: {
+      name: string;
+      bulkAppend?: ReturnType<typeof vi.fn>;
+      append?: ReturnType<typeof vi.fn>;
+    }): RegisteredMapProjection {
+      const pipelineName = "test_pipeline";
+      const definition: MapProjectionDefinition<{ doubled: number; src: string }, any> = {
+        name,
+        eventTypes: ["trace.upserted"],
+        map: (event: any) => ({
+          doubled: ((event.data?.value as number | undefined) ?? 0) * 2,
+          src: event.aggregateId,
+        }),
+        store: {
+          append: append ?? vi.fn().mockResolvedValue(undefined),
+          ...(bulkAppend ? { bulkAppend } : {}),
+        },
+      };
+      return {
+        projectionName: name,
+        pipelineName,
+        aggregateType: "trace",
+        source: "pipeline",
+        pauseKey: `${pipelineName}/handler/${name}`,
+        kind: "map",
+        definition,
+      };
+    }
+
+    it("drains, marks cutoffs, bulk-appends mapped records, and cleans markers", async () => {
+      const redis = getTestRedisConnection()!;
+      const projectionName = `mapReplayHappy_${Date.now()}`;
+      const pausedSetKey = "{event-sourcing/jobs}:gq:paused-jobs";
+
+      // Capture whether the pause-set entry is active at the moment records
+      // are flushed. The replay batch must keep the projection paused through
+      // the WRITE phase and only unpause in the UNMARK step that follows.
+      let pausedDuringWrite: number | null = null;
+      const bulkAppend = vi.fn(async (_records: any[], _ctx: any) => {
+        pausedDuringWrite = await redis.sismember(
+          pausedSetKey,
+          `test_pipeline/handler/${projectionName}`,
+        );
+      });
+
+      const projection = createMapProjection({ name: projectionName, bulkAppend });
+      const service = createServiceWithResolver();
+
+      const result = await service.replay({
+        projections: [],
+        mapProjections: [projection],
+        tenantIds: [tenantA],
+        since: "2023-11-01",
+      });
+
+      expect(result.batchErrors).toBe(0);
+      expect(result.aggregatesReplayed).toBe(2);
+      expect(result.totalEvents).toBe(2);
+
+      // Records flushed via bulkAppend grouped by aggregate (one call per agg).
+      expect(bulkAppend).toHaveBeenCalledTimes(2);
+      const appendedRecords = bulkAppend.mock.calls.flatMap(([records]) => records as any[]);
+      expect(appendedRecords.map((r) => r.src).sort()).toEqual(["trace-a1", "trace-a2"]);
+      expect(appendedRecords.map((r) => r.doubled).sort((a, b) => a - b)).toEqual([2, 4]);
+
+      // Each bulkAppend call must carry the per-aggregate context (not a
+      // shared/generic context), so the store can route records correctly.
+      for (const [records, ctx] of bulkAppend.mock.calls as Array<[any[], any]>) {
+        expect(ctx.tenantId).toBe(tenantA);
+        expect(records.every((r) => r.src === ctx.aggregateId)).toBe(true);
+      }
+
+      // Pause was held active while records were being written.
+      expect(pausedDuringWrite).toBe(1);
+
+      // Pause cleared on success.
+      const stillPaused = await redis.sismember(
+        pausedSetKey,
+        `test_pipeline/handler/${projectionName}`,
+      );
+      expect(stillPaused).toBe(0);
+
+      // Final cleanupAll removed both replay marker keys.
+      const cutoffLeft = await redis.exists(`${CUTOFF_KEY_PREFIX}${projectionName}`);
+      const completedLeft = await redis.exists(`${COMPLETED_KEY_PREFIX}${projectionName}`);
+      expect(cutoffLeft).toBe(0);
+      expect(completedLeft).toBe(0);
+    });
+
+    it("skips aggregates already in the completed set on resume", async () => {
+      const redis = getTestRedisConnection()!;
+      const projectionName = `mapReplayResume_${Date.now()}`;
+
+      // Pre-populate the completed set to simulate an earlier partial run that
+      // finished trace-a1 before being interrupted.
+      const completedAggKey = aggregateKey({
+        tenantId: tenantA,
+        aggregateType: "trace",
+        aggregateId: "trace-a1",
+      });
+      await redis.sadd(`${COMPLETED_KEY_PREFIX}${projectionName}`, completedAggKey);
+
+      const bulkAppend = vi.fn().mockResolvedValue(undefined);
+      const projection = createMapProjection({ name: projectionName, bulkAppend });
+      const service = createServiceWithResolver();
+
+      const result = await service.replay({
+        projections: [],
+        mapProjections: [projection],
+        tenantIds: [tenantA],
+        since: "2023-11-01",
+      });
+
+      expect(result.batchErrors).toBe(0);
+      // Only trace-a2 was processed; trace-a1 was skipped via the completed set.
+      expect(result.totalEvents).toBe(1);
+
+      expect(bulkAppend).toHaveBeenCalledTimes(1);
+      const appendedRecords = bulkAppend.mock.calls.flatMap(([records]) => records as any[]);
+      expect(appendedRecords.map((r) => r.src)).toEqual(["trace-a2"]);
+
+      // cleanupAll ran — both keys gone, including the pre-populated completed set.
+      const completedLeft = await redis.exists(`${COMPLETED_KEY_PREFIX}${projectionName}`);
+      const cutoffLeft = await redis.exists(`${CUTOFF_KEY_PREFIX}${projectionName}`);
+      expect(completedLeft).toBe(0);
+      expect(cutoffLeft).toBe(0);
+    });
+
   });
 });
