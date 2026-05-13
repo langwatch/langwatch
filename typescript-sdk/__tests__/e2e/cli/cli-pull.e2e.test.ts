@@ -70,7 +70,7 @@ describe("CLI E2E", () => {
 
   afterAll(async () => {
     const apiHelpers = new ApiHelpers(langwatch);
-    await apiHelpers.cleapUpTestPrompts();
+    await apiHelpers.cleanUpTestPrompts();
   });
 
   describe("pull", () => {

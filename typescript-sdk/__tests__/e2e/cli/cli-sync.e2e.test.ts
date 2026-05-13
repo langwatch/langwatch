@@ -37,7 +37,7 @@ const TMP_BASE_DIR = path.join(__dirname, "tmp", "sync");
 
 // File-local prefix that does NOT start with the shared PROMPT_NAME_PREFIX.
 // Vitest runs e2e files in parallel, and sibling files (cli-push/pull/tag)
-// each run cleapUpTestPrompts() in their afterAll, which deletes every
+// each run cleanUpTestPrompts() in their afterAll, which deletes every
 // prompt starting with the shared prefix. Using a distinct prefix here
 // keeps those siblings from nuking this file's prompts mid-test.
 const SYNC_PROMPT_PREFIX = "cli-sync-e2e-test-prompt-";
@@ -95,9 +95,12 @@ describe("CLI E2E", () => {
 
   afterAll(async () => {
     const apiHelpers = new ApiHelpers(langwatch);
-    await apiHelpers.cleapUpTestPrompts(Array.from(createdHandles));
-    if (fs.existsSync(TMP_BASE_DIR)) {
-      fs.rmSync(TMP_BASE_DIR, { recursive: true, force: true });
+    try {
+      await apiHelpers.cleanUpTestPrompts(Array.from(createdHandles));
+    } finally {
+      if (fs.existsSync(TMP_BASE_DIR)) {
+        fs.rmSync(TMP_BASE_DIR, { recursive: true, force: true });
+      }
     }
   });
 

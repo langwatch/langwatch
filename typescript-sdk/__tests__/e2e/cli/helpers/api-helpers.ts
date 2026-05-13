@@ -13,7 +13,7 @@ export class ApiHelpers {
    * file's afterAll will delete prompts another file is still using.
    * Prefer passing the per-file set of handles you actually created.
    */
-  cleapUpTestPrompts = async (handles?: string[]) => {
+  cleanUpTestPrompts = async (handles?: string[]) => {
     const targets =
       handles ??
       (await this.langwatch.prompts.getAll())
@@ -33,7 +33,7 @@ export class ApiHelpers {
         )
         .join("; ");
       throw new Error(
-        `cleapUpTestPrompts: ${failures.length} prompt deletion(s) failed: ${detail}`,
+        `cleanUpTestPrompts: ${failures.length} prompt deletion(s) failed: ${detail}`,
       );
     }
   };
