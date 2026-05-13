@@ -332,10 +332,10 @@ describe("ClickHouseTraceService", () => {
 
           expect(result).not.toBeNull();
 
-          // The data query (2nd call) includes the keyset cursor condition
+          // The data query (2nd call) includes the keyset cursor condition on deduped values
           const dataCall = mockClickHouseQuery.mock.calls[1]!;
           expect(dataCall[0].query).toContain(
-            "(toUnixTimestamp64Milli(ts.OccurredAt), ts.TraceId) <",
+            "(toUnixTimestamp64Milli(s._oa), s.TraceId) <",
           );
           expect(dataCall[0].query_params.lastTimestamp).toBe(cursorTimestamp);
           expect(dataCall[0].query_params.lastTraceId).toBe(cursorTraceId);
@@ -366,10 +366,10 @@ describe("ClickHouseTraceService", () => {
           // input.scrollId is ignored — only options.scrollId is read
           const dataCall = mockClickHouseQuery.mock.calls[1]!;
           expect(dataCall[0].query).not.toContain(
-            "(toUnixTimestamp64Milli(ts.OccurredAt), ts.TraceId) <",
+            "(toUnixTimestamp64Milli(s._oa), s.TraceId) <",
           );
           expect(dataCall[0].query).not.toContain(
-            "(toUnixTimestamp64Milli(ts.OccurredAt), ts.TraceId) >",
+            "(toUnixTimestamp64Milli(s._oa), s.TraceId) >",
           );
         });
       });
@@ -392,10 +392,10 @@ describe("ClickHouseTraceService", () => {
           // The data query (2nd call) must NOT contain cursor condition
           const dataCall = mockClickHouseQuery.mock.calls[1]!;
           expect(dataCall[0].query).not.toContain(
-            "(toUnixTimestamp64Milli(ts.OccurredAt), ts.TraceId) <",
+            "(toUnixTimestamp64Milli(s._oa), s.TraceId) <",
           );
           expect(dataCall[0].query).not.toContain(
-            "(toUnixTimestamp64Milli(ts.OccurredAt), ts.TraceId) >",
+            "(toUnixTimestamp64Milli(s._oa), s.TraceId) >",
           );
         });
       });
@@ -419,10 +419,10 @@ describe("ClickHouseTraceService", () => {
           // The data query (2nd call) must NOT contain cursor condition
           const dataCall = mockClickHouseQuery.mock.calls[1]!;
           expect(dataCall[0].query).not.toContain(
-            "(toUnixTimestamp64Milli(ts.OccurredAt), ts.TraceId) <",
+            "(toUnixTimestamp64Milli(s._oa), s.TraceId) <",
           );
           expect(dataCall[0].query).not.toContain(
-            "(toUnixTimestamp64Milli(ts.OccurredAt), ts.TraceId) >",
+            "(toUnixTimestamp64Milli(s._oa), s.TraceId) >",
           );
         });
       });
@@ -448,10 +448,10 @@ describe("ClickHouseTraceService", () => {
 
           const dataCall = mockClickHouseQuery.mock.calls[1]!;
           expect(dataCall[0].query).not.toContain(
-            "(toUnixTimestamp64Milli(ts.OccurredAt), ts.TraceId) <",
+            "(toUnixTimestamp64Milli(s._oa), s.TraceId) <",
           );
           expect(dataCall[0].query).not.toContain(
-            "(toUnixTimestamp64Milli(ts.OccurredAt), ts.TraceId) >",
+            "(toUnixTimestamp64Milli(s._oa), s.TraceId) >",
           );
         });
       });
@@ -476,10 +476,10 @@ describe("ClickHouseTraceService", () => {
 
           const dataCall = mockClickHouseQuery.mock.calls[1]!;
           expect(dataCall[0].query).not.toContain(
-            "(toUnixTimestamp64Milli(ts.OccurredAt), ts.TraceId) <",
+            "(toUnixTimestamp64Milli(s._oa), s.TraceId) <",
           );
           expect(dataCall[0].query).not.toContain(
-            "(toUnixTimestamp64Milli(ts.OccurredAt), ts.TraceId) >",
+            "(toUnixTimestamp64Milli(s._oa), s.TraceId) >",
           );
         });
       });

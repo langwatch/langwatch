@@ -1361,13 +1361,13 @@ export class ClickHouseTraceService {
           ? ` AND (${searchableColumns.map((col) => `${col} LIKE {searchQuery:String}`).join(" OR ")})`
           : "";
 
-        // Keyset cursor condition — only for the data query
+        // Keyset cursor condition — applied AFTER GROUP BY on deduped values
         let cursorCondition = "";
         if (cursor) {
           cursorCondition =
             sortDirection === "desc"
-              ? " AND (toUnixTimestamp64Milli(ts.OccurredAt), ts.TraceId) < ({lastTimestamp:UInt64}, {lastTraceId:String})"
-              : " AND (toUnixTimestamp64Milli(ts.OccurredAt), ts.TraceId) > ({lastTimestamp:UInt64}, {lastTraceId:String})";
+              ? " WHERE (toUnixTimestamp64Milli(s._oa), s.TraceId) < ({lastTimestamp:UInt64}, {lastTraceId:String})"
+              : " WHERE (toUnixTimestamp64Milli(s._oa), s.TraceId) > ({lastTimestamp:UInt64}, {lastTraceId:String})";
         }
 
         const orderDirection = sortDirection === "desc" ? "DESC" : "ASC";
@@ -1448,9 +1448,9 @@ export class ClickHouseTraceService {
                       ${extraFilters}
                       ${traceIdFilter}
                       ${searchFilter}
-                      ${cursorCondition}
                     GROUP BY ts.TraceId
                   ) s
+                  ${cursorCondition}
                   ORDER BY s._oa ${orderDirection}, s.TraceId ${orderDirection}
                   LIMIT {pageSize:UInt32}
                 )
@@ -1458,6 +1458,8 @@ export class ClickHouseTraceService {
                   SELECT TenantId, TraceId, max(UpdatedAt)
                   FROM trace_summaries
                   WHERE TenantId = {tenantId:String}
+                    AND OccurredAt >= fromUnixTimestamp64Milli({startDate:UInt64})
+                    AND OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})
                   GROUP BY TenantId, TraceId
                 )
               ORDER BY ts.OccurredAt ${orderDirection}, ts.TraceId ${orderDirection}
