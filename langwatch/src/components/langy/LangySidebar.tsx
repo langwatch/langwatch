@@ -26,7 +26,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import NextLink from "next/link";
+import NextLink from "~/utils/compat/next-link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Kbd } from "~/components/ops/shared/Kbd";
 import { Markdown } from "~/components/Markdown";

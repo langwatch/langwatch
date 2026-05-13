@@ -351,22 +351,22 @@ describe("Agents Endpoints", () => {
         throw new Error("Test user must have a team");
       }
 
-      const targetProjectExists = await prisma.project.findUnique({
+      // Upsert (not findUnique+create) — multiple integration workers race on
+      // this shared id; the prior check-then-create pattern leaked unique-
+      // constraint failures across workers.
+      await prisma.project.upsert({
         where: { id: targetProjectId },
+        update: {},
+        create: {
+          id: targetProjectId,
+          name: "Test Project Copy Target",
+          slug: "test-project-copy-target",
+          apiKey: "test-api-key-evaluator-copy-target",
+          teamId: teamUser.team.id,
+          language: "en",
+          framework: "test-framework",
+        },
       });
-      if (!targetProjectExists) {
-        await prisma.project.create({
-          data: {
-            id: targetProjectId,
-            name: "Test Project Copy Target",
-            slug: "test-project-copy-target",
-            apiKey: "test-api-key-evaluator-copy-target",
-            teamId: teamUser.team.id,
-            language: "en",
-            framework: "test-framework",
-          },
-        });
-      }
 
       await prisma.agent.deleteMany({
         where: {

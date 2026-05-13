@@ -100,9 +100,9 @@ describe("ProposalCard", () => {
         expect(discard).toBeDefined();
       });
 
-      it("labels the card with the 'Langy proposes' affordance", () => {
+      it("labels the card with the proposal affordance overline", () => {
         renderCard();
-        expect(screen.getByText(/Langy proposes/i)).toBeDefined();
+        expect(screen.getByText(/^Proposal$/i)).toBeDefined();
       });
     });
 
@@ -224,9 +224,9 @@ describe("ProposalCard", () => {
         ).toBeDefined();
       });
 
-      it("surfaces the 'Langy wants to delete' status label", () => {
+      it("surfaces the 'Wants to delete' status label", () => {
         renderCard({ proposal: destructiveProposal });
-        expect(screen.getByText(/Langy wants to delete/i)).toBeDefined();
+        expect(screen.getByText(/Wants to delete/i)).toBeDefined();
       });
     });
 
