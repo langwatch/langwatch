@@ -661,7 +661,10 @@ EOF
   # $BOXD_FORK_REPO is interpolated directly into the remote shell here —
   # safe because the regex validation above restricts it to
   # [A-Za-z0-9._-]+/[A-Za-z0-9._-]+ (no shell metacharacters possible).
-  if ! "$BOXD_BIN" exec "$vm" -- "
+  # boxd exec runs the remote command under /bin/sh (dash on Ubuntu/Debian),
+  # which doesn't grok 'set -o pipefail'. Wrap in 'bash -c' so the recipe
+  # gets bash semantics — pipefail is load-bearing for curl|bash safety.
+  if ! "$BOXD_BIN" exec "$vm" -- bash -c "
     set -euo pipefail
     if ! command -v node >/dev/null 2>&1 \\
        || [ \"\$(node --version 2>/dev/null | cut -d. -f1 | tr -d v)\" -lt 18 ]; then
@@ -671,7 +674,7 @@ EOF
     if [ ! -d langwatch ]; then
       git clone https://github.com/$BOXD_FORK_REPO.git langwatch
     fi
-    cd langwatch && corepack enable && pnpm -w install
+    cd langwatch && sudo corepack enable && pnpm -w install
   "; then
     echo "ERROR: provisioning $vm failed. Inspect with 'boxd connect $vm'." >&2
     return 1
@@ -691,7 +694,9 @@ boxd_golden_reset() {
   fi
   if boxd_vm_exists "$vm"; then
     printf 'Destroying %s\n' "$vm" >&2
-    if ! "$BOXD_BIN" destroy "$vm" >/dev/null 2>&1; then
+    # `boxd destroy` requires --confirm/-y to be non-interactive. We've
+    # already gated on BOXD_FORK_YES=1 above for user-level consent.
+    if ! "$BOXD_BIN" destroy "$vm" -y >/dev/null 2>&1; then
       echo "ERROR: 'boxd destroy $vm' failed; aborting reset." >&2
       return 1
     fi

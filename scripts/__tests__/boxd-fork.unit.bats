@@ -326,3 +326,64 @@ EOF
   [ "$status" -eq 0 ]
   [ "$output" = "alice--langwatch-golden" ]
 }
+
+# @scenario "boxd_golden_reset passes -y to non-interactive destroy"
+@test "boxd_golden_reset: 'boxd destroy' is invoked with -y so it doesn't prompt" {
+  # `boxd destroy` requires --confirm/-y or it prompts and aborts. The
+  # reset is already gated by BOXD_FORK_YES=1, so the inner destroy must
+  # be non-interactive.
+  run grep -E '\$BOXD_BIN" destroy "\$vm" -y' "$SCRIPT_DIR/boxd-fork.sh"
+  [ "$status" -eq 0 ]
+}
+
+# @scenario "corepack enable is sudo'd so it can write /usr/bin/pnpm"
+@test "boxd_golden: 'corepack enable' is invoked with sudo (needs root for /usr/bin symlink)" {
+  # corepack enable creates symlinks in /usr/bin and fails EACCES as a
+  # non-root user. The provisioning recipe runs as the VM's default user,
+  # so the call needs sudo.
+  run grep -E 'sudo corepack enable' "$SCRIPT_DIR/boxd-fork.sh"
+  [ "$status" -eq 0 ]
+}
+
+# @scenario "provisioning recipe wraps remote command in bash -c"
+@test "boxd_golden: provisioning recipe invokes bash -c so 'set -o pipefail' works under dash" {
+  # boxd exec runs the remote command under /bin/sh, which is dash on
+  # Ubuntu/Debian. Dash does not support 'set -o pipefail' — the recipe
+  # must wrap in 'bash -c' or the first line dies with
+  # "/bin/sh: set: Illegal option -o pipefail" and provisioning fails.
+  run grep -E '\$BOXD_BIN" exec "\$vm" -- bash -c' "$SCRIPT_DIR/boxd-fork.sh"
+  [ "$status" -eq 0 ]
+}
+
+# @scenario "no 'boxd exec ... -- \"...\"' sends 'set -o pipefail' to dash"
+@test "boxd-fork.sh: 'set -o pipefail' inside a boxd-exec recipe must be preceded by 'bash -c'" {
+  # Regression guard for the dash-vs-bash mismatch: 'boxd exec' runs the
+  # remote command under /bin/sh (dash), which can't parse pipefail.
+  # For every line containing 'set -o pipefail', walk backwards up to 20
+  # lines and require that the enclosing 'boxd exec' invocation includes
+  # 'bash -c' before the opening quote of the recipe.
+  awk '
+    {
+      lines[NR] = $0
+      if ($0 ~ /set -[a-zA-Z]*o[a-zA-Z]* pipefail/) pipefail_lines[NR] = 1
+    }
+    END {
+      bad = 0
+      for (n in pipefail_lines) {
+        found_exec = 0; ok = 0
+        for (i = n; i >= n - 20 && i > 0; i--) {
+          if (lines[i] ~ /\$BOXD_BIN" exec /) {
+            found_exec = 1
+            if (lines[i] ~ /bash -c/) ok = 1
+            break
+          }
+        }
+        if (found_exec && !ok) {
+          print "BAD line " n ": pipefail in boxd-exec recipe without bash -c"
+          bad = 1
+        }
+      }
+      exit bad
+    }
+  ' "$SCRIPT_DIR/boxd-fork.sh"
+}
