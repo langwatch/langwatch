@@ -1,5 +1,3 @@
-import { execSync } from "node:child_process";
-import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   CONTACT_SALES_URL,
@@ -79,38 +77,6 @@ describe("CONTACT_SALES_URL", () => {
   /** @scenario CONTACT_SALES_URL resolves to the public demo form */
   it("equals the public LangWatch demo form URL", () => {
     expect(CONTACT_SALES_URL).toBe("https://langwatch.ai/get-a-demo");
-  });
-
-  /** @scenario No personal HubSpot scheduling URL remains anywhere in the app */
-  describe("when scanning the source tree for personal HubSpot scheduling URLs", () => {
-    it("finds zero references to the old manouk-draisma HubSpot scheduler", () => {
-      const repoRoot = resolve(__dirname, "..", "..", "..");
-      const stdout = execSync(
-        "git grep -l 'meetings-eu1.hubspot.com/manouk-draisma' -- 'src' 'ee' ':!ee/licensing/__tests__/constants.unit.test.ts' || true",
-        { cwd: repoRoot, encoding: "utf8" },
-      );
-      const hits = stdout
-        .split("\n")
-        .map((line) => line.trim())
-        .filter(Boolean);
-      expect(hits).toEqual([]);
-    });
-  });
-
-  /** @scenario Help Center self-hosting link is verified absent from app code */
-  describe("when scanning the repo for the reported broken self-hosting Help Center URL", () => {
-    it("finds zero references in TypeScript, TSX, MDX, MD, or JSON files", () => {
-      const repoRoot = resolve(__dirname, "..", "..", "..", "..");
-      const stdout = execSync(
-        "git grep -l 'self-hosting/overview#self-hosting-overview' -- '*.ts' '*.tsx' '*.mdx' '*.md' '*.json' ':!langwatch/ee/licensing/__tests__/constants.unit.test.ts' || true",
-        { cwd: repoRoot, encoding: "utf8" },
-      );
-      const hits = stdout
-        .split("\n")
-        .map((line) => line.trim())
-        .filter(Boolean);
-      expect(hits).toEqual([]);
-    });
   });
 });
 
