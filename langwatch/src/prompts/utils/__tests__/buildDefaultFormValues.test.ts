@@ -74,7 +74,7 @@ describe("buildDefaultFormValues", () => {
       const defaults = buildDefaultFormValues({
         version: {
           configData: {
-            llm: { model: "openai/gpt-4o" },
+            llm: { model: "openai/gpt-5-mini" },
           },
         },
       });
