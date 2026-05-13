@@ -16,6 +16,7 @@ import {
   LATEST_SCHEMA_VERSION,
   type LatestConfigVersionSchema,
   parseLlmConfigVersion,
+  parseRuntimeConfig,
 } from "./llm-config-version-schema";
 import {
   type CreateLlmConfigVersionParams,
@@ -28,7 +29,7 @@ const logger = createLogger("langwatch:prompt-config:llm-config.repository");
  * Recursively sort all object keys for deterministic JSON serialization.
  * Arrays preserve element order but their object elements get sorted keys.
  */
-function sortKeysDeep(obj: unknown): unknown {
+export function sortKeysDeep(obj: unknown): unknown {
   if (Array.isArray(obj)) return obj.map(sortKeysDeep);
   if (obj && typeof obj === "object" && obj !== null) {
     return Object.fromEntries(
@@ -138,7 +139,7 @@ export class LlmConfigRepository {
             latestVersion: {
               ...parseLlmConfigVersion(rawVersion),
               runtimeConfig:
-                (rawVersion.runtimeConfig as Record<string, unknown>) ?? {},
+                parseRuntimeConfig(rawVersion.runtimeConfig),
             },
           };
         } catch (error) {
@@ -298,7 +299,7 @@ export class LlmConfigRepository {
         latestVersion: {
           ...parseLlmConfigVersion(rawVersion),
           runtimeConfig:
-            (rawVersion.runtimeConfig as Record<string, unknown>) ?? {},
+            parseRuntimeConfig(rawVersion.runtimeConfig),
         },
       };
     } catch (error) {
@@ -573,7 +574,7 @@ export class LlmConfigRepository {
         latestVersion: {
           ...parseLlmConfigVersion(newVersion),
           runtimeConfig:
-            (newVersion.runtimeConfig as Record<string, unknown>) ?? {},
+            parseRuntimeConfig(newVersion.runtimeConfig),
         },
       };
     });

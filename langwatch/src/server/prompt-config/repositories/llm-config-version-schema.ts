@@ -128,6 +128,33 @@ export function parseLlmConfigVersion(
   return validator.parse(llmConfigVersion);
 }
 
+export type RuntimeConfig = Record<string, unknown>;
+
+export function parseRuntimeConfig(value: unknown): RuntimeConfig {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value as RuntimeConfig;
+  }
+  return {};
+}
+
+export function runtimeConfigsEqual(a: unknown, b: unknown): boolean {
+  const sortKeysDeep = (obj: unknown): unknown => {
+    if (Array.isArray(obj)) return obj.map(sortKeysDeep);
+    if (obj && typeof obj === "object") {
+      return Object.fromEntries(
+        Object.entries(obj)
+          .sort(([x], [y]) => x.localeCompare(y))
+          .map(([k, v]) => [k, sortKeysDeep(v)]),
+      );
+    }
+    return obj;
+  };
+  return (
+    JSON.stringify(sortKeysDeep(a ?? {})) ===
+    JSON.stringify(sortKeysDeep(b ?? {}))
+  );
+}
+
 export function isValidHandle(handle: string): boolean {
   // npm package name pattern: allows lowercase letters, numbers, hyphens, and optionally one slash
   const npmPackagePattern = /^[a-z0-9_-]+(?:\/[a-z0-9_-]+)?$/;

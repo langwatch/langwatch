@@ -58,7 +58,6 @@ const TestWrapper = ({
   const methods = useForm<PromptConfigFormValues>({
     defaultValues: {
       version: {
-          config: {},
         config: {},
         configData: {
           inputs: [],

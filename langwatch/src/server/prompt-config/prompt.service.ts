@@ -31,6 +31,8 @@ import {
   LATEST_SCHEMA_VERSION,
   type LatestConfigVersionSchema,
   parseLlmConfigVersion,
+  parseRuntimeConfig,
+  runtimeConfigsEqual,
 } from "./repositories/llm-config-version-schema";
 import { mergeAutoDetectedInputs } from "./mergeAutoDetectedInputs";
 import {
@@ -328,7 +330,7 @@ export class PromptService {
 
     const versions = rawVersions.map((v) => ({
       ...parseLlmConfigVersion(v),
-      runtimeConfig: (v.runtimeConfig as Record<string, unknown>) ?? {},
+      runtimeConfig: parseRuntimeConfig(v.runtimeConfig),
     }));
 
     const versionIds = versions
@@ -562,7 +564,7 @@ export class PromptService {
     const latestVersion = {
       ...parseLlmConfigVersion(latestVersionRaw),
       runtimeConfig:
-        (latestVersionRaw.runtimeConfig as Record<string, unknown>) ?? {},
+        parseRuntimeConfig(latestVersionRaw.runtimeConfig),
     };
 
     const latestVersionId = latestVersion.id ?? "";
@@ -669,7 +671,7 @@ export class PromptService {
         const resolvedConfig =
           incomingConfig !== undefined
             ? incomingConfig
-            : ((latestVersionRaw.runtimeConfig as Record<string, unknown>) ?? {});
+            : parseRuntimeConfig(latestVersionRaw.runtimeConfig);
 
         // Create the new version with updated configData
         // Note: Even if only metadata (handle/scope) changed, we create a version
@@ -947,9 +949,10 @@ export class PromptService {
         remoteConfigData,
       );
 
-      const runtimeConfigEqual =
-        JSON.stringify(params.config ?? {}) ===
-        JSON.stringify(existingPrompt.config ?? {});
+      const runtimeConfigEqual = runtimeConfigsEqual(
+        params.config,
+        existingPrompt.config,
+      );
 
       if (comparison.isEqual && runtimeConfigEqual) {
         // Content is the same - up to date

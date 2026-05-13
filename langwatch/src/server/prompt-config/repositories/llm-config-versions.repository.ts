@@ -13,6 +13,7 @@ import { LlmConfigRepository } from "./llm-config.repository";
 import {
   getVersionValidator,
   type LatestConfigVersionSchema,
+  parseRuntimeConfig,
 } from "./llm-config-version-schema";
 
 /**
@@ -279,7 +280,7 @@ export class LlmConfigVersionsRepository {
         schemaVersion: version.schemaVersion as SchemaVersion,
         configData: version.configData as LlmConfigVersionDTO["configData"],
         runtimeConfig:
-          (version.runtimeConfig as Record<string, unknown>) ?? {},
+          parseRuntimeConfig(version.runtimeConfig),
       },
       organizationId,
     });
