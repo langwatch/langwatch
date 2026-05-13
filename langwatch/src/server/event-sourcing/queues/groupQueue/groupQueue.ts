@@ -38,6 +38,11 @@ import {
 } from "./metrics";
 import { GroupQueueMetricsCollector } from "./metricsCollector";
 import { type DispatchResult, GroupStagingScripts } from "./scripts";
+import {
+  TenantRateTracker,
+  tenantIdFromGroupId,
+} from "../../../observability/tenantRateTracker";
+import { featureFlagService } from "../../../featureFlag";
 
 /**
  * Configuration for the group queue.
@@ -98,6 +103,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
   private readonly redisConnection: IORedis | Cluster;
   private readonly blockingConnection: IORedis | Cluster;
   private readonly scripts: GroupStagingScripts;
+  private readonly rateTracker!: TenantRateTracker;
   private readonly globalConcurrency: number;
   private readonly consumerEnabled: boolean;
   private readonly dispatcher: GroupQueueDispatcher | null;
@@ -164,6 +170,18 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     this.scripts = new GroupStagingScripts(
       this.redisConnection,
       this.queueName,
+    );
+
+    // Per-tenant rate tracker (post-2026-05-11 incident follow-up). Cheap
+    // pipelined writes on the producer hot path. AnomalyDetector worker
+    // consumes the data; the tracker itself never blocks send(). The
+    // PostHog feature-flag service is wired in so a runaway tracker can
+    // be killed in seconds without a redeploy (see
+    // ANOMALY_DETECTION_KILL_SWITCH_FLAG).
+    this.rateTracker = new TenantRateTracker(
+      this.redisConnection,
+      Date.now,
+      featureFlagService,
     );
 
     // fastq promise-based queue — replaces BullMQ Queue + Worker
@@ -276,6 +294,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         gqJobsDelayedTotal.inc({ queue_name: this.queueName });
         gqJobDelayMilliseconds.observe({ queue_name: this.queueName }, delay);
       }
+      // Per-tenant rate tracking (post-2026-05-11 follow-up). Non-blocking;
+      // failures are swallowed inside the tracker so observability never
+      // breaks production traffic.
+      const tenantId = tenantIdFromGroupId(groupId);
+      if (tenantId) {
+        void this.rateTracker.record(tenantId);
+      }
     } else {
       gqJobsDedupedTotal.inc({ queue_name: this.queueName });
     }
@@ -358,6 +383,20 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         for (let i = 0; i < newStagedCount; i++) {
           gqJobDelayMilliseconds.observe({ queue_name: this.queueName }, effectiveDelay);
         }
+      }
+      // Per-tenant rate tracking. The Lua script may have deduped some
+      // payloads, so we conservatively credit each unique tenant prefix
+      // 1 per source-payload — slight over-count when dedup hits, but the
+      // anomaly thresholds (10×/100× baseline) are unaffected.
+      const perTenant = new Map<string, number>();
+      for (const job of jobsToStage) {
+        const tenantId = tenantIdFromGroupId(job.groupId);
+        if (tenantId) {
+          perTenant.set(tenantId, (perTenant.get(tenantId) ?? 0) + 1);
+        }
+      }
+      for (const [tenantId, count] of perTenant) {
+        void this.rateTracker.record(tenantId, count);
       }
     }
     if (dedupedCount > 0) {

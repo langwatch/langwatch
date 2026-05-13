@@ -23,6 +23,7 @@ import { PipelineTreeCard } from "~/components/ops/queues/PipelineTreeCard";
 import { BlockedCard } from "~/components/ops/queues/BlockedCard";
 import { DlqCard } from "~/components/ops/queues/DlqCard";
 import { GroupsCard } from "~/components/ops/queues/GroupsCard";
+import { AnomaliesCard } from "~/components/ops/queues/AnomaliesCard";
 
 export function OpsDashboardContent({ data }: { data: DashboardData }) {
   const totalBlocked = data.queues.reduce(
@@ -150,6 +151,7 @@ export function OpsDashboardContent({ data }: { data: DashboardData }) {
         )}
       </Card.Root>
 
+      <AnomaliesCard />
       <BlockedCard queueNames={queueNames} />
       <DlqCard queueNames={queueNames} />
       <GroupsCard queueNames={queueNames} />

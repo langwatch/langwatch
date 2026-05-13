@@ -33,6 +33,7 @@ vi.mock("~/server/traces/trace-formatting", () => ({
 
 vi.mock("~/utils/logger/server", () => ({
   createLogger: () => ({
+    debug: vi.fn(),
     info: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),

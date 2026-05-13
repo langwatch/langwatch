@@ -27,6 +27,7 @@ vi.mock("~/server/rbac/custom-role-permissions", () => ({
 // Mock the logger
 vi.mock("~/utils/logger/server", () => ({
   createLogger: () => ({
+    debug: vi.fn(),
     warn: vi.fn(),
     info: vi.fn(),
     error: vi.fn(),

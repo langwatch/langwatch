@@ -98,6 +98,17 @@ export function createEnvConfig() {
       BLOCK_LOCAL_HTTP_CALLS: z.boolean().optional(),
       ALLOWED_PROXY_HOSTS: z.string().optional(),
       SHOW_OPS_IN_MAIN_SIDEBAR: z.string().optional(),
+      // Post-2026-05-11 loop-prevention kill-switch. Set to "1" to
+      // bypass the reactor depth check; emergency rollback only.
+      LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD: z.string().optional(),
+      // Post-2026-05-11 tenant soft-cap: max in-flight event-sourcing
+      // groups per tenant in the DISPATCH_LUA scheduler.
+      // Default 100 (≈ one worker pod's concurrency) — every install
+      // gets noisy-neighbour protection out of the box. Set to "0" to
+      // disable entirely (incident kill switch). Set to a positive int
+      // to retune (e.g. raise for a legitimate heavy single-tenant
+      // workload).
+      LANGWATCH_DISPATCH_TENANT_CAP: z.string().optional(),
       USE_S3_STORAGE: z.boolean().optional(),
       S3_ENDPOINT: z.string().optional(),
       S3_ACCESS_KEY_ID: z.string().optional(),
@@ -232,6 +243,9 @@ export function createEnvConfig() {
         process.env.BLOCK_LOCAL_HTTP_CALLS?.toLowerCase() === "true",
       ALLOWED_PROXY_HOSTS: process.env.ALLOWED_PROXY_HOSTS,
       SHOW_OPS_IN_MAIN_SIDEBAR: process.env.SHOW_OPS_IN_MAIN_SIDEBAR,
+      LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD:
+        process.env.LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD,
+      LANGWATCH_DISPATCH_TENANT_CAP: process.env.LANGWATCH_DISPATCH_TENANT_CAP,
       USE_S3_STORAGE:
         process.env.USE_S3_STORAGE === "1" ||
         process.env.USE_S3_STORAGE?.toLowerCase() === "true",

@@ -63,7 +63,68 @@ export interface WorkflowExecutor {
     workflowId: string,
     projectId: string,
     inputs: Record<string, string>,
+    versionId?: string,
+    causalityDepth?: number,
   ): Promise<{ result: SingleEvaluationResult; status: string }>;
+}
+
+/**
+ * Returns the max `langwatch.causality_depth` across the supplied spans
+ * (0 if absent on all). The dispatcher uses this to pass the parent
+ * depth to nlpgo, which increments and stamps on every span it emits.
+ * Loop-prevention design lives in
+ * specs/monitors/online-evaluator-loop-prevention.feature.
+ *
+ * Real-world spans come from `mapNormalizedSpanToSpan` which unflattens
+ * OTLP dot-notation attributes into nested objects under `span.params`,
+ * so `langwatch.causality_depth` lives at `params.langwatch.causality_depth`.
+ * We also probe a few legacy / synthetic shapes used by tests and older
+ * span sources so the helper is robust to both.
+ */
+export function maxCausalityDepthOfSpans(
+  spans:
+    | Array<{
+        params?: Record<string, unknown> | null;
+        attributes?: Record<string, unknown> | null;
+      }>
+    | undefined
+    | null,
+): number {
+  if (!spans || spans.length === 0) return 0;
+  let max = 0;
+  for (const span of spans) {
+    const raw = pickCausalityDepth(span);
+    if (raw === undefined || raw === null) continue;
+    const n =
+      typeof raw === "number"
+        ? raw
+        : typeof raw === "string"
+          ? Number.parseInt(raw, 10)
+          : NaN;
+    if (Number.isFinite(n) && n > max) max = n;
+  }
+  return max;
+}
+
+function pickCausalityDepth(span: {
+  params?: Record<string, unknown> | null;
+  attributes?: Record<string, unknown> | null;
+}): unknown {
+  // Real production path: unflattened in params.langwatch.causality_depth.
+  const params = (span.params ?? null) as Record<string, unknown> | null;
+  if (params) {
+    const ns = params.langwatch as Record<string, unknown> | undefined;
+    if (ns && ns.causality_depth !== undefined) return ns.causality_depth;
+    if (params["langwatch.causality_depth"] !== undefined) {
+      return params["langwatch.causality_depth"];
+    }
+  }
+  // Legacy / synthetic test path.
+  const attrs = (span.attributes ?? null) as Record<string, unknown> | null;
+  if (attrs && attrs["langwatch.causality_depth"] !== undefined) {
+    return attrs["langwatch.causality_depth"];
+  }
+  return undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -143,6 +204,12 @@ export class EvaluationExecutionService {
     const normalizedSettings =
       settings && typeof settings === "object" ? settings : undefined;
 
+    // Compute parent causality depth from the trace's spans; nlpgo
+    // increments and stamps the result on every span it emits.
+    const parentCausalityDepth = maxCausalityDepthOfSpans(
+      trace.spans as unknown as Array<{ attributes?: Record<string, unknown> | null }>,
+    );
+
     const result = await this.runEvaluation({
       projectId,
       evaluatorType,
@@ -150,6 +217,7 @@ export class EvaluationExecutionService {
       settings: normalizedSettings,
       trace,
       workflowId,
+      parentCausalityDepth,
     });
 
     const isError = result.status === "error";
@@ -348,12 +416,13 @@ export class EvaluationExecutionService {
     settings?: Record<string, unknown>;
     trace?: Trace;
     workflowId?: string | null;
+    parentCausalityDepth?: number;
   }): Promise<SingleEvaluationResult> {
-    const { projectId, evaluatorType, data, settings, trace, workflowId } = params;
+    const { projectId, evaluatorType, data, settings, trace, workflowId, parentCausalityDepth } = params;
 
     // Custom/workflow evaluators
     if (data.type === "custom") {
-      return this.runCustomEvaluation(projectId, evaluatorType, data.data, trace, workflowId);
+      return this.runCustomEvaluation(projectId, evaluatorType, data.data, trace, workflowId, parentCausalityDepth);
     }
 
     // Built-in evaluators
@@ -384,6 +453,7 @@ export class EvaluationExecutionService {
     data: Record<string, unknown>,
     trace?: Trace,
     workflowId?: string | null,
+    parentCausalityDepth?: number,
   ): Promise<SingleEvaluationResult> {
     const resolvedWorkflowId = workflowId ?? evaluatorType.split("/")[1];
 
@@ -401,6 +471,8 @@ export class EvaluationExecutionService {
       resolvedWorkflowId,
       projectId,
       requestBody as Record<string, string>,
+      undefined,
+      parentCausalityDepth,
     );
 
     if (response.status !== "success") {

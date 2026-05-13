@@ -36,6 +36,18 @@ export interface NLPGOFetchOptions<TBody = unknown> {
   origin: NLPOrigin;
   /** Optional organization scope for PostHog group targeting. */
   organizationId?: string;
+  /**
+   * Causality depth of the *caller*. nlpgo increments by 1 and stamps
+   * the result on every span it emits. The reactor in trace-processing
+   * skips dispatching evaluations on spans where depth >= 1, breaking
+   * the eval-of-eval loop. See
+   * specs/monitors/online-evaluator-loop-prevention.feature.
+   *
+   * 0 (or absent) means "this call originates from non-evaluator code"
+   * (eg. user-triggered Studio run). The receiver always emits depth=1
+   * on its spans in that case.
+   */
+  causalityDepth?: number;
 }
 
 export interface NLPGOFetchResult<T> {
@@ -77,6 +89,17 @@ export async function nlpgoFetch<T = unknown>(
     "Content-Type": "application/json",
     "X-LangWatch-Origin": opts.origin,
   };
+
+  // Causality depth: forwarded to nlpgo only when the caller is part of
+  // an evaluator chain (i.e. opts.causalityDepth is explicitly set, even
+  // to 0). When undefined we DO NOT send the header — otherwise nlpgo
+  // would stamp depth>=1 on every non-evaluator workflow run (playground,
+  // scenarios, customer workflow API), silently blocking ON_MESSAGE
+  // monitors from firing on workflow-produced traces.
+  if (opts.causalityDepth !== undefined) {
+    const callerDepth = Math.max(0, Math.floor(opts.causalityDepth));
+    headers["X-LangWatch-Causality-Depth"] = String(callerDepth);
+  }
 
   const functionArn = process.env.LANGWATCH_NLP_LAMBDA_CONFIG
     ? await getProjectLambdaArn(opts.projectId)
