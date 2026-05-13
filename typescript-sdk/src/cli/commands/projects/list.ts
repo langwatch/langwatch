@@ -29,7 +29,7 @@ export const listProjectsCommand = async (options?: {
       console.log();
       console.log(chalk.gray("No projects yet."));
       console.log(chalk.gray("Create one with:"));
-      console.log(chalk.cyan('  langwatch projects create --name "my-project" --language python --framework langchain'));
+      console.log(chalk.cyan('  langwatch projects create --name "my-project" --language python --framework langchain --new-team-name "my-team"'));
       return;
     }
 
