@@ -14,6 +14,7 @@ describe("OrganizationService", () => {
   const mockRepo: OrganizationRepository = {
     getOrganizationIdByTeamId: vi.fn(),
     getUserOrgRole: vi.fn(),
+    getUserOrgRoleByTeamId: vi.fn(),
     getProjectIds: vi.fn(),
     getFeature: vi.fn(),
     findWithAdmins: vi.fn(),

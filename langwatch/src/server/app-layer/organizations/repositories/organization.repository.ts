@@ -229,6 +229,10 @@ export interface OrganizationRepository {
     userId: string;
     organizationId: string;
   }): Promise<OrganizationUserRole | null>;
+  getUserOrgRoleByTeamId(params: {
+    userId: string;
+    teamId: string;
+  }): Promise<OrganizationUserRole | null>;
   getProjectIds(organizationId: string): Promise<string[]>;
   getFeature(
     organizationId: string,
@@ -309,6 +313,13 @@ export class NullOrganizationRepository implements OrganizationRepository {
   async getUserOrgRole(_params: {
     userId: string;
     organizationId: string;
+  }): Promise<OrganizationUserRole | null> {
+    return null;
+  }
+
+  async getUserOrgRoleByTeamId(_params: {
+    userId: string;
+    teamId: string;
   }): Promise<OrganizationUserRole | null> {
     return null;
   }

@@ -135,23 +135,16 @@ export async function getUserProtectionsForProject(
   let isMemberOfTeam = teamBindings.length > 0;
 
   if (!isMemberOfTeam) {
-    const orgService = getApp().organizations;
-    const organizationId = await orgService.getOrganizationIdByTeamId(
-      project.teamId,
-    );
+    const orgRole = await getApp().organizations.getUserOrgRoleByTeamId({
+      userId: ctx.session.user.id,
+      teamId: project.teamId,
+    });
 
-    if (organizationId) {
-      const orgRole = await orgService.getUserOrgRole({
-        userId: ctx.session.user.id,
-        organizationId,
-      });
-
-      if (orgRole && orgRole !== OrganizationUserRole.EXTERNAL) {
-        isMemberOfTeam = true;
-        if (orgRole === OrganizationUserRole.ADMIN) {
-          isAdminForTeam = true;
-        }
-      }
+    if (orgRole === OrganizationUserRole.ADMIN) {
+      isMemberOfTeam = true;
+      isAdminForTeam = true;
+    } else if (orgRole === OrganizationUserRole.MEMBER) {
+      isMemberOfTeam = true;
     }
   }
 

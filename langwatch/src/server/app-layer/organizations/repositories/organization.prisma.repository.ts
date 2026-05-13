@@ -57,8 +57,25 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     userId: string;
     organizationId: string;
   }): Promise<OrganizationUserRole | null> {
+    const orgUser = await this.prisma.organizationUser.findUnique({
+      where: { userId_organizationId: { userId, organizationId } },
+      select: { role: true },
+    });
+    return orgUser?.role ?? null;
+  }
+
+  async getUserOrgRoleByTeamId({
+    userId,
+    teamId,
+  }: {
+    userId: string;
+    teamId: string;
+  }): Promise<OrganizationUserRole | null> {
     const orgUser = await this.prisma.organizationUser.findFirst({
-      where: { userId, organizationId },
+      where: {
+        userId,
+        organization: { teams: { some: { id: teamId } } },
+      },
       select: { role: true },
     });
     return orgUser?.role ?? null;

@@ -12,8 +12,7 @@ vi.mock("../rbac", () => ({
 }));
 
 const mockOrgService = {
-  getOrganizationIdByTeamId: vi.fn(),
-  getUserOrgRole: vi.fn(),
+  getUserOrgRoleByTeamId: vi.fn(),
 };
 
 vi.mock("~/server/app-layer/app", () => ({
@@ -143,8 +142,7 @@ describe("getUserProtectionsForProject", () => {
       });
 
       mockPrisma.roleBinding.findMany.mockResolvedValue([]);
-      mockOrgService.getOrganizationIdByTeamId.mockResolvedValue("org-1");
-      mockOrgService.getUserOrgRole.mockResolvedValue(null);
+      mockOrgService.getUserOrgRoleByTeamId.mockResolvedValue(null);
     });
 
     it("denies visibility for VISIBLE_TO_ALL", async () => {
@@ -169,8 +167,7 @@ describe("getUserProtectionsForProject", () => {
       });
 
       mockPrisma.roleBinding.findMany.mockResolvedValue([]);
-      mockOrgService.getOrganizationIdByTeamId.mockResolvedValue("org-1");
-      mockOrgService.getUserOrgRole.mockResolvedValue("MEMBER");
+      mockOrgService.getUserOrgRoleByTeamId.mockResolvedValue("MEMBER");
     });
 
     it("grants visibility for VISIBLE_TO_ALL via org fallback", async () => {
@@ -213,8 +210,7 @@ describe("getUserProtectionsForProject", () => {
       });
 
       mockPrisma.roleBinding.findMany.mockResolvedValue([]);
-      mockOrgService.getOrganizationIdByTeamId.mockResolvedValue("org-1");
-      mockOrgService.getUserOrgRole.mockResolvedValue("ADMIN");
+      mockOrgService.getUserOrgRoleByTeamId.mockResolvedValue("ADMIN");
     });
 
     it("grants visibility for VISIBLE_TO_ADMIN via org admin fallback", async () => {
@@ -257,8 +253,7 @@ describe("getUserProtectionsForProject", () => {
       });
 
       mockPrisma.roleBinding.findMany.mockResolvedValue([]);
-      mockOrgService.getOrganizationIdByTeamId.mockResolvedValue("org-1");
-      mockOrgService.getUserOrgRole.mockResolvedValue("EXTERNAL");
+      mockOrgService.getUserOrgRoleByTeamId.mockResolvedValue("EXTERNAL");
     });
 
     it("denies visibility even for VISIBLE_TO_ALL", async () => {

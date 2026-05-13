@@ -118,6 +118,13 @@ export class OrganizationService {
     return this.repo.getUserOrgRole(params);
   }
 
+  async getUserOrgRoleByTeamId(params: {
+    userId: string;
+    teamId: string;
+  }): Promise<OrganizationUserRole | null> {
+    return this.repo.getUserOrgRoleByTeamId(params);
+  }
+
   async getProjectIds(organizationId: string): Promise<string[]> {
     return this.repo.getProjectIds(organizationId);
   }
