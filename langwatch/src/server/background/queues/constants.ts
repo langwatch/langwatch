@@ -28,12 +28,6 @@ export const TOPIC_CLUSTERING_QUEUE = {
   JOB: "topic_clustering",
 } as const;
 
-/** Track events queue - processes analytics events */
-export const TRACK_EVENTS_QUEUE = {
-  NAME: makeQueueName("track_events"),
-  JOB: "track_events",
-} as const;
-
 /** Usage stats queue - collects usage statistics */
 export const USAGE_STATS_QUEUE = {
   NAME: makeQueueName("usage_stats"),

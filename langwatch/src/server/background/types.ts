@@ -5,7 +5,6 @@ import type {
   RESTEvaluation,
   ReservedTraceMetadata,
   Span,
-  TrackEventRESTParamsValidator,
 } from "../tracer/types";
 
 export type EvaluationJobCheck = {
@@ -62,15 +61,6 @@ export function getEvaluatorId(check: EvaluationJobCheck): string {
 export type TopicClusteringJob = {
   project_id: string;
   search_after?: [number, string];
-};
-
-export type TrackEventJob = {
-  project_id: string;
-  postpone_count: number;
-  event: TrackEventRESTParamsValidator & {
-    event_id: string;
-    timestamp: number;
-  };
 };
 
 export type CollectorJob = {

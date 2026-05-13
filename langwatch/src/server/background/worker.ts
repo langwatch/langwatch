@@ -6,7 +6,6 @@ import type {
   CollectorJob,
   EvaluationJob,
   TopicClusteringJob,
-  TrackEventJob,
   UsageStatsJob,
 } from "~/server/background/types";
 import type {
@@ -22,7 +21,6 @@ import {
 import { registerEvaluationsFallbackWorker } from "./queues/evaluationsQueue";
 import { startAnomalyWorker } from "../observability/anomalyWorker";
 import { startTopicClusteringWorker } from "./workers/topicClusteringWorker";
-import { startTrackEventsWorker } from "./workers/trackEventsWorker";
 
 import fs from "fs";
 import http from "http";
@@ -112,7 +110,6 @@ type Workers = {
   collectorWorker: Worker<CollectorJob, void, string> | undefined;
   evaluationsWorker: Worker<EvaluationJob, any, EvaluatorTypes> | undefined;
   topicClusteringWorker: Worker<TopicClusteringJob, void, string> | undefined;
-  trackEventsWorker: Worker<TrackEventJob, void, string> | undefined;
   usageStatsWorker: Worker<UsageStatsJob, void, string> | undefined;
   scenarioProcessor: { close: () => Promise<void> } | undefined;
 };
@@ -162,7 +159,6 @@ export const start = async (
       runEvaluationMock ?? runEvaluationJob,
     );
     const topicClusteringWorker = startTopicClusteringWorker();
-    const trackEventsWorker = startTrackEventsWorker();
     const usageStatsWorker = startUsageStatsWorker();
     const metricsServer = startMetricsServer();
 
@@ -170,7 +166,6 @@ export const start = async (
     registerCloseable("collector", collectorWorker);
     registerCloseable("evaluations", evaluationsWorker);
     registerCloseable("topicClustering", topicClusteringWorker);
-    registerCloseable("trackEvents", trackEventsWorker);
     registerCloseable("usageStats", usageStatsWorker);
     registerCloseable("scenario", scenarioProcessor);
     registerCloseable("metricsServer", {
@@ -209,7 +204,6 @@ export const start = async (
     collectorWorker?.on("closing", closingListener);
     evaluationsWorker?.on("closing", closingListener);
     topicClusteringWorker?.on("closing", closingListener);
-    trackEventsWorker?.on("closing", closingListener);
     usageStatsWorker?.on("closing", closingListener);
     if (maxRuntimeMs) {
       setTimeout(() => {
@@ -219,13 +213,11 @@ export const start = async (
           collectorWorker?.off("closing", closingListener);
           evaluationsWorker?.off("closing", closingListener);
           topicClusteringWorker?.off("closing", closingListener);
-          trackEventsWorker?.off("closing", closingListener);
           usageStatsWorker?.off("closing", closingListener);
           await Promise.all([
             collectorWorker?.close(),
             evaluationsWorker?.close(),
             topicClusteringWorker?.close(),
-            trackEventsWorker?.close(),
             usageStatsWorker?.close(),
             scenarioProcessor?.close(),
             new Promise<void>((resolve) =>
@@ -245,7 +237,6 @@ export const start = async (
         collectorWorker,
         evaluationsWorker,
         topicClusteringWorker,
-        trackEventsWorker,
         usageStatsWorker,
         scenarioProcessor,
       });
