@@ -114,7 +114,7 @@ describe("ReplayService tenant-specific ClickHouse", () => {
           source: "pipeline",
           pauseKey: "test/projection/test",
           kind: "fold",
-          definition: { name: "test", version: "v1", lastEventOccurredAtKey: "LastEventOccurredAt", eventTypes: ["trace.upserted"], init: () => ({}), apply: (s) => s, store: { store: vi.fn(), get: vi.fn() } },
+          definition: { name: "test", version: "v1", LastEventOccurredAtKey: "LastEventOccurredAt", eventTypes: ["trace.upserted"], init: () => ({}), apply: (s) => s, store: { store: vi.fn(), get: vi.fn() } },
         },
         since: "2023-11-01",
         tenantId: tenantA,
@@ -136,7 +136,7 @@ describe("ReplayService tenant-specific ClickHouse", () => {
           source: "pipeline",
           pauseKey: "test/projection/test",
           kind: "fold",
-          definition: { name: "test", version: "v1", lastEventOccurredAtKey: "LastEventOccurredAt", eventTypes: ["trace.upserted"], init: () => ({}), apply: (s) => s, store: { store: vi.fn(), get: vi.fn() } },
+          definition: { name: "test", version: "v1", LastEventOccurredAtKey: "LastEventOccurredAt", eventTypes: ["trace.upserted"], init: () => ({}), apply: (s) => s, store: { store: vi.fn(), get: vi.fn() } },
         },
         since: "2023-11-01",
         tenantId: tenantA,
@@ -150,7 +150,7 @@ describe("ReplayService tenant-specific ClickHouse", () => {
           source: "pipeline",
           pauseKey: "test/projection/test",
           kind: "fold",
-          definition: { name: "test", version: "v1", lastEventOccurredAtKey: "LastEventOccurredAt", eventTypes: ["trace.upserted"], init: () => ({}), apply: (s) => s, store: { store: vi.fn(), get: vi.fn() } },
+          definition: { name: "test", version: "v1", LastEventOccurredAtKey: "LastEventOccurredAt", eventTypes: ["trace.upserted"], init: () => ({}), apply: (s) => s, store: { store: vi.fn(), get: vi.fn() } },
         },
         since: "2023-11-01",
         tenantId: tenantB,
@@ -182,7 +182,7 @@ describe("ReplayService tenant-specific ClickHouse", () => {
           source: "pipeline",
           pauseKey: "test/projection/test",
           kind: "fold",
-          definition: { name: "test", version: "v1", lastEventOccurredAtKey: "LastEventOccurredAt", eventTypes: ["trace.upserted"], init: () => ({}), apply: (s) => s, store: { store: vi.fn(), get: vi.fn() } },
+          definition: { name: "test", version: "v1", LastEventOccurredAtKey: "LastEventOccurredAt", eventTypes: ["trace.upserted"], init: () => ({}), apply: (s) => s, store: { store: vi.fn(), get: vi.fn() } },
         },
         since: "2023-11-01",
         // no tenantId — discovers across all
@@ -225,7 +225,7 @@ describe("ReplayService tenant-specific ClickHouse", () => {
           source: "pipeline",
           pauseKey: "test/projection/test",
           kind: "fold",
-          definition: { name: "test", version: "v1", lastEventOccurredAtKey: "LastEventOccurredAt", eventTypes: ["trace.upserted"], init: () => ({}), apply: (s) => s, store: { store: vi.fn(), get: vi.fn() } },
+          definition: { name: "test", version: "v1", LastEventOccurredAtKey: "LastEventOccurredAt", eventTypes: ["trace.upserted"], init: () => ({}), apply: (s) => s, store: { store: vi.fn(), get: vi.fn() } },
         },
         since: "2023-11-01",
         tenantId: tenantA,
@@ -239,7 +239,7 @@ describe("ReplayService tenant-specific ClickHouse", () => {
           source: "pipeline",
           pauseKey: "test/projection/test",
           kind: "fold",
-          definition: { name: "test", version: "v1", lastEventOccurredAtKey: "LastEventOccurredAt", eventTypes: ["trace.upserted"], init: () => ({}), apply: (s) => s, store: { store: vi.fn(), get: vi.fn() } },
+          definition: { name: "test", version: "v1", LastEventOccurredAtKey: "LastEventOccurredAt", eventTypes: ["trace.upserted"], init: () => ({}), apply: (s) => s, store: { store: vi.fn(), get: vi.fn() } },
         },
         since: "2023-11-01",
         tenantId: tenantB,
@@ -254,17 +254,21 @@ describe("ReplayService tenant-specific ClickHouse", () => {
   });
 
   describe("replay map projection", () => {
+    type MapRecord = { doubled: number; src: string };
+    type AppendFn = MapProjectionDefinition<MapRecord, any>["store"]["append"];
+    type BulkAppendFn = NonNullable<MapProjectionDefinition<MapRecord, any>["store"]["bulkAppend"]>;
+
     function createMapProjection({
       name,
       bulkAppend,
       append,
     }: {
       name: string;
-      bulkAppend?: ReturnType<typeof vi.fn>;
-      append?: ReturnType<typeof vi.fn>;
+      bulkAppend?: BulkAppendFn;
+      append?: AppendFn;
     }): RegisteredMapProjection {
       const pipelineName = "test_pipeline";
-      const definition: MapProjectionDefinition<{ doubled: number; src: string }, any> = {
+      const definition: MapProjectionDefinition<MapRecord, any> = {
         name,
         eventTypes: ["trace.upserted"],
         map: (event: any) => ({
@@ -272,7 +276,7 @@ describe("ReplayService tenant-specific ClickHouse", () => {
           src: event.aggregateId,
         }),
         store: {
-          append: append ?? vi.fn().mockResolvedValue(undefined),
+          append: append ?? (async () => undefined),
           ...(bulkAppend ? { bulkAppend } : {}),
         },
       };
