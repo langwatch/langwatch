@@ -7,6 +7,10 @@ export async function handleCreateProject(params: {
   teamId?: string;
   newTeamName?: string;
 }): Promise<string> {
+  if (!params.teamId && !params.newTeamName) {
+    return "Error: You must provide either `teamId` (to add to an existing team) or `newTeamName` (to create a new team for this project).";
+  }
+
   const result = await apiCreateProject({
     name: params.name,
     language: params.language,
@@ -14,6 +18,12 @@ export async function handleCreateProject(params: {
     teamId: params.teamId,
     newTeamName: params.newTeamName,
   });
+
+  if (!result.serviceApiKey) {
+    throw new Error(
+      "API did not return a service API key. The project was created but the key is missing — check the LangWatch UI.",
+    );
+  }
 
   const lines: string[] = [];
   lines.push(`Project created successfully!\n`);

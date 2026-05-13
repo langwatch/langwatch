@@ -320,3 +320,132 @@ describe("handleRevokeApiKey()", () => {
     expect(result).toContain("revoked successfully");
   });
 });
+
+// --- Error-path tests ---
+
+describe("handleCreateProject() validation", () => {
+  describe("when neither teamId nor newTeamName is provided", () => {
+    it("returns a validation error without calling the API", async () => {
+      const result = await handleCreateProject({
+        name: "Test Project",
+        language: "python",
+        framework: "openai",
+      });
+
+      expect(result).toContain("Error");
+      expect(result).toContain("teamId");
+      expect(result).toContain("newTeamName");
+      expect(mockCreateProject).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when API does not return a serviceApiKey", () => {
+    it("throws an error to prevent silent data loss", async () => {
+      mockCreateProject.mockResolvedValue({
+        id: "proj_new",
+        name: "New Project",
+        slug: "new-project",
+        language: "typescript",
+        framework: "custom",
+        teamId: "team_1",
+        piiRedactionLevel: "DISABLED",
+        createdAt: "2024-01-01T00:00:00Z",
+        updatedAt: "2024-01-01T00:00:00Z",
+        serviceApiKey: "",
+        serviceApiKeyId: "key_svc_1",
+      } as never);
+
+      await expect(
+        handleCreateProject({
+          name: "New Project",
+          language: "typescript",
+          framework: "custom",
+          newTeamName: "My Team",
+        }),
+      ).rejects.toThrow("service API key");
+    });
+  });
+});
+
+describe("handleListProjects() edge cases", () => {
+  describe("when API returns non-array data", () => {
+    it("returns empty state message", async () => {
+      mockListProjects.mockResolvedValue({
+        data: null as never,
+        pagination: { page: 1, limit: 100, total: 0, totalPages: 0 },
+      });
+
+      const result = await handleListProjects();
+
+      expect(result).toContain("No projects found");
+    });
+  });
+
+  describe("when API call throws", () => {
+    it("propagates the error", async () => {
+      mockListProjects.mockRejectedValue(
+        new Error('LangWatch API error 403: {"error":"Forbidden","message":"Insufficient permissions"}'),
+      );
+
+      await expect(handleListProjects()).rejects.toThrow("403");
+    });
+  });
+});
+
+describe("handleListApiKeys() edge cases", () => {
+  describe("when a key has a past expiration date", () => {
+    it("shows EXPIRED status", async () => {
+      mockListApiKeys.mockResolvedValue({
+        data: [
+          {
+            id: "key_exp",
+            name: "Expired Key",
+            description: null,
+            createdAt: "2024-01-01T00:00:00Z",
+            expiresAt: "2024-06-01T00:00:00Z",
+            lastUsedAt: null,
+            revokedAt: null,
+            roleBindings: [],
+          },
+        ],
+      });
+
+      const result = await handleListApiKeys();
+
+      expect(result).toContain("EXPIRED");
+    });
+  });
+
+  describe("when a key has a future expiration date", () => {
+    it("shows ACTIVE status", async () => {
+      mockListApiKeys.mockResolvedValue({
+        data: [
+          {
+            id: "key_future",
+            name: "Future Key",
+            description: null,
+            createdAt: "2024-01-01T00:00:00Z",
+            expiresAt: "2099-12-31T23:59:59Z",
+            lastUsedAt: null,
+            revokedAt: null,
+            roleBindings: [],
+          },
+        ],
+      });
+
+      const result = await handleListApiKeys();
+
+      expect(result).toContain("ACTIVE");
+    });
+  });
+
+  describe("when API returns non-array data", () => {
+    it("returns empty state message", async () => {
+      mockListApiKeys.mockResolvedValue({ data: null as never });
+
+      const result = await handleListApiKeys();
+
+      expect(result).toContain("No API keys found");
+    });
+  });
+});
