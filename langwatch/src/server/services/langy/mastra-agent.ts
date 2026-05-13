@@ -52,6 +52,10 @@ export async function streamLangyMastraResponse({
     id: "langy",
     name: "Langy",
     instructions: systemPrompt,
+    // @ts-expect-error Mastra ↔ AI SDK v6 type bridge gap (Phase 4.3 spike).
+    // `Agent` expects `DynamicArgument<ModelWithRetries[] | MastraModelConfig, unknown>`
+    // but we pass a plain AI-SDK `LanguageModel`. Mastra accepts it at runtime
+    // (its `isVercelModel` check); the wrapper type belongs in Phase 4.5 cutover.
     model,
     tools,
   });
@@ -63,6 +67,11 @@ export async function streamLangyMastraResponse({
   });
 
   return createUIMessageStreamResponse({
+    // @ts-expect-error Mastra ↔ AI SDK v6 type bridge gap (Phase 4.3 spike).
+    // `toAISdkV5Stream` returns `ReadableStream<InferUIMessageChunk<UIMessage<..., UITools>>>`,
+    // `createUIMessageStreamResponse` wants `ReadableStream<UIMessageChunk<..., UIDataTypes>>`.
+    // Chunk shape matches at runtime; the generic `UITools` parameter is the only mismatch.
+    // Resolve at Phase 4.5 cutover when this path becomes the default.
     stream: toAISdkV5Stream(stream, { from: "agent" }),
   });
 }
