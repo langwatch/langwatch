@@ -120,11 +120,13 @@ describe("Feature: Teams REST API", () => {
   });
 
   describe("Authentication", () => {
+    /** @scenario Rejects unauthenticated requests */
     it("returns 401 without auth header", async () => {
       const res = await app.request("/api/teams");
       expect(res.status).toBe(401);
     });
 
+    /** @scenario Rejects invalid API key */
     it("returns 401 with invalid API key", async () => {
       const res = await app.request("/api/teams", {
         headers: { Authorization: "Bearer sk-lw-invalid_token" },
@@ -134,6 +136,7 @@ describe("Feature: Teams REST API", () => {
   });
 
   describe("POST /api/teams", () => {
+    /** @scenario Creates a team */
     it("creates a team and returns 201", async () => {
       const res = await api.post("/api/teams", {
         name: "My Test Team",
@@ -149,6 +152,7 @@ describe("Feature: Teams REST API", () => {
       expect(body.updatedAt).toBeDefined();
     });
 
+    /** @scenario Rejects create when name is missing */
     it("returns 422 when name is missing", async () => {
       const res = await api.post("/api/teams", {});
       expect(res.status).toBe(422);
@@ -157,11 +161,13 @@ describe("Feature: Teams REST API", () => {
       expect(body.error).toBe("Unprocessable Entity");
     });
 
+    /** @scenario Rejects create when name is empty */
     it("returns 422 when name is empty", async () => {
       const res = await api.post("/api/teams", { name: "" });
       expect(res.status).toBe(422);
     });
 
+    /** @scenario Rejects create when name exceeds 255 characters */
     it("returns 422 when name exceeds 255 characters", async () => {
       const res = await api.post("/api/teams", { name: "a".repeat(256) });
       expect(res.status).toBe(422);
@@ -169,6 +175,7 @@ describe("Feature: Teams REST API", () => {
   });
 
   describe("GET /api/teams", () => {
+    /** @scenario Lists non-archived teams for the organization */
     it("lists non-archived teams for the organization", async () => {
       const res = await api.get("/api/teams");
       expect(res.status).toBe(200);
@@ -180,6 +187,7 @@ describe("Feature: Teams REST API", () => {
       expect(body.pagination.page).toBe(1);
     });
 
+    /** @scenario Paginates team list */
     it("paginates results", async () => {
       const res = await api.get("/api/teams?page=1&limit=2");
       expect(res.status).toBe(200);
@@ -188,6 +196,7 @@ describe("Feature: Teams REST API", () => {
       expect(body.pagination.limit).toBe(2);
     });
 
+    /** @scenario Excludes teams from other organizations */
     it("excludes teams from other organizations", async () => {
       await prisma.team.create({
         data: {
@@ -207,6 +216,7 @@ describe("Feature: Teams REST API", () => {
   });
 
   describe("GET /api/teams/:id", () => {
+    /** @scenario Returns a team by id */
     it("returns a team by id", async () => {
       const createRes = await api.post("/api/teams", {
         name: `Get Test ${nanoid(6)}`,
@@ -221,11 +231,13 @@ describe("Feature: Teams REST API", () => {
       expect(body.name).toBe(created.name);
     });
 
+    /** @scenario Returns 404 for non-existent team */
     it("returns 404 for non-existent team", async () => {
       const res = await api.get("/api/teams/team_doesnotexist");
       expect(res.status).toBe(404);
     });
 
+    /** @scenario Returns 404 for team in another organization */
     it("returns 404 for team in another organization", async () => {
       const otherTeam = await prisma.team.create({
         data: {
@@ -241,6 +253,7 @@ describe("Feature: Teams REST API", () => {
   });
 
   describe("PATCH /api/teams/:id", () => {
+    /** @scenario Updates team name */
     it("updates team name", async () => {
       const createRes = await api.post("/api/teams", {
         name: `Patch Test ${nanoid(6)}`,
@@ -257,6 +270,7 @@ describe("Feature: Teams REST API", () => {
       expect(body.id).toBe(created.id);
     });
 
+    /** @scenario Returns 404 when updating non-existent team */
     it("returns 404 for non-existent team", async () => {
       const res = await api.patch("/api/teams/team_ghost", {
         name: "Whatever",
@@ -266,6 +280,7 @@ describe("Feature: Teams REST API", () => {
   });
 
   describe("DELETE /api/teams/:id", () => {
+    /** @scenario Archives a team */
     it("archives the team", async () => {
       const createRes = await api.post("/api/teams", {
         name: `Delete Test ${nanoid(6)}`,
@@ -280,6 +295,7 @@ describe("Feature: Teams REST API", () => {
       expect(body.archivedAt).toBeDefined();
     });
 
+    /** @scenario Archived team is inaccessible via GET */
     it("makes the team inaccessible via GET after archival", async () => {
       const createRes = await api.post("/api/teams", {
         name: `Archive Test ${nanoid(6)}`,
@@ -292,6 +308,7 @@ describe("Feature: Teams REST API", () => {
       expect(getRes.status).toBe(404);
     });
 
+    /** @scenario Archived team is excluded from list */
     it("excludes archived teams from list", async () => {
       const createRes = await api.post("/api/teams", {
         name: `Archive List Test ${nanoid(6)}`,
@@ -306,11 +323,13 @@ describe("Feature: Teams REST API", () => {
       expect(ids).not.toContain(created.id);
     });
 
+    /** @scenario Returns 404 when deleting non-existent team */
     it("returns 404 for non-existent team", async () => {
       const res = await api.delete("/api/teams/team_nope");
       expect(res.status).toBe(404);
     });
 
+    /** @scenario Returns 404 when deleting already-archived team */
     it("returns 404 for already-archived team", async () => {
       const createRes = await api.post("/api/teams", {
         name: `Double Archive ${nanoid(6)}`,
@@ -369,11 +388,13 @@ describe("Feature: Teams REST API", () => {
         }),
     };
 
+    /** @scenario Viewer can list teams */
     it("allows viewer to list teams", async () => {
       const res = await viewerApi.get("/api/teams");
       expect(res.status).toBe(200);
     });
 
+    /** @scenario Viewer cannot create a team */
     it("returns 403 when viewer creates a team", async () => {
       const res = await viewerApi.post("/api/teams", { name: "Blocked Team" });
       expect(res.status).toBe(403);
@@ -382,6 +403,7 @@ describe("Feature: Teams REST API", () => {
       expect(body.error).toBe("Forbidden");
     });
 
+    /** @scenario Viewer cannot update a team */
     it("returns 403 when viewer updates a team", async () => {
       const createRes = await api.post("/api/teams", {
         name: `Perm Test ${nanoid(6)}`,
@@ -394,6 +416,7 @@ describe("Feature: Teams REST API", () => {
       expect(res.status).toBe(403);
     });
 
+    /** @scenario Viewer cannot delete a team */
     it("returns 403 when viewer deletes a team", async () => {
       const createRes = await api.post("/api/teams", {
         name: `Perm Del Test ${nanoid(6)}`,
