@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/oklog/ulid/v2"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/langwatch/langwatch/services/nlpgo/app"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/agentblock"
@@ -224,7 +225,15 @@ func (e *Engine) runLayer(ctx context.Context, req ExecuteRequest, plan *planner
 			node := state.nodes[nodeID]
 			inputs := state.resolveInputs(plan, nodeID)
 			ns := &NodeState{ID: nodeID, Status: "running", Inputs: inputs}
-			nodeCtx, span := startNodeSpan(ctx, node, req)
+			// Skip the span for pass-through node kinds (Entry, End,
+			// PromptingTechnique) — Python doesn't emit spans for those
+			// either. nodeEmitsSpan keeps the trace tree free of 0ms
+			// noise rows so operators see only nodes with real work.
+			nodeCtx := ctx
+			var span trace.Span
+			if nodeEmitsSpan(node.Type) {
+				nodeCtx, span = startNodeSpan(ctx, node, req)
+			}
 			started := time.Now()
 			outputs, derr := e.dispatch(nodeCtx, req, node, inputs, ns)
 			ns.DurationMS = time.Since(started).Milliseconds()
@@ -242,7 +251,9 @@ func (e *Engine) runLayer(ctx context.Context, req ExecuteRequest, plan *planner
 			// it must run after the success branch sets it. Tracing parity
 			// with Python's execute_component depends on this attribute
 			// being present.
-			endNodeSpan(span, ns, derr)
+			if span != nil {
+				endNodeSpan(span, ns, derr)
+			}
 			state.recordState(nodeID, ns)
 		}()
 	}
