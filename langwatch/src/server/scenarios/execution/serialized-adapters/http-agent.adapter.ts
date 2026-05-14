@@ -203,7 +203,7 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
         "http call failed",
       );
       throw new Error(
-        `HTTP ${response.status}: ${response.statusText} from ${url} (request-id: ${
+        `HTTP ${response.status}: ${response.statusText} from ${loggedUrl} (request-id: ${
           upstreamRequestId ?? "none"
         }): ${previewErrorBody(responseBody)}`,
       );

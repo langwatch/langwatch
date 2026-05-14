@@ -77,7 +77,7 @@ Feature: HTTP agent error surfacing and per-call diagnostics
     When the adapter calls the stub
     Then exactly one structured diagnostic log line is emitted
     And the log line includes the response status 422
-    And the log line includes a redacted, truncated sample of the response body
+    And the log line includes a truncated sample of the response body
 
   @integration
   Scenario: Diagnostic log preserves response body for the success path
