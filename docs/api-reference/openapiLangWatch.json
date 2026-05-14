@@ -27408,6 +27408,9 @@
           },
           "404": {
             "description": "Team not found"
+          },
+          "422": {
+            "description": "Validation error (invalid name)"
           }
         }
       },
@@ -27900,7 +27903,15 @@
             "type": "string",
             "format": "date-time"
           }
-        }
+        },
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "organizationId",
+          "createdAt",
+          "updatedAt"
+        ]
       }
     },
     "securitySchemes": {
