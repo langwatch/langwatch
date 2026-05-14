@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  CONTACT_SALES_URL,
   FREE_PLAN,
   LICENSE_ERRORS,
   LICENSE_ERROR_MESSAGES,
@@ -69,6 +70,13 @@ describe("UNLIMITED_PLAN", () => {
     expect(UNLIMITED_PLAN.maxMessagesPerMonth).toBe(Number.MAX_SAFE_INTEGER);
     expect(UNLIMITED_PLAN.maxWorkflows).toBe(Number.MAX_SAFE_INTEGER);
     expect(UNLIMITED_PLAN.canPublish).toBe(true);
+  });
+});
+
+describe("CONTACT_SALES_URL", () => {
+  /** @scenario CONTACT_SALES_URL resolves to the public demo form */
+  it("equals the public LangWatch demo form URL", () => {
+    expect(CONTACT_SALES_URL).toBe("https://langwatch.ai/get-a-demo");
   });
 });
 
