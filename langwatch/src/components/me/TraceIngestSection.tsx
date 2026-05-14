@@ -213,7 +213,6 @@ export function TraceIngestSection() {
                   subtitle={meta.subtitle}
                   icon={meta.icon}
                   installed={!!binding}
-                  prefix={binding?.bindingAccessTokenPrefix ?? null}
                   onClick={() => handleTileClick(t.id, t.slug)}
                 />
               );
@@ -260,7 +259,6 @@ function InstallTile({
   subtitle,
   icon,
   installed,
-  prefix,
   onClick,
 }: {
   slug: string;
@@ -268,7 +266,6 @@ function InstallTile({
   subtitle: string;
   icon: ReactNode;
   installed: boolean;
-  prefix: string | null;
   onClick: () => void;
 }) {
   return (
@@ -320,11 +317,6 @@ function InstallTile({
           <Text fontSize="xs" color="fg.muted" lineClamp={2}>
             {subtitle}
           </Text>
-          {installed && prefix && (
-            <Text fontSize="xs" color="fg.subtle" fontFamily="mono">
-              {prefix}…
-            </Text>
-          )}
         </VStack>
       </HStack>
     </Box>
