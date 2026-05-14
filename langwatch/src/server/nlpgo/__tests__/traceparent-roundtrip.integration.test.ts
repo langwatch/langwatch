@@ -30,10 +30,16 @@
  * wire format but doesn't prove the spans actually survive the
  * roundtrip and land where Studio queries them.
  *
- * Skipped when:
- *   - `go` is not on PATH (CI without Go toolchain)
+ * Opt-in: this test spawns a real Go subprocess (`go run`), which on
+ * a cold module cache takes well over CI's nlpgo-health budget. It is
+ * therefore skipped unless explicitly enabled via NLPGO_E2E=1. Run it
+ * locally to validate the full roundtrip before shipping pipeline /
+ * traceparent / OTLP changes.
+ *
+ * Skipped when ANY of:
+ *   - NLPGO_E2E is not "1"
+ *   - `go` is not on PATH
  *   - testcontainers Redis + ClickHouse are not running
- *   - SKIP_NLPGO_E2E=1 is set
  */
 import { execSync, spawn, type ChildProcess } from "node:child_process";
 import http from "node:http";
@@ -98,7 +104,7 @@ function hasGo(): boolean {
   }
 }
 const shouldRun =
-  hasTestcontainers && hasGo() && process.env.SKIP_NLPGO_E2E !== "1";
+  process.env.NLPGO_E2E === "1" && hasTestcontainers && hasGo();
 
 const noopReactor = { name: "noop", options: {}, handle: async () => {} };
 
@@ -244,6 +250,18 @@ describe.skipIf(!shouldRun)(
       langwatchSrv = http.createServer((req, res) => {
         const chunks: Buffer[] = [];
         req.on("data", (c: Buffer) => chunks.push(c));
+        req.on("error", (err) => {
+          if (process.env.NLPGO_TEST_LOG === "1") {
+            // eslint-disable-next-line no-console
+            console.error("[fake-langwatch] request stream error", err);
+          }
+          try {
+            res.statusCode = 500;
+            res.end();
+          } catch {
+            /* response may already be closed */
+          }
+        });
         req.on("end", () => {
           void (async () => {
             const body = Buffer.concat(chunks);
@@ -308,11 +326,15 @@ describe.skipIf(!shouldRun)(
         stdio: ["ignore", "pipe", "pipe"],
         detached: true,
       });
-      nlpgoProcess.stderr?.on("data", (chunk: Buffer) => {
+      const drain = (label: "out" | "err", chunk: Buffer) => {
         if (process.env.NLPGO_TEST_LOG === "1") {
-          process.stderr.write(`[nlpgo] ${chunk.toString()}`);
+          process.stderr.write(`[nlpgo:${label}] ${chunk.toString()}`);
         }
-      });
+      };
+      // Must drain BOTH pipes — leaving stdout unconsumed will block the
+      // Go subprocess on writes once the Linux pipe buffer (~64 KiB) fills.
+      nlpgoProcess.stdout?.on("data", (chunk: Buffer) => drain("out", chunk));
+      nlpgoProcess.stderr?.on("data", (chunk: Buffer) => drain("err", chunk));
       nlpgoProcess.on("exit", (code, signal) => {
         if (code !== 0 && code !== null) {
           // eslint-disable-next-line no-console
@@ -446,7 +468,6 @@ describe.skipIf(!shouldRun)(
           // children create a fresh trace_id (the 2026-05-14 bug).
           do_not_trace: false,
           run_evaluations: false,
-          origin: "evaluation",
         },
       };
     }

@@ -233,6 +233,10 @@ export class RecordSpanCommand implements CommandHandler<
     };
   }
 
+  private static readonly RESERVED_ATTR_PASSTHROUGH = new Set<string>([
+    "langwatch.reserved.causality_depth",
+  ]);
+
   /**
    * Strips user-submitted `langwatch.reserved.*` attributes from a span
    * and its events/links/resource. These attributes are reserved for
@@ -254,10 +258,6 @@ export class RecordSpanCommand implements CommandHandler<
    * impact, and bypassing requires knowing internal attribute names.
    * Far preferable to silently breaking loop prevention.
    */
-  private static readonly RESERVED_ATTR_PASSTHROUGH = new Set<string>([
-    "langwatch.reserved.causality_depth",
-  ]);
-
   private static stripReservedAttributes(
     span: OtlpSpan,
     resource: OtlpResource | null,

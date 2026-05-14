@@ -255,7 +255,7 @@ func TestCausalityPropagation_RootSpanContinuesParentTrace(t *testing.T) {
 	// (its parent should be the REMOTE inbound span context).
 	var rootStudioSpan sdktrace.ReadOnlySpan
 	for _, s := range ended {
-		if s.Parent().IsValid() && s.Parent().IsRemote() {
+		if s.SpanKind() == trace.SpanKindServer && s.Parent().IsValid() && s.Parent().IsRemote() {
 			rootStudioSpan = s
 			break
 		}

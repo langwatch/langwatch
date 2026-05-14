@@ -402,31 +402,37 @@ describe.skipIf(!hasTestcontainers)(
       await new Promise((resolve) => setTimeout(resolve, 1500));
     }
 
-    /** @scenario Incoming span with causality_depth=0 still triggers evaluations */
-    it("dispatches one executeEvaluation per monitor when depth=0", async () => {
-      const traceId = generateId("trace");
-      const span = buildAppOriginSpan({
-        traceId,
-        spanId: generateId("span"),
-        depth: 0,
-      });
+    describe("given an incoming span with causality_depth=0", () => {
+      describe("when the span is recorded through the pipeline", () => {
+        /** @scenario Incoming span with causality_depth=0 still triggers evaluations */
+        it("dispatches one executeEvaluation per monitor", async () => {
+          const traceId = generateId("trace");
+          const span = buildAppOriginSpan({
+            traceId,
+            spanId: generateId("span"),
+            depth: 0,
+          });
 
-      await recordSpan(span);
-      await waitFor(() => dispatcher.captured.length >= 1, {
-        timeoutMs: 20_000,
-        label: "reactor dispatched evaluation through the real queue",
-      });
+          await recordSpan(span);
+          await waitFor(() => dispatcher.captured.length >= 1, {
+            timeoutMs: 20_000,
+            label: "reactor dispatched evaluation through the real queue",
+          });
 
-      expect(dispatcher.captured).toHaveLength(1);
-      expect(dispatcher.captured[0]!.evaluatorId).toBe(
-        "monitor_test_loop_prevention",
-      );
-      expect(dispatcher.captured[0]!.tenantId).toBe(tenantIdString);
-      expect(dispatcher.captured[0]!.traceId).toBe(traceId);
+          expect(dispatcher.captured).toHaveLength(1);
+          expect(dispatcher.captured[0]!.evaluatorId).toBe(
+            "monitor_test_loop_prevention",
+          );
+          expect(dispatcher.captured[0]!.tenantId).toBe(tenantIdString);
+          expect(dispatcher.captured[0]!.traceId).toBe(traceId);
+        });
+      });
     });
 
-    /** @scenario Incoming span with causality_depth=1 does not trigger evaluations */
-    it("BLOCKS dispatch when the incoming span carries causality_depth=1", async () => {
+    describe("given an incoming span with causality_depth=1", () => {
+      describe("when the span is recorded after a depth=0 seed", () => {
+        /** @scenario Incoming span with causality_depth=1 does not trigger evaluations */
+        it("blocks dispatch and increments the loop-blocked counter", async () => {
       const traceId = generateId("trace");
 
       // Seed: app-origin depth=0 span establishes the trace's origin
@@ -458,13 +464,17 @@ describe.skipIf(!hasTestcontainers)(
       );
       await quietReactorWindow();
 
-      expect(dispatcher.captured.length).toBe(dispatchesBefore);
-      const afterBlocked = await readBlockedCounter("depth_direct");
-      expect(afterBlocked - beforeBlocked).toBeGreaterThanOrEqual(1);
+          expect(dispatcher.captured.length).toBe(dispatchesBefore);
+          const afterBlocked = await readBlockedCounter("depth_direct");
+          expect(afterBlocked - beforeBlocked).toBeGreaterThanOrEqual(1);
+        });
+      });
     });
 
-    /** @scenario Causality guard is per-span — fresh app activity still re-triggers */
-    it("re-dispatches when a fresh depth=0 span arrives after a depth=1 noise span", async () => {
+    describe("given a trace that has already seen depth=0 then depth=1", () => {
+      describe("when a fresh depth=0 span arrives later on the same trace", () => {
+        /** @scenario Causality guard is per-span — fresh app activity still re-triggers */
+        it("re-dispatches because the depth check is per-span, not per-trace", async () => {
       const traceId = generateId("trace");
 
       // 1. Initial app-origin span — should dispatch.
@@ -526,11 +536,15 @@ describe.skipIf(!hasTestcontainers)(
           label: "fresh depth=0 re-dispatched on the same trace",
         },
       );
-      expect(dispatcher.captured.length).toBe(dispatchesAfter1 + 1);
+          expect(dispatcher.captured.length).toBe(dispatchesAfter1 + 1);
+        });
+      });
     });
 
-    /** @scenario LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD bypasses depth check */
-    it("kill switch — LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD=1 dispatches even on depth=1", async () => {
+    describe("given LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD=1", () => {
+      describe("when a depth=1 span arrives that would normally be blocked", () => {
+        /** @scenario LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD bypasses depth check */
+        it("the kill switch lets the dispatch through anyway", async () => {
       const traceId = generateId("trace");
 
       // Seed to establish origin on fold + clear baseline.
@@ -582,6 +596,8 @@ describe.skipIf(!hasTestcontainers)(
           process.env.LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD = prev;
         }
       }
+        });
+      });
     });
   },
 );
