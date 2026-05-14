@@ -250,6 +250,14 @@ describe("StoredObjectsService (ingest + read path)", () => {
             bytes,
           });
 
+          // Wait for the first row to become visible to the dedup probe;
+          // ClickHouse async_insert makes writes invisible to immediate
+          // reads. In production this race is benign because the id is a
+          // deterministic UUID v5 of (project_id, sha256) — both inserts
+          // produce the same row key and RMT collapses them. In this test
+          // we want to observe the dedup-hit branch explicitly.
+          await waitForRow(ch, PROJECT_A, first.id);
+
           const second = await service.storeFromBytes({
             projectId: PROJECT_A,
             purpose: "scenario_event",
