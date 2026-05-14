@@ -259,11 +259,17 @@ jobs:
             echo "NPX_SERVER_OPENAI_API_KEY not set — skipping workflow execution probe."
             exit 0
           fi
-          # Posts a minimal workflow execution that hits langwatch_nlp.
+          # Placeholder until the real workflow-execution fixture lands.
+          # The earlier "Probe service health endpoints" step already
+          # asserts nlpgo /health (GET) returns 200; re-asserting it here
+          # gives us a stable, mode-independent (nlpgo serves /health in
+          # both go-only and python modes) signal that the secret-gated
+          # branch actually executes. POST against /health returns 502
+          # under nlpgo (only GET is wired) — the earlier draft used POST
+          # and tripped that.
           base=${RESOLVED_BASE}
-          # TODO: replace with a real workflow execution once the smoke fixture lands.
-          curl -fsS -X POST "http://127.0.0.1:$((base + 1))/health"
-          echo "(placeholder workflow probe — full fixture follows browser-QA)"
+          curl -fsS "http://127.0.0.1:$((base + 1))/health" >/dev/null
+          echo "(placeholder workflow probe — real fixture pending)"
 
       - name: Tear down
         if: always()
