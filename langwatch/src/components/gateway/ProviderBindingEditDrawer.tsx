@@ -101,7 +101,7 @@ export function ProviderBindingEditDrawer({
       placement="end"
       size="md"
     >
-      <Drawer.Content>
+      <Drawer.Content bg="bg">
         <Drawer.Header>
           <Drawer.Title>Edit provider binding</Drawer.Title>
           <Drawer.CloseTrigger />

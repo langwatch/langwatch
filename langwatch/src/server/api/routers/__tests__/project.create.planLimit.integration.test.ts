@@ -224,6 +224,7 @@ describe.skipIf(isTestcontainersOnly)(
     });
 
     describe("when overrideAddingLimitations is true", () => {
+      /** @scenario Allow creation when plan has override enabled */
       it("allows project creation despite exceeding limit", async () => {
         const plan: PlanInfo = {
           ...FREE_PLAN,

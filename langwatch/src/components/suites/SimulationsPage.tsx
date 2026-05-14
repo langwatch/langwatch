@@ -79,7 +79,7 @@ export default function SimulationsPage() {
     }
   }, [router.isReady]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const { period, setPeriod } = usePeriodSelector(30);
+  const { period, mode, setPeriod, setRelativePeriod } = usePeriodSelector(30);
 
   // State
   const [contextMenu, setContextMenu] = useState<{
@@ -319,7 +319,12 @@ export default function SimulationsPage() {
           <HStack justify="space-between" align="center" w="full">
             <PageLayout.Heading>Simulations</PageLayout.Heading>
             <HStack>
-              <PeriodSelector period={period} setPeriod={setPeriod} />
+              <PeriodSelector
+                period={period}
+                mode={mode}
+                setPeriod={setPeriod}
+                setRelativePeriod={setRelativePeriod}
+              />
               <PageLayout.HeaderButton onClick={handleNewSuite}>
                 <Plus size={16} /> New Run Plan
               </PageLayout.HeaderButton>

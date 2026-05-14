@@ -28,7 +28,10 @@ export class FallbackExtractor implements CanonicalAttributesExtractor {
     const { attrs } = ctx.bag;
 
     // Skip type inference if already set (in bag or by a previous extractor)
-    if (attrs.has(ATTR_KEYS.SPAN_TYPE) || ctx.out[ATTR_KEYS.SPAN_TYPE] !== undefined) {
+    if (
+      attrs.has(ATTR_KEYS.SPAN_TYPE) ||
+      ctx.out[ATTR_KEYS.SPAN_TYPE] !== undefined
+    ) {
       extractErrorInfo(ctx);
       return;
     }

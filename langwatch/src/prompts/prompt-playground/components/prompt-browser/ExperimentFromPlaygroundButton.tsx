@@ -330,7 +330,7 @@ export function ExperimentFromPlaygroundButton({
         open={isDialogOpen}
         onOpenChange={({ open }) => setIsDialogOpen(open)}
       >
-        <Dialog.Content>
+        <Dialog.Content bg="bg">
           <Dialog.Header>
             <Dialog.Title>Create Experiment</Dialog.Title>
           </Dialog.Header>

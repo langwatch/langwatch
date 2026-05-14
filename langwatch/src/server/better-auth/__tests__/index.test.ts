@@ -17,6 +17,20 @@ describe("better-auth config", () => {
       expect(typeof (auth.api as any).signInEmail).toBe("function");
     });
 
+    it("enables account linking so orphan email-verified Users can sign in via OAuth", async () => {
+      // Regression: a User row with emailVerified=true but zero Account rows
+      // (pre-seeded invite, half-finished signup, or migration leftover)
+      // permanently blocks subsequent OAuth sign-ins for that email — error
+      // surfaces as "registered with another authentication method". On
+      // SSO-enforced orgs this locked users out even after successful IdP
+      // auth. Enabling accountLinking lets BetterAuth attach the new Account
+      // to the existing email-verified User. SSO-domain enforcement still
+      // runs in beforeAccountCreate, so wrong providers are rejected.
+      const { auth } = await import("../index");
+      const options = (auth as any).options;
+      expect(options?.account?.accountLinking?.enabled).toBe(true);
+    });
+
     it("forces sessions to be stored in the database (not Redis-only)", async () => {
       // Regression for iter-19 bug 15: with `secondaryStorage` set,
       // BetterAuth's `createSession` skips the main Prisma adapter unless
@@ -29,6 +43,7 @@ describe("better-auth config", () => {
       expect(options?.session?.storeSessionInDatabase).toBe(true);
     });
 
+    /** @scenario Credentials-only on-prem mode */
     it("gates emailAndPassword.enabled on NEXTAUTH_PROVIDER=email", async () => {
       // Regression for iter-20 bug 16: BetterAuth's email/password routes
       // (`/sign-up/email`, `/sign-in/email`) were unconditionally enabled,

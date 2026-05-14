@@ -19,6 +19,12 @@ vi.mock("~/hooks/useDrawer", () => ({
   }),
 }));
 
+// TraceIdPeek (rendered transitively) calls useFeatureFlag → tRPC, which has
+// no withTRPC wrapper in these tests.
+vi.mock("~/hooks/useFeatureFlag", () => ({
+  useFeatureFlag: () => ({ enabled: false, isLoading: false }),
+}));
+
 // Wrapper with Chakra provider
 const Wrapper = ({ children }: { children: ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
@@ -84,6 +90,7 @@ describe("BatchEvaluationResultsTable", () => {
   });
 
   describe("Loading State", () => {
+    /** @scenario Show loading skeleton while fetching results */
     it("shows skeleton when loading", () => {
       render(
         <BatchEvaluationResultsTable
@@ -103,6 +110,7 @@ describe("BatchEvaluationResultsTable", () => {
   });
 
   describe("Empty State", () => {
+    /** @scenario Show empty state when no results */
     it("shows empty message when no data", () => {
       render(
         <BatchEvaluationResultsTable
@@ -147,6 +155,7 @@ describe("BatchEvaluationResultsTable", () => {
       expect(screen.getByText("1")).toBeInTheDocument();
     });
 
+    /** @scenario Display dataset columns in the table */
     it("renders dataset column headers", () => {
       const data = createTestData();
 
@@ -163,6 +172,8 @@ describe("BatchEvaluationResultsTable", () => {
       expect(screen.getAllByText("expected").length).toBeGreaterThan(0);
     });
 
+    /** @scenario Display target output columns */
+    /** @scenario Display V3 evaluations with multiple targets */
     it("renders target column headers", () => {
       const data = createTestData();
 

@@ -5,7 +5,7 @@ import { z } from "zod";
 import { patchZodOpenapi } from "../../../../utils/extend-zod-openapi";
 import {
   type AuthMiddlewareVariables,
-  authMiddleware,
+  authMiddleware, requirePermission,
   resourceLimitMiddleware,
 } from "../../middleware";
 import {
@@ -86,6 +86,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── List Dashboards ───────────────────────────────────────────
   .get(
     "/",
+    requirePermission("analytics:view"),
     describeRoute({
       description: "List all dashboards for the project with graph counts",
     }),
@@ -115,9 +116,11 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── Create Dashboard ──────────────────────────────────────────
   .post(
     "/",
+    requirePermission("analytics:manage"),
     describeRoute({
       description: "Create a new dashboard",
     }),
+    requirePermission("analytics:manage"),
     resourceLimitMiddleware("dashboards"),
     zValidator("json", createDashboardSchema, validationHook),
     async (c) => {
@@ -148,6 +151,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // Placed before /:id to avoid route conflict with "reorder" being treated as an id
   .put(
     "/reorder",
+    requirePermission("analytics:manage"),
     describeRoute({
       description: "Reorder dashboards by providing an ordered list of IDs",
     }),
@@ -169,6 +173,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── Get Single Dashboard ──────────────────────────────────────
   .get(
     "/:id",
+    requirePermission("analytics:view"),
     describeRoute({
       description: "Get a dashboard by its id, including its graphs",
     }),
@@ -200,6 +205,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── Rename Dashboard ──────────────────────────────────────────
   .patch(
     "/:id",
+    requirePermission("analytics:manage"),
     describeRoute({
       description: "Rename a dashboard",
     }),
@@ -232,6 +238,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── Delete Dashboard ──────────────────────────────────────────
   .delete(
     "/:id",
+    requirePermission("analytics:manage"),
     describeRoute({
       description: "Delete a dashboard and its graphs (hard delete, cascade)",
     }),

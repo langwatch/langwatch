@@ -62,6 +62,9 @@ describe("<RunRow/> borderless styling", () => {
   });
 
   describe("when rendered", () => {
+    /** @scenario "Run rows in All Runs panel span the full available width" */
+    /** @scenario "Run history rows span the full container width" */
+    /** @scenario "Run history rows have no rounded corners" */
     it("renders header as a direct child without wrapper Box", () => {
       render(
         <RunRow
@@ -80,6 +83,7 @@ describe("<RunRow/> borderless styling", () => {
       expect(header).toHaveAttribute("data-testid", "run-row-header");
     });
 
+    /** @scenario "Run row headers are sticky when scrolling" */
     it("has a sticky header with position sticky", () => {
       render(
         <RunRow

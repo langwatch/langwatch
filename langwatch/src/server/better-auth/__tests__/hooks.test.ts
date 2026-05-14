@@ -1,5 +1,15 @@
 import type { PrismaClient } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
+
+vi.mock("~/server/app-layer/app", () => ({
+  getApp: () => ({
+    notifications: {
+      sendSlackSignupEvent: vi.fn().mockResolvedValue(undefined),
+    },
+    nurturing: null,
+  }),
+}));
+
 import {
   afterAccountCreate,
   afterAccountUpdate,
@@ -76,6 +86,7 @@ describe("beforeUserCreate", () => {
 
 describe("afterUserCreate", () => {
   describe("when the email domain matches an organization with ssoDomain", () => {
+    /** @scenario New user with matching SSO domain joins the SSO org */
     it("adds the user to the organization as a MEMBER", async () => {
       const prisma = makePrismaMock({
         organization: {
@@ -92,7 +103,7 @@ describe("afterUserCreate", () => {
 
       await afterUserCreate({
         prisma,
-        user: { id: "user_1", email: "new@acme.com" },
+        user: { id: "user_1", email: "new@acme.com", name: "New User" },
       });
 
       expect(prisma.organization.findUnique).toHaveBeenCalledWith({
@@ -148,7 +159,7 @@ describe("afterUserCreate", () => {
 
       await afterUserCreate({
         prisma,
-        user: { id: "user_1", email: "alice@acme.com" },
+        user: { id: "user_1", email: "alice@acme.com", name: "Alice" },
       });
 
       // Default-branch create must NOT run when invite is applied.
@@ -182,7 +193,7 @@ describe("afterUserCreate", () => {
       const prisma = makePrismaMock();
       await afterUserCreate({
         prisma,
-        user: { id: "user_1", email: "u@other.com" },
+        user: { id: "user_1", email: "u@other.com", name: "User" },
       });
       expect(prisma.organizationUser.create).not.toHaveBeenCalled();
     });
@@ -193,7 +204,7 @@ describe("afterUserCreate", () => {
       const prisma = makePrismaMock();
       await afterUserCreate({
         prisma,
-        user: { id: "user_1", email: "" },
+        user: { id: "user_1", email: "", name: "User" },
       });
       expect(prisma.organization.findUnique).not.toHaveBeenCalled();
     });
@@ -224,7 +235,7 @@ describe("afterUserCreate", () => {
       await expect(
         afterUserCreate({
           prisma,
-          user: { id: "user_1", email: "u@acme.com" },
+          user: { id: "user_1", email: "u@acme.com", name: "User" },
         }),
       ).resolves.toBeUndefined();
     });
@@ -244,6 +255,7 @@ describe("beforeAccountCreate", () => {
   });
 
   describe("when the user is deactivated", () => {
+    /** @scenario Deactivated user is blocked */
     it("throws USER_DEACTIVATED", async () => {
       const prisma = makePrismaMock({
         user: {
@@ -265,6 +277,7 @@ describe("beforeAccountCreate", () => {
   });
 
   describe("when the user's email domain matches an org with correct SSO provider", () => {
+    /** @scenario Existing user with correct SSO provider auto-links */
     it("defers reconciliation to afterAccountCreate (no DB writes in before)", async () => {
       const deleteMany = vi.fn();
       const update = vi.fn();
@@ -300,6 +313,7 @@ describe("beforeAccountCreate", () => {
   });
 
   describe("when an EXISTING user's email domain matches an org with WRONG SSO provider", () => {
+    /** @scenario Existing user with wrong SSO provider gets pending flag */
     it("soft-blocks by setting pendingSsoSetup=true without throwing", async () => {
       const update = vi.fn().mockResolvedValue(undefined);
       const prisma = makePrismaMock({
@@ -565,6 +579,7 @@ describe("afterAccountCreate", () => {
 
 describe("beforeSessionCreate", () => {
   describe("when the user is deactivated", () => {
+    /** @scenario Deactivated user is blocked from signing in */
     it("blocks the session", async () => {
       const prisma = makePrismaMock({
         user: {
@@ -583,6 +598,7 @@ describe("beforeSessionCreate", () => {
   });
 
   describe("when the user is active", () => {
+    /** @scenario Active user is not blocked from signing in */
     it("allows the session", async () => {
       const prisma = makePrismaMock({
         user: {

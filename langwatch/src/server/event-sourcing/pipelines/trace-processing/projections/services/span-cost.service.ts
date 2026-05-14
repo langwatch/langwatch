@@ -43,6 +43,15 @@ export class SpanCostService {
     const promptTokens = Math.max(0, coerceToNumber(inputTokens) ?? 0);
     const completionTokens = Math.max(0, coerceToNumber(outputTokens) ?? 0);
 
+    // If both gen_ai semconv token counts are present, treat the values as
+    // authoritative — we surface them as exact numbers so the UI shouldn't
+    // also apologise with an "estimated" caveat. Only honour the
+    // `langwatch.tokens.estimated` flag when one or both counts were missing
+    // from the semconv attrs (and so were derived elsewhere).
+    const hasFullSemconv =
+      coerceToNumber(inputTokens) !== null &&
+      coerceToNumber(outputTokens) !== null;
+
     return {
       promptTokens,
       completionTokens,
@@ -53,8 +62,9 @@ export class SpanCostService {
         completionTokens,
       }),
       estimated:
-        attrs[ATTR_KEYS.LANGWATCH_TOKENS_ESTIMATED] === true ||
-        attrs[ATTR_KEYS.LANGWATCH_TOKENS_ESTIMATED] === "true",
+        !hasFullSemconv &&
+        (attrs[ATTR_KEYS.LANGWATCH_TOKENS_ESTIMATED] === true ||
+          attrs[ATTR_KEYS.LANGWATCH_TOKENS_ESTIMATED] === "true"),
     };
   }
 

@@ -1,7 +1,7 @@
+import { EventEmitter } from "node:events";
 import * as os from "node:os";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
-import type { NextApiResponse } from "~/types/next-stubs";
 import type {
   DashboardData,
   PipelineNode,
@@ -19,10 +19,15 @@ const logger = createLogger("langwatch:ops:metrics-collector");
 
 const THROUGHPUT_BUFFER_SIZE = 900;
 const METRICS_COLLECT_INTERVAL_MS = 2_000;
-const SSE_PUSH_INTERVAL_MS = 2_000;
-const SSE_HEARTBEAT_INTERVAL_MS = 15_000;
+const DASHBOARD_BROADCAST_INTERVAL_MS = 2_000;
 const REDIS_STATE_TTL_SECONDS = 3600;
 const QUEUE_DISCOVERY_INTERVAL_MS = 10_000;
+// Memoize badge counts for 5 seconds. The badge polls every 60s
+// off-route, but this also covers concurrent calls from multiple tabs
+// or layout remounts within the same window.
+const BADGE_CACHE_TTL_MS = 5_000;
+
+export const DASHBOARD_EVENT = "dashboard";
 
 const REDIS_STATE_KEY = "ops:metrics:state";
 const KNOWN_PIPELINES_KEY = "ops:known-pipelines";
@@ -59,11 +64,6 @@ interface PersistedMetricsState {
   throughputBuffer: ThroughputPoint[];
   latestTotalCompleted: number;
   latestTotalFailed: number;
-}
-
-interface SSEClient {
-  id: string;
-  res: NextApiResponse;
 }
 
 const EMPTY_PHASE = {
@@ -244,6 +244,12 @@ class OpsMetricsCollector {
   private latestTotalCompleted = 0;
   private latestTotalFailed = 0;
   private latestQueues: QueueInfo[] = [];
+  // Memoized badge-counts result. See `getBadgeCounts` for rationale.
+  private badgeCountsCache: {
+    blockedCount: number;
+    dlqCount: number;
+    computedAt: Date;
+  } | null = null;
   private latestRedisInfo: RedisInfo = {
     usedMemoryHuman: "?",
     peakMemoryHuman: "?",
@@ -255,7 +261,6 @@ class OpsMetricsCollector {
   private collectInterval: ReturnType<typeof setInterval> | null = null;
   private discoveryInterval: ReturnType<typeof setInterval> | null = null;
   private broadcastInterval: ReturnType<typeof setInterval> | null = null;
-  private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
   private lastCpuUsage = process.cpuUsage();
   private lastCpuTime = Date.now();
   private currentCpuPercent = 0;
@@ -274,8 +279,7 @@ class OpsMetricsCollector {
   private isCollecting = false;
   private prevCompleted = new Map<string, number>();
   private prevFailed = new Map<string, number>();
-  private clients: SSEClient[] = [];
-  private clientCounter = 0;
+  private emitter = new EventEmitter();
 
   private queueRepo: QueueRepository;
 
@@ -285,6 +289,15 @@ class OpsMetricsCollector {
   }) {
     this.redis = params.redis;
     this.queueRepo = params.queueRepo;
+    // Each tRPC subscriber adds one listener. The dashboard is admin-only;
+    // raise the cap so we don't get MaxListenersExceededWarning under
+    // multi-tab use without losing the leak signal entirely.
+    this.emitter.setMaxListeners(100);
+  }
+
+  /** Event emitter used by the tRPC dashboardStream subscription. */
+  getEmitter(): EventEmitter {
+    return this.emitter;
   }
 
   async start(): Promise<void> {
@@ -300,17 +313,13 @@ class OpsMetricsCollector {
       QUEUE_DISCOVERY_INTERVAL_MS,
     );
     this.broadcastInterval = setInterval(() => {
-      if (this.clients.length === 0) return;
+      if (this.emitter.listenerCount(DASHBOARD_EVENT) === 0) return;
       try {
-        const data = this.getDashboardData();
-        this.broadcast("dashboard", data);
+        this.emitter.emit(DASHBOARD_EVENT, this.getDashboardData());
       } catch (err) {
         logger.warn({ error: err }, "Failed to broadcast dashboard data");
       }
-    }, SSE_PUSH_INTERVAL_MS);
-    this.heartbeatInterval = setInterval(() => {
-      this.broadcast("heartbeat", { timestamp: Date.now() });
-    }, SSE_HEARTBEAT_INTERVAL_MS);
+    }, DASHBOARD_BROADCAST_INTERVAL_MS);
   }
 
   stop(): void {
@@ -326,41 +335,7 @@ class OpsMetricsCollector {
       clearInterval(this.broadcastInterval);
       this.broadcastInterval = null;
     }
-    if (this.heartbeatInterval) {
-      clearInterval(this.heartbeatInterval);
-      this.heartbeatInterval = null;
-    }
-    for (const client of this.clients) {
-      client.res.end();
-    }
-    this.clients = [];
-  }
-
-  addClient(res: NextApiResponse): string {
-    const id = `client-${++this.clientCounter}`;
-    const client: SSEClient = { id, res };
-    this.clients.push(client);
-
-    res.on("close", () => {
-      this.clients = this.clients.filter((c) => c.id !== id);
-    });
-
-    return id;
-  }
-
-  removeClient(res: NextApiResponse): void {
-    this.clients = this.clients.filter((c) => c.res !== res);
-  }
-
-  private broadcast(event: string, data: unknown): void {
-    const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
-    for (const client of this.clients) {
-      try {
-        client.res.write(payload);
-      } catch {
-        // client disconnected
-      }
-    }
+    this.emitter.removeAllListeners();
   }
 
   private async discoverQueues(): Promise<void> {
@@ -369,6 +344,51 @@ class OpsMetricsCollector {
     } catch (err) {
       logger.warn({ error: err }, "Queue discovery failed, keeping existing names");
     }
+  }
+
+  /**
+   * Lightweight per-call summary used by the global ops badge in the
+   * main menu. Pulls only the two integers the badge renders, so the
+   * global poll doesn't drag the full dashboard aggregation
+   * (pipeline tree, error normalization, etc.) into every tRPC batch.
+   * One slow procedure in a tRPC HTTP batch holds back every other
+   * query that fired in the same window.
+   *
+   * The result is memoized for `BADGE_CACHE_TTL_MS` so any burst of
+   * concurrent callers (multiple browser tabs, layout remounts, etc.)
+   * shares a single computation. `latestQueues` is already a cached
+   * snapshot, so this is mostly defense-in-depth — a future change
+   * that makes the per-call work expensive would otherwise silently
+   * regress the badge poll back into the slow tRPC batch path.
+   *
+   * `computedAt` ships back so the caller (and ops dashboards) can
+   * tell exactly how stale the value is.
+   */
+  getBadgeCounts(): {
+    blockedCount: number;
+    dlqCount: number;
+    computedAt: Date;
+  } {
+    const now = Date.now();
+    if (
+      this.badgeCountsCache &&
+      now - this.badgeCountsCache.computedAt.getTime() < BADGE_CACHE_TTL_MS
+    ) {
+      return this.badgeCountsCache;
+    }
+
+    let blockedCount = 0;
+    let dlqCount = 0;
+    for (const q of this.latestQueues) {
+      blockedCount += q.blockedGroupCount;
+      dlqCount += q.dlqCount;
+    }
+    this.badgeCountsCache = {
+      blockedCount,
+      dlqCount,
+      computedAt: new Date(now),
+    };
+    return this.badgeCountsCache;
   }
 
   getDashboardData(): DashboardData {

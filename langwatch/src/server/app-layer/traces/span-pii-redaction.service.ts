@@ -99,6 +99,17 @@ type StringEntry = {
 };
 
 /**
+ * Accumulator used by the record-shaped redaction paths (logs, metrics).
+ * Tracks parallel arrays of texts and back-references plus a cumulative
+ * length budget enforced by `tryPush`.
+ */
+type RedactionBatch = {
+  texts: string[];
+  refs: { obj: Record<string, string>; key: string }[];
+  tryPush: (obj: Record<string, string>, key: string, value: string) => void;
+};
+
+/**
  * Service responsible for redacting PII from OTLP span data.
  * Scans all string attribute values and sends them in a single batch
  * to the PII detection service. This service should be applied BEFORE
@@ -127,59 +138,27 @@ export class OtlpSpanPiiRedactionService {
    * Collects all string values from span attributes, events, links,
    * status.message, and resource attributes, then sends them in a
    * single batch to the PII detection service.
-   *
-   * @param span - The OTLP span to redact
-   * @param resource - The OTLP resource to redact (nullable)
-   * @param piiRedactionLevel - The project's PII redaction level
    */
   async redactSpan(
     span: OtlpSpan,
     resource: OtlpResource | null,
     piiRedactionLevel: PIIRedactionLevel,
   ): Promise<void> {
-    if (process.env.DISABLE_PII_REDACTION) {
-      return;
-    }
-
-    if (piiRedactionLevel === "DISABLED") {
-      return;
-    }
-
-    const piiEnforced = this.deps.isProduction;
-
-    if (!this.deps.isLangevalsConfigured) {
-      if (piiEnforced) {
-        throw new Error(
-          "LANGEVALS_ENDPOINT is not set, PII check cannot be performed",
-        );
-      }
-      return;
-    }
-
-    const options: PIICheckOptions = {
-      piiRedactionLevel,
-      enforced: piiEnforced,
-      mainMethod: "presidio",
-    };
+    const options = this.buildOptions(piiRedactionLevel);
+    if (!options) return;
 
     const entries: StringEntry[] = [];
     let anySkipped = false;
     let anyRedacted = false;
     let totalLength = 0;
 
-    // Collect all string values from span attributes, events, and links
     for (const attrs of this.collectAllAttributeSets(span)) {
-      const result = this.collectStringEntries(
-        attrs,
-        entries,
-        totalLength,
-      );
+      const result = this.collectStringEntries(attrs, entries, totalLength);
       anySkipped ||= result.skipped;
       anyRedacted ||= result.collected;
       totalLength = result.totalLength;
     }
 
-    // Collect status.message
     if (
       span.status?.message != null &&
       typeof span.status.message === "string" &&
@@ -201,7 +180,6 @@ export class OtlpSpanPiiRedactionService {
       }
     }
 
-    // Collect resource attributes
     if (resource?.attributes) {
       const result = this.collectStringEntries(
         resource.attributes,
@@ -212,7 +190,6 @@ export class OtlpSpanPiiRedactionService {
       anyRedacted ||= result.collected;
     }
 
-    // Mark span with pii_redaction_status when any attributes were skipped
     if (anySkipped) {
       const statusValue = anyRedacted ? "partial" : "none";
       const existingIdx = span.attributes.findIndex(
@@ -232,7 +209,6 @@ export class OtlpSpanPiiRedactionService {
       return;
     }
 
-    // Batch all string values into a single PII detection call
     const results = await this.deps.batchClearPII(
       entries.map((e) => e.text),
       options,
@@ -244,7 +220,6 @@ export class OtlpSpanPiiRedactionService {
       );
     }
 
-    // Apply redacted values back to their original locations
     for (let i = 0; i < entries.length; i++) {
       const redacted = results[i];
       if (redacted != null) {
@@ -257,9 +232,6 @@ export class OtlpSpanPiiRedactionService {
   /**
    * Redacts PII from the body and attributes of a log record.
    * Mutates the log record in place for efficiency.
-   *
-   * @param log - The log record to redact (body and attributes)
-   * @param piiRedactionLevel - The project's PII redaction level
    */
   async redactLog(
     log: {
@@ -269,84 +241,17 @@ export class OtlpSpanPiiRedactionService {
     },
     piiRedactionLevel: PIIRedactionLevel,
   ): Promise<void> {
-    if (process.env.DISABLE_PII_REDACTION) {
-      return;
-    }
+    const options = this.buildOptions(piiRedactionLevel);
+    if (!options) return;
 
-    if (piiRedactionLevel === "DISABLED") {
-      return;
-    }
-
-    const piiEnforced = this.deps.isProduction;
-
-    if (!this.deps.isLangevalsConfigured) {
-      if (piiEnforced) {
-        throw new Error(
-          "LANGEVALS_ENDPOINT is not set, PII check cannot be performed",
-        );
-      }
-      return;
-    }
-
-    const options: PIICheckOptions = {
-      piiRedactionLevel,
-      enforced: piiEnforced,
-      mainMethod: "presidio",
-    };
-
-    const texts: string[] = [];
-    const refs: { obj: Record<string, string>; key: string }[] = [];
-    const maxLen = this.deps.piiRedactionMaxAttributeLength;
-    let totalLength = 0;
-
-    const tryPush = (obj: Record<string, string>, key: string, value: string) => {
-      if (totalLength + value.length > maxLen) {
-        this.logger.warn(
-          { key, valueLength: value.length, totalLength, maxLength: maxLen },
-          "Skipping PII redaction — cumulative batch size would exceed limit",
-        );
-        return;
-      }
-      texts.push(value);
-      refs.push({ obj, key });
-      totalLength += value.length;
-    };
-
-    // Body
+    const batch = this.createRedactionBatch();
     if (log.body) {
-      tryPush(log as unknown as Record<string, string>, "body", log.body);
+      batch.tryPush(log as unknown as Record<string, string>, "body", log.body);
     }
+    this.collectRecordEntries(batch, log.attributes);
+    this.collectRecordEntries(batch, log.resourceAttributes);
 
-    // Attributes
-    for (const key of Object.keys(log.attributes)) {
-      if (log.attributes[key]) {
-        tryPush(log.attributes, key, log.attributes[key]!);
-      }
-    }
-
-    // Resource attributes
-    for (const key of Object.keys(log.resourceAttributes)) {
-      if (log.resourceAttributes[key]) {
-        tryPush(log.resourceAttributes, key, log.resourceAttributes[key]!);
-      }
-    }
-
-    if (texts.length === 0) return;
-
-    const results = await this.deps.batchClearPII(texts, options);
-
-    if (results.length !== refs.length) {
-      throw new Error(
-        `Incomplete PII batch: got ${results.length} results for ${refs.length} inputs`,
-      );
-    }
-
-    for (let i = 0; i < refs.length; i++) {
-      const redacted = results[i];
-      if (redacted != null) {
-        refs[i]!.obj[refs[i]!.key] = redacted;
-      }
-    }
+    await this.applyRedactionBatch(batch, options);
   }
 
   /**
@@ -362,13 +267,26 @@ export class OtlpSpanPiiRedactionService {
     },
     piiRedactionLevel: PIIRedactionLevel,
   ): Promise<void> {
-    if (process.env.DISABLE_PII_REDACTION) {
-      return;
-    }
+    const options = this.buildOptions(piiRedactionLevel);
+    if (!options) return;
 
-    if (piiRedactionLevel === "DISABLED") {
-      return;
-    }
+    const batch = this.createRedactionBatch();
+    this.collectRecordEntries(batch, metric.attributes);
+    this.collectRecordEntries(batch, metric.resourceAttributes);
+
+    await this.applyRedactionBatch(batch, options);
+  }
+
+  /**
+   * Returns PIICheckOptions for the redaction call, or null when redaction
+   * should be skipped (disabled, no langevals in dev, etc). Throws when
+   * langevals is required but unset in production.
+   */
+  private buildOptions(
+    piiRedactionLevel: PIIRedactionLevel,
+  ): PIICheckOptions | null {
+    if (process.env.DISABLE_PII_REDACTION) return null;
+    if (piiRedactionLevel === "DISABLED") return null;
 
     const piiEnforced = this.deps.isProduction;
 
@@ -378,59 +296,75 @@ export class OtlpSpanPiiRedactionService {
           "LANGEVALS_ENDPOINT is not set, PII check cannot be performed",
         );
       }
-      return;
+      return null;
     }
 
-    const options: PIICheckOptions = {
+    return {
       piiRedactionLevel,
       enforced: piiEnforced,
       mainMethod: "presidio",
     };
+  }
 
+  private createRedactionBatch(): RedactionBatch {
     const texts: string[] = [];
     const refs: { obj: Record<string, string>; key: string }[] = [];
     const maxLen = this.deps.piiRedactionMaxAttributeLength;
-    let totalLength = 0;
+    const logger = this.logger;
+    const state = { totalLength: 0 };
 
-    const tryPush = (obj: Record<string, string>, key: string, value: string) => {
-      if (totalLength + value.length > maxLen) {
-        this.logger.warn(
-          { key, valueLength: value.length, totalLength, maxLength: maxLen },
-          "Skipping PII redaction — cumulative batch size would exceed limit",
-        );
-        return;
-      }
-      texts.push(value);
-      refs.push({ obj, key });
-      totalLength += value.length;
+    return {
+      texts,
+      refs,
+      tryPush(obj, key, value) {
+        if (state.totalLength + value.length > maxLen) {
+          logger.warn(
+            {
+              key,
+              valueLength: value.length,
+              totalLength: state.totalLength,
+              maxLength: maxLen,
+            },
+            "Skipping PII redaction — cumulative batch size would exceed limit",
+          );
+          return;
+        }
+        texts.push(value);
+        refs.push({ obj, key });
+        state.totalLength += value.length;
+      },
     };
+  }
 
-    for (const key of Object.keys(metric.attributes)) {
-      if (metric.attributes[key]) {
-        tryPush(metric.attributes, key, metric.attributes[key]!);
+  private collectRecordEntries(
+    batch: RedactionBatch,
+    record: Record<string, string>,
+  ): void {
+    for (const key of Object.keys(record)) {
+      if (record[key]) {
+        batch.tryPush(record, key, record[key]!);
       }
     }
+  }
 
-    for (const key of Object.keys(metric.resourceAttributes)) {
-      if (metric.resourceAttributes[key]) {
-        tryPush(metric.resourceAttributes, key, metric.resourceAttributes[key]!);
-      }
-    }
+  private async applyRedactionBatch(
+    batch: RedactionBatch,
+    options: PIICheckOptions,
+  ): Promise<void> {
+    if (batch.texts.length === 0) return;
 
-    if (texts.length === 0) return;
+    const results = await this.deps.batchClearPII(batch.texts, options);
 
-    const results = await this.deps.batchClearPII(texts, options);
-
-    if (results.length !== refs.length) {
+    if (results.length !== batch.refs.length) {
       throw new Error(
-        `Incomplete PII batch: got ${results.length} results for ${refs.length} inputs`,
+        `Incomplete PII batch: got ${results.length} results for ${batch.refs.length} inputs`,
       );
     }
 
-    for (let i = 0; i < refs.length; i++) {
+    for (let i = 0; i < batch.refs.length; i++) {
       const redacted = results[i];
       if (redacted != null) {
-        refs[i]!.obj[refs[i]!.key] = redacted;
+        batch.refs[i]!.obj[batch.refs[i]!.key] = redacted;
       }
     }
   }

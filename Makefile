@@ -1,6 +1,40 @@
-.PHONY: start sync-all-openapi user-delete-dry-run user-delete es-delete-dry-run es-delete
-.PHONY: dev dev-nlp dev-scenarios dev-full down logs clean ps quickstart worktree
+.PHONY: help start sync-all-openapi user-delete-dry-run user-delete es-delete-dry-run es-delete
+.PHONY: dev dev-nlp dev-scenarios dev-test dev-full down logs clean ps quickstart quickstart-help worktree
 .PHONY: dev-up dev-down dev-logs setup-hooks service service-watch
+.PHONY: _dev-deprecation-warning _dev-up-deprecation-warning
+
+# Surface every target — boxd-* are pulled in via include below.
+help:
+	@echo "LangWatch dev targets:"
+	@echo ""
+	@echo "  Primary (Docker dev environment):"
+	@echo "    make quickstart                     interactive — asks 'what are you working on?'"
+	@echo "    make quickstart frontend-only       no compose; pure pnpm dev against your .env URLs"
+	@echo "    make quickstart backend-shared      postgres + redis + clickhouse + app, URLs → local"
+	@echo "    make quickstart migration           postgres + clickhouse on host ports (prisma migrate)"
+	@echo "    make quickstart nlp                 backend + langwatch_nlp + langevals"
+	@echo "    make quickstart full-local          everything (--profile full)"
+	@echo "    make quickstart-help                non-interactive mode reference"
+	@echo "    make service svc=<name>             run a Go service (e.g. aigateway)"
+	@echo "    make service-watch svc=<name>       run a Go service with live reload (air)"
+	@echo "    make worktree <issue|name>          create a git worktree for an issue/feature"
+	@echo "    make down                           stop all services"
+	@echo ""
+	@echo "  Boxd workflows (multi-step orchestration over the boxd CLI):"
+	@echo "    make boxd-help                      full boxd target reference"
+	@echo "    make boxd-golden                    create the canonical base VM"
+	@echo "    make boxd-fork-pr PR=<n>            fork golden for an existing PR"
+	@echo "    make boxd-fork-branch BRANCH=<n>    fork golden for a branch"
+	@echo "    make boxd-fork-issue ISSUE=<n>      fork + worktree + tmux+claude in VM"
+	@echo "    make boxd-connect-{pr,branch,issue} <ARG>=<v>   attach to the in-VM session"
+	@echo ""
+	@echo "  Deprecated (use 'make quickstart' — kept for one release):"
+	@echo "    make dev / dev-nlp / dev-scenarios / dev-test / dev-full"
+	@echo "    make dev-up / dev-down / dev-logs"
+	@echo ""
+	@echo "  See: dev/docs/adr/004-docker-dev-environment.md, dev/docs/boxd-makefile.md"
+
+include boxd.mk
 
 # =============================================================================
 # DOCKER DEV ENVIRONMENT (compose.dev.yml)
@@ -9,6 +43,13 @@
 # App is volume-mounted for hot reload.
 
 COMPOSE = docker compose -f compose.dev.yml
+
+# Sources scripts/lib/sanitize-dev-env.sh and rewrites stale localhost-pinned
+# NEXTAUTH_URL / BASE_HOST exports to the compose-derived APP_PORT (default
+# 5560). Real overrides like boxd-proxy URLs are left untouched. Prepended
+# to every dev `up` recipe so `make dev*` paths can't silently 403 on login
+# if a previous session leaked the env (lw#3453).
+SANITIZE_DEV_ENV = APP_PORT=$${APP_PORT:-5560} . scripts/lib/sanitize-dev-env.sh && sanitize_localhost_dev_env
 
 # Install git hooks (idempotent, runs automatically before dev targets)
 setup-hooks:
@@ -42,25 +83,27 @@ service-watch:
 			--build.include_ext "go" \
 			--build.exclude_dir "tmp,vendor,node_modules"
 
-# Minimal: postgres + redis + clickhouse + app
-dev:
-	$(COMPOSE) up
+# Deprecation warning for dev* targets — kept for one release. (#3860 AC#9)
+# Each maps onto the equivalent quickstart mode so the URL-override behavior
+# is consistent regardless of which alias the user invoked.
+_dev-deprecation-warning:
+	@printf '\033[33m[deprecated] make %s → make quickstart (or ./scripts/dev.sh <mode>)\033[0m\n' "$(MAKECMDGOALS)" >&2
+	@printf 'See: dev/docs/adr/004-docker-dev-environment.md\n' >&2
 
-# + NLP service + langevals (for evaluations)
-dev-nlp:
-	$(COMPOSE) --profile nlp up
+dev: _dev-deprecation-warning
+	@./scripts/dev.sh backend-shared
 
-# + scenario worker + bullboard + NLP
-dev-scenarios:
-	$(COMPOSE) --profile scenarios up
+dev-nlp: _dev-deprecation-warning
+	@./scripts/dev.sh nlp
 
-# + AI test server (for HTTP agent testing)
-dev-test:
-	$(COMPOSE) --profile test up
+dev-scenarios: _dev-deprecation-warning
+	@./scripts/dev.sh full-local
 
-# Everything
-dev-full:
-	$(COMPOSE) --profile full up
+dev-test: _dev-deprecation-warning
+	@./scripts/dev.sh full-local
+
+dev-full: _dev-deprecation-warning
+	@./scripts/dev.sh full-local
 
 # Stop all services
 down:
@@ -96,9 +139,34 @@ start/postgres:
 tsc-watch:
 	cd langwatch && pnpm tsc-watch
 
-# Interactive profile chooser
+# Single entry point — interactive launcher or non-interactive mode runner.
+# (#3860 AC#1, AC#2). Positional usage via MAKECMDGOALS:
+#   make quickstart                  # interactive prompt
+#   make quickstart frontend-only    # no compose, fastest
+#   make quickstart backend-shared   # postgres + redis + clickhouse + app
+#   make quickstart migration        # postgres + clickhouse on host ports
+#   make quickstart nlp              # backend + nlp + langevals
+#   make quickstart full-local       # --profile full
+ifeq (quickstart,$(firstword $(MAKECMDGOALS)))
+  QUICKSTART_ARG := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
+  # The eval below silently overrides whatever name the user passed with a
+  # no-op recipe. If they pass an existing target name (e.g. `help`, `down`,
+  # `logs`), make would happily overwrite the real recipe and run the empty
+  # one — so we error out explicitly with a hint instead.
+  ifneq ($(filter $(QUICKSTART_ARG),help dev dev-up dev-down dev-logs dev-nlp dev-scenarios dev-test dev-full down logs clean ps quickstart quickstart-help worktree start),)
+    $(error 'make quickstart $(QUICKSTART_ARG)' collides with target '$(QUICKSTART_ARG)' — use `make quickstart-help` for the mode reference, or pass a mode like `frontend-only` / `backend-shared` / `nlp` / `migration` / `full-local`)
+  endif
+  ifneq ($(QUICKSTART_ARG),)
+    $(eval $(QUICKSTART_ARG):;@:)
+  endif
+endif
 quickstart:
-	@./scripts/dev.sh
+	@./scripts/dev.sh $(QUICKSTART_ARG)
+
+# Non-interactive mode reference (#3860 AC#8). Use `make quickstart-help` —
+# `make quickstart help` collides with the existing `help` target.
+quickstart-help:
+	@./scripts/dev.sh help
 
 # =============================================================================
 # ISOLATED DEV INSTANCES (for AI agents / parallel worktrees)
@@ -106,16 +174,20 @@ quickstart:
 # Each worktree gets its own containers, volumes, and ports.
 # Port info saved to .dev-port for agent/skill discovery.
 
+# Deprecation warning for dev-up / dev-down / dev-logs (#3860 AC#9).
+_dev-up-deprecation-warning:
+	@printf '\033[33m[deprecated] make %s → make quickstart (single entry point)\033[0m\n' "$(MAKECMDGOALS)" >&2
+
 # Start isolated instance (detached). Usage: make dev-up [PROFILE=scenarios]
-dev-up:
+dev-up: _dev-up-deprecation-warning
 	@./scripts/dev-up.sh $(PROFILE)
 
 # Stop isolated instance
-dev-down:
+dev-down: _dev-up-deprecation-warning
 	@./scripts/dev-down.sh
 
 # Tail logs for isolated instance
-dev-logs:
+dev-logs: _dev-up-deprecation-warning
 	@if [ -f .dev-port ]; then . ./.dev-port && COMPOSE_PROJECT_NAME=$$COMPOSE_PROJECT_NAME VOLUME_PREFIX=$$VOLUME_PREFIX docker compose -f compose.dev.yml --profile full logs -f; \
 	else echo "No .dev-port found. Is the instance running?"; fi
 

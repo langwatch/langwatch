@@ -134,6 +134,7 @@ describe("GatewayProviderCredentialService.create", () => {
   });
 
   describe("happy path", () => {
+    /** @scenario Enabling a provider for the gateway does NOT re-enter the API key */
     it("defaults slot='primary' and rotationPolicy='MANUAL' when unspecified", async () => {
       const { prisma, createArgs } = mockPrisma({
         modelProvider: stubModelProvider(),
@@ -148,6 +149,7 @@ describe("GatewayProviderCredentialService.create", () => {
       expect(data.rotationPolicy).toBe("MANUAL");
     });
 
+    /** @scenario Provider binding mutation writes targetKind=provider_binding */
     it("emits a PROVIDER_BINDING_UPDATED change-event + gateway.provider_binding.created audit entry", async () => {
       const { prisma, changeEventCreate, auditCreate } = mockPrisma({
         modelProvider: stubModelProvider(),

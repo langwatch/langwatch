@@ -4,6 +4,15 @@ Feature: Project Creation Flow
   I want to create a new project successfully
   So that I can start tracking my LLM application
 
+  # End-to-end creation flow scenarios (success toast, error toast,
+  # duplicate-name handling, drawer close, redirect, form reset,
+  # tracking event) all need a JSDOM render fixture wiring the
+  # drawer to the mutation. The "calls correct API endpoint"
+  # scenario is partially bound to `CreateProjectDrawer.test.tsx`
+  # (multi-org org-id assertion). Cheap follow-up: a single happy-
+  # path test asserting toast / closeDrawer / trackEvent on success
+  # would bind several scenarios in one shot.
+
   Background:
     Given I am logged in as an authenticated user
     And I have permission to create projects
@@ -30,7 +39,6 @@ Feature: Project Creation Flow
     And the project is created under "Analytics Team"
     And I see a success toast notification
 
-  @unimplemented
   Scenario: Project creation calls correct API endpoint
     Given the CreateProjectDrawer is open with valid data
     When I submit the form

@@ -26,6 +26,7 @@ describe("isCancellableStatus()", () => {
   });
 
   describe("when status is SUCCESS", () => {
+    /** @scenario "Cancellation does not overwrite terminal results" */
     it("returns false", () => {
       expect(isCancellableStatus(ScenarioRunStatus.SUCCESS)).toBe(false);
     });

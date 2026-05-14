@@ -77,7 +77,7 @@ export function DemonstrationsModal({
 
   return (
     <Dialog.Root open={open} onOpenChange={({ open }) => !open && onClose()}>
-      <Dialog.Content
+      <Dialog.Content bg="bg"
         marginX="32px"
         marginTop="32px"
         width="calc(100vw - 64px)"

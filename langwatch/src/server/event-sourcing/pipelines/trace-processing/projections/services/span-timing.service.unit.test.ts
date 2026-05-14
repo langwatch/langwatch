@@ -39,6 +39,7 @@ function makeState(
 ): TraceSummaryData {
   return {
     traceId: "trace-1",
+    traceName: "",
     spanCount: 0,
     totalDurationMs: 0,
     computedIOSchemaVersion: "2025-12-18",
@@ -58,9 +59,20 @@ function makeState(
     outputFromRootSpan: false,
     outputSpanEndTimeMs: 0,
     blockedByGuardrail: false,
+    rootSpanType: null,
+    containsAi: false,
     topicId: null,
     subTopicId: null,
     annotationIds: [],
+    containsPrompt: false,
+    selectedPromptId: null,
+    selectedPromptSpanId: null,
+    selectedPromptStartTimeMs: null,
+    lastUsedPromptId: null,
+    lastUsedPromptVersionNumber: null,
+    lastUsedPromptVersionId: null,
+    lastUsedPromptSpanId: null,
+    lastUsedPromptStartTimeMs: null,
     attributes: {},
     scenarioRoleCosts: {},
     scenarioRoleLatencies: {},
@@ -69,7 +81,7 @@ function makeState(
     occurredAt: 0,
     createdAt: 0,
     updatedAt: 0,
-    lastEventOccurredAt: 0,
+    LastEventOccurredAt: 0,
     ...overrides,
   };
 }

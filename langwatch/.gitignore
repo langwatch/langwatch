@@ -75,7 +75,19 @@ node_modules/
 # GDPR compliance reports (contain PII)
 /reports/
 
+# Auto-generated self-signed dev certs for HTTPS+HTTP/2 (LANGWATCH_DEV_HTTP2=1)
+/.dev-certs/
+
+# Vitest browser-mode test attachment cache (regenerated on each run)
+/.vitest-attachments/
+
+# Local-only experimental package — not part of the shipped app
+/packages/insanity-check/
+
 licenses.json
 .pnpm-store/
 server.log
 screenshot-*.png
+
+# Vitest browser-mode auto-captured test screenshots (regenerated on each run)
+**/__screenshots__/

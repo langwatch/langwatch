@@ -117,6 +117,7 @@ describe("RBAC Permission System", () => {
   });
 
   describe("Team Role Permissions", () => {
+    /** @scenario Team role permissions are unaffected by org role awareness */
     it("allows ADMIN to access all experiment permissions", () => {
       expect(teamRoleHasPermission(TeamUserRole.ADMIN, "workflows:view")).toBe(
         true,
@@ -200,6 +201,7 @@ describe("RBAC Permission System", () => {
   });
 
   describe("Organization Role Permissions", () => {
+    /** @scenario Platform identifies the user's organization role */
     it("allows ORGANIZATION_ADMIN to access organization permissions", () => {
       expect(
         organizationRoleHasPermission(
@@ -247,6 +249,8 @@ describe("RBAC Permission System", () => {
   });
 
   describe("Custom Role Scenarios", () => {
+    /** @scenario Custom role grants are honored and org role is still known */
+    /** @scenario Custom role restrictions are honored and org role is still known */
     it("simulates custom role with only manage permission", () => {
       // Simulate a custom role that only has workflows:manage
       const customPermissions = ["workflows:manage"];
@@ -454,6 +458,7 @@ describe("RBAC Permission System", () => {
 
   describe("Permission Retrieval Functions", () => {
     describe("getTeamRolePermissions", () => {
+      /** @scenario "Effective role maps to correct permission grants" */
       it("returns all permissions for ADMIN role", () => {
         const permissions = getTeamRolePermissions(TeamUserRole.ADMIN);
         expect(permissions).toContain("project:view");

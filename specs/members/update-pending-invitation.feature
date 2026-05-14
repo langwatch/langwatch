@@ -3,6 +3,27 @@ Feature: Invitation Approval Workflow
   I want to request invitations for new users
   So that admins can approve them and new collaborators can join
 
+  # End-to-end invitation flows are partially bound to existing
+  # JSDOM render tests:
+  #   * `InvitesTable.integration.test.tsx` — Pending Approval / Invited
+  #     badges + admin-only approve/reject buttons.
+  #   * `members-invitation-approval.integration.test.tsx` —
+  #     WaitingApprovalActions visibility (admin sees buttons, non-
+  #     admin does not).
+  #
+  # The full backend integration suite
+  # (`organization.invites.integration.test.ts`) covers core
+  # `createInviteRequest` validation, expiration/email semantics,
+  # admin approval transitions, license-limit enforcement, and
+  # batch / non-admin / email-failure edge cases.
+  #
+  # The Playwright e2e specs under
+  # `agentic-e2e-tests/tests/members/*.spec.ts` remain `test.fixme()`
+  # for CI-flakiness reasons (#1811), so the four `@e2e` scenarios
+  # below are still `@unimplemented`. The display-list scenarios
+  # (admin/non-admin visibility, badges) need a JSDOM render harness
+  # over the members page that does not yet exist.
+
   # ============================================================================
   # E2E: Happy Paths - Full User Workflows
   # ============================================================================
@@ -45,27 +66,27 @@ Feature: Invitation Approval Workflow
   # Integration: Backend Edge Cases, Error Handling, and Rendered Components
   # ============================================================================
 
-  @integration @unimplemented
+  @integration
   Scenario: Member cannot request invitation with ADMIN role
     Given I am authenticated as a "MEMBER" of the organization
     When I request an invitation for "user@example.com" with role "ADMIN"
     Then the request fails with a validation error
     And the error indicates the role is not allowed
 
-  @integration @unimplemented
+  @integration
   Scenario: Member request sets requestedBy to the requesting user
     Given I am authenticated as a "MEMBER" of the organization
     When I request an invitation for "user@example.com" with role "MEMBER"
     Then the invitation is queued for admin approval
     And the invitation records who requested it
 
-  @integration @unimplemented
+  @integration
   Scenario: Invitation request has no expiration while awaiting approval
     Given I am authenticated as a "MEMBER" of the organization
     When I request an invitation for "user@example.com" with role "MEMBER"
     Then the invitation does not expire while waiting for admin approval
 
-  @integration @unimplemented
+  @integration
   Scenario: Approving an invitation sets expiration and status
     Given there is a "WAITING_APPROVAL" invitation for "user@example.com"
     And I am authenticated as an "ADMIN" of the organization
@@ -73,41 +94,41 @@ Feature: Invitation Approval Workflow
     Then the invitation becomes ready for the invited user to accept
     And the invitation expires after a 48-hour invite window
 
-  @integration @unimplemented
+  @integration
   Scenario: No email is sent when a member creates an invitation request
     Given I am authenticated as a "MEMBER" of the organization
     When I request an invitation for "user@example.com" with role "MEMBER"
     Then no invitation email is sent to "user@example.com"
 
-  @integration @unimplemented
+  @integration
   Scenario: Email is sent when admin approves an invitation request
     Given there is a "WAITING_APPROVAL" invitation for "user@example.com"
     And I am authenticated as an "ADMIN" of the organization
     When I approve the invitation for "user@example.com"
     Then an invitation email is sent to "user@example.com"
 
-  @integration @unimplemented
+  @integration
   Scenario: WAITING_APPROVAL invites count toward license member limits
     Given the organization has reached its member limit
     And there is a pending approval invitation
     When I invite user "new@example.com" to the organization
     Then the invitation request is rejected because the member limit was reached
 
-  @integration @unimplemented
+  @integration
   Scenario: Duplicate detection across PENDING and WAITING_APPROVAL statuses
     Given there is a "WAITING_APPROVAL" invitation for "existing@example.com"
     And I am authenticated as a "MEMBER" of the organization
     When I request an invitation for "existing@example.com" with role "MEMBER"
     Then the request fails with a duplicate invitation error
 
-  @integration @unimplemented
+  @integration
   Scenario: Admin batch invite creates all records before sending any emails
     Given I am authenticated as an "ADMIN" of the organization
     When I invite multiple users in a single batch
     Then all invite records are created atomically
     And emails are sent only after all records are persisted
 
-  @integration @unimplemented
+  @integration
   Scenario: Email failure during approval does not revert the approval
     Given there is a "WAITING_APPROVAL" invitation for "user@example.com"
     And I am authenticated as an "ADMIN" of the organization
@@ -116,14 +137,14 @@ Feature: Invitation Approval Workflow
     Then the invitation is still approved
     And the invite link is shown as fallback
 
-  @integration @unimplemented
+  @integration
   Scenario: Deleting a WAITING_APPROVAL invitation works the same as PENDING
     Given there is a "WAITING_APPROVAL" invitation for "remove@example.com"
     And I am authenticated as an "ADMIN" of the organization
     When I delete the invitation for "remove@example.com"
     Then the invitation is removed successfully
 
-  @integration @unimplemented
+  @integration
   Scenario: Non-admin cannot approve invitations
     Given there is a "WAITING_APPROVAL" invitation for "user@example.com"
     And I am authenticated as a "MEMBER" of the organization

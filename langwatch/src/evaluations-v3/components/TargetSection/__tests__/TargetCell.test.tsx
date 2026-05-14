@@ -23,6 +23,11 @@ vi.mock("~/hooks/useDrawer", () => ({
   setFlowCallbacks: mockSetFlowCallbacks,
 }));
 
+// TraceIdPeek pulls in useFeatureFlag → tRPC, which has no withTRPC wrapper here.
+vi.mock("~/hooks/useFeatureFlag", () => ({
+  useFeatureFlag: () => ({ enabled: false, isLoading: false }),
+}));
+
 // Mutable state for the store mock — each test seeds what the component will
 // read. `useEvaluationsV3Store` accepts a selector, so the mock must too.
 type StoreMockState = {

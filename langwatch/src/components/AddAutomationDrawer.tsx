@@ -321,7 +321,7 @@ export function AutomationDrawer() {
       onOpenChange={({ open }) => !open && closeDrawer()}
       placement="end"
     >
-      <Drawer.Content maxWidth="1200px">
+      <Drawer.Content bg="bg" maxWidth="1200px">
         <Drawer.Header>
           <Drawer.CloseTrigger />
           <Heading>Add Automation</Heading>

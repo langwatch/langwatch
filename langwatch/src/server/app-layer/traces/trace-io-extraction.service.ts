@@ -1,11 +1,11 @@
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
+import type { NormalizedSpan } from "../../event-sourcing/pipelines/trace-processing/schemas/spans";
 import { ATTR_KEYS } from "./canonicalisation/extractors/_constants";
 import {
   extractLastUserMessageText,
   extractMessageContentText,
 } from "./canonicalisation/extractors/_messages";
-import type { NormalizedSpan } from "../../event-sourcing/pipelines/trace-processing/schemas/spans";
 
 /**
  * Service for extracting input/output text from spans using tree traversal
@@ -93,7 +93,11 @@ export class TraceIOExtractionService {
         });
         const httpFallback = this.getHttpFallback(orderedSpans);
         return httpFallback
-          ? { raw: httpFallback, text: httpFallback, source: "langwatch" as const }
+          ? {
+              raw: httpFallback,
+              text: httpFallback,
+              source: "langwatch" as const,
+            }
           : null;
       },
     );
@@ -188,7 +192,11 @@ export class TraceIOExtractionService {
         });
         const httpFallback = this.getHttpStatusFallback(tree);
         return httpFallback
-          ? { raw: httpFallback, text: httpFallback, source: "langwatch" as const }
+          ? {
+              raw: httpFallback,
+              text: httpFallback,
+              source: "langwatch" as const,
+            }
           : null;
       },
     );
@@ -222,9 +230,10 @@ export class TraceIOExtractionService {
     // Priority 1: GenAI messages
     const genAiValue = attrs[keys.genAi];
     if (genAiValue !== undefined && genAiValue !== null) {
-      const text = messagesToText(genAiValue, type);
+      const normalized = normalizeChatPayload(genAiValue);
+      const text = messagesToText(normalized, type);
       if (text) {
-        return { raw: genAiValue, text, source: "gen_ai" };
+        return { raw: normalized, text, source: "gen_ai" };
       }
     }
 
@@ -236,15 +245,10 @@ export class TraceIOExtractionService {
     // a stringified mystery object shadow a real match on another span.
     const langwatchValue = attrs[keys.langwatch];
     if (langwatchValue !== undefined && langwatchValue !== null) {
-      if (typeof langwatchValue === "string") {
-        if (langwatchValue.length > 0) {
-          return { raw: langwatchValue, text: langwatchValue, source: "langwatch" };
-        }
-      } else {
-        const heuristicText = messagesToText(langwatchValue, type);
-        if (heuristicText) {
-          return { raw: langwatchValue, text: heuristicText, source: "langwatch" };
-        }
+      const normalized = normalizeChatPayload(langwatchValue);
+      const text = messagesToText(normalized, type);
+      if (text) {
+        return { raw: normalized, text, source: "langwatch" };
       }
     }
 
@@ -496,7 +500,8 @@ function hasMeaningfulLeaf(
   if (typeof value !== "object") return false;
   if (seen.has(value as object)) return false;
   seen.add(value as object);
-  if (Array.isArray(value)) return value.some((v) => hasMeaningfulLeaf(v, seen));
+  if (Array.isArray(value))
+    return value.some((v) => hasMeaningfulLeaf(v, seen));
   return Object.values(value as Record<string, unknown>).some((v) =>
     hasMeaningfulLeaf(v, seen),
   );
@@ -523,6 +528,83 @@ function stringifyForText(value: unknown): string | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * Some agent runtimes (Claude Code, certain Anthropic instrumentations)
+ * emit chat content with each typed block (`thinking` / `tool_use` /
+ * `tool_result`) wrapped *inside* a generic `{type:"text", text:"<JSON
+ * of the real block>"}` envelope. That double-wrap means downstream
+ * renderers have to peek into the `text` field and re-parse to recover
+ * the actual block kind — and every consumer ends up implementing that
+ * defensively. Normalize once at ingest so we store the proper Anthropic
+ * content-block array end-to-end.
+ *
+ * Walks the input shape (string / object / array) and unwraps any
+ * `{type:"text", text:"<JSON typed block>"}` it finds. Returns the
+ * normalized value in the same outer shape (object stays object, array
+ * stays array; a JSON string is parsed-and-renormalized when possible,
+ * otherwise returned unchanged).
+ */
+function normalizeChatPayload(
+  value: unknown,
+  seen: WeakSet<object> = new WeakSet(),
+): unknown {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        return normalizeChatPayload(parsed, seen);
+      } catch {
+        // not parseable JSON — leave the raw string alone
+      }
+    }
+    return value;
+  }
+  if (Array.isArray(value)) {
+    if (seen.has(value)) return null;
+    seen.add(value);
+    return value.map((item) => normalizeChatPayload(item, seen));
+  }
+  if (value && typeof value === "object") {
+    if (seen.has(value as object)) return null;
+    seen.add(value as object);
+    const obj = value as Record<string, unknown>;
+    // If this object IS a content block whose `text` is a JSON-encoded
+    // typed block (with a non-text inner `type`), replace it with the
+    // unwrapped block.
+    if (obj.type === "text" && typeof obj.text === "string") {
+      const t = obj.text.trim();
+      if (t.startsWith("{") && t.endsWith("}") && t.includes('"type":"')) {
+        try {
+          const inner = JSON.parse(t) as Record<string, unknown>;
+          if (
+            inner &&
+            typeof inner === "object" &&
+            typeof inner.type === "string" &&
+            inner.type !== "text"
+          ) {
+            // Recurse into the unwrapped block in case the inner shape
+            // also has nested wrappers (e.g. tool_result.content).
+            return normalizeChatPayload(inner, seen);
+          }
+        } catch {
+          // not clean JSON — fall through and keep the text wrapper
+        }
+      }
+      // Text block that wasn't unwrapped: preserve `text` verbatim so
+      // user-pasted JSON-looking content stays as the original string.
+      return obj;
+    }
+    // Otherwise: walk every property, normalizing in place.
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(obj)) {
+      out[k] = normalizeChatPayload(v, seen);
+    }
+    return out;
+  }
+  return value;
 }
 
 function messagesToText(

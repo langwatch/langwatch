@@ -66,7 +66,7 @@ export function SaveVersionDialog({
         }
       }}
     >
-      <Dialog.Content>
+      <Dialog.Content bg="bg">
         <Dialog.Header>
           <Dialog.Title>Save Version</Dialog.Title>
         </Dialog.Header>

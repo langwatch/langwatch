@@ -403,7 +403,7 @@ const CICDDialog = React.memo(function CICDDialog({
       onOpenChange={({ open: isOpen }) => !isOpen && onClose()}
       size="xl"
     >
-      <Dialog.Content>
+      <Dialog.Content bg="bg">
         <Dialog.CloseTrigger />
         <Dialog.Header width="100%" marginTop={4}>
           <VStack alignItems="flex-start" gap={2} width="100%">

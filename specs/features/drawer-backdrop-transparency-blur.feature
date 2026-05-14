@@ -3,10 +3,12 @@ Feature: Drawer backdrop transparency and blur
   I want drawers to be semi-transparent with a blur effect
   So that I can maintain spatial context of the content behind the drawer
 
+  # All 1 scenario bound to drawer-backdrop.integration.test.tsx.
+
   Background:
     Given the application is loaded
 
-  @integration @unimplemented
+  @integration
   Scenario: Drawer content panel applies blur filter and transparency
     When a drawer opens
     Then the drawer content panel has a backdrop-filter with 25px blur

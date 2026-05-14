@@ -3,13 +3,24 @@ Feature: External SDK/CI sets in suites sidebar
   I want to see scenario sets sent from SDK/CI in the suites sidebar
   So that I can monitor external evaluation runs alongside platform suites
 
+  # Parity status: 5 of 11 scenarios bound to existing tests.
+  # Remaining scenarios (#3458):
+  #   6 NO_TEST: shipped behavior, no integration test yet
+  # NO_TEST gaps:
+  #   - "Clicking an external set opens the batch view"
+  #   - "External set batch view is read-only"
+  #   - "Search filters across both Suites and External Sets"
+  #   - "Search with no matches hides both sections"
+  #   - "Sets associated with a platform suite do not appear in External Sets"
+  #   - "External sets are ordered by most recent run"
+
   Background:
     Given I am logged into project "my-project"
     And suites are available
 
   # Happy path - external sets appear and are navigable
 
-  @e2e @unimplemented
+  @e2e
   Scenario: External sets section appears with SDK-submitted scenario runs
     Given an SDK client has submitted scenario runs with scenarioSetId "nightly-regression"
     And "nightly-regression" is not associated with any platform suite
@@ -25,14 +36,14 @@ Feature: External SDK/CI sets in suites sidebar
 
   # Display and status summary
 
-  @integration @unimplemented
+  @integration
   Scenario: External set entry shows pass rate and recency
     Given scenarioSetId "ci-smoke-tests" last ran 1 hour ago with 15/20 passing
     And "ci-smoke-tests" is not associated with any platform suite
     When I view the suites sidebar
     Then "ci-smoke-tests" shows "15/20 passed" and recency in the External Sets section
 
-  @integration @unimplemented
+  @integration
   Scenario Outline: External set shows correct status indicator
     Given scenarioSetId "ci-smoke-tests" last ran 30 minutes ago with <passed>/<total> passing
     And "ci-smoke-tests" is not associated with any platform suite
@@ -44,7 +55,7 @@ Feature: External SDK/CI sets in suites sidebar
       | 10     | 10    | checkmark |
       | 7      | 10    | error     |
 
-  @integration @unimplemented
+  @integration
   Scenario: External set uses scenarioSetId as its display name
     Given an SDK client has submitted scenario runs with scenarioSetId "my-custom-set-name"
     When I view the suites sidebar
@@ -79,7 +90,7 @@ Feature: External SDK/CI sets in suites sidebar
 
   # Empty state
 
-  @integration @unimplemented
+  @integration
   Scenario: External Sets section is hidden when no external sets exist
     Given no scenario runs have been submitted with an unlinked scenarioSetId
     When I view the suites sidebar

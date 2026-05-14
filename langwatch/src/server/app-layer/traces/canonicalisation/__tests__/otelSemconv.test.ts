@@ -9,32 +9,21 @@
  * interaction bugs between extractors.
  */
 import { describe, expect, it } from "vitest";
-import type { NormalizedSpan } from "../../../../event-sourcing/pipelines/trace-processing/schemas/spans";
 import { CanonicalizeSpanAttributesService } from "../canonicalizeSpanAttributesService";
+import { makeStubSpan } from "./_helpers";
 
 const service = new CanonicalizeSpanAttributesService();
 
-const clientSpan: Pick<
-  NormalizedSpan,
-  "name" | "kind" | "instrumentationScope" | "statusMessage" | "statusCode"
-> = {
+const clientSpan = makeStubSpan({
   name: "chat gpt-4",
-  kind: "CLIENT",
   instrumentationScope: { name: "openai.sdk", version: "1.0" },
-  statusMessage: null,
-  statusCode: null,
-} as any;
+});
 
-const internalSpan: Pick<
-  NormalizedSpan,
-  "name" | "kind" | "instrumentationScope" | "statusMessage" | "statusCode"
-> = {
+const internalSpan = makeStubSpan({
   name: "execute_tool search",
   kind: "INTERNAL",
   instrumentationScope: { name: "my-agent", version: "1.0" },
-  statusMessage: null,
-  statusCode: null,
-} as any;
+});
 
 describe("OTel GenAI Semantic Conventions v1.38.0", () => {
   // ─────────────────────────────────────────────────────────────────────────
@@ -53,7 +42,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
           "gen_ai.conversation.id": "conv_abc",
         },
         [],
-        clientSpan as any,
+        clientSpan,
       );
 
       expect(result.attributes["gen_ai.operation.name"]).toBe("chat");
@@ -87,7 +76,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
           "gen_ai.request.choice.count": 3,
         },
         [],
-        clientSpan as any,
+        clientSpan,
       );
 
       expect(result.attributes["gen_ai.request.temperature"]).toBe(0.7);
@@ -117,7 +106,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
           "gen_ai.usage.output_tokens": 280,
         },
         [],
-        clientSpan as any,
+        clientSpan,
       );
 
       expect(result.attributes["gen_ai.usage.input_tokens"]).toBe(150);
@@ -148,7 +137,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
           "gen_ai.input.messages": inputMessages,
         },
         [],
-        clientSpan as any,
+        clientSpan,
       );
 
       // System messages stripped; only non-system messages preserved
@@ -196,7 +185,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
           "gen_ai.input.messages": inputMessages,
         },
         [],
-        clientSpan as any,
+        clientSpan,
       );
 
       expect(result.attributes["gen_ai.input.messages"]).toEqual(inputMessages);
@@ -221,7 +210,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
           "gen_ai.input.messages": inputMessages,
         },
         [],
-        clientSpan as any,
+        clientSpan,
       );
 
       // The GenAI extractor tries to extract system instruction from existing messages
@@ -254,7 +243,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
           "gen_ai.input.messages": inputMessages,
         },
         [],
-        clientSpan as any,
+        clientSpan,
       );
 
       const parsed = result.attributes["gen_ai.input.messages"] as any[];
@@ -284,10 +273,12 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
           "gen_ai.output.messages": outputMessages,
         },
         [],
-        clientSpan as any,
+        clientSpan,
       );
 
-      expect(result.attributes["gen_ai.output.messages"]).toEqual(outputMessages);
+      expect(result.attributes["gen_ai.output.messages"]).toEqual(
+        outputMessages,
+      );
     });
 
     it("preserves tool_call output messages", () => {
@@ -313,7 +304,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
           "gen_ai.output.messages": outputMessages,
         },
         [],
-        clientSpan as any,
+        clientSpan,
       );
 
       const parsed = result.attributes["gen_ai.output.messages"] as any[];
@@ -343,10 +334,12 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
           "gen_ai.request.choice.count": 2,
         },
         [],
-        clientSpan as any,
+        clientSpan,
       );
 
-      const parsed = result.attributes["gen_ai.output.messages"] as any[];
+      const parsed = result.attributes["gen_ai.output.messages"] as Array<
+        Record<string, unknown>
+      >;
       expect(parsed).toHaveLength(2);
     });
 
@@ -369,7 +362,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
           "gen_ai.output.messages": outputMessages,
         },
         [],
-        clientSpan as any,
+        clientSpan,
       );
 
       const parsed = result.attributes["gen_ai.output.messages"] as any[];
@@ -394,7 +387,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
           "gen_ai.system_instructions": instructions,
         },
         [],
-        clientSpan as any,
+        clientSpan,
       );
 
       // genAi extractor consumes the attribute and extracts text content
@@ -411,7 +404,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
           "gen_ai.system_instructions": "Be concise and accurate.",
         },
         [],
-        clientSpan as any,
+        clientSpan,
       );
 
       expect(result.attributes["gen_ai.system_instructions"]).toBe(
@@ -443,7 +436,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
           "gen_ai.tool.definitions": toolDefs,
         },
         [],
-        clientSpan as any,
+        clientSpan,
       );
 
       expect(result.attributes["gen_ai.tool.definitions"]).toEqual(toolDefs);
@@ -468,7 +461,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
           "gen_ai.tool.call.result": { flights: [] },
         },
         [],
-        internalSpan as any,
+        internalSpan,
       );
 
       expect(result.attributes["gen_ai.operation.name"]).toBe("execute_tool");
@@ -495,7 +488,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
           "gen_ai.request.encoding_formats": ["float"],
         },
         [],
-        clientSpan as any,
+        clientSpan,
       );
 
       expect(result.attributes["gen_ai.operation.name"]).toBe("embeddings");
@@ -522,7 +515,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
           "error.type": "rate_limit_exceeded",
         },
         [],
-        clientSpan as any,
+        clientSpan,
       );
 
       expect(result.attributes["error.type"]).toBe("rate_limit_exceeded");
@@ -542,9 +535,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
         },
         {
           role: "user",
-          parts: [
-            { type: "text", content: "What is the weather in Paris?" },
-          ],
+          parts: [{ type: "text", content: "What is the weather in Paris?" }],
         },
       ];
 
@@ -590,7 +581,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
           "gen_ai.conversation.id": "conv_session_1",
         },
         [],
-        clientSpan as any,
+        clientSpan,
       );
 
       // Core attributes
@@ -612,12 +603,12 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
       expect(result.attributes["gen_ai.input.messages"]).toEqual([
         {
           role: "user",
-          parts: [
-            { type: "text", content: "What is the weather in Paris?" },
-          ],
+          parts: [{ type: "text", content: "What is the weather in Paris?" }],
         },
       ]);
-      expect(result.attributes["gen_ai.output.messages"]).toEqual(outputMessages);
+      expect(result.attributes["gen_ai.output.messages"]).toEqual(
+        outputMessages,
+      );
 
       // System instruction extracted from parts-based message
       expect(result.attributes["gen_ai.system_instructions"]).toBe(
@@ -648,7 +639,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
           "gen_ai.input.messages": inputMessages,
         },
         [],
-        clientSpan as any,
+        clientSpan,
       );
 
       // System messages stripped; only non-system messages preserved
@@ -674,10 +665,12 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
           "gen_ai.output.messages": outputMessages,
         },
         [],
-        clientSpan as any,
+        clientSpan,
       );
 
-      expect(result.attributes["gen_ai.output.messages"]).toEqual(outputMessages);
+      expect(result.attributes["gen_ai.output.messages"]).toEqual(
+        outputMessages,
+      );
     });
   });
 
@@ -694,7 +687,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
           "gen_ai.agent.description": "Plans travel itineraries",
         },
         [],
-        internalSpan as any,
+        internalSpan,
       );
 
       expect(result.attributes["gen_ai.operation.name"]).toBe("invoke_agent");
@@ -718,7 +711,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
           "gen_ai.output.type": "text",
         },
         [],
-        clientSpan as any,
+        clientSpan,
       );
 
       expect(result.attributes["gen_ai.output.type"]).toBe("text");
@@ -732,7 +725,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
           "gen_ai.output.type": "json",
         },
         [],
-        clientSpan as any,
+        clientSpan,
       );
 
       expect(result.attributes["gen_ai.output.type"]).toBe("json");

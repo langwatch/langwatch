@@ -1,7 +1,8 @@
-import type { Dataset, DatasetRecord } from "@prisma/client";
+import type { Dataset, DatasetRecord, Prisma } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { captureException } from "~/utils/posthogErrorCapture";
+import { stripNullBytes } from "../../datasets/sanitize";
 import type { DatasetRecordInput } from "../../datasets/types";
 import { prisma } from "../../db";
 import { StorageService } from "../../storage";
@@ -25,7 +26,7 @@ const createDatasetRecords = ({
 
     const record = {
       id,
-      entry: entryWithoutId,
+      entry: stripNullBytes(entryWithoutId) as Record<string, unknown>,
       datasetId,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -47,13 +48,19 @@ export const createManyDatasetRecords = async ({
   datasetId,
   projectId,
   datasetRecords,
+  tx,
 }: {
   datasetId: string;
   projectId: string;
   // Input records - IDs are optional (backend generates with nanoid)
   datasetRecords: DatasetRecordInput[];
+  // Optional transaction client. When provided, all DB reads/writes for the
+  // Postgres path are joined to the caller's transaction so that a failure in
+  // record insertion can roll back the parent dataset row.
+  tx?: Prisma.TransactionClient;
 }) => {
-  const dataset = await prisma.dataset.findFirst({
+  const db = tx ?? prisma;
+  const dataset = await db.dataset.findFirst({
     where: { id: datasetId, projectId },
   });
 
@@ -95,7 +102,7 @@ export const createManyDatasetRecords = async ({
       JSON.stringify(allRecords),
     );
 
-    await prisma.dataset.update({
+    await db.dataset.update({
       where: { id: datasetId, projectId },
       data: { s3RecordCount: allRecords.length },
     });
@@ -108,7 +115,7 @@ export const createManyDatasetRecords = async ({
       projectId,
     });
 
-    return prisma.datasetRecord.createMany({
+    return db.datasetRecord.createMany({
       data: recordData as (DatasetRecord & { entry: any })[],
     });
   }
@@ -221,13 +228,16 @@ export const getFullDataset = async ({
     });
 
     if (
+      entrySelection === "first" ||
       entrySelection === "random" ||
       entrySelection === "last" ||
       typeof entrySelection === "number"
     ) {
       let skip = 0;
 
-      if (entrySelection === "last") {
+      if (entrySelection === "first") {
+        skip = 0;
+      } else if (entrySelection === "last") {
         skip = Math.max(count - 1, 0);
       } else if (entrySelection === "random") {
         skip = Math.floor(Math.random() * count);

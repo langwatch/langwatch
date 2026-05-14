@@ -108,6 +108,7 @@ describe("MessageHoverActions", () => {
   });
 
   describe("when user is a lite member", () => {
+    /** @scenario Lite member does not see the "View Trace" hover action on messages */
     it("does not render the View Trace button", () => {
       const { container } = render(
         <TranslationWrapper isLiteMember={true} />,

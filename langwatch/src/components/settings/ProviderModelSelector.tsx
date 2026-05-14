@@ -40,11 +40,13 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
   options,
   onChange,
   size = "full",
+  disabled = false,
 }: {
   model: string;
   options: string[];
   onChange: (model: string) => void;
   size?: "sm" | "md" | "full";
+  disabled?: boolean;
 }) {
   const [modelSearch, setModelSearch] = useState("");
 
@@ -168,6 +170,7 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
         setHighlightedValue(details.highlightedValue);
       }}
       size={size === "full" ? undefined : size}
+      disabled={disabled}
     >
       <Select.Trigger
         className="fix-hidden-inputs"
@@ -179,14 +182,22 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
           {() => selectValueText}
         </Select.ValueText>
       </Select.Trigger>
-      <Select.Content>
+      <Select.Content padding={1}>
         <Field.Root asChild>
-          <Box position="sticky" top={0} zIndex="1">
+          <Box
+            position="sticky"
+            top={0}
+            zIndex="1"
+            background="bg.panel"
+            paddingX={1}
+            paddingY={1}
+            borderBottom="1px solid"
+            borderColor="border"
+          >
             <InputGroup
               startElement={<Search size={16} />}
               startOffset="-4px"
-              background="bg.panel"
-              width="calc(100% - 9px)"
+              width="full"
             >
               <Input
                 size="sm"
@@ -194,6 +205,15 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
                 type="search"
                 value={modelSearch}
                 onChange={(e) => setModelSearch(e.target.value)}
+                border="none"
+                _focus={{ boxShadow: "none" }}
+                _focusVisible={{
+                  outline: "2px solid",
+                  outlineColor: "colorPalette.focusRing",
+                  outlineOffset: "1px",
+                  borderRadius: "sm",
+                }}
+                paddingX={2}
               />
             </InputGroup>
           </Box>

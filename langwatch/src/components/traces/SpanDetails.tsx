@@ -331,14 +331,19 @@ export function SpanDetails({
             whiteSpace="pre-wrap"
             color="fg"
           >
-            {span.error.message}
-            {span.error.stacktrace && (
+            {span.error.message ||
+              (!span.error.stacktrace?.length && (
+                <Text color="red.fg/60" fontStyle="italic">
+                  An error occurred (no exception message captured)
+                </Text>
+              ))}
+            {span.error.stacktrace?.length ? (
               <Box>
                 <Text as="code" fontSize="12px">
                   {span.error.stacktrace.join("\n")}
                 </Text>
               </Box>
-            )}
+            ) : null}
           </Box>
         </VStack>
       ) : (

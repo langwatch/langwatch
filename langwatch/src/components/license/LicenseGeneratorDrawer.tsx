@@ -36,7 +36,7 @@ export function LicenseGeneratorDrawer({
       closeOnInteractOutside={true}
       modal={false}
     >
-      <Drawer.Content>
+      <Drawer.Content bg="bg">
         <Drawer.CloseTrigger />
         <Drawer.Header>
           <Heading>Generate License</Heading>

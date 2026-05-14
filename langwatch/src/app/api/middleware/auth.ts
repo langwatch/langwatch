@@ -1,7 +1,11 @@
 import type { Project } from "@prisma/client";
 import type { MiddlewareHandler } from "hono";
 import { prisma } from "~/server/db";
-import { createUnifiedAuthMiddleware } from "~/server/pat/auth-middleware";
+import {
+  createUnifiedAuthMiddleware,
+  requireApiKeyPermission as createRequireApiKeyPermission,
+} from "~/server/api-key/auth-middleware";
+import type { Permission } from "~/server/api/rbac";
 
 /**
  * Variables set by the auth middleware.
@@ -9,9 +13,9 @@ import { createUnifiedAuthMiddleware } from "~/server/pat/auth-middleware";
  */
 export type AuthMiddlewareVariables = {
   project: Project;
-  patId?: string;
-  patUserId?: string;
-  patOrganizationId?: string;
+  apiKeyId?: string;
+  apiKeyUserId?: string;
+  apiKeyOrganizationId?: string;
 };
 
 /**
@@ -23,3 +27,11 @@ export type AuthMiddlewareVariables = {
  */
 export const authMiddleware: MiddlewareHandler =
   createUnifiedAuthMiddleware({ prisma });
+
+/**
+ * Per-endpoint RBAC middleware. Legacy project keys always pass through;
+ * service/user API keys are checked against their role bindings.
+ */
+export function requirePermission(permission: Permission): MiddlewareHandler {
+  return createRequireApiKeyPermission({ prisma, permission });
+}

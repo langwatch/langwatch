@@ -23,10 +23,13 @@ describe("applySpanToSummary token estimation integration", () => {
   // langwatch.tokens.estimated onto the raw span. After canonicalization,
   // these attributes become canonical keys that the fold projection reads.
 
-  describe("when estimated token attributes are present (post-RecordSpanCommand estimation)", () => {
-    it("reads estimated tokens and computes cost", () => {
+  describe("when both gen_ai semconv token attrs are present (even if our tokenizer wrote them)", () => {
+    it("treats the values as authoritative and does not flag as estimated", () => {
       // After RecordSpanCommand runs token estimation and canonicalization
       // processes the span, the normalized span will have these attributes.
+      // Behavior: gen_ai.usage.* presence wins over langwatch.tokens.estimated —
+      // since we surface the numbers as exact in the UI, we shouldn't also
+      // contradict ourselves with an "estimated" caveat.
       const span = createTestSpan({
         spanAttributes: {
           "langwatch.span.type": "llm",
@@ -47,10 +50,27 @@ describe("applySpanToSummary token estimation integration", () => {
 
       expect(result.totalPromptTokenCount).toBe(25);
       expect(result.totalCompletionTokenCount).toBe(12);
-      expect(result.tokensEstimated).toBe(true);
+      expect(result.tokensEstimated).toBe(false);
       // gpt-4o-mini is in the static registry, so cost should be computed
       expect(result.totalCost).not.toBeNull();
       expect(result.totalCost).toBeGreaterThan(0);
+    });
+  });
+
+  describe("when only one gen_ai semconv attr is present and our tokenizer flag is set", () => {
+    it("flags as estimated since the missing side was filled in elsewhere", () => {
+      const span = createTestSpan({
+        spanAttributes: {
+          "langwatch.span.type": "llm",
+          "gen_ai.request.model": "gpt-4o-mini",
+          "gen_ai.usage.input_tokens": 25,
+          "langwatch.tokens.estimated": true,
+        },
+      });
+
+      const result = applySpanToSummary({ state: createInitState(), span });
+
+      expect(result.tokensEstimated).toBe(true);
     });
   });
 

@@ -8,7 +8,7 @@ import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createLogger } from "~/utils/logger/server";
 import {
   type AuthMiddlewareVariables,
-  authMiddleware,
+  authMiddleware, requirePermission,
   handleError,
 } from "../../middleware";
 import { loggerMiddleware } from "../../middleware/logger";
@@ -65,6 +65,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── List Secrets ────────────────────────────────────────────
   .get(
     "/",
+    requirePermission("secrets:view"),
     describeRoute({
       description:
         "List all secrets for the project (values are never returned)",
@@ -111,6 +112,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── Get Secret ──────────────────────────────────────────────
   .get(
     "/:id",
+    requirePermission("secrets:view"),
     describeRoute({
       description: "Get a secret by its ID (value is never returned)",
       responses: {
@@ -164,6 +166,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── Create Secret ───────────────────────────────────────────
   .post(
     "/",
+    requirePermission("secrets:manage"),
     describeRoute({
       description:
         "Create a new project secret. The value is encrypted at rest and never returned.",
@@ -258,6 +261,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── Update Secret ───────────────────────────────────────────
   .put(
     "/:id",
+    requirePermission("secrets:manage"),
     describeRoute({
       description: "Update a secret's value",
       responses: {
@@ -321,6 +325,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── Delete Secret ───────────────────────────────────────────
   .delete(
     "/:id",
+    requirePermission("secrets:manage"),
     describeRoute({
       description: "Delete a secret",
       responses: {

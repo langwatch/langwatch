@@ -4,13 +4,13 @@ import { getLangWatchTracer } from "langwatch";
 import { createLogger } from "~/utils/logger/server";
 import type { DeepPartial } from "~/utils/types";
 import {
-  type RecordLogCommandData,
   piiRedactionLevelSchema,
+  type RecordLogCommandData,
 } from "../../event-sourcing/pipelines/trace-processing/schemas/commands";
 import type { OtlpAnyValue } from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
 import {
-  TraceRequestUtils,
   normalizeOtlpAttributeMap,
+  TraceRequestUtils,
 } from "../../event-sourcing/pipelines/trace-processing/utils/traceRequest.utils";
 export interface LogRequestCollectionDeps {
   recordLog: (data: RecordLogCommandData) => Promise<void>;
@@ -120,7 +120,8 @@ export class LogRequestCollectionService {
                   resourceAttributes: resourceAttrs,
                   scopeName,
                   scopeVersion,
-                  piiRedactionLevel: piiRedactionLevelSchema.parse(piiRedactionLevel),
+                  piiRedactionLevel:
+                    piiRedactionLevelSchema.parse(piiRedactionLevel),
                   occurredAt: Date.now(),
                 });
 
@@ -145,7 +146,6 @@ export class LogRequestCollectionService {
       },
     );
   }
-
 }
 
 /**

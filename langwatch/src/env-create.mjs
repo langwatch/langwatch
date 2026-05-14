@@ -64,9 +64,6 @@ export function createEnvConfig() {
       // Argon2id pepper mixed into virtual-key hashing. Rotating this
       // invalidates all existing VKs — treat as append-only / key-management.
       LW_VIRTUAL_KEY_PEPPER: z.string().min(32).optional(),
-      ELASTICSEARCH_NODE_URL: z.string().optional(),
-      ELASTICSEARCH_API_KEY: z.string().optional(),
-      ELASTICSEARCH_CONFIGURED: z.boolean().optional(),
       REDIS_URL: z.string().optional(),
       REDIS_CLUSTER_ENDPOINTS: z.string().optional(),
       REDIS_DB_INDEX: z.preprocess(
@@ -87,14 +84,31 @@ export function createEnvConfig() {
       DEMO_PROJECT_ID: z.string().optional(),
       DEMO_PROJECT_USER_ID: z.string().optional(),
       DEMO_PROJECT_SLUG: z.string().optional(),
-      IS_OPENSEARCH: z.boolean().optional(),
-      IS_QUICKWIT: z.boolean().optional(),
       USE_AWS_SES: z.string().optional(),
       AWS_REGION: z.string().optional(),
       EMAIL_DEFAULT_FROM: z.string().optional(),
       S3_KEY_SALT: z.string().optional(),
       IS_SAAS: z.boolean().optional(),
+      // Controls SSRF blocking for outbound HTTP calls (TS proxy + scenario
+      // runner; mirrored on the Python NLP side via the same env name). When
+      // true: private IPs, localhost, and hostnames resolving to private IPs
+      // are blocked unless listed in ALLOWED_PROXY_HOSTS. When unset/false:
+      // local destinations are allowed (cloud metadata is still always
+      // blocked). Default: false.
+      BLOCK_LOCAL_HTTP_CALLS: z.boolean().optional(),
+      ALLOWED_PROXY_HOSTS: z.string().optional(),
       SHOW_OPS_IN_MAIN_SIDEBAR: z.string().optional(),
+      // Post-2026-05-11 loop-prevention kill-switch. Set to "1" to
+      // bypass the reactor depth check; emergency rollback only.
+      LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD: z.string().optional(),
+      // Post-2026-05-11 tenant soft-cap: max in-flight event-sourcing
+      // groups per tenant in the DISPATCH_LUA scheduler.
+      // Default 100 (≈ one worker pod's concurrency) — every install
+      // gets noisy-neighbour protection out of the box. Set to "0" to
+      // disable entirely (incident kill switch). Set to a positive int
+      // to retune (e.g. raise for a legitimate heavy single-tenant
+      // workload).
+      LANGWATCH_DISPATCH_TENANT_CAP: z.string().optional(),
       USE_S3_STORAGE: z.boolean().optional(),
       S3_ENDPOINT: z.string().optional(),
       S3_ACCESS_KEY_ID: z.string().optional(),
@@ -200,9 +214,6 @@ export function createEnvConfig() {
       AUTH0_MGMT_CLIENT_ID: process.env.AUTH0_MGMT_CLIENT_ID,
       AUTH0_MGMT_CLIENT_SECRET: process.env.AUTH0_MGMT_CLIENT_SECRET,
       API_TOKEN_JWT_SECRET: process.env.API_TOKEN_JWT_SECRET,
-      ELASTICSEARCH_NODE_URL: process.env.ELASTICSEARCH_NODE_URL,
-      ELASTICSEARCH_API_KEY: process.env.ELASTICSEARCH_API_KEY,
-      ELASTICSEARCH_CONFIGURED: !!(process.env.ELASTICSEARCH_NODE_URL),
       REDIS_URL: process.env.REDIS_URL,
       REDIS_CLUSTER_ENDPOINTS: process.env.REDIS_CLUSTER_ENDPOINTS,
       REDIS_DB_INDEX: process.env.REDIS_DB_INDEX,
@@ -220,13 +231,6 @@ export function createEnvConfig() {
       DEMO_PROJECT_ID: process.env.DEMO_PROJECT_ID,
       DEMO_PROJECT_USER_ID: process.env.DEMO_PROJECT_USER_ID,
       DEMO_PROJECT_SLUG: process.env.DEMO_PROJECT_SLUG,
-      IS_OPENSEARCH:
-        process.env.IS_OPENSEARCH === "1" ||
-        process.env.IS_OPENSEARCH?.toLowerCase() === "true",
-      IS_QUICKWIT:
-        process.env.IS_QUICKWIT === "1" ||
-        process.env.IS_QUICKWIT?.toLowerCase() === "true" ||
-        process.env.ELASTICSEARCH_NODE_URL?.startsWith("quickwit://"),
       USE_AWS_SES: process.env.USE_AWS_SES,
       AWS_REGION: process.env.AWS_REGION,
       EMAIL_DEFAULT_FROM: process.env.EMAIL_DEFAULT_FROM,
@@ -234,7 +238,14 @@ export function createEnvConfig() {
       IS_SAAS:
         process.env.IS_SAAS === "1" ||
         process.env.IS_SAAS?.toLowerCase() === "true",
+      BLOCK_LOCAL_HTTP_CALLS:
+        process.env.BLOCK_LOCAL_HTTP_CALLS === "1" ||
+        process.env.BLOCK_LOCAL_HTTP_CALLS?.toLowerCase() === "true",
+      ALLOWED_PROXY_HOSTS: process.env.ALLOWED_PROXY_HOSTS,
       SHOW_OPS_IN_MAIN_SIDEBAR: process.env.SHOW_OPS_IN_MAIN_SIDEBAR,
+      LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD:
+        process.env.LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD,
+      LANGWATCH_DISPATCH_TENANT_CAP: process.env.LANGWATCH_DISPATCH_TENANT_CAP,
       USE_S3_STORAGE:
         process.env.USE_S3_STORAGE === "1" ||
         process.env.USE_S3_STORAGE?.toLowerCase() === "true",
@@ -306,6 +317,18 @@ export function createEnvConfig() {
     !process.env.SKIP_ENV_VALIDATION &&
     !process.env.BUILD_TIME
   ) {
+    if (
+      (process.env.IS_SAAS === "1" ||
+        process.env.IS_SAAS?.toLowerCase() === "true") &&
+      !(
+        process.env.BLOCK_LOCAL_HTTP_CALLS === "1" ||
+        process.env.BLOCK_LOCAL_HTTP_CALLS?.toLowerCase() === "true"
+      )
+    ) {
+      throw new Error(
+        "IS_SAAS=true requires BLOCK_LOCAL_HTTP_CALLS=true to keep SSRF protections enabled",
+      );
+    }
     assertGatewaySecretsAllOrNone(process.env);
   }
 

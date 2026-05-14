@@ -179,6 +179,7 @@ describe("Suites Page Layout (Issue #1671)", () => {
 });
 
   describe("when rendering the SuiteSidebar", () => {
+    /** @scenario "Sidebar does not display a redundant SUITES label" */
     it("does not render a 'SUITES' section header in the sidebar", () => {
       const suites = [makeSuite()];
       render(

@@ -118,6 +118,7 @@ describe("mapToPlanInfo", () => {
     expect(result.maxMembersLite).toBe(10);
   });
 
+  /** @scenario PlanInfo defaults maxMembersLite to 1 when not specified */
   it("defaults maxMembersLite to 1 when not provided", () => {
     const licenseData = createLicenseData();
 

@@ -271,6 +271,7 @@ export const organizationRouter = createTRPCRouter({
           elasticsearchNodeUrl: z.string().optional(),
           elasticsearchApiKey: z.string().optional(),
           s3Bucket: z.string().optional(),
+          presenceEnabled: z.boolean().optional(),
         })
         .refine((data) => {
           const hasNodeUrl = !!data.elasticsearchNodeUrl?.trim();
@@ -322,6 +323,7 @@ export const organizationRouter = createTRPCRouter({
         elasticsearchNodeUrl: input.elasticsearchNodeUrl,
         elasticsearchApiKey: input.elasticsearchApiKey,
         s3Bucket: input.s3Bucket,
+        presenceEnabled: input.presenceEnabled,
       });
 
       if (input.elasticsearchNodeUrl && input.elasticsearchApiKey) {

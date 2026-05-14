@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "~/utils/api";
-import { usePageVisibility } from "./usePageVisibility";
+import type { ConnectionState } from "./useSSESubscription";
 import { useSSESubscription } from "./useSSESubscription";
 
 interface UseTraceUpdateListenerOptions {
@@ -9,9 +9,17 @@ interface UseTraceUpdateListenerOptions {
   onSpanStored?: (traceIds: string[]) => void | Promise<void>;
   onTraceSummaryUpdated?: (traceIds: string[]) => void | Promise<void>;
   enabled?: boolean;
-  pageOffset?: number;
-  cursorPageNumber?: number;
   debounceMs?: number;
+  /**
+   * Maximum time (ms) between callback fires during continuous events.
+   * Without this, trailing-edge debounce never fires during active ingestion
+   * because each event resets the timer.
+   *
+   * When set, the first event starts a maxWait timer that fires regardless
+   * of whether new events keep arriving. After firing, the cycle resets.
+   * If omitted, pure trailing-edge debounce is used (existing behavior).
+   */
+  maxWaitMs?: number;
 }
 
 interface TraceBroadcastPayload {
@@ -24,13 +32,11 @@ interface TraceBroadcastPayload {
  * Differentiates between span storage events and trace summary updates
  * so callers can refetch only the relevant data.
  *
- * Uses trailing-edge debounce: events accumulate traceIds during the window,
- * callback fires only after `debounceMs` of silence. This gives the backend
- * time to finish processing before we fetch.
- *
- * Callbacks receive the accumulated traceIds from the debounce window so
- * callers can decide whether to refetch (visible trace updated) or just
- * bump a counter (new trace not on screen).
+ * Supports two modes:
+ * - **Trailing-edge debounce** (default): events accumulate traceIds during the
+ *   window, callback fires only after `debounceMs` of silence.
+ * - **Throttle with maxWait**: callback fires at most every `maxWaitMs` during
+ *   continuous events, ensuring updates are visible during active ingestion.
  */
 export function useTraceUpdateListener({
   projectId,
@@ -38,39 +44,9 @@ export function useTraceUpdateListener({
   onSpanStored,
   onTraceSummaryUpdated,
   enabled = true,
-  pageOffset,
-  cursorPageNumber,
   debounceMs = 5000,
+  maxWaitMs,
 }: UseTraceUpdateListenerOptions) {
-  const isVisible = usePageVisibility();
-
-  // Track when the page became hidden so we can keep processing for a grace period
-  const hiddenAtRef = useRef<number>(0);
-  const HIDDEN_GRACE_MS = 3 * 60_000; // 3 minutes
-
-  useEffect(() => {
-    if (isVisible) {
-      hiddenAtRef.current = 0;
-    } else if (hiddenAtRef.current === 0) {
-      hiddenAtRef.current = Date.now();
-    }
-  }, [isVisible]);
-
-  const isOnFirstPage =
-    (pageOffset === void 0 || pageOffset === 0) &&
-    (cursorPageNumber === void 0 || cursorPageNumber <= 1);
-
-  // Evaluated at call time (not memoized) so the grace-period check uses fresh timestamps
-  const isEligibleForUpdate = useCallback(() => {
-    if (!isOnFirstPage) return false;
-    if (isVisible) return true;
-    // Page is hidden — allow for a grace period
-    return (
-      hiddenAtRef.current > 0 &&
-      Date.now() - hiddenAtRef.current < HIDDEN_GRACE_MS
-    );
-  }, [isVisible, isOnFirstPage]);
-
   // Stable refs for callbacks to avoid stale closures in timers
   const onSpanStoredRef = useRef(onSpanStored);
   onSpanStoredRef.current = onSpanStored;
@@ -78,69 +54,101 @@ export function useTraceUpdateListener({
   const onTraceSummaryUpdatedRef = useRef(onTraceSummaryUpdated);
   onTraceSummaryUpdatedRef.current = onTraceSummaryUpdated;
 
-  // Trailing-edge debounce state for span events
-  const spanTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Debounce/throttle state for span events
+  const spanDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const spanMaxWaitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const spanTraceIdsRef = useRef<Set<string>>(new Set());
 
-  // Trailing-edge debounce state for summary events
-  const summaryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Debounce/throttle state for summary events
+  const summaryDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const summaryMaxWaitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const summaryTraceIdsRef = useRef<Set<string>>(new Set());
+
+  const flushSpanUpdate = useCallback(() => {
+    if (spanDebounceTimerRef.current) {
+      clearTimeout(spanDebounceTimerRef.current);
+      spanDebounceTimerRef.current = null;
+    }
+    if (spanMaxWaitTimerRef.current) {
+      clearTimeout(spanMaxWaitTimerRef.current);
+      spanMaxWaitTimerRef.current = null;
+    }
+    const ids = [...spanTraceIdsRef.current];
+    spanTraceIdsRef.current = new Set();
+    if (ids.length > 0) {
+      void onSpanStoredRef.current?.(ids);
+    }
+  }, []);
+
+  const flushSummaryUpdate = useCallback(() => {
+    if (summaryDebounceTimerRef.current) {
+      clearTimeout(summaryDebounceTimerRef.current);
+      summaryDebounceTimerRef.current = null;
+    }
+    if (summaryMaxWaitTimerRef.current) {
+      clearTimeout(summaryMaxWaitTimerRef.current);
+      summaryMaxWaitTimerRef.current = null;
+    }
+    const ids = [...summaryTraceIdsRef.current];
+    summaryTraceIdsRef.current = new Set();
+    if (ids.length > 0) {
+      void onTraceSummaryUpdatedRef.current?.(ids);
+    }
+  }, []);
 
   const scheduleSpanUpdate = useCallback(
     (eventTraceId: string | undefined) => {
-      if (!isEligibleForUpdate()) return;
-
       if (eventTraceId) {
         spanTraceIdsRef.current.add(eventTraceId);
       }
 
-      if (spanTimerRef.current) {
-        clearTimeout(spanTimerRef.current);
+      // Reset trailing-edge debounce timer
+      if (spanDebounceTimerRef.current) {
+        clearTimeout(spanDebounceTimerRef.current);
       }
-      spanTimerRef.current = setTimeout(() => {
-        spanTimerRef.current = null;
-        const ids = [...spanTraceIdsRef.current];
-        spanTraceIdsRef.current = new Set();
-        void onSpanStoredRef.current?.(ids);
-      }, debounceMs);
+      spanDebounceTimerRef.current = setTimeout(flushSpanUpdate, debounceMs);
+
+      // Start maxWait timer on first event in this cycle (if maxWaitMs is set)
+      if (maxWaitMs != null && !spanMaxWaitTimerRef.current) {
+        spanMaxWaitTimerRef.current = setTimeout(flushSpanUpdate, maxWaitMs);
+      }
     },
-    [isEligibleForUpdate, debounceMs],
+    [debounceMs, maxWaitMs, flushSpanUpdate],
   );
 
   const scheduleSummaryUpdate = useCallback(
     (eventTraceId: string | undefined) => {
-      if (!isEligibleForUpdate()) return;
-
       if (eventTraceId) {
         summaryTraceIdsRef.current.add(eventTraceId);
       }
 
-      if (summaryTimerRef.current) {
-        clearTimeout(summaryTimerRef.current);
+      // Reset trailing-edge debounce timer
+      if (summaryDebounceTimerRef.current) {
+        clearTimeout(summaryDebounceTimerRef.current);
       }
-      summaryTimerRef.current = setTimeout(() => {
-        summaryTimerRef.current = null;
-        const ids = [...summaryTraceIdsRef.current];
-        summaryTraceIdsRef.current = new Set();
-        void onTraceSummaryUpdatedRef.current?.(ids);
-      }, debounceMs);
+      summaryDebounceTimerRef.current = setTimeout(flushSummaryUpdate, debounceMs);
+
+      // Start maxWait timer on first event in this cycle (if maxWaitMs is set)
+      if (maxWaitMs != null && !summaryMaxWaitTimerRef.current) {
+        summaryMaxWaitTimerRef.current = setTimeout(flushSummaryUpdate, maxWaitMs);
+      }
     },
-    [isEligibleForUpdate, debounceMs],
+    [debounceMs, maxWaitMs, flushSummaryUpdate],
   );
 
   // Cleanup timers on unmount
   useEffect(() => {
     return () => {
-      if (spanTimerRef.current) {
-        clearTimeout(spanTimerRef.current);
-      }
-      if (summaryTimerRef.current) {
-        clearTimeout(summaryTimerRef.current);
-      }
+      if (spanDebounceTimerRef.current) clearTimeout(spanDebounceTimerRef.current);
+      if (spanMaxWaitTimerRef.current) clearTimeout(spanMaxWaitTimerRef.current);
+      if (summaryDebounceTimerRef.current) clearTimeout(summaryDebounceTimerRef.current);
+      if (summaryMaxWaitTimerRef.current) clearTimeout(summaryMaxWaitTimerRef.current);
     };
   }, []);
 
-  useSSESubscription<
+  const [lastEventAt, setLastEventAt] = useState<number>(0);
+
+  const sse = useSSESubscription<
     { event: string; timestamp: number },
     { projectId: string }
   >(
@@ -150,7 +158,6 @@ export function useTraceUpdateListener({
     {
       enabled: Boolean(enabled && projectId),
       onData: (data) => {
-        if (!isEligibleForUpdate()) return;
         if (!data.event) return;
 
         try {
@@ -160,6 +167,8 @@ export function useTraceUpdateListener({
               : data.event;
 
           if (traceId && payload.traceId !== traceId) return;
+
+          setLastEventAt(Date.now());
 
           if (payload.event === "span_stored") {
             scheduleSpanUpdate(payload.traceId);
@@ -172,4 +181,9 @@ export function useTraceUpdateListener({
       },
     },
   );
+
+  return {
+    connectionState: sse.connectionState,
+    lastEventAt,
+  };
 }

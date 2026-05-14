@@ -171,6 +171,7 @@ export type GroupByField =
   | "metadata.model"
   | "metadata.span_type"
   | "topics.topics"
+  | "traces.trace_name"
   | "evaluations.evaluation_passed"
   | "evaluations.evaluation_label"
   | "evaluations.evaluation_processing_state"
@@ -204,6 +205,12 @@ const groupByExpressions: Partial<
   "topics.topics": () => ({
     column: `${tableAliases.trace_summaries}.TopicId`,
     requiredJoins: [],
+  }),
+
+  "traces.trace_name": () => ({
+    column: `if(${tableAliases.trace_summaries}.TraceName = '', 'unknown', ${tableAliases.trace_summaries}.TraceName)`,
+    requiredJoins: [],
+    handlesUnknown: true,
   }),
 
   "metadata.user_id": () => ({

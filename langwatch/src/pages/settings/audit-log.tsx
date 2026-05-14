@@ -61,6 +61,7 @@ function AuditLogPage() {
   // Date range selector
   const {
     period: { startDate, endDate },
+    mode,
   } = usePeriodSelector(30);
 
   // Helper to parse URL query param to number with default
@@ -518,15 +519,24 @@ function AuditLogPage() {
             </Text>
             <PeriodSelector
               period={{ startDate, endDate }}
+              mode={mode}
               setPeriod={(start, end) => {
+                const { period: _omit, ...rest } = router.query;
                 void router.push({
                   pathname: router.pathname,
                   query: {
-                    ...router.query,
+                    ...rest,
                     startDate: start.toISOString(),
                     endDate: end.toISOString(),
                     pageOffset: 0,
                   },
+                });
+              }}
+              setRelativePeriod={(presetKey) => {
+                const { startDate: _s, endDate: _e, ...rest } = router.query;
+                void router.push({
+                  pathname: router.pathname,
+                  query: { ...rest, period: presetKey, pageOffset: 0 },
                 });
               }}
             />

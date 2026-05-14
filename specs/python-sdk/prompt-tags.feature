@@ -3,6 +3,14 @@ Feature: Python SDK custom tag support
   I want to fetch prompts by tag and manage tag assignments
   So that I can pin my code to tagged versions and promote versions across environments
 
+  # All `@unimplemented` scenarios in this file describe Python SDK
+  # behaviour. The check-feature-parity script only scans `*.test.ts
+  # /tsx` files, so Python pytest cases under `python-sdk/tests/`
+  # cannot be bound via JSDoc today. Underlying tag-fetch tests
+  # exist in `python-sdk/tests/prompts/test_prompt.py` and
+  # `test_fetch_policies.py`. Cheap structural fix: extend the
+  # parity scanner to read pytest docstrings.
+
   Background:
     Given a LangWatch client initialized with a valid API key
 

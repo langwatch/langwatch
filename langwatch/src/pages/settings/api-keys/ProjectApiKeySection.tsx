@@ -37,9 +37,9 @@ export function ProjectApiKeySection() {
         <Text fontSize="sm" color="fg">
           Prefer{" "}
           <Text as="span" fontWeight="600">
-            Personal Access Tokens
+            API Keys
           </Text>{" "}
-          for new integrations — they&apos;re scoped to a user, honor your
+          for new integrations. They&apos;re scoped to a user, honor your
           role bindings, and can be revoked individually. Project API keys
           remain available for backwards compatibility.
         </Text>

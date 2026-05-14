@@ -123,7 +123,7 @@ export function CreateProjectDrawer({
         }
       }}
     >
-      <Drawer.Content>
+      <Drawer.Content bg="bg">
         <Drawer.Header>
           <Drawer.CloseTrigger onClick={handleClose} />
           <Heading>Create New Project</Heading>

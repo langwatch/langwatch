@@ -76,6 +76,7 @@ describe("ModelProviderService business logic", () => {
       expect(result).toEqual({ OPENAI_API_KEY: "new-key" });
     });
 
+    /** @scenario Preserve original API key when saving with masked placeholder */
     it("preserves existing key when new value is masked placeholder", () => {
       const validatedKeys = {
         OPENAI_API_KEY: MASKED_KEY_PLACEHOLDER,
@@ -105,6 +106,7 @@ describe("ModelProviderService business logic", () => {
       expect(result.OPENAI_API_KEY).toBe("sk-new-key");
     });
 
+    /** @scenario Preserve original subscription key when saving with masked placeholder */
     it("preserves multiple masked keys", () => {
       const validatedKeys = {
         AWS_ACCESS_KEY_ID: MASKED_KEY_PLACEHOLDER,
@@ -141,6 +143,7 @@ describe("ModelProviderService business logic", () => {
   });
 
   describe("maskApiKeys", () => {
+    /** @scenario API key masking when editing existing provider */
     it("masks fields containing KEY", () => {
       const customKeys = {
         OPENAI_API_KEY: "sk-actual-key",

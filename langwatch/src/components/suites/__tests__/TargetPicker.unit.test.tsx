@@ -154,6 +154,7 @@ describe("<TargetPicker />", () => {
     ];
 
     describe("when the picker renders with onSelectAll and onClear", () => {
+      /** @scenario "Target picker displays Select All and Clear buttons" */
       it("displays a Select All button in the footer", () => {
         renderPicker({ targets, totalCount: 3, onSelectAll: vi.fn(), onClear: vi.fn() });
 
@@ -200,6 +201,7 @@ describe("<TargetPicker />", () => {
     });
 
     describe("when Select All is clicked", () => {
+      /** @scenario "Clicking Select All selects all targets" */
       it("calls onSelectAll", async () => {
         const onSelectAll = vi.fn();
         const user = userEvent.setup();
@@ -213,6 +215,7 @@ describe("<TargetPicker />", () => {
     });
 
     describe("when Clear is clicked", () => {
+      /** @scenario "Clicking Clear deselects all targets" */
       it("calls onClear", async () => {
         const onClear = vi.fn();
         const user = userEvent.setup();

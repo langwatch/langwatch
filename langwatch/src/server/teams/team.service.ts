@@ -90,6 +90,7 @@ export class TeamService {
             include: {
               user: { select: { id: true, name: true, email: true } },
               group: { select: { id: true, name: true, scimSource: true } },
+              apiKey: { select: { id: true, name: true } },
               customRole: { select: { id: true, name: true } },
             },
           }),
@@ -103,6 +104,7 @@ export class TeamService {
                 include: {
                   user: { select: { id: true, name: true, email: true } },
                   group: { select: { id: true, name: true, scimSource: true } },
+                  apiKey: { select: { id: true, name: true } },
                   customRole: { select: { id: true, name: true } },
                 },
               })
@@ -176,7 +178,7 @@ export class TeamService {
             groupId: null as string | null,
             viaGroupId: null as string | null,
             viaGroupName: null as string | null,
-            name: b.user?.name ?? b.user?.email ?? "Unknown",
+            name: b.user?.name ?? b.user?.email ?? b.apiKey?.name ?? "Unknown",
             email: b.user?.email ?? null,
             role: b.role,
             customRoleId: b.customRoleId,
@@ -288,7 +290,7 @@ export class TeamService {
               userId: b.userId,
               groupId: b.groupId,
               viaGroupName: b.groupId ? b.group?.name ?? null : null,
-              name: b.user?.name ?? b.group?.name ?? "Unknown",
+              name: b.user?.name ?? b.group?.name ?? b.apiKey?.name ?? "Unknown",
               email: b.user?.email ?? null,
               role: b.role,
               customRoleId: b.customRoleId,

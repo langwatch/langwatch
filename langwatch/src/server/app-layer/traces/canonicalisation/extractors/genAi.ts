@@ -35,6 +35,7 @@
 
 import { ATTR_KEYS } from "./_constants";
 import {
+  coerceStringNumberAttrs,
   extractInputMessages,
   extractModelToBoth,
   extractOutputMessages,
@@ -143,7 +144,10 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
     );
     if (rawSystemInstructions !== undefined) {
       if (typeof rawSystemInstructions === "string") {
-        ctx.setAttr(ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS, rawSystemInstructions);
+        ctx.setAttr(
+          ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS,
+          rawSystemInstructions,
+        );
         ctx.recordRule(`${this.id}:system_instructions(string)`);
       } else if (Array.isArray(rawSystemInstructions)) {
         // Array of content blocks: [{ type: "text", content: "..." }]
@@ -180,10 +184,7 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
       if (Array.isArray(existing)) {
         const sysInstruction = extractSystemInstructionFromMessages(existing);
         if (sysInstruction !== null) {
-          ctx.setAttr(
-            ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS,
-            sysInstruction,
-          );
+          ctx.setAttr(ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS, sysInstruction);
           // Strip system messages and re-set
           const stripped = stripSystemMessages(existing);
           attrs.take(ATTR_KEYS.GEN_AI_INPUT_MESSAGES);
@@ -193,8 +194,15 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
           ctx.recordRule(`${this.id}:system_instruction(existing)`);
         }
         // Annotate existing messages as chat_messages type (only if messages remain)
-        if (ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES] !== undefined || attrs.has(ATTR_KEYS.GEN_AI_INPUT_MESSAGES)) {
-          recordValueType(ctx, ATTR_KEYS.GEN_AI_INPUT_MESSAGES, "chat_messages");
+        if (
+          ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES] !== undefined ||
+          attrs.has(ATTR_KEYS.GEN_AI_INPUT_MESSAGES)
+        ) {
+          recordValueType(
+            ctx,
+            ATTR_KEYS.GEN_AI_INPUT_MESSAGES,
+            "chat_messages",
+          );
         }
       }
     }
@@ -247,49 +255,25 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
     // Coerce string→number for reasoning tokens and cache tokens
     // (Mastra sends these as strings, e.g. "720")
     // ─────────────────────────────────────────────────────────────────────────
-    const extendedTokenKeys = [
+    coerceStringNumberAttrs(ctx, this.id, [
       ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS,
       ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
       ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
-    ] as const;
-
-    for (const key of extendedTokenKeys) {
-      const raw = attrs.get(key);
-      if (typeof raw === "string") {
-        const n = asNumber(raw);
-        if (n !== null) {
-          attrs.take(key);
-          ctx.setAttr(key, n);
-          ctx.recordRule(`${this.id}:coerce(${key})`);
-        }
-      }
-    }
+    ]);
 
     // ─────────────────────────────────────────────────────────────────────────
     // Request Parameter Coercion
     // Coerce string→number for request parameters that arrive as strings
     // (e.g. Mastra sends temperature as "1" instead of 1)
     // ─────────────────────────────────────────────────────────────────────────
-    const requestParamKeys = [
+    coerceStringNumberAttrs(ctx, this.id, [
       ATTR_KEYS.GEN_AI_REQUEST_TEMPERATURE,
       ATTR_KEYS.GEN_AI_REQUEST_MAX_TOKENS,
       ATTR_KEYS.GEN_AI_REQUEST_TOP_P,
       ATTR_KEYS.GEN_AI_REQUEST_FREQUENCY_PENALTY,
       ATTR_KEYS.GEN_AI_REQUEST_PRESENCE_PENALTY,
       ATTR_KEYS.GEN_AI_REQUEST_SEED,
-    ] as const;
-
-    for (const key of requestParamKeys) {
-      const raw = attrs.get(key);
-      if (typeof raw === "string") {
-        const n = asNumber(raw);
-        if (n !== null) {
-          attrs.take(key);
-          ctx.setAttr(key, n);
-          ctx.recordRule(`${this.id}:coerce(${key})`);
-        }
-      }
-    }
+    ]);
 
     // ─────────────────────────────────────────────────────────────────────────
     // Request Parameters (from legacy llm.invocation_parameters)

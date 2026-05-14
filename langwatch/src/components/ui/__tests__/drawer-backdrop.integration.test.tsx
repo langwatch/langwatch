@@ -17,7 +17,7 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
 function renderDrawer() {
   render(
     <Drawer.Root open={true} placement="end">
-      <Drawer.Content>
+      <Drawer.Content bg="bg">
         <Drawer.Body>Content</Drawer.Body>
       </Drawer.Content>
     </Drawer.Root>,
@@ -29,6 +29,7 @@ describe("DrawerContent transparency", () => {
   afterEach(cleanup);
 
   describe("when a drawer opens", () => {
+    /** @scenario Drawer content panel applies blur filter and transparency */
     it("renders the drawer content panel", () => {
       renderDrawer();
 

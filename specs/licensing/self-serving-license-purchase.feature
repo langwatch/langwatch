@@ -1,4 +1,14 @@
 Feature: Self-Serving License Purchase
+
+  # Two scenarios below are bound to licensePurchaseHandler unit tests.
+  # The remaining @unimplemented scenarios cover Stripe-webhook-router
+  # behavior (how checkout.session.completed events are dispatched
+  # between license and subscription flows), error-path handling for
+  # missing private key / unreachable Slack / missing email config, and
+  # the configurable payment-link UI button. Each requires either a
+  # webhook-router integration fixture or a license-page component test
+  # — neither exists yet. Aspirational pending those harnesses.
+
   As a user wanting to run LangWatch self-hosted
   I want to purchase a license and receive it automatically
   So that I can activate my self-hosted deployment without manual intervention
@@ -8,14 +18,6 @@ Feature: Self-Serving License Purchase
     And the Stripe license payment link is configured
 
   # Core webhook flow
-  @integration @unimplemented
-  Scenario: Generate and email license on successful Stripe purchase
-    Given a user completes checkout via the license payment link with 5 seats
-    When the Stripe checkout.session.completed webhook fires
-    Then a GROWTH license is generated with maxMembers set to 5
-    And all other plan limits are set to unlimited
-    And the license expires 1 year from the purchase date
-    And the license is emailed to the buyer's email address
 
   @integration @unimplemented
   Scenario: Route license purchase separately from subscription checkout
@@ -31,31 +33,12 @@ Feature: Self-Serving License Purchase
     Then the existing subscription checkout flow executes
     And the license generation flow is NOT triggered
 
-  @integration @unimplemented
-  Scenario: Default to 1 seat when quantity is missing
-    Given a user completes checkout via the license payment link with no quantity specified
-    When the Stripe checkout.session.completed webhook fires
-    Then a GROWTH license is generated with maxMembers set to 1
-
-  @integration @unimplemented
+  @integration
   Scenario: Use business name as organization name in license
     Given a user completes checkout with business name "Acme Corp" and email "buyer@acme.com"
     When the license is generated
     Then the license organization name is "Acme Corp"
     And the license email is "buyer@acme.com"
-
-  @integration @unimplemented
-  Scenario: Fall back to email when business name is empty
-    Given a user completes checkout with no business name and email "buyer@solo.dev"
-    When the license is generated
-    Then the license organization name is "buyer@solo.dev"
-
-  # Slack notification
-  @integration @unimplemented
-  Scenario: Notify Slack channel on license purchase
-    Given the Slack license webhook URL is configured
-    When a license is successfully generated from a purchase
-    Then a Slack notification is sent with buyer email, plan type, seat count, and amount paid
 
   @integration @unimplemented
   Scenario: Continue license delivery when Slack notification fails
@@ -81,7 +64,7 @@ Feature: Self-Serving License Purchase
     And the error is logged
 
   # GROWTH plan template
-  @integration @unimplemented
+  @integration
   Scenario: GROWTH plan includes all features with no artificial limits
     Given a user purchases a GROWTH license with 10 seats
     When the license is generated

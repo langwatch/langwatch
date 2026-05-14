@@ -49,6 +49,7 @@ describe("createResilientClickHouseClient()", () => {
   });
 
   describe("when insert fails with transient error then succeeds", () => {
+    /** @scenario Transient insert errors are retried with exponential backoff */
     it("retries and returns the result", async () => {
       const transientError = new Error("MEMORY_LIMIT_EXCEEDED");
       const result = { executed: true };
@@ -107,6 +108,7 @@ describe("createResilientClickHouseClient()", () => {
   });
 
   describe("when insert fails with non-transient error", () => {
+    /** @scenario Non-transient insert errors fail immediately */
     it("throws immediately without retrying", async () => {
       const schemaError = new Error("Table does_not_exist doesn't exist");
       const mock = makeMockClient({
@@ -160,6 +162,7 @@ describe("createResilientClickHouseClient()", () => {
       expect(mock.query).toHaveBeenCalledTimes(1);
     });
 
+    /** @scenario Query successes are logged at debug level */
     it("logs structured debug fields", async () => {
       const queryResult = { data: [] };
       const mock = makeMockClient({
@@ -183,6 +186,7 @@ describe("createResilientClickHouseClient()", () => {
   });
 
   describe("when query fails", () => {
+    /** @scenario Queries are not retried on failure */
     it("throws without retrying", async () => {
       const err = new Error("MEMORY_LIMIT_EXCEEDED");
       const mock = makeMockClient({
@@ -199,6 +203,7 @@ describe("createResilientClickHouseClient()", () => {
       expect(mock.query).toHaveBeenCalledTimes(1);
     });
 
+    /** @scenario Query failures are logged with structured metadata */
     it("logs structured error fields", async () => {
       const err = new Error("MEMORY_LIMIT_EXCEEDED");
       const mock = makeMockClient({
@@ -268,6 +273,7 @@ describe("createResilientClickHouseClient()", () => {
   });
 
   describe("when logging throws during query failure", () => {
+    /** @scenario Logging crashes do not affect query results */
     it("still propagates the original ClickHouse error", async () => {
       const chError = new Error("MEMORY_LIMIT_EXCEEDED");
       const mock = makeMockClient({
@@ -484,6 +490,7 @@ describe("createResilientClickHouseClient()", () => {
   });
 
   describe("when command or close is called", () => {
+    /** @scenario Non-query operations pass through to the underlying client */
     it("passes through to the underlying client", async () => {
       const mock = makeMockClient({
         command: vi.fn().mockResolvedValue(undefined),

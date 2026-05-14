@@ -120,6 +120,7 @@ describe("Model Providers API", () => {
         });
       });
 
+      /** @scenario GET /api/model-providers lists providers with masked keys */
       it("returns the provider with masked API keys", async () => {
         const res = await helpers.api.get("/api/model-providers");
 
@@ -161,6 +162,7 @@ describe("Model Providers API", () => {
         );
       });
 
+      /** @scenario PUT /api/model-providers/:provider upserts provider config */
       it("never returns raw API key in response", async () => {
         const res = await helpers.api.put("/api/model-providers/openai", {
           enabled: true,

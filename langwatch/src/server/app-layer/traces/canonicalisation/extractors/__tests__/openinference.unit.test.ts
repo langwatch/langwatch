@@ -166,9 +166,7 @@ describe("OpenInferenceExtractor", () => {
 
       extractor.apply(ctx);
 
-      expect(ctx.out[ATTR_KEYS.GEN_AI_CONVERSATION_ID]).toBe(
-        "existing-thread",
-      );
+      expect(ctx.out[ATTR_KEYS.GEN_AI_CONVERSATION_ID]).toBe("existing-thread");
     });
   });
 
@@ -195,6 +193,91 @@ describe("OpenInferenceExtractor", () => {
       expect(ctx.out[ATTR_KEYS.LANGWATCH_LABELS]).toBe(
         JSON.stringify(["tag-a", "tag-b"]),
       );
+    });
+  });
+
+  describe("when llm.token_count.* attributes are present", () => {
+    it("maps prompt/completion counts to canonical gen_ai.usage.*", () => {
+      const ctx = createExtractorContext({
+        [ATTR_KEYS.OPENINFERENCE_LLM_TOKEN_COUNT_PROMPT]: 751,
+        [ATTR_KEYS.OPENINFERENCE_LLM_TOKEN_COUNT_COMPLETION]: 94,
+        [ATTR_KEYS.OPENINFERENCE_LLM_TOKEN_COUNT_TOTAL]: 845,
+      });
+
+      extractor.apply(ctx);
+
+      expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS]).toBe(751);
+      expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS]).toBe(94);
+    });
+
+    it("maps reasoning + cache_read + cache_write to canonical keys", () => {
+      const ctx = createExtractorContext({
+        [ATTR_KEYS.OPENINFERENCE_LLM_TOKEN_COUNT_COMPLETION_DETAILS_REASONING]:
+          12,
+        [ATTR_KEYS.OPENINFERENCE_LLM_TOKEN_COUNT_PROMPT_DETAILS_CACHE_READ]:
+          120,
+        [ATTR_KEYS.OPENINFERENCE_LLM_TOKEN_COUNT_PROMPT_DETAILS_CACHE_WRITE]:
+          30,
+      });
+
+      extractor.apply(ctx);
+
+      expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS]).toBe(12);
+      expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]).toBe(120);
+      expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]).toBe(
+        30,
+      );
+    });
+
+    it("consumes all llm.token_count.* keys so they don't leak into params", () => {
+      const ctx = createExtractorContext({
+        [ATTR_KEYS.OPENINFERENCE_LLM_TOKEN_COUNT_PROMPT]: 751,
+        [ATTR_KEYS.OPENINFERENCE_LLM_TOKEN_COUNT_COMPLETION]: 94,
+        [ATTR_KEYS.OPENINFERENCE_LLM_TOKEN_COUNT_TOTAL]: 845,
+        [ATTR_KEYS.OPENINFERENCE_LLM_TOKEN_COUNT_COMPLETION_DETAILS_REASONING]:
+          12,
+        [ATTR_KEYS.OPENINFERENCE_LLM_TOKEN_COUNT_PROMPT_DETAILS_CACHE_READ]:
+          120,
+        [ATTR_KEYS.OPENINFERENCE_LLM_TOKEN_COUNT_PROMPT_DETAILS_CACHE_WRITE]:
+          30,
+      });
+
+      extractor.apply(ctx);
+
+      const remaining = [
+        ATTR_KEYS.OPENINFERENCE_LLM_TOKEN_COUNT_PROMPT,
+        ATTR_KEYS.OPENINFERENCE_LLM_TOKEN_COUNT_COMPLETION,
+        ATTR_KEYS.OPENINFERENCE_LLM_TOKEN_COUNT_TOTAL,
+        ATTR_KEYS.OPENINFERENCE_LLM_TOKEN_COUNT_COMPLETION_DETAILS_REASONING,
+        ATTR_KEYS.OPENINFERENCE_LLM_TOKEN_COUNT_PROMPT_DETAILS_CACHE_READ,
+        ATTR_KEYS.OPENINFERENCE_LLM_TOKEN_COUNT_PROMPT_DETAILS_CACHE_WRITE,
+      ];
+      for (const key of remaining) {
+        expect(ctx.bag.attrs.has(key)).toBe(false);
+      }
+    });
+
+    it("records a rule when any token-count attribute is present", () => {
+      const ctx = createExtractorContext({
+        [ATTR_KEYS.OPENINFERENCE_LLM_TOKEN_COUNT_PROMPT]: 10,
+      });
+
+      extractor.apply(ctx);
+
+      expect(ctx.recordRule).toHaveBeenCalledWith(
+        "openinference:llm.token_count",
+      );
+    });
+
+    it("does not overwrite a canonical token already set by gen_ai.usage.*", () => {
+      const ctx = createExtractorContext({
+        [ATTR_KEYS.OPENINFERENCE_LLM_TOKEN_COUNT_PROMPT]: 999,
+      });
+      ctx.out[ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS] = 42;
+
+      extractor.apply(ctx);
+
+      expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS]).toBe(42);
     });
   });
 });

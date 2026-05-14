@@ -57,9 +57,9 @@ describe("SpanNormalizationPipelineService — SDK evaluation events", () => {
         null,
       );
 
-      expect(
-        normalized.spanAttributes[ATTR_KEYS.GEN_AI_EVALUATION_NAME],
-      ).toBe("toxicity");
+      expect(normalized.spanAttributes[ATTR_KEYS.GEN_AI_EVALUATION_NAME]).toBe(
+        "toxicity",
+      );
       expect(
         normalized.spanAttributes[ATTR_KEYS.GEN_AI_EVALUATION_SCORE_VALUE],
       ).toBe(0.95);

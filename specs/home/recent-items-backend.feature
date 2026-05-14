@@ -4,6 +4,14 @@ Feature: Recent Items Backend
   I want to retrieve my recently accessed items
   So that I can quickly jump back to what I was working on
 
+  # Most scenarios bound via existing
+  # `langwatch/src/server/home/__tests__/recent-items.integration.test.ts`.
+  # The remaining @unimplemented scenarios (monitor/annotation extraction,
+  # ordering, dedup, deep-link URLs) need additional cases in that same
+  # file — the audit-log → entity-resolver pipeline is fully functional
+  # but the scenarios for those specific entity types/edge cases haven't
+  # been written yet.
+
   Background:
     Given I am authenticated as user "user-123"
     And I have access to project "project-456"
@@ -15,7 +23,6 @@ Feature: Recent Items Backend
     Then I should receive an empty array
 
   # Filtering
-  @unimplemented
   Scenario: Returns items from AuditLog filtered by user and project
     Given user "other-user" has audit log entries for project "project-456"
     And I have audit log entries for project "other-project"
@@ -24,7 +31,6 @@ Feature: Recent Items Backend
     Then I should only receive items from my audit log entries for project "project-456"
 
   # Entity extraction - Prompts
-  @unimplemented
   Scenario: Extracts prompt IDs from prompts.update actions
     Given I have an audit log entry for action "prompts.update" with args:
       | configId | prompt-123 |
@@ -35,7 +41,6 @@ Feature: Recent Items Backend
       | id   | prompt-123   |
       | name | My Prompt    |
 
-  @unimplemented
   Scenario: Extracts prompt IDs from prompts.create actions
     Given I have an audit log entry for action "prompts.create" with args:
       | configId | prompt-456 |
@@ -47,7 +52,6 @@ Feature: Recent Items Backend
       | name | New Prompt   |
 
   # Entity extraction - Workflows
-  @unimplemented
   Scenario: Extracts workflow IDs from workflow.update actions
     Given I have an audit log entry for action "workflow.update" with args:
       | workflowId | workflow-123 |
@@ -59,7 +63,6 @@ Feature: Recent Items Backend
       | name | My Workflow  |
       | icon | 🔄           |
 
-  @unimplemented
   Scenario: Extracts workflow IDs from workflow.create actions
     Given I have an audit log entry for action "workflow.create" with args:
       | workflowId | workflow-456 |
@@ -72,7 +75,6 @@ Feature: Recent Items Backend
       | icon | ⚡           |
 
   # Entity extraction - Datasets
-  @unimplemented
   Scenario: Extracts dataset IDs from dataset.update actions
     Given I have an audit log entry for action "dataset.update" with args:
       | datasetId | dataset-123 |
@@ -83,7 +85,6 @@ Feature: Recent Items Backend
       | id   | dataset-123  |
       | name | My Dataset   |
 
-  @unimplemented
   Scenario: Extracts dataset IDs from dataset.create actions
     Given I have an audit log entry for action "dataset.create" with args:
       | datasetId | dataset-456 |
@@ -119,7 +120,6 @@ Feature: Recent Items Backend
       | name | My Queue   |
 
   # Hydration
-  @unimplemented
   Scenario: Hydrates items with entity name and updatedAt
     Given I have an audit log entry for action "workflow.update" with args:
       | workflowId | workflow-789 |
@@ -132,8 +132,7 @@ Feature: Recent Items Backend
       | updatedAt | 2024-01-15T10:30:00Z |
 
   # Deleted entities
-  @unimplemented
-  Scenario: Excludes deleted entities from results
+  Scenario: Excludes soft-deleted prompts from results
     Given I have an audit log entry for action "prompts.update" with args:
       | configId | deleted-prompt |
     And no prompt exists with id "deleted-prompt"
@@ -148,7 +147,6 @@ Feature: Recent Items Backend
     Then I should not receive an item with id "archived-workflow"
 
   # Limits and ordering
-  @unimplemented
   Scenario: Limits results to requested count
     Given I have 20 audit log entries for different prompts
     When I request recent items with limit 5

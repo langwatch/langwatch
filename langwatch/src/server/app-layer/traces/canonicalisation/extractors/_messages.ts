@@ -51,7 +51,10 @@ export const extractMessageContentText = (message: unknown): string | null => {
 
 /**
  * Extracts text strings from content/parts arrays.
- * Handles plain strings, {type:"text", text:...}, {text:...}, {content:...}.
+ * Handles plain strings, {type:"text", text:...}, {text:...}, {content:...},
+ * {type:"thinking", thinking:...}, {type:"tool_use", input:...}, and
+ * {type:"tool_result", content:...} so unwrapped Anthropic typed blocks
+ * still surface as a meaningful raw match.
  */
 const extractTextsFromParts = (parts: unknown[]): string[] => {
   const texts: string[] = [];
@@ -66,6 +69,17 @@ const extractTextsFromParts = (parts: unknown[]): string[] => {
         texts.push(p.text);
       } else if (typeof p.content === "string") {
         texts.push(p.content);
+      } else if (p.type === "thinking" && typeof p.thinking === "string") {
+        texts.push(p.thinking);
+      } else if (p.type === "tool_use" && p.input != null) {
+        try {
+          texts.push(JSON.stringify(p.input));
+        } catch {
+          // ignore unstringifiable inputs
+        }
+      } else if (p.type === "tool_result" && Array.isArray(p.content)) {
+        const inner = extractTextsFromParts(p.content);
+        if (inner.length > 0) texts.push(inner.join("\n"));
       }
     }
   }
@@ -238,8 +252,6 @@ const isObjectWithNumericKeys = (v: unknown): v is Record<string, unknown> => {
  * preserving index order.
  */
 const numericKeysToArray = (obj: Record<string, unknown>): unknown[] => {
-  const entries = Object.entries(obj).sort(
-    ([a], [b]) => Number(a) - Number(b),
-  );
+  const entries = Object.entries(obj).sort(([a], [b]) => Number(a) - Number(b));
   return entries.map(([, v]) => v);
 };

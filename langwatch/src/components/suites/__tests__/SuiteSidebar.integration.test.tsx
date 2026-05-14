@@ -60,6 +60,7 @@ describe("<SuiteSidebar/>", () => {
   });
 
   describe("given no suites exist", () => {
+    /** @scenario "Empty state when no run plans exist" */
     it("displays empty state message", () => {
       render(<SuiteSidebar {...defaultProps} suites={[]} />, {
         wrapper: Wrapper,
@@ -84,6 +85,7 @@ describe("<SuiteSidebar/>", () => {
       makeSuite({ id: "suite_3", name: "Quick Run", slug: "quick-run" }),
     ];
 
+    /** @scenario "Sidebar still shows suite names and action buttons after label removal" */
     it("displays all suite names", () => {
       render(<SuiteSidebar {...defaultProps} suites={suites} />, {
         wrapper: Wrapper,
@@ -186,6 +188,7 @@ describe("<SuiteSidebar/>", () => {
     });
 
     describe("when typing 'billing' in the search box", () => {
+      /** @scenario Suite sidebar filters suites with search icon visible */
       it("filters to only show Billing Edge", async () => {
         const user = userEvent.setup();
 
@@ -203,6 +206,7 @@ describe("<SuiteSidebar/>", () => {
     });
 
     describe("when search matches no suites", () => {
+      /** @scenario "Empty state when search has no matches" */
       it("displays no matching suites message", async () => {
         const user = userEvent.setup();
 

@@ -3,6 +3,20 @@ Feature: Tag display for suites and scenarios
   I want tags to have a consistent appearance across the app
   So that labels are visually clear and easy to manage
 
+  # Parity status: 0 of 7 scenarios bound to existing tests.
+  # The remaining are tracked under #3458:
+  #   - 6 NO_TEST: behavior shipped + correct, no integration test yet exists
+  #   - 1 UPDATE: implementation diverged from the spec wording — needs scenario rewrite
+  # NO_TEST gaps:
+  #   - "Tags display as pills"
+  #   - "Tags can be removed"
+  #   - "Suite sidebar shows tags"
+  #   - "Scenario table shows tags"
+  #   - "An add button appears after existing tags"
+  #   - "Clicking add button opens inline tag input"
+  # UPDATE divergences:
+  #   - "Suite detail panel shows tags"
+
   Background:
     Given I am logged into a project
 

@@ -4,11 +4,12 @@ import { describeRoute } from "hono-openapi";
 import { resolver, validator as zValidator } from "hono-openapi/zod";
 import { z } from "zod";
 import { prisma } from "~/server/db";
+import { monitorMappingsSchema } from "~/server/tracer/tracesMapping";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createLogger } from "~/utils/logger/server";
 import {
   type AuthMiddlewareVariables,
-  authMiddleware,
+  authMiddleware, requirePermission,
   handleError,
   resourceLimitMiddleware,
 } from "../../middleware";
@@ -54,7 +55,7 @@ const createMonitorSchema = z.object({
   executionMode: executionModeEnum.default("ON_MESSAGE"),
   preconditions: z.array(z.unknown()).default([]),
   parameters: z.record(z.unknown()).default({}),
-  mappings: z.record(z.unknown()).optional(),
+  mappings: monitorMappingsSchema,
   sample: z.number().min(0).max(1).default(1.0),
   evaluatorId: z.string().optional(),
   level: z.enum(["trace", "thread"]).default("trace"),
@@ -68,7 +69,7 @@ const updateMonitorSchema = z.object({
   executionMode: executionModeEnum.optional(),
   preconditions: z.array(z.unknown()).optional(),
   parameters: z.record(z.unknown()).optional(),
-  mappings: z.record(z.unknown()).optional(),
+  mappings: monitorMappingsSchema,
   sample: z.number().min(0).max(1).optional(),
   evaluatorId: z.string().nullable().optional(),
   level: z.enum(["trace", "thread"]).optional(),
@@ -121,6 +122,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── List Monitors ───────────────────────────────────────────
   .get(
     "/",
+    requirePermission("evaluations:view"),
     describeRoute({
       description:
         "List all online evaluation monitors for the project",
@@ -158,6 +160,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── Get Monitor ─────────────────────────────────────────────
   .get(
     "/:id",
+    requirePermission("evaluations:view"),
     describeRoute({
       description: "Get a monitor by its ID",
       responses: {
@@ -207,6 +210,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── Create Monitor ──────────────────────────────────────────
   .post(
     "/",
+    requirePermission("evaluations:manage"),
     resourceLimitMiddleware("onlineEvaluations"),
     describeRoute({
       description: "Create a new online evaluation monitor",
@@ -257,7 +261,7 @@ export const app = new Hono<{ Variables: Variables }>()
           executionMode: body.executionMode,
           preconditions: body.preconditions as Prisma.InputJsonValue,
           parameters: body.parameters as Prisma.InputJsonValue,
-          mappings: (body.mappings ?? {}) as Prisma.InputJsonValue,
+          mappings: (body.mappings ?? null) as Prisma.InputJsonValue,
           sample: body.sample,
           enabled: true,
           evaluatorId: body.evaluatorId ?? null,
@@ -279,6 +283,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── Update Monitor ──────────────────────────────────────────
   .patch(
     "/:id",
+    requirePermission("evaluations:manage"),
     describeRoute({
       description:
         "Update a monitor (name, enabled state, settings, etc.)",
@@ -368,6 +373,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── Toggle Monitor ──────────────────────────────────────────
   .post(
     "/:id/toggle",
+    requirePermission("evaluations:manage"),
     describeRoute({
       description: "Enable or disable a monitor",
       responses: {
@@ -420,6 +426,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── Delete Monitor ──────────────────────────────────────────
   .delete(
     "/:id",
+    requirePermission("evaluations:manage"),
     describeRoute({
       description: "Delete a monitor",
       responses: {

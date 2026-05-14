@@ -121,6 +121,7 @@ describe("VariableMappingInput", () => {
       });
     });
 
+    /** @scenario Search/filter in dropdown */
     it("filters fields based on search", async () => {
       const user = userEvent.setup();
       renderComponent();
@@ -283,6 +284,7 @@ describe("VariableMappingInput", () => {
       });
     });
 
+    /** @scenario Keyboard navigation in dropdown */
     it("navigates down with ArrowDown and selects", async () => {
       const onMappingChange = vi.fn();
       renderComponent({ onMappingChange });
@@ -431,6 +433,7 @@ describe("VariableMappingInput", () => {
   });
 
   describe("clearing source mapping", () => {
+    /** @scenario Remove root badge clears all */
     it("clears mapping when clicking the X button on the tag", async () => {
       const user = userEvent.setup();
       const onMappingChange = vi.fn();
@@ -856,6 +859,7 @@ describe("VariableMappingInput", () => {
       });
     });
 
+    /** @scenario Remove nested badge to re-select */
     it("allows clicking badge to go back to that level", async () => {
       const user = userEvent.setup();
       renderNestedComponent();
@@ -895,6 +899,7 @@ describe("VariableMappingInput", () => {
       });
     });
 
+    /** @scenario Select simple field (no nesting) */
     it("allows selecting simple field without nesting", async () => {
       const user = userEvent.setup();
       const onMappingChange = vi.fn();

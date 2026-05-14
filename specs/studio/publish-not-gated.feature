@@ -40,13 +40,3 @@ Feature: Workflow Publish Is Not Gated By Subscription Or License
     Given the Publish component renders
     Then it must not read activePlan.canPublish to disable or hide menu items
     And it must not render a lock-icon menu item that redirects to plan management
-
-  @integration @unimplemented
-  Scenario: Workflow creation count limits still apply
-    Given my organization has reached the maximum number of workflows
-    When I try to create a new workflow
-    Then I see the workflow count limit blocker
-    And the upgrade link redirects to plan management
-    # The publish gate removal does NOT remove resource count limits.
-    # This scenario documents the existing resource-limit behavior; coverage
-    # lives in specs/licensing/enforcement-resources.feature, not here.

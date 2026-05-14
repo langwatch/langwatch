@@ -9,7 +9,7 @@ import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createLogger } from "~/utils/logger/server";
 import {
   type AuthMiddlewareVariables,
-  authMiddleware,
+  authMiddleware, requirePermission,
   resourceLimitMiddleware,
 } from "../../middleware";
 import { loggerMiddleware } from "../../middleware/logger";
@@ -127,6 +127,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── List Suites ────────────────────────────────────────────
   .get(
     "/",
+    requirePermission("scenarios:view"),
     describeRoute({
       description: "List all non-archived suites (run plans) for the project",
       responses: {
@@ -161,6 +162,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── Get Suite ──────────────────────────────────────────────
   .get(
     "/:id",
+    requirePermission("scenarios:view"),
     describeRoute({
       description: "Get a suite (run plan) by its ID",
       responses: {
@@ -206,6 +208,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── Create Suite ───────────────────────────────────────────
   .post(
     "/",
+    requirePermission("scenarios:manage"),
     resourceLimitMiddleware("experiments"),
     describeRoute({
       description: "Create a new suite (run plan)",
@@ -252,6 +255,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── Update Suite ───────────────────────────────────────────
   .patch(
     "/:id",
+    requirePermission("scenarios:manage"),
     describeRoute({
       description: "Update a suite (run plan)",
       responses: {
@@ -305,6 +309,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── Duplicate Suite ────────────────────────────────────────
   .post(
     "/:id/duplicate",
+    requirePermission("scenarios:manage"),
     describeRoute({
       description: "Duplicate a suite (run plan)",
       responses: {
@@ -352,6 +357,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── Run Suite ──────────────────────────────────────────────
   .post(
     "/:id/run",
+    requirePermission("scenarios:manage"),
     describeRoute({
       description: "Trigger a suite run. Schedules scenario executions for all active scenarios × targets × repeatCount.",
       responses: {
@@ -419,6 +425,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── Delete (Archive) Suite ─────────────────────────────────
   .delete(
     "/:id",
+    requirePermission("scenarios:manage"),
     describeRoute({
       description: "Archive (soft-delete) a suite (run plan)",
       responses: {

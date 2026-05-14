@@ -18,7 +18,7 @@ import { SimulationConsole } from "../simulation-console/SimulationConsole";
 const DrawerWrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>
     <Drawer.Root open={true} placement="end">
-      <Drawer.Content>{children}</Drawer.Content>
+      <Drawer.Content bg="bg">{children}</Drawer.Content>
     </Drawer.Root>
   </ChakraProvider>
 );
@@ -32,6 +32,7 @@ describe("ScenarioRunDetailDrawer", () => {
 
   describe("ScenarioRunHeader in drawer context", () => {
     describe("given a failed run", () => {
+      /** @scenario Drawer header shows run identity and status */
       it("displays the scenario name and status icon", () => {
         render(
           <ScenarioRunHeader
@@ -96,6 +97,7 @@ describe("ScenarioRunDetailDrawer", () => {
 
   describe("SimulationConsole in drawer context", () => {
     describe("given a completed run with results", () => {
+      /** @scenario Criteria section shows pass/fail summary */
       it("displays the test report with criteria", () => {
         render(
           <SimulationConsole

@@ -29,6 +29,21 @@ overrides:
   "express-rate-limit@>=8.2.0 <8.2.2": "8.2.2"
   # Security: glob ReDoS (from mcp-server)
   "glob@>=10.2.0 <10.5.0": "10.5.0"
+  # Security: vite WebSocket file read + server.fs.deny bypass (#783/#784)
+  "vite@<7.3.2": "7.3.2"
+  "vite@>=8.0.0 <8.0.5": "8.0.5"
+  # Security: Next.js DoS with Server Components (#872)
+  # next is an unused optional peer dep of better-auth (this is a Vite app)
+  "next@>=13.0.0 <15.5.15": "15.5.15"
+  # Security: axios prototype pollution gadgets, header injection, loopback bypass (#982/#984/#987/#988)
+  "axios@>=1.0.0 <1.16.0": "1.16.0"
+  # Security: fast-xml-builder attribute value quote bypass (#1028)
+  "fast-xml-builder@<1.1.7": "1.1.7"
+  # Security: fast-uri path traversal + host confusion (#1031-#1042)
+  "fast-uri@<3.1.2": "3.1.2"
+  # Security: protobufjs code execution, DoS, code injection (CVE-2026-44289/44290/44291/44293)
+  "protobufjs@<7.5.6": "7.5.6"
+  "protobufjs@>=8.0.0 <8.0.2": "8.0.2"
 
 packageExtensions:
   bullmq-otel:

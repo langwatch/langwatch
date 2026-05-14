@@ -13,69 +13,21 @@ Feature: Message/Trace Limit Enforcement with License
   # TraceUsageService with License Limits
   # ============================================================================
 
-  @unimplemented
-  Scenario: Reports not exceeded when under monthly limit
-    Given the organization has a license with maxMessagesPerMonth 10000
-    And the organization has 5000 traces this month
-    When I check the trace limit for team "team-456"
-    Then exceeded is false
-
-  @unimplemented
-  Scenario: Reports exceeded when at monthly limit
-    Given the organization has a license with maxMessagesPerMonth 10000
-    And the organization has 10000 traces this month
-    When I check the trace limit for team "team-456"
-    Then exceeded is true
-    And the message contains "Monthly limit of 10000 traces reached"
-
-  @unimplemented
-  Scenario: Reports exceeded when over monthly limit
-    Given the organization has a license with maxMessagesPerMonth 10000
-    And the organization has 15000 traces this month
-    When I check the trace limit for team "team-456"
-    Then exceeded is true
-
-  @unimplemented
-  Scenario: Returns correct count and limit values
-    Given the organization has a PRO license with maxMessagesPerMonth 50000
-    And the organization has 25000 traces this month
-    When I check the trace limit for team "team-456"
-    Then the response includes:
-      | count               | 25000  |
-      | maxMessagesPerMonth | 50000  |
-      | planName            | PRO    |
-
   # ============================================================================
   # Invalid/Expired License (Temporary Self-Hosted Compatibility)
   # NOTE: Transitional policy — during compatibility window, self-hosted fallback
   # FREE plan does not block trace ingestion. This will be lifted in a future PR.
   # ============================================================================
 
-  @unimplemented
-  Scenario: Expired license does not block ingestion during compatibility window
-    Given the organization has an expired license
-    And the organization has 1000 traces this month
-    When I check the trace limit for team "team-456"
-    Then exceeded is false
-
-  @unimplemented
-  Scenario: Invalid license does not block ingestion during compatibility window
-    Given the organization has an invalid license signature
-    And the organization has 500 traces this month
-    When I check the trace limit for team "team-456"
-    Then exceeded is false
-
-  @unimplemented
-  Scenario: Invalid license remains unblocked even at FREE tier count during compatibility window
-    Given the organization has an invalid license signature
-    And the organization has 1000 traces this month
-    When I check the trace limit for team "team-456"
-    Then exceeded is false
-
   # ============================================================================
   # Caching Behavior
   # ============================================================================
 
+  # KEPT @unimplemented: TTL-based cache for trace counts is not yet
+  # implemented in TraceUsageService — current code calls Elasticsearch on
+  # every check. Adding the cache + tests requires deciding TTL window,
+  # invalidation strategy, and where to inject the clock. Out of parity
+  # scope; tracked as a future feature.
   @unimplemented
   Scenario: Uses cached count within TTL
     Given the organization has a license with maxMessagesPerMonth 10000
@@ -85,6 +37,8 @@ Feature: Message/Trace Limit Enforcement with License
     Then the Elasticsearch query is not executed
     And the cached count is returned
 
+  # KEPT @unimplemented: see preceding scenario — the trace-count cache
+  # itself does not exist in code yet.
   @unimplemented
   Scenario: Refreshes count after cache expires
     Given the organization has a license with maxMessagesPerMonth 10000
@@ -97,14 +51,3 @@ Feature: Message/Trace Limit Enforcement with License
   # Cross-Project Aggregation
   # ============================================================================
 
-  @unimplemented
-  Scenario: Aggregates traces across all organization projects
-    Given the organization has a license with maxMessagesPerMonth 10000
-    And a project "project-abc" exists in the team
-    And a project "project-def" exists in the team
-    And project "project-789" has 4000 traces this month
-    And project "project-abc" has 3000 traces this month
-    And project "project-def" has 4000 traces this month
-    When I check the trace limit for team "team-456"
-    Then exceeded is true
-    And count is 11000

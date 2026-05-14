@@ -5,6 +5,8 @@ import { makeScenarioRunData } from "./test-helpers";
 
 describe("getAdaptivePollingInterval()", () => {
   describe("when run data contains rows with PENDING or IN_PROGRESS status", () => {
+    /** @scenario "Polling interval is fast when runs are in progress" */
+    /** @scenario "All Runs polling interval is fast when any run is active" */
     it("returns an interval between 2000 and 3000 ms", () => {
       const runs = [
         makeScenarioRunData({ status: ScenarioRunStatus.IN_PROGRESS }),
@@ -33,6 +35,8 @@ describe("getAdaptivePollingInterval()", () => {
   });
 
   describe("when run data contains only settled rows", () => {
+    /** @scenario "Polling interval is slow when all runs are settled" */
+    /** @scenario "All Runs polling interval is slow when all runs are settled" */
     it("returns an interval between 15000 and 30000 ms", () => {
       const runs = [
         makeScenarioRunData({ status: ScenarioRunStatus.SUCCESS }),
@@ -54,6 +58,7 @@ describe("getAdaptivePollingInterval()", () => {
   });
 
   describe("when a row transitions to IN_PROGRESS status", () => {
+    /** @scenario "Polling interval returns to fast when a new run starts" */
     it("drops the interval to between 2000 and 3000 ms", () => {
       // First call with settled data
       const settledRuns = [

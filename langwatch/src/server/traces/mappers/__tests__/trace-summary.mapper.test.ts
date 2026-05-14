@@ -193,7 +193,7 @@ function makeSummary(
     occurredAt: 1000,
     createdAt: 1000,
     updatedAt: 2000,
-    lastEventOccurredAt: 2000,
+    LastEventOccurredAt: 2000,
     ...overrides,
   } as TraceSummaryData;
 }

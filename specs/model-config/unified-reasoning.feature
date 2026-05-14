@@ -27,19 +27,6 @@ Feature: Unified Reasoning Parameter
     Then the result should be { reasoning_effort: "medium" }
     # LiteLLM expects reasoning_effort and transforms internally
 
-  @unit @unimplemented
-  Scenario: Uses model reasoningConfig.parameterName when available
-    Given a model with reasoningConfig.parameterName "custom_reasoning"
-    And a prompt config with reasoning "high"
-    When mapping reasoning to provider parameters
-    Then the result should be { custom_reasoning: "high" }
-
-  @unit @unimplemented
-  Scenario: Returns undefined when reasoning is not set
-    Given a prompt config with no reasoning value
-    When mapping reasoning to provider parameters
-    Then the result should be undefined
-
   @unit
   Scenario: Returns undefined when reasoning is empty string
     Given a prompt config with reasoning ""
@@ -65,27 +52,3 @@ Feature: Unified Reasoning Parameter
     Given database config with effort "medium"
     When normalizing to unified format
     Then the result should have reasoning "medium"
-
-  @unit @unimplemented
-  Scenario: reasoning takes precedence over provider-specific fields
-    Given database config with reasoning "high" and reasoning_effort "low"
-    When normalizing to unified format
-    Then the result should have reasoning "high"
-
-  @unit @unimplemented
-  Scenario: Falls back through provider-specific fields if reasoning not set
-    Given database config with no reasoning but effort "medium"
-    When normalizing to unified format
-    Then the result should have reasoning "medium"
-
-  @unit @unimplemented
-  Scenario: Falls back in priority order reasoning > reasoning_effort > thinkingLevel > effort
-    Given database config with thinkingLevel "low" and effort "high"
-    When normalizing to unified format
-    Then the result should have reasoning "low"
-
-  @unit @unimplemented
-  Scenario: Returns undefined when no reasoning fields are set
-    Given database config with no reasoning fields
-    When normalizing to unified format
-    Then the result should be undefined

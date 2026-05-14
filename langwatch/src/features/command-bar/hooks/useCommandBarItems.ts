@@ -11,6 +11,7 @@ import {
 } from "../constants";
 import type { GroupedRecentItems } from "../useRecentItems";
 import { findEasterEgg } from "../easterEggs";
+import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 
 /**
  * Hook that builds the flat list of all items for keyboard navigation and display.
@@ -23,6 +24,7 @@ export function useCommandBarItems(
   idResult: SearchResult | null,
   groupedItems: GroupedRecentItems,
   projectSlug: string | undefined,
+  projectId: string | undefined,
 ): {
   allItems: ListItem[];
   recentItemsLimited: RecentItem[];
@@ -30,6 +32,21 @@ export function useCommandBarItems(
   searchInDocsItem: ListItem | null;
   easterEggItem: ListItem | null;
 } {
+  const { enabled: isTracesV2Enabled } = useFeatureFlag(
+    "release_ui_traces_v2_enabled",
+    { projectId, enabled: !!projectId },
+  );
+
+  const availableTopLevelNav = useMemo(
+    () =>
+      isTracesV2Enabled
+        ? topLevelNavigationCommands
+        : topLevelNavigationCommands.filter(
+            (cmd) => cmd.id !== "nav-traces-v2",
+          ),
+    [isTracesV2Enabled],
+  );
+
   // Get top recent items across all time groups
   const recentItemsLimited = useMemo(() => {
     const allRecent = [
@@ -105,7 +122,7 @@ export function useCommandBarItems(
       }
 
       // Show only top-level navigation commands by default
-      for (const cmd of topLevelNavigationCommands) {
+      for (const cmd of availableTopLevelNav) {
         items.push({ type: "command", data: cmd });
       }
     } else {
@@ -152,6 +169,7 @@ export function useCommandBarItems(
   }, [
     query,
     recentItemsLimited,
+    availableTopLevelNav,
     easterEggItem,
     idResult,
     filteredCommands,

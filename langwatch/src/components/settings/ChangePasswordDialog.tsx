@@ -84,7 +84,7 @@ export function ChangePasswordDialog({
       }}
       placement="center"
     >
-      <Dialog.Content>
+      <Dialog.Content bg="bg">
         <Dialog.CloseTrigger />
         <Dialog.Header>
           <Dialog.Title fontSize="md" fontWeight="500">

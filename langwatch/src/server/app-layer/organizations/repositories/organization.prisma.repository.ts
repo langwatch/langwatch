@@ -50,6 +50,37 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     return team?.organizationId ?? null;
   }
 
+  async getUserOrgRole({
+    userId,
+    organizationId,
+  }: {
+    userId: string;
+    organizationId: string;
+  }): Promise<OrganizationUserRole | null> {
+    const orgUser = await this.prisma.organizationUser.findUnique({
+      where: { userId_organizationId: { userId, organizationId } },
+      select: { role: true },
+    });
+    return orgUser?.role ?? null;
+  }
+
+  async getUserOrgRoleByTeamId({
+    userId,
+    teamId,
+  }: {
+    userId: string;
+    teamId: string;
+  }): Promise<OrganizationUserRole | null> {
+    const orgUser = await this.prisma.organizationUser.findFirst({
+      where: {
+        userId,
+        organization: { teams: { some: { id: teamId } } },
+      },
+      select: { role: true },
+    });
+    return orgUser?.role ?? null;
+  }
+
   async getProjectIds(organizationId: string): Promise<string[]> {
     const projects = await this.prisma.project.findMany({
       where: { team: { organizationId } },
@@ -417,6 +448,9 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
           ? encrypt(input.elasticsearchApiKey)
           : null,
         s3Bucket: input.s3Bucket,
+        ...(input.presenceEnabled !== undefined
+          ? { presenceEnabled: input.presenceEnabled }
+          : {}),
       },
     });
   }

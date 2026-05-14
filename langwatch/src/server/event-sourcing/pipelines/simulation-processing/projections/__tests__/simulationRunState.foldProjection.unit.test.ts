@@ -607,4 +607,61 @@ describe("simulationRunStateFoldProjection", () => {
       expect(state.FinishedAt).toBe(3000);
     });
   });
+
+  describe("when SimulationRunCancelRequested event is applied", () => {
+    function createCancelRequestedEvent(occurredAt = 5000): SimulationProcessingEvent {
+      return {
+        id: "event-cancel",
+        aggregateId: "scenario-run-1",
+        aggregateType: "simulation_run",
+        tenantId: TEST_TENANT_ID,
+        createdAt: occurredAt,
+        occurredAt,
+        type: SIMULATION_RUN_EVENT_TYPES.CANCEL_REQUESTED,
+        version: SIMULATION_EVENT_VERSIONS.CANCEL_REQUESTED,
+        data: { scenarioRunId: "scenario-run-1" },
+      } as SimulationProcessingEvent;
+    }
+
+    /** @scenario Fold projection sets CancellationRequestedAt without changing Status */
+    it("sets CancellationRequestedAt to event occurredAt while preserving Status", () => {
+      const initial = foldProjection.init();
+      const inProgress = foldProjection.apply(
+        initial,
+        createRunStartedEvent({}, { occurredAt: 1000 }),
+      );
+      expect(inProgress.Status).toBe("IN_PROGRESS");
+      expect(inProgress.CancellationRequestedAt).toBeNull();
+
+      const after = foldProjection.apply(
+        inProgress,
+        createCancelRequestedEvent(5000),
+      );
+
+      expect(after.CancellationRequestedAt).toBe(5000);
+      expect(after.Status).toBe("IN_PROGRESS");
+    });
+
+    /** @scenario Cancel request is idempotent */
+    it("preserves the original CancellationRequestedAt when applied a second time", () => {
+      const initial = foldProjection.init();
+      const inProgress = foldProjection.apply(
+        initial,
+        createRunStartedEvent({}, { occurredAt: 1000 }),
+      );
+      const afterFirst = foldProjection.apply(
+        inProgress,
+        createCancelRequestedEvent(5000),
+      );
+      expect(afterFirst.CancellationRequestedAt).toBe(5000);
+
+      const afterSecond = foldProjection.apply(
+        afterFirst,
+        createCancelRequestedEvent(8000),
+      );
+
+      expect(afterSecond.CancellationRequestedAt).toBe(5000);
+      expect(afterSecond.Status).toBe("IN_PROGRESS");
+    });
+  });
 });

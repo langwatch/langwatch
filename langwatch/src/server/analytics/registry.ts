@@ -835,6 +835,11 @@ export const analyticsGroups = {
   topics: {
     topics: simpleFieldGroupping("Topic", "metadata.topic_id"),
   },
+  traces: {
+    // TraceName is a ClickHouse-only dimension. This ES entry satisfies the
+    // type system; the actual GROUP BY runs through aggregation-builder.ts.
+    trace_name: simpleFieldGroupping("Trace Name", "metadata.trace_name"),
+  },
   metadata: {
     user_id: simpleFieldGroupping("User", "metadata.user_id"),
 

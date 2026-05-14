@@ -48,6 +48,10 @@ function createMockRepo(overrides: Partial<QueueRepository> = {}): QueueReposito
     canaryUnblock: vi.fn().mockResolvedValue({ unblockedCount: 0, groupIds: [] }),
     listDlqGroups: vi.fn().mockResolvedValue([]),
     drainAllBlockedPreview: vi.fn().mockResolvedValue({ totalAffected: 0, byPipeline: [], byError: [] }),
+    pauseTenant: vi.fn().mockResolvedValue(undefined),
+    unpauseTenant: vi.fn().mockResolvedValue(undefined),
+    listPausedTenants: vi.fn().mockResolvedValue([]),
+    drainTenant: vi.fn().mockResolvedValue({ groupsDrained: 0, jobsDrained: 0 }),
     ...overrides,
   };
 }
@@ -356,6 +360,115 @@ describe("QueueService", () => {
 
         expect(result).toEqual({ unblockedCount: 2, groupIds: ["g1", "g2"] });
         expect(repo.canaryUnblock).toHaveBeenCalledWith({ queueName: "q1", count: 5 });
+      });
+    });
+  });
+
+  describe("tenant pause + bulk drain", () => {
+    describe("when pauseTenant is called", () => {
+      /** @scenario Pausing a tenant halts dispatch for that tenant only */
+      it("delegates to the repository with tenantId", async () => {
+        const repo = createMockRepo();
+        const service = new QueueService(repo);
+
+        await service.pauseTenant({ queueName: "q1", tenantId: "project_X" });
+
+        expect(repo.pauseTenant).toHaveBeenCalledWith({
+          queueName: "q1",
+          tenantId: "project_X",
+        });
+      });
+    });
+
+    describe("when unpauseTenant is called", () => {
+      /** @scenario Unpausing a tenant resumes dispatch immediately */
+      it("delegates to the repository (which signals the dispatcher)", async () => {
+        const repo = createMockRepo();
+        const service = new QueueService(repo);
+
+        await service.unpauseTenant({ queueName: "q1", tenantId: "project_X" });
+
+        expect(repo.unpauseTenant).toHaveBeenCalledWith({
+          queueName: "q1",
+          tenantId: "project_X",
+        });
+      });
+    });
+
+    describe("when listPausedTenants is called", () => {
+      it("returns the repository's list of paused tenant ids", async () => {
+        const repo = createMockRepo({
+          listPausedTenants: vi
+            .fn()
+            .mockResolvedValue(["project_A", "project_B"]),
+        });
+        const service = new QueueService(repo);
+
+        const result = await service.listPausedTenants({ queueName: "q1" });
+
+        expect(result).toEqual(["project_A", "project_B"]);
+      });
+    });
+
+    describe("when drainTenant is called", () => {
+      /** @scenario drainTenant bulk-drains all groups for a tenantId */
+      it("returns groupsDrained and jobsDrained from the repository", async () => {
+        const repo = createMockRepo({
+          drainTenant: vi
+            .fn()
+            .mockResolvedValue({ groupsDrained: 1234, jobsDrained: 5678 }),
+        });
+        const service = new QueueService(repo);
+
+        const result = await service.drainTenant({
+          queueName: "q1",
+          tenantId: "project_X",
+        });
+
+        expect(result).toEqual({ groupsDrained: 1234, jobsDrained: 5678 });
+        expect(repo.drainTenant).toHaveBeenCalledWith({
+          queueName: "q1",
+          tenantId: "project_X",
+        });
+      });
+
+      /** @scenario drainTenant decrements stats:total-pending atomically per group */
+      it("returns counts in the shape the UI expects (groupsDrained + jobsDrained)", async () => {
+        // Decrement semantics are tested at the Lua level (see
+        // scripts.integration.test.ts "decrements stats:total-pending");
+        // here we just verify the service surfaces the repo's totals
+        // through to the caller without re-shaping them.
+        const repo = createMockRepo({
+          drainTenant: vi
+            .fn()
+            .mockResolvedValue({ groupsDrained: 3, jobsDrained: 12 }),
+        });
+        const service = new QueueService(repo);
+
+        const result = await service.drainTenant({
+          queueName: "q1",
+          tenantId: "project_X",
+        });
+
+        expect(result).toEqual({ groupsDrained: 3, jobsDrained: 12 });
+      });
+
+      /** @scenario drainTenant supports an optional groupIdContains substring filter */
+      it("forwards groupIdContains substring filter to the repository", async () => {
+        const repo = createMockRepo();
+        const service = new QueueService(repo);
+
+        await service.drainTenant({
+          queueName: "q1",
+          tenantId: "project_X",
+          groupIdContains: "/fold/projectDailySdkUsage/",
+        });
+
+        expect(repo.drainTenant).toHaveBeenCalledWith({
+          queueName: "q1",
+          tenantId: "project_X",
+          groupIdContains: "/fold/projectDailySdkUsage/",
+        });
       });
     });
   });

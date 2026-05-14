@@ -8,38 +8,19 @@ Feature: Internal Slack Notifications for Resource Limit Reached
   Background:
     Given an organization "Acme Corp" on the "Launch" plan
 
-  @unimplemented
-  Scenario: Slack notification sent when a resource limit is reached
-    Given the organization has reached the maximum number of workflows
-    When a user attempts to create a workflow
-    Then a Slack notification is sent with organization name, plan name, resource type, and usage counts
-    And the user sees the upgrade modal
-
-  @unimplemented
-  Scenario: No duplicate notification within 24-hour cooldown for the same limit type
-    Given a resource limit notification was already sent for "workflows" within the last 24 hours
-    When a user attempts to create a workflow
-    Then no Slack notification is sent
-
-  @unimplemented
-  Scenario: Cooldown is per limit type, not per organization
-    Given a resource limit notification was already sent for "workflows" within the last 24 hours
-    When a user attempts to create an agent and the limit is reached
-    Then a Slack notification is sent for "agents"
-
+  # KEPT @unimplemented: 24h cooldown logic is not implemented in
+  # notification.service.ts (notifyResourceLimitReached fires on every hit
+  # without dedup state). Bindable once the dedup table + clock-aware test
+  # harness is added.
   @unimplemented
   Scenario: Notification resumes after cooldown expires
     Given a resource limit notification for "workflows" was sent more than 24 hours ago
     When a user attempts to create a workflow and the limit is reached
     Then a Slack notification is sent
 
-  @unimplemented
-  Scenario: Notification failure does not block the user
-    Given the Slack webhook is unreachable
-    When a user attempts to create a workflow and the limit is reached
-    Then the user sees the upgrade modal
-    And the failure is captured for observability
-
+  # KEPT @unimplemented: existing notification service tests cover the
+  # Slack-channel side, but explicit "no-CRM-notification" assertion is
+  # missing. Cheap follow-up but out of parity scope.
   @unimplemented
   Scenario: Only internal ops team is notified, not CRM
     Given resource limit notifications are configured

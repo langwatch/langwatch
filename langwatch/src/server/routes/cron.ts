@@ -23,7 +23,6 @@ import { migrateToColdStorage } from "~/tasks/cold/moveTracesToColdStorage";
 import { scheduleTopicClustering } from "~/server/background/queues/topicClusteringQueue";
 import cleanupOldLambdas from "~/tasks/cleanupOldLambdas";
 import { processCustomGraphTrigger } from "~/pages/api/cron/triggers/customGraphTrigger";
-import { processTraceBasedTrigger } from "~/pages/api/cron/triggers/traceBasedTrigger";
 import { ANALYTICS_KEYS } from "~/types";
 import { createLogger } from "~/utils/logger/server";
 import { captureException } from "~/utils/posthogErrorCapture";
@@ -398,43 +397,28 @@ app.get("/cron/triggers", async (c) => {
     );
   }
 
+  // Only process custom graph triggers — trace-based triggers are handled
+  // reactively by the alertTrigger reactor on the trace-processing pipeline.
+  const graphTriggers = triggers.filter((t) => t.customGraphId);
+
   const results = [];
 
-  for (const trigger of triggers) {
-    if (trigger.customGraphId) {
-      try {
-        const result = await processCustomGraphTrigger(trigger, projects);
-        results.push(result);
-      } catch (error) {
-        logger.error(
-          { triggerId: trigger.id, error },
-          "error processing custom graph trigger",
-        );
-        results.push({
-          triggerId: trigger.id,
-          status: "error",
-          message:
-            error instanceof Error ? error.message : "Unknown error",
-          type: "customGraph",
-        });
-      }
-    } else {
-      try {
-        const result = await processTraceBasedTrigger(trigger, projects);
-        results.push(result);
-      } catch (error) {
-        logger.error(
-          { triggerId: trigger.id, error },
-          "error processing trace-based trigger",
-        );
-        results.push({
-          triggerId: trigger.id,
-          status: "error",
-          message:
-            error instanceof Error ? error.message : "Unknown error",
-          type: "traceBased",
-        });
-      }
+  for (const trigger of graphTriggers) {
+    try {
+      const result = await processCustomGraphTrigger(trigger, projects);
+      results.push(result);
+    } catch (error) {
+      logger.error(
+        { triggerId: trigger.id, error },
+        "error processing custom graph trigger",
+      );
+      results.push({
+        triggerId: trigger.id,
+        status: "error",
+        message:
+          error instanceof Error ? error.message : "Unknown error",
+        type: "customGraph",
+      });
     }
   }
 

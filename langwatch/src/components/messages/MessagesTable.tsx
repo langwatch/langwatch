@@ -94,7 +94,9 @@ export function MessagesTable({
 
   const {
     period: { startDate, endDate },
+    mode,
     setPeriod,
+    setRelativePeriod,
   } = usePeriodSelector();
 
   const navigationFooter = useNavigationFooter();
@@ -227,8 +229,6 @@ export function MessagesTable({
       }
     },
     enabled: !!project,
-    pageOffset: navigationFooter.pageOffset,
-    cursorPageNumber: navigationFooter.cursorPageNumber,
   });
 
   // Wrap acceptPending to also bump liveEndDate (component-level concern)
@@ -1104,30 +1104,35 @@ export function MessagesTable({
                   ...selectedHeaderColumns,
                 }).map(([columnKey, column]) => {
                   if (columnKey === "checked") return null;
+                  const toggleColumn = () => {
+                    setSelectedHeaderColumns({
+                      ...selectedHeaderColumns,
+                      [columnKey]: {
+                        enabled: !selectedHeaderColumns[columnKey]?.enabled,
+                        name: column.name,
+                      },
+                    });
+                    setLocalStorageHeaderColumns({
+                      ...selectedHeaderColumns,
+                      [columnKey]: {
+                        enabled: !selectedHeaderColumns[columnKey]?.enabled,
+                        name: column.name,
+                      },
+                    });
+                  };
                   return (
-                    <Checkbox
+                    <HStack
                       key={columnKey}
-                      checked={selectedHeaderColumns[columnKey]?.enabled}
-                      onChange={() => {
-                        setSelectedHeaderColumns({
-                          ...selectedHeaderColumns,
-                          [columnKey]: {
-                            enabled: !selectedHeaderColumns[columnKey]?.enabled,
-                            name: column.name,
-                          },
-                        });
-
-                        setLocalStorageHeaderColumns({
-                          ...selectedHeaderColumns,
-                          [columnKey]: {
-                            enabled: !selectedHeaderColumns[columnKey]?.enabled,
-                            name: column.name,
-                          },
-                        });
-                      }}
+                      width="full"
+                      cursor="pointer"
+                      onClick={toggleColumn}
                     >
-                      {column.name}
-                    </Checkbox>
+                      <Checkbox
+                        checked={selectedHeaderColumns[columnKey]?.enabled}
+                      >
+                        {column.name}
+                      </Checkbox>
+                    </HStack>
                   );
                 })}
               </VStack>
@@ -1136,7 +1141,12 @@ export function MessagesTable({
         </Popover.Root>
         {/** Column selector - end */}
 
-        <PeriodSelector period={{ startDate, endDate }} setPeriod={setPeriod} />
+        <PeriodSelector
+          period={{ startDate, endDate }}
+          mode={mode}
+          setPeriod={setPeriod}
+          setRelativePeriod={setRelativePeriod}
+        />
         <FilterToggle />
         {!hideAnalyticsToggle && <ToggleAnalytics />}
       </PageLayout.Header>
@@ -1370,7 +1380,7 @@ export function MessagesTable({
                   </Button>
                 </Dialog.Trigger>
                 <Portal>
-                  <Dialog.Content>
+                  <Dialog.Content bg="bg">
                     <Dialog.Header>
                       <Dialog.Title>Add to Queue</Dialog.Title>
                     </Dialog.Header>

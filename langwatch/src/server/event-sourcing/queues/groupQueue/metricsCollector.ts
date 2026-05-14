@@ -4,6 +4,7 @@ import type { Cluster } from "ioredis";
 import type { Logger } from "pino";
 import {
   gqActiveGroups,
+  gqBlockedGroups,
   gqFastqActive,
   gqFastqPending,
   gqPendingGroups,
@@ -56,14 +57,21 @@ export class GroupQueueMetricsCollector {
 
       const keyPrefix = this.params.scripts.getKeyPrefix();
       const readyKey = `${keyPrefix}ready`;
+      const blockedKey = `${keyPrefix}blocked`;
 
       const pendingGroupCount = await this.params.redisConnection.zcard(
         readyKey,
       );
+      const blockedGroupCount =
+        await this.params.redisConnection.scard(blockedKey);
 
       gqPendingGroups.set(
         { queue_name: this.params.queueName },
         pendingGroupCount,
+      );
+      gqBlockedGroups.set(
+        { queue_name: this.params.queueName },
+        blockedGroupCount,
       );
       gqActiveGroups.set(
         { queue_name: this.params.queueName },

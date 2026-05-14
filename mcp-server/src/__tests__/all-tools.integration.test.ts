@@ -781,6 +781,7 @@ describe("All MCP tools integration", () => {
   // =====================
   describe("discover_schema", () => {
     describe("when category is filters", () => {
+      /** @scenario Agent discovers available filter fields */
       it("returns filter field documentation", async () => {
         const { formatSchema } = await import(
           "../tools/discover-schema.js"
@@ -793,6 +794,7 @@ describe("All MCP tools integration", () => {
     });
 
     describe("when category is metrics", () => {
+      /** @scenario Agent discovers available metrics with allowed aggregations */
       it("returns metric documentation", async () => {
         const { formatSchema } = await import(
           "../tools/discover-schema.js"
@@ -818,6 +820,7 @@ describe("All MCP tools integration", () => {
     });
 
     describe("when category is groups", () => {
+      /** @scenario Agent discovers available group-by options */
       it("returns group-by options", async () => {
         const { formatSchema } = await import(
           "../tools/discover-schema.js"
@@ -876,6 +879,7 @@ describe("All MCP tools integration", () => {
     });
 
     describe("when category is all", () => {
+      /** @scenario Agent discovers all schema information at once */
       it("returns all schema categories", async () => {
         const { formatSchema } = await import(
           "../tools/discover-schema.js"
@@ -895,6 +899,7 @@ describe("All MCP tools integration", () => {
   // =====================
   describe("search_traces", () => {
     describe("when traces are found", () => {
+      /** @scenario Agent searches traces with a text query */
       it("returns formatted trace digests", async () => {
         const { handleSearchTraces } = await import(
           "../tools/search-traces.js"
@@ -924,6 +929,7 @@ describe("All MCP tools integration", () => {
     });
 
     describe("when pagination token is present", () => {
+      /** @scenario Agent paginates through trace results */
       it("includes scroll ID for next page", async () => {
         const { handleSearchTraces } = await import(
           "../tools/search-traces.js"
@@ -953,6 +959,7 @@ describe("All MCP tools integration", () => {
     });
 
     describe("when filters are applied", () => {
+      /** @scenario Agent searches traces filtered by user_id */
       it("passes filters to the API", async () => {
         const { handleSearchTraces } = await import(
           "../tools/search-traces.js"
@@ -976,6 +983,7 @@ describe("All MCP tools integration", () => {
   // =====================
   describe("get_trace", () => {
     describe("when trace exists", () => {
+      /** @scenario Agent gets a single trace by ID in AI-readable format */
       it("returns formatted trace with metadata and evaluations", async () => {
         const { handleGetTrace } = await import(
           "../tools/get-trace.js"
@@ -993,6 +1001,7 @@ describe("All MCP tools integration", () => {
     });
 
     describe("when trace does not exist", () => {
+      /** @scenario Agent gets a trace that does not exist */
       it("propagates the 404 error", async () => {
         const { handleGetTrace } = await import(
           "../tools/get-trace.js"

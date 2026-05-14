@@ -42,6 +42,12 @@ vi.mock("~/components/traces/TraceDetails", () => ({
   TraceDetails: () => <div data-testid="trace-details">TraceDetails</div>,
 }));
 
+// NewTracesPromo pulls in tRPC (publicEnv → useOrganizationTeamProject) which
+// requires withTRPC context this test does not provide.
+vi.mock("~/components/messages/NewTracesPromo", () => ({
+  NewTracesPromo: () => null,
+}));
+
 // Capture the onOpenChange handler from Drawer.Root
 let capturedOnOpenChange: (() => void) | undefined;
 vi.mock("~/components/ui/drawer", () => ({

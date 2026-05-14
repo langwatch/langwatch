@@ -37,9 +37,24 @@ const SPECS_ROOT = resolve(REPO_ROOT, "specs");
 const DEFAULT_TEST_ROOTS: string[] = [
   "langwatch/src",
   "langwatch/ee",
+  "langwatch/scripts",
   "mcp-server/src",
   "typescript-sdk/src",
   "python-sdk/src",
+];
+
+/**
+ * Roots scanned for `.bats` shell tests. Shell-driven dev-environment
+ * behavior (compose overrides, boxd fork orchestration) is tested with
+ * bats, not vitest — without this scan path, scenarios that describe
+ * shell behavior would have no way to satisfy parity and would be stuck
+ * on `@unimplemented` forever. Bats bindings use the same `@scenario`
+ * token, expressed as a hash-comment directly above an `@test "..." {`
+ * line.
+ */
+const DEFAULT_BATS_TEST_ROOTS: string[] = [
+  "scripts/__tests__",
+  "langwatch/scripts/__tests__",
 ];
 
 /**
@@ -62,26 +77,10 @@ const LEGACY_UNBOUND: string[] = [
   // Drive this list to empty by binding scenarios, flagging
   // `@unimplemented`, or removing scenarios from feature files.
   // See dev/docs/TESTING_PHILOSOPHY.md for the migration direction.
-  //
-  // nlp-go workflow engine (introduced by #3483) — scenarios document the
-  // Go port of the NLP workflow engine. Tests live in services/aigateway
-  // and langwatch_nlp; bindings have not been backfilled yet.
-  "specs/nlp-go/code-block.feature",
-  "specs/nlp-go/dataset-block.feature",
-  "specs/nlp-go/engine.feature",
-  "specs/nlp-go/feature-flag.feature",
-  "specs/nlp-go/front-door.feature",
-  "specs/nlp-go/http-block.feature",
-  "specs/nlp-go/llm-block.feature",
-  "specs/nlp-go/parallel-deployment.feature",
-  "specs/nlp-go/proxy.feature",
-  "specs/nlp-go/telemetry.feature",
-  "specs/nlp-go/topic-clustering.feature",
-  "specs/nlp-go/tracing-parity.feature",
-  "specs/studio/dataset-creation-regression.feature",
 ];
 
 const TEST_FILE_RE = /\.test\.tsx?$/;
+const BATS_FILE_RE = /\.bats$/;
 const FEATURE_FILE_RE = /\.feature$/;
 const SKIP_DIR = new Set(["node_modules", ".next", "dist", "build"]);
 
@@ -274,6 +273,63 @@ function collectAllBindings(testRoots: string[]): CollectedBinding[] {
   return bindings;
 }
 
+/**
+ * Bats binding form (line-oriented, comment-prefixed):
+ *
+ *   # @scenario "Stale localhost NEXTAUTH_URL is rewritten to the fork's proxy URL"
+ *   @test "boxd_rewrite_env: rewrites NEXTAUTH_URL allowlist key" {
+ *     ...
+ *   }
+ *
+ * Title may be wrapped in `"..."` or `'...'`. The next non-blank,
+ * non-comment line must begin with `@test ` (case-insensitive on `@test`
+ * to mirror bats' own tolerance). Bare-word titles aren't supported here
+ * because bash line-comments make it ambiguous where the title ends.
+ */
+// CRLF tolerance: `\r` is included in the trailing-whitespace class so files
+// committed with Windows line endings still match. The capture groups also
+// exclude `\r` so the title doesn't pick up a trailing CR.
+const BATS_ANNOTATION_RE =
+  /^[ \t]*#[ \t]*@scenario[ \t]+(?:"([^"\r\n]+)"|'([^'\r\n]+)')[ \t\r]*$/;
+
+function isNextLineBatsTest(lines: string[], startLineIdx: number): boolean {
+  for (let i = startLineIdx; i < lines.length; i++) {
+    const line = lines[i] ?? "";
+    const trimmed = line.trim();
+    if (trimmed === "") continue;
+    if (trimmed.startsWith("#")) continue;
+    return /^@test\b/.test(trimmed);
+  }
+  return false;
+}
+
+function collectBatsBindings(testRoots: string[]): CollectedBinding[] {
+  const bindings: CollectedBinding[] = [];
+  const files: string[] = [];
+  for (const r of testRoots) {
+    files.push(...walkFiles(resolve(REPO_ROOT, r), (n) => BATS_FILE_RE.test(n)));
+  }
+
+  for (const file of files) {
+    const src = readFileSync(file, "utf8");
+    const lines = src.split("\n");
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i] ?? "";
+      const m = line.match(BATS_ANNOTATION_RE);
+      if (!m) continue;
+      const title = (m[1] ?? m[2] ?? "").trim();
+      if (!title) continue;
+      if (!isNextLineBatsTest(lines, i + 1)) continue;
+      bindings.push({
+        title,
+        ref: { file: relative(REPO_ROOT, file), line: i + 1 },
+      });
+    }
+  }
+
+  return bindings;
+}
+
 function indexByTitle(bindings: CollectedBinding[]): Map<string, BindingRef[]> {
   const byTitle = new Map<string, BindingRef[]>();
   for (const b of bindings) {
@@ -333,7 +389,7 @@ function printEnforcedReport(r: Report): void {
     console.log(`    ✗ [${tags}] ${s.title}`);
     console.log(`      ${r.feature}:${s.line}`);
     console.log(
-      `      Add: /** @scenario ${s.title} */ directly above an it(...) test that exercises this behavior`
+      `      Add: /** @scenario ${s.title} */ above an it(...) test, or # @scenario "${s.title}" above an @test in a .bats file`
     );
   }
 }
@@ -398,7 +454,10 @@ function main(): void {
   const allFeatures = discoverFeatureFiles();
   const listErrors = validateLegacyList(allFeatures);
 
-  const bindings = collectAllBindings(DEFAULT_TEST_ROOTS);
+  const bindings = [
+    ...collectAllBindings(DEFAULT_TEST_ROOTS),
+    ...collectBatsBindings(DEFAULT_BATS_TEST_ROOTS),
+  ];
   const bindingsByTitle = indexByTitle(bindings);
 
   const allKnownTitles = new Set<string>();

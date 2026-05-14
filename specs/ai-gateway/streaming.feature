@@ -1,4 +1,11 @@
 Feature: SSE streaming — exact byte preservation post-first-chunk
+
+  # All scenarios in this file describe gateway data-plane SSE behaviour
+  # (response-header injection before first chunk, byte-equivalent
+  # passthrough, mid-stream upstream drop handling, post-guardrail
+  # non-blocking, per-chunk guardrail). Implemented in the Go gateway
+  # service, out of scope for the TS parity check.
+
   Coding CLIs (Claude Code, Codex) parse SSE tool-call deltas with zero
   tolerance for reordering or re-chunking. We pass through byte-for-byte
   after the first chunk. Before the first chunk we can still mutate

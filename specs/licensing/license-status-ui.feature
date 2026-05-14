@@ -1,5 +1,12 @@
 @wip @unit
 Feature: License Status UI Component
+
+  # All scenarios in this file describe rendering of the LicenseStatusCard
+  # (no-license empty state, status badge, member usage, expiration date,
+  # toasts, skeleton). They require a component test against the rendered
+  # status card or Playwright E2E. No fixture exists yet — all aspirational
+  # pending the page-test harness.
+
   As a LangWatch administrator
   I want to view and manage my license in the settings UI
   So that I can activate, view status, and remove licenses
@@ -94,14 +101,6 @@ Feature: License Status UI Component
   # ============================================================================
   # License Upload Flow
   # ============================================================================
-
-  @unimplemented
-  Scenario: Shows loading state during upload
-    Given the organization has no license
-    And I enter a license key in the textarea
-    When I click "Activate License"
-    Then the button shows a loading spinner
-    And the button is disabled
 
   @unimplemented
   Scenario: Shows success toast on successful activation

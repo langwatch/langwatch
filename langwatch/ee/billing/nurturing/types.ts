@@ -100,7 +100,8 @@ export type CioEventName =
   | "experiment_ran"
   | "first_prompt_created"
   | "first_simulation_ran"
-  | "joined_via_invite";
+  | "joined_via_invite"
+  | "joined_via_sso";
 
 // ---------------------------------------------------------------------------
 // Batch call discriminated union

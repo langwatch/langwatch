@@ -1,5 +1,5 @@
 import { Box, MenuSeparator, Portal, VStack } from "@chakra-ui/react";
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   LuActivity,
   LuBookOpen,
@@ -23,6 +23,24 @@ export type SupportMenuProps = {
 export const SupportMenu = ({ showLabel = true }: SupportMenuProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const publicEnv = usePublicEnv();
+
+  // Hover-open menus need a short close delay so a mouse moving
+  // diagonally from the trigger over to the content doesn't dismiss
+  // the menu while crossing the 1px gap. Without this, sliding the
+  // cursor past the trigger to a sidebar item below leaves the menu
+  // stuck open with no cursor over it.
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cancelClose = useCallback(() => {
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+  }, []);
+  const scheduleClose = useCallback(() => {
+    cancelClose();
+    closeTimerRef.current = setTimeout(() => setIsOpen(false), 120);
+  }, [cancelClose]);
+  useEffect(() => cancelClose, [cancelClose]);
 
   return (
     <VStack width="full" align="start" gap={0.5}>
@@ -69,7 +87,11 @@ export const SupportMenu = ({ showLabel = true }: SupportMenuProps) => {
             textAlign="left"
             cursor="pointer"
             aria-label="Support"
-            onMouseEnter={() => setIsOpen(true)}
+            onMouseEnter={() => {
+              cancelClose();
+              setIsOpen(true);
+            }}
+            onMouseLeave={scheduleClose}
           >
             <SideMenuItem
               icon={LuLifeBuoy}
@@ -89,7 +111,11 @@ export const SupportMenu = ({ showLabel = true }: SupportMenuProps) => {
         </Menu.Trigger>
 
         <Portal>
-          <Menu.Content marginLeft={-1} onMouseLeave={() => setIsOpen(false)}>
+          <Menu.Content
+            marginLeft={-1}
+            onMouseEnter={cancelClose}
+            onMouseLeave={scheduleClose}
+          >
             <Menu.Item value="github">
               <Link
                 isExternal

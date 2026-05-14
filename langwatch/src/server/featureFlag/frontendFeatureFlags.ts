@@ -54,6 +54,7 @@ export const FRONTEND_FEATURE_FLAGS = [
   "release_ui_dark_mode_enabled",
   "release_ui_negate_filters_enabled",
   "release_ui_ai_gateway_menu_enabled",
+  "release_ui_traces_v2_enabled",
 ] as const;
 
 /**

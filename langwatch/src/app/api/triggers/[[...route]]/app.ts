@@ -7,10 +7,11 @@ import { z } from "zod";
 import { badRequestSchema } from "~/app/api/shared/schemas";
 import { prisma } from "~/server/db";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
+import { getApp } from "~/server/app-layer/app";
 import { createLogger } from "~/utils/logger/server";
 import {
   type AuthMiddlewareVariables,
-  authMiddleware,
+  authMiddleware, requirePermission,
   resourceLimitMiddleware,
 } from "../../middleware";
 import { loggerMiddleware } from "../../middleware/logger";
@@ -105,6 +106,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── List Triggers ──────────────────────────────────────────
   .get(
     "/",
+    requirePermission("triggers:view"),
     describeRoute({
       description: "List all active triggers (automations) for the project",
       responses: {
@@ -141,6 +143,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── Get Trigger ────────────────────────────────────────────
   .get(
     "/:id",
+    requirePermission("triggers:view"),
     describeRoute({
       description: "Get a trigger by its ID",
       responses: {
@@ -187,6 +190,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── Create Trigger ─────────────────────────────────────────
   .post(
     "/",
+    requirePermission("triggers:manage"),
     resourceLimitMiddleware("automations"),
     describeRoute({
       description: "Create a new trigger (automation)",
@@ -222,6 +226,8 @@ export const app = new Hono<{ Variables: Variables }>()
         },
       });
 
+      await getApp().triggers.invalidate(project.id);
+
       return c.json({
         ...toTriggerResponse(trigger),
         platformUrl: platformUrl({
@@ -235,6 +241,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── Update Trigger ─────────────────────────────────────────
   .patch(
     "/:id",
+    requirePermission("triggers:manage"),
     describeRoute({
       description: "Update a trigger (name, active state, message, filters)",
       responses: {
@@ -283,6 +290,8 @@ export const app = new Hono<{ Variables: Variables }>()
         data,
       });
 
+      await getApp().triggers.invalidate(project.id);
+
       return c.json({
         ...toTriggerResponse(updated),
         platformUrl: platformUrl({
@@ -296,6 +305,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── Delete Trigger ─────────────────────────────────────────
   .delete(
     "/:id",
+    requirePermission("triggers:manage"),
     describeRoute({
       description: "Delete (soft-delete) a trigger",
       responses: {
@@ -333,6 +343,8 @@ export const app = new Hono<{ Variables: Variables }>()
         where: { id, projectId: project.id },
         data: { deleted: true, active: false },
       });
+
+      await getApp().triggers.invalidate(project.id);
 
       return c.json({ id, deleted: true });
     },

@@ -18,6 +18,7 @@ import {
   LuSquare,
 } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
+import { TraceIdPeek } from "~/features/traces-v2/components/TraceIdPeek";
 import type { FieldMapping as UIFieldMapping } from "~/components/variables";
 import { parseLLMError } from "~/utils/formatLLMError";
 import { formatTargetOutput } from "~/utils/formatTargetOutput";
@@ -526,6 +527,7 @@ export function TargetCellContent({
           </Button>
         </Tooltip>
       )}
+      {traceId && <TraceIdPeek traceId={traceId} />}
       {/* Copy button - shows when there's output */}
       {rawOutput && (
         <Tooltip

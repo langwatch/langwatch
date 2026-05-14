@@ -31,3 +31,35 @@ Feature: Queue pipeline pausing
     When jobs are queued for the paused pipeline
     Then those jobs are not dispatched
     And when the pipeline is unpaused, the queued jobs dispatch immediately
+
+  # ============================================================================
+  # Per-tenant pause — added 2026-05-11 post-incident
+  # ============================================================================
+  # During the W_7kPya event-sourcing outage we wished we could pause ALL
+  # processing for one tenant without affecting other tenants. The existing
+  # pause is per-pipeline-key (e.g. "trace_processing", or
+  # "trace_processing/command/recordSpan"). It cannot scope by tenant.
+  #
+  # The dispatch Lua extracts the tenantId from the groupId prefix
+  # (everything before the first "/"). If `<keyPrefix>paused-tenants` SET
+  # contains that tenantId, the group is skipped this scan (same skip as
+  # pipeline pauses — group remains in staging and re-checks next scan).
+
+  @integration @v1 @tenant-pause
+  Scenario: Pausing a tenant halts dispatch for that tenant only
+    Given two tenants A and B both with pending groups
+    When an operator pauses tenant A
+    Then no further groups for tenant A are dispatched
+    And tenant B's groups continue dispatching normally
+
+  @integration @v1 @tenant-pause
+  Scenario: Unpausing a tenant resumes dispatch immediately
+    Given tenant A is paused and has pending groups
+    When the operator unpauses tenant A
+    Then tenant A's groups resume dispatching within the next scan
+
+  # Note: scenarios "active jobs at pause-time complete normally" and
+  # "Ops UI controls" are covered by integration tests + manual QA below
+  # and are not added as separate @scenario-bound unit tests because the
+  # Lua dispatch path and React UI rendering are exercised in higher-level
+  # suites (integration + manual browser QA captured in the PR description).

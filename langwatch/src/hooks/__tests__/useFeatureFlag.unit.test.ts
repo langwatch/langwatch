@@ -3,8 +3,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook } from "@testing-library/react";
-import { FEATURE_FLAG_CACHE_TTL_MS } from "../../server/featureFlag/constants";
-import { useFeatureFlag } from "../useFeatureFlag";
+import { CLIENT_FLAG_STALE_TIME_MS, useFeatureFlag } from "../useFeatureFlag";
 
 vi.mock("../../utils/api", () => ({
   api: {
@@ -123,9 +122,10 @@ describe("useFeatureFlag()", () => {
           organizationId: "org-456",
         },
         {
-          staleTime: FEATURE_FLAG_CACHE_TTL_MS,
+          staleTime: CLIENT_FLAG_STALE_TIME_MS,
           refetchOnWindowFocus: false,
           enabled: true,
+          trpc: { context: { skipBatch: true } },
         },
       );
     });
@@ -149,9 +149,10 @@ describe("useFeatureFlag()", () => {
           organizationId: undefined,
         },
         {
-          staleTime: FEATURE_FLAG_CACHE_TTL_MS,
+          staleTime: CLIENT_FLAG_STALE_TIME_MS,
           refetchOnWindowFocus: false,
           enabled: true,
+          trpc: { context: { skipBatch: true } },
         },
       );
     });

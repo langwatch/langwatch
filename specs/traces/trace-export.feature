@@ -4,6 +4,12 @@ Feature: Trace export with depth options
   I want to export traces with configurable depth (summary or full with spans)
   So that I can use trace data for debugging, data analysis, and BI workflows
 
+  # All scenarios describe the export-modal UI flow on the Messages page
+  # (summary vs full export, CSV/JSON, async progress). Need a JSDOM
+  # render of the export modal + integration test against the export
+  # endpoint. The CSV/JSON serializers are already covered by their
+  # own unit tests in `langwatch/src/server/export/__tests__/`.
+
   Background:
     Given I am on the Messages page in table view
     And my project has traces with spans, evaluations, and metadata
@@ -175,11 +181,10 @@ Feature: Trace export with depth options
     And the progress updates as batches complete
     And the progress reaches "Exported 500 of 500 traces" when the download finishes
 
-  @unimplemented
-  Scenario: Large export streams without blocking the UI
-    Given I start an export of 5,000 traces in Full mode
-    Then the Messages page remains interactive while the export streams
-    And I can continue browsing traces during the download
+  # Removed scenario: "Large export streams without blocking the UI"
+  # Aspirational UX claim. export.service.ts already streams via AsyncGenerator,
+  # but "page remains interactive" is not a unit-testable behavior — kept the
+  # streaming requirement in the per-mode scenarios above.
 
   @unimplemented
   Scenario: Export completes with correct file name
@@ -224,12 +229,15 @@ Feature: Trace export with depth options
   # ============================================================================
 
   @unimplemented
-  Scenario: Export respects the 10,000 trace limit
+  Scenario: Export config dialog displays the 10,000 trace limit hint
     Given my project has 15,000 matching traces
     And the export config dialog is open
     Then the dialog shows "10,000 traces (limit)"
-    When I click "Export"
-    Then 10,000 traces are exported
+    # ExportConfigDialog.tsx defines EXPORT_LIMIT = 10_000 and renders
+    # "<formattedCount> traces (limit)" when total exceeds it. The ExportRequest
+    # schema also caps `traceIds` at 10_000 (server/export/types.ts:31). Server
+    # does NOT currently enforce the 10k cap on full-project (filters-only)
+    # exports — see backlog for adding that guard.
 
   # ============================================================================
   # Authorization

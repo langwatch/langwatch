@@ -2,13 +2,25 @@
 import { Dialog as ChakraDialog, Portal } from "@chakra-ui/react";
 import * as React from "react";
 import { CloseButton } from "./close-button";
+import { IsolatedErrorBoundary } from "./IsolatedErrorBoundary";
 
 interface DialogContentProps extends ChakraDialog.ContentProps {
   portalled?: boolean;
   portalRef?: React.RefObject<HTMLElement>;
   backdrop?: boolean;
+  /** Props merged onto the default backdrop (e.g. stronger blur). */
+  backdropProps?: ChakraDialog.BackdropProps;
   /** Props passed to the positioner (e.g. style for --layer-index). */
   positionerProps?: ChakraDialog.PositionerProps;
+  /**
+   * Set to `false` to disable the inline error boundary that wraps
+   * children. By default, a render-time crash inside a dialog body shows
+   * an inline error panel — it does NOT close the dialog or take down the
+   * page. Opt out only if you have a more specific outer boundary already.
+   */
+  withErrorBoundary?: boolean;
+  /** Optional scope label shown by the error fallback. */
+  errorScope?: string;
 }
 
 export const DialogContent = React.forwardRef<
@@ -20,26 +32,37 @@ export const DialogContent = React.forwardRef<
     portalled = true,
     portalRef,
     backdrop = true,
+    backdropProps,
     positionerProps,
+    withErrorBoundary = true,
+    errorScope,
     ...rest
   } = props;
+
+  // Crash inside the dialog body should NOT close the dialog. Wrap the
+  // children so a render error renders an inline error panel within the
+  // dialog frame instead.
+  const safeChildren = withErrorBoundary ? (
+    <IsolatedErrorBoundary scope={errorScope}>{children}</IsolatedErrorBoundary>
+  ) : (
+    children
+  );
 
   return (
     <Portal disabled={!portalled} container={portalRef}>
       {backdrop && (
         <ChakraDialog.Backdrop
           backdropFilter="blur(8px)"
-          background="blackAlpha.400/10"
+          {...backdropProps}
         />
       )}
       <ChakraDialog.Positioner {...positionerProps}>
         <ChakraDialog.Content
-          borderRadius="lg"
           ref={ref}
           {...rest}
           asChild={false}
         >
-          {children}
+          {safeChildren}
         </ChakraDialog.Content>
       </ChakraDialog.Positioner>
     </Portal>

@@ -1,5 +1,8 @@
-import { describe, it, expect } from "vitest";
-import { deserializeAttributes, serializeAttributes } from "../span-storage.clickhouse.repository";
+import { describe, expect, it } from "vitest";
+import {
+  deserializeAttributes,
+  serializeAttributes,
+} from "../span-storage.clickhouse.repository";
 
 describe("serializeAttributes", () => {
   describe("when given string values", () => {

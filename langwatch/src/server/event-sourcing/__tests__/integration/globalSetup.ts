@@ -148,7 +148,7 @@ export async function setup(): Promise<void> {
     .start();
 
   // Start Redis container (reusable to speed up subsequent test runs)
-  redisContainer = await new RedisContainer()
+  redisContainer = await new RedisContainer("redis:alpine")
     .withLabels(CONTAINER_LABELS)
     .withReuse()
     .start();

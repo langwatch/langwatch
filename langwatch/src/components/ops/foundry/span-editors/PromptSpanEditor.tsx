@@ -18,13 +18,37 @@ export function PromptSpanEditor({ span }: { span: SpanConfig }) {
     <Box rounded="lg" border="1px solid" borderColor="yellow.500/20" bg="yellow.500/5" p={4}>
       <Text fontSize="sm" fontWeight="semibold" color="yellow.400" mb={3}>Prompt Configuration</Text>
       <Flex gap={3} mb={3}>
+        <Box flex={2}>
+          <Text fontSize="xs" color="fg.subtle" mb={1}>Prompt handle</Text>
+          <Input
+            size="sm"
+            value={prompt.promptId ?? ""}
+            onChange={(e) => updatePrompt({ promptId: e.target.value })}
+            placeholder="e.g. customer-support-v2"
+          />
+        </Box>
         <Box flex={1}>
-          <Text fontSize="xs" color="fg.subtle" mb={1}>Prompt ID</Text>
-          <Input size="sm" value={prompt.promptId ?? ""} onChange={(e) => updatePrompt({ promptId: e.target.value })} placeholder="e.g. customer-support-v2" />
+          <Text fontSize="xs" color="fg.subtle" mb={1}>Version</Text>
+          <Input
+            size="sm"
+            type="number"
+            min={1}
+            value={prompt.version ?? ""}
+            onChange={(e) => {
+              const v = e.target.value === "" ? undefined : Number(e.target.value);
+              updatePrompt({ version: Number.isInteger(v) && (v ?? 0) > 0 ? v : undefined });
+            }}
+            placeholder="e.g. 3"
+          />
         </Box>
         <Box flex={1}>
           <Text fontSize="xs" color="fg.subtle" mb={1}>Version ID</Text>
-          <Input size="sm" value={prompt.versionId ?? ""} onChange={(e) => updatePrompt({ versionId: e.target.value })} placeholder="e.g. ver-abc123" />
+          <Input
+            size="sm"
+            value={prompt.versionId ?? ""}
+            onChange={(e) => updatePrompt({ versionId: e.target.value })}
+            placeholder="e.g. ver-abc123"
+          />
         </Box>
       </Flex>
       <Text fontSize="xs" fontWeight="medium" color="fg.subtle" mb={1}>Template Variables</Text>

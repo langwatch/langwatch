@@ -40,6 +40,12 @@ BULLBOARD_PORT=$(find_free_port 3000)
 AI_SERVER_PORT=$(find_free_port 3456)
 export APP_PORT BULLBOARD_PORT AI_SERVER_PORT
 
+# Strip any stale http://localhost:<oldport> exports of NEXTAUTH_URL /
+# BASE_HOST so dynamic-port worktrees don't 403 on login (lw#3453). Real
+# overrides (e.g. boxd proxy URLs) are left alone — see comment in helper.
+. "$(dirname "$0")/lib/sanitize-dev-env.sh"
+sanitize_localhost_dev_env
+
 # ---------------------------------------------------------------------------
 # Ensure .env files exist
 # ---------------------------------------------------------------------------
@@ -79,8 +85,16 @@ fi
 # Start services in detached mode
 # ---------------------------------------------------------------------------
 echo "Starting LangWatch (project=${COMPOSE_PROJECT_NAME}, app_port=${APP_PORT})..."
-# Use email auth for browser tests (overrides .env's NEXTAUTH_PROVIDER)
-echo "NEXTAUTH_PROVIDER=email" > langwatch/.env.dev-up
+
+# Write URL overrides into langwatch/.env.dev-up. Same shared helper as
+# scripts/dev.sh — only the URLs whose services actually start for this
+# profile are overridden (#3860 AC#6). The helper honors each service's
+# compose profile membership: langwatch_nlp runs under [nlp, scenarios,
+# full], langevals only under [nlp, full]. test/debug profiles add no
+# extra URL overrides.
+. "$(dirname "$0")/lib/write-dev-overrides.sh"
+write_dev_overrides "${PROFILE:-backend-shared}" langwatch/.env.dev-up
+
 $COMPOSE_CMD up -d
 
 # ---------------------------------------------------------------------------

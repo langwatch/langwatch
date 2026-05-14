@@ -135,6 +135,10 @@ export const clickHouseFilterConditions: Record<
     if (hasFalse) return { sql: "ts.ContainsErrorStatus = false", params: {} };
     return { sql: "1=0", params: {} };
   },
+  "traces.name": (values, paramId) => ({
+    sql: `ts.TraceName IN ({${paramId}_values:Array(String)})`,
+    params: { [`${paramId}_values`]: values },
+  }),
 
   // Spans
   "spans.type": (values, paramId) => ({

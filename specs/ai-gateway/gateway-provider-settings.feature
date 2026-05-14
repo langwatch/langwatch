@@ -1,4 +1,15 @@
 Feature: AI Gateway — Provider settings cohesion
+
+  # The "Enabling a provider does not re-enter API key" scenario is
+  # bound below to providerCredential.service.unit.test.ts. The
+  # remaining @unimplemented scenarios fall in two unbindable groups:
+  # (1) end-to-end behaviour wiring the control plane to the Go gateway
+  # (key rotation propagation, soft-disable cascade, evaluator-vs-gateway
+  # header isolation, provider-health visibility) — needs a TS↔Go
+  # integration harness; and (2) UI surfaces for the provider binding
+  # form (gateway-only fields, self-hosted/Azure preservation) — needs
+  # component-test fixtures. All aspirational pending those harnesses.
+
   As a project admin setting up provider credentials
   I want a single source of truth for provider credentials that both the legacy
   LangWatch stack (evaluators, prompt playground via litellm/langevals) AND the
@@ -22,7 +33,7 @@ Feature: AI Gateway — Provider settings cohesion
   # Existing ModelProvider rows are reused, not duplicated
   # ============================================================================
 
-  @integration @unimplemented
+  @integration
   Scenario: Enabling a provider for the gateway does NOT re-enter the API key
     Given project "gateway-demo" has ModelProvider "openai" configured
     When I open the "AI Gateway → Providers" section

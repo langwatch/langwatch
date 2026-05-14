@@ -6,15 +6,16 @@ import { useMemo, useState } from "react";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { Tooltip } from "../../../../components/ui/tooltip";
 import { useActiveProject } from "../../contexts/ActiveProjectContext";
-import { maskApiKey } from "./shared/api-key-utils";
-import { buildMcpConfig } from "./shared/build-mcp-config";
-import { InlineCopyButton } from "./shared/InlineCopyButton";
-import { JsonHighlight } from "./shared/JsonHighlight";
+import { CodePreview } from "./observability/CodePreview";
+import {
+  buildMcpJson,
+  findLangwatchEnvLines,
+} from "./shared/build-mcp-config";
 import { TabButton } from "./shared/TabButton";
 
-const MotionVStack = motion(VStack);
+const MotionVStack = motion.create(VStack);
 
-type AppKey = "claude-desktop" | "chatgpt";
+type AppKey = "claude-desktop" | "codex" | "gemini";
 
 const APPS: {
   key: AppKey;
@@ -31,12 +32,21 @@ const APPS: {
     ],
   },
   {
-    key: "chatgpt",
-    label: "ChatGPT",
+    key: "codex",
+    label: "Codex",
     steps: [
-      "Go to Settings → Connectors → Developer mode",
-      'Click "Create", name it LangWatch, paste the config',
-      "Start a conversation and mention LangWatch",
+      "Open ~/.codex/config.toml (or create it)",
+      "Paste the LangWatch MCP server entry into [mcp_servers]",
+      "Restart Codex",
+    ],
+  },
+  {
+    key: "gemini",
+    label: "Gemini",
+    steps: [
+      "Run gemini mcp add langwatch -- npx -y @langwatch/mcp-server",
+      "Set the LANGWATCH_API_KEY / LANGWATCH_PROJECT_ID env vars",
+      "Restart your Gemini session",
     ],
   },
 ];
@@ -48,39 +58,20 @@ export function ViaMcpClientScreen(): React.ReactElement {
 
   const effectiveApiKey = project?.apiKey ?? "";
   const effectiveEndpoint = publicEnv.data?.BASE_HOST;
+  const effectiveProjectId = project?.id;
 
   const configReady = !!publicEnv.data && !!effectiveApiKey;
 
   const configJson = useMemo(
     () =>
       configReady
-        ? JSON.stringify(
-            buildMcpConfig({
-              apiKey: effectiveApiKey,
-              endpoint: effectiveEndpoint,
-            }),
-            null,
-            2,
-          )
+        ? buildMcpJson({
+            apiKey: effectiveApiKey,
+            endpoint: effectiveEndpoint,
+            projectId: effectiveProjectId,
+          })
         : null,
-    [configReady, effectiveApiKey, effectiveEndpoint],
-  );
-
-  const maskedApiKey = maskApiKey(effectiveApiKey);
-
-  const displayConfigJson = useMemo(
-    () =>
-      configReady
-        ? JSON.stringify(
-            buildMcpConfig({
-              apiKey: maskedApiKey,
-              endpoint: effectiveEndpoint,
-            }),
-            null,
-            2,
-          )
-        : null,
-    [configReady, maskedApiKey, effectiveEndpoint],
+    [configReady, effectiveApiKey, effectiveEndpoint, effectiveProjectId],
   );
 
   const currentApp = APPS.find((a) => a.key === activeApp)!;
@@ -111,7 +102,7 @@ export function ViaMcpClientScreen(): React.ReactElement {
             borderColor="border.subtle"
             bg="bg.panel/70"
             backdropFilter="blur(20px) saturate(1.3)"
-            boxShadow="0 2px 16px rgba(0,0,0,0.04)"
+            boxShadow="sm"
             w="fit-content"
           >
             {APPS.map((app) => (
@@ -180,8 +171,8 @@ export function ViaMcpClientScreen(): React.ReactElement {
                     w={5}
                     h={5}
                     borderRadius="full"
-                    bg="orange.50"
-                    color="orange.500"
+                    bg="orange.subtle"
+                    color="orange.fg"
                     display="flex"
                     alignItems="center"
                     justifyContent="center"
@@ -192,7 +183,7 @@ export function ViaMcpClientScreen(): React.ReactElement {
                   </Box>
                   <Text
                     fontSize="sm"
-                    color="fg.DEFAULT"
+                    color="fg"
                     fontWeight="medium"
                     letterSpacing="-0.01em"
                   >
@@ -226,29 +217,24 @@ export function ViaMcpClientScreen(): React.ReactElement {
             app.
           </Text>
         </VStack>
-
-        <Box
-          position="relative"
-          borderRadius="xl"
-          overflow="hidden"
-          border="1px solid"
-          borderColor={{ base: "border.subtle", _dark: "orange.800" }}
-          bg="bg.panel/70"
-          backdropFilter="blur(20px) saturate(1.3)"
-          boxShadow="sm"
-          transition="all 0.17s ease"
-          _hover={{
-            borderColor: "orange.emphasized",
-            boxShadow: "md",
-          }}
-        >
-          <JsonHighlight code={displayConfigJson ?? "Loading config…"} />
-          {configJson && (
-            <Box position="absolute" top={2.5} right={2.5}>
-              <InlineCopyButton text={configJson} label="Config" />
-            </Box>
-          )}
-        </Box>
+        {/*
+         * Same `CodePreview` the Manually tab uses for SDK code — keeps
+         * MCP/manual surfaces visually consistent (border, copy button,
+         * sensitive-value masking + reveal, line highlighting all share
+         * the same shiki adapter and recipe). The `sensitiveValue` toggle
+         * lets users reveal the API key in place rather than us
+         * pre-masking the displayed JSON.
+         */}
+        <CodePreview
+          code={configJson ?? "Loading config…"}
+          filename="mcp.json"
+          codeLanguage="json"
+          highlightLines={
+            configJson ? findLangwatchEnvLines(configJson) : undefined
+          }
+          sensitiveValue={effectiveApiKey || undefined}
+          enableVisibilityToggle={!!effectiveApiKey}
+        />
       </VStack>
     </Grid>
   );

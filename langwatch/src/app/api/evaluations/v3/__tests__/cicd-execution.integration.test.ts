@@ -176,6 +176,7 @@ describe.skipIf(process.env.CI)("CI/CD Evaluation Execution API", () => {
         expect(body.error).toContain("Invalid API key");
       });
 
+      /** @scenario API key authentication via X-Auth-Token header */
       it("accepts X-Auth-Token header for authentication", async () => {
         const response = await fetch(
           `${getBaseUrl()}/api/evaluations/v3/${testSlug}/run`,
@@ -191,6 +192,7 @@ describe.skipIf(process.env.CI)("CI/CD Evaluation Execution API", () => {
         expect(response.status).not.toBe(401);
       });
 
+      /** @scenario API key authentication via Authorization Bearer header */
       it("accepts Authorization Bearer header for authentication", async () => {
         const response = await fetch(
           `${getBaseUrl()}/api/evaluations/v3/${testSlug}/run`,
@@ -208,6 +210,7 @@ describe.skipIf(process.env.CI)("CI/CD Evaluation Execution API", () => {
     });
 
     describe("evaluation lookup", () => {
+      /** @scenario Evaluation not found returns 404 */
       it("returns 404 for non-existent evaluation", async () => {
         const response = await fetch(
           `${getBaseUrl()}/api/evaluations/v3/non-existent-slug/run`,
@@ -226,6 +229,7 @@ describe.skipIf(process.env.CI)("CI/CD Evaluation Execution API", () => {
     });
 
     describe("polling mode (default)", () => {
+      /** @scenario Default response returns runId for polling */
       it("returns runId immediately for polling", async () => {
         const response = await fetch(
           `${getBaseUrl()}/api/evaluations/v3/${testSlug}/run`,
@@ -324,6 +328,7 @@ describe.skipIf(process.env.CI)("CI/CD Evaluation Execution API", () => {
     });
 
     describe("run status", () => {
+      /** @scenario Poll for non-existent run returns 404 */
       it("returns 404 for non-existent run", async () => {
         const response = await fetch(
           `${getBaseUrl()}/api/evaluations/v3/runs/non-existent-run`,
@@ -373,6 +378,7 @@ describe.skipIf(process.env.CI)("CI/CD Evaluation Execution API", () => {
         expect(body.total).toBe(2);
       }, 30000);
 
+      /** @scenario Poll for run status when completed */
       it("returns summary when run completes", async () => {
         // Start a run
         const startResponse = await fetch(

@@ -25,9 +25,11 @@ import {
 export function BetaPill({
   children,
   message,
+  label = "Beta",
 }: {
   children?: ReactNode;
   message: ReactNode;
+  label?: string;
 }) {
   const [open, setOpen] = useState(false);
   const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -75,7 +77,7 @@ export function BetaPill({
         <Badge
           size="sm"
           variant="subtle"
-          colorPalette="purple"
+          colorPalette="blue"
           cursor="pointer"
           tabIndex={0}
           onMouseEnter={handleOpen}
@@ -87,7 +89,7 @@ export function BetaPill({
             setOpen((prev) => !prev);
           }}
         >
-          Beta
+          {label}
         </Badge>
       </PopoverAnchor>
       <PopoverContent

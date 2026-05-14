@@ -3,6 +3,16 @@ Feature: Custom prompt tag definitions (CRUD)
   I want to create custom tags beyond the built-in "production" and "staging"
   So that my team can tag prompt versions for additional environments like "canary" or "ab-test"
 
+  # All 13 remaining @unimplemented scenarios are UPDATE/KEEP per AUDIT_MANIFEST.md:
+  # behavior is implemented and covered by prompt-tags.integration.test.ts (REST)
+  # and prompt-tag.service.unit.test.ts (validation). The endpoint paths in this
+  # spec ("/api/orgs/:orgId/prompt-tags", "/api/orgs/:orgId/prompt-tags/:tagId")
+  # are stale — actual routes are POST/GET/DELETE /api/prompts/tags with org
+  # resolved via API key. Wording ("production"/"staging" as built-ins) is also
+  # stale — only "latest" is in PROTECTED_TAGS now. Aspirational pending UPDATE
+  # rewrites of paths + tag-name claims, plus KEEP non-admin-403 and cross-org
+  # delete tests. Tracked in PR #3458.
+
   Background:
     Given I am authenticated as an org admin for "my-org"
     And the org has a project "my-project" with a prompt "pizza-prompt" (v1, v2, v3)
@@ -50,14 +60,6 @@ Feature: Custom prompt tag definitions (CRUD)
   # --- Assign custom tags (existing endpoints) ---
 
   @integration @unimplemented
-  Scenario: Assign a custom tag to a prompt version
-    Given a custom tag "canary" exists
-    When I assign "canary" to v2 of "pizza-prompt"
-    Then fetching "pizza-prompt" with tag "canary" returns v2
-
-  # --- List ---
-
-  @integration @unimplemented
   Scenario: List tags returns all org tags
     Given custom tags "canary" and "ab-test" exist
     When I GET /api/orgs/:orgId/prompt-tags
@@ -77,13 +79,6 @@ Feature: Custom prompt tag definitions (CRUD)
     When I DELETE /api/orgs/:orgId/prompt-tags/:tagId
     Then the response status is 204
     And the tag "canary" no longer exists
-
-  @integration @unimplemented
-  Scenario: Delete a custom tag cascades to assignments
-    Given a custom tag "canary" exists
-    And "canary" is assigned to v2 of "pizza-prompt"
-    When I DELETE /api/orgs/:orgId/prompt-tags/:tagId
-    Then the "canary" assignment on "pizza-prompt" is cleared
 
   @integration @unimplemented
   Scenario: Cannot delete protected tags

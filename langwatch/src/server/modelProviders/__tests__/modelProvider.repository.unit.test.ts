@@ -318,6 +318,7 @@ describe("ModelProviderRepository", () => {
     };
 
     describe("when the project has rows at every scope level", () => {
+      /** @scenario Model Providers page lists all accessible rows across scopes */
       it("returns every accessible row without deduplication", async () => {
         (prisma.project.findUnique as any).mockResolvedValue(projectRow);
 
@@ -441,6 +442,7 @@ describe("ModelProviderRepository", () => {
     });
 
     describe("when the query filters via the ModelProviderScope join", () => {
+      /** @scenario Rows outside my permission are hidden */
       it("uses { scopes: { some: { OR: [...] } } } with all three scope predicates", async () => {
         (prisma.project.findUnique as any).mockResolvedValue(projectRow);
         (prisma.modelProvider.findMany as any).mockResolvedValue([]);

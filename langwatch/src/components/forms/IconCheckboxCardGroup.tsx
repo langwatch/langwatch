@@ -84,7 +84,7 @@ export const IconCheckboxCardGroup = <T extends string = string>({
                 <Text
                   textStyle="sm"
                   fontWeight="medium"
-                  color="fg.DEFAULT"
+                  color="fg"
                   truncate
                 >
                   {item.title}

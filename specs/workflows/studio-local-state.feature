@@ -3,6 +3,13 @@ Feature: Studio Local State for Evaluators and Agents
   I want local (unsaved) changes that don't immediately affect the global DB record
   So that I can experiment with settings without breaking other workflows or evaluations that reference the same evaluator/agent
 
+  # All scenarios describe the local-state lifecycle (orange dot, Apply,
+  # Save, Discard, drawer-vs-DB precedence) on workflow studio nodes.
+  # Need a Workflow store + studio-canvas integration test that
+  # exercises the drawer + node localConfig roundtrip. The eval-v3
+  # patterns this is modeled on are tested in evaluations-v3 — the
+  # studio side has no equivalent harness yet.
+
   # Context:
   # Evaluators and agents in the studio are DB-backed records (evaluators/<id>, agents/<id>).
   # The same record can be referenced from multiple workflows and from evaluations-v3.

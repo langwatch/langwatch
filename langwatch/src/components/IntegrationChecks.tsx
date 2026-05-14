@@ -13,6 +13,9 @@ export const useIntegrationChecks = () => {
     { projectId: project?.id ?? "" },
     {
       enabled: !!project,
+      // Onboarding checklist: staleTime: Infinity is fine here because
+      // refetchOnWindowFocus picks up out-of-band changes (first message
+      // synced, first workflow created, etc.) when the user returns to the tab.
       refetchOnWindowFocus: true,
       refetchOnMount: false,
       staleTime: Infinity,

@@ -66,6 +66,7 @@ describe("<ExternalSetDetailPanel/>", () => {
   });
 
   describe("when clicking a scenario run row", () => {
+    /** @scenario "Clicking a run in external set detail opens the drawer" */
     it("opens the drawer instead of navigating to a new page", () => {
       const runs = [
         {

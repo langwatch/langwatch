@@ -316,6 +316,7 @@ export const projectRouter = createTRPCRouter({
             .enum(["REDACTED_TO_ALL", "VISIBLE_TO_ADMIN", "VISIBLE_TO_ALL"])
             .optional(),
           traceSharingEnabled: z.boolean().optional(),
+          presenceEnabled: z.boolean().optional(),
           userLinkTemplate: z.string().optional(),
           s3Endpoint: z.string().optional(),
           s3AccessKeyId: z.string().optional(),
@@ -378,6 +379,8 @@ export const projectRouter = createTRPCRouter({
             input.capturedOutputVisibility ?? project.capturedOutputVisibility,
           traceSharingEnabled:
             input.traceSharingEnabled ?? project.traceSharingEnabled,
+          presenceEnabled:
+            input.presenceEnabled ?? project.presenceEnabled,
           s3Endpoint: input.s3Endpoint ? encrypt(input.s3Endpoint) : null,
           s3AccessKeyId: input.s3AccessKeyId
             ? encrypt(input.s3AccessKeyId)

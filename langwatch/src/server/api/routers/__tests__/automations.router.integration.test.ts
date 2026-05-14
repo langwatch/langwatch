@@ -4,12 +4,16 @@
  * Router-level tests for automation filter validation and update sanitization.
  */
 import { TriggerAction } from "@prisma/client";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { globalForApp } from "../../../app-layer/app";
+import { createTestApp } from "../../../app-layer/presets";
 
-const { mockEnforceLicenseLimit, mockTriggerUpdate } = vi.hoisted(() => ({
-  mockEnforceLicenseLimit: vi.fn().mockResolvedValue(undefined),
-  mockTriggerUpdate: vi.fn(),
-}));
+const { mockEnforceLicenseLimit, mockTriggerUpdate, mockTriggersInvalidate } =
+  vi.hoisted(() => ({
+    mockEnforceLicenseLimit: vi.fn().mockResolvedValue(undefined),
+    mockTriggerUpdate: vi.fn(),
+    mockTriggersInvalidate: vi.fn().mockResolvedValue(undefined),
+  }));
 
 vi.mock("~/server/license-enforcement", async (importOriginal) => {
   const actual = await importOriginal<typeof import("~/server/license-enforcement")>();
@@ -20,14 +24,18 @@ vi.mock("~/server/license-enforcement", async (importOriginal) => {
   };
 });
 
-vi.mock("../../rbac", () => ({
-  checkProjectPermission: vi.fn().mockImplementation(() => {
-    return async ({ ctx, next }: any) =>
-      next({
-        ctx: { ...ctx, permissionChecked: true },
-      });
-  }),
-}));
+vi.mock("../../rbac", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../rbac")>();
+  return {
+    ...actual,
+    checkProjectPermission: vi.fn().mockImplementation(() => {
+      return async ({ ctx, next }: any) =>
+        next({
+          ctx: { ...ctx, permissionChecked: true },
+        });
+    }),
+  };
+});
 
 vi.mock("~/server/auditLog", () => ({
   auditLog: vi.fn().mockResolvedValue(undefined),
@@ -58,6 +66,7 @@ function createTestCaller() {
 
 describe("automationRouter", () => {
   let caller: ReturnType<typeof createTestCaller>;
+  let previousApp: typeof globalForApp.__langwatch_app;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -66,7 +75,15 @@ describe("automationRouter", () => {
       id: "trigger_test_123",
       filters: JSON.stringify({ "spans.model": ["gpt-5-mini"] }),
     });
+    previousApp = globalForApp.__langwatch_app;
+    globalForApp.__langwatch_app = createTestApp({
+      triggers: { invalidate: mockTriggersInvalidate } as any,
+    });
     caller = createTestCaller();
+  });
+
+  afterEach(() => {
+    globalForApp.__langwatch_app = previousApp;
   });
 
   describe("create", () => {

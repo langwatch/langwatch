@@ -1,18 +1,13 @@
 import { describe, expect, it } from "vitest";
-import type { NormalizedSpan } from "../../../../event-sourcing/pipelines/trace-processing/schemas/spans";
 import { CanonicalizeSpanAttributesService } from "../canonicalizeSpanAttributesService";
+import { makeStubSpan } from "./_helpers";
 
 const service = new CanonicalizeSpanAttributesService();
 
-/** Minimal span context for canonicalize() */
-const stubSpan: Pick<
-  NormalizedSpan,
-  "name" | "kind" | "instrumentationScope"
-> = {
+const stubSpan = makeStubSpan({
   name: "chat claude-opus-4-6",
-  kind: "CLIENT",
   instrumentationScope: { name: "openclaw", version: "1.0.0" },
-} as any;
+});
 
 describe("CanonicalizeSpanAttributesService", () => {
   describe("when span has gen_ai.input.messages and gen_ai.output.messages", () => {
@@ -49,9 +44,7 @@ describe("CanonicalizeSpanAttributesService", () => {
       const outputMessages = [
         {
           role: "assistant",
-          content: [
-            { type: "text", text: "It's sunny at 22°C in London." },
-          ],
+          content: [{ type: "text", text: "It's sunny at 22°C in London." }],
         },
       ];
 
@@ -66,14 +59,16 @@ describe("CanonicalizeSpanAttributesService", () => {
           "gen_ai.usage.output_tokens": 25,
         },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       // gen_ai.input.messages must survive as-is
       expect(result.attributes["gen_ai.input.messages"]).toEqual(inputMessages);
 
       // gen_ai.output.messages must survive as-is
-      expect(result.attributes["gen_ai.output.messages"]).toEqual(outputMessages);
+      expect(result.attributes["gen_ai.output.messages"]).toEqual(
+        outputMessages,
+      );
 
       // Model and usage should be extracted correctly
       expect(result.attributes["gen_ai.request.model"]).toBe("claude-opus-4-6");
@@ -108,7 +103,7 @@ describe("CanonicalizeSpanAttributesService", () => {
           "gen_ai.output.messages": outputMessages,
         },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       // System messages stripped; only non-system messages preserved
@@ -118,7 +113,9 @@ describe("CanonicalizeSpanAttributesService", () => {
           parts: [{ type: "text", content: "[Sun 2026-02-08 20:58 UTC] hi" }],
         },
       ]);
-      expect(result.attributes["gen_ai.output.messages"]).toEqual(outputMessages);
+      expect(result.attributes["gen_ai.output.messages"]).toEqual(
+        outputMessages,
+      );
 
       // System instruction extracted from content blocks using 'content' field
       expect(result.attributes["gen_ai.system_instructions"]).toBe(
@@ -134,19 +131,17 @@ describe("CanonicalizeSpanAttributesService", () => {
           "gen_ai.tool.call.id": "call_abc123",
         },
         [],
-        {
+        makeStubSpan({
           ...stubSpan,
           name: "get_weather",
-        } as any,
+        }),
       );
 
       expect(result.attributes["langwatch.span.type"]).toBe("tool");
     });
 
     it("does not overwrite existing gen_ai.input.messages with legacy fallback", () => {
-      const inputMessages = [
-        { role: "user", content: "Hello" },
-      ];
+      const inputMessages = [{ role: "user", content: "Hello" }];
 
       const result = service.canonicalize(
         {
@@ -157,7 +152,7 @@ describe("CanonicalizeSpanAttributesService", () => {
           ]),
         },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       // gen_ai.input.messages wins over gen_ai.prompt

@@ -37,7 +37,9 @@ describe("<ExportProgress/>", () => {
       });
 
       expect(
-        screen.getByText("Exported 0 of 500 traces...")
+        screen.getByText((_, el) =>
+            el?.tagName.toLowerCase() === "p" &&
+            el.textContent === "Exported 0 of 500 traces…")
       ).toBeInTheDocument();
     });
 
@@ -59,7 +61,11 @@ describe("<ExportProgress/>", () => {
       );
 
       expect(
-        screen.getByText("Exported 100 of 500 traces...")
+        screen.getByText(
+          (_, el) =>
+            el?.tagName.toLowerCase() === "p" &&
+            el.textContent === "Exported 100 of 500 traces…"
+        )
       ).toBeInTheDocument();
 
       rerender(
@@ -69,7 +75,11 @@ describe("<ExportProgress/>", () => {
       );
 
       expect(
-        screen.getByText("Exported 300 of 500 traces...")
+        screen.getByText(
+          (_, el) =>
+            el?.tagName.toLowerCase() === "p" &&
+            el.textContent === "Exported 300 of 500 traces…"
+        )
       ).toBeInTheDocument();
     });
   });

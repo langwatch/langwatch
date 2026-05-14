@@ -97,7 +97,7 @@ export const TRACE_PROCESSING_COMMAND_TYPES = [
 export type TraceProcessingCommandType =
   (typeof TRACE_PROCESSING_COMMAND_TYPES)[number];
 
-export const TRACE_SUMMARY_PROJECTION_VERSION_LATEST = "2026-03-25" as const;
+export const TRACE_SUMMARY_PROJECTION_VERSION_LATEST = "2026-04-23" as const;
 
 /** Reactors skip traces older than this threshold to avoid re-processing during resyncs. */
 export const STALE_TRACE_THRESHOLD_MS = 60 * 60 * 1000; // 1 hour

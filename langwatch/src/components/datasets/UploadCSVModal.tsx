@@ -76,7 +76,7 @@ export function UploadCSVModal({
         onOpenChange={({ open }) => !open && onClose()}
         closeOnInteractOutside={false}
       >
-        <Dialog.Content>
+        <Dialog.Content bg="bg">
           <Dialog.Header>
             <Dialog.Title>Upload CSV</Dialog.Title>
             <Dialog.CloseTrigger />

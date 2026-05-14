@@ -33,6 +33,7 @@ function makeContext(
     aggregateId: "trace-1",
     foldState: {
       traceId: "trace-1",
+      traceName: "",
       spanCount: 1,
       totalDurationMs: 100,
       computedIOSchemaVersion: "2025-12-18",
@@ -50,6 +51,8 @@ function makeContext(
       totalCompletionTokens: 0,
       occurredAt: Date.now(),
       blockedByGuardrail: false,
+      rootSpanType: null,
+      containsAi: false,
       attributes: attributeOverrides,
       labels: [],
     } as unknown as TraceSummaryData,

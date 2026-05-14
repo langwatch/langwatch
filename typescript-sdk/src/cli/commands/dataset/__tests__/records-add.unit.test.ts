@@ -24,6 +24,7 @@ describe("parseRecordsJson()", () => {
   });
 
   describe("when given a non-array JSON value", () => {
+    /** @scenario Add records rejects non-array JSON */
     it("throws for a JSON object", () => {
       expect(() => parseRecordsJson('{"input": "hello"}')).toThrow(
         "expected a JSON array",
@@ -42,6 +43,7 @@ describe("parseRecordsJson()", () => {
   });
 
   describe("when given invalid JSON", () => {
+    /** @scenario Add records rejects invalid JSON */
     it("throws for malformed JSON", () => {
       expect(() => parseRecordsJson("{not valid json}")).toThrow(
         "Invalid JSON",

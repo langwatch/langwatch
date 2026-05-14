@@ -64,6 +64,8 @@ describe("runEvaluationJob - evaluator settings resolution", () => {
     }
   });
 
+  /** @scenario Execute evaluation using evaluator settings */
+  /** @scenario Evaluator settings take precedence */
   it("uses evaluator.config.settings when monitor has evaluatorId", async () => {
     const evaluatorSettings = { model: "gpt-4o", temperature: 0.7 };
     const monitorParameters = { model: "gpt-3.5", temperature: 0.5 };
@@ -123,6 +125,7 @@ describe("runEvaluationJob - evaluator settings resolution", () => {
     expect(resolvedSettings).not.toEqual(monitorParameters);
   });
 
+  /** @scenario Backward compatibility with legacy monitors */
   it("uses monitor.parameters when monitor has no evaluatorId (backward compatibility)", async () => {
     const monitorParameters = { model: "gpt-3.5", temperature: 0.5 };
 

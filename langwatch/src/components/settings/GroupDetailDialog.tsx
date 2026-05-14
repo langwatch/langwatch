@@ -173,7 +173,7 @@ export function GroupDetailDialog({
       onOpenChange={(e) => { if (!e.open) { reset(); onClose(); } }}
       size="lg"
     >
-      <Dialog.Content maxHeight="90vh" overflowY="auto">
+      <Dialog.Content bg="bg" maxHeight="90vh" overflowY="auto">
         <Dialog.Header>
           <Dialog.Title>{group.name}</Dialog.Title>
         </Dialog.Header>

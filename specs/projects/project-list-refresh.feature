@@ -4,6 +4,14 @@ Feature: Project List Refresh After Creation
   I want newly created projects to appear immediately in all project lists
   So that I don't need to refresh the page to see my new project
 
+  # All scenarios describe post-creation list refresh behaviour
+  # across the settings page, navbar dropdown, and drawer flow.
+  # The CreateProjectDrawer integration test mocks
+  # `organization.getAll.invalidate` and `limits.getUsage.invalidate`
+  # but does not assert they're called on success. Cheap follow-up:
+  # extend the existing component test to assert both invalidations
+  # fire after a successful mutation.
+
   Background:
     Given I am logged in as an authenticated user
     And I have permission to create projects

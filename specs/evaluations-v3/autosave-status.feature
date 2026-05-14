@@ -90,19 +90,6 @@ Feature: Autosave Status Indicator
   # ============================================================================
   # Combined States (Evaluation + Dataset)
   # ============================================================================
-
-  @unimplemented
-  Scenario: Status shows saving when evaluation state is saving
-    Given the evaluation state save is in progress
-    And the dataset sync is idle
-    Then the status indicator shows "Saving..."
-
-  @unimplemented
-  Scenario: Status shows saving when dataset sync is in progress
-    Given the evaluation state save is idle
-    And the dataset sync is in progress
-    Then the status indicator shows "Saving..."
-
   @unimplemented
   Scenario: Error takes priority over saving state
     Given the evaluation state save failed
@@ -168,17 +155,6 @@ Feature: Autosave Status Indicator
     And targetMetadata (cost, duration, traceId) are saved
     And evaluatorResults are saved
     And errors are saved
-
-  @unimplemented
-  Scenario: Transient execution state is NOT persisted
-    Given an evaluation is currently running
-    When the autosave is triggered
-    Then the persisted state does NOT include:
-      | field          |
-      | status         |
-      | progress       |
-      | total          |
-      | executingCells |
 
   @unimplemented
   Scenario: Results are restored on page reload

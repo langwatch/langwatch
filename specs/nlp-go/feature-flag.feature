@@ -7,6 +7,13 @@ Feature: TS app routes to nlpgo via release_nlp_go_engine_enabled
   # Topic clustering is intentionally NOT gated by this flag (see §11). Distinct id
   # is projectId so the flag rolls out per-project. Env override mirrors PostHog.
 
+  # All @unimplemented scenarios describe TS-app routing behavior in
+  # nlpgoFetch / studioBackendPostEvent / playground that is partially covered
+  # by langwatch/src/app/api/workflows/post_event/__tests__/post-event-routing.test.ts
+  # (parameterized for-loop — does not bind cleanly via @scenario). Remaining
+  # scenarios cover edge paths (HMAC signing, retry, rollback) that need new
+  # focused unit tests. Aspirational pending those tests.
+
   Background:
     Given the langwatch app is running with featureFlagService configured
     And the AI Gateway is reachable

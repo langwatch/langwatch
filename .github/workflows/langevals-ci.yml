@@ -49,7 +49,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Setup UV
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
           enable-cache: true
           cache-dependency-glob: "langevals/uv.lock"
@@ -78,7 +78,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Setup UV
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
           enable-cache: true
           cache-dependency-glob: "langevals/uv.lock"
@@ -90,7 +90,7 @@ jobs:
       - name: Run tests
         working-directory: langevals
         env:
-          OPENAI_API_KEY: ${{ secrets.PYTHON_SDK_OPENAI_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.LANGEVALS_OPENAI_API_KEY }}
           AZURE_API_KEY: ${{ secrets.PYTHON_SDK_AZURE_OPENAI_API_KEY }}
           AZURE_API_BASE: ${{ secrets.PYTHON_SDK_AZURE_OPENAI_ENDPOINT }}
           AZURE_CONTENT_SAFETY_ENDPOINT: ${{ secrets.LANGEVALS_AZURE_CONTENT_SAFETY_ENDPOINT }}
@@ -123,7 +123,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
 
       - name: Build Docker image
         uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7.1.0

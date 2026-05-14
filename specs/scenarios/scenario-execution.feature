@@ -3,8 +3,11 @@ Feature: Scenario Execution
   I want to run scenarios against my agents
   So that I can validate their behavior meets my criteria
 
-  Background:
-    Given I am logged into project "my-project"
+  # Per AUDIT_MANIFEST.md: all 11 @unimplemented scenarios are KEEP — backend
+  # primitives exist but no E2E or integration UI tests have been written yet.
+  # Cover Run with prompt/HTTP target, conversation streaming, results page,
+  # back navigation, run history list, Run Again preference persistence, and
+  # toast-on-no-provider flow. Tracked in PR #3458.
 
   # ============================================================================
   # Running Scenarios

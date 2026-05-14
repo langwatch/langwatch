@@ -4,6 +4,12 @@
 traceDir
 node_modules
 
+# Defense against MCP env-var leaks: external tooling can mkdir a literal
+# directory like "${HOME/...}" relative to cwd when bash-style env defaults
+# aren't expanded. Never let those slip into the repo again.
+${HOME*
+${VAR*
+
 llm-model-costs.json
 quickwit-*
 
@@ -11,9 +17,12 @@ quickwit-*
 /service
 
 # ClickHouse local data (created by local dev CH instance)
-store/
-data/
-metadata/
+/store/
+/data/
+/metadata/
+/langwatch/store/
+/langwatch/data/
+/langwatch/metadata/
 __pycache__
 dist/
 
@@ -41,6 +50,7 @@ prompts/**
 # Claude Code personal settings
 **/.claude/settings.local.json
 **/.claude/agent-memory/
+**/.claude/projects/
 .claude/scheduled_tasks.lock
 .claude/skills/local-*/
 

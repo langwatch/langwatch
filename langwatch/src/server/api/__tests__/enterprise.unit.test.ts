@@ -21,11 +21,14 @@ vi.mock("~/server/app-layer/app", () => ({
 
 describe("enterprise", () => {
   describe("isEnterpriseTier", () => {
+    /** @scenario Plan type matching is case-sensitive */
     it("returns true for ENTERPRISE", () => {
       expect(isEnterpriseTier("ENTERPRISE")).toBe(true);
     });
 
     describe("when plan type is not ENTERPRISE", () => {
+      /** @scenario FREE plan is not recognized as enterprise */
+      /** @scenario OPEN_SOURCE plan is not recognized as enterprise */
       it.each(["FREE", "OPEN_SOURCE", "PRO", "GROWTH", "STARTER", ""])(
         "returns false for %s",
         (planType) => {
@@ -85,6 +88,8 @@ describe("enterprise", () => {
     });
 
     describe("when plan is ENTERPRISE", () => {
+      /** @scenario Enterprise plan from subscription is recognized */
+      /** @scenario Enterprise plan from license is recognized */
       it("resolves without throwing", async () => {
         const enterprisePlan: PlanInfo = {
           ...FREE_PLAN,
@@ -142,6 +147,7 @@ describe("enterprise", () => {
     });
 
     describe("when plan provider fails", () => {
+      /** @scenario Guard fails closed when plan lookup fails */
       it("denies access by propagating the error", async () => {
         mockGetActivePlan.mockRejectedValue(
           new Error("Plan provider unavailable"),

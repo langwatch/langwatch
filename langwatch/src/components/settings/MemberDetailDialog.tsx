@@ -152,7 +152,7 @@ export function MemberDetailDialog({
       }}
       size="lg"
     >
-      <Dialog.Content maxHeight="90vh" overflowY="auto">
+      <Dialog.Content bg="bg" maxHeight="90vh" overflowY="auto">
         <Dialog.Header>
           <Dialog.Title>{member.user.name ?? member.user.email}</Dialog.Title>
         </Dialog.Header>

@@ -3,6 +3,24 @@ Feature: Suite run history group-by selector
   I want to group results by target or scenario
   So that I can analyze results from different perspectives
 
+  # Parity status: 1 of 13 scenarios bound to existing tests.
+  # Remaining @unimplemented scenarios (#3458):
+  #   12 NO_TEST: shipped behavior, no integration test yet
+  # NO_TEST gaps:
+  #   - "User groups suite results by target"
+  #   - "Group-by selection persists in the URL"
+  #   - "Grouping by scenario re-groups results under scenario headers"
+  #   - "Grouping by target re-groups results under target headers"
+  #   - "None grouping preserves current batch run layout"
+  #   - "Grouping by target respects active scenario filter"
+  #   - "Switching group-by mode preserves active filters"
+  #   - "Switching group-by mode collapses all groups"
+  #   - "Every grouping mode returns groups with identifier, label, type, timestamp, and runs"
+  #   - "groupRunsByScenarioId groups runs by their scenarioId"
+  #   - "groupRunsByTarget groups runs by their targetReferenceId"
+  #   - "groupRunsByTarget places runs without target metadata in an \"Unknown\" group"
+  #   - "Groups are sorted by most recent timestamp descending"
+
   Background:
     Given a suite with multiple scenarios, targets, and batch runs
 
@@ -26,7 +44,7 @@ Feature: Suite run history group-by selector
     And results are grouped by target
 
   # UI elements: selector exists with correct options
-  @integration @unimplemented
+  @integration
   Scenario: Group-by selector renders with correct options
     When the run history list renders
     Then I see a group-by selector in the top-right of the filter bar

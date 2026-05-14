@@ -1,6 +1,6 @@
 {
     "name": "langwatch",
-    "version": "0.27.0",
+    "version": "0.28.0",
     "description": "LangWatch TypeScript/JavaScript SDK. Interact with the full LangWatch API and use the LangWatch OpenTelemetry SDK to instrument your application. For more information, see https://docs.langwatch.ai/integration/typescript/guide",
     "main": "dist/index.js",
     "module": "dist/index.mjs",
@@ -67,13 +67,13 @@
         "@langchain/core": ">=0.3.68 <0.4.0",
         "@langchain/langgraph": ">=0.4.0 <1.0.0",
         "@langchain/openai": ">=0.6.0 <1.0.0",
-        "@opentelemetry/sdk-node": "0.205.0",
+        "@opentelemetry/sdk-node": "0.216.0",
         "@opentelemetry/sdk-trace-node": "^2.0.1",
         "@opentelemetry/sdk-trace-web": ">=2.0.1",
         "@types/debug": "^4.1.12",
         "@types/js-yaml": "^4.0.9",
         "@types/node": "^24.1.0",
-        "@typescript/native-preview": "7.0.0-dev.20250804.1",
+        "@typescript/native-preview": "7.0.0-dev.20260426.1",
         "@vercel/otel": "^1.13.0",
         "@vitest/coverage-v8": "3.2.4",
         "dotenv-cli": "^11.0.0",
@@ -97,7 +97,7 @@
     "dependencies": {
         "@opentelemetry/api-logs": "0.205.0",
         "@opentelemetry/core": "^2.0.1",
-        "@opentelemetry/exporter-logs-otlp-http": "0.205.0",
+        "@opentelemetry/exporter-logs-otlp-http": "0.216.0",
         "@opentelemetry/exporter-trace-otlp-http": "0.205.0",
         "@opentelemetry/instrumentation": "0.212.0",
         "@opentelemetry/resources": "^2.0.1",
@@ -166,17 +166,18 @@
             "@opentelemetry/resources": "^2.0.1",
             "@opentelemetry/sdk-trace-base": "^2.0.1",
             "@opentelemetry/instrumentation": "0.212.0",
-            "@opentelemetry/sdk-node": "0.205.0",
+            "@opentelemetry/sdk-node": "0.216.0",
             "@opentelemetry/context-async-hooks": "^2.1.0",
             "@opentelemetry/api-logs": "0.205.0",
             "@opentelemetry/sdk-logs": "0.205.0",
-            "@opentelemetry/exporter-logs-otlp-http": "0.205.0",
+            "@opentelemetry/exporter-logs-otlp-http": "0.216.0",
             "@opentelemetry/exporter-trace-otlp-http": "0.205.0",
             "zod": "^4.0.14",
             "langchain@<0.3.37": "0.3.37",
             "@langchain/core@<0.3.80": "0.3.80",
-            "protobufjs@<7.5.5": ">=7.5.5",
-            "protobufjs@>=8.0.0 <8.0.1": ">=8.0.1"
+            "langsmith@<0.6.0": "0.6.0",
+            "protobufjs@<7.5.6": ">=7.5.6",
+            "protobufjs@>=8.0.0 <8.0.2": ">=8.0.2"
         }
     }
 }

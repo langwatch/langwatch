@@ -55,7 +55,7 @@ export function CopyableInputWithPrefix({
         fontSize="xs"
         lineHeight="tall"
         fontFamily="mono"
-        color="fg.DEFAULT"
+        color="fg"
         whiteSpace="nowrap"
         overflow="hidden"
         textOverflow="ellipsis"

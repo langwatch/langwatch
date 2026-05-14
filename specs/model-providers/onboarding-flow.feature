@@ -3,6 +3,13 @@ Feature: Onboarding Flow
   I want to configure a model provider during onboarding
   So that I can start using LangWatch immediately
 
+  # All scenarios describe the onboarding flow UI for configuring a model
+  # provider (form + redirect after save). Need a JSDOM render of
+  # `OnboardingFlow` + Next.js router mock to assert redirect targets
+  # ("/@project/evaluations", "/@project/prompts"). The form's
+  # validation/save mechanics overlap with credential-validation.feature.
+  # Aspirational pending an onboarding-flow test harness.
+
   Background:
     Given I am a new user going through onboarding
     And I am on the model provider setup step

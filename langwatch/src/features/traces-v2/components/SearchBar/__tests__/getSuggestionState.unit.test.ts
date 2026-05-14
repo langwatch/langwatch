@@ -1,0 +1,376 @@
+import { describe, expect, it } from "vitest";
+import { getSuggestionState } from "../getSuggestionState";
+
+describe("getSuggestionState", () => {
+  describe("given an empty editor", () => {
+    describe("when the cursor is at position 0", () => {
+      it("opens in field mode with empty query so the dropdown can list all fields on focus", () => {
+        expect(getSuggestionState("", 0)).toEqual({
+          open: true,
+          mode: "field",
+          query: "",
+          tokenStart: 0,
+        });
+      });
+    });
+  });
+
+  describe("given the cursor is inside a field-name token", () => {
+    describe("when the text is just '@' and cursor sits after it", () => {
+      it("opens the dropdown in field mode with empty query", () => {
+        expect(getSuggestionState("@", 1)).toEqual({
+          open: true,
+          mode: "field",
+          query: "",
+          tokenStart: 0,
+        });
+      });
+    });
+
+    describe("when the user has typed a partial field name", () => {
+      it("returns the chars between '@' and cursor as the query", () => {
+        expect(getSuggestionState("@mo", 3)).toEqual({
+          open: true,
+          mode: "field",
+          query: "mo",
+          tokenStart: 0,
+        });
+      });
+    });
+
+    describe("when the cursor is between '@' and the typed chars", () => {
+      it("uses only the chars before the cursor as the query", () => {
+        expect(getSuggestionState("@mo", 1)).toEqual({
+          open: true,
+          mode: "field",
+          query: "",
+          tokenStart: 0,
+        });
+      });
+    });
+  });
+
+  describe("given the cursor is inside a value token", () => {
+    describe("when the text is '@field:' with cursor after the colon", () => {
+      it("opens the dropdown in value mode with empty query", () => {
+        expect(getSuggestionState("@model:", 7)).toEqual({
+          open: true,
+          mode: "value",
+          field: "model",
+          query: "",
+          tokenStart: 0,
+        });
+      });
+    });
+
+    describe("when the user has typed a partial value", () => {
+      it("returns the chars between ':' and cursor as the query", () => {
+        expect(getSuggestionState("@model:gpt", 10)).toEqual({
+          open: true,
+          mode: "value",
+          field: "model",
+          query: "gpt",
+          tokenStart: 0,
+        });
+      });
+    });
+
+    describe("when there is no leading sigil (post-accept state)", () => {
+      it("still opens value mode so reopen-after-accept works", () => {
+        expect(getSuggestionState("model:gpt", 9)).toEqual({
+          open: true,
+          mode: "value",
+          field: "model",
+          query: "gpt",
+          tokenStart: 0,
+        });
+      });
+    });
+  });
+
+  describe("given the cursor has moved past the token", () => {
+    describe("when there is a trailing space and cursor sits after it", () => {
+      it("returns closed", () => {
+        expect(getSuggestionState("@model:gpt-4o ", 14)).toEqual({
+          open: false,
+        });
+      });
+    });
+
+    describe("when the cursor sits inside an identifier-shape word with no '@' before it", () => {
+      it("opens passive field-mode autocomplete", () => {
+        // Passive suggestions are filtered to known fields by `getSuggestionItems`,
+        // so the dropdown only renders when at least one field name matches.
+        expect(getSuggestionState("refund", 6)).toEqual({
+          open: true,
+          mode: "field",
+          query: "refund",
+          tokenStart: 0,
+        });
+      });
+    });
+
+    describe("when the user types multi-word free text", () => {
+      it("opens at each identifier-shape word but closes at the spaces", () => {
+        const text = "model is broken";
+        // pos 0: empty token, closed.
+        expect(getSuggestionState(text, 0)).toEqual({ open: false });
+        // pos 1-5: typing "model" — open with growing query.
+        for (let pos = 1; pos <= 5; pos++) {
+          expect(getSuggestionState(text, pos)).toMatchObject({
+            open: true,
+            mode: "field",
+          });
+        }
+        // pos 6: cursor right after the space — empty token, closed.
+        expect(getSuggestionState(text, 6)).toEqual({ open: false });
+      });
+    });
+  });
+
+  describe("given multiple clauses in the query", () => {
+    describe("when the cursor sits inside a later @-token", () => {
+      it("opens for that token only", () => {
+        expect(getSuggestionState("@status:error AND @mo", 21)).toEqual({
+          open: true,
+          mode: "field",
+          query: "mo",
+          tokenStart: 18,
+        });
+      });
+    });
+
+    describe("when the cursor sits at the end of an earlier value with no whitespace yet", () => {
+      it("opens in value mode for the earlier field", () => {
+        expect(getSuggestionState("@status:error AND @mo", 13)).toEqual({
+          open: true,
+          mode: "value",
+          field: "status",
+          query: "error",
+          tokenStart: 0,
+        });
+      });
+    });
+
+    describe("when the cursor sits in the whitespace between clauses", () => {
+      it("returns closed", () => {
+        expect(getSuggestionState("@status:error AND @mo", 14)).toEqual({
+          open: false,
+        });
+      });
+    });
+
+    describe("when the cursor sits inside a later @-token but the @ immediately follows another token char (no space)", () => {
+      it("returns closed because the active token has no field/sigil shape", () => {
+        // "foo@bar" — no separator before the @, so the active token is "foo@bar".
+        // The token doesn't start with `@`, has no `:`, and contains a non-identifier
+        // char, so the dropdown stays closed.
+        expect(getSuggestionState("foo@bar", 7)).toEqual({ open: false });
+      });
+    });
+  });
+
+  describe("given a parenthesised expression", () => {
+    describe("when the cursor sits inside a value token wrapped in parens", () => {
+      it("opens because '(' acts as a token boundary", () => {
+        expect(getSuggestionState("(@status:error)", 14)).toEqual({
+          open: true,
+          mode: "value",
+          field: "status",
+          query: "error",
+          tokenStart: 1,
+        });
+      });
+    });
+
+    describe("when the cursor sits after the closing paren", () => {
+      it("returns closed", () => {
+        expect(getSuggestionState("(@status:error)", 15)).toEqual({
+          open: false,
+        });
+      });
+    });
+  });
+
+  describe("given a quoted value", () => {
+    describe("when the cursor sits inside the quoted value before any whitespace", () => {
+      it("returns closed because quoted values are not autocompleted", () => {
+        expect(getSuggestionState('@status:"refu', 13)).toEqual({
+          open: false,
+        });
+      });
+    });
+
+    describe("when the cursor sits inside a quoted value after a space inside the quotes", () => {
+      it("opens passive field-mode for the post-space identifier (the active token is no longer the quoted value)", () => {
+        // The space terminates the value-mode token, leaving "po" as the new
+        // active word. Identifier-shape, so passive autocomplete opens —
+        // dropdown is invisible if no fields prefix-match.
+        expect(getSuggestionState('@status:"refund po', 18)).toEqual({
+          open: true,
+          mode: "field",
+          query: "po",
+          tokenStart: 16,
+        });
+      });
+    });
+  });
+
+  describe("given the cursor sits exactly on the '@' character", () => {
+    describe("when the cursor is before the '@'", () => {
+      it("returns closed because the @ has not been entered yet from cursor's perspective", () => {
+        expect(getSuggestionState("@model", 0)).toEqual({ open: false });
+      });
+    });
+  });
+
+  describe("given the negation prefix 'NOT '", () => {
+    describe("when the cursor sits inside the negated field token", () => {
+      it("opens for the field after '@' regardless of preceding 'NOT '", () => {
+        expect(getSuggestionState("NOT @stat", 9)).toEqual({
+          open: true,
+          mode: "field",
+          query: "stat",
+          tokenStart: 4,
+        });
+      });
+    });
+  });
+
+  describe("given an existing dynamic-prefix attribute chip", () => {
+    describe("when the cursor sits inside the value of trace.attribute.langwatch.origin", () => {
+      it("opens in value mode for the full prefix-qualified field so the resolver can fetch values for that key", () => {
+        // Chip-edit regression: `attribute.langwatch.origin:application`
+        // with the cursor mid-value used to return empty suggestions because
+        // the static FIELD_VALUES has no entry for the prefixed field.
+        const text = "trace.attribute.langwatch.origin:application";
+        expect(getSuggestionState(text, text.length)).toEqual({
+          open: true,
+          mode: "value",
+          field: "trace.attribute.langwatch.origin",
+          query: "application",
+          tokenStart: 0,
+        });
+      });
+    });
+
+    describe("when the cursor sits mid-value with only a wildcard typed", () => {
+      it("opens in value mode with the glob as the query so the resolver can return all values", () => {
+        const text = "trace.attribute.langwatch.origin:*";
+        expect(getSuggestionState(text, text.length)).toEqual({
+          open: true,
+          mode: "value",
+          field: "trace.attribute.langwatch.origin",
+          query: "*",
+          tokenStart: 0,
+        });
+      });
+    });
+
+    describe("when the cursor sits inside the key part of a dynamic-prefix chip", () => {
+      it("opens in field mode with the full typed prefix so key-discovery can re-rank", () => {
+        // Cursor right after `lang` of `trace.attribute.lang|watch.origin:foo`.
+        // No colon yet from cursor's POV → field mode with the partial key.
+        const text = "trace.attribute.langwatch.origin:application";
+        const cursorAfterLang = "trace.attribute.lang".length;
+        expect(getSuggestionState(text, cursorAfterLang)).toEqual({
+          open: true,
+          mode: "field",
+          query: "trace.attribute.lang",
+          tokenStart: 0,
+        });
+      });
+    });
+
+    describe("when the cursor sits inside the value of span.attribute.gen_ai.request.model", () => {
+      it("opens value mode against the full span-attribute-qualified field", () => {
+        const text = "span.attribute.gen_ai.request.model:gpt-4o";
+        expect(getSuggestionState(text, text.length)).toEqual({
+          open: true,
+          mode: "value",
+          field: "span.attribute.gen_ai.request.model",
+          query: "gpt-4o",
+          tokenStart: 0,
+        });
+      });
+    });
+
+    describe("when the cursor sits inside the value of event.attribute.exception.type", () => {
+      it("opens value mode against the full event-attribute-qualified field", () => {
+        const text = "event.attribute.exception.type:ValueError";
+        expect(getSuggestionState(text, text.length)).toEqual({
+          open: true,
+          mode: "value",
+          field: "event.attribute.exception.type",
+          query: "ValueError",
+          tokenStart: 0,
+        });
+      });
+    });
+
+    describe("when the chip is preceded by another clause", () => {
+      it("scopes tokenStart to the active token only — preceding clauses are untouched", () => {
+        // `status:error AND trace.attribute.langwatch.origin:appli|cation`
+        const prefix = "status:error AND ";
+        const chip = "trace.attribute.langwatch.origin:application";
+        const text = prefix + chip;
+        const cursorMidValue = prefix.length + chip.indexOf(":") + 1 + 5; // after "appli"
+        expect(getSuggestionState(text, cursorMidValue)).toEqual({
+          open: true,
+          mode: "value",
+          field: "trace.attribute.langwatch.origin",
+          query: "appli",
+          tokenStart: prefix.length,
+        });
+      });
+    });
+  });
+
+  describe("given a typo'd dynamic prefix", () => {
+    describe("when the user types a near-miss like 'atrace.attribute.x:foo'", () => {
+      it("still opens value mode against the typo'd field name", () => {
+        // The state machine doesn't know about valid prefixes — it only
+        // recognises the `field:value` shape. Routing the typo into a
+        // helpful "did you mean" is the resolver's job, not this layer's.
+        // What matters here is that we surface the typo'd field intact so
+        // downstream code can decide what to do with it.
+        const text = "atrace.attribute.x:foo";
+        expect(getSuggestionState(text, text.length)).toEqual({
+          open: true,
+          mode: "value",
+          field: "atrace.attribute.x",
+          query: "foo",
+          tokenStart: 0,
+        });
+      });
+    });
+  });
+
+  describe("given the shorthand negation '-' prefix", () => {
+    describe("when the cursor sits inside a negated value token with sigil", () => {
+      it("opens in value mode and preserves the `-` prefix in the editor", () => {
+        // tokenStart points after the `-` so accepting only replaces from `@…`
+        // onward, leaving the negation prefix intact.
+        expect(getSuggestionState("-@status:err", 12)).toEqual({
+          open: true,
+          mode: "value",
+          field: "status",
+          query: "err",
+          tokenStart: 1,
+        });
+      });
+    });
+
+    describe("when the cursor sits inside a negated value token without sigil", () => {
+      it("opens in value mode for the post-accept state", () => {
+        expect(getSuggestionState("-status:err", 11)).toEqual({
+          open: true,
+          mode: "value",
+          field: "status",
+          query: "err",
+          tokenStart: 1,
+        });
+      });
+    });
+  });
+});

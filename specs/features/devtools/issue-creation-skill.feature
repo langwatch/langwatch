@@ -3,6 +3,20 @@ Feature: Standardized GitHub issue creation via /create-issue skill
   I want a single command to create well-structured GitHub issues
   So that issues follow templates, get proper labels and project fields, and link to epics consistently
 
+  # Parity status: 0 of 6 scenarios bound to existing tests.
+  # Remaining @unimplemented scenarios (#3458):
+  #   4 HARNESS_GAP: scenarios describe Claude Code skill behavior
+  #     (/create-issue SKILL.md in ~/.claude/skills/) — the TS-only
+  #     parity checker cannot bind skill markdown files
+  #   1 UPDATE: "Offers to launch implementation after creation"
+  #     (skill now asks about /investigate, not /implement)
+  # Sections list:
+  #   - "Assigns issue to current GitHub user"
+  #   - "Adds issue to LangWatch Kanban project with default status"
+  #   - "Shows usage instructions when invoked with no arguments"
+  #   - "Shows authentication error when not logged in"
+  #   - "Shows access error when project is unreachable"
+
   Background:
     Given a SKILL.md file exists at .claude/skills/create-issue/SKILL.md
     And the skill is user-invocable via /create-issue
@@ -19,38 +33,6 @@ Feature: Standardized GitHub issue creation via /create-issue skill
   # --- Issue creation workflow ---
 
   @integration @unimplemented
-  Scenario: Confirms detected type before creating issue
-    Given the user runs /create-issue "Refactor the auth module and add OAuth support"
-    When the skill detects a type from the description
-    Then it displays the detected type and asks the user to confirm or change it
-    And waits for user confirmation before creating the issue
-
-  @integration @unimplemented
-  Scenario: Creates bug issue with template body sections
-    Given the user runs /create-issue "Login page throws 500 error"
-    And the user confirms type BUG
-    When the skill creates the issue
-    Then the created issue has title containing the bug description
-    And the issue body contains Describe the bug, To reproduce, and Expected behavior sections
-    And the issue is labeled "bug"
-
-  @integration @unimplemented
-  Scenario: Creates feature request with template body sections
-    Given the user runs /create-issue "Add CSV export for evaluation results"
-    And the user confirms type FEAT
-    When the skill creates the issue
-    Then the issue body contains Problem, Proposed solution, and Alternatives considered sections
-    And the issue is labeled "feature"
-
-  @integration @unimplemented
-  Scenario: Creates chore with template body sections
-    Given the user runs /create-issue "Upgrade Prisma to v6"
-    And the user confirms type CHORE
-    When the skill creates the issue
-    Then the issue body contains Description and Scope sections
-    And the issue is labeled "chore"
-
-  @integration @unimplemented
   Scenario: Assigns issue to current GitHub user
     Given the user runs /create-issue "Fix pagination in traces view"
     And the user confirms the detected type
@@ -63,36 +45,6 @@ Feature: Standardized GitHub issue creation via /create-issue skill
     And the user confirms the detected type
     When the skill creates the issue
     Then the issue appears in project number 5 with Status set to "Backlog"
-
-  @integration @unimplemented
-  Scenario: Sets optional project fields when user specifies them
-    Given the user runs /create-issue "Add dark mode support" with priority P1 and size M
-    And the user confirms the detected type
-    When the skill creates the issue
-    Then the project Priority field is "P1" and Size field is "M"
-
-  @integration @unimplemented
-  Scenario: Sets Epic project field when user specifies an epic category
-    Given the user runs /create-issue "Fix trace filtering" with epic "Traces UI/UX Extreme Makeover"
-    And the user confirms the detected type
-    When the skill creates the issue
-    Then the project Epic field is set to "Traces UI/UX Extreme Makeover"
-
-  # --- Sub-issue linking ---
-
-  @integration @unimplemented
-  Scenario: Links issue as sub-issue of parent epic
-    Given the user runs /create-issue "Fix trace date picker" with parent epic issue 500
-    And the user confirms the detected type
-    When the skill creates the issue
-    Then the new issue appears as a sub-issue of issue 500
-
-  @integration @unimplemented
-  Scenario: Skips sub-issue linking when no parent epic specified
-    Given the user runs /create-issue "Update README" without specifying a parent epic
-    And the user confirms the detected type
-    When the skill creates the issue
-    Then no sub-issue relationship is created
 
   # --- Implementation handoff ---
 

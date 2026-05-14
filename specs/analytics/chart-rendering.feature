@@ -3,6 +3,13 @@ Feature: Analytics Chart Rendering
   Charts on the analytics dashboard render data correctly across
   all graph types, metrics, and color configurations.
 
+  # The remaining `@unimplemented` scenarios in this file describe React /
+  # frontend rendering behavior on the analytics dashboard. They need a
+  # JSDOM/component-render harness for the dashboard chart components — no
+  # such harness exists today for the analytics chart wrappers. Tracked here
+  # rather than dropped because the assertions are concrete and would catch
+  # real regressions once the harness lands.
+
   Background:
     Given a project with analytics data stored in ClickHouse
 
@@ -32,7 +39,7 @@ Feature: Analytics Chart Rendering
   # Pass rate formatting
   # ---------------------------------------------------------------------------
 
-  @unit @unimplemented
+  @unit
   Scenario: Evaluation pass rate displays as percentage
     Given a chart showing evaluation pass rate data
     When the chart renders the Y-axis and tooltips
@@ -72,7 +79,7 @@ Feature: Analytics Chart Rendering
   # Event metrics coexistence
   # ---------------------------------------------------------------------------
 
-  @unit @unimplemented
+  @unit
   Scenario: Event details and event score metrics use distinct aggregation keys
     Given a dashboard with both event score and event details metrics
     When both metrics query the same event key and subkey
@@ -82,7 +89,7 @@ Feature: Analytics Chart Rendering
   # Tokens per second metric completeness
   # ---------------------------------------------------------------------------
 
-  @unit @unimplemented
+  @unit
   Scenario: Tokens per second metric resolves duration from stored spans
     Given an analytics query for the performance tokens per second metric
     When the ClickHouse query is built
@@ -92,7 +99,7 @@ Feature: Analytics Chart Rendering
   # Error state when query fails (bug fix #2599)
   # ---------------------------------------------------------------------------
 
-  @regression @integration @unimplemented
+  @regression @integration
   Scenario: Chart shows error state when analytics query fails
     Given an analytics chart with no cached data
     When the ClickHouse query returns an error
@@ -107,7 +114,7 @@ Feature: Analytics Chart Rendering
     Then the chart continues showing the cached data
     And a badge indicates the data may be stale with a retry option
 
-  @regression @integration @unimplemented
+  @regression @integration
   Scenario: Error state is visually distinct from empty data state
     Given an analytics chart
     When the query fails with an error

@@ -40,6 +40,16 @@ export function createProjectMetadataReactor(
       const { tenantId, foldState } = context;
       const attrs = foldState.attributes ?? {};
 
+      // Sample traces (seeded from the empty-state "Seed sample traces"
+      // path; every span carries `langwatch.origin = "sample"`) are not
+      // a real first ingest. Flipping `firstMessage` / `integrated` on
+      // them would prematurely dismiss the empty-state onboarding card
+      // even though the user hasn't connected their own app yet. Skip
+      // entirely — a real trace will trigger this reactor again.
+      if (attrs["langwatch.origin"] === "sample") {
+        return;
+      }
+
       try {
         const project = await deps.projects.getById(tenantId);
 

@@ -14,13 +14,15 @@ import { AddDatasetRecordDrawerV2 } from "./AddDatasetRecordDrawer";
 import { AddOrEditAnnotationScoreDrawer } from "./AddOrEditAnnotationScoreDrawer";
 import { AddOrEditDatasetDrawer } from "./AddOrEditDatasetDrawer";
 import { AutomationDrawer } from "./AddAutomationDrawer";
-import { AgentCodeEditorDrawer } from "./agents/AgentCodeEditorDrawer";
 import { AgentHistoryDrawer } from "./agents/AgentHistoryDrawer";
-import { AgentHttpEditorDrawer } from "./agents/AgentHttpEditorDrawer";
 import { AgentListDrawer } from "./agents/AgentListDrawer";
 import { AgentTypeSelectorDrawer } from "./agents/AgentTypeSelectorDrawer";
 import { AgentWorkflowEditorDrawer } from "./agents/AgentWorkflowEditorDrawer";
-import { WorkflowSelectorDrawer } from "./agents/WorkflowSelectorDrawer";
+import {
+  AgentCodeEditorDrawerFromUrl,
+  AgentHttpEditorDrawerFromUrl,
+  WorkflowSelectorDrawerFromUrl,
+} from "./agents/drawerFromUrl";
 import { AlertDrawer } from "./analytics/AlertDrawer";
 import { DashboardNameDrawer } from "./analytics/DashboardNameDrawer";
 import { BatchEvaluationDrawer } from "./BatchEvaluationDrawer";
@@ -37,6 +39,7 @@ import { EvaluatorHistoryDrawer } from "./evaluators/EvaluatorHistoryDrawer";
 import { EvaluatorListDrawer } from "./evaluators/EvaluatorListDrawer";
 import { EvaluatorTypeSelectorDrawer } from "./evaluators/EvaluatorTypeSelectorDrawer";
 import { WorkflowSelectorForEvaluatorDrawer } from "./evaluators/WorkflowSelectorForEvaluatorDrawer";
+import { FeatureFlagsDrawer } from "./drawers/FeatureFlagsDrawer";
 import { SdkRadarDrawer } from "./drawers/SdkRadarDrawer";
 // Lazy-loaded: FoundryDrawer transitively imports the OTel SDK which has
 // side effects that break React if evaluated eagerly at app startup.
@@ -53,6 +56,8 @@ import { LLMModelCostDrawer } from "./settings/LLMModelCostDrawer";
 import { ScenarioRunDetailDrawer } from "./simulations/ScenarioRunDetailDrawer";
 import { SuiteFormDrawer } from "./suites/SuiteFormDrawer";
 import { TraceDetailsDrawer } from "./TraceDetailsDrawer";
+// Traces V2 drawers
+import { TraceV2DrawerShell } from "../features/traces-v2/components/TraceDrawer";
 // Evaluations V3 drawers
 import { TargetTypeSelectorDrawer } from "./targets/TargetTypeSelectorDrawer";
 
@@ -62,6 +67,7 @@ import { TargetTypeSelectorDrawer } from "./targets/TargetTypeSelectorDrawer";
  */
 export const drawers = {
   traceDetails: TraceDetailsDrawer,
+  traceV2Details: TraceV2DrawerShell,
   batchEvaluation: BatchEvaluationDrawer,
   automation: AutomationDrawer,
   editModelProvider: EditModelProviderDrawer,
@@ -83,10 +89,10 @@ export const drawers = {
   agentList: AgentListDrawer,
   agentHistory: AgentHistoryDrawer,
   agentTypeSelector: AgentTypeSelectorDrawer,
-  agentCodeEditor: AgentCodeEditorDrawer,
-  agentHttpEditor: AgentHttpEditorDrawer,
+  agentCodeEditor: AgentCodeEditorDrawerFromUrl,
+  agentHttpEditor: AgentHttpEditorDrawerFromUrl,
   agentWorkflowEditor: AgentWorkflowEditorDrawer,
-  workflowSelector: WorkflowSelectorDrawer,
+  workflowSelector: WorkflowSelectorDrawerFromUrl,
   evaluatorHistory: EvaluatorHistoryDrawer,
   evaluatorList: EvaluatorListDrawer,
   evaluatorCategorySelector: EvaluatorCategorySelectorDrawer,
@@ -107,6 +113,8 @@ export const drawers = {
   guardrails: GuardrailsDrawer,
   // SDK Radar
   sdkRadar: SdkRadarDrawer,
+  // Dev tools
+  featureFlags: FeatureFlagsDrawer,
   // Ops
   foundry: FoundryDrawer,
 } satisfies Record<string, React.FC<any>>;

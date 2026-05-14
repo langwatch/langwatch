@@ -81,7 +81,7 @@ jobs:
           node-version: "24"
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4
+        uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6.0.8
         with:
           run_install: false
 
@@ -294,7 +294,7 @@ jobs:
         # widen to `!success()` — that catches both genuine failures and
         # 35-minute-job-cap cancellations, which is when we most want logs.
         if: ${{ !success() }}
-        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: npx-server-smoke-logs-${{ matrix.runner }}-${{ github.sha }}
           path: _logs

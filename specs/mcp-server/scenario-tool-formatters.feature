@@ -2,6 +2,15 @@
 Feature: MCP Scenario Tool Formatters
   Scenario formatters produce AI-readable digest or raw JSON output
 
+  # The list/get formatter behavior is bound via existing
+  # `scenario-tools.unit.test.ts` (digest mode totals, situation
+  # truncation, criteria count, labels, no-results path, JSON parse).
+  # The remaining @unimplemented scenarios — sub-criteria with the
+  # discover_scenario_schema endpoint — sit in
+  # `discover-schema.unit.test.ts` and `discover-evaluator-schema.unit.test.ts`
+  # which already have targeted unit tests but lack JSDoc bindings to
+  # these specific scenario titles.
+
   @unimplemented
   Scenario: List scenarios digest includes expected fields per scenario
     Given a list of scenarios with names, situations, criteria, and labels

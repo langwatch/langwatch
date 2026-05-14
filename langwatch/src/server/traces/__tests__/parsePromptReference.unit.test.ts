@@ -8,6 +8,7 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: "team/sample-prompt",
         promptVersionNumber: 3,
+        promptVersionId: null,
         promptTag: null,
         promptVariables: null,
       });
@@ -18,6 +19,7 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: "my-org/deep/nested-prompt",
         promptVersionNumber: 12,
+        promptVersionId: null,
         promptTag: null,
         promptVariables: null,
       });
@@ -28,6 +30,7 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: "simple-prompt",
         promptVersionNumber: 1,
+        promptVersionId: null,
         promptTag: null,
         promptVariables: null,
       });
@@ -38,6 +41,7 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: "team/prompt",
         promptVersionNumber: null,
+        promptVersionId: null,
         promptTag: "abc",
         promptVariables: null,
       });
@@ -48,6 +52,7 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: "team/prompt",
         promptVersionNumber: null,
+        promptVersionId: null,
         promptTag: "0",
         promptVariables: null,
       });
@@ -58,6 +63,7 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: "team/prompt",
         promptVersionNumber: null,
+        promptVersionId: null,
         promptTag: "-1",
         promptVariables: null,
       });
@@ -68,6 +74,7 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: null,
         promptVersionNumber: null,
+        promptVersionId: null,
         promptTag: null,
         promptVariables: null,
       });
@@ -78,7 +85,22 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: "team/prompt",
         promptVersionNumber: null,
+        promptVersionId: null,
         promptTag: "1.5",
+        promptVariables: null,
+      });
+    });
+
+    it("surfaces langwatch.prompt.version.id alongside combined format", () => {
+      const attrs = {
+        "langwatch.prompt.id": "team/prompt:3",
+        "langwatch.prompt.version.id": "ver-abc123",
+      };
+      expect(parsePromptReference(attrs)).toEqual({
+        promptHandle: "team/prompt",
+        promptVersionNumber: 3,
+        promptVersionId: "ver-abc123",
+        promptTag: null,
         promptVariables: null,
       });
     });
@@ -90,6 +112,7 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: "pizza-prompt",
         promptVersionNumber: null,
+        promptVersionId: null,
         promptTag: "production",
         promptVariables: null,
       });
@@ -100,6 +123,7 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: "pizza-prompt",
         promptVersionNumber: 3,
+        promptVersionId: null,
         promptTag: null,
         promptVariables: null,
       });
@@ -110,6 +134,77 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: "pizza-prompt",
         promptVersionNumber: null,
+        promptVersionId: null,
+        promptTag: null,
+        promptVariables: null,
+      });
+    });
+  });
+
+  describe("when flat format is present (bare-slug prompt.id with separate version attributes)", () => {
+    it("treats bare-slug prompt.id as the handle", () => {
+      const attrs = { "langwatch.prompt.id": "customer-support-v2" };
+      expect(parsePromptReference(attrs)).toEqual({
+        promptHandle: "customer-support-v2",
+        promptVersionNumber: null,
+        promptVersionId: null,
+        promptTag: null,
+        promptVariables: null,
+      });
+    });
+
+    it("pairs bare-slug prompt.id with version.id", () => {
+      const attrs = {
+        "langwatch.prompt.id": "customer-support-v2",
+        "langwatch.prompt.version.id": "ver-abc123",
+      };
+      expect(parsePromptReference(attrs)).toEqual({
+        promptHandle: "customer-support-v2",
+        promptVersionNumber: null,
+        promptVersionId: "ver-abc123",
+        promptTag: null,
+        promptVariables: null,
+      });
+    });
+
+    it("pairs bare-slug prompt.id with version.number", () => {
+      const attrs = {
+        "langwatch.prompt.id": "customer-support-v2",
+        "langwatch.prompt.version.number": 7,
+      };
+      expect(parsePromptReference(attrs)).toEqual({
+        promptHandle: "customer-support-v2",
+        promptVersionNumber: 7,
+        promptVersionId: null,
+        promptTag: null,
+        promptVariables: null,
+      });
+    });
+
+    it("pairs bare-slug prompt.id with both version.id and version.number", () => {
+      const attrs = {
+        "langwatch.prompt.id": "customer-support-v2",
+        "langwatch.prompt.version.id": "ver-abc123",
+        "langwatch.prompt.version.number": "7",
+      };
+      expect(parsePromptReference(attrs)).toEqual({
+        promptHandle: "customer-support-v2",
+        promptVersionNumber: 7,
+        promptVersionId: "ver-abc123",
+        promptTag: null,
+        promptVariables: null,
+      });
+    });
+
+    it("ignores invalid version.number on a bare-slug handle", () => {
+      const attrs = {
+        "langwatch.prompt.id": "customer-support-v2",
+        "langwatch.prompt.version.number": "not-a-number",
+      };
+      expect(parsePromptReference(attrs)).toEqual({
+        promptHandle: "customer-support-v2",
+        promptVersionNumber: null,
+        promptVersionId: null,
         promptTag: null,
         promptVariables: null,
       });
@@ -125,6 +220,7 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: "team/sample-prompt",
         promptVersionNumber: 2,
+        promptVersionId: null,
         promptTag: null,
         promptVariables: null,
       });
@@ -138,6 +234,7 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: "team/sample-prompt",
         promptVersionNumber: 5,
+        promptVersionId: null,
         promptTag: null,
         promptVariables: null,
       });
@@ -148,6 +245,7 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: null,
         promptVersionNumber: null,
+        promptVersionId: null,
         promptTag: null,
         promptVariables: null,
       });
@@ -158,6 +256,7 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: null,
         promptVersionNumber: null,
+        promptVersionId: null,
         promptTag: null,
         promptVariables: null,
       });
@@ -169,26 +268,25 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference({})).toEqual({
         promptHandle: null,
         promptVersionNumber: null,
+        promptVersionId: null,
         promptTag: null,
         promptVariables: null,
       });
     });
 
-    it("returns nulls for UUID-only prompt id without colon", () => {
-      const attrs = {
-        "langwatch.prompt.id": "clxyz123abc",
-        "langwatch.prompt.version.id": "ver456def",
-      };
+    it("surfaces version.id even when no handle is present", () => {
+      const attrs = { "langwatch.prompt.version.id": "ver-orphan" };
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: null,
         promptVersionNumber: null,
+        promptVersionId: "ver-orphan",
         promptTag: null,
         promptVariables: null,
       });
     });
   });
 
-  describe("when new format takes precedence over old format", () => {
+  describe("format precedence", () => {
     it("prefers combined format over separate attributes", () => {
       const attrs = {
         "langwatch.prompt.id": "team/new-prompt:5",
@@ -198,13 +296,29 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: "team/new-prompt",
         promptVersionNumber: 5,
+        promptVersionId: null,
+        promptTag: null,
+        promptVariables: null,
+      });
+    });
+
+    it("flat-format prompt.id overrides legacy handle attribute", () => {
+      const attrs = {
+        "langwatch.prompt.id": "team/new-prompt",
+        "langwatch.prompt.handle": "team/old-prompt",
+        "langwatch.prompt.version.number": "9",
+      };
+      expect(parsePromptReference(attrs)).toEqual({
+        promptHandle: "team/new-prompt",
+        promptVersionNumber: 9,
+        promptVersionId: null,
         promptTag: null,
         promptVariables: null,
       });
     });
   });
 
-  describe("when prompt variables are present", () => {
+  describe("when prompt variables are present (legacy JSON blob)", () => {
     it("extracts variables from valid JSON wrapper", () => {
       const attrs = {
         "langwatch.prompt.id": "team/sample-prompt:3",
@@ -295,6 +409,90 @@ describe("parsePromptReference()", () => {
       expect(result.promptVersionNumber).toBeNull();
       expect(result.promptTag).toBeNull();
       expect(result.promptVariables).toEqual({ name: "Alice" });
+    });
+  });
+
+  describe("when prompt variables are present (flat keys)", () => {
+    it("extracts variables from flat langwatch.prompt.variables.<name> attributes", () => {
+      const attrs = {
+        "langwatch.prompt.id": "customer-support-v2",
+        "langwatch.prompt.variables.customer_name": "Alice",
+        "langwatch.prompt.variables.issue": "billing discrepancy",
+      };
+      const result = parsePromptReference(attrs);
+      expect(result.promptVariables).toEqual({
+        customer_name: "Alice",
+        issue: "billing discrepancy",
+      });
+    });
+
+    it("coerces non-string scalar values to strings", () => {
+      const attrs = {
+        "langwatch.prompt.id": "customer-support-v2",
+        "langwatch.prompt.variables.count": 42,
+        "langwatch.prompt.variables.active": true,
+      };
+      const result = parsePromptReference(attrs);
+      expect(result.promptVariables).toEqual({
+        count: "42",
+        active: "true",
+      });
+    });
+
+    it("ignores the bare prefix with no variable name", () => {
+      const attrs = {
+        "langwatch.prompt.id": "customer-support-v2",
+        "langwatch.prompt.variables.": "noise",
+        "langwatch.prompt.variables.real": "kept",
+      };
+      const result = parsePromptReference(attrs);
+      expect(result.promptVariables).toEqual({ real: "kept" });
+    });
+
+    it("works without any handle attribute", () => {
+      const attrs = {
+        "langwatch.prompt.variables.customer_name": "Alice",
+      };
+      const result = parsePromptReference(attrs);
+      expect(result.promptHandle).toBeNull();
+      expect(result.promptVariables).toEqual({ customer_name: "Alice" });
+    });
+  });
+
+  describe("when both flat variable keys and JSON blob are present", () => {
+    it("merges them, with flat keys winning on collision", () => {
+      const attrs = {
+        "langwatch.prompt.id": "customer-support-v2",
+        "langwatch.prompt.variables":
+          '{"type":"json","value":{"customer_name":"Bob","topic":"AI"}}',
+        "langwatch.prompt.variables.customer_name": "Alice",
+      };
+      const result = parsePromptReference(attrs);
+      expect(result.promptVariables).toEqual({
+        customer_name: "Alice",
+        topic: "AI",
+      });
+    });
+  });
+
+  describe("end-to-end flat shape", () => {
+    it("parses the proposed canonical SDK emission shape", () => {
+      const attrs = {
+        "langwatch.prompt.id": "customer-support-v2",
+        "langwatch.prompt.version.id": "ver-abc123",
+        "langwatch.prompt.variables.customer_name": "Alice",
+        "langwatch.prompt.variables.issue": "billing discrepancy",
+      };
+      expect(parsePromptReference(attrs)).toEqual({
+        promptHandle: "customer-support-v2",
+        promptVersionNumber: null,
+        promptVersionId: "ver-abc123",
+        promptTag: null,
+        promptVariables: {
+          customer_name: "Alice",
+          issue: "billing discrepancy",
+        },
+      });
     });
   });
 });

@@ -52,7 +52,7 @@ export function ExportConfigDialog({
 
   return (
     <Dialog.Root open={isOpen} onOpenChange={({ open }) => !open && onClose()}>
-      <Dialog.Content>
+      <Dialog.Content bg="bg">
         <Dialog.CloseTrigger />
         <Dialog.Header>
           <Dialog.Title>Export Traces</Dialog.Title>

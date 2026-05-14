@@ -15,6 +15,7 @@ export interface EvaluationProcessingPipelineDeps {
   evalRunStore: FoldProjectionStore<EvaluationRunData>;
   executeEvaluationCommand: ExecuteEvaluationCommand;
   esSyncReactor: ReactorDefinition<EvaluationProcessingEvent, EvaluationRunData>;
+  evaluationAlertTriggerReactor: ReactorDefinition<EvaluationProcessingEvent, EvaluationRunData>;
   customerIoEvaluationSyncReactor?: ReactorDefinition<EvaluationProcessingEvent, EvaluationRunData>;
 }
 
@@ -37,7 +38,8 @@ export function createEvaluationProcessingPipeline(deps: EvaluationProcessingPip
     .withFoldProjection("evaluationRun", new EvaluationRunFoldProjection({
       store: deps.evalRunStore,
     }))
-    .withReactor("evaluationRun", "evaluationEsSync", deps.esSyncReactor);
+    .withReactor("evaluationRun", "evaluationEsSync", deps.esSyncReactor)
+    .withReactor("evaluationRun", "evaluationAlertTrigger", deps.evaluationAlertTriggerReactor);
 
   if (deps.customerIoEvaluationSyncReactor) {
     builder = builder.withReactor(

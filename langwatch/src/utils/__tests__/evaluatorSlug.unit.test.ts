@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { generateEvaluatorSlug, isValidEvaluatorSlug } from "../evaluatorSlug";
 
 describe("generateEvaluatorSlug", () => {
+  /** @scenario Generate slug from evaluator name on creation */
   it("should generate slug from simple name with format name-XXXXX", () => {
     const slug = generateEvaluatorSlug("My Custom Evaluator");
     expect(slug).toMatch(/^my-custom-evaluator-[a-z0-9]{5}$/);
@@ -12,6 +13,7 @@ describe("generateEvaluatorSlug", () => {
     expect(slug).toMatch(/^safety-[a-z0-9]{5}$/);
   });
 
+  /** @scenario Handle special characters in name */
   it("should handle names with special characters", () => {
     const slug = generateEvaluatorSlug("LLM Judge (v2.0) - Beta!");
     // slugify with strict: true removes special chars (dots are removed, not converted)
@@ -50,18 +52,21 @@ describe("generateEvaluatorSlug", () => {
     expect(slug).toMatch(/^trimmed-name-[a-z0-9]{5}$/);
   });
 
+  /** @scenario Handle empty or whitespace-only names */
   it("should throw error for empty name", () => {
     expect(() => generateEvaluatorSlug("")).toThrow(
       "Evaluator name cannot be empty",
     );
   });
 
+  /** @scenario Handle empty or whitespace-only names */
   it("should throw error for whitespace-only name", () => {
     expect(() => generateEvaluatorSlug("   ")).toThrow(
       "Evaluator name cannot be empty",
     );
   });
 
+  /** @scenario Handle very long names */
   it("should truncate very long names", () => {
     const longName = "A".repeat(100);
     const slug = generateEvaluatorSlug(longName);
@@ -94,6 +99,7 @@ describe("generateEvaluatorSlug", () => {
     expect(parts[parts.length - 1]).toHaveLength(5);
   });
 
+  /** @scenario Slug uniqueness within project */
   it("should generate unique slugs for same name", () => {
     const slug1 = generateEvaluatorSlug("Same Name");
     const slug2 = generateEvaluatorSlug("Same Name");
@@ -104,6 +110,41 @@ describe("generateEvaluatorSlug", () => {
 
     // But full slugs should be different due to nanoid
     expect(slug1).not.toBe(slug2);
+  });
+
+  /** @scenario Same name allowed in different projects */
+  it("generates slugs that share the same base for the same name (project-independent)", () => {
+    // generateEvaluatorSlug is project-agnostic — it's the *uniqueness* of the
+    // resulting slug (per the random nanoid suffix) that lets two evaluators
+    // with the same name coexist across projects without collision. Two calls
+    // with identical input produce slugs with the same prefix but different
+    // suffixes, so two projects creating "Same Name" each get a valid,
+    // distinct slug.
+    const slugProj1 = generateEvaluatorSlug("Exact Match");
+    const slugProj2 = generateEvaluatorSlug("Exact Match");
+
+    expect(slugProj1.startsWith("exact-match-")).toBe(true);
+    expect(slugProj2.startsWith("exact-match-")).toBe(true);
+    expect(slugProj1).not.toBe(slugProj2);
+  });
+
+  /** @scenario Handle unicode characters in name */
+  it("removes or transliterates unicode characters in the name", () => {
+    // slugify (strict mode) strips non-ASCII, leaving the latin parts.
+    const slug = generateEvaluatorSlug("Säfety チェック");
+    expect(slug).toMatch(/^[a-z0-9-]+-[a-z0-9]{5}$/);
+  });
+
+  /** @scenario Retry on unique constraint violation */
+  it("produces a different slug on the next call when given the same name", () => {
+    // The repository retries on unique-constraint violation by re-invoking
+    // generateEvaluatorSlug (see EvaluatorRepository.create). This test
+    // pins the contract that re-invocation yields a different slug, which
+    // is what makes that retry path eventually converge.
+    const first = generateEvaluatorSlug("Conflict");
+    const second = generateEvaluatorSlug("Conflict");
+    const third = generateEvaluatorSlug("Conflict");
+    expect(new Set([first, second, third]).size).toBe(3);
   });
 });
 

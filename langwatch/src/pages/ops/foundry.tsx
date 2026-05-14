@@ -6,6 +6,8 @@ import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { OpsPageShell } from "~/components/ops/shared/OpsPageShell";
 import { PlaygroundContent } from "~/components/ops/foundry/PlaygroundContent";
 import { PresetPicker } from "~/components/ops/foundry/PresetPicker";
+import { GenerateTraceDialog } from "~/components/ops/foundry/GenerateTraceDialog";
+import { GenerateConversationDialog } from "~/components/ops/foundry/GenerateConversationDialog";
 import { useTraceStore } from "~/components/ops/foundry/traceStore";
 
 const SPLASH_LINES = [
@@ -52,6 +54,8 @@ export default function OpsFoundryPage() {
           <Flex align="center" justify="space-between" w="full">
             <PageLayout.Heading>The Foundry</PageLayout.Heading>
             <HStack gap={2}>
+              <GenerateConversationDialog />
+              <GenerateTraceDialog />
               <PresetPicker />
               <Button size="xs" variant="outline" onClick={resetTrace}>
                 <RotateCcw size={14} />

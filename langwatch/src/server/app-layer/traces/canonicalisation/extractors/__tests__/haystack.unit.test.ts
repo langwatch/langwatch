@@ -46,9 +46,7 @@ describe("HaystackExtractor", () => {
     });
 
     it("extracts document_id when present", () => {
-      const docs = [
-        { document: { content: "Content", id: "my-doc-id" } },
-      ];
+      const docs = [{ document: { content: "Content", id: "my-doc-id" } }];
       const ctx = createExtractorContext(
         { [ATTR_KEYS.RETRIEVAL_DOCUMENTS]: JSON.stringify(docs) },
         haystackScope,
@@ -76,9 +74,7 @@ describe("HaystackExtractor", () => {
 
       extractor.apply(ctx);
 
-      const contexts = ctx.out[
-        ATTR_KEYS.LANGWATCH_RAG_CONTEXTS
-      ] as unknown[];
+      const contexts = ctx.out[ATTR_KEYS.LANGWATCH_RAG_CONTEXTS] as unknown[];
       expect(contexts).toHaveLength(1);
       expect(contexts[0]).toEqual({ content: "Valid" });
     });

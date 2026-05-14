@@ -3,7 +3,7 @@ import { useRouter } from "~/utils/compat/next-router";
 import numeral from "numeral";
 import { useEffect, useMemo } from "react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
+import { useSpanTreeLoader } from "../../hooks/useSpanTreeLoader";
 import { useTraceUpdateListener } from "../../hooks/useTraceUpdateListener";
 import type { Span } from "../../server/tracer/types";
 
@@ -43,9 +43,10 @@ function buildTree(spans: Span[]): Record<string, SpanWithChildren> {
 interface SpanNodeProps {
   span: SpanWithChildren;
   level: number;
+  isNew?: boolean;
 }
 
-const SpanNode: React.FC<SpanNodeProps> = ({ span, level }) => {
+const SpanNode: React.FC<SpanNodeProps> = ({ span, level, isNew }) => {
   const router = useRouter();
   const currentSpanId =
     typeof router.query.span === "string" ? router.query.span : undefined;
@@ -76,6 +77,13 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level }) => {
       gap={2}
       marginLeft={level == 0 ? "0" : level == 1 ? "10px" : "26px"}
       position="relative"
+      css={isNew ? {
+        "@keyframes spanFadeIn": {
+          from: { opacity: 0, transform: "translateX(-8px)" },
+          to: { opacity: 1, transform: "translateX(0)" },
+        },
+        animation: "spanFadeIn 0.3s ease-out",
+      } : undefined}
     >
       <Box
         zIndex={1}
@@ -113,12 +121,19 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level }) => {
         paddingX={level > 0 ? 8 : 4}
         paddingRight={4}
         borderRadius={6}
-        background={span.span_id === currentSpanId ? "bg.muted" : undefined}
+        background={
+          isNew
+            ? "orange.subtle"
+            : span.span_id === currentSpanId
+              ? "bg.muted"
+              : undefined
+        }
         _hover={{
           background: "bg.muted",
         }}
         cursor="pointer"
         role="button"
+        transition="background 0.6s ease-out"
         onClick={() => {
           void router.replace(
             {
@@ -149,7 +164,7 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level }) => {
           <HStack>
             <HoverableBigText
               color={!span.name && !("model" in span) ? "gray.400" : undefined}
-              maxWidth="180px"
+              maxWidth="300px"
               lineClamp={1}
               expandable={false}
             >
@@ -220,13 +235,21 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level }) => {
         </VStack>
       </HStack>
       {span.children.map((childSpan) => (
-        <SpanNode key={childSpan.span_id} span={childSpan} level={level + 1} />
+        <SpanNode
+          key={childSpan.span_id}
+          span={childSpan}
+          level={level + 1}
+          isNew={isNew}
+        />
       ))}
     </VStack>
   );
 };
 
-const TreeRenderer: React.FC<{ spans: Span[] }> = ({ spans }) => {
+const TreeRenderer: React.FC<{
+  spans: Span[];
+  newSpanIds: Set<string>;
+}> = ({ spans, newSpanIds }) => {
   const tree = buildTree(spans);
 
   const spansById = spans.reduce(
@@ -245,7 +268,14 @@ const TreeRenderer: React.FC<{ spans: Span[] }> = ({ spans }) => {
       {rootSpans.map((rootSpan) => {
         const span = tree[rootSpan.span_id];
         if (!span) return null;
-        return <SpanNode key={rootSpan.span_id} span={span} level={0} />;
+        return (
+          <SpanNode
+            key={rootSpan.span_id}
+            span={span}
+            level={0}
+            isNew={newSpanIds.has(rootSpan.span_id)}
+          />
+        );
       })}
     </VStack>
   );
@@ -262,44 +292,42 @@ type SpanTreeProps = {
 };
 
 export function SpanTree(props: SpanTreeProps) {
-  const { traceId, spanId, trace } = useTraceDetailsState(props.traceId);
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
+  const spanId =
+    typeof router.query.span === "string" ? router.query.span : undefined;
 
-  // Use spans from trace.data directly — avoids a duplicate ClickHouse query.
-  // traces.getById already fetches spans via getTracesWithSpans.
-  const sortedSpans = useMemo(() => {
-    if (!trace.data?.spans) return undefined;
-    return [...trace.data.spans].sort((a, b) => {
-      const startDiff =
-        (a.timestamps?.started_at ?? 0) - (b.timestamps?.started_at ?? 0);
-      if (startDiff === 0) {
-        return (
-          (b.timestamps?.finished_at ?? 0) - (a.timestamps?.finished_at ?? 0)
-        );
-      }
-      return startDiff;
-    });
-  }, [trace.data?.spans]);
+  const loader = useSpanTreeLoader({
+    projectId: project?.id ?? "",
+    traceId: props.traceId,
+    enabled: !!project && !!props.traceId,
+  });
 
   useTraceUpdateListener({
     projectId: project?.id ?? "",
-    traceId,
-    onSpanStored: (_traceIds) => void trace.refetch(),
-    onTraceSummaryUpdated: (_traceIds) => void trace.refetch(),
-    enabled: !!project && !!traceId,
+    traceId: props.traceId,
+    onSpanStored: () => void loader.onSpanStored(),
+    onTraceSummaryUpdated: () => void loader.onSpanStored(),
+    enabled: !!project && !!props.traceId,
+    debounceMs: 300,
+    maxWaitMs: 500,
   });
 
-  const span = spanId
-    ? sortedSpans?.find((span) => span.span_id === spanId)
-    : sortedSpans?.[0];
+  const sortedSpans = loader.spans;
+
+  const span = useMemo(() => {
+    if (!sortedSpans.length) return undefined;
+    return spanId
+      ? sortedSpans.find((s) => s.span_id === spanId)
+      : sortedSpans[0];
+  }, [sortedSpans, spanId]);
 
   useEffect(() => {
     if (
       (!spanId || spanId !== span?.span_id) &&
       project &&
-      traceId &&
-      sortedSpans &&
+      props.traceId &&
+      sortedSpans.length > 0 &&
       sortedSpans[0]
     ) {
       void router.replace(
@@ -313,32 +341,50 @@ export function SpanTree(props: SpanTreeProps) {
         { shallow: true },
       );
     }
-  }, [project, router, span?.span_id, spanId, sortedSpans, traceId]);
+  }, [project, router, span?.span_id, spanId, sortedSpans, props.traceId]);
 
-  if (!trace.data) {
+  if (loader.isLoading) {
     return null;
   }
 
   return (
     <VStack width="full">
-      {sortedSpans ? (
-        <HStack
-          align="start"
-          width="full"
-          gap={10}
-          paddingX={6}
-          flexDirection={{ base: "column", xl: "row" }}
-        >
-          <TreeRenderer spans={sortedSpans} />
-          {project && span && (
-            <SpanDetails
-              project={project}
-              span={span}
-              allSpans={sortedSpans}
-            />
+      {sortedSpans.length > 0 ? (
+        <>
+          {loader.isBackfilling && (
+            <HStack
+              width="full"
+              paddingX={6}
+              paddingY={1}
+              fontSize="13px"
+              color="fg.muted"
+            >
+              <Text>
+                Loading spans: {loader.loadedCount} / {loader.total}
+              </Text>
+            </HStack>
           )}
-        </HStack>
-      ) : trace.isError ? (
+          <HStack
+            align="start"
+            width="full"
+            gap={10}
+            paddingX={6}
+            flexDirection={{ base: "column", xl: "row" }}
+          >
+            <TreeRenderer
+              spans={sortedSpans}
+              newSpanIds={loader.newSpanIds}
+            />
+            {project && span && (
+              <SpanDetails
+                project={project}
+                span={span}
+                allSpans={sortedSpans}
+              />
+            )}
+          </HStack>
+        </>
+      ) : loader.error ? (
         <Alert.Root status="error">
           <Alert.Indicator />
           <Alert.Content>

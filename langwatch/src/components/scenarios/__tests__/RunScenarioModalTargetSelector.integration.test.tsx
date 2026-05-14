@@ -110,6 +110,7 @@ describe("RunScenarioModal with TargetSelector", () => {
   }
 
   describe("when selecting a prompt from the dropdown", () => {
+    /** @scenario "Selecting a prompt keeps the modal open" */
     it("keeps the modal open and shows the selected prompt", async () => {
       renderModal();
       await openDropdown();
@@ -132,6 +133,8 @@ describe("RunScenarioModal with TargetSelector", () => {
   });
 
   describe("when selecting an agent from the dropdown", () => {
+    /** @scenario "Selecting an agent keeps the modal open" */
+    /** @scenario Selecting an agent preserves its type */
     it("keeps the modal open and shows the selected agent", async () => {
       renderModal();
       await openDropdown();
@@ -152,6 +155,7 @@ describe("RunScenarioModal with TargetSelector", () => {
   });
 
   describe("when clicking inside the modal but outside the dropdown", () => {
+    /** @scenario "Clicking outside the dropdown closes only the dropdown" */
     it("closes the dropdown but keeps the modal open", async () => {
       renderModal();
       await openDropdown();
@@ -177,6 +181,7 @@ describe("RunScenarioModal with TargetSelector", () => {
   // fix is scoped to the dropdown container and cannot affect backdrop behavior.
 
   describe("when completing the full run flow after selecting a target", () => {
+    /** @scenario "Completing the full run flow after selecting a target" */
     it("initiates the scenario run with the selected target", async () => {
       renderModal();
       await openDropdown();

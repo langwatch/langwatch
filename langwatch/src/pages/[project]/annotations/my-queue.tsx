@@ -87,7 +87,7 @@ export default function TraceAnnotations() {
           height="100%"
           width="full"
           justify="center"
-          backgroundColor="gray.100"
+          backgroundColor="bg.muted"
           marginTop="-48px"
         >
           <TasksDone />
@@ -130,7 +130,7 @@ export default function TraceAnnotations() {
             left={0}
             right={0}
             width="full"
-            backgroundColor="white"
+            backgroundColor="bg.panel"
             borderTop="1px solid"
             borderColor="border"
             zIndex={10}
@@ -202,7 +202,7 @@ const AnnotationQueuePicker = ({
 
   return (
     <Box
-      boxShadow="0px -3px 10px rgba(0, 0, 0, 0.05)"
+      shadow="md"
       padding={5}
       width="full"
       position="relative"
@@ -214,7 +214,7 @@ const AnnotationQueuePicker = ({
           left={0}
           right={0}
           bottom={0}
-          backgroundColor="whiteAlpha.800"
+          backgroundColor="bg.panel/80"
           zIndex={20}
           display="flex"
           alignItems="center"

@@ -83,6 +83,8 @@ describe("LicenseEnforcementRepository", () => {
   });
 
   describe("getWorkflowCount", () => {
+    /** @scenario Counts workflows across all projects in organization */
+    /** @scenario Counts only non-archived workflows toward limit */
     it("queries workflows with organization filter and archivedAt null", async () => {
       mockPrisma.workflow.count.mockResolvedValue(5);
 
@@ -107,6 +109,7 @@ describe("LicenseEnforcementRepository", () => {
   });
 
   describe("getPromptCount", () => {
+    /** @scenario Counts prompts across all projects in organization */
     it("queries prompts with organization filter and deletedAt null", async () => {
       mockPrisma.llmPromptConfig.count.mockResolvedValue(10);
 
@@ -128,6 +131,8 @@ describe("LicenseEnforcementRepository", () => {
   });
 
   describe("getEvaluatorCount", () => {
+    /** @scenario Counts evaluators across all projects in organization */
+    /** @scenario Counts only non-archived evaluators toward limit */
     it("queries evaluators with organization filter and archivedAt null", async () => {
       mockPrisma.evaluator.count.mockResolvedValue(3);
 
@@ -152,6 +157,7 @@ describe("LicenseEnforcementRepository", () => {
   });
 
   describe("getActiveScenarioCount", () => {
+    /** @scenario Counts scenarios across all projects in organization */
     it("queries only active (non-archived) scenarios with organization filter", async () => {
       mockPrisma.scenario.count.mockResolvedValue(7);
 
@@ -173,13 +179,15 @@ describe("LicenseEnforcementRepository", () => {
   });
 
   describe("getProjectCount", () => {
-    it("queries projects with organization filter", async () => {
+    /** @scenario Counts projects across all teams */
+    /** @scenario Counts only non-archived projects toward limit */
+    it("queries non-archived projects with organization filter that traverses every team", async () => {
       mockPrisma.project.count.mockResolvedValue(4);
 
       const result = await repository.getProjectCount(organizationId);
 
       expect(mockPrisma.project.count).toHaveBeenCalledWith({
-        where: { team: { organizationId } },
+        where: { team: { organizationId }, archivedAt: null },
       });
       expect(result).toBe(4);
     });
@@ -252,6 +260,7 @@ describe("LicenseEnforcementRepository", () => {
       expect(result).toBe(0);
     });
 
+    /** @scenario Pending invites count toward total member limit */
     it("counts pending invites with ADMIN role as full members", async () => {
       mockPrisma.organizationUser.findMany.mockResolvedValue([]);
       mockPrisma.team.findMany.mockResolvedValue([]);
@@ -284,6 +293,7 @@ describe("LicenseEnforcementRepository", () => {
       expect(result).toBe(1);
     });
 
+    /** @scenario Pending invite with non-view custom role counts as Full Member */
     it("counts pending invites with non-view custom role as full members", async () => {
       mockPrisma.organizationUser.findMany.mockResolvedValue([]);
       mockPrisma.team.findMany.mockResolvedValue([]);
@@ -303,6 +313,7 @@ describe("LicenseEnforcementRepository", () => {
       expect(result).toBe(1);
     });
 
+    /** @scenario Pending invite with view-only custom role counts as Lite Member */
     it("does not count pending invites with view-only custom role as full members", async () => {
       mockPrisma.organizationUser.findMany.mockResolvedValue([]);
       mockPrisma.team.findMany.mockResolvedValue([]);
@@ -322,6 +333,8 @@ describe("LicenseEnforcementRepository", () => {
       expect(result).toBe(0);
     });
 
+    /** @scenario Expired invites do not count toward member limit */
+    /** @scenario Only non-expired pending invites count toward limit */
     it("does not count expired invites", async () => {
       mockPrisma.organizationUser.findMany.mockResolvedValue([]);
       mockPrisma.team.findMany.mockResolvedValue([]);
@@ -387,6 +400,7 @@ describe("LicenseEnforcementRepository", () => {
       vi.useRealTimers();
     });
 
+    /** @scenario Lite Member users are counted separately from full members */
     it("counts EXTERNAL users without custom role as Lite Member", async () => {
       mockPrisma.organizationUser.findMany.mockResolvedValue([
         { userId: "u1", role: OrganizationUserRole.EXTERNAL },
@@ -576,6 +590,8 @@ describe("LicenseEnforcementRepository", () => {
   });
 
   describe("getAgentCount", () => {
+    /** @scenario Counts agents across all projects in organization */
+    /** @scenario Counts only non-archived agents toward limit */
     it("fetches project IDs then counts agents with projectId filter", async () => {
       mockPrisma.project.findMany.mockResolvedValue([
         { id: "proj-1" },
@@ -618,6 +634,7 @@ describe("LicenseEnforcementRepository", () => {
   });
 
   describe("getExperimentCount", () => {
+    /** @scenario Counts experiments across all projects in organization */
     it("excludes real_time experiments from count", async () => {
       mockPrisma.project.findMany.mockResolvedValue([
         { id: "proj-1" },
@@ -684,6 +701,7 @@ describe("LicenseEnforcementRepository", () => {
       expect(call?.where).toHaveProperty("archivedAt", null);
     });
 
+    /** @scenario Counts only non-archived agents toward limit */
     it("agent query excludes archived agents", async () => {
       mockPrisma.project.findMany.mockResolvedValue([{ id: "proj-1" }]);
       await repository.getAgentCount(organizationId);

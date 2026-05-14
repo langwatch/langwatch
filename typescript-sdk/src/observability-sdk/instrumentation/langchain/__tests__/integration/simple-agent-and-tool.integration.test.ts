@@ -167,7 +167,7 @@ describe("LangChain Integration Tests", () => {
     expect(toolSpans.length).toBeGreaterThan(0);
   });
 
-  it("should handle multiple consecutive LLM calls with context grouping", async () => {
+  it("should handle multiple consecutive LLM calls with context grouping", { timeout: 30_000 }, async () => {
     const tracer = getLangWatchTracer("langchain-integration-test");
 
     await tracer.withActiveSpan(

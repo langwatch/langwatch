@@ -3,12 +3,15 @@ import { PromptScope } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
 import type { VersionedPrompt } from "~/server/prompt-config";
 import {
+  formValuesToTriggerSaveVersionParams,
   nodeDataToLocalPromptConfig,
   promptConfigFormValuesToOptimizationStudioNodeData,
   safeOptimizationStudioNodeDataToPromptConfigFormInitialValues,
   versionedPromptToPromptConfigFormValues,
   versionedPromptToPromptConfigFormValuesWithSystemMessage,
 } from "../llmPromptConfigUtils";
+import { buildDefaultFormValues } from "../buildDefaultFormValues";
+import { formSchema } from "~/prompts/schemas/form-schema";
 
 describe("safeOptimizationStudioNodeDataToPromptConfigFormInitialValues", () => {
   describe("when LLM value is an object", () => {
@@ -370,6 +373,30 @@ describe("versionedPromptToPromptConfigFormValues", () => {
       expect(result.handle).toBeNull();
     });
   });
+
+  describe("when prompt has reasoning set", () => {
+    /** @scenario "versionedPromptToPromptConfigFormValues maps reasoning correctly" */
+    it("maps reasoning 'high' onto form values llm.reasoning", () => {
+      const prompt = createMockPrompt("test-prompt");
+      prompt.reasoning = "high";
+
+      const result = versionedPromptToPromptConfigFormValues(prompt);
+
+      expect(result.version.configData.llm.reasoning).toBe("high");
+    });
+  });
+
+  describe("when prompt has no reasoning", () => {
+    /** @scenario "versionedPromptToPromptConfigFormValues handles missing reasoning" */
+    it("leaves form values llm.reasoning undefined", () => {
+      const prompt = createMockPrompt("test-prompt");
+      // reasoning intentionally not set
+
+      const result = versionedPromptToPromptConfigFormValues(prompt);
+
+      expect(result.version.configData.llm.reasoning).toBeUndefined();
+    });
+  });
 });
 
 describe("versionedPromptToPromptConfigFormValuesWithSystemMessage", () => {
@@ -708,6 +735,75 @@ describe("nodeDataToLocalPromptConfig()", () => {
 
       expect(result).not.toBeUndefined();
       expect(result!.messages).toEqual([{ role: "system", content: "" }]);
+    });
+  });
+});
+
+describe("formValuesToTriggerSaveVersionParams", () => {
+  describe("when form values include reasoning", () => {
+    /** @scenario "formValuesToTriggerSaveVersionParams includes reasoning" */
+    it("propagates reasoning 'high' and omits legacy provider-specific fields", () => {
+      const formValues = buildDefaultFormValues({
+        version: { configData: { llm: { reasoning: "high" } } },
+      });
+
+      const result = formValuesToTriggerSaveVersionParams(formValues);
+
+      expect(result.reasoning).toBe("high");
+      // Unified field is the canonical sink; legacy provider-specific
+      // names must not leak through.
+      expect(result).not.toHaveProperty("reasoningEffort");
+      expect(result).not.toHaveProperty("thinkingLevel");
+      expect(result).not.toHaveProperty("effort");
+    });
+  });
+
+  describe("when form values omit reasoning", () => {
+    /** @scenario "formValuesToTriggerSaveVersionParams handles undefined reasoning" */
+    it("returns reasoning undefined and no legacy fields", () => {
+      const formValues = buildDefaultFormValues();
+
+      const result = formValuesToTriggerSaveVersionParams(formValues);
+
+      expect(result.reasoning).toBeUndefined();
+      expect(result).not.toHaveProperty("reasoningEffort");
+    });
+  });
+});
+
+describe("formSchema reasoning validation", () => {
+  describe("when llm.reasoning is set to a valid value", () => {
+    /** @scenario "Form schema accepts reasoning field with valid value" */
+    it("accepts 'high'", () => {
+      const values = buildDefaultFormValues({
+        version: { configData: { llm: { reasoning: "high" } } },
+      });
+      expect(formSchema.safeParse(values).success).toBe(true);
+    });
+
+    /** @scenario Form schema accepts reasoning field with "low" value */
+    it("accepts 'low'", () => {
+      const values = buildDefaultFormValues({
+        version: { configData: { llm: { reasoning: "low" } } },
+      });
+      expect(formSchema.safeParse(values).success).toBe(true);
+    });
+
+    /** @scenario Form schema accepts reasoning field with "medium" value */
+    it("accepts 'medium'", () => {
+      const values = buildDefaultFormValues({
+        version: { configData: { llm: { reasoning: "medium" } } },
+      });
+      expect(formSchema.safeParse(values).success).toBe(true);
+    });
+  });
+
+  describe("when llm.reasoning is not set", () => {
+    /** @scenario "Form schema accepts undefined reasoning" */
+    it("accepts undefined reasoning", () => {
+      const values = buildDefaultFormValues();
+      expect(formSchema.safeParse(values).success).toBe(true);
+      expect(values.version.configData.llm.reasoning).toBeUndefined();
     });
   });
 });

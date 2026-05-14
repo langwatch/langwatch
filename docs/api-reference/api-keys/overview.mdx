@@ -1,0 +1,59 @@
+---
+title: 'Overview'
+description: 'Create and manage API keys programmatically. Supports personal keys (user-scoped) and service keys (project-scoped, for automation).'
+---
+
+## Intro
+
+The API Keys API lets you create, list, and revoke API keys for your organization. Two key types are supported:
+
+- **Personal keys** — tied to a user, inherit the user's RBAC permissions
+- **Service keys** — no user association, scoped to specific projects with ADMIN access. Ideal for CI/CD, scaffolding tools, and service-to-service integrations
+
+## Authentication
+
+Requires an **organization-level API key** with `organization:manage` permission. Pass it as a Bearer token:
+
+```
+Authorization: Bearer sk-lw-<id>_<secret>
+```
+
+## Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/api-keys` | List all API keys in the organization |
+| `POST` | `/api/api-keys` | Create a new API key |
+| `DELETE` | `/api/api-keys/{id}` | Revoke an API key |
+
+## Key Types
+
+### Personal Keys
+
+Created for a specific user. The key's effective permissions are the intersection of the key's bindings and the user's own role bindings (the "ceiling" model).
+
+```json
+{
+  "keyType": "personal",
+  "name": "My dev key",
+  "bindings": [
+    { "role": "ADMIN", "scopeType": "ORGANIZATION", "scopeId": "<orgId>" }
+  ]
+}
+```
+
+### Service Keys
+
+Created without a user association (`userId: null`). Scoped to specific projects via `projectIds`. Each project gets an ADMIN binding automatically.
+
+```json
+{
+  "keyType": "service",
+  "name": "CI pipeline key",
+  "projectIds": ["project_abc123", "project_def456"]
+}
+```
+
+<Info>
+Service keys without `projectIds` get org-wide ADMIN access. Always scope to specific projects when possible.
+</Info>

@@ -3,6 +3,13 @@ Feature: Provider Deletion
   I want to delete providers I no longer need
   So that I can keep my configuration clean
 
+  # All scenarios describe the delete-confirmation dialog UI (menu trigger,
+  # blocking-reasons list when default models bind the provider). Need a
+  # JSDOM render of `DeleteProviderDialog` + integration test against
+  # `modelProviderService.deleteModelProvider`. The scope-based delete
+  # authz is already covered in `modelProvider.authz.integration.test.ts`.
+  # Aspirational pending the delete-dialog harness.
+
   Background:
     Given I am logged in
     And I have access to a project

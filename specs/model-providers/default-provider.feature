@@ -3,6 +3,13 @@ Feature: Default Provider Settings
   I want to set a provider as the default for LangWatch features
   So that operations use my preferred provider automatically
 
+  # All scenarios describe the "Default Model" section of the model provider
+  # drawer (toggle + three model selectors). Need a JSDOM render of
+  # `DefaultModelSelectors` + integration test against project settings update.
+  # The behind-the-scenes resolution (which provider gets used when defaultModel
+  # is null) is already covered by `utils.unit.test.ts` (`getVercelAIModel`).
+  # Aspirational pending the default-model UI harness.
+
   Background:
     Given I am logged in
     And I have access to a project
@@ -78,22 +85,6 @@ Feature: Default Provider Settings
     Then the "Use openai as the default" toggle is checked
     And the toggle is disabled
     And a tooltip explains this is the only enabled provider
-
-  @integration @unimplemented
-  Scenario: Show "Default Model" badge when default model belongs to provider
-    Given I have "openai" provider enabled
-    And the project's default model is "openai/gpt-4o"
-    When I navigate to the Model Providers settings page
-    Then I see the "openai" provider in the list
-    And the "openai" provider row shows a "Default Model" badge
-
-  @integration @unimplemented
-  Scenario: Hide "Default Model" badge when default model does not belong to provider
-    Given I have "openai" provider enabled
-    And the project's default model is "anthropic/claude-sonnet-4"
-    When I navigate to the Model Providers settings page
-    Then I see the "openai" provider in the list
-    And the "openai" provider row does not show a "Default Model" badge
 
   @integration @unimplemented
   Scenario: Include custom models in model selector options

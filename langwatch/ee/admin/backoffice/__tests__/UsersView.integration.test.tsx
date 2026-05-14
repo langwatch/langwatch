@@ -54,6 +54,7 @@ describe("Feature: Backoffice User Impersonation Reason", () => {
   });
 
   describe("given the ops admin has opened the impersonation dialog", () => {
+    /** @scenario Impersonation dialog asks for a single-line reason */
     it("shows a single-line reason field", () => {
       render(<ImpersonateDialog user={user} onClose={vi.fn()} />, {
         wrapper: Wrapper,
@@ -65,6 +66,7 @@ describe("Feature: Backoffice User Impersonation Reason", () => {
       expect(reason.tagName).toBe("INPUT");
     });
 
+    /** @scenario Enter submits a completed impersonation reason */
     it("submits the reason when Enter is pressed", async () => {
       const testingUser = userEvent.setup();
       render(<ImpersonateDialog user={user} onClose={vi.fn()} />, {
@@ -85,6 +87,7 @@ describe("Feature: Backoffice User Impersonation Reason", () => {
       });
     });
 
+    /** @scenario Empty reason still blocks impersonation */
     it("keeps blocking empty reasons when Enter is pressed", async () => {
       render(<ImpersonateDialog user={user} onClose={vi.fn()} />, {
         wrapper: Wrapper,

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildMetadataFieldChildren,
   buildSpanFieldChildren,
+  coerceMonitorMappings,
   extractTracesFields,
   getThreadAvailableSources,
   getTraceAvailableSources,
@@ -10,6 +11,7 @@ import {
   SPAN_SUBFIELDS,
   THREAD_MAPPINGS,
   TRACE_MAPPINGS,
+  tryAndConvertTo,
 } from "../tracesMapping";
 import { formatSpansDigest } from "../spanToReadableSpan";
 
@@ -389,6 +391,8 @@ describe("THREAD_MAPPINGS", () => {
 });
 
 describe("formatSpansDigest", () => {
+  /** @scenario Formatted trace produces a span hierarchy digest */
+  /** @scenario Formatted trace includes inputs and outputs */
   it("produces a string digest from spans", async () => {
     const spans = [
       {
@@ -438,6 +442,7 @@ describe("formatSpansDigest", () => {
     expect(result).toBe("No spans recorded.");
   });
 
+  /** @scenario Formatted trace includes errors */
   it("includes error information in the digest", async () => {
     const spans = [
       {
@@ -465,6 +470,7 @@ describe("formatSpansDigest", () => {
     expect(result).toContain("ERROR");
   });
 
+  /** @scenario Thread-level formatted traces joins multiple traces */
   it("joins multiple trace digests with separator for thread use", async () => {
     const trace1Spans = [
       {
@@ -509,6 +515,7 @@ describe("formatSpansDigest", () => {
 });
 
 describe("getTraceAvailableSources", () => {
+  /** @scenario Trace-level formatted trace source is available */
   it("includes formatted_trace with label 'Full Trace (AI-Readable)'", () => {
     const sources = getTraceAvailableSources([], []);
     const traceSource = sources[0]!;
@@ -830,6 +837,102 @@ describe("mappingStateSchema", () => {
       const result = mappingStateSchema.parse(input);
 
       expect(result.mapping.my_column).toHaveProperty("source", "input");
+    });
+  });
+});
+
+describe("tryAndConvertTo", () => {
+  describe("when given an OTel typed-object wrapper", () => {
+    it("returns the bare value when the wrapper type is 'text'", () => {
+      // Bug: currently returns '{"type":"text","value":"stockout"}' instead of "stockout"
+      expect(tryAndConvertTo({ type: "text", value: "stockout" }, "string")).toBe(
+        "stockout",
+      );
+    });
+
+    it("returns the bare value stringified when the wrapper type is 'json' and value is a number", () => {
+      // Any `type` discriminator should trigger unwrap
+      expect(tryAndConvertTo({ type: "json", value: 42 }, "string")).toBe("42");
+    });
+  });
+
+  describe("when given an array of OTel typed-object wrappers", () => {
+    it("unwraps each element and returns a string array", () => {
+      expect(
+        tryAndConvertTo(
+          [
+            { type: "text", value: "a" },
+            { type: "text", value: "b" },
+          ],
+          "string[]",
+        ),
+      ).toEqual(["a", "b"]);
+    });
+  });
+
+  describe("when given a plain object that is not a typed-object wrapper", () => {
+    it("stringifies the object as JSON", () => {
+      // Guard: non-wrapper objects must NOT be unwrapped
+      expect(tryAndConvertTo({ foo: "bar" }, "string")).toBe('{"foo":"bar"}');
+    });
+  });
+
+  describe("when given a bare string", () => {
+    it("returns the string unchanged", () => {
+      expect(tryAndConvertTo("stockout", "string")).toBe("stockout");
+    });
+  });
+
+  describe("when given null", () => {
+    it("returns undefined", () => {
+      expect(tryAndConvertTo(null, "string")).toBeUndefined();
+    });
+  });
+
+  describe("when given undefined", () => {
+    it("returns undefined", () => {
+      expect(tryAndConvertTo(undefined, "string")).toBeUndefined();
+    });
+  });
+});
+
+describe("coerceMonitorMappings (runtime write-path coercion for non-Zod callers)", () => {
+  describe("when value is null", () => {
+    it("coerces to canonical empty MappingState", () => {
+      expect(coerceMonitorMappings(null)).toEqual({
+        mapping: {},
+        expansions: [],
+      });
+    });
+  });
+
+  describe("when value is undefined", () => {
+    it("coerces to canonical empty MappingState", () => {
+      expect(coerceMonitorMappings(undefined)).toEqual({
+        mapping: {},
+        expansions: [],
+      });
+    });
+  });
+
+  describe("when value is the legacy `{}` shape that caused issue #3875", () => {
+    it("coerces to canonical empty MappingState", () => {
+      expect(coerceMonitorMappings({})).toEqual({
+        mapping: {},
+        expansions: [],
+      });
+    });
+  });
+
+  describe("when value is a properly shaped MappingState", () => {
+    it("preserves the value", () => {
+      const valid = {
+        mapping: {
+          input: { source: "input", key: undefined, subkey: undefined },
+        },
+        expansions: [],
+      };
+      expect(coerceMonitorMappings(valid)).toEqual(valid);
     });
   });
 });

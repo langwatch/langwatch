@@ -4,6 +4,12 @@ Feature: CI/CD Execution of Platform Evaluations
   I want to run my platform-configured evaluations from CI/CD pipelines
   So that I can automate quality checks on my LLM applications
 
+  # 6 scenarios bound to cicd-execution.integration.test.ts (auth headers,
+  # 404 lookups, runId polling). Remaining @unimplemented scenarios need an
+  # SSE event-stream test harness (target_result/evaluator_result/done events)
+  # plus error-text rewrites flagged in AUDIT_MANIFEST.md ("Missing API key" vs
+  # actual "Missing credentials"). Aspirational pending those follow-ups.
+
   Background:
     Given a project with API key "test-api-key"
     And a saved Evaluations V3 experiment "my-evaluation" with:
@@ -15,14 +21,12 @@ Feature: CI/CD Execution of Platform Evaluations
   # Authentication
   # ==========================================================================
 
-  @unimplemented
   Scenario: API key authentication via X-Auth-Token header
     Given a valid API key in the X-Auth-Token header
     When I POST to /api/evaluations/v3/my-evaluation/run
     Then I receive 200 OK
     And the response contains a runId
 
-  @unimplemented
   Scenario: API key authentication via Authorization Bearer header
     Given a valid API key in the Authorization header as "Bearer {key}"
     When I POST to /api/evaluations/v3/my-evaluation/run
@@ -52,7 +56,6 @@ Feature: CI/CD Execution of Platform Evaluations
     Then the backend loads experiment with slug "my-evaluation"
     And extracts targets, evaluators, and dataset from workbenchState
 
-  @unimplemented
   Scenario: Evaluation not found returns 404
     When I POST to /api/evaluations/v3/non-existent/run
     Then I receive 404 Not Found
@@ -68,7 +71,6 @@ Feature: CI/CD Execution of Platform Evaluations
   # Polling Mode (Default)
   # ==========================================================================
 
-  @unimplemented
   Scenario: Default response returns runId for polling
     When I POST to /api/evaluations/v3/my-evaluation/run
     Then I receive 200 OK with Content-Type "application/json"
@@ -88,7 +90,6 @@ Feature: CI/CD Execution of Platform Evaluations
       | progress | number  |
       | total    | number  |
 
-  @unimplemented
   Scenario: Poll for run status when completed
     Given run "run_abc123" has completed
     When I GET /api/evaluations/v3/runs/run_abc123
@@ -98,7 +99,6 @@ Feature: CI/CD Execution of Platform Evaluations
       | status  | completed |
       | summary | object    |
 
-  @unimplemented
   Scenario: Poll for non-existent run returns 404
     When I GET /api/evaluations/v3/runs/non-existent
     Then I receive 404 Not Found
@@ -159,48 +159,6 @@ Feature: CI/CD Execution of Platform Evaluations
     Then I receive SSE event:
       | type    | done   |
       | summary | object |
-
-  # ==========================================================================
-  # Summary Format
-  # ==========================================================================
-
-  @unimplemented
-  Scenario: Summary contains target statistics
-    When execution completes
-    Then the summary contains per-target stats:
-      | field       | description              |
-      | targetId    | target identifier        |
-      | name        | target display name      |
-      | passed      | count of passed evals    |
-      | failed      | count of failed evals    |
-      | avgLatency  | average duration in ms   |
-      | totalCost   | total cost in USD        |
-
-  @unimplemented
-  Scenario: Summary contains evaluator statistics
-    When execution completes
-    Then the summary contains per-evaluator stats:
-      | field      | description             |
-      | evaluator  | evaluator identifier    |
-      | name       | evaluator display name  |
-      | passed     | count of passed results |
-      | failed     | count of failed results |
-      | passRate   | percentage passed       |
-      | avgScore   | average score if scored |
-
-  @unimplemented
-  Scenario: Summary contains overall statistics
-    When execution completes
-    Then the summary contains:
-      | field          | description               |
-      | runId          | unique run identifier     |
-      | status         | completed/failed/stopped  |
-      | totalPassed    | total passed evaluations  |
-      | totalFailed    | total failed evaluations  |
-      | passRate       | overall pass percentage   |
-      | duration       | total execution time ms   |
-      | totalCost      | total cost in USD         |
-      | runUrl         | URL to view in LangWatch  |
 
   # ==========================================================================
   # Error Handling

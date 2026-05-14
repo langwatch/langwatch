@@ -1,6 +1,5 @@
 import { prisma } from "~/server/db";
-import type { Trace } from "~/server/tracer/types";
-import type { TraceGroups, TriggerData } from "./types";
+import type { TriggerData } from "./types";
 
 export const updateAlert = async (
   triggerId: string,
@@ -48,51 +47,6 @@ export const addTriggersSent = async (
       },
     });
   }
-};
-
-/**
- * Fetches TriggerSent records for the given traceIds, chunking the query
- * to avoid massive IN clauses that exhaust RDS CPU.
- *
- * @see https://github.com/langwatch/langwatch/issues/2597
- */
-export const triggerSentForMany = async (
-  triggerId: string,
-  traceIds: string[],
-  projectId: string,
-) => {
-  if (traceIds.length === 0) {
-    return [];
-  }
-
-  const CHUNK_SIZE = 500;
-  const results: Awaited<ReturnType<typeof prisma.triggerSent.findMany>> = [];
-
-  for (let i = 0; i < traceIds.length; i += CHUNK_SIZE) {
-    const chunk = traceIds.slice(i, i + CHUNK_SIZE);
-    const triggerSent = await prisma.triggerSent.findMany({
-      where: {
-        triggerId,
-        traceId: { in: chunk },
-        projectId,
-      },
-    });
-    results.push(...triggerSent);
-  }
-
-  return results;
-};
-
-export const getLatestUpdatedAt = (traces: TraceGroups): number | undefined => {
-  const updatedTimes = traces.groups
-    .flatMap((group: Trace[]) =>
-      group
-        .map((item: Trace) => item.timestamps?.updated_at)
-        .filter((timestamp): timestamp is number => timestamp !== undefined),
-    )
-    .sort((a: number, b: number) => b - a);
-
-  return updatedTimes[0];
 };
 
 export const checkThreshold = (

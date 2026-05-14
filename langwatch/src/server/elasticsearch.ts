@@ -1,5 +1,4 @@
 import { Client as ElasticClient } from "@elastic/elasticsearch";
-import { Client as OpenSearchClient } from "@opensearch-project/opensearch";
 
 import { env } from "../env.mjs";
 import { decrypt } from "../utils/encryption";
@@ -126,21 +125,16 @@ export const esClient = async (
 
   if (!elasticsearchNodeUrl) return unconfiguredEsClient;
 
-  const client =
-    !!env.IS_OPENSEARCH || !!env.IS_QUICKWIT
-      ? (new OpenSearchClient({
-          node: elasticsearchNodeUrl.replace("quickwit://", "http://"),
-        }) as unknown as ElasticClient)
-      : new ElasticClient({
-          node: elasticsearchNodeUrl,
-          ...(elasticsearchApiKey
-            ? {
-                auth: {
-                  apiKey: elasticsearchApiKey,
-                },
-              }
-            : {}),
-        });
+  const client = new ElasticClient({
+    node: elasticsearchNodeUrl,
+    ...(elasticsearchApiKey
+      ? {
+          auth: {
+            apiKey: elasticsearchApiKey,
+          },
+        }
+      : {}),
+  });
 
   // Apply patches to this specific client instance
   if (env.IS_OPENSEARCH) {

@@ -3,6 +3,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 export interface McpConfig {
   apiKey: string | undefined;
   endpoint: string;
+  projectId?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -56,6 +57,7 @@ export function initConfig(args: { apiKey?: string; endpoint?: string }): void {
       args.endpoint ||
       process.env.LANGWATCH_ENDPOINT ||
       "https://app.langwatch.ai",
+    projectId: process.env.LANGWATCH_PROJECT_ID,
   };
 }
 
