@@ -30,18 +30,18 @@
  * wire format but doesn't prove the spans actually survive the
  * roundtrip and land where Studio queries them.
  *
- * Opt-in: this test spawns a real Go subprocess (`go run`), which on
- * a cold module cache takes well over CI's nlpgo-health budget. It is
- * therefore skipped unless explicitly enabled via NLPGO_E2E=1. Run it
- * locally to validate the full roundtrip before shipping pipeline /
- * traceparent / OTLP changes.
+ * Cost amortization: `go run ./cmd/service` recompiles on every call,
+ * which on CI's cold module cache exceeds any reasonable health-poll
+ * budget. Instead we `go build` the binary ONCE per test process into
+ * a cached path under the repo's .vitest-tmp/ and exec it directly —
+ * the compiled binary boots in ~1s.
  *
  * Skipped when ANY of:
- *   - NLPGO_E2E is not "1"
  *   - `go` is not on PATH
  *   - testcontainers Redis + ClickHouse are not running
  */
 import { execSync, spawn, type ChildProcess } from "node:child_process";
+import fs from "node:fs";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import path from "node:path";
@@ -103,8 +103,90 @@ function hasGo(): boolean {
     return false;
   }
 }
-const shouldRun =
-  process.env.NLPGO_E2E === "1" && hasTestcontainers && hasGo();
+const shouldRun = hasTestcontainers && hasGo();
+
+// Cached compiled binary. Lives under the repo's .vitest-tmp/ so a
+// single CI shard or local re-run reuses the build artifact across
+// vitest restarts. `os.tmpdir()` would work too, but keeping it inside
+// the repo means `make clean` / artifact cleanup picks it up.
+const NLPGO_TEST_BIN_DIR = path.join(REPO_ROOT, "langwatch", ".vitest-tmp");
+const NLPGO_TEST_BIN = path.join(
+  NLPGO_TEST_BIN_DIR,
+  process.platform === "win32" ? "nlpgo-test.exe" : "nlpgo-test",
+);
+
+/**
+ * Builds the nlpgo binary once and caches it on disk. Subsequent calls
+ * skip the build if the cached binary is newer than the most-recently
+ * modified .go source file under services/nlpgo (cheap staleness check
+ * matching what `go build` itself would conclude).
+ *
+ * Returns the absolute path to the binary.
+ */
+function ensureNlpgoBinary(timeoutMs = 600_000): string {
+  fs.mkdirSync(NLPGO_TEST_BIN_DIR, { recursive: true });
+
+  // Cheap staleness check: rebuild if any .go file under services/nlpgo
+  // or cmd/service is newer than the cached binary's mtime.
+  let cachedMtime = 0;
+  try {
+    cachedMtime = fs.statSync(NLPGO_TEST_BIN).mtimeMs;
+  } catch {
+    cachedMtime = 0;
+  }
+  const watchDirs = [
+    path.join(REPO_ROOT, "services", "nlpgo"),
+    path.join(REPO_ROOT, "cmd", "service"),
+    path.join(REPO_ROOT, "pkg"),
+  ].filter((p) => fs.existsSync(p));
+
+  function newestGoMtime(dir: string): number {
+    let newest = 0;
+    const stack = [dir];
+    while (stack.length) {
+      const d = stack.pop()!;
+      let entries: fs.Dirent[];
+      try {
+        entries = fs.readdirSync(d, { withFileTypes: true });
+      } catch {
+        continue;
+      }
+      for (const e of entries) {
+        const full = path.join(d, e.name);
+        if (e.isDirectory()) {
+          if (e.name === "node_modules" || e.name.startsWith(".")) continue;
+          stack.push(full);
+        } else if (e.name.endsWith(".go") || e.name === "go.mod" || e.name === "go.sum") {
+          try {
+            const m = fs.statSync(full).mtimeMs;
+            if (m > newest) newest = m;
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+    }
+    return newest;
+  }
+
+  const newestSrcMtime = watchDirs.reduce(
+    (acc, d) => Math.max(acc, newestGoMtime(d)),
+    0,
+  );
+
+  if (cachedMtime > 0 && newestSrcMtime <= cachedMtime) {
+    return NLPGO_TEST_BIN;
+  }
+
+  // Cold/stale: actually compile. `go build` honours module cache, so
+  // back-to-back runs in the same CI job are fast even after the first.
+  execSync(`go build -o ${NLPGO_TEST_BIN} ./cmd/service`, {
+    cwd: REPO_ROOT,
+    stdio: process.env.NLPGO_TEST_LOG === "1" ? "inherit" : "pipe",
+    timeout: timeoutMs,
+  });
+  return NLPGO_TEST_BIN;
+}
 
 const noopReactor = { name: "noop", options: {}, handle: async () => {} };
 
@@ -313,8 +395,13 @@ describe.skipIf(!shouldRun)(
       );
       langwatchUrl = `http://127.0.0.1:${(langwatchSrv.address() as AddressInfo).port}`;
 
-      // Spawn nlpgo.
-      nlpgoProcess = spawn("go", ["run", "./cmd/service", "nlpgo"], {
+      // Build nlpgo (cached). The build itself can take a couple of
+      // minutes on a cold CI module cache; subsequent runs in the same
+      // job are near-instant because of the staleness check.
+      const binary = ensureNlpgoBinary();
+
+      // Spawn the pre-built binary. It boots in ~1s.
+      nlpgoProcess = spawn(binary, ["nlpgo"], {
         cwd: REPO_ROOT,
         env: {
           ...process.env,
@@ -344,8 +431,10 @@ describe.skipIf(!shouldRun)(
         }
       });
 
-      await waitForNlpgoHealth();
-    }, 150_000);
+      // Health check on the pre-built binary — boots in ~1s, give it
+      // 30s on a slow CI runner.
+      await waitForNlpgoHealth(30_000);
+    }, 700_000); // build (up to 600s cold) + boot + health window
 
     afterAll(async () => {
       if (nlpgoProcess?.pid) {
