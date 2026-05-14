@@ -6,7 +6,10 @@
  */
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import {
+  getClickHouseClientForProject,
+  getSharedClickHouseClient,
+} from "~/server/clickhouse/clickhouseClient";
 import type { StoredObject } from "./stored-object";
 import { storedObjectSchema } from "./stored-object";
 
@@ -205,6 +208,65 @@ export class StoredObjectsRepository {
         }
 
         return { id: rows[0]!.id };
+      },
+    );
+  }
+
+  /**
+   * Resolves the owning project for a stored_object id.
+   *
+   * Exception to the tenant-filter rule: callers (e.g. GET /api/files/:id)
+   * don't yet know which project owns a file when they only have the object id.
+   * This method performs a cross-tenant lookup on the shared ClickHouse client
+   * to recover the project_id. Once the project is resolved, all subsequent
+   * reads MUST be project-scoped.
+   *
+   * Returns null when no row matches the given id.
+   */
+  async findProjectByObjectId({
+    id,
+  }: {
+    id: string;
+  }): Promise<{ projectId: string } | null> {
+    return tracer.withActiveSpan(
+      "StoredObjectsRepository.findProjectByObjectId",
+      {
+        kind: SpanKind.CLIENT,
+        attributes: {
+          "db.system": "clickhouse",
+          "db.operation": "SELECT",
+          "stored_object.id": id,
+        },
+      },
+      async (span) => {
+        const client = getSharedClickHouseClient();
+
+        if (!client) {
+          throw new Error(
+            "ClickHouse is not configured — cannot resolve owner project for stored object",
+          );
+        }
+
+        const result = await client.query({
+          query: `
+            SELECT project_id
+            FROM ${TABLE_NAME}
+            WHERE id = {id:String}
+            LIMIT 1
+          `,
+          query_params: { id },
+          format: "JSONEachRow",
+        });
+
+        const rows = await result.json<{ project_id: string }[]>();
+
+        span.setAttribute("result.found", rows.length > 0);
+
+        if (rows.length === 0) {
+          return null;
+        }
+
+        return { projectId: rows[0]!.project_id };
       },
     );
   }

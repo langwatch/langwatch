@@ -266,6 +266,24 @@ export class StoredObjectsService {
   }
 
   /**
+   * Resolves the owning project for a stored_object id.
+   *
+   * Performs a cross-tenant repository lookup to find the project_id for the
+   * given object id. Returns null if no row matches. Callers must gate access
+   * with a project-membership check once the project is resolved.
+   *
+   * See StoredObjectsRepository.findProjectByObjectId for the rationale on the
+   * tenant-filter exception.
+   */
+  async resolveOwnerProject({
+    id,
+  }: {
+    id: string;
+  }): Promise<{ projectId: string } | null> {
+    return this.repository.findProjectByObjectId({ id });
+  }
+
+  /**
    * Stub for future cascade delete on project deletion.
    *
    * Logs a warning so the gap is visible in logs. The actual purge
