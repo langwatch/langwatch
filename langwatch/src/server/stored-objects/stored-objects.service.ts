@@ -88,7 +88,8 @@ function mintStorageUri({
   if (s3Bucket && s3Bucket.trim() !== "") {
     return mintS3Uri({ bucket: s3Bucket, projectId, sha256 });
   }
-  const root = process.env.LOCAL_STORAGE_PATH ?? "/var/lib/langwatch/objects";
+  const root =
+    process.env.LANGWATCH_LOCAL_STORAGE_PATH ?? "/var/lib/langwatch/objects";
   return mintFileUri({ root, projectId, sha256 });
 }
 
