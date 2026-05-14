@@ -63,11 +63,7 @@ import {
   TraceSummaryFoldProjection,
   type TraceSummaryData,
 } from "../../projections/traceSummary.foldProjection";
-import type {
-  SpanReceivedEvent,
-  TraceProcessingEvent,
-} from "../../schemas/events";
-import { SPAN_RECEIVED_EVENT_TYPE } from "../../schemas/constants";
+import type { TraceProcessingEvent } from "../../schemas/events";
 import type { OtlpSpan } from "../../schemas/otlp";
 import { SpanAppendStore } from "../../projections/spanStorage.store";
 import { TraceSummaryStore } from "../../projections/traceSummary.store";
@@ -189,36 +185,6 @@ function buildAppOriginSpan(opts: {
 
 function generateId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
-}
-
-/**
- * Mirrors the SpanReceivedEvent shape produced by recordSpan's
- * emitEvents step. The reactor reads `event.data.span.attributes` for
- * the depth check, and `event.occurredAt` for the recency gate. Other
- * fields are passed through to dispatchEvaluations but not consulted
- * by the loop-prevention logic.
- */
-function buildSpanReceivedEvent(opts: {
-  tenantId: string;
-  traceId: string;
-  span: OtlpSpan;
-}): SpanReceivedEvent {
-  return {
-    type: SPAN_RECEIVED_EVENT_TYPE,
-    tenantId: opts.tenantId,
-    aggregateId: opts.traceId,
-    occurredAt: Date.now(),
-    data: {
-      span: opts.span as any,
-      resource: { attributes: [], droppedAttributesCount: 0 } as any,
-      instrumentationScope: { name: "langwatch.test" } as any,
-      piiRedactionLevel: "DISABLED",
-    },
-    metadata: {
-      spanId: (opts.span as any).spanId,
-      traceId: opts.traceId,
-    },
-  } as unknown as SpanReceivedEvent;
 }
 
 async function waitFor(
