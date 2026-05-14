@@ -71,6 +71,17 @@ Feature: Online-evaluator infinite-loop prevention
     # an already-evaluated trace must still trigger evaluation — only the
     # evaluator's own emitted spans (depth>=1) are blocked.
 
+  @unit @loop-prevention @depth-direct
+  Scenario: Reserved causality_depth attribute passes through strip
+    Given recordSpan strips user-submitted langwatch.reserved.* attributes
+    When a span arrives carrying langwatch.reserved.causality_depth=1
+    Then the attribute survives stripping
+    And the emitted span_received event carries the depth attribute
+    # The original 2026-05-11 fix was silently disabled in production
+    # because recordSpan's strip nuked the very attribute the reactor
+    # uses for loop detection. The fix adds a narrow passthrough
+    # allowlist; this scenario pins the attribute name as load-bearing.
+
   @integration @unit @loop-prevention @kill-switch
   Scenario: LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD bypasses depth check
     Given the env var "LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD" is set to "1"

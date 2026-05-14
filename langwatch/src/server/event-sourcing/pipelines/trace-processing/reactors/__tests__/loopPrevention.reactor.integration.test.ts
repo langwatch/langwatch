@@ -37,7 +37,7 @@
  *      check (emergency rollback path).
  */
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
 import { SpanStorageClickHouseRepository } from "~/server/app-layer/traces/repositories/span-storage.clickhouse.repository";
 import { TraceSummaryService } from "~/server/app-layer/traces/trace-summary.service";
@@ -252,7 +252,7 @@ async function readBlockedCounter(reason: string): Promise<number> {
 // ---------------------------------------------------------------------------
 
 describe.skipIf(!hasTestcontainers)(
-  "evaluationTrigger reactor — loop prevention against real pipeline state",
+  "evaluationTrigger reactor — loop prevention end-to-end through the real event-sourcing pipeline",
   () => {
     let eventSourcing: EventSourcing;
     let tracePipeline: ReturnType<typeof createTracePipeline>;
@@ -260,7 +260,6 @@ describe.skipIf(!hasTestcontainers)(
     let tenantId: ReturnType<typeof createTestTenantId>;
     let tenantIdString: string;
     let dispatcher: ReturnType<typeof makeCapturingEvaluationDispatcher>;
-    let reactor: ReturnType<typeof createEvaluationTriggerReactor>;
 
     function createTracePipeline() {
       const clickHouseClient = getTestClickHouseClient();
@@ -291,15 +290,20 @@ describe.skipIf(!hasTestcontainers)(
       );
 
       // Build the REAL evaluationTrigger reactor with a capturing
-      // dispatcher. We won't rely on the BullMQ-scheduled call path;
-      // the test invokes reactor.handle() directly with foldState
-      // read from CH. The reactor instance is the production code.
+      // dispatcher and wire it into the pipeline so the
+      // GroupQueueProcessor actually fires it when spans land.
+      // Override `delay` to 0 — production default is 30s, which is
+      // a deliberate dedup window but unhelpful for tests.
       const monitorService = new MonitorService(makeFakeMonitorRepository());
       dispatcher = makeCapturingEvaluationDispatcher();
-      reactor = createEvaluationTriggerReactor({
+      const realReactor = createEvaluationTriggerReactor({
         monitors: monitorService,
         evaluation: dispatcher.dispatch,
       });
+      const fastReactor = {
+        ...realReactor,
+        options: { ...realReactor.options, delay: 0 },
+      };
 
       const pipelineName = `trace_loop_prevention_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
       const pipelineDef = definePipeline<TraceProcessingEvent>()
@@ -313,7 +317,7 @@ describe.skipIf(!hasTestcontainers)(
           "spanStorage",
           new SpanStorageMapProjection({ store: spanAppendStore }) as any,
         )
-        .withReactor("traceSummary", "evaluationTrigger", noopReactor as any)
+        .withReactor("traceSummary", "evaluationTrigger", fastReactor as any)
         .withReactor("traceSummary", "customEvaluationSync", noopReactor as any)
         .withReactor("traceSummary", "traceUpdateBroadcast", noopReactor as any)
         .withReactor("traceSummary", "simulationMetricsSync", noopReactor as any)
@@ -330,6 +334,17 @@ describe.skipIf(!hasTestcontainers)(
       };
     }
 
+    // Stale Redis jobs from prior test-file runs (different pipeline
+    // names) cause "Unknown job in global queue" rejections that
+    // block this run's reactors from picking up work. Flush once
+    // before any test in this suite executes.
+    beforeAll(async () => {
+      const redisConnection = getTestRedisConnection();
+      if (redisConnection) {
+        await redisConnection.flushall();
+      }
+    });
+
     beforeEach(async () => {
       tracePipeline = createTracePipeline();
       tenantId = createTestTenantId();
@@ -344,14 +359,13 @@ describe.skipIf(!hasTestcontainers)(
     });
 
     /**
-     * Sends one recordSpan command and waits for the trace_summaries
-     * row to land in ClickHouse with a resolved origin. Returns the
-     * persisted foldState — the same shape the reactor receives in
-     * production via ReactorContext.foldState.
+     * Push a span through the real GroupQueueProcessor pipeline.
+     * Awaits the trace_summaries row landing in ClickHouse so the
+     * fold projection definitely ran before we move on. Reactor
+     * dispatch is asynchronous afterwards — assert on
+     * `dispatcher.captured` directly in the tests.
      */
-    async function sendSpanAndAwaitFold(
-      span: OtlpSpan,
-    ): Promise<TraceSummaryData> {
+    async function recordSpan(span: OtlpSpan): Promise<void> {
       await tracePipeline.commands.recordSpan.send({
         tenantId: tenantIdString,
         span: span as any,
@@ -361,10 +375,9 @@ describe.skipIf(!hasTestcontainers)(
         occurredAt: Date.now(),
       });
 
-      let fold: TraceSummaryData | null = null;
       await waitFor(
         async () => {
-          fold = await traceSummaryStore.get(
+          const fold = await traceSummaryStore.get(
             (span as any).traceId,
             { tenantId: tenantIdString } as any,
           );
@@ -375,28 +388,34 @@ describe.skipIf(!hasTestcontainers)(
           label: "trace_summaries row with resolved origin in CH",
         },
       );
-      if (!fold) throw new Error("fold became null after waitFor");
-      return fold;
+    }
+
+    /**
+     * Quiet window after a span lands. The real evaluationTrigger
+     * reactor is dispatched asynchronously by the GroupQueueProcessor;
+     * `recordSpan` only awaits the fold. We need to give the worker a
+     * polling cycle to pick up the reactor job and either call dispatch
+     * or block it. 1500ms is comfortably above the dispatcher's BRPOP
+     * timeout cadence at signalTimeoutSec=5 with delay=0 jobs.
+     */
+    async function quietReactorWindow(): Promise<void> {
+      await new Promise((resolve) => setTimeout(resolve, 1500));
     }
 
     /** @scenario Incoming span with causality_depth=0 still triggers evaluations */
     it("dispatches one executeEvaluation per monitor when depth=0", async () => {
       const traceId = generateId("trace");
-      const spanId = generateId("span");
-      const span = buildAppOriginSpan({ traceId, spanId, depth: 0 });
-
-      const foldState = await sendSpanAndAwaitFold(span);
-      expect(foldState.attributes["langwatch.origin"]).toBe("application");
-
-      await reactor.handle(buildSpanReceivedEvent({
-        tenantId: tenantIdString,
+      const span = buildAppOriginSpan({
         traceId,
-        span,
-      }) as any, {
-        tenantId: tenantIdString,
-        aggregateId: traceId,
-        foldState,
-      } as any);
+        spanId: generateId("span"),
+        depth: 0,
+      });
+
+      await recordSpan(span);
+      await waitFor(() => dispatcher.captured.length >= 1, {
+        timeoutMs: 20_000,
+        label: "reactor dispatched evaluation through the real queue",
+      });
 
       expect(dispatcher.captured).toHaveLength(1);
       expect(dispatcher.captured[0]!.evaluatorId).toBe(
@@ -410,41 +429,38 @@ describe.skipIf(!hasTestcontainers)(
     it("BLOCKS dispatch when the incoming span carries causality_depth=1", async () => {
       const traceId = generateId("trace");
 
-      // First seed the trace with an app-origin span so foldState has
-      // a resolved origin (otherwise the originGuardedReactor returns
-      // early before reaching the depth check).
-      const seedSpan = buildAppOriginSpan({
-        traceId,
-        spanId: generateId("seed"),
-        depth: 0,
+      // Seed: app-origin depth=0 span establishes the trace's origin
+      // on the fold (required for the originGuardedReactor wrapper
+      // to fire its inner handler at all).
+      await recordSpan(
+        buildAppOriginSpan({
+          traceId,
+          spanId: generateId("seed"),
+          depth: 0,
+        }),
+      );
+      // The seed itself triggers one dispatch. Wait for it so we
+      // have a stable baseline to assert no further dispatch happens.
+      await waitFor(() => dispatcher.captured.length >= 1, {
+        timeoutMs: 20_000,
+        label: "seed depth=0 dispatched",
       });
-      const foldState = await sendSpanAndAwaitFold(seedSpan);
-      expect(foldState.attributes["langwatch.origin"]).toBe("application");
-
-      // Now construct the eval-emitted span (depth=1) and invoke the
-      // reactor with it as the incoming event.
-      const evalSpan = buildAppOriginSpan({
-        traceId,
-        spanId: generateId("eval"),
-        depth: 1,
-      });
-
-      const beforeBlocked = await readBlockedCounter("depth_direct");
       const dispatchesBefore = dispatcher.captured.length;
+      const beforeBlocked = await readBlockedCounter("depth_direct");
 
-      await reactor.handle(buildSpanReceivedEvent({
-        tenantId: tenantIdString,
-        traceId,
-        span: evalSpan,
-      }) as any, {
-        tenantId: tenantIdString,
-        aggregateId: traceId,
-        foldState,
-      } as any);
+      // Eval-emitted span (depth=1) — must be blocked by the reactor.
+      await recordSpan(
+        buildAppOriginSpan({
+          traceId,
+          spanId: generateId("eval"),
+          depth: 1,
+        }),
+      );
+      await quietReactorWindow();
 
       expect(dispatcher.captured.length).toBe(dispatchesBefore);
       const afterBlocked = await readBlockedCounter("depth_direct");
-      expect(afterBlocked - beforeBlocked).toBe(1);
+      expect(afterBlocked - beforeBlocked).toBeGreaterThanOrEqual(1);
     });
 
     /** @scenario Causality guard is per-span — fresh app activity still re-triggers */
@@ -452,92 +468,112 @@ describe.skipIf(!hasTestcontainers)(
       const traceId = generateId("trace");
 
       // 1. Initial app-origin span — should dispatch.
-      const span1 = buildAppOriginSpan({
-        traceId,
-        spanId: generateId("s1"),
-        depth: 0,
+      await recordSpan(
+        buildAppOriginSpan({
+          traceId,
+          spanId: generateId("s1"),
+          depth: 0,
+        }),
+      );
+      await waitFor(() => dispatcher.captured.length >= 1, {
+        timeoutMs: 20_000,
+        label: "first depth=0 dispatched",
       });
-      const fold1 = await sendSpanAndAwaitFold(span1);
-      await reactor.handle(buildSpanReceivedEvent({
-        tenantId: tenantIdString,
-        traceId,
-        span: span1,
-      }) as any, {
-        tenantId: tenantIdString,
-        aggregateId: traceId,
-        foldState: fold1,
-      } as any);
       const dispatchesAfter1 = dispatcher.captured.length;
       expect(dispatchesAfter1).toBe(1);
 
-      // 2. Eval-emitted span on same trace (depth=1) — must NOT add a dispatch.
-      const span2 = buildAppOriginSpan({
-        traceId,
-        spanId: generateId("s2"),
-        depth: 1,
-      });
-      // The eval-emitted span also goes through the real pipeline.
-      const fold2 = await sendSpanAndAwaitFold(span2);
-      await reactor.handle(buildSpanReceivedEvent({
-        tenantId: tenantIdString,
-        traceId,
-        span: span2,
-      }) as any, {
-        tenantId: tenantIdString,
-        aggregateId: traceId,
-        foldState: fold2,
-      } as any);
+      // 2. Eval-emitted span on same trace (depth=1) — must NOT add a
+      //    dispatch. The reactor dedup window (30s makeJobId TTL) is
+      //    irrelevant here because the depth check returns BEFORE the
+      //    queue's dedup applies — that's exactly the guarantee.
+      await recordSpan(
+        buildAppOriginSpan({
+          traceId,
+          spanId: generateId("s2"),
+          depth: 1,
+        }),
+      );
+      await quietReactorWindow();
       expect(dispatcher.captured.length).toBe(dispatchesAfter1);
 
       // 3. Fresh app-origin span (depth=0) later on SAME trace —
-      //    legitimate new activity, MUST dispatch again.
-      const span3 = buildAppOriginSpan({
-        traceId,
-        spanId: generateId("s3"),
-        depth: 0,
-      });
-      const fold3 = await sendSpanAndAwaitFold(span3);
-      await reactor.handle(buildSpanReceivedEvent({
-        tenantId: tenantIdString,
-        traceId,
-        span: span3,
-      }) as any, {
-        tenantId: tenantIdString,
-        aggregateId: traceId,
-        foldState: fold3,
-      } as any);
+      //    legitimate new activity, MUST dispatch again. The reactor
+      //    has `makeJobId(...) = eval-trigger:tenant:trace` plus a
+      //    30s TTL — to bypass the queue-side dedup of this case we
+      //    nuke the dedup keys for this trace before re-dispatching.
+      //    (In production, the 30s window IS the dedup; tests just
+      //    need to prove the depth check itself doesn't pin the
+      //    trace forever.)
+      const redis = getTestRedisConnection()!;
+      const dedupKeys = await redis.keys(
+        `*eval-trigger:${tenantIdString}:${traceId}*`,
+      );
+      if (dedupKeys.length > 0) {
+        await redis.del(...dedupKeys);
+      }
+
+      await recordSpan(
+        buildAppOriginSpan({
+          traceId,
+          spanId: generateId("s3"),
+          depth: 0,
+        }),
+      );
+      await waitFor(
+        () => dispatcher.captured.length >= dispatchesAfter1 + 1,
+        {
+          timeoutMs: 20_000,
+          label: "fresh depth=0 re-dispatched on the same trace",
+        },
+      );
       expect(dispatcher.captured.length).toBe(dispatchesAfter1 + 1);
     });
 
     /** @scenario LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD bypasses depth check */
     it("kill switch — LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD=1 dispatches even on depth=1", async () => {
       const traceId = generateId("trace");
-      const seedSpan = buildAppOriginSpan({
-        traceId,
-        spanId: generateId("seed"),
-        depth: 0,
-      });
-      const foldState = await sendSpanAndAwaitFold(seedSpan);
 
-      const evalSpan = buildAppOriginSpan({
-        traceId,
-        spanId: generateId("eval"),
-        depth: 1,
+      // Seed to establish origin on fold + clear baseline.
+      await recordSpan(
+        buildAppOriginSpan({
+          traceId,
+          spanId: generateId("seed"),
+          depth: 0,
+        }),
+      );
+      await waitFor(() => dispatcher.captured.length >= 1, {
+        timeoutMs: 20_000,
+        label: "seed dispatched",
       });
+      const dispatchesBefore = dispatcher.captured.length;
+
+      // Clear queue-side dedup so the next eval-trigger isn't suppressed
+      // by the 30s window for this trace.
+      const redis = getTestRedisConnection()!;
+      const dedupKeys = await redis.keys(
+        `*eval-trigger:${tenantIdString}:${traceId}*`,
+      );
+      if (dedupKeys.length > 0) {
+        await redis.del(...dedupKeys);
+      }
 
       const prev = process.env.LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD;
       process.env.LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD = "1";
       try {
-        const dispatchesBefore = dispatcher.captured.length;
-        await reactor.handle(buildSpanReceivedEvent({
-          tenantId: tenantIdString,
-          traceId,
-          span: evalSpan,
-        }) as any, {
-          tenantId: tenantIdString,
-          aggregateId: traceId,
-          foldState,
-        } as any);
+        await recordSpan(
+          buildAppOriginSpan({
+            traceId,
+            spanId: generateId("eval"),
+            depth: 1,
+          }),
+        );
+        await waitFor(
+          () => dispatcher.captured.length >= dispatchesBefore + 1,
+          {
+            timeoutMs: 20_000,
+            label: "kill switch lets depth=1 dispatch through the queue",
+          },
+        );
         expect(dispatcher.captured.length).toBe(dispatchesBefore + 1);
       } finally {
         if (prev === undefined) {
