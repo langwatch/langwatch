@@ -60,6 +60,17 @@ Feature: Online-evaluator infinite-loop prevention
     When the evaluationTrigger reactor fires for this event
     Then one executeEvaluation command is dispatched per monitor
 
+  @integration @loop-prevention @depth-direct
+  Scenario: Causality guard is per-span — fresh app activity still re-triggers
+    Given a span_received event arrives with depth=0 and the reactor dispatches evaluation
+    And a second span_received event arrives on the same trace with depth=1
+    And the reactor blocks dispatch for the depth=1 event
+    When a third span_received event arrives on the same trace with depth=0
+    Then the reactor dispatches evaluation again for the third event
+    # The guard is per-span, not per-trace. New legitimate app activity on
+    # an already-evaluated trace must still trigger evaluation — only the
+    # evaluator's own emitted spans (depth>=1) are blocked.
+
   @integration @unit @loop-prevention @kill-switch
   Scenario: LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD bypasses depth check
     Given the env var "LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD" is set to "1"
