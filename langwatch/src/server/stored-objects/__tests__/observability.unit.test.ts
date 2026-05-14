@@ -29,13 +29,13 @@ describe("stored_object metrics are registered", () => {
   it("registers stored_object_extract_total counter", () => {
     const metric = register.getSingleMetric("stored_object_extract_total");
     expect(metric).toBeDefined();
-    expect(metric?.name).toBe("stored_object_extract_total");
+    expect((metric as { name: string } | undefined)?.name).toBe("stored_object_extract_total");
   });
 
   it("registers stored_object_dedup_hit_total counter", () => {
     const metric = register.getSingleMetric("stored_object_dedup_hit_total");
     expect(metric).toBeDefined();
-    expect(metric?.name).toBe("stored_object_dedup_hit_total");
+    expect((metric as { name: string } | undefined)?.name).toBe("stored_object_dedup_hit_total");
   });
 
   it("registers stored_object_write_failures_total counter", () => {
@@ -43,7 +43,7 @@ describe("stored_object metrics are registered", () => {
       "stored_object_write_failures_total",
     );
     expect(metric).toBeDefined();
-    expect(metric?.name).toBe("stored_object_write_failures_total");
+    expect((metric as { name: string } | undefined)?.name).toBe("stored_object_write_failures_total");
   });
 
   it("registers stored_object_read_failures_total counter", () => {
@@ -51,13 +51,13 @@ describe("stored_object metrics are registered", () => {
       "stored_object_read_failures_total",
     );
     expect(metric).toBeDefined();
-    expect(metric?.name).toBe("stored_object_read_failures_total");
+    expect((metric as { name: string } | undefined)?.name).toBe("stored_object_read_failures_total");
   });
 
   it("registers stored_object_size_bytes histogram", () => {
     const metric = register.getSingleMetric("stored_object_size_bytes");
     expect(metric).toBeDefined();
-    expect(metric?.name).toBe("stored_object_size_bytes");
+    expect((metric as { name: string } | undefined)?.name).toBe("stored_object_size_bytes");
   });
 
   describe("when purpose-labelled metrics are recorded", () => {

@@ -74,17 +74,11 @@ describe("AC16 — no automatic retention, GC, or orphan reaping for stored_obje
       // If this assertion fails, a new background job references stored_objects.
       // Before adding such a job, review AC16 in the RFC and update this test
       // to explicitly allow the reference with a clear rationale.
-      expect(offendingFiles).toEqual(
-        [],
-        [
-          "Found background worker files referencing 'stored_objects':",
-          ...offendingFiles.map((f) => `  ${path.relative(REPO_ROOT, f)}`),
-          "",
-          "AC16 forbids automatic retention, time-based GC, or orphan reaping.",
-          "If you intend to add a legitimate background job for stored_objects,",
-          "update this test with an explicit allowlist entry and a rationale.",
-        ].join("\n"),
+      // AC16 forbids automatic retention, time-based GC, or orphan reaping.
+      const offendingPaths = offendingFiles.map((f) =>
+        path.relative(REPO_ROOT, f),
       );
+      expect(offendingPaths).toEqual([]);
     });
   });
 
@@ -98,15 +92,11 @@ describe("AC16 — no automatic retention, GC, or orphan reaping for stored_obje
         return /stored_objects/i.test(content);
       });
 
-      expect(offendingFiles).toEqual(
-        [],
-        [
-          "Found queue files referencing 'stored_objects':",
-          ...offendingFiles.map((f) => `  ${path.relative(REPO_ROOT, f)}`),
-          "",
-          "AC16 forbids automatic retention GC queues for stored_objects.",
-        ].join("\n"),
+      // AC16 forbids automatic retention GC queues for stored_objects.
+      const offendingPaths = offendingFiles.map((f) =>
+        path.relative(REPO_ROOT, f),
       );
+      expect(offendingPaths).toEqual([]);
     });
   });
 });

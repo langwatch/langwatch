@@ -50,6 +50,11 @@ export class StoredObjectsRepository {
       },
       async () => {
         const client = await getClickHouseClientForProject(projectId);
+        if (!client) {
+          throw new Error(
+            "ClickHouse is not configured — cannot insert stored object",
+          );
+        }
 
         await client.insert({
           table: TABLE_NAME,
@@ -102,6 +107,11 @@ export class StoredObjectsRepository {
       },
       async (span) => {
         const client = await getClickHouseClientForProject(projectId);
+        if (!client) {
+          throw new Error(
+            "ClickHouse is not configured — cannot find stored object by id",
+          );
+        }
 
         // Scalar-subquery dedup: inner reads only (project_id, id, inserted_at)
         // to find max(inserted_at), outer reads the full row for that version.
@@ -186,6 +196,11 @@ export class StoredObjectsRepository {
       },
       async (span) => {
         const client = await getClickHouseClientForProject(projectId);
+        if (!client) {
+          throw new Error(
+            "ClickHouse is not configured — cannot find stored object by sha256",
+          );
+        }
 
         const result = await client.query({
           query: `
@@ -199,7 +214,7 @@ export class StoredObjectsRepository {
           format: "JSONEachRow",
         });
 
-        const rows = await result.json<{ id: string }[]>();
+        const rows = await result.json<{ id: string }>();
 
         span.setAttribute("result.found", rows.length > 0);
 
@@ -258,7 +273,7 @@ export class StoredObjectsRepository {
           format: "JSONEachRow",
         });
 
-        const rows = await result.json<{ project_id: string }[]>();
+        const rows = await result.json<{ project_id: string }>();
 
         span.setAttribute("result.found", rows.length > 0);
 

@@ -18,8 +18,10 @@ vi.mock("langwatch", () => ({
     ) => {
       // withActiveSpan(name, fn) or withActiveSpan(name, options, fn)
       const fn = args.length === 1 ? args[0] : args[1];
-      const span = { setAttribute: vi.fn() };
-      return (fn as (span: typeof span) => Promise<unknown>)(span);
+      const span: { setAttribute: ReturnType<typeof vi.fn> } = {
+        setAttribute: vi.fn(),
+      };
+      return (fn as (s: typeof span) => Promise<unknown>)(span);
     },
   }),
 }));

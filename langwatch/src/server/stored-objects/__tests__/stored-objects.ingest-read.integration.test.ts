@@ -64,8 +64,8 @@ vi.mock("langwatch", () => ({
       ...args: unknown[]
     ) => {
       const fn = args.length === 1 ? args[0] : args[1];
-      const span = { setAttribute: vi.fn() };
-      return (fn as (span: typeof span) => Promise<unknown>)(span);
+      const span: { setAttribute: ReturnType<typeof vi.fn> } = { setAttribute: vi.fn() };
+      return (fn as (s: typeof span) => Promise<unknown>)(span);
     },
   }),
 }));
@@ -130,7 +130,7 @@ async function waitForRow(
       query_params: { projectId, id },
       format: "JSONEachRow",
     });
-    const rows = await result.json<{ id: string }[]>();
+    const rows = await result.json<{ id: string }>();
     if (rows.length > 0) return true;
     await new Promise((r) => setTimeout(r, 200));
   }
@@ -318,14 +318,14 @@ describe("StoredObjectsService (ingest + read path)", () => {
             query_params: { id: resultA.id },
             format: "JSONEachRow",
           });
-          const rowAData = await rowA.json<{ project_id: string }[]>();
+          const rowAData = await rowA.json<{ project_id: string }>();
 
           const rowB = await ch.query({
             query: `SELECT project_id FROM stored_objects WHERE id = {id:String} LIMIT 1`,
             query_params: { id: resultB.id },
             format: "JSONEachRow",
           });
-          const rowBData = await rowB.json<{ project_id: string }[]>();
+          const rowBData = await rowB.json<{ project_id: string }>();
 
           expect(rowAData[0]?.project_id).toBe(PROJECT_A);
           expect(rowBData[0]?.project_id).toBe(PROJECT_B);
@@ -442,7 +442,7 @@ describe("StoredObjectsService (ingest + read path)", () => {
             query_params: { id },
             format: "JSONEachRow",
           });
-          const rows = await result.json<{ project_id: string; storage_uri: string }[]>();
+          const rows = await result.json<{ project_id: string; storage_uri: string }>();
 
           expect(rows.length).toBeGreaterThan(0);
           expect(rows[0]?.project_id).toBe(PROJECT_A);
