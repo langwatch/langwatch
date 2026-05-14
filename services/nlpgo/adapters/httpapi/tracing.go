@@ -31,7 +31,35 @@ const tracerName = "langwatch-nlpgo"
 //
 // When the inbound trace_id is malformed or absent, fall through to
 // a fresh trace (still better than dropping the request).
-func startStudioSpan(ctx context.Context, name string, req *app.WorkflowRequest, workflowAPIKey string) (context.Context, trace.Span) {
+// studioSpanNameAndType returns the OTel root span name and the
+// langwatch.span.type value that match Python's optional_langwatch_trace
+// shape per endpoint type:
+//
+//	execute_flow        → ("execute_flow",        "workflow")
+//	execute_evaluation  → ("execute_evaluation",  "evaluation")
+//	execute_component   → ("execute_component",   "component")
+//	default (legacy)    → ("execute_flow",        "workflow")
+//
+// Earlier revisions used a single hard-coded name ("nlpgo.studio.
+// execute_sync" / ".execute_stream") with no span.type, which left
+// the Studio drawer rendering the root row with no chip color +
+// migration-internal jargon (rchaves dogfood 2026-05-14). Splitting
+// by req.Type matches what langwatch_nlp/studio/execute/execute_*.py
+// stamps on its own root span and is what the trace drawer's color
+// dispatcher recognizes.
+func studioSpanNameAndType(eventType string) (name, spanType string) {
+	switch eventType {
+	case "execute_evaluation":
+		return "execute_evaluation", "evaluation"
+	case "execute_component":
+		return "execute_component", "component"
+	case "execute_flow", "":
+		return "execute_flow", "workflow"
+	}
+	return "execute_flow", "workflow"
+}
+
+func startStudioSpan(ctx context.Context, req *app.WorkflowRequest, workflowAPIKey string) (context.Context, trace.Span) {
 	if workflowAPIKey != "" {
 		ctx = context.WithValue(ctx, otelsetup.APIKeyContextKey{}, workflowAPIKey)
 	}
@@ -63,10 +91,13 @@ func startStudioSpan(ctx context.Context, name string, req *app.WorkflowRequest,
 			ctx = trace.ContextWithSpanContext(ctx, sc)
 		}
 	}
+	spanName, spanType := studioSpanNameAndType(req.Type)
 	tracer := otelapi.Tracer(tracerName)
-	ctx, span := tracer.Start(ctx, name,
+	attrs := studioRequestAttrs(req)
+	attrs = append(attrs, attribute.String("langwatch.span.type", spanType))
+	ctx, span := tracer.Start(ctx, spanName,
 		trace.WithSpanKind(trace.SpanKindServer),
-		trace.WithAttributes(studioRequestAttrs(req)...),
+		trace.WithAttributes(attrs...),
 	)
 	return ctx, span
 }

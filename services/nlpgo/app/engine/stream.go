@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/oklog/ulid/v2"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/planner"
 )
@@ -170,7 +171,14 @@ func (e *Engine) runLayerStream(ctx context.Context, req ExecuteRequest, plan *p
 			inputs := state.resolveInputs(plan, nodeID)
 			ns := &NodeState{ID: nodeID, Status: "running", Inputs: inputs}
 			emit(ctx, out, stateEvent(traceID, nodeID, ns))
-			nodeCtx, span := startNodeSpan(ctx, node, req)
+			// Pass-through kinds (Entry, End, PromptingTechnique) skip
+			// span emission — Python parity, see engine.go's twin
+			// branch for the rationale.
+			nodeCtx := ctx
+			var span trace.Span
+			if nodeEmitsSpan(node.Type) {
+				nodeCtx, span = startNodeSpan(ctx, node, req)
+			}
 			started := time.Now()
 			outputs, derr := e.dispatch(nodeCtx, req, node, inputs, ns)
 			ns.DurationMS = time.Since(started).Milliseconds()
@@ -186,7 +194,9 @@ func (e *Engine) runLayerStream(ctx context.Context, req ExecuteRequest, plan *p
 			}
 			// endNodeSpan reads ns.Outputs to stamp langwatch.output;
 			// must run after the success branch sets it (Python parity).
-			endNodeSpan(span, ns, derr)
+			if span != nil {
+				endNodeSpan(span, ns, derr)
+			}
 			state.recordState(nodeID, ns)
 			emit(ctx, out, stateEvent(traceID, nodeID, ns))
 		}()
