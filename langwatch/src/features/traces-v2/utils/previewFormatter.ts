@@ -226,6 +226,14 @@ function unwrapChatArray(arr: unknown[]): UnwrapResult | null {
  * visible rather than rendering "(blob)" placeholders that the caller
  * couldn't distinguish from a real text "(blob)".
  */
+// Typed `parts` entries we treat as user-meaningful prose. `text` covers
+// Anthropic / Genkit / Mastra and AI SDK v4. `reasoning` is AI SDK v5
+// where the model's chain-of-thought lands in a sibling part with its
+// own `.text` string — same wire shape, different `type`. Skipping it
+// would re-introduce the wrapper-JSON failure mode this PR is fixing,
+// just for the next payload generation.
+const RENDERABLE_PART_TYPES = new Set(["text", "reasoning"]);
+
 function extractMessagePartsText(parts: unknown[]): string | null {
   const texts: string[] = [];
   for (const part of parts) {
@@ -236,9 +244,9 @@ function extractMessagePartsText(parts: unknown[]): string | null {
     if (!part || typeof part !== "object") continue;
     const p = part as { type?: unknown; text?: unknown; content?: unknown };
 
-    // Typed part: only "text" is renderable as a preview string.
+    // Typed part: only renderable types contribute to the preview.
     if (typeof p.type === "string") {
-      if (p.type !== "text") continue;
+      if (!RENDERABLE_PART_TYPES.has(p.type)) continue;
       if (typeof p.text === "string") {
         texts.push(p.text);
       } else if (typeof p.content === "string") {

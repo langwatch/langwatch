@@ -239,6 +239,23 @@ describe("formatPreview", () => {
       expect(result.text).toBe("Hello via parts.text");
     });
 
+    it("accepts AI SDK v5 `reasoning` parts as renderable text", () => {
+      // v5 splits chain-of-thought into its own part; the visible text
+      // still lives in `.text`. Treating it as renderable keeps the
+      // preview useful rather than falling through to JSON wrapper.
+      const input = JSON.stringify([
+        {
+          role: "assistant",
+          parts: [
+            { type: "reasoning", text: "Thinking about the answer…" },
+            { type: "text", text: "Final answer." },
+          ],
+        },
+      ]);
+      const result = formatPreview(input, { maxChars: 200 });
+      expect(result.text).toBe("Thinking about the answer… Final answer.");
+    });
+
     it("falls through to JSON when parts has no text-typed entries", () => {
       // Image-only message: no text to extract. Preview falls through
       // to the wrapper JSON rather than fabricating "(blob)" — caller

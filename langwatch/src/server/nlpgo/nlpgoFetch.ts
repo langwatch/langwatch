@@ -32,12 +32,20 @@ const SPAN_ID_HEX_RE = /^[0-9a-fA-F]{16}$/;
  * than silently emitting a broken header (silent breakage = orphan
  * traces in prod, the exact failure mode we're fixing).
  *
+ * The `sampled` flag defaults to true because every existing caller
+ * is in the evaluator chain, where we always want to record. If a
+ * future caller is propagating from a non-sampled inbound trace, it
+ * MUST pass `sampled: false` so we don't force-sample downstream.
+ *
  * Exported for unit tests.
  */
-export function formatTraceparent(parent: {
-  traceId: string;
-  parentSpanId: string;
-}): string {
+export function formatTraceparent(
+  parent: {
+    traceId: string;
+    parentSpanId: string;
+  },
+  options: { sampled?: boolean } = {},
+): string {
   if (!TRACE_ID_HEX_RE.test(parent.traceId)) {
     throw new Error(
       `nlpgoFetch.formatTraceparent: invalid traceId (need 32 hex chars), got: ${JSON.stringify(parent.traceId)}`,
@@ -48,7 +56,8 @@ export function formatTraceparent(parent: {
       `nlpgoFetch.formatTraceparent: invalid parentSpanId (need 16 hex chars), got: ${JSON.stringify(parent.parentSpanId)}`,
     );
   }
-  return `00-${parent.traceId.toLowerCase()}-${parent.parentSpanId.toLowerCase()}-01`;
+  const flags = options.sampled === false ? "00" : "01";
+  return `00-${parent.traceId.toLowerCase()}-${parent.parentSpanId.toLowerCase()}-${flags}`;
 }
 
 export interface NLPGOFetchOptions<TBody = unknown> {

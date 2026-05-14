@@ -841,9 +841,15 @@ const customEvaluation = async (
     throw new Error("Project not found");
   }
 
+  // do_not_trace=false on the wire so eval-emitted spans land under
+  // the parent trace's traceparent context (post-2026-05-14 fix). The
+  // explicit do_not_trace=false arg passed to runEvaluationWorkflow
+  // below already overrides this default, but pinning the field on
+  // the body itself keeps the wire shape honest if a future refactor
+  // drops the explicit override on runWorkflow.
   const requestBody: Record<string, any> = {
     trace_id: trace?.trace_id,
-    do_not_trace: true,
+    do_not_trace: false,
     ...data,
   };
 

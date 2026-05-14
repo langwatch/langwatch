@@ -213,6 +213,67 @@ describe("extractParentTraceForNlpgo", () => {
     });
     expect(extractParentTraceForNlpgo(trace)).toBeUndefined();
   });
+
+  describe("when the trace has multiple parent-less spans", () => {
+    // Broken / multi-source instrumentation can leave more than one
+    // root. find() would pick whichever happened to land first in the
+    // array — non-deterministic across re-runs. We pin the choice on
+    // earliest started_at (with span_id tie-break) so two consecutive
+    // eval runs against the same trace produce identical traceparent
+    // linkage.
+    const EARLIER_SPAN = "1111111111111111";
+    const LATER_SPAN = "9999999999999999";
+
+    it("picks the earliest started_at root deterministically", () => {
+      const trace = buildTrace({
+        trace_id: VALID_TRACE_ID,
+        spans: [
+          {
+            span_id: LATER_SPAN,
+            parent_id: null,
+            trace_id: VALID_TRACE_ID,
+            type: "span",
+            timestamps: { started_at: 200, finished_at: 300 },
+          } as any,
+          {
+            span_id: EARLIER_SPAN,
+            parent_id: null,
+            trace_id: VALID_TRACE_ID,
+            type: "span",
+            timestamps: { started_at: 100, finished_at: 150 },
+          } as any,
+        ],
+      });
+      expect(extractParentTraceForNlpgo(trace)?.parentSpanId).toBe(
+        EARLIER_SPAN,
+      );
+    });
+
+    it("falls back to span_id ordering when started_at ties", () => {
+      const trace = buildTrace({
+        trace_id: VALID_TRACE_ID,
+        spans: [
+          {
+            span_id: LATER_SPAN,
+            parent_id: null,
+            trace_id: VALID_TRACE_ID,
+            type: "span",
+            timestamps: { started_at: 100, finished_at: 150 },
+          } as any,
+          {
+            span_id: EARLIER_SPAN,
+            parent_id: null,
+            trace_id: VALID_TRACE_ID,
+            type: "span",
+            timestamps: { started_at: 100, finished_at: 150 },
+          } as any,
+        ],
+      });
+      expect(extractParentTraceForNlpgo(trace)?.parentSpanId).toBe(
+        EARLIER_SPAN,
+      );
+    });
+  });
 });
 
 describe("EvaluationExecutionService", () => {

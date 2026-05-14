@@ -89,7 +89,22 @@ export function extractParentTraceForNlpgo(
   trace: Trace | undefined,
 ): { traceId: string; parentSpanId: string } | undefined {
   if (!trace?.trace_id || !TRACE_ID_HEX.test(trace.trace_id)) return undefined;
-  const rootSpan = trace.spans?.find((s) => !s.parent_id);
+
+  // Broken / multi-source instrumentation can leave a trace with more
+  // than one parent-less span. `find()` would then pick whichever span
+  // happened to be ingested first — non-deterministic across re-runs.
+  // Sort by started_at (earliest is the true root in any sane trace)
+  // with span_id as the tie-breaker to keep two consecutive eval runs
+  // pinned to the same parent_span_id.
+  const rootCandidates = (trace.spans ?? []).filter((s) => !s.parent_id);
+  if (rootCandidates.length === 0) return undefined;
+  rootCandidates.sort((a, b) => {
+    const aStart = a.timestamps?.started_at ?? Number.MAX_SAFE_INTEGER;
+    const bStart = b.timestamps?.started_at ?? Number.MAX_SAFE_INTEGER;
+    if (aStart !== bStart) return aStart - bStart;
+    return (a.span_id ?? "").localeCompare(b.span_id ?? "");
+  });
+  const rootSpan = rootCandidates[0];
   if (!rootSpan?.span_id || !SPAN_ID_HEX.test(rootSpan.span_id)) return undefined;
   return {
     traceId: trace.trace_id.toLowerCase(),

@@ -246,5 +246,10 @@ export class TraceIOAccumulationService {
 function preferText(text: string | null | undefined, raw: unknown): string {
   if (typeof text === "string" && text.length > 0) return text;
   if (typeof raw === "string") return raw;
+  // JSON.stringify(undefined) returns the literal value `undefined`,
+  // not the string "undefined". Guard explicitly so a future caller
+  // that hands us `undefined` doesn't silently corrupt the trace
+  // summary with a non-string value cast to string.
+  if (raw === undefined) return "";
   return JSON.stringify(raw);
 }
