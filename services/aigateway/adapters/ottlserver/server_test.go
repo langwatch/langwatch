@@ -78,7 +78,7 @@ func TestServer_HandleTransform_ClaudeCodeFixture(t *testing.T) {
 	t.Parallel()
 	fixturePath, ok := locateFixture("specs/ai-governance/ingestion-sources/fixtures/claude-code-2.1.129-otlp-capture.jsonl")
 	if !ok {
-		t.Skip("fixture not committed (recorded capture lives in a separate artefact store); skipping until the fixture lands in the tree")
+		t.Skip("fixture not committed (recorded capture lives in a separate artifact store); skipping until the fixture lands in the tree")
 	}
 	bodies := loadOtlpLogBodies(t, fixturePath)
 	require.NotEmpty(t, bodies, "fixture must contain at least one POST /v1/logs body")
@@ -251,23 +251,11 @@ func loadOtlpLogBodies(t *testing.T, path string) [][]byte {
 	return out
 }
 
-// findFixture walks up from the test's working directory until it
-// finds the path. Lets the test run from the package directory or
-// from the repo root without dancing with relative paths.
-func findFixture(t *testing.T, rel string) string {
-	t.Helper()
-	path, ok := locateFixture(rel)
-	if !ok {
-		cwd, _ := os.Getwd()
-		t.Fatalf("could not locate fixture %q starting from %q", rel, cwd)
-	}
-	return path
-}
-
 // locateFixture walks up from the test's working directory to find a
-// fixture file. Unlike findFixture it does not fail the test — callers
-// can decide to skip when the fixture is missing (e.g. for fixtures
-// stored outside the repo).
+// fixture file. Returns ok=false when the fixture is missing so callers
+// can decide to skip (e.g. for fixtures stored outside the repo).
+// Lets the test run from the package directory or from the repo root
+// without dancing with relative paths.
 func locateFixture(rel string) (string, bool) {
 	cwd, err := os.Getwd()
 	if err != nil {
