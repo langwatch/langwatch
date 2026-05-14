@@ -649,12 +649,12 @@ describe("governance CLI wrappers — e2e", () => {
       const argv: string[] = [];
       let argc = 0;
       for (const line of stdout.split("\n")) {
-        const argMatch = line.match(/^ARG\[(\d+)\]=(.*)$/);
+        const argMatch = /^ARG\[(\d+)\]=(.*)$/.exec(line);
         if (argMatch) {
           argv[Number(argMatch[1])] = argMatch[2] ?? "";
           continue;
         }
-        const argcMatch = line.match(/^ARGC=(\d+)$/);
+        const argcMatch = /^ARGC=(\d+)$/.exec(line);
         if (argcMatch) argc = Number(argcMatch[1]);
       }
       return { argc, argv };

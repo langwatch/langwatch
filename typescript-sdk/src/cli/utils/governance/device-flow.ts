@@ -186,7 +186,7 @@ export async function exchange(
       // Pre-f9fcc3927 servers returned the device-session shape without
       // a `kind` field. Normalise so callers can always discriminate.
       if (!("kind" in body) || !body.kind) {
-        return { kind: "device_session", ...(body as LegacyExchangeResult) };
+        return { kind: "device_session", ...(body) };
       }
       return body as ExchangeResult;
     }

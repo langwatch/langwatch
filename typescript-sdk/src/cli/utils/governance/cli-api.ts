@@ -14,7 +14,7 @@
  *      `metadata.surface = 'cli'` per @audit-uniform.
  */
 
-import { GovernanceConfig } from "./config";
+import { type GovernanceConfig } from "./config";
 import {
   CLI_SURFACE_HEADER,
   CLI_SURFACE_VALUE,

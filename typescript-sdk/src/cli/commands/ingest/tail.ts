@@ -4,7 +4,7 @@ import { loadConfig, isLoggedIn } from "@/cli/utils/governance/config";
 import {
   getEventsForSource,
   GovernanceCliError,
-  ActivityEventDetailRow,
+  type ActivityEventDetailRow,
 } from "@/cli/utils/governance/cli-api";
 
 /**

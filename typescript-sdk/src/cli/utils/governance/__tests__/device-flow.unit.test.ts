@@ -147,7 +147,10 @@ describe("exchange", () => {
     await exchange({ baseUrl: url, fetchImpl }, "DC");
     expect(fetchImpl).toHaveBeenCalledTimes(1);
     const init = fetchImpl.mock.calls[0]?.[1] as RequestInit | undefined;
-    const sent = JSON.parse(String(init?.body ?? "{}")) as {
+    const rawBody = init?.body;
+    const sent = JSON.parse(
+      typeof rawBody === "string" ? rawBody : "{}",
+    ) as {
       device_code: string;
       client_info?: {
         hostname?: string;

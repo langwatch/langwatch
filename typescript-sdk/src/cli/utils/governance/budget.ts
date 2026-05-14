@@ -9,7 +9,7 @@
  * spawning the tool.
  */
 
-import { GovernanceConfig } from "./config";
+import { type GovernanceConfig } from "./config";
 
 export interface BudgetExceededPayload {
   type: string;
