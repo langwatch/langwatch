@@ -134,6 +134,14 @@ jobs:
             agentic-e2e-tests/pnpm-lock.yaml
             mcp-server/pnpm-lock.yaml
 
+      # node-pty@1.1.0 only ships prebuilds for darwin/win32, so on Linux
+      # its postinstall always falls back to `node-gyp rebuild`. With
+      # pnpm/action-setup v6's npm-bootstrap path, node-gyp isn't on PATH
+      # by default — install it globally before any install that hits
+      # mcp-server's onlyBuiltDependencies allowlist.
+      - name: Install node-gyp (for node-pty postinstall)
+        run: npm install -g node-gyp
+
       - name: Build mcp-server
         working-directory: mcp-server
         run: pnpm install --frozen-lockfile && pnpm run build
