@@ -527,7 +527,7 @@ const CONTENT_MODE_COPY: Record<ContentMode, { title: string; helper: string }> 
       "Drop user prompts and assistant completions before write — keep tokens, cost, model name, latency, and span shape intact for cost & ops dashboards. System messages still flow.",
   },
   strip_all: {
-    title: "Strip everything (no-spy)",
+    title: "Strip everything",
     helper:
       "Drop prompts, completions, AND system instructions. ClickHouse only sees metadata: tokens, cost, model, latency, and span structure. Strongest privacy posture; no LLM-content debugging from observability data.",
   },
@@ -557,7 +557,7 @@ function ContentModeSection({ organizationId }: { organizationId: string }) {
 
   return (
     <SectionCard
-      title="Content logging mode (no-spy)"
+      title="Content logging mode"
       subline="Controls whether gen_ai prompt/completion/system payloads from gateway-origin spans are persisted to ClickHouse. The receiver strips before write — content never lands at rest, even briefly."
     >
       <VStack align="stretch" gap={2}>
