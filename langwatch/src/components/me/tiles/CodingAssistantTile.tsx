@@ -27,22 +27,25 @@ import type { CodingAssistantConfig } from "./types";
  * Foreign URLs (acme-internal docs, public links the admin pasted on
  * purpose) are returned untouched.
  */
+const PRODUCTION_DOCS_HOST = "docs.langwatch.ai";
+
 function rewriteDocsHostForLocalDev(url: string | undefined): string | undefined {
   if (!url) return url;
-  const productionPrefix = "https://docs.langwatch.ai";
-  if (!url.startsWith(productionPrefix)) return url;
-  // `startsWith` alone would also match attacker hosts like
-  // `https://docs.langwatch.ai.evil.example/...`. Require a host
-  // boundary (path, query, or fragment delimiter) or exact-match
-  // before rewriting.
-  const tail = url.slice(productionPrefix.length);
-  const isExactHost = tail === "";
-  const hasHostBoundary =
-    tail.startsWith("/") || tail.startsWith("?") || tail.startsWith("#");
-  if (!isExactHost && !hasHostBoundary) return url;
+  // Parse and compare hosts explicitly so an attacker URL like
+  // `https://docs.langwatch.ai.evil.example/...` cannot be rewritten
+  // through a substring/startsWith match.
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return url;
+  }
+  if (parsed.protocol !== "https:" || parsed.host !== PRODUCTION_DOCS_HOST) {
+    return url;
+  }
   const base = getDocsBaseUrl();
-  if (base === productionPrefix) return url;
-  return base + tail;
+  if (base === `https://${PRODUCTION_DOCS_HOST}`) return url;
+  return base + parsed.pathname + parsed.search + parsed.hash;
 }
 
 interface Props {
