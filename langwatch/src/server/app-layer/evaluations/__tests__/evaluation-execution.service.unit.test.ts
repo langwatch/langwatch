@@ -19,6 +19,7 @@ import {
 } from "../errors";
 import {
   EvaluationExecutionService,
+  extractParentTraceForNlpgo,
   maxCausalityDepthOfSpans,
   type EvaluationExecutionDeps,
   type ModelEnvResolver,
@@ -110,6 +111,109 @@ function createTestService(overrides: TestOverrides = {}) {
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
+
+describe("extractParentTraceForNlpgo", () => {
+  // Returns the traceparent context (traceId + rootSpan.span_id) that
+  // gets propagated as a W3C `traceparent` header from TS to nlpgo so
+  // eval workflow spans land as children of the parent trace. Returning
+  // undefined makes nlpgo fall back to body-supplied trace_id (no
+  // parent linkage) — preferable to a fake parent_span_id that would
+  // render under a non-existent span in Studio's waterfall.
+  const VALID_TRACE_ID = "0af7651916cd43dd8448eb211c80319c";
+  const VALID_ROOT_SPAN_ID = "b7ad6b7169203331";
+
+  /** @scenario extractParentTraceForNlpgo returns context for valid OTel trace */
+  it("returns {traceId, parentSpanId} when trace_id is 32-hex and root span is 16-hex", () => {
+    const trace = buildTrace({
+      trace_id: VALID_TRACE_ID,
+      spans: [
+        {
+          span_id: VALID_ROOT_SPAN_ID,
+          parent_id: null,
+          trace_id: VALID_TRACE_ID,
+          type: "span",
+          timestamps: { started_at: 0, finished_at: 0 },
+        } as any,
+      ],
+    });
+    expect(extractParentTraceForNlpgo(trace)).toEqual({
+      traceId: VALID_TRACE_ID,
+      parentSpanId: VALID_ROOT_SPAN_ID,
+    });
+  });
+
+  it("lowercases the IDs so callers pass either case", () => {
+    const trace = buildTrace({
+      trace_id: VALID_TRACE_ID.toUpperCase(),
+      spans: [
+        {
+          span_id: VALID_ROOT_SPAN_ID.toUpperCase(),
+          parent_id: null,
+          trace_id: VALID_TRACE_ID.toUpperCase(),
+          type: "span",
+          timestamps: { started_at: 0, finished_at: 0 },
+        } as any,
+      ],
+    });
+    const result = extractParentTraceForNlpgo(trace);
+    expect(result?.traceId).toBe(VALID_TRACE_ID);
+    expect(result?.parentSpanId).toBe(VALID_ROOT_SPAN_ID);
+  });
+
+  /** @scenario extractParentTraceForNlpgo returns undefined for legacy trace_id shapes */
+  it("returns undefined when trace_id is the legacy trace_<nanoid> shape", () => {
+    const trace = buildTrace({
+      trace_id: "trace_abc123xyz",
+      spans: [
+        {
+          span_id: VALID_ROOT_SPAN_ID,
+          parent_id: null,
+          trace_id: "trace_abc123xyz",
+          type: "span",
+          timestamps: { started_at: 0, finished_at: 0 },
+        } as any,
+      ],
+    });
+    expect(extractParentTraceForNlpgo(trace)).toBeUndefined();
+  });
+
+  it("returns undefined when there is no root span", () => {
+    const trace = buildTrace({
+      trace_id: VALID_TRACE_ID,
+      spans: [
+        {
+          span_id: "0000000000000001",
+          // Not a root — has a parent_id.
+          parent_id: "0000000000000099",
+          trace_id: VALID_TRACE_ID,
+          type: "span",
+          timestamps: { started_at: 0, finished_at: 0 },
+        } as any,
+      ],
+    });
+    expect(extractParentTraceForNlpgo(trace)).toBeUndefined();
+  });
+
+  it("returns undefined when trace is undefined", () => {
+    expect(extractParentTraceForNlpgo(undefined)).toBeUndefined();
+  });
+
+  it("returns undefined when the root span_id is malformed (not 16-hex)", () => {
+    const trace = buildTrace({
+      trace_id: VALID_TRACE_ID,
+      spans: [
+        {
+          span_id: "span_legacy_format",
+          parent_id: null,
+          trace_id: VALID_TRACE_ID,
+          type: "span",
+          timestamps: { started_at: 0, finished_at: 0 },
+        } as any,
+      ],
+    });
+    expect(extractParentTraceForNlpgo(trace)).toBeUndefined();
+  });
+});
 
 describe("EvaluationExecutionService", () => {
   describe("executeForTrace()", () => {
@@ -223,6 +327,12 @@ describe("EvaluationExecutionService", () => {
           }),
           undefined,
           expect.any(Number),
+          // parentTrace: defaultTrace's trace_id is "trace-1" (not
+          // 32-hex), so extractParentTraceForNlpgo returns undefined.
+          // Adapter-level OTel trace_ids would set this to a real
+          // {traceId, parentSpanId} — separately covered by
+          // extractParentTraceForNlpgo's own tests.
+          undefined,
         );
       });
 

@@ -91,6 +91,50 @@ Feature: Online-evaluator infinite-loop prevention
     And a warning is logged that the guard is disabled
 
   # ============================================================================
+  # TS-side dispatch: traceparent + parent-span context propagation to nlpgo.
+  #
+  # The eval-execution service runs in TS. It calls nlpgoFetch to dispatch
+  # the eval workflow. For nlpgo's emitted spans to land as children of the
+  # parent trace (not as a separate orphan trace — the 2026-05-14 prod bug),
+  # nlpgoFetch must send a valid W3C `traceparent` header derived from the
+  # parent trace's root span.
+  # ============================================================================
+
+  @unit @loop-prevention @traceparent
+  Scenario: formatTraceparent builds a valid W3C traceparent header
+    Given traceId is a 32-hex string
+    And parentSpanId is a 16-hex string
+    When formatTraceparent is called
+    Then the result is "00-<traceId>-<parentSpanId>-01"
+
+  @unit @loop-prevention @traceparent
+  Scenario: formatTraceparent rejects malformed traceId
+    Given a non-32-hex traceId
+    When formatTraceparent is called
+    Then it throws (loud failure — silent broken header would orphan traces in prod)
+
+  @unit @loop-prevention @traceparent
+  Scenario: formatTraceparent rejects malformed parentSpanId
+    Given a non-16-hex parentSpanId
+    When formatTraceparent is called
+    Then it throws
+
+  @unit @loop-prevention @traceparent
+  Scenario: extractParentTraceForNlpgo returns context for valid OTel trace
+    Given the parent trace has a 32-hex trace_id and a 16-hex root span_id
+    When extractParentTraceForNlpgo runs
+    Then it returns the lowercased trace_id and root span_id
+
+  @unit @loop-prevention @traceparent
+  Scenario: extractParentTraceForNlpgo returns undefined for legacy trace_id shapes
+    Given the parent trace has a legacy trace_<nanoid> trace_id
+    When extractParentTraceForNlpgo runs
+    Then it returns undefined
+    # nlpgo falls back to body-supplied trace_id when no traceparent header
+    # arrives — better than synthesizing a parent_span_id that would
+    # render under a non-existent span in Studio's waterfall.
+
+  # ============================================================================
   # nlpgo-side guarantees (Go tests live in services/nlpgo/...)
   # ============================================================================
 
