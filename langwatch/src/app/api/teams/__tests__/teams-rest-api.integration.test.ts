@@ -388,10 +388,10 @@ describe("Feature: Teams REST API", () => {
         }),
     };
 
-    /** @scenario Viewer can list teams */
-    it("allows viewer to list teams", async () => {
+    /** @scenario Viewer cannot list teams */
+    it("returns 403 when viewer lists teams", async () => {
       const res = await viewerApi.get("/api/teams");
-      expect(res.status).toBe(200);
+      expect(res.status).toBe(403);
     });
 
     /** @scenario Viewer cannot create a team */

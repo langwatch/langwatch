@@ -146,10 +146,10 @@ Feature: Teams REST API
   # ============================================================================
 
   @integration
-  Scenario: Viewer can list teams
+  Scenario: Viewer cannot list teams
     Given I am authenticated with a viewer-scoped API key
     When I GET /api/teams
-    Then the response status is 200
+    Then the response status is 403
 
   @integration
   Scenario: Viewer cannot create a team
