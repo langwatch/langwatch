@@ -1,7 +1,45 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
-import { applySpanToSummary } from "../traceSummary.foldProjection";
+import { createTenantId } from "~/server/event-sourcing";
+import {
+  TRACE_NAME_CHANGED_EVENT_TYPE,
+  TRACE_NAME_CHANGED_EVENT_VERSION_LATEST,
+} from "../../schemas/constants";
+import type { TraceNameChangedEvent } from "../../schemas/events";
+import {
+  applySpanToSummary,
+  TraceSummaryFoldProjection,
+} from "../traceSummary.foldProjection";
 import { createInitState, createTestSpan } from "./fixtures/trace-summary-test.fixtures";
+
+function makeTraceNameChangedEvent({
+  newName,
+  changedByUserId = null,
+}: {
+  newName: string;
+  changedByUserId?: string | null;
+}): TraceNameChangedEvent {
+  return {
+    id: `evt-rename-${newName}`,
+    type: TRACE_NAME_CHANGED_EVENT_TYPE,
+    version: TRACE_NAME_CHANGED_EVENT_VERSION_LATEST,
+    aggregateType: "trace",
+    aggregateId: "trace-1",
+    tenantId: createTenantId("tenant-1"),
+    createdAt: Date.now(),
+    occurredAt: Date.now(),
+    data: { traceId: "trace-1", newName, changedByUserId },
+    metadata: {},
+  };
+}
+
+function makeProjection() {
+  const store = {
+    store: async () => {},
+    get: async () => null,
+  };
+  return new TraceSummaryFoldProjection({ store });
+}
 
 describe("applySpanToSummary() trace name extraction", () => {
   beforeEach(() => {
@@ -99,8 +137,8 @@ describe("applySpanToSummary() trace name extraction", () => {
   });
 
   describe("when multiple root spans exist", () => {
-    /** @scenario Multiple root spans use earliest start time */
-    it("uses the root span with earliest start time", () => {
+    /** @scenario Trace name is sticky once set */
+    it("keeps the first set trace name even when an earlier root arrives later", () => {
       const laterRoot = createTestSpan({
         id: "root-2",
         spanId: "root-2",
@@ -121,9 +159,11 @@ describe("applySpanToSummary() trace name extraction", () => {
       let state = applySpanToSummary({ state: createInitState(), span: laterRoot });
       expect(state.traceName).toBe("manual-handler");
 
-      // Earlier root arrives later — should overwrite
+      // Earlier root arrives second — trace name is sticky, but the
+      // canonical-root metadata still rotates to the truly earlier one.
       state = applySpanToSummary({ state, span: earlierRoot });
-      expect(state.traceName).toBe("auto-instrumented-GET");
+      expect(state.traceName).toBe("manual-handler");
+      expect(state.rootSpanStartTimeMs).toBe(1000);
     });
 
     it("keeps earlier root name when later root arrives second", () => {
@@ -201,6 +241,116 @@ describe("applySpanToSummary() trace name extraction", () => {
       // Later empty-named root should NOT overwrite
       state = applySpanToSummary({ state, span: emptyNameRoot });
       expect(state.traceName).toBe("OrderAgent");
+    });
+  });
+
+  describe("when the user emits a TraceNameChanged event", () => {
+    it("overrides the existing trace name", () => {
+      const projection = makeProjection();
+      const root = createTestSpan({
+        id: "root-1",
+        spanId: "root-1",
+        parentSpanId: null,
+        name: "OrderAgent",
+        startTimeUnixMs: 1000,
+      });
+      let state = applySpanToSummary({ state: createInitState(), span: root });
+      expect(state.traceName).toBe("OrderAgent");
+
+      state = projection.apply(
+        state,
+        makeTraceNameChangedEvent({ newName: "Customer support — high priority" }),
+      );
+
+      expect(state.traceName).toBe("Customer support — high priority");
+      expect(state.traceNameUserOverridden).toBe(true);
+    });
+
+    it("survives a later root-span arrival that would otherwise overwrite the name", () => {
+      // The original bug: a delayed earlier root span landing post-rename
+      // wiped the user's edit because the projection unconditionally
+      // overwrote `traceName` whenever a "better" root span arrived. Pin
+      // the latch so the rename sticks.
+      const projection = makeProjection();
+      const lateRoot = createTestSpan({
+        id: "root-1",
+        spanId: "root-1",
+        parentSpanId: null,
+        name: "auto-instrumented-GET",
+        startTimeUnixMs: 2000,
+      });
+      let state = applySpanToSummary({ state: createInitState(), span: lateRoot });
+      expect(state.traceName).toBe("auto-instrumented-GET");
+
+      state = projection.apply(
+        state,
+        makeTraceNameChangedEvent({ newName: "Manually labelled trace" }),
+      );
+      expect(state.traceName).toBe("Manually labelled trace");
+
+      // Earlier-named root span shows up after the rename — without the
+      // override latch, this would silently revert the user's edit.
+      const earlierRoot = createTestSpan({
+        id: "root-2",
+        spanId: "root-2",
+        parentSpanId: null,
+        name: "auto-instrumented-POST",
+        startTimeUnixMs: 1000,
+      });
+      state = applySpanToSummary({ state, span: earlierRoot });
+
+      expect(state.traceName).toBe("Manually labelled trace");
+      expect(state.traceNameUserOverridden).toBe(true);
+      // rootSpanType still updates from the discovered span — the latch
+      // only protects the user-facing name.
+      expect(state.rootSpanStartTimeMs).toBe(1000);
+    });
+
+    it("still records rootSpanType/StartTimeMs when the rename arrives before any root span", () => {
+      // Regression: the canonical-root gate used to be `traceName !== ""`,
+      // which a TraceNameChanged event could trip before any root span
+      // existed — freezing out later root-span discoveries entirely. The
+      // gate is now anchored on `rootSpanStartTimeMs` so root metadata
+      // still populates even when the name is latched.
+      const projection = makeProjection();
+      let state = createInitState();
+
+      state = projection.apply(
+        state,
+        makeTraceNameChangedEvent({ newName: "Manually labelled trace" }),
+      );
+      expect(state.traceName).toBe("Manually labelled trace");
+      expect(state.rootSpanStartTimeMs).toBeUndefined();
+
+      const root = createTestSpan({
+        id: "root-1",
+        spanId: "root-1",
+        parentSpanId: null,
+        name: "auto-instrumented-GET",
+        startTimeUnixMs: 1500,
+      });
+      state = applySpanToSummary({ state, span: root });
+
+      expect(state.traceName).toBe("Manually labelled trace");
+      expect(state.traceNameUserOverridden).toBe(true);
+      expect(state.rootSpanStartTimeMs).toBe(1500);
+    });
+
+    it("can be replayed multiple times with the latest value winning", () => {
+      const projection = makeProjection();
+      let state = createInitState();
+
+      state = projection.apply(
+        state,
+        makeTraceNameChangedEvent({ newName: "First rename" }),
+      );
+      state = projection.apply(
+        state,
+        makeTraceNameChangedEvent({ newName: "Second rename" }),
+      );
+
+      expect(state.traceName).toBe("Second rename");
+      expect(state.traceNameUserOverridden).toBe(true);
     });
   });
 });

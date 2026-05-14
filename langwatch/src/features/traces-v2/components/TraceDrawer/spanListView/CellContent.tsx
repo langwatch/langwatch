@@ -107,7 +107,6 @@ export function FooterCell({
             color="fg.muted"
           >
             {totals.duration === 0 ? "<1ms" : formatDuration(totals.duration)}
-            {!isFiltered && "*"}
           </Text>
         </Tooltip>
       );

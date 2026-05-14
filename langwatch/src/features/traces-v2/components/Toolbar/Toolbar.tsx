@@ -4,6 +4,7 @@ import type React from "react";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useTourEntryPoints } from "../../onboarding";
 import { useFindStore } from "../../stores/findStore";
+import { AutomateButton } from "./AutomateButton";
 import { ColumnsDropdown } from "./ColumnsDropdown";
 import { DensityToggle } from "./DensityToggle";
 import { GroupingSelector } from "./GroupingSelector";
@@ -99,6 +100,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll }) => {
             </IconButton>
           </Tooltip>
         )}
+        <AutomateButton />
         <KeyboardShortcutsButton />
       </Flex>
     </Flex>

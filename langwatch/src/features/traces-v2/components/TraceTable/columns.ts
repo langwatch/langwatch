@@ -11,26 +11,59 @@ const groupCol = createColumnHelper<TraceGroup>();
 const num: ColumnMeta = { align: "right" };
 const flex: ColumnMeta = { flex: true };
 
-export const traceAtomicColumnDefs: Record<
-  string,
-  ColumnDef<TraceListItem, any>
-> = {
-  // The backend `SORT_COLUMN_MAP` (server/app-layer/traces/trace-list.service.ts)
-  // covers only the numeric/time columns. UI sorting is disabled here for
-  // columns the backend silently falls back to `OccurredAt` on — clicking
-  // those headers used to look like a no-op.
-  "span-name": traceCol.accessor((row) => row.traceName || row.name, {
-    id: "span-name",
-    header: "Name",
+const traceColumnDefs = {
+  time: traceCol.accessor("timestamp", {
+    id: "time",
+    header: "Time",
+    size: 60,
+    minSize: 60,
+    enableResizing: false,
+  }),
+  trace: traceCol.accessor("name", {
+    id: "trace",
+    header: "Trace (summary)",
+    // Was flex (`size: 9999, meta.flex`) so the column absorbed every
+    // pixel of leftover space — fine on a typical lens with eight to
+    // ten columns visible, but with a slimmer column set (or a
+    // collapsed sidebar) the trace cell ballooned out to 800px+ of
+    // mostly empty whitespace beside the name + ID. Pinning the
+    // default to `560px` (and capping the resize range to 320–820)
+    // keeps the cell legible when it has room AND prevents
+    // pathological growth when the user trims columns. Resizing
+    // still works because non-flex columns honour `getSize()` width
+    // directly.
+    size: 560,
+    minSize: 320,
+    maxSize: 820,
+    meta: { skeletonLines: 2 },
+    enableSorting: false,
+  }),
+  // Broken-out alternates to the composite `trace` column. Lenses can mix
+  // and match: engineers tend to prefer the dense `trace` summary; product
+  // people prefer dedicated input/output columns. They live here as
+  // first-class options so the column picker can toggle them. Trace name
+  // and root span name are split because the composite cell falls back
+  // from the former to the latter — exposing them separately lets the
+  // user see both when they diverge.
+  "trace-name": traceCol.accessor((row) => row.traceName ?? "", {
+    id: "trace-name",
+    header: "Trace name",
     size: 200,
     minSize: 140,
     enableSorting: false,
   }),
-  "span-type": traceCol.accessor((row) => row.rootSpanType ?? "", {
-    id: "span-type",
-    header: "Type",
-    size: 80,
-    minSize: 70,
+  "root-span-name": traceCol.accessor((row) => row.name ?? "", {
+    id: "root-span-name",
+    header: "Root span name",
+    size: 200,
+    minSize: 140,
+    enableSorting: false,
+  }),
+  "root-span-type": traceCol.accessor((row) => row.rootSpanType ?? "", {
+    id: "root-span-type",
+    header: "Root span type",
+    size: 90,
+    minSize: 80,
     enableSorting: false,
   }),
   "trace-id": traceCol.accessor("traceId", {
@@ -61,35 +94,6 @@ export const traceAtomicColumnDefs: Record<
     header: "Error",
     size: 320,
     minSize: 220,
-    enableSorting: false,
-  }),
-};
-
-const traceColumnDefs = {
-  time: traceCol.accessor("timestamp", {
-    id: "time",
-    header: "Time",
-    size: 60,
-    minSize: 60,
-    enableResizing: false,
-  }),
-  trace: traceCol.accessor("name", {
-    id: "trace",
-    header: "Trace",
-    // Was flex (`size: 9999, meta.flex`) so the column absorbed every
-    // pixel of leftover space — fine on a typical lens with eight to
-    // ten columns visible, but with a slimmer column set (or a
-    // collapsed sidebar) the trace cell ballooned out to 800px+ of
-    // mostly empty whitespace beside the name + ID. Pinning the
-    // default to `560px` (and capping the resize range to 320–820)
-    // keeps the cell legible when it has room AND prevents
-    // pathological growth when the user trims columns. Resizing
-    // still works because non-flex columns honour `getSize()` width
-    // directly.
-    size: 560,
-    minSize: 320,
-    maxSize: 820,
-    meta: { skeletonLines: 2 },
     enableSorting: false,
   }),
   service: traceCol.accessor("serviceName", {
@@ -141,8 +145,15 @@ const traceColumnDefs = {
   evaluations: traceCol.accessor((row) => row.evaluations.length, {
     id: "evaluations",
     header: "Evals",
-    size: 400,
-    minSize: 200,
+    // Default sized for the common case (0–2 evaluator chips per row).
+    // With chips capped at ~120px each (name truncated to 80px + score +
+    // borders + gap), 280px fits the typical two-chip row without
+    // padding waste; long evaluator names truncate inside the chip and
+    // surface the full name on hover. `maxSize` keeps an over-eager
+    // resize from punching the trace column off-screen.
+    size: 280,
+    minSize: 160,
+    maxSize: 640,
     enableSorting: false,
   }),
   events: traceCol.accessor((row) => row.events.length, {
@@ -350,44 +361,6 @@ export function buildTraceColumns(
   return ids
     .map((id) => traceColumnDefsByString[id])
     .filter((def): def is ColumnDef<TraceListItem, any> => Boolean(def));
-}
-
-export function getTraceColumnDef(
-  id: string,
-): ColumnDef<TraceListItem, any> | undefined {
-  return traceColumnDefsByString[id] ?? traceAtomicColumnDefs[id];
-}
-
-export function makeEvalColumnDef(
-  evaluatorId: string,
-  evaluatorName: string | null,
-): ColumnDef<TraceListItem, any> {
-  return traceCol.accessor(
-    (row) =>
-      row.evaluations.find((e) => e.evaluatorId === evaluatorId)?.score ?? 0,
-    {
-      id: `eval:${evaluatorId}`,
-      header: evaluatorName ?? evaluatorId,
-      size: 130,
-      minSize: 100,
-      enableSorting: false,
-    },
-  );
-}
-
-export function makeEventColumnDef(
-  name: string,
-): ColumnDef<TraceListItem, any> {
-  return traceCol.accessor(
-    (row) => row.events.filter((e) => e.name === name).length,
-    {
-      id: `event:${name}`,
-      header: name,
-      size: 110,
-      minSize: 90,
-      enableSorting: false,
-    },
-  );
 }
 
 export function buildConversationColumns(

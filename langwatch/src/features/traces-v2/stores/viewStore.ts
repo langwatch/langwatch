@@ -17,7 +17,7 @@ export interface SortConfig {
 export interface ColumnConfig {
   id: string;
   label: string;
-  section: "standard" | "evaluations" | "events";
+  section: "standard" | "fields" | "evaluations" | "events";
   visible: boolean;
   pinned?: "left";
   minWidth: number;
@@ -323,6 +323,35 @@ const builtInLenses: LensConfig[] = [
     isBuiltIn: true,
     columns: ["time", "trace", "input", "output", "evaluations", "events"],
     addons: ["io-preview"],
+    grouping: "flat",
+    sort: DEFAULT_SORT,
+    filterText: "",
+  },
+  {
+    // "Fields" lens: the PM-friendly column shape — each piece of trace
+    // metadata in its own column, including separate Input and Output.
+    // Engineers tend to prefer the dense "trace" composite cell; product
+    // people prefer scannable per-field columns. Both are now lens-level
+    // choices instead of being conflated with display density.
+    id: "by-field",
+    name: "By Field",
+    isBuiltIn: true,
+    columns: [
+      "time",
+      "trace-name",
+      "root-span-name",
+      "root-span-type",
+      "input",
+      "output",
+      "service",
+      "duration",
+      "cost",
+      "tokens",
+      "model",
+      "evaluations",
+      "events",
+    ],
+    addons: ["expanded-peek"],
     grouping: "flat",
     sort: DEFAULT_SORT,
     filterText: "",

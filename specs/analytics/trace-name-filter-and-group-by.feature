@@ -46,12 +46,14 @@ Feature: Trace Name Filter and Group-By
     Then the TraceName field still equals "OrderAgent"
 
   @unit
-  Scenario: Multiple root spans use earliest start time
+  Scenario: Trace name is sticky once set
     Given a trace with two root spans
     And the first root span starts at T1 with name "auto-instrumented-GET"
     And the second root span starts at T2 (after T1) with name "manual-handler"
-    When both spans are processed in any order
-    Then the TraceName field equals "auto-instrumented-GET"
+    When the later root "manual-handler" is processed first
+    And the earlier root "auto-instrumented-GET" is processed second
+    Then the TraceName field stays equal to "manual-handler"
+    And the canonical root start time rotates to T1
 
   # ---------------------------------------------------------------------------
   # Filter: trace name appears as a filter dimension

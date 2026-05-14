@@ -34,12 +34,6 @@ export function formatTokens(tokens: number): string {
   return `${tokens}`;
 }
 
-const PROVIDER_ABBREVIATIONS: Readonly<Record<string, string>> = {
-  openai: "oai",
-  anthropic: "ant",
-  google: "ggl",
-};
-
 const MODEL_ABBREVIATIONS: ReadonlyArray<readonly [from: string, to: string]> =
   [
     ["gpt-4o-mini", "4o-mini"],
@@ -56,12 +50,11 @@ export function abbreviateModel(model: string): string {
   if (slash < 0) return model;
   const provider = model.slice(0, slash);
   const name = model.slice(slash + 1);
-  const shortProvider = PROVIDER_ABBREVIATIONS[provider] ?? provider;
   let shortName = name;
   for (const [from, to] of MODEL_ABBREVIATIONS) {
     shortName = shortName.replace(from, to);
   }
-  return `${shortProvider}/${shortName}`;
+  return `${provider}/${shortName}`;
 }
 
 export function formatWallClock(startMs: number, endMs: number): string {

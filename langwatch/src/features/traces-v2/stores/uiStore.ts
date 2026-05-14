@@ -9,6 +9,11 @@ import { create } from "zustand";
  */
 interface UIState {
   sidebarCollapsed: boolean;
+  // Transient override used only on mobile (< md). The persisted
+  // `sidebarCollapsed` is the user's desktop preference; on a narrow
+  // viewport we force-collapse regardless, but the user can opt back
+  // in for the rest of the session via this flag.
+  mobileExpandedOverride: boolean;
   syntaxHelpOpen: boolean;
   shortcutsHelpOpen: boolean;
 
@@ -57,12 +62,29 @@ function persistUI(snapshot: Persisted): void {
 
 const initial = loadPersistedUI();
 
+// Chakra's default `md` breakpoint is 48em — match that here so the
+// store and `useBreakpointValue({ base, md })` in FilterAside agree on
+// where "mobile" ends.
+function isBelowMdViewport(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.matchMedia("(max-width: 47.99em)").matches;
+}
+
 export const useUIStore = create<UIState>((set, get) => ({
   sidebarCollapsed: initial.sidebarCollapsed,
+  mobileExpandedOverride: false,
   syntaxHelpOpen: false,
   shortcutsHelpOpen: false,
 
   toggleSidebar: () => {
+    // On mobile we don't touch the persisted desktop preference — the
+    // user is just opting in/out for this session. Without this gate
+    // the persisted flag would be set to `expanded` on a 390px viewport
+    // and silently bleed into the next desktop session.
+    if (isBelowMdViewport()) {
+      set({ mobileExpandedOverride: !get().mobileExpandedOverride });
+      return;
+    }
     const next = !get().sidebarCollapsed;
     set({ sidebarCollapsed: next });
     persistUI({ sidebarCollapsed: next });

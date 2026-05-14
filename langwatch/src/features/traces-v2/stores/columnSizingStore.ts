@@ -41,13 +41,32 @@ function load(): Record<string, ColumnSizing> {
   }
 }
 
+/**
+ * Debounce the localStorage write. `columnResizeMode: "onChange"` fires
+ * setSizing on every mousemove during a drag — without throttling we
+ * synchronously JSON-stringify and rewrite the entire blob ~60×/sec,
+ * which shows up as visible jitter while resizing. Coalesce into one
+ * write per idle frame; the in-memory store updates immediately so the
+ * UI still reflects the latest width with zero perceived lag.
+ */
+let persistTimer: ReturnType<typeof setTimeout> | null = null;
+let pendingPersist: Record<string, ColumnSizing> | null = null;
+
 function persist(byKey: Record<string, ColumnSizing>): void {
   if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(byKey));
-  } catch {
-    // storage may be full / disabled
-  }
+  pendingPersist = byKey;
+  if (persistTimer !== null) return;
+  persistTimer = setTimeout(() => {
+    persistTimer = null;
+    const snapshot = pendingPersist;
+    pendingPersist = null;
+    if (!snapshot) return;
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
+    } catch {
+      // storage may be full / disabled
+    }
+  }, 120);
 }
 
 export const useColumnSizingStore = create<ColumnSizingState>((set) => ({

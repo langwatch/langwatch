@@ -5,10 +5,16 @@ import {
   generateTraceAction,
   generateTraceQueryFromPrompt,
 } from "~/server/app-layer/traces/ai-query";
+import { ValidationError } from "~/server/app-layer/domain-error";
 import { TraceNotFoundError } from "~/server/app-layer/traces/errors";
 import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to-clickhouse";
 import type { SpanSummaryRow } from "~/server/app-layer/traces/repositories/span-storage.repository";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import { changeTraceNameInputSchema } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
+import {
+  TRACE_NAME_MAX_LENGTH,
+  TRACE_NAME_MIN_LENGTH,
+} from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
 import type { Span, SpanInputOutput } from "~/server/tracer/types";
 import { checkProjectPermission } from "../rbac";
 import type {
@@ -466,6 +472,53 @@ export const tracesV2Router = createTRPCRouter({
         throw new TraceNotFoundError(input.traceId);
       }
       return mapTraceSummaryToHeader(summary);
+    }),
+
+  /**
+   * Lets a user rename a trace. Trim happens in the procedure so the event
+   * always carries a canonical form, then the schema check rejects empty /
+   * over-long names — when those rejections fire we surface them as a
+   * `ValidationError` (DomainError), so the client receives the rich
+   * `domainError` payload via tRPC's error formatter alongside the safe
+   * user-facing message. The command pipeline still re-validates via Zod
+   * as a defence-in-depth check (replays from a poisoned event store).
+   */
+  changeName: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        traceId: z.string(),
+        newName: z.string(),
+      }),
+    )
+    .use(checkProjectPermission("traces:update"))
+    .mutation(async ({ input, ctx }) => {
+      const trimmed = input.newName.trim();
+      const parsed = changeTraceNameInputSchema.safeParse({ newName: trimmed });
+      if (!parsed.success) {
+        throw new ValidationError(
+          `Trace name must be between ${TRACE_NAME_MIN_LENGTH} and ${TRACE_NAME_MAX_LENGTH} characters after trimming`,
+          {
+            meta: {
+              field: "newName",
+              minLength: TRACE_NAME_MIN_LENGTH,
+              maxLength: TRACE_NAME_MAX_LENGTH,
+              receivedLength: trimmed.length,
+              fieldErrors: parsed.error.flatten().fieldErrors,
+            },
+          },
+        );
+      }
+
+      await getApp().traces.changeTraceName({
+        tenantId: input.projectId,
+        traceId: input.traceId,
+        newName: parsed.data.newName,
+        changedByUserId: ctx.session.user.id,
+        occurredAt: Date.now(),
+      });
+
+      return { traceId: input.traceId, newName: parsed.data.newName };
     }),
 
   spansPaginated: protectedProcedure

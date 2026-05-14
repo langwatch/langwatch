@@ -156,5 +156,39 @@ describe("traceSummary span flags", () => {
         expect(result.spanCount).toBe(0);
       });
     });
+
+    describe("when it carries an event payload", () => {
+      it("hoists the event onto the trace summary", () => {
+        // /api/track_event creates a synthetic `langwatch.track_event`
+        // span and stuffs the user-tracked event into `span.events`. The
+        // synthetic-span guard used to early-return before
+        // `accumulateEvents` ran, so the event vanished. Pin the fix.
+        const state = createInitState();
+        const span = createTestSpan({
+          parentSpanId: null,
+          name: "langwatch.track_event",
+          spanId: "evt-span-1",
+          events: [
+            {
+              name: "thumbs_up_down",
+              timeUnixMs: 1700,
+              attributes: { value: "up" },
+            },
+          ],
+        });
+
+        const result = applySpanToSummary({ state, span });
+
+        expect(result.events).toHaveLength(1);
+        expect(result.events?.[0]).toMatchObject({
+          spanId: "evt-span-1",
+          name: "thumbs_up_down",
+          attributes: { value: "up" },
+        });
+        // Timing/cost still un-touched — synthetic spans don't represent
+        // real execution.
+        expect(result.spanCount).toBe(0);
+      });
+    });
   });
 });

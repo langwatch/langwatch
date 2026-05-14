@@ -166,4 +166,17 @@ export const editorStyles: SystemStyleObject = {
     borderColor: "red.muted",
     color: "red.fg",
   },
+  // Back-propagate hover from the X button onto the left half of the chip
+  // so the whole pill reads "about to delete" — without this the variant
+  // tint (green for numeric, purple for scenario, etc.) stayed on the
+  // left half while only the X button turned red, which made the hover
+  // state look broken.
+  "& .filter-token:has(+ .filter-token-delete:hover)": {
+    background: "red.subtle",
+    borderColor: "red.muted",
+  },
+  "& .filter-token:has(+ .filter-token-delete:active)": {
+    background: "red.muted",
+    borderColor: "red.muted",
+  },
 };

@@ -13,6 +13,7 @@ import { IOViewer } from "../IOViewer";
 import { ScopeBlock, ScopeChip } from "../ScopeChip";
 import { AccordionShell, Section } from "./AccordionShell";
 import { EmptyEventsState, EmptyHint } from "./EmptyStates";
+import { EventCard } from "./EventCard";
 import { useAutoOpenSections } from "./sectionPresence";
 import { countFlatLeaves } from "./utils";
 
@@ -113,7 +114,6 @@ export function TraceSummaryAccordions({
                 title="Input and Output"
                 empty={!hasIO}
                 isFirst={isFirst}
-                stackIndex={idx}
                 open={isOpen}
               >
                 {hasIO ? (
@@ -156,7 +156,6 @@ export function TraceSummaryAccordions({
                 count={attrCount}
                 empty={!hasAttributes && !resources.isLoading}
                 isFirst={isFirst}
-                stackIndex={idx}
                 open={isOpen}
               >
                 {hasAttributes ? (
@@ -184,7 +183,6 @@ export function TraceSummaryAccordions({
                 value="scope"
                 title="Instrumentation Scope"
                 isFirst={isFirst}
-                stackIndex={idx}
                 open={isOpen}
               >
                 <ScopeBlock scope={resources.scope} />
@@ -198,7 +196,6 @@ export function TraceSummaryAccordions({
                 value="exceptions"
                 title="Exceptions"
                 isFirst={isFirst}
-                stackIndex={idx}
                 open={isOpen}
               >
                 <HStack
@@ -243,7 +240,6 @@ export function TraceSummaryAccordions({
                   pendingCount === 0
                 }
                 isFirst={isFirst}
-                stackIndex={idx}
                 open={isOpen}
               >
                 {evalsLoading ? (
@@ -274,35 +270,20 @@ export function TraceSummaryAccordions({
               count={traceEvents.length > 0 ? traceEvents.length : undefined}
               empty={traceEvents.length === 0}
               isFirst={isFirst}
-                stackIndex={idx}
               open={isOpen}
             >
               {traceEvents.length > 0 ? (
-                <VStack align="stretch" gap={1}>
+                <VStack align="stretch" gap={2}>
                   {traceEvents.map((evt, i) => (
-                    <HStack key={`${evt.spanId}-${evt.timestamp}-${i}`} gap={3}>
-                      <Text textStyle="xs" fontWeight="medium">
-                        {evt.name}
-                      </Text>
-                      <Text textStyle="xs" color="fg.subtle" fontFamily="mono">
-                        +
-                        {Math.max(
-                          0,
-                          Math.round(evt.timestamp - trace.timestamp),
-                        )}
-                        ms
-                      </Text>
-                      {onSelectSpan && evt.spanId && (
-                        <Button
-                          size="xs"
-                          variant="ghost"
-                          marginLeft="auto"
-                          onClick={() => onSelectSpan(evt.spanId)}
-                        >
-                          View span
-                        </Button>
-                      )}
-                    </HStack>
+                    <EventCard
+                      key={`${evt.spanId}-${evt.timestamp}-${i}`}
+                      name={evt.name}
+                      timestampMs={evt.timestamp}
+                      anchorMs={trace.timestamp}
+                      attributes={evt.attributes}
+                      spanId={evt.spanId}
+                      onSelectSpan={onSelectSpan}
+                    />
                   ))}
                 </VStack>
               ) : (

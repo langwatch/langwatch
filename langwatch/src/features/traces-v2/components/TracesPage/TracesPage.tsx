@@ -1,4 +1,4 @@
-import { Box, Flex, HStack, VStack } from "@chakra-ui/react";
+import { Box, Flex, HStack, useBreakpointValue, VStack } from "@chakra-ui/react";
 import React, { useMemo } from "react";
 import { ExportConfigDialog } from "~/components/messages/ExportConfigDialog";
 import { ExportProgress } from "~/components/messages/ExportProgress";
@@ -183,7 +183,21 @@ export const TracesPage: React.FC = () => {
 const FilterAside: React.FC<{
   dimmed?: boolean;
 }> = React.memo(({ dimmed = false }) => {
-  const collapsed = useUIStore((s) => s.sidebarCollapsed);
+  const persistedCollapsed = useUIStore((s) => s.sidebarCollapsed);
+  const mobileExpandedOverride = useUIStore((s) => s.mobileExpandedOverride);
+  // Below `md` the expanded sidebar steals 240px+ from a 390px-wide
+  // viewport, leaving the actual trace table unreadable. Force the
+  // collapsed rail on small screens regardless of the persisted preference,
+  // BUT honour the transient `mobileExpandedOverride` so the explicit
+  // expand button and the keyboard shortcut still work — they flip the
+  // override instead of the persisted desktop pref.
+  const forceCollapsedSmallScreen = useBreakpointValue(
+    { base: true, md: false },
+    { fallback: "md" },
+  );
+  const collapsed = forceCollapsedSmallScreen
+    ? !mobileExpandedOverride
+    : persistedCollapsed;
   // Grow the aside by one lane per active OR group so the connector
   // overlay has room to draw without squeezing the facet rows. When
   // the AST has no cross-facet OR the width is identical to before.

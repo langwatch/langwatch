@@ -330,52 +330,71 @@ export const SpanListView = memo(function SpanListView({
         </HStack>
       </Flex>
 
-      {/* Table header */}
+      {/* Table header — style matches the main trace table so the drawer
+          and the page table read as the same visual language */}
       <Flex
         gap={0}
         paddingX={3}
         paddingY={1}
         borderBottomWidth="1px"
-        borderColor="border.subtle"
+        borderColor="border.muted"
         flexShrink={0}
+        bg="bg.surface"
+        position="sticky"
+        top={0}
+        zIndex={1}
       >
-        {visibleColumns.map((col) => (
-          <Flex
-            key={col.field}
-            flex={col.flex ?? "none"}
-            width={col.flex ? undefined : col.width}
-            paddingX={1}
-            cursor="pointer"
-            onClick={() => handleHeaderClick(col.field)}
-            userSelect="none"
-            align="center"
-            justify={
-              col.align === "right"
-                ? "flex-end"
-                : col.align === "center"
-                  ? "center"
-                  : "flex-start"
-            }
-            _hover={{ color: "fg" }}
-            transition="color 0.1s ease"
-          >
-            <Text
-              textStyle="xs"
-              fontWeight="semibold"
-              color={sortField === col.field ? "fg" : "fg.muted"}
+        {visibleColumns.map((col) => {
+          const isActive = sortField === col.field;
+          return (
+            <Flex
+              key={col.field}
+              flex={col.flex ?? "none"}
+              width={col.flex ? undefined : col.width}
+              paddingX={1}
+              cursor="pointer"
+              onClick={() => handleHeaderClick(col.field)}
+              userSelect="none"
+              align="center"
+              justify={
+                col.align === "right"
+                  ? "flex-end"
+                  : col.align === "center"
+                    ? "center"
+                    : "flex-start"
+              }
+              transition="color 0.1s ease"
+              role="button"
+              aria-sort={
+                isActive
+                  ? sortDirection === "asc"
+                    ? "ascending"
+                    : "descending"
+                  : "none"
+              }
             >
-              {col.label}
-            </Text>
-            {sortField === col.field && (
-              <Icon
-                as={sortDirection === "asc" ? LuArrowUp : LuArrowDown}
-                boxSize={3}
-                color="fg.muted"
-                marginLeft={0.5}
-              />
-            )}
-          </Flex>
-        ))}
+              <Text
+                textStyle="2xs"
+                fontWeight={isActive ? "600" : "500"}
+                color={isActive ? "fg" : "fg.subtle/70"}
+                textTransform="uppercase"
+                letterSpacing="0.06em"
+                whiteSpace="nowrap"
+                _hover={{ color: "fg" }}
+              >
+                {col.label}
+              </Text>
+              {isActive && col.label && (
+                <Icon
+                  as={sortDirection === "asc" ? LuArrowUp : LuArrowDown}
+                  boxSize="12px"
+                  color="blue.fg"
+                  marginLeft={1}
+                />
+              )}
+            </Flex>
+          );
+        })}
       </Flex>
 
       {/* Virtualized rows */}
