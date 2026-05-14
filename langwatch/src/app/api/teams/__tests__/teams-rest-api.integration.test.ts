@@ -310,5 +310,98 @@ describe("Feature: Teams REST API", () => {
       const res = await api.delete("/api/teams/team_nope");
       expect(res.status).toBe(404);
     });
+
+    it("returns 404 for already-archived team", async () => {
+      const createRes = await api.post("/api/teams", {
+        name: `Double Archive ${nanoid(6)}`,
+      });
+      const created = await createRes.json();
+      await api.delete(`/api/teams/${created.id}`);
+
+      const res = await api.delete(`/api/teams/${created.id}`);
+      expect(res.status).toBe(404);
+    });
+  });
+
+  describe("Permission denial", () => {
+    let viewerToken: string;
+
+    beforeAll(async () => {
+      const apiKeyService = ApiKeyService.create(prisma);
+      const viewerKey = await apiKeyService.create({
+        name: `teams-viewer-${nanoid(6)}`,
+        userId,
+        createdByUserId: userId,
+        organizationId: testOrganization.id,
+        permissionMode: "scoped",
+        bindings: [
+          {
+            role: TeamUserRole.VIEWER,
+            scopeType: RoleBindingScopeType.ORGANIZATION,
+            scopeId: testOrganization.id,
+          },
+        ],
+      });
+      viewerToken = viewerKey.token;
+    });
+
+    const viewerApi = {
+      get: (path: string) =>
+        app.request(path, {
+          headers: { Authorization: `Bearer ${viewerToken}`, "Content-Type": "application/json" },
+        }),
+      post: (path: string, body: unknown) =>
+        app.request(path, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${viewerToken}`, "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }),
+      patch: (path: string, body: unknown) =>
+        app.request(path, {
+          method: "PATCH",
+          headers: { Authorization: `Bearer ${viewerToken}`, "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }),
+      delete: (path: string) =>
+        app.request(path, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${viewerToken}`, "Content-Type": "application/json" },
+        }),
+    };
+
+    it("allows viewer to list teams", async () => {
+      const res = await viewerApi.get("/api/teams");
+      expect(res.status).toBe(200);
+    });
+
+    it("returns 403 when viewer creates a team", async () => {
+      const res = await viewerApi.post("/api/teams", { name: "Blocked Team" });
+      expect(res.status).toBe(403);
+
+      const body = await res.json();
+      expect(body.error).toBe("Forbidden");
+    });
+
+    it("returns 403 when viewer updates a team", async () => {
+      const createRes = await api.post("/api/teams", {
+        name: `Perm Test ${nanoid(6)}`,
+      });
+      const created = await createRes.json();
+
+      const res = await viewerApi.patch(`/api/teams/${created.id}`, {
+        name: "Nope",
+      });
+      expect(res.status).toBe(403);
+    });
+
+    it("returns 403 when viewer deletes a team", async () => {
+      const createRes = await api.post("/api/teams", {
+        name: `Perm Del Test ${nanoid(6)}`,
+      });
+      const created = await createRes.json();
+
+      const res = await viewerApi.delete(`/api/teams/${created.id}`);
+      expect(res.status).toBe(403);
+    });
   });
 });
