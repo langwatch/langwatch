@@ -70,7 +70,10 @@ import {
 } from "../../app-layer/evaluations/azure-safety-env";
 import { getAzureSafetyEnvFromProject } from "../../app-layer/evaluations/azure-safety-env.server";
 import { runEvaluationWorkflow } from "../../workflows/runWorkflow";
-import { maxCausalityDepthOfSpans } from "../../app-layer/evaluations/evaluation-execution.service";
+import {
+  extractParentTraceForNlpgo,
+  maxCausalityDepthOfSpans,
+} from "../../app-layer/evaluations/evaluation-execution.service";
 import {
   EVALUATIONS_QUEUE,
   updateEvaluationStatusInES,
@@ -848,12 +851,19 @@ const customEvaluation = async (
     throw new Error("Workflow ID is required");
   }
 
+  // W3C trace context — same as eval-execution.service: pass the
+  // parent trace's root span so nlpgo emits eval spans as a child
+  // sub-tree of the trace being evaluated, not as an orphan trace.
+  // See 2026-05-14 prod regression.
+  const parentTrace = extractParentTraceForNlpgo(trace);
+
   const response = await runEvaluationWorkflow(
     resolvedWorkflowId,
     project.id,
     requestBody,
     undefined,
     parentCausalityDepth,
+    parentTrace,
   );
 
   const { result, status } = response;
