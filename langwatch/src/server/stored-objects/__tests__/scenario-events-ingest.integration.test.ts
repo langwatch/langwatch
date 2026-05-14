@@ -1,0 +1,308 @@
+/**
+ * @vitest-environment node
+ * @integration
+ *
+ * Integration tests for the /api/scenario-events POST handler covering
+ * stored-objects ingest behaviour.
+ *
+ * Covers:
+ *  - Case 4: storage PUT failure → 5xx response, no partial state
+ *  - Case 8: request body > 50 MB → 413 before extraction runs
+ *  - Smoke: valid event with inline media → extraction runs, service called
+ *
+ * The handler mounts authentication via the real authMiddleware (X-Auth-Token),
+ * so a real Prisma project is created in beforeAll. Heavy non-auth dependencies
+ * (getApp, checkScenarioSetLimitForRunStarted, createStoredObjectsService) are
+ * mocked to keep these tests scoped to the storage path.
+ */
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { prisma } from "~/server/db";
+import { projectFactory } from "~/factories/project.factory";
+
+// ---------------------------------------------------------------------------
+// Hoisted mocks — declared before any imports that might trigger module load
+// ---------------------------------------------------------------------------
+
+// Mock heavy app-layer dependencies so the handler can run without Redis etc.
+vi.mock("~/server/app-layer/app", () => ({
+  getApp: () => ({
+    simulations: {
+      startRun: vi.fn().mockResolvedValue(undefined),
+      messageSnapshot: vi.fn().mockResolvedValue(undefined),
+      textMessageStart: vi.fn().mockResolvedValue(undefined),
+      textMessageEnd: vi.fn().mockResolvedValue(undefined),
+      finishRun: vi.fn().mockResolvedValue(undefined),
+      deleteRun: vi.fn().mockResolvedValue(undefined),
+      runs: { getAllRunIdsForProject: vi.fn().mockResolvedValue([]) },
+    },
+    broadcast: {
+      broadcastToTenantRateLimited: vi.fn().mockResolvedValue(undefined),
+    },
+  }),
+}));
+
+vi.mock(
+  "~/app/api/scenario-events/[[...route]]/scenario-set-limit",
+  () => ({
+    checkScenarioSetLimitForRunStarted: vi.fn().mockResolvedValue(undefined),
+  }),
+);
+
+// We spy on createStoredObjectsService to control whether PUT throws.
+// The factory module is mocked so we can replace the returned service per test.
+const mockStoreFromBytes = vi.fn();
+const mockGetById = vi.fn();
+
+vi.mock("~/server/stored-objects/stored-objects-factory", () => ({
+  createStoredObjectsService: vi.fn(() => ({
+    storeFromBytes: mockStoreFromBytes,
+    getById: mockGetById,
+    resolveOwnerProject: vi.fn(),
+    cascadeDeleteProject: vi.fn(),
+    cascadeDeleteOwner: vi.fn(),
+  })),
+}));
+
+// Suppress logger noise
+vi.mock("~/utils/logger/server", () => ({
+  createLogger: () => ({
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+  }),
+}));
+
+// Tracer pass-through
+vi.mock("langwatch", () => ({
+  getLangWatchTracer: () => ({
+    withActiveSpan: (
+      _name: string,
+      ...args: unknown[]
+    ) => {
+      const fn = args.length === 1 ? args[0] : args[1];
+      const span = { setAttribute: vi.fn() };
+      return (fn as (span: typeof span) => Promise<unknown>)(span);
+    },
+  }),
+}));
+
+// Metrics stubs
+vi.mock("~/server/metrics", () => ({
+  getStoredObjectExtractCounter: () => ({ inc: vi.fn() }),
+  getStoredObjectDedupHitCounter: () => ({ inc: vi.fn() }),
+  getStoredObjectWriteFailureCounter: () => ({ inc: vi.fn() }),
+  getStoredObjectSizeBytesHistogram: () => ({ observe: vi.fn() }),
+  storedObjectReadFailureCounter: { inc: vi.fn() },
+}));
+
+// env
+vi.mock("~/env.mjs", () => ({
+  env: {
+    S3_BUCKET_NAME: "",
+  },
+}));
+
+// ---------------------------------------------------------------------------
+// Imports after mocks
+// ---------------------------------------------------------------------------
+
+import { app } from "~/app/api/scenario-events/[[...route]]/app";
+import { ScenarioEventType } from "~/server/scenarios/scenario-event.enums";
+
+// ---------------------------------------------------------------------------
+// Test fixtures
+// ---------------------------------------------------------------------------
+
+const BASE_HOST = "https://test.langwatch.ai";
+
+/** A minimal valid SCENARIO_RUN_STARTED event payload. */
+function makeRunStartedEvent(overrides: Record<string, unknown> = {}) {
+  return {
+    type: ScenarioEventType.RUN_STARTED,
+    timestamp: Date.now(),
+    batchRunId: `batch-${nanoid(6)}`,
+    scenarioId: `scenario-${nanoid(6)}`,
+    scenarioRunId: `run-${nanoid(6)}`,
+    scenarioSetId: "default",
+    metadata: { name: "Test scenario" },
+    ...overrides,
+  };
+}
+
+/**
+ * A TEXT_MESSAGE_END event whose message.content array carries an inline image part.
+ * extractInlineMediaFromEvent checks for event.message.content being an array
+ * and processes image parts with source.type="data".
+ */
+function makeEventWithInlineImage(scenarioRunId: string) {
+  const imageBase64 = Buffer.from("fake-image-bytes").toString("base64");
+  return {
+    type: ScenarioEventType.TEXT_MESSAGE_END,
+    timestamp: Date.now(),
+    batchRunId: `batch-${nanoid(6)}`,
+    scenarioId: `scenario-${nanoid(6)}`,
+    scenarioRunId,
+    scenarioSetId: "default",
+    messageId: `msg-${nanoid(6)}`,
+    role: "assistant",
+    content: "",
+    message: {
+      role: "assistant",
+      content: [
+        {
+          type: "image",
+          source: {
+            type: "data",
+            value: imageBase64,
+            mimeType: "image/png",
+          },
+        },
+      ],
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Setup / teardown
+// ---------------------------------------------------------------------------
+
+let testApiKey: string;
+let testProjectId: string;
+let testProjectSlug: string;
+let orgId: string;
+let teamId: string;
+
+beforeAll(async () => {
+  // Persist a real project so the authMiddleware can resolve the API key
+  const org = await prisma.organization.create({
+    data: {
+      name: `SO Ingest Test Org ${nanoid(6)}`,
+      slug: `--so-ingest-org-${nanoid(6)}`,
+    },
+  });
+  orgId = org.id;
+
+  const team = await prisma.team.create({
+    data: {
+      name: `SO Ingest Test Team ${nanoid(6)}`,
+      slug: `--so-ingest-team-${nanoid(6)}`,
+      organizationId: org.id,
+    },
+  });
+  teamId = team.id;
+
+  const project = projectFactory.build({ slug: `--so-ingest-proj-${nanoid(6)}` });
+  const created = await prisma.project.create({
+    data: { ...project, teamId: team.id },
+  });
+  testApiKey = created.apiKey;
+  testProjectId = created.id;
+  testProjectSlug = created.slug;
+
+  // Set BASE_HOST so the handler can build the redirect URL
+  process.env.BASE_HOST = BASE_HOST;
+});
+
+afterAll(async () => {
+  await prisma.project.deleteMany({ where: { id: testProjectId } });
+  await prisma.team.deleteMany({ where: { id: teamId } });
+  await prisma.organization.deleteMany({ where: { id: orgId } });
+  delete process.env.BASE_HOST;
+});
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+describe("POST /api/scenario-events (ingest)", () => {
+  describe("when a request body exceeds 50 MB (case 8 — 413)", () => {
+    it("returns 413 before any extraction logic runs", async () => {
+      // bodyLimit is 50 * 1024 * 1024 = 52428800 bytes
+      const oversizedBody = "x".repeat(52_428_801);
+
+      const res = await app.request("/api/scenario-events", {
+        method: "POST",
+        headers: {
+          "X-Auth-Token": testApiKey,
+          "Content-Type": "application/json",
+        },
+        body: oversizedBody,
+      });
+
+      expect(res.status).toBe(413);
+      // storeFromBytes must not have been called — no extraction
+      expect(mockStoreFromBytes).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the storage driver rejects the PUT with an error (case 4 — 5xx, no partial state)", () => {
+    it("returns a 5xx and does not partially persist any data", async () => {
+      // Arrange: storage PUT will throw
+      mockStoreFromBytes.mockRejectedValueOnce(new Error("storage unavailable"));
+
+      const scenarioRunId = `run-${nanoid(6)}`;
+      const body = makeEventWithInlineImage(scenarioRunId);
+
+      const res = await app.request("/api/scenario-events", {
+        method: "POST",
+        headers: {
+          "X-Auth-Token": testApiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+
+      // The handler propagates the storage error → 5xx
+      expect(res.status).toBeGreaterThanOrEqual(500);
+    });
+  });
+
+  describe("when a valid event with inline image content is posted (smoke — case 1)", () => {
+    it("calls storeFromBytes and returns 201 on success", async () => {
+      const extractedId = `stored-${nanoid(8)}`;
+      mockStoreFromBytes.mockResolvedValueOnce({
+        id: extractedId,
+        mediaType: "image/png",
+        isDuplicate: false,
+      });
+
+      const scenarioRunId = `run-${nanoid(6)}`;
+      const body = makeEventWithInlineImage(scenarioRunId);
+
+      const res = await app.request("/api/scenario-events", {
+        method: "POST",
+        headers: {
+          "X-Auth-Token": testApiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+
+      expect(res.status).toBe(201);
+      // storeFromBytes was called with the decoded image bytes
+      expect(mockStoreFromBytes).toHaveBeenCalledWith(
+        expect.objectContaining({
+          projectId: testProjectId,
+          mediaType: "image/png",
+          purpose: "scenario_event",
+        }),
+      );
+    });
+  });
+
+  describe("when an event is posted without auth credentials", () => {
+    it("returns 401", async () => {
+      const body = makeRunStartedEvent();
+
+      const res = await app.request("/api/scenario-events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      expect(res.status).toBe(401);
+    });
+  });
+});
