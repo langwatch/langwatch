@@ -3,6 +3,14 @@ Feature: Deploy Prompt Dialog
   I want a dialog to assign prompt versions to environment labels
   So that I can control which version is served in each environment from the UI
 
+  # 1 scenario bound to llm-config-tag.repository.unit.test.ts (empty
+  # getTagsForConfig). The remaining 2 @unimplemented are UPDATE per
+  # AUDIT_MANIFEST.md: dialog-open description copy drifted (actual reads
+  # "Use tags to get specific prompt versions via the SDK and API. Prompt
+  # versions with the production tag are returned by default."), and the
+  # method name is `getTagsForConfig` not `getLabelsForConfig`. Aspirational
+  # pending UPDATE-class scenario rewrites tracked in PR #3458.
+
   Background:
     Given I am logged into project "my-project"
     And a prompt "pizza-prompt" exists with versions v1, v2, v3, v4

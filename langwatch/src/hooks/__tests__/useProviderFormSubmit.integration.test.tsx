@@ -11,6 +11,7 @@
 
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 import type { FormSnapshot } from "../useProviderFormSubmit";
 
 // ---------------------------------------------------------------------------
@@ -64,6 +65,7 @@ vi.mock("../../components/ui/toaster", () => ({
 
 // Import after mocks
 import { useProviderFormSubmit } from "../useProviderFormSubmit";
+import { MASKED_KEY_PLACEHOLDER } from "../../utils/constants";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -228,6 +230,129 @@ describe("useProviderFormSubmit()", () => {
           (call) => call[0]?.type === "error",
         );
         expect(errorToasts).toHaveLength(0);
+      });
+    });
+  });
+
+  // Regression tests for #3532: the !isUsingEnvVars branch must filter
+  // MASKED_KEY_PLACEHOLDER values out of customKeys before submit, otherwise
+  // env-fallback projects post the literal placeholder string and the
+  // backend rejects it as "invalid api key".
+  describe("given isUsingEnvVars is false (env-fallback project, drawer open)", () => {
+    // Matches the shape of registry.ts azure.keysSchema: all keys optional,
+    // .passthrough() so MASKED_KEY_PLACEHOLDER and "" both validate.
+    const passthroughSchema = z
+      .object({
+        AZURE_OPENAI_API_KEY: z.string().nullable().optional(),
+        AZURE_OPENAI_ENDPOINT: z.string().nullable().optional(),
+      })
+      .passthrough();
+    describe("when all keys are still masked (Save without editing)", () => {
+      it("omits all masked entries from the submitted customKeys", async () => {
+        const snapshot = buildSnapshot({
+          isUsingEnvVars: false,
+          useAsDefaultProvider: false,
+          providerKeysSchema: passthroughSchema,
+          customKeys: {
+            AZURE_OPENAI_API_KEY: MASKED_KEY_PLACEHOLDER,
+            AZURE_OPENAI_ENDPOINT: MASKED_KEY_PLACEHOLDER,
+          },
+          initialKeys: {
+            AZURE_OPENAI_API_KEY: MASKED_KEY_PLACEHOLDER,
+            AZURE_OPENAI_ENDPOINT: MASKED_KEY_PLACEHOLDER,
+          },
+        });
+        const { result } = renderSubmitHook({ snapshot });
+
+        await act(async () => {
+          await result.current.submit();
+        });
+
+        expect(mockUpdateMutateAsync).toHaveBeenCalledTimes(1);
+        const payload = mockUpdateMutateAsync.mock.calls[0]?.[0];
+        expect(payload?.customKeys).toEqual({});
+      });
+    });
+
+    describe("when one key edited and one still masked", () => {
+      it("includes the edited key and omits the masked one", async () => {
+        const snapshot = buildSnapshot({
+          isUsingEnvVars: false,
+          useAsDefaultProvider: false,
+          providerKeysSchema: passthroughSchema,
+          customKeys: {
+            AZURE_OPENAI_API_KEY: "sk-newly-typed",
+            AZURE_OPENAI_ENDPOINT: MASKED_KEY_PLACEHOLDER,
+          },
+          initialKeys: {
+            AZURE_OPENAI_API_KEY: MASKED_KEY_PLACEHOLDER,
+            AZURE_OPENAI_ENDPOINT: MASKED_KEY_PLACEHOLDER,
+          },
+        });
+        const { result } = renderSubmitHook({ snapshot });
+
+        await act(async () => {
+          await result.current.submit();
+        });
+
+        const payload = mockUpdateMutateAsync.mock.calls[0]?.[0];
+        expect(payload?.customKeys).toEqual({
+          AZURE_OPENAI_API_KEY: "sk-newly-typed",
+        });
+      });
+    });
+
+    describe("when user cleared a key (empty string)", () => {
+      it("preserves the empty string in the payload (not treated as masked)", async () => {
+        const snapshot = buildSnapshot({
+          isUsingEnvVars: false,
+          useAsDefaultProvider: false,
+          providerKeysSchema: passthroughSchema,
+          customKeys: {
+            AZURE_OPENAI_API_KEY: "",
+            AZURE_OPENAI_ENDPOINT: MASKED_KEY_PLACEHOLDER,
+          },
+          initialKeys: {
+            AZURE_OPENAI_API_KEY: MASKED_KEY_PLACEHOLDER,
+            AZURE_OPENAI_ENDPOINT: MASKED_KEY_PLACEHOLDER,
+          },
+        });
+        const { result } = renderSubmitHook({ snapshot });
+
+        await act(async () => {
+          await result.current.submit();
+        });
+
+        const payload = mockUpdateMutateAsync.mock.calls[0]?.[0];
+        expect(payload?.customKeys).toEqual({
+          AZURE_OPENAI_API_KEY: "",
+        });
+      });
+    });
+
+    describe("when all keys are freshly typed (no masked placeholders)", () => {
+      it("submits the freshly-typed keys as-is", async () => {
+        const snapshot = buildSnapshot({
+          isUsingEnvVars: false,
+          useAsDefaultProvider: false,
+          providerKeysSchema: passthroughSchema,
+          customKeys: {
+            AZURE_OPENAI_API_KEY: "sk-new-key",
+            AZURE_OPENAI_ENDPOINT: "https://example.openai.azure.com",
+          },
+          initialKeys: {},
+        });
+        const { result } = renderSubmitHook({ snapshot });
+
+        await act(async () => {
+          await result.current.submit();
+        });
+
+        const payload = mockUpdateMutateAsync.mock.calls[0]?.[0];
+        expect(payload?.customKeys).toEqual({
+          AZURE_OPENAI_API_KEY: "sk-new-key",
+          AZURE_OPENAI_ENDPOINT: "https://example.openai.azure.com",
+        });
       });
     });
   });

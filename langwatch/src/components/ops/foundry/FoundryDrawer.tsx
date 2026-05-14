@@ -73,7 +73,7 @@ export function FoundryDrawer() {
 
   return (
     <Drawer.Root open={true} placement="end" size="md" onOpenChange={() => closeDrawer()}>
-      <Drawer.Content>
+      <Drawer.Content bg="bg">
         <Drawer.Header>
           <HStack width="full">
             <Heading size="md">The Foundry</Heading>

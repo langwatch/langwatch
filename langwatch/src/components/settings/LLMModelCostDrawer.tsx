@@ -33,7 +33,7 @@ export function LLMModelCostDrawer({
       size={"xl"}
       onOpenChange={() => closeDrawer()}
     >
-      <Drawer.Content>
+      <Drawer.Content bg="bg">
         <Drawer.Header>
           <Heading>{id ? "Edit LLM Model Cost" : "Add LLM Model Cost"}</Heading>
           <Drawer.CloseTrigger />

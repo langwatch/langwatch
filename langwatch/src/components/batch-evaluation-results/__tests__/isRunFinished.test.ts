@@ -21,6 +21,7 @@ describe("isRunFinished", () => {
   });
 
   describe("when stoppedAt is set", () => {
+    /** @scenario Show stopped indicator for stopped run */
     it("returns true", () => {
       expect(isRunFinished({ stoppedAt: 1705312800000 })).toBe(true);
     });
@@ -35,6 +36,7 @@ describe("isRunFinished", () => {
   });
 
   describe("when updatedAt is recent (< 5 minutes)", () => {
+    /** @scenario Show running indicator for in-progress run */
     it("returns false", () => {
       const twoMinutesAgo = Date.now() - 2 * 60 * 1000;
       expect(isRunFinished({ updatedAt: twoMinutesAgo })).toBe(false);

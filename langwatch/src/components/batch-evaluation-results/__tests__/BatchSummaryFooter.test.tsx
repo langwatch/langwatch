@@ -127,6 +127,8 @@ describe("BatchSummaryFooter", () => {
   });
 
   describe("Cost Display", () => {
+    /** @scenario Run shows summary information */
+    /** @scenario Cost appears in experiment results UI */
     it("displays total cost", () => {
       const run = createRunSummary({
         summary: {

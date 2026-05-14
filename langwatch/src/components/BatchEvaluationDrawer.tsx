@@ -141,7 +141,7 @@ export function BatchEvaluationDrawer(props: BatchEvaluatioProps) {
         }
       }}
     >
-      <Drawer.Content>
+      <Drawer.Content bg="bg">
         <Drawer.CloseTrigger />
         <Drawer.Header>
           <HStack>

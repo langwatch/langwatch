@@ -9,7 +9,7 @@ import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createLogger } from "~/utils/logger/server";
 import {
   type AuthMiddlewareVariables,
-  authMiddleware,
+  authMiddleware, requirePermission,
   handleError,
   resourceLimitMiddleware,
 } from "../../middleware";
@@ -122,6 +122,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── List Monitors ───────────────────────────────────────────
   .get(
     "/",
+    requirePermission("evaluations:view"),
     describeRoute({
       description:
         "List all online evaluation monitors for the project",
@@ -159,6 +160,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── Get Monitor ─────────────────────────────────────────────
   .get(
     "/:id",
+    requirePermission("evaluations:view"),
     describeRoute({
       description: "Get a monitor by its ID",
       responses: {
@@ -208,6 +210,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── Create Monitor ──────────────────────────────────────────
   .post(
     "/",
+    requirePermission("evaluations:manage"),
     resourceLimitMiddleware("onlineEvaluations"),
     describeRoute({
       description: "Create a new online evaluation monitor",
@@ -280,6 +283,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── Update Monitor ──────────────────────────────────────────
   .patch(
     "/:id",
+    requirePermission("evaluations:manage"),
     describeRoute({
       description:
         "Update a monitor (name, enabled state, settings, etc.)",
@@ -369,6 +373,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── Toggle Monitor ──────────────────────────────────────────
   .post(
     "/:id/toggle",
+    requirePermission("evaluations:manage"),
     describeRoute({
       description: "Enable or disable a monitor",
       responses: {
@@ -421,6 +426,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── Delete Monitor ──────────────────────────────────────────
   .delete(
     "/:id",
+    requirePermission("evaluations:manage"),
     describeRoute({
       description: "Delete a monitor",
       responses: {

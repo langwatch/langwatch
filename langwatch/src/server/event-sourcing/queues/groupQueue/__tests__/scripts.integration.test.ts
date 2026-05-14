@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { Redis } from "ioredis";
 import {
   startTestContainers,
@@ -6,6 +6,7 @@ import {
   getTestRedisConnection,
 } from "../../../__tests__/integration/testContainers";
 import { GroupStagingScripts, type DispatchResult } from "../scripts";
+import { QueueRedisRepository } from "../../../../app-layer/ops/repositories/queue.redis.repository";
 
 let redis: Redis;
 let scripts: GroupStagingScripts;
@@ -1063,14 +1064,20 @@ describe("GroupStagingScripts", () => {
         // Sanity: group is no longer in ready
         expect(await inspectReadySet()).toEqual([]);
 
-        // Heartbeat fires after blocking — must not reinsert the blocked group
+        // Heartbeat fires after blocking — must not reinsert the blocked group.
+        // Post-2026-05-11 tenant-soft-cap change: RESTAGE_AND_BLOCK_LUA now
+        // DEL's the activeKey atomically (so the tenant_active counter can
+        // be DECR'd in lockstep without TTL drift). Consequence: a heartbeat
+        // arriving AFTER restage sees no active lease and returns false.
+        // Either way, the ready set must stay empty — that's the safety
+        // property the test enforces.
         const ok = await scripts.refreshActiveKey({
           groupId: "group-a",
           stagedJobId: "j1",
           activeTtlSec: 60,
         });
 
-        expect(ok).toBe(true);
+        expect(ok).toBe(false);
         expect(await inspectReadySet()).toEqual([]);
       });
     });
@@ -1405,6 +1412,148 @@ describe("GroupStagingScripts", () => {
       expect(result!.stagedJobId).toBe("j1");
     });
   });
+
+  // Tenant-level pause via "tenant:<tenantId>" entries in the same
+  // paused-jobs SET. Added post-2026-05-11 incident — see
+  // specs/queue-pausing/queue-pausing.feature.
+  describe("when head-of-line group's tenant is paused", () => {
+    function makeBenignJobData(overrides: Record<string, unknown> = {}): string {
+      return JSON.stringify({
+        __pipelineName: "ingestion",
+        __jobType: "projection",
+        __jobName: "traceProjection",
+        ...overrides,
+      });
+    }
+
+    /** @scenario Pausing a tenant halts dispatch for that tenant only */
+    it("skips a group whose tenantId-prefix is in paused-jobs as 'tenant:<id>'", async () => {
+      await scripts.stage(
+        makeJob({
+          stagedJobId: "j1",
+          groupId: "project_A/command/recordSpan/trace:xyz",
+          dispatchAfterMs: 100,
+          jobDataJson: makeBenignJobData(),
+        }),
+      );
+      await scripts.addPauseKey("tenant:project_A");
+
+      const result = await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
+      expect(result).toBeNull();
+    });
+
+    it("dispatches groups for non-paused tenants while paused tenant is skipped", async () => {
+      await scripts.stage(
+        makeJob({
+          stagedJobId: "j-bad",
+          groupId: "project_A/command/recordSpan/trace:aaa",
+          dispatchAfterMs: 100,
+          jobDataJson: makeBenignJobData(),
+        }),
+      );
+      await scripts.stage(
+        makeJob({
+          stagedJobId: "j-ok",
+          groupId: "project_B/command/recordSpan/trace:bbb",
+          dispatchAfterMs: 100,
+          jobDataJson: makeBenignJobData(),
+        }),
+      );
+      await scripts.addPauseKey("tenant:project_A");
+
+      const result = await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
+      expect(result).not.toBeNull();
+      expect(result!.groupId).toBe("project_B/command/recordSpan/trace:bbb");
+      expect(result!.stagedJobId).toBe("j-ok");
+    });
+
+    /** @scenario Unpausing a tenant resumes dispatch immediately */
+    it("resumes dispatch immediately after the tenant pause key is removed", async () => {
+      await scripts.stage(
+        makeJob({
+          stagedJobId: "j1",
+          groupId: "project_A/command/recordSpan/trace:xyz",
+          dispatchAfterMs: 100,
+          jobDataJson: makeBenignJobData(),
+        }),
+      );
+      await scripts.addPauseKey("tenant:project_A");
+
+      const blocked = await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
+      expect(blocked).toBeNull();
+
+      await scripts.removePauseKey("tenant:project_A");
+
+      const result = await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
+      expect(result).not.toBeNull();
+      expect(result!.stagedJobId).toBe("j1");
+    });
+
+    it("does not pause an unrelated tenant whose id is a prefix of the paused one", async () => {
+      // SISMEMBER on the full string "tenant:project_A" must NOT match
+      // a group for tenantId "project_AA". This guards against accidental
+      // prefix-substring matches in the Lua extraction.
+      await scripts.stage(
+        makeJob({
+          stagedJobId: "j1",
+          groupId: "project_AA/command/recordSpan/trace:xyz",
+          dispatchAfterMs: 100,
+          jobDataJson: makeBenignJobData(),
+        }),
+      );
+      await scripts.addPauseKey("tenant:project_A");
+
+      const result = await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
+      expect(result).not.toBeNull();
+      expect(result!.stagedJobId).toBe("j1");
+    });
+
+    it("tenant pause works alongside pipeline pause without interference", async () => {
+      await scripts.stage(
+        makeJob({
+          stagedJobId: "j1",
+          groupId: "project_A/command/recordSpan/trace:xyz",
+          dispatchAfterMs: 100,
+          jobDataJson: makeBenignJobData(),
+        }),
+      );
+      // Pause BOTH the tenant AND a pipeline; the group should remain blocked
+      // even if one of the pauses is later removed.
+      await scripts.addPauseKey("tenant:project_A");
+      await scripts.addPauseKey("ingestion");
+
+      let result = await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
+      expect(result).toBeNull();
+
+      // Remove pipeline pause — tenant pause still blocks
+      await scripts.removePauseKey("ingestion");
+      result = await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
+      expect(result).toBeNull();
+
+      // Remove tenant pause — now dispatches
+      await scripts.removePauseKey("tenant:project_A");
+      result = await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
+      expect(result).not.toBeNull();
+      expect(result!.stagedJobId).toBe("j1");
+    });
+
+    it("falls back gracefully when groupId has no '/' (single-segment id)", async () => {
+      // Defensive: a groupId without "/" means the whole string is the tenant.
+      // This shouldn't happen in production but the Lua must not error.
+      await scripts.stage(
+        makeJob({
+          stagedJobId: "j1",
+          groupId: "single_segment_group",
+          dispatchAfterMs: 100,
+          jobDataJson: makeBenignJobData(),
+        }),
+      );
+      await scripts.addPauseKey("tenant:single_segment_group");
+
+      const result = await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
+      expect(result).toBeNull();
+    });
+  });
   });
 
   describe("dispatchBatch", () => {
@@ -1511,7 +1660,574 @@ describe("GroupStagingScripts", () => {
       const jobs = await inspectGroupJobs("group-paused");
       expect(jobs).toContain("j1");
     });
+
+    // Mirror of dispatch() tenant-pause coverage. dispatchBatch shares the
+    // same pause-check Lua block but iterates multiple jobs per call, so a
+    // separate test guards against the second branch drifting from the first.
+    it("skips groups whose tenantId is paused and returns only other tenants", async () => {
+      await scripts.stage(
+        makeJob({
+          stagedJobId: "j-bad",
+          groupId: "project_A/command/recordSpan/trace:a",
+          dispatchAfterMs: 100,
+          jobDataJson: JSON.stringify({}),
+        }),
+      );
+      await scripts.stage(
+        makeJob({
+          stagedJobId: "j-ok",
+          groupId: "project_B/command/recordSpan/trace:b",
+          dispatchAfterMs: 100,
+          jobDataJson: JSON.stringify({}),
+        }),
+      );
+      await scripts.addPauseKey("tenant:project_A");
+
+      const results = await scripts.dispatchBatch({
+        nowMs: 200,
+        activeTtlSec: 60,
+        maxJobs: 10,
+      });
+
+      expect(results).toHaveLength(1);
+      expect(results[0]!.groupId).toBe("project_B/command/recordSpan/trace:b");
+    });
+
+    it("a non-paused tenant whose id is a prefix of a paused one still dispatches", async () => {
+      await scripts.stage(
+        makeJob({
+          stagedJobId: "j1",
+          groupId: "project_AA/command/recordSpan/trace:x",
+          dispatchAfterMs: 100,
+          jobDataJson: JSON.stringify({}),
+        }),
+      );
+      await scripts.addPauseKey("tenant:project_A");
+
+      const results = await scripts.dispatchBatch({
+        nowMs: 200,
+        activeTtlSec: 60,
+        maxJobs: 10,
+      });
+
+      expect(results).toHaveLength(1);
+      expect(results[0]!.stagedJobId).toBe("j1");
+    });
   });
+  });
+
+  // ============================================================================
+  // DRAIN_GROUP_LUA (lives in queue.redis.repository.ts but consumes the same
+  // group keys and stats:total-pending counter that the scripts in this suite
+  // produce, so it belongs here). Post-2026-05-11 incident: drain MUST
+  // decrement total-pending or bulk-drain at 500K scale leaks the stat.
+  // ============================================================================
+  describe("DRAIN_GROUP_LUA total-pending decrement", () => {
+    let repo: QueueRedisRepository;
+    beforeAll(() => {
+      repo = new QueueRedisRepository(redis);
+    });
+
+    /** @scenario drainTenant decrements stats:total-pending atomically per group */
+    it("decrements stats:total-pending by the count of staged jobs dropped", async () => {
+      await scripts.stage(makeJob({ stagedJobId: "j1", groupId: "g-drain", dispatchAfterMs: 1000 }));
+      await scripts.stage(makeJob({ stagedJobId: "j2", groupId: "g-drain", dispatchAfterMs: 2000 }));
+      await scripts.stage(makeJob({ stagedJobId: "j3", groupId: "g-drain", dispatchAfterMs: 3000 }));
+
+      const before = Number(await redis.get(`${keyPrefix()}stats:total-pending`));
+      expect(before).toBe(3);
+
+      const result = await repo.drainGroup({ queueName: QUEUE_NAME, groupId: "g-drain" });
+      expect(result.jobsRemoved).toBe(3);
+
+      const after = Number(await redis.get(`${keyPrefix()}stats:total-pending`));
+      expect(after).toBe(0);
+    });
+
+    it("also decrements for an active in-flight job (active key is dropped, COMPLETE_LUA would no-op)", async () => {
+      // Stage two, dispatch one (now active), then drain. Total dropped
+      // should be 2: 1 staged + 1 active. total-pending must drop by 2,
+      // not 1, otherwise the active job's eventual COMPLETE_LUA call —
+      // which now no-ops because the active key is gone — would leak the
+      // counter forever.
+      await scripts.stage(makeJob({ stagedJobId: "j1", groupId: "g-active", dispatchAfterMs: 100 }));
+      await scripts.stage(makeJob({ stagedJobId: "j2", groupId: "g-active", dispatchAfterMs: 200 }));
+
+      const before = Number(await redis.get(`${keyPrefix()}stats:total-pending`));
+      expect(before).toBe(2);
+
+      // Move j1 from staged → active
+      const dispatched = await scripts.dispatch({ nowMs: 150, activeTtlSec: 60 });
+      expect(dispatched).not.toBeNull();
+      expect(dispatched!.stagedJobId).toBe("j1");
+      // Sanity: active key exists, only j2 left in staged jobsKey
+      expect(await inspectActiveKey("g-active")).toBe("j1");
+      const staged = await inspectGroupJobs("g-active");
+      expect(staged.filter((s) => !s.match(/^\d+$/))).toEqual(["j2"]);
+
+      const result = await repo.drainGroup({ queueName: QUEUE_NAME, groupId: "g-active" });
+      expect(result.jobsRemoved).toBe(2); // 1 staged (j2) + 1 active (j1)
+
+      const after = Number(await redis.get(`${keyPrefix()}stats:total-pending`));
+      expect(after).toBe(0); // started at 2, dropped 2
+    });
+
+    it("decrements only the active count when no jobs are staged", async () => {
+      // Edge case: ZCARD=0 but activeKey exists. Drop must still account for 1.
+      await scripts.stage(makeJob({ stagedJobId: "j1", groupId: "g-only-active", dispatchAfterMs: 100 }));
+      await scripts.dispatch({ nowMs: 150, activeTtlSec: 60 });
+      const beforeStaged = await inspectGroupJobs("g-only-active");
+      expect(beforeStaged.filter((s) => !s.match(/^\d+$/))).toEqual([]);
+      expect(await inspectActiveKey("g-only-active")).toBe("j1");
+
+      const before = Number(await redis.get(`${keyPrefix()}stats:total-pending`));
+      const result = await repo.drainGroup({ queueName: QUEUE_NAME, groupId: "g-only-active" });
+      expect(result.jobsRemoved).toBe(1);
+
+      const after = Number(await redis.get(`${keyPrefix()}stats:total-pending`));
+      expect(after).toBe(before - 1);
+    });
+
+    it("returns 0 and does not touch total-pending when the group is empty", async () => {
+      // Defensive: drain on a never-existed group should not push counter negative.
+      await redis.set(`${keyPrefix()}stats:total-pending`, "5");
+
+      const result = await repo.drainGroup({ queueName: QUEUE_NAME, groupId: "never-existed" });
+      expect(result.jobsRemoved).toBe(0);
+
+      const after = Number(await redis.get(`${keyPrefix()}stats:total-pending`));
+      expect(after).toBe(5);
+    });
+  });
+
+  describe("drainTenant bulk scoping", () => {
+    let repo: QueueRedisRepository;
+    beforeAll(() => {
+      repo = new QueueRedisRepository(redis);
+    });
+
+    /** @scenario drainTenant supports an optional groupIdContains substring filter */
+    it("with groupIdContains filter, drains only matching groupIds within the tenant", async () => {
+      // Stage groups across two projections for the same tenant + one group
+      // for a different tenant. Filter should hit only fold/projectDailySdkUsage.
+      await scripts.stage(
+        makeJob({
+          stagedJobId: "fold-a",
+          groupId: "project_X/fold/projectDailySdkUsage/key-1",
+          dispatchAfterMs: 100,
+          jobDataJson: JSON.stringify({}),
+        }),
+      );
+      await scripts.stage(
+        makeJob({
+          stagedJobId: "fold-b",
+          groupId: "project_X/fold/projectDailySdkUsage/key-2",
+          dispatchAfterMs: 100,
+          jobDataJson: JSON.stringify({}),
+        }),
+      );
+      await scripts.stage(
+        makeJob({
+          stagedJobId: "cmd-c",
+          groupId: "project_X/command/recordSpan/trace:t1",
+          dispatchAfterMs: 100,
+          jobDataJson: JSON.stringify({}),
+        }),
+      );
+      await scripts.stage(
+        makeJob({
+          stagedJobId: "other-tenant",
+          groupId: "project_Y/fold/projectDailySdkUsage/key-1",
+          dispatchAfterMs: 100,
+          jobDataJson: JSON.stringify({}),
+        }),
+      );
+
+      const result = await repo.drainTenant({
+        queueName: QUEUE_NAME,
+        tenantId: "project_X",
+        groupIdContains: "/fold/projectDailySdkUsage/",
+      });
+
+      expect(result.groupsDrained).toBe(2); // only the two fold groups for project_X
+      expect(result.jobsDrained).toBe(2);
+
+      // Untouched groups still hold their jobs
+      const cmdJobs = await inspectGroupJobs("project_X/command/recordSpan/trace:t1");
+      expect(cmdJobs.filter((s) => !s.match(/^\d+$/))).toContain("cmd-c");
+      const otherTenantJobs = await inspectGroupJobs("project_Y/fold/projectDailySdkUsage/key-1");
+      expect(otherTenantJobs.filter((s) => !s.match(/^\d+$/))).toContain("other-tenant");
+    });
+
+    it("without groupIdContains, drains every group for the tenant", async () => {
+      await scripts.stage(
+        makeJob({
+          stagedJobId: "a",
+          groupId: "project_All/fold/x/key-1",
+          dispatchAfterMs: 100,
+          jobDataJson: JSON.stringify({}),
+        }),
+      );
+      await scripts.stage(
+        makeJob({
+          stagedJobId: "b",
+          groupId: "project_All/map/y/key-1",
+          dispatchAfterMs: 100,
+          jobDataJson: JSON.stringify({}),
+        }),
+      );
+
+      const result = await repo.drainTenant({
+        queueName: QUEUE_NAME,
+        tenantId: "project_All",
+      });
+
+      expect(result.groupsDrained).toBe(2);
+      expect(result.jobsDrained).toBe(2);
+    });
+
+    it("ignores groupIds that match the filter but belong to a different tenant", async () => {
+      await scripts.stage(
+        makeJob({
+          stagedJobId: "wrong-tenant",
+          groupId: "project_Z/fold/somethingShared/key-1",
+          dispatchAfterMs: 100,
+          jobDataJson: JSON.stringify({}),
+        }),
+      );
+
+      const result = await repo.drainTenant({
+        queueName: QUEUE_NAME,
+        tenantId: "project_NotZ",
+        groupIdContains: "/fold/somethingShared/",
+      });
+
+      expect(result.groupsDrained).toBe(0);
+      expect(result.jobsDrained).toBe(0);
+
+      const survivors = await inspectGroupJobs("project_Z/fold/somethingShared/key-1");
+      expect(survivors.filter((s) => !s.match(/^\d+$/))).toContain("wrong-tenant");
+    });
+  });
+
+  /**
+   * Post-2026-05-11 tenant soft-cap integration coverage.
+   *
+   * These tests drive the new Lua paths against a real Redis (via
+   * testcontainers) and prove:
+   *   - the `tenant_active:<tenantId>` counter stays consistent across
+   *     DISPATCH (INCR) → COMPLETE / RESTAGE_AND_BLOCK (DECR/DEL) and
+   *     REFRESH / RETRY_RESTAGE (TTL renewal)
+   *   - cap enforcement at the scheduler level
+   *   - widened scan budget keeps cross-tenant fairness when an
+   *     over-cap tenant dominates the head of the ready zset
+   *   - cap=0 (kill switch) leaves the counter machinery completely
+   *     inert — no `tenant_active:*` keys ever appear
+   *
+   * All scenarios mutate `LANGWATCH_DISPATCH_TENANT_CAP` per test
+   * (readTenantCap reads process.env at call time on purpose) and
+   * restore it in afterEach so test ordering is independent.
+   */
+  describe("tenant soft-cap (LANGWATCH_DISPATCH_TENANT_CAP)", () => {
+    const TENANT_CAP_ENV = "LANGWATCH_DISPATCH_TENANT_CAP";
+    let originalEnv: string | undefined;
+
+    beforeEach(() => {
+      originalEnv = process.env[TENANT_CAP_ENV];
+    });
+
+    afterEach(() => {
+      if (originalEnv === undefined) {
+        delete process.env[TENANT_CAP_ENV];
+      } else {
+        process.env[TENANT_CAP_ENV] = originalEnv;
+      }
+    });
+
+    function tenantCounterKey(tenantId: string) {
+      return `${keyPrefix()}tenant_active:${tenantId}`;
+    }
+
+    async function stageOne({
+      tenantId,
+      groupSuffix,
+      stagedJobId,
+      dispatchAfterMs = 1000,
+    }: {
+      tenantId: string;
+      groupSuffix: string;
+      stagedJobId: string;
+      dispatchAfterMs?: number;
+    }) {
+      const groupId = `${tenantId}/${groupSuffix}`;
+      await scripts.stage(
+        makeJob({ groupId, stagedJobId, dispatchAfterMs }),
+      );
+      return groupId;
+    }
+
+    /** @scenario Counter increments on dispatch, decrements on completion */
+    it("INCRs the tenant counter on dispatch and DELs it on completion", async () => {
+      process.env[TENANT_CAP_ENV] = "10";
+      const groupId = await stageOne({
+        tenantId: "proj_acme",
+        groupSuffix: "g1",
+        stagedJobId: "j1",
+      });
+
+      const dispatched = await scripts.dispatch({
+        nowMs: 2000,
+        activeTtlSec: 60,
+      });
+      expect(dispatched?.groupId).toBe(groupId);
+
+      // Counter at 1 after first dispatch
+      expect(await redis.get(tenantCounterKey("proj_acme"))).toBe("1");
+      // TTL is in lockstep with activeKey
+      const counterTtl = await redis.ttl(tenantCounterKey("proj_acme"));
+      const activeTtl = await redis.ttl(
+        `${keyPrefix()}group:${groupId}:active`,
+      );
+      expect(Math.abs(counterTtl - activeTtl)).toBeLessThanOrEqual(1);
+
+      // Completing the only in-flight group DELs the counter (n was 1)
+      await scripts.complete({
+        groupId,
+        stagedJobId: dispatched!.stagedJobId,
+      });
+      expect(await redis.exists(tenantCounterKey("proj_acme"))).toBe(0);
+    });
+
+    it("DECRs (does not DEL) when there are other in-flight groups for the same tenant", async () => {
+      process.env[TENANT_CAP_ENV] = "10";
+      await stageOne({
+        tenantId: "proj_acme",
+        groupSuffix: "g1",
+        stagedJobId: "j1",
+      });
+      await stageOne({
+        tenantId: "proj_acme",
+        groupSuffix: "g2",
+        stagedJobId: "j2",
+      });
+
+      const d1 = await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 });
+      const d2 = await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 });
+      expect(d1).not.toBeNull();
+      expect(d2).not.toBeNull();
+      expect(await redis.get(tenantCounterKey("proj_acme"))).toBe("2");
+
+      // Complete only one
+      await scripts.complete({
+        groupId: d1!.groupId,
+        stagedJobId: d1!.stagedJobId,
+      });
+      expect(await redis.get(tenantCounterKey("proj_acme"))).toBe("1");
+    });
+
+    /** @scenario RESTAGE_AND_BLOCK decrements the counter on exhausted retries */
+    it("RESTAGE_AND_BLOCK_LUA decrements the tenant counter (preventing slot leak on terminal failures)", async () => {
+      process.env[TENANT_CAP_ENV] = "10";
+      const groupId = await stageOne({
+        tenantId: "proj_acme",
+        groupSuffix: "g1",
+        stagedJobId: "j1",
+      });
+      await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 });
+      expect(await redis.get(tenantCounterKey("proj_acme"))).toBe("1");
+
+      await scripts.restageAndBlock({
+        groupId,
+        newStagedJobId: "j1-restaged",
+        score: 9999,
+        jobDataJson: JSON.stringify({ hello: "world" }),
+        errorMessage: "max retries",
+      });
+      expect(await redis.exists(tenantCounterKey("proj_acme"))).toBe(0);
+    });
+
+    /** @scenario REFRESH keeps the tenant counter TTL aligned with activeKey */
+    it("REFRESH_LUA renews the tenant counter TTL in lockstep with activeKey", async () => {
+      process.env[TENANT_CAP_ENV] = "10";
+      const groupId = await stageOne({
+        tenantId: "proj_acme",
+        groupSuffix: "g1",
+        stagedJobId: "j1",
+      });
+      const dispatched = await scripts.dispatch({
+        nowMs: 2000,
+        activeTtlSec: 60,
+      });
+
+      // Force the counter into a low-TTL state to prove EXPIRE renewal works
+      await redis.expire(tenantCounterKey("proj_acme"), 5);
+      const beforeRefresh = await redis.ttl(tenantCounterKey("proj_acme"));
+      expect(beforeRefresh).toBeLessThanOrEqual(5);
+
+      await scripts.refreshActiveKey({
+        groupId,
+        stagedJobId: dispatched!.stagedJobId,
+        activeTtlSec: 60,
+      });
+
+      const counterTtl = await redis.ttl(tenantCounterKey("proj_acme"));
+      const activeTtl = await redis.ttl(
+        `${keyPrefix()}group:${groupId}:active`,
+      );
+      expect(counterTtl).toBeGreaterThan(beforeRefresh);
+      expect(Math.abs(counterTtl - activeTtl)).toBeLessThanOrEqual(1);
+    });
+
+    /** @scenario RETRY_RESTAGE keeps the tenant counter TTL aligned through backoff */
+    it("RETRY_RESTAGE_LUA aligns the tenant counter TTL with the retry TTL", async () => {
+      process.env[TENANT_CAP_ENV] = "10";
+      const groupId = await stageOne({
+        tenantId: "proj_acme",
+        groupSuffix: "g1",
+        stagedJobId: "j1",
+      });
+      const dispatched = await scripts.dispatch({
+        nowMs: 2000,
+        activeTtlSec: 60,
+      });
+
+      await scripts.retryRestage({
+        groupId,
+        stagedJobId: dispatched!.stagedJobId,
+        newStagedJobId: "j1-retry",
+        dispatchAfterMs: 9999,
+        jobDataJson: JSON.stringify({ hello: "world" }),
+        backoffMs: 30_000,
+      });
+
+      const counterTtl = await redis.ttl(tenantCounterKey("proj_acme"));
+      const activeTtl = await redis.ttl(
+        `${keyPrefix()}group:${groupId}:active`,
+      );
+      // retryRestage sets activeKey TTL to ceil(backoffMs/1000)+2 = 32s
+      expect(counterTtl).toBeGreaterThan(0);
+      expect(Math.abs(counterTtl - activeTtl)).toBeLessThanOrEqual(2);
+    });
+
+    /** @scenario DISPATCH_LUA refuses to dispatch when tenant is at cap */
+    it("refuses to dispatch a group whose tenant is already at cap", async () => {
+      process.env[TENANT_CAP_ENV] = "2";
+      // Three groups, all same tenant, all eligible
+      await stageOne({
+        tenantId: "proj_noisy",
+        groupSuffix: "g1",
+        stagedJobId: "j1",
+      });
+      await stageOne({
+        tenantId: "proj_noisy",
+        groupSuffix: "g2",
+        stagedJobId: "j2",
+      });
+      await stageOne({
+        tenantId: "proj_noisy",
+        groupSuffix: "g3",
+        stagedJobId: "j3",
+      });
+
+      // First two dispatches OK
+      expect(await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 })).not.toBeNull();
+      expect(await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 })).not.toBeNull();
+      expect(await redis.get(tenantCounterKey("proj_noisy"))).toBe("2");
+
+      // Third dispatch must be refused — tenant is at cap=2
+      const third = await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 });
+      expect(third).toBeNull();
+      // Counter unchanged — over-cap groups don't INCR
+      expect(await redis.get(tenantCounterKey("proj_noisy"))).toBe("2");
+      // g3 is still on ready zset waiting
+      const ready = await inspectReadySet();
+      expect(ready.some((s) => s === "proj_noisy/g3")).toBe(true);
+    });
+
+    /** @scenario Over-cap tenant at the head of the zset does not starve other tenants */
+    it("widened scan budget walks past over-cap tenant's groups to serve a quiet tenant deeper in the zset", async () => {
+      process.env[TENANT_CAP_ENV] = "1";
+
+      // proj_noisy stages 50 groups at score=1000 (head of zset)
+      const noisyJobs = Array.from({ length: 50 }, (_, i) =>
+        makeJob({
+          groupId: `proj_noisy/g${i}`,
+          stagedJobId: `noisy-j${i}`,
+          dispatchAfterMs: 1000,
+        }),
+      );
+      await scripts.stageBatch(noisyJobs);
+
+      // proj_quiet stages 1 group at score=1001 (later in zset)
+      await stageOne({
+        tenantId: "proj_quiet",
+        groupSuffix: "only",
+        stagedJobId: "quiet-j1",
+        dispatchAfterMs: 1001,
+      });
+
+      // First dispatch: proj_noisy/g0 wins (counter goes 0→1)
+      const first = await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 });
+      expect(first?.groupId).toMatch(/^proj_noisy\//);
+      expect(await redis.get(tenantCounterKey("proj_noisy"))).toBe("1");
+
+      // Second dispatch: proj_noisy is at cap, scheduler MUST walk past
+      // its remaining 49 over-cap groups and find proj_quiet's one group.
+      const second = await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 });
+      expect(second).not.toBeNull();
+      expect(second!.groupId).toBe("proj_quiet/only");
+      expect(await redis.get(tenantCounterKey("proj_quiet"))).toBe("1");
+    });
+
+    /** @scenario cap=0 produces zero tenant counter keys (back-compat regression) */
+    it("when cap=0 (kill switch), no tenant_active:* keys are ever created", async () => {
+      process.env[TENANT_CAP_ENV] = "0";
+
+      const groupId = await stageOne({
+        tenantId: "proj_acme",
+        groupSuffix: "g1",
+        stagedJobId: "j1",
+      });
+      const dispatched = await scripts.dispatch({
+        nowMs: 2000,
+        activeTtlSec: 60,
+      });
+      expect(dispatched).not.toBeNull();
+
+      // Scan for any tenant_active:* keys — must be none.
+      const keysAfterDispatch = await redis.keys(`${keyPrefix()}tenant_active:*`);
+      expect(keysAfterDispatch).toEqual([]);
+
+      // Round-trip a full lifecycle to confirm no key is created at any
+      // step (COMPLETE attempts the DEL branch even with cap=0; that
+      // branch must not silently create keys).
+      await scripts.complete({
+        groupId,
+        stagedJobId: dispatched!.stagedJobId,
+      });
+      const keysAfterComplete = await redis.keys(`${keyPrefix()}tenant_active:*`);
+      expect(keysAfterComplete).toEqual([]);
+
+      // restageAndBlock path too — re-stage a fresh group and walk the
+      // failure path. Counter must still not appear.
+      await stageOne({
+        tenantId: "proj_acme",
+        groupSuffix: "g2",
+        stagedJobId: "j2",
+      });
+      const d2 = await scripts.dispatch({ nowMs: 3000, activeTtlSec: 60 });
+      await scripts.restageAndBlock({
+        groupId: d2!.groupId,
+        newStagedJobId: "j2-restaged",
+        score: 9999,
+        jobDataJson: JSON.stringify({}),
+        errorMessage: "boom",
+      });
+      const keysAfterRestage = await redis.keys(
+        `${keyPrefix()}tenant_active:*`,
+      );
+      expect(keysAfterRestage).toEqual([]);
+    });
   });
 
   describe("signal list cap", () => {

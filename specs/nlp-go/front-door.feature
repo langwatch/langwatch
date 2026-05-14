@@ -10,6 +10,12 @@ Feature: Front-door reverse proxy — nlpgo routes /go/* itself, everything else
   # NLPGO_BYPASS=1 short-circuits this whole skill — it's handled by the container's
   # entry script before nlpgo would have started, see parallel-deployment.feature.
 
+  # All scenarios are @unimplemented because services/nlpgo/ does not yet exist.
+  # The TS feature-parity checker only scans TS test roots, so Go-side reverse
+  # proxy scenarios cannot be bound via @scenario JSDoc. Aspirational pending
+  # nlpgo service stand-up — Go-side test coverage will live alongside the
+  # nlpgo source under services/nlpgo/.
+
   Background:
     Given the container is up with nlpgo on :5562 and uvicorn on :5561
 

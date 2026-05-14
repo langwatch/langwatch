@@ -9,7 +9,7 @@ dependencies = [
     "pytest>=8.1.2",
     "fastapi>=0.115.11",
     "pydantic>=2.4.0",
-    "python-dotenv==1.0.1",
+    "python-dotenv==1.2.2",
     "mangum>=0.17.0",
     "pandas>=2.2.2",
     "markdown>=3.6",
@@ -82,6 +82,12 @@ langevals-langevals = { workspace = true }
 langevals-presidio = { workspace = true }
 langevals-legacy = { workspace = true }
 langevals-topic_clustering = { workspace = true }
+
+[tool.uv]
+override-dependencies = [
+    "langchain>=0.3.30",
+    "langsmith>=0.8.0",
+]
 
 # PyTorch CPU index for Linux
 [[tool.uv.index]]

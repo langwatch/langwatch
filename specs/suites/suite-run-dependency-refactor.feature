@@ -4,6 +4,14 @@ Feature: Suite run validation uses repository classes
   So that validation logic follows the Router -> Service -> Repository pattern
     and avoids duplicating queries already in ScenarioRepository and AgentRepository
 
+  # The validation behavior described here lives behind the SuiteService
+  # `run()` path which is exercised by `suite.service.unit.test.ts`. The
+  # `archived-scenario-exclusion.feature` file in this same directory already
+  # binds the active/archived/all-archived/missing-reference cases to those
+  # tests. The scenarios here are duplicates focused on "uses repositories
+  # via injection" — a pure-implementation detail that has no behavioral
+  # observable beyond what's already covered. Tracked rather than retested.
+
   Background:
     Given a project belonging to an organization
 

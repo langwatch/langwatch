@@ -7,6 +7,15 @@ Feature: Prompt selection drawer
   # The PromptListDrawer provides a consistent way to select prompts
   # across the application, with folder grouping and create/edit capabilities.
 
+  # All 22 remaining @unimplemented scenarios are KEEP/UPDATE per AUDIT_MANIFEST.md:
+  # PromptListDrawer.test.tsx + PromptEditorDrawer.test.tsx cover the basic list,
+  # search, empty-state, and editor-drawer rendering. The remaining scenarios need
+  # either copy/field-name updates (UPDATE — e.g., Save button label, Outputs in
+  # popover not separate field, header layout) or new end-to-end tests covering
+  # multi-folder grouping, folder expansion, drawer-stack history, and discard-changes
+  # flows (KEEP). Aspirational pending UPDATE-class rewrites and KEEP-class test
+  # additions tracked in PR #3458.
+
   # ============================================================================
   # PromptListDrawer - Basic display
   # ============================================================================

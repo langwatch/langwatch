@@ -397,7 +397,7 @@ export function VirtualKeyEditDrawer({
       placement="end"
       size="md"
     >
-      <Drawer.Content>
+      <Drawer.Content bg="bg">
         <Drawer.Header>
           <Drawer.Title>Edit virtual key</Drawer.Title>
           <Drawer.CloseTrigger />

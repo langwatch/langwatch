@@ -318,7 +318,7 @@ export default function ModelsPage() {
             }
           }}
         >
-          <Dialog.Content>
+          <Dialog.Content bg="bg">
             <Dialog.Header>
               <Dialog.Title>Disable {providerToDisable?.name}?</Dialog.Title>
             </Dialog.Header>

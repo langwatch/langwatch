@@ -7,7 +7,7 @@ import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createLogger } from "~/utils/logger/server";
 import {
   type AuthMiddlewareVariables,
-  authMiddleware,
+  authMiddleware, requirePermission,
 } from "../../middleware";
 import { loggerMiddleware } from "../../middleware/logger";
 import { tracerMiddleware } from "../../middleware/tracer";
@@ -90,6 +90,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── List Runs ──────────────────────────────────────────────
   .get(
     "/",
+    requirePermission("scenarios:view"),
     describeRoute({
       description: "List simulation runs, optionally filtered by scenarioSetId or batchRunId",
       responses: {
@@ -191,6 +192,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── Get Single Run ────────────────────────────────────────
   .get(
     "/:scenarioRunId",
+    requirePermission("scenarios:view"),
     describeRoute({
       description: "Get a single simulation run by its ID",
       responses: {
@@ -239,6 +241,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── List Batches ──────────────────────────────────────────
   .get(
     "/batches/list",
+    requirePermission("scenarios:view"),
     describeRoute({
       description: "List batch summaries for a scenario set (pass/fail counts per batch)",
       responses: {

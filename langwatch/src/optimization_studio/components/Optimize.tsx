@@ -341,7 +341,7 @@ export function OptimizeModalContent({
 
   if (!versions.data) {
     return (
-      <Dialog.Content borderTop="5px solid" borderColor="green.400">
+      <Dialog.Content bg="bg" borderTop="5px solid" borderColor="green.400">
         <Dialog.Header fontWeight={600}>Optimize Workflow</Dialog.Header>
         <Dialog.CloseTrigger />
         <Dialog.Body>
@@ -369,7 +369,7 @@ export function OptimizeModalContent({
 
   return (
     <FormProvider {...form}>
-    <Dialog.Content
+    <Dialog.Content bg="bg"
       as="form"
       // eslint-disable-next-line @typescript-eslint/no-misused-promises
       onSubmit={form.handleSubmit(onSubmit)}

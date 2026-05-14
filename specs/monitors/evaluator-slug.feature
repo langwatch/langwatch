@@ -4,6 +4,19 @@ Feature: Evaluator Slug Generation
   I want evaluators to have human-readable slugs
   So that guardrails can reference them by slug instead of ID
 
+  # 4 of 8 scenarios bound to evaluatorSlug.unit.test.ts (Generate slug from
+  # name, Slug uniqueness, Handle very long names, Handle empty/whitespace).
+  # Remaining 4 @unimplemented scenarios:
+  # - "Same name allowed in different projects": DELETE per manifest
+  #   (evaluatorSlug.ts is project-agnostic — no project-scoped slug logic).
+  # - "Handle special characters in name": UPDATE per manifest (slugify strict
+  #   drops dots, output is "llm-judge-v20-beta-XXXXX" not "llm-judge-v2-0-beta").
+  # - "Handle unicode characters in name": UPDATE per manifest (scenario name
+  #   contains no unicode; needs rewrite with real unicode example).
+  # - "Retry on unique constraint violation": DELETE per manifest (no retry
+  #   logic exists; uniqueness relies solely on nanoid entropy).
+  # Aspirational pending DELETE/UPDATE rewrites tracked in PR #3458.
+
   Background:
     Given the system supports evaluator creation with slug generation
 

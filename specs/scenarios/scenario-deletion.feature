@@ -13,6 +13,13 @@ Feature: Scenario Archiving
       | Angry double-charge refund   | billing      |
       | HTTP troubleshooting request | http         |
 
+  # Per AUDIT_MANIFEST.md the original 25 @unimplemented scenarios were classified
+  # as 23 DUPLICATE (already bound to existing tests) + 2 KEEP-E2E. Bound scenarios
+  # were stripped (covered by ScenarioTable.integration.test.tsx,
+  # scenario-archive.integration.test.ts, useScenarioSelection.integration.test.ts,
+  # ScenarioRunActions.integration.test.tsx via @scenario JSDoc). Two E2E scenarios
+  # remain @unimplemented pending E2E test coverage in PR #3458.
+
   # ============================================================================
   # E2E: Happy Paths — Full User Workflows
   # ============================================================================
@@ -38,32 +45,3 @@ Feature: Scenario Archiving
     When I confirm the archive
     Then neither scenario appears in the scenarios list
     And the remaining 3 scenarios are still visible
-
-  # ============================================================================
-  # Integration: Row Selection UI
-  # ============================================================================
-
-  # ============================================================================
-  # Integration: Single Archive via Row Action Menu
-  # ============================================================================
-
-  # ============================================================================
-  # Integration: Batch Archive
-  # ============================================================================
-
-  # ============================================================================
-  # Integration: Soft Archive Backend Behavior
-  # ============================================================================
-
-  # ============================================================================
-  # Integration: Archived Scenario Guardrails
-  # ============================================================================
-
-  # ============================================================================
-  # Integration: Negative Paths
-  # ============================================================================
-
-  # ============================================================================
-  # Unit: Selection State Logic
-  # ============================================================================
-

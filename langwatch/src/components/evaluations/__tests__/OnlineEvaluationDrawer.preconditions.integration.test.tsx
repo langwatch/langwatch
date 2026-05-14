@@ -117,6 +117,7 @@ describe("<OnlineEvaluationDrawer /> preconditions", () => {
   };
 
   describe("when default preconditions are active", () => {
+    /** @scenario Default-only precondition shows collapsed summary */
     it("shows collapsed summary text", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       await setupWithEvaluator(user);

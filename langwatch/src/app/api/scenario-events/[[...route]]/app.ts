@@ -14,7 +14,7 @@ import {
   encodeStart,
 } from "~/utils/streaming-event-codec";
 import {
-  authMiddleware,
+  authMiddleware, requirePermission,
   blockTraceUsageExceededMiddleware,
   handleError,
   loggerMiddleware,
@@ -45,6 +45,7 @@ app.onError(handleError);
 // POST /api/scenario-events - Create a new scenario event
 app.post(
   "/",
+  requirePermission("scenarios:manage"),
   describeRoute({
     description: "Create a new scenario event",
     responses: {
@@ -124,6 +125,7 @@ app.post(
 // DELETE /api/scenario-events - Delete all events for a project
 export const route = app.delete(
   "/",
+  requirePermission("scenarios:manage"),
   describeRoute({
     description: "Delete all events",
     responses: {

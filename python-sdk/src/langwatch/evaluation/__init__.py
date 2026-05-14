@@ -29,6 +29,13 @@ from typing import Any, Dict, List, Literal, Optional, Union, cast, TYPE_CHECKIN
 from uuid import UUID
 
 import httpx
+from tenacity import (
+    retry,
+    retry_if_exception,
+    stop_after_attempt,
+    wait_exponential,
+    wait_random,
+)
 import langwatch
 from langwatch.domain import SpanTimestamps
 from pksuid import PKSUID
@@ -37,7 +44,7 @@ from langwatch.telemetry.context import get_current_span
 from langwatch.state import get_api_key, get_endpoint, get_instance
 from langwatch.attributes import AttributeKey
 from langwatch.utils.auth import build_auth_headers
-from langwatch.utils.exceptions import EvaluatorException, better_raise_for_status
+from langwatch.utils.exceptions import better_raise_for_status
 from pydantic import BaseModel
 
 from langwatch.types import (
@@ -74,6 +81,28 @@ from langwatch.experiment.platform_run import (
 
 if TYPE_CHECKING:
     from langwatch.telemetry.tracing import LangWatchTrace
+
+
+# Gateway/edge codes that mean "the request didn't reach a healthy origin or the
+# origin took too long" — distinct from a 500 the evaluator itself returned,
+# which usually reflects a deterministic problem retrying won't fix.
+_RETRYABLE_STATUS_CODES = frozenset({502, 503, 504, 524})
+
+
+def _is_transient_evaluator_error(exc: BaseException) -> bool:
+    if isinstance(exc, (httpx.TimeoutException, httpx.ConnectError)):
+        return True
+    if isinstance(exc, httpx.HTTPStatusError):
+        return exc.response.status_code in _RETRYABLE_STATUS_CODES
+    return False
+
+
+_retry_evaluator_call = retry(
+    retry=retry_if_exception(_is_transient_evaluator_error),
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=2, max=10) + wait_random(0, 1),
+    reraise=True,
+)
 
 
 # ============================================================================
@@ -159,10 +188,15 @@ def evaluate(
             span=span,
             as_guardrail=as_guardrail,
         )
-        try:
+        @_retry_evaluator_call
+        def _post() -> httpx.Response:
             with httpx.Client(timeout=900) as client:
                 response = client.post(**request_params)
-                better_raise_for_status(response, cls=EvaluatorException)
+                better_raise_for_status(response)
+                return response
+
+        try:
+            response = _post()
         except Exception as e:
             return _handle_exception(e, span, as_guardrail)
 
@@ -219,10 +253,15 @@ async def async_evaluate(
             span=span,
             as_guardrail=as_guardrail,
         )
-        try:
+        @_retry_evaluator_call
+        async def _post() -> httpx.Response:
             async with httpx.AsyncClient(timeout=900) as client:
                 response = await client.post(**request_params)
                 better_raise_for_status(response)
+                return response
+
+        try:
+            response = await _post()
         except Exception as e:
             return _handle_exception(e, span, as_guardrail)
 

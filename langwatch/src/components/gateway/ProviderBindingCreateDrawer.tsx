@@ -156,7 +156,7 @@ export function ProviderBindingCreateDrawer({
       placement="end"
       size="md"
     >
-      <Drawer.Content>
+      <Drawer.Content bg="bg">
         <Drawer.Header>
           <Drawer.Title>Bind provider to gateway</Drawer.Title>
           <Drawer.CloseTrigger />

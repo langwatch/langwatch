@@ -97,7 +97,7 @@ export function CacheRuleEditDrawer({ rule, onOpenChange, onSaved }: Props) {
       placement="end"
       size="md"
     >
-      <Drawer.Content>
+      <Drawer.Content bg="bg">
         <Drawer.Header>
           <Drawer.Title>Edit cache rule</Drawer.Title>
           <Drawer.CloseTrigger />

@@ -187,6 +187,7 @@ describe("Feature: Suites REST API", () => {
         expect(body[0].name).toBe("My Suite");
       });
 
+      /** @scenario Archived suite does not appear in sidebar search results */
       it("excludes archived suites", async () => {
         await createSuite({ archivedAt: new Date() });
 
@@ -291,6 +292,7 @@ describe("Feature: Suites REST API", () => {
   });
 
   describe("DELETE /api/suites/:id", () => {
+    /** @scenario Archived suite is hidden from the active list */
     it("archives the suite", async () => {
       const suite = await createSuite({ name: "To Archive" });
 
@@ -313,6 +315,7 @@ describe("Feature: Suites REST API", () => {
       expect(ids).not.toContain(suite.id);
     });
 
+    /** @scenario Archiving a non-existent suite returns not found */
     it("returns 404 for non-existent suite", async () => {
       const res = await helpers.api.delete("/api/suites/nonexistent-id");
 

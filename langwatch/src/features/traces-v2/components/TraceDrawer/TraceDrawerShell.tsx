@@ -100,7 +100,7 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
         size="lg"
         onOpenChange={() => handleClose()}
       >
-        <Drawer.Content>
+        <Drawer.Content bg="bg">
           <Drawer.Body padding={0}>
             <TraceDrawerEmptyState
               error={headerQuery.error}
@@ -131,7 +131,7 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
       onOpenChange={() => handleClose()}
     >
       <CodeBlock.AdapterProvider value={shikiAdapter}>
-        <Drawer.Content
+        <Drawer.Content bg="bg"
           ref={drawerContentRef}
           paddingX={0}
           // Maximized state used to expand to a full 100vw, leaving no gap on

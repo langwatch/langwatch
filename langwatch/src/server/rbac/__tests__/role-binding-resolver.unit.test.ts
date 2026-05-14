@@ -65,6 +65,7 @@ const projectScope: ScopeRef = {
 
 describe("checkRoleBindingPermission()", () => {
   describe("when checking built-in role permissions", () => {
+    /** @scenario Effective role maps to correct permission grants */
     it("grants team:manage to Admin", async () => {
       const prisma = makePrisma({
         directBindings: [

@@ -268,7 +268,7 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
       onOpenChange={({ open }) => !open && onClose()}
       size="xl"
     >
-      <Drawer.Content>
+      <Drawer.Content bg="bg">
         <Drawer.CloseTrigger />
         <Drawer.Header>
           <HStack>

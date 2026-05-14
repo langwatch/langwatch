@@ -47,6 +47,7 @@ describe("BatchTargetCell", () => {
   });
 
   describe("Output Display", () => {
+    /** @scenario Display target output with cost and duration */
     it("renders string output", () => {
       const targetOutput = createTargetOutput({
         output: { message: "Hello world" },
@@ -82,6 +83,7 @@ describe("BatchTargetCell", () => {
       expect(screen.getByText("No output")).toBeInTheDocument();
     });
 
+    /** @scenario Display error state in target cell */
     it("displays error state with error message", () => {
       const targetOutput = createTargetOutput({
         output: null,
@@ -95,6 +97,8 @@ describe("BatchTargetCell", () => {
       expect(screen.getByText("Connection timeout")).toBeInTheDocument();
     });
 
+    /** @scenario Expand long target output */
+    /** @scenario Truncate long text in dataset cells */
     it("truncates very long output with indicator", () => {
       const longText = "A".repeat(15000);
       const targetOutput = createTargetOutput({
@@ -110,6 +114,9 @@ describe("BatchTargetCell", () => {
   });
 
   describe("Evaluator Results", () => {
+    /** @scenario Display evaluator chips below target output */
+    /** @scenario Evaluator chip shows pass status */
+    /** @scenario Evaluator chip shows fail status */
     it("renders evaluator chips for each result", () => {
       const targetOutput = createTargetOutput({
         evaluatorResults: [
@@ -158,6 +165,7 @@ describe("BatchTargetCell", () => {
       expect(screen.getByText("0.75")).toBeInTheDocument();
     });
 
+    /** @scenario Evaluator chip shows error status */
     it("handles error status in evaluator", () => {
       const targetOutput = createTargetOutput({
         evaluatorResults: [

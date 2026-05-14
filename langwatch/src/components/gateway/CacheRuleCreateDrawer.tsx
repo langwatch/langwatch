@@ -66,7 +66,7 @@ export function CacheRuleCreateDrawer({ open, onOpenChange, onCreated }: Props) 
       placement="end"
       size="md"
     >
-      <Drawer.Content>
+      <Drawer.Content bg="bg">
         <Drawer.Header>
           <Drawer.Title>New cache rule</Drawer.Title>
           <Drawer.CloseTrigger />

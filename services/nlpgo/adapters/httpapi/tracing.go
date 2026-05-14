@@ -46,17 +46,22 @@ func startStudioSpan(ctx context.Context, name string, req *app.WorkflowRequest,
 	if req.DoNotTrace {
 		return ctx, trace.SpanFromContext(ctx)
 	}
-	if tid, ok := parseTraceID(req.TraceID); ok {
-		// Remote=true tells the sampler to honor the inbound decision
-		// (we always-sample inbound Studio runs since the langwatch app
-		// already gated them).
-		sc := trace.NewSpanContext(trace.SpanContextConfig{
-			TraceID:    tid,
-			SpanID:     newSpanID(),
-			TraceFlags: trace.FlagsSampled,
-			Remote:     true,
-		})
-		ctx = trace.ContextWithSpanContext(ctx, sc)
+	// Prefer the W3C-extracted parent span context (set by
+	// applyInboundCausality via the global propagator) over the
+	// body-supplied req.TraceID. This is what lets evaluator workflows
+	// continue the caller's trace end-to-end — same trace_id, parent
+	// span_id linked. Fall back to body TraceID for callers that
+	// haven't been updated to send `traceparent` yet.
+	if !trace.SpanContextFromContext(ctx).IsValid() {
+		if tid, ok := parseTraceID(req.TraceID); ok {
+			sc := trace.NewSpanContext(trace.SpanContextConfig{
+				TraceID:    tid,
+				SpanID:     newSpanID(),
+				TraceFlags: trace.FlagsSampled,
+				Remote:     true,
+			})
+			ctx = trace.ContextWithSpanContext(ctx, sc)
+		}
 	}
 	tracer := otelapi.Tracer(tracerName)
 	ctx, span := tracer.Start(ctx, name,

@@ -6,6 +6,12 @@ Feature: Dataset block — entry node reads inline dataset records and emits one
 
   See _shared/contract.md §5.
 
+  # All scenarios are @unimplemented because services/nlpgo/ does not yet exist.
+  # The TS feature-parity checker only scans TS test roots, so Go-side scenarios
+  # cannot be bound via @scenario JSDoc. Python-side parity reference:
+  # langwatch_nlp/langwatch_nlp/studio/execute/entry_node.py.
+  # Aspirational pending nlpgo service stand-up.
+
   Background:
     Given nlpgo is listening on :5562
 

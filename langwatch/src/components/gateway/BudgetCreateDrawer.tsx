@@ -149,7 +149,7 @@ export function BudgetCreateDrawer({
       placement="end"
       size="md"
     >
-      <Drawer.Content>
+      <Drawer.Content bg="bg">
         <Drawer.Header>
           <Drawer.Title>New budget</Drawer.Title>
           <Drawer.CloseTrigger />

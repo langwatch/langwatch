@@ -41,7 +41,7 @@ import {
 import type { Prisma } from "@prisma/client";
 
 import { prisma } from "~/server/db";
-import { requirePatPermission } from "~/server/pat/auth-middleware";
+import { requireApiKeyPermission } from "~/server/api-key/auth-middleware";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createLogger } from "~/utils/logger/server";
 
@@ -58,11 +58,11 @@ patchZodOpenapi();
 
 const logger = createLogger("langwatch:api:governance");
 
-const requireAiToolsView = requirePatPermission({
+const requireAiToolsView = requireApiKeyPermission({
   prisma,
   permission: "aiTools:view",
 });
-const requireAiToolsManage = requirePatPermission({
+const requireAiToolsManage = requireApiKeyPermission({
   prisma,
   permission: "aiTools:manage",
 });
@@ -70,7 +70,7 @@ const requireAiToolsManage = requirePatPermission({
 // install / list / uninstall / rotate their OWN bindings, so the ceiling
 // is `organization:view` (member-of-org) rather than aiTools:* admin.
 // Cross-bind invariants are enforced inside the service layer.
-const requireOrgView = requirePatPermission({
+const requireOrgView = requireApiKeyPermission({
   prisma,
   permission: "organization:view",
 });

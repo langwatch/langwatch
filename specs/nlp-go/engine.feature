@@ -6,6 +6,13 @@ Feature: Workflow execution engine — DSL parsing, DAG resolution, lifecycle
 
   See _shared/contract.md §5, §6, §10.
 
+  # All scenarios are @unimplemented because services/nlpgo/ does not yet exist.
+  # The TS feature-parity checker only scans TS test roots, so Go-side engine
+  # scenarios cannot be bound via @scenario JSDoc. Python-side parity reference:
+  # langwatch_nlp/langwatch_nlp/studio/execute/workflow.py + execute_component.py
+  # and langwatch_nlp/tests/studio/test_workflow_parse_and_execution.py.
+  # Aspirational pending nlpgo service stand-up.
+
   Background:
     Given nlpgo is listening on :5562
     And nlpgo imports the AI Gateway dispatcher in-process (see contract.md §8)

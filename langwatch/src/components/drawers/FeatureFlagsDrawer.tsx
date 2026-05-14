@@ -113,7 +113,7 @@ export function FeatureFlagsDrawer() {
       size="md"
       onOpenChange={() => closeDrawer()}
     >
-      <Drawer.Content>
+      <Drawer.Content bg="bg">
         <Drawer.Header>
           <HStack width="full">
             <Heading size="md">Feature Flags (Dev)</Heading>

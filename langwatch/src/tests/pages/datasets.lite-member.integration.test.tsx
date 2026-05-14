@@ -250,6 +250,7 @@ describe("Datasets page permission visibility", () => {
       mockIsLiteMemberRef.current = true;
     });
 
+    /** @scenario Lite member does not see edit or delete actions on datasets */
     it("hides edit and delete menu items", () => {
       renderPage();
 

@@ -34,7 +34,7 @@ import {
   type PlanProvider,
 } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
-import { PatService } from "~/server/pat/pat.service";
+import { ApiKeyService } from "~/server/api-key/api-key.service";
 
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import { app } from "../[[...route]]/app";
@@ -168,11 +168,12 @@ describe("Feature: User-Ingestion-Bindings REST API", () => {
 
     // PAT scoped MEMBER at org so the ceiling stays tight; MEMBER carries
     // organization:view, which is the permission the binding routes gate on.
-    const patService = PatService.create(prisma);
-    const patResult = await patService.create({
+    const apiKeyService = ApiKeyService.create(prisma);
+    const apiKeyResult = await apiKeyService.create({
       name: `bindings-pat-${ns}`,
       userId: testUser.id,
       organizationId: testOrganization.id,
+      permissionMode: "all",
       bindings: [
         {
           role: TeamUserRole.MEMBER,
@@ -181,7 +182,7 @@ describe("Feature: User-Ingestion-Bindings REST API", () => {
         },
       ],
     });
-    patToken = patResult.token;
+    patToken = apiKeyResult.token;
 
     // Platform-published template the test caller can install against.
     const platformId = `tmpl-bindings-${nanoid(8)}`;
@@ -229,7 +230,7 @@ describe("Feature: User-Ingestion-Bindings REST API", () => {
     await prisma.roleBinding.deleteMany({
       where: { organizationId: { in: orgIds } },
     });
-    await prisma.personalAccessToken.deleteMany({
+    await prisma.apiKey.deleteMany({
       where: { organizationId: { in: orgIds } },
     });
     await prisma.teamUser

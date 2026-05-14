@@ -104,7 +104,7 @@ export function ScenarioWelcomeModal({
 }) {
   return (
     <Dialog.Root open={open} onOpenChange={(e) => onOpenChange(e.open)} placement="center" size="lg">
-      <Dialog.Content maxWidth="640px">
+      <Dialog.Content bg="bg" maxWidth="640px">
         <Dialog.CloseTrigger />
         <Dialog.Body py={8} px={8}>
           <ScenarioWelcomeContent onProceed={onProceed} />

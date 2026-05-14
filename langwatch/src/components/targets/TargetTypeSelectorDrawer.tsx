@@ -79,7 +79,7 @@ export function TargetTypeSelectorDrawer(props: TargetTypeSelectorDrawerProps) {
       size="md"
       modal={false}
     >
-      <Drawer.Content>
+      <Drawer.Content bg="bg">
         <Drawer.CloseTrigger />
         <Drawer.Header>
           <HStack gap={2}>

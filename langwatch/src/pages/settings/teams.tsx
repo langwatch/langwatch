@@ -161,7 +161,7 @@ function AddToTeamDialog({
 
   return (
     <Dialog.Root open={open} onOpenChange={(e) => !e.open && onClose()}>
-      <Dialog.Content maxWidth="440px">
+      <Dialog.Content bg="bg" maxWidth="440px">
         <Dialog.Header>
           <Dialog.Title>Add member to {teamName}</Dialog.Title>
         </Dialog.Header>
@@ -299,7 +299,7 @@ function AddToProjectDialog({
 
   return (
     <Dialog.Root open={open} onOpenChange={(e) => !e.open && onClose()}>
-      <Dialog.Content maxWidth="440px">
+      <Dialog.Content bg="bg" maxWidth="440px">
         <Dialog.Header>
           <Dialog.Title>Add access to {projectName}</Dialog.Title>
         </Dialog.Header>

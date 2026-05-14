@@ -1,0 +1,18 @@
+# Overlay applied by `make quickstart migration` so contributors can run
+# `pnpm prisma migrate dev` and `pnpm clickhouse:migrate` from their host
+# shell against the local stateful stores. The base compose.dev.yml leaves
+# postgres + clickhouse without host ports for normal modes (workspace-
+# internal access only); this overlay opens them up for the migration mode.
+#
+# Usage:
+#   docker compose -f compose.dev.yml -f compose.dev.migration.yml up postgres clickhouse
+#
+# scripts/dev.sh wires this together when "migration" mode is selected.
+
+services:
+  postgres:
+    ports:
+      - "5432:5432"
+  clickhouse:
+    ports:
+      - "8123:8123"

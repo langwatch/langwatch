@@ -11,13 +11,10 @@ Feature: Scenario Bulk Actions
       | Billing Check   | ["billing"] |
       | Greeting Prompt | ["general"] |
 
-  # ============================================================================
-  # Floating Bar Visibility
-  # ============================================================================
-
-  # ============================================================================
-  # Floating Bar Layout (matches traces pattern)
-  # ============================================================================
+  # Per AUDIT_MANIFEST.md: 5 scenarios → 3 DUPLICATE (now bound via @scenario
+  # JSDoc against ScenarioTable.integration.test.tsx BatchActionBar tests) +
+  # 2 KEEP-E2E (scroll-stickiness + end-to-end archive flow) which remain
+  # @unimplemented pending E2E coverage in PR #3458.
 
   @e2e @unimplemented
   Scenario: Floating bar stays fixed during scroll
@@ -26,10 +23,6 @@ Feature: Scenario Bulk Actions
     When I select "Refund Flow"
     And I scroll down the scenario list
     Then the floating action bar remains visible
-
-  # ============================================================================
-  # Bulk Actions
-  # ============================================================================
 
   @e2e @unimplemented
   Scenario: Archive selected scenarios via floating bar

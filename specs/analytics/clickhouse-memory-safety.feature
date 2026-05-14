@@ -55,7 +55,7 @@ Feature: ClickHouse Query Memory Safety Regression Tests
   # Layer 2: Memory-budgeted smoke tests (real ClickHouse, seeded data)
   # ---------------------------------------------------------------------------
 
-  @integration @unimplemented
+  @integration
   Scenario: All generated analytics queries are valid ClickHouse SQL
     Given a running ClickHouse test container with schema applied
     And 10000 spans seeded with 50 attribute keys per span across 1000 traces
@@ -69,7 +69,7 @@ Feature: ClickHouse Query Memory Safety Regression Tests
     When each analytics query path is executed with max_memory_usage set to 50MB
     Then every query completes without a memory exceeded error
 
-  @integration @unimplemented
+  @integration
   Scenario: Analytics queries complete within time budget on seeded data
     Given a running ClickHouse test container with schema applied
     And 10000 spans seeded with 50 attribute keys per span across 1000 traces

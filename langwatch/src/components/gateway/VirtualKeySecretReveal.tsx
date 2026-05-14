@@ -68,7 +68,7 @@ export function VirtualKeySecretReveal({
       closeOnInteractOutside={false}
       closeOnEscape={false}
     >
-      <Dialog.Content maxWidth="560px">
+      <Dialog.Content bg="bg" maxWidth="560px">
           <Dialog.Header>
             <Dialog.Title>
               {kind === "rotate"

@@ -1,5 +1,6 @@
 import {
   type PrismaClient,
+  OrganizationUserRole,
   ProjectSensitiveDataVisibilityLevel,
   RoleBindingScopeType,
   TeamUserRole,
@@ -7,6 +8,7 @@ import {
 import type { Session } from "~/server/auth";
 import type { Protections } from "../elasticsearch/protections";
 import { hasProjectPermission, isDemoProject } from "./rbac";
+import { getApp } from "~/server/app-layer/app";
 
 export const extractCheckKeys = (
   inputObject: Record<string, any>,
@@ -115,8 +117,8 @@ export async function getUserProtectionsForProject(
     };
   }
 
-  // For signed in users, check their team permissions via RoleBinding
-  const bindings = await ctx.prisma.roleBinding.findMany({
+  // Check team-level role bindings
+  const teamBindings = await ctx.prisma.roleBinding.findMany({
     where: {
       userId: ctx.session.user.id,
       scopeType: RoleBindingScopeType.TEAM,
@@ -127,10 +129,24 @@ export async function getUserProtectionsForProject(
     },
   });
 
-  const isAdminForTeam = bindings.some(
+  let isAdminForTeam = teamBindings.some(
     (binding) => binding.role === TeamUserRole.ADMIN,
   );
-  const isMemberOfTeam = bindings.length > 0;
+  let isMemberOfTeam = teamBindings.length > 0;
+
+  if (!isMemberOfTeam) {
+    const orgRole = await getApp().organizations.getUserOrgRoleByTeamId({
+      userId: ctx.session.user.id,
+      teamId: project.teamId,
+    });
+
+    if (orgRole === OrganizationUserRole.ADMIN) {
+      isMemberOfTeam = true;
+      isAdminForTeam = true;
+    } else if (orgRole === OrganizationUserRole.MEMBER) {
+      isMemberOfTeam = true;
+    }
+  }
 
   const obtainVisibilityLevel = (
     visibility: ProjectSensitiveDataVisibilityLevel,

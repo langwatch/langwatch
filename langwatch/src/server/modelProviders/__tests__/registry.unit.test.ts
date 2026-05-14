@@ -187,7 +187,7 @@ describe("Backward Compatibility", () => {
     });
 
     it("includes standard models without suffixes", () => {
-      expect(allLitellmModels["anthropic/claude-3.7-sonnet"]).toBeDefined();
+      expect(allLitellmModels["anthropic/claude-sonnet-4-6"]).toBeDefined();
       expect(allLitellmModels["openai/gpt-4o"]).toBeDefined();
     });
   });

@@ -225,6 +225,14 @@ export interface UpdateTeamMemberRoleInput {
 
 export interface OrganizationRepository {
   getOrganizationIdByTeamId(teamId: string): Promise<string | null>;
+  getUserOrgRole(params: {
+    userId: string;
+    organizationId: string;
+  }): Promise<OrganizationUserRole | null>;
+  getUserOrgRoleByTeamId(params: {
+    userId: string;
+    teamId: string;
+  }): Promise<OrganizationUserRole | null>;
   getProjectIds(organizationId: string): Promise<string[]>;
   getFeature(
     organizationId: string,
@@ -299,6 +307,20 @@ export interface OrganizationRepository {
 
 export class NullOrganizationRepository implements OrganizationRepository {
   async getOrganizationIdByTeamId(_teamId: string): Promise<string | null> {
+    return null;
+  }
+
+  async getUserOrgRole(_params: {
+    userId: string;
+    organizationId: string;
+  }): Promise<OrganizationUserRole | null> {
+    return null;
+  }
+
+  async getUserOrgRoleByTeamId(_params: {
+    userId: string;
+    teamId: string;
+  }): Promise<OrganizationUserRole | null> {
     return null;
   }
 

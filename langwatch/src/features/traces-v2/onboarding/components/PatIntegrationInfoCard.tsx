@@ -126,7 +126,7 @@ export function PatIntegrationInfoCard({
 
   const [revealed, setRevealed] = useState(false);
 
-  const createMutation = api.personalAccessToken.create.useMutation();
+  const createMutation = api.apiKey.create.useMutation();
 
   const handleGenerate = () => {
     createMutation.mutate(

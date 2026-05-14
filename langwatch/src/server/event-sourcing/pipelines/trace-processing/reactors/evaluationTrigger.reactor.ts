@@ -1,4 +1,5 @@
 import { generate } from "@langwatch/ksuid";
+import { evaluatorLoopBlockedCounter } from "../../../../metrics";
 import type { MonitorService } from "~/server/app-layer/monitors/monitor.service";
 import type { QueueSendOptions } from "../../../queues";
 import { ExecuteEvaluationCommand } from "../../evaluation-processing/commands/executeEvaluation.command";
@@ -44,6 +45,50 @@ export function createEvaluationTriggerReactor(
         return;
       }
       const { tenantId, aggregateId: traceId, foldState } = context;
+
+      // Infinite-loop prevention (post-2026-05-11 incident). See
+      // specs/monitors/online-evaluator-loop-prevention.feature.
+      //
+      // Depth-only per-span check (origin remains a user-configurable
+      // precondition, not a hardcoded reactor rule): if the inbound
+      // span's own `langwatch.reserved.causality_depth` attribute is
+      // >= 1, it was emitted by an evaluator workflow (or downstream
+      // of one). Skip dispatch.
+      //
+      // A fresh app-origin span on the same trace (depth 0) still
+      // triggers normally — re-runs are allowed, only eval spans are
+      // blocked.
+      //
+      // The primary guarantee that every eval-emitted span carries the
+      // attribute is the nlpgo-side BaggageAttributeProcessor (stamps
+      // every span at OnStart from a single baggage entry on context).
+      //
+      // Kill-switch: LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD=1 bypasses
+      // the check (emergency rollback without redeploy). Captured in
+      // env-create.mjs for schema discoverability; read via process.env
+      // here so tests can mutate it between cases.
+      const guardDisabled =
+        process.env.LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD === "1";
+
+      if (!guardDisabled && isSpanReceivedEvent(event)) {
+        const reason = detectCausalityLoop({
+          spanAttributes: event.data.span.attributes,
+        });
+        if (reason) {
+          recordLoopBlocked(reason);
+          logger.warn(
+            { tenantId, observedTraceId: traceId, reason },
+            "Skipping evaluation dispatch — causality loop guard fired",
+          );
+          return;
+        }
+      } else if (guardDisabled) {
+        logger.warn(
+          { tenantId, observedTraceId: traceId },
+          "LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD=1 — loop guard bypassed",
+        );
+      }
+
       // Origin is known — dispatch to monitors, precondition matchers filter by origin.
       await dispatchEvaluations({
         deps,
@@ -54,6 +99,58 @@ export function createEvaluationTriggerReactor(
       });
     },
   });
+}
+
+const CAUSALITY_DEPTH_ATTR = "langwatch.reserved.causality_depth";
+
+/**
+ * Causality-loop detection on a single incoming span_received event.
+ * Exported for unit testing.
+ */
+export function detectCausalityLoop(params: {
+  spanAttributes: Array<{ key: string; value: unknown }> | undefined | null;
+}): "depth_direct" | null {
+  const depth = extractCausalityDepthFromOtlpAttrs(params.spanAttributes);
+  if (depth >= 1) return "depth_direct";
+  return null;
+}
+
+/**
+ * OTLP spans deliver attributes as `[{key, value: AnyValue}]` arrays.
+ * AnyValue is a union — string/int/bool/double/array. We accept any
+ * encoding that parses to a positive finite integer.
+ */
+function extractCausalityDepthFromOtlpAttrs(
+  attrs: Array<{ key: string; value: unknown }> | undefined | null,
+): number {
+  if (!Array.isArray(attrs)) return 0;
+  for (const attr of attrs) {
+    if (attr?.key !== CAUSALITY_DEPTH_ATTR) continue;
+    const v = attr.value as Record<string, unknown> | number | string | null;
+    let raw: unknown = v;
+    if (v && typeof v === "object") {
+      // Handle OTLP AnyValue: { intValue?, stringValue?, doubleValue? }
+      raw =
+        (v as Record<string, unknown>).intValue ??
+        (v as Record<string, unknown>).stringValue ??
+        (v as Record<string, unknown>).doubleValue ??
+        v;
+    }
+    const n =
+      typeof raw === "number"
+        ? raw
+        : typeof raw === "string"
+          ? Number.parseInt(raw, 10)
+          : NaN;
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return 0;
+}
+
+function recordLoopBlocked(reason: string): void {
+  // tenant attribution lives in the structured log line, not the
+  // Prometheus label (cardinality control — see metrics.ts comment).
+  evaluatorLoopBlockedCounter.inc({ reason });
 }
 
 // ---------------------------------------------------------------------------

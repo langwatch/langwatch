@@ -3,6 +3,13 @@ Feature: Prompt version tags
   I want to assign tags like "production" and "staging" to specific prompt versions
   So that I can control which version is served in each environment without changing code
 
+  # All 3 remaining @unimplemented scenarios are KEEP/UPDATE per AUDIT_MANIFEST.md:
+  # PromptTagAssignment record shape (UPDATE — old name was PromptVersionTag),
+  # plus end-to-end ?tag=production / no-tag fetch via REST API (KEEP — service-
+  # level tests exist in prompt-tags.integration.test.ts but no e2e on the
+  # /api/prompts/:id endpoint with tag query). Aspirational pending UPDATE
+  # rewording + KEEP REST-level tests tracked in PR #3458.
+
   Background:
     Given I am logged into project "my-project"
 

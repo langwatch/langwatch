@@ -2,30 +2,26 @@ import { on } from "node:events";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { checkOpsPermission, type PermissionMiddleware } from "~/server/api/rbac";
+import { checkOpsPermission } from "~/server/api/rbac";
 import { getApp } from "~/server/app-layer/app";
 import { DASHBOARD_EVENT } from "~/server/app-layer/ops/metrics-collector";
 import type { DashboardData } from "~/server/app-layer/ops/types";
 import { getProjectionMetadata, getReactorMetadata } from "~/server/event-sourcing/pipelineRegistry";
+import { AnomalyStateStore } from "~/server/observability/anomalyState";
+import { connection } from "~/server/redis";
 
-const opsViewPermission = checkOpsPermission("ops:view");
+const opsViewPermission = checkOpsPermission({ permission: "ops:view" });
 
-const opsManagePermission = checkOpsPermission("ops:manage");
+// Status-probe variant of the ops:view middleware — populates `ctx.opsScope`
+// (with `kind: "none"` for non-ops users) without throwing FORBIDDEN. Lets
+// `getScope` be a probe that the global menu can poll on every page load
+// without spamming the console (lw#3584).
+const opsViewProbe = checkOpsPermission({
+  permission: "ops:view",
+  throwOnDeny: false,
+});
 
-/**
- * Inline permission-skip middleware for `getScope` only — the exported
- * `skipPermissionCheck` from rbac.ts is typed for `object` input which
- * doesn't unify with `protectedProcedure`'s `_input_out: void` for the
- * no-input introspection query. Same effect (sets
- * `permissionChecked = true` so `enforcePermissionCheck` passes),
- * scoped to this single procedure so no broader RBAC bypass surface
- * is added.
- */
-const skipOpsScopeIntrospectionPermission: PermissionMiddleware<void> =
-  async ({ ctx, next }) => {
-    ctx.permissionChecked = true;
-    return await next();
-  };
+const opsManagePermission = checkOpsPermission({ permission: "ops:manage" });
 
 function requireOps() {
   const ops = getApp().ops;
@@ -40,28 +36,25 @@ function requireOps() {
 
 export const opsRouter = createTRPCRouter({
   /**
-   * Introspection: returns the caller's ops scope, or `null` when they
-   * lack `ops:view`. Deliberately uses `skipPermissionCheck` instead
-   * of `opsViewPermission` — "no scope" is a valid answer to the
-   * question "what scope do I have", not an error. Throwing 403 here
-   * would spam the browser console for every non-ops user (which is
-   * most users) on every page-load that mounts a layout consuming
-   * `useOpsPermission` (MainMenu, SettingsLayout, command-bar,
-   * ReplayStatusBanner, ReplayProgressDrawer). All other procedures
-   * in this router keep their `opsViewPermission` /
-   * `opsManagePermission` gates.
+   * Status probe — returns the calling user's ops scope. Always succeeds for
+   * any authenticated user; non-ops users get `{ scope: { kind: "none" } }`
+   * instead of FORBIDDEN. The hook (`useOpsPermission`) derives `hasAccess`
+   * from `scope.kind !== "none"` so the global menu can hide ops UI without
+   * spamming the console with permission errors on every page load
+   * (lw#3584).
    *
-   * Caught by ariana's QA dogfood (G9): non-ops users saw 3 console
-   * errors per page load. Authentication is still required (the
-   * `protectedProcedure` chain remains), so this is not an open
-   * endpoint — anonymous callers still get UNAUTHORIZED.
+   * The mutating ops endpoints below still go through the throw-on-deny
+   * variant of `checkOpsPermission` — only this status probe relaxes it.
    */
-  getScope: protectedProcedure
-    .input(z.void())
-    .use(skipOpsScopeIntrospectionPermission)
-    .query(({ ctx }) => {
-      return { scope: ctx.opsScope ?? null };
-    }),
+  getScope: protectedProcedure.use(opsViewProbe).query(({ ctx }) => {
+    if (!ctx.opsScope) {
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "opsScope not populated by middleware (probable bug)",
+      });
+    }
+    return { scope: ctx.opsScope };
+  }),
 
   getDashboardSnapshot: protectedProcedure
     .use(opsViewPermission)
@@ -231,6 +224,56 @@ export const opsRouter = createTRPCRouter({
     .mutation(async ({ input }) => {
       const ops = requireOps();
       return ops.queues.unpausePipeline(input);
+    }),
+
+  pauseTenant: protectedProcedure
+    .use(opsManagePermission)
+    .input(
+      z.object({
+        queueName: z.string(),
+        tenantId: z.string().min(1),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const ops = requireOps();
+      return ops.queues.pauseTenant(input);
+    }),
+
+  unpauseTenant: protectedProcedure
+    .use(opsManagePermission)
+    .input(
+      z.object({
+        queueName: z.string(),
+        tenantId: z.string().min(1),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const ops = requireOps();
+      return ops.queues.unpauseTenant(input);
+    }),
+
+  listPausedTenants: protectedProcedure
+    .use(opsViewPermission)
+    .input(z.object({ queueName: z.string() }))
+    .query(async ({ input }) => {
+      const ops = requireOps();
+      return ops.queues.listPausedTenants(input);
+    }),
+
+  drainTenant: protectedProcedure
+    .use(opsManagePermission)
+    .input(
+      z.object({
+        queueName: z.string(),
+        tenantId: z.string().min(1),
+        // Optional substring filter on groupId. Honest substring semantics —
+        // see drainTenant repo doc for example fragments to type.
+        groupIdContains: z.string().optional(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const ops = requireOps();
+      return ops.queues.drainTenant(input);
     }),
 
   retryBlocked: protectedProcedure
@@ -550,5 +593,46 @@ export const opsRouter = createTRPCRouter({
         });
       }
       return result;
+    }),
+
+  // ---------------------------------------------------------------------------
+  // Tenant anomalies (post-2026-05-11 incident follow-up).
+  // ---------------------------------------------------------------------------
+
+  /**
+   * List currently-active tenant anomalies (rate breaker + structural
+   * fingerprint loops). Sorted with hard-tier first.
+   */
+  listAnomalies: protectedProcedure
+    .use(opsViewPermission)
+    .query(async () => {
+      if (!connection) return { anomalies: [] };
+      const store = new AnomalyStateStore(connection);
+      const anomalies = await store.list();
+      anomalies.sort((a, b) => {
+        if (a.tier !== b.tier) return a.tier === "hard" ? -1 : 1;
+        return b.triggeredAt - a.triggeredAt;
+      });
+      return { anomalies };
+    }),
+
+  /**
+   * Dismiss an active anomaly manually. The next detector tick may
+   * resurface it if conditions are still met — this is just an operator
+   * ack to stop the badge from blinking.
+   */
+  dismissAnomaly: protectedProcedure
+    .use(opsManagePermission)
+    .input(
+      z.object({
+        tenantId: z.string().min(1),
+        kind: z.enum(["rate_breaker"]),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      if (!connection) return { dismissed: false };
+      const store = new AnomalyStateStore(connection);
+      await store.clear(input.tenantId, input.kind);
+      return { dismissed: true };
     }),
 });

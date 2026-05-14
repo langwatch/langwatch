@@ -3,6 +3,15 @@ Feature: Open trace in Playground
   I want to open it in the Prompt Playground
   So that I can iterate on the prompt used in the traced LLM call
 
+  # All 3 remaining @unimplemented scenarios are KEEP per AUDIT_MANIFEST.md:
+  # the LLM_PARAMETER_MAP loop in clickhouse-trace.service.ts and
+  # elasticsearch-trace.service.ts extracts all gen_ai.request.* params plus
+  # routes unknown keys into litellmParams, but no integration test exercises
+  # the ClickHouse or Elasticsearch path end-to-end with these attributes.
+  # All other parameter-coercion / unset-handling scenarios are covered by
+  # useLoadSpanIntoPromptPlayground.unit.test.ts. Aspirational pending KEEP-class
+  # backend-integration tests tracked in PR #3458.
+
   Background:
     Given a project with traced LLM calls
 

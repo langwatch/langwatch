@@ -3,6 +3,12 @@ Feature: Prompt soft-delete
   I want deleted prompts to be soft-deleted
   So that existing suites can still reference them and I understand why a target is unavailable
 
+  # Both remaining @unimplemented scenarios are KEEP per AUDIT_MANIFEST.md:
+  # the handle-nulling-on-delete logic that enables reuse is unit-tested in
+  # llm-config.soft-delete.unit.test.ts, but no integration test exercises
+  # the full create-with-reused-handle or post-archive CLI sync flow end-to-end.
+  # Aspirational pending KEEP-class integration tests tracked in PR #3458.
+
   Background:
     Given I am logged into project "my-project"
 

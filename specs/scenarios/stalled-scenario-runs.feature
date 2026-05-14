@@ -3,6 +3,12 @@ Feature: Detect and display stalled scenario runs
   I want stalled scenario runs to be detected and clearly distinguished from active runs
   So that I understand when a run will never complete due to infrastructure issues
 
+  # Per AUDIT_MANIFEST.md: 12 scenarios → 10 DUPLICATE (now bound via @scenario
+  # JSDoc against stall-detection.unit.test.ts, stall-detection-batch.unit.test.ts,
+  # stalled-status-display.integration.test.ts) + 1 UPDATE (10min vs 30min
+  # threshold drift) + 1 KEEP-E2E. The 2 remaining @unimplemented scenarios
+  # are pending rewrite/E2E coverage in PR #3458.
+
   # Context: When a worker dies (OOM, container kill, stalled job) the RUN_FINISHED
   # event never reaches ElasticSearch. Without detection, these runs appear as
   # "in progress" forever. This feature derives a STALLED status at read time

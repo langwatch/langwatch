@@ -169,7 +169,7 @@ export function UserManagementDrawer({
         }
       }}
     >
-      <Drawer.Content>
+      <Drawer.Content bg="bg">
         <Drawer.Header>
           <Heading size="md">Manage Seats</Heading>
           <Drawer.CloseTrigger />

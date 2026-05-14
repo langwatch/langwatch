@@ -4,6 +4,10 @@ Feature: Learning Resources
   I want access to learning resources
   So that I can learn how to use the platform effectively
 
+  # All scenarios describe LearningResources component rendering
+  # (documentation link, video card, click navigation). Need a JSDOM
+  # render of the component — no test fixture exists yet.
+
   Background:
     Given I am on the home page
 

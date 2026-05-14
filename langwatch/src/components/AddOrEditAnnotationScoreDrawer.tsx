@@ -32,7 +32,7 @@ export const AddOrEditAnnotationScoreDrawer = ({
       }}
       onInteractOutside={handleClose}
     >
-      <Drawer.Content>
+      <Drawer.Content bg="bg">
         <Drawer.Header>
           <HStack>
             <Drawer.CloseTrigger />

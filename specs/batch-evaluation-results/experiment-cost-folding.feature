@@ -4,6 +4,17 @@ Feature: Experiment trace cost folding
   I want trace costs to be automatically folded into experiment run results
   So that I can see LLM costs per row and per run without manual tracking
 
+  # Reactor + projection scenarios are bound below to:
+  #   * experimentMetricsSync.reactor.unit.test.ts — dispatch + skip
+  #     paths for evaluation.run_id presence and totalCost values.
+  #   * experimentRunState.projection.handler.test.ts — TraceMetrics
+  #     accumulation + per-trace breakdown.
+  #
+  # The single-target / multi-target service-level cost-enrichment
+  # scenarios are exercised by clickhouse-experiment-run.service
+  # integration tests; the SDK DataFrame scenario lives in the
+  # python-sdk pytest suite (out of parity-script scan reach today).
+
   Background:
     Given an SDK experiment is running via evaluation.loop()
     And each iteration creates an OpenTelemetry trace with evaluation.run_id attribute

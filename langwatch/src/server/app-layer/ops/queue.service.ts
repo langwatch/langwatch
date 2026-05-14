@@ -175,6 +175,34 @@ export class QueueService {
     return this.repo.listPausedKeys(params);
   }
 
+  async pauseTenant(params: {
+    queueName: string;
+    tenantId: string;
+  }): Promise<void> {
+    return this.repo.pauseTenant(params);
+  }
+
+  async unpauseTenant(params: {
+    queueName: string;
+    tenantId: string;
+  }): Promise<void> {
+    return this.repo.unpauseTenant(params);
+  }
+
+  async listPausedTenants(params: {
+    queueName: string;
+  }): Promise<string[]> {
+    return this.repo.listPausedTenants(params);
+  }
+
+  async drainTenant(params: {
+    queueName: string;
+    tenantId: string;
+    groupIdContains?: string;
+  }): Promise<{ groupsDrained: number; jobsDrained: number }> {
+    return this.repo.drainTenant(params);
+  }
+
   async moveToDlq(params: {
     queueName: string;
     groupId: string;

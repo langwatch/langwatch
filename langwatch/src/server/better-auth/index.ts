@@ -330,6 +330,27 @@ export const auth = betterAuth({
       idToken: "id_token",
       scope: "scope",
     },
+    /**
+     * Allow an OAuth sign-in to link to an existing User row when the email
+     * matches AND that User's `emailVerified` is true. Without this, an
+     * orphan User (no `Account` rows — e.g. pre-seeded invite, half-finished
+     * legacy signup, or migration leftover) blocks every subsequent OAuth
+     * sign-in for that email with `account_already_linked_to_different_user`
+     * → surfaced to the UI as "registered with another authentication method".
+     *
+     * On SSO-enforced orgs this was especially broken: even though the user
+     * authenticated successfully through the org's IdP, BetterAuth refused to
+     * attach the new Account, leaving them permanently locked out.
+     *
+     * Security posture: linking requires the existing User to be
+     * `emailVerified=true` and the OAuth provider to return the same email
+     * (`allowDifferentEmails` defaults to false). SSO-domain enforcement
+     * still runs in `beforeAccountCreate` and rejects the wrong provider
+     * before any link happens.
+     */
+    accountLinking: {
+      enabled: true,
+    },
   },
   verification: {
     modelName: "VerificationToken",
@@ -401,7 +422,7 @@ export const auth = betterAuth({
             user: user as { email: string; deactivatedAt?: Date | null } & Record<string, unknown>,
           }),
         after: async (user) => {
-          await afterUserCreate({ prisma, user: user as { id: string; email: string } });
+          await afterUserCreate({ prisma, user: user as { id: string; email: string; name: string } });
         },
       },
     },

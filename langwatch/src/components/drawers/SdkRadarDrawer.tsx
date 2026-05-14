@@ -51,7 +51,7 @@ export function SdkRadarDrawer() {
       size="lg"
       onOpenChange={() => closeDrawer()}
     >
-      <Drawer.Content>
+      <Drawer.Content bg="bg">
         <Drawer.Header>
           <HStack width="full">
             <Heading size="md">SDK Radar</Heading>

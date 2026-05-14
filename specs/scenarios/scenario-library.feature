@@ -6,6 +6,11 @@ Feature: Scenario Library
   Background:
     Given I am logged into project "my-project"
 
+  # Per AUDIT_MANIFEST.md: 5 scenarios → 2 DUPLICATE (already covered elsewhere
+  # and removed) + 3 KEEP. The 3 KEEP scenarios remain @unimplemented pending
+  # integration test coverage for list-page wrapper, row-click navigation, and
+  # empty state CTA — tracked in PR #3458.
+
   # ============================================================================
   # Navigation
   # ============================================================================

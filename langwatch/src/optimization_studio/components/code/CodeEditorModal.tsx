@@ -90,7 +90,7 @@ export function CodeEditorModal({
 
   return (
     <Dialog.Root open={open} onOpenChange={({ open }) => !open && onClose_()}>
-      <Dialog.Content
+      <Dialog.Content bg="bg"
         margin="64px"
         minWidth="calc(100vw - 128px)"
         height="calc(100vh - 128px)"

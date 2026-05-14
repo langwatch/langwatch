@@ -3,6 +3,12 @@ Feature: Internal Set ID Namespace
   I want on-platform scenarios to use a distinct internal namespace
   So that internal sets do not collide with user-created set names
 
+  # Per AUDIT_MANIFEST.md: 13 scenarios → 11 DUPLICATE (already bound via
+  # @scenario JSDoc against internal-set-id.unit.test.ts, SetCard.test.tsx,
+  # simulations-page.test.tsx, simulation-runner.router.unit.test.ts) +
+  # 1 UPDATE (display name "Manual Run" vs "On-Platform Scenarios") +
+  # 1 KEEP-E2E. The 2 remaining @unimplemented scenarios are pending in PR #3458.
+
   # ============================================================================
   # Utility Functions - Set ID Detection
   # ============================================================================
