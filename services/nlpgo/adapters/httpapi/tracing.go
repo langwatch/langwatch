@@ -2,7 +2,6 @@ package httpapi
 
 import (
 	"context"
-	"crypto/rand"
 	"encoding/hex"
 
 	otelapi "go.opentelemetry.io/otel"
@@ -103,17 +102,23 @@ func startStudioSpan(ctx context.Context, req *app.WorkflowRequest, workflowAPIK
 	// applyInboundCausality via the global propagator) over the
 	// body-supplied req.TraceID. This is what lets evaluator workflows
 	// continue the caller's trace end-to-end — same trace_id, parent
-	// span_id linked. Fall back to body TraceID for callers that
-	// haven't been updated to send `traceparent` yet.
+	// span_id linked.
+	//
+	// Fall-back path: when there's no inbound traceparent (Studio's
+	// playground frontend ships trace_id in the body only, no W3C
+	// headers), seed our context-aware IDGenerator with the body
+	// trace_id. The next tracer.Start call sees no valid parent
+	// SpanContext, falls into IDGenerator.NewIDs, and gets back
+	// (body_trace_id, fresh_span_id). The result is a TRUE root span:
+	// trace_id preserved, parent_span_id all-zeros.
+	//
+	// Earlier code synthesised a remote SpanContext with a random
+	// SpanID as a phantom parent — the LangWatch UI then flagged every
+	// playground workflow root as "Parent not in trace" because that
+	// phantom was never emitted. (2026-05-15 regression.)
 	if !trace.SpanContextFromContext(ctx).IsValid() {
 		if tid, ok := parseTraceID(req.TraceID); ok {
-			sc := trace.NewSpanContext(trace.SpanContextConfig{
-				TraceID:    tid,
-				SpanID:     newSpanID(),
-				TraceFlags: trace.FlagsSampled,
-				Remote:     true,
-			})
-			ctx = trace.ContextWithSpanContext(ctx, sc)
+			ctx = otelsetup.WithTraceIDOverride(ctx, tid)
 		}
 	}
 	spanName, spanType := studioSpanNameAndType(req.Type, req.WorkflowName)
@@ -168,11 +173,3 @@ func parseTraceID(s string) (trace.TraceID, bool) {
 	return tid, true
 }
 
-// newSpanID returns a random 8-byte span id. crypto/rand because
-// span_id collisions across concurrent runs would silently corrupt
-// the trace tree.
-func newSpanID() trace.SpanID {
-	var sid trace.SpanID
-	_, _ = rand.Read(sid[:])
-	return sid
-}

@@ -190,6 +190,7 @@ func New(ctx context.Context, opts Options) (*Provider, error) {
 			sdktrace.WithSpanProcessor(NewBaggageAttributeProcessor(AutoStampedBaggageKeys...)),
 			sdktrace.WithSpanProcessor(router),
 			sdktrace.WithSampler(sdktrace.ParentBased(rootSampler)),
+			sdktrace.WithIDGenerator(NewIDGenerator()),
 		)
 		otelapi.SetTracerProvider(tp)
 		return &Provider{tp: tp}, nil
@@ -249,6 +250,7 @@ func New(ctx context.Context, opts Options) (*Provider, error) {
 			sdktrace.WithMaxQueueSize(queueSize),
 		),
 		sdktrace.WithSampler(sdktrace.ParentBased(rootSampler)),
+		sdktrace.WithIDGenerator(NewIDGenerator()),
 	)
 	otelapi.SetTracerProvider(tp)
 
