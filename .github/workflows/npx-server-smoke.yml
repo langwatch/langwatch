@@ -184,10 +184,18 @@ jobs:
 
       - name: Probe service health endpoints
         run: |
-          set -e
+          # pipefail catches curl exit codes when piped through tee —
+          # without it, `curl … | tee` always exits 0 because tee
+          # always succeeds, masking real probe failures (the original
+          # /health vs /healthz misnomer slipped past CI for weeks
+          # because of this).
+          set -eo pipefail
           base=${RESOLVED_BASE}
           curl -fsS "http://127.0.0.1:$base/api/health"            | tee /tmp/health-app.json
-          curl -fsS "http://127.0.0.1:$((base + 1))/health"        | tee /tmp/health-nlp.json
+          # nlpgo only serves /healthz (chi-routed liveness). /health
+          # falls through to goOnlyModeFallback OR the proxypass
+          # 502-after-hang loop and is not a valid probe.
+          curl -fsS "http://127.0.0.1:$((base + 1))/healthz"       | tee /tmp/health-nlp.json
           curl -fsS "http://127.0.0.1:$((base + 2))/"              | tee /tmp/health-langevals.json
           curl -fsS "http://127.0.0.1:$((base + 3))/healthz"       | tee /tmp/health-gateway.json
 
@@ -254,28 +262,18 @@ jobs:
         env:
           OPENAI_API_KEY: ${{ secrets.NPX_SERVER_OPENAI_API_KEY }}
         run: |
+          set -e
           if [[ -z "$OPENAI_API_KEY" ]]; then
             echo "NPX_SERVER_OPENAI_API_KEY not set — skipping workflow execution probe."
             exit 0
           fi
           # Placeholder until the real workflow-execution fixture lands.
-          # We DO NOT `set -e` here intentionally: the curl below is a
-          # soft signal, not a gate. Observed flakes:
-          #   - run 25854430517: probe used `-X POST /health` → 502 from
-          #     nlpgo's no-python-upstream proxypass.
-          #   - run 25863417408: probe used GET /health → curl 56 because
-          #     nlpgo started returning oversized response headers under
-          #     load. Both are real but immaterial to the smoke gate.
-          # The earlier "Probe service health endpoints" step already
-          # owns the hard health-check gate; this step is a TODO
-          # scaffold for the secret-gated workflow execution that will
-          # replace it (browser-QA fixture pending).
+          # We hit nlpgo's /healthz (chi-routed liveness) — the only path
+          # that is actually wired. Earlier drafts hit /health and either
+          # 502'd (POST) or hung 5+min (GET → proxypass self-loop).
           base=${RESOLVED_BASE}
-          if curl -fsS --max-time 30 "http://127.0.0.1:$((base + 1))/health" >/dev/null 2>&1; then
-            echo "✓ nlpgo /health responded — placeholder probe ok"
-          else
-            echo "⚠  nlpgo /health probe failed (non-fatal) — full fixture pending"
-          fi
+          curl -fsS --max-time 10 "http://127.0.0.1:$((base + 1))/healthz" >/dev/null
+          echo "(placeholder workflow probe — real fixture pending)"
 
       - name: Tear down
         if: always()
