@@ -42,7 +42,7 @@ export class PrismaTeamRepository implements TeamRepository {
     slug: string;
     organizationId: string;
   }): Promise<Team | null> {
-    return this.prisma.team.findFirst({ where: { slug, organizationId } });
+    return this.prisma.team.findFirst({ where: { slug, organizationId, archivedAt: null } });
   }
 
   async create(data: CreateTeamInput): Promise<Team> {
