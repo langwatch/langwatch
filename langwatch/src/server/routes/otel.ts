@@ -356,7 +356,11 @@ app.post("/traces", async (c) => {
       // a malicious upstream cannot forge a different template/binding
       // identity onto its own bound traces.
       if (resolved.type === "user_ingestion_binding") {
-        stampBindingProvenanceOnTraceRequest(traceRequest, {
+        // OTLP SDK types and the local stamp helper agree structurally on
+        // the slice we mutate (resourceSpans → resource → attributes). The
+        // cast bridges nullability differences in deeper fields the helper
+        // never reads.
+        stampBindingProvenanceOnTraceRequest(traceRequest as unknown as Parameters<typeof stampBindingProvenanceOnTraceRequest>[0], {
           bindingId: resolved.bindingId,
           templateId: resolved.templateId,
           templateSlug: resolved.templateSlug,
@@ -442,7 +446,7 @@ app.post("/logs", async (c) => {
       }
 
       if (resolved.type === "user_ingestion_binding") {
-        stampBindingProvenanceOnLogRequest(logRequest, {
+        stampBindingProvenanceOnLogRequest(logRequest as unknown as Parameters<typeof stampBindingProvenanceOnLogRequest>[0], {
           bindingId: resolved.bindingId,
           templateId: resolved.templateId,
           templateSlug: resolved.templateSlug,

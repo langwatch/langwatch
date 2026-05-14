@@ -59,7 +59,7 @@ void (async () => {
     if (url.includes("/api/trpc/") && resp.request().method() === "POST" && resp.status() === 200) {
       const body = await resp.text().catch(() => "");
       const m = body.match(/"token":"(lwub_[A-Za-z0-9_]+)"/);
-      if (m) {
+      if (m && m[1]) {
         capturedToken = m[1];
         console.log(`[mint] full token captured from tRPC body`);
       }

@@ -513,7 +513,7 @@ export const app = new Hono<{ Variables: Variables }>()
       const organizationId = await orgIdForProject(project.id);
       const service = IngestionTemplateService.create(prisma);
       const callerUserId = callerUserIdFromContext(
-        c.get("patUserId"),
+        c.get("apiKeyUserId") ?? undefined,
         project.id,
       );
       try {
@@ -593,7 +593,7 @@ export const app = new Hono<{ Variables: Variables }>()
       const organizationId = await orgIdForProject(project.id);
       const service = IngestionTemplateService.create(prisma);
       const callerUserId = callerUserIdFromContext(
-        c.get("patUserId"),
+        c.get("apiKeyUserId") ?? undefined,
         project.id,
       );
       try {
@@ -647,7 +647,7 @@ export const app = new Hono<{ Variables: Variables }>()
       const organizationId = await orgIdForProject(project.id);
       const service = IngestionTemplateService.create(prisma);
       const callerUserId = callerUserIdFromContext(
-        c.get("patUserId"),
+        c.get("apiKeyUserId") ?? undefined,
         project.id,
       );
       try {
@@ -710,7 +710,7 @@ export const app = new Hono<{ Variables: Variables }>()
       const organizationId = await orgIdForProject(project.id);
       const service = IngestionTemplateService.create(prisma);
       const callerUserId = callerUserIdFromContext(
-        c.get("patUserId"),
+        c.get("apiKeyUserId") ?? undefined,
         project.id,
       );
       try {
@@ -757,7 +757,7 @@ export const app = new Hono<{ Variables: Variables }>()
     requireOrgView,
     async (c) => {
       const project = c.get("project");
-      const caller = callerUserIdRequired(c.get("patUserId"));
+      const caller = callerUserIdRequired(c.get("apiKeyUserId") ?? undefined);
       if (!caller.ok) {
         return c.json(
           {
@@ -820,7 +820,7 @@ export const app = new Hono<{ Variables: Variables }>()
     requireOrgView,
     async (c) => {
       const project = c.get("project");
-      const caller = callerUserIdRequired(c.get("patUserId"));
+      const caller = callerUserIdRequired(c.get("apiKeyUserId") ?? undefined);
       if (!caller.ok) {
         return c.json(
           {
@@ -906,7 +906,7 @@ export const app = new Hono<{ Variables: Variables }>()
     requireOrgView,
     async (c) => {
       const project = c.get("project");
-      const caller = callerUserIdRequired(c.get("patUserId"));
+      const caller = callerUserIdRequired(c.get("apiKeyUserId") ?? undefined);
       if (!caller.ok) {
         return c.json(
           {
@@ -970,7 +970,7 @@ export const app = new Hono<{ Variables: Variables }>()
     requireOrgView,
     async (c) => {
       const project = c.get("project");
-      const caller = callerUserIdRequired(c.get("patUserId"));
+      const caller = callerUserIdRequired(c.get("apiKeyUserId") ?? undefined);
       if (!caller.ok) {
         return c.json(
           {

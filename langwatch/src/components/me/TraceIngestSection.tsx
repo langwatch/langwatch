@@ -274,7 +274,10 @@ function InstallTile({
   return (
     <Box
       as="button"
-      type="button"
+      // Chakra v3 typing for `as` doesn't surface native button props on Box.
+      // Spread is necessary so React forwards `type="button"` to the rendered
+      // <button>, preventing the default form-submit behavior.
+      {...({ type: "button" } as { type: "button" })}
       onClick={onClick}
       borderWidth="1px"
       borderColor={installed ? "green.300" : "border.muted"}

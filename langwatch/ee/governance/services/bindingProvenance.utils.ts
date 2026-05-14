@@ -72,7 +72,7 @@ const PROVENANCE_KEYS: readonly string[] = [
  */
 type OtlpAttribute = {
   key: string;
-  value: { stringValue?: string } & Record<string, unknown>;
+  value: { stringValue?: string | null } & Record<string, unknown>;
 };
 
 type OtlpResource = { attributes?: OtlpAttribute[] | null };
