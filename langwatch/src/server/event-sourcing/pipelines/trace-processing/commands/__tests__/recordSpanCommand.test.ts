@@ -306,6 +306,47 @@ describe("RecordSpanCommand", () => {
         expect(emittedSpan.events[0]!.attributes).toHaveLength(0);
       });
 
+      /** @scenario Reserved causality_depth attribute passes through strip */
+      it("preserves langwatch.reserved.causality_depth on the emitted span (loop-prevention contract)", async () => {
+        // Regression for the post-2026-05-11 bug: stripReservedAttributes
+        // was nuking the very attribute the evaluationTrigger reactor
+        // reads to detect loops, silently disabling loop prevention.
+        // The fix is a passthrough allowlist; this test pins the
+        // attribute name as load-bearing — renaming or removing the
+        // entry would silently re-break loop prevention in production.
+        const command = createMockCommand(
+          "project-123",
+          "trace-1",
+          "span-1",
+          [
+            {
+              key: "langwatch.reserved.causality_depth",
+              value: { stringValue: "1" },
+            },
+            {
+              key: "langwatch.reserved.pii_redaction_status",
+              value: { stringValue: "true" },
+            },
+            { key: "gen_ai.prompt", value: { stringValue: "hello" } },
+          ],
+        );
+
+        const events = await handler.handle(command);
+
+        const emittedSpan = events[0]!.data.span;
+        const depthAttr = emittedSpan.attributes.find(
+          (a) => a.key === "langwatch.reserved.causality_depth",
+        );
+        expect(depthAttr).toBeDefined();
+        expect(depthAttr!.value).toEqual({ stringValue: "1" });
+
+        // Other reserved attrs are still stripped (allowlist is narrow).
+        const piiAttr = emittedSpan.attributes.find(
+          (a) => a.key === "langwatch.reserved.pii_redaction_status",
+        );
+        expect(piiAttr).toBeUndefined();
+      });
+
       it("preserves original command data when stripping reserved attributes", async () => {
         const command = createMockCommand(
           "project-123",

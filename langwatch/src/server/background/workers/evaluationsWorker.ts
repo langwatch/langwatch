@@ -70,7 +70,10 @@ import {
 } from "../../app-layer/evaluations/azure-safety-env";
 import { getAzureSafetyEnvFromProject } from "../../app-layer/evaluations/azure-safety-env.server";
 import { runEvaluationWorkflow } from "../../workflows/runWorkflow";
-import { maxCausalityDepthOfSpans } from "../../app-layer/evaluations/evaluation-execution.service";
+import {
+  extractParentTraceForNlpgo,
+  maxCausalityDepthOfSpans,
+} from "../../app-layer/evaluations/evaluation-execution.service";
 import {
   EVALUATIONS_QUEUE,
   updateEvaluationStatusInES,
@@ -838,9 +841,15 @@ const customEvaluation = async (
     throw new Error("Project not found");
   }
 
+  // do_not_trace=false on the wire so eval-emitted spans land under
+  // the parent trace's traceparent context (post-2026-05-14 fix). The
+  // explicit do_not_trace=false arg passed to runEvaluationWorkflow
+  // below already overrides this default, but pinning the field on
+  // the body itself keeps the wire shape honest if a future refactor
+  // drops the explicit override on runWorkflow.
   const requestBody: Record<string, any> = {
     trace_id: trace?.trace_id,
-    do_not_trace: true,
+    do_not_trace: false,
     ...data,
   };
 
@@ -848,12 +857,19 @@ const customEvaluation = async (
     throw new Error("Workflow ID is required");
   }
 
+  // W3C trace context — same as eval-execution.service: pass the
+  // parent trace's root span so nlpgo emits eval spans as a child
+  // sub-tree of the trace being evaluated, not as an orphan trace.
+  // See 2026-05-14 prod regression.
+  const parentTrace = extractParentTraceForNlpgo(trace);
+
   const response = await runEvaluationWorkflow(
     resolvedWorkflowId,
     project.id,
     requestBody,
     undefined,
     parentCausalityDepth,
+    parentTrace,
   );
 
   const { result, status } = response;

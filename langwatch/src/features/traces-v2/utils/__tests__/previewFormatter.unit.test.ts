@@ -172,6 +172,103 @@ describe("formatPreview", () => {
       const result = formatPreview(input, { maxChars: 80 });
       expect(result.text).toBe("Here is the answer");
     });
+
+    // Regression for the 2026-05-14 prod report: the new traces explorer
+    // was rendering message-shaped traces (Genkit / AI SDK / Mastra) as
+    // raw JSON because unwrapChatArray only knew the `content` field.
+    // Backend's extractMessageContentText already handles `parts`; the
+    // renderer was the lone gap.
+    it("walks Genkit/Mastra-style `parts` arrays with {type:text, content:...}", () => {
+      const input = JSON.stringify([
+        {
+          role: "assistant",
+          parts: [
+            { type: "text", content: "I can see this is a G'nger Refresh Juice" },
+          ],
+        },
+      ]);
+      const result = formatPreview(input, { maxChars: 80 });
+      expect(result.text).toBe("I can see this is a G'nger Refresh Juice");
+      expect(result.role).toBe("assistant");
+    });
+
+    it("skips non-text parts (blob, image, reasoning) and surfaces only text parts", () => {
+      // Real prod payload shape: user uploads a product image (blob)
+      // plus a structured text description. Preview must show the text.
+      const input = JSON.stringify([
+        {
+          role: "user",
+          parts: [
+            {
+              type: "blob",
+              modality: "image",
+              mime_type: "image/png",
+              content: "iVBORw0KGgo...",
+            },
+            { type: "text", content: "Product: G'nger Refresh juice 200 ml" },
+          ],
+        },
+      ]);
+      const result = formatPreview(input, { maxChars: 200 });
+      expect(result.text).toBe("Product: G'nger Refresh juice 200 ml");
+      expect(result.role).toBe("user");
+    });
+
+    it("joins multiple text parts with a space", () => {
+      const input = JSON.stringify([
+        {
+          role: "assistant",
+          parts: [
+            { type: "text", content: "First part." },
+            { type: "text", content: "Second part." },
+          ],
+        },
+      ]);
+      const result = formatPreview(input, { maxChars: 200 });
+      expect(result.text).toBe("First part. Second part.");
+    });
+
+    it("accepts Anthropic-shaped parts with {type:text, text:...}", () => {
+      const input = JSON.stringify([
+        {
+          role: "assistant",
+          parts: [{ type: "text", text: "Hello via parts.text" }],
+        },
+      ]);
+      const result = formatPreview(input, { maxChars: 80 });
+      expect(result.text).toBe("Hello via parts.text");
+    });
+
+    it("accepts AI SDK v5 `reasoning` parts as renderable text", () => {
+      // v5 splits chain-of-thought into its own part; the visible text
+      // still lives in `.text`. Treating it as renderable keeps the
+      // preview useful rather than falling through to JSON wrapper.
+      const input = JSON.stringify([
+        {
+          role: "assistant",
+          parts: [
+            { type: "reasoning", text: "Thinking about the answer…" },
+            { type: "text", text: "Final answer." },
+          ],
+        },
+      ]);
+      const result = formatPreview(input, { maxChars: 200 });
+      expect(result.text).toBe("Thinking about the answer… Final answer.");
+    });
+
+    it("falls through to JSON when parts has no text-typed entries", () => {
+      // Image-only message: no text to extract. Preview falls through
+      // to the wrapper JSON rather than fabricating "(blob)" — caller
+      // can show the raw shape if needed.
+      const input = JSON.stringify([
+        {
+          role: "user",
+          parts: [{ type: "blob", modality: "image", mime_type: "image/png" }],
+        },
+      ]);
+      const result = formatPreview(input, { maxChars: 200 });
+      expect(result.text).toContain("blob");
+    });
   });
 
   describe("given a top-level Anthropic typed block", () => {

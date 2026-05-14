@@ -23,6 +23,43 @@ export type NLPOrigin =
  */
 const NLP_GO_FLAG = "release_nlp_go_engine_enabled";
 
+const TRACE_ID_HEX_RE = /^[0-9a-fA-F]{32}$/;
+const SPAN_ID_HEX_RE = /^[0-9a-fA-F]{16}$/;
+
+/**
+ * Format a W3C `traceparent` header value. Validates that traceId and
+ * parentSpanId are well-formed hex; throws on malformed input rather
+ * than silently emitting a broken header (silent breakage = orphan
+ * traces in prod, the exact failure mode we're fixing).
+ *
+ * The `sampled` flag defaults to true because every existing caller
+ * is in the evaluator chain, where we always want to record. If a
+ * future caller is propagating from a non-sampled inbound trace, it
+ * MUST pass `sampled: false` so we don't force-sample downstream.
+ *
+ * Exported for unit tests.
+ */
+export function formatTraceparent(
+  parent: {
+    traceId: string;
+    parentSpanId: string;
+  },
+  options: { sampled?: boolean } = {},
+): string {
+  if (!TRACE_ID_HEX_RE.test(parent.traceId)) {
+    throw new Error(
+      `nlpgoFetch.formatTraceparent: invalid traceId (need 32 hex chars), got: ${JSON.stringify(parent.traceId)}`,
+    );
+  }
+  if (!SPAN_ID_HEX_RE.test(parent.parentSpanId)) {
+    throw new Error(
+      `nlpgoFetch.formatTraceparent: invalid parentSpanId (need 16 hex chars), got: ${JSON.stringify(parent.parentSpanId)}`,
+    );
+  }
+  const flags = options.sampled === false ? "00" : "01";
+  return `00-${parent.traceId.toLowerCase()}-${parent.parentSpanId.toLowerCase()}-${flags}`;
+}
+
 export interface NLPGOFetchOptions<TBody = unknown> {
   /** projectId is the distinct_id used for the per-project flag rollout. */
   projectId: string;
@@ -48,6 +85,27 @@ export interface NLPGOFetchOptions<TBody = unknown> {
    * on its spans in that case.
    */
   causalityDepth?: number;
+  /**
+   * Parent trace context for W3C `traceparent` propagation. When set,
+   * nlpgo's spans inherit `traceId` so the eval workflow appears as
+   * a child sub-tree of the parent trace in Studio's waterfall view
+   * instead of landing on a separate trace.
+   *
+   * Without this, nlpgo's `applyInboundCausality` finds no traceparent
+   * header, `startStudioSpan` falls through to a fresh trace, and
+   * eval spans become orphans of the original trace they evaluate.
+   * This is exactly the bug rchaves caught in prod on 2026-05-14
+   * (eval ran, spans emitted, but landed on a new trace_id).
+   *
+   * `parentSpanId` is the 16-hex span_id the eval root span should
+   * link to as its parent. Callers should pass the root span_id of
+   * the parent trace so the waterfall renders cleanly; a synthesized
+   * value still gives trace_id continuity but loses the linkage UI.
+   */
+  parentTrace?: {
+    traceId: string;
+    parentSpanId: string;
+  };
 }
 
 export interface NLPGOFetchResult<T> {
@@ -99,6 +157,15 @@ export async function nlpgoFetch<T = unknown>(
   if (opts.causalityDepth !== undefined) {
     const callerDepth = Math.max(0, Math.floor(opts.causalityDepth));
     headers["X-LangWatch-Causality-Depth"] = String(callerDepth);
+  }
+
+  // W3C traceparent — makes the receiving service's spans inherit our
+  // trace_id and parent_span_id. Without this header, nlpgo creates a
+  // new trace_id for the evaluation, breaking the parent-child link
+  // (the 2026-05-14 orphan-trace bug rchaves caught in prod).
+  // Format: 00-<32-hex traceId>-<16-hex parentSpanId>-<flags>
+  if (opts.parentTrace) {
+    headers["traceparent"] = formatTraceparent(opts.parentTrace);
   }
 
   const functionArn = process.env.LANGWATCH_NLP_LAMBDA_CONFIG

@@ -81,6 +81,10 @@ node_modules/
 # Vitest browser-mode test attachment cache (regenerated on each run)
 /.vitest-attachments/
 
+# Compiled-once test binaries (nlpgo e2e). Cached across runs so the
+# `go build` cost is paid once per CI job, not per spawn.
+/.vitest-tmp/
+
 # Local-only experimental package — not part of the shipped app
 /packages/insanity-check/
 
