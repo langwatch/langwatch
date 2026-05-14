@@ -599,10 +599,18 @@ describe.skipIf(!shouldRun)(
           true,
         );
 
-        // Poll ClickHouse for the persisted spans. Two flush windows
-        // chain here: nlpgo's BatchSpanProcessor (5s default) + the
-        // event-sourcing fold/map projection workers (sub-second).
-        // 25s deadline absorbs both with margin.
+        // Poll ClickHouse for the persisted spans. Three flush windows
+        // chain here: nlpgo's BatchSpanProcessor (5s scheduled delay) +
+        // OTLP HTTP roundtrip + the event-sourcing fold/map projections.
+        // 45s deadline absorbs all three with margin on a loaded CI runner.
+        //
+        // CRITICAL: we must NOT exit the loop on the first non-empty
+        // result. The studio root span ends AFTER its children, so BSP
+        // exports it in a LATER batch — children show up first, root
+        // second. If we asserted on the first non-empty snapshot, we'd
+        // see only execute_component(parent=studio_root) rows and miss
+        // the studio_root(parent=inbound) row that the assertion actually
+        // depends on. Exit only when the load-bearing row arrives.
         const ch = getTestClickHouseClient()!;
 
         interface SpanRow {
@@ -612,9 +620,7 @@ describe.skipIf(!shouldRun)(
           SpanName: string;
         }
 
-        let rows: SpanRow[] = [];
-        const deadline = Date.now() + 25_000;
-        while (Date.now() < deadline && rows.length === 0) {
+        async function fetchRows(): Promise<SpanRow[]> {
           const result = await ch.query({
             query: `
               SELECT TraceId, SpanId, ParentSpanId, SpanName
@@ -635,8 +641,20 @@ describe.skipIf(!shouldRun)(
             },
             format: "JSONEachRow",
           });
-          rows = await result.json<SpanRow>();
-          if (rows.length === 0) await sleep(500);
+          return await result.json<SpanRow>();
+        }
+
+        const hasLinkedSpan = (rows: SpanRow[]): boolean =>
+          rows.some(
+            (r) => (r.ParentSpanId ?? "").toLowerCase() === PARENT_SPAN_ID,
+          );
+
+        let rows: SpanRow[] = [];
+        const deadline = Date.now() + 45_000;
+        while (Date.now() < deadline) {
+          rows = await fetchRows();
+          if (rows.length > 0 && hasLinkedSpan(rows)) break;
+          await sleep(500);
         }
 
         // CORE ASSERTION 1 — spans landed in CH under the INBOUND trace_id.
