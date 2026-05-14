@@ -23,6 +23,7 @@ import { app as scenariosApp } from "../app/api/scenarios/[[...route]]/app";
 import { app as secretsApp } from "../app/api/secrets/[[...route]]/app";
 import { app as simulationRunsApp } from "../app/api/simulation-runs/[[...route]]/app";
 import { app as suitesApp } from "../app/api/suites/[[...route]]/app";
+import { app as teamsApp } from "../app/api/teams/[[...route]]/app";
 import { app as tracesApp } from "../app/api/traces/[[...route]]/app";
 import { app as triggersApp } from "../app/api/triggers/[[...route]]/app";
 import { app as workflowsCrudApp } from "../app/api/workflows/[[...route]]/app";
@@ -89,6 +90,7 @@ export function createApiRouter() {
   api.route("/", secretsApp);
   api.route("/", simulationRunsApp);
   api.route("/", suitesApp);
+  api.route("/", teamsApp);
   api.route("/", tracesApp);
   api.route("/", triggersApp);
   api.route("/", workflowsCrudApp);      // CRUD — complements workflowsApp (code-completion, post_event)
