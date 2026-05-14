@@ -92,6 +92,68 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
     });
   });
 
+  describe("when an evaluator workflow emits child spans on a customer's trace", () => {
+    // 2026-05-14 prod regression. Loop-prevention PR #4048 made eval
+    // workflow spans (running in nlpgo) continue the parent trace via
+    // W3C traceparent. Those spans land on the customer's trace as
+    // children with langwatch.origin="evaluation" + causality_depth=1.
+    // The previous "explicit origin on any span always wins" rule then
+    // overwrote the customer's resolved origin (playground, application,
+    // etc.) on the trace summary as the eval spans arrived.
+    /** @scenario Eval-emitted child spans do not flip the trace summary origin */
+    it("preserves the customer trace's origin once the root span has resolved it", () => {
+      const rootSpan = createTestSpan({
+        id: "root-1",
+        spanId: "root-1",
+        parentSpanId: null,
+        spanAttributes: {
+          "langwatch.origin": "playground",
+        },
+      });
+
+      // Eval workflow's first span: child of customer's root, carrying
+      // depth=1 + explicit origin=evaluation (stamped by nlpgo's
+      // BaggageAttributeProcessor + startStudioSpan attrs).
+      const evalChildSpan = createTestSpan({
+        id: "eval-child-1",
+        spanId: "eval-child-1",
+        parentSpanId: "root-1",
+        spanAttributes: {
+          "langwatch.origin": "evaluation",
+          "langwatch.reserved.causality_depth": "1",
+        },
+      });
+
+      let state = applySpanToSummary({ state: createInitState(), span: rootSpan });
+      state = applySpanToSummary({ state, span: evalChildSpan });
+
+      expect(state.attributes["langwatch.origin"]).toBe("playground");
+    });
+
+    /** @scenario Standalone eval trace (no parent) still resolves to evaluation */
+    it("still resolves origin=evaluation when the eval IS the top-level trace", () => {
+      // Standalone eval trace — no inbound traceparent, eval workflow
+      // creates its own root span with origin=evaluation. The trace
+      // summary must NOT mistakenly classify this as a customer trace.
+      const evalRootSpan = createTestSpan({
+        id: "eval-root",
+        spanId: "eval-root",
+        parentSpanId: null,
+        spanAttributes: {
+          "langwatch.origin": "evaluation",
+          "langwatch.reserved.causality_depth": "1",
+        },
+      });
+
+      const state = applySpanToSummary({
+        state: createInitState(),
+        span: evalRootSpan,
+      });
+
+      expect(state.attributes["langwatch.origin"]).toBe("evaluation");
+    });
+  });
+
   describe("when no span sets langwatch.origin", () => {
     /** @scenario "Traces without any origin attribute remain unset" */
     it("does not set langwatch.origin in summary attributes", () => {
