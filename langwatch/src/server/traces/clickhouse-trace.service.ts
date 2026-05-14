@@ -1483,11 +1483,15 @@ export class ClickHouseTraceService {
               toUnixTimestamp64Milli(ts.UpdatedAt) AS ts_UpdatedAt
             FROM trace_summaries ts
             WHERE ts.TenantId = {tenantId:String}
+              AND ts.OccurredAt >= fromUnixTimestamp64Milli({startDate:UInt64})
+              AND ts.OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})
               AND ts.TraceId IN ({pageTraceIds:Array(String)})
               AND (ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (
                 SELECT TenantId, TraceId, max(UpdatedAt)
                 FROM trace_summaries
                 WHERE TenantId = {tenantId:String}
+                  AND OccurredAt >= fromUnixTimestamp64Milli({startDate:UInt64})
+                  AND OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})
                   AND TraceId IN ({pageTraceIds:Array(String)})
                 GROUP BY TenantId, TraceId
               )
@@ -1495,6 +1499,8 @@ export class ClickHouseTraceService {
           `,
           query_params: {
             tenantId: projectId,
+            startDate: startDate ?? 0,
+            endDate: endDate ?? Date.now(),
             pageTraceIds,
           },
           format: "JSONEachRow",
