@@ -31,9 +31,18 @@ function rewriteDocsHostForLocalDev(url: string | undefined): string | undefined
   if (!url) return url;
   const productionPrefix = "https://docs.langwatch.ai";
   if (!url.startsWith(productionPrefix)) return url;
+  // `startsWith` alone would also match attacker hosts like
+  // `https://docs.langwatch.ai.evil.example/...`. Require a host
+  // boundary (path, query, or fragment delimiter) or exact-match
+  // before rewriting.
+  const tail = url.slice(productionPrefix.length);
+  const isExactHost = tail === "";
+  const hasHostBoundary =
+    tail.startsWith("/") || tail.startsWith("?") || tail.startsWith("#");
+  if (!isExactHost && !hasHostBoundary) return url;
   const base = getDocsBaseUrl();
   if (base === productionPrefix) return url;
-  return base + url.slice(productionPrefix.length);
+  return base + tail;
 }
 
 interface Props {
