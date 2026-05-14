@@ -225,6 +225,41 @@ Feature: Explicit application origin for race condition prevention
     Then no origin tag is shown
 
   # ===========================================================================
+  # Eval-chain origin pinning (2026-05-14 prod regression)
+  # ===========================================================================
+  #
+  # PR #4048 wired loop prevention end-to-end: nlpgo evaluator workflows
+  # now continue the parent trace via W3C traceparent and stamp every
+  # emitted span with `langwatch.reserved.causality_depth = N+1`.
+  # As a side effect, those eval spans carry `langwatch.origin = "evaluation"`
+  # and land on the customer's trace as children. The fold projection's
+  # previous rule "explicit origin on any span always wins" then
+  # overwrote the customer's resolved origin (playground / application /
+  # etc.) on the trace summary, mis-classifying the trace.
+  #
+  # Fix: a non-root span carrying causality_depth >= 1 is by definition
+  # an eval child riding in on someone else's traceparent. Its explicit
+  # origin must NOT flip the trace summary once an origin is resolved.
+
+  @unit @scenario
+  Scenario: Eval-emitted child span does not flip the customer trace's origin
+    Given the root span resolved langwatch.origin = "playground"
+    And later an eval workflow emits a child span on the same trace
+    And that child span carries langwatch.origin = "evaluation"
+    And that child span carries langwatch.reserved.causality_depth = "1"
+    When the fold projection processes the eval child span
+    Then the trace summary's langwatch.origin remains "playground"
+
+  @unit @scenario
+  Scenario: Standalone eval trace still resolves to evaluation
+    Given an eval workflow runs without an inbound traceparent
+    And its root span carries langwatch.origin = "evaluation"
+    And its root span carries langwatch.reserved.causality_depth = "1"
+    When the fold projection processes the eval root span
+    Then the trace summary's langwatch.origin is "evaluation"
+    Because root spans always define the trace's origin regardless of depth
+
+  # ===========================================================================
   # Race condition scenarios (the core problem this feature prevents)
   # ===========================================================================
 
