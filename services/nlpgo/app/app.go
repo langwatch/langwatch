@@ -69,6 +69,12 @@ type WorkflowRequest struct {
 	// api_key in context yet and drops the span. Engine-internal spans
 	// also use it for sibling-trace correlation.
 	APIKey string
+	// WorkflowName is the user-visible name from the canvas
+	// (`workflow.name` in the inbound payload). Peeked at decode time
+	// alongside APIKey so the handler can stamp it on the OTel root
+	// span before the engine even starts. Empty when missing/malformed
+	// so the tracing layer falls back to the event-type default.
+	WorkflowName string
 	// Type is the discriminator from the inbound StudioClientEvent
 	// envelope ("execute_flow" / "execute_component" / "execute_evaluation").
 	// Determines which workflow-level state-change family the engine emits:

@@ -210,6 +210,7 @@ func decodeStudioClientEvent(r *http.Request, body []byte) (*app.WorkflowRequest
 		ThreadID:          threadID,
 		NodeID:            inner.NodeID,
 		APIKey:            peekWorkflowAPIKey(inner.Workflow),
+		WorkflowName:      peekWorkflowName(inner.Workflow),
 		Type:              peek.Type,
 		RunID:             inner.RunID,
 		WorkflowVersionID: inner.WorkflowVersionID,
@@ -217,6 +218,26 @@ func decodeStudioClientEvent(r *http.Request, body []byte) (*app.WorkflowRequest
 		DatasetEntry:      inner.DatasetEntry,
 		DoNotTrace:        doNotTrace,
 	}, nil
+}
+
+// peekWorkflowName extracts the user-visible workflow name from raw
+// workflow JSON. Used by the OTel root span so operators see "My
+// Translation Agent" in the trace drawer instead of a generic
+// "execute_flow" — Python parity is `optional_langwatch_trace(name=
+// workflow.name)` at execute_flow.py. Falls back to empty on
+// missing/malformed input so the caller can use the event-type
+// default.
+func peekWorkflowName(raw json.RawMessage) string {
+	if len(raw) == 0 {
+		return ""
+	}
+	var peek struct {
+		Name string `json:"name"`
+	}
+	if err := json.Unmarshal(raw, &peek); err != nil {
+		return ""
+	}
+	return peek.Name
 }
 
 // peekWorkflowEnableTracing extracts `enable_tracing` from the raw

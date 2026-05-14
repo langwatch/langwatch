@@ -33,30 +33,55 @@ const tracerName = "langwatch-nlpgo"
 // a fresh trace (still better than dropping the request).
 // studioSpanNameAndType returns the OTel root span name and the
 // langwatch.span.type value that match Python's optional_langwatch_trace
-// shape per endpoint type:
+// shape per endpoint type.
 //
-//	execute_flow        → ("execute_flow",        "workflow")
-//	execute_evaluation  → ("execute_evaluation",  "evaluation")
-//	execute_component   → ("execute_component",   "component")
-//	default (legacy)    → ("execute_flow",        "workflow")
+// Naming priority (rchaves dogfood 2026-05-14, second pass):
+//  1. workflowName, when set, is the canvas name of the workflow the
+//     operator typed in Studio (e.g. "Translation Agent"). When a trace
+//     drawer lists three runs of the same workflow, they all share the
+//     workflow name — and that is the right grouping for an operator
+//     debugging "did my Translation Agent fail?". Mirrors Python's
+//     `optional_langwatch_trace(name=workflow.name)` in execute_flow.py.
+//  2. When workflowName is empty (sub-workflows that don't carry a name,
+//     direct curl tests, malformed payloads), fall back to the event
+//     type so the row still has a non-empty label.
+//
+// langwatch.span.type still switches strictly on the event type so
+// Studio's color dispatcher (workflow=blue / evaluation=purple /
+// component=green) stays right regardless of the user-typed name:
+//
+//	execute_flow        → "workflow"
+//	execute_evaluation  → "evaluation"
+//	execute_component   → "component"
+//	default (legacy)    → "workflow"
 //
 // Earlier revisions used a single hard-coded name ("nlpgo.studio.
 // execute_sync" / ".execute_stream") with no span.type, which left
 // the Studio drawer rendering the root row with no chip color +
-// migration-internal jargon (rchaves dogfood 2026-05-14). Splitting
-// by req.Type matches what langwatch_nlp/studio/execute/execute_*.py
-// stamps on its own root span and is what the trace drawer's color
-// dispatcher recognizes.
-func studioSpanNameAndType(eventType string) (name, spanType string) {
+// migration-internal jargon. The first fix moved to event-type names
+// (still generic across workflows); this fix completes the rename by
+// using the workflow's actual canvas name.
+func studioSpanNameAndType(eventType, workflowName string) (name, spanType string) {
 	switch eventType {
 	case "execute_evaluation":
-		return "execute_evaluation", "evaluation"
+		spanType = "evaluation"
 	case "execute_component":
-		return "execute_component", "component"
+		spanType = "component"
 	case "execute_flow", "":
-		return "execute_flow", "workflow"
+		spanType = "workflow"
+	default:
+		spanType = "workflow"
 	}
-	return "execute_flow", "workflow"
+	if workflowName != "" {
+		return workflowName, spanType
+	}
+	switch eventType {
+	case "execute_evaluation":
+		return "execute_evaluation", spanType
+	case "execute_component":
+		return "execute_component", spanType
+	}
+	return "execute_flow", spanType
 }
 
 func startStudioSpan(ctx context.Context, req *app.WorkflowRequest, workflowAPIKey string) (context.Context, trace.Span) {
@@ -91,7 +116,7 @@ func startStudioSpan(ctx context.Context, req *app.WorkflowRequest, workflowAPIK
 			ctx = trace.ContextWithSpanContext(ctx, sc)
 		}
 	}
-	spanName, spanType := studioSpanNameAndType(req.Type)
+	spanName, spanType := studioSpanNameAndType(req.Type, req.WorkflowName)
 	tracer := otelapi.Tracer(tracerName)
 	attrs := studioRequestAttrs(req)
 	attrs = append(attrs, attribute.String("langwatch.span.type", spanType))
