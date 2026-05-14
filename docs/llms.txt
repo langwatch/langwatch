@@ -59,6 +59,15 @@ Always navigate to docs links using the .md extension for better readability.
 - [Update project](https://langwatch.ai/docs/api-reference/projects/update-project.md)
 - [Archive project](https://langwatch.ai/docs/api-reference/projects/archive-project.md)
 
+## Teams
+
+- [Overview](https://langwatch.ai/docs/api-reference/teams/overview.md): Create, list, update, and archive LangWatch teams programmatically. Designed for automated provisioning and cleanup of team structures.
+- [List teams](https://langwatch.ai/docs/api-reference/teams/list-teams.md)
+- [Create team](https://langwatch.ai/docs/api-reference/teams/create-team.md)
+- [Get team](https://langwatch.ai/docs/api-reference/teams/get-team.md)
+- [Update team](https://langwatch.ai/docs/api-reference/teams/update-team.md)
+- [Archive team](https://langwatch.ai/docs/api-reference/teams/archive-team.md)
+
 ## API Keys
 
 - [Overview](https://langwatch.ai/docs/api-reference/api-keys/overview.md): Create and manage API keys programmatically. Supports personal keys (user-scoped) and service keys (project-scoped, for automation).

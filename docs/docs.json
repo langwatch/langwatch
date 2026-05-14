@@ -707,6 +707,17 @@
             ]
           },
           {
+            "group": "Teams",
+            "pages": [
+              "api-reference/teams/overview",
+              "api-reference/teams/list-teams",
+              "api-reference/teams/create-team",
+              "api-reference/teams/get-team",
+              "api-reference/teams/update-team",
+              "api-reference/teams/archive-team"
+            ]
+          },
+          {
             "group": "API Keys",
             "pages": [
               "api-reference/api-keys/overview",
