@@ -150,9 +150,16 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await prisma.project.deleteMany({ where: { id: { in: [projectAId, projectBId] } } });
-  await prisma.team.deleteMany({ where: { id: teamId } });
-  await prisma.organization.deleteMany({ where: { id: orgId } });
+  // Best-effort cleanup — see scenario-events-ingest test for rationale.
+  try {
+    await prisma.project.deleteMany({
+      where: { id: { in: [projectAId, projectBId] } },
+    });
+    await prisma.team.deleteMany({ where: { id: teamId } });
+    await prisma.organization.deleteMany({ where: { id: orgId } });
+  } catch {
+    /* ignore — postgres schema may not include all FK targets in test */
+  }
 });
 
 beforeEach(() => {
