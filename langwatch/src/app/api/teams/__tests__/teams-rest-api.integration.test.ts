@@ -17,35 +17,38 @@ describe("Feature: Teams REST API", () => {
 
   let testOrganization: Organization;
   let otherOrganization: Organization;
-  let patToken: string;
+  let apiKeyToken: string;
   let userId: string;
 
-  const authHeaders = () => ({
-    Authorization: `Bearer ${patToken}`,
-    "Content-Type": "application/json",
-  });
+  function createApiClient(tokenFn: () => string) {
+    const headers = () => ({
+      Authorization: `Bearer ${tokenFn()}`,
+      "Content-Type": "application/json",
+    });
+    return {
+      get: (path: string) =>
+        app.request(path, { headers: headers() }),
+      post: (path: string, body: unknown) =>
+        app.request(path, {
+          method: "POST",
+          headers: headers(),
+          body: JSON.stringify(body),
+        }),
+      patch: (path: string, body: unknown) =>
+        app.request(path, {
+          method: "PATCH",
+          headers: headers(),
+          body: JSON.stringify(body),
+        }),
+      delete: (path: string) =>
+        app.request(path, {
+          method: "DELETE",
+          headers: headers(),
+        }),
+    };
+  }
 
-  const api = {
-    get: (path: string) =>
-      app.request(path, { headers: authHeaders() }),
-    post: (path: string, body: unknown) =>
-      app.request(path, {
-        method: "POST",
-        headers: authHeaders(),
-        body: JSON.stringify(body),
-      }),
-    patch: (path: string, body: unknown) =>
-      app.request(path, {
-        method: "PATCH",
-        headers: authHeaders(),
-        body: JSON.stringify(body),
-      }),
-    delete: (path: string) =>
-      app.request(path, {
-        method: "DELETE",
-        headers: authHeaders(),
-      }),
-  };
+  const api = createApiClient(() => apiKeyToken);
 
   beforeAll(async () => {
     testOrganization = await prisma.organization.create({
@@ -98,7 +101,7 @@ describe("Feature: Teams REST API", () => {
         },
       ],
     });
-    patToken = created.token;
+    apiKeyToken = created.token;
   });
 
   afterAll(async () => {
@@ -343,7 +346,7 @@ describe("Feature: Teams REST API", () => {
   });
 
   describe("Permission denial", () => {
-    let viewerToken: string;
+    let viewerKeyToken: string;
 
     beforeAll(async () => {
       const apiKeyService = ApiKeyService.create(prisma);
@@ -361,32 +364,10 @@ describe("Feature: Teams REST API", () => {
           },
         ],
       });
-      viewerToken = viewerKey.token;
+      viewerKeyToken = viewerKey.token;
     });
 
-    const viewerApi = {
-      get: (path: string) =>
-        app.request(path, {
-          headers: { Authorization: `Bearer ${viewerToken}`, "Content-Type": "application/json" },
-        }),
-      post: (path: string, body: unknown) =>
-        app.request(path, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${viewerToken}`, "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        }),
-      patch: (path: string, body: unknown) =>
-        app.request(path, {
-          method: "PATCH",
-          headers: { Authorization: `Bearer ${viewerToken}`, "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        }),
-      delete: (path: string) =>
-        app.request(path, {
-          method: "DELETE",
-          headers: { Authorization: `Bearer ${viewerToken}`, "Content-Type": "application/json" },
-        }),
-    };
+    const viewerApi = createApiClient(() => viewerKeyToken);
 
     /** @scenario Viewer cannot list teams */
     it("returns 403 when viewer lists teams", async () => {
