@@ -31,8 +31,15 @@ import {
 import { ValidationError } from "~/server/event-sourcing/services/errorHandling";
 
 function buildMessageRestJson(messageFields: Record<string, unknown>): string {
+  // Preserve structured content (array of AG-UI parts) so the renderer can
+  // route media parts through <MediaPart>. Flat-string content goes to the
+  // top-level Content column and is omitted here.
   const { id, role, content, trace_id, ...restFields } = messageFields;
-  return Object.keys(restFields).length > 0 ? JSON.stringify(restFields) : "";
+  const rest: Record<string, unknown> = { ...restFields };
+  if (Array.isArray(content)) {
+    rest.content = content;
+  }
+  return Object.keys(rest).length > 0 ? JSON.stringify(rest) : "";
 }
 
 /**

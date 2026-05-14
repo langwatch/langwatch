@@ -190,75 +190,93 @@ export async function extractInlineMediaFromEvent({
       },
     },
     async (span) => {
-      // Only events with a `message` carrying an array content are eligible.
-      if (
-        typeof event !== "object" ||
-        event === null ||
-        !("message" in event) ||
-        typeof (event as { message: unknown }).message !== "object" ||
-        (event as { message: unknown }).message === null
-      ) {
+      if (typeof event !== "object" || event === null) {
         span.setAttribute("stored_objects.refs_extracted", 0);
         return { rewrittenEvent: event, refs: [] };
       }
 
-      const message = (event as { message: Record<string, unknown> }).message;
+      const allRefs: ExtractedRef[] = [];
 
-      if (!Array.isArray(message.content)) {
-        span.setAttribute("stored_objects.refs_extracted", 0);
-        return { rewrittenEvent: event, refs: [] };
-      }
+      // Per-message walker: parses `content` parts via AG-UI and rewrites
+      // inline data → URL refs. Returns the rewritten message and any refs.
+      // On parse failure, returns the message unchanged so the event still
+      // ingests in a degraded-but-not-broken state.
+      const rewriteMessage = async (
+        rawMessage: Record<string, unknown>,
+      ): Promise<Record<string, unknown>> => {
+        if (!Array.isArray(rawMessage.content)) return rawMessage;
 
-      const rawParts: unknown[] = message.content;
-
-      // Attempt to parse each part through the AG-UI schema.
-      // If any part fails to parse, bail out and return the event unchanged.
-      const parsedParts: InputContentPart[] = [];
-      for (const raw of rawParts) {
-        const result = InputContentSchema.safeParse(raw);
-        if (!result.success) {
-          logger.debug(
-            { error: result.error.message },
-            "content part failed AG-UI parse — passing event through unchanged",
-          );
-          span.setAttribute("stored_objects.refs_extracted", 0);
-          return { rewrittenEvent: event, refs: [] };
+        const rawParts: unknown[] = rawMessage.content;
+        const parsedParts: InputContentPart[] = [];
+        for (const raw of rawParts) {
+          const result = InputContentSchema.safeParse(raw);
+          if (!result.success) {
+            logger.debug(
+              { error: result.error.message },
+              "content part failed AG-UI parse — passing message through unchanged",
+            );
+            return rawMessage;
+          }
+          parsedParts.push(result.data);
         }
-        parsedParts.push(result.data);
-      }
 
-      // Walk each part sequentially — storage I/O is the bottleneck; no parallel needed.
-      const rewrittenParts: InputContentPart[] = [];
-      const refs: ExtractedRef[] = [];
-
-      for (const part of parsedParts) {
-        // storeFromBytes throws propagate out here — caller maps to 5xx.
-        const { part: rewritten, ref } = await processContentPart({
-          part,
-          projectId,
-          purpose,
-          ownerKind,
-          ownerId,
-          service,
-        });
-        rewrittenParts.push(rewritten);
-        if (ref !== null) {
-          refs.push(ref);
+        const rewrittenParts: InputContentPart[] = [];
+        for (const part of parsedParts) {
+          // storeFromBytes throws propagate out — caller maps to 5xx.
+          const { part: rewritten, ref } = await processContentPart({
+            part,
+            projectId,
+            purpose,
+            ownerKind,
+            ownerId,
+            service,
+          });
+          rewrittenParts.push(rewritten);
+          if (ref !== null) allRefs.push(ref);
         }
-      }
 
-      span.setAttribute("stored_objects.refs_extracted", refs.length);
-
-      // Immutable rewrite — build a new event object
-      const rewrittenEvent = {
-        ...(event as object),
-        message: {
-          ...message,
-          content: rewrittenParts,
-        },
+        return { ...rawMessage, content: rewrittenParts };
       };
 
-      return { rewrittenEvent, refs };
+      const eventObj = event as Record<string, unknown>;
+
+      // Shape A: TEXT_MESSAGE_END style — `event.message` is the single message.
+      if (
+        eventObj.message &&
+        typeof eventObj.message === "object" &&
+        !Array.isArray(eventObj.message)
+      ) {
+        const rewrittenMessage = await rewriteMessage(
+          eventObj.message as Record<string, unknown>,
+        );
+        span.setAttribute("stored_objects.refs_extracted", allRefs.length);
+        return {
+          rewrittenEvent: { ...eventObj, message: rewrittenMessage },
+          refs: allRefs,
+        };
+      }
+
+      // Shape B: MESSAGE_SNAPSHOT style — `event.messages` is an array of messages.
+      if (Array.isArray(eventObj.messages)) {
+        const rewrittenMessages: unknown[] = [];
+        for (const m of eventObj.messages) {
+          if (m && typeof m === "object" && !Array.isArray(m)) {
+            rewrittenMessages.push(
+              await rewriteMessage(m as Record<string, unknown>),
+            );
+          } else {
+            rewrittenMessages.push(m);
+          }
+        }
+        span.setAttribute("stored_objects.refs_extracted", allRefs.length);
+        return {
+          rewrittenEvent: { ...eventObj, messages: rewrittenMessages },
+          refs: allRefs,
+        };
+      }
+
+      span.setAttribute("stored_objects.refs_extracted", 0);
+      return { rewrittenEvent: event, refs: [] };
     },
   );
 }
