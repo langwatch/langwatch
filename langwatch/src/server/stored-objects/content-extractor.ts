@@ -12,9 +12,13 @@
  * the entire event is returned unchanged ("degraded, not broken").
  */
 import { InputContentSchema } from "@ag-ui/core";
+import { SpanKind } from "@opentelemetry/api";
+import { getLangWatchTracer } from "langwatch";
 import { z } from "zod";
 import { createLogger } from "~/utils/logger/server";
 import type { StoredObjectsService } from "./stored-objects.service";
+
+const tracer = getLangWatchTracer("langwatch.stored-objects.content-extractor");
 
 const logger = createLogger("langwatch:stored-objects:content-extractor");
 
@@ -174,68 +178,87 @@ export async function extractInlineMediaFromEvent({
   purpose: string;
   service: StoredObjectsService;
 }): Promise<{ rewrittenEvent: unknown; refs: ExtractedRef[] }> {
-  // Only events with a `message` carrying an array content are eligible.
-  if (
-    typeof event !== "object" ||
-    event === null ||
-    !("message" in event) ||
-    typeof (event as { message: unknown }).message !== "object" ||
-    (event as { message: unknown }).message === null
-  ) {
-    return { rewrittenEvent: event, refs: [] };
-  }
-
-  const message = (event as { message: Record<string, unknown> }).message;
-
-  if (!Array.isArray(message.content)) {
-    return { rewrittenEvent: event, refs: [] };
-  }
-
-  const rawParts: unknown[] = message.content;
-
-  // Attempt to parse each part through the AG-UI schema.
-  // If any part fails to parse, bail out and return the event unchanged.
-  const parsedParts: InputContentPart[] = [];
-  for (const raw of rawParts) {
-    const result = InputContentSchema.safeParse(raw);
-    if (!result.success) {
-      logger.debug(
-        { error: result.error.message },
-        "content part failed AG-UI parse — passing event through unchanged",
-      );
-      return { rewrittenEvent: event, refs: [] };
-    }
-    parsedParts.push(result.data);
-  }
-
-  // Walk each part sequentially — storage I/O is the bottleneck; no parallel needed.
-  const rewrittenParts: InputContentPart[] = [];
-  const refs: ExtractedRef[] = [];
-
-  for (const part of parsedParts) {
-    // storeFromBytes throws propagate out here — caller maps to 5xx.
-    const { part: rewritten, ref } = await processContentPart({
-      part,
-      projectId,
-      purpose,
-      ownerKind,
-      ownerId,
-      service,
-    });
-    rewrittenParts.push(rewritten);
-    if (ref !== null) {
-      refs.push(ref);
-    }
-  }
-
-  // Immutable rewrite — build a new event object
-  const rewrittenEvent = {
-    ...(event as object),
-    message: {
-      ...message,
-      content: rewrittenParts,
+  return tracer.withActiveSpan(
+    "StoredObjects.extractInlineMediaFromEvent",
+    {
+      kind: SpanKind.INTERNAL,
+      attributes: {
+        "tenant.id": projectId,
+        "stored_objects.purpose": purpose,
+        "stored_objects.owner_kind": ownerKind,
+        "stored_objects.owner_id": ownerId,
+      },
     },
-  };
+    async (span) => {
+      // Only events with a `message` carrying an array content are eligible.
+      if (
+        typeof event !== "object" ||
+        event === null ||
+        !("message" in event) ||
+        typeof (event as { message: unknown }).message !== "object" ||
+        (event as { message: unknown }).message === null
+      ) {
+        span.setAttribute("stored_objects.refs_extracted", 0);
+        return { rewrittenEvent: event, refs: [] };
+      }
 
-  return { rewrittenEvent, refs };
+      const message = (event as { message: Record<string, unknown> }).message;
+
+      if (!Array.isArray(message.content)) {
+        span.setAttribute("stored_objects.refs_extracted", 0);
+        return { rewrittenEvent: event, refs: [] };
+      }
+
+      const rawParts: unknown[] = message.content;
+
+      // Attempt to parse each part through the AG-UI schema.
+      // If any part fails to parse, bail out and return the event unchanged.
+      const parsedParts: InputContentPart[] = [];
+      for (const raw of rawParts) {
+        const result = InputContentSchema.safeParse(raw);
+        if (!result.success) {
+          logger.debug(
+            { error: result.error.message },
+            "content part failed AG-UI parse — passing event through unchanged",
+          );
+          span.setAttribute("stored_objects.refs_extracted", 0);
+          return { rewrittenEvent: event, refs: [] };
+        }
+        parsedParts.push(result.data);
+      }
+
+      // Walk each part sequentially — storage I/O is the bottleneck; no parallel needed.
+      const rewrittenParts: InputContentPart[] = [];
+      const refs: ExtractedRef[] = [];
+
+      for (const part of parsedParts) {
+        // storeFromBytes throws propagate out here — caller maps to 5xx.
+        const { part: rewritten, ref } = await processContentPart({
+          part,
+          projectId,
+          purpose,
+          ownerKind,
+          ownerId,
+          service,
+        });
+        rewrittenParts.push(rewritten);
+        if (ref !== null) {
+          refs.push(ref);
+        }
+      }
+
+      span.setAttribute("stored_objects.refs_extracted", refs.length);
+
+      // Immutable rewrite — build a new event object
+      const rewrittenEvent = {
+        ...(event as object),
+        message: {
+          ...message,
+          content: rewrittenParts,
+        },
+      };
+
+      return { rewrittenEvent, refs };
+    },
+  );
 }
