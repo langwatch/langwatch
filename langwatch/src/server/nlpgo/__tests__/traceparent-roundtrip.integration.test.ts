@@ -40,7 +40,12 @@
  *   - `go` is not on PATH
  *   - testcontainers Redis + ClickHouse are not running
  */
-import { execSync, spawn, type ChildProcess } from "node:child_process";
+import {
+  execFileSync,
+  execSync,
+  spawn,
+  type ChildProcess,
+} from "node:child_process";
 import fs from "node:fs";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
@@ -180,11 +185,20 @@ function ensureNlpgoBinary(timeoutMs = 600_000): string {
 
   // Cold/stale: actually compile. `go build` honours module cache, so
   // back-to-back runs in the same CI job are fast even after the first.
-  execSync(`go build -o ${NLPGO_TEST_BIN} ./cmd/service`, {
-    cwd: REPO_ROOT,
-    stdio: process.env.NLPGO_TEST_LOG === "1" ? "inherit" : "pipe",
-    timeout: timeoutMs,
-  });
+  // execFileSync (not execSync) — pass argv as an array so the shell
+  // never interprets the binary path. REPO_ROOT can sit under a worktree
+  // dir like `.claude/worktrees/...` whose absolute path could in
+  // principle contain spaces or shell metachars; binding through argv
+  // sidesteps that entirely (CodeQL js/shell-command-injection-from-environment).
+  execFileSync(
+    "go",
+    ["build", "-o", NLPGO_TEST_BIN, "./cmd/service"],
+    {
+      cwd: REPO_ROOT,
+      stdio: process.env.NLPGO_TEST_LOG === "1" ? "inherit" : "pipe",
+      timeout: timeoutMs,
+    },
+  );
   return NLPGO_TEST_BIN;
 }
 
