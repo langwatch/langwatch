@@ -100,7 +100,7 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
     // The previous "explicit origin on any span always wins" rule then
     // overwrote the customer's resolved origin (playground, application,
     // etc.) on the trace summary as the eval spans arrived.
-    /** @scenario Eval-emitted child spans do not flip the trace summary origin */
+    /** @scenario Eval-emitted child span does not flip the customer trace's origin */
     it("preserves the customer trace's origin once the root span has resolved it", () => {
       const rootSpan = createTestSpan({
         id: "root-1",
@@ -130,7 +130,7 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
       expect(state.attributes["langwatch.origin"]).toBe("playground");
     });
 
-    /** @scenario Standalone eval trace (no parent) still resolves to evaluation */
+    /** @scenario Standalone eval trace still resolves to evaluation */
     it("still resolves origin=evaluation when the eval IS the top-level trace", () => {
       // Standalone eval trace — no inbound traceparent, eval workflow
       // creates its own root span with origin=evaluation. The trace
