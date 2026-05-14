@@ -7,12 +7,15 @@ import { TraceMessage } from "../copilot-kit/TraceMessage";
 import { Markdown } from "../Markdown";
 import { RenderInputOutput } from "../traces/RenderInputOutput";
 import { safeJsonParseOrStringFallback } from "./utils/safe-json-parse-or-string-fallback";
+import { MediaPart } from "./MediaPart";
+import type { MediaPartData } from "./MediaPart";
 
 type RawMessage = ScenarioMessageSnapshotEvent["messages"][number];
 
 type DisplayItem =
   | { kind: "text"; id: string; role: string; content: string; traceId?: string }
   | { kind: "image"; id: string; src: string; traceId?: string }
+  | { kind: "media"; id: string; part: MediaPartData; traceId?: string }
   | { kind: "tool_call"; id: string; name: string; arguments: unknown; traceId?: string }
   | { kind: "tool_result"; id: string; result: unknown; traceId?: string };
 
@@ -105,6 +108,13 @@ export function ScenarioMessageRenderer({
             return (
               <VStack key={item.id} align="flex-end">
                 <Image src={item.src} maxH="200px" borderRadius="md" />
+              </VStack>
+            );
+
+          case "media":
+            return (
+              <VStack key={item.id} align="flex-start" width="100%">
+                <MediaPart part={item.part} />
               </VStack>
             );
 
@@ -249,6 +259,24 @@ function flattenMixed(content: any[], msg: RawMessage): DisplayItem[] {
       // Handles: {type:"text", text:"..."}, {type:"text", content:"..."}, {text:"..."}
       const text = item.text ?? item.content ?? "";
       if (text) items.push({ kind: "text", id: `${msg.id}-c${i}`, role: msg.role ?? "assistant", content: text, traceId: msg.trace_id });
+    } else if (typeof item === "object" && (item.type === "image" || item.type === "audio" || item.type === "video") && item.source) {
+      // AG-UI media parts with source.type="url"|"data" (Phase I externalized shape)
+      const part: MediaPartData = {
+        type: item.type as "image" | "audio" | "video",
+        source: item.source,
+      };
+      items.push({ kind: "media", id: `${msg.id}-media${i}`, part, traceId: msg.trace_id });
+    } else if (typeof item === "object" && item.type === "binary" && item.mimeType) {
+      // AG-UI binary part
+      const part: MediaPartData = {
+        type: "binary",
+        mimeType: item.mimeType,
+        id: item.id,
+        url: item.url,
+        data: item.data,
+        filename: item.filename,
+      };
+      items.push({ kind: "media", id: `${msg.id}-media${i}`, part, traceId: msg.trace_id });
     } else if (typeof item === "object" && item.type === "image_url" && item.image_url?.url) {
       items.push({ kind: "image", id: `${msg.id}-img${i}`, src: item.image_url.url, traceId: msg.trace_id });
     } else if (typeof item === "object" && item.image) {
