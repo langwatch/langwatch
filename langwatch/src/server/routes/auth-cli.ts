@@ -600,21 +600,23 @@ app.post("/exchange", async (c: Context) => {
       expires_at: now + REFRESH_TOKEN_TTL_SECONDS * 1000,
       client_info: clientInfoStamped,
     };
-    await redis
-      .multi()
-      .set(
-        accessTokenKey(accessToken),
-        JSON.stringify(accessRecord),
-        "EX",
-        ACCESS_TOKEN_TTL_SECONDS,
-      )
-      .set(
-        refreshTokenKey(refreshToken),
-        JSON.stringify(refreshRecord),
-        "EX",
-        REFRESH_TOKEN_TTL_SECONDS,
-      )
-      .exec();
+    // Per-key sets — Redis cluster CROSSSLOT-rejects multi-key ops
+    // when keys differ in hash slot. The two records can briefly diverge
+    // (e.g. access set but refresh not yet) — that's acceptable: the
+    // browser path only reads access; refresh exchange goes back through
+    // this same handler if access expires.
+    await redis.set(
+      accessTokenKey(accessToken),
+      JSON.stringify(accessRecord),
+      "EX",
+      ACCESS_TOKEN_TTL_SECONDS,
+    );
+    await redis.set(
+      refreshTokenKey(refreshToken),
+      JSON.stringify(refreshRecord),
+      "EX",
+      REFRESH_TOKEN_TTL_SECONDS,
+    );
 
     // Per-user token index — single-key ops, cluster-safe. Used by
     // CliTokenRevocationService.revokeForUser on deactivation.
