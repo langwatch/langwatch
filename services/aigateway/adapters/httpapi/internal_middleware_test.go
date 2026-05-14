@@ -34,8 +34,8 @@ func TestInternalAuthMiddleware_ValidSignaturePasses(t *testing.T) {
 		// The handler must still be able to read the body — verify
 		// that the middleware buffered it correctly.
 		body, err := io.ReadAll(r.Body)
-		require.NoError(t, err)
-		assert.Equal(t, `{"hello":"world"}`, string(body))
+		assert.NoError(t, err)
+		assert.JSONEq(t, `{"hello":"world"}`, string(body))
 		w.WriteHeader(http.StatusOK)
 	}))
 

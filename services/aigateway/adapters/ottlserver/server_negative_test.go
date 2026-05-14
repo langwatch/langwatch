@@ -317,9 +317,9 @@ func TestServer_HandleValidate_PerStatementIndicesPreservedOnInterleavedErrors(t
 	// correct row.
 	stmts := []string{
 		`set(attributes["a"], "x")`, // 0 — valid
-		`???bad???`,                  // 1 — invalid
+		`???bad???`,                 // 1 — invalid
 		`set(attributes["b"], "y")`, // 2 — valid
-		`set(`,                       // 3 — invalid
+		`set(`,                      // 3 — invalid
 	}
 	body, _ := json.Marshal(validateRequest{Statements: stmts})
 	rec := postJSON(t, srv.HandleValidate, body)

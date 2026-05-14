@@ -76,10 +76,10 @@ type validateRequest struct {
 }
 
 type transformRequest struct {
-	SourceID   string   `json:"source_id"`
-	Kind       string   `json:"kind"`
-	Encoding   string   `json:"encoding"`
-	PayloadB64 string   `json:"payload_b64"`
+	SourceID   string `json:"source_id"`
+	Kind       string `json:"kind"`
+	Encoding   string `json:"encoding"`
+	PayloadB64 string `json:"payload_b64"`
 	// LegacyPayloadB64 is the original sergey contract field name.
 	// Kept on the wire so an old TS client (or an older gateway)
 	// can roll out independently. Prefer `payload_b64`.

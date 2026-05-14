@@ -179,4 +179,3 @@ func decodeTransform(t *testing.T, raw []byte) plog.Logs {
 	require.NoError(t, err)
 	return logs
 }
-

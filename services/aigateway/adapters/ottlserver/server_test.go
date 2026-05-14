@@ -114,7 +114,7 @@ func TestServer_HandleTransform_ClaudeCodeFixture(t *testing.T) {
 		totalApiRequests += apiRequests
 	}
 
-	require.Greater(t, totalApiRequests, 0, "fixture must include at least one claude_code.api_request record; got 0")
+	require.Positive(t, totalApiRequests, "fixture must include at least one claude_code.api_request record; got 0")
 	t.Logf("examined %d log records (%d api_request) across %d batches", totalRecords, totalApiRequests, len(bodies))
 }
 
@@ -230,7 +230,7 @@ func loadOtlpLogBodies(t *testing.T, path string) [][]byte {
 		if err := json.Unmarshal(line, &req); err != nil {
 			t.Fatalf("malformed fixture line: %v", err)
 		}
-		if req.Method != "POST" || !strings.HasSuffix(req.Path, "/v1/logs") {
+		if req.Method != http.MethodPost || !strings.HasSuffix(req.Path, "/v1/logs") {
 			continue
 		}
 		switch req.BodyEncoding {
