@@ -1,5 +1,6 @@
 import type { Project } from "@prisma/client";
 import { Hono } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import { describeRoute } from "hono-openapi";
 import { resolver, validator as zValidator } from "hono-openapi/zod";
 import { getApp } from "~/server/app-layer/app";
@@ -7,6 +8,8 @@ import { ScenarioEventType } from "~/server/scenarios/scenario-event.enums";
 import type { ScenarioEvent } from "~/server/scenarios/scenario-event.types";
 import { DEFAULT_SET_ID } from "~/server/scenarios/internal-set-id";
 import { responseSchemas, scenarioEventSchema } from "~/server/scenarios/schemas";
+import { extractInlineMediaFromEvent } from "~/server/stored-objects/content-extractor";
+import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
 import { createLogger } from "~/utils/logger/server";
 import {
   encodeContent,
@@ -45,6 +48,7 @@ app.onError(handleError);
 // POST /api/scenario-events - Create a new scenario event
 app.post(
   "/",
+  bodyLimit({ maxSize: 50 * 1024 * 1024 }), // 50MB — accommodates inline media payloads
   requirePermission("scenarios:manage"),
   describeRoute({
     description: "Create a new scenario event",
@@ -67,18 +71,46 @@ app.post(
   zValidator("json", scenarioEventSchema),
   async (c) => {
     const { project } = c.var;
-    const event = c.req.valid("json");
+    const validatedEvent = c.req.valid("json");
 
     logger.info(
       {
         projectId: project.id,
-        eventType: event.type,
-        scenarioId: event.scenarioId,
-        scenarioRunId: event.scenarioRunId,
-        scenarioSetId: event.scenarioSetId,
+        eventType: validatedEvent.type,
+        scenarioId: validatedEvent.scenarioId,
+        scenarioRunId: validatedEvent.scenarioRunId,
+        scenarioSetId: validatedEvent.scenarioSetId,
       },
       "Received scenario event",
     );
+
+    // Extract inline media bytes, externalize to stored objects, and rewrite
+    // the event payload to reference them by URL before dispatch.
+    const service = createStoredObjectsService({ projectId: project.id });
+    const { rewrittenEvent: rawRewritten, refs } = await extractInlineMediaFromEvent({
+      event: validatedEvent,
+      projectId: project.id,
+      ownerKind: "scenario_run",
+      ownerId: validatedEvent.scenarioRunId,
+      purpose: "scenario_event",
+      service,
+    });
+
+    // Cast back to the typed ScenarioEvent — the rewrite only touches content
+    // arrays inside message objects; all discriminant fields are preserved.
+    const event = rawRewritten as ScenarioEvent;
+
+    if (refs.length > 0) {
+      logger.info(
+        {
+          stored_object_ids: refs.map((r) => r.id),
+          projectId: project.id,
+          scenarioRunId: validatedEvent.scenarioRunId,
+          count: refs.length,
+        },
+        `scenario event extracted ${refs.length} stored object(s)`,
+      );
+    }
 
     // Enforce scenario set limit on RUN_STARTED events.
     // ScenarioSetLimitExceededError (DomainError with httpStatus 403)
