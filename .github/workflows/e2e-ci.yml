@@ -140,7 +140,7 @@ jobs:
       # by default — install it globally before any install that hits
       # mcp-server's onlyBuiltDependencies allowlist.
       - name: Install node-gyp (for node-pty postinstall)
-        run: npm install -g node-gyp
+        run: npm install -g node-gyp@12.3.0
 
       - name: Build mcp-server
         working-directory: mcp-server
