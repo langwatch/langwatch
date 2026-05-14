@@ -31,6 +31,7 @@ jobs:
             relevant:
               - 'mcp-server/**'
               - '.github/workflows/mcp-javascript-ci.yml'
+              - '.github/actions/setup-pnpm-node/**'
               - '.github/.release-please-manifest.json'
 
   typecheck:
