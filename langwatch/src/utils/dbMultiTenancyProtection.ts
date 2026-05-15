@@ -109,6 +109,16 @@ const EXEMPT_MODELS = [
    * `modelProviderId`). Same rationale as VirtualKeyProviderCredential.
    */
   "ModelProviderScope",
+  /**
+   * ModelDefault holds the (scopeType, scopeId, role, featureKey?) →
+   * model assignments that back the role-based default models resolver
+   * (B3). Same principal-style scope shape as ModelProvider: a row can
+   * live at organization, team, or project scope. The resolver walks
+   * the scope chain after first deriving the project's teamId + orgId
+   * via `project.findUnique`, so the tenancy boundary is enforced one
+   * level above this middleware.
+   */
+  "ModelDefault",
 ];
 
 const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
