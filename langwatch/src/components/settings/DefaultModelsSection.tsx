@@ -7,11 +7,12 @@
  * below — each row groups every ModelDefault scope that shares the
  * same (role, featureKey, model) so a single "rule" can apply to
  * multiple teams or projects with one chip-picker. "+ Add override"
- * opens a drawer to author a new assignment.
+ * opens `DefaultModelOverrideDrawer` to author or edit a rule; saving
+ * fans out per-scope set/clear calls to keep storage in sync with the
+ * grouped UI representation.
  *
  * See specs/model-providers/role-based-default-models.feature for the
- * full behavioural contract. Drawer + ScopeChipPicker integration is
- * landed by the UI lane on top of this shim.
+ * full behavioural contract.
  */
 
 import {
@@ -21,19 +22,23 @@ import {
   Card,
   Heading,
   HStack,
+  IconButton,
   Spinner,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Plus } from "lucide-react";
-import { useMemo } from "react";
+import { Pencil, Plus } from "lucide-react";
+import { useMemo, useState } from "react";
 
 import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
 
+import { DefaultModelOverrideDrawer } from "./DefaultModelOverrideDrawer";
+
 type DefaultModelsPayload =
   RouterOutputs["modelProvider"]["getDefaultModelsForProject"];
+type Assignment = DefaultModelsPayload["assignments"][number];
 type ModelRoleKey = "DEFAULT" | "FAST" | "EMBEDDINGS";
 
 const ROLE_LABEL: Record<ModelRoleKey, string> = {
@@ -70,6 +75,11 @@ export function DefaultModelsSection() {
     return map;
   }, [dataQuery.data?.features]);
 
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [editingAssignment, setEditingAssignment] = useState<
+    Assignment | undefined
+  >(undefined);
+
   if (dataQuery.isLoading || !dataQuery.data) {
     return (
       <Card.Root width="full" data-testid="default-models-section">
@@ -85,6 +95,15 @@ export function DefaultModelsSection() {
 
   const data = dataQuery.data;
   const roles: ModelRoleKey[] = ["DEFAULT", "FAST", "EMBEDDINGS"];
+
+  const openAdd = () => {
+    setEditingAssignment(undefined);
+    setDrawerOpen(true);
+  };
+  const openEdit = (a: Assignment) => {
+    setEditingAssignment(a);
+    setDrawerOpen(true);
+  };
 
   return (
     <VStack
@@ -107,9 +126,7 @@ export function DefaultModelsSection() {
           size="sm"
           variant="outline"
           data-testid="add-override-button"
-          // The drawer is wired by the override-editor lane on top of
-          // this shim. The button stays visible so the page reads
-          // correctly during integration.
+          onClick={openAdd}
         >
           <HStack gap={1}>
             <Plus size={14} />
@@ -202,6 +219,17 @@ export function DefaultModelsSection() {
                         ))}
                       </HStack>
                     </Box>
+                    <Tooltip content="Edit this rule">
+                      <IconButton
+                        size="xs"
+                        variant="ghost"
+                        aria-label="Edit override"
+                        onClick={() => openEdit(a)}
+                        data-testid={`assignment-row-${a.id}-edit`}
+                      >
+                        <Pencil size={14} />
+                      </IconButton>
+                    </Tooltip>
                   </HStack>
                 );
               })
@@ -209,6 +237,17 @@ export function DefaultModelsSection() {
           </VStack>
         </Card.Body>
       </Card.Root>
+
+      <DefaultModelOverrideDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        editing={editingAssignment}
+        available={data.available}
+        features={data.features}
+        onSaved={() => {
+          /* dataQuery is invalidated inside the drawer; nothing extra here */
+        }}
+      />
     </VStack>
   );
 }

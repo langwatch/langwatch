@@ -47,8 +47,11 @@ Feature: Role-based default models with per-scope overrides
     Then I see "openai/gpt-5.5" next to the role name
     And a subtle hint reads "from organization"
 
-  @integration
+  @integration @unimplemented
   Scenario: Embeddings has no per-feature expand because it has a single consumer
+    # In the flat-rules-list UX there is no per-role expand chevron;
+    # the Embeddings role's effective value renders as a normal row.
+    # Kept here for parity with the pre-redesign spec language.
     Given the Embeddings role is consumed only by "analytics.topic_clustering_embeddings"
     When I view the Embeddings line
     Then no expand chevron is shown on the Embeddings line
@@ -70,13 +73,19 @@ Feature: Role-based default models with per-scope overrides
     # renders one logical "assignment" per group with the scopes as
     # chips on the same row.
 
-  @integration @unimplemented
+  @integration
   Scenario: Adding an override opens a drawer with a scope chip picker and per-role model selectors
     When I click "+ Add override"
     Then a drawer opens
     And the drawer shows a ScopeChipPicker so I can pick one or more scopes (organization, teams, projects)
     And the drawer shows a Default / Fast / Embeddings model selector
     And the drawer optionally drills into per-feature overrides
+
+  @integration
+  Scenario: Editing an assignment row opens the drawer pre-filled with that rule
+    Given an existing per-feature override targets "traces.ai_search" at project scope
+    When I click the row's Edit button
+    Then the drawer opens with the feature pre-selected and the Delete CTA enabled
 
   @integration @unimplemented
   Scenario: Saving a multi-scope override creates one ModelDefault row per scope but renders as one assignment

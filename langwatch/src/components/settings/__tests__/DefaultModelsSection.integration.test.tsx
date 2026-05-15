@@ -10,18 +10,25 @@
  *  - One row per assignment renders below, scopes shown as chips on
  *    the same row (a single rule spanning multiple scopes is ONE
  *    visual row, not N).
- *  - The "+ Add override" CTA is wired so the drawer-lane can grab it.
+ *  - The "+ Add override" CTA opens the override drawer.
+ *  - Editing an assignment row pre-fills the drawer with that rule's
+ *    scopes, role/feature, and model.
  *
- * Mocks the tRPC query layer with a hand-crafted payload so the test
- * stays hermetic.
+ * Mocks the tRPC query + mutation layer with a hand-crafted payload so
+ * the test stays hermetic. The DefaultModelOverrideDrawer mounts a
+ * full-fledged Chakra Drawer; we only assert on the radio + role
+ * buttons + chip summary text rather than driving the underlying chip
+ * `Select`, which is portaled and harder to test in jsdom.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DefaultModelsSection } from "../DefaultModelsSection";
 
 const mockGetDefaultModels = vi.fn();
 const mockInvalidate = vi.fn();
+const mockSetRole = vi.fn();
+const mockSetFeature = vi.fn();
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
@@ -42,6 +49,18 @@ vi.mock("~/utils/api", () => ({
     modelProvider: {
       getDefaultModelsForProject: {
         useQuery: () => mockGetDefaultModels(),
+      },
+      setRoleAssignmentForScope: {
+        useMutation: () => ({
+          mutateAsync: mockSetRole,
+          isPending: false,
+        }),
+      },
+      setFeatureOverrideForScope: {
+        useMutation: () => ({
+          mutateAsync: mockSetFeature,
+          isPending: false,
+        }),
       },
     },
   },
@@ -92,18 +111,14 @@ const FAKE_PAYLOAD = {
       role: "FAST",
       featureKey: null,
       model: "openai/gpt-5.4-mini",
-      scopes: [
-        { type: "ORGANIZATION", id: "org-1", name: "Acme" },
-      ],
+      scopes: [{ type: "ORGANIZATION", id: "org-1", name: "Acme" }],
     },
     {
       id: "FAST::traces.ai_search::anthropic/claude-sonnet-4-6",
       role: "FAST",
       featureKey: "traces.ai_search",
       model: "anthropic/claude-sonnet-4-6",
-      scopes: [
-        { type: "PROJECT", id: "proj-1", name: "Acme App" },
-      ],
+      scopes: [{ type: "PROJECT", id: "proj-1", name: "Acme App" }],
     },
   ],
   available: {
@@ -148,6 +163,8 @@ describe("<DefaultModelsSection />", () => {
       isLoading: false,
     });
     mockInvalidate.mockReset();
+    mockSetRole.mockReset();
+    mockSetFeature.mockReset();
   });
   afterEach(() => cleanup());
 
@@ -196,9 +213,45 @@ describe("<DefaultModelsSection />", () => {
     expect(featureRow.textContent).toMatch(/anthropic\/claude-sonnet-4-6/);
   });
 
-  it("exposes the +Add override CTA so the drawer lane can wire it", () => {
+  /** @scenario Adding an override opens a drawer with a scope chip picker and per-role model selectors */
+  it("opens the drawer with an empty form when Add override is clicked", async () => {
     renderSection();
-    expect(screen.getByTestId("add-override-button")).toBeInTheDocument();
+    // Drawer.Root unmounts its content while `open=false`, so the title
+    // text isn't present yet.
+    expect(screen.queryByText(/Add override/i, { selector: "h2,h3,header *" }))
+      .toBeNull;
+
+    fireEvent.click(screen.getByTestId("add-override-button"));
+
+    // Verify the drawer body landed in the document via its scope-picker
+    // label + the per-role buttons + the model selector trigger.
+    expect(
+      await screen.findByText(/Scope\(s\) this override applies to/i),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("override-mode-role")).toBeInTheDocument();
+    expect(screen.getByTestId("override-mode-feature")).toBeInTheDocument();
+    expect(screen.getByTestId("override-role-default")).toBeInTheDocument();
+    expect(screen.getByTestId("override-role-fast")).toBeInTheDocument();
+    expect(screen.getByTestId("override-role-embeddings")).toBeInTheDocument();
+    // Save disabled (no chips, no model picked yet).
+    expect(screen.getByTestId("override-save")).toBeDisabled();
+  });
+
+  /** @scenario Editing an assignment row opens the drawer pre-filled with that rule */
+  it("opens the drawer pre-filled when an assignment row's Edit is clicked", async () => {
+    renderSection();
+    fireEvent.click(
+      screen.getByTestId(
+        "assignment-row-FAST::traces.ai_search::anthropic/claude-sonnet-4-6-edit",
+      ),
+    );
+    // Editing this feature-keyed row puts the drawer in "feature" mode,
+    // so the feature-pick row for "traces.ai_search" must be visible.
+    expect(
+      await screen.findByTestId("override-feature-traces.ai_search"),
+    ).toBeInTheDocument();
+    // Delete CTA is enabled in edit mode.
+    expect(screen.getByTestId("override-delete")).not.toBeDisabled();
   });
 
   it("shows the empty-state copy when no assignments exist", () => {
