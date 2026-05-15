@@ -44,21 +44,23 @@ Feature: Prompt sync fidelity between the platform and local YAML
     Then the sync payload outputs are flat fields "l1", "l2", "l3", "reasoning"
     And no single json_schema catch-all output is sent
 
-  # --- Sampling parameters must not break the model on pull ---
+  # --- Sampling parameters are never fabricated at the write boundary ---
+  # A model-invalid value is refused at persistence time (not papered over on
+  # read) so the stored prompt is honest for every consumer: UI, pull, runtime.
 
   @integration
-  Scenario: Pulling a gpt-5-family prompt never writes a temperature it cannot accept
-    Given a stored prompt on a model whose registry entry does not support temperature
-    And the stored prompt has a temperature value
-    When the prompt is fetched through the prompts REST API
-    Then the API response omits the temperature field
+  Scenario: Publishing a prompt version on a model that rejects temperature never stores it
+    Given a model whose registry entry does not support temperature
+    When a prompt version is published with a temperature on that model
+    Then the stored version has no temperature
+    And the prompts REST API returns no temperature for it
 
   @integration
-  Scenario: Pulling a prompt on a model that supports temperature keeps the temperature
-    Given a stored prompt on a model whose registry entry supports temperature
-    And the stored prompt has a temperature value
-    When the prompt is fetched through the prompts REST API
-    Then the API response still includes the temperature field
+  Scenario: Publishing a prompt version on a model that supports temperature keeps it
+    Given a model whose registry entry supports temperature
+    When a prompt version is published with a temperature on that model
+    Then the stored version keeps the temperature untouched
+    And the prompts REST API returns that temperature
 
   # --- New prompts start modern ---
 
@@ -67,6 +69,13 @@ Feature: Prompt sync fidelity between the platform and local YAML
     When I read the platform default prompt model
     Then it resolves to a model present in the model registry
     And that model is not a legacy gpt-4 generation model
+
+  @unit
+  Scenario: Pushing a prompt with no temperature sends no temperature
+    Given a local prompt YAML with no modelParameters temperature
+    When the prompt is pushed to the platform
+    Then the sync payload has no temperature
+    # Removing temperature from the YAML therefore clears it on the next pull
 
   @unit
   Scenario: Creating a prompt via the CLI does not inject a temperature

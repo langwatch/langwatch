@@ -7,13 +7,17 @@ import {
 } from "~/factories/llm-config.factory";
 import { projectFactory } from "~/factories/project.factory";
 import { prisma } from "~/server/db";
+import { LlmConfigVersionsRepository } from "~/server/prompt-config/repositories/llm-config-versions.repository";
+import { LATEST_SCHEMA_VERSION } from "~/server/prompt-config/repositories/llm-config-version-schema";
 import { app } from "../[[...route]]/app";
 
 /**
- * The prompts REST API must never hand back a sampling parameter the model
- * provider would reject — otherwise `langwatch prompt pull` writes, e.g., a
- * `temperature` into local YAML that breaks the next call against the gpt-5
- * family (whose registry entry does not list `temperature`).
+ * A prompt version must never persist a sampling parameter the chosen model
+ * rejects. Enforced at the single write boundary (createVersion) so the stored
+ * data is honest — `langwatch prompt pull` then never writes, e.g., a
+ * `temperature` into local YAML that breaks the next gpt-5-family call. We do
+ * not invent or alter values: a legitimate value on a model that supports the
+ * parameter is kept untouched.
  */
 describe("prompt sync fidelity — sampling parameters", () => {
   let testOrganization: Organization;
@@ -21,7 +25,7 @@ describe("prompt sync fidelity — sampling parameters", () => {
   let testProject: Project;
   let testApiKey: string;
 
-  async function createPromptOnModel(model: string, temperature: number) {
+  async function publishPromptOnModel(model: string, temperature: number) {
     const configData = llmPromptConfigFactory.build({
       projectId: testProject.id,
       organizationId: testOrganization.id,
@@ -39,36 +43,49 @@ describe("prompt sync fidelity — sampling parameters", () => {
       },
     });
 
-    const versionData = llmPromptConfigVersionFactory.build({
+    // Seed an initial version so the config exists, then publish a new
+    // version on the target model — the flow the customer hit.
+    const seed = llmPromptConfigVersionFactory.build({
       configId: config.id,
       projectId: testProject.id,
-      configData: {
-        prompt: "You are a helpful assistant",
-        model,
-        temperature,
-        inputs: [{ identifier: "input", type: "str" }],
-        outputs: [{ identifier: "output", type: "str" }],
-      } as any,
     });
-
     await prisma.llmPromptConfigVersion.create({
       data: {
-        id: versionData.id,
+        id: seed.id,
         configId: config.id,
         projectId: testProject.id,
-        version: 1,
-        schemaVersion: versionData.schemaVersion,
-        configData: versionData.configData as any,
-        commitMessage: "v1",
-        createdAt: new Date("2026-01-01T00:00:00Z"),
+        version: 0,
+        schemaVersion: seed.schemaVersion,
+        configData: seed.configData as any,
+        commitMessage: "seed",
       },
     });
 
-    return config;
+    const repository = new LlmConfigVersionsRepository(prisma);
+    const version = await repository.createVersion({
+      organizationId: testOrganization.id,
+      versionData: {
+        configId: config.id,
+        projectId: testProject.id,
+        schemaVersion: LATEST_SCHEMA_VERSION,
+        commitMessage: "v1",
+        authorId: null,
+        configData: {
+          prompt: "You are a helpful assistant",
+          model,
+          temperature,
+          messages: [],
+          inputs: [{ identifier: "input", type: "str" }],
+          outputs: [{ identifier: "output", type: "str" }],
+        },
+      } as any,
+    });
+
+    return { config, version };
   }
 
-  async function get(path: string) {
-    const res = await app.request(path, {
+  async function getViaApi(id: string) {
+    const res = await app.request(`/api/prompts/${id}`, {
       headers: { "X-Auth-Token": testApiKey },
     });
     return res.json();
@@ -104,25 +121,38 @@ describe("prompt sync fidelity — sampling parameters", () => {
     await prisma.organization.delete({ where: { id: testOrganization.id } });
   });
 
-  describe("when the stored model does not support temperature", () => {
-    /** @scenario Pulling a gpt-5-family prompt never writes a temperature it cannot accept */
-    it("omits temperature from the API response", async () => {
-      const config = await createPromptOnModel("openai/gpt-5.4-mini", 0.4);
+  describe("when publishing a version on a model that does not support temperature", () => {
+    /** @scenario Publishing a prompt version on a model that rejects temperature never stores it */
+    it("does not persist the temperature, so the API never returns one", async () => {
+      const { config, version } = await publishPromptOnModel(
+        "openai/gpt-5.4-mini",
+        0.4,
+      );
 
-      const body = await get(`/api/prompts/${config.id}`);
+      // Stored data is honest — the value never made it to the DB.
+      expect(
+        (version.configData as Record<string, unknown>).temperature,
+      ).toBeUndefined();
 
+      const body = await getViaApi(config.id);
       expect(body.model).toBe("openai/gpt-5.4-mini");
       expect(body.temperature).toBeUndefined();
     });
   });
 
-  describe("when the stored model supports temperature", () => {
-    /** @scenario Pulling a prompt on a model that supports temperature keeps the temperature */
-    it("keeps temperature in the API response", async () => {
-      const config = await createPromptOnModel("openai/gpt-4o-mini", 0.4);
+  describe("when publishing a version on a model that supports temperature", () => {
+    /** @scenario Publishing a prompt version on a model that supports temperature keeps it */
+    it("persists the temperature untouched", async () => {
+      const { config, version } = await publishPromptOnModel(
+        "openai/gpt-4o-mini",
+        0.4,
+      );
 
-      const body = await get(`/api/prompts/${config.id}`);
+      expect(
+        (version.configData as Record<string, unknown>).temperature,
+      ).toBe(0.4);
 
+      const body = await getViaApi(config.id);
       expect(body.model).toBe("openai/gpt-4o-mini");
       expect(body.temperature).toBe(0.4);
     });
