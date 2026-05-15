@@ -19,6 +19,7 @@ import LLMsTxtProtip from "/snippets/llms-txt-protip.mdx";
 ## Prerequisites
 
 - Obtain your `LANGWATCH_API_KEY` from the [LangWatch dashboard](https://app.langwatch.ai/)
+- If using a **service API key**, also obtain your `LANGWATCH_PROJECT_ID` from your project settings
 - Install the OpenTelemetry SDK for your programming language
 
 ## LangWatch OTEL API Endpoint
@@ -219,7 +220,12 @@ Set these environment variables for authentication:
 
 ```bash
 export LANGWATCH_API_KEY="your-api-key-here"
+export LANGWATCH_PROJECT_ID="your-project-id-here"  # Required for service API keys
 ```
+
+<Note>
+  `LANGWATCH_PROJECT_ID` is required when using a **service API key** (e.g. for CI/CD or multi-project setups). Project API keys obtained from the project settings page already have the project context built in.
+</Note>
 
 ## Verification
 

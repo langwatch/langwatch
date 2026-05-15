@@ -45,7 +45,12 @@ Be sure to login or create an account on the link that will be displayed, then p
   <Tab title="Environment Variable">
 ```bash
 export LANGWATCH_API_KEY=your_api_key
+export LANGWATCH_PROJECT_ID=your_project_id  # Required for service API keys
 ```
+
+<Note>
+  `LANGWATCH_PROJECT_ID` is required when using a **service API key** (e.g. for CI/CD or multi-project setups). Project API keys obtained via `langwatch.login()` or from the project settings page already have the project context built in.
+</Note>
   </Tab>
 </Tabs>
 

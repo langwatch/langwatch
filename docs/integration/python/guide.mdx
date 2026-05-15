@@ -33,6 +33,8 @@ Integrate LangWatch into your Python application to start observing your LLM int
 
 First, you need a LangWatch API key. Sign up at [app.langwatch.ai](https://app.langwatch.ai) and find your API key in your project settings. The SDK will automatically use the `LANGWATCH_API_KEY` environment variable if it is set.
 
+If you are using a **service API key** (e.g. for CI/CD or multi-project setups), you must also set `LANGWATCH_PROJECT_ID` so the SDK knows which project to send traces to. You can find the project ID in your project settings.
+
 ## Start Instrumenting
 
 First, ensure you have the SDK installed:
@@ -171,6 +173,7 @@ exclude_rules = [
 
 langwatch.setup(
     api_key=os.getenv("LANGWATCH_API_KEY"),
+    project_id=os.getenv("LANGWATCH_PROJECT_ID"), # Required for service API keys
     endpoint_url="https://your-langwatch-instance.com", # Optional: Defaults to env var or cloud
     base_attributes={
       AttributeKey.ServiceName: "my-awesome-service",
@@ -194,6 +197,11 @@ langwatch.setup(
 <ParamField path="api_key" type="str | None">
   Your LangWatch API key. If not provided, it uses the `LANGWATCH_API_KEY`
   environment variable.
+</ParamField>
+
+<ParamField path="project_id" type="str | None">
+  Your LangWatch project ID. Required when using a service API key. If not
+  provided, it uses the `LANGWATCH_PROJECT_ID` environment variable.
 </ParamField>
 
 <ParamField path="endpoint_url" type="str | None">
