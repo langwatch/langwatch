@@ -190,16 +190,18 @@ function buildService(projectId: string): StoredObjectsService {
 
 /**
  * Mints a `file://` URI under tmpDir so storage hits the test temp dir.
- * We override the default LOCAL_STORAGE_PATH by patching process.env.
+ * We override the default LANGWATCH_LOCAL_STORAGE_PATH by patching
+ * process.env so the driver writes under the per-test tmpdir instead of
+ * /var/lib/langwatch (which CI runners can't write to).
  */
 function withTmpStorage(fn: () => Promise<void>): Promise<void> {
-  const original = process.env.LOCAL_STORAGE_PATH;
-  process.env.LOCAL_STORAGE_PATH = tmpDir;
+  const original = process.env.LANGWATCH_LOCAL_STORAGE_PATH;
+  process.env.LANGWATCH_LOCAL_STORAGE_PATH = tmpDir;
   return fn().finally(() => {
     if (original === undefined) {
-      delete process.env.LOCAL_STORAGE_PATH;
+      delete process.env.LANGWATCH_LOCAL_STORAGE_PATH;
     } else {
-      process.env.LOCAL_STORAGE_PATH = original;
+      process.env.LANGWATCH_LOCAL_STORAGE_PATH = original;
     }
   });
 }

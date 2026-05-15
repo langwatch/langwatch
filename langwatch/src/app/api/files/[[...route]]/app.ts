@@ -2,6 +2,7 @@ import { Readable } from "node:stream";
 import type { Project } from "@prisma/client";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
+import type { MiddlewareHandler } from "hono";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { requireProjectPermission } from "~/server/auth/permissions";
@@ -15,6 +16,8 @@ import {
 
 type Variables = {
   project?: Project;
+  apiKeyProjectId?: string;
+  userId?: string;
 };
 
 export const app = new Hono<{ Variables: Variables }>().basePath("/api/files");
@@ -36,37 +39,28 @@ app.onError(handleError);
  * check via requireProjectPermission. API-key callers don't need a userId —
  * they're already gated to a project and the row's project_id must match.
  */
-type FilesContext = {
-  Variables: Variables & { userId?: string; apiKeyProjectId?: string };
-};
-
-const dualAuth = async (
-  c: Parameters<Parameters<typeof app.use>[0] extends infer T ? T : never>[0],
-  next: () => Promise<void>,
-): Promise<void> => {
-  // Attempt API-key auth via the unified middleware. If it succeeds it'll
-  // set c.var.project; if it throws we fall back to session.
+const dualAuth: MiddlewareHandler<{ Variables: Variables }> = async (
+  c,
+  next,
+) => {
   try {
-    await authMiddleware(c as never, async () => {
+    await authMiddleware(c, async () => {
       /* no-op: just want the side effect of populating c.var.project */
     });
-    const project = (c.get as (k: "project") => Project | undefined)("project");
+    const project = c.get("project");
     if (project) {
-      (c.set as (k: "apiKeyProjectId", v: string) => void)(
-        "apiKeyProjectId",
-        project.id,
-      );
+      c.set("apiKeyProjectId", project.id);
       return await next();
     }
   } catch {
     // fall through to session auth
   }
 
-  const session = await getServerAuthSession({ req: c.req.raw as never });
+  const session = await getServerAuthSession({ req: c.req.raw });
   if (!session?.user?.id) {
     throw new HTTPException(401, { message: "unauthenticated" });
   }
-  (c.set as (k: "userId", v: string) => void)("userId", session.user.id);
+  c.set("userId", session.user.id);
   return next();
 };
 
@@ -88,6 +82,9 @@ const dualAuth = async (
  */
 app.get("/:id", dualAuth, async (c) => {
   const id = c.req.param("id");
+  if (!id) {
+    return c.json({ status: "not_found" }, 404);
+  }
 
   // Step 1: resolve the owning project from the row id (cross-tenant lookup).
   const bootstrapService = createStoredObjectsService({
@@ -99,10 +96,8 @@ app.get("/:id", dualAuth, async (c) => {
   }
 
   // Step 2: project-membership gate.
-  const apiKeyProjectId = (c.get as (k: "apiKeyProjectId") => string | undefined)(
-    "apiKeyProjectId",
-  );
-  const userId = (c.get as (k: "userId") => string | undefined)("userId");
+  const apiKeyProjectId = c.get("apiKeyProjectId");
+  const userId = c.get("userId");
 
   if (apiKeyProjectId) {
     if (apiKeyProjectId !== owner.projectId) {

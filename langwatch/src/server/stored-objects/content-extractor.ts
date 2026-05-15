@@ -241,15 +241,21 @@ export async function extractInlineMediaFromEvent({
       const eventObj = event as Record<string, unknown>;
 
       // Shape A: TEXT_MESSAGE_END style — `event.message` is the single message.
+      // `rewriteMessage` returns the same reference when nothing changed (no
+      // content array, or a parse failure that triggers the degraded
+      // fallback). Preserve reference identity of the event in that case so
+      // callers and tests can assert "unchanged" via === / toBe.
       if (
         eventObj.message &&
         typeof eventObj.message === "object" &&
         !Array.isArray(eventObj.message)
       ) {
-        const rewrittenMessage = await rewriteMessage(
-          eventObj.message as Record<string, unknown>,
-        );
+        const originalMessage = eventObj.message as Record<string, unknown>;
+        const rewrittenMessage = await rewriteMessage(originalMessage);
         span.setAttribute("stored_objects.refs_extracted", allRefs.length);
+        if (rewrittenMessage === originalMessage) {
+          return { rewrittenEvent: event, refs: allRefs };
+        }
         return {
           rewrittenEvent: { ...eventObj, message: rewrittenMessage },
           refs: allRefs,
@@ -258,17 +264,24 @@ export async function extractInlineMediaFromEvent({
 
       // Shape B: MESSAGE_SNAPSHOT style — `event.messages` is an array of messages.
       if (Array.isArray(eventObj.messages)) {
+        const originalMessages = eventObj.messages;
         const rewrittenMessages: unknown[] = [];
-        for (const m of eventObj.messages) {
+        let anyChanged = false;
+        for (const m of originalMessages) {
           if (m && typeof m === "object" && !Array.isArray(m)) {
-            rewrittenMessages.push(
-              await rewriteMessage(m as Record<string, unknown>),
+            const rewritten = await rewriteMessage(
+              m as Record<string, unknown>,
             );
+            if (rewritten !== m) anyChanged = true;
+            rewrittenMessages.push(rewritten);
           } else {
             rewrittenMessages.push(m);
           }
         }
         span.setAttribute("stored_objects.refs_extracted", allRefs.length);
+        if (!anyChanged) {
+          return { rewrittenEvent: event, refs: allRefs };
+        }
         return {
           rewrittenEvent: { ...eventObj, messages: rewrittenMessages },
           refs: allRefs,

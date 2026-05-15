@@ -74,7 +74,7 @@ function deriveStoredObjectId({
  * Returns the storage URI for a new object based on current env configuration.
  *
  * When `S3_BUCKET_NAME` is set the object goes to S3; otherwise it lands on
- * the local filesystem at `LOCAL_STORAGE_PATH` (mirrors the legacy
+ * the local filesystem at `LANGWATCH_LOCAL_STORAGE_PATH` (mirrors the legacy
  * `StorageService.getLocalStoragePath` pattern).
  */
 function mintStorageUri({
