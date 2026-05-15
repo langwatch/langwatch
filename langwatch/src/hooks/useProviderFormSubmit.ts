@@ -257,17 +257,10 @@ export function useProviderFormSubmit({
         scopeId,
       });
 
-      // Update project default models if useAsDefaultProvider is enabled
-      if (useAsDefaultProvider && projectId) {
-        await updateProjectDefaultModelsMutation.mutateAsync({
-          projectId,
-          defaultModel: projectDefaultModel ?? undefined,
-          topicClusteringModel: projectTopicClusteringModel ?? undefined,
-          embeddingsModel: projectEmbeddingsModel ?? undefined,
-        });
-
-        void utils.organization.getAll.invalidate();
-      }
+      // Project default models are no longer written from the provider
+      // drawer — the redesigned DefaultModelsSection on the model-providers
+      // settings page owns hierarchical default-model writes per scope.
+      // See specs/model-providers/hierarchical-default-models.feature.
 
       toaster.create({
         title: "Model Provider Updated",

@@ -109,6 +109,83 @@ describe("modelProviderHelpers", () => {
       expect(result.topicClusteringModel).toBe(DEFAULT_TOPIC_CLUSTERING_MODEL);
       expect(result.embeddingsModel).toBe(DEFAULT_EMBEDDINGS_MODEL);
     });
+
+    /** @scenario Setting an org-level default applies to every project in that organization */
+    it("inherits the org-level default when project and team are empty", () => {
+      const result = getEffectiveDefaults(
+        { defaultModel: null, topicClusteringModel: null, embeddingsModel: null },
+        { defaultModel: null, topicClusteringModel: null, embeddingsModel: null },
+        { defaultModel: "openai/gpt-5.5", topicClusteringModel: null, embeddingsModel: null },
+      );
+
+      expect(result.defaultModel).toBe("openai/gpt-5.5");
+      // Other fields still fall through to constants when the org leaves them empty.
+      expect(result.topicClusteringModel).toBe(DEFAULT_TOPIC_CLUSTERING_MODEL);
+    });
+
+    /** @scenario Project-level default overrides the org default for that project only */
+    it("project value beats team and org for that field", () => {
+      const result = getEffectiveDefaults(
+        { defaultModel: "anthropic/claude-sonnet-4-6" },
+        { defaultModel: "openai/gpt-4o" },
+        { defaultModel: "openai/gpt-5.5" },
+      );
+
+      expect(result.defaultModel).toBe("anthropic/claude-sonnet-4-6");
+    });
+
+    /** @scenario Team default sits between org and project in the resolution order */
+    it("team value beats org when the project is empty", () => {
+      const result = getEffectiveDefaults(
+        { defaultModel: null },
+        { defaultModel: "openai/gpt-4o" },
+        { defaultModel: "openai/gpt-5.5" },
+      );
+
+      expect(result.defaultModel).toBe("openai/gpt-4o");
+    });
+
+    /** @scenario Clearing a scope falls back to the next level up */
+    it("clearing project falls back to the team value", () => {
+      const result = getEffectiveDefaults(
+        { defaultModel: null }, // user cleared the project override
+        { defaultModel: "openai/gpt-4o" },
+        { defaultModel: "openai/gpt-5.5" },
+      );
+
+      expect(result.defaultModel).toBe("openai/gpt-4o");
+    });
+
+    it("resolves each field independently across scopes", () => {
+      const result = getEffectiveDefaults(
+        { defaultModel: "anthropic/claude-sonnet-4-6", embeddingsModel: null },
+        { defaultModel: null, embeddingsModel: "openai/text-embedding-3-large" },
+        { defaultModel: null, embeddingsModel: null },
+      );
+
+      expect(result.defaultModel).toBe("anthropic/claude-sonnet-4-6");
+      expect(result.embeddingsModel).toBe("openai/text-embedding-3-large");
+    });
+  });
+
+  describe("getEffectiveDefaultsWithSource()", () => {
+    /** @scenario The page shows the effective default and where it comes from */
+    it("reports the source scope for each effective default", async () => {
+      const { getEffectiveDefaultsWithSource } = await import(
+        "../modelProviderHelpers"
+      );
+
+      const result = getEffectiveDefaultsWithSource(
+        { defaultModel: null, embeddingsModel: null },
+        { defaultModel: "openai/gpt-4o", embeddingsModel: null },
+        { defaultModel: "openai/gpt-5.5", embeddingsModel: null },
+      );
+
+      expect(result.defaultModel.value).toBe("openai/gpt-4o");
+      expect(result.defaultModel.source).toBe("team");
+      // Embeddings falls all the way through to the constant.
+      expect(result.embeddingsModel.source).toBe("constant");
+    });
   });
 
   describe("isProviderDefaultModel()", () => {

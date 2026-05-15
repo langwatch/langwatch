@@ -13,6 +13,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { BrainCircuit, Edit, MoreVertical, Plus, Trash2 } from "lucide-react";
+import { DefaultModelsSection } from "../../components/settings/DefaultModelsSection";
 import { ProviderScopeChips } from "../../components/settings/ProviderScopeChips";
 import { useEffect, useMemo, useState } from "react";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
@@ -38,6 +39,10 @@ import {
   DEFAULT_TOPIC_CLUSTERING_MODEL,
 } from "../../utils/constants";
 import {
+  filterProvidersByScope,
+  type ScopeFilter,
+} from "../../utils/filterProvidersByScope";
+import {
   isProviderEffectiveDefault,
   isProviderUsedForDefaultModels,
   shouldAutoEnableAsDefault,
@@ -60,10 +65,21 @@ export default function ModelsPage() {
     name: string;
   } | null>(null);
 
-  const enabledProviders = useMemo(() => {
+  const [scopeFilter, setScopeFilter] = useState<ScopeFilter>("all");
+
+  const allEnabledProviders = useMemo(() => {
     if (!providers) return [];
     return Object.values(providers).filter((provider) => provider.enabled);
   }, [providers]);
+
+  // Client-side filter for the scope dropdown at the top of the page.
+  // The list query returns every provider the caller can see; this just
+  // narrows the visible rows. See specs/model-providers/scope-filter.feature.
+  const enabledProviders = useMemo(
+    () =>
+      filterProvidersByScope(allEnabledProviders, scopeFilter, project?.id),
+    [allEnabledProviders, scopeFilter, project?.id],
+  );
 
   // Every registry provider is always addable — iter 109 allows multiple
   // rows per provider type so users can configure "OpenAI" at org scope
@@ -115,6 +131,41 @@ export default function ModelsPage() {
         <HStack width="full" marginTop={2}>
           <Heading as="h2">Model Providers</Heading>
           <Spacer />
+          {/* Scope filter — providers always live across org/team/project;
+              this just narrows the visible rows. See
+              specs/model-providers/scope-filter.feature. */}
+          <Menu.Root>
+            <Menu.Trigger asChild>
+              <Button
+                size="sm"
+                variant="outline"
+                data-testid="scope-filter-trigger"
+              >
+                {scopeFilter === "all"
+                  ? "All you can see"
+                  : scopeFilter === "organization"
+                    ? "Organization"
+                    : "This project"}
+              </Button>
+            </Menu.Trigger>
+            <Menu.Content>
+              <Menu.Item value="all" onClick={() => setScopeFilter("all")}>
+                All you can see
+              </Menu.Item>
+              <Menu.Item
+                value="organization"
+                onClick={() => setScopeFilter("organization")}
+              >
+                Organization
+              </Menu.Item>
+              <Menu.Item
+                value="project"
+                onClick={() => setScopeFilter("project")}
+              >
+                This project
+              </Menu.Item>
+            </Menu.Content>
+          </Menu.Root>
           {/*
             iter 109 #63: ProjectSelector is gone — Model Providers is now
             an org-level surface. Scope is set per-row via the drawer's
@@ -290,6 +341,12 @@ export default function ModelsPage() {
             </Card.Body>
           </Card.Root>
         )}
+
+        {/* Hierarchical default models — section moved out of the
+            provider drawer. Resolves project → team → organization →
+            built-in constant. See specs/model-providers/
+            hierarchical-default-models.feature. */}
+        <DefaultModelsSection />
 
         <Dialog.Root
           open={!!providerToDisable}

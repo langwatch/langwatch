@@ -19,7 +19,9 @@ import { parseZodFieldErrors, type ZodErrorStructure } from "../../utils/zod";
 import { Switch } from "../ui/switch";
 import { CredentialsSection } from "./ModelProviderCredentialsSection";
 import { CustomModelInputSection } from "./ModelProviderCustomModelInput";
-import { DefaultProviderSection } from "./ModelProviderDefaultSection";
+// DefaultProviderSection has been moved out of this drawer to a page-level
+// section on the model-providers settings page (DefaultModelsSection). See
+// specs/model-providers/hierarchical-default-models.feature.
 import { ExtraHeadersSection } from "./ModelProviderExtraHeadersSection";
 import { ProviderScopeSection } from "./ModelProviderScopeSection";
 
@@ -289,22 +291,11 @@ export const EditModelProviderForm = ({
         />
 
         {isLlmProvider && (
-          <>
-            <CustomModelInputSection
-              state={state}
-              actions={actions}
-              provider={provider}
-            />
-
-            <DefaultProviderSection
-              state={state}
-              actions={actions}
-              provider={provider}
-              enabledProvidersCount={enabledProvidersCount}
-              project={project}
-              providers={providers}
-            />
-          </>
+          <CustomModelInputSection
+            state={state}
+            actions={actions}
+            provider={provider}
+          />
         )}
 
         <HStack width="full" justify="end">

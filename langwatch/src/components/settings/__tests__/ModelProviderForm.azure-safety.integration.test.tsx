@@ -272,10 +272,13 @@ describe("Feature: Azure Safety model provider form rendering", () => {
         expect(screen.getByText("Custom Models")).toBeTruthy();
       });
 
-      it("renders the Default Provider toggle", () => {
+      /** @scenario Default models live in a section below the providers list, not in the drawer */
+      it("no longer renders the Default Provider toggle in the drawer", () => {
+        // Defaults moved to the page-level DefaultModelsSection (see
+        // specs/model-providers/hierarchical-default-models.feature).
         expect(
-          screen.getByText(/use openai as the default for langwatch/i),
-        ).toBeTruthy();
+          screen.queryByText(/use openai as the default for langwatch/i),
+        ).toBeNull();
       });
 
       it("does not render the Use API Gateway toggle", () => {
