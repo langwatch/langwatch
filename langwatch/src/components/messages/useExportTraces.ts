@@ -245,6 +245,17 @@ export function useExportTraces({
           }
 
           const blob = await response.blob();
+
+          if (blob.size === 0) {
+            toaster.create({
+              title: "Export produced no data",
+              description:
+                "No traces matched the current filters. Try adjusting the time range or search query.",
+              type: "warning",
+            });
+            return false;
+          }
+
           const filename = extractFilename({
             contentDisposition: response.headers.get("Content-Disposition"),
             fallbackName: fallbackFilename,
