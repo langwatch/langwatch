@@ -247,11 +247,15 @@ export function useExportTraces({
           const blob = await response.blob();
 
           if (blob.size === 0) {
+            const isNoMatches = totalTraces === 0;
             toaster.create({
-              title: "Export produced no data",
-              description:
-                "No traces matched the current filters. Try adjusting the time range or search query.",
-              type: "warning",
+              title: isNoMatches
+                ? "Export produced no data"
+                : "Export failed",
+              description: isNoMatches
+                ? "No traces matched the current filters. Try adjusting the time range or search query."
+                : "The server returned an empty response. Please try again.",
+              type: isNoMatches ? "warning" : "error",
             });
             return false;
           }

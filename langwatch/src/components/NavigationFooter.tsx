@@ -135,7 +135,7 @@ export const useMessagesNavigationFooter = () => {
         // Push the current scrollId onto the stack before navigating forward
         // so prevPage can pop it to go back.
         if (urlScrollId) {
-          cursorStackRef.current = [...cursorStackRef.current, urlScrollId];
+          cursorStackRef.current.push(urlScrollId);
         }
         setCursorPageNumber((prev) => prev + 1);
         void router.push(
@@ -176,8 +176,7 @@ export const useMessagesNavigationFooter = () => {
       const stack = cursorStackRef.current;
       if (stack.length > 0) {
         // Pop the previous cursor and navigate to it
-        const previousScrollId = stack[stack.length - 1]!;
-        cursorStackRef.current = stack.slice(0, -1);
+        const previousScrollId = stack.pop()!;
         setCursorPageNumber((prev) => Math.max(1, prev - 1));
         void router.push(
           {
@@ -320,7 +319,9 @@ export function MessagesNavigationFooter({
 }) {
   if (totalHits === 0 && pageOffset === 0 && !useCursorPagination) return null;
 
-  const isPrevDisabled = !useCursorPagination && pageOffset === 0;
+  const isPrevDisabled = useCursorPagination
+    ? cursorPageNumber <= 1
+    : pageOffset === 0;
   const isNextDisabled = useCursorPagination
     ? !scrollId
     : pageOffset + pageSize >= totalHits;
@@ -363,12 +364,8 @@ export function MessagesNavigationFooter({
             padding={0}
             onClick={prevPage}
             disabled={isPrevDisabled}
-            aria-label={
-              useCursorPagination ? "Go to first page" : "Go to previous page"
-            }
-            title={
-              useCursorPagination ? "Go to first page" : "Go to previous page"
-            }
+            aria-label="Go to previous page"
+            title="Go to previous page"
           >
             <ChevronLeft />
           </Button>

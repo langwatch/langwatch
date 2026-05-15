@@ -78,11 +78,16 @@ describe("useMessagesNavigationFooter()", () => {
           result.current.prevPage();
         });
 
-        // BUG: prevPage currently always resets to page 1 (pageOffset: 0, scrollId: null).
-        // It should go back to the previous page, not jump to page 1.
-        // The cursorPageNumber should decrement, not reset to 1.
-        expect(result.current.cursorPageNumber).not.toBe(1);
         expect(result.current.cursorPageNumber).toBe(2);
+
+        // Verify prevPage navigated to the correct previous cursor (cursor1)
+        expect(mockPush).toHaveBeenCalledWith(
+          expect.objectContaining({
+            query: expect.objectContaining({ scrollId: cursor1 }),
+          }),
+          undefined,
+          expect.any(Object),
+        );
       });
     });
 
