@@ -9,7 +9,7 @@
  * in the tRPC layer.
  */
 
-import type { PrismaClient } from "@prisma/client";
+import { Prisma, type PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import {
   getEffectiveDefaultsWithSource,
@@ -72,8 +72,32 @@ export class DefaultModelsService {
       return current ?? {};
     }
 
-    if (scopeType === "ORGANIZATION") {
-      const row = await this.prisma.organization.update({
+    try {
+      if (scopeType === "ORGANIZATION") {
+        const row = await this.prisma.organization.update({
+          where: { id: scopeId },
+          data,
+          select: {
+            defaultModel: true,
+            topicClusteringModel: true,
+            embeddingsModel: true,
+          },
+        });
+        return row;
+      }
+      if (scopeType === "TEAM") {
+        const row = await this.prisma.team.update({
+          where: { id: scopeId },
+          data,
+          select: {
+            defaultModel: true,
+            topicClusteringModel: true,
+            embeddingsModel: true,
+          },
+        });
+        return row;
+      }
+      const row = await this.prisma.project.update({
         where: { id: scopeId },
         data,
         select: {
@@ -83,29 +107,21 @@ export class DefaultModelsService {
         },
       });
       return row;
+    } catch (err) {
+      // Surface a friendly NOT_FOUND when the caller targets a scope id
+      // that no longer exists, instead of leaking Prisma's internal P2025
+      // error to the tRPC client.
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === "P2025"
+      ) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: `${scopeType.toLowerCase()} not found`,
+        });
+      }
+      throw err;
     }
-    if (scopeType === "TEAM") {
-      const row = await this.prisma.team.update({
-        where: { id: scopeId },
-        data,
-        select: {
-          defaultModel: true,
-          topicClusteringModel: true,
-          embeddingsModel: true,
-        },
-      });
-      return row;
-    }
-    const row = await this.prisma.project.update({
-      where: { id: scopeId },
-      data,
-      select: {
-        defaultModel: true,
-        topicClusteringModel: true,
-        embeddingsModel: true,
-      },
-    });
-    return row;
   }
 
   /**

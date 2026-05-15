@@ -16,6 +16,7 @@ import {
   buildCustomKeyState,
   getDisplayKeysForProvider,
   getEffectiveDefaults,
+  getEffectiveDefaultsWithSource,
   getProviderFromModel,
   getSchemaShape,
   hasUserEnteredNewApiKey,
@@ -170,11 +171,7 @@ describe("modelProviderHelpers", () => {
 
   describe("getEffectiveDefaultsWithSource()", () => {
     /** @scenario The page shows the effective default and where it comes from */
-    it("reports the source scope for each effective default", async () => {
-      const { getEffectiveDefaultsWithSource } = await import(
-        "../modelProviderHelpers"
-      );
-
+    it("reports the source scope for each effective default", () => {
       const result = getEffectiveDefaultsWithSource(
         { defaultModel: null, embeddingsModel: null },
         { defaultModel: "openai/gpt-4o", embeddingsModel: null },

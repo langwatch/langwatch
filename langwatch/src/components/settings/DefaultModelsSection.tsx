@@ -206,7 +206,13 @@ export function DefaultModelsSection() {
                     {SCOPE_LABEL[scope]}
                   </Heading>
                   {!writable && (
-                    <Tooltip content={`Requires ${scope}:manage permission`}>
+                    <Tooltip
+                      content={
+                        scope === "project"
+                          ? "Requires project:update permission"
+                          : `Requires ${scope}:manage permission`
+                      }
+                    >
                       <Badge colorPalette="gray" variant="subtle">
                         read-only
                       </Badge>

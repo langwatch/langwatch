@@ -175,4 +175,51 @@ describe("DefaultModelsService Integration", () => {
       expect(resolved.effective.defaultModel.source).toBe("team");
     });
   });
+
+  describe("when different fields come from different scopes", () => {
+    it("resolves each of defaultModel / topicClusteringModel / embeddingsModel independently", async () => {
+      // Org sets all three. Team overrides only topicClusteringModel.
+      // Project overrides only embeddingsModel. The effective values
+      // should land on the lowest scope that actually carries each one.
+      await service.setForScope({
+        scopeType: "ORGANIZATION",
+        scopeId: organizationId,
+        values: {
+          defaultModel: "openai/gpt-5.5",
+          topicClusteringModel: "openai/gpt-4o",
+          embeddingsModel: "openai/text-embedding-3-large",
+        },
+      });
+      await service.setForScope({
+        scopeType: "TEAM",
+        scopeId: teamId,
+        values: {
+          defaultModel: null,
+          topicClusteringModel: "anthropic/claude-sonnet-4-6",
+          embeddingsModel: null,
+        },
+      });
+      await service.setForScope({
+        scopeType: "PROJECT",
+        scopeId: projectId,
+        values: {
+          defaultModel: null,
+          topicClusteringModel: null,
+          embeddingsModel: "openai/text-embedding-3-small",
+        },
+      });
+
+      const resolved = await service.getForProject(projectId);
+      expect(resolved.effective.defaultModel.value).toBe("openai/gpt-5.5");
+      expect(resolved.effective.defaultModel.source).toBe("organization");
+      expect(resolved.effective.topicClusteringModel.value).toBe(
+        "anthropic/claude-sonnet-4-6",
+      );
+      expect(resolved.effective.topicClusteringModel.source).toBe("team");
+      expect(resolved.effective.embeddingsModel.value).toBe(
+        "openai/text-embedding-3-small",
+      );
+      expect(resolved.effective.embeddingsModel.source).toBe("project");
+    });
+  });
 });

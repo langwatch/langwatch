@@ -12,7 +12,7 @@ Feature: Hierarchical default models across organization, team, and project
   Background:
     Given I am logged in
     And I have access to an organization with at least one team and project
-    And I have "project:manage" permission on the project
+    And I have "project:update" permission on the project
     And I have at least one enabled model provider
 
   # ============================================================================
@@ -34,7 +34,7 @@ Feature: Hierarchical default models across organization, team, and project
     Given no team or project default model is set
     When I set the organization's default model to "openai/gpt-5.5"
     Then every project in that organization resolves "openai/gpt-5.5" as its default model
-    And a project-level override is shown as "inherited from organization"
+    And the project-level effective default is labelled "inherited from organization"
 
   @integration
   Scenario: Project-level default overrides the org default for that project only
