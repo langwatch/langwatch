@@ -250,6 +250,22 @@ func emit(ctx context.Context, out chan<- StreamEvent, ev StreamEvent) {
 // schema regardless of which engine produced the event.
 func stateEvent(traceID, nodeID string, ns *NodeState) StreamEvent {
 	es := map[string]any{"status": ns.Status}
+	// trace_id MUST live inside execution_state, not only on the outer
+	// envelope. Python's start_component_event / end_component_event /
+	// component_error_event all stamp ExecutionState.trace_id
+	// (langwatch_nlp/studio/types/events.py:216,250,269). The Studio TS
+	// parser for `component_state_change` reads the per-row trace id
+	// exclusively from execution_state.trace_id (resultMapper.ts:306) —
+	// the envelope `trace_id` is consumed only by `execution_state_change`
+	// / `evaluation_state_change`, not this event type. Omitting it here
+	// is why eval-v3's TargetCell rendered no "View trace" link: the
+	// orchestrator generated the id and sent it *into* nlpgo, but nlpgo
+	// never echoed it back into the state the cell reads (rchaves dogfood
+	// 2026-05-15). Guard on non-empty so curl/test payloads without a
+	// trace id don't inject an empty string the UI would treat as set.
+	if traceID != "" {
+		es["trace_id"] = traceID
+	}
 	if ns.Inputs != nil {
 		es["inputs"] = ns.Inputs
 	}
