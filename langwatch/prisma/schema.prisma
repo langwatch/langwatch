@@ -719,13 +719,22 @@ model ModelProvider {
 // Writing an entry requires the caller to hold the matching manage-
 // permission on that entity (organization:manage, team:manage,
 // project:manage). Reads filter by the caller's membership set.
+// scopeType uses its own Postgres enum following the per-table
+// convention (RoleBindingScopeType / GatewayBudgetScopeType / etc).
+// See dev/docs/best_practices/scoped-resources.md.
+enum ModelProviderScopeType {
+    ORGANIZATION
+    TEAM
+    PROJECT
+}
+
 model ModelProviderScope {
-    id              String   @id @default(nanoid())
+    id              String                 @id @default(nanoid())
     modelProviderId String
-    modelProvider   ModelProvider @relation(fields: [modelProviderId], references: [id], onDelete: Cascade)
-    scopeType       String
+    modelProvider   ModelProvider          @relation(fields: [modelProviderId], references: [id], onDelete: Cascade)
+    scopeType       ModelProviderScopeType
     scopeId         String
-    createdAt       DateTime @default(now())
+    createdAt       DateTime               @default(now())
 
     @@unique([modelProviderId, scopeType, scopeId])
     @@index([scopeType, scopeId])
@@ -741,16 +750,24 @@ model ModelProviderScope {
 // since Postgres treats NULLs as distinct in a single composite unique.
 // They live in the migration alongside the table itself — Prisma can't
 // express partial indexes in schema.prisma.
+// scopeType uses its own Postgres enum — same per-table convention as
+// ModelProviderScopeType. See dev/docs/best_practices/scoped-resources.md.
+enum ModelDefaultScopeType {
+    ORGANIZATION
+    TEAM
+    PROJECT
+}
+
 model ModelDefault {
-    id         String   @id @default(nanoid())
-    scopeType  String
+    id         String                @id @default(nanoid())
+    scopeType  ModelDefaultScopeType
     scopeId    String
     role       String
     featureKey String?
     model      String
     authorId   String?
-    createdAt  DateTime @default(now())
-    updatedAt  DateTime @updatedAt
+    createdAt  DateTime              @default(now())
+    updatedAt  DateTime              @updatedAt
 
     @@index([scopeType, scopeId, role])
 }

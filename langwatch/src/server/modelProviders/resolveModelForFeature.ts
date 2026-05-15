@@ -128,7 +128,7 @@ async function loadDefaultsForChain(
   role: ModelRole,
   featureKey: string,
 ): Promise<ModelDefaultRow[]> {
-  const scopes: { scopeType: string; scopeId: string }[] = [
+  const scopes: { scopeType: "PROJECT" | "TEAM" | "ORGANIZATION"; scopeId: string }[] = [
     { scopeType: "PROJECT", scopeId: chain.projectId },
   ];
   if (chain.teamId) {

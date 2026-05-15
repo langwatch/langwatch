@@ -16,10 +16,18 @@
 -- would NOT prevent two role-level rows for the same (scope, role).
 -- Two partial unique indexes give the semantics we want without a
 -- single index that conflates "no override" with "override=empty".
+--
+-- Scope-type column uses its own Postgres enum (per-table convention,
+-- mirroring RoleBindingScopeType + GatewayBudgetScopeType — see
+-- dev/docs/best_practices/scoped-resources.md). Keeps invalid values
+-- out at the storage layer instead of relying on application code to
+-- guard the column.
+
+CREATE TYPE "ModelDefaultScopeType" AS ENUM ('ORGANIZATION', 'TEAM', 'PROJECT');
 
 CREATE TABLE "ModelDefault" (
     "id"         TEXT NOT NULL,
-    "scopeType"  TEXT NOT NULL,
+    "scopeType"  "ModelDefaultScopeType" NOT NULL,
     "scopeId"    TEXT NOT NULL,
     "role"       TEXT NOT NULL,
     "featureKey" TEXT,
