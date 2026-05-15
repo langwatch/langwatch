@@ -1,0 +1,205 @@
+---
+title: "API Keys"
+description: "Create and manage API keys in LangWatch. Use personal keys for development and AI assistants, or service keys for CI/CD and automation."
+sidebarTitle: API Keys
+keywords: api keys, authentication, personal keys, service keys, langwatch, security, mcp, ci/cd
+---
+
+LangWatch uses API keys to authenticate SDK calls, MCP connections, and API requests. All keys are managed from a single place: **Settings → API Keys**.
+
+<Frame>
+  <img src="/images/platform/api-keys-settings.png" alt="LangWatch API Keys settings page" />
+</Frame>
+
+## Key Types
+
+| | Personal Key | Service Key |
+|---|---|---|
+| **Tied to** | A specific user | No user (org-level) |
+| **Best for** | Local development, AI assistants (MCP), personal workflows | CI/CD pipelines, automation, service-to-service |
+| **Permissions** | Inherits your RBAC permissions (ceiling model) | Scoped to specific projects with ADMIN access |
+| **Survives user removal** | No — disabled when user leaves the org | Yes — independent of any user |
+| **Requires `LANGWATCH_PROJECT_ID`** | Yes | Yes |
+
+<Info>
+  **Legacy project keys** (the `LANGWATCH_API_KEY` shown on the project setup page) still work and will continue to be supported. They have the project context built in, so they don't require `LANGWATCH_PROJECT_ID`. New users should prefer creating keys from **Settings → API Keys** for better security and access control.
+</Info>
+
+## Creating a Personal API Key
+
+Personal keys are ideal for local development, connecting your AI coding assistant via MCP, or any workflow where you want the key tied to your identity.
+
+<Steps>
+  <Step title="Go to Settings → API Keys">
+    Navigate to [Settings → API Keys](https://app.langwatch.ai/settings/api-keys) in your LangWatch dashboard.
+  </Step>
+
+  <Step title="Click Create API Key">
+    Click the **Create API Key** button in the top right.
+  </Step>
+
+  <Step title="Configure the key">
+    - **Type**: Select **Personal**
+    - **Name**: Give it a descriptive name (e.g., "My MCP key", "Local dev")
+    - **Expiration**: Optionally set an expiration date
+    - **Permissions**: Choose a permission mode:
+      - **All** — inherits your full permissions
+      - **Read-only** — view-only access across all projects
+      - **Restricted** — manually select which projects and roles
+  </Step>
+
+  <Step title="Copy your key">
+    After creation, your key is shown **once**. Copy it and store it securely — you won't be able to see the full key again.
+
+    The key format is: `sk-lw-<id>_<secret>`
+  </Step>
+</Steps>
+
+### Using a Personal Key
+
+Set both `LANGWATCH_API_KEY` and `LANGWATCH_PROJECT_ID` in your environment:
+
+```bash .env
+LANGWATCH_API_KEY="sk-lw-..."
+LANGWATCH_PROJECT_ID="your-project-id"
+```
+
+You can find your project ID in **Settings → Projects** or in the project URL.
+
+## Creating a Service API Key
+
+Service keys are designed for automated systems — CI/CD pipelines, production services, and multi-project setups. They aren't tied to any user, so they keep working even if team members leave.
+
+<Note>
+  Only organization **admins** can create service keys.
+</Note>
+
+<Steps>
+  <Step title="Go to Settings → API Keys">
+    Navigate to [Settings → API Keys](https://app.langwatch.ai/settings/api-keys) in your LangWatch dashboard.
+  </Step>
+
+  <Step title="Click Create API Key">
+    Click the **Create API Key** button in the top right.
+  </Step>
+
+  <Step title="Configure the key">
+    - **Type**: Select **Service**
+    - **Name**: Give it a descriptive name (e.g., "CI pipeline", "Production tracing")
+    - **Projects**: Select which projects this key can access
+    - **Expiration**: Optionally set an expiration date
+
+    <Warning>
+      A service key without specific projects gets **org-wide ADMIN access**. Always scope to specific projects when possible.
+    </Warning>
+  </Step>
+
+  <Step title="Copy your key">
+    After creation, your key is shown **once**. Copy it and store it securely.
+  </Step>
+</Steps>
+
+### Using a Service Key
+
+Service keys require `LANGWATCH_PROJECT_ID` so the SDK knows which project to send traces to:
+
+<Tabs>
+<Tab title="Environment variables">
+```bash .env
+LANGWATCH_API_KEY="sk-lw-..."
+LANGWATCH_PROJECT_ID="your-project-id"
+```
+</Tab>
+<Tab title="Python">
+```python
+import langwatch
+
+langwatch.setup(
+    api_key="sk-lw-...",
+    project_id="your-project-id",
+)
+```
+</Tab>
+<Tab title="TypeScript">
+```typescript
+import { LangWatch } from 'langwatch';
+
+const langwatch = new LangWatch({
+  apiKey: 'sk-lw-...',
+  projectId: 'your-project-id',
+});
+```
+</Tab>
+</Tabs>
+
+## Connecting to AI Assistants (MCP)
+
+Personal API keys work with the [LangWatch MCP Server](/integration/mcp) to give your AI coding assistant access to LangWatch features — tracing, analytics, prompt management, and more.
+
+<Steps>
+  <Step title="Create a personal API key">
+    Follow the [steps above](#creating-a-personal-api-key) to create a personal key.
+  </Step>
+
+  <Step title="Add the MCP server to your editor">
+
+<Tabs>
+<Tab title="Claude Code">
+```bash
+claude mcp add langwatch -- npx -y @langwatch/mcp-server --apiKey sk-lw-...
+```
+</Tab>
+<Tab title="Cursor / VS Code">
+```json
+{
+  "mcpServers": {
+    "langwatch": {
+      "command": "npx",
+      "args": ["-y", "@langwatch/mcp-server"],
+      "env": {
+        "LANGWATCH_API_KEY": "sk-lw-..."
+      }
+    }
+  }
+}
+```
+</Tab>
+</Tabs>
+
+See the [full MCP setup guide](/integration/mcp) for all supported editors.
+  </Step>
+
+  <Step title="Ask your assistant to instrument your code">
+    ```plaintext
+    "Instrument my codebase with LangWatch"
+    ```
+  </Step>
+</Steps>
+
+## Permissions Model
+
+API key permissions follow a **ceiling model**: the effective permissions of a key are the intersection of the key's own bindings and the creating user's current role.
+
+- If you have **ADMIN** access and create a key with **All** permissions, the key gets ADMIN
+- If you have **MEMBER** access and create a key with **All** permissions, the key gets MEMBER (not ADMIN)
+- **Restricted** keys let you manually narrow access to specific projects and roles
+
+Service keys bypass the user ceiling since they have no associated user — their permissions come directly from their project bindings.
+
+For more on roles and permissions, see [Access Control (RBAC)](/platform/rbac).
+
+## Managing Keys
+
+From the **Settings → API Keys** page you can:
+
+- **View all keys** — see name, status, creation date, last used, and creator
+- **Revoke a key** — immediately disables the key (soft delete, can't be undone)
+- **Edit permissions** — update the permission mode or project bindings
+
+<Tip>
+  Rotate keys regularly and revoke any that are no longer in use. Set expiration dates on keys used for temporary workflows.
+</Tip>
+
+## Programmatic Key Management
+
+You can also create and manage API keys via the REST API. See the [API Keys API Reference](/api-reference/api-keys/overview) for endpoints and examples.

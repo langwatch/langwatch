@@ -209,6 +209,7 @@
               {
                 "group": "Administration",
                 "pages": [
+                  "platform/api-keys",
                   "platform/rbac",
                   "platform/audit-log",
                   "platform/scim",
