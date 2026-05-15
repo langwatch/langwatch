@@ -19,6 +19,7 @@ describe("<MediaPart/>", () => {
   afterEach(cleanup);
 
   describe("when a message has a url-shape audio part", () => {
+    /** @scenario "Trace timeline renders the new file id shape as an inline media tag" */
     it("renders an <audio> element pointing at the URL", () => {
       render(
         <MediaPart
@@ -86,6 +87,7 @@ describe("<MediaPart/>", () => {
   });
 
   describe("when a message has an inline-data audio part (legacy)", () => {
+    /** @scenario "Trace timeline still renders legacy inline base64 file shapes unchanged" */
     it("renders an <audio> element with a data: URI", () => {
       const base64 = Buffer.from("fake-audio-bytes").toString("base64");
 
@@ -146,6 +148,7 @@ describe("<MediaPart/>", () => {
       vi.restoreAllMocks();
     });
 
+    /** @scenario "Trace timeline shows a missing badge when the byte content is no longer retrievable" */
     it("renders a missing-badge placeholder labeled with the mediaType", async () => {
       render(
         <MediaPart

@@ -195,6 +195,7 @@ describe("storeFromBytes", () => {
   });
 
   describe("when called from two pods concurrently with identical input", () => {
+    /** @scenario "Stored object id is deterministic so concurrent ingest of the same content collapses cleanly" */
     it("both compute the same id from project_id and sha256", () => {
       // The id is derived purely from (projectId, sha256) — no randomness.
       // Simulating two concurrent pods means calling deriveStoredObjectId
@@ -314,6 +315,7 @@ describe("resolveOwnerProject", () => {
 });
 
 describe("StoredObjectsService surface", () => {
+  /** @scenario "StoredObjectsService exposes storeFromBytes, getById, cascadeDeleteProject, cascadeDeleteOwner" */
   it("exposes storeFromBytes, getById, resolveOwnerProject, cascadeDeleteProject, cascadeDeleteOwner", () => {
     const service = new StoredObjectsService(makeRepository(), makeRegistry());
 

@@ -179,6 +179,7 @@ describe("GET /api/files/:id", () => {
   });
 
   describe("when the row exists and storage has the bytes (case 5)", () => {
+    /** @scenario "GET /api/files/:id streams the bytes for an existing row" */
     it("streams the bytes with correct Content-Type and 200 status", async () => {
       const fileId = `stored-${nanoid(8)}`;
       const content = "hello-world-bytes";
@@ -211,6 +212,7 @@ describe("GET /api/files/:id", () => {
   });
 
   describe("when the row exists but storage no longer holds the blob (case 6 — missing)", () => {
+    /** @scenario "GET /api/files/:id returns 404 with status missing when storage no longer holds the blob" */
     it("returns 404 with body { status: 'missing' }", async () => {
       const fileId = `stored-${nanoid(8)}`;
       const row = makeStoredObjectRow({ id: fileId, project_id: projectAId });
@@ -247,6 +249,7 @@ describe("GET /api/files/:id", () => {
   });
 
   describe("when the caller is authenticated for a different project than the file owner (403)", () => {
+    /** @scenario "GET /api/files/:id enforces project ownership through the shared permission check" */
     it("returns 403 forbidden without streaming any bytes", async () => {
       const fileId = `stored-${nanoid(8)}`;
 
@@ -264,6 +267,7 @@ describe("GET /api/files/:id", () => {
   });
 
   describe("when storage returns a transient non-404 error", () => {
+    /** @scenario "GET /api/files/:id returns 502 with a friendly message on transient storage failure" */
     it("returns 502 with a friendly message", async () => {
       const fileId = `stored-${nanoid(8)}`;
 

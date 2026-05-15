@@ -253,6 +253,7 @@ describe("POST /api/scenario-events (ingest)", () => {
   });
 
   describe("when the storage driver rejects the PUT with an error (case 4 — 5xx, no partial state)", () => {
+    /** @scenario "Storage put failure aborts the entire event with a 5xx and no partial state" */
     it("returns a 5xx and does not partially persist any data", async () => {
       // Arrange: storage PUT will throw
       mockStoreFromBytes.mockRejectedValueOnce(new Error("storage unavailable"));

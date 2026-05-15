@@ -100,6 +100,7 @@ describe("S3Driver", () => {
   // -------------------------------------------------------------------------
 
   describe("when put is called", () => {
+    /** @scenario "S3 driver handles s3 URIs through the configured S3 client" */
     it("sends a PutObjectCommand with the URI's bucket and key, the bytes, and the media type", async () => {
       s3Client.send.mockResolvedValueOnce({});
       const bytes = Buffer.from("hello world");

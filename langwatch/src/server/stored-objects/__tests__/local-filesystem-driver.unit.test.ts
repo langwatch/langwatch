@@ -54,6 +54,7 @@ afterEach(async () => {
 // ---------------------------------------------------------------------------
 
 describe("when put is called with bytes and a file URI", () => {
+  /** @scenario "Local filesystem driver writes under the configured root using atomic rename" */
   it("writes the bytes to the final path", async () => {
     const uri = mintFileUri({
       root: tmpDir,
@@ -124,6 +125,7 @@ describe("when put writes a temporary file first", () => {
 // ---------------------------------------------------------------------------
 
 describe("Local filesystem driver write is atomic under interruption", () => {
+  /** @scenario "Local filesystem driver write is atomic under interruption" */
   it("converges to a complete file when retried after an interrupted write", async () => {
     const projectId = "proj-interrupted";
     const sha256 = "interruptedsha256";

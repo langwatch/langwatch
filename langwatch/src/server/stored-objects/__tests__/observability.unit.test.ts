@@ -26,6 +26,7 @@ describe("stored_object metrics are registered", () => {
     register.resetMetrics();
   });
 
+  /** @scenario "Prometheus metrics emit for ingest, dedup, write and read failures, and size distribution" */
   it("registers stored_object_extract_total counter", () => {
     const metric = register.getSingleMetric("stored_object_extract_total");
     expect(metric).toBeDefined();

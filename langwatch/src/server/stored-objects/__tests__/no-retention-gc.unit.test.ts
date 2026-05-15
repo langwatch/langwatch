@@ -62,6 +62,7 @@ function findSourceFiles(dir: string): string[] {
 
 describe("AC16 — no automatic retention, GC, or orphan reaping for stored_objects", () => {
   describe("when the background worker directory is scanned for stored_objects references", () => {
+    /** @scenario "No automatic retention, time-based GC, or orphan reaping runs" */
     it("finds no background job that references stored_objects", () => {
       const backgroundDir = path.join(REPO_ROOT, "src/server/background");
       const sourceFiles = findSourceFiles(backgroundDir);

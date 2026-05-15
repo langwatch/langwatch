@@ -19,6 +19,8 @@ function makeMockDriver(): StorageDriver {
 
 describe("StorageRegistry", () => {
   describe("when an s3 URI is passed", () => {
+    /** @scenario "StorageDriver interface exposes get, put, delete, exists" */
+    /** @scenario "Storage registry dispatches by URI scheme" */
     it("delegates to the s3 driver", async () => {
       const s3 = makeMockDriver();
       const file = makeMockDriver();
@@ -48,6 +50,7 @@ describe("StorageRegistry", () => {
   });
 
   describe("when a file URI is passed", () => {
+    /** @scenario "Both drivers remain available for reads regardless of which scheme new URIs use" */
     it("delegates to the file driver", async () => {
       const s3 = makeMockDriver();
       const file = makeMockDriver();

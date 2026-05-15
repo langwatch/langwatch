@@ -8,6 +8,7 @@ import { getUriScheme, mintFileUri, mintS3Uri } from "../uri";
 
 describe("mintS3Uri", () => {
   describe("given a project id and sha256", () => {
+    /** @scenario "Minted URI is content-addressed under projectId and sha256" */
     it("matches s3://<bucket>/<projectId>/<sha256>", () => {
       const uri = mintS3Uri({
         bucket: "my-bucket",
@@ -19,6 +20,7 @@ describe("mintS3Uri", () => {
   });
 
   describe("when called twice with identical inputs", () => {
+    /** @scenario "Same content from the same project yields the same URI" */
     it("returns the identical URI", () => {
       const params = {
         bucket: "my-bucket",

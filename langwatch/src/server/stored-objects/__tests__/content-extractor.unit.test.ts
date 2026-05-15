@@ -125,6 +125,7 @@ describe("extractInlineMediaFromEvent", () => {
   });
 
   describe("when an event has an audio part with source.type=data", () => {
+    /** @scenario "Inline file part is externalized and the event payload is rewritten by id" */
     it("calls storeFromBytes with the decoded bytes and the mimeType, replaces the part with source.type=url referencing /api/files/{id}, and returns one ref", async () => {
       const base64Payload = makeBase64Payload("audio-data");
       const mimeType = "audio/mp3";

@@ -213,6 +213,7 @@ function withTmpStorage(fn: () => Promise<void>): Promise<void> {
 describe("StoredObjectsService (ingest + read path)", () => {
   describe("given a project and some bytes to store", () => {
     describe("when storeFromBytes is called for the first time (ingest case 1)", () => {
+      /** @scenario "Stored objects metadata table exists with the documented shape" */
       it("inserts a row in stored_objects and returns a stable id", async () => {
         await withTmpStorage(async () => {
           const bytes = makeBytes("case-1-payload");
@@ -237,6 +238,7 @@ describe("StoredObjectsService (ingest + read path)", () => {
     });
 
     describe("when the same bytes are stored twice within the same project (dedup case 2)", () => {
+      /** @scenario "Duplicate content within a project reuses the existing stored_objects id" */
       it("returns the same id and does not insert a second row", async () => {
         await withTmpStorage(async () => {
           const bytes = makeBytes("case-2-dedup-same-project");
@@ -288,6 +290,7 @@ describe("StoredObjectsService (ingest + read path)", () => {
     });
 
     describe("when identical bytes are stored for two different projects (dedup-miss across projects case 3)", () => {
+      /** @scenario "Integration suite covers every documented ingest and read shape" */
       it("creates separate rows for each project with different ids", async () => {
         await withTmpStorage(async () => {
           const bytes = makeBytes("cross-project-dedup-miss");
@@ -431,6 +434,7 @@ describe("StoredObjectsService (ingest + read path)", () => {
 
   describe("given a stored object row written during event ingest (cascade contract case 9)", () => {
     describe("when the row is queried directly from ClickHouse", () => {
+      /** @scenario "Stored objects rows are tenant-tagged so a future project-purge can cascade" */
       it("carries the project_id of the ingesting project so a future cascade can filter by it", async () => {
         await withTmpStorage(async () => {
           const bytes = makeBytes("case-9-cascade-contract");

@@ -22,6 +22,7 @@ Feature: Externalize event byte content to stored_objects
     And the table is partitioned by toYYYYMM(created_at)
     And bloom-filter skip indexes exist on sha256 and on purpose
 
+  @unimplemented
   @integration
   Scenario: Stored objects migration is idempotent
     Given the stored_objects migration has already been applied
@@ -124,6 +125,7 @@ Feature: Externalize event byte content to stored_objects
     And no stored_objects row is written
     And no event lands in the ClickHouse event store
 
+  @unimplemented
   @integration
   Scenario: Event POST rejects bodies larger than 50MB with 413 before extraction
     Given a request body exceeding 50MB on /api/scenario-events
@@ -170,6 +172,7 @@ Feature: Externalize event byte content to stored_objects
     Then the response is forbidden
     And no bytes are streamed
 
+  @unimplemented
   @integration
   Scenario: GET /api/files/:id honors the standard per-project rate limit
     Given the caller has reached the per-project rate limit
@@ -229,6 +232,7 @@ Feature: Externalize event byte content to stored_objects
     And it exposes cascadeDeleteOwner
     And it depends on StoredObjectsRepository and the storage registry as interfaces
 
+  @unimplemented
   @unit
   Scenario: Route handlers delegate to the service and never touch the repository directly
     Given the /api/scenario-events handler and the /api/files/:id handler
@@ -240,6 +244,7 @@ Feature: Externalize event byte content to stored_objects
   # Observability (AC18, AC19, AC20)
   # ---------------------------------------------------------------
 
+  @unimplemented
   @integration
   Scenario: OpenTelemetry spans wrap extraction during ingest and reads via /api/files/:id
     Given OpenTelemetry tracing is enabled
@@ -258,6 +263,7 @@ Feature: Externalize event byte content to stored_objects
     And the counter stored_object_read_failures_total increases on storage read failure
     And the histogram stored_object_size_bytes{purpose} observes the byte size
 
+  @unimplemented
   @integration
   Scenario: Ingest logs list every stored_objects id extracted for an event
     Given an event with two inline file parts is ingested
