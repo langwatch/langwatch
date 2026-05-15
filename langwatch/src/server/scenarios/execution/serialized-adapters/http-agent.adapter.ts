@@ -48,6 +48,46 @@ function redactUrlForLogs(url: string): string {
   }
 }
 
+/** Header names (lowercase) whose values must be redacted in logs and errors. */
+const SENSITIVE_HEADERS = new Set(["authorization", "x-api-key"]);
+
+/** Maximum body length to include in error messages before truncating. */
+const ERROR_BODY_LIMIT_CHARS = 2048;
+
+function previewErrorBody(body: string): string {
+  if (body.length <= ERROR_BODY_LIMIT_CHARS) {
+    return body;
+  }
+  return `${body.slice(0, ERROR_BODY_LIMIT_CHARS)}... [truncated]`;
+}
+
+function redactHeaders(
+  headers: Record<string, string>,
+): Record<string, string> {
+  const redacted: Record<string, string> = {};
+  for (const [key, value] of Object.entries(headers)) {
+    redacted[key] = SENSITIVE_HEADERS.has(key.toLowerCase())
+      ? "[REDACTED]"
+      : value;
+  }
+  return redacted;
+}
+
+/**
+ * Pick the upstream request id (first match wins). Different upstreams use
+ * different header conventions — surface whichever the target chose.
+ */
+function pickUpstreamRequestId(
+  headers: { get(name: string): string | null },
+): string | undefined {
+  return (
+    headers.get("x-request-id") ??
+    headers.get("x-amzn-requestid") ??
+    headers.get("x-n8n-execution-id") ??
+    undefined
+  );
+}
+
 /**
  * Serialized HTTP agent adapter that uses pre-fetched configuration.
  * No database access required.
@@ -116,6 +156,7 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
     const method = this.config.method.toUpperCase();
     const startedAt = Date.now();
     const loggedUrl = redactUrlForLogs(url);
+    const redactedHeaders = redactHeaders(headers);
     let response: Awaited<ReturnType<typeof ssrfSafeFetch>>;
     try {
       response = await ssrfSafeFetch(url, {
@@ -134,6 +175,7 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
           errorClass,
           message,
           durationMs: Date.now() - startedAt,
+          headers: redactedHeaders,
         },
         "http call failed",
       );
@@ -147,6 +189,7 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
         typeof response.text === "function"
           ? await response.text().catch(() => "")
           : "";
+      const upstreamRequestId = pickUpstreamRequestId(response.headers);
       this.logger.warn(
         {
           url: loggedUrl,
@@ -154,10 +197,16 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
           statusCode: response.status,
           durationMs,
           responseBodyPreview: previewResponseBody(responseBody),
+          requestId: upstreamRequestId,
+          headers: redactedHeaders,
         },
         "http call failed",
       );
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      throw new Error(
+        `HTTP ${response.status}: ${response.statusText} from ${loggedUrl} (request-id: ${
+          upstreamRequestId ?? "none"
+        }): ${previewErrorBody(responseBody)}`,
+      );
     }
 
     this.logger.info(
@@ -166,6 +215,8 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
         method,
         statusCode: response.status,
         durationMs,
+        requestId: pickUpstreamRequestId(response.headers),
+        headers: redactedHeaders,
       },
       "http call ok",
     );
