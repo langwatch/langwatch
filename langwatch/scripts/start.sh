@@ -58,7 +58,9 @@ if [[ "$NODE_ENV" = "development" ]]; then
   START_VITE_COMMAND="pnpm run dev:vite"
 fi
 
-pnpm run start:prepare:db
+if [ "$SKIP_PREPARE_DB" != "true" ]; then
+  pnpm run start:prepare:db
+fi
 
 COMMANDS=()
 NAMES=()

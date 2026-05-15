@@ -71,9 +71,9 @@ services:
       - db-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U prisma -d mydb"]
-      interval: 10s
+      interval: 3s
       timeout: 5s
-      retries: 5
+      retries: 10
     deploy:
       resources:
         limits:
@@ -97,9 +97,9 @@ services:
       - redis-data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
+      interval: 3s
       timeout: 5s
-      retries: 5
+      retries: 10
     deploy:
       resources:
         limits:
@@ -115,10 +115,10 @@ services:
       - clickhouse-data:/var/lib/clickhouse
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8123/ping || exit 1"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
       retries: 10
-      start_period: 30s
+      start_period: 10s
     deploy:
       resources:
         limits:
@@ -158,10 +158,9 @@ services:
           chmod +x /opt/goose-bin/goose &&
           printf '%s' \"$$GOOSE_MARKER\" > /opt/goose-bin/.goose-meta;
         fi &&
-        (cd /mcp-server && pnpm install --ignore-scripts && pnpm run build) &&
+        (cd /mcp-server && pnpm install --ignore-scripts) &&
         pnpm -w install &&
-        pnpm -w exec prisma generate &&
-        pnpm run types:zod:generate
+        pnpm run start:prepare:files
       "
     environment:
       COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
@@ -189,10 +188,8 @@ services:
       sh -c "
         export PATH=/opt/goose-bin:$$PATH &&
         corepack enable &&
-        pnpm -w exec prisma generate &&
-        pnpm run types:zod:generate &&
         pnpm run start:prepare:db &&
-        pnpm run dev
+        START_WORKERS=true FORCE_COLOR=1 SKIP_PREPARE_DB=true pnpm start 2>&1 | tee server.log
       "
     ports:
       - "${APP_PORT:-5560}:5560"
