@@ -1093,7 +1093,11 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
           paddingY={3}
           position="sticky"
           top={0}
-          zIndex={1}
+          zIndex={2}
+          // Solid background matching the drawer surface so messages
+          // scrolling underneath never show through or over the header.
+          bg="bg"
+          data-testid="prompt-editor-sticky-header"
         >
           <PromptEditorHeader
             onSave={() => void handleSave()}

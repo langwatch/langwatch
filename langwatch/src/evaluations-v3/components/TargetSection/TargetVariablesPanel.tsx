@@ -9,6 +9,7 @@ import {
   VariablesSection,
 } from "~/components/variables";
 import type { Field } from "~/optimization_studio/types/dsl";
+import { useResolveTargetName } from "../../hooks/useResolveTargetName";
 import type { DatasetReference, FieldMapping, TargetConfig } from "../../types";
 import { getUsedFields } from "../../utils/mappingValidation";
 
@@ -44,10 +45,17 @@ type TargetVariablesPanelProps = {
  * Convert the active dataset and targets to AvailableSource format for the VariablesSection.
  * Only the active dataset is included as a source - sources are scoped per-dataset.
  */
-const buildAvailableSources = (
-  activeDataset: DatasetReference | undefined,
-  otherTargets: TargetConfig[],
-): AvailableSource[] => {
+type BuildAvailableSourcesParams = {
+  activeDataset: DatasetReference | undefined;
+  otherTargets: TargetConfig[];
+  resolveTargetName: (target: TargetConfig) => string;
+};
+
+const buildAvailableSources = ({
+  activeDataset,
+  otherTargets,
+  resolveTargetName,
+}: BuildAvailableSourcesParams): AvailableSource[] => {
   const sources: AvailableSource[] = [];
 
   // Add only the active dataset as a source
@@ -69,7 +77,7 @@ const buildAvailableSources = (
     const sourceType = target.type === "prompt" ? "signature" : "code";
     sources.push({
       id: target.id,
-      name: target.id, // Name will be resolved by the panel component
+      name: resolveTargetName(target),
       type: sourceType,
       fields: target.outputs.map((output) => ({
         name: output.identifier,
@@ -177,10 +185,18 @@ export const TargetVariablesPanel = ({
     [datasets, activeDatasetId],
   );
 
+  // Resolve other-target source labels to human-readable names
+  const resolveTargetName = useResolveTargetName();
+
   // Build available sources for mapping (only active dataset)
   const availableSources = useMemo(
-    () => buildAvailableSources(activeDataset, otherTargets),
-    [activeDataset, otherTargets],
+    () =>
+      buildAvailableSources({
+        activeDataset,
+        otherTargets,
+        resolveTargetName,
+      }),
+    [activeDataset, otherTargets, resolveTargetName],
   );
 
   // Convert target inputs to variables

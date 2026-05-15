@@ -439,21 +439,103 @@ describe("TargetHeader alert icon", () => {
 // ============================================================================
 
 describe("Validation edge cases", () => {
-  it("falls back to target.inputs for validation when no localPromptConfig", () => {
-    // When prompt content isn't loaded yet (no localPromptConfig),
-    // we use target.inputs as the source of fields that need mapping.
-    // This ensures the alert icon shows even before the drawer is opened.
+  /** @scenario A declared prompt variable not referenced by any message is not required */
+  it("surfaces declared inputs as advisory (not run-blocking) when no localPromptConfig", () => {
+    // A prompt that follows the latest version with no local edits has no
+    // message content here. A declared variable like the default "input"
+    // may never be referenced by the template, so it must NOT hard-block
+    // the run. It is still surfaced (advisory) so the alert icon shows and
+    // nudges the user to configure the target.
     const target: TargetConfig = {
       ...createTestTarget("r1", [{ identifier: "input", type: "str" }]),
-      localPromptConfig: undefined, // Explicitly no localPromptConfig - prompt not loaded yet
+      localPromptConfig: undefined, // follows latest, prompt not loaded yet
     };
 
     const result = getTargetMissingMappings(target, DEFAULT_TEST_DATA_ID);
 
-    // Should be INVALID because "input" is in target.inputs but has no mapping
-    expect(result.isValid).toBe(false);
+    // Run is NOT blocked: no required mapping is missing.
+    expect(result.isValid).toBe(true);
+    // But the missing mapping is still surfaced as advisory.
     expect(result.missingMappings.length).toBe(1);
     expect(result.missingMappings[0]?.fieldId).toBe("input");
+    expect(result.missingMappings[0]?.isRequired).toBe(false);
+    // The alert icon still shows so the user knows to configure it.
+    expect(targetHasMissingMappings(target, DEFAULT_TEST_DATA_ID)).toBe(true);
+  });
+
+  /** @scenario A declared prompt variable that IS referenced still requires a mapping */
+  it("hard-requires a referenced+declared variable once the prompt is configured", () => {
+    // Prompt is configured (localPromptConfig present) and the user message
+    // references {{product_name}}, which is declared but unmapped.
+    const target: TargetConfig = {
+      id: "r1",
+      type: "prompt",
+      inputs: [{ identifier: "product_name", type: "str" }],
+      outputs: [{ identifier: "output", type: "str" }],
+      mappings: {},
+      localPromptConfig: {
+        llm: { model: "gpt-4" },
+        messages: [
+          { role: "user", content: "Classify {{product_name}}" },
+        ],
+        inputs: [{ identifier: "product_name", type: "str" }],
+        outputs: [{ identifier: "output", type: "str" }],
+      },
+    };
+
+    const result = getTargetMissingMappings(target, DEFAULT_TEST_DATA_ID);
+
+    expect(result.isValid).toBe(false);
+    expect(result.missingMappings.map((m) => m.fieldId)).toContain(
+      "product_name",
+    );
+    expect(
+      result.missingMappings.find((m) => m.fieldId === "product_name")
+        ?.isRequired,
+    ).toBe(true);
+  });
+
+  /** @scenario A declared prompt variable not referenced by any message is not required */
+  it("does not block the run when an explicit user message omits a declared 'input'", () => {
+    // Mirrors the reported bug: explicit user message uses real variables,
+    // but the prompt still carries a default declared "input" it never
+    // references. The experiment must be runnable.
+    const target: TargetConfig = {
+      id: "r1",
+      type: "prompt",
+      inputs: [
+        { identifier: "input", type: "str" },
+        { identifier: "product_name", type: "str" },
+      ],
+      outputs: [{ identifier: "output", type: "str" }],
+      mappings: {},
+      localPromptConfig: {
+        llm: { model: "gpt-4" },
+        messages: [
+          {
+            role: "user",
+            content: "Classify this product: {{product_name}}",
+          },
+        ],
+        inputs: [
+          { identifier: "input", type: "str" },
+          { identifier: "product_name", type: "str" },
+        ],
+        outputs: [{ identifier: "output", type: "str" }],
+      },
+    };
+
+    const result = getTargetMissingMappings(target, DEFAULT_TEST_DATA_ID);
+
+    // "input" is declared but never referenced -> not flagged at all.
+    expect(
+      result.missingMappings.some((m) => m.fieldId === "input"),
+    ).toBe(false);
+    // "product_name" IS referenced + declared + unmapped -> required.
+    expect(
+      result.missingMappings.find((m) => m.fieldId === "product_name")
+        ?.isRequired,
+    ).toBe(true);
   });
 
   it("uses localPromptConfig.inputs when it differs from target.inputs (form-added variables)", () => {

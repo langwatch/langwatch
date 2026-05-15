@@ -244,6 +244,17 @@ export const getTargetMissingMappings = (
     };
   }
 
+  // For a prompt target that follows the latest version with no local
+  // edits, we don't have the message templates, so `usedFields` is a coarse
+  // proxy (all declared inputs). A prompt scaffold can declare variables it
+  // never references (e.g. the default `input`), so we cannot prove these
+  // are actually required. Surface them as an advisory (alert) instead of a
+  // hard requirement so an unreferenced declared variable never blocks the
+  // run. Once the prompt is opened/edited (localPromptConfig present) the
+  // `{{var}}`-based detection is exact and these become hard-required again.
+  const isUnprovenPromptUsage =
+    target.type === "prompt" && !target.localPromptConfig;
+
   // Standard validation for prompts and code agents
   for (const fieldId of usedFields) {
     // Skip if not in inputs list - user hasn't defined this variable
@@ -255,7 +266,7 @@ export const getTargetMissingMappings = (
       missingMappings.push({
         fieldId,
         fieldName: fieldId,
-        isRequired: true,
+        isRequired: !isUnprovenPromptUsage,
       });
     }
   }
@@ -269,16 +280,22 @@ export const getTargetMissingMappings = (
 /**
  * Check if a target has any missing mappings (simpler check for UI alerts).
  *
+ * Drives the alert icon, so it surfaces ANY missing mapping — including
+ * advisory ones (a follow-latest prompt whose declared variables can't yet
+ * be proven required). Advisory misses still warn the user to configure the
+ * target, but they do not hard-block the run (see `getTargetMissingMappings`
+ * and the `isValid` gate used by the run button).
+ *
  * @param target - The target to check
  * @param datasetId - The dataset to check against
- * @returns true if there are missing required mappings
+ * @returns true if there are any missing mappings (required or advisory)
  */
 export const targetHasMissingMappings = (
   target: TargetConfig,
   datasetId: string,
 ): boolean => {
-  const { isValid } = getTargetMissingMappings(target, datasetId);
-  return !isValid;
+  const { missingMappings } = getTargetMissingMappings(target, datasetId);
+  return missingMappings.length > 0;
 };
 
 // ============================================================================

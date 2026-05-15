@@ -20,6 +20,7 @@ import { useDrawer } from "~/hooks/useDrawer";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import { useExecuteEvaluation } from "../hooks/useExecuteEvaluation";
 import { useOpenTargetEditor } from "../hooks/useOpenTargetEditor";
+import { useResolveTargetName } from "../hooks/useResolveTargetName";
 import {
   convertFromUIMapping,
   convertToUIMapping,
@@ -36,6 +37,7 @@ export const RunEvaluationButton = ({
 }: RunEvaluationButtonProps) => {
   const { openDrawer } = useDrawer();
   const { openTargetEditor } = useOpenTargetEditor();
+  const resolveTargetName = useResolveTargetName();
   const { status, progress, execute, abort, isAborting } =
     useExecuteEvaluation();
 
@@ -109,7 +111,7 @@ export const RunEvaluationButton = ({
         if (target) {
           availableSources.push({
             id: target.id,
-            name: target.id, // Display name will be resolved by the drawer
+            name: resolveTargetName(target),
             type: "signature" as const,
             fields: target.outputs.map((o) => ({
               name: o.identifier,

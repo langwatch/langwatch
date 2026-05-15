@@ -48,10 +48,14 @@ export const useTargetName = (target: TargetConfig): string => {
       },
     );
 
-  // Return empty string while loading, then the name once loaded
+  // Return empty string while loading, then the name once loaded.
+  // For prompts, prefer the globally-unique handle, then the plain name
+  // (always present on LlmPromptConfig), then "New Prompt" as last resort.
+  // A placeholder prompt with no handle yet should still render a label.
   if (target.type === "prompt") {
     if (target.promptId && promptLoading) return "";
-    return target.promptId ? prompt?.handle ?? "" : "New Prompt";
+    if (!target.promptId) return "New Prompt";
+    return prompt?.handle ?? prompt?.name ?? "New Prompt";
   }
   if (target.type === "agent") {
     if (agentLoading) return "";

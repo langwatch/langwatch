@@ -113,3 +113,23 @@ Feature: Mapping Validation and Missing Mapping Detection
     When I click the evaluator chip on a runner cell
     Then the evaluator drawer opens
     And the missing mappings are highlighted
+
+  # ============================================================================
+  # Declared-but-unused prompt variables
+  # ============================================================================
+
+  @regression
+  Scenario: A declared prompt variable not referenced by any message is not required
+    Given I have a prompt target with an explicit user message
+    And the message content does not reference "{{input}}"
+    And "input" is still a declared variable on the prompt
+    And the prompt target follows the latest version with no local edits
+    Then "input" is not reported as a missing required mapping
+    And the experiment can run without mapping "input"
+
+  @regression
+  Scenario: A declared prompt variable that IS referenced still requires a mapping
+    Given I have a prompt target whose user message references "{{product_name}}"
+    And "product_name" is a declared variable on the prompt
+    And "product_name" is not mapped for the active dataset
+    Then "product_name" is reported as a missing required mapping
