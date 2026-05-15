@@ -69,7 +69,7 @@ Feature: Model Provider Scope and Multi-Instance
     And I have only "project:manage" on "web-app"
     Then the Scope field is pre-filled with project "web-app"
 
-  @integration @unimplemented
+  @integration
   Scenario: Save a provider with multiple scopes
     Given I open the Create Model Provider drawer for "openai"
     When I set the name to "OpenAI Production"
@@ -127,7 +127,7 @@ Feature: Model Provider Scope and Multi-Instance
   # check. Users disambiguate duplicates through the scope chips on the
   # list page and the scope-grouped header in model selectors.
 
-  @integration @unimplemented
+  @integration
   Scenario: Create a second OpenAI row under a different scope
     Given the org "acme" already has a ModelProvider named "OpenAI" scoped to project "web-app"
     When I open the Create Model Provider drawer and select provider "openai"
@@ -136,6 +136,32 @@ Feature: Model Provider Scope and Multi-Instance
     And I click "Save"
     Then two ModelProviders now exist with name "OpenAI"
     And each one is disambiguated by its distinct scope set
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # Quick-add scope chips at the top of the create drawer
+  # ────────────────────────────────────────────────────────────────────────────
+
+  @integration
+  Scenario: Quick-add 'This project' chip pre-fills scope to the current project
+    Given I open the Create Model Provider drawer for "openai" from project "web-app"
+    When I click the "This project" quick-add chip at the top of the drawer
+    Then the Scope field is set to only project "web-app"
+    And no other scope entries are selected
+
+  @integration
+  Scenario: Quick-add 'This team' chip pre-fills scope to the parent team
+    Given I open the Create Model Provider drawer for "openai" from project "web-app" in team "platform"
+    When I click the "This team" quick-add chip at the top of the drawer
+    Then the Scope field is set to only team "platform"
+    And no other scope entries are selected
+
+  @integration
+  Scenario: Quick-add 'Organization' chip pre-fills scope to the organization
+    Given I open the Create Model Provider drawer for "openai" from project "web-app" in organization "acme"
+    And I have "organization:manage" on "acme"
+    When I click the "Organization" quick-add chip at the top of the drawer
+    Then the Scope field is set to only organization "acme"
+    And no other scope entries are selected
 
   @integration @unimplemented
   Scenario: Users can edit the name to something custom

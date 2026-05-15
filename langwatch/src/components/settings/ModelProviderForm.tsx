@@ -248,18 +248,6 @@ export const EditModelProviderForm = ({
           </Field.Root>
         )}
 
-        <CredentialsSection
-          state={state}
-          actions={actions}
-          provider={provider}
-          fieldErrors={fieldErrors}
-          setFieldErrors={setFieldErrors}
-          projectId={projectId}
-          organizationId={organizationId}
-          apiKeyValidationError={apiKeyValidationError}
-          onApiKeyValidationClear={clearApiKeyError}
-        />
-
         <ProviderScopeSection
           state={state}
           actions={actions}
@@ -282,6 +270,18 @@ export const EditModelProviderForm = ({
               })),
             ) ?? []
           }
+        />
+
+        <CredentialsSection
+          state={state}
+          actions={actions}
+          provider={provider}
+          fieldErrors={fieldErrors}
+          setFieldErrors={setFieldErrors}
+          projectId={projectId}
+          organizationId={organizationId}
+          apiKeyValidationError={apiKeyValidationError}
+          onApiKeyValidationClear={clearApiKeyError}
         />
 
         <ExtraHeadersSection

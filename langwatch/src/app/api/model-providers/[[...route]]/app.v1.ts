@@ -115,7 +115,11 @@ app.put(
         defaultModel = `${provider}/${defaultModel}`;
       }
 
-      await service.updateModelProvider({
+      // REST endpoint is keyed on the provider string in the URL and
+      // preserves the legacy single-instance upsert contract. The
+      // multi-instance create flow lives behind the tRPC `update`
+      // procedure, which goes through the id-based path.
+      await service.upsertByProviderKey({
         projectId: project.id,
         provider,
         enabled: data.enabled,
