@@ -175,6 +175,19 @@ Feature: Role-based default models with per-scope overrides
     And the Embeddings role is seeded with the OpenAI embeddings model
     And the Default Models section reflects the seeded values without further user action
 
+  @integration
+  Scenario: The user's onboarding pick wins over the additive seed
+    Given the additive seed wrote "openai/gpt-5.5" for the Default role at organization scope
+    When the same submit carries a user-picked Default model "openai/gpt-4o"
+    Then the ModelDefault row for (Default, organization) is upserted to "openai/gpt-4o"
+    And the registry-flagship value the seed wrote no longer appears in the rules list
+
+  @integration
+  Scenario: Toggling "Set as default" off does not write any ModelDefault row
+    Given the provider create submit carries useAsDefaultProvider=false
+    Then no setRoleAssignmentForScope call fires
+    And the seed remains the only writer of org-scope rows during this submit
+
   @integration @unimplemented
   Scenario: Onboarding a provider that does not offer embeddings only seeds the roles it can fulfill
     Given the organization has just enabled Anthropic on onboarding and has no other provider

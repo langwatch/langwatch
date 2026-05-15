@@ -24,11 +24,15 @@ const {
   mockUpdateProjectDefaultModelsMutateAsync,
   mockToasterCreate,
   mockInvalidate,
+  mockSetRoleAssignmentMutateAsync,
+  mockDefaultModelsInvalidate,
 } = vi.hoisted(() => ({
   mockUpdateMutateAsync: vi.fn().mockResolvedValue({}),
   mockUpdateProjectDefaultModelsMutateAsync: vi.fn().mockResolvedValue({}),
   mockToasterCreate: vi.fn(),
   mockInvalidate: vi.fn(),
+  mockSetRoleAssignmentMutateAsync: vi.fn().mockResolvedValue({ ok: true }),
+  mockDefaultModelsInvalidate: vi.fn(),
 }));
 
 vi.mock("../../utils/api", () => ({
@@ -39,11 +43,21 @@ vi.mock("../../utils/api", () => ({
           invalidate: mockInvalidate,
         },
       },
+      modelProvider: {
+        getDefaultModelsForProject: {
+          invalidate: mockDefaultModelsInvalidate,
+        },
+      },
     }),
     modelProvider: {
       update: {
         useMutation: () => ({
           mutateAsync: mockUpdateMutateAsync,
+        }),
+      },
+      setRoleAssignmentForScope: {
+        useMutation: () => ({
+          mutateAsync: mockSetRoleAssignmentMutateAsync,
         }),
       },
     },
@@ -229,6 +243,77 @@ describe("useProviderFormSubmit()", () => {
           (call) => call[0]?.type === "error",
         );
         expect(errorToasts).toHaveLength(0);
+      });
+
+      /** @scenario Toggling "Set as default" off does not write any ModelDefault row */
+      it("does not call setRoleAssignmentForScope (the seed remains the only writer)", async () => {
+        const snapshot = buildSnapshot({
+          useAsDefaultProvider: false,
+          projectDefaultModel: "azure/gpt-5-mini",
+          projectTopicClusteringModel: "azure/gpt-5-mini",
+          projectEmbeddingsModel: null,
+          scopes: [{ scopeType: "ORGANIZATION", scopeId: "org-1" }],
+        });
+        const { result } = renderSubmitHook({ snapshot });
+
+        await act(async () => {
+          await result.current.submit();
+        });
+
+        expect(mockSetRoleAssignmentMutateAsync).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given useAsDefaultProvider is true and the picks land on same-provider models", () => {
+    /** @scenario The user's onboarding pick wins over the additive seed */
+    it("upserts a ModelDefault row per role per scope using the user's picks", async () => {
+      const snapshot = buildSnapshot({
+        useAsDefaultProvider: true,
+        // All picks belong to the azure provider being submitted so the
+        // mismatch guard accepts the submit.
+        projectDefaultModel: "azure/gpt-5-mini",
+        projectTopicClusteringModel: "azure/gpt-5-mini",
+        projectEmbeddingsModel: "azure/text-embedding-3-small",
+        scopes: [
+          { scopeType: "ORGANIZATION", scopeId: "org-1" },
+          { scopeType: "PROJECT", scopeId: "proj-1" },
+        ],
+      });
+      const { result } = renderSubmitHook({ snapshot });
+
+      await act(async () => {
+        await result.current.submit();
+      });
+
+      // 2 scopes × 3 roles = 6 upserts. Each carries the user's picked
+      // model (not the registry flagship that the additive seed would
+      // have written).
+      expect(mockSetRoleAssignmentMutateAsync).toHaveBeenCalledTimes(6);
+      // Spot-check the per-scope-per-role payloads.
+      expect(mockSetRoleAssignmentMutateAsync).toHaveBeenCalledWith({
+        scopeType: "ORGANIZATION",
+        scopeId: "org-1",
+        role: "DEFAULT",
+        model: "azure/gpt-5-mini",
+      });
+      expect(mockSetRoleAssignmentMutateAsync).toHaveBeenCalledWith({
+        scopeType: "ORGANIZATION",
+        scopeId: "org-1",
+        role: "FAST",
+        model: "azure/gpt-5-mini",
+      });
+      expect(mockSetRoleAssignmentMutateAsync).toHaveBeenCalledWith({
+        scopeType: "ORGANIZATION",
+        scopeId: "org-1",
+        role: "EMBEDDINGS",
+        model: "azure/text-embedding-3-small",
+      });
+      expect(mockSetRoleAssignmentMutateAsync).toHaveBeenCalledWith({
+        scopeType: "PROJECT",
+        scopeId: "proj-1",
+        role: "DEFAULT",
+        model: "azure/gpt-5-mini",
       });
     });
   });

@@ -74,6 +74,14 @@ export function useProviderFormSubmit({
   const updateMutation = api.modelProvider.update.useMutation();
   const updateProjectDefaultModelsMutation =
     api.project.updateProjectDefaultModels.useMutation();
+  // B3 redesign: the user's onboarding picks for the three role models
+  // need to win over the additive seed (which fills in the registry
+  // flagship). After the provider create lands, we replay those picks
+  // through `setRoleAssignmentForScope` at every scope the provider
+  // covers so the new ModelDefault table reflects what the user chose
+  // rather than what the seed defaulted to.
+  const setRoleAssignmentMutation =
+    api.modelProvider.setRoleAssignmentForScope.useMutation();
 
   const [isSaving, setIsSaving] = useState(false);
   const [errors, setErrors] = useState<{ customKeysRoot?: string }>({});
@@ -262,6 +270,62 @@ export function useProviderFormSubmit({
       // settings page owns hierarchical default-model writes per scope.
       // See specs/model-providers/hierarchical-default-models.feature.
 
+      // Replay the onboarding picks into ModelDefault. Mario's additive
+      // seed in `updateModelProvider` already wrote the registry flagship
+      // for each role at every scope this provider covers, but the user
+      // explicitly picked a Default / Topic-clustering / Embeddings
+      // model on this drawer — those picks need to win. We call
+      // `setRoleAssignmentForScope` (upsert semantics) per scope per
+      // role with the user's value. The Fast role is reused for the
+      // legacy "topic clustering" field (the feature registry binds
+      // `analytics.topic_clustering_llm` to FAST). See
+      // specs/model-providers/role-based-default-models.feature.
+      if (useAsDefaultProvider) {
+        const targetScopes = scopes && scopes.length > 0
+          ? scopes
+          : scopeType && scopeId
+            ? [{ scopeType, scopeId }]
+            : [];
+        const writes: Array<Promise<unknown>> = [];
+        for (const s of targetScopes) {
+          if (projectDefaultModel) {
+            writes.push(
+              setRoleAssignmentMutation.mutateAsync({
+                scopeType: s.scopeType,
+                scopeId: s.scopeId,
+                role: "DEFAULT",
+                model: projectDefaultModel,
+              }),
+            );
+          }
+          if (projectTopicClusteringModel) {
+            writes.push(
+              setRoleAssignmentMutation.mutateAsync({
+                scopeType: s.scopeType,
+                scopeId: s.scopeId,
+                role: "FAST",
+                model: projectTopicClusteringModel,
+              }),
+            );
+          }
+          if (projectEmbeddingsModel) {
+            writes.push(
+              setRoleAssignmentMutation.mutateAsync({
+                scopeType: s.scopeType,
+                scopeId: s.scopeId,
+                role: "EMBEDDINGS",
+                model: projectEmbeddingsModel,
+              }),
+            );
+          }
+        }
+        // Best-effort: a single failed scope (e.g. RBAC blocks an org
+        // write for a non-admin) shouldn't kill the whole submit — log
+        // and continue. The provider row is already created.
+        await Promise.allSettled(writes);
+        await utils.modelProvider.getDefaultModelsForProject.invalidate();
+      }
+
       toaster.create({
         title: "Model Provider Updated",
         type: "success",
@@ -287,6 +351,7 @@ export function useProviderFormSubmit({
     onError,
     updateMutation,
     updateProjectDefaultModelsMutation,
+    setRoleAssignmentMutation,
     utils,
   ]);
 
