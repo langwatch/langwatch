@@ -148,7 +148,16 @@ describe("pushPrompts", () => {
         model: "openai/gpt-4o",
         messages: [{ role: "system", content: "test" }],
         response_format: {
-          schema: { type: "object", properties: { value: { type: "string" } } },
+          // A rich (non-flat) schema stays a single json_schema output, so the
+          // identifier-fallback path is what's under test here. Flat object
+          // schemas intentionally expand into flat fields instead (see the
+          // dedicated round-trip suite).
+          schema: {
+            type: "object",
+            properties: {
+              value: { type: "string", enum: ["a", "b"] },
+            },
+          },
         },
       } as any);
 

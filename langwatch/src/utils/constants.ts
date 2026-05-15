@@ -1,4 +1,8 @@
-export const DEFAULT_MODEL = "openai/gpt-5.2";
+// Newest OpenAI flagship in the model registry. A guard test
+// (constants.default-model.unit.test.ts) fails CI if this drifts behind a
+// newer flagship or points at a legacy generation, so new prompts always
+// start on a current model.
+export const DEFAULT_MODEL = "openai/gpt-5.5";
 
 export const DEFAULT_EMBEDDINGS_MODEL = "openai/text-embedding-3-small";
 

@@ -59,9 +59,7 @@ langwatch prompt add agent/customer-service
 Your newly created or fetched prompt will be on a yaml file in the `prompts/` directory, and look like this:
 
 ```yaml
-model: openai/gpt-5
-modelParameters:
-  temperature: 1.0
+model: openai/gpt-5.5
 messages:
   - role: system
     content: You are a helpful assistant.
@@ -266,9 +264,8 @@ The CLI uses two configuration files:
 Prompts files end with `.prompt.yaml` extension and follow this format:
 
 ```yaml
-model: openai/gpt-5
+model: openai/gpt-5.5
 modelParameters:
-  temperature: 0.7
   max_tokens: 1000
 messages:
   - role: system
@@ -281,6 +278,53 @@ messages:
 ```
 
 This is the same structure as [GitHub Prompts](https://docs.github.com/en/github-models/use-github-models/storing-prompts-in-github-repositories).
+
+#### Model selection
+
+`langwatch prompt create` writes the current flagship model. Always keep
+`model` on a modern model — the latest OpenAI generation is `openai/gpt-5.5`.
+Do not pin a legacy model such as `gpt-4o-mini`; the platform applies the same
+current default when a prompt is synced without an explicit model.
+
+#### Temperature and the gpt-5 family
+
+The gpt-5 family rejects a custom `temperature`. Do **not** set
+`modelParameters.temperature` for those models — `langwatch prompt create`
+omits it on purpose. The platform also strips sampling parameters a model
+cannot accept, so a `pull` never writes a `temperature` back into your YAML
+for a model that would reject it. Only add `temperature` for a model that
+explicitly supports it.
+
+#### Structured outputs (`response_format`)
+
+When a prompt must return strict JSON, declare a `response_format` block. It
+round-trips losslessly through `push` and `pull` — what you configure on the
+platform comes back exactly, and vice versa:
+
+```yaml
+model: openai/gpt-5.5
+messages:
+  - role: system
+    content: Classify the product into the taxonomy.
+  - role: user
+    content: "{{product}}"
+response_format:
+  name: product_category
+  schema:
+    type: object
+    properties:
+      category: { type: string }
+      reasoning: { type: string }
+    required: [category, reasoning]
+    additionalProperties: false
+```
+
+A flat object schema (only scalar `string` / `number` / `boolean`
+properties) shows up on the platform as individual structured-output fields
+and comes back as the same flat schema on the next `pull`. A richer schema
+(enums, nested objects, arrays) is preserved verbatim as a single
+JSON-schema output. Either way, `push` then `pull` yields an identical
+`response_format`.
 
 ## Commands Reference
 

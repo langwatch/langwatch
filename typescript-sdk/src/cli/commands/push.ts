@@ -4,6 +4,7 @@ import chalk from "chalk";
 import ora from "ora";
 import * as yaml from "js-yaml";
 import { PromptConverter } from "@/cli/utils/promptConverter";
+import { responseFormatToOutputs } from "@/cli/utils/responseFormat";
 import {
   type ConfigData,
   PromptsApiService,
@@ -112,18 +113,14 @@ export const pushPrompts = async ({
 
         const currentVersion = lock.prompts[promptName]?.version;
 
-        // Build outputs based on response_format if present
-        const responseFormat = (localConfig as any).response_format;
-        let outputs: ConfigData["outputs"] = [{ identifier: "output", type: "str" }];
-        if (responseFormat?.schema) {
-          outputs = [
-            {
-              identifier: responseFormat.name ?? "output",
-              type: "json_schema",
-              json_schema: responseFormat.schema,
-            },
-          ];
-        }
+        // Build outputs from the local response_format block. A flat object
+        // schema expands back into flat platform fields; a richer schema is
+        // preserved verbatim as one json_schema output. Exact inverse of the
+        // pull direction (outputsToResponseFormat) so push/pull is lossless.
+        const outputs: ConfigData["outputs"] =
+          (responseFormatToOutputs(
+            (localConfig as any).response_format,
+          ) as ConfigData["outputs"]) ?? [{ identifier: "output", type: "str" }];
 
         const configData: ConfigData = {
           model: localConfig.model,

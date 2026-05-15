@@ -4,6 +4,7 @@ import chalk from "chalk";
 import { FileManager } from "../utils/fileManager";
 import { checkApiKey } from "../utils/apiKey";
 import { ensureProjectInitialized } from "../utils/init";
+import { DEFAULT_PROMPT_MODEL } from "../constants";
 
 type CreateOptions = Record<string, unknown>;
 
@@ -44,10 +45,13 @@ export const createCommand = async (
       fs.mkdirSync(promptsDir, { recursive: true });
     }
 
-    // Default prompt content
-    const defaultContent = `model: openai/gpt-5
-modelParameters:
-  temperature: 0.7
+    // Default prompt content.
+    //
+    // No `modelParameters.temperature`: the latest model families (gpt-5+)
+    // reject a custom temperature, so injecting one by default breaks the
+    // very models a new prompt should be using. Add it back only for a model
+    // that supports it.
+    const defaultContent = `model: ${DEFAULT_PROMPT_MODEL}
 messages:
   - role: system
     content: You are a helpful assistant.

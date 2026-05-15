@@ -45,6 +45,7 @@ import {
 import {
   buildStandardSuccessResponse,
   handlePossibleConflictError,
+  stripUnsupportedSamplingParams,
 } from "./utils";
 import { handleSystemPromptConflict } from "./utils/handle-system-prompt-conflict";
 
@@ -99,7 +100,7 @@ app.get(
 
     return c.json(
       apiResponsePromptWithVersionDataSchema.array().parse(configs).map((p) => ({
-        ...p,
+        ...stripUnsupportedSamplingParams(p),
         platformUrl: platformUrl({
           projectSlug: project.slug,
           path: `/prompts`,
@@ -453,7 +454,7 @@ app.get(
 
     return c.json(
       apiResponsePromptWithVersionDataSchema.array().parse(versions).map((v) => ({
-        ...v,
+        ...stripUnsupportedSamplingParams(v),
         platformUrl: platformUrl({
           projectSlug: project.slug,
           path: `/prompts`,
@@ -507,7 +508,9 @@ app.post(
       );
 
       return c.json({
-        ...apiResponsePromptWithVersionDataSchema.parse(restored),
+        ...stripUnsupportedSamplingParams(
+          apiResponsePromptWithVersionDataSchema.parse(restored),
+        ),
         platformUrl: platformUrl({
           projectSlug: project.slug,
           path: `/prompts`,
@@ -623,7 +626,9 @@ app.get(
       }
 
       return c.json({
-        ...apiResponsePromptWithVersionDataSchema.parse(config),
+        ...stripUnsupportedSamplingParams(
+          apiResponsePromptWithVersionDataSchema.parse(config),
+        ),
         platformUrl: platformUrl({
           projectSlug: project.slug,
           path: `/prompts`,
@@ -732,7 +737,9 @@ app.post(
       });
 
       return c.json({
-        ...apiResponsePromptWithVersionDataSchema.parse(responseConfig),
+        ...stripUnsupportedSamplingParams(
+          apiResponsePromptWithVersionDataSchema.parse(responseConfig),
+        ),
         platformUrl: platformUrl({
           projectSlug: project.slug,
           path: `/prompts`,
@@ -980,7 +987,9 @@ app.put(
       );
 
       return c.json({
-        ...apiResponsePromptWithVersionDataSchema.parse(responseConfig),
+        ...stripUnsupportedSamplingParams(
+          apiResponsePromptWithVersionDataSchema.parse(responseConfig),
+        ),
         platformUrl: platformUrl({
           projectSlug: project.slug,
           path: `/prompts`,
