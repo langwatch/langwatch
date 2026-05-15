@@ -297,10 +297,20 @@ export const modelProviderRouter = createTRPCRouter({
   // ────────────────────────────────────────────────────────────────────────
 
   /**
-   * Rich snapshot for the Default Models settings page: per-role effective
-   * resolution for the project, plus the raw role-level value at each scope
-   * so the line UI can render "from organization" / "from team" hints and
-   * let admins flip the value at any scope they can manage.
+   * Snapshot for the Default Models settings page.
+   *
+   * Shape mirrors RBAC: the top of the page renders three "current
+   * default" lines (one per role) showing the effective resolution for
+   * THIS project; everything else is a flat `assignments` list of
+   * principal-style policy rows — `{ role, featureKey?, model, scopes:
+   * [...] }` — where one logical row can mix organization / team /
+   * project scopes that share the same model.
+   *
+   * Storage stays one ModelDefault row per scope (so the resolver walk
+   * is unchanged). The server groups rows by (role, featureKey, model)
+   * before returning so the UI can render multi-scope assignments as
+   * one chip-picker row. `available` carries the picker options the
+   * caller is allowed to write to (RBAC-filtered).
    */
   getDefaultModelsForProject: protectedProcedure
     .input(z.object({ projectId: z.string() }))
@@ -309,166 +319,295 @@ export const modelProviderRouter = createTRPCRouter({
       const { projectId } = input;
       const project = await ctx.prisma.project.findUnique({
         where: { id: projectId },
-        select: { id: true, teamId: true, team: { select: { organizationId: true } } },
+        select: {
+          id: true,
+          teamId: true,
+          team: {
+            select: {
+              organizationId: true,
+              organization: { select: { id: true, name: true } },
+            },
+          },
+        },
       });
       if (!project) {
         throw new Error("Project not found");
       }
       const teamId = project.teamId;
       const organizationId = project.team?.organizationId ?? null;
+      const organizationName = project.team?.organization?.name ?? null;
 
       const features = allFeatures();
 
-      // Resolve the effective model per role using a feature from that role
-      // as a proxy (the resolver's role-level walk is shared across all
-      // features in a role — we just need one feature per role to read it).
-      const featureProxyByRole: Partial<Record<ModelRole, string>> = {};
+      // Effective resolution per role (drives the three top-of-page
+      // lines). Uses one feature per role as a proxy — the resolver's
+      // role-level walk is shared across all features in a role.
+      const effective: Record<
+        ModelRole,
+        { model: string; source: string; scope: string | null } | null
+      > = { DEFAULT: null, FAST: null, EMBEDDINGS: null };
       for (const role of MODEL_ROLES) {
-        const f = features.find((x) => x.role === role);
-        if (f) featureProxyByRole[role] = f.key;
+        const proxy = features.find((x) => x.role === role);
+        if (!proxy) continue;
+        try {
+          const r = await resolveModelForFeature(proxy.key, {
+            prisma: ctx.prisma,
+            projectId,
+          });
+          effective[role] = {
+            model: r.model,
+            source: r.source,
+            scope: r.scope,
+          };
+        } catch {
+          effective[role] = null;
+        }
       }
 
-      const roles = await Promise.all(
-        MODEL_ROLES.map(async (role) => {
-          const proxyFeatureKey = featureProxyByRole[role];
-          let effective: {
-            model: string;
-            source: string;
-            scope: string | null;
-          } | null = null;
-          if (proxyFeatureKey) {
-            try {
-              const r = await resolveModelForFeature(proxyFeatureKey, {
-                prisma: ctx.prisma,
-                projectId,
-              });
-              effective = { model: r.model, source: r.source, scope: r.scope };
-            } catch {
-              effective = null;
-            }
-          }
-          // Raw role-level value at each scope (null = not set, falls back).
-          const [orgRow, teamRow, projectRow] = await Promise.all([
-            organizationId
-              ? ctx.prisma.modelDefault.findFirst({
-                  where: {
-                    scopeType: "ORGANIZATION",
-                    scopeId: organizationId,
-                    role,
-                    featureKey: null,
-                  },
-                  select: { model: true },
-                })
-              : Promise.resolve(null),
-            teamId
-              ? ctx.prisma.modelDefault.findFirst({
-                  where: {
-                    scopeType: "TEAM",
-                    scopeId: teamId,
-                    role,
-                    featureKey: null,
-                  },
-                  select: { model: true },
-                })
-              : Promise.resolve(null),
-            ctx.prisma.modelDefault.findFirst({
-              where: {
-                scopeType: "PROJECT",
-                scopeId: projectId,
-                role,
-                featureKey: null,
-              },
-              select: { model: true },
-            }),
-          ]);
+      // Available scopes for the override drawer's chip picker. Limited
+      // to scopes the caller can write at: org needs organization:manage,
+      // team needs team:manage, project needs project:update. The drawer
+      // hides chips the caller can't act on so we never invite a write
+      // that would 403 on save.
+      let canWriteOrg = false;
+      let writableTeams: { id: string; name: string }[] = [];
+      let writableProjects: { id: string; name: string; teamId: string }[] = [];
+      if (organizationId) {
+        canWriteOrg = await hasOrganizationPermission(
+          ctx,
+          organizationId,
+          "organization:manage",
+        );
+        const orgTeams = await ctx.prisma.team.findMany({
+          where: { organizationId },
+          select: { id: true, name: true },
+          orderBy: { name: "asc" },
+        });
+        const teamWritable = await Promise.all(
+          orgTeams.map(async (t) => ({
+            ...t,
+            writable: await hasTeamPermission(ctx, t.id, "team:manage"),
+          })),
+        );
+        writableTeams = teamWritable
+          .filter((t) => t.writable)
+          .map(({ id, name }) => ({ id, name }));
 
-          // Per-feature: effective resolution + per-scope override rows.
-          const roleFeatures = features.filter((f) => f.role === role);
-          const featureRows = await Promise.all(
-            roleFeatures.map(async (f) => {
-              let featEffective: {
-                model: string;
-                source: string;
-                scope: string | null;
-              } | null = null;
-              try {
-                const r = await resolveModelForFeature(f.key, {
-                  prisma: ctx.prisma,
-                  projectId,
-                });
-                featEffective = {
-                  model: r.model,
-                  source: r.source,
-                  scope: r.scope,
-                };
-              } catch {
-                featEffective = null;
-              }
-              const [oRow, tRow, pRow] = await Promise.all([
-                organizationId
-                  ? ctx.prisma.modelDefault.findFirst({
-                      where: {
-                        scopeType: "ORGANIZATION",
-                        scopeId: organizationId,
-                        role,
-                        featureKey: f.key,
-                      },
-                      select: { model: true },
-                    })
-                  : Promise.resolve(null),
-                teamId
-                  ? ctx.prisma.modelDefault.findFirst({
-                      where: {
-                        scopeType: "TEAM",
-                        scopeId: teamId,
-                        role,
-                        featureKey: f.key,
-                      },
-                      select: { model: true },
-                    })
-                  : Promise.resolve(null),
-                ctx.prisma.modelDefault.findFirst({
-                  where: {
-                    scopeType: "PROJECT",
-                    scopeId: projectId,
-                    role,
-                    featureKey: f.key,
-                  },
-                  select: { model: true },
-                }),
-              ]);
-              return {
-                key: f.key,
-                displayName: f.displayName,
-                description: f.description,
-                effective: featEffective,
-                perScope: {
-                  organization: oRow?.model ?? null,
-                  team: tRow?.model ?? null,
-                  project: pRow?.model ?? null,
-                },
-              };
-            }),
-          );
-
-          return {
-            role,
-            effective,
-            perScope: {
-              organization: orgRow?.model ?? null,
-              team: teamRow?.model ?? null,
-              project: projectRow?.model ?? null,
+        const orgProjects = await ctx.prisma.project.findMany({
+          where: { team: { organizationId } },
+          select: { id: true, name: true, teamId: true },
+          orderBy: { name: "asc" },
+        });
+        const projectWritable = await Promise.all(
+          orgProjects.map(async (p) => ({
+            ...p,
+            writable: await hasProjectPermission(ctx, p.id, "project:update"),
+          })),
+        );
+        writableProjects = projectWritable
+          .filter((p) => p.writable)
+          .map(({ id, name, teamId }) => ({ id, name, teamId }));
+      } else {
+        // Personal-account project (no org/team): only project scope.
+        const writable = await hasProjectPermission(
+          ctx,
+          projectId,
+          "project:update",
+        );
+        if (writable) {
+          writableProjects = [
+            {
+              id: projectId,
+              name: (
+                await ctx.prisma.project.findUnique({
+                  where: { id: projectId },
+                  select: { name: true },
+                })
+              )?.name ?? projectId,
+              teamId: teamId ?? "",
             },
-            features: featureRows,
-          };
-        }),
+          ];
+        }
+      }
+      const available = {
+        organization:
+          canWriteOrg && organizationId
+            ? { id: organizationId, name: organizationName ?? organizationId }
+            : null,
+        teams: writableTeams,
+        projects: writableProjects,
+      };
+
+      // All ModelDefault rows in scope for this org/project. We fetch
+      // by scope IDs the caller's view can see (the org's teams and
+      // projects, plus the org itself) so the overrides list shows
+      // every assignment that affects this org — readability isn't
+      // RBAC-gated even when writability is.
+      const allTeamIds = organizationId
+        ? (
+            await ctx.prisma.team.findMany({
+              where: { organizationId },
+              select: { id: true },
+            })
+          ).map((t) => t.id)
+        : teamId
+          ? [teamId]
+          : [];
+      const allProjectIds = organizationId
+        ? (
+            await ctx.prisma.project.findMany({
+              where: { team: { organizationId } },
+              select: { id: true },
+            })
+          ).map((p) => p.id)
+        : [projectId];
+
+      const visibleRows = await ctx.prisma.modelDefault.findMany({
+        where: {
+          OR: [
+            organizationId
+              ? { scopeType: "ORGANIZATION", scopeId: organizationId }
+              : null,
+            allTeamIds.length > 0
+              ? { scopeType: "TEAM", scopeId: { in: allTeamIds } }
+              : null,
+            allProjectIds.length > 0
+              ? { scopeType: "PROJECT", scopeId: { in: allProjectIds } }
+              : null,
+          ].filter(Boolean) as any[],
+        },
+        select: {
+          id: true,
+          scopeType: true,
+          scopeId: true,
+          role: true,
+          featureKey: true,
+          model: true,
+        },
+      });
+
+      // Resolve names so the UI can render chips without an extra round
+      // trip. Pull only the IDs we actually saw rows for.
+      const seenTeamIds = Array.from(
+        new Set(
+          visibleRows
+            .filter((r) => r.scopeType === "TEAM")
+            .map((r) => r.scopeId),
+        ),
       );
+      const seenProjectIds = Array.from(
+        new Set(
+          visibleRows
+            .filter((r) => r.scopeType === "PROJECT")
+            .map((r) => r.scopeId),
+        ),
+      );
+      const [seenTeams, seenProjects] = await Promise.all([
+        seenTeamIds.length > 0
+          ? ctx.prisma.team.findMany({
+              where: { id: { in: seenTeamIds } },
+              select: { id: true, name: true },
+            })
+          : Promise.resolve([] as { id: string; name: string }[]),
+        seenProjectIds.length > 0
+          ? ctx.prisma.project.findMany({
+              where: { id: { in: seenProjectIds } },
+              select: { id: true, name: true },
+            })
+          : Promise.resolve([] as { id: string; name: string }[]),
+      ]);
+      const teamNameById = new Map(seenTeams.map((t) => [t.id, t.name]));
+      const projectNameById = new Map(
+        seenProjects.map((p) => [p.id, p.name]),
+      );
+      const scopeName = (
+        scopeType: "ORGANIZATION" | "TEAM" | "PROJECT",
+        scopeId: string,
+      ): string => {
+        if (scopeType === "ORGANIZATION")
+          return organizationName ?? scopeId;
+        if (scopeType === "TEAM") return teamNameById.get(scopeId) ?? scopeId;
+        return projectNameById.get(scopeId) ?? scopeId;
+      };
+
+      // Group by (role, featureKey ?? "", model). One group = one logical
+      // assignment shown as a single row in the UI.
+      type AssignmentScope = {
+        type: "ORGANIZATION" | "TEAM" | "PROJECT";
+        id: string;
+        name: string;
+      };
+      type Assignment = {
+        id: string;
+        role: ModelRole;
+        featureKey: string | null;
+        model: string;
+        scopes: AssignmentScope[];
+      };
+      const groups = new Map<string, Assignment>();
+      for (const row of visibleRows) {
+        const role = row.role as ModelRole;
+        const featureKey = row.featureKey;
+        const key = `${role}::${featureKey ?? ""}::${row.model}`;
+        const scope: AssignmentScope = {
+          type: row.scopeType as AssignmentScope["type"],
+          id: row.scopeId,
+          name: scopeName(
+            row.scopeType as AssignmentScope["type"],
+            row.scopeId,
+          ),
+        };
+        const existing = groups.get(key);
+        if (existing) {
+          existing.scopes.push(scope);
+        } else {
+          groups.set(key, {
+            id: key,
+            role,
+            featureKey,
+            model: row.model,
+            scopes: [scope],
+          });
+        }
+      }
+      // Stable order: role-level assignments first (featureKey null), then
+      // per-feature, both sorted by model name for diff-friendly output.
+      const assignments = Array.from(groups.values()).sort((a, b) => {
+        if (a.role !== b.role)
+          return MODEL_ROLES.indexOf(a.role) - MODEL_ROLES.indexOf(b.role);
+        const af = a.featureKey ?? "";
+        const bf = b.featureKey ?? "";
+        if (af !== bf) return af.localeCompare(bf);
+        return a.model.localeCompare(b.model);
+      });
+
+      // Sort scopes within each assignment so the chip render order is
+      // stable across reloads (Organization → Teams → Projects, each
+      // alphabetical).
+      const scopeRank = { ORGANIZATION: 0, TEAM: 1, PROJECT: 2 } as const;
+      for (const a of assignments) {
+        a.scopes.sort((x, y) => {
+          if (x.type !== y.type) return scopeRank[x.type] - scopeRank[y.type];
+          return x.name.localeCompare(y.name);
+        });
+      }
+
+      const featureProjection = features.map((f) => ({
+        key: f.key,
+        role: f.role,
+        displayName: f.displayName,
+        description: f.description,
+      }));
 
       return {
         projectId,
         teamId,
         organizationId,
-        roles,
+        organizationName,
+        effective,
+        assignments,
+        available,
+        features: featureProjection,
       };
     }),
 

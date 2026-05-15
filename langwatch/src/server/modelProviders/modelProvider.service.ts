@@ -19,6 +19,7 @@ import {
   type MaybeStoredModelProvider,
   modelProviders,
 } from "./registry";
+import { seedOnboardingDefaultsForProvider } from "./seedOnboardingDefaults";
 
 /**
  * Minimal ctx slice this service uses to authorize scope-level writes.
@@ -247,6 +248,29 @@ export class ModelProviderService {
           customKeysProvided,
           tx,
         );
+
+        // Onboarding seed: writes one role-level ModelDefault row per
+        // role the provider can fulfill (DEFAULT / FAST / EMBEDDINGS),
+        // at every scope the new credential is bound to. Strictly
+        // additive — `seedOnboardingDefaultsForProvider` skips any
+        // (scope, role) pair that already has a row, so enabling a
+        // second provider later can't silently replace a user's
+        // configured choice. Without this wiring the seed function is
+        // dead code; the bug surfaces as a fresh org showing
+        // "not configured" on every role despite having a provider
+        // enabled. See
+        // specs/model-providers/model-resolver-and-registry.feature.
+        const targetScopes: ScopeInput[] = scopes ?? [
+          { scopeType: "PROJECT", scopeId: projectId },
+        ];
+        for (const scope of targetScopes) {
+          await seedOnboardingDefaultsForProvider({
+            prisma: tx as unknown as PrismaClient,
+            provider,
+            scopeType: scope.scopeType,
+            scopeId: scope.scopeId,
+          });
+        }
       }
 
       // Update project default model if provided

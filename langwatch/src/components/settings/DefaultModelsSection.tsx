@@ -1,19 +1,23 @@
 /**
- * Line-based "Default Models" section. Renders the three role lines
- * (Default / Fast / Embeddings) below the providers list on the
- * model-providers settings page. Each line shows the project's effective
- * model + an inheritance chip ("inherited from organization", etc.), and
- * lets admins set the role-level value at any scope they can manage
- * (Organization / Team / Project) plus expand a list of platform features
- * for per-feature overrides.
+ * Default Models settings — current effective lines + flat overrides
+ * list, mirroring the RBAC settings page.
  *
- * Replaces the B2 Org/Team/Project section-block design. See
- * specs/model-providers/role-based-default-models.feature.
+ * The page renders three "current default" lines at the top (one per
+ * role, with the inheritance hint) and a flat list of assignment rows
+ * below — each row groups every ModelDefault scope that shares the
+ * same (role, featureKey, model) so a single "rule" can apply to
+ * multiple teams or projects with one chip-picker. "+ Add override"
+ * opens a drawer to author a new assignment.
+ *
+ * See specs/model-providers/role-based-default-models.feature for the
+ * full behavioural contract. Drawer + ScopeChipPicker integration is
+ * landed by the UI lane on top of this shim.
  */
 
 import {
   Badge,
   Box,
+  Button,
   Card,
   Heading,
   HStack,
@@ -21,17 +25,16 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { ChevronDown, ChevronRight } from "lucide-react";
-import { useMemo, useState } from "react";
-import { allModelOptions } from "~/components/ModelSelector";
+import { Plus } from "lucide-react";
+import { useMemo } from "react";
+
 import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
-import { toaster } from "~/components/ui/toaster";
-import { ProviderModelSelector } from "./ProviderModelSelector";
 
+type DefaultModelsPayload =
+  RouterOutputs["modelProvider"]["getDefaultModelsForProject"];
 type ModelRoleKey = "DEFAULT" | "FAST" | "EMBEDDINGS";
-type ScopeKey = "organization" | "team" | "project";
 
 const ROLE_LABEL: Record<ModelRoleKey, string> = {
   DEFAULT: "Default",
@@ -46,16 +49,14 @@ const ROLE_BLURB: Record<ModelRoleKey, string> = {
   EMBEDDINGS: "Semantic vectors used by topic clustering and similar features.",
 };
 
-const SCOPE_LABEL: Record<ScopeKey, string> = {
-  organization: "Organization",
-  team: "Team",
-  project: "Project",
+const SCOPE_CHIP_LABEL: Record<"ORGANIZATION" | "TEAM" | "PROJECT", string> = {
+  ORGANIZATION: "Organization",
+  TEAM: "Team",
+  PROJECT: "Project",
 };
 
 export function DefaultModelsSection() {
-  const { project, organization, team, hasPermission } =
-    useOrganizationTeamProject();
-  const utils = api.useContext();
+  const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
 
   const dataQuery = api.modelProvider.getDefaultModelsForProject.useQuery(
@@ -63,95 +64,15 @@ export function DefaultModelsSection() {
     { enabled: !!projectId },
   );
 
-  const setRoleMutation =
-    api.modelProvider.setRoleAssignmentForScope.useMutation();
-  const setFeatureMutation =
-    api.modelProvider.setFeatureOverrideForScope.useMutation();
-
-  const modelChoices = useMemo(() => allModelOptions, []);
-
-  const canManage = (scope: ScopeKey): boolean => {
-    if (scope === "organization") return hasPermission("organization:manage");
-    if (scope === "team") return hasPermission("team:manage");
-    return hasPermission("project:update");
-  };
-
-  const scopeId = (scope: ScopeKey): string | null => {
-    if (scope === "organization") return organization?.id ?? null;
-    if (scope === "team") return team?.id ?? null;
-    return project?.id ?? null;
-  };
-
-  const invalidate = () =>
-    utils.modelProvider.getDefaultModelsForProject.invalidate({ projectId });
-
-  const setRole = async (
-    scope: ScopeKey,
-    role: ModelRoleKey,
-    model: string,
-  ) => {
-    const id = scopeId(scope);
-    if (!id) return;
-    try {
-      await setRoleMutation.mutateAsync({
-        scopeType: scope.toUpperCase() as "ORGANIZATION" | "TEAM" | "PROJECT",
-        scopeId: id,
-        role,
-        model: model || null,
-      });
-      await invalidate();
-      toaster.create({
-        title: `${SCOPE_LABEL[scope]} ${ROLE_LABEL[role]} model updated`,
-        type: "success",
-        duration: 2500,
-        meta: { closable: true },
-      });
-    } catch (err) {
-      toaster.create({
-        title: "Failed to update model",
-        description: err instanceof Error ? err.message : String(err),
-        type: "error",
-        duration: 5000,
-        meta: { closable: true },
-      });
-    }
-  };
-
-  const setFeature = async (
-    scope: ScopeKey,
-    featureKey: string,
-    model: string,
-  ) => {
-    const id = scopeId(scope);
-    if (!id) return;
-    try {
-      await setFeatureMutation.mutateAsync({
-        scopeType: scope.toUpperCase() as "ORGANIZATION" | "TEAM" | "PROJECT",
-        scopeId: id,
-        featureKey,
-        model: model || null,
-      });
-      await invalidate();
-      toaster.create({
-        title: `Feature override updated`,
-        type: "success",
-        duration: 2500,
-        meta: { closable: true },
-      });
-    } catch (err) {
-      toaster.create({
-        title: "Failed to update feature override",
-        description: err instanceof Error ? err.message : String(err),
-        type: "error",
-        duration: 5000,
-        meta: { closable: true },
-      });
-    }
-  };
+  const featureByKey = useMemo(() => {
+    const map = new Map<string, DefaultModelsPayload["features"][number]>();
+    for (const f of dataQuery.data?.features ?? []) map.set(f.key, f);
+    return map;
+  }, [dataQuery.data?.features]);
 
   if (dataQuery.isLoading || !dataQuery.data) {
     return (
-      <Card.Root width="full">
+      <Card.Root width="full" data-testid="default-models-section">
         <Card.Body>
           <HStack gap={3}>
             <Spinner size="sm" />
@@ -163,6 +84,7 @@ export function DefaultModelsSection() {
   }
 
   const data = dataQuery.data;
+  const roles: ModelRoleKey[] = ["DEFAULT", "FAST", "EMBEDDINGS"];
 
   return (
     <VStack
@@ -171,276 +93,128 @@ export function DefaultModelsSection() {
       align="stretch"
       data-testid="default-models-section"
     >
-      <HStack gap={3} align="baseline">
-        <Heading as="h3" size="md">
-          Default Models
-        </Heading>
-        <Text fontSize="sm" color="fg.muted">
-          Picked by features that don't ask for a specific model. Resolves
-          project → team → organization, with a built-in fallback.
-        </Text>
+      <HStack gap={3} align="baseline" justify="space-between">
+        <VStack align="start" gap={1}>
+          <Heading as="h3" size="md">
+            Default Models
+          </Heading>
+          <Text fontSize="sm" color="fg.muted">
+            One pick per role flows everywhere. Override per scope or per
+            feature below.
+          </Text>
+        </VStack>
+        <Button
+          size="sm"
+          variant="outline"
+          data-testid="add-override-button"
+          // The drawer is wired by the override-editor lane on top of
+          // this shim. The button stays visible so the page reads
+          // correctly during integration.
+        >
+          <HStack gap={1}>
+            <Plus size={14} />
+            <Text>Add override</Text>
+          </HStack>
+        </Button>
       </HStack>
 
-      {data.roles.map((roleData) => (
-        <RoleLine
-          key={roleData.role}
-          role={roleData.role as ModelRoleKey}
-          effective={roleData.effective}
-          perScope={roleData.perScope}
-          features={roleData.features}
-          organizationName={organization?.name}
-          teamName={team?.name}
-          projectName={project?.name}
-          canManage={canManage}
-          scopeId={scopeId}
-          options={modelChoices}
-          onSetRole={setRole}
-          onSetFeature={setFeature}
-        />
-      ))}
-    </VStack>
-  );
-}
-
-type DefaultModelsPayload =
-  RouterOutputs["modelProvider"]["getDefaultModelsForProject"];
-type RoleData = DefaultModelsPayload["roles"][number];
-
-function RoleLine({
-  role,
-  effective,
-  perScope,
-  features,
-  organizationName,
-  teamName,
-  projectName,
-  canManage,
-  scopeId,
-  options,
-  onSetRole,
-  onSetFeature,
-}: {
-  role: ModelRoleKey;
-  effective: RoleData["effective"];
-  perScope: RoleData["perScope"];
-  features: RoleData["features"];
-  organizationName?: string;
-  teamName?: string;
-  projectName?: string;
-  canManage: (scope: ScopeKey) => boolean;
-  scopeId: (scope: ScopeKey) => string | null;
-  options: string[];
-  onSetRole: (scope: ScopeKey, role: ModelRoleKey, model: string) => void;
-  onSetFeature: (scope: ScopeKey, featureKey: string, model: string) => void;
-}) {
-  const [expanded, setExpanded] = useState(false);
-  const canExpand = role !== "EMBEDDINGS" && features.length > 0;
-  const ChevronIcon = expanded ? ChevronDown : ChevronRight;
-
-  return (
-    <Card.Root width="full" data-testid={`role-line-${role.toLowerCase()}`}>
-      <Card.Body>
-        <VStack align="stretch" gap={3}>
-          <HStack gap={3} align="center">
-            {canExpand && (
-              <Box
-                as="button"
-                onClick={() => setExpanded((prev) => !prev)}
-                cursor="pointer"
-                data-testid={`role-line-${role.toLowerCase()}-expand`}
-              >
-                <ChevronIcon size={18} />
-              </Box>
-            )}
-            {!canExpand && <Box width="18px" />}
-            <Heading as="h4" size="sm">
-              {ROLE_LABEL[role]}
-            </Heading>
-            {effective ? (
-              <>
-                <Badge colorPalette="blue">{effective.model}</Badge>
-                <SourceChip
-                  source={effective.source}
-                  scope={effective.scope}
-                  organizationName={organizationName}
-                  teamName={teamName}
-                  projectName={projectName}
-                />
-              </>
-            ) : (
-              <Badge colorPalette="orange">not configured</Badge>
-            )}
-            <Box flex={1} />
-            <Text fontSize="xs" color="fg.muted">
-              {ROLE_BLURB[role]}
-            </Text>
-          </HStack>
-
-          {/* Per-scope role-level value rows. The user sets the role's
-              model at the scope they manage; clearing falls back to the
-              next scope up. */}
-          <VStack align="stretch" gap={2} paddingLeft={6}>
-            {(["organization", "team", "project"] as const).map((scope) => {
-              const writable = canManage(scope) && !!scopeId(scope);
-              const current = perScope[scope] ?? "";
+      {/* Top: three "effective for this project" lines. */}
+      <Card.Root width="full" data-testid="effective-models-card">
+        <Card.Body>
+          <VStack align="stretch" gap={3}>
+            {roles.map((role) => {
+              const eff = data.effective[role];
               return (
-                <HStack key={scope} gap={3} align="center">
+                <HStack
+                  key={role}
+                  gap={3}
+                  align="center"
+                  data-testid={`role-line-${role.toLowerCase()}`}
+                >
                   <Box width="120px" flexShrink={0}>
-                    <Text fontSize="sm" color="fg.muted">
-                      {SCOPE_LABEL[scope]}
-                    </Text>
+                    <Text fontWeight="medium">{ROLE_LABEL[role]}</Text>
                   </Box>
                   <Box flex={1}>
-                    <ProviderModelSelector
-                      model={current}
-                      options={options}
-                      onChange={(m) => onSetRole(scope, role, m)}
-                      disabled={!writable}
-                    />
+                    {eff ? (
+                      <HStack gap={2}>
+                        <Badge colorPalette="blue">{eff.model}</Badge>
+                        <Text fontSize="xs" color="fg.muted">
+                          {sourceHint(eff.source, eff.scope)}
+                        </Text>
+                      </HStack>
+                    ) : (
+                      <Badge colorPalette="orange">not configured</Badge>
+                    )}
                   </Box>
-                  {!writable && scopeId(scope) && (
-                    <Tooltip
-                      content={
-                        scope === "project"
-                          ? "Requires project:update permission"
-                          : `Requires ${scope}:manage permission`
-                      }
-                    >
-                      <Badge colorPalette="gray" variant="subtle">
-                        read-only
-                      </Badge>
-                    </Tooltip>
-                  )}
+                  <Tooltip content={ROLE_BLURB[role]}>
+                    <Text fontSize="xs" color="fg.muted" maxWidth="320px">
+                      {ROLE_BLURB[role]}
+                    </Text>
+                  </Tooltip>
                 </HStack>
               );
             })}
           </VStack>
+        </Card.Body>
+      </Card.Root>
 
-          {canExpand && expanded && (
-            <VStack
-              align="stretch"
-              gap={2}
-              paddingLeft={6}
-              data-testid={`role-line-${role.toLowerCase()}-features`}
-            >
-              <Text fontSize="xs" color="fg.muted" fontWeight="medium">
-                Features using this role
+      {/* Flat overrides list, RBAC-style. */}
+      <Card.Root width="full" data-testid="overrides-card">
+        <Card.Body>
+          <VStack align="stretch" gap={3}>
+            <Heading as="h4" size="sm">
+              Overrides
+            </Heading>
+            {data.assignments.length === 0 ? (
+              <Text fontSize="sm" color="fg.muted">
+                No overrides yet. Add one to point a scope or a feature at
+                a different model.
               </Text>
-              {features.map((f) => (
-                <FeatureRow
-                  key={f.key}
-                  feature={f}
-                  role={role}
-                  canManage={canManage}
-                  scopeId={scopeId}
-                  options={options}
-                  onSetFeature={onSetFeature}
-                />
-              ))}
-            </VStack>
-          )}
-        </VStack>
-      </Card.Body>
-    </Card.Root>
+            ) : (
+              data.assignments.map((a) => {
+                const feature = a.featureKey
+                  ? featureByKey.get(a.featureKey)
+                  : null;
+                return (
+                  <HStack
+                    key={a.id}
+                    gap={3}
+                    align="center"
+                    data-testid={`assignment-row-${a.id}`}
+                  >
+                    <Box width="160px" flexShrink={0}>
+                      <Text fontSize="sm" fontWeight="medium">
+                        {ROLE_LABEL[a.role as ModelRoleKey]}
+                        {feature ? ` · ${feature.displayName}` : ""}
+                      </Text>
+                    </Box>
+                    <Box flex={1}>
+                      <HStack gap={2} flexWrap="wrap">
+                        <Badge colorPalette="blue">{a.model}</Badge>
+                        {a.scopes.map((s) => (
+                          <Badge
+                            key={`${s.type}:${s.id}`}
+                            colorPalette="gray"
+                            variant="subtle"
+                          >
+                            {SCOPE_CHIP_LABEL[s.type]} · {s.name}
+                          </Badge>
+                        ))}
+                      </HStack>
+                    </Box>
+                  </HStack>
+                );
+              })
+            )}
+          </VStack>
+        </Card.Body>
+      </Card.Root>
+    </VStack>
   );
 }
 
-function SourceChip({
-  source,
-  scope,
-  organizationName,
-  teamName,
-  projectName,
-}: {
-  source: string;
-  scope: string | null;
-  organizationName?: string;
-  teamName?: string;
-  projectName?: string;
-}) {
-  if (source === "constant") {
-    return (
-      <Text fontSize="xs" color="fg.muted">
-        built-in fallback
-      </Text>
-    );
-  }
-  if (source === "feature_override") {
-    return (
-      <Text fontSize="xs" color="fg.muted">
-        feature override · {scope}
-      </Text>
-    );
-  }
-  // role_default
-  const named =
-    scope === "organization"
-      ? organizationName
-      : scope === "team"
-        ? teamName
-        : scope === "project"
-          ? projectName
-          : null;
-  return (
-    <Text fontSize="xs" color="fg.muted">
-      inherited from {scope}
-      {named ? ` ${named}` : ""}
-    </Text>
-  );
-}
-
-function FeatureRow({
-  feature,
-  role,
-  canManage,
-  scopeId,
-  options,
-  onSetFeature,
-}: {
-  feature: RoleData["features"][number];
-  role: ModelRoleKey;
-  canManage: (scope: ScopeKey) => boolean;
-  scopeId: (scope: ScopeKey) => string | null;
-  options: string[];
-  onSetFeature: (scope: ScopeKey, featureKey: string, model: string) => void;
-}) {
-  // Per-feature override is currently editable at project scope only.
-  // Org/team override surfaces stay viewable below as @unimplemented in
-  // the spec until B3.2c lands the scope-line UI.
-  const writable = canManage("project") && !!scopeId("project");
-  const current = feature.perScope.project ?? "";
-  const hasAnyOverride =
-    feature.perScope.project !== null ||
-    feature.perScope.team !== null ||
-    feature.perScope.organization !== null;
-  const effectiveLabel = feature.effective
-    ? feature.effective.source === "feature_override"
-      ? `feature override (${feature.effective.scope}) · ${feature.effective.model}`
-      : `inherits ${ROLE_LABEL[role]} (${feature.effective.model})`
-    : "not configured";
-  return (
-    <HStack
-      gap={3}
-      align="center"
-      data-testid={`feature-row-${feature.key}`}
-    >
-      <Box width="160px" flexShrink={0}>
-        <Text fontSize="sm">{feature.displayName}</Text>
-        <Text fontSize="xs" color="fg.muted">
-          {feature.description}
-        </Text>
-      </Box>
-      <Box flex={1}>
-        <ProviderModelSelector
-          model={current}
-          options={options}
-          onChange={(m) => onSetFeature("project", feature.key, m)}
-          disabled={!writable}
-        />
-      </Box>
-      <Text fontSize="xs" color={hasAnyOverride ? "fg" : "fg.muted"}>
-        {effectiveLabel}
-      </Text>
-    </HStack>
-  );
+function sourceHint(source: string, scope: string | null): string {
+  if (source === "constant") return "built-in fallback";
+  if (source === "feature_override") return `feature override · ${scope}`;
+  return `from ${scope}`;
 }
