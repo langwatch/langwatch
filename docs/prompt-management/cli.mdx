@@ -281,19 +281,18 @@ This is the same structure as [GitHub Prompts](https://docs.github.com/en/github
 
 #### Model selection
 
-`langwatch prompt create` writes the current flagship model. Always keep
-`model` on a modern model — the latest OpenAI generation is `openai/gpt-5.5`.
-Do not pin a legacy model such as `gpt-4o-mini`; the platform applies the same
-current default when a prompt is synced without an explicit model.
+`langwatch prompt create` writes the current flagship model. Prefer modern
+defaults — the latest OpenAI generation is `openai/gpt-5.5`. Pick an older
+or cheaper model (for example `gpt-4o-mini`) when you intentionally optimize
+for cost or latency; the platform applies the same current default when a
+prompt is synced without an explicit model.
 
 #### Temperature and the gpt-5 family
 
 The gpt-5 family rejects a custom `temperature`. Do **not** set
 `modelParameters.temperature` for those models — `langwatch prompt create`
-omits it on purpose. The platform also strips sampling parameters a model
-cannot accept, so a `pull` never writes a `temperature` back into your YAML
-for a model that would reject it. Only add `temperature` for a model that
-explicitly supports it.
+omits it on purpose. Sync stays a pure pass-through: a `pull` writes back
+exactly what the platform stored, no value invented or stripped.
 
 #### Structured outputs (`response_format`)
 

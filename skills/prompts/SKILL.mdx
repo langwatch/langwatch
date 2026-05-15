@@ -143,6 +143,6 @@ Run `langwatch prompt list` to confirm everything synced, or open the Prompts se
 - Do NOT add a hardcoded fallback string in a try/catch — that silently defeats versioning
 - Do NOT manually edit `prompts.json` — use the CLI
 - Do NOT skip `langwatch prompt sync` after creating prompts
-- Do NOT pin a legacy model (`gpt-4o-mini`, `gpt-4o`) — use the current flagship (`openai/gpt-5.5`)
+- Prefer the current flagship (`openai/gpt-5.5`) — pick an older model like `gpt-4o-mini` only when intentionally optimizing for cost or latency
 - Do NOT set `modelParameters.temperature` on a gpt-5-family model — it will be rejected
 - Do NOT ask for JSON in the prompt text when output must be structured — use a `response_format` block

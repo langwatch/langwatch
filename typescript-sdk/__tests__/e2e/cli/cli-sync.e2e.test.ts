@@ -99,12 +99,12 @@ describe("CLI E2E", () => {
         const createResult = cli.run(`prompt create ${promptHandle}`);
         expectCliResultSuccess(createResult);
 
-        // Verify prompt file content
+        // Verify prompt file content. Tracks the CLI default template; the
+        // template intentionally omits modelParameters.temperature because
+        // the gpt-5 family rejects a custom temperature.
         expect(localPromptFileManagement.getPromptFileContent(promptHandle))
           .toMatchInlineSnapshot(`
-          "model: openai/gpt-5
-          modelParameters:
-            temperature: 0.7
+          "model: openai/gpt-5.5
           messages:
             - role: system
               content: You are a helpful assistant.
@@ -128,8 +128,9 @@ describe("CLI E2E", () => {
         if (!remotePrompt) {
           throw new Error("Remote prompt not found");
         }
-        expect(remotePrompt.model).toBe("openai/gpt-5");
-        expect(remotePrompt.temperature).toBe(0.7);
+        expect(remotePrompt.model).toBe("openai/gpt-5.5");
+        // Template omits temperature, so nothing is pushed.
+        expect(remotePrompt.temperature).toBeUndefined();
         expect(remotePrompt.messages).toEqual([
           { role: "system", content: "You are a helpful assistant." },
           { role: "user", content: "{{input}}" },

@@ -62,7 +62,8 @@ Feature: Prompt sync fidelity between the platform and local YAML
     Given a local prompt YAML with no modelParameters temperature
     When the prompt is pushed to the platform
     Then the sync payload has no temperature
-    # Removing temperature from the YAML therefore clears it on the next pull
+    # The full create-push-pull cycle is asserted by the @e2e scenario below,
+    # which proves removing temperature from the YAML clears it end-to-end.
 
   @unit
   Scenario: Creating a prompt via the CLI does not inject a temperature
