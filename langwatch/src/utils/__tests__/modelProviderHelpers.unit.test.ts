@@ -183,6 +183,65 @@ describe("modelProviderHelpers", () => {
       // Embeddings falls all the way through to the constant.
       expect(result.embeddingsModel.source).toBe("constant");
     });
+
+    it("reports 'project' source when the project sets the value", () => {
+      const result = getEffectiveDefaultsWithSource(
+        { defaultModel: "anthropic/claude-sonnet-4-6" },
+        { defaultModel: "openai/gpt-4o" },
+        { defaultModel: "openai/gpt-5.5" },
+      );
+
+      expect(result.defaultModel.value).toBe("anthropic/claude-sonnet-4-6");
+      expect(result.defaultModel.source).toBe("project");
+    });
+
+    it("reports 'organization' source when only the org sets the value", () => {
+      const result = getEffectiveDefaultsWithSource(
+        { embeddingsModel: null },
+        { embeddingsModel: null },
+        { embeddingsModel: "openai/text-embedding-3-large" },
+      );
+
+      expect(result.embeddingsModel.value).toBe(
+        "openai/text-embedding-3-large",
+      );
+      expect(result.embeddingsModel.source).toBe("organization");
+    });
+
+    it("reports the topicClusteringModel source independently", () => {
+      const result = getEffectiveDefaultsWithSource(
+        { topicClusteringModel: null },
+        { topicClusteringModel: "openai/gpt-4o-mini" },
+        { topicClusteringModel: null },
+      );
+
+      expect(result.topicClusteringModel.value).toBe("openai/gpt-4o-mini");
+      expect(result.topicClusteringModel.source).toBe("team");
+    });
+
+    it("can carry different sources for the three fields in one result", () => {
+      const result = getEffectiveDefaultsWithSource(
+        {
+          defaultModel: "anthropic/claude-sonnet-4-6",
+          topicClusteringModel: null,
+          embeddingsModel: null,
+        },
+        {
+          defaultModel: null,
+          topicClusteringModel: "openai/gpt-4o-mini",
+          embeddingsModel: null,
+        },
+        {
+          defaultModel: null,
+          topicClusteringModel: null,
+          embeddingsModel: "openai/text-embedding-3-large",
+        },
+      );
+
+      expect(result.defaultModel.source).toBe("project");
+      expect(result.topicClusteringModel.source).toBe("team");
+      expect(result.embeddingsModel.source).toBe("organization");
+    });
   });
 
   describe("isProviderDefaultModel()", () => {
