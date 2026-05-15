@@ -1,0 +1,806 @@
+import { useChat } from "@ai-sdk/react";
+import {
+  Box,
+  Button,
+  HStack,
+  IconButton,
+  Input,
+  Spinner,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
+import { DefaultChatTransport, type UIMessage } from "ai";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  LuArrowRight,
+  LuCheck,
+  LuSend,
+  LuSparkles,
+  LuSquare,
+  LuX,
+} from "react-icons/lu";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { Markdown } from "~/components/Markdown";
+import { toaster } from "~/components/ui/toaster";
+import { isHandledByGlobalHandler } from "~/utils/trpcError";
+
+const DRAWER_WIDTH = 420;
+const HANDLE_WIDTH = 26;
+const PANEL_GUTTER = 16;
+
+/**
+ * Total horizontal space the Langy panel occupies when docked open
+ * (panel width + the right-side gutter). Page layouts can use this
+ * to shift content out of the way with a matching transition.
+ */
+export const LANGY_DOCKED_OFFSET = DRAWER_WIDTH + PANEL_GUTTER;
+export const LANGY_TRANSITION = "360ms cubic-bezier(0.32, 0.72, 0, 1)";
+
+const SAMPLE_PROMPTS = [
+  "Summarize my current experiment",
+  "Which rows are failing and why?",
+  "Suggest an evaluator for measuring RAG hallucinations",
+];
+
+export interface LangyProposal {
+  langyProposal: true;
+  kind: string;
+  summary: string;
+  rationale?: string;
+  destructive?: boolean;
+  payload: Record<string, unknown>;
+}
+
+export type AppliedOutcome = {
+  /** Label for the "open" affordance. Defaults to "Open". */
+  label?: string;
+  /** If provided, clicking the applied card triggers this (e.g. openDrawer). */
+  onOpen?: () => void;
+  /** Fallback link target if no onOpen is provided. */
+  href?: string;
+} | void;
+
+export type ProposalHandlers = Record<
+  string,
+  (payload: Record<string, unknown>) => Promise<AppliedOutcome>
+>;
+
+interface LangyDrawerProps {
+  proposalHandlers?: ProposalHandlers;
+  experimentSlug?: string;
+  /**
+   * Controlled open state. When provided, the parent owns visibility —
+   * which is what enables the surrounding layout to shift in lockstep.
+   * If omitted, the drawer manages its own state (overlay-style).
+   */
+  isOpen?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}
+
+export function LangyDrawer({
+  proposalHandlers,
+  experimentSlug,
+  isOpen: isOpenProp,
+  onOpenChange,
+}: LangyDrawerProps) {
+  const isControlled = isOpenProp !== undefined;
+  const [internalOpen, setInternalOpen] = useState(false);
+  const isOpen = isControlled ? isOpenProp : internalOpen;
+  const setIsOpen = (next: boolean) => {
+    if (!isControlled) setInternalOpen(next);
+    onOpenChange?.(next);
+  };
+
+  return (
+    <>
+      <LangyHandle isOpen={isOpen} onToggle={() => setIsOpen(!isOpen)} />
+      <LangyPanel
+        isOpen={isOpen}
+        onClose={() => setIsOpen(false)}
+        proposalHandlers={proposalHandlers}
+        experimentSlug={experimentSlug}
+      />
+    </>
+  );
+}
+
+function LangyHandle({
+  isOpen,
+  onToggle,
+}: {
+  isOpen: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <Box
+      as="button"
+      onClick={onToggle}
+      aria-label={isOpen ? "Close Langy" : "Open Langy"}
+      position="fixed"
+      right={isOpen ? `${DRAWER_WIDTH + PANEL_GUTTER / 2}px` : 0}
+      top="50%"
+      transform="translateY(-50%)"
+      width={`${HANDLE_WIDTH}px`}
+      height="84px"
+      zIndex={1600}
+      cursor="pointer"
+      borderTopLeftRadius="lg"
+      borderBottomLeftRadius="lg"
+      background="bg.surface/80"
+      backdropFilter="blur(25px)"
+      borderWidth="1px"
+      borderColor="border.emphasized"
+      borderRightWidth={0}
+      boxShadow="sm"
+      color={isOpen ? "blue.fg" : "fg.muted"}
+      transition={`right ${LANGY_TRANSITION}, transform 180ms ease, color 180ms ease, background 180ms ease`}
+      _hover={{
+        transform: "translate(-2px, -50%)",
+        color: "blue.fg",
+        background: "bg.panel/90",
+      }}
+    >
+      <VStack gap={1.5} height="full" justify="center">
+        <LuSparkles size={14} />
+        <Text
+          fontSize="10px"
+          fontWeight="600"
+          letterSpacing="0.12em"
+          style={{
+            writingMode: "vertical-rl",
+            textOrientation: "mixed",
+            transform: "rotate(180deg)",
+          }}
+        >
+          LANGY
+        </Text>
+      </VStack>
+    </Box>
+  );
+}
+
+function LangyPanel({
+  isOpen,
+  onClose,
+  proposalHandlers,
+  experimentSlug,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  proposalHandlers?: ProposalHandlers;
+  experimentSlug?: string;
+}) {
+  const { project } = useOrganizationTeamProject();
+  const projectId = project?.id;
+
+  const [input, setInput] = useState("");
+  const [appliedOutcomes, setAppliedOutcomes] = useState<
+    Record<
+      string,
+      { href?: string; label?: string; onOpen?: () => void }
+    >
+  >({});
+  const [discardedProposals, setDiscardedProposals] = useState<Set<string>>(
+    new Set(),
+  );
+  const [applyingProposals, setApplyingProposals] = useState<Set<string>>(
+    new Set(),
+  );
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const transport = useMemo(
+    () => new DefaultChatTransport({ api: "/api/langy/chat" }),
+    [],
+  );
+  const { messages, sendMessage, stop, status } = useChat({
+    transport,
+    onError: (error) => {
+      if (isHandledByGlobalHandler(error)) return;
+      toaster.create({
+        title: "Langy error",
+        description: error.message,
+        type: "error",
+        duration: 5000,
+        meta: { closable: true },
+      });
+    },
+  });
+
+  useEffect(() => {
+    if (!scrollRef.current) return;
+    scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [messages, status]);
+
+  const isBusy = status === "submitted" || status === "streaming";
+
+  const send = async (text: string) => {
+    if (!text.trim() || !projectId || isBusy) return;
+    setInput("");
+    await sendMessage(
+      { role: "user", parts: [{ type: "text", text }] },
+      { body: { projectId, experimentSlug } },
+    );
+  };
+
+  const applyProposal = async (
+    proposalId: string,
+    proposal: LangyProposal,
+  ) => {
+    if (applyingProposals.has(proposalId)) return;
+    if (proposalId in appliedOutcomes) return;
+    if (discardedProposals.has(proposalId)) return;
+    const handler = proposalHandlers?.[proposal.kind];
+    if (!handler) {
+      toaster.create({
+        title: "Cannot apply",
+        description: `No handler for '${proposal.kind}' on this page.`,
+        type: "error",
+        duration: 5000,
+        meta: { closable: true },
+      });
+      return;
+    }
+    setApplyingProposals((prev) => new Set(prev).add(proposalId));
+    try {
+      const outcome = await handler(proposal.payload);
+      setAppliedOutcomes((prev) => ({
+        ...prev,
+        [proposalId]: outcome ?? {},
+      }));
+      toaster.create({
+        title: "Applied",
+        description: proposal.summary,
+        type: "success",
+        duration: 3000,
+        meta: { closable: true },
+      });
+    } catch (error) {
+      if (!isHandledByGlobalHandler(error)) {
+        toaster.create({
+          title: "Failed to apply",
+          description: error instanceof Error ? error.message : "Unknown error",
+          type: "error",
+          duration: 5000,
+          meta: { closable: true },
+        });
+      }
+    } finally {
+      setApplyingProposals((prev) => {
+        const next = new Set(prev);
+        next.delete(proposalId);
+        return next;
+      });
+    }
+  };
+
+  const discardProposal = (proposalId: string) => {
+    setDiscardedProposals((prev) => new Set(prev).add(proposalId));
+  };
+
+  return (
+    <Box
+      position="fixed"
+      top={2}
+      right={2}
+      bottom={2}
+      width={`${DRAWER_WIDTH}px`}
+      zIndex={1500}
+      borderRadius="lg"
+      background="bg.surface/85"
+      backdropFilter="blur(28px) saturate(140%)"
+      borderWidth="1px"
+      borderColor="border.emphasized"
+      boxShadow="0 24px 60px -20px rgba(15, 23, 42, 0.35), 0 8px 20px -8px rgba(15, 23, 42, 0.2)"
+      transition={`transform ${LANGY_TRANSITION}, opacity 220ms ease`}
+      transform={
+        isOpen
+          ? "translateX(0)"
+          : `translateX(calc(${DRAWER_WIDTH}px + ${PANEL_GUTTER}px))`
+      }
+      opacity={isOpen ? 1 : 0}
+      pointerEvents={isOpen ? "auto" : "none"}
+      aria-hidden={!isOpen}
+    >
+      <VStack gap={0} align="stretch" height="full">
+        <PanelHeader onClose={onClose} />
+        <Box ref={scrollRef} flex={1} overflowY="auto" paddingX={4} paddingY={4}>
+          {messages.length === 0 ? (
+            <EmptyState onPick={(prompt) => void send(prompt)} />
+          ) : (
+            <VStack gap={3} align="stretch">
+              {messages.map((message) => (
+                <MessageContent
+                  key={message.id}
+                  message={message}
+                  appliedOutcomes={appliedOutcomes}
+                  discardedProposals={discardedProposals}
+                  applyingProposals={applyingProposals}
+                  onApply={applyProposal}
+                  onDiscard={discardProposal}
+                />
+              ))}
+              {isBusy && <ThinkingIndicator messages={messages} />}
+            </VStack>
+          )}
+        </Box>
+        <Composer
+          input={input}
+          onInputChange={setInput}
+          onSend={() => void send(input)}
+          onStop={() => void stop()}
+          isBusy={isBusy}
+          disabled={!projectId}
+          canSend={!!input.trim() && !isBusy && !!projectId}
+        />
+      </VStack>
+    </Box>
+  );
+}
+
+function PanelHeader({ onClose }: { onClose: () => void }) {
+  return (
+    <HStack
+      paddingX={4}
+      paddingY={3}
+      borderBottomWidth="1px"
+      borderColor="border.muted"
+      gap={3}
+    >
+      <Box
+        width="28px"
+        height="28px"
+        borderRadius="md"
+        display="flex"
+        alignItems="center"
+        justifyContent="center"
+        background="blue.subtle"
+        color="blue.fg"
+      >
+        <LuSparkles size={14} />
+      </Box>
+      <VStack align="start" gap={0}>
+        <Text fontSize="sm" fontWeight="600" color="fg">
+          Langy
+        </Text>
+        <Text fontSize="xs" color="fg.muted">
+          Propose &amp; apply
+        </Text>
+      </VStack>
+      <Box flex={1} />
+      <IconButton
+        size="xs"
+        variant="ghost"
+        aria-label="Close Langy"
+        onClick={onClose}
+      >
+        <LuX size={14} />
+      </IconButton>
+    </HStack>
+  );
+}
+
+function ThinkingIndicator({ messages }: { messages: UIMessage[] }) {
+  const last = messages.at(-1);
+  const activeTool =
+    last?.role === "assistant"
+      ? last.parts.findLast((part) => part.type?.startsWith("tool-"))
+      : undefined;
+  const label = activeTool?.type
+    ? activeTool.type.replace(/^tool-/, "").replace(/_/g, " ")
+    : "thinking";
+
+  return (
+    <HStack
+      color="fg.muted"
+      fontSize="xs"
+      paddingX={3}
+      paddingY={2}
+      borderRadius="md"
+      background="bg.subtle"
+      borderWidth="1px"
+      borderColor="border.muted"
+      alignSelf="flex-start"
+    >
+      <Spinner size="xs" colorPalette="blue" />
+      <Text>Langy is {label}…</Text>
+    </HStack>
+  );
+}
+
+function Composer({
+  input,
+  onInputChange,
+  onSend,
+  onStop,
+  isBusy,
+  disabled,
+  canSend,
+}: {
+  input: string;
+  onInputChange: (v: string) => void;
+  onSend: () => void;
+  onStop: () => void;
+  isBusy: boolean;
+  disabled: boolean;
+  canSend: boolean;
+}) {
+  return (
+    <Box
+      paddingX={3}
+      paddingY={3}
+      borderTopWidth="1px"
+      borderColor="border.muted"
+    >
+      <HStack gap={2}>
+        <Input
+          placeholder={
+            isBusy ? "Langy is working…" : "Ask Langy or describe what you want…"
+          }
+          value={input}
+          onChange={(e) => onInputChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              if (!isBusy) onSend();
+            }
+          }}
+          disabled={disabled || isBusy}
+          size="sm"
+          variant="outline"
+          borderColor="border.emphasized"
+          background="bg.panel"
+        />
+        {isBusy ? (
+          <IconButton
+            size="sm"
+            colorPalette="red"
+            variant="outline"
+            aria-label="Stop"
+            onClick={onStop}
+          >
+            <LuSquare size={12} />
+          </IconButton>
+        ) : (
+          <IconButton
+            size="sm"
+            colorPalette="blue"
+            aria-label="Send"
+            onClick={onSend}
+            disabled={!canSend}
+          >
+            <LuSend size={14} />
+          </IconButton>
+        )}
+      </HStack>
+    </Box>
+  );
+}
+
+function EmptyState({ onPick }: { onPick: (prompt: string) => void }) {
+  return (
+    <VStack align="stretch" gap={3} paddingTop={2}>
+      <VStack align="start" gap={1}>
+        <Text fontSize="sm" fontWeight="600" color="fg">
+          Hey, I&apos;m Langy.
+        </Text>
+        <Text fontSize="xs" color="fg.muted" lineHeight="1.55">
+          I can propose evaluators, help you pick the right one for your
+          experiment, and (soon) touch prompts and datasets. Try:
+        </Text>
+      </VStack>
+      <VStack align="stretch" gap={2}>
+        {SAMPLE_PROMPTS.map((prompt) => (
+          <Box
+            key={prompt}
+            as="button"
+            textAlign="left"
+            paddingX={3}
+            paddingY="10px"
+            borderRadius="md"
+            cursor="pointer"
+            background="bg.panel"
+            borderWidth="1px"
+            borderColor="border.muted"
+            boxShadow="2xs"
+            transition="background 150ms ease, border-color 150ms ease"
+            _hover={{
+              background: "bg.subtle",
+              borderColor: "border.emphasized",
+            }}
+            onClick={() => onPick(prompt)}
+          >
+            <HStack gap={2} align="flex-start">
+              <Box color="blue.fg" paddingTop="2px">
+                <LuArrowRight size={12} />
+              </Box>
+              <Text fontSize="xs" color="fg" lineHeight="1.5">
+                {prompt}
+              </Text>
+            </HStack>
+          </Box>
+        ))}
+      </VStack>
+    </VStack>
+  );
+}
+
+function MessageContent({
+  message,
+  appliedOutcomes,
+  discardedProposals,
+  applyingProposals,
+  onApply,
+  onDiscard,
+}: {
+  message: UIMessage;
+  appliedOutcomes: Record<
+    string,
+    { href?: string; label?: string; onOpen?: () => void }
+  >;
+  discardedProposals: Set<string>;
+  applyingProposals: Set<string>;
+  onApply: (proposalId: string, proposal: LangyProposal) => Promise<void>;
+  onDiscard: (proposalId: string) => void;
+}) {
+  const isUser = message.role === "user";
+  const textParts = message.parts
+    .filter((part): part is { type: "text"; text: string } => part.type === "text")
+    .map((part) => part.text)
+    .join("");
+
+  const proposals = extractProposals(message);
+
+  if (!textParts && proposals.length === 0) return null;
+
+  return (
+    <VStack align="stretch" gap={2} width="full">
+      {textParts && (
+        <Box
+          width="full"
+          display="flex"
+          justifyContent={isUser ? "flex-end" : "flex-start"}
+        >
+          <Box
+            maxWidth="88%"
+            paddingX={3}
+            paddingY={2}
+            borderRadius="md"
+            borderTopRightRadius={isUser ? "sm" : "md"}
+            borderTopLeftRadius={isUser ? "md" : "sm"}
+            background={isUser ? "blue.solid" : "bg.panel"}
+            color={isUser ? "white" : "fg"}
+            borderWidth={isUser ? 0 : "1px"}
+            borderColor="border.muted"
+            boxShadow="2xs"
+          >
+            {isUser ? (
+              <Text fontSize="sm" whiteSpace="pre-wrap" lineHeight="1.5">
+                {textParts}
+              </Text>
+            ) : (
+              <Box
+                fontSize="sm"
+                lineHeight="1.55"
+                css={{
+                  "& p": { margin: 0 },
+                  "& p + p": { marginTop: "6px" },
+                  "& ul, & ol": { paddingLeft: "18px", margin: "4px 0" },
+                  "& code": {
+                    fontSize: "12px",
+                    padding: "1px 5px",
+                    borderRadius: "4px",
+                    background: "bg.subtle",
+                  },
+                }}
+              >
+                <Markdown>{textParts}</Markdown>
+              </Box>
+            )}
+          </Box>
+        </Box>
+      )}
+      {proposals.map(({ id, proposal }) => (
+        <ProposalCard
+          key={id}
+          proposal={proposal}
+          appliedOutcome={appliedOutcomes[id]}
+          isDiscarded={discardedProposals.has(id)}
+          isApplying={applyingProposals.has(id)}
+          onApply={() => void onApply(id, proposal)}
+          onDiscard={() => onDiscard(id)}
+        />
+      ))}
+    </VStack>
+  );
+}
+
+function ProposalCard({
+  proposal,
+  appliedOutcome,
+  isDiscarded,
+  isApplying,
+  onApply,
+  onDiscard,
+}: {
+  proposal: LangyProposal;
+  appliedOutcome?: { href?: string; label?: string; onOpen?: () => void };
+  isDiscarded: boolean;
+  isApplying: boolean;
+  onApply: () => void;
+  onDiscard: () => void;
+}) {
+  const isApplied = !!appliedOutcome;
+  const destructive = !!proposal.destructive;
+  const faded = isDiscarded;
+  const statusLabel = isApplied
+    ? destructive
+      ? "Done"
+      : "Applied"
+    : isDiscarded
+      ? "Discarded"
+      : isApplying
+        ? destructive
+          ? "Deleting…"
+          : "Applying…"
+        : destructive
+          ? "Langy wants to delete"
+          : "Langy proposes";
+  const accentPalette = isApplied
+    ? destructive
+      ? "gray"
+      : "green"
+    : destructive
+      ? "red"
+      : "blue";
+  const borderTone = isApplied
+    ? destructive
+      ? "border.emphasized"
+      : "green.emphasized"
+    : destructive
+      ? "red.emphasized"
+      : "blue.emphasized";
+  const primaryButtonLabel = destructive ? "Delete" : "Apply";
+  const openHref = appliedOutcome?.href;
+  const onOpen = appliedOutcome?.onOpen;
+  const openLabel = appliedOutcome?.label ?? "Open";
+  const hasOpen = !!onOpen || !!openHref;
+
+  const triggerOpen = () => {
+    if (onOpen) {
+      onOpen();
+      return;
+    }
+    if (openHref) {
+      window.location.href = openHref;
+    }
+  };
+
+  return (
+    <Box
+      padding={3}
+      borderRadius="lg"
+      background="bg.panel"
+      borderWidth="1px"
+      borderColor={borderTone}
+      boxShadow="sm"
+      opacity={faded ? 0.75 : 1}
+      cursor={hasOpen ? "pointer" : "default"}
+      onClick={(e) => {
+        if (!hasOpen) return;
+        const target = e.target as HTMLElement;
+        if (target.closest("a, button")) return;
+        triggerOpen();
+      }}
+      transition="border-color 150ms ease, box-shadow 150ms ease"
+      _hover={
+        hasOpen
+          ? { borderColor: "green.fg", boxShadow: "md" }
+          : undefined
+      }
+    >
+      <VStack align="stretch" gap={2}>
+        <HStack gap={2}>
+          <Box
+            width="20px"
+            height="20px"
+            borderRadius="sm"
+            display="flex"
+            alignItems="center"
+            justifyContent="center"
+            background={`${accentPalette}.subtle`}
+            color={`${accentPalette}.fg`}
+          >
+            {isApplied ? <LuCheck size={12} /> : <LuSparkles size={12} />}
+          </Box>
+          <Text
+            fontSize="10px"
+            fontWeight="600"
+            letterSpacing="0.08em"
+            textTransform="uppercase"
+            color={`${accentPalette}.fg`}
+          >
+            {statusLabel}
+          </Text>
+        </HStack>
+        <Text fontSize="sm" fontWeight="600" color="fg">
+          {proposal.summary}
+        </Text>
+        {proposal.rationale && (
+          <Text fontSize="xs" color="fg.muted" lineHeight="1.5">
+            {proposal.rationale}
+          </Text>
+        )}
+        {!isApplied && !isDiscarded && (
+          <HStack gap={2} paddingTop={1}>
+            <Button
+              size="xs"
+              colorPalette={destructive ? "red" : "blue"}
+              onClick={onApply}
+              disabled={isApplying}
+              loading={isApplying}
+            >
+              <LuCheck size={12} />
+              {primaryButtonLabel}
+            </Button>
+            <Button
+              size="xs"
+              variant="ghost"
+              onClick={onDiscard}
+              disabled={isApplying}
+            >
+              {destructive ? "Cancel" : "Discard"}
+            </Button>
+          </HStack>
+        )}
+        {isApplied && hasOpen && (
+          <HStack gap={2} paddingTop={1}>
+            {onOpen ? (
+              <Button
+                size="xs"
+                variant="outline"
+                colorPalette="green"
+                onClick={triggerOpen}
+              >
+                {openLabel}
+                <LuArrowRight size={12} />
+              </Button>
+            ) : openHref ? (
+              <Button size="xs" variant="outline" colorPalette="green" asChild>
+                <a href={openHref}>
+                  {openLabel}
+                  <LuArrowRight size={12} />
+                </a>
+              </Button>
+            ) : null}
+          </HStack>
+        )}
+      </VStack>
+    </Box>
+  );
+}
+
+function extractProposals(
+  message: UIMessage,
+): Array<{ id: string; proposal: LangyProposal }> {
+  const result: Array<{ id: string; proposal: LangyProposal }> = [];
+  for (const part of message.parts) {
+    if (!part.type?.startsWith("tool-")) continue;
+    const output = (part as { output?: unknown }).output;
+    if (!isLangyProposal(output)) continue;
+    const id =
+      (part as { toolCallId?: string }).toolCallId ??
+      `${message.id}:${result.length}`;
+    result.push({ id, proposal: output });
+  }
+  return result;
+}
+
+function isLangyProposal(value: unknown): value is LangyProposal {
+  if (!value || typeof value !== "object") return false;
+  const v = value as Record<string, unknown>;
+  return (
+    v.langyProposal === true &&
+    typeof v.kind === "string" &&
+    typeof v.summary === "string"
+  );
+}
