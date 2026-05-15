@@ -20,16 +20,14 @@ import { createServer, type Server } from "node:http";
 import { AgentRole, type AgentInput } from "@langwatch/scenario";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { HttpAgentData } from "../types";
+import { SerializedHttpAgentAdapter } from "../serialized-adapters/http-agent.adapter";
 
-// Use native fetch so localhost isn't blocked by SSRF protection.
+// Use native fetch so localhost isn't blocked by SSRF protection. Vitest hoists
+// vi.mock above the static import below, so the adapter still gets the mock.
 vi.mock("~/utils/ssrfProtection", () => ({
   ssrfSafeFetch: async (url: string, init?: RequestInit) =>
     fetch(url, init),
 }));
-
-const { SerializedHttpAgentAdapter } = await import(
-  "../serialized-adapters/http-agent.adapter"
-);
 
 interface N8nLikeServer {
   url: string;
@@ -50,13 +48,15 @@ async function createN8nLikeServer(): Promise<N8nLikeServer> {
     req.on("end", () => {
       try {
         parsed = JSON.parse(body);
-      } catch (e) {
+      } catch {
+        // Static hint mirroring n8n's envelope without echoing the parser
+        // exception/stack into the response (CodeQL: stack-trace exposure).
         res.writeHead(422, { "Content-Type": "application/json" });
         res.end(
           JSON.stringify({
             code: 422,
             message: "Failed to parse request body",
-            hint: e instanceof Error ? e.message : String(e),
+            hint: "Bad control character in string literal in JSON",
           }),
         );
         return;

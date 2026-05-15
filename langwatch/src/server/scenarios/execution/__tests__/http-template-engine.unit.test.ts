@@ -30,11 +30,15 @@ function inputWith(content: string | unknown[]): AgentInput {
   };
 }
 
-function render(
-  template: string,
-  input: AgentInput,
-  scenarioMappings?: Record<string, FieldMapping>,
-): string {
+function render({
+  template,
+  input,
+  scenarioMappings,
+}: {
+  template: string;
+  input: AgentInput;
+  scenarioMappings?: Record<string, FieldMapping>;
+}): string {
   return renderBodyTemplate({
     template,
     context: buildTemplateContext({ input, scenarioMappings }),
@@ -46,10 +50,10 @@ describe("body template JSON safety", () => {
     describe("when the value contains a newline", () => {
       /** @scenario A user message with a newline is escaped inside a JSON string literal */
       it("escapes it so the body is valid JSON", () => {
-        const body = render(
-          '{"chatInput": "{{ input }}"}',
-          inputWith("line one\nline two"),
-        );
+        const body = render({
+          template: '{"chatInput": "{{ input }}"}',
+          input: inputWith("line one\nline two"),
+        });
 
         expect(() => JSON.parse(body)).not.toThrow();
         expect(JSON.parse(body).chatInput).toBe("line one\nline two");
@@ -59,10 +63,10 @@ describe("body template JSON safety", () => {
     describe("when the value contains a double quote", () => {
       /** @scenario A user message containing a double quote is escaped */
       it("escapes it so the body is valid JSON", () => {
-        const body = render(
-          '{"chatInput": "{{ input }}"}',
-          inputWith('she said "hi"'),
-        );
+        const body = render({
+          template: '{"chatInput": "{{ input }}"}',
+          input: inputWith('she said "hi"'),
+        });
 
         expect(JSON.parse(body).chatInput).toBe('she said "hi"');
       });
@@ -71,10 +75,10 @@ describe("body template JSON safety", () => {
     describe("when the value contains a backslash", () => {
       /** @scenario A user message containing a backslash is escaped */
       it("escapes it so the body is valid JSON", () => {
-        const body = render(
-          '{"chatInput": "{{ input }}"}',
-          inputWith("path C:\\temp\\new"),
-        );
+        const body = render({
+          template: '{"chatInput": "{{ input }}"}',
+          input: inputWith("path C:\\temp\\new"),
+        });
 
         expect(JSON.parse(body).chatInput).toBe("path C:\\temp\\new");
       });
@@ -82,10 +86,10 @@ describe("body template JSON safety", () => {
 
     describe("when the value contains a tab and a carriage return", () => {
       it("escapes both control characters", () => {
-        const body = render(
-          '{"chatInput": "{{ input }}"}',
-          inputWith("a\tb\rc"),
-        );
+        const body = render({
+          template: '{"chatInput": "{{ input }}"}',
+          input: inputWith("a\tb\rc"),
+        });
 
         expect(JSON.parse(body).chatInput).toBe("a\tb\rc");
       });
@@ -101,7 +105,7 @@ describe("body template JSON safety", () => {
         { role: "assistant", content: 'reply with "quotes"' },
       ];
 
-      const body = render('{"messages": {{messages}}}', input);
+      const body = render({ template: '{"messages": {{messages}}}', input });
 
       const parsed = JSON.parse(body);
       expect(Array.isArray(parsed.messages)).toBe(true);
@@ -115,10 +119,10 @@ describe("body template JSON safety", () => {
         { role: "user", content: 'multi\nline "quoted" \\slash' },
       ];
 
-      const body = render(
-        '{\n  "thread_id": "{{threadId}}",\n  "messages": {{messages}}\n}',
+      const body = render({
+        template: '{\n  "thread_id": "{{threadId}}",\n  "messages": {{messages}}\n}',
         input,
-      );
+      });
 
       const parsed = JSON.parse(body);
       expect(parsed.thread_id).toBe("thread-1");
@@ -129,7 +133,10 @@ describe("body template JSON safety", () => {
   describe("given structured (non-string) message content", () => {
     it("still injects {{input}} raw so {\"input\": {{input}}} stays valid", () => {
       const structured = [{ type: "text", text: "Hello world" }];
-      const body = render('{"input": {{input}}}', inputWith(structured));
+      const body = render({
+        template: '{"input": {{input}}}',
+        input: inputWith(structured),
+      });
 
       expect(JSON.parse(body).input).toEqual(structured);
     });
@@ -138,7 +145,10 @@ describe("body template JSON safety", () => {
   describe("given the raw filter", () => {
     /** @scenario A user can opt a scalar out of escaping with the raw filter */
     it("opts a scalar out of JSON escaping", () => {
-      const body = render('{"passthrough": {{ input | raw }}}', inputWith('{"a":1}'));
+      const body = render({
+        template: '{"passthrough": {{ input | raw }}}',
+        input: inputWith('{"a":1}'),
+      });
 
       expect(JSON.parse(body).passthrough).toEqual({ a: 1 });
     });
@@ -147,11 +157,13 @@ describe("body template JSON safety", () => {
   describe("given scenario mappings", () => {
     /** @scenario Mapped scenario fields routed to a string slot are escaped */
     it("escapes a field mapped to the scenario input", () => {
-      const body = render(
-        '{"q": "{{query}}"}',
-        inputWith("has a\nnewline"),
-        { query: { type: "source", sourceId: "scenario", path: ["input"] } },
-      );
+      const body = render({
+        template: '{"q": "{{query}}"}',
+        input: inputWith("has a\nnewline"),
+        scenarioMappings: {
+          query: { type: "source", sourceId: "scenario", path: ["input"] },
+        },
+      });
 
       expect(JSON.parse(body).q).toBe("has a\nnewline");
     });
@@ -160,21 +172,23 @@ describe("body template JSON safety", () => {
       const input = inputWith("hi");
       input.messages = [{ role: "user", content: "line\nbreak" }];
 
-      const body = render(
-        '{"history": {{context}}}',
+      const body = render({
+        template: '{"history": {{context}}}',
         input,
-        { context: { type: "source", sourceId: "scenario", path: ["messages"] } },
-      );
+        scenarioMappings: {
+          context: { type: "source", sourceId: "scenario", path: ["messages"] },
+        },
+      });
 
       expect(JSON.parse(body).history).toEqual(input.messages);
     });
 
     it("escapes a static value mapping containing control characters", () => {
-      const body = render(
-        '{"sys": "{{ctx}}"}',
-        inputWith("hi"),
-        { ctx: { type: "value", value: 'line\nwith "quote"' } },
-      );
+      const body = render({
+        template: '{"sys": "{{ctx}}"}',
+        input: inputWith("hi"),
+        scenarioMappings: { ctx: { type: "value", value: 'line\nwith "quote"' } },
+      });
 
       expect(JSON.parse(body).sys).toBe('line\nwith "quote"');
     });

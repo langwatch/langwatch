@@ -32,10 +32,10 @@ Feature: HTTP agent body templates always render valid JSON
   @unit
   Scenario: A user message containing a backslash is escaped
     Given an HTTP agent with body template '{"chatInput": "{{ input }}"}'
-    And the last user message content is "path C:\temp\new"
+    And the last user message content is the literal path "C:\\temp\\new"
     When the adapter builds the request body
     Then the rendered body parses as JSON
-    And the parsed "chatInput" equals "path C:\temp\new"
+    And the parsed "chatInput" equals the literal path "C:\\temp\\new"
 
   @unit
   Scenario: Pre-serialized conversation history is still injected as raw JSON
