@@ -3,7 +3,7 @@
  *
  * Unit tests for extractInlineMediaFromEvent.
  */
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 // ---------------------------------------------------------------------------
 // Hoisted mocks — must be declared before any imports that trigger module load
