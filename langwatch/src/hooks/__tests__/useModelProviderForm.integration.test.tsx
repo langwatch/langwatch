@@ -21,11 +21,24 @@ vi.mock("../../utils/api", () => ({
           invalidate: mockInvalidate,
         },
       },
+      modelProvider: {
+        getDefaultModelsForProject: {
+          invalidate: vi.fn(),
+        },
+      },
     }),
     modelProvider: {
       update: {
         useMutation: () => ({
           mutateAsync: mockMutateAsync,
+        }),
+      },
+      // B3 redesign: `useProviderFormSubmit` replays the user's "Set as
+      // default" picks into ModelDefault via this mutation; stub it so
+      // the hook can render.
+      setRoleAssignmentForScope: {
+        useMutation: () => ({
+          mutateAsync: vi.fn().mockResolvedValue({ ok: true }),
         }),
       },
     },
