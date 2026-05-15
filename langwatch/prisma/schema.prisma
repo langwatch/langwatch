@@ -732,6 +732,29 @@ model ModelProviderScope {
     @@index([modelProviderId])
 }
 
+// ModelDefault is the source of truth for "which model does {feature, role}
+// resolve to at {scope}" once the resolver lands in B3.1. A null featureKey
+// is the role-level default for that scope; a populated featureKey is a
+// per-feature override. See specs/model-providers/model-resolver-and-registry.feature.
+//
+// The two partial unique indexes encode the (NULL = role-level) semantics
+// since Postgres treats NULLs as distinct in a single composite unique.
+// They live in the migration alongside the table itself — Prisma can't
+// express partial indexes in schema.prisma.
+model ModelDefault {
+    id         String   @id @default(nanoid())
+    scopeType  String
+    scopeId    String
+    role       String
+    featureKey String?
+    model      String
+    authorId   String?
+    createdAt  DateTime @default(now())
+    updatedAt  DateTime @updatedAt
+
+    @@index([scopeType, scopeId, role])
+}
+
 model ProjectSecret {
     id             String   @id @default(nanoid())
     projectId      String
