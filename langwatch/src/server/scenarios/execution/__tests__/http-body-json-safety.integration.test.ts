@@ -126,6 +126,7 @@ describe("HTTP agent body JSON safety (n8n regression)", () => {
 
   describe("given an n8n-style body template and an awkward conversation turn", () => {
     describe("when the adapter calls the webhook", () => {
+      /** @scenario Adapter posts a parseable body to a real HTTP endpoint */
       it("sends a body the server can JSON-parse (no HTTP 422)", async () => {
         const adapter = new SerializedHttpAgentAdapter(
           config({

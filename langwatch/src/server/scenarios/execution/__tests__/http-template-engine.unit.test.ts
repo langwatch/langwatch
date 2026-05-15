@@ -44,6 +44,7 @@ function render(
 describe("body template JSON safety", () => {
   describe("given a scalar value interpolated inside a JSON string literal", () => {
     describe("when the value contains a newline", () => {
+      /** @scenario A user message with a newline is escaped inside a JSON string literal */
       it("escapes it so the body is valid JSON", () => {
         const body = render(
           '{"chatInput": "{{ input }}"}',
@@ -56,6 +57,7 @@ describe("body template JSON safety", () => {
     });
 
     describe("when the value contains a double quote", () => {
+      /** @scenario A user message containing a double quote is escaped */
       it("escapes it so the body is valid JSON", () => {
         const body = render(
           '{"chatInput": "{{ input }}"}',
@@ -67,6 +69,7 @@ describe("body template JSON safety", () => {
     });
 
     describe("when the value contains a backslash", () => {
+      /** @scenario A user message containing a backslash is escaped */
       it("escapes it so the body is valid JSON", () => {
         const body = render(
           '{"chatInput": "{{ input }}"}',
@@ -90,6 +93,7 @@ describe("body template JSON safety", () => {
   });
 
   describe("given the pre-serialized conversation history", () => {
+    /** @scenario Pre-serialized conversation history is still injected as raw JSON */
     it("injects {{messages}} as a raw JSON array, not an escaped string", () => {
       const input = inputWith("hello");
       input.messages = [
@@ -104,6 +108,7 @@ describe("body template JSON safety", () => {
       expect(parsed.messages).toEqual(input.messages);
     });
 
+    /** @scenario The default body template survives an awkward conversation */
     it("keeps the default threadId+messages template valid for awkward turns", () => {
       const input = inputWith("hi");
       input.messages = [
@@ -131,6 +136,7 @@ describe("body template JSON safety", () => {
   });
 
   describe("given the raw filter", () => {
+    /** @scenario A user can opt a scalar out of escaping with the raw filter */
     it("opts a scalar out of JSON escaping", () => {
       const body = render('{"passthrough": {{ input | raw }}}', inputWith('{"a":1}'));
 
@@ -139,6 +145,7 @@ describe("body template JSON safety", () => {
   });
 
   describe("given scenario mappings", () => {
+    /** @scenario Mapped scenario fields routed to a string slot are escaped */
     it("escapes a field mapped to the scenario input", () => {
       const body = render(
         '{"q": "{{query}}"}',
