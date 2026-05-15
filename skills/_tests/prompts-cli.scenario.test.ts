@@ -248,4 +248,82 @@ describe("LangWatch Prompts CLI — Agent Usability", () => {
     },
     900_000
   );
+
+  it.skipIf(isCI)(
+    "agent adds a structured-output prompt with a modern model",
+    async () => {
+      const tempFolder = fs.mkdtempSync(
+        path.join(os.tmpdir(), "langwatch-cli-prompts-structured-")
+      );
+
+      fs.writeFileSync(
+        path.join(tempFolder, ".env"),
+        `LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}\n`
+      );
+      fs.writeFileSync(
+        path.join(tempFolder, "prompts.json"),
+        JSON.stringify({ prompts: {} })
+      );
+      fs.writeFileSync(
+        path.join(tempFolder, "prompts-lock.json"),
+        JSON.stringify({ lockfileVersion: 1, prompts: {} })
+      );
+      fs.mkdirSync(path.join(tempFolder, "prompts"), { recursive: true });
+
+      const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
+        name: "CLI structured-output prompt",
+        description:
+          "Developer wants a prompt that classifies a product and must return strict JSON with a category and reasoning, versioned via the LangWatch Prompts CLI.",
+        agents: [
+          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          scenario.userSimulatorAgent({ model: judgeModel }),
+          scenario.judgeAgent({
+            model: judgeModel,
+            criteria: [
+              "Agent created the prompt using the langwatch prompt CLI",
+              "Agent declared structured outputs via a response_format block rather than only asking for JSON in the prompt text",
+              "Agent kept the prompt on a current model and did not downgrade to a legacy model like gpt-4o-mini",
+            ],
+          }),
+        ],
+        script: [
+          scenario.user(
+            "use the langwatch prompt cli to version a new prompt called product-classifier. It classifies a product into a category and must always return strict JSON with two fields: category (string) and reasoning (string). The cli is already installed globally. Check `langwatch docs prompt-management/cli` if needed."
+          ),
+          scenario.agent(),
+          (state) => {
+            toolCallFix(state);
+
+            const promptsDir = path.join(tempFolder, "prompts");
+            const yamlFiles = fs.existsSync(promptsDir)
+              ? fs
+                  .readdirSync(promptsDir)
+                  .filter((f) => f.endsWith(".prompt.yaml"))
+              : [];
+            expect(yamlFiles.length).toBeGreaterThan(0);
+
+            const content = yamlFiles
+              .map((f) => fs.readFileSync(path.join(promptsDir, f), "utf8"))
+              .join("\n");
+
+            // Structured output must be declared, not just requested in prose
+            expect(content).toMatch(/response_format/);
+            // Modern model — never a legacy gpt-4 / gpt-3.x generation
+            const modelMatch = /^model:\s*(\S+)/m.exec(content);
+            expect(modelMatch).toBeTruthy();
+            expect(modelMatch![1]!).not.toMatch(
+              /^openai\/gpt-[0-4]([.-]|$)/
+            );
+
+            assertNoInteractiveWorkarounds(state);
+          },
+          scenario.judge(),
+        ],
+      });
+
+      expect(result.success).toBe(true);
+    },
+    900_000
+  );
 });

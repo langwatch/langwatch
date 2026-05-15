@@ -148,7 +148,16 @@ describe("pushPrompts", () => {
         model: "openai/gpt-4o",
         messages: [{ role: "system", content: "test" }],
         response_format: {
-          schema: { type: "object", properties: { value: { type: "string" } } },
+          // A rich (non-flat) schema stays a single json_schema output, so the
+          // identifier-fallback path is what's under test here. Flat object
+          // schemas intentionally expand into flat fields instead (see the
+          // dedicated round-trip suite).
+          schema: {
+            type: "object",
+            properties: {
+              value: { type: "string", enum: ["a", "b"] },
+            },
+          },
         },
       } as any);
 
@@ -253,6 +262,38 @@ describe("pushPrompts", () => {
 
       // No response_format sent
       expect(syncCall.configData.response_format).toBeUndefined();
+    });
+  });
+
+  describe("when local config has no modelParameters temperature", () => {
+    /** @scenario Pushing a prompt with no temperature sends no temperature */
+    it("sends no temperature, so removing it from YAML clears it", async () => {
+      vi.mocked(FileManager.loadLocalPrompt).mockReturnValue({
+        model: "openai/gpt-5.5",
+        messages: [{ role: "system", content: "You are a helpful assistant." }],
+      } as any);
+
+      mockSync.mockResolvedValue({
+        action: "created",
+        prompt: { version: 1, versionId: "v1" },
+      });
+
+      const config: PromptsConfig = {
+        prompts: { "no-temp": "file:prompts/no-temp.prompt.yaml" },
+      };
+      const lock: PromptsLock = { lockfileVersion: 1, prompts: {} };
+      const result: SyncResult = {
+        fetched: [],
+        pushed: [],
+        unchanged: [],
+        cleaned: [],
+        errors: [],
+      };
+
+      await pushPrompts({ config, lock, promptsApiService, result });
+
+      const syncCall = mockSync.mock.calls[0]![0];
+      expect(syncCall.configData.temperature).toBeUndefined();
     });
   });
 });
