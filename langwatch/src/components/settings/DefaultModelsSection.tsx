@@ -23,7 +23,7 @@ import {
 import { useMemo } from "react";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { modelSelectorOptions } from "~/components/ModelSelector";
+import { allModelOptions } from "~/components/ModelSelector";
 import { api } from "~/utils/api";
 import { toaster } from "~/components/ui/toaster";
 import { ProviderModelSelector } from "./ProviderModelSelector";
@@ -54,11 +54,7 @@ export function DefaultModelsSection() {
   const setProjectMutation =
     api.modelProvider.setProjectDefaultModels.useMutation();
 
-  const allModelOptions = useMemo(() => modelSelectorOptions(), []);
-  const modelChoices = useMemo(
-    () => allModelOptions.map((o) => o.value),
-    [allModelOptions],
-  );
+  const modelChoices = useMemo(() => allModelOptions, []);
 
   if (effectiveQuery.isLoading || !effectiveQuery.data) {
     return (
