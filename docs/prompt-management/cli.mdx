@@ -279,52 +279,6 @@ messages:
 
 This is the same structure as [GitHub Prompts](https://docs.github.com/en/github-models/use-github-models/storing-prompts-in-github-repositories).
 
-#### Model selection
-
-`langwatch prompt create` writes the current flagship model. Prefer modern
-defaults — the latest OpenAI generation is `openai/gpt-5.5`. Pick an older
-or cheaper model (for example `gpt-4o-mini`) when you intentionally optimize
-for cost or latency; the platform applies the same current default when a
-prompt is synced without an explicit model.
-
-#### Temperature and the gpt-5 family
-
-The gpt-5 family rejects a custom `temperature`. Do **not** set
-`modelParameters.temperature` for those models — `langwatch prompt create`
-omits it on purpose. Sync stays a pure pass-through: a `pull` writes back
-exactly what the platform stored, no value invented or stripped.
-
-#### Structured outputs (`response_format`)
-
-When a prompt must return strict JSON, declare a `response_format` block. It
-round-trips losslessly through `push` and `pull` — what you configure on the
-platform comes back exactly, and vice versa:
-
-```yaml
-model: openai/gpt-5.5
-messages:
-  - role: system
-    content: Classify the product into the taxonomy.
-  - role: user
-    content: "{{product}}"
-response_format:
-  name: product_category
-  schema:
-    type: object
-    properties:
-      category: { type: string }
-      reasoning: { type: string }
-    required: [category, reasoning]
-    additionalProperties: false
-```
-
-A flat object schema (only scalar `string` / `number` / `boolean`
-properties) shows up on the platform as individual structured-output fields
-and comes back as the same flat schema on the next `pull`. A richer schema
-(enums, nested objects, arrays) is preserved verbatim as a single
-JSON-schema output. Either way, `push` then `pull` yields an identical
-`response_format`.
-
 ## Commands Reference
 
 ### `langwatch prompt init`
@@ -598,3 +552,21 @@ alwaysApply: true
 ### Cloud Code Integration
 
 Include prompt content in cloud development environments by referencing the YAML files in the `prompts/.materialized` directory.
+
+## Reference: structured outputs
+
+For prompts that must return strict JSON, add a `response_format` block alongside `messages` in the `.prompt.yaml`:
+
+```yaml
+response_format:
+  name: product_category
+  schema:
+    type: object
+    properties:
+      category: { type: string }
+      reasoning: { type: string }
+    required: [category, reasoning]
+    additionalProperties: false
+```
+
+`response_format` round-trips through `push` and `pull`: the schema you author locally comes back identical after editing on the platform.

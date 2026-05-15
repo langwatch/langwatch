@@ -1,8 +1,9 @@
-// Newest OpenAI flagship in the model registry. A guard test
-// (constants.default-model.unit.test.ts) fails CI if this drifts behind a
-// newer flagship or points at a legacy generation, so new prompts always
-// start on a current model.
-export const DEFAULT_MODEL = "openai/gpt-5.5";
+import { getLatestOpenAIChatFlagship } from "../server/modelProviders/getLatestFlagship";
+
+// Auto-derived from the LLM model registry (llmModels.json) — always the
+// newest plain `openai/gpt-<major>.<minor>` flagship. Hard fallback only
+// for the unreachable case where the registry has no plain flagship.
+export const DEFAULT_MODEL = getLatestOpenAIChatFlagship() ?? "openai/gpt-5";
 
 export const DEFAULT_EMBEDDINGS_MODEL = "openai/text-embedding-3-small";
 
