@@ -187,7 +187,13 @@ describe("useProviderFormSubmit()", () => {
     });
 
     describe("when all models start with azure/ (no mismatch)", () => {
-      it("calls updateProjectDefaultModels mutation with the selected models", async () => {
+      /** @scenario Default models live in a section below the providers list, not in the drawer */
+      it("no longer writes project defaults from the provider drawer", async () => {
+        // Project default models are now owned by the page-level
+        // DefaultModelsSection (see specs/model-providers/
+        // hierarchical-default-models.feature). The drawer's submit path
+        // must NOT write to project.defaultModel so it can't silently
+        // pin an inherited org/team default onto the project.
         const snapshot = buildSnapshot({
           projectDefaultModel: "azure/gpt-5-mini",
           projectTopicClusteringModel: "azure/gpt-5-mini",
@@ -199,14 +205,7 @@ describe("useProviderFormSubmit()", () => {
           await result.current.submit();
         });
 
-        expect(mockUpdateProjectDefaultModelsMutateAsync).toHaveBeenCalledWith(
-          expect.objectContaining({
-            projectId: "proj-1",
-            defaultModel: "azure/gpt-5-mini",
-            topicClusteringModel: "azure/gpt-5-mini",
-            embeddingsModel: "azure/text-embedding-3-small",
-          }),
-        );
+        expect(mockUpdateProjectDefaultModelsMutateAsync).not.toHaveBeenCalled();
       });
     });
   });
