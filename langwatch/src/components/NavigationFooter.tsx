@@ -66,6 +66,7 @@ export const useMessagesNavigationFooter = () => {
 
   const [totalHits, setTotalHits] = useState<number>(0);
   const [cursorPageNumber, setCursorPageNumber] = useState<number>(1);
+  const cursorStackRef = useRef<string[]>([]);
 
   // Safely parse URL parameters
   const pageOffset = useMemo(
@@ -86,10 +87,11 @@ export const useMessagesNavigationFooter = () => {
     totalHits / (cursorInfo?.pageSize || pageSize),
   );
 
-  // Reset cursor page number when switching pagination modes
+  // Reset cursor state when switching pagination modes
   useEffect(() => {
     if (!useCursorPagination) {
       setCursorPageNumber(1);
+      cursorStackRef.current = [];
     }
   }, [useCursorPagination]);
 
@@ -130,7 +132,11 @@ export const useMessagesNavigationFooter = () => {
   const nextPage = useCallback(
     (currentResponseScrollId?: string | null) => {
       if (currentResponseScrollId) {
-        // Cursor-based pagination
+        // Push the current scrollId onto the stack before navigating forward
+        // so prevPage can pop it to go back.
+        if (urlScrollId) {
+          cursorStackRef.current.push(urlScrollId);
+        }
         setCursorPageNumber((prev) => prev + 1);
         void router.push(
           {
@@ -159,7 +165,7 @@ export const useMessagesNavigationFooter = () => {
         );
       }
     },
-    [router, pageOffset, pageSize, useCursorPagination, buildPaginationQuery],
+    [router, pageOffset, pageSize, useCursorPagination, urlScrollId, buildPaginationQuery],
   );
 
   /**
@@ -167,16 +173,31 @@ export const useMessagesNavigationFooter = () => {
    */
   const prevPage = useCallback(() => {
     if (useCursorPagination) {
-      // Reset to first page in offset mode
-      setCursorPageNumber(1);
-      void router.push(
-        {
-          pathname: router.pathname,
-          query: buildPaginationQuery({ pageOffset: 0, scrollId: null }),
-        },
-        undefined,
-        { shallow: true },
-      );
+      const stack = cursorStackRef.current;
+      if (stack.length > 0) {
+        // Pop the previous cursor and navigate to it
+        const previousScrollId = stack.pop()!;
+        setCursorPageNumber((prev) => Math.max(1, prev - 1));
+        void router.push(
+          {
+            pathname: router.pathname,
+            query: buildPaginationQuery({ scrollId: previousScrollId }),
+          },
+          undefined,
+          { shallow: true },
+        );
+      } else {
+        // No previous cursor — return to page 1 (offset mode)
+        setCursorPageNumber(1);
+        void router.push(
+          {
+            pathname: router.pathname,
+            query: buildPaginationQuery({ pageOffset: 0, scrollId: null }),
+          },
+          undefined,
+          { shallow: true },
+        );
+      }
     } else if (pageOffset > 0) {
       // Offset-based pagination
       void router.push(
@@ -298,7 +319,9 @@ export function MessagesNavigationFooter({
 }) {
   if (totalHits === 0 && pageOffset === 0 && !useCursorPagination) return null;
 
-  const isPrevDisabled = !useCursorPagination && pageOffset === 0;
+  const isPrevDisabled = useCursorPagination
+    ? cursorPageNumber <= 1
+    : pageOffset === 0;
   const isNextDisabled = useCursorPagination
     ? !scrollId
     : pageOffset + pageSize >= totalHits;
@@ -341,12 +364,8 @@ export function MessagesNavigationFooter({
             padding={0}
             onClick={prevPage}
             disabled={isPrevDisabled}
-            aria-label={
-              useCursorPagination ? "Go to first page" : "Go to previous page"
-            }
-            title={
-              useCursorPagination ? "Go to first page" : "Go to previous page"
-            }
+            aria-label="Go to previous page"
+            title="Go to previous page"
           >
             <ChevronLeft />
           </Button>
