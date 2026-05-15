@@ -22,8 +22,9 @@ Feature: Mapping source display names
   @integration
   Scenario: Source name falls back to the ID when no friendly name is known
     Given I have an evaluator that maps "output" from a target whose name has not loaded yet
+    And the target's internal ID is "target_1778838627724"
     When I view the evaluator's variable mappings
-    Then the "output" mapping still renders a stable label using the source identifier
+    Then the "output" mapping shows the exact label "target_1778838627724.l3"
 
   @integration
   Scenario: Chaining one target into another shows the upstream target name

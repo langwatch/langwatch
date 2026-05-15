@@ -45,11 +45,17 @@ type TargetVariablesPanelProps = {
  * Convert the active dataset and targets to AvailableSource format for the VariablesSection.
  * Only the active dataset is included as a source - sources are scoped per-dataset.
  */
-const buildAvailableSources = (
-  activeDataset: DatasetReference | undefined,
-  otherTargets: TargetConfig[],
-  resolveTargetName: (target: TargetConfig) => string,
-): AvailableSource[] => {
+type BuildAvailableSourcesParams = {
+  activeDataset: DatasetReference | undefined;
+  otherTargets: TargetConfig[];
+  resolveTargetName: (target: TargetConfig) => string;
+};
+
+const buildAvailableSources = ({
+  activeDataset,
+  otherTargets,
+  resolveTargetName,
+}: BuildAvailableSourcesParams): AvailableSource[] => {
   const sources: AvailableSource[] = [];
 
   // Add only the active dataset as a source
@@ -184,7 +190,12 @@ export const TargetVariablesPanel = ({
 
   // Build available sources for mapping (only active dataset)
   const availableSources = useMemo(
-    () => buildAvailableSources(activeDataset, otherTargets, resolveTargetName),
+    () =>
+      buildAvailableSources({
+        activeDataset,
+        otherTargets,
+        resolveTargetName,
+      }),
     [activeDataset, otherTargets, resolveTargetName],
   );
 

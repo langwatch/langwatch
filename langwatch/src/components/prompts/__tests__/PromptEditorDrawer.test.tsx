@@ -388,9 +388,16 @@ describe("PromptEditorDrawer", () => {
 
       const style = getComputedStyle(header);
       expect(style.position).toBe("sticky");
-      // A non-empty background is what stops scrolling text from showing
-      // through the header (the bug was a transparent sticky bar).
-      expect(style.background || style.backgroundColor).not.toBe("");
+      // The fix is the `bg="bg"` prop on the sticky header — Chakra applies
+      // it as `background: var(--chakra-colors-bg)` (a solid app-surface
+      // color in a real browser). jsdom does not resolve CSS custom
+      // properties so `backgroundColor` falls back to rgba(0,0,0,0); we
+      // therefore assert the Chakra background token IS applied. A
+      // regression that deletes the prop would leave the rule unset, and
+      // this expectation would fail. The "solid in browser" check is
+      // covered by the QA dogfood screenshots embedded in the PR body.
+      const bg = (style.background || "").trim();
+      expect(bg).toMatch(/var\(--chakra-colors-/);
     });
 
     it("shows variables section", () => {
