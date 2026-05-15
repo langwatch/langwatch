@@ -1068,6 +1068,26 @@ func paramAnyMap(params []dsl.Field, name string) map[string]any {
 	return nil
 }
 
+// paramAny reads a parameter as an arbitrary JSON-decoded value.
+// Used for the prompt-config `messages` parameter (a saved template
+// message list) which buildMessages feeds through coerceChatMessages
+// the same way it handles an inputs-borne list.
+func paramAny(params []dsl.Field, name string) any {
+	for _, p := range params {
+		if p.Identifier != name {
+			continue
+		}
+		if len(p.Value) == 0 {
+			return nil
+		}
+		var v any
+		if err := jsonUnmarshalRaw(p.Value, &v); err == nil {
+			return v
+		}
+	}
+	return nil
+}
+
 func paramStringMap(params []dsl.Field, name string) map[string]string {
 	for _, p := range params {
 		if p.Identifier != name {
@@ -1181,23 +1201,70 @@ func splitModel(s string) (model, provider string) {
 // type. We accept both shapes; the legacy `messages` key is also
 // accepted for callers that pre-populate explicit history.
 func buildMessages(node *dsl.Node, inputs map[string]any) []app.ChatMessage {
-	if msgs := coerceChatMessages(inputs["chat_messages"]); msgs != nil {
-		return msgs
-	}
-	if msgs := coerceChatMessages(inputs["messages"]); msgs != nil {
-		return msgs
-	}
+	// Render the system prompt from the `instructions` parameter using
+	// the input variables. Mirrors langwatch_nlp's
+	// dspy/template_adapter.py format(): `{% for %}` / `{% if %}` /
+	// filters / `{{ var }}` all resolve here. Empty/whitespace-only
+	// after rendering ⇒ no system message (Python drops it too —
+	// template_adapter.py:170).
+	system := ""
 	if instr := paramString(node.Data.Parameters, "instructions"); instr != "" {
-		// Render Liquid placeholders + control flow + filters against
-		// the upstream inputs. Mirrors langwatch_nlp's
-		// dspy/template_adapter.py — DSPy templates with loops over
-		// chat history (`{% for m in messages %}{{ m.content }}{% endfor %}`)
-		// or branches on input shape now render correctly on the Go
-		// path. Pure `{{ var }}` templates fall back to the simple
-		// JSON-escaping interpolator so HTTP-block parity stays.
-		rendered, _ := template.RenderFull(instr, inputs)
+		system, _ = template.RenderFull(instr, inputs)
+	}
+
+	// Resolve the conversation history. Priority:
+	//  1. inputs["chat_messages"] / inputs["messages"] — the node→node
+	//     pipeline shape and the prompt-playground execute_component
+	//     shape (PromptStudioAdapter sends the saved template messages
+	//     + live turns under inputs.messages).
+	//  2. the node's `messages` PARAMETER — the saved prompt-config
+	//     template list, used when no inputs-borne history is present.
+	var history []app.ChatMessage
+	if msgs := coerceChatMessages(inputs["chat_messages"]); msgs != nil {
+		history = msgs
+	} else if msgs := coerceChatMessages(inputs["messages"]); msgs != nil {
+		history = msgs
+	} else if msgs := coerceChatMessages(paramAny(node.Data.Parameters, "messages")); msgs != nil {
+		history = msgs
+	}
+
+	if history != nil {
+		// Python parity (template_adapter.py:166-191): prepend the
+		// rendered system, render EACH message's string content with
+		// the input variables, then drop any message whose content is
+		// empty after rendering. The empty-drop is the load-bearing
+		// step — an unfilled `{{input}}` template turn renders to ""
+		// and is removed, so it is NOT duplicated alongside the real
+		// user turn (the 2026-05-14 prompt-playground regression).
+		out := make([]app.ChatMessage, 0, len(history)+1)
+		if strings.TrimSpace(system) != "" {
+			out = append(out, app.ChatMessage{Role: "system", Content: system})
+		}
+		for _, m := range history {
+			if s, ok := m.Content.(string); ok {
+				rendered, _ := template.RenderFull(s, inputs)
+				m.Content = rendered
+				// Mirrors _filter_empty_content_messages: a turn whose
+				// text content is empty after rendering is dropped —
+				// UNLESS it carries tool_calls (an assistant turn that
+				// only requests a tool legitimately has empty content).
+				if strings.TrimSpace(rendered) == "" && len(m.ToolCalls) == 0 {
+					continue
+				}
+			}
+			out = append(out, m)
+		}
+		return out
+	}
+
+	// No explicit history: fold scalar inputs into a single user turn
+	// (text-in / text-out signatures). composeUserPrompt is NOT
+	// template-rendered — it is the raw upstream input, matching the
+	// Python parity expectation that interpolation applies to
+	// instructions + template messages, not the live user prompt.
+	if strings.TrimSpace(system) != "" {
 		return []app.ChatMessage{
-			{Role: "system", Content: rendered},
+			{Role: "system", Content: system},
 			{Role: "user", Content: composeUserPrompt(inputs)},
 		}
 	}
