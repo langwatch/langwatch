@@ -120,7 +120,7 @@ export const apiKeyRouter = createTRPCRouter({
           : Promise.resolve([]),
         projectIds.size
           ? ctx.prisma.project.findMany({
-              where: { id: { in: [...projectIds] } },
+              where: { id: { in: [...projectIds] }, archivedAt: null },
               select: { id: true, name: true },
             })
           : Promise.resolve([]),
@@ -134,21 +134,28 @@ export const apiKeyRouter = createTRPCRouter({
 
       const orgName = new Map(orgs.map((o) => [o.id, o.name]));
       const teamName = new Map(teams.map((t) => [t.id, t.name]));
+      const activeProjectIds = new Set(projects.map((p) => p.id));
       const projectName = new Map(projects.map((p) => [p.id, p.name]));
       const customRoleName = new Map(customRoles.map((r) => [r.id, r.name]));
 
-      return bindings.map((b) => ({
-        ...b,
-        scopeName:
-          b.scopeType === RoleBindingScopeType.ORGANIZATION
-            ? orgName.get(b.scopeId) ?? null
-            : b.scopeType === RoleBindingScopeType.TEAM
-              ? teamName.get(b.scopeId) ?? null
-              : projectName.get(b.scopeId) ?? null,
-        customRoleName: b.customRoleId
-          ? customRoleName.get(b.customRoleId) ?? null
-          : null,
-      }));
+      return bindings
+        .filter(
+          (b) =>
+            b.scopeType !== RoleBindingScopeType.PROJECT ||
+            activeProjectIds.has(b.scopeId),
+        )
+        .map((b) => ({
+          ...b,
+          scopeName:
+            b.scopeType === RoleBindingScopeType.ORGANIZATION
+              ? orgName.get(b.scopeId) ?? null
+              : b.scopeType === RoleBindingScopeType.TEAM
+                ? teamName.get(b.scopeId) ?? null
+                : projectName.get(b.scopeId) ?? null,
+          customRoleName: b.customRoleId
+            ? customRoleName.get(b.customRoleId) ?? null
+            : null,
+        }));
     }),
 
   /**
