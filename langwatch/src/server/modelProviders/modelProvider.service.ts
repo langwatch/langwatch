@@ -188,12 +188,11 @@ export class ModelProviderService {
       customKeys,
     );
 
-    // Find existing provider
-    const existingProvider = await this.findExistingProvider(
-      id,
-      provider,
-      projectId,
-    );
+    // Find existing provider. Absent `id` means an explicit create — we
+    // intentionally do NOT auto-match by (provider, projectId) here,
+    // since that would clobber an existing row at a different scope when
+    // a user adds a second instance of the same provider type.
+    const existingProvider = await this.findExistingProvider(id, projectId);
 
     // Resolve input scope set. Callers may pass `scopes: [...]` directly,
     // or a single-scope pair via the legacy `scopeType`/`scopeId` fields.
@@ -260,6 +259,29 @@ export class ModelProviderService {
 
       return result;
     });
+  }
+
+  /**
+   * Upsert-by-provider-key path for the REST endpoint
+   * `PUT /api/model-providers/:provider`. The REST contract identifies a
+   * row by provider string within a project (legacy single-instance shape);
+   * if a project-scoped row exists for that provider we update it,
+   * otherwise we create one. The tRPC `update` procedure goes through the
+   * id-based path and never lands here, so the multi-instance create flow
+   * from the UI is unaffected.
+   */
+  async upsertByProviderKey(
+    input: UpdateModelProviderInput,
+    ctx?: AuthzContext,
+  ) {
+    const existing = await this.repository.findByProvider(
+      input.provider,
+      input.projectId,
+    );
+    return await this.updateModelProvider(
+      { ...input, id: existing?.id },
+      ctx,
+    );
   }
 
   /**
@@ -613,15 +635,22 @@ export class ModelProviderService {
     return { validatedKeys, customKeysProvided };
   }
 
+  /**
+   * Look up the existing row a write targets. When the caller supplies an
+   * `id`, that's an explicit edit. When `id` is absent, this is an explicit
+   * create: returning `null` here lets `updateModelProvider` go straight to
+   * `createNew` instead of falling through to a scope-blind
+   * `findByProvider` match that silently clobbers the first existing row
+   * of the same provider type (the multi-instance override bug). The
+   * REST upsert-by-provider-key entrypoint uses
+   * `upsertByProviderKey` below, not this code path.
+   */
   private async findExistingProvider(
     id: string | undefined,
-    provider: string,
     projectId: string,
   ) {
-    if (id) {
-      return await this.repository.findById(id, projectId);
-    }
-    return await this.repository.findByProvider(provider, projectId);
+    if (!id) return null;
+    return await this.repository.findById(id, projectId);
   }
 
   private async updateExisting(

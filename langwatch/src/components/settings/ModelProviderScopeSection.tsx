@@ -1,9 +1,11 @@
 import {
   Box,
+  Button,
   createListCollection,
   HStack,
   Text,
   VStack,
+  Wrap,
 } from "@chakra-ui/react";
 import { Building2, Folder, Users } from "lucide-react";
 import { useMemo } from "react";
@@ -207,9 +209,72 @@ export function ProviderScopeSection({
 
   if (!hasOrgOrTeam) return null;
 
+  // One-click pre-fills for the common single-scope picks. Each chip
+  // replaces the current selection with exactly that scope so users don't
+  // have to dig into the multi-select for the 90% case ("this project",
+  // "this team", "the whole org"). The multi-select below is still there
+  // for cross-team / cross-project setups.
+  const quickPicks = (
+    [
+      organizationId && {
+        key: "ORGANIZATION" as const,
+        label: "Organization",
+        icon: <Building2 size={14} aria-hidden />,
+        scope: {
+          scopeType: "ORGANIZATION" as const,
+          scopeId: organizationId,
+        },
+      },
+      teamId && {
+        key: "TEAM" as const,
+        label: "This team",
+        icon: <Users size={14} aria-hidden />,
+        scope: { scopeType: "TEAM" as const, scopeId: teamId },
+      },
+      projectId && {
+        key: "PROJECT" as const,
+        label: "This project",
+        icon: <Folder size={14} aria-hidden />,
+        scope: { scopeType: "PROJECT" as const, scopeId: projectId },
+      },
+    ] as const
+  ).filter(Boolean) as Array<{
+    key: ModelProviderScopeType;
+    label: string;
+    icon: React.ReactElement;
+    scope: ScopeSelection;
+  }>;
+
+  const isQuickPickActive = (scope: ScopeSelection) =>
+    state.scopes.length === 1 &&
+    state.scopes[0]!.scopeType === scope.scopeType &&
+    state.scopes[0]!.scopeId === scope.scopeId;
+
   return (
     <VStack align="start" width="full" gap={2}>
       <SmallLabel>Scope</SmallLabel>
+      {quickPicks.length > 0 && (
+        <Wrap gap={2} role="group" aria-label="Quick scope">
+          {quickPicks.map((pick) => {
+            const active = isQuickPickActive(pick.scope);
+            return (
+              <Button
+                key={`${pick.scope.scopeType}:${pick.scope.scopeId}`}
+                type="button"
+                size="xs"
+                variant={active ? "solid" : "outline"}
+                aria-pressed={active}
+                onClick={() => actions.setScopes([pick.scope])}
+              >
+                <HStack gap={1}>
+                  {pick.icon}
+                  <Text>{pick.label}</Text>
+                </HStack>
+              </Button>
+            );
+          })}
+        </Wrap>
+      )}
       <Select.Root
         collection={collection}
         value={selectedValues}
