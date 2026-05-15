@@ -230,6 +230,47 @@ Feature: LLM block — Studio signature node executes via the Go AI Gateway
     And tool_calls in the history are forwarded role-correct (tool messages keep tool_call_id)
 
   # ============================================================================
+  # Prompt-playground message assembly (system + variable interpolation)
+  #
+  # The prompt playground sends an execute_component event whose signature
+  # node carries an `instructions` parameter (the system prompt the user
+  # typed) plus a `messages` history (the saved template messages, which
+  # may contain {{var}} placeholders, followed by the live conversation
+  # turns). Regression 2026-05-14: nlpgo returned the messages array
+  # verbatim — dropping the system prompt, never interpolating the
+  # placeholders, and leaving an empty {{input}} template turn duplicated
+  # alongside the real user turn. Python parity is template_adapter.py
+  # format(): render the system from instructions, render each message's
+  # content with the input variables, then drop messages whose content is
+  # empty after rendering (this is what removes the unfilled {{input}}
+  # placeholder turn).
+  # ============================================================================
+
+  @integration @v1 @unimplemented
+  Scenario: prompt-playground signature node renders the system prompt from instructions
+    Given a signature node whose instructions are "You are a helpful assistant" and whose messages history is a single user turn "{{input}}"
+    And the input variable "input" is "hello there"
+    When the workflow runs
+    Then the assembled prompt starts with a system message containing "You are a helpful assistant"
+    And the user turn content is "hello there" with no literal "{{input}}" remaining
+
+  @integration @v1 @unimplemented
+  Scenario: an unfilled template placeholder turn is dropped, not duplicated
+    Given a signature node whose messages history is "{{input}}" followed by a live user turn "test6"
+    And the input variable "input" is empty
+    When the workflow runs
+    Then the assembled prompt has exactly one user turn with content "test6"
+    And there is no user turn whose content is empty or the literal "{{input}}"
+
+  @integration @v1 @unimplemented
+  Scenario: instructions with empty variables still produce a non-empty system prompt
+    Given a signature node whose instructions are "You are a helpful assistant\n___{{answer}}___\n___{{unbiased}}___\nalways return passed as true"
+    And the input variables "answer" and "unbiased" are empty
+    When the workflow runs
+    Then the assembled prompt has a system message containing "You are a helpful assistant"
+    And the system message contains "always return passed as true"
+
+  # ============================================================================
   # Streaming — SSE pass-through
   # ============================================================================
 
