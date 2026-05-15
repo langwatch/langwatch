@@ -28,9 +28,12 @@ import { sseLink } from "./sseLink";
 import {
   extractLimitExceededInfo,
   extractLiteMemberRestrictionInfo,
+  extractMissingModelInfo,
   markAsHandledByLicenseHandler,
   markAsHandledByLiteMemberHandler,
+  markAsHandledByMissingModelHandler,
 } from "./trpcError";
+import { useMissingModelModalStore } from "../stores/missingModelModalStore";
 import { useUpgradeModalStore } from "../stores/upgradeModalStore";
 import { useState, type ReactNode } from "react";
 
@@ -158,6 +161,17 @@ function createQueryClientConfig() {
             resource: restrictionInfo.resource,
           });
         }
+        // Check for ModelNotConfiguredError — surfaced when an AI-powered
+        // feature can't resolve a model anywhere in the scope chain. The
+        // singleton store dedups identical (featureKey, role) calls while
+        // the modal is on screen, so retry storms only show one modal.
+        const missingModelInfo = extractMissingModelInfo(error);
+        if (missingModelInfo) {
+          if (error instanceof Error) {
+            markAsHandledByMissingModelHandler(error);
+          }
+          useMissingModelModalStore.getState().open(missingModelInfo);
+        }
         // Non-license/non-restriction errors bubble up to component-level handlers
       },
     }),
@@ -170,6 +184,16 @@ function createQueryClientConfig() {
         const restrictionInfo = extractLiteMemberRestrictionInfo(error);
         if (restrictionInfo && error instanceof Error) {
           markAsHandledByLiteMemberHandler(error);
+        }
+        // Queries (e.g. fetching a result that requires an LLM call
+        // server-side) can also surface a ModelNotConfiguredError. Open
+        // the same modal so background fetches don't fail silently.
+        const missingModelInfo = extractMissingModelInfo(error);
+        if (missingModelInfo) {
+          if (error instanceof Error) {
+            markAsHandledByMissingModelHandler(error);
+          }
+          useMissingModelModalStore.getState().open(missingModelInfo);
         }
       },
     }),
