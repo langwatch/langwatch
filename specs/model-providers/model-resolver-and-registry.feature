@@ -133,7 +133,7 @@ Feature: Model resolver and feature registry
     And the error carries the featureDisplayName "AI search"
     And the error carries the projectId used in the resolve call
 
-  @integration @unimplemented
+  @integration
   Scenario: A tRPC procedure forwards ModelNotConfiguredError as a typed TRPCError
     Given a tRPC procedure that resolves a model and calls the provider
     When the resolver throws ModelNotConfiguredError for "traces.ai_search"
@@ -141,16 +141,11 @@ Feature: Model resolver and feature registry
     And the error data carries cause "MODEL_NOT_CONFIGURED"
     And the error data carries featureKey "traces.ai_search"
     And the error data carries role "FAST"
-    # The frontend interceptor matches on cause === MODEL_NOT_CONFIGURED
-    # and opens the missing-model modal with the role and feature in
-    # context. The wire-format mapping (TRPCError code + cause + data
-    # payload via `toResponseBody()`) ships in the follow-up PR that
-    # replaces the `project.defaultModel ?? DEFAULT_MODEL` call sites
-    # with `resolveModelForFeature(...)` so the typed error actually
-    # crosses the boundary on a real procedure call. The
-    # ModelNotConfiguredError shape itself (cause + featureKey + role
-    # + projectId + serialisable response body) is already pinned by
-    # the resolver integration test.
+    # Middleware re-raises ModelNotConfiguredError as a BAD_REQUEST
+    # TRPCError; the errorFormatter serialises the cause into
+    # data.cause = { code, featureKey, featureDisplayName, role,
+    # projectId } so the frontend interceptor (utils/trpcError.ts) can
+    # render the missing-model popup.
 
   # ────────────────────────────────────────────────────────────────────────────
   # Onboarding seed
