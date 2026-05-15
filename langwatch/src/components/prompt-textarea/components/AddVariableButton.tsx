@@ -17,10 +17,15 @@ export const AddVariableButton = forwardRef<
     <Button
       ref={ref}
       size="xs"
-      variant="ghost"
+      variant="outline"
       colorPalette="gray"
       onClick={onClick}
       onMouseDown={(e) => e.stopPropagation()}
+      // Solid (non-transparent) background + tight padding so the button
+      // reads as its own pill over the textarea text.
+      bg="bg.panel"
+      borderColor="border"
+      paddingX={2}
       _hover={{ background: "bg.muted" }}
       {...props}
     >
