@@ -1,12 +1,25 @@
 import { z } from "zod";
 import { customModelUpdateInputSchema } from "../../modelProviders/customModel.schema";
 import { DefaultModelsService } from "../../modelProviders/defaultModels.service";
+import {
+  allFeatures,
+  featureByKey,
+  MODEL_ROLES,
+  type ModelRole,
+} from "../../modelProviders/featureRegistry";
+import {
+  setFeatureOverride,
+  setRoleAssignment,
+} from "../../modelProviders/modelDefaults.service";
 import { ModelProviderService } from "../../modelProviders/modelProvider.service";
+import { resolveModelForFeature } from "../../modelProviders/resolveModelForFeature";
 import {
   checkProjectPermission,
   checkOrganizationPermission,
   checkTeamPermission,
+  hasOrganizationPermission,
   hasProjectPermission,
+  hasTeamPermission,
 } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import {
@@ -274,5 +287,306 @@ export const modelProviderRouter = createTRPCRouter({
         values,
       });
     }),
+
+  // ────────────────────────────────────────────────────────────────────────
+  // Role + feature-keyed default models (Area B3.2). Writes go through
+  // Mario's `modelDefaults.service` so they land in the new `ModelDefault`
+  // table; the legacy Organization/Team/Project scalar columns become
+  // read-only fallback during the compat window.
+  // See specs/model-providers/role-based-default-models.feature.
+  // ────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Rich snapshot for the Default Models settings page: per-role effective
+   * resolution for the project, plus the raw role-level value at each scope
+   * so the line UI can render "from organization" / "from team" hints and
+   * let admins flip the value at any scope they can manage.
+   */
+  getDefaultModelsForProject: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .use(checkProjectPermission("project:view"))
+    .query(async ({ input, ctx }) => {
+      const { projectId } = input;
+      const project = await ctx.prisma.project.findUnique({
+        where: { id: projectId },
+        select: { id: true, teamId: true, team: { select: { organizationId: true } } },
+      });
+      if (!project) {
+        throw new Error("Project not found");
+      }
+      const teamId = project.teamId;
+      const organizationId = project.team?.organizationId ?? null;
+
+      const features = allFeatures();
+
+      // Resolve the effective model per role using a feature from that role
+      // as a proxy (the resolver's role-level walk is shared across all
+      // features in a role — we just need one feature per role to read it).
+      const featureProxyByRole: Partial<Record<ModelRole, string>> = {};
+      for (const role of MODEL_ROLES) {
+        const f = features.find((x) => x.role === role);
+        if (f) featureProxyByRole[role] = f.key;
+      }
+
+      const roles = await Promise.all(
+        MODEL_ROLES.map(async (role) => {
+          const proxyFeatureKey = featureProxyByRole[role];
+          let effective: {
+            model: string;
+            source: string;
+            scope: string | null;
+          } | null = null;
+          if (proxyFeatureKey) {
+            try {
+              const r = await resolveModelForFeature(proxyFeatureKey, {
+                prisma: ctx.prisma,
+                projectId,
+              });
+              effective = { model: r.model, source: r.source, scope: r.scope };
+            } catch {
+              effective = null;
+            }
+          }
+          // Raw role-level value at each scope (null = not set, falls back).
+          const [orgRow, teamRow, projectRow] = await Promise.all([
+            organizationId
+              ? ctx.prisma.modelDefault.findFirst({
+                  where: {
+                    scopeType: "ORGANIZATION",
+                    scopeId: organizationId,
+                    role,
+                    featureKey: null,
+                  },
+                  select: { model: true },
+                })
+              : Promise.resolve(null),
+            teamId
+              ? ctx.prisma.modelDefault.findFirst({
+                  where: {
+                    scopeType: "TEAM",
+                    scopeId: teamId,
+                    role,
+                    featureKey: null,
+                  },
+                  select: { model: true },
+                })
+              : Promise.resolve(null),
+            ctx.prisma.modelDefault.findFirst({
+              where: {
+                scopeType: "PROJECT",
+                scopeId: projectId,
+                role,
+                featureKey: null,
+              },
+              select: { model: true },
+            }),
+          ]);
+
+          // Per-feature: effective resolution + per-scope override rows.
+          const roleFeatures = features.filter((f) => f.role === role);
+          const featureRows = await Promise.all(
+            roleFeatures.map(async (f) => {
+              let featEffective: {
+                model: string;
+                source: string;
+                scope: string | null;
+              } | null = null;
+              try {
+                const r = await resolveModelForFeature(f.key, {
+                  prisma: ctx.prisma,
+                  projectId,
+                });
+                featEffective = {
+                  model: r.model,
+                  source: r.source,
+                  scope: r.scope,
+                };
+              } catch {
+                featEffective = null;
+              }
+              const [oRow, tRow, pRow] = await Promise.all([
+                organizationId
+                  ? ctx.prisma.modelDefault.findFirst({
+                      where: {
+                        scopeType: "ORGANIZATION",
+                        scopeId: organizationId,
+                        role,
+                        featureKey: f.key,
+                      },
+                      select: { model: true },
+                    })
+                  : Promise.resolve(null),
+                teamId
+                  ? ctx.prisma.modelDefault.findFirst({
+                      where: {
+                        scopeType: "TEAM",
+                        scopeId: teamId,
+                        role,
+                        featureKey: f.key,
+                      },
+                      select: { model: true },
+                    })
+                  : Promise.resolve(null),
+                ctx.prisma.modelDefault.findFirst({
+                  where: {
+                    scopeType: "PROJECT",
+                    scopeId: projectId,
+                    role,
+                    featureKey: f.key,
+                  },
+                  select: { model: true },
+                }),
+              ]);
+              return {
+                key: f.key,
+                displayName: f.displayName,
+                description: f.description,
+                effective: featEffective,
+                perScope: {
+                  organization: oRow?.model ?? null,
+                  team: tRow?.model ?? null,
+                  project: pRow?.model ?? null,
+                },
+              };
+            }),
+          );
+
+          return {
+            role,
+            effective,
+            perScope: {
+              organization: orgRow?.model ?? null,
+              team: teamRow?.model ?? null,
+              project: projectRow?.model ?? null,
+            },
+            features: featureRows,
+          };
+        }),
+      );
+
+      return {
+        projectId,
+        teamId,
+        organizationId,
+        roles,
+      };
+    }),
+
+  /**
+   * Set or clear the role-level default model at a scope. Clearing
+   * (model=null) deletes the `ModelDefault` row and lets the resolver fall
+   * back to the next scope up; setting writes to the new table only —
+   * never to the legacy Organization/Team/Project scalar columns.
+   * Scope-aware authz lives in the inline middleware below.
+   */
+  setRoleAssignmentForScope: protectedProcedure
+    .input(
+      z.object({
+        scopeType: z.enum(["ORGANIZATION", "TEAM", "PROJECT"]),
+        scopeId: z.string(),
+        role: z.enum(MODEL_ROLES),
+        model: z.string().nullable(),
+      }),
+    )
+    .use(scopeAwarePermissionMiddleware)
+    .mutation(async ({ input, ctx }) => {
+      await setRoleAssignment(
+        { prisma: ctx.prisma },
+        {
+          scopeType: input.scopeType,
+          scopeId: input.scopeId,
+          role: input.role,
+          model: input.model,
+          authorId: ctx.session?.user?.id ?? null,
+        },
+      );
+      return { ok: true };
+    }),
+
+  /**
+   * Set or clear a per-feature override at a scope. The feature key must
+   * exist in the registry — its role is read from the registry so the row
+   * carries the right role tag for the resolver's walk.
+   */
+  setFeatureOverrideForScope: protectedProcedure
+    .input(
+      z.object({
+        scopeType: z.enum(["ORGANIZATION", "TEAM", "PROJECT"]),
+        scopeId: z.string(),
+        featureKey: z.string(),
+        model: z.string().nullable(),
+      }),
+    )
+    .use(scopeAwarePermissionMiddleware)
+    .mutation(async ({ input, ctx }) => {
+      if (!featureByKey(input.featureKey)) {
+        throw new Error(`Unknown feature key: "${input.featureKey}".`);
+      }
+      await setFeatureOverride(
+        { prisma: ctx.prisma },
+        {
+          scopeType: input.scopeType,
+          scopeId: input.scopeId,
+          featureKey: input.featureKey,
+          model: input.model,
+          authorId: ctx.session?.user?.id ?? null,
+        },
+      );
+      return { ok: true };
+    }),
 });
+
+/**
+ * Permission middleware for the role/feature default writers. Each scope
+ * demands its matching permission so a project admin can't silently push
+ * a role default up to the organization scope. Matches the per-scope
+ * permission map the existing model-providers update mutation uses.
+ */
+async function scopeAwarePermissionMiddleware({
+  ctx,
+  input,
+  next,
+}: {
+  ctx: any;
+  input: { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string };
+  next: () => Promise<unknown>;
+}): Promise<unknown> {
+  await assertCanWriteScope(ctx, input.scopeType, input.scopeId);
+  ctx.permissionChecked = true;
+  return next();
+}
+
+/**
+ * RBAC guard for the role/feature default writers. Each scope demands a
+ * different permission so a project admin can't silently push a role
+ * default up to the organization scope. Mirrors the model-providers
+ * update mutation's scope-aware authz.
+ */
+async function assertCanWriteScope(
+  ctx: any,
+  scopeType: "ORGANIZATION" | "TEAM" | "PROJECT",
+  scopeId: string,
+): Promise<void> {
+  if (!ctx.session?.user?.id) {
+    throw new Error("Not authenticated");
+  }
+  if (scopeType === "ORGANIZATION") {
+    if (
+      !(await hasOrganizationPermission(ctx, scopeId, "organization:manage"))
+    ) {
+      throw new Error("Missing organization:manage permission");
+    }
+    return;
+  }
+  if (scopeType === "TEAM") {
+    if (!(await hasTeamPermission(ctx, scopeId, "team:manage"))) {
+      throw new Error("Missing team:manage permission");
+    }
+    return;
+  }
+  // PROJECT
+  if (!(await hasProjectPermission(ctx, scopeId, "project:update"))) {
+    throw new Error("Missing project:update permission");
+  }
+}
 
