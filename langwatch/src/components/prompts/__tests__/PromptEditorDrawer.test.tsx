@@ -377,6 +377,22 @@ describe("PromptEditorDrawer", () => {
       expect(screen.getByTestId("messages-field")).toBeInTheDocument();
     });
 
+    /** @scenario The model selector header stays opaque above scrolling messages */
+    it("renders the model selector inside a sticky header with a solid background", () => {
+      renderWithProviders(<PromptEditorDrawer open={true} />);
+
+      const header = screen.getByTestId("prompt-editor-sticky-header");
+      // The model selector lives inside the sticky header, so it stays
+      // pinned while the messages below scroll.
+      expect(header).toContainElement(screen.getByTestId("model-select"));
+
+      const style = getComputedStyle(header);
+      expect(style.position).toBe("sticky");
+      // A non-empty background is what stops scrolling text from showing
+      // through the header (the bug was a transparent sticky bar).
+      expect(style.background || style.backgroundColor).not.toBe("");
+    });
+
     it("shows variables section", () => {
       renderWithProviders(<PromptEditorDrawer open={true} />);
       expect(screen.getByText("Variables")).toBeInTheDocument();

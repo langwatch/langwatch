@@ -22,6 +22,14 @@ vi.mock("../../../hooks/useTargetName", () => ({
   useTargetName: () => "Web Search",
 }));
 
+// Resolver returns a friendly name for the chained prompt target, and falls
+// back to the raw id when no entity/name is known.
+vi.mock("../../../hooks/useResolveTargetName", () => ({
+  useResolveTargetName:
+    () => (t: { id: string; promptId?: string }) =>
+      t.promptId === "prompt-cat" ? "category_classifier" : t.id,
+}));
+
 const mockDatasets: DatasetReference[] = [
   {
     id: "dataset-1",
@@ -118,9 +126,10 @@ describe("TargetVariablesPanel", () => {
 
     it("shows mapped variable as a tag", () => {
       renderComponent();
-      // The mapped field should show as a closable tag with source prefix and field name
+      // The mapped field should show as a closable tag with the friendly
+      // source name and field name
       expect(screen.getByTestId("source-mapping-tag")).toBeInTheDocument();
-      expect(screen.getByText("dataset-1.input_text")).toBeInTheDocument();
+      expect(screen.getByText("Test Dataset.input_text")).toBeInTheDocument();
     });
 
     it("shows helper text", () => {
@@ -210,11 +219,36 @@ describe("TargetVariablesPanel", () => {
         await user.click(emptyInput);
 
         await waitFor(() => {
-          // Name is resolved from target.id since names are now fetched via hooks
+          // Falls back to target.id when the target has no resolvable entity
           expect(screen.getByText("target-2")).toBeInTheDocument();
           expect(screen.getByText("search_results")).toBeInTheDocument();
         });
       }
+    });
+
+    /** @scenario Chaining one target into another shows the upstream target name */
+    it("labels an upstream prompt target source with its resolved name", async () => {
+      const user = userEvent.setup();
+      const upstream: TargetConfig = {
+        ...mockOtherTarget,
+        id: "target_1778838627724",
+        promptId: "prompt-cat",
+      };
+      renderComponent({ otherTargets: [upstream] });
+
+      const inputs = screen.getAllByRole("textbox");
+      const emptyInput = inputs.find(
+        (input) => !(input as HTMLInputElement).value,
+      );
+      expect(emptyInput).toBeDefined();
+      await user.click(emptyInput!);
+
+      await waitFor(() => {
+        expect(screen.getByText("category_classifier")).toBeInTheDocument();
+      });
+      expect(
+        screen.queryByText("target_1778838627724"),
+      ).not.toBeInTheDocument();
     });
   });
 

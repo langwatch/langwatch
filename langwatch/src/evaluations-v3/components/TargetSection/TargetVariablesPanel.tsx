@@ -9,6 +9,7 @@ import {
   VariablesSection,
 } from "~/components/variables";
 import type { Field } from "~/optimization_studio/types/dsl";
+import { useResolveTargetName } from "../../hooks/useResolveTargetName";
 import type { DatasetReference, FieldMapping, TargetConfig } from "../../types";
 import { getUsedFields } from "../../utils/mappingValidation";
 
@@ -47,6 +48,7 @@ type TargetVariablesPanelProps = {
 const buildAvailableSources = (
   activeDataset: DatasetReference | undefined,
   otherTargets: TargetConfig[],
+  resolveTargetName: (target: TargetConfig) => string,
 ): AvailableSource[] => {
   const sources: AvailableSource[] = [];
 
@@ -69,7 +71,7 @@ const buildAvailableSources = (
     const sourceType = target.type === "prompt" ? "signature" : "code";
     sources.push({
       id: target.id,
-      name: target.id, // Name will be resolved by the panel component
+      name: resolveTargetName(target),
       type: sourceType,
       fields: target.outputs.map((output) => ({
         name: output.identifier,
@@ -177,10 +179,13 @@ export const TargetVariablesPanel = ({
     [datasets, activeDatasetId],
   );
 
+  // Resolve other-target source labels to human-readable names
+  const resolveTargetName = useResolveTargetName();
+
   // Build available sources for mapping (only active dataset)
   const availableSources = useMemo(
-    () => buildAvailableSources(activeDataset, otherTargets),
-    [activeDataset, otherTargets],
+    () => buildAvailableSources(activeDataset, otherTargets, resolveTargetName),
+    [activeDataset, otherTargets, resolveTargetName],
   );
 
   // Convert target inputs to variables

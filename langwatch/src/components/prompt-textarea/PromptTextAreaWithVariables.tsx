@@ -513,6 +513,16 @@ export const PromptTextAreaWithVariables = ({
               }
               right={2}
               gap={1}
+              data-testid="add-context-buttons"
+              // Solid floating pill so the message text behind never bleeds
+              // through the button labels.
+              bg="bg.panel"
+              borderWidth="1px"
+              borderColor="border"
+              borderRadius="md"
+              boxShadow="sm"
+              paddingX={1}
+              paddingY={0.5}
             >
               <AddLogicButton
                 ref={logicMenu.addButtonRef}

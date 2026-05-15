@@ -78,7 +78,9 @@ export const useEvaluatorMappings = (
     if (target) {
       sources.push({
         id: target.id,
-        name: target.id, // Name will be resolved by the caller
+        // Fallback label only; consumers resolve the friendly target name
+        // via useResolveTargetName before rendering the mapping tag.
+        name: target.id,
         type: "signature" as const,
         fields: target.outputs.map((output) => ({
           name: output.identifier,

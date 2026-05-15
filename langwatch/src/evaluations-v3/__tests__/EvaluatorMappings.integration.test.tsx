@@ -113,6 +113,11 @@ vi.mock("~/utils/api", () => ({
         useQuery: () => ({ data: [], isLoading: false }),
       },
     },
+    prompts: {
+      getAllPromptsForProject: {
+        useQuery: () => ({ data: [], isLoading: false }),
+      },
+    },
   },
 }));
 
