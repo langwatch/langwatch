@@ -112,7 +112,7 @@ func startStudioSpan(ctx context.Context, req *app.WorkflowRequest, workflowAPIK
 	// (body_trace_id, fresh_span_id). The result is a TRUE root span:
 	// trace_id preserved, parent_span_id all-zeros.
 	//
-	// Earlier code synthesised a remote SpanContext with a random
+	// Earlier code synthesized a remote SpanContext with a random
 	// SpanID as a phantom parent — the LangWatch UI then flagged every
 	// playground workflow root as "Parent not in trace" because that
 	// phantom was never emitted. (2026-05-15 regression.)

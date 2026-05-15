@@ -12,7 +12,7 @@ import (
 )
 
 /** @scenario Studio playground request with body trace_id but no traceparent header creates a true root span */
-func TestContextAwareIDGenerator_HonoursOverrideForRootSpans(t *testing.T) {
+func TestContextAwareIDGenerator_HonorsOverrideForRootSpans(t *testing.T) {
 	rec := tracetest.NewSpanRecorder()
 	tp := sdktrace.NewTracerProvider(
 		sdktrace.WithSpanProcessor(rec),
@@ -88,7 +88,7 @@ func TestContextAwareIDGenerator_DoesNotOverrideChildSpans(t *testing.T) {
 
 func TestWithTraceIDOverride_InvalidTraceIDIsDropped(t *testing.T) {
 	// Zero TraceID is invalid per W3C and would corrupt traces if
-	// honoured. WithTraceIDOverride must silently drop it so callers
+	// honored. WithTraceIDOverride must silently drop it so callers
 	// can't accidentally pin to all-zeros.
 	ctx := WithTraceIDOverride(context.Background(), trace.TraceID{})
 	_, ok := traceIDFromContext(ctx)

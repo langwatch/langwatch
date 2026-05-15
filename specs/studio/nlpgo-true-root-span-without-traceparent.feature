@@ -12,7 +12,7 @@ Feature: nlpgo emits a TRUE root span when no inbound traceparent is supplied
   # request BODY only — no W3C `traceparent` HTTP header. nlpgo needs that
   # trace_id for continuity (the LangWatch "Full Trace" drawer pivots on it).
   #
-  # The pre-fix path in services/nlpgo/adapters/httpapi/tracing.go synthesised
+  # The pre-fix path in services/nlpgo/adapters/httpapi/tracing.go synthesized
   # a remote SpanContext with a FRESHLY RANDOM SpanID as the "parent" so the
   # in-process span chain would inherit the body trace_id. The studio root
   # then carried parent_span_id = <random phantom> in OTLP — a span that is

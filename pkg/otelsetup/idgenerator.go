@@ -1,18 +1,17 @@
 // Context-aware ID generator: lets callers seed the trace_id for the
 // next OTel root span via a context value, while keeping random IDs for
 // every other span. This is the mechanism that lets nlpgo's
-// startStudioSpan honour a body-supplied trace_id and STILL produce a
+// startStudioSpan honor a body-supplied trace_id and STILL produce a
 // TRUE root span (parent_span_id = zero) — fixing the 2026-05-15
 // regression where playground workflow roots showed "Parent not in
-// trace" because the previous code synthesised a phantom remote parent
+// trace" because the previous code synthesized a phantom remote parent
 // SpanContext for trace-id continuity.
 
 package otelsetup
 
 import (
 	"context"
-	"encoding/binary"
-	"math/rand/v2"
+	"crypto/rand"
 
 	"go.opentelemetry.io/otel/sdk/trace"
 	apitrace "go.opentelemetry.io/otel/trace"
@@ -52,7 +51,7 @@ func traceIDFromContext(ctx context.Context) (apitrace.TraceID, bool) {
 }
 
 // ContextAwareIDGenerator is a drop-in for the SDK's default random
-// generator that honours WithTraceIDOverride on NewIDs. Span IDs are
+// generator that honors WithTraceIDOverride on NewIDs. Span IDs are
 // always random — pinning span_id across processes is never the right
 // move and would silently corrupt the trace tree.
 type ContextAwareIDGenerator struct{}
@@ -65,7 +64,7 @@ func NewIDGenerator() *ContextAwareIDGenerator {
 }
 
 // NewIDs is called by the SDK when starting a span with no valid
-// parent SpanContext in ctx. We honour the trace_id override (if any)
+// parent SpanContext in ctx. We honor the trace_id override (if any)
 // and always mint a fresh span_id.
 func (g *ContextAwareIDGenerator) NewIDs(ctx context.Context) (apitrace.TraceID, apitrace.SpanID) {
 	if tid, ok := traceIDFromContext(ctx); ok {
@@ -80,13 +79,14 @@ func (g *ContextAwareIDGenerator) NewSpanID(_ context.Context, _ apitrace.TraceI
 	return randomSpanID()
 }
 
-// randomTraceID mirrors the SDK's default behaviour for the random
-// fallback path. Loop until the result is non-zero per W3C spec.
+// randomTraceID returns a cryptographically-random non-zero trace id.
+// crypto/rand (not math/rand) because trace/span id collisions across
+// concurrent runs would silently corrupt the trace tree, and gosec
+// G404 forbids the weak generator for anything security-adjacent.
 func randomTraceID() apitrace.TraceID {
 	var tid apitrace.TraceID
 	for {
-		binary.NativeEndian.PutUint64(tid[:8], rand.Uint64())
-		binary.NativeEndian.PutUint64(tid[8:], rand.Uint64())
+		_, _ = rand.Read(tid[:])
 		if tid.IsValid() {
 			return tid
 		}
@@ -96,7 +96,7 @@ func randomTraceID() apitrace.TraceID {
 func randomSpanID() apitrace.SpanID {
 	var sid apitrace.SpanID
 	for {
-		binary.NativeEndian.PutUint64(sid[:], rand.Uint64())
+		_, _ = rand.Read(sid[:])
 		if sid.IsValid() {
 			return sid
 		}
