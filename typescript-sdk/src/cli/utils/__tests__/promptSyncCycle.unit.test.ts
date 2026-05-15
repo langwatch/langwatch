@@ -1,9 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { DEFAULT_PROMPT_MODEL } from "../../constants";
-import {
-  responseFormatToOutputs,
-  type CliOutput,
-} from "../responseFormat";
+import { responseFormatToOutputs } from "../responseFormat";
 import { PromptConverter } from "../promptConverter";
 import type { PromptResponse } from "@/client-sdk/services/prompts/types";
 
@@ -33,7 +30,7 @@ describe("prompt sync fidelity — full create→push→pull cycle", () => {
     };
 
     // 2. Push: response_format → platform outputs.
-    const outputs = responseFormatToOutputs(responseFormat) as CliOutput[];
+    const outputs = responseFormatToOutputs(responseFormat)!;
 
     // 3. Server stores it and, because the default model is a gpt-5-family
     //    model that rejects temperature, the prompts API never returns one

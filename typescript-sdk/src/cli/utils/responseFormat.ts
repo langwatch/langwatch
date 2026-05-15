@@ -126,7 +126,7 @@ export const asFlatFields = (
     return null;
   }
 
-  const properties = schema.properties as Record<string, unknown>;
+  const properties = schema.properties;
   const propertyNames = Object.keys(properties);
   if (propertyNames.length === 0) return null;
 
