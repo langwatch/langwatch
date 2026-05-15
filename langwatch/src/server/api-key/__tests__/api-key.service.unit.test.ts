@@ -67,6 +67,7 @@ function createMockPrisma() {
     $transaction: vi.fn((fn: (tx: typeof mockTx) => Promise<unknown>) => fn(mockTx)),
     organizationUser: {
       findFirst: vi.fn().mockResolvedValue({ userId: "user_1" }),
+      findMany: vi.fn().mockResolvedValue([]),
     },
     apiKey: {
       findFirst: vi.fn(),
@@ -76,8 +77,24 @@ function createMockPrisma() {
     },
     roleBinding: {
       findFirst: vi.fn(),
+      findMany: vi.fn().mockResolvedValue([]),
       createMany: vi.fn(),
       deleteMany: vi.fn(),
+    },
+    organization: {
+      findMany: vi.fn().mockResolvedValue([]),
+    },
+    team: {
+      findMany: vi.fn().mockResolvedValue([]),
+    },
+    project: {
+      findMany: vi.fn().mockResolvedValue([]),
+    },
+    customRole: {
+      findMany: vi.fn().mockResolvedValue([]),
+    },
+    user: {
+      findMany: vi.fn().mockResolvedValue([]),
     },
     _mockTx: mockTx,
   } as any;
@@ -421,6 +438,177 @@ describe("ApiKeyService", () => {
             organizationId: "org_1",
           }),
         ).rejects.toThrow();
+      });
+    });
+  });
+
+  describe("getMyBindings()", () => {
+    describe("when user has active bindings", () => {
+      it("returns bindings with resolved scope names", async () => {
+        prisma.roleBinding.findMany.mockResolvedValue([
+          { id: "rb_1", role: "ADMIN", customRoleId: null, scopeType: "ORGANIZATION", scopeId: "org_1" },
+          { id: "rb_2", role: "MEMBER", customRoleId: null, scopeType: "PROJECT", scopeId: "proj_1" },
+        ]);
+        prisma.organization.findMany.mockResolvedValue([{ id: "org_1", name: "Acme Corp" }]);
+        prisma.project.findMany.mockResolvedValue([{ id: "proj_1", name: "My Project" }]);
+
+        const result = await service.getMyBindings({ userId: "user_1", organizationId: "org_1" });
+
+        expect(result).toEqual([
+          expect.objectContaining({ id: "rb_1", scopeName: "Acme Corp" }),
+          expect.objectContaining({ id: "rb_2", scopeName: "My Project" }),
+        ]);
+      });
+    });
+
+    describe("when user has archived project bindings", () => {
+      it("excludes archived project bindings", async () => {
+        prisma.roleBinding.findMany.mockResolvedValue([
+          { id: "rb_1", role: "ADMIN", customRoleId: null, scopeType: "ORGANIZATION", scopeId: "org_1" },
+          { id: "rb_2", role: "MEMBER", customRoleId: null, scopeType: "PROJECT", scopeId: "archived_proj" },
+        ]);
+        prisma.organization.findMany.mockResolvedValue([{ id: "org_1", name: "Acme Corp" }]);
+        prisma.project.findMany.mockResolvedValue([]);
+
+        const result = await service.getMyBindings({ userId: "user_1", organizationId: "org_1" });
+
+        expect(result).toHaveLength(1);
+      });
+    });
+
+    describe("when user has custom role bindings", () => {
+      it("includes custom role names", async () => {
+        prisma.roleBinding.findMany.mockResolvedValue([
+          { id: "rb_1", role: "CUSTOM", customRoleId: "cr_1", scopeType: "ORGANIZATION", scopeId: "org_1" },
+        ]);
+        prisma.organization.findMany.mockResolvedValue([{ id: "org_1", name: "Acme Corp" }]);
+        prisma.customRole.findMany.mockResolvedValue([{ id: "cr_1", name: "Deployer" }]);
+
+        const result = await service.getMyBindings({ userId: "user_1", organizationId: "org_1" });
+
+        expect(result[0]!.customRoleName).toBe("Deployer");
+      });
+    });
+
+    describe("when user is not an org member", () => {
+      it("throws scope violation error", async () => {
+        prisma.organizationUser.findFirst.mockResolvedValue(null);
+
+        await expect(
+          service.getMyBindings({ userId: "user_1", organizationId: "org_1" }),
+        ).rejects.toThrow("Not a member of this organization");
+      });
+    });
+  });
+
+  describe("getApiKeysWithNames()", () => {
+    describe("when caller is admin", () => {
+      it("returns all org keys with enriched names", async () => {
+        prisma.apiKey.findMany.mockResolvedValue([
+          {
+            id: "ak_1",
+            name: "Key 1",
+            description: null,
+            lookupId: "lookup1234567890",
+            permissionMode: "all",
+            userId: "user_1",
+            createdByUserId: "user_1",
+            organizationId: "org_1",
+            createdAt: new Date(),
+            expiresAt: null,
+            lastUsedAt: null,
+            revokedAt: null,
+            roleBindings: [
+              { id: "rb_1", role: "ADMIN", customRoleId: null, scopeType: "ORGANIZATION", scopeId: "org_1" },
+            ],
+          },
+        ]);
+        prisma.organization.findMany.mockResolvedValue([{ id: "org_1", name: "Acme Corp" }]);
+        prisma.user.findMany.mockResolvedValue([{ id: "user_1", name: "Alice", email: "alice@acme.com" }]);
+
+        const result = await service.getApiKeysWithNames({
+          userId: "user_1",
+          organizationId: "org_1",
+          isAdmin: true,
+        });
+
+        expect(result[0]!.userName).toBe("Alice");
+      });
+    });
+
+    describe("when caller is not admin", () => {
+      it("returns only user's own keys", async () => {
+        prisma.apiKey.findMany.mockResolvedValue([]);
+
+        const result = await service.getApiKeysWithNames({
+          userId: "user_1",
+          organizationId: "org_1",
+          isAdmin: false,
+        });
+
+        expect(prisma.apiKey.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({ organizationId: "org_1" }),
+          }),
+        );
+        expect(result).toEqual([]);
+      });
+    });
+  });
+
+  describe("getOrgProjects()", () => {
+    describe("when org has active projects", () => {
+      it("returns non-archived projects ordered by name", async () => {
+        prisma.project.findMany.mockResolvedValue([
+          { id: "proj_1", name: "Alpha" },
+          { id: "proj_2", name: "Beta" },
+        ]);
+
+        const result = await service.getOrgProjects({ userId: "user_1", organizationId: "org_1" });
+
+        expect(result).toEqual([
+          { id: "proj_1", name: "Alpha" },
+          { id: "proj_2", name: "Beta" },
+        ]);
+      });
+    });
+
+    describe("when user is not an org member", () => {
+      it("throws scope violation error", async () => {
+        prisma.organizationUser.findFirst.mockResolvedValue(null);
+
+        await expect(
+          service.getOrgProjects({ userId: "user_1", organizationId: "org_1" }),
+        ).rejects.toThrow("Not a member of this organization");
+      });
+    });
+  });
+
+  describe("getOrgMembers()", () => {
+    describe("when caller is admin", () => {
+      it("returns org members with user details", async () => {
+        prisma.roleBinding.findFirst.mockResolvedValue({ id: "rb_admin" });
+        prisma.organizationUser.findMany.mockResolvedValue([
+          { user: { id: "user_1", name: "Alice", email: "alice@acme.com" } },
+          { user: { id: "user_2", name: null, email: "bob@acme.com" } },
+        ]);
+
+        const result = await service.getOrgMembers({ userId: "user_1", organizationId: "org_1" });
+
+        expect(result).toEqual([
+          { id: "user_1", name: "Alice", email: "alice@acme.com" },
+          { id: "user_2", name: null, email: "bob@acme.com" },
+        ]);
+      });
+    });
+
+    describe("when caller is not admin", () => {
+      it("returns empty array", async () => {
+        prisma.roleBinding.findFirst.mockResolvedValue(null);
+
+        const result = await service.getOrgMembers({ userId: "user_1", organizationId: "org_1" });
+
+        expect(result).toEqual([]);
       });
     });
   });

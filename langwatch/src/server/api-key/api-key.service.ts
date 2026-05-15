@@ -217,10 +217,7 @@ export class ApiKeyService {
     });
   }
 
-  /**
-   * Verifies the creator is a member of the org before an API key can be minted.
-   */
-  private async assertOrgMembership({
+  async assertOrgMembership({
     userId,
     organizationId,
   }: {
@@ -547,10 +544,226 @@ export class ApiKeyService {
     return !!binding;
   }
 
+  async getMyBindings({
+    userId,
+    organizationId,
+  }: {
+    userId: string;
+    organizationId: string;
+  }) {
+    await this.assertOrgMembership({ userId, organizationId });
+
+    const bindings = await this.prisma.roleBinding.findMany({
+      where: { userId, organizationId },
+      select: {
+        id: true,
+        role: true,
+        customRoleId: true,
+        scopeType: true,
+        scopeId: true,
+      },
+    });
+
+    const { orgNames, teamNames, projectNames, customRoleNames } =
+      await this.resolveScopeNames({ bindings });
+
+    const activeProjectIds = new Set(projectNames.keys());
+
+    return bindings
+      .filter(
+        (b) =>
+          b.scopeType !== RoleBindingScopeType.PROJECT ||
+          activeProjectIds.has(b.scopeId),
+      )
+      .map((b) => ({
+        ...b,
+        scopeName:
+          b.scopeType === RoleBindingScopeType.ORGANIZATION
+            ? orgNames.get(b.scopeId) ?? null
+            : b.scopeType === RoleBindingScopeType.TEAM
+              ? teamNames.get(b.scopeId) ?? null
+              : projectNames.get(b.scopeId) ?? null,
+        customRoleName: b.customRoleId
+          ? customRoleNames.get(b.customRoleId) ?? null
+          : null,
+      }));
+  }
+
+  async getApiKeysWithNames({
+    userId,
+    organizationId,
+    isAdmin,
+  }: {
+    userId: string;
+    organizationId: string;
+    isAdmin: boolean;
+  }) {
+    await this.assertOrgMembership({ userId, organizationId });
+
+    const apiKeys = isAdmin
+      ? await this.listAll({ organizationId })
+      : await this.list({ userId, organizationId });
+
+    const allBindings = apiKeys.flatMap((k) => k.roleBindings);
+    const { orgNames, teamNames, projectNames, customRoleNames } =
+      await this.resolveScopeNames({ bindings: allBindings });
+
+    const userIds = new Set<string>();
+    for (const k of apiKeys) {
+      if (k.userId) userIds.add(k.userId);
+      if (k.createdByUserId) userIds.add(k.createdByUserId);
+    }
+
+    const users = userIds.size
+      ? await this.prisma.user.findMany({
+          where: { id: { in: [...userIds] } },
+          select: { id: true, name: true, email: true },
+        })
+      : [];
+    const userName = new Map(users.map((u) => [u.id, u.name ?? u.email]));
+
+    return apiKeys.map((apiKey) => ({
+      id: apiKey.id,
+      lookupIdSuffix: apiKey.lookupId.slice(-4),
+      name: apiKey.name,
+      description: apiKey.description,
+      permissionMode: apiKey.permissionMode,
+      userId: apiKey.userId,
+      userName: apiKey.userId ? (userName.get(apiKey.userId) ?? null) : null,
+      createdByUserId: apiKey.createdByUserId,
+      createdByUserName: apiKey.createdByUserId
+        ? userName.get(apiKey.createdByUserId) ?? null
+        : null,
+      createdAt: apiKey.createdAt,
+      expiresAt: apiKey.expiresAt,
+      lastUsedAt: apiKey.lastUsedAt,
+      revokedAt: apiKey.revokedAt,
+      roleBindings: apiKey.roleBindings.map((rb) => ({
+        id: rb.id,
+        role: rb.role,
+        customRoleId: rb.customRoleId,
+        customRoleName: rb.customRoleId
+          ? customRoleNames.get(rb.customRoleId) ?? null
+          : null,
+        scopeType: rb.scopeType,
+        scopeId: rb.scopeId,
+        scopeName:
+          rb.scopeType === RoleBindingScopeType.ORGANIZATION
+            ? orgNames.get(rb.scopeId) ?? null
+            : rb.scopeType === RoleBindingScopeType.TEAM
+              ? teamNames.get(rb.scopeId) ?? null
+              : projectNames.get(rb.scopeId) ?? null,
+      })),
+    }));
+  }
+
+  async getOrgProjects({
+    userId,
+    organizationId,
+  }: {
+    userId: string;
+    organizationId: string;
+  }) {
+    await this.assertOrgMembership({ userId, organizationId });
+
+    return this.prisma.project.findMany({
+      where: {
+        team: { organizationId },
+        archivedAt: null,
+      },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    });
+  }
+
+  async getOrgMembers({
+    userId,
+    organizationId,
+  }: {
+    userId: string;
+    organizationId: string;
+  }) {
+    await this.assertOrgMembership({ userId, organizationId });
+
+    const isAdmin = await this.isOrgAdmin({ userId, organizationId });
+    if (!isAdmin) return [];
+
+    const orgUsers = await this.prisma.organizationUser.findMany({
+      where: { organizationId },
+      include: {
+        user: { select: { id: true, name: true, email: true } },
+      },
+    });
+    return orgUsers.map((ou) => ({
+      id: ou.user.id,
+      name: ou.user.name,
+      email: ou.user.email,
+    }));
+  }
+
   /**
    * Gets a single API key by ID (for display, not verification).
    */
   async getById({ id }: { id: string }): Promise<ApiKeyWithBindings | null> {
     return this.repo.findById({ id });
+  }
+
+  private async resolveScopeNames({
+    bindings,
+  }: {
+    bindings: Array<{
+      scopeType: string;
+      scopeId: string;
+      customRoleId?: string | null;
+    }>;
+  }) {
+    const orgIds = new Set<string>();
+    const teamIds = new Set<string>();
+    const projectIds = new Set<string>();
+    const customRoleIds = new Set<string>();
+
+    for (const b of bindings) {
+      if (b.scopeType === RoleBindingScopeType.ORGANIZATION)
+        orgIds.add(b.scopeId);
+      else if (b.scopeType === RoleBindingScopeType.TEAM)
+        teamIds.add(b.scopeId);
+      else if (b.scopeType === RoleBindingScopeType.PROJECT)
+        projectIds.add(b.scopeId);
+      if (b.customRoleId) customRoleIds.add(b.customRoleId);
+    }
+
+    const [orgs, teams, projects, customRoles] = await Promise.all([
+      orgIds.size
+        ? this.prisma.organization.findMany({
+            where: { id: { in: [...orgIds] } },
+            select: { id: true, name: true },
+          })
+        : Promise.resolve([]),
+      teamIds.size
+        ? this.prisma.team.findMany({
+            where: { id: { in: [...teamIds] } },
+            select: { id: true, name: true },
+          })
+        : Promise.resolve([]),
+      projectIds.size
+        ? this.prisma.project.findMany({
+            where: { id: { in: [...projectIds] }, archivedAt: null },
+            select: { id: true, name: true },
+          })
+        : Promise.resolve([]),
+      customRoleIds.size
+        ? this.prisma.customRole.findMany({
+            where: { id: { in: [...customRoleIds] } },
+            select: { id: true, name: true },
+          })
+        : Promise.resolve([]),
+    ]);
+
+    return {
+      orgNames: new Map(orgs.map((o) => [o.id, o.name])),
+      teamNames: new Map(teams.map((t) => [t.id, t.name])),
+      projectNames: new Map(projects.map((p) => [p.id, p.name])),
+      customRoleNames: new Map(customRoles.map((r) => [r.id, r.name])),
+    };
   }
 }

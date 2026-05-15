@@ -1,5 +1,4 @@
 import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
-import type { PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
@@ -8,10 +7,6 @@ import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { auditLog } from "~/server/auditLog";
 import { skipPermissionCheck } from "../rbac";
 
-/**
- * Maps an API key domain error to a tRPCError. Re-throws anything
- * that isn't a handled DomainError.
- */
 function mapApiKeyDomainError(error: unknown): never {
   if (DomainError.isHandled(error)) {
     switch (error.kind) {
@@ -28,27 +23,6 @@ function mapApiKeyDomainError(error: unknown): never {
     }
   }
   throw error;
-}
-
-async function assertOrgMembership({
-  prisma,
-  userId,
-  organizationId,
-}: {
-  prisma: PrismaClient;
-  userId: string;
-  organizationId: string;
-}): Promise<void> {
-  const membership = await prisma.organizationUser.findFirst({
-    where: { userId, organizationId },
-    select: { userId: true },
-  });
-  if (!membership) {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: "Not a member of this organization",
-    });
-  }
 }
 
 const roleBindingSchema = z.object({
@@ -71,91 +45,15 @@ export const apiKeyRouter = createTRPCRouter({
       }),
     )
     .query(async ({ ctx, input }) => {
-      await assertOrgMembership({
-        prisma: ctx.prisma,
-        userId: ctx.session.user.id,
-        organizationId: input.organizationId,
-      });
-
-      const bindings = await ctx.prisma.roleBinding.findMany({
-        where: {
+      const apiKeyService = ApiKeyService.create(ctx.prisma);
+      try {
+        return await apiKeyService.getMyBindings({
           userId: ctx.session.user.id,
           organizationId: input.organizationId,
-        },
-        select: {
-          id: true,
-          role: true,
-          customRoleId: true,
-          scopeType: true,
-          scopeId: true,
-        },
-      });
-
-      const orgIds = new Set<string>();
-      const teamIds = new Set<string>();
-      const projectIds = new Set<string>();
-      const customRoleIds = new Set<string>();
-      for (const b of bindings) {
-        if (b.scopeType === RoleBindingScopeType.ORGANIZATION)
-          orgIds.add(b.scopeId);
-        else if (b.scopeType === RoleBindingScopeType.TEAM)
-          teamIds.add(b.scopeId);
-        else if (b.scopeType === RoleBindingScopeType.PROJECT)
-          projectIds.add(b.scopeId);
-        if (b.customRoleId) customRoleIds.add(b.customRoleId);
+        });
+      } catch (error) {
+        mapApiKeyDomainError(error);
       }
-
-      const [orgs, teams, projects, customRoles] = await Promise.all([
-        orgIds.size
-          ? ctx.prisma.organization.findMany({
-              where: { id: { in: [...orgIds] } },
-              select: { id: true, name: true },
-            })
-          : Promise.resolve([]),
-        teamIds.size
-          ? ctx.prisma.team.findMany({
-              where: { id: { in: [...teamIds] } },
-              select: { id: true, name: true },
-            })
-          : Promise.resolve([]),
-        projectIds.size
-          ? ctx.prisma.project.findMany({
-              where: { id: { in: [...projectIds] }, archivedAt: null },
-              select: { id: true, name: true },
-            })
-          : Promise.resolve([]),
-        customRoleIds.size
-          ? ctx.prisma.customRole.findMany({
-              where: { id: { in: [...customRoleIds] } },
-              select: { id: true, name: true },
-            })
-          : Promise.resolve([]),
-      ]);
-
-      const orgName = new Map(orgs.map((o) => [o.id, o.name]));
-      const teamName = new Map(teams.map((t) => [t.id, t.name]));
-      const activeProjectIds = new Set(projects.map((p) => p.id));
-      const projectName = new Map(projects.map((p) => [p.id, p.name]));
-      const customRoleName = new Map(customRoles.map((r) => [r.id, r.name]));
-
-      return bindings
-        .filter(
-          (b) =>
-            b.scopeType !== RoleBindingScopeType.PROJECT ||
-            activeProjectIds.has(b.scopeId),
-        )
-        .map((b) => ({
-          ...b,
-          scopeName:
-            b.scopeType === RoleBindingScopeType.ORGANIZATION
-              ? orgName.get(b.scopeId) ?? null
-              : b.scopeType === RoleBindingScopeType.TEAM
-                ? teamName.get(b.scopeId) ?? null
-                : projectName.get(b.scopeId) ?? null,
-          customRoleName: b.customRoleId
-            ? customRoleName.get(b.customRoleId) ?? null
-            : null,
-        }));
     }),
 
   /**
@@ -169,119 +67,20 @@ export const apiKeyRouter = createTRPCRouter({
       }),
     )
     .query(async ({ ctx, input }) => {
-      await assertOrgMembership({
-        prisma: ctx.prisma,
-        userId: ctx.session.user.id,
-        organizationId: input.organizationId,
-      });
-
       const apiKeyService = ApiKeyService.create(ctx.prisma);
-      const callerIsAdmin = await apiKeyService.isOrgAdmin({
-        userId: ctx.session.user.id,
-        organizationId: input.organizationId,
-      });
-
-      const apiKeys = callerIsAdmin
-        ? await apiKeyService.listAll({ organizationId: input.organizationId })
-        : await apiKeyService.list({
-            userId: ctx.session.user.id,
-            organizationId: input.organizationId,
-          });
-
-      // Resolve scope names and user names for display
-      const allBindings = apiKeys.flatMap((k) => k.roleBindings);
-      const orgIds = new Set<string>();
-      const teamIds = new Set<string>();
-      const projectIds = new Set<string>();
-      const customRoleIds = new Set<string>();
-      const userIds = new Set<string>();
-
-      for (const b of allBindings) {
-        if (b.scopeType === RoleBindingScopeType.ORGANIZATION)
-          orgIds.add(b.scopeId);
-        else if (b.scopeType === RoleBindingScopeType.TEAM)
-          teamIds.add(b.scopeId);
-        else if (b.scopeType === RoleBindingScopeType.PROJECT)
-          projectIds.add(b.scopeId);
-        if (b.customRoleId) customRoleIds.add(b.customRoleId);
+      try {
+        const callerIsAdmin = await apiKeyService.isOrgAdmin({
+          userId: ctx.session.user.id,
+          organizationId: input.organizationId,
+        });
+        return await apiKeyService.getApiKeysWithNames({
+          userId: ctx.session.user.id,
+          organizationId: input.organizationId,
+          isAdmin: callerIsAdmin,
+        });
+      } catch (error) {
+        mapApiKeyDomainError(error);
       }
-      for (const k of apiKeys) {
-        if (k.userId) userIds.add(k.userId);
-        if (k.createdByUserId) userIds.add(k.createdByUserId);
-      }
-
-      const [orgs, teams, projects, customRoles, users] = await Promise.all([
-        orgIds.size
-          ? ctx.prisma.organization.findMany({
-              where: { id: { in: [...orgIds] } },
-              select: { id: true, name: true },
-            })
-          : Promise.resolve([]),
-        teamIds.size
-          ? ctx.prisma.team.findMany({
-              where: { id: { in: [...teamIds] } },
-              select: { id: true, name: true },
-            })
-          : Promise.resolve([]),
-        projectIds.size
-          ? ctx.prisma.project.findMany({
-              where: { id: { in: [...projectIds] } },
-              select: { id: true, name: true },
-            })
-          : Promise.resolve([]),
-        customRoleIds.size
-          ? ctx.prisma.customRole.findMany({
-              where: { id: { in: [...customRoleIds] } },
-              select: { id: true, name: true },
-            })
-          : Promise.resolve([]),
-        userIds.size
-          ? ctx.prisma.user.findMany({
-              where: { id: { in: [...userIds] } },
-              select: { id: true, name: true, email: true },
-            })
-          : Promise.resolve([]),
-      ]);
-
-      const orgName = new Map(orgs.map((o) => [o.id, o.name]));
-      const teamName = new Map(teams.map((t) => [t.id, t.name]));
-      const projectName = new Map(projects.map((p) => [p.id, p.name]));
-      const customRoleName = new Map(customRoles.map((r) => [r.id, r.name]));
-      const userName = new Map(users.map((u) => [u.id, u.name ?? u.email]));
-
-      return apiKeys.map((apiKey) => ({
-        id: apiKey.id,
-        lookupIdSuffix: apiKey.lookupId.slice(-4),
-        name: apiKey.name,
-        description: apiKey.description,
-        permissionMode: apiKey.permissionMode,
-        userId: apiKey.userId,
-        userName: apiKey.userId ? (userName.get(apiKey.userId) ?? null) : null,
-        createdByUserId: apiKey.createdByUserId,
-        createdByUserName: apiKey.createdByUserId
-          ? userName.get(apiKey.createdByUserId) ?? null
-          : null,
-        createdAt: apiKey.createdAt,
-        expiresAt: apiKey.expiresAt,
-        lastUsedAt: apiKey.lastUsedAt,
-        revokedAt: apiKey.revokedAt,
-        roleBindings: apiKey.roleBindings.map((rb) => ({
-          id: rb.id,
-          role: rb.role,
-          customRoleId: rb.customRoleId,
-          customRoleName: rb.customRoleId
-            ? customRoleName.get(rb.customRoleId) ?? null
-            : null,
-          scopeType: rb.scopeType,
-          scopeId: rb.scopeId,
-          scopeName:
-            rb.scopeType === RoleBindingScopeType.ORGANIZATION
-              ? orgName.get(rb.scopeId) ?? null
-              : rb.scopeType === RoleBindingScopeType.TEAM
-                ? teamName.get(rb.scopeId) ?? null
-                : projectName.get(rb.scopeId) ?? null,
-        })),
-      }));
     }),
 
   create: protectedProcedure
@@ -303,13 +102,16 @@ export const apiKeyRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      await assertOrgMembership({
-        prisma: ctx.prisma,
-        userId: ctx.session.user.id,
-        organizationId: input.organizationId,
-      });
-
       const apiKeyService = ApiKeyService.create(ctx.prisma);
+      try {
+        await apiKeyService.assertOrgMembership({
+          userId: ctx.session.user.id,
+          organizationId: input.organizationId,
+        });
+      } catch (error) {
+        mapApiKeyDomainError(error);
+      }
+
       const isService = input.keyType === "service";
 
       // Service keys and assigning to another user both require admin
@@ -385,13 +187,16 @@ export const apiKeyRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      await assertOrgMembership({
-        prisma: ctx.prisma,
-        userId: ctx.session.user.id,
-        organizationId: input.organizationId,
-      });
-
       const apiKeyService = ApiKeyService.create(ctx.prisma);
+      try {
+        await apiKeyService.assertOrgMembership({
+          userId: ctx.session.user.id,
+          organizationId: input.organizationId,
+        });
+      } catch (error) {
+        mapApiKeyDomainError(error);
+      }
+
       const callerIsAdmin = await apiKeyService.isOrgAdmin({
         userId: ctx.session.user.id,
         organizationId: input.organizationId,
@@ -443,13 +248,16 @@ export const apiKeyRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      await assertOrgMembership({
-        prisma: ctx.prisma,
-        userId: ctx.session.user.id,
-        organizationId: input.organizationId,
-      });
-
       const apiKeyService = ApiKeyService.create(ctx.prisma);
+      try {
+        await apiKeyService.assertOrgMembership({
+          userId: ctx.session.user.id,
+          organizationId: input.organizationId,
+        });
+      } catch (error) {
+        mapApiKeyDomainError(error);
+      }
+
       const callerIsAdmin = await apiKeyService.isOrgAdmin({
         userId: ctx.session.user.id,
         organizationId: input.organizationId,
@@ -486,20 +294,15 @@ export const apiKeyRouter = createTRPCRouter({
       }),
     )
     .query(async ({ ctx, input }) => {
-      await assertOrgMembership({
-        prisma: ctx.prisma,
-        userId: ctx.session.user.id,
-        organizationId: input.organizationId,
-      });
-
-      return ctx.prisma.project.findMany({
-        where: {
-          team: { organizationId: input.organizationId },
-          archivedAt: null,
-        },
-        select: { id: true, name: true },
-        orderBy: { name: "asc" },
-      });
+      const apiKeyService = ApiKeyService.create(ctx.prisma);
+      try {
+        return await apiKeyService.getOrgProjects({
+          userId: ctx.session.user.id,
+          organizationId: input.organizationId,
+        });
+      } catch (error) {
+        mapApiKeyDomainError(error);
+      }
     }),
 
   /**
@@ -513,29 +316,14 @@ export const apiKeyRouter = createTRPCRouter({
       }),
     )
     .query(async ({ ctx, input }) => {
-      await assertOrgMembership({
-        prisma: ctx.prisma,
-        userId: ctx.session.user.id,
-        organizationId: input.organizationId,
-      });
-
       const apiKeyService = ApiKeyService.create(ctx.prisma);
-      const callerIsAdmin = await apiKeyService.isOrgAdmin({
-        userId: ctx.session.user.id,
-        organizationId: input.organizationId,
-      });
-      if (!callerIsAdmin) return [];
-
-      const orgUsers = await ctx.prisma.organizationUser.findMany({
-        where: { organizationId: input.organizationId },
-        include: {
-          user: { select: { id: true, name: true, email: true } },
-        },
-      });
-      return orgUsers.map((ou) => ({
-        id: ou.user.id,
-        name: ou.user.name,
-        email: ou.user.email,
-      }));
+      try {
+        return await apiKeyService.getOrgMembers({
+          userId: ctx.session.user.id,
+          organizationId: input.organizationId,
+        });
+      } catch (error) {
+        mapApiKeyDomainError(error);
+      }
     }),
 });
