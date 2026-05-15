@@ -26,6 +26,10 @@ Let's get cracking.
     ```
 
     This will add the `LANGWATCH_API_KEY` to your local `.env` file.
+
+    <Note>
+      If you are using a **service API key** (e.g. for CI/CD or multi-project setups), you must also set `LANGWATCH_PROJECT_ID` in your `.env` file so the SDK knows which project to send traces to. You can find the project ID in your project settings.
+    </Note>
   </Step>
 
   <Step title="Let LangWatch MCP do the rest for you (Optional)">
@@ -77,6 +81,7 @@ from langwatch.instrumentors import OpenAIInstrumentor
 
 langwatch.setup(
     api_key=os.getenv("LANGWATCH_API_KEY"), # Your LangWatch API key
+    project_id=os.getenv("LANGWATCH_PROJECT_ID"), # Required for service API keys
     instrumentors=[OpenAIInstrumentor()] # Add the instrumentor for your LLM
 )
 ```
@@ -100,6 +105,7 @@ export function register() {
     serviceName: 'your-app-name', // Give your service a clear name
     traceExporter: new LangWatchExporter({
       apiKey: process.env.LANGWATCH_API_KEY, // Your LangWatch API key
+      projectId: process.env.LANGWATCH_PROJECT_ID, // Required for service API keys
     })
   });
 }

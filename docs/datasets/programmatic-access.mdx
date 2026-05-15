@@ -26,6 +26,10 @@ const langwatch = new LangWatch();
   </Tab>
 </Tabs>
 
+<Note>
+  If you are using a **service API key** (e.g. for CI/CD or multi-project setups), you must also set the `LANGWATCH_PROJECT_ID` environment variable (or pass `project_id`/`projectId` to the SDK) so the SDK knows which project to access. You can find the project ID in your project settings.
+</Note>
+
 ## List Datasets
 
 Retrieve all datasets for your project with pagination support.
