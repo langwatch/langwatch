@@ -124,3 +124,61 @@ export function extractLimitExceededInfo(
     max: typeof cause.max === "number" ? cause.max : 0,
   };
 }
+
+// --- Missing-model (ModelNotConfiguredError) dedup ---
+const handledMissingModelErrors = new WeakSet<Error>();
+
+export function markAsHandledByMissingModelHandler(error: Error): void {
+  handledMissingModelErrors.add(error);
+}
+
+export function isHandledByMissingModelHandler(error: unknown): boolean {
+  return error instanceof Error && handledMissingModelErrors.has(error);
+}
+
+export interface MissingModelExtracted {
+  featureKey: string;
+  featureDisplayName: string;
+  role: "DEFAULT" | "FAST" | "EMBEDDINGS";
+  projectId?: string;
+}
+
+/**
+ * Extracts the typed payload from a tRPC error whose cause is
+ * `MODEL_NOT_CONFIGURED`. The wire shape is set by the server-side
+ * `ModelNotConfiguredError` (see
+ * `specs/model-providers/model-resolver-and-registry.feature`).
+ */
+export function extractMissingModelInfo(
+  error: unknown,
+): MissingModelExtracted | null {
+  if (!(error instanceof TRPCClientError)) return null;
+  // Server wraps the typed error as a BAD_REQUEST TRPCError with
+  // cause.code === "MODEL_NOT_CONFIGURED". The interceptor keys off the
+  // cause string, not the HTTP/TRPC code, so REST and tRPC surfaces both
+  // funnel into the same modal.
+  const cause = error.data?.cause as
+    | {
+        code?: string;
+        featureKey?: string;
+        featureDisplayName?: string;
+        role?: string;
+        projectId?: string;
+      }
+    | undefined;
+
+  if (cause?.code !== "MODEL_NOT_CONFIGURED") return null;
+  if (!cause.featureKey || !cause.role) return null;
+
+  const role = cause.role as MissingModelExtracted["role"];
+  if (role !== "DEFAULT" && role !== "FAST" && role !== "EMBEDDINGS") {
+    return null;
+  }
+
+  return {
+    featureKey: cause.featureKey,
+    featureDisplayName: cause.featureDisplayName ?? cause.featureKey,
+    role,
+    projectId: cause.projectId,
+  };
+}
