@@ -442,6 +442,10 @@ Let's get cracking.
     ```
 
     This will add the `LANGWATCH_API_KEY` to your local `.env` file.
+
+    <Note>
+      If you are using a **service API key** (e.g. for CI/CD or multi-project setups), you must also set `LANGWATCH_PROJECT_ID` in your `.env` file so the SDK knows which project to send traces to. You can find the project ID in your project settings.
+    </Note>
   </Step>
 
   <Step title="Let LangWatch MCP do the rest for you (Optional)">
@@ -493,6 +497,7 @@ from langwatch.instrumentors import OpenAIInstrumentor
 
 langwatch.setup(
     api_key=os.getenv("LANGWATCH_API_KEY"), # Your LangWatch API key
+    project_id=os.getenv("LANGWATCH_PROJECT_ID"), # Required for service API keys
     instrumentors=[OpenAIInstrumentor()] # Add the instrumentor for your LLM
 )
 ```
@@ -516,6 +521,7 @@ export function register() {
     serviceName: 'your-app-name', // Give your service a clear name
     traceExporter: new LangWatchExporter({
       apiKey: process.env.LANGWATCH_API_KEY, // Your LangWatch API key
+      projectId: process.env.LANGWATCH_PROJECT_ID, // Required for service API keys
     })
   });
 }
@@ -4752,7 +4758,7 @@ from langwatch.types import RAGChunk
 from langwatch.attributes import AttributeKey # For semantic attribute keys
 import asyncio # Assuming async operation
 
-langwatch.setup()
+langwatch.setup()  # Reads LANGWATCH_API_KEY and LANGWATCH_PROJECT_ID from environment
 
 async def rag_retrieval_manual(query: str):
     # Use async with for the span, instead of a decorator
@@ -7760,6 +7766,7 @@ import { FilterableBatchSpanProcessor, LangWatchExporter } from "langwatch";
 const processor = new FilterableBatchSpanProcessor(
   new LangWatchExporter({
     apiKey: "your-api-key",
+    projectId: "your-project-id", // Required for service API keys
   }),
   [
     { attribute: "http.url", value: "/health" },
@@ -10054,6 +10061,7 @@ This guide shows you how to set up OpenTelemetry instrumentation in any language
 ## Prerequisites
 
 - Obtain your `LANGWATCH_API_KEY` from the [LangWatch dashboard](https://app.langwatch.ai/)
+- If using a **service API key**, also obtain your `LANGWATCH_PROJECT_ID` from your project settings
 - Install the OpenTelemetry SDK for your programming language
 
 ## LangWatch OTEL API Endpoint
@@ -10256,7 +10264,12 @@ Set these environment variables for authentication:
 
 ```bash
 export LANGWATCH_API_KEY="your-api-key-here"
+export LANGWATCH_PROJECT_ID="your-project-id-here"  # Required for service API keys
 ```
+
+<Note>
+  `LANGWATCH_PROJECT_ID` is required when using a **service API key** (e.g. for CI/CD or multi-project setups). Project API keys obtained from the project settings page already have the project context built in.
+</Note>
 
 ## Verification
 
@@ -13570,6 +13583,10 @@ const langwatch = new LangWatch();
 ```
 
 
+
+<Note>
+  If you are using a **service API key** (e.g. for CI/CD or multi-project setups), you must also set the `LANGWATCH_PROJECT_ID` environment variable (or pass `project_id`/`projectId` to the SDK) so the SDK knows which project to access. You can find the project ID in your project settings.
+</Note>
 
 ## List Datasets
 
@@ -18408,7 +18425,12 @@ Be sure to login or create an account on the link that will be displayed, then p
 
 ```bash
 export LANGWATCH_API_KEY=your_api_key
+export LANGWATCH_PROJECT_ID=your_project_id  # Required for service API keys
 ```
+
+<Note>
+  `LANGWATCH_PROJECT_ID` is required when using a **service API key** (e.g. for CI/CD or multi-project setups). Project API keys obtained via `langwatch.login()` or from the project settings page already have the project context built in.
+</Note>
 
 
 
