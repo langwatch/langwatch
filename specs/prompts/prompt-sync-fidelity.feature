@@ -44,23 +44,10 @@ Feature: Prompt sync fidelity between the platform and local YAML
     Then the sync payload outputs are flat fields "l1", "l2", "l3", "reasoning"
     And no single json_schema catch-all output is sent
 
-  # --- Sampling parameters are never fabricated at the write boundary ---
-  # A model-invalid value is refused at persistence time (not papered over on
-  # read) so the stored prompt is honest for every consumer: UI, pull, runtime.
-
-  @integration
-  Scenario: Publishing a prompt version on a model that rejects temperature never stores it
-    Given a model whose registry entry does not support temperature
-    When a prompt version is published with a temperature on that model
-    Then the stored version has no temperature
-    And the prompts REST API returns no temperature for it
-
-  @integration
-  Scenario: Publishing a prompt version on a model that supports temperature keeps it
-    Given a model whose registry entry supports temperature
-    When a prompt version is published with a temperature on that model
-    Then the stored version keeps the temperature untouched
-    And the prompts REST API returns that temperature
+  # --- Sync is a pure pass-through: never fabricate, never strip ---
+  # If the user set a value, keep it. If they didn't, don't invent one. The
+  # platform UI is the right place to stop materializing a value the user
+  # never chose; the sync layer faithfully propagates whatever was stored.
 
   # --- New prompts start modern ---
 

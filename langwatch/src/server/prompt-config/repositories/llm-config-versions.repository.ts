@@ -9,7 +9,6 @@ import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 
 import type { SchemaVersion } from "../enums";
-import { dropModelUnsupportedSamplingParams } from "../dropUnsupportedSamplingParams";
 import { LlmConfigRepository } from "./llm-config.repository";
 import {
   getVersionValidator,
@@ -194,17 +193,6 @@ export class LlmConfigVersionsRepository {
         code: "NOT_FOUND",
         message: "Prompt config not found.",
       });
-    }
-
-    // Never persist a sampling parameter the chosen model rejects (e.g. a
-    // slider-materialized temperature on a gpt-5-family model). Done here, at
-    // the single write boundary, so the stored data is honest for every
-    // consumer — UI, CLI pull, and the runtime — rather than papered over on
-    // read.
-    if (versionData.configData) {
-      dropModelUnsupportedSamplingParams(
-        versionData.configData as Record<string, unknown>,
-      );
     }
 
     // Omit the version field from the validator since auto-incremented by the database
