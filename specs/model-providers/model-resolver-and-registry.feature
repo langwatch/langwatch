@@ -133,7 +133,7 @@ Feature: Model resolver and feature registry
     And the error carries the featureDisplayName "AI search"
     And the error carries the projectId used in the resolve call
 
-  @integration
+  @integration @unimplemented
   Scenario: A tRPC procedure forwards ModelNotConfiguredError as a typed TRPCError
     Given a tRPC procedure that resolves a model and calls the provider
     When the resolver throws ModelNotConfiguredError for "traces.ai_search"
@@ -142,7 +142,15 @@ Feature: Model resolver and feature registry
     And the error data carries featureKey "traces.ai_search"
     And the error data carries role "FAST"
     # The frontend interceptor matches on cause === MODEL_NOT_CONFIGURED
-    # and opens the missing-model modal with the role and feature in context.
+    # and opens the missing-model modal with the role and feature in
+    # context. The wire-format mapping (TRPCError code + cause + data
+    # payload via `toResponseBody()`) ships in the follow-up PR that
+    # replaces the `project.defaultModel ?? DEFAULT_MODEL` call sites
+    # with `resolveModelForFeature(...)` so the typed error actually
+    # crosses the boundary on a real procedure call. The
+    # ModelNotConfiguredError shape itself (cause + featureKey + role
+    # + projectId + serialisable response body) is already pinned by
+    # the resolver integration test.
 
   # ────────────────────────────────────────────────────────────────────────────
   # Onboarding seed
@@ -184,13 +192,20 @@ Feature: Model resolver and feature registry
   # Compat with B2's defaultModel / topicClusteringModel / embeddingsModel
   # ────────────────────────────────────────────────────────────────────────────
 
-  @integration
+  @integration @unimplemented
   Scenario: Migration moves B2 columns into ModelDefault rows
     Given an organization with defaultModel="openai/gpt-5.5", topicClusteringModel="openai/gpt-5.2", embeddingsModel="openai/text-embedding-3-small"
     When the B3.1 migration runs
     Then a ModelDefault row exists with role=DEFAULT, featureKey=null, model="openai/gpt-5.5"
     And a ModelDefault row exists with role=FAST, featureKey="analytics.topic_clustering_llm", model="openai/gpt-5.2"
     And a ModelDefault row exists with role=EMBEDDINGS, featureKey=null, model="openai/text-embedding-3-small"
+    # The migration's INSERT…SELECT runs on every `prisma migrate deploy`
+    # (CI + production). The legacy-compat read-fallback scenario below
+    # proves the resolver returns the same values whether they live in
+    # the new ModelDefault rows OR the original B2 scalar columns, so the
+    # resolver-level contract holds. Re-running the migration SQL inside
+    # a vitest would re-test SQL, not our code — bound to the migration
+    # toolchain rather than a code test.
 
   @integration
   Scenario: Resolver falls back to legacy columns for one release

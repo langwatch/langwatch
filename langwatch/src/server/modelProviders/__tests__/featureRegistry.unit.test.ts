@@ -2,8 +2,10 @@ import { describe, it, expect } from "vitest";
 
 import {
   allFeatures,
+  assertUniqueFeatureKeys,
   featureByKey,
   featuresByRole,
+  type FeatureDescriptor,
 } from "../featureRegistry";
 
 describe("feature registry", () => {
@@ -40,5 +42,26 @@ describe("feature registry", () => {
 
   it("never ships an empty registry", () => {
     expect(allFeatures().length).toBeGreaterThan(0);
+  });
+
+  /** @scenario Registering a feature key twice is a build-time failure */
+  it("rejects duplicate keys at registration time", () => {
+    const features: FeatureDescriptor[] = [
+      {
+        key: "duplicate.feature",
+        role: "DEFAULT",
+        displayName: "First",
+        description: "",
+      },
+      {
+        key: "duplicate.feature",
+        role: "FAST",
+        displayName: "Second",
+        description: "",
+      },
+    ];
+    expect(() => assertUniqueFeatureKeys(features)).toThrow(
+      /Duplicate feature registry key/,
+    );
   });
 });

@@ -97,16 +97,26 @@ const REGISTRY: FeatureDescriptor[] = [
   },
 ];
 
-// Duplicate-key guard at module load.
-const seenKeys = new Set<string>();
-for (const f of REGISTRY) {
-  if (seenKeys.has(f.key)) {
-    throw new Error(
-      `Duplicate feature registry key: "${f.key}". Feature keys must be unique.`,
-    );
+/**
+ * Asserts every key in a feature-descriptor list is unique. Used both at
+ * module load (below) and as the surface tests bind to so we can prove
+ * the guard fires without monkey-patching the module system.
+ */
+export function assertUniqueFeatureKeys(
+  features: readonly FeatureDescriptor[],
+): void {
+  const seen = new Set<string>();
+  for (const f of features) {
+    if (seen.has(f.key)) {
+      throw new Error(
+        `Duplicate feature registry key: "${f.key}". Feature keys must be unique.`,
+      );
+    }
+    seen.add(f.key);
   }
-  seenKeys.add(f.key);
 }
+
+assertUniqueFeatureKeys(REGISTRY);
 
 export const allFeatures = (): FeatureDescriptor[] => [...REGISTRY];
 
