@@ -86,6 +86,12 @@ func installProductionTracerStack(t *testing.T) *tracetest.SpanRecorder {
 			otelsetup.AutoStampedBaggageKeys...,
 		)),
 		sdktrace.WithSpanProcessor(rec),
+		// The context-aware IDGenerator is what lets startStudioSpan
+		// preserve the body-supplied trace_id when there's no inbound
+		// W3C traceparent header — the 2026-05-15 "Parent not in trace"
+		// fix. Production wires this in pkg/otelsetup/otelsetup.go;
+		// mirror it here so tests exercise the production wiring.
+		sdktrace.WithIDGenerator(otelsetup.NewIDGenerator()),
 	)
 	prevTP := otelapi.GetTracerProvider()
 	otelapi.SetTracerProvider(tp)
@@ -375,4 +381,86 @@ func TestCausalityPropagation_SanityCheckParentIsRemoteFlag(t *testing.T) {
 	require.Len(t, ended, 1)
 	assert.True(t, ended[0].Parent().IsRemote(),
 		"sanity: a span started under a remote SpanContext must report Parent().IsRemote() = true")
+}
+
+// 2026-05-15 prod regression. Studio's playground frontend mints a
+// trace_id and posts it in the request BODY only — no W3C traceparent
+// header. startStudioSpan's pre-fix path synthesized a remote
+// SpanContext with a freshly-minted random SpanID as the "parent" so
+// the engine's children inherited the body trace_id. The studio root
+// then ended up with parent_span_id = <random phantom> — a span that
+// is never emitted anywhere. The LangWatch UI surfaces this as
+// "Parent not in trace" against every workflow root, with a different
+// random parent per invocation.
+//
+// Fix: when there's no inbound traceparent header, the studio root
+// MUST be a true OTel root span (parent context invalid → parent_span_id
+// is the zero SpanID in OTLP), with trace_id preserved via a
+// context-aware IDGenerator.
+/** @scenario Studio playground request with body trace_id but no traceparent header creates a true root span */
+func TestCausalityPropagation_BodyTraceIDOnlyProducesTrueRootSpan(t *testing.T) {
+	rec := installProductionTracerStack(t)
+	url, _ := setupCausalityStack(t)
+
+	const bodyTraceID = "deadbeefdeadbeefdeadbeefdeadbeef"
+
+	body := `{
+  "trace_id": "` + bodyTraceID + `",
+  "origin": "workflow",
+  "workflow": {
+    "workflow_id":"wf","api_key":"sk-test","spec_version":"1.3","name":"x","icon":"x","description":"x","version":"x",
+    "template_adapter":"default",
+    "nodes":[
+      {"id":"entry","type":"entry","data":{"train_size":1.0,"test_size":0.0,"seed":1,
+        "outputs":[{"identifier":"input","type":"str"}],
+        "dataset":{"inline":{"records":{"input":["hello"]},"count":1}}}},
+      {"id":"end","type":"end","data":{}}
+    ],
+    "edges":[
+      {"id":"e1","source":"entry","sourceHandle":"input","target":"end","targetHandle":"any","type":"default"}
+    ],
+    "state":{}
+  }
+}`
+
+	req, err := http.NewRequest(http.MethodPost, url+"/go/studio/execute_sync", bytes.NewBufferString(body))
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+	// Deliberately NO traceparent header — this is what the playground
+	// frontend ships today.
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	respBody, _ := io.ReadAll(resp.Body)
+	require.Equal(t, http.StatusOK, resp.StatusCode, "body: %s", string(respBody))
+
+	ended := rec.Ended()
+	require.NotEmpty(t, ended, "expected at least one span recorded; got 0")
+
+	// Find the studio root span. It's the SpanKindServer span started
+	// by startStudioSpan. With the fix in place it must be a TRUE root:
+	// parent SpanContext invalid, parent_span_id all-zeros in OTLP.
+	var rootStudioSpan sdktrace.ReadOnlySpan
+	for _, s := range ended {
+		if s.SpanKind() == trace.SpanKindServer {
+			rootStudioSpan = s
+			break
+		}
+	}
+	require.NotNil(t, rootStudioSpan,
+		"no SpanKindServer span emitted — startStudioSpan didn't run")
+
+	// Critical assertion: the studio root has NO valid parent. Before
+	// the fix this was a valid-but-phantom span_id; the UI flagged it as
+	// "Parent not in trace" on every playground invocation.
+	assert.False(t, rootStudioSpan.Parent().IsValid(),
+		"studio root must be a true root (no parent_span_id) when there's no inbound traceparent — "+
+			"otherwise the LangWatch UI shows 'Parent not in trace' on every playground run. "+
+			"Parent SpanContext: %s", rootStudioSpan.Parent().SpanID())
+
+	// And trace_id continuity — the studio root must adopt the body
+	// trace_id so the LangWatch "Full Trace" drawer can pivot on it.
+	assert.Equal(t, bodyTraceID, rootStudioSpan.SpanContext().TraceID().String(),
+		"studio root must preserve the body-supplied trace_id even when there's no inbound parent context")
 }
