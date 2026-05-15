@@ -602,7 +602,14 @@ describe.skipIf(!shouldRun)(
         // Poll ClickHouse for the persisted spans. Three flush windows
         // chain here: nlpgo's BatchSpanProcessor (5s scheduled delay) +
         // OTLP HTTP roundtrip + the event-sourcing fold/map projections.
-        // 45s deadline absorbs all three with margin on a loaded CI runner.
+        // The integration shard runs this alongside other heavyweight
+        // subprocess + pipeline tests under a 4-wide vitest pool; on a
+        // saturated CI runner the chain has been observed to need well
+        // past 45s purely from scheduler contention (the spans DO land,
+        // just late). 120s deadline absorbs all three plus that
+        // contention with margin — widening the budget cannot mask a
+        // real regression because the assertions below still require the
+        // spans to actually arrive under the inbound trace_id.
         //
         // CRITICAL: we must NOT exit the loop on the first non-empty
         // result. The studio root span ends AFTER its children, so BSP
@@ -650,7 +657,7 @@ describe.skipIf(!shouldRun)(
           );
 
         let rows: SpanRow[] = [];
-        const deadline = Date.now() + 45_000;
+        const deadline = Date.now() + 120_000;
         while (Date.now() < deadline) {
           rows = await fetchRows();
           if (rows.length > 0 && hasLinkedSpan(rows)) break;
@@ -689,7 +696,7 @@ describe.skipIf(!shouldRun)(
               .join(", ")}`,
         ).toBeGreaterThan(0);
       },
-      90_000,
+      180_000,
     );
   },
 );
