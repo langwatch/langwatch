@@ -3,6 +3,7 @@ import { useRef } from "react";
 import { useColorMode } from "~/components/ui/color-mode";
 import { Drawer } from "~/components/ui/drawer";
 import { IsolatedErrorBoundary } from "~/components/ui/IsolatedErrorBoundary";
+import { useDrawer } from "~/hooks/useDrawer";
 import {
   DRAWER_MIN_WIDTH_PX,
   useDrawerStore,
@@ -63,6 +64,17 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
   const pinned = useDrawerStore((s) => s.pinned);
   const setShortcutsOpen = useDrawerStore((s) => s.setShortcutsOpen);
 
+  // Drive `open` off the URL via `useDrawer().currentDrawer`. The
+  // previous `open={true}` hardcode relied entirely on the parent
+  // unmounting this shell when the URL stripped `drawer.open` — under
+  // the Vite/React-Router compat layer that unmount sometimes lost the
+  // race with Chakra's portal, leaving the drawer's DOM stranded after
+  // the URL had already cleared. Reading the URL state directly means
+  // the close button + Esc both trigger Chakra's own close animation
+  // *and* the parent unmount, so the panel can't survive either path.
+  const { currentDrawer } = useDrawer();
+  const drawerOpen = currentDrawer === "traceV2Details";
+
   // Watch the actual rendered drawer body so the layout decision
   // reflects whatever pixel width the operator dragged the drawer to —
   // not the abstract widthPx state (which may be `null` when at the
@@ -76,7 +88,7 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
   if (!isLoading && !trace) {
     return (
       <Drawer.Root
-        open={true}
+        open={drawerOpen}
         placement="end"
         size="lg"
         onOpenChange={() => handleClose()}
@@ -121,7 +133,7 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
 
   return (
     <Drawer.Root
-      open={true}
+      open={drawerOpen}
       placement="end"
       size="lg"
       // When unpinned, the drawer behaves as a standard modal — clicking

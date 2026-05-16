@@ -58,7 +58,7 @@ export const ActiveSearchEditor: React.FC<ActiveSearchEditorProps> = ({
   onSuggestionOpenChange,
   onCursorAnchorChange,
 }) => {
-  const { editor, suggestion, acceptSuggestion, cursorAnchorX } =
+  const { editor, suggestion, acceptSuggestion, cursorAnchorX, endAnchorX } =
     useFilterEditor({
       queryText,
       applyQueryText,
@@ -87,8 +87,11 @@ export const ActiveSearchEditor: React.FC<ActiveSearchEditorProps> = ({
   }, [suggestion.state.open, suggestion.items.length, onSuggestionOpenChange]);
 
   useEffect(() => {
-    onCursorAnchorChange?.(cursorAnchorX);
-  }, [cursorAnchorX, onCursorAnchorChange]);
+    // Forward the *end-of-content* anchor (not the cursor) so the
+    // inline submit hint stays pinned to the right of whatever's been
+    // typed regardless of caret moves or selection.
+    onCursorAnchorChange?.(endAnchorX);
+  }, [endAnchorX, onCursorAnchorChange]);
 
   return (
     <>

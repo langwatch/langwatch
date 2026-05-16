@@ -347,13 +347,11 @@ const IS_MAC =
 const MOD_KEY_SYMBOL = IS_MAC ? "⌘" : "Ctrl";
 
 /**
- * Inline "Press ⏎ to search filters, ⌘+⏎ to Ask AI" hint rendered as
- * plain gray text pinned just after the typed content (anchored to the
- * editor's cursor position). Looks like a continuation of the input —
- * which is exactly the point: it's a hint, not a button row. The Ask
- * AI clause is still clickable so a mouse-driven operator can punt
- * the query to AI without learning the shortcut. The whole thing
- * disappears mid-autocomplete so it never competes with the dropdown.
+ * Plain one-liner hint that floats just after the typed content. No
+ * Kbd chips, no two-tone text — every glyph is the same `fg.subtle`
+ * gray so the whole line reads as a hint and nothing else. The Ask AI
+ * fragment is still clickable for mouse-driven operators, but it
+ * doesn't visually announce itself as "a button you must press".
  */
 const SearchSubmitHint: React.FC<{
   anchorX: number;
@@ -361,10 +359,6 @@ const SearchSubmitHint: React.FC<{
 }> = ({ anchorX, onAskAi }) => (
   <Text
     position="absolute"
-    // Pin just past the cursor with a small gap. The cursor anchor is
-    // measured from the editor's left edge; the typing area starts at
-    // the same origin, so this lands exactly after the last typed
-    // glyph. Capped at the editor's right edge by `maxWidth` below.
     left={`${anchorX + 12}px`}
     top="50%"
     transform="translateY(-50%)"
@@ -374,34 +368,21 @@ const SearchSubmitHint: React.FC<{
     whiteSpace="nowrap"
     overflow="hidden"
     textOverflow="ellipsis"
-    maxWidth="calc(100% - var(--cursor-anchor, 0px))"
-    // The editor itself owns clicks for caret placement — the hint
-    // shouldn't intercept them. We still re-enable pointer events on
-    // the Ask AI fragment so it remains clickable.
     pointerEvents="none"
     userSelect="none"
   >
-    {"Press "}
-    <Kbd>↵</Kbd>
-    {" to search, "}
+    {`Press ↵ to search, `}
     <chakra.span
       onMouseDown={(e) => {
-        // mouseDown so we beat the editor's onBlur — the click would
-        // otherwise race with AI mode entry.
         e.preventDefault();
         e.stopPropagation();
         onAskAi();
       }}
       cursor="pointer"
       pointerEvents="auto"
-      color="fg.muted"
-      _hover={{ color: "fg" }}
-      transition="color 0.12s ease"
+      _hover={{ textDecoration: "underline" }}
     >
-      <Kbd>{MOD_KEY_SYMBOL}</Kbd>
-      <chakra.span marginX={0.5} />
-      <Kbd>↵</Kbd>
-      {" to Ask AI"}
+      {`${MOD_KEY_SYMBOL}+↵ to Ask AI`}
     </chakra.span>
   </Text>
 );
