@@ -614,35 +614,30 @@ export function PaneLayout({
 function PaneResizeBar({ orientation }: { orientation: DrawerLayout }) {
   const isHorizontal = orientation === "horizontal";
   return (
+    // Single 1px element that IS the visible separator — claiming
+    // exactly 1px of layout space is cheaper and more reliable than
+    // a 0-area parent with a sub-pixel absolutely-positioned child
+    // (which rounded to 0px in some browsers, making the separator
+    // disappear in spots). The hit area is handled by the
+    // PanelResizeHandle's `hitAreaMargins` — this Box only needs to
+    // be a visible 1px line.
     <Box
-      // Zero-area parent (the visible line itself is 1px and centered
-      // on this parent via the absolute child below). Keeps the
-      // handle from claiming layout space — the adjacent panels can
-      // sit flush against the separator.
-      width={isHorizontal ? "0px" : "100%"}
-      height={isHorizontal ? "100%" : "0px"}
-      position="relative"
-    >
-      <Box
-        position="absolute"
-        top={isHorizontal ? 0 : "-0.5px"}
-        bottom={isHorizontal ? 0 : "-0.5px"}
-        left={isHorizontal ? "-0.5px" : 0}
-        right={isHorizontal ? "-0.5px" : 0}
-        // Default visible separator tone. Lit blue when the parent
-        // `[data-resize-handle-state]` (set by the library on its
-        // own root div) flips to `hover` or `drag`. CSS selector
-        // walks up to the handle root, so this stays scoped per
-        // handle instance — no cross-talk between sibling handles.
-        bg={{ base: "gray.200", _dark: "border.muted" }}
-        transition="background 100ms ease"
-        css={{
-          "[data-resize-handle-state='hover'] &, [data-resize-handle-state='drag'] &":
-            {
-              background: "var(--chakra-colors-blue-solid)",
-            },
-        }}
-      />
-    </Box>
+      width={isHorizontal ? "1px" : "100%"}
+      height={isHorizontal ? "100%" : "1px"}
+      flexShrink={0}
+      // Default visible separator tone. Lit blue via the library-set
+      // `[data-resize-handle-state]` attribute (values: `hover` /
+      // `drag` / `inactive`) on the parent handle div — gives the
+      // user the same "this is grabbable" affordance as the waterfall
+      // chart.
+      bg={{ base: "gray.200", _dark: "border.muted" }}
+      transition="background 100ms ease"
+      css={{
+        "[data-resize-handle-state='hover'] &, [data-resize-handle-state='drag'] &":
+          {
+            background: "var(--chakra-colors-blue-solid)",
+          },
+      }}
+    />
   );
 }
