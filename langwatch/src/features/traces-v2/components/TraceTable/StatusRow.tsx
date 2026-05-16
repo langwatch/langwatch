@@ -49,10 +49,11 @@ export const ROW_STYLES: Record<RowVariant, RowStyle> = {
     borderColor: "transparent",
     bg: "transparent",
     // Light blue tint on hover so the row hover state reads as a
-    // deliberate selection cue rather than a faint grey wash. Matches
-    // the selected-row tint (blue.fg/8) but lighter so hover doesn't
-    // get mistaken for selection.
-    hoverBg: "blue.fg/5",
+    // deliberate selection cue rather than a faint grey wash. Sits
+    // alongside the selected-row tint (blue.fg/8) without competing
+    // with it — hover is brighter so the cursor's row pops, selected
+    // is solid blue so it stays distinct after click.
+    hoverBg: "blue.fg/12",
     separatorColor: "border.subtle",
     bottomSeparatorColor: "border.muted",
   },
