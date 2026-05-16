@@ -249,8 +249,10 @@ describe("PromptStudioAdapter", () => {
       const mocked = vi.mocked(studioBackendPostEvent);
       expect(mocked, "studioBackendPostEvent must have been called").toHaveBeenCalled();
       // The component_state_change consumer is async; we only need the
-      // envelope shape that was passed in.
-      return mocked.mock.calls[0][0].message;
+      // envelope shape that was passed in. The `!` propagates the
+      // toHaveBeenCalled guarantee past TS's noUncheckedIndexedAccess.
+      const firstCall = mocked.mock.calls[0]!;
+      return (firstCall[0] as any).message;
     }
 
     beforeEach(() => {
@@ -303,7 +305,7 @@ describe("PromptStudioAdapter", () => {
       // the placeholder against inputs.input.
       const userTurns = sent.filter((m) => m.role === "user");
       expect(userTurns).toHaveLength(1);
-      expect(userTurns[0].content).toBe("{{input}}");
+      expect(userTurns[0]!.content).toBe("{{input}}");
     });
 
     it("keeps prior assistant + user turns when the template absorbs only the latest live turn", async () => {
