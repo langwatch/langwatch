@@ -26,8 +26,11 @@ export interface RowStyle {
 export const ROW_STYLES: Record<RowVariant, RowStyle> = {
   selected: {
     borderColor: "blue.fg",
-    bg: "blue.fg/8",
-    hoverBg: "blue.fg/10",
+    // Light blue surface tint for the active row — Chakra's
+    // `blue.subtle` semantic token, matches what the docs use for
+    // selected list items. Reads naturally against the white table.
+    bg: "blue.subtle",
+    hoverBg: "blue.subtle",
     separatorColor: "border.subtle",
     bottomSeparatorColor: "border.muted",
   },
@@ -48,11 +51,10 @@ export const ROW_STYLES: Record<RowVariant, RowStyle> = {
   default: {
     borderColor: "transparent",
     bg: "transparent",
-    // Light blue tint on hover. `blue.fg` was the foreground-tone
-    // (dark navy) — using it as a bg even at low opacity looked
-    // muddy. `blue.subtle` is Chakra's semantic light-blue background
-    // token, sits naturally against the white table surface.
-    hoverBg: "blue.subtle",
+    // Light grey tint on hover — same `gray.subtle` token the Model
+    // column badge uses, so hover reads as "highlighted, not yet
+    // selected" while the selected state owns the `blue.subtle` tint.
+    hoverBg: "gray.subtle",
     separatorColor: "border.subtle",
     bottomSeparatorColor: "border.muted",
   },
