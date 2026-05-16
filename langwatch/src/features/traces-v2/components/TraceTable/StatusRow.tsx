@@ -48,7 +48,11 @@ export const ROW_STYLES: Record<RowVariant, RowStyle> = {
   default: {
     borderColor: "transparent",
     bg: "transparent",
-    hoverBg: "fg.subtle/6",
+    // Light blue tint on hover so the row hover state reads as a
+    // deliberate selection cue rather than a faint grey wash. Matches
+    // the selected-row tint (blue.fg/8) but lighter so hover doesn't
+    // get mistaken for selection.
+    hoverBg: "blue.fg/5",
     separatorColor: "border.subtle",
     bottomSeparatorColor: "border.muted",
   },
