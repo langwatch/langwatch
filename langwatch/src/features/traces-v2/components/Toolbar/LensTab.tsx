@@ -155,7 +155,7 @@ const DraftDot: React.FC<{ lensId: string; lensName: string }> = ({
   return (
     <>
       <Tooltip
-        content="Unsaved changes — click to discard or save as new lens"
+        content="Unsaved changes. Click to discard or save as new lens."
         positioning={{ placement: "bottom" }}
       >
         <Box display="inline-flex" marginLeft={0.5}>

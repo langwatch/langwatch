@@ -15,7 +15,7 @@ import { useViewStore } from "../../stores/viewStore";
 import { LensConfigDialog } from "./LensConfigDialog";
 
 const BETA_TOOLTIP =
-  "Lenses are saved in your browser during this beta — they don't sync across browsers or teammates yet.";
+  "Lenses are saved in your browser during this beta. They don't sync across browsers or teammates yet.";
 
 /**
  * Lens creation entry point — two paths from the same trigger:
@@ -135,7 +135,7 @@ export const CreateLensButton: React.FC = () => {
                 <Text marginLeft={1}>Configure columns, sort, and more…</Text>
               </Button>
               <Text fontSize="2xs" color="fg.subtle" lineHeight="1.4">
-                Saved locally during beta — won't sync across browsers yet.
+                Saved locally during beta. Won't sync across browsers yet.
               </Text>
             </Stack>
           </PopoverBody>
