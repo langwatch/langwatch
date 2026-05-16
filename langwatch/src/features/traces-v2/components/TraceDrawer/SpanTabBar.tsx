@@ -7,7 +7,7 @@ import {
   Icon,
   Text,
 } from "@chakra-ui/react";
-import { memo, useMemo, useRef } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import {
   LuChevronDown,
   LuChevronRight,
@@ -439,6 +439,38 @@ export const SpanTabBar = memo(function SpanTabBar({
   const activeOverflowId =
     tabDescriptors.find((d) => d.activeId)?.id ?? null;
   const scrollerRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Operator feedback: the instrumentation scope (rendered via
+  // `rightSlot`) is a nice-to-have — under tight width it should be
+  // the FIRST thing to disappear, before any tabs collapse into the
+  // kebab menu. Threshold is a hard cutoff on the row's pixel width
+  // rather than a feedback-driven re-measure, which avoids the
+  // oscillation that two-phase "hide / re-show / hide again" logic
+  // would introduce when the rightSlot freeing space pushes the row
+  // back over the threshold.
+  const [hideRightSlot, setHideRightSlot] = useState(false);
+  useEffect(() => {
+    if (!rightSlot) {
+      setHideRightSlot(false);
+      return;
+    }
+    const el = containerRef.current;
+    if (!el) return;
+    const measure = () => {
+      const width = el.clientWidth;
+      if (width <= 0) return;
+      // 520px is where the Summary/LLM-Optimized/Prompts tab trio
+      // alongside the collapse toggle starts to feel cramped with the
+      // scope chip still rendered. Tuned empirically against the
+      // narrowest drawer width the operator drags to.
+      setHideRightSlot(width < 520);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [rightSlot]);
   // Reserve room for kebab trigger + optional rightSlot + the
   // pinned-span overflow menu + the trailing collapse toggle. 96px gives
   // enough headroom that the last visible tab doesn't bleed under those
@@ -452,6 +484,7 @@ export const SpanTabBar = memo(function SpanTabBar({
 
   return (
     <HStack
+      ref={containerRef}
       gap="5px"
       paddingLeft={collapsePosition === "leading" ? 2 : 4}
       paddingRight={collapsePosition === "leading" ? 4 : 2}
@@ -493,20 +526,26 @@ export const SpanTabBar = memo(function SpanTabBar({
             onUnpinSpan={unpinSpan}
           />
         )}
-        <OverflowMenu
-          items={tabDescriptors
-            .filter((d) => hiddenTabIds.has(d.id))
-            .map((d) => ({ id: d.id, label: d.label, content: d.menuContent }))}
-          activeId={activeOverflowId}
-          onSelect={(id) => {
-            const descriptor = tabDescriptors.find((d) => d.id === id);
-            descriptor?.onSelect();
-          }}
-          ariaLabel="Show more tabs"
-        />
+        <Flex align="center" flexShrink={0}>
+          <OverflowMenu
+            items={tabDescriptors
+              .filter((d) => hiddenTabIds.has(d.id))
+              .map((d) => ({
+                id: d.id,
+                label: d.label,
+                content: d.menuContent,
+              }))}
+            activeId={activeOverflowId}
+            onSelect={(id) => {
+              const descriptor = tabDescriptors.find((d) => d.id === id);
+              descriptor?.onSelect();
+            }}
+            ariaLabel="Show more tabs"
+          />
+        </Flex>
       </HStack>
 
-      {rightSlot ? (
+      {rightSlot && !hideRightSlot ? (
         <Flex align="center" flexShrink={0} paddingLeft={3}>
           {rightSlot}
         </Flex>

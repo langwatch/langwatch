@@ -247,19 +247,21 @@ export const ConversationContext = memo(function ConversationContext({
       width="100%"
       minHeight={0}
       minWidth={0}
-      // Light mode tone stack (lightest → darkest):
+      // Light mode tone stack:
       //   panel bg     = `bg.surface` (white) — header + content both
       //                  sit on white, matching the accordion sections
-      //                  below
-      //   row borders  = `gray.300` (light only) so the inner card
-      //                  reads as a slightly darker frame against the
-      //                  white surround
-      //   non-selected = bg.surface (white) — no tint on rows or on
-      //                  the assistant reply line
-      //   selected     = `gray.200` — a tad darker than the previous
-      //                  `bg.muted`, reads clearly as "this row"
+      //   row borders  = `gray.200` (light only)
+      //   non-selected = `bg.surface` (white)
+      //   selected     = `blue.subtle` — matches the row-selection blue
+      //                  used on the trace list, replacing the previous
+      //                  gray indent
       // Dark mode keeps the validated palette.
       bg={{ base: "bg.surface", _dark: "bg.surface" }}
+      // Bottom border doubles as the ctx ↔ viz separator when the
+      // pane is expanded (the header's own borderBottom only sits at
+      // the chevron line, not at the bottom of the pane).
+      borderBottomWidth="1px"
+      borderColor={{ base: "gray.200", _dark: "border.muted" }}
     >
       <ContextHeader
         position={ctx.position}
@@ -513,26 +515,33 @@ const ConversationRow = memo(function ConversationRow({
         paddingX={3}
         paddingY={2}
         borderBottomWidth={isLast ? 0 : "1px"}
-        borderColor="border.muted"
-        opacity={0.55}
+        // Border color must not be inside the opacity-dimmed scope —
+        // otherwise the separator between the "Start of conversation"
+        // placeholder and the selected blue row reads as a barely-
+        // visible line. Use the same `gray.200` border the rest of
+        // the rows do, at full opacity, while the rest of the
+        // placeholder visuals stay dimmed via a child opacity wrapper.
+        borderColor={{ base: "gray.200", _dark: "border.muted" }}
         cursor="default"
       >
-        <Icon
-          as={PlaceholderIcon}
-          boxSize={3.5}
-          color="fg.subtle"
-          flexShrink={0}
-        />
-        <Text
-          textStyle="xs"
-          color="fg.subtle"
-          fontStyle="italic"
-          truncate
-          flex={1}
-          minWidth={0}
-        >
-          {row.assistantText ?? row.userText ?? ""}
-        </Text>
+        <Flex align="center" gap={2.5} flex={1} minWidth={0} opacity={0.55}>
+          <Icon
+            as={PlaceholderIcon}
+            boxSize={3.5}
+            color="fg.subtle"
+            flexShrink={0}
+          />
+          <Text
+            textStyle="xs"
+            color="fg.subtle"
+            fontStyle="italic"
+            truncate
+            flex={1}
+            minWidth={0}
+          >
+            {row.assistantText ?? row.userText ?? ""}
+          </Text>
+        </Flex>
       </Flex>
     );
   }
@@ -548,13 +557,14 @@ const ConversationRow = memo(function ConversationRow({
         gap={2.5}
         paddingX={3}
         paddingY={2}
-        // Light mode: non-selected rows = white; selected row =
-        // `gray.100` (lighter than the previous `gray.200` — a calm
-        // tint, not a hard step against the white surround).
-        // Dark mode keeps the validated `blue.subtle` selection.
+        // Selected row uses `blue.subtle` in both modes — same tint
+        // the trace list applies to the active row, so the operator's
+        // "this is the current turn" cue is consistent across
+        // surfaces. Non-selected rows are white (light) / transparent
+        // (dark) so the panel chrome shows through.
         bg={
           isCurrent
-            ? { base: "gray.100", _dark: "blue.subtle" }
+            ? "blue.subtle"
             : { base: "bg.surface", _dark: "transparent" }
         }
         borderBottomWidth={isLast ? 0 : "1px"}
@@ -600,7 +610,10 @@ const ConversationRow = memo(function ConversationRow({
             // (lighter than `blue.fg` so the icon doesn't shout).
             iconColor={{ base: "blue.500", _dark: "blue.fg" }}
             text={row.userText}
-            emphasised={isCurrent}
+            // No bold on the input line of the current turn —
+            // selection is communicated by the row's blue.subtle bg,
+            // not by font weight (operator feedback).
+            emphasised={false}
             placeholder="(no user message)"
             kind="user"
           />
@@ -657,9 +670,6 @@ const TurnLine: React.FC<{
       paddingX={isAssistant ? 2 : 1}
       paddingLeft={isAssistant ? 5 : 1}
       borderRadius="sm"
-      // No bg on the assistant reply line — the indented `↳` glyph
-      // alone signals "this is the reply". The previous `bg.muted`
-      // tint was reading as a selection on every row.
       position="relative"
     >
       {isAssistant && (

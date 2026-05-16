@@ -30,7 +30,7 @@ interface PaneLayoutProps {
 // stale snapshot from a previous structure can leave one Panel sized
 // at 100% / another at 0%, which reads as "body content disappeared".
 const PANE_GROUP_STORAGE_PREFIX =
-  "langwatch:traces-v2:drawer-panel-sizes:v2";
+  "langwatch:traces-v2:drawer-panel-sizes:v3";
 
 // SpanTabBar minHeight. Keep in sync with SpanTabBar.tsx.
 const SPAN_TAB_BAR_HEIGHT_PX = 38;
@@ -187,6 +187,22 @@ export function PaneLayout({
     observer.observe(el);
     return () => observer.disconnect();
   }, [layout]);
+
+  // Whenever the measured `ctxMaxSize` shrinks below the Panel's
+  // current size — e.g., content got shorter, or the persisted
+  // autoSaveId restored a value from a wider state — clamp the Panel
+  // down. react-resizable-panels' `maxSize` prop is enforced on drag
+  // but not always on rehydration / dynamic prop change, so this
+  // makes the cap stick.
+  useEffect(() => {
+    const handle = ctxPanelRef.current;
+    if (!handle) return;
+    if (ctxState.collapsed) return;
+    const current = handle.getSize();
+    if (current > ctxMaxSize + 0.5) {
+      handle.resize(ctxMaxSize);
+    }
+  }, [ctxMaxSize, ctxState.collapsed]);
 
   useEffect(() => {
     const handle = ctxPanelRef.current;
@@ -410,10 +426,36 @@ export function PaneLayout({
             id="ctx"
             order={1}
             defaultSize={ctxState.collapsed ? ctxCollapsedSize : ctxMaxSize}
-            minSize={ctxCollapsedSize}
+            // `minSize` is the floor in the EXPANDED state. Setting
+            // it strictly above `collapsedSize` gives the library a
+            // clean snap region — dragging into the gap between the
+            // two snaps to collapsedSize (firing onCollapse), instead
+            // of leaving the pane parked at some sub-header height
+            // that the chevron can't reconcile.
+            minSize={Math.max(ctxCollapsedSize + 4, 12)}
             maxSize={ctxMaxSize}
             collapsible
             collapsedSize={ctxCollapsedSize}
+            // Library-driven collapse/expand fires when the operator
+            // drags the divider across the `collapsedSize` threshold.
+            // Without these the drag-to-resize gesture would update
+            // the Panel's pixel size but leave the store stuck on the
+            // pre-drag state — the chevron would say "open" while the
+            // pane was collapsed, and the next chevron click would
+            // appear to no-op (it's "already" in the state the store
+            // thinks it should reach).
+            onCollapse={() => {
+              if (!useDrawerStore.getState().paneState.conversationContext
+                .collapsed) {
+                togglePaneCollapsed("conversationContext");
+              }
+            }}
+            onExpand={() => {
+              if (useDrawerStore.getState().paneState.conversationContext
+                .collapsed) {
+                togglePaneCollapsed("conversationContext");
+              }
+            }}
           >
             {ctxPane}
           </Panel>
