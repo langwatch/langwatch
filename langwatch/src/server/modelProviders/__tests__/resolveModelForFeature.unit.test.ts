@@ -140,14 +140,20 @@ describe("resolveModelForFeature (unit)", () => {
   });
 
   /** @scenario An empty database falls back to the built-in constant */
-  it("falls back to the built-in DEFAULT constant when nothing is configured", async () => {
+  it("falls back to the System default for DEFAULT when nothing is configured", async () => {
     const prisma = fakePrisma({ project: PROJECT, configs: [] });
     const r = await resolveModelForFeature("prompt.create_default", {
       prisma,
       projectId: PROJECT.id,
     });
-    expect(r.source).toBe("constant");
-    expect(r.scope).toBeNull();
+    // The label users see in the UI is "from System" / "Inherit (System
+    // default)" — never "built-in". That contract starts here, with the
+    // resolver emitting source="system" and scope="system" for the
+    // baked-in role constant. Prod-sim: the same path runs without any
+    // env-fed scalar columns (PROJECT has all legacy fields null), so
+    // this scenario also pins down the "no env vars in prod" case.
+    expect(r.source).toBe("system");
+    expect(r.scope).toBe("system");
     expect(typeof r.model).toBe("string");
     expect(r.model.length).toBeGreaterThan(0);
   });

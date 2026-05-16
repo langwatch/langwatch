@@ -414,8 +414,8 @@ function ResolvedScopeView({
                 <HStack gap={2}>
                   <ModelChip model={resolved.model} />
                   <Text fontSize="xs" color="fg.muted">
-                    {resolved.source === "constant"
-                      ? "built-in fallback"
+                    {resolved.source === "system"
+                      ? "from System"
                       : `from ${resolved.scope}`}
                   </Text>
                 </HStack>

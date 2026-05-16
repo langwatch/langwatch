@@ -617,8 +617,8 @@ function buildInheritOption(
     return {
       model: fromEffective.model,
       label:
-        fromEffective.source === "constant"
-          ? "Inherit (built-in default)"
+        fromEffective.source === "system"
+          ? "Inherit (System default)"
           : `Inherit (from ${scope})`,
     };
   }

@@ -13,8 +13,13 @@ import {
 } from "./featureRegistry";
 import { ModelNotConfiguredError } from "./modelNotConfiguredError";
 
-export type ResolutionSource = "feature_override" | "role_default" | "constant";
-export type ResolutionScope = "project" | "team" | "organization" | null;
+export type ResolutionSource = "feature_override" | "role_default" | "system";
+export type ResolutionScope =
+  | "project"
+  | "team"
+  | "organization"
+  | "system"
+  | null;
 
 export interface Resolution {
   model: string;
@@ -29,9 +34,12 @@ interface Ctx {
 }
 
 /**
- * Built-in constants for each role. Used as the last fallback before the
- * resolver throws `ModelNotConfiguredError`. Keeping them centralised
- * makes it obvious where the safety net lives.
+ * System-default models for each role. Surfaced as scope="system" when
+ * nothing higher in the cascade (or in the legacy B2 columns) has a
+ * value, so the UI can render "from System" / "Inherit (System default)"
+ * consistently with how env-var-driven model providers are labelled
+ * elsewhere. If even this fallback is missing for a role the resolver
+ * throws `ModelNotConfiguredError`.
  */
 const ROLE_CONSTANT: Record<ModelRole, string | null> = {
   DEFAULT: DEFAULT_MODEL,
@@ -268,7 +276,8 @@ function legacyColumnFor(
  *   2. Legacy B2 scalar column at project → team → org (compat
  *      fallback; removed in the follow-up PR once writes have drained
  *      off the legacy columns).
- *   3. Built-in role constant.
+ *   3. System role default (scope="system"). Same env-var-style framing
+ *      as model providers — never "built-in".
  *   4. ModelNotConfiguredError.
  */
 export async function resolveModelForFeature(
@@ -332,13 +341,16 @@ export async function resolveModelForFeature(
     }
   }
 
-  // 3. Built-in role constant.
+  // 3. System default for the role. Surfaced as scope="system" so the
+  // UI can label it the same as any other env-var-driven LangWatch
+  // primitive instead of inventing a "built-in" concept the user has
+  // never met.
   const constant = ROLE_CONSTANT[feature.role];
   if (constant) {
     return {
       model: constant,
-      source: "constant",
-      scope: null,
+      source: "system",
+      scope: "system",
       feature,
     };
   }
