@@ -205,10 +205,22 @@ export function PaneLayout({
       ? `${PANE_GROUP_STORAGE_PREFIX}:viz-detail:h`
       : `${PANE_GROUP_STORAGE_PREFIX}:viz-detail:v`;
 
+  // `width/height: 100%` instead of `flex: 1` — react-resizable-panels'
+  // `Panel` renders as `<div style="flex: <size> 1 0px">` with no
+  // `display: flex`, so a `flex: 1` child collapses to 0 height inside
+  // the body Panel of the ctx-body group. Explicit 100% works in both
+  // contexts (Flex parent in the no-ctx branch, plain Panel parent in
+  // the ctx branch).
   const vizDetailGroup = (
     <Box
       ref={vizDetailGroupRef}
-      style={{ flex: 1, minHeight: 0, minWidth: 0, display: "flex" }}
+      style={{
+        width: "100%",
+        height: "100%",
+        minHeight: 0,
+        minWidth: 0,
+        display: "flex",
+      }}
     >
       <PanelGroup
         direction={layout === "horizontal" ? "horizontal" : "vertical"}
