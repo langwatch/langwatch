@@ -11,10 +11,10 @@ import type {
   SpanTreeNode,
   TraceHeader,
 } from "~/server/api/routers/tracesV2.schemas";
+import { useConversationContext } from "../../../hooks/useConversationContext";
 import { useDrawerStore } from "../../../stores/drawerStore";
 import { ConversationContext } from "../ConversationContext";
 import { VizPlaceholder } from "../VizPlaceholder";
-import { Pane } from "./Pane";
 import { SpanDetailPane } from "./SpanDetailPane";
 import type { DrawerLayout } from "./usePaneLayout";
 
@@ -59,7 +59,17 @@ export function PaneLayout({
   const paneState = useDrawerStore((s) => s.paneState);
   const togglePaneCollapsed = useDrawerStore((s) => s.togglePaneCollapsed);
 
-  const hasConversation = !!trace.conversationId;
+  // Conversation context only earns a pane slot when the trace's
+  // conversation has more than one turn — a single-turn "thread" is
+  // just the trace the user is already looking at, surrounded by
+  // Start/End placeholders. The pane reads as visual noise there.
+  // `useConversationContext` is the same query the component itself
+  // uses, so this is a cache hit, not a second round trip.
+  const ctx = useConversationContext(
+    trace.conversationId ?? null,
+    trace.traceId,
+  );
+  const hasConversation = !!trace.conversationId && ctx.total > 1;
   const ctxState = paneState.conversationContext;
   const detailState = paneState.spanDetail;
 
@@ -170,25 +180,22 @@ export function PaneLayout({
     />
   );
 
+  // No outer `<Pane>` wrapper — the header lives inside
+  // `<ConversationContext>` so the operator sees a single labelled
+  // strip (matching the Section style elsewhere in the drawer) instead
+  // of two stacked "CONVERSATION CONTEXT" headers.
   const ctxPane = hasConversation ? (
-    <Pane
-      title="Conversation Context"
-      collapsed={ctxState.collapsed}
-      onToggleCollapsed={() => togglePaneCollapsed("conversationContext")}
-      position="top"
+    <IsolatedErrorBoundary
+      scope="Couldn't render conversation context"
+      resetKeys={[trace.conversationId ?? "", trace.traceId]}
     >
-      <Box paddingY={3}>
-        <IsolatedErrorBoundary
-          scope="Couldn't render conversation context"
-          resetKeys={[trace.conversationId ?? "", trace.traceId]}
-        >
-          <ConversationContext
-            conversationId={trace.conversationId!}
-            traceId={trace.traceId}
-          />
-        </IsolatedErrorBoundary>
-      </Box>
-    </Pane>
+      <ConversationContext
+        conversationId={trace.conversationId!}
+        traceId={trace.traceId}
+        collapsed={ctxState.collapsed}
+        onToggleCollapsed={() => togglePaneCollapsed("conversationContext")}
+      />
+    </IsolatedErrorBoundary>
   ) : null;
 
   const vizDetailGroupId =

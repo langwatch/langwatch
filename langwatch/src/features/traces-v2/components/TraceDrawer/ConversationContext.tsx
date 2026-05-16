@@ -1,5 +1,6 @@
 import {
   Box,
+  chakra,
   Circle,
   Flex,
   HStack,
@@ -13,6 +14,7 @@ import { memo, useCallback, useMemo } from "react";
 import {
   LuArrowLeft,
   LuArrowRight,
+  LuChevronDown,
   LuCircleDashed,
   LuFlag,
   LuMessageCircle,
@@ -32,6 +34,8 @@ import { useDisplayRoleVisuals } from "./scenarioRoles";
 interface ConversationContextProps {
   conversationId: string | null;
   traceId: string;
+  collapsed: boolean;
+  onToggleCollapsed: () => void;
 }
 
 /**
@@ -176,6 +180,8 @@ function buildRows({
 export const ConversationContext = memo(function ConversationContext({
   conversationId,
   traceId,
+  collapsed,
+  onToggleCollapsed,
 }: ConversationContextProps) {
   const { navigateToTrace } = useTraceDrawerNavigation();
   const viewMode = useDrawerStore((s) => s.viewMode);
@@ -210,31 +216,126 @@ export const ConversationContext = memo(function ConversationContext({
   );
 
   if (!conversationId) return null;
+  // A single-turn conversation has no "context" worth showing — every
+  // row would be a Start/End placeholder around the trace the user is
+  // already looking at. Bail out so the parent can skip rendering the
+  // pane entirely (no header, no resize handle, no empty band).
+  if (!ctx.isLoading && ctx.total <= 1) return null;
 
   return (
-    <Box paddingX={4}>
-      <HStack gap={2} marginBottom={2}>
-        <Icon as={LuMessageCircle} boxSize={3} color="fg.muted" />
-        <Text
-          textStyle="2xs"
-          color="fg.muted"
-          textTransform="uppercase"
-          letterSpacing="0.06em"
-          fontWeight="semibold"
-        >
-          Conversation Context
-        </Text>
-        {ctx.isLoading ? (
-          <Text textStyle="2xs" color="fg.subtle">
-            loading…
-          </Text>
-        ) : ctx.total > 0 ? (
-          <Text textStyle="2xs" color="fg.subtle">
-            turn {ctx.position} of {ctx.total}
-          </Text>
-        ) : null}
-      </HStack>
+    <Box
+      display="flex"
+      flexDirection="column"
+      height="100%"
+      bg="bg.surface"
+    >
+      <ContextHeader
+        position={ctx.position}
+        total={ctx.total}
+        isLoading={ctx.isLoading}
+        collapsed={collapsed}
+        onToggleCollapsed={onToggleCollapsed}
+      />
+      {collapsed ? null : (
+        <Box flex={1} minHeight={0} overflow="auto" paddingX={4} paddingY={3}>
+          <ContextBody
+            ctx={ctx}
+            rows={rows}
+            traceId={traceId}
+            onSelect={navigate}
+          />
+        </Box>
+      )}
+    </Box>
+  );
+});
 
+/**
+ * Header matching the Section/Input-Output accordion style used
+ * elsewhere in the drawer: white bg, muted uppercase title, chevron
+ * on the right (not the left). Double-click the header to toggle
+ * collapsed state — same affordance the Pane primitive used to
+ * expose.
+ */
+function ContextHeader({
+  position,
+  total,
+  isLoading,
+  collapsed,
+  onToggleCollapsed,
+}: {
+  position: number;
+  total: number;
+  isLoading: boolean;
+  collapsed: boolean;
+  onToggleCollapsed: () => void;
+}) {
+  return (
+    <chakra.button
+      type="button"
+      onClick={onToggleCollapsed}
+      aria-expanded={!collapsed}
+      display="flex"
+      alignItems="center"
+      gap={2}
+      width="100%"
+      paddingX={4}
+      paddingY={2}
+      bg="bg.surface"
+      borderTopWidth="0"
+      borderBottomWidth={collapsed ? 0 : "1px"}
+      borderColor={{ base: "gray.200", _dark: "border.muted" }}
+      color="fg.muted"
+      cursor="pointer"
+      textAlign="left"
+      transition="background 120ms ease, color 120ms ease"
+      _hover={{ bg: "bg.softHover", color: "fg" }}
+      flexShrink={0}
+    >
+      <Icon as={LuMessageCircle} boxSize={3} color="inherit" />
+      <Text
+        textStyle="2xs"
+        fontWeight="semibold"
+        color="inherit"
+        textTransform="uppercase"
+        letterSpacing="wider"
+      >
+        Conversation Context
+      </Text>
+      {isLoading ? (
+        <Text textStyle="2xs" color="fg.subtle">
+          loading…
+        </Text>
+      ) : total > 0 ? (
+        <Text textStyle="2xs" color="fg.subtle">
+          turn {position} of {total}
+        </Text>
+      ) : null}
+      <Box flex={1} />
+      <Icon
+        as={LuChevronDown}
+        boxSize={3}
+        color="inherit"
+        transition="transform 120ms ease"
+        transform={collapsed ? "rotate(-90deg)" : "rotate(0deg)"}
+      />
+    </chakra.button>
+  );
+}
+
+function ContextBody({
+  ctx,
+  rows,
+  traceId,
+  onSelect,
+}: {
+  ctx: ReturnType<typeof useConversationContext>;
+  rows: ConversationRow[];
+  traceId: string;
+  onSelect: (id: string) => void;
+}) {
+  return (
+    <>
       {ctx.isLoading && rows.length === 0 ? (
         // Skeleton mirrors the eventual row layout (icon + line) so the
         // section doesn't jump in height once the thread resolves.
@@ -308,7 +409,7 @@ export const ConversationContext = memo(function ConversationContext({
                     key={row.key}
                     row={row}
                     isLast={i === rows.length - 1}
-                    onSelect={navigate}
+                    onSelect={onSelect}
                   />
                 ))}
               </VStack>
@@ -316,9 +417,9 @@ export const ConversationContext = memo(function ConversationContext({
           </AnimatePresence>
         </Box>
       )}
-    </Box>
+    </>
   );
-});
+}
 
 const ConversationRow = memo(function ConversationRow({
   row,
