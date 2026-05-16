@@ -247,7 +247,12 @@ const builtInLenses: LensConfig[] = [
     columns: [
       "time",
       "trace",
-      "service",
+      // Origin replaces Service as the default secondary column —
+      // most teams have a single service per workspace but multiple
+      // origins (application / evaluation / simulation) that drive
+      // different mental models for each row. Service is still
+      // available via the column picker.
+      "origin",
       "duration",
       "cost",
       "tokens",

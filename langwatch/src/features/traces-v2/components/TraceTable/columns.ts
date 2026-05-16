@@ -15,8 +15,10 @@ const traceColumnDefs = {
   time: traceCol.accessor("timestamp", {
     id: "time",
     header: "Time",
-    size: 60,
-    minSize: 60,
+    // Sized for "TIME" + sort caret + padding without clamping; the
+    // body content (`16d`, `2m`, `now`) fits comfortably inside.
+    size: 80,
+    minSize: 80,
     enableResizing: false,
   }),
   trace: traceCol.accessor("name", {
@@ -108,31 +110,35 @@ const traceColumnDefs = {
     enableSorting: false,
   }),
   duration: traceCol.accessor("durationMs", {
+    // Min widths below are sized so the uppercase header label *and*
+    // the sort chevron fit without clamping at the default column
+    // width. The numeric content itself is short (`1.0s`, `$0.0016`)
+    // so the header — not the body — drives the minimum.
     id: "duration",
     header: "Duration",
-    size: 80,
-    minSize: 70,
+    size: 95,
+    minSize: 95,
     meta: num,
   }),
   cost: traceCol.accessor("totalCost", {
     id: "cost",
     header: "Cost",
-    size: 80,
-    minSize: 70,
+    size: 90,
+    minSize: 80,
     meta: num,
   }),
   tokens: traceCol.accessor("totalTokens", {
     id: "tokens",
     header: "Tokens",
-    size: 65,
-    minSize: 55,
+    size: 90,
+    minSize: 85,
     meta: num,
   }),
   spans: traceCol.accessor("spanCount", {
     id: "spans",
     header: "Spans",
-    size: 60,
-    minSize: 50,
+    size: 80,
+    minSize: 75,
     meta: num,
   }),
   model: traceCol.accessor((row) => row.models[0] ?? "", {
@@ -174,7 +180,7 @@ const traceColumnDefs = {
     id: "ttft",
     header: "TTFT",
     size: 80,
-    minSize: 70,
+    minSize: 75,
     meta: num,
   }),
   userId: traceCol.accessor((row) => row.userId ?? "", {
@@ -194,22 +200,24 @@ const traceColumnDefs = {
   origin: traceCol.accessor("origin", {
     id: "origin",
     header: "Origin",
-    size: 110,
-    minSize: 100,
+    // Fits the longest expected label ("Application", 11 chars) +
+    // badge padding + the header chevron.
+    size: 130,
+    minSize: 120,
     enableSorting: false,
   }),
   tokensIn: traceCol.accessor((row) => row.inputTokens ?? 0, {
     id: "tokensIn",
     header: "Tokens In",
-    size: 80,
-    minSize: 70,
+    size: 105,
+    minSize: 100,
     meta: num,
   }),
   tokensOut: traceCol.accessor((row) => row.outputTokens ?? 0, {
     id: "tokensOut",
     header: "Tokens Out",
-    size: 80,
-    minSize: 70,
+    size: 115,
+    minSize: 110,
     meta: num,
   }),
 } satisfies Record<string, ColumnDef<TraceListItem, any>>;

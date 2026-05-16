@@ -1,6 +1,9 @@
-import { Text } from "@chakra-ui/react";
+import { Badge, Text } from "@chakra-ui/react";
 import type { TraceListItem } from "../../../../../types/trace";
-import { formatDuration, formatTokens } from "../../../../../utils/formatters";
+import {
+  formatDuration,
+  formatTokens,
+} from "../../../../../utils/formatters";
 import { MonoCell } from "../../../MonoCell";
 import { StatusIndicator } from "../../../StatusRow";
 import type { CellDef } from "../../types";
@@ -56,20 +59,51 @@ export const ConversationIdCell = {
   ),
 } as const satisfies CellDef<TraceListItem>;
 
-const ORIGIN_LABEL: Record<TraceListItem["origin"], string> = {
-  application: "App",
-  simulation: "Sim",
-  evaluation: "Eval",
+const ORIGIN_LABEL: Record<string, string> = {
+  application: "Application",
+  simulation: "Simulation",
+  evaluation: "Evaluation",
+  workflow: "Workflow",
+  playground: "Playground",
+  gateway: "Gateway",
+  sample: "Sample",
+};
+
+/**
+ * Map each origin to a Chakra `colorPalette` for the badge. Mirrors
+ * the dot-color map (`ORIGIN_COLORS` in formatters) and the
+ * canonical `~/utils/originColors.ts` table so the table chip,
+ * filter sidebar dots, and any other origin renderer agree on
+ * which colour each origin gets.
+ */
+const ORIGIN_PALETTE: Record<string, string> = {
+  application: "blue",
+  evaluation: "green",
+  simulation: "pink",
+  workflow: "cyan",
+  playground: "teal",
+  gateway: "purple",
+  sample: "gray",
 };
 
 export const OriginCell = {
   id: "origin",
   label: "Origin",
-  render: ({ row }) => (
-    <Text textStyle="xs" color="fg.muted">
-      {ORIGIN_LABEL[row.origin] ?? row.origin}
-    </Text>
-  ),
+  render: ({ row }) => {
+    const label = ORIGIN_LABEL[row.origin] ?? row.origin;
+    const palette = ORIGIN_PALETTE[row.origin] ?? "gray";
+    return (
+      <Badge
+        size="sm"
+        variant="subtle"
+        colorPalette={palette}
+        textTransform="capitalize"
+        fontWeight="medium"
+      >
+        {label}
+      </Badge>
+    );
+  },
 } as const satisfies CellDef<TraceListItem>;
 
 export const TokensInCell = {

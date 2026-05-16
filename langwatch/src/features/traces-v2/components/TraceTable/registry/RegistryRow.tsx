@@ -119,6 +119,11 @@ function RegistryRowComponent<TRow>({
       cursor={onSelect || onToggleExpand ? "pointer" : "default"}
       onClick={hoverScope === "split" ? handleRowClick : undefined}
       bg={hoverScope === "split" ? style.bg : undefined}
+      // Reveal opt-in subdued content (e.g. trace ID in TraceCell)
+      // only while the row is hovered. Children mark themselves with
+      // `data-row-hover-reveal` and start at opacity 0 — the CSS rule
+      // here lifts them to 1 when the parent row is hovered.
+      css={{ "&:hover [data-row-hover-reveal]": { opacity: 1 } }}
       _hover={hoverScope === "split" ? { bg: style.hoverBg } : undefined}
     >
       {visibleCells.map((cell, i) => {

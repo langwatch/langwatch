@@ -59,8 +59,13 @@ export function TraceTableShell<T>({
         {table.getHeaderGroups().map((headerGroup) => (
           <Tr
             key={headerGroup.id}
+            // Heavier bottom border so the head reads as its own band
+            // against the white body rows. `border.emphasized` was the
+            // intent here, but in light mode against `bg.subtle` it was
+            // washing out — using the explicit gray.300/gray.600 step
+            // gives consistent contrast across modes.
             borderBottomWidth="1px"
-            borderColor="border.emphasized"
+            borderColor={{ base: "gray.300", _dark: "gray.700" }}
           >
             {headerGroup.headers.map((header, i) => (
               <HeaderCell
@@ -132,12 +137,12 @@ function HeaderCell<T>({
             ? { base: "bg.subtle", _dark: "bg.surface" }
             : undefined
       }
-      // Visible 1px vertical separator between TH cells. Slightly darker
-      // than the row dividers so the header reads as one structural band
-      // against the white table body — `border.emphasized` matches the
-      // header's own bottom border.
+      // Visible 1px vertical separator between TH cells, matched to
+      // the head row's bottom border so the head reads as a clear
+      // bordered band — the previous `border.emphasized` token was
+      // rendering near-invisible against `bg.subtle` in light mode.
       borderRightWidth="1px"
-      borderRightColor="border.emphasized"
+      borderRightColor={{ base: "gray.300", _dark: "gray.700" }}
       // Unified padding for every header — sortable + non-sortable share the
       // same Th paddings so the column titles line up across the row. The
       // sortable button below is `width: full` and only adds its own
