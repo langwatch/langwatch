@@ -1,3 +1,4 @@
+import type { ModelDefaultScopeType } from "@prisma/client";
 import { z } from "zod";
 import { customModelUpdateInputSchema } from "../../modelProviders/customModel.schema";
 import { DefaultModelsService } from "../../modelProviders/defaultModels.service";
@@ -16,6 +17,7 @@ import {
 } from "../../modelProviders/modelDefaults.service";
 import { ModelProviderService } from "../../modelProviders/modelProvider.service";
 import { resolveModelForFeature } from "../../modelProviders/resolveModelForFeature";
+import { buildSeedPlanForProvider } from "../../modelProviders/seedOnboardingDefaults";
 import {
   checkProjectPermission,
   checkOrganizationPermission,
@@ -718,6 +720,313 @@ export const modelProviderRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       await deleteConfig({ prisma: ctx.prisma }, input.id);
       return { ok: true };
+    }),
+
+  /**
+   * "What would the cascade hand back for these scopes if I had no
+   * value here?" — drives the drawer's inherited-as-placeholder + the
+   * "Inherit (from organization) [openai/gpt-5.5]" dropdown entry.
+   *
+   * The cascade walk is computed for the most-specific picked scope
+   * (project beats team beats org), excluding any config attached to
+   * the picked scopes themselves (and, when editing, optionally an
+   * `excludeConfigId` so the in-progress draft is treated as "not
+   * yet saved"). For each role + each registered feature key, the
+   * response carries the model the cascade would resolve to + the
+   * scope tier it came from.
+   *
+   * When the cascade has nothing AND there's a provider visible to
+   * the caller that could fulfill a role, the response surfaces an
+   * `inferred` suggestion from the registry's latest-flagship /
+   * mini / embedding heuristic — same logic the onboarding seed
+   * uses. The drawer can show this as the dropdown's first entry so
+   * the user always has SOMETHING to pick, even on a brand-new
+   * organization.
+   */
+  getInheritedValuesForScopes: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        scopes: z
+          .array(
+            z.object({
+              scopeType: z.enum(["ORGANIZATION", "TEAM", "PROJECT"]),
+              scopeId: z.string().min(1),
+            }),
+          )
+          .min(1, "Pick at least one scope."),
+        excludeConfigId: z.string().optional(),
+      }),
+    )
+    .use(checkProjectPermission("project:view"))
+    .query(async ({ input, ctx }) => {
+      // Build a per-key map of {model, source, scope?} the cascade
+      // would resolve to for each role + feature key, if no value
+      // were set on the picked scopes themselves. This is deliberately
+      // ONE answer per key — the resolution at runtime is per-scope,
+      // but the drawer surfaces a single "if you inherit, here's what
+      // you'd get" hint that's good enough for the user to decide.
+      const project = await ctx.prisma.project.findUnique({
+        where: { id: input.projectId },
+        select: {
+          id: true,
+          teamId: true,
+          team: { select: { organizationId: true } },
+        },
+      });
+      if (!project) throw new Error("Project not found");
+      const teamId = project.teamId;
+      const organizationId = project.team?.organizationId ?? null;
+
+      // The cascade we want to surface is "what would a project see
+      // inside the most-specific picked scope". Pick the most-specific
+      // tier in the picked set (PROJECT beats TEAM beats ORGANIZATION).
+      const tierRank = { PROJECT: 0, TEAM: 1, ORGANIZATION: 2 } as const;
+      const sortedPicked = [...input.scopes].sort(
+        (a, b) => tierRank[a.scopeType] - tierRank[b.scopeType],
+      );
+      const referenceScope = sortedPicked[0]!;
+
+      // Resolve the chain that "anchors" the cascade walk. For a
+      // picked PROJECT scope, anchor is that project's team + org.
+      // For a TEAM, anchor is the team itself + its org. For an
+      // ORGANIZATION, only the org tier matters.
+      let chainTeamId: string | null = null;
+      let chainOrganizationId: string | null = null;
+      if (referenceScope.scopeType === "PROJECT") {
+        const refProject = await ctx.prisma.project.findUnique({
+          where: { id: referenceScope.scopeId },
+          select: {
+            teamId: true,
+            team: { select: { organizationId: true } },
+          },
+        });
+        chainTeamId = refProject?.teamId ?? null;
+        chainOrganizationId = refProject?.team?.organizationId ?? null;
+      } else if (referenceScope.scopeType === "TEAM") {
+        const refTeam = await ctx.prisma.team.findUnique({
+          where: { id: referenceScope.scopeId },
+          select: { organizationId: true },
+        });
+        chainTeamId = referenceScope.scopeId;
+        chainOrganizationId = refTeam?.organizationId ?? null;
+      } else {
+        chainOrganizationId = referenceScope.scopeId;
+      }
+
+      // Build the set of (scopeType, scopeId) pairs to exclude from
+      // the cascade — the picked scopes themselves are treated as
+      // "not yet set" so we surface what the user would inherit.
+      const excludedScopes = new Set(
+        input.scopes.map((s) => `${s.scopeType}::${s.scopeId}`),
+      );
+
+      // Tiers to walk: PROJECT (referenceScope if it's a project) →
+      // TEAM (chainTeamId) → ORGANIZATION (chainOrganizationId).
+      const tiers: Array<{
+        tier: "project" | "team" | "organization";
+        scopeType: ModelDefaultScopeType;
+        scopeId: string;
+      }> = [];
+      if (
+        referenceScope.scopeType === "PROJECT" &&
+        !excludedScopes.has(`PROJECT::${referenceScope.scopeId}`)
+      ) {
+        tiers.push({
+          tier: "project",
+          scopeType: "PROJECT",
+          scopeId: referenceScope.scopeId,
+        });
+      }
+      if (chainTeamId && !excludedScopes.has(`TEAM::${chainTeamId}`)) {
+        tiers.push({
+          tier: "team",
+          scopeType: "TEAM",
+          scopeId: chainTeamId,
+        });
+      }
+      if (
+        chainOrganizationId &&
+        !excludedScopes.has(`ORGANIZATION::${chainOrganizationId}`)
+      ) {
+        tiers.push({
+          tier: "organization",
+          scopeType: "ORGANIZATION",
+          scopeId: chainOrganizationId,
+        });
+      }
+
+      // Pull every config attached at any tier in the walk. Exclude
+      // configs the caller is editing (excludeConfigId) and configs
+      // whose ONLY attachment is to an excluded scope (so a multi-
+      // scope config that ALSO attaches to a non-excluded scope
+      // still contributes — the resolver doesn't care about the
+      // attachment we're ignoring, just whether any attachment
+      // hits the walk's tier).
+      const tierScopeIds = tiers.map((t) => ({
+        scopeType: t.scopeType,
+        scopeId: t.scopeId,
+      }));
+      const candidateConfigs =
+        tierScopeIds.length > 0
+          ? await ctx.prisma.modelDefaultConfig.findMany({
+              where: {
+                AND: [
+                  input.excludeConfigId
+                    ? { id: { not: input.excludeConfigId } }
+                    : {},
+                  { scopes: { some: { OR: tierScopeIds } } },
+                ],
+              },
+              select: {
+                id: true,
+                config: true,
+                createdAt: true,
+                scopes: {
+                  select: { scopeType: true, scopeId: true },
+                },
+              },
+            })
+          : [];
+
+      // Helper: read a string value from a config's JSON.
+      const readKey = (cfg: unknown, key: string): string | null => {
+        if (typeof cfg !== "object" || cfg === null) return null;
+        const v = (cfg as Record<string, unknown>)[key];
+        return typeof v === "string" && v.length > 0 ? v : null;
+      };
+
+      // Walk the cascade for a single key (role or feature key).
+      // Returns the first hit, tier-by-tier specificity, within-tier
+      // by createdAt DESC.
+      type Hit = {
+        model: string;
+        source: "feature_override" | "role_default";
+        scope: "project" | "team" | "organization";
+      };
+      const walkKey = (key: string, isFeatureKey: boolean): Hit | null => {
+        for (const t of tiers) {
+          const attached = candidateConfigs
+            .filter((c) =>
+              c.scopes.some(
+                (s) =>
+                  s.scopeType === t.scopeType && s.scopeId === t.scopeId,
+              ),
+            )
+            .sort(
+              (a, b) =>
+                b.createdAt.getTime() - a.createdAt.getTime(),
+            );
+          for (const c of attached) {
+            const value = readKey(c.config, key);
+            if (value) {
+              return {
+                model: value,
+                source: isFeatureKey ? "feature_override" : "role_default",
+                scope: t.tier,
+              };
+            }
+          }
+        }
+        return null;
+      };
+
+      // Inference fallback: when cascade returns nothing for a role,
+      // and there's a provider enabled at any visible scope, suggest
+      // the registry's latest-flagship / mini / embedding for that
+      // role. Reuses buildSeedPlanForProvider — same heuristic the
+      // onboarding seed uses, so a fresh org's "Inherit" placeholder
+      // matches what they'd see if they re-ran the seed.
+      const providers = organizationId
+        ? await ctx.prisma.modelProvider.findMany({
+            where: {
+              enabled: true,
+              scopes: {
+                some: {
+                  OR: [
+                    { scopeType: "ORGANIZATION", scopeId: organizationId },
+                    teamId
+                      ? { scopeType: "TEAM", scopeId: teamId }
+                      : { scopeType: "TEAM", scopeId: "__none__" },
+                    { scopeType: "PROJECT", scopeId: input.projectId },
+                  ],
+                },
+              },
+            },
+            select: { provider: true, scopes: { select: { scopeType: true } } },
+            orderBy: { createdAt: "asc" },
+          })
+        : [];
+      const inferenceProvider = providers[0]?.provider;
+      const inferencePlan = inferenceProvider
+        ? buildSeedPlanForProvider(inferenceProvider)
+        : {};
+
+      // Build the response. One entry per role; one entry per feature
+      // key. For features the cascade walk targets the feature key
+      // first; the role's value is the fallback.
+      const features = allFeatures();
+      const inherited: Record<
+        string,
+        {
+          model: string;
+          source: "feature_override" | "role_default" | "inferred";
+          scope: "project" | "team" | "organization" | null;
+          inferredFromProvider?: string;
+        } | null
+      > = {};
+
+      for (const role of MODEL_ROLES) {
+        const hit = walkKey(role, false);
+        if (hit) {
+          inherited[role] = hit;
+          continue;
+        }
+        const inferredModel = (inferencePlan as Record<string, string | undefined>)[
+          role
+        ];
+        if (inferredModel && inferenceProvider) {
+          inherited[role] = {
+            model: inferredModel,
+            source: "inferred",
+            scope: null,
+            inferredFromProvider: inferenceProvider,
+          };
+          continue;
+        }
+        inherited[role] = null;
+      }
+
+      for (const f of features) {
+        // For a feature key: the cascade can have either the feature
+        // key itself OR the role default. Feature-key match wins.
+        const featureHit = walkKey(f.key, true);
+        if (featureHit) {
+          inherited[f.key] = featureHit;
+          continue;
+        }
+        // Fall back to whatever the role inherits — keeps the dropdown
+        // saying "Inherit (from organization)" for a feature row even
+        // when only the role default is set higher up the chain.
+        const roleHit = inherited[f.role];
+        if (roleHit) {
+          inherited[f.key] = roleHit;
+          continue;
+        }
+        inherited[f.key] = null;
+      }
+
+      return {
+        inherited,
+        // Echo the reference scope so the UI can confirm which scope
+        // the inheritance preview was computed against. Useful when
+        // the picked set is heterogeneous and the user wonders why
+        // "(from organization)" rather than "(from team)".
+        referenceScope: {
+          scopeType: referenceScope.scopeType,
+          scopeId: referenceScope.scopeId,
+        },
+      };
     }),
 });
 
