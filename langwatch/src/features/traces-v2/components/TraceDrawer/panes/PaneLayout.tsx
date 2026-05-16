@@ -85,6 +85,7 @@ export function PaneLayout({
       maximized={vizState.maximizedWithinGroup}
       onToggleMaximized={() => togglePaneMaximized("visualization")}
       canMaximize={showDetail || vizMaximized}
+      position={layout === "horizontal" ? "left" : "top"}
     >
       <IsolatedErrorBoundary
         scope="Couldn't render visualisation"
@@ -113,6 +114,7 @@ export function PaneLayout({
       maximized={detailState.maximizedWithinGroup}
       onToggleMaximized={() => togglePaneMaximized("spanDetail")}
       canMaximize={showViz || detailMaximized}
+      position={layout === "horizontal" ? "right" : "bottom"}
     >
       <SpanDetailPane
         trace={trace}
@@ -128,6 +130,7 @@ export function PaneLayout({
       collapsed={ctxState.collapsed}
       onToggleCollapsed={() => togglePaneCollapsed("conversationContext")}
       canMaximize={false}
+      position="top"
     >
       <Box paddingY={3}>
         <IsolatedErrorBoundary
@@ -271,35 +274,43 @@ export function PaneLayout({
 }
 
 /**
- * Visual treatment for the `<PanelResizeHandle>` slot. The handle is
- * a thin bar with a tiny pill at its centre — same affordance as the
- * drawer-edge grip, scaled down for inline use.
+ * Visual treatment for the `<PanelResizeHandle>` slot. Devtools-style:
+ * the panes are glued together with no visible gap and no inline pill —
+ * the only visible separator is the pane's own 1px bottom border. The
+ * handle itself is a slightly wider transparent strip that overlays
+ * that line so the operator still has a forgiving drag target. Cursor
+ * is the only on-screen hint that the line is interactive.
  */
 function PaneResizeBar({ orientation }: { orientation: DrawerLayout }) {
   const isHorizontal = orientation === "horizontal";
   return (
-    <Flex
-      align="center"
-      justify="center"
+    <Box
       role="separator"
       aria-orientation={isHorizontal ? "vertical" : "horizontal"}
-      width={isHorizontal ? "6px" : "100%"}
-      height={isHorizontal ? "100%" : "6px"}
+      // Zero box width — the handle is rendered as a transparent
+      // overlay via the `::after` pseudo so it doesn't take any space
+      // in the flex layout. Panes therefore sit flush against each
+      // other; the 1px separator the operator sees is the pane's own
+      // border, not this element.
+      width={isHorizontal ? "0px" : "100%"}
+      height={isHorizontal ? "100%" : "0px"}
+      position="relative"
       cursor={isHorizontal ? "col-resize" : "row-resize"}
-      bg="transparent"
-      transition="background 120ms ease"
-      _hover={{ bg: "bg.muted" }}
-    >
-      <Box
-        width={isHorizontal ? "2px" : "32px"}
-        height={isHorizontal ? "32px" : "2px"}
-        borderRadius="full"
-        bg="gray.emphasized"
-        opacity={0.4}
-        transition="opacity 120ms ease"
-        _groupHover={{ opacity: 1 }}
-      />
-    </Flex>
+      css={{
+        // Generous invisible hit area centered on the (zero-width)
+        // separator line. 7px on each side of the line covers both
+        // sub-pixel rendering and trackpad imprecision without making
+        // the gap visible.
+        "&::after": {
+          content: '""',
+          position: "absolute",
+          ...(isHorizontal
+            ? { top: 0, bottom: 0, left: "-7px", right: "-7px" }
+            : { left: 0, right: 0, top: "-7px", bottom: "-7px" }),
+          background: "transparent",
+        },
+      }}
+    />
   );
 }
 

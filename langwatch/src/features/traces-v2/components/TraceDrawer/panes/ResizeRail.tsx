@@ -75,10 +75,18 @@ export function ResizeRail() {
         typeof window !== "undefined"
           ? window.innerWidth - DRAWER_MAXIMIZE_EDGE_PX
           : Number.POSITIVE_INFINITY;
-      const clamped = Math.max(
+      let clamped = Math.max(
         DRAWER_MIN_WIDTH_PX,
         Math.min(maxWidth, proposed),
       );
+      // Magnet snap: when the user drags the rail within ~32px of the
+      // viewport edge (i.e., proposed width is within 32px of max), snap
+      // to the max-edge value so it's easy to commit a full-screen
+      // expansion without having to be pixel-perfect.
+      const MAGNET_PX = 32;
+      if (proposed >= maxWidth - MAGNET_PX) {
+        clamped = maxWidth;
+      }
       if (Math.abs(dx) > 2) drag.didMove = true;
       setWidthPx(clamped);
     },
@@ -123,17 +131,33 @@ export function ResizeRail() {
     return () => window.removeEventListener("resize", onResize);
   }, [widthPx, setWidthPx]);
 
+  // Determine whether the drawer is at the max-snap width. When it is,
+  // we hide the pill — the rail is invisible chrome that only re-appears
+  // on hover for the operator to grab the edge back. The default 45%
+  // fallback (`widthPx === null`) is never "at max" so the pill is
+  // always visible there.
+  const atMaxSnap = (() => {
+    if (typeof window === "undefined" || widthPx === null) return false;
+    const max = window.innerWidth - DRAWER_MAXIMIZE_EDGE_PX;
+    return Math.abs(widthPx - max) < 2;
+  })();
+
   return (
     <Box
       data-edge-grip="true"
       position="absolute"
       top={0}
       bottom={0}
-      left={0}
-      width="14px"
+      // Sit OUTSIDE the drawer: the visible pill lives in the page
+      // gutter to the left of the drawer's content. A generous portion
+      // of the hit area extends INTO the drawer as well so a user
+      // landing on the inner edge still picks up `col-resize`.
+      left="-10px"
+      width="22px"
       // No tab focus on purpose — see component-level docstring.
       cursor="col-resize"
-      zIndex={10}
+      // Above the drawer body but below any toasts / overlays.
+      zIndex={20}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
@@ -147,15 +171,16 @@ export function ResizeRail() {
         data-edge-pill
         position="absolute"
         top="50%"
-        left="50%"
+        // Pill sits at the leftmost edge of the rail (in the gutter).
+        left="4px"
         width="4px"
         height="40px"
         borderRadius="full"
         bg="gray.emphasized"
-        opacity={0.5}
+        opacity={atMaxSnap ? 0 : 0.5}
         transition="opacity 120ms ease"
         pointerEvents="none"
-        style={{ transform: "translate(-50%, -50%)" }}
+        style={{ transform: "translateY(-50%)" }}
       />
     </Box>
   );

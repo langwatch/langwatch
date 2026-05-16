@@ -148,6 +148,11 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
               ? undefined
               : { base: "100vw", md: "auto" }
           }
+          // The ResizeRail renders the visible pill in a 10px gutter
+          // *outside* the drawer's left edge. Allow horizontal overflow
+          // so that bit isn't clipped; the body itself still clips its
+          // own scroll content.
+          overflow="visible"
           // Anchor for the empty-state onboarding tour: a global
           // CSS rule keyed off `body[data-traces-tour-stage]`
           // applies a soft blue glow to this element during

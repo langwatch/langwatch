@@ -1,9 +1,43 @@
 import { Box, chakra, HStack, Icon, Text } from "@chakra-ui/react";
-import { ChevronDown, ChevronRight, Maximize2, Minimize2 } from "lucide-react";
+import {
+  Maximize2,
+  Minimize2,
+  PanelBottomClose,
+  PanelBottomOpen,
+  PanelLeftClose,
+  PanelLeftOpen,
+  PanelRightClose,
+  PanelRightOpen,
+  PanelTopClose,
+  PanelTopOpen,
+} from "lucide-react";
 import type { ReactNode } from "react";
 import { Tooltip } from "~/components/ui/tooltip";
 
 const PaneButton = chakra("button");
+
+/**
+ * Where the pane sits inside its `<PanelGroup>`. Drives the
+ * collapse-icon orientation — a top-stacked pane shows the "Panel Top"
+ * icons (the affordance flips down/up), a left-side pane in a
+ * horizontal split shows the "Panel Left" ones (collapse rolls
+ * leftward), etc. Mirrors Chrome DevTools' panel-position controls.
+ */
+export type PanePosition = "top" | "bottom" | "left" | "right";
+
+function collapseIconFor(position: PanePosition, collapsed: boolean) {
+  switch (position) {
+    case "bottom":
+      return collapsed ? PanelBottomOpen : PanelBottomClose;
+    case "left":
+      return collapsed ? PanelLeftOpen : PanelLeftClose;
+    case "right":
+      return collapsed ? PanelRightOpen : PanelRightClose;
+    case "top":
+    default:
+      return collapsed ? PanelTopOpen : PanelTopClose;
+  }
+}
 
 export interface PaneProps {
   title: string;
@@ -19,6 +53,9 @@ export interface PaneProps {
   /** When `false`, the maximize control is hidden — useful for a pane
    * that is the only one in its group. */
   canMaximize?: boolean;
+  /** Where the pane sits in its group — drives the collapse-icon
+   * orientation. Defaults to "top" (the legacy stacked layout). */
+  position?: PanePosition;
   children: ReactNode;
 }
 
@@ -46,10 +83,12 @@ export function Pane({
   maximized = false,
   onToggleMaximized,
   canMaximize = true,
+  position = "top",
   children,
 }: PaneProps) {
   const collapseLabel = collapsed ? "Expand pane" : "Collapse pane";
   const maximizeLabel = maximized ? "Restore pane" : "Maximize pane";
+  const CollapseIcon = collapseIconFor(position, collapsed);
 
   return (
     <Box
@@ -72,6 +111,7 @@ export function Pane({
         canMaximize={canMaximize}
         collapseLabel={collapseLabel}
         maximizeLabel={maximizeLabel}
+        CollapseIcon={CollapseIcon}
       />
       {!collapsed && (
         <Box
@@ -105,6 +145,7 @@ interface PaneHeaderProps
   > {
   collapseLabel: string;
   maximizeLabel: string;
+  CollapseIcon: React.ElementType;
 }
 
 function PaneHeader({
@@ -118,6 +159,7 @@ function PaneHeader({
   canMaximize,
   collapseLabel,
   maximizeLabel,
+  CollapseIcon,
 }: PaneHeaderProps) {
   const handleHeaderDoubleClick = (e: React.MouseEvent<HTMLElement>) => {
     // Ignore double-clicks that bubble from the collapse / maximize
@@ -172,10 +214,7 @@ function PaneHeader({
         padding={0}
         _hover={{ color: "fg" }}
       >
-        <Icon
-          as={collapsed ? ChevronRight : ChevronDown}
-          boxSize={3.5}
-        />
+        <Icon as={CollapseIcon} boxSize={3.5} />
       </PaneButton>
       {icon ? (
         <Box display="inline-flex" alignItems="center" color="fg.muted">
