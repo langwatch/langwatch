@@ -13,8 +13,6 @@ import { LuArrowRight, LuMessageCircle, LuSparkles, LuX } from "react-icons/lu";
 import { Link } from "~/components/ui/link";
 import { Tooltip } from "~/components/ui/tooltip";
 import { setTracesV2Preferred } from "~/features/traces-v2/hooks/useTracesV2Preference";
-import { useDrawerStore } from "~/features/traces-v2/stores/drawerStore";
-import { useDrawer } from "~/hooks/useDrawer";
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
@@ -53,40 +51,6 @@ function snooze(projectId: string, mode: PromoMode): void {
   } catch {
     // No-op: best-effort dismissal.
   }
-}
-
-/**
- * Module-level transition flag for the v1↔v2 drawer swap.
- *
- * When the operator clicks "Try the new one" (or "Go back to old
- * visualization") we open the target drawer via `openDrawer`, which
- * unmounts the source drawer. Chakra's `<Drawer.Root open={true}>`
- * fires `onOpenChange(false)` during that unmount — and the source
- * drawer's handler unconditionally calls `goBack()` (legacy
- * behaviour for X-click / Esc / outside-click), which pops the
- * freshly-pushed entry off the drawer stack and reverts the URL.
- *
- * Per-render URL guards (`useDrawer().drawerOpen()`,
- * `window.location.search`) turned out to be unreliable across the
- * react-router → React commit → Chakra dispose chain. A synchronous
- * module-level flag is bulletproof: set true before the swap,
- * cleared on the next macrotask (a `setTimeout(0)` definitively
- * runs after React has committed the unmount).
- */
-let drawerSwapInProgress = false;
-
-export function markDrawerSwapInProgress(): void {
-  drawerSwapInProgress = true;
-  // setTimeout (not queueMicrotask) so the flag survives React's
-  // commit phase — microtasks can interleave with React work, but a
-  // macrotask is guaranteed to run after the current commit batch.
-  setTimeout(() => {
-    drawerSwapInProgress = false;
-  }, 0);
-}
-
-export function isDrawerSwapInProgress(): boolean {
-  return drawerSwapInProgress;
 }
 
 /**
@@ -150,11 +114,6 @@ export function NewTracesPromo({
   const mode: PromoMode = tracesV2Enabled ? "try" : "request";
   const [dismissed, setDismissed] = useState(false);
   const [hasMounted, setHasMounted] = useState(false);
-  // Must be called above the early-return guard below — Rules of
-  // Hooks: every hook needs to fire on every render, in the same
-  // order. The previous render with `!hasMounted` skipped this and
-  // tripped "Rendered more hooks than during the previous render".
-  const { openDrawer } = useDrawer();
 
   useEffect(() => {
     setHasMounted(true);
@@ -186,15 +145,18 @@ export function NewTracesPromo({
     setDismissed(true);
   };
 
-  // When opening v2 in-place we want the click → drawer-render to be
-  // synchronous (no URL round-trip). The v2 drawer mount reads from
-  // the drawer store, so we push there first before flipping the URL.
+  // Going hard-nav rather than openDrawer: the v1→v2 swap kept losing
+  // races against Chakra's unmount-fired onOpenChange (which calls
+  // goBack and pops the freshly-pushed v2 entry). Two rounds of
+  // increasingly elaborate guards (URL snapshot, live window.location,
+  // module-level transition flag) still misfired under live testing.
+  // A full window.location navigation gives us a deterministic clean
+  // slate — every in-flight drawer state is dropped, the page reloads
+  // with traceV2Details as the only drawer. v1 is going away soon
+  // anyway, so the page reload cost is short-lived.
   const handleTryV2 = (e: React.MouseEvent) => {
     e.preventDefault();
     if (!traceId) {
-      // No trace context (banner shown on a landing page) — keep the
-      // historical "go to the traces list" navigation. The list page
-      // itself surfaces the v2 explorer.
       if (projectSlug) {
         window.location.href = `/${projectSlug}/traces`;
       }
@@ -206,17 +168,19 @@ export function NewTracesPromo({
       projectId,
       traceId,
     });
-    // Tell v1's onOpenChange-fired goBack to skip this swap (see
-    // `markDrawerSwapInProgress` docstring for the why). Must be set
-    // BEFORE openDrawer so the unmount that openDrawer triggers
-    // happens while the flag is true.
-    markDrawerSwapInProgress();
-    // Optimistic store push so the v2 shell mounts on the next render
-    // — `openDrawer` will sync the URL params on the current path.
-    useDrawerStore.getState().openTrace(traceId, null);
-    openDrawer("traceV2Details", { traceId });
     if (projectId) snooze(projectId, mode);
-    setDismissed(true);
+    // Preserve every non-drawer query param (`span`, filters, time
+    // range, …) so the underlying scenario / list view stays put;
+    // only swap the drawer.* params.
+    const url = new URL(window.location.href);
+    const drawerKeys: string[] = [];
+    url.searchParams.forEach((_, key) => {
+      if (key.startsWith("drawer.")) drawerKeys.push(key);
+    });
+    for (const key of drawerKeys) url.searchParams.delete(key);
+    url.searchParams.set("drawer.open", "traceV2Details");
+    url.searchParams.set("drawer.traceId", traceId);
+    window.location.href = url.toString();
   };
 
   const requestAccessMailto = `mailto:support@langwatch.ai?subject=${encodeURIComponent(

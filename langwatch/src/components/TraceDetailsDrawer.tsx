@@ -2,10 +2,7 @@ import { useState } from "react";
 import { useDrawer } from "~/hooks/useDrawer";
 import { Drawer } from "../components/ui/drawer";
 import { useAnnotationCommentStore } from "../hooks/useAnnotationCommentStore";
-import {
-  isDrawerSwapInProgress,
-  NewTracesPromo,
-} from "./messages/NewTracesPromo";
+import { NewTracesPromo } from "./messages/NewTracesPromo";
 import { TraceDetails } from "./traces/TraceDetails";
 
 interface TraceDetailsDrawerProps {
@@ -30,16 +27,7 @@ export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
       preventScroll={true}
       placement="end"
       size={traceView === "full" ? "full" : "xl"}
-      onOpenChange={({ open }) => {
-        // Skip the goBack when we're in the middle of swapping to the
-        // v2 drawer (NewTracesPromo sets a module-level flag before
-        // calling openDrawer). Without this, Chakra's unmount-fired
-        // onOpenChange(false) pops the v2 entry off the drawer stack
-        // and the operator gets bounced back to v1.
-        // URL-based guards proved unreliable across the
-        // react-router → React commit → Chakra dispose chain.
-        if (open) return;
-        if (isDrawerSwapInProgress()) return;
+      onOpenChange={() => {
         goBack();
         commentState.resetComment();
       }}
