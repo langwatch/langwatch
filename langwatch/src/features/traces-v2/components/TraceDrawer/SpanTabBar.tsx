@@ -51,12 +51,13 @@ const INLINE_KEEP_WHEN_OVERFLOW = 3;
 
 /**
  * `data-overflow-id` for the right-aligned instrumentation scope chip.
- * Module-scoped so the `tabIds` useMemo factory (which React invokes
- * synchronously on first render) can reference it without hitting a
- * temporal-dead-zone error — a function-body `const` declared *after*
- * the memo line would still be in TDZ at the time the factory runs.
+ * The chip lives inside the scroller (right-aligned via `marginLeft:
+ * auto` on its wrapper) so the SAME `useOverflowVisibility` pass that
+ * decides which tabs hide also decides whether the chip fits. Module
+ * scope dodges TDZ for the `tabIds` useMemo factory that references it.
  */
 const RIGHT_SLOT_OVERFLOW_ID = "right-slot:instrumentation";
+
 
 /** Map span type → Chakra colorPalette so Badge variants stay consistent. */
 const SPAN_TYPE_PALETTE: Record<string, string> = {
@@ -443,33 +444,28 @@ export const SpanTabBar = memo(function SpanTabBar({
 
   const tabIds = useMemo(() => {
     const ids = tabDescriptors.map((d) => d.id);
-    // RightSlot appended LAST so the overflow cutoff iterator cuts
-    // it first under any tight width. No-op when there's no slot
-    // to render.
+    // RightSlot lives in the same scroller and gets the same
+    // measurement treatment as the tabs. Last in DOM, so the
+    // left-to-right cutoff iterator sees it last → it's always the
+    // first thing cut when the row gets tight.
     if (rightSlot) ids.push(RIGHT_SLOT_OVERFLOW_ID);
     return ids;
   }, [tabDescriptors, rightSlot]);
   const activeOverflowId =
     tabDescriptors.find((d) => d.activeId)?.id ?? null;
   const scrollerRef = useRef<HTMLDivElement>(null);
-
-  // The rightSlot (instrumentation scope chip) participates in the
-  // same overflow measurement as the tabs, sitting LAST in DOM order
-  // inside the scroller. That way `useOverflowVisibility` cuts it
-  // first (the cutoff iterates left-to-right) — so under tight
-  // widths the scope chip vanishes before any tab collapses into
-  // the kebab menu. Excluded from the OverflowMenu items list so it
-  // doesn't reappear in the dropdown (it's a passive label, not a
-  // navigation target). Id is module-scoped (above) to dodge TDZ.
   // Reserve room for kebab trigger + optional rightSlot + the
   // pinned-span overflow menu + the trailing collapse toggle. 96px gives
   // enough headroom that the last visible tab doesn't bleed under those
   // controls on a narrow drawer.
+  // No reservePx — the kebab + rightSlot wrapper is a natural-flow
+  // child of the scroller (pushed right via `marginLeft: auto`), so
+  // there's no fixed-position chrome to reserve space for.
   const hiddenTabIds = useOverflowVisibility({
     scrollerRef,
     items: tabIds,
     activeId: activeOverflowId,
-    reservePx: 96,
+    reservePx: 0,
   });
 
   return (
@@ -515,35 +511,53 @@ export const SpanTabBar = memo(function SpanTabBar({
             onUnpinSpan={unpinSpan}
           />
         )}
-        {rightSlot ? (
-          <Flex
-            data-overflow-id={RIGHT_SLOT_OVERFLOW_ID}
-            display={
-              hiddenTabIds.has(RIGHT_SLOT_OVERFLOW_ID) ? "none" : "flex"
-            }
-            align="center"
-            flexShrink={0}
-            paddingLeft={3}
-          >
-            {rightSlot}
+        {/*
+          Right-aligned cluster: instrumentation scope chip + the
+          overflow kebab. `marginLeft: auto` on the wrapper consumes
+          the row's leftover space so this cluster always sits
+          flush-right (matching the operator expectation that the
+          chip and the kebab belong at the rightmost edge of the
+          strip, never inline with the tabs). When tabs overflow,
+          the cluster slides right; when the row gets too tight for
+          the chip, the cutoff iterator hides the chip first because
+          its `data-overflow-id` sits last in DOM order.
+        */}
+        <Flex
+          marginLeft="auto"
+          align="center"
+          gap="5px"
+          flexShrink={0}
+          minWidth={0}
+        >
+          {rightSlot ? (
+            <Flex
+              data-overflow-id={RIGHT_SLOT_OVERFLOW_ID}
+              display={
+                hiddenTabIds.has(RIGHT_SLOT_OVERFLOW_ID) ? "none" : "flex"
+              }
+              align="center"
+              flexShrink={0}
+            >
+              {rightSlot}
+            </Flex>
+          ) : null}
+          <Flex align="center" flexShrink={0}>
+            <OverflowMenu
+              items={tabDescriptors
+                .filter((d) => hiddenTabIds.has(d.id))
+                .map((d) => ({
+                  id: d.id,
+                  label: d.label,
+                  content: d.menuContent,
+                }))}
+              activeId={activeOverflowId}
+              onSelect={(id) => {
+                const descriptor = tabDescriptors.find((d) => d.id === id);
+                descriptor?.onSelect();
+              }}
+              ariaLabel="Show more tabs"
+            />
           </Flex>
-        ) : null}
-        <Flex align="center" flexShrink={0}>
-          <OverflowMenu
-            items={tabDescriptors
-              .filter((d) => hiddenTabIds.has(d.id))
-              .map((d) => ({
-                id: d.id,
-                label: d.label,
-                content: d.menuContent,
-              }))}
-            activeId={activeOverflowId}
-            onSelect={(id) => {
-              const descriptor = tabDescriptors.find((d) => d.id === id);
-              descriptor?.onSelect();
-            }}
-            ariaLabel="Show more tabs"
-          />
         </Flex>
       </HStack>
       {collapsePosition === "trailing" && (
