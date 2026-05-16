@@ -62,29 +62,17 @@ export function PaneLayout({
 
   const paneState = useDrawerStore((s) => s.paneState);
   const togglePaneCollapsed = useDrawerStore((s) => s.togglePaneCollapsed);
-  const togglePaneMaximized = useDrawerStore((s) => s.togglePaneMaximized);
 
   const hasConversation = !!trace.conversationId;
   const ctxState = paneState.conversationContext;
   const vizState = paneState.visualization;
   const detailState = paneState.spanDetail;
 
-  // Maximizing the viz hides the detail and vice versa. We honour
-  // whichever was clicked most recently — Zustand updates are
-  // synchronous so the user always sees the result of their last action.
-  const vizMaximized = vizState.maximizedWithinGroup;
-  const detailMaximized = detailState.maximizedWithinGroup;
-  const showViz = !detailMaximized;
-  const showDetail = !vizMaximized;
-
   const vizPane = (
     <Pane
       title="Visualization"
       collapsed={vizState.collapsed}
       onToggleCollapsed={() => togglePaneCollapsed("visualization")}
-      maximized={vizState.maximizedWithinGroup}
-      onToggleMaximized={() => togglePaneMaximized("visualization")}
-      canMaximize={showDetail || vizMaximized}
       position={layout === "horizontal" ? "left" : "top"}
     >
       <IsolatedErrorBoundary
@@ -111,9 +99,6 @@ export function PaneLayout({
       title="Details"
       collapsed={detailState.collapsed}
       onToggleCollapsed={() => togglePaneCollapsed("spanDetail")}
-      maximized={detailState.maximizedWithinGroup}
-      onToggleMaximized={() => togglePaneMaximized("spanDetail")}
-      canMaximize={showViz || detailMaximized}
       position={layout === "horizontal" ? "right" : "bottom"}
     >
       <SpanDetailPane
@@ -129,7 +114,6 @@ export function PaneLayout({
       title="Conversation Context"
       collapsed={ctxState.collapsed}
       onToggleCollapsed={() => togglePaneCollapsed("conversationContext")}
-      canMaximize={false}
       position="top"
     >
       <Box paddingY={3}>
@@ -188,37 +172,31 @@ export function PaneLayout({
       autoSaveId={vizDetailGroupId}
       style={{ flex: 1, minHeight: 0, minWidth: 0 }}
     >
-      {showViz ? (
-        <Panel
-          ref={vizPanelRef}
-          id="viz"
-          order={1}
-          defaultSize={layout === "horizontal" ? 55 : 50}
-          minSize={15}
-          collapsible
-          collapsedSize={4}
-        >
-          {vizPane}
-        </Panel>
-      ) : null}
-      {showViz && showDetail ? (
-        <PanelResizeHandle>
-          <PaneResizeBar orientation={layout} />
-        </PanelResizeHandle>
-      ) : null}
-      {showDetail ? (
-        <Panel
-          ref={detailPanelRef}
-          id="detail"
-          order={2}
-          defaultSize={layout === "horizontal" ? 45 : 50}
-          minSize={15}
-          collapsible
-          collapsedSize={4}
-        >
-          {detailPane}
-        </Panel>
-      ) : null}
+      <Panel
+        ref={vizPanelRef}
+        id="viz"
+        order={1}
+        defaultSize={layout === "horizontal" ? 55 : 50}
+        minSize={15}
+        collapsible
+        collapsedSize={4}
+      >
+        {vizPane}
+      </Panel>
+      <PanelResizeHandle>
+        <PaneResizeBar orientation={layout} />
+      </PanelResizeHandle>
+      <Panel
+        ref={detailPanelRef}
+        id="detail"
+        order={2}
+        defaultSize={layout === "horizontal" ? 45 : 50}
+        minSize={15}
+        collapsible
+        collapsedSize={4}
+      >
+        {detailPane}
+      </Panel>
     </PanelGroup>
   );
 

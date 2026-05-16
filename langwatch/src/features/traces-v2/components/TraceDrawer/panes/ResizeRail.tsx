@@ -148,12 +148,12 @@ export function ResizeRail() {
       position="absolute"
       top={0}
       bottom={0}
-      // Sit OUTSIDE the drawer: the visible pill lives in the page
-      // gutter to the left of the drawer's content. A generous portion
-      // of the hit area extends INTO the drawer as well so a user
-      // landing on the inner edge still picks up `col-resize`.
-      left="-10px"
-      width="22px"
+      // Sit OUTSIDE the drawer with a visible gap between the pill and
+      // the drawer's left edge. The hit area is generous (28px) and
+      // straddles the gap: it extends 18px into the gutter (where the
+      // pill lives) and 10px into the drawer for forgiving inward grabs.
+      left="-18px"
+      width="28px"
       // No tab focus on purpose — see component-level docstring.
       cursor="col-resize"
       // Above the drawer body but below any toasts / overlays.
@@ -171,7 +171,10 @@ export function ResizeRail() {
         data-edge-pill
         position="absolute"
         top="50%"
-        // Pill sits at the leftmost edge of the rail (in the gutter).
+        // Pill sits flush to the left edge of the rail (deep in the
+        // gutter), leaving a clear ~10px breathing strip between the
+        // pill and the drawer's left edge so the chrome reads as
+        // detached, not glued.
         left="4px"
         width="4px"
         height="40px"

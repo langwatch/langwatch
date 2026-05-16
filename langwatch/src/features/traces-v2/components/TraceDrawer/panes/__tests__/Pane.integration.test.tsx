@@ -84,12 +84,11 @@ describe("Pane", () => {
   });
 
   describe("given the user double-clicks the header", () => {
-    /** @scenario Maximize-within-group hides siblings */
-    describe("when onToggleMaximized is wired", () => {
-      it("fires the maximize handler", () => {
-        const onToggleMaximized = vi.fn();
+    describe("when onToggleCollapsed is wired", () => {
+      it("toggles collapse (the maximize gesture was removed)", () => {
+        const onToggleCollapsed = vi.fn();
         render(
-          <Pane title="Visualization" onToggleMaximized={onToggleMaximized}>
+          <Pane title="Visualization" onToggleCollapsed={onToggleCollapsed}>
             <div>body</div>
           </Pane>,
           { wrapper },
@@ -99,20 +98,16 @@ describe("Pane", () => {
           name: /Visualization pane controls/i,
         });
         fireEvent.doubleClick(toolbar);
-        expect(onToggleMaximized).toHaveBeenCalledTimes(1);
+        expect(onToggleCollapsed).toHaveBeenCalledTimes(1);
       });
     });
   });
 
-  describe("given canMaximize is false", () => {
-    describe("when rendered", () => {
-      it("does not show the maximize affordance", () => {
+  describe("given the pane is rendered", () => {
+    describe("when checked for a maximize control", () => {
+      it("does not render one (removed per operator feedback)", () => {
         render(
-          <Pane
-            title="Conversation Context"
-            onToggleMaximized={vi.fn()}
-            canMaximize={false}
-          >
+          <Pane title="Conversation Context">
             <div>body</div>
           </Pane>,
           { wrapper },
