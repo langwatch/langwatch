@@ -27,14 +27,21 @@
 import {
   Box,
   Button,
-  Card,
   Field,
   HStack,
   Spinner,
   Text,
   VStack,
+  Wrap,
 } from "@chakra-ui/react";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import {
+  Building2,
+  ChevronDown,
+  ChevronRight,
+  Folder,
+  Users,
+} from "lucide-react";
+import { Tooltip } from "~/components/ui/tooltip";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { allModelOptions } from "~/components/ModelSelector";
@@ -81,6 +88,12 @@ interface Props {
   /** Effective resolution for the project currently viewed — used as
    *  the "if you don't override" placeholder for each row. */
   effective: Payload["effective"];
+  /** Quick-pick context: the scope ids the caller is currently sitting on
+   *  so the drawer can offer "Organization / This team / This project" chips
+   *  same as the model-provider drawer. */
+  currentOrganizationId?: string | null;
+  currentTeamId?: string | null;
+  currentProjectId?: string | null;
   onSaved: () => void;
 }
 
@@ -91,6 +104,9 @@ export function DefaultModelOverrideDrawer({
   available,
   features,
   effective,
+  currentOrganizationId,
+  currentTeamId,
+  currentProjectId,
   onSaved,
 }: Props) {
   const utils = api.useContext();
@@ -234,31 +250,32 @@ export function DefaultModelOverrideDrawer({
         </Drawer.Header>
         <Drawer.Body>
           <VStack align="stretch" gap={5}>
-            <ScopeChipPicker
-              value={scopes}
+            <ScopeSection
+              scopes={scopes}
               onChange={setScopes}
-              organizationId={available.organization?.id}
-              organizationName={available.organization?.name}
-              availableTeams={available.teams}
-              availableProjects={available.projects}
-              label="Scope(s) this config applies to"
+              available={available}
+              currentOrganizationId={currentOrganizationId}
+              currentTeamId={currentTeamId}
+              currentProjectId={currentProjectId}
             />
 
-            {ROLES.map((role) => (
-              <RoleRow
-                key={role}
-                role={role}
-                config={config}
-                features={featuresByRole[role]}
-                effective={effective[role]}
-                expanded={expanded[role]}
-                onToggleExpand={() =>
-                  setExpanded((prev) => ({ ...prev, [role]: !prev[role] }))
-                }
-                modelOptions={modelOptions}
-                onSetOverride={setOverride}
-              />
-            ))}
+            <VStack align="stretch" gap={2}>
+              {ROLES.map((role) => (
+                <RoleRow
+                  key={role}
+                  role={role}
+                  config={config}
+                  features={featuresByRole[role]}
+                  effective={effective[role]}
+                  expanded={expanded[role]}
+                  onToggleExpand={() =>
+                    setExpanded((prev) => ({ ...prev, [role]: !prev[role] }))
+                  }
+                  modelOptions={modelOptions}
+                  onSetOverride={setOverride}
+                />
+              ))}
+            </VStack>
           </VStack>
         </Drawer.Body>
         <Drawer.Footer>
@@ -316,100 +333,86 @@ function RoleRow({
 }) {
   const current = config[role] ?? "";
   const inheritedModel = effective?.model;
-  const inheritedSource = effective?.scope;
   const canExpand = features.length > 0;
   const ChevronIcon = expanded ? ChevronDown : ChevronRight;
 
   return (
-    <Card.Root data-testid={`role-row-${role.toLowerCase()}`}>
-      <Card.Body padding={3}>
-        <VStack align="stretch" gap={2}>
-          <HStack gap={3} align="center">
-            {canExpand ? (
-              <Box
-                as="button"
-                onClick={onToggleExpand}
-                cursor="pointer"
-                data-testid={`role-row-${role.toLowerCase()}-expand`}
-              >
-                <ChevronIcon size={16} />
-              </Box>
-            ) : (
-              <Box width="16px" />
-            )}
-            <Box width="100px" flexShrink={0}>
-              <Text fontWeight="medium">{ROLE_LABEL[role]}</Text>
-            </Box>
-            <Box flex={1} position="relative">
-              {!current && inheritedModel && (
-                <Box
-                  position="absolute"
-                  insetInlineStart={3}
-                  top={0}
-                  bottom={0}
-                  display="flex"
-                  alignItems="center"
-                  pointerEvents="none"
-                  data-testid={`role-row-${role.toLowerCase()}-inherited-placeholder`}
-                >
-                  <ModelChip model={inheritedModel} size="sm" inherited />
-                </Box>
-              )}
-              <ProviderModelSelector
-                model={current}
-                options={modelOptions}
-                onChange={(m) => onSetOverride(role, m)}
-              />
-            </Box>
-            <Text
-              fontSize="xs"
-              color="fg.muted"
-              maxWidth="220px"
-              data-testid={`role-row-${role.toLowerCase()}-blurb`}
-            >
-              {ROLE_BLURB[role]}
+    <Box data-testid={`role-row-${role.toLowerCase()}`} width="full">
+      <HStack gap={3} align="center" paddingY={1}>
+        {/* Role label — hover the label itself to see what the role is
+            for. No info icon, no inline blurb. Keeps the row a single
+            tight line, white BG, no card wrapper. */}
+        <Tooltip content={ROLE_BLURB[role]}>
+          <Box
+            width="100px"
+            flexShrink={0}
+            cursor="help"
+            data-testid={`role-row-${role.toLowerCase()}-label`}
+          >
+            <Text fontWeight="medium" fontSize="sm">
+              {ROLE_LABEL[role]}
             </Text>
-          </HStack>
-          {current && (
-            <HStack gap={2} paddingLeft="116px">
-              <Text fontSize="xs" color="fg.muted">
-                Pinned at this scope. Clear to inherit
-                {inheritedSource ? ` (${inheritedSource})` : ""}.
-              </Text>
-              <Button
-                size="xs"
-                variant="ghost"
-                onClick={() => onSetOverride(role, null)}
-                data-testid={`role-row-${role.toLowerCase()}-clear`}
-              >
-                Clear
-              </Button>
-            </HStack>
-          )}
-          {canExpand && expanded && (
-            <VStack
-              align="stretch"
-              gap={2}
-              paddingLeft={6}
-              paddingTop={2}
-              data-testid={`role-row-${role.toLowerCase()}-features`}
+          </Box>
+        </Tooltip>
+        <Box flex={1} position="relative">
+          {!current && inheritedModel && (
+            <Box
+              position="absolute"
+              insetInlineStart={3}
+              top={0}
+              bottom={0}
+              display="flex"
+              alignItems="center"
+              pointerEvents="none"
+              data-testid={`role-row-${role.toLowerCase()}-inherited-placeholder`}
             >
-              {features.map((f) => (
-                <FeatureRow
-                  key={f.key}
-                  feature={f}
-                  override={config[f.key] ?? ""}
-                  roleLevelOverride={config[role] ?? ""}
-                  inheritedModel={inheritedModel}
-                  modelOptions={modelOptions}
-                  onSetOverride={onSetOverride}
-                />
-              ))}
-            </VStack>
+              <ModelChip model={inheritedModel} size="sm" inherited />
+            </Box>
           )}
+          <ProviderModelSelector
+            model={current}
+            options={modelOptions}
+            onChange={(m) => onSetOverride(role, m)}
+          />
+        </Box>
+        {canExpand ? (
+          <Box
+            as="button"
+            onClick={onToggleExpand}
+            cursor="pointer"
+            color="fg.muted"
+            flexShrink={0}
+            padding={1}
+            data-testid={`role-row-${role.toLowerCase()}-expand`}
+          >
+            <ChevronIcon size={16} />
+          </Box>
+        ) : (
+          <Box width="24px" flexShrink={0} />
+        )}
+      </HStack>
+      {canExpand && expanded && (
+        <VStack
+          align="stretch"
+          gap={1}
+          paddingLeft={4}
+          paddingBottom={1}
+          data-testid={`role-row-${role.toLowerCase()}-features`}
+        >
+          {features.map((f) => (
+            <FeatureRow
+              key={f.key}
+              feature={f}
+              override={config[f.key] ?? ""}
+              roleLevelOverride={config[role] ?? ""}
+              inheritedModel={inheritedModel}
+              modelOptions={modelOptions}
+              onSetOverride={onSetOverride}
+            />
+          ))}
         </VStack>
-      </Card.Body>
-    </Card.Root>
+      )}
+    </Box>
   );
 }
 
@@ -439,12 +442,14 @@ function FeatureRow({
       align="center"
       data-testid={`feature-row-${feature.key}`}
     >
-      <Box width="160px" flexShrink={0}>
-        <Text fontSize="sm">{feature.displayName}</Text>
-        <Text fontSize="xs" color="fg.muted">
-          {feature.description}
-        </Text>
-      </Box>
+      {/* Feature description is hidden behind a tooltip on the label so
+          the row stays a single line and the drawer doesn't read like a
+          wall of help text. */}
+      <Tooltip content={feature.description}>
+        <Box width="160px" flexShrink={0} cursor="help">
+          <Text fontSize="sm">{feature.displayName}</Text>
+        </Box>
+      </Tooltip>
       <Box flex={1} position="relative">
         {!override && wouldInherit && (
           <Box
@@ -466,16 +471,102 @@ function FeatureRow({
           onChange={(m) => onSetOverride(feature.key, m)}
         />
       </Box>
-      {override && (
-        <Button
-          size="xs"
-          variant="ghost"
-          onClick={() => onSetOverride(feature.key, null)}
-          data-testid={`feature-row-${feature.key}-clear`}
-        >
-          Clear
-        </Button>
-      )}
+      <Box width="24px" flexShrink={0} />
     </HStack>
+  );
+}
+
+/**
+ * Scope picker section. Quick-pick chips ("Organization" / "This team"
+ * / "This project") follow the same pattern as `ProviderScopeSection`
+ * from the model-provider drawer — picking one replaces the selection
+ * with that single scope, and the multi-scope chip picker stays
+ * available below for fan-out cases. Lives inline here (rather than
+ * pulling `ProviderScopeSection` in) because that component is tightly
+ * coupled to `useModelProviderForm`'s reducer; pulling it apart is a
+ * follow-up if more surfaces need this primitive.
+ */
+function ScopeSection({
+  scopes,
+  onChange,
+  available,
+  currentOrganizationId,
+  currentTeamId,
+  currentProjectId,
+}: {
+  scopes: ScopeChipPickerEntry[];
+  onChange: (next: ScopeChipPickerEntry[]) => void;
+  available: Payload["available"];
+  currentOrganizationId?: string | null;
+  currentTeamId?: string | null;
+  currentProjectId?: string | null;
+}) {
+  const quickPicks: Array<{
+    label: string;
+    icon: React.ReactElement;
+    scope: ScopeChipPickerEntry;
+  }> = [];
+  if (currentOrganizationId && available.organization) {
+    quickPicks.push({
+      label: "Organization",
+      icon: <Building2 size={14} aria-hidden />,
+      scope: { scopeType: "ORGANIZATION", scopeId: currentOrganizationId },
+    });
+  }
+  if (currentTeamId) {
+    quickPicks.push({
+      label: "This team",
+      icon: <Users size={14} aria-hidden />,
+      scope: { scopeType: "TEAM", scopeId: currentTeamId },
+    });
+  }
+  if (currentProjectId) {
+    quickPicks.push({
+      label: "This project",
+      icon: <Folder size={14} aria-hidden />,
+      scope: { scopeType: "PROJECT", scopeId: currentProjectId },
+    });
+  }
+
+  const isQuickPickActive = (target: ScopeChipPickerEntry) =>
+    scopes.length === 1 &&
+    scopes[0]!.scopeType === target.scopeType &&
+    scopes[0]!.scopeId === target.scopeId;
+
+  return (
+    <VStack align="start" width="full" gap={2}>
+      {quickPicks.length > 0 && (
+        <Wrap gap={2} role="group" aria-label="Quick scope">
+          {quickPicks.map((pick) => {
+            const active = isQuickPickActive(pick.scope);
+            return (
+              <Button
+                key={`${pick.scope.scopeType}:${pick.scope.scopeId}`}
+                type="button"
+                size="xs"
+                variant={active ? "solid" : "outline"}
+                aria-pressed={active}
+                onClick={() => onChange([pick.scope])}
+                data-testid={`quick-scope-${pick.scope.scopeType.toLowerCase()}`}
+              >
+                <HStack gap={1}>
+                  {pick.icon}
+                  <Text>{pick.label}</Text>
+                </HStack>
+              </Button>
+            );
+          })}
+        </Wrap>
+      )}
+      <ScopeChipPicker
+        value={scopes}
+        onChange={onChange}
+        organizationId={available.organization?.id}
+        organizationName={available.organization?.name}
+        availableTeams={available.teams}
+        availableProjects={available.projects}
+        label=""
+      />
+    </VStack>
   );
 }
