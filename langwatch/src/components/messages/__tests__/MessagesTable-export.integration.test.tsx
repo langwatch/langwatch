@@ -229,6 +229,14 @@ vi.mock("~/utils/api", () => ({
         useQuery: () => ({ data: null, isLoading: false }),
       },
     },
+    // `useTraceDetailsDrawer` now calls `useFeatureFlag`, which hits
+    // `api.featureFlag.isEnabled.useQuery`. Stub it as disabled so the
+    // hook stays on the v1 drawer route.
+    featureFlag: {
+      isEnabled: {
+        useQuery: () => ({ data: { enabled: false }, isLoading: false }),
+      },
+    },
     useContext: () => ({
       annotation: {
         getPendingItemsCount: { invalidate: stableSetFn },
