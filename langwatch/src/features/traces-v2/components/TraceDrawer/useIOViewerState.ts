@@ -62,19 +62,22 @@ export function useIOViewerState({
 }: UseIOViewerStateArgs): IOViewerState {
   const [format, setFormat] = useState<ViewFormat>("pretty");
   const chatLayout = useChatLayoutPref((s) => s.chatLayout);
-  const setChatLayoutRaw = useChatLayoutPref((s) => s.setChatLayout);
   // Wrap the store setter as a `SetStateAction` so the existing IOViewer
   // call sites (`setChatLayout(v as ChatLayout)`, etc.) keep typechecking
-  // without churn.
+  // without churn. The functional-updater branch evaluates against the
+  // LATEST store state (not the render-time `chatLayout` closure), so
+  // concurrent updates from multiple subscribers compose correctly
+  // (CodeRabbit suggestion, PR #4084).
   const setChatLayout = useCallback<Dispatch<SetStateAction<ChatLayout>>>(
     (value) => {
-      const next =
-        typeof value === "function"
-          ? (value as (prev: ChatLayout) => ChatLayout)(chatLayout)
-          : value;
-      setChatLayoutRaw(next);
+      useChatLayoutPref.setState((state) => ({
+        chatLayout:
+          typeof value === "function"
+            ? (value as (prev: ChatLayout) => ChatLayout)(state.chatLayout)
+            : value,
+      }));
     },
-    [chatLayout, setChatLayoutRaw],
+    [],
   );
   // `mode` is retained on the API for future per-mode defaults but no
   // longer drives the initial layout.

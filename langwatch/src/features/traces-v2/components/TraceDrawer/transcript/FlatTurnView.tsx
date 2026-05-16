@@ -1,4 +1,4 @@
-import { Box, chakra, Flex, HStack, Icon, Text } from "@chakra-ui/react";
+import { Box, chakra, Flex, Icon, Text } from "@chakra-ui/react";
 import { LuBot, LuChevronUp, LuUser } from "react-icons/lu";
 import { getDisplayRoleVisuals, useIsScenarioRole } from "../scenarioRoles";
 import { BlockStack } from "./BlockStack";
