@@ -287,20 +287,39 @@ export function PaneLayout({
   // instead of `handle.expand()`'s library default (which could blow
   // the panel up to 60–70% on wide screens).
   const lastExpandedDetailSize = useRef<number | null>(null);
+  // Drive the library state from the store, defensively. Don't trust
+  // `handle.isCollapsed()` as the only signal — after a drag-past-min
+  // collapse the library can land in a hybrid state where the panel
+  // size is at `collapsedSize` but `isCollapsed()` returns false (or
+  // vice versa), and the next click on "Show details" then becomes
+  // a no-op. Compare the pixel size too: anything below the expected
+  // expanded floor is treated as "needs expanding".
   useEffect(() => {
     const handle = detailPanelRef.current;
     if (!handle) return;
-    if (detailState.collapsed && !handle.isCollapsed()) {
+    if (detailState.collapsed) {
       const current = handle.getSize();
-      if (current > 1) lastExpandedDetailSize.current = current;
-      handle.collapse();
-    } else if (!detailState.collapsed && handle.isCollapsed()) {
-      const target =
-        lastExpandedDetailSize.current ??
-        (layout === "horizontal" ? 45 : 50);
+      if (current > detailMinSize + 0.5) {
+        lastExpandedDetailSize.current = current;
+        handle.collapse();
+      } else if (!handle.isCollapsed()) {
+        // Already at collapsedSize but library doesn't think so —
+        // force the flag to align.
+        handle.collapse();
+      }
+      return;
+    }
+    const target =
+      lastExpandedDetailSize.current ??
+      (layout === "horizontal" ? 45 : 50);
+    const current = handle.getSize();
+    // Below the min floor → panel was collapsed-or-near-it, expand.
+    // Library's own `isCollapsed()` is unreliable post-drag, so size
+    // is the trustworthy check.
+    if (current <= detailMinSize + 0.5 || handle.isCollapsed()) {
       handle.resize(target);
     }
-  }, [detailState.collapsed, layout]);
+  }, [detailState.collapsed, layout, detailMinSize]);
 
   // The Visualization panel renders its own tab strip as chrome — no
   // outer Pane wrapper. A 1px border on the side facing the Details
