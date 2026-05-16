@@ -20,6 +20,7 @@ import {
   buildTracePlaceholderRows,
   SKELETON_ROW_COUNT,
 } from "./skeletonPlaceholders";
+import { TraceStatisticsProvider } from "./traceStatisticsContext";
 import { TraceTableShell } from "./TraceTableShell";
 import { useTraceLensColumns } from "./useTraceLensColumns";
 import { useTraceLensKeyboard } from "./useTraceLensKeyboard";
@@ -134,42 +135,46 @@ export const TraceLensBody: React.FC<TraceLensBodyProps> = ({
 
   return (
     <Box tabIndex={0} onKeyDown={handleKeyDown} outline="none" height="full">
-      <TraceTableShell table={table} minWidth={minWidth}>
-        <VirtualSpacer height={paddingTop} colSpan={colSpan} />
-        {virtualItems.map((virtualItem) => {
-          const row = rows[virtualItem.index];
-          if (!row) return null;
-          return (
-            <RegistryRow
-              key={row.id}
-              ref={virtualizer.measureElement}
-              data-index={virtualItem.index}
-              tanstackRow={row}
-              registry={registry}
-              addons={lens.addons}
-              status={row.original.status}
-              hoverScope="unified"
-              isSelected={
-                !isLoading && row.original.traceId === selectedTraceId
-              }
-              isFocused={!isLoading && virtualItem.index === focusedIndex}
-              isExpanded={
-                !isLoading && row.original.traceId === expandedTraceId
-              }
-              isNew={!isLoading && newIds.has(row.original.traceId)}
-              rowDomId={row.original.traceId}
-              onSelect={
-                isLoading ? undefined : () => toggleTrace(row.original)
-              }
-              onTogglePeek={
-                isLoading ? undefined : () => togglePeek(row.original.traceId)
-              }
-              isLoading={isLoading}
-            />
-          );
-        })}
-        <VirtualSpacer height={paddingBottom} colSpan={colSpan} />
-      </TraceTableShell>
+      <TraceStatisticsProvider traces={traces} skip={isLoading}>
+        <TraceTableShell table={table} minWidth={minWidth}>
+          <VirtualSpacer height={paddingTop} colSpan={colSpan} />
+          {virtualItems.map((virtualItem) => {
+            const row = rows[virtualItem.index];
+            if (!row) return null;
+            return (
+              <RegistryRow
+                key={row.id}
+                ref={virtualizer.measureElement}
+                data-index={virtualItem.index}
+                tanstackRow={row}
+                registry={registry}
+                addons={lens.addons}
+                status={row.original.status}
+                hoverScope="unified"
+                isSelected={
+                  !isLoading && row.original.traceId === selectedTraceId
+                }
+                isFocused={!isLoading && virtualItem.index === focusedIndex}
+                isExpanded={
+                  !isLoading && row.original.traceId === expandedTraceId
+                }
+                isNew={!isLoading && newIds.has(row.original.traceId)}
+                rowDomId={row.original.traceId}
+                onSelect={
+                  isLoading ? undefined : () => toggleTrace(row.original)
+                }
+                onTogglePeek={
+                  isLoading
+                    ? undefined
+                    : () => togglePeek(row.original.traceId)
+                }
+                isLoading={isLoading}
+              />
+            );
+          })}
+          <VirtualSpacer height={paddingBottom} colSpan={colSpan} />
+        </TraceTableShell>
+      </TraceStatisticsProvider>
     </Box>
   );
 };

@@ -37,7 +37,6 @@ const traceColumnDefs = {
     size: 560,
     minSize: 320,
     maxSize: 820,
-    meta: { skeletonLines: 2 },
     enableSorting: false,
   }),
   // Broken-out alternates to the composite `trace` column. Lenses can mix
