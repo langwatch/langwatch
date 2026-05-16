@@ -49,6 +49,15 @@ import {
 const MAX_INLINE_PINNED = 4;
 const INLINE_KEEP_WHEN_OVERFLOW = 3;
 
+/**
+ * `data-overflow-id` for the right-aligned instrumentation scope chip.
+ * Module-scoped so the `tabIds` useMemo factory (which React invokes
+ * synchronously on first render) can reference it without hitting a
+ * temporal-dead-zone error — a function-body `const` declared *after*
+ * the memo line would still be in TDZ at the time the factory runs.
+ */
+const RIGHT_SLOT_OVERFLOW_ID = "right-slot:instrumentation";
+
 /** Map span type → Chakra colorPalette so Badge variants stay consistent. */
 const SPAN_TYPE_PALETTE: Record<string, string> = {
   llm: "blue",
@@ -451,8 +460,7 @@ export const SpanTabBar = memo(function SpanTabBar({
   // widths the scope chip vanishes before any tab collapses into
   // the kebab menu. Excluded from the OverflowMenu items list so it
   // doesn't reappear in the dropdown (it's a passive label, not a
-  // navigation target).
-  const RIGHT_SLOT_OVERFLOW_ID = "right-slot:instrumentation";
+  // navigation target). Id is module-scoped (above) to dodge TDZ.
   // Reserve room for kebab trigger + optional rightSlot + the
   // pinned-span overflow menu + the trailing collapse toggle. 96px gives
   // enough headroom that the last visible tab doesn't bleed under those

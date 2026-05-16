@@ -91,7 +91,12 @@ export function Section({
         // "drifted down", open read as "drifted up".
         alignItems="center"
         paddingX={4}
-        paddingY={tokens.sectionTriggerY}
+        // +0.5 density step (~2px each side) over the raw token —
+        // operator feedback: the section triggers felt cramped, this
+        // gives the row a touch of breathing room without breaking
+        // the rhythm with the ctx header above (which already runs
+        // at `densityPaddingY + 0.5`).
+        paddingY={tokens.sectionTriggerY + 0.5}
         // Solid bg under sticky so content scrolling underneath is
         // occluded — without it the title would overlap the content
         // beneath when pinned. `bg.surface` matches the drawer body.
