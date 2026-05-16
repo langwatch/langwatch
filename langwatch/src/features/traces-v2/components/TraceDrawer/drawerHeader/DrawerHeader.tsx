@@ -747,9 +747,11 @@ export const DrawerHeader = memo(function DrawerHeader({
             close button sits flush with the drawer edge, matching the
             online-evaluations / add-to-dataset drawers (their
             DrawerCloseTrigger uses absolute positioning at the edge).
-            Without this offset the X reads as floating ~8px in from
-            the drawer chrome. */}
-        <HStack gap={1} flexShrink={0} marginRight={-2}>
+            marginTop matches what the other drawers do — their close
+            button sits ~8px from the top of the drawer chrome, the
+            VStack's paddingTop={3} (12px) puts ours too low without
+            this offset. */}
+        <HStack gap={1} flexShrink={0} marginRight={-2} marginTop={-2}>
           <Tooltip
             content={
               <HStack gap={1}>
