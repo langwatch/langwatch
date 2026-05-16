@@ -225,7 +225,15 @@ export const ConversationContext = memo(function ConversationContext({
       width="100%"
       minHeight={0}
       minWidth={0}
-      bg="bg.surface"
+      // Light mode tone stack (lightest → darkest):
+      //   panel bg = `bg.subtle` — very light gray, slightly lighter
+      //     than the Span header tone, sits behind the rows
+      //   non-selected row = `bg.surface` (white) — pops cleanly
+      //   selected row    = `bg.muted` — calm gray indent that reads
+      //     as "this is the current turn" without shouting in blue
+      // Dark mode keeps the validated palette: panel = surface,
+      // selection still uses `blue.subtle` (set on the row itself).
+      bg={{ base: "bg.subtle", _dark: "bg.surface" }}
     >
       <ContextHeader
         position={ctx.position}
@@ -279,7 +287,9 @@ function ContextHeader({
       width="100%"
       paddingX={4}
       paddingY={2}
-      bg="bg.surface"
+      // Header sits on the same subtle tone as the panel body in
+      // light mode so the chrome reads as a single strip.
+      bg={{ base: "bg.subtle", _dark: "bg.surface" }}
       borderTopWidth="0"
       borderBottomWidth={collapsed ? 0 : "1px"}
       borderColor={{ base: "gray.200", _dark: "border.muted" }}
@@ -287,7 +297,7 @@ function ContextHeader({
       cursor="pointer"
       textAlign="left"
       transition="background 120ms ease, color 120ms ease"
-      _hover={{ bg: "bg.softHover", color: "fg" }}
+      _hover={{ bg: { base: "bg.subtle", _dark: "bg.softHover" }, color: "fg" }}
       flexShrink={0}
     >
       <Icon as={LuMessageCircle} boxSize={3} color="inherit" />
@@ -483,14 +493,16 @@ const ConversationRow = memo(function ConversationRow({
         gap={2.5}
         paddingX={3}
         paddingY={2}
-        // Light mode: non-selected rows are the panel's neutral gray
-        // (`bg.muted`), the selected row pops as a clean white surface.
-        // Dark mode keeps the existing blue-subtle selection — against
-        // the dark canvas it reads as the intended highlight tone.
+        // Light mode: non-selected rows are clean white (`bg.surface`)
+        // and pop against the slightly-gray panel; the selected row
+        // sinks into a calm `bg.muted` indent — the same gray the
+        // INPUT / USER block uses elsewhere in the drawer, no blue.
+        // Dark mode keeps the validated `blue.subtle` selection
+        // against the dark canvas.
         bg={
           isCurrent
-            ? { base: "bg.surface", _dark: "blue.subtle" }
-            : { base: "bg.muted", _dark: "transparent" }
+            ? { base: "bg.muted", _dark: "blue.subtle" }
+            : { base: "bg.surface", _dark: "transparent" }
         }
         borderBottomWidth={isLast ? 0 : "1px"}
         borderColor="border.muted"
@@ -499,7 +511,7 @@ const ConversationRow = memo(function ConversationRow({
         _hover={
           isCurrent
             ? undefined
-            : { bg: { base: "bg.softHover", _dark: "bg.muted" } }
+            : { bg: { base: "bg.subtle", _dark: "bg.muted" } }
         }
         transition="background 0.12s ease"
         textAlign="left"

@@ -11,7 +11,6 @@ import type {
   SpanTreeNode,
   TraceHeader,
 } from "~/server/api/routers/tracesV2.schemas";
-import { useConversationContext } from "../../../hooks/useConversationContext";
 import { useDrawerStore } from "../../../stores/drawerStore";
 import { ConversationContext } from "../ConversationContext";
 import { VizPlaceholder } from "../VizPlaceholder";
@@ -65,19 +64,14 @@ export function PaneLayout({
   const togglePaneCollapsed = useDrawerStore((s) => s.togglePaneCollapsed);
 
   // Conversation context pane slot is keyed on `conversationId` alone —
-  // a stable boolean per trace. The pane should also disappear when
-  // the conversation has only one turn, but we handle that by
-  // imperatively collapsing the Panel to 0 (see effect below); we do
-  // NOT flip the surrounding layout structure based on async `ctx.total`,
-  // because mounting / unmounting the top-level `<PanelGroup>` mid-load
-  // unmounts the body group too, which loses the viz / details panel
-  // sizes (and on some renders blanks the body entirely).
-  const ctx = useConversationContext(
-    trace.conversationId ?? null,
-    trace.traceId,
-  );
+  // a stable boolean per trace. We do NOT gate the surrounding layout
+  // structure on async `ctx.total`: flipping the top-level <PanelGroup>
+  // mid-load unmounts the body group too, which loses viz / detail
+  // sizes (some renders ended up blanking the body entirely).
+  // Single-turn conversations are handled inside `ConversationContext`
+  // by returning null; the Panel slot still exists, it just renders
+  // nothing.
   const hasConversation = !!trace.conversationId;
-  const isSingleTurnConversation = !ctx.isLoading && ctx.total <= 1;
   const ctxState = paneState.conversationContext;
   const detailState = paneState.spanDetail;
 
@@ -117,18 +111,9 @@ export function PaneLayout({
   useEffect(() => {
     const handle = ctxPanelRef.current;
     if (!handle) return;
-    // Single-turn conversations: force-collapse so the pane shrinks to
-    // its `collapsedSize` strip and the body Panel reclaims the space.
-    // The visible header inside `ConversationContext` also returns
-    // null at total <= 1, so this collapsed Panel ends up showing
-    // nothing — exactly the "hide entirely" affordance.
-    if (isSingleTurnConversation) {
-      if (!handle.isCollapsed()) handle.collapse();
-      return;
-    }
     if (ctxState.collapsed && !handle.isCollapsed()) handle.collapse();
     else if (!ctxState.collapsed && handle.isCollapsed()) handle.expand();
-  }, [ctxState.collapsed, isSingleTurnConversation]);
+  }, [ctxState.collapsed]);
   // Remember the user's manually-resized detail size so re-opening
   // after a "Hide details" round-trip lands back at the same width
   // instead of `handle.expand()`'s library default (which could blow
@@ -290,18 +275,10 @@ export function PaneLayout({
           ref={ctxPanelRef}
           id="ctx"
           order={1}
-          // Single-turn conversations collapse to 0 so the strip
-          // vanishes; otherwise normal 4% collapsed strip / 18% open.
-          defaultSize={
-            isSingleTurnConversation
-              ? 0
-              : ctxState.collapsed
-                ? 4
-                : 18
-          }
-          minSize={isSingleTurnConversation ? 0 : 4}
+          defaultSize={ctxState.collapsed ? 4 : 18}
+          minSize={4}
           collapsible
-          collapsedSize={isSingleTurnConversation ? 0 : 4}
+          collapsedSize={4}
         >
           {ctxPane}
         </Panel>

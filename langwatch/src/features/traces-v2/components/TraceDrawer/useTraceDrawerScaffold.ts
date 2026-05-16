@@ -78,13 +78,25 @@ export function useTraceDrawerScaffold(): TraceDrawerScaffold {
 
   const headerQuery = useTraceHeader();
   const spanTreeQuery = useSpanTree();
-  const trace = headerQuery.data ?? null;
-  const spanTree = spanTreeQuery.data ?? [];
+  // `useTraceHeader` uses React Query's `keepPreviousData`, so the
+  // previous trace's data lingers until the new fetch resolves. That
+  // matters now that the drawer is mounted optimistically: switching
+  // from trace A → close → open trace B no longer unmounts the hook,
+  // so without an explicit id match check we'd briefly show A's
+  // header chips, conversation context, etc. under the new selection.
+  // Guard by traceId match; the spans tree is keyed on traceId too.
+  const trace =
+    headerQuery.data && headerQuery.data.traceId === traceId
+      ? headerQuery.data
+      : null;
+  const spanTree =
+    spanTreeQuery.data && trace ? spanTreeQuery.data : [];
   // Show the full-shell skeleton whenever we have a traceId in the URL but
   // no result yet — including the moment before the project context has
   // loaded and the query is still disabled. Without this guard, hard
   // reloading a drawer URL renders the 404 page for one frame before the
-  // refetch even runs.
+  // refetch even runs. Also covers the A→B reopen case above (no `trace`
+  // until the matching fetch lands).
   const isLoading = traceId ? !trace && !headerQuery.error : false;
 
   const conversationContext = useConversationContext(
