@@ -27,9 +27,7 @@
 import {
   Box,
   Button,
-  Field,
   HStack,
-  Spinner,
   Text,
   VStack,
   Wrap,
@@ -55,7 +53,6 @@ import {
   ScopeChipPicker,
   type ScopeChipPickerEntry,
 } from "./ScopeChipPicker";
-import { SmallLabel } from "../SmallLabel";
 
 type Payload = RouterOutputs["modelProvider"]["getDefaultModelsForProject"];
 type ConfigRow = Payload["configs"][number];
@@ -482,11 +479,7 @@ function FeatureRow({
   // wins over the server's per-feature cascade, which in turn beats the
   // role cascade. Without that local check the placeholder would lag
   // behind what the user just typed in the role row above.
-  const wouldInherit =
-    roleLevelOverride ||
-    inheritedForFeature?.model ||
-    inheritedRoleModel ||
-    "";
+  //
   // Surface "Inherit (from role-level in this config)" when the user
   // already picked a role-level value here, otherwise walk the same
   // cascade fallback chain the role row uses: server's per-feature
