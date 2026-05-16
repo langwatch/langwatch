@@ -268,7 +268,7 @@ export function cellPropsFor(
   borderLeftWidth?: string;
   borderLeftColor?: Color;
   borderRightWidth: string;
-  borderRightColor: Color;
+  borderRightColor?: Color;
 } {
   const meta = cell.column.columnDef.meta as ColumnMeta | undefined;
   const size = cell.column.getSize();
@@ -286,8 +286,14 @@ export function cellPropsFor(
     textAlign: meta?.align ?? "left",
     width: useFixedWidth ? `${size}px` : undefined,
     minWidth: `${cell.column.columnDef.minSize ?? 0}px`,
-    borderRightWidth: "1px",
-    borderRightColor: rightBorderColor ?? "border.subtle",
+    // No vertical separators on body cells — the table head owns the
+    // column boundaries via its own TH borders. Operator feedback:
+    // body-row verticals added visual noise on the white surface and
+    // made error rows even busier than they needed to be. Caller can
+    // pass `rightBorderColor` to opt a specific cell back into a
+    // separator if needed.
+    borderRightWidth: rightBorderColor ? "1px" : "0",
+    borderRightColor: rightBorderColor ?? undefined,
     ...(index === 0 && leftBorderColor
       ? { borderLeftWidth: "2px", borderLeftColor: leftBorderColor }
       : {}),

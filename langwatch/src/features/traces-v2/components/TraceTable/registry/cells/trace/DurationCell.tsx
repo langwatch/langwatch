@@ -20,7 +20,6 @@ interface DurationBarProps {
  */
 function DurationBar({ durationMs, width, height }: DurationBarProps) {
   const { p95DurationMs, hasData } = useTraceStatistics();
-  // No useful denominator yet — render the empty track and bail.
   if (!hasData || durationMs <= 0) {
     return (
       <Box
@@ -34,26 +33,68 @@ function DurationBar({ durationMs, width, height }: DurationBarProps) {
   const ratio = durationMs / p95DurationMs;
   const isOverP95 = ratio >= 1;
   const fillRatio = Math.min(ratio, 1);
-  const multiplier = ratio >= 10 ? ratio.toFixed(0) : ratio.toFixed(1);
-  const tooltipLabel = isOverP95
-    ? `${formatDuration(durationMs)} · ${multiplier}× the visible page's p95 (${formatDuration(p95DurationMs)})`
-    : `${formatDuration(durationMs)} · ${multiplier}× the visible page's p95 (${formatDuration(p95DurationMs)})`;
+  return (
+    <Box
+      width={width}
+      height={height}
+      bg="border.subtle"
+      borderRadius="full"
+    >
+      <Box
+        height="full"
+        width={`${fillRatio * 100}%`}
+        bg={isOverP95 ? "red.fg" : "blue.fg"}
+        borderRadius="full"
+      />
+    </Box>
+  );
+}
+
+/**
+ * Renders the duration value (the read at a glance), the inline bar,
+ * and a tooltip that hovers over BOTH (wraps the VStack). Phrasing
+ * the comparison as a percentage of p95 reads more naturally than the
+ * raw multiplier — "30% of the page's p95" beats "0.3× p95".
+ */
+function DurationCellInner({
+  durationMs,
+  textStyle,
+  textColor,
+  barWidth,
+  barHeight,
+  gap,
+}: {
+  durationMs: number;
+  textStyle: "mono" | "comfortable";
+  textColor?: string;
+  barWidth: string;
+  barHeight: string;
+  gap: number;
+}) {
+  const { p95DurationMs, hasData } = useTraceStatistics();
+  const ratio = hasData && durationMs > 0 ? durationMs / p95DurationMs : null;
+  const tooltipLabel = (() => {
+    if (ratio == null) return formatDuration(durationMs);
+    const pct = ratio * 100;
+    const pctText = pct >= 100 ? pct.toFixed(0) : pct.toFixed(1);
+    return `${formatDuration(durationMs)} total duration · that's ${pctText}% of the p95 of the visible traces on this page (${formatDuration(p95DurationMs)})`;
+  })();
   return (
     <Tooltip content={tooltipLabel} positioning={{ placement: "left" }}>
-      <Box
-        width={width}
-        height={height}
-        bg="border.subtle"
-        borderRadius="full"
-        cursor="help"
-      >
-        <Box
-          height="full"
-          width={`${fillRatio * 100}%`}
-          bg={isOverP95 ? "red.fg" : "blue.fg"}
-          borderRadius="full"
+      <VStack gap={gap} align="end" cursor="help" width="full">
+        {textStyle === "mono" ? (
+          <MonoCell>{formatDuration(durationMs)}</MonoCell>
+        ) : (
+          <Text textStyle="sm" color={textColor ?? "fg.muted"}>
+            {formatDuration(durationMs)}
+          </Text>
+        )}
+        <DurationBar
+          durationMs={durationMs}
+          width={barWidth}
+          height={barHeight}
         />
-      </Box>
+      </VStack>
     </Tooltip>
   );
 }
@@ -62,17 +103,21 @@ export const DurationCell = {
   id: "duration",
   label: "Duration",
   render: ({ row }) => (
-    <VStack gap={0} align="end">
-      <MonoCell>{formatDuration(row.durationMs)}</MonoCell>
-      <DurationBar durationMs={row.durationMs} width="40px" height="2px" />
-    </VStack>
+    <DurationCellInner
+      durationMs={row.durationMs}
+      textStyle="mono"
+      barWidth="40px"
+      barHeight="2px"
+      gap={0}
+    />
   ),
   renderComfortable: ({ row }) => (
-    <VStack gap={1} align="end">
-      <Text textStyle="sm" color="fg.muted">
-        {formatDuration(row.durationMs)}
-      </Text>
-      <DurationBar durationMs={row.durationMs} width="56px" height="3px" />
-    </VStack>
+    <DurationCellInner
+      durationMs={row.durationMs}
+      textStyle="comfortable"
+      barWidth="56px"
+      barHeight="3px"
+      gap={1}
+    />
   ),
 } as const satisfies CellDef<TraceListItem>;

@@ -159,7 +159,7 @@ function RegistryRowComponent<TRow>({
             // `whiteSpace=nowrap` themselves; the Td-level clip is the
             // belt-and-suspenders that catches anything that doesn't.
             overflow="hidden"
-            {...cellPropsFor(cell, style.borderColor, i, style.separatorColor)}
+            {...cellPropsFor(cell, style.borderColor, i)}
           >
             {isLoading ? (
               isSelectCell ? (
