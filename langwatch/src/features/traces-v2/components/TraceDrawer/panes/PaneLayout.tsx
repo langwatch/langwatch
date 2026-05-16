@@ -1,5 +1,7 @@
 import { Box, Flex } from "@chakra-ui/react";
+import { useEffect, useRef } from "react";
 import {
+  type ImperativePanelHandle,
   Panel,
   PanelGroup,
   PanelResizeHandle,
@@ -149,6 +151,34 @@ export function PaneLayout({
       ? `${PANE_GROUP_STORAGE_PREFIX}:viz-detail:h`
       : `${PANE_GROUP_STORAGE_PREFIX}:viz-detail:v`;
 
+  const vizPanelRef = useRef<ImperativePanelHandle>(null);
+  const detailPanelRef = useRef<ImperativePanelHandle>(null);
+  const ctxPanelRef = useRef<ImperativePanelHandle>(null);
+
+  useEffect(() => {
+    const handle = ctxPanelRef.current;
+    if (!handle) return;
+    if (ctxState.collapsed && !handle.isCollapsed()) handle.collapse();
+    else if (!ctxState.collapsed && handle.isCollapsed()) handle.expand();
+  }, [ctxState.collapsed]);
+
+  // Sync `paneState[...].collapsed` to the underlying Panel via the
+  // imperative API. Without this, collapsing the pane only hides its
+  // content while the parent `<Panel>` still reserves the full size —
+  // the freed space wouldn't flow to the sibling.
+  useEffect(() => {
+    const handle = vizPanelRef.current;
+    if (!handle) return;
+    if (vizState.collapsed && !handle.isCollapsed()) handle.collapse();
+    else if (!vizState.collapsed && handle.isCollapsed()) handle.expand();
+  }, [vizState.collapsed]);
+  useEffect(() => {
+    const handle = detailPanelRef.current;
+    if (!handle) return;
+    if (detailState.collapsed && !handle.isCollapsed()) handle.collapse();
+    else if (!detailState.collapsed && handle.isCollapsed()) handle.expand();
+  }, [detailState.collapsed]);
+
   const vizDetailGroup = (
     <PanelGroup
       direction={layout === "horizontal" ? "horizontal" : "vertical"}
@@ -157,10 +187,13 @@ export function PaneLayout({
     >
       {showViz ? (
         <Panel
+          ref={vizPanelRef}
           id="viz"
           order={1}
           defaultSize={layout === "horizontal" ? 55 : 50}
           minSize={15}
+          collapsible
+          collapsedSize={4}
         >
           {vizPane}
         </Panel>
@@ -172,10 +205,13 @@ export function PaneLayout({
       ) : null}
       {showDetail ? (
         <Panel
+          ref={detailPanelRef}
           id="detail"
           order={2}
           defaultSize={layout === "horizontal" ? 45 : 50}
           minSize={15}
+          collapsible
+          collapsedSize={4}
         >
           {detailPane}
         </Panel>
@@ -213,10 +249,13 @@ export function PaneLayout({
         style={{ flex: 1, minHeight: 0, minWidth: 0 }}
       >
         <Panel
+          ref={ctxPanelRef}
           id="ctx"
           order={1}
           defaultSize={ctxState.collapsed ? 4 : 18}
           minSize={4}
+          collapsible
+          collapsedSize={4}
         >
           {ctxPane}
         </Panel>
