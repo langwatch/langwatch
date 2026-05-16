@@ -14,7 +14,6 @@ import {
   LuMaximize2,
   LuMinimize2,
   LuRefreshCw,
-  LuX,
 } from "react-icons/lu";
 import { Kbd } from "~/components/ops/shared/Kbd";
 import {
@@ -23,6 +22,7 @@ import {
   MenuItem,
   MenuRoot,
 } from "~/components/ui/menu";
+import { CloseButton } from "~/components/ui/close-button";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
 import { TracePresenceAvatars } from "~/features/presence/components/TracePresenceAvatars";
@@ -160,7 +160,6 @@ function TraceIdChip({ traceId }: { traceId: string }) {
   );
   return (
     <Chip
-      label="Trace ID"
       value={value}
       tone="neutral"
       onClick={() => void handleCopy()}
@@ -646,21 +645,14 @@ export const DrawerHeader = memo(function DrawerHeader({
 
   return (
     <VStack align="stretch" gap={2} paddingX={4} paddingTop={3}>
-      {/* Row 1: three-column header. Left column carries the title +
-          status, the middle column centers the Trace ID chip, the
-          right column holds the actions. Equal-flex columns keep the
-          ID centered regardless of how long the trace name gets — the
-          previous single HStack pushed the ID to the right of the
-          status chip, which made it look adrift in the middle of the
-          row depending on title length. */}
-      <Box
-        display="grid"
-        gridTemplateColumns="1fr auto 1fr"
-        alignItems="center"
-        gap={2.5}
-        minWidth={0}
-      >
-        <HStack gap={2.5} minWidth={0} flexWrap="wrap" align="center">
+      {/* Row 1: Trace ID chip + title + status on the left, actions
+          on the right. The Trace ID chip leads the row (replacing the
+          previous LLM root-span-type badge — that badge was almost
+          always "span" or "llm" and added noise instead of signal).
+          The chip itself shows only the id (no "Trace ID" label),
+          with hover-to-expand + click-to-copy. */}
+      <HStack justify="space-between" align="center" gap={2.5} minWidth={0}>
+        <HStack gap={2.5} minWidth={0} flex={1} flexWrap="wrap" align="center">
           {canGoBack && (
             <MenuRoot>
               <Tooltip
@@ -726,26 +718,7 @@ export const DrawerHeader = memo(function DrawerHeader({
               </MenuContent>
             </MenuRoot>
           )}
-          {trace.rootSpanType && (
-            <Text
-              textStyle="2xs"
-              fontWeight="semibold"
-              color={
-                (SPAN_TYPE_COLORS[trace.rootSpanType] as string) ?? "gray.solid"
-              }
-              paddingX={1.5}
-              paddingY={0.5}
-              borderRadius="sm"
-              borderWidth="1px"
-              borderColor={
-                (SPAN_TYPE_COLORS[trace.rootSpanType] as string) ?? "gray.solid"
-              }
-              letterSpacing="0.04em"
-              flexShrink={0}
-            >
-              {trace.rootSpanType.toUpperCase()}
-            </Text>
-          )}
+          <TraceIdChip traceId={trace.traceId} />
           <EditableTraceName
             traceId={trace.traceId}
             titleText={titleText}
@@ -770,16 +743,7 @@ export const DrawerHeader = memo(function DrawerHeader({
           )}
         </HStack>
 
-        {/* Center column — anchors the Trace ID chip in the middle of
-            the header regardless of how wide the title or action
-            clusters are. `justify-self: center` works with the
-            `auto`-sized middle column so the chip is laid out around
-            its own width rather than stretching across the column. */}
-        <Box justifySelf="center">
-          <TraceIdChip traceId={trace.traceId} />
-        </Box>
-
-        <HStack gap={1} flexShrink={0} justifySelf="end">
+        <HStack gap={1} flexShrink={0}>
           <Tooltip
             content={
               <HStack gap={1}>
@@ -861,30 +825,15 @@ export const DrawerHeader = memo(function DrawerHeader({
             }
             positioning={{ placement: "bottom" }}
           >
-            {/* Generous inner padding so the click target is forgiving,
-                with a small gap between the button and the drawer's
-                outer chrome (`marginRight={-1}`) — the previous
-                `marginRight={-4}` had the X glued flush to the edge
-                which felt cramped. */}
-            <Button
-              size="xs"
-              variant="ghost"
-              onClick={onClose}
-              aria-label="Close drawer"
-              paddingX={2}
-              paddingY={2}
-              height="auto"
-              minWidth="auto"
-              marginRight={-1}
-              color="fg.muted"
-              _hover={{ bg: "bg.muted", color: "fg" }}
-              _active={{ bg: "bg.emphasized" }}
-            >
-              <Icon as={LuX} boxSize={5} strokeWidth={2.25} />
-            </Button>
+            {/* Standard Chakra `CloseButton` — same affordance as
+                every other drawer in the app (online evaluations,
+                add-to-dataset, …). The previous custom Button with a
+                larger LuX icon was inconsistent with the rest of the
+                product. */}
+            <CloseButton size="sm" onClick={onClose} aria-label="Close drawer" />
           </Tooltip>
         </HStack>
-      </Box>
+      </HStack>
 
       {/* Row 2: Unified context strip. Three logical sections — performance
           metrics, pinned context, source/tools chips — flow into one wrapped
