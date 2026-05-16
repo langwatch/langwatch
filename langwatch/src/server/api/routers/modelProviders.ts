@@ -8,8 +8,11 @@ import {
   type ModelRole,
 } from "../../modelProviders/featureRegistry";
 import {
-  setFeatureOverride,
-  setRoleAssignment,
+  createConfig,
+  deleteConfig,
+  setFeatureAtScope,
+  setRoleAtScope,
+  updateConfig,
 } from "../../modelProviders/modelDefaults.service";
 import { ModelProviderService } from "../../modelProviders/modelProvider.service";
 import { resolveModelForFeature } from "../../modelProviders/resolveModelForFeature";
@@ -299,18 +302,17 @@ export const modelProviderRouter = createTRPCRouter({
   /**
    * Snapshot for the Default Models settings page.
    *
-   * Shape mirrors RBAC: the top of the page renders three "current
-   * default" lines (one per role) showing the effective resolution for
-   * THIS project; everything else is a flat `assignments` list of
-   * principal-style policy rows — `{ role, featureKey?, model, scopes:
-   * [...] }` — where one logical row can mix organization / team /
-   * project scopes that share the same model.
+   * Shape mirrors RBAC: three effective default models for THIS
+   * project at the top (the resolver's "what would I actually use
+   * here" answer), then a flat list of `ModelDefaultConfig` rows —
+   * each carrying its CSS-cascade JSON payload + the scopes it
+   * attaches to. The UI groups, filters, or pivots this list itself
+   * (per-scope drilldown is a client-side filter, not a separate
+   * server call).
    *
-   * Storage stays one ModelDefault row per scope (so the resolver walk
-   * is unchanged). The server groups rows by (role, featureKey, model)
-   * before returning so the UI can render multi-scope assignments as
-   * one chip-picker row. `available` carries the picker options the
-   * caller is allowed to write to (RBAC-filtered).
+   * `available` carries the scopes the caller can write to (RBAC-
+   * filtered) so the drawer's chip picker can be the source of truth
+   * without a redundant authz check.
    */
   getDefaultModelsForProject: protectedProcedure
     .input(z.object({ projectId: z.string() }))
@@ -438,11 +440,11 @@ export const modelProviderRouter = createTRPCRouter({
         projects: writableProjects,
       };
 
-      // All ModelDefault rows in scope for this org/project. We fetch
-      // by scope IDs the caller's view can see (the org's teams and
-      // projects, plus the org itself) so the overrides list shows
-      // every assignment that affects this org — readability isn't
-      // RBAC-gated even when writability is.
+      // All configs visible from this project's vantage point: any
+      // config attached at THIS org / one of its teams / one of its
+      // projects. Read-visibility is broader than write-permission —
+      // the user can see the whole policy landscape that affects
+      // them, even if they can only edit their own scopes.
       const allTeamIds = organizationId
         ? (
             await ctx.prisma.team.findMany({
@@ -462,44 +464,63 @@ export const modelProviderRouter = createTRPCRouter({
           ).map((p) => p.id)
         : [projectId];
 
-      const visibleRows = await ctx.prisma.modelDefault.findMany({
-        where: {
-          OR: [
-            organizationId
-              ? { scopeType: "ORGANIZATION", scopeId: organizationId }
-              : null,
-            allTeamIds.length > 0
-              ? { scopeType: "TEAM", scopeId: { in: allTeamIds } }
-              : null,
-            allProjectIds.length > 0
-              ? { scopeType: "PROJECT", scopeId: { in: allProjectIds } }
-              : null,
-          ].filter(Boolean) as any[],
-        },
-        select: {
-          id: true,
-          scopeType: true,
-          scopeId: true,
-          role: true,
-          featureKey: true,
-          model: true,
-        },
-      });
+      const visibleScopeFilter = [
+        organizationId
+          ? { scopeType: "ORGANIZATION" as const, scopeId: organizationId }
+          : null,
+        allTeamIds.length > 0
+          ? { scopeType: "TEAM" as const, scopeId: { in: allTeamIds } }
+          : null,
+        allProjectIds.length > 0
+          ? { scopeType: "PROJECT" as const, scopeId: { in: allProjectIds } }
+          : null,
+      ].filter(Boolean) as Array<{
+        scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+        scopeId: string | { in: string[] };
+      }>;
 
-      // Resolve names so the UI can render chips without an extra round
-      // trip. Pull only the IDs we actually saw rows for.
+      const configRows =
+        visibleScopeFilter.length > 0
+          ? await ctx.prisma.modelDefaultConfig.findMany({
+              where: {
+                scopes: { some: { OR: visibleScopeFilter } },
+              },
+              select: {
+                id: true,
+                config: true,
+                createdAt: true,
+                updatedAt: true,
+                authorId: true,
+                scopes: {
+                  select: {
+                    id: true,
+                    scopeType: true,
+                    scopeId: true,
+                  },
+                },
+              },
+              orderBy: { createdAt: "desc" },
+            })
+          : [];
+
+      // Resolve scope names so the UI can render chips without an
+      // extra round trip. Pull only the ids we actually saw.
       const seenTeamIds = Array.from(
         new Set(
-          visibleRows
-            .filter((r) => r.scopeType === "TEAM")
-            .map((r) => r.scopeId),
+          configRows.flatMap((c) =>
+            c.scopes
+              .filter((s) => s.scopeType === "TEAM")
+              .map((s) => s.scopeId),
+          ),
         ),
       );
       const seenProjectIds = Array.from(
         new Set(
-          visibleRows
-            .filter((r) => r.scopeType === "PROJECT")
-            .map((r) => r.scopeId),
+          configRows.flatMap((c) =>
+            c.scopes
+              .filter((s) => s.scopeType === "PROJECT")
+              .map((s) => s.scopeId),
+          ),
         ),
       );
       const [seenTeams, seenProjects] = await Promise.all([
@@ -530,67 +551,28 @@ export const modelProviderRouter = createTRPCRouter({
         return projectNameById.get(scopeId) ?? scopeId;
       };
 
-      // Group by (role, featureKey ?? "", model). One group = one logical
-      // assignment shown as a single row in the UI.
-      type AssignmentScope = {
-        type: "ORGANIZATION" | "TEAM" | "PROJECT";
-        id: string;
-        name: string;
-      };
-      type Assignment = {
-        id: string;
-        role: ModelRole;
-        featureKey: string | null;
-        model: string;
-        scopes: AssignmentScope[];
-      };
-      const groups = new Map<string, Assignment>();
-      for (const row of visibleRows) {
-        const role = row.role as ModelRole;
-        const featureKey = row.featureKey;
-        const key = `${role}::${featureKey ?? ""}::${row.model}`;
-        const scope: AssignmentScope = {
-          type: row.scopeType as AssignmentScope["type"],
-          id: row.scopeId,
-          name: scopeName(
-            row.scopeType as AssignmentScope["type"],
-            row.scopeId,
-          ),
-        };
-        const existing = groups.get(key);
-        if (existing) {
-          existing.scopes.push(scope);
-        } else {
-          groups.set(key, {
-            id: key,
-            role,
-            featureKey,
-            model: row.model,
-            scopes: [scope],
-          });
-        }
-      }
-      // Stable order: role-level assignments first (featureKey null), then
-      // per-feature, both sorted by model name for diff-friendly output.
-      const assignments = Array.from(groups.values()).sort((a, b) => {
-        if (a.role !== b.role)
-          return MODEL_ROLES.indexOf(a.role) - MODEL_ROLES.indexOf(b.role);
-        const af = a.featureKey ?? "";
-        const bf = b.featureKey ?? "";
-        if (af !== bf) return af.localeCompare(bf);
-        return a.model.localeCompare(b.model);
-      });
-
-      // Sort scopes within each assignment so the chip render order is
-      // stable across reloads (Organization → Teams → Projects, each
-      // alphabetical).
+      // Sort scopes within each config (Organization → Teams →
+      // Projects, each alphabetical) so chip render order is stable
+      // across reloads.
       const scopeRank = { ORGANIZATION: 0, TEAM: 1, PROJECT: 2 } as const;
-      for (const a of assignments) {
-        a.scopes.sort((x, y) => {
-          if (x.type !== y.type) return scopeRank[x.type] - scopeRank[y.type];
-          return x.name.localeCompare(y.name);
-        });
-      }
+      const configs = configRows.map((c) => ({
+        id: c.id,
+        config: c.config as Record<string, string>,
+        createdAt: c.createdAt,
+        updatedAt: c.updatedAt,
+        authorId: c.authorId,
+        scopes: c.scopes
+          .map((s) => ({
+            type: s.scopeType,
+            id: s.scopeId,
+            name: scopeName(s.scopeType, s.scopeId),
+          }))
+          .sort((x, y) => {
+            if (x.type !== y.type)
+              return scopeRank[x.type] - scopeRank[y.type];
+            return x.name.localeCompare(y.name);
+          }),
+      }));
 
       const featureProjection = features.map((f) => ({
         key: f.key,
@@ -605,18 +587,22 @@ export const modelProviderRouter = createTRPCRouter({
         organizationId,
         organizationName,
         effective,
-        assignments,
+        configs,
         available,
         features: featureProjection,
       };
     }),
 
   /**
-   * Set or clear the role-level default model at a scope. Clearing
-   * (model=null) deletes the `ModelDefault` row and lets the resolver fall
-   * back to the next scope up; setting writes to the new table only —
-   * never to the legacy Organization/Team/Project scalar columns.
-   * Scope-aware authz lives in the inline middleware below.
+   * Single-key writers used by the provider-create "Set as default"
+   * flow and any tactical "change just this role at this scope" UI.
+   * Both go through modelDefaults.service which finds the (newest)
+   * config attached at the scope and updates the matching key in
+   * place, or creates a new config if none exists.
+   *
+   * Scope-aware authz: org needs organization:manage, team needs
+   * team:manage, project needs project:update — same map the
+   * provider update mutation uses.
    */
   setRoleAssignmentForScope: protectedProcedure
     .input(
@@ -629,7 +615,7 @@ export const modelProviderRouter = createTRPCRouter({
     )
     .use(scopeAwarePermissionMiddleware)
     .mutation(async ({ input, ctx }) => {
-      await setRoleAssignment(
+      await setRoleAtScope(
         { prisma: ctx.prisma },
         {
           scopeType: input.scopeType,
@@ -642,11 +628,6 @@ export const modelProviderRouter = createTRPCRouter({
       return { ok: true };
     }),
 
-  /**
-   * Set or clear a per-feature override at a scope. The feature key must
-   * exist in the registry — its role is read from the registry so the row
-   * carries the right role tag for the resolver's walk.
-   */
   setFeatureOverrideForScope: protectedProcedure
     .input(
       z.object({
@@ -661,7 +642,7 @@ export const modelProviderRouter = createTRPCRouter({
       if (!featureByKey(input.featureKey)) {
         throw new Error(`Unknown feature key: "${input.featureKey}".`);
       }
-      await setFeatureOverride(
+      await setFeatureAtScope(
         { prisma: ctx.prisma },
         {
           scopeType: input.scopeType,
@@ -671,6 +652,71 @@ export const modelProviderRouter = createTRPCRouter({
           authorId: ctx.session?.user?.id ?? null,
         },
       );
+      return { ok: true };
+    }),
+
+  /**
+   * Full-config writer: save (create or update) a whole policy
+   * including its scope attachments. The drawer's "Save" button
+   * funnels through here.
+   *
+   * - `id` omitted → create a new config.
+   * - `id` provided → update that config's JSON + scope attachments.
+   *
+   * Scope-aware authz: the caller must hold the matching manage
+   * permission on every scope they are attaching to OR removing from,
+   * so a project admin can't silently push a default up to org level.
+   */
+  saveDefaultModelsConfig: protectedProcedure
+    .input(
+      z.object({
+        id: z.string().optional(),
+        config: z.record(z.string()),
+        scopes: z
+          .array(
+            z.object({
+              scopeType: z.enum(["ORGANIZATION", "TEAM", "PROJECT"]),
+              scopeId: z.string().min(1),
+            }),
+          )
+          .min(1, "Pick at least one scope."),
+      }),
+    )
+    .use(saveConfigPermissionMiddleware)
+    .mutation(async ({ input, ctx }) => {
+      if (input.id) {
+        await updateConfig(
+          { prisma: ctx.prisma },
+          {
+            id: input.id,
+            config: input.config,
+            scopes: input.scopes,
+            authorId: ctx.session?.user?.id ?? null,
+          },
+        );
+        return { id: input.id };
+      }
+      const created = await createConfig(
+        { prisma: ctx.prisma },
+        {
+          config: input.config,
+          scopes: input.scopes,
+          authorId: ctx.session?.user?.id ?? null,
+        },
+      );
+      return { id: created.id };
+    }),
+
+  /**
+   * Delete a config (and all its scope attachments cascade). The
+   * caller must hold the matching manage permission on every scope
+   * the config is currently attached to.
+   */
+  deleteDefaultModelsConfig: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .use(deleteConfigPermissionMiddleware)
+    .mutation(async ({ input, ctx }) => {
+      await deleteConfig({ prisma: ctx.prisma }, input.id);
       return { ok: true };
     }),
 });
@@ -691,6 +737,85 @@ async function scopeAwarePermissionMiddleware({
   next: () => Promise<unknown>;
 }): Promise<unknown> {
   await assertCanWriteScope(ctx, input.scopeType, input.scopeId);
+  ctx.permissionChecked = true;
+  return next();
+}
+
+/**
+ * Permission middleware for saveDefaultModelsConfig. Iterates every
+ * scope in the desired attachment set + every scope being removed (on
+ * an update) and asserts the caller can write each one. Setting
+ * `ctx.permissionChecked = true` is required by the permission-builder
+ * contract — without it `enforcePermissionCheck` throws.
+ */
+async function saveConfigPermissionMiddleware({
+  ctx,
+  input,
+  next,
+}: {
+  ctx: any;
+  input: {
+    id?: string;
+    scopes: Array<{
+      scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+      scopeId: string;
+    }>;
+  };
+  next: () => Promise<unknown>;
+}): Promise<unknown> {
+  for (const s of input.scopes) {
+    await assertCanWriteScope(ctx, s.scopeType, s.scopeId);
+  }
+  if (input.id) {
+    const existing = await ctx.prisma.modelDefaultConfigScope.findMany({
+      where: { configId: input.id },
+      select: { scopeType: true, scopeId: true },
+    });
+    const desired = new Set(
+      input.scopes.map((s) => `${s.scopeType}::${s.scopeId}`),
+    );
+    const removed = existing.filter(
+      (e: { scopeType: string; scopeId: string }) =>
+        !desired.has(`${e.scopeType}::${e.scopeId}`),
+    );
+    for (const r of removed) {
+      await assertCanWriteScope(
+        ctx,
+        r.scopeType as "ORGANIZATION" | "TEAM" | "PROJECT",
+        r.scopeId,
+      );
+    }
+  }
+  ctx.permissionChecked = true;
+  return next();
+}
+
+/**
+ * Permission middleware for deleteDefaultModelsConfig. Reads the
+ * config's current scope attachments and asserts the caller can write
+ * each one — deleting a config the caller can't fully manage would
+ * remove rules at scopes they don't own.
+ */
+async function deleteConfigPermissionMiddleware({
+  ctx,
+  input,
+  next,
+}: {
+  ctx: any;
+  input: { id: string };
+  next: () => Promise<unknown>;
+}): Promise<unknown> {
+  const scopes = await ctx.prisma.modelDefaultConfigScope.findMany({
+    where: { configId: input.id },
+    select: { scopeType: true, scopeId: true },
+  });
+  for (const s of scopes) {
+    await assertCanWriteScope(
+      ctx,
+      s.scopeType as "ORGANIZATION" | "TEAM" | "PROJECT",
+      s.scopeId,
+    );
+  }
   ctx.permissionChecked = true;
   return next();
 }

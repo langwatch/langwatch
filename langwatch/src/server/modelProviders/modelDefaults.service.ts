@@ -1,106 +1,300 @@
-import type { PrismaClient } from "@prisma/client";
+import type { ModelDefaultScopeType, PrismaClient } from "@prisma/client";
 
-import type { ModelRole } from "./featureRegistry";
-import { featureByKey } from "./featureRegistry";
+import {
+  allFeatures,
+  featureByKey,
+  MODEL_ROLES,
+  type ModelRole,
+} from "./featureRegistry";
 
 interface Ctx {
   prisma: PrismaClient;
 }
 
-export type ScopeType = "ORGANIZATION" | "TEAM" | "PROJECT";
+export type ScopeAttachment = {
+  scopeType: ModelDefaultScopeType;
+  scopeId: string;
+};
 
 /**
- * Sets (or clears) the role-level default model at a scope. Writes to
- * `ModelDefault` only — never the legacy B2 scalar columns on
- * Organization / Team / Project, so the legacy fields drain to read-only
- * over time and the resolver always sees the freshest source of truth.
- *
- * Passing `model === null` clears the row (used when the UI removes a
- * scope override line).
+ * Allowed keys in a ModelDefaultConfig JSON: role names + every
+ * feature key registered today. Anything else is silently dropped at
+ * the write boundary so a typo can't leak into storage.
  */
-export async function setRoleAssignment(
+function validKeySet(): Set<string> {
+  const keys = new Set<string>();
+  for (const role of MODEL_ROLES) keys.add(role as ModelRole);
+  for (const f of allFeatures()) keys.add(f.key);
+  return keys;
+}
+
+function sanitizeConfig(raw: Record<string, unknown>): Record<string, string> {
+  const valid = validKeySet();
+  const clean: Record<string, string> = {};
+  for (const [key, value] of Object.entries(raw)) {
+    if (!valid.has(key)) continue;
+    if (typeof value !== "string") continue;
+    if (value.length === 0) continue;
+    clean[key] = value;
+  }
+  return clean;
+}
+
+/**
+ * Create a new ModelDefaultConfig with its scope attachments. Empty
+ * configs (no valid keys) are rejected — a config is meaningless
+ * without at least one model assignment.
+ */
+export async function createConfig(
   ctx: Ctx,
   params: {
-    scopeType: ScopeType;
+    config: Record<string, unknown>;
+    scopes: ScopeAttachment[];
+    authorId?: string | null;
+  },
+): Promise<{ id: string }> {
+  const config = sanitizeConfig(params.config);
+  if (Object.keys(config).length === 0) {
+    throw new Error("ModelDefaultConfig must carry at least one role or feature key.");
+  }
+  if (params.scopes.length === 0) {
+    throw new Error("ModelDefaultConfig must attach to at least one scope.");
+  }
+  // Deduplicate scope attachments before insert so a caller passing
+  // the same (type,id) twice doesn't trip the unique index.
+  const seen = new Set<string>();
+  const scopes: ScopeAttachment[] = [];
+  for (const s of params.scopes) {
+    const key = `${s.scopeType}::${s.scopeId}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    scopes.push(s);
+  }
+
+  const created = await ctx.prisma.modelDefaultConfig.create({
+    data: {
+      config,
+      authorId: params.authorId ?? null,
+      scopes: { create: scopes.map((s) => ({ scopeType: s.scopeType, scopeId: s.scopeId })) },
+    },
+    select: { id: true },
+  });
+  return { id: created.id };
+}
+
+/**
+ * Update a config's JSON payload and/or its scope attachments. The
+ * config's `createdAt` is intentionally left alone — that's the
+ * resolver's tiebreak for same-scope ordering, so promoting an old
+ * config to "newest" via an unrelated edit would silently change
+ * resolution.
+ */
+export async function updateConfig(
+  ctx: Ctx,
+  params: {
+    id: string;
+    config?: Record<string, unknown>;
+    scopes?: ScopeAttachment[];
+    authorId?: string | null;
+  },
+): Promise<void> {
+  const data: { config?: Record<string, string>; authorId?: string | null } = {};
+  if (params.config !== undefined) {
+    const clean = sanitizeConfig(params.config);
+    if (Object.keys(clean).length === 0) {
+      // Empty config = pure inherit at every key. We treat that as a
+      // delete because an attached-but-empty config has no effect on
+      // resolution but still occupies the same-scope tiebreak slot
+      // (newest empty would mask older non-empty at the same scope).
+      await deleteConfig(ctx, params.id);
+      return;
+    }
+    data.config = clean;
+  }
+  if (params.authorId !== undefined) data.authorId = params.authorId;
+
+  if (params.scopes !== undefined) {
+    // Replace-all semantics for scope attachments: empty array → delete
+    // the config (an unattached config can never be hit by the
+    // resolver). Otherwise compute the add/remove diff against the
+    // current set.
+    if (params.scopes.length === 0) {
+      await deleteConfig(ctx, params.id);
+      return;
+    }
+    const desired = new Map<string, ScopeAttachment>();
+    for (const s of params.scopes) {
+      desired.set(`${s.scopeType}::${s.scopeId}`, s);
+    }
+    const current = await ctx.prisma.modelDefaultConfigScope.findMany({
+      where: { configId: params.id },
+      select: { id: true, scopeType: true, scopeId: true },
+    });
+    const currentByKey = new Map(
+      current.map((c) => [`${c.scopeType}::${c.scopeId}`, c]),
+    );
+    const toAdd = [...desired.values()].filter(
+      (s) => !currentByKey.has(`${s.scopeType}::${s.scopeId}`),
+    );
+    const toRemove = current.filter(
+      (c) => !desired.has(`${c.scopeType}::${c.scopeId}`),
+    );
+
+    await ctx.prisma.$transaction([
+      ctx.prisma.modelDefaultConfig.update({
+        where: { id: params.id },
+        data,
+      }),
+      ...(toAdd.length > 0
+        ? [
+            ctx.prisma.modelDefaultConfigScope.createMany({
+              data: toAdd.map((s) => ({
+                configId: params.id,
+                scopeType: s.scopeType,
+                scopeId: s.scopeId,
+              })),
+            }),
+          ]
+        : []),
+      ...(toRemove.length > 0
+        ? [
+            ctx.prisma.modelDefaultConfigScope.deleteMany({
+              where: { id: { in: toRemove.map((c) => c.id) } },
+            }),
+          ]
+        : []),
+    ]);
+    return;
+  }
+
+  // No scope changes — just bump the JSON / authorId.
+  await ctx.prisma.modelDefaultConfig.update({
+    where: { id: params.id },
+    data,
+  });
+}
+
+/**
+ * Delete a config. Scope attachments cascade via the FK.
+ */
+export async function deleteConfig(
+  ctx: Ctx,
+  configId: string,
+): Promise<void> {
+  await ctx.prisma.modelDefaultConfig.delete({ where: { id: configId } });
+}
+
+/**
+ * Convenience helper used by the create-provider seed + the
+ * "set as default" flow on the provider form. Sets one role's value
+ * inside the (only) config attached at the given scope, creating that
+ * config if none exists. The caller is responsible for scope-level
+ * RBAC; this function does not check permissions.
+ */
+export async function setRoleAtScope(
+  ctx: Ctx,
+  params: {
+    scopeType: ModelDefaultScopeType;
     scopeId: string;
     role: ModelRole;
     model: string | null;
     authorId?: string | null;
   },
 ): Promise<void> {
-  const { scopeType, scopeId, role, model, authorId } = params;
-  if (model === null) {
-    await ctx.prisma.modelDefault.deleteMany({
-      where: { scopeType, scopeId, role, featureKey: null },
-    });
-    return;
+  const valid = validKeySet();
+  if (!valid.has(params.role)) {
+    throw new Error(`Unknown role: "${params.role}".`);
   }
-  const existing = await ctx.prisma.modelDefault.findFirst({
-    where: { scopeType, scopeId, role, featureKey: null },
+
+  // Pick the config to mutate: if multiple are attached at this
+  // exact scope, take the newest (matches the resolver's same-scope
+  // tiebreak so the user's edit affects the row they actually see).
+  const attached = await ctx.prisma.modelDefaultConfigScope.findMany({
+    where: { scopeType: params.scopeType, scopeId: params.scopeId },
+    select: { config: { select: { id: true, config: true, createdAt: true } } },
   });
-  if (existing) {
-    await ctx.prisma.modelDefault.update({
-      where: { id: existing.id },
-      data: { model, authorId: authorId ?? null },
-    });
+  attached.sort(
+    (a, b) =>
+      (b.config.createdAt?.getTime() ?? 0) -
+      (a.config.createdAt?.getTime() ?? 0),
+  );
+  const target = attached[0]?.config;
+
+  if (params.model === null) {
+    // Clearing a key the active config doesn't have is a no-op.
+    if (!target) return;
+    const next = { ...((target.config ?? {}) as Record<string, unknown>) };
+    delete next[params.role];
+    await updateConfig(ctx, { id: target.id, config: next, authorId: params.authorId });
     return;
   }
-  await ctx.prisma.modelDefault.create({
-    data: {
-      scopeType,
-      scopeId,
-      role,
-      featureKey: null,
-      model,
-      authorId: authorId ?? null,
-    },
+
+  if (target) {
+    const next = {
+      ...((target.config ?? {}) as Record<string, unknown>),
+      [params.role]: params.model,
+    };
+    await updateConfig(ctx, { id: target.id, config: next, authorId: params.authorId });
+    return;
+  }
+
+  // No config attached at this scope — create one with just this role.
+  await createConfig(ctx, {
+    config: { [params.role]: params.model },
+    scopes: [{ scopeType: params.scopeType, scopeId: params.scopeId }],
+    authorId: params.authorId ?? null,
   });
 }
 
 /**
- * Sets (or clears) a per-feature override at a scope. The feature must
- * exist in the registry; its role determines which `ModelDefault.role`
- * the row carries.
+ * Same as setRoleAtScope but for a feature key (registry-validated).
+ * Used by the per-feature override row in the drawer.
  */
-export async function setFeatureOverride(
+export async function setFeatureAtScope(
   ctx: Ctx,
   params: {
-    scopeType: ScopeType;
+    scopeType: ModelDefaultScopeType;
     scopeId: string;
     featureKey: string;
     model: string | null;
     authorId?: string | null;
   },
 ): Promise<void> {
-  const { scopeType, scopeId, featureKey, model, authorId } = params;
-  const feature = featureByKey(featureKey);
-  if (!feature) {
-    throw new Error(`Unknown feature key: "${featureKey}".`);
+  if (!featureByKey(params.featureKey)) {
+    throw new Error(`Unknown feature key: "${params.featureKey}".`);
   }
-  if (model === null) {
-    await ctx.prisma.modelDefault.deleteMany({
-      where: { scopeType, scopeId, role: feature.role, featureKey },
-    });
-    return;
-  }
-  const existing = await ctx.prisma.modelDefault.findFirst({
-    where: { scopeType, scopeId, role: feature.role, featureKey },
+
+  const attached = await ctx.prisma.modelDefaultConfigScope.findMany({
+    where: { scopeType: params.scopeType, scopeId: params.scopeId },
+    select: { config: { select: { id: true, config: true, createdAt: true } } },
   });
-  if (existing) {
-    await ctx.prisma.modelDefault.update({
-      where: { id: existing.id },
-      data: { model, authorId: authorId ?? null },
-    });
+  attached.sort(
+    (a, b) =>
+      (b.config.createdAt?.getTime() ?? 0) -
+      (a.config.createdAt?.getTime() ?? 0),
+  );
+  const target = attached[0]?.config;
+
+  if (params.model === null) {
+    if (!target) return;
+    const next = { ...((target.config ?? {}) as Record<string, unknown>) };
+    delete next[params.featureKey];
+    await updateConfig(ctx, { id: target.id, config: next, authorId: params.authorId });
     return;
   }
-  await ctx.prisma.modelDefault.create({
-    data: {
-      scopeType,
-      scopeId,
-      role: feature.role,
-      featureKey,
-      model,
-      authorId: authorId ?? null,
-    },
+
+  if (target) {
+    const next = {
+      ...((target.config ?? {}) as Record<string, unknown>),
+      [params.featureKey]: params.model,
+    };
+    await updateConfig(ctx, { id: target.id, config: next, authorId: params.authorId });
+    return;
+  }
+
+  await createConfig(ctx, {
+    config: { [params.featureKey]: params.model },
+    scopes: [{ scopeType: params.scopeType, scopeId: params.scopeId }],
+    authorId: params.authorId ?? null,
   });
 }

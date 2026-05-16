@@ -117,15 +117,18 @@ const EXEMPT_MODELS = [
    */
   "FeatureFlag",
   /**
-   * ModelDefault holds the (scopeType, scopeId, role, featureKey?) →
-   * model assignments that back the role-based default models resolver
-   * (B3). Same principal-style scope shape as ModelProvider: a row can
-   * live at organization, team, or project scope. The resolver walks
-   * the scope chain after first deriving the project's teamId + orgId
-   * via `project.findUnique`, so the tenancy boundary is enforced one
-   * level above this middleware.
+   * ModelDefaultConfig holds a JSON config payload (CSS-style cascade)
+   * attached to N scopes via ModelDefaultConfigScope. The resolver
+   * walks the scope chain after first deriving the project's teamId +
+   * orgId via `project.findUnique`, so the tenancy boundary is enforced
+   * one level above this middleware. Same principal-style scope shape
+   * pattern as ModelProvider + ModelProviderScope; ModelDefaultConfig
+   * is the parent row (no projectId column — access flows through the
+   * scope join) and ModelDefaultConfigScope is the n:n join (also no
+   * projectId column).
    */
-  "ModelDefault",
+  "ModelDefaultConfig",
+  "ModelDefaultConfigScope",
 ];
 
 const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {

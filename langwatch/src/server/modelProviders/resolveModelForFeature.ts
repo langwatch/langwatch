@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
+import type { ModelDefaultScopeType, PrismaClient } from "@prisma/client";
 
 import {
   DEFAULT_EMBEDDINGS_MODEL,
@@ -31,9 +31,7 @@ interface Ctx {
 /**
  * Built-in constants for each role. Used as the last fallback before the
  * resolver throws `ModelNotConfiguredError`. Keeping them centralised
- * makes it obvious where the safety net lives, and the eventual A11y of
- * the auto-latest-flagship value (PR #4068) flows through `DEFAULT_MODEL`
- * once that lands on main.
+ * makes it obvious where the safety net lives.
  */
 const ROLE_CONSTANT: Record<ModelRole, string | null> = {
   DEFAULT: DEFAULT_MODEL,
@@ -114,115 +112,164 @@ async function loadScopeChain(
   };
 }
 
-interface ModelDefaultRow {
-  scopeType: string;
-  scopeId: string;
-  role: string;
-  featureKey: string | null;
-  model: string;
+/**
+ * One config row + its attachments at scopes inside this resolution's
+ * scope chain. The resolver walks tier-by-tier (PROJECT → TEAM → ORG)
+ * and within each tier picks the newest config that has the key.
+ */
+export interface ConfigForChain {
+  id: string;
+  config: Record<string, unknown>;
+  createdAt: Date;
+  /** Subset of the config's scope attachments that intersect this chain. */
+  scopeTiersHere: Array<{
+    scopeType: ModelDefaultScopeType;
+    scopeId: string;
+  }>;
 }
 
-async function loadDefaultsForChain(
+async function loadConfigsForChain(
   prisma: PrismaClient,
   chain: ScopeChain,
-  role: ModelRole,
-  featureKey: string,
-): Promise<ModelDefaultRow[]> {
-  const scopes: { scopeType: "PROJECT" | "TEAM" | "ORGANIZATION"; scopeId: string }[] = [
-    { scopeType: "PROJECT", scopeId: chain.projectId },
-  ];
+): Promise<ConfigForChain[]> {
+  const orFilters: Array<{
+    scopeType: ModelDefaultScopeType;
+    scopeId: string;
+  }> = [{ scopeType: "PROJECT", scopeId: chain.projectId }];
   if (chain.teamId) {
-    scopes.push({ scopeType: "TEAM", scopeId: chain.teamId });
+    orFilters.push({ scopeType: "TEAM", scopeId: chain.teamId });
   }
   if (chain.organizationId) {
-    scopes.push({ scopeType: "ORGANIZATION", scopeId: chain.organizationId });
+    orFilters.push({
+      scopeType: "ORGANIZATION",
+      scopeId: chain.organizationId,
+    });
   }
 
-  // One query, both role-level and feature-override rows for the chain.
-  return await prisma.modelDefault.findMany({
+  // Pull every config that has at least one scope attachment in our
+  // chain, plus all of that config's attachments so we know which tier
+  // the row applies at. Returning the full attachment set lets one
+  // multi-scope config win at the most-specific scope it's attached
+  // to (so an org+team config still beats a project-only config when
+  // resolving for a project not in the chain, but at the project tier
+  // the project-only config wins because TIER beats tier-ordering).
+  const rows = await prisma.modelDefaultConfig.findMany({
     where: {
-      role,
-      OR: scopes,
-      AND: [{ OR: [{ featureKey: null }, { featureKey }] }],
+      scopes: { some: { OR: orFilters } },
     },
     select: {
-      scopeType: true,
-      scopeId: true,
-      role: true,
-      featureKey: true,
-      model: true,
+      id: true,
+      config: true,
+      createdAt: true,
+      scopes: {
+        select: {
+          scopeType: true,
+          scopeId: true,
+        },
+      },
     },
   });
+
+  return rows.map((r) => ({
+    id: r.id,
+    config: (r.config ?? {}) as Record<string, unknown>,
+    createdAt: r.createdAt,
+    scopeTiersHere: r.scopes.filter((s) =>
+      orFilters.some(
+        (f) => f.scopeType === s.scopeType && f.scopeId === s.scopeId,
+      ),
+    ),
+  }));
 }
 
-function pickRow(
-  rows: ModelDefaultRow[],
-  predicate: (r: ModelDefaultRow) => boolean,
-): ModelDefaultRow | undefined {
-  return rows.find(predicate);
-}
-
-function scopeOrder(): ("PROJECT" | "TEAM" | "ORGANIZATION")[] {
-  return ["PROJECT", "TEAM", "ORGANIZATION"];
-}
-
-function scopeIdForType(
+function tierForConfig(
+  config: ConfigForChain,
   chain: ScopeChain,
-  scopeType: "PROJECT" | "TEAM" | "ORGANIZATION",
-): string | null {
-  if (scopeType === "PROJECT") return chain.projectId;
-  if (scopeType === "TEAM") return chain.teamId;
-  return chain.organizationId;
+): "project" | "team" | "organization" | null {
+  // CSS-cascade: most-specific tier wins. If a single config attaches
+  // at multiple tiers in our chain (rare but legal — e.g. org + a
+  // specific project), prefer the most specific one when picking the
+  // "scope" attribute we surface back to callers.
+  const types = new Set(config.scopeTiersHere.map((s) => s.scopeType));
+  if (types.has("PROJECT") && config.scopeTiersHere.some(
+    (s) => s.scopeType === "PROJECT" && s.scopeId === chain.projectId,
+  )) {
+    return "project";
+  }
+  if (types.has("TEAM") && config.scopeTiersHere.some(
+    (s) => s.scopeType === "TEAM" && s.scopeId === chain.teamId,
+  )) {
+    return "team";
+  }
+  if (types.has("ORGANIZATION")) {
+    return "organization";
+  }
+  return null;
 }
+
+function readKey(
+  config: Record<string, unknown>,
+  key: string,
+): string | null {
+  const v = config[key];
+  return typeof v === "string" && v.length > 0 ? v : null;
+}
+
+const TIER_ORDER: Array<"project" | "team" | "organization"> = [
+  "project",
+  "team",
+  "organization",
+];
 
 function legacyColumnFor(
   chain: ScopeChain,
   role: ModelRole,
-  scopeType: "PROJECT" | "TEAM" | "ORGANIZATION",
+  tier: "project" | "team" | "organization",
   featureKey: string,
 ): string | null {
-  // Map a B2 scalar column to the (role, featureKey) it corresponds to.
-  // Only the columns whose semantic role matches this feature/role pair
-  // contribute to the fallback. Everything else returns null so we don't
-  // surface, say, a topicClusteringModel value when resolving AI search.
+  // Map a B2 scalar column to the (role, featureKey) it corresponds
+  // to. Only the columns whose semantic role matches this feature/role
+  // pair contribute to the fallback — we never surface a
+  // topicClusteringModel value when resolving AI search, for example.
   if (role === "DEFAULT") {
-    if (scopeType === "PROJECT") return chain.projectDefaultModel;
-    if (scopeType === "TEAM") return chain.teamDefaultModel;
+    if (tier === "project") return chain.projectDefaultModel;
+    if (tier === "team") return chain.teamDefaultModel;
     return chain.organizationDefaultModel;
   }
   if (role === "EMBEDDINGS") {
-    if (scopeType === "PROJECT") return chain.projectEmbeddingsModel;
-    if (scopeType === "TEAM") return chain.teamEmbeddingsModel;
+    if (tier === "project") return chain.projectEmbeddingsModel;
+    if (tier === "team") return chain.teamEmbeddingsModel;
     return chain.organizationEmbeddingsModel;
   }
-  // FAST: the only legacy column we map is topic clustering, and only for
-  // the topic-clustering LLM feature itself. AI search, autocomplete, etc.
-  // never had a dedicated scalar column, so they have nothing to inherit.
-  if (
-    role === "FAST" &&
-    featureKey === "analytics.topic_clustering_llm"
-  ) {
-    if (scopeType === "PROJECT") return chain.projectTopicClusteringModel;
-    if (scopeType === "TEAM") return chain.teamTopicClusteringModel;
+  // FAST: the only legacy column we map is topic clustering, and only
+  // for the topic-clustering LLM feature itself. AI search, autocomplete,
+  // etc. never had a dedicated scalar column, so they inherit nothing
+  // from the legacy compat layer.
+  if (role === "FAST" && featureKey === "analytics.topic_clustering_llm") {
+    if (tier === "project") return chain.projectTopicClusteringModel;
+    if (tier === "team") return chain.teamTopicClusteringModel;
     return chain.organizationTopicClusteringModel;
   }
   return null;
 }
 
 /**
- * Walk the scope chain + role + per-feature override storage to return
- * the model a feature should use. See
- * specs/model-providers/model-resolver-and-registry.feature for the full
- * contract.
+ * Walk the scope chain + config attachments to return the model a
+ * feature should use. See
+ * specs/model-providers/model-default-config-cascade.feature for the
+ * full contract.
  *
- * Resolution order (most-specific wins):
- *   1. Per-feature override row at PROJECT → TEAM → ORGANIZATION
- *   2. Role-level row at PROJECT → TEAM → ORGANIZATION
- *   3. Legacy B2 scalar column at PROJECT → TEAM → ORGANIZATION
- *      (compat fallback; removed in the follow-up PR once writes have
- *      drained off the legacy columns)
- *   4. Built-in role constant
- *   5. ModelNotConfiguredError
+ * Resolution order (CSS-cascade):
+ *   1. Tier-by-tier (project → team → org). Within a tier, configs
+ *      sorted by createdAt DESC; the first config that has the
+ *      featureKey set wins for "feature override", the first that has
+ *      the role set wins for "role default". Lower tier always beats
+ *      higher tier regardless of recency.
+ *   2. Legacy B2 scalar column at project → team → org (compat
+ *      fallback; removed in the follow-up PR once writes have drained
+ *      off the legacy columns).
+ *   3. Built-in role constant.
+ *   4. ModelNotConfiguredError.
  */
 export async function resolveModelForFeature(
   featureKey: string,
@@ -234,69 +281,58 @@ export async function resolveModelForFeature(
   }
 
   const chain = await loadScopeChain(ctx.prisma, ctx.projectId);
-  const rows = await loadDefaultsForChain(
-    ctx.prisma,
-    chain,
-    feature.role,
-    feature.key,
-  );
+  const configs = await loadConfigsForChain(ctx.prisma, chain);
 
-  // 1. Per-feature override (project → team → org).
-  for (const scopeType of scopeOrder()) {
-    const scopeId = scopeIdForType(chain, scopeType);
-    if (!scopeId) continue;
-    const override = pickRow(
-      rows,
-      (r) =>
-        r.scopeType === scopeType &&
-        r.scopeId === scopeId &&
-        r.featureKey === feature.key,
-    );
-    if (override) {
-      return {
-        model: override.model,
-        source: "feature_override",
-        scope: scopeType.toLowerCase() as ResolutionScope,
-        feature,
-      };
+  // Walk tiers in specificity order (project most specific). At each
+  // tier, sort configs attached to THIS tier by createdAt DESC and
+  // pick the first one carrying a value for the feature key (override)
+  // or the role key (role default). Feature-key match beats role-key
+  // match at the same tier.
+  for (const tier of TIER_ORDER) {
+    const tierConfigs = configs.filter((c) => tierForConfig(c, chain) === tier);
+    if (tierConfigs.length === 0) continue;
+    tierConfigs.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
+    // 1a. Per-feature override at this tier.
+    for (const c of tierConfigs) {
+      const value = readKey(c.config, feature.key);
+      if (value) {
+        return {
+          model: value,
+          source: "feature_override",
+          scope: tier,
+          feature,
+        };
+      }
+    }
+    // 1b. Role-level value at this tier.
+    for (const c of tierConfigs) {
+      const value = readKey(c.config, feature.role);
+      if (value) {
+        return {
+          model: value,
+          source: "role_default",
+          scope: tier,
+          feature,
+        };
+      }
     }
   }
 
-  // 2. Role-level default (project → team → org).
-  for (const scopeType of scopeOrder()) {
-    const scopeId = scopeIdForType(chain, scopeType);
-    if (!scopeId) continue;
-    const roleRow = pickRow(
-      rows,
-      (r) =>
-        r.scopeType === scopeType &&
-        r.scopeId === scopeId &&
-        r.featureKey === null,
-    );
-    if (roleRow) {
-      return {
-        model: roleRow.model,
-        source: "role_default",
-        scope: scopeType.toLowerCase() as ResolutionScope,
-        feature,
-      };
-    }
-  }
-
-  // 3. Legacy B2 scalar columns (one-release compat).
-  for (const scopeType of scopeOrder()) {
-    const legacy = legacyColumnFor(chain, feature.role, scopeType, feature.key);
+  // 2. Legacy B2 scalar columns (one-release compat).
+  for (const tier of TIER_ORDER) {
+    const legacy = legacyColumnFor(chain, feature.role, tier, feature.key);
     if (legacy) {
       return {
         model: legacy,
         source: "role_default",
-        scope: scopeType.toLowerCase() as ResolutionScope,
+        scope: tier,
         feature,
       };
     }
   }
 
-  // 4. Built-in role constant.
+  // 3. Built-in role constant.
   const constant = ROLE_CONSTANT[feature.role];
   if (constant) {
     return {
@@ -307,7 +343,7 @@ export async function resolveModelForFeature(
     };
   }
 
-  // 5. Nothing left to fall back on.
+  // 4. Nothing left to fall back on.
   throw new ModelNotConfiguredError(
     feature.key,
     feature.role,

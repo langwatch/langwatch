@@ -1,9 +1,7 @@
-import type { PrismaClient } from "@prisma/client";
+import type { ModelDefaultScopeType, PrismaClient } from "@prisma/client";
 
 // @ts-ignore - JSON import
 import * as llmModelsRaw from "./llmModels.json";
-
-import type { ModelRole } from "./featureRegistry";
 
 interface RegistryEntry {
   id: string;
@@ -75,30 +73,32 @@ function pickLatestEmbedding(provider: string): string | undefined {
 }
 
 interface ProviderSeedPlan {
-  default?: string;
-  fast?: string;
-  embeddings?: string;
+  DEFAULT?: string;
+  FAST?: string;
+  EMBEDDINGS?: string;
 }
 
 /**
- * The seed plan for a given provider. Drives onboarding row creation —
- * each populated role gets a ModelDefault row, missing entries are
- * skipped (e.g. Anthropic has no embeddings).
+ * The seed plan for a given provider. Each populated role becomes a
+ * top-level key in the seeded ModelDefaultConfig's JSON. Missing roles
+ * are skipped — Anthropic, for instance, has no embeddings model, so
+ * EMBEDDINGS stays absent (= "inherit from parent scope", which at
+ * org-scope means "fall back to the built-in role constant").
  */
 export function buildSeedPlanForProvider(
   provider: string,
 ): ProviderSeedPlan {
   if (provider === "openai") {
     return {
-      default: pickLatestOpenAIChat("plain"),
-      fast: pickLatestOpenAIChat("mini"),
-      embeddings: pickLatestEmbedding("openai"),
+      DEFAULT: pickLatestOpenAIChat("plain"),
+      FAST: pickLatestOpenAIChat("mini"),
+      EMBEDDINGS: pickLatestEmbedding("openai"),
     };
   }
   if (provider === "anthropic") {
     return {
-      default: pickLatestAnthropicChat("sonnet"),
-      fast: pickLatestAnthropicChat("haiku"),
+      DEFAULT: pickLatestAnthropicChat("sonnet"),
+      FAST: pickLatestAnthropicChat("haiku"),
       // Anthropic ships no embeddings model.
     };
   }
@@ -108,54 +108,60 @@ export function buildSeedPlanForProvider(
   return {};
 }
 
-const ROLE_FOR_PLAN_FIELD: Record<keyof ProviderSeedPlan, ModelRole> = {
-  default: "DEFAULT",
-  fast: "FAST",
-  embeddings: "EMBEDDINGS",
-};
-
 /**
- * Onboarding seed: when a provider gets enabled (typically on the first-
- * provider-setup step of onboarding), populate the three role-level
- * ModelDefault rows for the chosen scope with sensible defaults — the
- * registry's newest flagship / mini / embedding model for that provider.
+ * Onboarding seed: when a provider is enabled at a scope, ensure that
+ * scope has a ModelDefaultConfig with sensible role-level values for
+ * roles the provider can fulfill. Strictly additive:
  *
- * Strictly additive. A role that already has a row at the target scope
- * is left untouched, so a user enabling a second provider later can't
- * silently replace their configured Default model.
+ *   - If no config is attached to (scopeType, scopeId), one is created
+ *     with the seed plan's roles. Default scope: ORGANIZATION (per
+ *     rchaves's directive — onboarding seeds at org level so the
+ *     entire organization inherits, not just the first project).
+ *   - If a config is already attached at the same scope, it is left
+ *     untouched. We do NOT merge in missing keys, because the user
+ *     may have intentionally cleared a key to inherit from a higher
+ *     scope; re-seeding would silently re-set it.
  *
- * Skips a role entirely when the provider has no model that fits (e.g.
- * Anthropic + Embeddings).
+ * Skips a role entirely when the provider has no model for it (e.g.
+ * Anthropic + EMBEDDINGS).
  */
 export async function seedOnboardingDefaultsForProvider(params: {
   prisma: PrismaClient;
   provider: string;
-  scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+  scopeType: ModelDefaultScopeType;
   scopeId: string;
+  authorId?: string | null;
 }): Promise<void> {
-  const { prisma, provider, scopeType, scopeId } = params;
+  const { prisma, provider, scopeType, scopeId, authorId } = params;
   const plan = buildSeedPlanForProvider(provider);
 
-  for (const [field, model] of Object.entries(plan)) {
-    if (!model) continue;
-    const role = ROLE_FOR_PLAN_FIELD[field as keyof ProviderSeedPlan];
-    const existing = await prisma.modelDefault.findFirst({
-      where: {
-        scopeType,
-        scopeId,
-        role,
-        featureKey: null,
-      },
-    });
-    if (existing) continue;
-    await prisma.modelDefault.create({
-      data: {
-        scopeType,
-        scopeId,
-        role,
-        featureKey: null,
-        model,
-      },
-    });
+  // Strip undefined entries — JSON.stringify would render them as the
+  // key not appearing, but Prisma's Json column accepts the object
+  // directly. Building a clean object up front keeps the stored shape
+  // obvious in the test snapshot.
+  const config: Record<string, string> = {};
+  for (const [key, value] of Object.entries(plan)) {
+    if (typeof value === "string" && value.length > 0) config[key] = value;
   }
+  if (Object.keys(config).length === 0) return;
+
+  // Idempotent at the scope level: if any config is already attached
+  // here, leave everything alone. Replacing or merging would step on
+  // the user's intentional choices (including their intentional
+  // "inherit from parent" via key absence).
+  const existing = await prisma.modelDefaultConfigScope.findFirst({
+    where: { scopeType, scopeId },
+    select: { id: true },
+  });
+  if (existing) return;
+
+  await prisma.modelDefaultConfig.create({
+    data: {
+      config,
+      authorId: authorId ?? null,
+      scopes: {
+        create: [{ scopeType, scopeId }],
+      },
+    },
+  });
 }

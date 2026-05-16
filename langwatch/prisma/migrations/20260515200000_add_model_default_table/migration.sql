@@ -1,170 +1,151 @@
--- ModelDefault is the single source of truth for "which model does
+-- ModelDefaultConfig is the single source of truth for "which model does
 -- {feature, role} resolve to at {scope}". Replaces the per-scope
 -- defaultModel / topicClusteringModel / embeddingsModel scalar columns
--- added in 20260515150000 (which stay readable for one release as a
--- compat fallback — the resolver in B3.1 prefers ModelDefault rows and
--- only walks the legacy columns when no row exists).
+-- added in 20260515150000 (the resolver still falls back to those for one
+-- release while we drain writes from old code paths).
 --
--- Row shape:
---   featureKey IS NULL → role-level default for the scope
---   featureKey populated → per-feature override (rarely needed but the
---                          escape hatch when a single feature wants a
---                          different model than its role's default)
+-- Shape:
+--   ModelDefaultConfig       — one row per config policy. Holds the JSON
+--                              payload mapping roles + feature keys to model
+--                              ids. Absent keys = "inherit from parent scope".
+--   ModelDefaultConfigScope  — n:n join binding a config to a (scopeType,
+--                              scopeId). One config can apply to many scopes;
+--                              one scope can have many configs (resolver
+--                              tiebreaks by createdAt DESC within a scope
+--                              tier).
 --
--- Postgres treats NULLs as DISTINCT in unique indexes by default, so a
--- single composite unique on (scopeType, scopeId, role, featureKey)
--- would NOT prevent two role-level rows for the same (scope, role).
--- Two partial unique indexes give the semantics we want without a
--- single index that conflates "no override" with "override=empty".
+-- The CSS-cascade rules and the JSON contract live in
+-- specs/model-providers/model-default-config-cascade.feature.
 --
--- Scope-type column uses its own Postgres enum (per-table convention,
--- mirroring RoleBindingScopeType + GatewayBudgetScopeType — see
--- dev/docs/best_practices/scoped-resources.md). Keeps invalid values
--- out at the storage layer instead of relying on application code to
--- guard the column.
+-- scopeType uses its own Postgres enum following the per-table
+-- convention (RoleBindingScopeType / GatewayBudgetScopeType / etc).
+-- See dev/docs/best_practices/scoped-resources.md.
 
 CREATE TYPE "ModelDefaultScopeType" AS ENUM ('ORGANIZATION', 'TEAM', 'PROJECT');
 
-CREATE TABLE "ModelDefault" (
-    "id"         TEXT NOT NULL,
-    "scopeType"  "ModelDefaultScopeType" NOT NULL,
-    "scopeId"    TEXT NOT NULL,
-    "role"       TEXT NOT NULL,
-    "featureKey" TEXT,
-    "model"      TEXT NOT NULL,
-    "createdAt"  TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt"  TIMESTAMP(3) NOT NULL,
-    "authorId"   TEXT,
+CREATE TABLE "ModelDefaultConfig" (
+    "id"        TEXT NOT NULL,
+    "config"    JSONB NOT NULL,
+    "authorId"  TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
-    CONSTRAINT "ModelDefault_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "ModelDefaultConfig_pkey" PRIMARY KEY ("id")
 );
 
-CREATE INDEX "ModelDefault_scope_role_idx"
-    ON "ModelDefault" ("scopeType", "scopeId", "role");
+CREATE TABLE "ModelDefaultConfigScope" (
+    "id"        TEXT NOT NULL,
+    "configId"  TEXT NOT NULL,
+    "scopeType" "ModelDefaultScopeType" NOT NULL,
+    "scopeId"   TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-CREATE UNIQUE INDEX "ModelDefault_scope_role_unique_role_level"
-    ON "ModelDefault" ("scopeType", "scopeId", "role")
-    WHERE "featureKey" IS NULL;
+    CONSTRAINT "ModelDefaultConfigScope_pkey" PRIMARY KEY ("id"),
+    CONSTRAINT "ModelDefaultConfigScope_configId_fkey"
+        FOREIGN KEY ("configId") REFERENCES "ModelDefaultConfig"("id")
+        ON DELETE CASCADE ON UPDATE CASCADE
+);
 
-CREATE UNIQUE INDEX "ModelDefault_scope_role_feature_unique_feature_override"
-    ON "ModelDefault" ("scopeType", "scopeId", "role", "featureKey")
-    WHERE "featureKey" IS NOT NULL;
+CREATE UNIQUE INDEX "ModelDefaultConfigScope_unique"
+    ON "ModelDefaultConfigScope" ("configId", "scopeType", "scopeId");
 
--- Data migration: lift the B2 scalar columns into ModelDefault rows.
--- The mapping is 1:1 with no sniffing — topicClusteringModel was always
--- an LLM, embeddingsModel was always an embedding model. The resolver
--- will continue to read the legacy columns when no row exists, so this
--- migration is additive and existing reads keep working.
+CREATE INDEX "ModelDefaultConfigScope_scope_idx"
+    ON "ModelDefaultConfigScope" ("scopeType", "scopeId");
 
-INSERT INTO "ModelDefault" ("id", "scopeType", "scopeId", "role", "featureKey", "model", "updatedAt")
+CREATE INDEX "ModelDefaultConfigScope_configId_idx"
+    ON "ModelDefaultConfigScope" ("configId");
+
+-- Data lift: pack the legacy scalar columns into config JSON, one
+-- config per (scopeType, scopeId) that had any non-null value. Three
+-- top-level keys we fill in:
+--   DEFAULT                            <- the role's flagship model
+--   analytics.topic_clustering_llm     <- per-feature override on FAST
+--   EMBEDDINGS                         <- the embeddings role
+--
+-- jsonb_strip_nulls drops keys whose value was NULL — the resolver
+-- treats key-absence as "inherit from parent scope", so a partial
+-- legacy row (e.g. only defaultModel set) ends up with the
+-- corresponding partial config JSON. Deterministic IDs ('mdcfg_<scope>_<id>')
+-- so the two-step INSERT can link config + scope without a CTE/RETURNING
+-- dance, and so re-running the migration in dev environments stays
+-- idempotent on the data shape (a fresh DROP is required to re-seed).
+
+INSERT INTO "ModelDefaultConfig" ("id", "config", "updatedAt")
 SELECT
-    gen_random_uuid()::text,
-    'ORGANIZATION',
-    "id",
-    'DEFAULT',
-    NULL,
-    "defaultModel",
+    'mdcfg_org_' || o."id",
+    jsonb_strip_nulls(jsonb_build_object(
+        'DEFAULT', o."defaultModel",
+        'analytics.topic_clustering_llm', o."topicClusteringModel",
+        'EMBEDDINGS', o."embeddingsModel"
+    )),
     NOW()
-FROM "Organization"
-WHERE "defaultModel" IS NOT NULL;
+FROM "Organization" o
+WHERE o."defaultModel" IS NOT NULL
+   OR o."topicClusteringModel" IS NOT NULL
+   OR o."embeddingsModel" IS NOT NULL;
 
-INSERT INTO "ModelDefault" ("id", "scopeType", "scopeId", "role", "featureKey", "model", "updatedAt")
+INSERT INTO "ModelDefaultConfigScope" ("id", "configId", "scopeType", "scopeId")
 SELECT
-    gen_random_uuid()::text,
-    'ORGANIZATION',
-    "id",
-    'FAST',
-    'analytics.topic_clustering_llm',
-    "topicClusteringModel",
-    NOW()
-FROM "Organization"
-WHERE "topicClusteringModel" IS NOT NULL;
+    'mdcs_org_' || o."id",
+    'mdcfg_org_' || o."id",
+    'ORGANIZATION'::"ModelDefaultScopeType",
+    o."id"
+FROM "Organization" o
+WHERE o."defaultModel" IS NOT NULL
+   OR o."topicClusteringModel" IS NOT NULL
+   OR o."embeddingsModel" IS NOT NULL;
 
-INSERT INTO "ModelDefault" ("id", "scopeType", "scopeId", "role", "featureKey", "model", "updatedAt")
+INSERT INTO "ModelDefaultConfig" ("id", "config", "updatedAt")
 SELECT
-    gen_random_uuid()::text,
-    'ORGANIZATION',
-    "id",
-    'EMBEDDINGS',
-    NULL,
-    "embeddingsModel",
+    'mdcfg_team_' || t."id",
+    jsonb_strip_nulls(jsonb_build_object(
+        'DEFAULT', t."defaultModel",
+        'analytics.topic_clustering_llm', t."topicClusteringModel",
+        'EMBEDDINGS', t."embeddingsModel"
+    )),
     NOW()
-FROM "Organization"
-WHERE "embeddingsModel" IS NOT NULL;
+FROM "Team" t
+WHERE t."defaultModel" IS NOT NULL
+   OR t."topicClusteringModel" IS NOT NULL
+   OR t."embeddingsModel" IS NOT NULL;
 
-INSERT INTO "ModelDefault" ("id", "scopeType", "scopeId", "role", "featureKey", "model", "updatedAt")
+INSERT INTO "ModelDefaultConfigScope" ("id", "configId", "scopeType", "scopeId")
 SELECT
-    gen_random_uuid()::text,
-    'TEAM',
-    "id",
-    'DEFAULT',
-    NULL,
-    "defaultModel",
-    NOW()
-FROM "Team"
-WHERE "defaultModel" IS NOT NULL;
+    'mdcs_team_' || t."id",
+    'mdcfg_team_' || t."id",
+    'TEAM'::"ModelDefaultScopeType",
+    t."id"
+FROM "Team" t
+WHERE t."defaultModel" IS NOT NULL
+   OR t."topicClusteringModel" IS NOT NULL
+   OR t."embeddingsModel" IS NOT NULL;
 
-INSERT INTO "ModelDefault" ("id", "scopeType", "scopeId", "role", "featureKey", "model", "updatedAt")
+INSERT INTO "ModelDefaultConfig" ("id", "config", "updatedAt")
 SELECT
-    gen_random_uuid()::text,
-    'TEAM',
-    "id",
-    'FAST',
-    'analytics.topic_clustering_llm',
-    "topicClusteringModel",
+    'mdcfg_proj_' || p."id",
+    jsonb_strip_nulls(jsonb_build_object(
+        'DEFAULT', p."defaultModel",
+        'analytics.topic_clustering_llm', p."topicClusteringModel",
+        'EMBEDDINGS', p."embeddingsModel"
+    )),
     NOW()
-FROM "Team"
-WHERE "topicClusteringModel" IS NOT NULL;
+FROM "Project" p
+WHERE p."defaultModel" IS NOT NULL
+   OR p."topicClusteringModel" IS NOT NULL
+   OR p."embeddingsModel" IS NOT NULL;
 
-INSERT INTO "ModelDefault" ("id", "scopeType", "scopeId", "role", "featureKey", "model", "updatedAt")
+INSERT INTO "ModelDefaultConfigScope" ("id", "configId", "scopeType", "scopeId")
 SELECT
-    gen_random_uuid()::text,
-    'TEAM',
-    "id",
-    'EMBEDDINGS',
-    NULL,
-    "embeddingsModel",
-    NOW()
-FROM "Team"
-WHERE "embeddingsModel" IS NOT NULL;
+    'mdcs_proj_' || p."id",
+    'mdcfg_proj_' || p."id",
+    'PROJECT'::"ModelDefaultScopeType",
+    p."id"
+FROM "Project" p
+WHERE p."defaultModel" IS NOT NULL
+   OR p."topicClusteringModel" IS NOT NULL
+   OR p."embeddingsModel" IS NOT NULL;
 
-INSERT INTO "ModelDefault" ("id", "scopeType", "scopeId", "role", "featureKey", "model", "updatedAt")
-SELECT
-    gen_random_uuid()::text,
-    'PROJECT',
-    "id",
-    'DEFAULT',
-    NULL,
-    "defaultModel",
-    NOW()
-FROM "Project"
-WHERE "defaultModel" IS NOT NULL;
-
-INSERT INTO "ModelDefault" ("id", "scopeType", "scopeId", "role", "featureKey", "model", "updatedAt")
-SELECT
-    gen_random_uuid()::text,
-    'PROJECT',
-    "id",
-    'FAST',
-    'analytics.topic_clustering_llm',
-    "topicClusteringModel",
-    NOW()
-FROM "Project"
-WHERE "topicClusteringModel" IS NOT NULL;
-
-INSERT INTO "ModelDefault" ("id", "scopeType", "scopeId", "role", "featureKey", "model", "updatedAt")
-SELECT
-    gen_random_uuid()::text,
-    'PROJECT',
-    "id",
-    'EMBEDDINGS',
-    NULL,
-    "embeddingsModel",
-    NOW()
-FROM "Project"
-WHERE "embeddingsModel" IS NOT NULL;
-
--- To roll back, drop the ModelDefault table.
--- The legacy columns are untouched, so reads continue to work via the
--- resolver's compat fallback. Down migration commented out to prevent
--- accidental data loss.
+-- To roll back, drop both tables + the enum.
+-- The legacy scalar columns on Organization/Team/Project are untouched,
+-- so reads continue to work via the resolver's compat fallback. Down
+-- migration commented out to prevent accidental data loss.

@@ -323,7 +323,9 @@ export function useProviderFormSubmit({
         // write for a non-admin) shouldn't kill the whole submit — log
         // and continue. The provider row is already created.
         await Promise.allSettled(writes);
-        await utils.modelProvider.getDefaultModelsForProject.invalidate();
+        await utils.modelProvider.getDefaultModelsForProject.invalidate({
+          projectId,
+        });
       }
 
       toaster.create({

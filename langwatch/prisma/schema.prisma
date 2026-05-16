@@ -758,18 +758,45 @@ enum ModelDefaultScopeType {
     PROJECT
 }
 
-model ModelDefault {
-    id         String                @id @default(nanoid())
-    scopeType  ModelDefaultScopeType
-    scopeId    String
-    role       String
-    featureKey String?
-    model      String
-    authorId   String?
-    createdAt  DateTime              @default(now())
-    updatedAt  DateTime              @updatedAt
+// ModelDefaultConfig is one CSS-style cascading policy. The JSON `config`
+// payload maps role names (DEFAULT / FAST / EMBEDDINGS) and feature keys
+// (prompt.create_default, traces.ai_search, …) to a model id. Absence of
+// a key means "inherit from the next scope up" — there is no explicit
+// "inherit" sentinel in storage. See
+// specs/model-providers/model-default-config-cascade.feature.
+//
+// One config attaches to N scopes via ModelDefaultConfigScope (same n:n
+// pattern as ModelProvider + ModelProviderScope from iter 109), so one
+// "Production models" policy can apply to Team A + Team B + Project X
+// with one row of state.
+//
+// On read the resolver walks PROJECT → TEAM → ORG; within a tier the
+// newest createdAt config that has the key wins. Lower-tier configs
+// always beat higher-tier ones even if higher tier was created later
+// (CSS specificity wins over recency across tiers).
+model ModelDefaultConfig {
+    id        String                    @id @default(nanoid())
+    config    Json
+    authorId  String?
+    createdAt DateTime                  @default(now())
+    updatedAt DateTime                  @updatedAt
+    scopes    ModelDefaultConfigScope[]
+}
 
-    @@index([scopeType, scopeId, role])
+// Join table binding a ModelDefaultConfig to a (scopeType, scopeId).
+// One config can have many scope attachments; one scope can have many
+// configs (resolver tiebreaks by createdAt DESC).
+model ModelDefaultConfigScope {
+    id        String                @id @default(nanoid())
+    configId  String
+    config    ModelDefaultConfig    @relation(fields: [configId], references: [id], onDelete: Cascade)
+    scopeType ModelDefaultScopeType
+    scopeId   String
+    createdAt DateTime              @default(now())
+
+    @@unique([configId, scopeType, scopeId])
+    @@index([scopeType, scopeId])
+    @@index([configId])
 }
 
 model ProjectSecret {
