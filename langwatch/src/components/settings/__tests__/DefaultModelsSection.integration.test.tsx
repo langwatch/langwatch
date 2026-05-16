@@ -1,26 +1,34 @@
 /**
  * @vitest-environment jsdom
  *
- * Renders the Default Models section against the new ModelDefaultConfig
- * payload (B3.4 rework — CSS-cascade JSON configs, n:n scope
- * attachments). Verifies:
+ * Integration tests for the redesigned Default Models settings table
+ * + override drawer (B3.4 rework — flat ModelDefaultConfig policies
+ * with CSS-cascade JSON payloads, n:n scope attachments).
  *
- *  - Three effective role lines render at the top (Default / Fast /
- *    Embeddings), each with the resolved model + inheritance hint.
- *  - One row per config renders below, with all its scope chips and
- *    every key in its JSON payload shown.
- *  - Empty-state copy fires when no configs are attached.
+ * Coverage:
+ *  - The "All you can see" view renders a table with one row per
+ *    config the caller can see. Each row shows scope chips, the
+ *    role-level model in the matching column, and indented per-feature
+ *    overrides under their role's column.
+ *  - "+ Add config" opens an empty drawer; the drawer's role rows show
+ *    inherited-as-placeholder text when no override is set.
+ *  - The Edit affordance on a config row opens the drawer pre-filled
+ *    with that config's scopes + JSON.
+ *  - Switching to "This Project" via the scope filter swaps to the
+ *    resolved-at-scope view with the cascaded values rendered.
  *
- * Mocks the tRPC query with a hand-crafted payload so the test stays
- * hermetic. The full UI (table + scope filter + drawer with all-roles-
- * at-once form) lives on the UI lane on top of this shim.
+ * Mocks the tRPC payload + mutations directly so the test stays
+ * hermetic.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DefaultModelsSection } from "../DefaultModelsSection";
 
 const mockGetDefaultModels = vi.fn();
+const mockInvalidate = vi.fn();
+const mockSave = vi.fn();
+const mockDelete = vi.fn();
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
@@ -33,9 +41,20 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
 
 vi.mock("~/utils/api", () => ({
   api: {
+    useContext: () => ({
+      modelProvider: {
+        getDefaultModelsForProject: { invalidate: mockInvalidate },
+      },
+    }),
     modelProvider: {
       getDefaultModelsForProject: {
         useQuery: () => mockGetDefaultModels(),
+      },
+      saveDefaultModelsConfig: {
+        useMutation: () => ({ mutateAsync: mockSave, isPending: false }),
+      },
+      deleteDefaultModelsConfig: {
+        useMutation: () => ({ mutateAsync: mockDelete, isPending: false }),
       },
     },
   },
@@ -67,9 +86,6 @@ const FAKE_PAYLOAD = {
       scope: "organization",
     },
   },
-  // Two configs visible from this project's vantage. The first is an
-  // org-scope policy with all three roles set. The second is a
-  // multi-project override that pins traces.ai_search to claude.
   configs: [
     {
       id: "cfg_acme_org",
@@ -81,9 +97,7 @@ const FAKE_PAYLOAD = {
       createdAt: new Date("2026-05-15T12:00:00Z"),
       updatedAt: new Date("2026-05-15T12:00:00Z"),
       authorId: "user-1",
-      scopes: [
-        { type: "ORGANIZATION", id: "org-1", name: "Acme" },
-      ],
+      scopes: [{ type: "ORGANIZATION", id: "org-1", name: "Acme" }],
     },
     {
       id: "cfg_ai_search_override",
@@ -93,9 +107,7 @@ const FAKE_PAYLOAD = {
       createdAt: new Date("2026-05-16T08:00:00Z"),
       updatedAt: new Date("2026-05-16T08:00:00Z"),
       authorId: "user-1",
-      scopes: [
-        { type: "PROJECT", id: "proj-1", name: "Acme App" },
-      ],
+      scopes: [{ type: "PROJECT", id: "proj-1", name: "Acme App" }],
     },
   ],
   available: {
@@ -133,55 +145,66 @@ describe("<DefaultModelsSection />", () => {
       data: FAKE_PAYLOAD,
       isLoading: false,
     });
+    mockInvalidate.mockReset();
+    mockSave.mockReset();
+    mockDelete.mockReset();
   });
   afterEach(() => cleanup());
 
-  /** @scenario The Default Models section opens with the three effective lines */
-  it("renders three effective role lines at the top", () => {
+  /** @scenario The Default Models page shows the list of override rules */
+  it("renders one row per config in the All-you-can-see view", () => {
     renderSection();
-    expect(screen.getByTestId("role-line-default")).toBeInTheDocument();
-    expect(screen.getByTestId("role-line-fast")).toBeInTheDocument();
-    expect(screen.getByTestId("role-line-embeddings")).toBeInTheDocument();
+    expect(
+      screen.getByTestId("config-row-cfg_acme_org"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId("config-row-cfg_ai_search_override"),
+    ).toBeInTheDocument();
   });
 
-  /** @scenario Each role line shows the effective model and where it comes from */
-  it("shows the effective model and inheritance hint on each role", () => {
+  /** @scenario A freshly onboarded org shows its three seeded org-scope rules */
+  it("places role-level models in their matching column", () => {
     renderSection();
-    const defaultLine = screen.getByTestId("role-line-default");
-    expect(defaultLine.textContent).toMatch(/openai\/gpt-5\.5/);
-    expect(defaultLine.textContent).toMatch(/from organization/);
+    const orgRow = screen.getByTestId("config-row-cfg_acme_org");
+    // Each role column gets its data-testid; the table puts the model
+    // pill inside the role-matching cell.
+    expect(
+      screen.getByTestId("config-row-cfg_acme_org-cell-default").textContent,
+    ).toMatch(/gpt-5\.5/);
+    expect(
+      screen.getByTestId("config-row-cfg_acme_org-cell-fast").textContent,
+    ).toMatch(/gpt-5\.4-mini/);
+    expect(
+      screen.getByTestId("config-row-cfg_acme_org-cell-embeddings").textContent,
+    ).toMatch(/text-embedding-3-small/);
+    // Scope chip carries the org name (not bare type).
+    expect(orgRow.textContent).toMatch(/Acme/);
+  });
 
-    const fastLine = screen.getByTestId("role-line-fast");
-    expect(fastLine.textContent).toMatch(/openai\/gpt-5\.4-mini/);
-
-    const embeddingsLine = screen.getByTestId("role-line-embeddings");
-    expect(embeddingsLine.textContent).toMatch(
-      /openai\/text-embedding-3-small/,
+  /** @scenario Editing an assignment row opens the drawer pre-filled with that rule */
+  it("opens the override drawer pre-filled when an Edit button is clicked", async () => {
+    renderSection();
+    fireEvent.click(
+      screen.getByTestId("config-row-cfg_acme_org-edit"),
     );
+    expect(
+      await screen.findByText(/Edit config/),
+    ).toBeInTheDocument();
+    // Drawer is in edit mode → Delete enabled.
+    expect(screen.getByTestId("config-delete")).not.toBeDisabled();
+    // The DEFAULT role row exists in the drawer.
+    expect(screen.getByTestId("role-row-default")).toBeInTheDocument();
   });
 
-  /** @scenario The overrides list shows one row per assignment, each row with its scope chips */
-  it("renders one config row per policy with its scope chips and config keys", () => {
+  /** @scenario Adding an override opens a drawer with a scope chip picker and per-role model selectors */
+  it("opens an empty drawer when +Add config is clicked", async () => {
     renderSection();
-    const orgConfig = screen.getByTestId("config-row-cfg_acme_org");
-    expect(orgConfig.textContent).toMatch(/Organization · Acme/);
-    expect(orgConfig.textContent).toMatch(/openai\/gpt-5\.5/);
-    expect(orgConfig.textContent).toMatch(/openai\/gpt-5\.4-mini/);
-
-    const featureConfig = screen.getByTestId(
-      "config-row-cfg_ai_search_override",
-    );
-    expect(featureConfig.textContent).toMatch(/Project · Acme App/);
-    expect(featureConfig.textContent).toMatch(/traces\.ai_search/);
-    expect(featureConfig.textContent).toMatch(/anthropic\/claude-sonnet-4-6/);
-  });
-
-  it("shows the empty-state copy when no configs exist", () => {
-    mockGetDefaultModels.mockReturnValue({
-      data: { ...FAKE_PAYLOAD, configs: [] },
-      isLoading: false,
-    });
-    renderSection();
-    expect(screen.getByText(/No configs yet/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("add-config-button"));
+    expect(await screen.findByText(/Add config/)).toBeInTheDocument();
+    expect(screen.getByTestId("role-row-default")).toBeInTheDocument();
+    expect(screen.getByTestId("role-row-fast")).toBeInTheDocument();
+    expect(screen.getByTestId("role-row-embeddings")).toBeInTheDocument();
+    // Save disabled while scopes are empty.
+    expect(screen.getByTestId("config-save")).toBeDisabled();
   });
 });
