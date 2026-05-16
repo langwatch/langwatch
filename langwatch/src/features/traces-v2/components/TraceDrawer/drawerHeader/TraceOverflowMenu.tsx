@@ -1,7 +1,9 @@
 import { Button, HStack, Icon, Text } from "@chakra-ui/react";
 import { MoreVertical } from "lucide-react";
+import posthog from "posthog-js";
 import { useCallback } from "react";
 import {
+  LuArrowLeft,
   LuBraces,
   LuCopy,
   LuDatabase,
@@ -16,6 +18,7 @@ import {
 import { Menu } from "~/components/ui/menu";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useConversationTurns } from "../../../hooks/useConversationTurns";
+import { setTracesV2Preferred } from "../../../hooks/useTracesV2Preference";
 
 interface TraceOverflowMenuProps {
   traceId: string;
@@ -66,6 +69,17 @@ export function TraceOverflowMenu({
     if (!dejaViewHref) return;
     window.open(dejaViewHref, "_blank", "noopener,noreferrer");
   }, [dejaViewHref]);
+
+  const handleSwitchBackToV1 = useCallback(() => {
+    setTracesV2Preferred(false);
+    posthog.capture("traces_v2_opt_out", {
+      surface: "drawer_overflow_menu",
+      traceId,
+    });
+    // Drop the v2 shell and hand the same trace back to the v1 drawer
+    // on the current page — operator's mental anchor stays put.
+    openDrawer("traceDetails", { traceId, selectedTab: "traceDetails" });
+  }, [openDrawer, traceId]);
 
   return (
     <Menu.Root positioning={{ placement: "bottom-end" }}>
@@ -159,6 +173,20 @@ export function TraceOverflowMenu({
             <Text>Keyboard shortcuts</Text>
           </HStack>
           <Menu.ItemCommand>?</Menu.ItemCommand>
+        </Menu.Item>
+
+        <Menu.Separator />
+
+        {/* Escape hatch back to the v1 drawer for operators who
+            opted into v2 via the promo but want to fall back. Clears
+            the localStorage opt-in and re-opens the same trace in
+            the legacy drawer — next time they `View Trace` they'll
+            land on v1 again until they re-opt in. */}
+        <Menu.Item value="switch-back-to-v1" onClick={handleSwitchBackToV1}>
+          <HStack gap={2}>
+            <Icon as={LuArrowLeft} boxSize={3.5} />
+            <Text>Go back to old trace visualization</Text>
+          </HStack>
         </Menu.Item>
       </Menu.Content>
     </Menu.Root>

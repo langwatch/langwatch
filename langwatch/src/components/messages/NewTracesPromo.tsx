@@ -7,10 +7,14 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import posthog from "posthog-js";
 import { useEffect, useState } from "react";
 import { LuArrowRight, LuMessageCircle, LuSparkles, LuX } from "react-icons/lu";
 import { Link } from "~/components/ui/link";
 import { Tooltip } from "~/components/ui/tooltip";
+import { setTracesV2Preferred } from "~/features/traces-v2/hooks/useTracesV2Preference";
+import { useDrawerStore } from "~/features/traces-v2/stores/drawerStore";
+import { useDrawer } from "~/hooks/useDrawer";
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
@@ -104,9 +108,34 @@ export function NewTracesPromo({
     setDismissed(true);
   };
 
-  const v2Href = traceId
-    ? `/${projectSlug}/traces?drawer.open=traceV2Details&drawer.traceId=${encodeURIComponent(traceId)}`
-    : `/${projectSlug}/traces`;
+  // When opening v2 in-place we want the click → drawer-render to be
+  // synchronous (no URL round-trip). The v2 drawer mount reads from
+  // the drawer store, so we push there first before flipping the URL.
+  const { openDrawer } = useDrawer();
+  const handleTryV2 = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!traceId) {
+      // No trace context (banner shown on a landing page) — keep the
+      // historical "go to the traces list" navigation. The list page
+      // itself surfaces the v2 explorer.
+      if (projectSlug) {
+        window.location.href = `/${projectSlug}/traces`;
+      }
+      return;
+    }
+    setTracesV2Preferred(true);
+    posthog.capture("traces_v2_opt_in", {
+      surface: "promo_banner",
+      projectId,
+      traceId,
+    });
+    // Optimistic store push so the v2 shell mounts on the next render
+    // — `openDrawer` will sync the URL params on the current path.
+    useDrawerStore.getState().openTrace(traceId, null);
+    openDrawer("traceV2Details", { traceId });
+    if (projectId) snooze(projectId, mode);
+    setDismissed(true);
+  };
 
   const requestAccessMailto = `mailto:support@langwatch.ai?subject=${encodeURIComponent(
     "Early access to the new Trace Explorer",
@@ -204,22 +233,22 @@ export function NewTracesPromo({
         )}
       </VStack>
       {mode === "try" ? (
-        <Link href={v2Href} aria-label="Open new Trace Explorer">
-          <Button
-            size={isCompact ? "xs" : "sm"}
-            bg="white"
-            color="purple.700"
-            fontWeight="600"
-            paddingX={isCompact ? 3 : 4}
-            boxShadow="0 1px 2px rgba(0, 0, 0, 0.12)"
-            _hover={{ bg: "white/90", transform: "translateY(-1px)" }}
-            _active={{ bg: "white/80", transform: "translateY(0)" }}
-            transition="background-color 0.12s ease, transform 0.12s ease"
-          >
-            Try the new one
-            <Icon as={LuArrowRight} boxSize={3.5} marginLeft={1} />
-          </Button>
-        </Link>
+        <Button
+          size={isCompact ? "xs" : "sm"}
+          aria-label="Try the new Trace Explorer"
+          bg="white"
+          color="purple.700"
+          fontWeight="600"
+          paddingX={isCompact ? 3 : 4}
+          boxShadow="0 1px 2px rgba(0, 0, 0, 0.12)"
+          _hover={{ bg: "white/90", transform: "translateY(-1px)" }}
+          _active={{ bg: "white/80", transform: "translateY(0)" }}
+          transition="background-color 0.12s ease, transform 0.12s ease"
+          onClick={handleTryV2}
+        >
+          Try the new one
+          <Icon as={LuArrowRight} boxSize={3.5} marginLeft={1} />
+        </Button>
       ) : (
         <Link
           href={requestAccessMailto}

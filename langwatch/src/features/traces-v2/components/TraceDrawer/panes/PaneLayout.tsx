@@ -560,6 +560,10 @@ function PaneResizeBar({ orientation }: { orientation: DrawerLayout }) {
         cursor={isHorizontal ? "col-resize" : "row-resize"}
         // Above the adjacent panel contents so the cursor wins where
         // the hit zone overlaps them. No bg — purely a hit target.
+        // Any sibling chrome that the operator needs to keep
+        // clickable when collapsed-against-this-handle (e.g., the
+        // "Show details" affordance in viz's tab row) must declare
+        // its own z-index >= 3 to win over this overlay.
         zIndex={2}
       />
     </Box>

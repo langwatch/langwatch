@@ -555,6 +555,17 @@ export function VizPlaceholder({
                 alignSelf="center"
                 height="26px"
                 flexShrink={0}
+                // When the detail pane is collapsed-to-zero against
+                // the resize handle on this edge, the handle's 6px
+                // hit-zone overlay (`z-index: 2` in PaneResizeBar)
+                // sits on top of this button. Without an explicit
+                // `position` + higher `z-index`, the overlay wins:
+                // cursor reads as col-resize and clicks land on the
+                // (no-op) resize, leaving the operator stuck. The
+                // overlay is intentionally still there so a mid-drag
+                // "oops, too far" can be undone by dragging back.
+                position="relative"
+                zIndex={3}
                 aria-label="Show details"
                 onClick={() => togglePaneCollapsed("spanDetail")}
               >
