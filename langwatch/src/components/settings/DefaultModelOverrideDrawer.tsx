@@ -338,13 +338,12 @@ function RoleRow({
 
   return (
     <Box data-testid={`role-row-${role.toLowerCase()}`} width="full">
-      <HStack gap={3} align="center" paddingY={1}>
-        {/* Role label — hover the label itself to see what the role is
-            for. No info icon, no inline blurb. Keeps the row a single
-            tight line, white BG, no card wrapper. */}
+      <HStack gap={2} align="center" paddingY={1}>
+        {/* Row reads: [label] ··············· [model selector] ▶
+            Label hugs the left, big flex spacer eats the middle, the
+            model selector + expand chevron live tight to the right. */}
         <Tooltip content={ROLE_BLURB[role]}>
           <Box
-            width="100px"
             flexShrink={0}
             cursor="help"
             data-testid={`role-row-${role.toLowerCase()}-label`}
@@ -354,7 +353,8 @@ function RoleRow({
             </Text>
           </Box>
         </Tooltip>
-        <Box flex={1} position="relative">
+        <Box flex={1} />
+        <Box width="240px" flexShrink={0} position="relative">
           {!current && inheritedModel && (
             <Box
               position="absolute"
@@ -438,19 +438,21 @@ function FeatureRow({
   const wouldInherit = roleLevelOverride || inheritedModel || "";
   return (
     <HStack
-      gap={3}
+      gap={2}
       align="center"
       data-testid={`feature-row-${feature.key}`}
     >
-      {/* Feature description is hidden behind a tooltip on the label so
-          the row stays a single line and the drawer doesn't read like a
-          wall of help text. */}
+      {/* Feature description tooltip lives on the label. Layout
+          mirrors the parent role row: label left, big spacer, selector
+          right-aligned, expand-slot reserved for alignment with the
+          role row above. */}
       <Tooltip content={feature.description}>
-        <Box width="160px" flexShrink={0} cursor="help">
+        <Box flexShrink={0} cursor="help">
           <Text fontSize="sm">{feature.displayName}</Text>
         </Box>
       </Tooltip>
-      <Box flex={1} position="relative">
+      <Box flex={1} />
+      <Box width="240px" flexShrink={0} position="relative">
         {!override && wouldInherit && (
           <Box
             position="absolute"

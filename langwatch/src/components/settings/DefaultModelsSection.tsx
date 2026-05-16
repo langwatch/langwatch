@@ -29,6 +29,7 @@ import {
   Box,
   Button,
   Card,
+  EmptyState,
   Heading,
   HStack,
   IconButton,
@@ -37,7 +38,14 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Building2, Folder, Pencil, Plus, Users } from "lucide-react";
+import {
+  Building2,
+  Folder,
+  Pencil,
+  Plus,
+  SlidersHorizontal,
+  Users,
+} from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { Tooltip } from "~/components/ui/tooltip";
@@ -160,6 +168,7 @@ export function DefaultModelsSection() {
               configs={data.configs}
               features={data.features}
               onEdit={openEdit}
+              onAdd={openAdd}
             />
           ) : (
             <ResolvedScopeView
@@ -198,19 +207,42 @@ function AllConfigsView({
   configs,
   features,
   onEdit,
+  onAdd,
 }: {
   configs: ConfigRow[];
   features: Payload["features"];
   onEdit: (c: ConfigRow) => void;
+  onAdd: () => void;
 }) {
   if (configs.length === 0) {
     return (
-      <Box padding={6}>
-        <Text fontSize="sm" color="fg.muted">
-          No default-model configs yet. Add one to pin a model at the
-          organization, team, or project level.
-        </Text>
-      </Box>
+      <EmptyState.Root width="full" paddingY={10}>
+        <EmptyState.Content>
+          <EmptyState.Indicator>
+            <SlidersHorizontal size={24} />
+          </EmptyState.Indicator>
+          <VStack textAlign="center" gap={2}>
+            <EmptyState.Title>No default models configured</EmptyState.Title>
+            <EmptyState.Description>
+              Define a default model to enable AI features across the
+              platform — prompt creation, evaluations, traces search,
+              workflows, scenarios, and analytics all read from this
+              cascade.
+            </EmptyState.Description>
+            <Button
+              size="sm"
+              colorPalette="orange"
+              onClick={onAdd}
+              data-testid="empty-state-add-config"
+            >
+              <HStack gap={1}>
+                <Plus size={14} />
+                <Text>Add your first config</Text>
+              </HStack>
+            </Button>
+          </VStack>
+        </EmptyState.Content>
+      </EmptyState.Root>
     );
   }
   return (
