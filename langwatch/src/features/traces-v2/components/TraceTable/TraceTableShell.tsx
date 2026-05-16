@@ -37,7 +37,15 @@ export function TraceTableShell<T>({
     <TableEl
       width="full"
       css={{
-        borderCollapse: "collapse",
+        // `separate` + `border-spacing: 0` keeps the visual look of a
+        // single-pixel grid (no gaps between cells) while letting each
+        // TH/TD render its OWN borders — under `collapse` adjacent
+        // borders are merged and the head's vertical separators were
+        // being absorbed by the body cells below, so the head looked
+        // borderless even though we set borderRight on every TH. With
+        // `separate` each TH paints its own right edge cleanly.
+        borderCollapse: "separate",
+        borderSpacing: 0,
         tableLayout: "fixed",
         minWidth,
         position: "relative",
@@ -59,13 +67,12 @@ export function TraceTableShell<T>({
         {table.getHeaderGroups().map((headerGroup) => (
           <Tr
             key={headerGroup.id}
-            // Heavier bottom border so the head reads as its own band
-            // against the white body rows. `border.emphasized` was the
-            // intent here, but in light mode against `bg.subtle` it was
-            // washing out — using the explicit gray.300/gray.600 step
-            // gives consistent contrast across modes.
-            borderBottomWidth="1px"
-            borderColor={{ base: "gray.300", _dark: "gray.700" }}
+            // Under `border-collapse: separate` the TR-level border
+            // doesn't paint reliably across cells — the row-level
+            // border needs to live on each TH (handled in HeaderCell
+            // below). Keeping the prop here for legacy SSR markup but
+            // it's a no-op under the new collapse mode.
+            borderBottomWidth="0"
           >
             {headerGroup.headers.map((header, i) => (
               <HeaderCell
@@ -137,12 +144,18 @@ function HeaderCell<T>({
             ? { base: "bg.subtle", _dark: "bg.surface" }
             : undefined
       }
-      // Visible 1px vertical separator between TH cells, matched to
-      // the head row's bottom border so the head reads as a clear
-      // bordered band — the previous `border.emphasized` token was
-      // rendering near-invisible against `bg.subtle` in light mode.
+      // Vertical separator between TH cells + bottom border to
+      // separate the head from the body rows. Under
+      // `border-collapse: separate` both edges paint cleanly per cell
+      // (the TR-level border was being swallowed). One step lighter
+      // than `gray.300/gray.700` since `separate` mode renders the
+      // border at full strength without sharing pixels with the body
+      // cell below — the previous step looked too heavy once the
+      // collapse merging stopped.
       borderRightWidth="1px"
-      borderRightColor={{ base: "gray.300", _dark: "gray.700" }}
+      borderRightColor={{ base: "gray.200", _dark: "gray.800" }}
+      borderBottomWidth="1px"
+      borderBottomColor={{ base: "gray.200", _dark: "gray.800" }}
       // Unified padding for every header — sortable + non-sortable share the
       // same Th paddings so the column titles line up across the row. The
       // sortable button below is `width: full` and only adds its own
