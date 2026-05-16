@@ -33,6 +33,7 @@ import {
   Heading,
   HStack,
   IconButton,
+  Menu,
   Spinner,
   Table,
   Text,
@@ -40,15 +41,16 @@ import {
 } from "@chakra-ui/react";
 import {
   Building2,
+  Edit,
   Folder,
-  Pencil,
+  MoreVertical,
   Plus,
   SlidersHorizontal,
+  Trash2,
   Users,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
 
@@ -58,6 +60,7 @@ import {
   type ScopeFilter,
 } from "./DefaultModelsScopeFilter";
 import { ModelChip } from "./ModelChip";
+import { toaster } from "~/components/ui/toaster";
 
 type Payload = RouterOutputs["modelProvider"]["getDefaultModelsForProject"];
 type ConfigRow = Payload["configs"][number];
@@ -71,7 +74,18 @@ const ROLE_LABEL: Record<ModelRoleKey, string> = {
   EMBEDDINGS: "Embeddings",
 };
 
-export function DefaultModelsSection() {
+interface DefaultModelsSectionProps {
+  /** Optional controlled filter from the page-level header dropdown.
+   *  When omitted the section keeps its own local state (used by tests
+   *  and standalone embeddings). */
+  filter?: ScopeFilter;
+  onFilterChange?: (next: ScopeFilter) => void;
+}
+
+export function DefaultModelsSection({
+  filter: controlledFilter,
+  onFilterChange,
+}: DefaultModelsSectionProps = {}) {
   const { project, team, organization } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
 
@@ -80,9 +94,35 @@ export function DefaultModelsSection() {
     { enabled: !!projectId },
   );
 
-  const [filter, setFilter] = useState<ScopeFilter>({ kind: "all" });
+  const [localFilter, setLocalFilter] = useState<ScopeFilter>({ kind: "all" });
+  const filter = controlledFilter ?? localFilter;
+  const setFilter = onFilterChange ?? setLocalFilter;
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editing, setEditing] = useState<ConfigRow | undefined>(undefined);
+
+  const utils = api.useContext();
+  const deleteMutation =
+    api.modelProvider.deleteDefaultModelsConfig.useMutation();
+  const handleDelete = async (c: ConfigRow) => {
+    try {
+      await deleteMutation.mutateAsync({ id: c.id });
+      await utils.modelProvider.getDefaultModelsForProject.invalidate();
+      toaster.create({
+        title: "Config deleted",
+        type: "success",
+        duration: 2500,
+        meta: { closable: true },
+      });
+    } catch (err) {
+      toaster.create({
+        title: "Failed to delete",
+        description: err instanceof Error ? err.message : String(err),
+        type: "error",
+        duration: 6000,
+        meta: { closable: true },
+      });
+    }
+  };
 
   const featuresByRole = useMemo(() => {
     const m: Record<ModelRoleKey, Payload["features"]> = {
@@ -133,23 +173,26 @@ export function DefaultModelsSection() {
             Default Models
           </Heading>
           <Text fontSize="sm" color="fg.muted">
-            One policy per scope, cascading like CSS. Pin a model at the
-            organization, override on specific teams or projects, drill
-            into a single feature only when you want a different model
-            there.
+            Define the default models to be used for language features.
           </Text>
         </VStack>
         <HStack gap={2}>
-          <DefaultModelsScopeFilter
-            value={filter}
-            onChange={setFilter}
-            available={data.available}
-            currentTeamId={team?.id}
-            currentProjectId={project?.id}
-          />
+          {/* When the section is uncontrolled (mounted outside the
+              settings page), render its own filter dropdown for parity.
+              In the controlled case the filter lives in the page header,
+              so we skip rendering it here to avoid the duplicate. */}
+          {controlledFilter === undefined && (
+            <DefaultModelsScopeFilter
+              value={filter}
+              onChange={setFilter}
+              available={data.available}
+              currentTeamId={team?.id}
+              currentProjectId={project?.id}
+            />
+          )}
           <Button
             size="sm"
-            colorPalette="orange"
+            variant="outline"
             data-testid="add-config-button"
             onClick={openAdd}
           >
@@ -168,6 +211,7 @@ export function DefaultModelsSection() {
               configs={data.configs}
               features={data.features}
               onEdit={openEdit}
+              onDelete={handleDelete}
               onAdd={openAdd}
             />
           ) : (
@@ -207,11 +251,13 @@ function AllConfigsView({
   configs,
   features,
   onEdit,
+  onDelete,
   onAdd,
 }: {
   configs: ConfigRow[];
   features: Payload["features"];
   onEdit: (c: ConfigRow) => void;
+  onDelete: (c: ConfigRow) => void;
   onAdd: () => void;
 }) {
   if (configs.length === 0) {
@@ -279,17 +325,50 @@ function AllConfigsView({
               </Table.Cell>
             ))}
             <Table.Cell textAlign="right">
-              <Tooltip content="Edit this config">
-                <IconButton
-                  size="xs"
-                  variant="ghost"
-                  aria-label="Edit config"
-                  onClick={() => onEdit(c)}
-                  data-testid={`config-row-${c.id}-edit`}
-                >
-                  <Pencil size={14} />
-                </IconButton>
-              </Tooltip>
+              {/* Matches the model-providers table: vertical 3-dot menu
+                  with Edit + Delete instead of a pencil in the row and a
+                  Delete button buried in the drawer footer. */}
+              <Menu.Root>
+                <Menu.Trigger asChild>
+                  <IconButton
+                    size="xs"
+                    variant="ghost"
+                    aria-label="Config actions"
+                    data-testid={`config-row-${c.id}-actions`}
+                  >
+                    <MoreVertical size={14} />
+                  </IconButton>
+                </Menu.Trigger>
+                <Menu.Content>
+                  <Menu.Item
+                    value="edit"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onEdit(c);
+                    }}
+                    data-testid={`config-row-${c.id}-edit`}
+                  >
+                    <Box display="flex" alignItems="center" gap={2}>
+                      <Edit size={14} />
+                      Edit config
+                    </Box>
+                  </Menu.Item>
+                  <Menu.Item
+                    value="delete"
+                    color="red"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onDelete(c);
+                    }}
+                    data-testid={`config-row-${c.id}-delete`}
+                  >
+                    <Box display="flex" alignItems="center" gap={2}>
+                      <Trash2 size={14} />
+                      Delete config
+                    </Box>
+                  </Menu.Item>
+                </Menu.Content>
+              </Menu.Root>
             </Table.Cell>
           </Table.Row>
         ))}

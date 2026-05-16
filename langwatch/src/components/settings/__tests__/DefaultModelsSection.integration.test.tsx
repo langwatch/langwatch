@@ -196,18 +196,33 @@ describe("<DefaultModelsSection />", () => {
   });
 
   /** @scenario Editing an assignment row opens the drawer pre-filled with that rule */
-  it("opens the override drawer pre-filled when an Edit button is clicked", async () => {
+  it("opens the override drawer pre-filled when Edit is picked from the row menu", async () => {
+    renderSection();
+    // Open the 3-dot row menu, then pick Edit. Mirrors the model-providers
+    // row pattern — Edit + Delete live behind a MoreVertical popover.
+    fireEvent.click(
+      screen.getByTestId("config-row-cfg_acme_org-actions"),
+    );
+    fireEvent.click(
+      await screen.findByTestId("config-row-cfg_acme_org-edit"),
+    );
+    // Drawer rendered with the role rows for the picked config.
+    expect(
+      await screen.findByTestId("role-row-default"),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("config-save")).toBeInTheDocument();
+  });
+
+  /** @scenario Deleting a config via the row menu removes the row */
+  it("fires the delete mutation when Delete is picked from the row menu", async () => {
     renderSection();
     fireEvent.click(
-      screen.getByTestId("config-row-cfg_acme_org-edit"),
+      screen.getByTestId("config-row-cfg_acme_org-actions"),
     );
-    expect(
-      await screen.findByText(/Edit config/),
-    ).toBeInTheDocument();
-    // Drawer is in edit mode → Delete enabled.
-    expect(screen.getByTestId("config-delete")).not.toBeDisabled();
-    // The DEFAULT role row exists in the drawer.
-    expect(screen.getByTestId("role-row-default")).toBeInTheDocument();
+    fireEvent.click(
+      await screen.findByTestId("config-row-cfg_acme_org-delete"),
+    );
+    expect(mockDelete).toHaveBeenCalledWith({ id: "cfg_acme_org" });
   });
 
   /** @scenario Adding an override opens a drawer with a scope chip picker and per-role model selectors */

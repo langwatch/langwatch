@@ -108,8 +108,6 @@ export function DefaultModelOverrideDrawer({
 }: Props) {
   const utils = api.useContext();
   const saveMutation = api.modelProvider.saveDefaultModelsConfig.useMutation();
-  const deleteMutation =
-    api.modelProvider.deleteDefaultModelsConfig.useMutation();
   const { project } = useOrganizationTeamProject();
 
   // Ask the server what the cascade would resolve for each role +
@@ -288,33 +286,6 @@ export function DefaultModelOverrideDrawer({
     }
   }, [canSave, saveMutation, editing, config, scopes, utils, onSaved, onClose]);
 
-  const handleDelete = useCallback(async () => {
-    if (!editing) return;
-    setBusy(true);
-    try {
-      await deleteMutation.mutateAsync({ id: editing.id });
-      await utils.modelProvider.getDefaultModelsForProject.invalidate();
-      toaster.create({
-        title: "Config deleted",
-        type: "success",
-        duration: 2500,
-        meta: { closable: true },
-      });
-      onSaved();
-      onClose();
-    } catch (err) {
-      toaster.create({
-        title: "Failed to delete",
-        description: err instanceof Error ? err.message : String(err),
-        type: "error",
-        duration: 6000,
-        meta: { closable: true },
-      });
-    } finally {
-      setBusy(false);
-    }
-  }, [editing, deleteMutation, utils, onSaved, onClose]);
-
   return (
     <Drawer.Root
       open={open}
@@ -366,32 +337,23 @@ export function DefaultModelOverrideDrawer({
           </VStack>
         </Drawer.Body>
         <Drawer.Footer>
-          <HStack width="full" justify="space-between">
-            <Button
-              variant="ghost"
-              colorPalette="red"
-              size="sm"
-              onClick={handleDelete}
-              disabled={!editing || busy}
-              data-testid="config-delete"
-            >
-              Delete
+          {/* Delete moved to the row's 3-dot menu in the table — matches
+              the model-providers row pattern. The drawer is purely
+              edit/save. */}
+          <HStack width="full" justify="flex-end" gap={2}>
+            <Button variant="outline" size="sm" onClick={onClose}>
+              Cancel
             </Button>
-            <HStack gap={2}>
-              <Button variant="outline" size="sm" onClick={onClose}>
-                Cancel
-              </Button>
-              <Button
-                colorPalette="orange"
-                size="sm"
-                onClick={handleSave}
-                disabled={!canSave}
-                loading={busy}
-                data-testid="config-save"
-              >
-                {editing ? "Save changes" : "Add config"}
-              </Button>
-            </HStack>
+            <Button
+              colorPalette="orange"
+              size="sm"
+              onClick={handleSave}
+              disabled={!canSave}
+              loading={busy}
+              data-testid="config-save"
+            >
+              {editing ? "Save changes" : "Add config"}
+            </Button>
           </HStack>
         </Drawer.Footer>
       </Drawer.Content>
@@ -606,6 +568,12 @@ function buildInheritOption(
         label: `Suggested from ${providerName}`,
       };
     }
+    if (fromServer.source === "system") {
+      return {
+        model: fromServer.model,
+        label: "Inherit (from System)",
+      };
+    }
     const scope = fromServer.scope ?? "cascade";
     return {
       model: fromServer.model,
@@ -613,13 +581,16 @@ function buildInheritOption(
     };
   }
   if (fromEffective) {
+    if (fromEffective.source === "system") {
+      return {
+        model: fromEffective.model,
+        label: "Inherit (from System)",
+      };
+    }
     const scope = fromEffective.scope ?? "cascade";
     return {
       model: fromEffective.model,
-      label:
-        fromEffective.source === "system"
-          ? "Inherit (System default)"
-          : `Inherit (from ${scope})`,
+      label: `Inherit (from ${scope})`,
     };
   }
   return undefined;

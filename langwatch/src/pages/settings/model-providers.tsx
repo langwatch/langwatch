@@ -14,6 +14,10 @@ import {
 } from "@chakra-ui/react";
 import { BrainCircuit, Edit, MoreVertical, Plus, Trash2 } from "lucide-react";
 import { DefaultModelsSection } from "../../components/settings/DefaultModelsSection";
+import {
+  DefaultModelsScopeFilter,
+  type ScopeFilter as PageScopeFilter,
+} from "../../components/settings/DefaultModelsScopeFilter";
 import { ProviderScopeChips } from "../../components/settings/ProviderScopeChips";
 import { useEffect, useMemo, useState } from "react";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
@@ -38,10 +42,7 @@ import {
   DEFAULT_EMBEDDINGS_MODEL,
   DEFAULT_TOPIC_CLUSTERING_MODEL,
 } from "../../utils/constants";
-import {
-  filterProvidersByScope,
-  type ScopeFilter,
-} from "../../utils/filterProvidersByScope";
+import { filterProvidersByScope } from "../../utils/filterProvidersByScope";
 import {
   isProviderEffectiveDefault,
   isProviderUsedForDefaultModels,
@@ -49,7 +50,7 @@ import {
 } from "../../utils/modelProviderHelpers";
 
 export default function ModelsPage() {
-  const { project, organization, hasPermission } =
+  const { project, organization, team, hasPermission } =
     useOrganizationTeamProject();
   const hasModelProvidersManagePermission = hasPermission("project:manage");
   const { providers, isLoading, refetch } = useModelProvidersSettings({
@@ -65,7 +66,33 @@ export default function ModelsPage() {
     name: string;
   } | null>(null);
 
-  const [scopeFilter, setScopeFilter] = useState<ScopeFilter>("all");
+  // One scope filter drives both tables on this page (Model Providers
+  // and Default Models). Shape matches the DefaultModelsScopeFilter
+  // primitive used in the header.
+  const [scopeFilter, setScopeFilter] = useState<PageScopeFilter>({
+    kind: "all",
+  });
+
+  // Build the `available` payload the filter dropdown needs (org / teams /
+  // projects). Pulled from the current organization graph so the page
+  // doesn't have to wait on the default-models query before the header
+  // filter can render.
+  const filterAvailable = useMemo(() => {
+    const teams = organization?.teams ?? [];
+    return {
+      organization: organization
+        ? { id: organization.id, name: organization.name }
+        : null,
+      teams: teams.map((t) => ({ id: t.id, name: t.name })),
+      projects: teams.flatMap((t) =>
+        (t.projects ?? []).map((p) => ({
+          id: p.id,
+          name: p.name,
+          teamId: t.id,
+        })),
+      ),
+    };
+  }, [organization]);
 
   const allEnabledProviders = useMemo(() => {
     if (!providers) return [];
@@ -131,41 +158,17 @@ export default function ModelsPage() {
         <HStack width="full" marginTop={2}>
           <Heading as="h2">Model Providers</Heading>
           <Spacer />
-          {/* Scope filter — providers always live across org/team/project;
-              this just narrows the visible rows. See
-              specs/model-providers/scope-filter.feature. */}
-          <Menu.Root>
-            <Menu.Trigger asChild>
-              <Button
-                size="sm"
-                variant="outline"
-                data-testid="scope-filter-trigger"
-              >
-                {scopeFilter === "all"
-                  ? "All you can see"
-                  : scopeFilter === "organization"
-                    ? "Organization"
-                    : "This project"}
-              </Button>
-            </Menu.Trigger>
-            <Menu.Content>
-              <Menu.Item value="all" onClick={() => setScopeFilter("all")}>
-                All you can see
-              </Menu.Item>
-              <Menu.Item
-                value="organization"
-                onClick={() => setScopeFilter("organization")}
-              >
-                Organization
-              </Menu.Item>
-              <Menu.Item
-                value="project"
-                onClick={() => setScopeFilter("project")}
-              >
-                This project
-              </Menu.Item>
-            </Menu.Content>
-          </Menu.Root>
+          {/* Single scope filter for the whole page — narrows both the
+              Model Providers table and the Default Models table below.
+              The DefaultModelsScopeFilter primitive carries the caret
+              icon + "More Scopes" submenu (see scope-filter.feature). */}
+          <DefaultModelsScopeFilter
+            value={scopeFilter}
+            onChange={setScopeFilter}
+            available={filterAvailable}
+            currentTeamId={team?.id}
+            currentProjectId={project?.id}
+          />
           {/*
             iter 109 #63: ProjectSelector is gone — Model Providers is now
             an org-level surface. Scope is set per-row via the drawer's
@@ -370,7 +373,10 @@ export default function ModelsPage() {
             provider drawer. Resolves project → team → organization →
             built-in constant. See specs/model-providers/
             hierarchical-default-models.feature. */}
-        <DefaultModelsSection />
+        <DefaultModelsSection
+          filter={scopeFilter}
+          onFilterChange={setScopeFilter}
+        />
 
         <Dialog.Root
           open={!!providerToDisable}
