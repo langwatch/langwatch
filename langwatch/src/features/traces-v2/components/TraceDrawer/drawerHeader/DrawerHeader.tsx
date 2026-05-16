@@ -743,7 +743,13 @@ export const DrawerHeader = memo(function DrawerHeader({
           )}
         </HStack>
 
-        <HStack gap={1} flexShrink={0}>
+        {/* Negative marginRight cancels the header's paddingX so the
+            close button sits flush with the drawer edge, matching the
+            online-evaluations / add-to-dataset drawers (their
+            DrawerCloseTrigger uses absolute positioning at the edge).
+            Without this offset the X reads as floating ~8px in from
+            the drawer chrome. */}
+        <HStack gap={1} flexShrink={0} marginRight={-2}>
           <Tooltip
             content={
               <HStack gap={1}>
