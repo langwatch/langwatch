@@ -10,6 +10,7 @@ import { ColumnsDropdown } from "./ColumnsDropdown";
 import { DensityToggle } from "./DensityToggle";
 import { GroupingSelector } from "./GroupingSelector";
 import { KeyboardShortcutsButton } from "./KeyboardShortcutsButton";
+import { LensNamePopover } from "./LensNamePopover";
 import { LensTabs } from "./LensTabs";
 import { LiveIndicator } from "./LiveIndicator";
 import { TimeRangePicker } from "./TimeRangePicker";
@@ -34,10 +35,10 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll }) => {
   const { onLaunchTour, onEndTour, tourActive } = useTourEntryPoints();
 
   // "Save Lens" outline button only surfaces when the active lens has
-  // pending local changes. Clicking it opens the same save-as-new flow
-  // the lens tab's overflow menu uses (browser prompt for the new
-  // name). Reverting is one keystroke away via the lens tab's right-
-  // click menu — we don't double up the affordance in the toolbar.
+  // pending local changes. Clicking it opens the shared
+  // `LensNamePopover` — same Chakra UI the + new lens button uses.
+  // Reverting is one keystroke away via the lens tab's right-click
+  // menu and via the draft-dot popover.
   const activeLensId = useViewStore((s) => s.activeLensId);
   const activeLensIsDraft = useViewStore((s) => s.isDraft(activeLensId));
   const activeLensName = useViewStore(
@@ -45,18 +46,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll }) => {
       s.allLenses.find((l) => l.id === activeLensId)?.name ?? "Current view",
   );
   const createLens = useViewStore((s) => s.createLens);
-
-  const handleSaveLens = () => {
-    if (typeof window === "undefined") return;
-    const name = window.prompt(
-      "Save current view as a new lens — name:",
-      `${activeLensName} (copy)`,
-    );
-    if (!name) return;
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    createLens(trimmed);
-  };
 
   return (
     <Flex
@@ -70,6 +59,24 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll }) => {
     >
       <LensTabs />
       <Flex marginLeft="auto" gap={1.5} align="center" flexShrink={0}>
+        {activeLensIsDraft && (
+          <LensNamePopover
+            defaultName={`${activeLensName} (copy)`}
+            onSubmit={(name) => createLens(name)}
+          >
+            <Button
+              size="xs"
+              variant="outline"
+              colorPalette="orange"
+              aria-label="Save current view as a new lens"
+            >
+              <Icon boxSize={3.5}>
+                <Bookmark />
+              </Icon>
+              Save Lens
+            </Button>
+          </LensNamePopover>
+        )}
         <Tooltip
           content={tourActive ? "Click to end the tour" : "Take the trace explorer tour"}
           positioning={{ placement: "bottom" }}
@@ -94,37 +101,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll }) => {
             {tourActive ? "On safari" : "Tour"}
           </Button>
         </Tooltip>
-        {activeLensIsDraft && (
-          <Tooltip
-            content={
-              <Flex direction="column" gap={1} maxWidth="240px">
-                <span>
-                  You've changed the current view's filters, columns, or
-                  grouping. Click to save these as a new lens you can
-                  always come back to.
-                </span>
-                <span style={{ opacity: 0.7 }}>
-                  Right-click the lens tab → Revert local changes to
-                  discard.
-                </span>
-              </Flex>
-            }
-            positioning={{ placement: "bottom" }}
-          >
-            <Button
-              size="xs"
-              variant="outline"
-              colorPalette="orange"
-              onClick={handleSaveLens}
-              aria-label="Save current view as a new lens"
-            >
-              <Icon boxSize={3.5}>
-                <Bookmark />
-              </Icon>
-              Save lens
-            </Button>
-          </Tooltip>
-        )}
         <LiveIndicator />
         <TimeRangePicker />
         <ColumnsDropdown />

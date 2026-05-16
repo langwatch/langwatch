@@ -10,6 +10,7 @@ import {
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import {
   LuArrowLeft,
+  LuCopy,
   LuLock,
   LuLockOpen,
   LuMaximize2,
@@ -76,6 +77,63 @@ interface DrawerHeaderProps {
   trace: TraceHeader;
   /** Parent's drawer-close handler (URL teardown). */
   onClose: () => void;
+}
+
+/**
+ * Inline trace ID chip — collapsed to the first 5 chars by default so
+ * it doesn't compete with the trace name, expands to the full ID on
+ * hover, and reveals a copy icon at the trailing edge. Power-users can
+ * still hit `Y` (overflow-menu shortcut) to copy without hovering;
+ * this is for the case where they want to read the ID without leaving
+ * the header.
+ */
+function TraceIdChip({
+  traceId,
+  onCopy,
+}: {
+  traceId: string;
+  onCopy: () => void;
+}) {
+  const short = traceId.slice(0, 5);
+  return (
+    <Tooltip
+      content="Trace ID — hover to see full, click to copy"
+      positioning={{ placement: "bottom" }}
+      openDelay={500}
+    >
+      <HStack
+        as="button"
+        gap={1}
+        paddingX={1.5}
+        paddingY={0.5}
+        borderRadius="md"
+        bg={{ base: "blackAlpha.50", _dark: "whiteAlpha.100" }}
+        color="fg.muted"
+        cursor="pointer"
+        flexShrink={0}
+        fontFamily="mono"
+        fontSize="2xs"
+        aria-label={`Copy trace ID ${traceId}`}
+        onClick={onCopy}
+        css={{
+          "& [data-hover-only]": { display: "none" },
+          "&:hover": { color: "fg" },
+          "&:hover [data-hover-only]": { display: "inline-flex" },
+          "&:hover [data-collapsed]": { display: "none" },
+          "&:hover [data-expanded]": { display: "inline" },
+        }}
+        _hover={{ bg: { base: "blackAlpha.100", _dark: "whiteAlpha.200" } }}
+      >
+        <Text as="span" data-collapsed>
+          {short}
+        </Text>
+        <Text as="span" data-expanded display="none">
+          {traceId}
+        </Text>
+        <Icon as={LuCopy} boxSize={3} data-hover-only />
+      </HStack>
+    </Tooltip>
+  );
 }
 
 /**
@@ -650,6 +708,7 @@ export const DrawerHeader = memo(function DrawerHeader({
             titleText={titleText}
             titleIsFallback={titleIsFallback}
           />
+          <TraceIdChip traceId={trace.traceId} onCopy={handleCopyTraceId} />
           <StatusChip trace={trace} statusColor={statusColor} />
           {conversationContext.total > 1 && (
             <ThreadProgressIndicator

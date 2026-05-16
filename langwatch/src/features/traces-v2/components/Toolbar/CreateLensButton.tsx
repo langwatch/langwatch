@@ -70,13 +70,20 @@ export const CreateLensButton: React.FC = () => {
           setOpen(e.open);
           if (!e.open) setName("");
         }}
+        // Anchor below the + trigger. Without an explicit placement,
+        // the popover was rendering at the document's top-left corner —
+        // the previous markup wrapped `PopoverTrigger` inside `Tooltip`,
+        // which severed the ref chain Zag.js uses to locate the anchor.
+        // Tooltip now lives INSIDE the trigger so the trigger receives
+        // the Button ref directly.
+        positioning={{ placement: "bottom-start" }}
       >
-        <Tooltip
-          content={BETA_TOOLTIP}
-          positioning={{ placement: "bottom" }}
-          contentProps={{ maxWidth: "240px" }}
-        >
-          <PopoverTrigger asChild>
+        <PopoverTrigger asChild>
+          <Tooltip
+            content={BETA_TOOLTIP}
+            positioning={{ placement: "bottom" }}
+            contentProps={{ maxWidth: "240px" }}
+          >
             <Button
               size="xs"
               variant="ghost"
@@ -87,8 +94,8 @@ export const CreateLensButton: React.FC = () => {
             >
               <LuPlus />
             </Button>
-          </PopoverTrigger>
-        </Tooltip>
+          </Tooltip>
+        </PopoverTrigger>
         <PopoverContent width="280px">
           <PopoverBody>
             <Stack gap={3}>

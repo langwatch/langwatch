@@ -1,4 +1,4 @@
-import { Box, Input, Tabs } from "@chakra-ui/react";
+import { Box, Button, HStack, Input, Stack, Tabs, Text } from "@chakra-ui/react";
 import type React from "react";
 import { useState } from "react";
 import {
@@ -8,6 +8,12 @@ import {
   LuTrash2,
   LuUndo2,
 } from "react-icons/lu";
+import {
+  PopoverBody,
+  PopoverContent,
+  PopoverRoot,
+  PopoverTrigger,
+} from "~/components/ui/popover";
 import { Tooltip } from "~/components/ui/tooltip";
 import {
   MenuContent,
@@ -18,6 +24,7 @@ import {
 } from "../../../../components/ui/menu";
 import type { LensConfig } from "../../stores/viewStore";
 import { useViewStore } from "../../stores/viewStore";
+import { LensNameDialog } from "./LensNameDialog";
 
 interface LensTabProps {
   lens: LensConfig;
@@ -86,7 +93,7 @@ export const LensTab: React.FC<LensTabProps> = ({
           </Box>
         </BuiltInTooltip>
       )}
-      {isDraft && <DraftDot />}
+      {isDraft && <DraftDot lensId={lens.id} lensName={lens.name} />}
       {errorCount > 0 && <ErrorBadge count={errorCount} />}
     </Tabs.Trigger>
   );
@@ -129,18 +136,96 @@ const BuiltInTooltip: React.FC<BuiltInTooltipProps> = ({
   );
 };
 
-const DraftDot: React.FC = () => (
-  <Box
-    as="span"
-    width="6px"
-    height="6px"
-    borderRadius="full"
-    backgroundColor="orange.solid"
-    display="inline-block"
-    marginLeft={0.5}
-    flexShrink={0}
-  />
-);
+/**
+ * Orange dot marking a lens with unsaved local edits. Clicking the dot
+ * opens a popover explaining "changes made" and offering Discard /
+ * Save as new lens. Replaces the previous bare dot — which carried the
+ * signal but no affordance, leaving users guessing what it meant or
+ * how to resolve it.
+ */
+const DraftDot: React.FC<{ lensId: string; lensName: string }> = ({
+  lensId,
+  lensName,
+}) => {
+  const revertLens = useViewStore((s) => s.revertLens);
+  const createLens = useViewStore((s) => s.createLens);
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [popoverOpen, setPopoverOpen] = useState(false);
+
+  return (
+    <>
+      <PopoverRoot
+        open={popoverOpen}
+        onOpenChange={(e) => setPopoverOpen(e.open)}
+        positioning={{ placement: "bottom" }}
+      >
+        <PopoverTrigger asChild>
+          <Box
+            as="button"
+            width="10px"
+            height="10px"
+            borderRadius="full"
+            backgroundColor="orange.solid"
+            display="inline-block"
+            marginLeft={1}
+            flexShrink={0}
+            cursor="pointer"
+            aria-label="Unsaved changes on this lens — click for options"
+            onClick={(e) => {
+              e.stopPropagation();
+              setPopoverOpen((v) => !v);
+            }}
+          />
+        </PopoverTrigger>
+        <PopoverContent width="280px">
+          <PopoverBody>
+            <Stack gap={3}>
+              <Text textStyle="sm" color="fg.muted" lineHeight="1.4">
+                You've changed columns, filters or sort on{" "}
+                <Text as="span" color="fg" fontWeight="semibold">
+                  {lensName}
+                </Text>
+                . These edits live in your browser only — save them as a
+                new lens to keep them, or discard to snap back.
+              </Text>
+              <HStack gap={2} justify="flex-end">
+                <Button
+                  size="xs"
+                  variant="ghost"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    revertLens(lensId);
+                    setPopoverOpen(false);
+                  }}
+                >
+                  Discard changes
+                </Button>
+                <Button
+                  size="xs"
+                  colorPalette="orange"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setPopoverOpen(false);
+                    setSaveDialogOpen(true);
+                  }}
+                >
+                  Save as new lens
+                </Button>
+              </HStack>
+            </Stack>
+          </PopoverBody>
+        </PopoverContent>
+      </PopoverRoot>
+      <LensNameDialog
+        open={saveDialogOpen}
+        onOpenChange={setSaveDialogOpen}
+        title="Save changes as new lens"
+        defaultName={`${lensName} (copy)`}
+        onSubmit={(name) => createLens(name)}
+      />
+    </>
+  );
+};
 
 const ErrorBadge: React.FC<{ count: number }> = ({ count }) => (
   <Box
@@ -197,25 +282,6 @@ const RenameInput: React.FC<{
   );
 };
 
-/**
- * Prompt the user for a new lens name and call `createLens` with the
- * trimmed result. Uses `window.prompt` for now — it sidesteps the awkward
- * "popover-from-context-menu" interaction and matches the bar of effort the
- * existing rename flow sets. Replace with a proper inline input later if
- * we want to polish it.
- */
-function promptSaveAsNewLens(
-  defaultName: string,
-  createLens: (name: string) => string,
-): void {
-  if (typeof window === "undefined") return;
-  const name = window.prompt("Save as new lens — name:", defaultName);
-  if (!name) return;
-  const trimmed = name.trim();
-  if (!trimmed) return;
-  createLens(trimmed);
-}
-
 const BuiltInLensMenuItems: React.FC<{
   lensId: string;
   canDelete: boolean;
@@ -227,12 +293,13 @@ const BuiltInLensMenuItems: React.FC<{
   const revertLens = useViewStore((s) => s.revertLens);
   const createLens = useViewStore((s) => s.createLens);
   const deleteLens = useViewStore((s) => s.deleteLens);
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
 
   return (
     <>
       <MenuItem
         value="save-as-new"
-        onClick={() => promptSaveAsNewLens(`${lensName} (copy)`, createLens)}
+        onClick={() => setSaveDialogOpen(true)}
         fontWeight={isDraft ? "semibold" : undefined}
       >
         <LuFilePlus />
@@ -256,6 +323,13 @@ const BuiltInLensMenuItems: React.FC<{
         <LuTrash2 />
         Delete
       </MenuItem>
+      <LensNameDialog
+        open={saveDialogOpen}
+        onOpenChange={setSaveDialogOpen}
+        title={isDraft ? "Save changes as new lens" : "Save as new lens"}
+        defaultName={`${lensName} (copy)`}
+        onSubmit={(name) => createLens(name)}
+      />
     </>
   );
 };
@@ -272,6 +346,7 @@ const UserLensMenuItems: React.FC<{
   const createLens = useViewStore((s) => s.createLens);
   const duplicateLens = useViewStore((s) => s.duplicateLens);
   const deleteLens = useViewStore((s) => s.deleteLens);
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
 
   return (
     <>
@@ -280,7 +355,7 @@ const UserLensMenuItems: React.FC<{
           "persist my changes" with "rewrite the shared lens definition". */}
       <MenuItem
         value="save-as-new"
-        onClick={() => promptSaveAsNewLens(`${lensName} (copy)`, createLens)}
+        onClick={() => setSaveDialogOpen(true)}
         fontWeight={isDraft ? "semibold" : undefined}
       >
         <LuFilePlus />
@@ -312,6 +387,13 @@ const UserLensMenuItems: React.FC<{
         <LuTrash2 />
         Delete
       </MenuItem>
+      <LensNameDialog
+        open={saveDialogOpen}
+        onOpenChange={setSaveDialogOpen}
+        title={isDraft ? "Save changes as new lens" : "Save as new lens"}
+        defaultName={`${lensName} (copy)`}
+        onSubmit={(name) => createLens(name)}
+      />
     </>
   );
 };
