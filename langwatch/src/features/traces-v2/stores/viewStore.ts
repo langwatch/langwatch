@@ -143,7 +143,6 @@ export function setLensSyncBridge(bridge: LensSyncBridge | null): void {
   lensSyncBridge = bridge;
 }
 
-const STORAGE_KEY = "langwatch:traces-v2:lenses:v2";
 const DISMISSED_BUILTINS_KEY = "langwatch:traces-v2:dismissed-builtins:v1";
 const DRAFTS_KEY = "langwatch:traces-v2:drafts:v1";
 
@@ -164,37 +163,13 @@ function migrateGrouping(value: unknown): GroupingMode | undefined {
   return isGroupingMode(value) ? value : undefined;
 }
 
-function loadCustomLenses(): LensConfig[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as Array<Partial<LensConfig>>;
-    if (!Array.isArray(parsed)) return [];
-    return parsed.map((lens) => ({
-      id: lens.id ?? "",
-      name: lens.name ?? "Untitled",
-      isBuiltIn: false,
-      columns: Array.isArray(lens.columns) ? lens.columns : [],
-      addons: Array.isArray(lens.addons) ? lens.addons : [],
-      grouping: migrateGrouping(lens.grouping) ?? "flat",
-      sort: lens.sort ?? DEFAULT_SORT,
-      filterText: typeof lens.filterText === "string" ? lens.filterText : "",
-    }));
-  } catch {
-    return [];
-  }
-}
-
-function persistCustomLenses(allLenses: LensConfig[]): void {
-  if (typeof window === "undefined") return;
-  try {
-    const custom = allLenses.filter((l) => !l.isBuiltIn);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(custom));
-  } catch {
-    // storage may be full / disabled
-  }
-}
+// Custom lenses no longer round-trip through localStorage. They live on
+// the server (SavedView table, kind="v2-traces-lens") and `useLensSync`
+// pushes them into the store via `setUserLenses` whenever the tRPC
+// query resolves. Drift between tabs is handled by React Query's
+// `refetchOnWindowFocus`; failed mutations roll back via the same
+// invalidate-on-error path. Keeping a localStorage shadow would just
+// be another source of inconsistency.
 
 function isSortConfig(value: unknown): value is SortConfig {
   if (!value || typeof value !== "object") return false;
@@ -454,10 +429,9 @@ function applyFilterTextFromLens(text: string): void {
 }
 
 const initialDismissedBuiltIns = loadDismissedBuiltInIds();
-const initialLenses: LensConfig[] = [
-  ...builtInLenses.filter((l) => !initialDismissedBuiltIns.has(l.id)),
-  ...loadCustomLenses(),
-];
+const initialLenses: LensConfig[] = builtInLenses.filter(
+  (l) => !initialDismissedBuiltIns.has(l.id),
+);
 const initialActiveLensId =
   initialLenses.find((l) => l.id === "all-traces")?.id ??
   initialLenses[0]?.id ??
@@ -610,7 +584,6 @@ export const useViewStore = create<ViewState>((set, get) => ({
       filterText: overrides?.filterText ?? getCurrentFilterText(),
     };
     const allLenses = [...state.allLenses, newLens];
-    persistCustomLenses(allLenses);
     lensSyncBridge?.create(newLens);
     // Adopt the new lens as the active one. When overrides are present we
     // also push the saved values into live state so the table immediately
@@ -656,7 +629,6 @@ export const useViewStore = create<ViewState>((set, get) => ({
       const allLenses = s.allLenses.map((l) =>
         l.id === lensId ? { ...l, name } : l,
       );
-      persistCustomLenses(allLenses);
       lensSyncBridge?.rename(lensId, name);
       return { allLenses };
     }),
@@ -675,7 +647,6 @@ export const useViewStore = create<ViewState>((set, get) => ({
       isBuiltIn: false,
     };
     const allLenses = [...state.allLenses, newLens];
-    persistCustomLenses(allLenses);
     lensSyncBridge?.create(newLens);
     applyFilterTextFromLens(newLens.filterText);
     set({
@@ -700,7 +671,6 @@ export const useViewStore = create<ViewState>((set, get) => ({
       dismissed.add(lensId);
       persistDismissedBuiltInIds(dismissed);
     } else {
-      persistCustomLenses(allLenses);
       lensSyncBridge?.delete(lensId);
     }
     if (s.activeLensId !== lensId) {
@@ -728,7 +698,6 @@ export const useViewStore = create<ViewState>((set, get) => ({
       // Mirror to localStorage so a refresh has instant data before
       // the tRPC query resolves — keeps the lens strip from flashing
       // empty between mount and hydration.
-      persistCustomLenses(allLenses);
       // If the active lens disappeared (deleted by another browser
       // tab / teammate), fall back to the first available.
       const activeStillPresent = allLenses.some(

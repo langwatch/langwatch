@@ -120,17 +120,6 @@ function RegistryRowComponent<TRow>({
 
   const mainRow = (
     <Tr
-      // Always render the row's bottom border, even when an addon row
-      // (e.g. IO preview arrows) sits below. Without this the vertical
-      // cell separators stop in mid-air at the addon row — the row
-      // visually melts into the addon block. The addon's own
-      // `borderBottomWidth` keeps the separation from the next trace.
-      borderBottomWidth="1px"
-      borderBottomColor={style.bottomSeparatorColor}
-      borderTopWidth={isFirstOfErrorRun ? "1px" : undefined}
-      borderTopColor={
-        isFirstOfErrorRun ? style.bottomSeparatorColor : undefined
-      }
       outline={isFocused ? "1px solid" : undefined}
       outlineColor={isFocused ? "blue.fg" : undefined}
       cursor={onSelect || onToggleExpand ? "pointer" : "default"}
@@ -150,6 +139,28 @@ function RegistryRowComponent<TRow>({
           <Td
             key={cell.id}
             bg={hoverScope === "unified" ? style.bg : undefined}
+            // Borders go on each TD instead of the Tr because the table
+            // runs under `border-collapse: separate` — under that mode
+            // browsers ignore TR-level borders, only TD borders render.
+            //
+            // The bottom border is skipped when an addon row (e.g. the
+            // IO preview) sits directly below — the main row + addon
+            // belong to the same row group visually, so a divider
+            // between them reads as the group being broken in two. The
+            // addon's own bottom border closes the group against the
+            // next trace.
+            //
+            // Top border only paints when this row leads a consecutive
+            // error run, so the red bracket closes the run on both
+            // sides instead of being open on top.
+            borderBottomWidth={hasAddons ? undefined : "1px"}
+            borderBottomColor={
+              hasAddons ? undefined : style.bottomSeparatorColor
+            }
+            borderTopWidth={isFirstOfErrorRun ? "1px" : undefined}
+            borderTopColor={
+              isFirstOfErrorRun ? style.bottomSeparatorColor : undefined
+            }
             // Select cells own their full padding so clicks anywhere inside
             // the cell (including the edge padding) hit the checkbox Box,
             // not the Td. The Box stops propagation so the row's

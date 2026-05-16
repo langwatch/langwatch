@@ -6,17 +6,9 @@ import type { CellDef } from "../../types";
 export const TraceCell = {
   id: "trace",
   label: "Trace",
-  render: ({ row }) => (
-    <HStack gap={1.5} minWidth={0}>
-      <TraceContent trace={row} size="compact" />
-      <TracePresenceAvatars traceId={row.traceId} max={3} size="2xs" />
-    </HStack>
-  ),
+  render: ({ row }) => <TraceContent trace={row} size="compact" />,
   renderComfortable: ({ row }) => (
-    <HStack gap={2} minWidth={0}>
-      <TraceContent trace={row} size="comfortable" />
-      <TracePresenceAvatars traceId={row.traceId} max={3} size="xs" />
-    </HStack>
+    <TraceContent trace={row} size="comfortable" />
   ),
 } as const satisfies CellDef<TraceListItem>;
 
@@ -28,6 +20,18 @@ const TraceContent: React.FC<{
   const nameStyle = comfortable ? "sm" : "xs";
   const idStyle = comfortable ? "xs" : "2xs";
   const hasName = Boolean(trace.traceName);
+  // Presence avatars sit immediately after the trace name — the trace
+  // ID + middle dot only fade in on hover, so without this placement
+  // the avatar would float alone in the middle of the cell with no
+  // anchor at rest. Right of the name keeps it adjacent to the title
+  // the avatar refers to.
+  const presence = (
+    <TracePresenceAvatars
+      traceId={trace.traceId}
+      max={3}
+      size={comfortable ? "xs" : "2xs"}
+    />
+  );
 
   return (
     <HStack gap={comfortable ? 2 : 1.5} minWidth={0}>
@@ -46,6 +50,7 @@ const TraceContent: React.FC<{
           >
             {trace.traceName}
           </Text>
+          {presence}
           {/* Trace ID + the separating middle dot fade in only when
               the parent row is hovered — keeps the table dense by
               default but the ID is one mouse-over away. The reveal is
@@ -77,16 +82,19 @@ const TraceContent: React.FC<{
           </Text>
         </HStack>
       ) : (
-        <Text
-          textStyle={nameStyle}
-          color="fg"
-          userSelect="all"
-          truncate
-          flexShrink={1}
-          minWidth={0}
-        >
-          {trace.traceId}
-        </Text>
+        <HStack gap={1.5} minWidth={0}>
+          <Text
+            textStyle={nameStyle}
+            color="fg"
+            userSelect="all"
+            truncate
+            flexShrink={1}
+            minWidth={0}
+          >
+            {trace.traceId}
+          </Text>
+          {presence}
+        </HStack>
       )}
     </HStack>
   );
