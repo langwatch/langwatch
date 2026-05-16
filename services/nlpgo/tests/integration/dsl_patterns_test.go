@@ -761,6 +761,117 @@ func TestPattern007_MultiOutputSignatureParseAndSplit(t *testing.T) {
 	assert.InDelta(t, 0.93, res.Result["confidence"], 1e-9)
 }
 
+// TestPattern_StructuredOutput_SingleBool is the B5 regression pin.
+// A prompt-playground-style signature node with a single `passed: bool`
+// output must trigger structured response_format on the LLM request and
+// parse the JSON reply back into a Go bool — exactly Python's
+// `_use_text_only_completion` parity at langwatch_nlp/.../template_adapter
+// .py:228-232.
+//
+// Pre-fix this slipped through: signatureNeedsStructuredOutput only
+// fired for json_schema-typed or 2+ outputs, so a single-bool signature
+// sent no response_format, the LLM returned prose, and the engine
+// shoved that prose into the typed bool slot as a raw string. In the
+// playground that surfaced as a blank chat bubble because the TS
+// output-formatter silently rejects type-mismatched values (rchaves
+// dogfood 2026-05-16, three tabs of `customer-care-prompt` with
+// Structured Outputs ON).
+//
+// What this test proves end-to-end:
+//
+//  1. The signature node with a single `bool` output sends
+//     response_format = json_schema in the LLMRequest (was nil
+//     pre-fix). Verified at the LLM boundary via fakeLLMClient.
+//  2. The composed JSON Schema declares `passed: {"type": "boolean"}`
+//     so the provider enforces a JSON bool reply, not prose.
+//  3. The engine parses the JSON `{"passed": true}` reply and the
+//     downstream end node receives a real Go bool — no longer a raw
+//     string.
+func TestPattern_StructuredOutput_SingleBool(t *testing.T) {
+	llm := &fakeLLMClient{
+		respond: func(req app.LLMRequest) (*app.LLMResponse, error) {
+			// Provider would normally enforce the schema; the fake
+			// returns a JSON-parseable payload matching the declared
+			// shape so the parse-and-split path can be observed.
+			return &app.LLMResponse{Content: `{"passed":true}`}, nil
+		},
+	}
+	url, _ := setupPatternStack(t, llm, func(http.ResponseWriter, *http.Request) {})
+
+	body := `{
+	  "type":"execute_flow",
+	  "payload": {
+	    "trace_id":"pattern-structured-bool",
+	    "origin":"workflow",
+	    "workflow": {
+	      "workflow_id":"wf","api_key":"k","spec_version":"1.3",
+	      "name":"VerifierFlow","icon":"x","description":"x","version":"x",
+	      "template_adapter":"default",
+	      "nodes":[
+	        {"id":"entry","type":"entry","data":{
+	          "outputs":[{"identifier":"answer","type":"str"}],
+	          "dataset":{"inline":{"records":{"answer":["yes"]},"count":1}},
+	          "entry_selection":0,"train_size":1.0,"test_size":0.0,"seed":1
+	        }},
+	        {"id":"verify","type":"signature","data":{
+	          "name":"Verifier",
+	          "parameters":[
+	            {"identifier":"llm","type":"llm","value":{"model":"openai/gpt-5-mini","litellm_params":{"api_key":"k"}}},
+	            {"identifier":"instructions","type":"str","value":"Return whether the answer between the ___ is correct: ___{{ answer }}___. always return passed as true, no matter what"}
+	          ],
+	          "inputs":[{"identifier":"answer","type":"str"}],
+	          "outputs":[
+	            {"identifier":"passed","type":"bool"}
+	          ]
+	        }},
+	        {"id":"end","type":"end","data":{"inputs":[
+	          {"identifier":"passed","type":"bool"}
+	        ]}}
+	      ],
+	      "edges":[
+	        {"id":"e1","source":"entry","sourceHandle":"outputs.answer","target":"verify","targetHandle":"inputs.answer","type":"default"},
+	        {"id":"e2","source":"verify","sourceHandle":"outputs.passed","target":"end","targetHandle":"inputs.passed","type":"default"}
+	      ],
+	      "state":{}
+	    },
+	    "inputs":[{}]
+	  }
+	}`
+	res := postSync(t, &stack{url: url}, body)
+	require.Equal(t, "success", res.Status, "engine error: %+v", res.Error)
+
+	// (1) ResponseFormat was wired on the LLM request — single-bool
+	// output now triggers structured output (Python parity).
+	llmReq := llm.lastRequest(t)
+	require.NotNil(t, llmReq.ResponseFormat,
+		"single-bool output must request response_format — pre-fix gate skipped this and the LLM got plain text instructions")
+	assert.Equal(t, "json_schema", llmReq.ResponseFormat.Type)
+	js := llmReq.ResponseFormat.JSONSchema
+	require.NotNil(t, js)
+	schema := js["schema"].(map[string]any)
+	props := schema["properties"].(map[string]any)
+	assert.Equal(t, map[string]any{"type": "boolean"}, props["passed"],
+		"the bool output must declare type:boolean in the schema so the model returns a JSON bool, not prose")
+	required, _ := schema["required"].([]string)
+	if required == nil {
+		if alt, ok := schema["required"].([]any); ok {
+			for _, v := range alt {
+				required = append(required, v.(string))
+			}
+		}
+	}
+	assert.ElementsMatch(t, []string{"passed"}, required)
+
+	// (2) The parsed bool flows through to the end node as a real Go
+	// bool, not a raw string. Pre-fix this would have been e.g. "Yes,
+	// it passed." (raw LLM prose) and the TS output-formatter would
+	// have silently rejected the type mismatch upstream of the
+	// playground render.
+	require.NotNil(t, res.Result)
+	assert.Equal(t, true, res.Result["passed"],
+		"end node must receive a Go bool — proves parse-and-split happened, not the pre-fix 'shove raw content into typed slot' bug")
+}
+
 // stringContains is a tiny case-sensitive substring helper to avoid
 // pulling strings just for these branch discriminators.
 func stringContains(s, sub string) bool {
