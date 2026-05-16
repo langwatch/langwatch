@@ -184,7 +184,24 @@ export function ScopeChipPicker({
           <Select.ValueText placeholder="Pick one or more scopes">
             {() => {
               if (value.length === 0) return "Pick one or more scopes";
-              return <ProviderScopeChips scopes={value} />;
+              // Hydrate the chips with names looked up from the picker's
+              // `options` so each chip reads "LangWatch" / "Acme Team" /
+              // "web-app" instead of bare "Organization" / "Team" /
+              // "Project". Without this, multiple teams render as
+              // identical "Team", "Team" pills — the bug rchaves caught
+              // in the model-provider drawer screenshot.
+              const named = value.map((v) => {
+                const match = options.find(
+                  (o) =>
+                    o.scopeType === v.scopeType && o.scopeId === v.scopeId,
+                );
+                return {
+                  scopeType: v.scopeType,
+                  scopeId: v.scopeId,
+                  name: match?.label,
+                };
+              });
+              return <ProviderScopeChips scopes={named} />;
             }}
           </Select.ValueText>
         </Select.Trigger>

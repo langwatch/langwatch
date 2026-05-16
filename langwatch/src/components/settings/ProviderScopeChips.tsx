@@ -4,8 +4,27 @@ import { Building2, Folder, Users } from "lucide-react";
 type ScopeEntry = {
   scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
   scopeId: string;
+  /**
+   * Display name of the scope (organization name, team name, or project
+   * name). When omitted the chip falls back to the bare type label —
+   * which is what older callers without name access used to render.
+   */
+  name?: string;
 };
 
+/**
+ * Renders a horizontal list of scope chips. Each chip shows the
+ * scope's icon + name (e.g. "LangWatch", "Acme Team", "web-app").
+ * Callers that only have access to the scope type fall back to the
+ * bare type label — that's the legacy behaviour for surfaces that
+ * haven't been wired up to pass names yet.
+ *
+ * Bug fixed 2026-05-16: previously rendered "Organization" / "Team" /
+ * "Project" with no name even when the caller knew the scope name,
+ * producing ambiguous chips like "Team", "Team" when multiple teams
+ * were attached to a provider. The shared screenshot from the
+ * model-providers drawer proved the issue.
+ */
 export function ProviderScopeChips({
   scopes,
   fallbackScopeType,
@@ -31,7 +50,7 @@ export function ProviderScopeChips({
             <Badge key={key} colorPalette="blue" variant="subtle" size={size}>
               <HStack gap={1}>
                 <Building2 size={iconSize} aria-hidden />
-                <Text>Organization</Text>
+                <Text>{entry.name ?? "Organization"}</Text>
               </HStack>
             </Badge>
           );
@@ -41,7 +60,7 @@ export function ProviderScopeChips({
             <Badge key={key} colorPalette="purple" variant="subtle" size={size}>
               <HStack gap={1}>
                 <Users size={iconSize} aria-hidden />
-                <Text>Team</Text>
+                <Text>{entry.name ?? "Team"}</Text>
               </HStack>
             </Badge>
           );
@@ -50,7 +69,7 @@ export function ProviderScopeChips({
           <Badge key={key} colorPalette="gray" variant="subtle" size={size}>
             <HStack gap={1}>
               <Folder size={iconSize} aria-hidden />
-              <Text>Project</Text>
+              <Text>{entry.name ?? "Project"}</Text>
             </HStack>
           </Badge>
         );

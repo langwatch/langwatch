@@ -247,6 +247,30 @@ export default function ModelsPage() {
             </Table.Header>
             <Table.Body>
               {enabledProviders.map((provider) => {
+                // Build a scope-id → display-name map so each chip can
+                // render the real org / team / project name instead of
+                // the bare type label. Without this lookup, providers
+                // bound to multiple teams render as identical "Team",
+                // "Team" pills (see ProviderScopeChips comment).
+                const scopeNameById = new Map<string, string>();
+                if (organization) {
+                  scopeNameById.set(organization.id, organization.name);
+                  for (const t of organization.teams ?? []) {
+                    scopeNameById.set(t.id, t.name);
+                    for (const p of t.projects ?? []) {
+                      scopeNameById.set(p.id, p.name);
+                    }
+                  }
+                }
+                const namedScopes = (provider as any).scopes
+                  ? ((provider as any).scopes as Array<{
+                      scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+                      scopeId: string;
+                    }>).map((s) => ({
+                      ...s,
+                      name: scopeNameById.get(s.scopeId),
+                    }))
+                  : undefined;
                 const providerIcon =
                   modelProviderIcons[
                     provider.provider as keyof typeof modelProviderIcons
@@ -275,7 +299,7 @@ export default function ModelsPage() {
                     </Table.Cell>
                     <Table.Cell>
                       <ProviderScopeChips
-                        scopes={(provider as any).scopes}
+                        scopes={namedScopes}
                         fallbackScopeType={(provider as any).scopeType}
                       />
                     </Table.Cell>
