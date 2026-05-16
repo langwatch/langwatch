@@ -112,31 +112,31 @@ export function PaneLayout({
       // than a guessed pixel constant, so density / font changes flow
       // through automatically.
       const headerPx = headerEl?.offsetHeight ?? CTX_HEADER_HEIGHT_PX;
-      // Content natural height — when expanded this is header + body
-      // rows; when collapsed only the header is rendered, so we
-      // fall back to the cached "last expanded" value to keep the
-      // max-size cap stable across collapse/expand cycles.
-      const measuredContentPx = contentEl?.scrollHeight ?? headerPx;
-      if (!ctxState.collapsed && measuredContentPx > headerPx + 8) {
-        lastExpandedContentPx.current = measuredContentPx;
+      // `contentRef` is on the scroll container holding the rows; its
+      // `scrollHeight` reflects the rows' unclipped natural height.
+      // Total natural height of the pane = header + body. When
+      // collapsed the body isn't rendered, so `contentEl` is null and
+      // we fall back to the cached last-expanded value to keep the
+      // max-cap stable across collapse/expand cycles.
+      const bodyPx = contentEl?.scrollHeight ?? 0;
+      const fullPx = bodyPx > 0 ? headerPx + bodyPx : headerPx;
+      if (!ctxState.collapsed && bodyPx > 0) {
+        lastExpandedContentPx.current = fullPx;
       }
-      const effectiveContentPx =
-        lastExpandedContentPx.current ?? measuredContentPx;
+      const effectivePx = lastExpandedContentPx.current ?? fullPx;
 
       const headerPct = (headerPx / dim) * 100;
       setCtxCollapsedSize(Math.min(20, Math.max(1, headerPct)));
 
       // +6px so the bottom row's border isn't visually clipped at the
-      // max drag position.
-      const naturalPct = ((effectiveContentPx + 6) / dim) * 100;
-      // Clamp:
-      //   lower bound — at least 12pct above header so even a single
-      //     placeholder turn opens to a visible strip,
-      //   upper bound — 65pct, leaving the body pane room to breathe
-      //     on tall conversations.
-      setCtxMaxSize(
-        Math.min(65, Math.max(headerPct + 12, naturalPct)),
-      );
+      // max drag position. Cap pixel-wise at 350px first (operator
+      // spec — even a long conversation shouldn't eat the whole
+      // drawer), then convert to a percentage.
+      const cappedPx = Math.min(effectivePx + 6, 350);
+      const naturalPct = (cappedPx / dim) * 100;
+      // Lower bound — at least 12pct above header so a single
+      // placeholder turn still opens to a visible strip.
+      setCtxMaxSize(Math.max(headerPct + 12, naturalPct));
     };
     measure();
     const groupObserver = new ResizeObserver(measure);
@@ -213,14 +213,18 @@ export function PaneLayout({
         const dim = groupEl.clientHeight;
         if (dim <= 0) return;
         const headerPx = headerEl?.offsetHeight ?? CTX_HEADER_HEIGHT_PX;
-        const contentPx = contentEl
-          ? Math.max(contentEl.scrollHeight, headerPx)
-          : headerPx;
+        // `contentRef` is the body scroll container — scrollHeight is
+        // the unclipped body height. Total natural pane height =
+        // header + body + 6px slack.
+        const bodyPx = contentEl?.scrollHeight ?? 0;
+        const fullPx = bodyPx > 0 ? headerPx + bodyPx + 6 : headerPx;
+        // 350px ceiling on first-open even for long conversations;
+        // the operator can still drag larger up to ctxMaxSize.
+        const cappedPx = Math.min(fullPx, 350);
         const headerPct = (headerPx / dim) * 100;
-        const naturalPct = ((contentPx + 6) / dim) * 100;
-        const targetPct = Math.min(
-          65,
-          Math.max(headerPct + 12, naturalPct),
+        const targetPct = Math.max(
+          headerPct + 12,
+          (cappedPx / dim) * 100,
         );
         h.resize(targetPct);
       });

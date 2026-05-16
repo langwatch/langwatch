@@ -241,7 +241,6 @@ export const ConversationContext = memo(function ConversationContext({
 
   return (
     <Box
-      ref={contentRef}
       display="flex"
       flexDirection="column"
       height="100%"
@@ -272,7 +271,20 @@ export const ConversationContext = memo(function ConversationContext({
         buttonRef={headerRef}
       />
       {collapsed ? null : (
-        <Box flex={1} minHeight={0} overflow="auto" paddingX={4} paddingY={3}>
+        // `contentRef` lives on the SCROLL container itself (the
+        // overflow:auto box). Its `scrollHeight` then reflects the
+        // unclipped natural height of the rows — header + clip area
+        // measurement on the outer wrapper was always returning the
+        // Panel size, which meant the max-cap fought the drag and the
+        // expand-to-content snap landed on a tiny strip.
+        <Box
+          ref={contentRef}
+          flex={1}
+          minHeight={0}
+          overflow="auto"
+          paddingX={4}
+          paddingY={3}
+        >
           <ContextBody
             ctx={ctx}
             rows={rows}
@@ -363,10 +375,9 @@ function ContextHeader({
         boxSize={3}
         color="inherit"
         transition="transform 120ms ease"
-        // Collapsed = chevron points up (rotate 180); expanded = points
-        // down. Matches the accordion sections below where "open" means
-        // chevron-down.
-        transform={collapsed ? "rotate(180deg)" : "rotate(0deg)"}
+        // Collapsed = chevron points down (closed); expanded = points
+        // up (rotated 180). Matches the accordion sections below.
+        transform={collapsed ? "rotate(0deg)" : "rotate(180deg)"}
       />
     </chakra.button>
   );
@@ -404,7 +415,7 @@ function ContextBody({
               paddingY={2}
               gap={2.5}
               borderBottomWidth={i === 2 ? 0 : "1px"}
-              borderColor={{ base: "gray.300", _dark: "border.muted" }}
+              borderColor={{ base: "gray.200", _dark: "border.muted" }}
             >
               <Skeleton height="14px" width="56px" borderRadius="sm" />
               <Skeleton height="14px" width="14px" borderRadius="full" />
@@ -423,7 +434,7 @@ function ContextBody({
           paddingX={3}
           borderRadius="md"
           borderWidth="1px"
-          borderColor={{ base: "gray.300", _dark: "border.muted" }}
+          borderColor={{ base: "gray.200", _dark: "border.muted" }}
           bg="bg.panel"
         >
           <Text textStyle="2xs" color="fg.subtle">
@@ -442,7 +453,7 @@ function ContextBody({
           // Light mode uses a deeper gray than `border.muted` so the
           // card frame reads against the white panel surface. Dark
           // mode keeps the validated muted border.
-          borderColor={{ base: "gray.300", _dark: "border.muted" }}
+          borderColor={{ base: "gray.200", _dark: "border.muted" }}
           bg="bg.panel"
           overflow="hidden"
         >
@@ -537,18 +548,17 @@ const ConversationRow = memo(function ConversationRow({
         gap={2.5}
         paddingX={3}
         paddingY={2}
-        // Light mode: non-selected rows = white (no tint anywhere,
-        // including on the assistant reply line below); selected row
-        // = `gray.200` (a tad darker than the previous `bg.muted` so
-        // the current-turn indent reads clearly without blue).
+        // Light mode: non-selected rows = white; selected row =
+        // `gray.100` (lighter than the previous `gray.200` — a calm
+        // tint, not a hard step against the white surround).
         // Dark mode keeps the validated `blue.subtle` selection.
         bg={
           isCurrent
-            ? { base: "gray.200", _dark: "blue.subtle" }
+            ? { base: "gray.100", _dark: "blue.subtle" }
             : { base: "bg.surface", _dark: "transparent" }
         }
         borderBottomWidth={isLast ? 0 : "1px"}
-        borderColor={{ base: "gray.300", _dark: "border.muted" }}
+        borderColor={{ base: "gray.200", _dark: "border.muted" }}
         cursor={isCurrent ? "default" : "pointer"}
         onClick={isCurrent ? undefined : handleClick}
         _hover={

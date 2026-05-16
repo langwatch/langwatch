@@ -157,15 +157,23 @@ export function Section({
             expand icon in the LLM-Optimized header row above — the
             default `<Accordion.ItemIndicator>` inherits the trigger's
             font size and reads visibly larger than its neighbours.
-            `display: flex` + `alignSelf: center` keep the chevron
-            anchored to the trigger's vertical middle regardless of
-            rotation state. */}
+            Explicit `_open` rotation because our own `display: flex`
+            override won the cascade against the default slot recipe
+            — the chevron would otherwise either not rotate at all,
+            or rotate the wrong direction. Closed = chevron-down,
+            open = rotate(180deg) = chevron-up.
+            `alignSelf: center` keeps the icon anchored to the
+            trigger's vertical midline through both states. */}
         <Accordion.ItemIndicator
           color="inherit"
           display="flex"
           alignItems="center"
           alignSelf="center"
           lineHeight={0}
+          transition="transform 120ms ease"
+          transformOrigin="center"
+          transform="rotate(0deg)"
+          _open={{ transform: "rotate(180deg)" }}
         >
           <Icon as={LuChevronDown} boxSize={3} />
         </Accordion.ItemIndicator>
