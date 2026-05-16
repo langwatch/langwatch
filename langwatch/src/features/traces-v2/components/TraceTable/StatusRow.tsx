@@ -48,12 +48,11 @@ export const ROW_STYLES: Record<RowVariant, RowStyle> = {
   default: {
     borderColor: "transparent",
     bg: "transparent",
-    // Light blue tint on hover so the row hover state reads as a
-    // deliberate selection cue rather than a faint grey wash. Sits
-    // alongside the selected-row tint (blue.fg/8) without competing
-    // with it — hover is brighter so the cursor's row pops, selected
-    // is solid blue so it stays distinct after click.
-    hoverBg: "blue.fg/12",
+    // Light blue tint on hover. `blue.fg` was the foreground-tone
+    // (dark navy) — using it as a bg even at low opacity looked
+    // muddy. `blue.subtle` is Chakra's semantic light-blue background
+    // token, sits naturally against the white table surface.
+    hoverBg: "blue.subtle",
     separatorColor: "border.subtle",
     bottomSeparatorColor: "border.muted",
   },
