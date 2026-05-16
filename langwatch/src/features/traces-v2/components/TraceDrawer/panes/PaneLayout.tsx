@@ -178,20 +178,36 @@ export function PaneLayout({
   // size along the relevant axis and convert.
   const vizDetailGroupRef = useRef<HTMLDivElement>(null);
   const [detailCollapsedSize, setDetailCollapsedSize] = useState<number>(6);
+  // In horizontal split, the detail panel has a pixel floor — `minSize`
+  // is a percentage in react-resizable-panels, so we measure the group's
+  // current width and convert. 200px keeps the chip rows / accordion
+  // sections legible even when the operator has yanked the divider as
+  // far right as possible. Vertical split doesn't need a pixel floor —
+  // there the panel always occupies the full drawer width.
+  const DETAIL_MIN_HORIZONTAL_PX = 200;
+  const [detailMinSize, setDetailMinSize] = useState<number>(20);
   useEffect(() => {
-    if (layout === "horizontal") {
-      // Fully hide the panel — the reopen affordance lives in the viz
-      // panel's tab row (see VizPlaceholder).
-      setDetailCollapsedSize(0);
-      return;
-    }
     const el = vizDetailGroupRef.current;
     if (!el) return;
     const measure = () => {
+      if (layout === "horizontal") {
+        // Fully hide on collapse — the reopen affordance lives in
+        // the viz panel's tab row (see VizPlaceholder).
+        setDetailCollapsedSize(0);
+        const width = el.clientWidth;
+        if (width <= 0) return;
+        const pct = (DETAIL_MIN_HORIZONTAL_PX / width) * 100;
+        // Cap at 50% so a very narrow drawer can still split.
+        setDetailMinSize(Math.min(50, Math.max(5, pct)));
+        return;
+      }
       const dim = el.clientHeight;
       if (dim <= 0) return;
       const pct = (SPAN_TAB_BAR_HEIGHT_PX / dim) * 100;
       setDetailCollapsedSize(Math.min(50, Math.max(1, pct)));
+      // No pixel floor in vertical layout — the panel always spans
+      // the drawer's full width.
+      setDetailMinSize(5);
     };
     measure();
     const observer = new ResizeObserver(measure);
@@ -397,7 +413,10 @@ export function PaneLayout({
           id="detail"
           order={2}
           defaultSize={layout === "horizontal" ? 45 : 50}
-          minSize={5}
+          // Horizontal split: 200px pixel floor converted to a
+          // percentage of the current group width (see the measure
+          // effect). Vertical split: nominal 5pct minimum.
+          minSize={detailMinSize}
           collapsible
           // Computed from the group's measured size so the collapsed
           // state lands exactly on the SpanTabBar height — no trailing
