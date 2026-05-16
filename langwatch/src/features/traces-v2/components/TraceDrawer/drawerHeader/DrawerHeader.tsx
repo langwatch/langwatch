@@ -710,21 +710,21 @@ export const DrawerHeader = memo(function DrawerHeader({
             }
             positioning={{ placement: "bottom" }}
           >
-            {/* The X sits as close as practical to the drawer's right
-                chrome — tighter `paddingX` shrinks the glyph's halo
-                inside the hit area, and a larger negative `marginRight`
-                pushes the whole button rightward by the same amount so
-                the click target still hugs the edge. Operator feedback:
-                the previous spacing left a visible gap between the X
-                and the drawer border. */}
+            {/* Generous inner padding so the click target is forgiving,
+                with a small gap between the button and the drawer's
+                outer chrome (`marginRight={-1}`) — the previous
+                `marginRight={-4}` had the X glued flush to the edge
+                which felt cramped. */}
             <Button
               size="xs"
               variant="ghost"
               onClick={onClose}
               aria-label="Close drawer"
-              paddingX={1.5}
+              paddingX={2}
+              paddingY={2}
+              height="auto"
               minWidth="auto"
-              marginRight={-4}
+              marginRight={-1}
               color="fg.muted"
               _hover={{ bg: "bg.muted", color: "fg" }}
               _active={{ bg: "bg.emphasized" }}

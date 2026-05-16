@@ -102,15 +102,25 @@ export function PaneLayout({
     if (ctxState.collapsed && !handle.isCollapsed()) handle.collapse();
     else if (!ctxState.collapsed && handle.isCollapsed()) handle.expand();
   }, [ctxState.collapsed]);
+  // Remember the user's manually-resized detail size so re-opening
+  // after a "Hide details" round-trip lands back at the same width
+  // instead of `handle.expand()`'s library default (which could blow
+  // the panel up to 60–70% on wide screens).
+  const lastExpandedDetailSize = useRef<number | null>(null);
   useEffect(() => {
     const handle = detailPanelRef.current;
     if (!handle) return;
-    // When details collapses, shrink the Panel to the SpanTabBar
-    // height so only the tab row remains visible. When expanded,
-    // restore the persisted relative size.
-    if (detailState.collapsed && !handle.isCollapsed()) handle.collapse();
-    else if (!detailState.collapsed && handle.isCollapsed()) handle.expand();
-  }, [detailState.collapsed]);
+    if (detailState.collapsed && !handle.isCollapsed()) {
+      const current = handle.getSize();
+      if (current > 1) lastExpandedDetailSize.current = current;
+      handle.collapse();
+    } else if (!detailState.collapsed && handle.isCollapsed()) {
+      const target =
+        lastExpandedDetailSize.current ??
+        (layout === "horizontal" ? 45 : 50);
+      handle.resize(target);
+    }
+  }, [detailState.collapsed, layout]);
 
   // The Visualization panel renders its own tab strip as chrome — no
   // outer Pane wrapper. A 1px border on the side facing the Details

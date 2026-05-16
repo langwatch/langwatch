@@ -45,7 +45,7 @@ function buildRow(raw: string | null): {
 const CompactIOPreview: React.FC<IOPreviewProps> = ({ input, output }) => {
   const tokens = useDensityTokens();
   return (
-    <VStack align="start" gap={0.5}>
+    <VStack align="start" gap={0.5} fontFamily="mono">
       {input !== null && (
         <CompactRow
           row={buildRow(input)}
@@ -142,7 +142,7 @@ const RoleIcon: React.FC<{
 };
 
 const ComfortableIOPreview: React.FC<IOPreviewProps> = ({ input, output }) => (
-  <VStack align="stretch" gap={2}>
+  <VStack align="stretch" gap={2} fontFamily="mono">
     {input !== null && (
       <ComfortableRow
         label="Input"

@@ -80,6 +80,42 @@ export const WaterfallView = memo(function WaterfallView({
     [rootDuration],
   );
 
+  // Drop interior markers when the timeline panel is narrow enough
+  // that adjacent labels would collide. Always keep the first + last
+  // so the trace's bounds stay readable; the rest are decimated by an
+  // integer stride so the remaining marks stay evenly spaced. The
+  // ResizeObserver fires on every drag so the count tracks the user's
+  // resize in real time.
+  const timelinePanelRef = useRef<HTMLDivElement>(null);
+  const [timelinePanelWidth, setTimelinePanelWidth] = useState(0);
+  useEffect(() => {
+    const el = timelinePanelRef.current;
+    if (!el) return;
+    const measure = () => setTimelinePanelWidth(el.clientWidth);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+  const visibleTimeMarkers = useMemo(() => {
+    if (timeMarkers.length <= 2) return timeMarkers;
+    // Reserve ~60px per label so neighbours don't touch even at the
+    // longest "00.0s" duration string. Always show first + last.
+    const PER_LABEL_PX = 60;
+    const maxLabels = Math.max(
+      2,
+      Math.floor(timelinePanelWidth / PER_LABEL_PX),
+    );
+    if (timeMarkers.length <= maxLabels) return timeMarkers;
+    const last = timeMarkers.length - 1;
+    const interiorBudget = Math.max(0, maxLabels - 2);
+    if (interiorBudget === 0) return [timeMarkers[0]!, timeMarkers[last]!];
+    const interior = timeMarkers.slice(1, -1);
+    const stride = Math.ceil(interior.length / interiorBudget);
+    const picked = interior.filter((_, i) => i % stride === 0);
+    return [timeMarkers[0]!, ...picked, timeMarkers[last]!];
+  }, [timeMarkers, timelinePanelWidth]);
+
   // Detect multi-root (forest)
   const rootCount = useMemo(() => tree.length, [tree]);
 
@@ -479,6 +515,7 @@ export const WaterfallView = memo(function WaterfallView({
 
       {/* Timeline panel */}
       <Flex
+        ref={timelinePanelRef}
         direction="column"
         flex={1}
         minWidth={0}
@@ -503,9 +540,9 @@ export const WaterfallView = memo(function WaterfallView({
             left={2}
             right={4}
           >
-            {timeMarkers.map((ms, idx) => {
+            {visibleTimeMarkers.map((ms, idx) => {
               const pct = rootDuration > 0 ? (ms / rootDuration) * 100 : 0;
-              const isLast = idx === timeMarkers.length - 1;
+              const isLast = idx === visibleTimeMarkers.length - 1;
               const isFirst = idx === 0;
               return (
                 <Text
@@ -563,7 +600,7 @@ export const WaterfallView = memo(function WaterfallView({
               pointerEvents="none"
               zIndex={0}
             >
-              {timeMarkers.map((ms, idx) => {
+              {visibleTimeMarkers.map((ms, idx) => {
                 const pct = rootDuration > 0 ? (ms / rootDuration) * 100 : 0;
                 return (
                   <Box
