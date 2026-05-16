@@ -29,11 +29,24 @@ type GroupedModelOptions = {
   models: ModelOption[];
 }[];
 
+/** Sentinel value emitted when the user picks the "Inherit" entry. The
+ *  caller maps this back to "clear the override" (which writes nothing
+ *  to the saved JSON, so the cascade walks up). */
+export const INHERIT_SENTINEL = "__inherit__";
+
 /**
  * A model selector that supports models from multiple providers.
  * Derives the provider icon from each model's prefix (e.g., "openai/gpt-4" -> openai icon).
  * Groups models by provider for better organization.
  * Used in the model provider settings form to select default models.
+ *
+ * `inheritOption` (optional) prepends a special "Inherit" entry at the
+ * top of the dropdown. When the user picks it, `onChange` is called
+ * with `INHERIT_SENTINEL`; the parent translates that to "clear the
+ * key from in-progress state". When `model` is empty AND
+ * `inheritOption` is set, the trigger renders the inherited model
+ * label at 0.55 opacity as a placeholder so the user can see what the
+ * cascade would resolve to.
  */
 export const ProviderModelSelector = React.memo(function ProviderModelSelector({
   model,
@@ -41,12 +54,19 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
   onChange,
   size = "full",
   disabled = false,
+  inheritOption,
 }: {
   model: string;
   options: string[];
   onChange: (model: string) => void;
   size?: "sm" | "md" | "full";
   disabled?: boolean;
+  inheritOption?: {
+    /** Model identifier the cascade would resolve to. Rendered with the provider icon. */
+    model: string;
+    /** Short label shown above the model, e.g. "Inherit (from organization)" or "Suggested from openai". */
+    label: string;
+  };
 }) {
   const [modelSearch, setModelSearch] = useState("");
 
@@ -116,9 +136,35 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
   const selectedIcon =
     selectedItem?.icon ??
     modelProviderIcons[model.split("/")[0] as keyof typeof modelProviderIcons];
-  const isUnknown = !selectedItem;
+  const isUnknown = !!model && !selectedItem;
 
-  const selectValueText = (
+  // Render the inherit placeholder in the trigger when the user hasn't
+  // picked anything. Uses the inherited model's icon + family at 0.55
+  // opacity so it reads as "this is what you'd get if you don't
+  // override" instead of an empty / broken selector.
+  const inheritIcon = inheritOption
+    ? modelProviderIcons[
+        inheritOption.model.split("/")[0] as keyof typeof modelProviderIcons
+      ]
+    : null;
+
+  const selectValueText = !model && inheritOption ? (
+    <HStack overflow="hidden" gap={2} align="center" opacity={0.55}>
+      {inheritIcon && (
+        <Box minWidth={size === "sm" ? MODEL_ICON_SIZE_SM : MODEL_ICON_SIZE}>
+          {inheritIcon}
+        </Box>
+      )}
+      <Box
+        fontSize={size === "sm" ? 12 : 14}
+        fontFamily="mono"
+        lineClamp={1}
+        wordBreak="break-all"
+      >
+        {inheritOption.model.split("/").slice(1).join("/")}
+      </Box>
+    </HStack>
+  ) : (
     <HStack overflow="hidden" gap={2} align="center">
       {selectedIcon && (
         <Box minWidth={size === "sm" ? MODEL_ICON_SIZE_SM : MODEL_ICON_SIZE}>
@@ -161,6 +207,10 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
       onValueChange={(change) => {
         const selectedValue = change.value[0];
         if (selectedValue) {
+          // Inherit sentinel rides the same callback as a normal pick;
+          // the caller maps `INHERIT_SENTINEL` to "clear the key" so the
+          // cascade walks up. Direct model pick stays an exact-value
+          // write.
           onChange(selectedValue);
         }
       }}
@@ -218,6 +268,44 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
             </InputGroup>
           </Box>
         </Field.Root>
+        {inheritOption && (
+          <Select.ItemGroup
+            label={
+              <Text fontSize="xs" fontWeight="medium" color="fg.muted">
+                Cascade
+              </Text>
+            }
+          >
+            <Select.Item
+              item={{
+                value: INHERIT_SENTINEL,
+                label: inheritOption.label,
+              }}
+              data-testid="provider-model-selector-inherit"
+            >
+              <HStack gap={2}>
+                {inheritIcon && (
+                  <Box width={MODEL_ICON_SIZE} minWidth={MODEL_ICON_SIZE}>
+                    {inheritIcon}
+                  </Box>
+                )}
+                <Box>
+                  <Text fontSize="sm" fontWeight="medium">
+                    {inheritOption.label}
+                  </Text>
+                  <Text
+                    fontSize="xs"
+                    color="fg.muted"
+                    fontFamily="mono"
+                    lineClamp={1}
+                  >
+                    {inheritOption.model.split("/").slice(1).join("/")}
+                  </Text>
+                </Box>
+              </HStack>
+            </Select.Item>
+          </Select.ItemGroup>
+        )}
         {filteredGroups.map((group) => (
           <Select.ItemGroup
             key={group.provider}

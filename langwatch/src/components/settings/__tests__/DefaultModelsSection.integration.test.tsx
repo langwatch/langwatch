@@ -50,6 +50,12 @@ vi.mock("~/utils/api", () => ({
       getDefaultModelsForProject: {
         useQuery: () => mockGetDefaultModels(),
       },
+      getInheritedValuesForScopes: {
+        useQuery: () => ({
+          data: { inherited: {}, referenceScope: null },
+          isLoading: false,
+        }),
+      },
       saveDefaultModelsConfig: {
         useMutation: () => ({ mutateAsync: mockSave, isPending: false }),
       },

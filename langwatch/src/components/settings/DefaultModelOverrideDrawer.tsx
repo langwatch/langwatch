@@ -49,8 +49,8 @@ import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
 import { api, type RouterOutputs } from "~/utils/api";
 
-import { ModelChip } from "./ModelChip";
-import { ProviderModelSelector } from "./ProviderModelSelector";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { INHERIT_SENTINEL, ProviderModelSelector } from "./ProviderModelSelector";
 import {
   ScopeChipPicker,
   type ScopeChipPickerEntry,
@@ -113,6 +113,13 @@ export function DefaultModelOverrideDrawer({
   const saveMutation = api.modelProvider.saveDefaultModelsConfig.useMutation();
   const deleteMutation =
     api.modelProvider.deleteDefaultModelsConfig.useMutation();
+  const { project } = useOrganizationTeamProject();
+
+  // Ask the server what the cascade would resolve for each role +
+  // feature key if the picked scopes had nothing set. The drawer uses
+  // the answer to render the inherit-placeholder + the "Inherit (from
+  // X) [model]" dropdown entry. Refetches whenever the chip selection
+  // changes — picking new scopes shifts the cascade answer.
 
   // ── Local state ───────────────────────────────────────────────────
   // `config` mirrors the JSON we'll send on save. Keys present here =
@@ -146,6 +153,24 @@ export function DefaultModelOverrideDrawer({
     setExpanded({ DEFAULT: false, FAST: false, EMBEDDINGS: false });
   }, [open, editing]);
 
+  const inheritedQuery =
+    api.modelProvider.getInheritedValuesForScopes.useQuery(
+      {
+        projectId: project?.id ?? "",
+        scopes: scopes.map((s) => ({
+          scopeType: s.scopeType,
+          scopeId: s.scopeId,
+        })),
+        excludeConfigId: editing?.id,
+      },
+      {
+        // Need at least one picked scope to anchor the cascade walk
+        // and the editing target should be settled.
+        enabled: !!project?.id && scopes.length > 0 && open,
+      },
+    );
+  const inherited = inheritedQuery.data?.inherited ?? {};
+
   const featuresByRole = useMemo(() => {
     const m: Record<ModelRoleKey, FeatureProjection[]> = {
       DEFAULT: [],
@@ -161,8 +186,14 @@ export function DefaultModelOverrideDrawer({
   const setOverride = useCallback((key: string, model: string | null) => {
     setConfig((prev) => {
       const next = { ...prev };
-      if (model === null || model === "") delete next[key];
-      else next[key] = model;
+      // Inherit sentinel + null + empty string all map to "clear the
+      // key from in-progress JSON" — the cascade walks up at save time
+      // since absent keys mean inherit (no sentinel in storage).
+      if (model === null || model === "" || model === INHERIT_SENTINEL) {
+        delete next[key];
+      } else {
+        next[key] = model;
+      }
       return next;
     });
   }, []);
@@ -267,6 +298,8 @@ export function DefaultModelOverrideDrawer({
                   config={config}
                   features={featuresByRole[role]}
                   effective={effective[role]}
+                  inheritedForRole={inherited[role] ?? null}
+                  inheritedForFeature={inherited}
                   expanded={expanded[role]}
                   onToggleExpand={() =>
                     setExpanded((prev) => ({ ...prev, [role]: !prev[role] }))
@@ -312,11 +345,16 @@ export function DefaultModelOverrideDrawer({
   );
 }
 
+type InheritedEntry =
+  RouterOutputs["modelProvider"]["getInheritedValuesForScopes"]["inherited"][string];
+
 function RoleRow({
   role,
   config,
   features,
   effective,
+  inheritedForRole,
+  inheritedForFeature,
   expanded,
   onToggleExpand,
   modelOptions,
@@ -326,13 +364,23 @@ function RoleRow({
   config: Record<string, string>;
   features: FeatureProjection[];
   effective: Payload["effective"][ModelRoleKey];
+  /** Server's cascade answer for this role at the picked scopes. Null
+   *  when no picked scope OR no cascade hit AND no inferable provider. */
+  inheritedForRole: InheritedEntry;
+  /** Server's per-key cascade answers; used by feature rows below. */
+  inheritedForFeature: Record<string, InheritedEntry>;
   expanded: boolean;
   onToggleExpand: () => void;
   modelOptions: string[];
   onSetOverride: (key: string, model: string | null) => void;
 }) {
   const current = config[role] ?? "";
-  const inheritedModel = effective?.model;
+  // Prefer the picked-scope cascade answer; fall back to the
+  // project's effective resolution when the picker is empty (so the
+  // user still sees a sensible placeholder while the chip set is
+  // being built).
+  const inheritedModel = inheritedForRole?.model ?? effective?.model;
+  const inheritOption = buildInheritOption(inheritedForRole, effective);
   const canExpand = features.length > 0;
   const ChevronIcon = expanded ? ChevronDown : ChevronRight;
 
@@ -354,25 +402,12 @@ function RoleRow({
           </Box>
         </Tooltip>
         <Box flex={1} />
-        <Box width="240px" flexShrink={0} position="relative">
-          {!current && inheritedModel && (
-            <Box
-              position="absolute"
-              insetInlineStart={3}
-              top={0}
-              bottom={0}
-              display="flex"
-              alignItems="center"
-              pointerEvents="none"
-              data-testid={`role-row-${role.toLowerCase()}-inherited-placeholder`}
-            >
-              <ModelChip model={inheritedModel} size="sm" inherited />
-            </Box>
-          )}
+        <Box width="240px" flexShrink={0}>
           <ProviderModelSelector
             model={current}
             options={modelOptions}
             onChange={(m) => onSetOverride(role, m)}
+            inheritOption={inheritOption}
           />
         </Box>
         {canExpand ? (
@@ -405,7 +440,9 @@ function RoleRow({
               feature={f}
               override={config[f.key] ?? ""}
               roleLevelOverride={config[role] ?? ""}
-              inheritedModel={inheritedModel}
+              inheritedForFeature={inheritedForFeature[f.key] ?? null}
+              inheritedForRole={inheritedForRole}
+              inheritedRoleModel={inheritedModel}
               modelOptions={modelOptions}
               onSetOverride={onSetOverride}
             />
@@ -420,22 +457,57 @@ function FeatureRow({
   feature,
   override,
   roleLevelOverride,
-  inheritedModel,
+  inheritedForFeature,
+  inheritedForRole,
+  inheritedRoleModel,
   modelOptions,
   onSetOverride,
 }: {
   feature: FeatureProjection;
   override: string;
   roleLevelOverride: string;
-  inheritedModel?: string;
+  /** Server cascade answer for this exact feature key. */
+  inheritedForFeature: InheritedEntry;
+  /** Server cascade answer for the feature's role (fallback chain). */
+  inheritedForRole: InheritedEntry;
+  /** Resolved model the role-level row would pick — wins over the
+   *  server-side feature inheritance because the in-progress config's
+   *  role-level pick is local and not yet persisted. */
+  inheritedRoleModel?: string;
   modelOptions: string[];
   onSetOverride: (key: string, model: string | null) => void;
 }) {
   // The feature's "would inherit" placeholder follows the same cascade
-  // the resolver does: a role-level pick in THIS config wins over the
-  // out-of-config effective model. That gives the user a faithful
-  // preview of what saving with the current form state would mean.
-  const wouldInherit = roleLevelOverride || inheritedModel || "";
+  // the resolver does: a role-level pick in THIS config (in-progress)
+  // wins over the server's per-feature cascade, which in turn beats the
+  // role cascade. Without that local check the placeholder would lag
+  // behind what the user just typed in the role row above.
+  const wouldInherit =
+    roleLevelOverride ||
+    inheritedForFeature?.model ||
+    inheritedRoleModel ||
+    "";
+  // Surface "Inherit (from role-level in this config)" when the user
+  // already picked a role-level value here, otherwise walk the same
+  // cascade fallback chain the role row uses: server's per-feature
+  // answer → server's role-level answer → in-progress role pick from
+  // this config → finally the resolved-role model from the page's
+  // effective payload, so the placeholder is never blank when there's
+  // anything cascading down.
+  let inheritOption: { model: string; label: string } | undefined;
+  if (roleLevelOverride) {
+    inheritOption = {
+      model: roleLevelOverride,
+      label: "Inherit (role default in this config)",
+    };
+  } else {
+    inheritOption =
+      buildInheritOption(inheritedForFeature, null) ??
+      buildInheritOption(inheritedForRole, null) ??
+      (inheritedRoleModel
+        ? { model: inheritedRoleModel, label: "Inherit (role default)" }
+        : undefined);
+  }
   return (
     <HStack
       gap={2}
@@ -452,30 +524,55 @@ function FeatureRow({
         </Box>
       </Tooltip>
       <Box flex={1} />
-      <Box width="240px" flexShrink={0} position="relative">
-        {!override && wouldInherit && (
-          <Box
-            position="absolute"
-            insetInlineStart={3}
-            top={0}
-            bottom={0}
-            display="flex"
-            alignItems="center"
-            pointerEvents="none"
-            data-testid={`feature-row-${feature.key}-inherited-placeholder`}
-          >
-            <ModelChip model={wouldInherit} size="sm" inherited />
-          </Box>
-        )}
+      <Box width="240px" flexShrink={0}>
         <ProviderModelSelector
           model={override}
           options={modelOptions}
           onChange={(m) => onSetOverride(feature.key, m)}
+          inheritOption={inheritOption ?? undefined}
         />
       </Box>
       <Box width="24px" flexShrink={0} />
     </HStack>
   );
+}
+
+/**
+ * Builds the `inheritOption` payload `ProviderModelSelector` consumes.
+ * The label tells the user where the value comes from — "Inherit (from
+ * organization)" or "Suggested from openai" for the inferred-fallback
+ * case — and the model is rendered at reduced opacity in the trigger +
+ * as the first dropdown entry.
+ */
+function buildInheritOption(
+  fromServer: InheritedEntry,
+  fromEffective: Payload["effective"][ModelRoleKey] | null,
+): { model: string; label: string } | undefined {
+  if (fromServer) {
+    if (fromServer.source === "inferred") {
+      const providerName = fromServer.inferredFromProvider ?? "first provider";
+      return {
+        model: fromServer.model,
+        label: `Suggested from ${providerName}`,
+      };
+    }
+    const scope = fromServer.scope ?? "cascade";
+    return {
+      model: fromServer.model,
+      label: `Inherit (from ${scope})`,
+    };
+  }
+  if (fromEffective) {
+    const scope = fromEffective.scope ?? "cascade";
+    return {
+      model: fromEffective.model,
+      label:
+        fromEffective.source === "constant"
+          ? "Inherit (built-in default)"
+          : `Inherit (from ${scope})`,
+    };
+  }
+  return undefined;
 }
 
 /**
