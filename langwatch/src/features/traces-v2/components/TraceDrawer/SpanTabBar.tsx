@@ -7,7 +7,7 @@ import {
   Icon,
   Text,
 } from "@chakra-ui/react";
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useMemo, useRef } from "react";
 import {
   LuChevronDown,
   LuChevronRight,
@@ -432,45 +432,27 @@ export const SpanTabBar = memo(function SpanTabBar({
     clearSpan,
   ]);
 
-  const tabIds = useMemo(
-    () => tabDescriptors.map((d) => d.id),
-    [tabDescriptors],
-  );
+  const tabIds = useMemo(() => {
+    const ids = tabDescriptors.map((d) => d.id);
+    // RightSlot appended LAST so the overflow cutoff iterator cuts
+    // it first under any tight width. No-op when there's no slot
+    // to render.
+    if (rightSlot) ids.push(RIGHT_SLOT_OVERFLOW_ID);
+    return ids;
+  }, [tabDescriptors, rightSlot]);
   const activeOverflowId =
     tabDescriptors.find((d) => d.activeId)?.id ?? null;
   const scrollerRef = useRef<HTMLDivElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
 
-  // Operator feedback: the instrumentation scope (rendered via
-  // `rightSlot`) is a nice-to-have — under tight width it should be
-  // the FIRST thing to disappear, before any tabs collapse into the
-  // kebab menu. Threshold is a hard cutoff on the row's pixel width
-  // rather than a feedback-driven re-measure, which avoids the
-  // oscillation that two-phase "hide / re-show / hide again" logic
-  // would introduce when the rightSlot freeing space pushes the row
-  // back over the threshold.
-  const [hideRightSlot, setHideRightSlot] = useState(false);
-  useEffect(() => {
-    if (!rightSlot) {
-      setHideRightSlot(false);
-      return;
-    }
-    const el = containerRef.current;
-    if (!el) return;
-    const measure = () => {
-      const width = el.clientWidth;
-      if (width <= 0) return;
-      // 520px is where the Summary/LLM-Optimized/Prompts tab trio
-      // alongside the collapse toggle starts to feel cramped with the
-      // scope chip still rendered. Tuned empirically against the
-      // narrowest drawer width the operator drags to.
-      setHideRightSlot(width < 520);
-    };
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [rightSlot]);
+  // The rightSlot (instrumentation scope chip) participates in the
+  // same overflow measurement as the tabs, sitting LAST in DOM order
+  // inside the scroller. That way `useOverflowVisibility` cuts it
+  // first (the cutoff iterates left-to-right) — so under tight
+  // widths the scope chip vanishes before any tab collapses into
+  // the kebab menu. Excluded from the OverflowMenu items list so it
+  // doesn't reappear in the dropdown (it's a passive label, not a
+  // navigation target).
+  const RIGHT_SLOT_OVERFLOW_ID = "right-slot:instrumentation";
   // Reserve room for kebab trigger + optional rightSlot + the
   // pinned-span overflow menu + the trailing collapse toggle. 96px gives
   // enough headroom that the last visible tab doesn't bleed under those
@@ -484,7 +466,6 @@ export const SpanTabBar = memo(function SpanTabBar({
 
   return (
     <HStack
-      ref={containerRef}
       gap="5px"
       paddingLeft={collapsePosition === "leading" ? 2 : 4}
       paddingRight={collapsePosition === "leading" ? 4 : 2}
@@ -526,6 +507,19 @@ export const SpanTabBar = memo(function SpanTabBar({
             onUnpinSpan={unpinSpan}
           />
         )}
+        {rightSlot ? (
+          <Flex
+            data-overflow-id={RIGHT_SLOT_OVERFLOW_ID}
+            display={
+              hiddenTabIds.has(RIGHT_SLOT_OVERFLOW_ID) ? "none" : "flex"
+            }
+            align="center"
+            flexShrink={0}
+            paddingLeft={3}
+          >
+            {rightSlot}
+          </Flex>
+        ) : null}
         <Flex align="center" flexShrink={0}>
           <OverflowMenu
             items={tabDescriptors
@@ -544,12 +538,6 @@ export const SpanTabBar = memo(function SpanTabBar({
           />
         </Flex>
       </HStack>
-
-      {rightSlot && !hideRightSlot ? (
-        <Flex align="center" flexShrink={0} paddingLeft={3}>
-          {rightSlot}
-        </Flex>
-      ) : null}
       {collapsePosition === "trailing" && (
         <Flex align="center" flexShrink={0} paddingLeft={2}>
           {collapseToggle}
