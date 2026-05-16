@@ -1,5 +1,5 @@
 import { Box, Flex } from "@chakra-ui/react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   type ImperativePanelHandle,
   Panel,
@@ -27,6 +27,9 @@ interface PaneLayoutProps {
 }
 
 const PANE_GROUP_STORAGE_PREFIX = "langwatch:traces-v2:drawer-panel-sizes";
+
+// SpanTabBar minHeight. Keep in sync with SpanTabBar.tsx.
+const SPAN_TAB_BAR_HEIGHT_PX = 38;
 
 /**
  * Renders the trace drawer body as a stack of independently sized,
@@ -62,6 +65,36 @@ export function PaneLayout({
 
   const ctxPanelRef = useRef<ImperativePanelHandle>(null);
   const detailPanelRef = useRef<ImperativePanelHandle>(null);
+
+  // The Details panel's collapsed size has to equal the SpanTabBar's
+  // pixel height (vertical layout) so collapsing leaves the tab row
+  // flush at the bottom — no trailing empty band. In horizontal layout
+  // the panel collapses to a narrow vertical strip that still shows the
+  // tab bar's leading collapse toggle. react-resizable-panels only
+  // accepts percentages, so we measure the PanelGroup's actual size
+  // along the relevant axis and convert. ResizeObserver keeps it in
+  // sync as the drawer resizes.
+  const vizDetailGroupRef = useRef<HTMLDivElement>(null);
+  const [detailCollapsedSize, setDetailCollapsedSize] = useState<number>(6);
+  useEffect(() => {
+    const el = vizDetailGroupRef.current;
+    if (!el) return;
+    const measure = () => {
+      const dim = layout === "horizontal" ? el.clientWidth : el.clientHeight;
+      if (dim <= 0) return;
+      // Vertical: collapse to the full tab-bar height so the tab row
+      // sits flush at the drawer bottom. Horizontal: collapse to a
+      // narrow strip wide enough for the leading collapse toggle.
+      const targetPx =
+        layout === "horizontal" ? 36 : SPAN_TAB_BAR_HEIGHT_PX;
+      const pct = (targetPx / dim) * 100;
+      setDetailCollapsedSize(Math.min(50, Math.max(1, pct)));
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [layout]);
 
   useEffect(() => {
     const handle = ctxPanelRef.current;
@@ -153,35 +186,42 @@ export function PaneLayout({
       : `${PANE_GROUP_STORAGE_PREFIX}:viz-detail:v`;
 
   const vizDetailGroup = (
-    <PanelGroup
-      direction={layout === "horizontal" ? "horizontal" : "vertical"}
-      autoSaveId={vizDetailGroupId}
-      style={{ flex: 1, minHeight: 0, minWidth: 0 }}
+    <Box
+      ref={vizDetailGroupRef}
+      style={{ flex: 1, minHeight: 0, minWidth: 0, display: "flex" }}
     >
-      <Panel
-        id="viz"
-        order={1}
-        defaultSize={layout === "horizontal" ? 55 : 50}
-        minSize={15}
+      <PanelGroup
+        direction={layout === "horizontal" ? "horizontal" : "vertical"}
+        autoSaveId={vizDetailGroupId}
+        style={{ flex: 1, minHeight: 0, minWidth: 0 }}
       >
-        {vizPanel}
-      </Panel>
-      <PanelResizeHandle>
-        <PaneResizeBar orientation={layout} />
-      </PanelResizeHandle>
-      <Panel
-        ref={detailPanelRef}
-        id="detail"
-        order={2}
-        defaultSize={layout === "horizontal" ? 45 : 50}
-        minSize={5}
-        collapsible
-        // Collapsed = SpanTabBar height only (~38px out of ~700px ≈ 5.5%).
-        collapsedSize={6}
-      >
-        {detailPanel}
-      </Panel>
-    </PanelGroup>
+        <Panel
+          id="viz"
+          order={1}
+          defaultSize={layout === "horizontal" ? 55 : 50}
+          minSize={15}
+        >
+          {vizPanel}
+        </Panel>
+        <PanelResizeHandle>
+          <PaneResizeBar orientation={layout} />
+        </PanelResizeHandle>
+        <Panel
+          ref={detailPanelRef}
+          id="detail"
+          order={2}
+          defaultSize={layout === "horizontal" ? 45 : 50}
+          minSize={5}
+          collapsible
+          // Computed from the group's measured size so the collapsed
+          // state lands exactly on the SpanTabBar height — no trailing
+          // empty band below the tab row.
+          collapsedSize={detailCollapsedSize}
+        >
+          {detailPanel}
+        </Panel>
+      </PanelGroup>
+    </Box>
   );
 
   if (!ctxPane) {

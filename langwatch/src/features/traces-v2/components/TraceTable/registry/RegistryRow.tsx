@@ -90,7 +90,12 @@ function RegistryRowComponent<TRow>({
 
   const mainRow = (
     <Tr
-      borderBottomWidth={hasAddons ? "0" : "1px"}
+      // Always render the row's bottom border, even when an addon row
+      // (e.g. IO preview arrows) sits below. Without this the vertical
+      // cell separators stop in mid-air at the addon row — the row
+      // visually melts into the addon block. The addon's own
+      // `borderBottomWidth` keeps the separation from the next trace.
+      borderBottomWidth="1px"
       borderBottomColor="border.muted"
       outline={isFocused ? "1px solid" : undefined}
       outlineColor={isFocused ? "blue.fg" : undefined}

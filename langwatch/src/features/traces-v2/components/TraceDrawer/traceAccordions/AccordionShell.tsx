@@ -93,7 +93,12 @@ export function Section({
         borderColor="border.muted"
         transition="background 120ms ease, color 120ms ease"
         _hover={{ bg: "bg.softHover", color: "fg" }}
-        _open={{ bg: "bg.softHover", color: "fg" }}
+        // Open state keeps the same white bg as closed — operator
+        // feedback: the gray fill on open made the panel feel busy and
+        // broke the "white card, gray header row" idiom. Only the title
+        // color promotes to `fg` so the open section still reads as
+        // active.
+        _open={{ color: "fg" }}
         cursor="pointer"
         // Each trigger pins flush with the SpanTabBar (no per-section
         // offset). The previous "Notion-style" stacking multiplied a

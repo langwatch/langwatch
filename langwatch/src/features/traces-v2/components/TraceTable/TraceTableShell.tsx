@@ -60,7 +60,7 @@ export function TraceTableShell<T>({
           <Tr
             key={headerGroup.id}
             borderBottomWidth="1px"
-            borderColor="border.muted"
+            borderColor="border.emphasized"
           >
             {headerGroup.headers.map((header, i) => (
               <HeaderCell
@@ -132,11 +132,12 @@ function HeaderCell<T>({
             ? { base: "bg.subtle", _dark: "bg.surface" }
             : undefined
       }
-      // Visible 1px vertical separator between TH cells. `border.muted`
-      // sits between `border.subtle` (too faint to see on the new
-      // lighter header bg) and `border` (too loud against the gray).
+      // Visible 1px vertical separator between TH cells. Slightly darker
+      // than the row dividers so the header reads as one structural band
+      // against the white table body — `border.emphasized` matches the
+      // header's own bottom border.
       borderRightWidth="1px"
-      borderRightColor="border.muted"
+      borderRightColor="border.emphasized"
       // Unified padding for every header — sortable + non-sortable share the
       // same Th paddings so the column titles line up across the row. The
       // sortable button below is `width: full` and only adds its own

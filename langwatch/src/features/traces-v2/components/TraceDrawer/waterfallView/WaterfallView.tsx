@@ -444,54 +444,64 @@ export const WaterfallView = memo(function WaterfallView({
         height="full"
         overflow="hidden"
       >
-        {/* Time axis header */}
+        {/* Time axis header — time markers share the same right inset as
+            the bars below so labels and bars align vertically. */}
         <Flex
           align="center"
           position="relative"
           height="24px"
           flexShrink={0}
-          paddingX={2}
           borderBottomWidth="1px"
           borderColor="border.subtle"
           bg="bg.subtle/30"
         >
-          {timeMarkers.map((ms, idx) => {
-            const pct = rootDuration > 0 ? (ms / rootDuration) * 100 : 0;
-            const isLast = idx === timeMarkers.length - 1;
-            const isFirst = idx === 0;
-            return (
-              <Text
-                key={idx}
-                textStyle="xs"
-                color="fg.subtle"
-                position="absolute"
-                left={`${pct}%`}
-                transform={
-                  isLast
-                    ? "translateX(-100%)"
-                    : isFirst
-                      ? undefined
-                      : "translateX(-50%)"
-                }
-                whiteSpace="nowrap"
-                userSelect="none"
-                lineHeight={1}
-              >
-                {formatDuration(ms)}
-              </Text>
-            );
-          })}
+          <Box
+            position="absolute"
+            top={0}
+            bottom={0}
+            left={2}
+            right={4}
+          >
+            {timeMarkers.map((ms, idx) => {
+              const pct = rootDuration > 0 ? (ms / rootDuration) * 100 : 0;
+              const isLast = idx === timeMarkers.length - 1;
+              const isFirst = idx === 0;
+              return (
+                <Text
+                  key={idx}
+                  textStyle="xs"
+                  color="fg.subtle"
+                  position="absolute"
+                  top="50%"
+                  left={`${pct}%`}
+                  transform={
+                    isLast
+                      ? "translate(-100%, -50%)"
+                      : isFirst
+                        ? "translateY(-50%)"
+                        : "translate(-50%, -50%)"
+                  }
+                  whiteSpace="nowrap"
+                  userSelect="none"
+                  lineHeight={1}
+                >
+                  {formatDuration(ms)}
+                </Text>
+              );
+            })}
+          </Box>
         </Flex>
 
         {/* Timeline rows — driven by the tree's scroll position via transform.
             No native scrollbar here; wheel events delegate to the tree.
-            A small right padding keeps the longest bars from kissing
-            the pane edge / resize divider. */}
+            Right inset is applied per-bar (in TimelineBar) rather than
+            on this container so the row's hover / selection background
+            still extends edge-to-edge while only the bars + time
+            labels stay clear of the pane edge. */}
         <Box
           flex={1}
           overflow="hidden"
           position="relative"
-          paddingRight={2}
           onWheel={handleTimelineWheel}
         >
           <Box
@@ -501,8 +511,17 @@ export const WaterfallView = memo(function WaterfallView({
             width="full"
             style={{ willChange: "transform" }}
           >
-            {/* Vertical grid lines */}
-            <Box position="absolute" inset={0} pointerEvents="none" zIndex={0}>
+            {/* Vertical grid lines — inset to match the bars and time
+                marker labels so the alignment grid is consistent. */}
+            <Box
+              position="absolute"
+              top={0}
+              bottom={0}
+              left={2}
+              right={4}
+              pointerEvents="none"
+              zIndex={0}
+            >
               {timeMarkers.map((ms, idx) => {
                 const pct = rootDuration > 0 ? (ms / rootDuration) * 100 : 0;
                 return (

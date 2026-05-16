@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { LuBot } from "react-icons/lu";
 import type { DisplayRoleVisuals } from "../scenarioRoles";
 import { BlockStack } from "./BlockStack";
+import { TurnCollapseChevron } from "./TurnCollapseChevron";
 import type { ChatMessage, ContentBlock } from "./types";
 
 export function AssistantTurnCard({
@@ -10,6 +11,7 @@ export function AssistantTurnCard({
   toolCalls,
   visuals,
   collapseTools = false,
+  onCollapse,
 }: {
   blocks: ContentBlock[];
   toolCalls: NonNullable<ChatMessage["tool_calls"]>;
@@ -20,6 +22,7 @@ export function AssistantTurnCard({
    */
   visuals?: DisplayRoleVisuals;
   collapseTools?: boolean;
+  onCollapse?: () => void;
 }) {
   // Operations = thinking + tool_use + tool_result (every block that isn't
   // user-facing output text). The header chip lets the user collapse them
@@ -102,6 +105,16 @@ export function AssistantTurnCard({
                 ? `Show ${operationCount} ${operationCount === 1 ? "step" : "steps"}`
                 : `Hide ${operationCount === 1 ? "step" : "steps"}`}
             </chakra.button>
+          </>
+        )}
+        {onCollapse && (
+          <>
+            {/* If the steps toggle wasn't rendered, push the chevron
+                to the right edge with our own spacer. */}
+            {!(!collapseTools && operationCount > 0 && hasOutputText) && (
+              <Box flex="1" />
+            )}
+            <TurnCollapseChevron onClick={onCollapse} />
           </>
         )}
       </HStack>

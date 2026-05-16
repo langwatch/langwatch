@@ -1,6 +1,6 @@
 import { Box, chakra, Flex, HStack, Icon, Text } from "@chakra-ui/react";
 import { useMemo, useState } from "react";
-import { LuChevronDown, LuChevronRight, LuUser } from "react-icons/lu";
+import { LuChevronRight, LuUser } from "react-icons/lu";
 import { getDisplayRoleVisuals, useIsScenarioRole } from "../scenarioRoles";
 import { ROLE_COLORS, ROLE_ICONS, ROLE_LABELS } from "./RoleChip";
 import { TurnView } from "./TurnView";
@@ -8,19 +8,31 @@ import { summarizeTurn } from "./turns";
 import type { ConversationTurn } from "./types";
 
 /**
- * Collapsible Gmail-style turn row. Header shows role + summary; body
- * expands to the full TurnView. Continuous thread line on the left.
+ * Collapsible Gmail-style turn row.
+ *
+ * - **Collapsed**: a single compact button showing role icon + label +
+ *   summary, with a chevron on the right. No outer indentation, no
+ *   thread line — turns sit flush in the container's own padding.
+ * - **Expanded**: the turn's own `<TurnView>` body renders directly with
+ *   no outer header chrome. The body's inner role header (system /
+ *   user / assistant chip) gains a collapse chevron inline, so we never
+ *   duplicate the role icon + label across an outer row and an inner
+ *   row.
  */
 export function ThreadedTurnView({
   turn,
-  index,
-  isLast,
   defaultExpanded,
   collapseTools = false,
 }: {
   turn: ConversationTurn;
-  index: number;
-  isLast: boolean;
+  /**
+   * Position of this turn in the surrounding list. Kept on the public
+   * API for back-compat with callers; no longer used now that the
+   * expanded state drops the outer "Turn N" header.
+   */
+  index?: number;
+  /** Last-turn flag, kept for caller back-compat (no longer drives chrome). */
+  isLast?: boolean;
   defaultExpanded: boolean;
   collapseTools?: boolean;
 }) {
@@ -50,87 +62,69 @@ export function ThreadedTurnView({
     ROLE_LABELS[sourceRole] ??
     sourceRole.toUpperCase();
 
-  return (
-    <Box position="relative" paddingLeft={6} paddingY={0}>
-      {!isLast && (
-        <Box
-          position="absolute"
-          left="7px"
-          top="22px"
-          bottom={0}
-          width="1px"
-          bg="border.muted"
+  if (expanded) {
+    return (
+      <Box paddingY={0.5}>
+        <TurnView
+          turn={turn}
+          collapseTools={collapseTools}
+          onCollapse={() => setExpanded(false)}
         />
-      )}
-      {/* A neutral chip with a colored icon — keeps the role signal but
-          drops the loud colored fill that was competing with the row text. */}
-      <Flex
-        position="absolute"
-        left={0}
-        top="6px"
-        width="14px"
-        height="14px"
-        borderRadius="full"
-        bg="bg.subtle"
-        borderWidth="1px"
-        borderColor="border.subtle"
-        align="center"
-        justify="center"
-        flexShrink={0}
-        zIndex={1}
-      >
-        <Icon as={RoleIcon} boxSize="8px" color={color} />
-      </Flex>
+      </Box>
+    );
+  }
 
-      <chakra.button
-        type="button"
-        onClick={() => setExpanded((v) => !v)}
-        display="flex"
-        alignItems="center"
-        gap={1.5}
-        paddingY={0.5}
-        paddingX={1.5}
-        borderRadius="sm"
-        cursor="pointer"
-        _hover={{ bg: "bg.muted" }}
-        textAlign="left"
-        width="full"
-      >
+  return (
+    <chakra.button
+      type="button"
+      onClick={() => setExpanded(true)}
+      display="flex"
+      alignItems="center"
+      gap={1.5}
+      paddingY={0.5}
+      paddingX={1.5}
+      borderRadius="sm"
+      cursor="pointer"
+      _hover={{ bg: "bg.muted" }}
+      textAlign="left"
+      width="full"
+    >
+      <HStack gap={1.5} flexShrink={0}>
+        <Flex
+          width="14px"
+          height="14px"
+          borderRadius="full"
+          bg="bg.subtle"
+          borderWidth="1px"
+          borderColor="border.subtle"
+          align="center"
+          justify="center"
+          flexShrink={0}
+        >
+          <Icon as={RoleIcon} boxSize="8px" color={color} />
+        </Flex>
         <Text
           textStyle="2xs"
           color={color}
           fontWeight="600"
           textTransform="uppercase"
           letterSpacing="0.06em"
-          flexShrink={0}
           lineHeight={1.4}
         >
           {label}
         </Text>
-        <Text
-          textStyle="xs"
-          color={expanded ? "fg.muted" : "fg.default"}
-          truncate
-          flex={1}
-          minWidth={0}
-          fontStyle={expanded ? "italic" : "normal"}
-          lineHeight={1.4}
-        >
-          {expanded ? `Turn ${index + 1}` : summary}
-        </Text>
-        <Icon
-          as={expanded ? LuChevronDown : LuChevronRight}
-          boxSize={2.5}
-          color="fg.subtle"
-          flexShrink={0}
-        />
-      </chakra.button>
-
-      {expanded && (
-        <Box paddingTop={1} paddingBottom={2}>
-          <TurnView turn={turn} collapseTools={collapseTools} />
-        </Box>
-      )}
-    </Box>
+      </HStack>
+      <Text
+        textStyle="xs"
+        color="fg.default"
+        truncate
+        flex={1}
+        minWidth={0}
+        lineHeight={1.4}
+      >
+        {summary}
+      </Text>
+      <Icon as={LuChevronRight} boxSize={2.5} color="fg.subtle" flexShrink={0} />
+    </chakra.button>
   );
 }

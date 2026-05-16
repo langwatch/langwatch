@@ -48,7 +48,6 @@ export function TimelineBar({
       height={`${rowHeight}px`}
       align="center"
       position="relative"
-      paddingX={2}
       cursor="pointer"
       onClick={onSelect}
       onMouseEnter={onHoverStart}
@@ -57,43 +56,57 @@ export function TimelineBar({
       transition="opacity 0.1s ease"
       bg={isSelected ? "blue.subtle" : isHovered ? "bg.muted" : undefined}
     >
-      {isZeroDuration ? (
-        /* Diamond marker for 0ms spans */
-        <Box
-          position="absolute"
-          left={`calc(${leftPct}% - 4px)`}
-          width="8px"
-          height="8px"
-          transform="rotate(45deg)"
-          bg={isError ? "red.solid" : color}
-          borderWidth={isSelected ? "1px" : "0px"}
-          borderColor="border.emphasized"
-          opacity={0.85}
-        />
-      ) : (
-        <Box
-          position="absolute"
-          left={`${leftPct}%`}
-          width={`${widthPct}%`}
-          minWidth={`${MIN_BAR_PX}px`}
-          height={`${BAR_HEIGHT}px`}
-          borderRadius="sm"
-          bg={color}
-          opacity={isSelected ? 0.95 : isHovered ? 0.85 : 0.7}
-          borderWidth={isError ? "1.5px" : isSelected ? "1px" : "0px"}
-          borderColor={
-            isError ? "red.solid" : isSelected ? "border.emphasized" : undefined
-          }
-          transition="opacity 0.1s ease"
-          boxShadow={
-            isSelected
-              ? "0 1px 3px 0 rgba(0,0,0,0.1)"
-              : isHovered
-                ? "0 1px 2px 0 rgba(0,0,0,0.06)"
-                : undefined
-          }
-        />
-      )}
+      {/* Bars live inside a smaller positioned containing block so the
+          row's hover / selection background can still extend
+          edge-to-edge while the bars themselves stay clear of the pane
+          edge / resize divider. left/right here mirror the inset used
+          by the time markers in WaterfallView's header. */}
+      <Box position="absolute" top={0} bottom={0} left={2} right={4}>
+        {isZeroDuration ? (
+          /* Diamond marker for 0ms spans */
+          <Box
+            position="absolute"
+            top="50%"
+            left={`calc(${leftPct}% - 4px)`}
+            width="8px"
+            height="8px"
+            transform="translateY(-50%) rotate(45deg)"
+            bg={isError ? "red.solid" : color}
+            borderWidth={isSelected ? "1px" : "0px"}
+            borderColor="border.emphasized"
+            opacity={0.85}
+          />
+        ) : (
+          <Box
+            position="absolute"
+            top="50%"
+            left={`${leftPct}%`}
+            width={`${widthPct}%`}
+            minWidth={`${MIN_BAR_PX}px`}
+            height={`${BAR_HEIGHT}px`}
+            transform="translateY(-50%)"
+            borderRadius="sm"
+            bg={color}
+            opacity={isSelected ? 0.95 : isHovered ? 0.85 : 0.7}
+            borderWidth={isError ? "1.5px" : isSelected ? "1px" : "0px"}
+            borderColor={
+              isError
+                ? "red.solid"
+                : isSelected
+                  ? "border.emphasized"
+                  : undefined
+            }
+            transition="opacity 0.1s ease"
+            boxShadow={
+              isSelected
+                ? "0 1px 3px 0 rgba(0,0,0,0.1)"
+                : isHovered
+                  ? "0 1px 2px 0 rgba(0,0,0,0.06)"
+                  : undefined
+            }
+          />
+        )}
+      </Box>
     </Flex>
   );
 }
@@ -120,27 +133,30 @@ export function GroupTimelineBar({
       height={`${GROUP_ROW_HEIGHT}px`}
       align="center"
       position="relative"
-      paddingX={2}
     >
-      <Box
-        position="absolute"
-        left={`${leftPct}%`}
-        width={`${widthPct}%`}
-        minWidth={`${MIN_BAR_PX}px`}
-        height={`${BAR_HEIGHT}px`}
-        borderRadius="sm"
-        bg={color}
-        opacity={0.45}
-        css={{
-          backgroundImage: `repeating-linear-gradient(
-            -45deg,
-            transparent,
-            transparent 3px,
-            rgba(255,255,255,0.15) 3px,
-            rgba(255,255,255,0.15) 6px
-          )`,
-        }}
-      />
+      <Box position="absolute" top={0} bottom={0} left={2} right={4}>
+        <Box
+          position="absolute"
+          top="50%"
+          left={`${leftPct}%`}
+          width={`${widthPct}%`}
+          minWidth={`${MIN_BAR_PX}px`}
+          height={`${BAR_HEIGHT}px`}
+          transform="translateY(-50%)"
+          borderRadius="sm"
+          bg={color}
+          opacity={0.45}
+          css={{
+            backgroundImage: `repeating-linear-gradient(
+              -45deg,
+              transparent,
+              transparent 3px,
+              rgba(255,255,255,0.15) 3px,
+              rgba(255,255,255,0.15) 6px
+            )`,
+          }}
+        />
+      </Box>
     </Flex>
   );
 }
