@@ -142,7 +142,15 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
     >
       <CodeBlock.AdapterProvider value={shikiAdapter}>
         <Drawer.Content
-          bg="bg"
+          // Transparent at the Content level so the header section
+          // below can run its own translucent + backdrop-blur fill
+          // (page content behind the drawer reads through blurred,
+          // consistent with the rest of the site's translucent
+          // chrome — see BelowFoldIndicator, sequence overlays).
+          // The lower pane container has its own `bg.surface` white,
+          // so only the header area is translucent — everything
+          // below stays solid white.
+          bg="transparent"
           ref={drawerContentRef}
           paddingX={0}
           maxWidth={
@@ -192,7 +200,17 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
               <TraceDrawerSkeleton onClose={handleClose} />
             ) : (
               <>
-                <Box flexShrink={0}>
+                <Box
+                  flexShrink={0}
+                  // Translucent fill + backdrop blur so the page behind
+                  // the drawer reads through (same recipe used elsewhere
+                  // for chrome — BelowFoldIndicator, sequence overlays,
+                  // onboarding panels). The lower pane container keeps
+                  // its solid `bg.surface` white, so only the header
+                  // strip is translucent.
+                  bg="bg.panel/70"
+                  backdropFilter="blur(20px) saturate(150%)"
+                >
                   <IsolatedErrorBoundary
                     scope="Couldn't render this trace's header"
                     resetKeys={[trace.traceId]}
