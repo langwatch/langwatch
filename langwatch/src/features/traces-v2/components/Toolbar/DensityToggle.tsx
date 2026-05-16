@@ -5,13 +5,18 @@ import { Kbd } from "~/components/ops/shared/Kbd";
 import { Tooltip } from "~/components/ui/tooltip";
 import { type Density, useDensityStore } from "../../stores/densityStore";
 
+// Icons map "visual height of letter" to "row height" — the up-arrow
+// "A↑" reads as "tighter rows, taller letters poking up" = compact,
+// and the down-arrow "A↓" reads as "looser rows, breathing room
+// below the letter" = comfortable. The previous mapping was reversed
+// from operator intuition.
 const OPTIONS: {
   density: Density;
   label: string;
   Icon: typeof AArrowDown;
 }[] = [
-  { density: "compact", label: "Compact", Icon: AArrowDown },
-  { density: "comfortable", label: "Comfortable", Icon: AArrowUp },
+  { density: "compact", label: "Compact", Icon: AArrowUp },
+  { density: "comfortable", label: "Comfortable", Icon: AArrowDown },
 ];
 
 const INACTIVE_ICON_OPACITY = 0.7;

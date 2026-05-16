@@ -10,7 +10,7 @@ import { useTraceResources } from "../../../hooks/useTraceResources";
 import { AttributeTable } from "../AttributeTable";
 import { EvalsList } from "../evalCards";
 import { IOViewer } from "../IOViewer";
-import { ScopeBlock, ScopeChip } from "../ScopeChip";
+import { ScopeBlock } from "../ScopeChip";
 import { AccordionShell, Section } from "./AccordionShell";
 import { EmptyEventsState, EmptyHint } from "./EmptyStates";
 import { EventCard } from "./EventCard";
@@ -92,16 +92,10 @@ export function TraceSummaryAccordions({
 
   return (
     <Box>
-      {hasScope && (
-        <Box
-          paddingX={4}
-          paddingY={2}
-          borderBottomWidth="1px"
-          borderColor="border.muted"
-        >
-          <ScopeChip scope={resources.scope} />
-        </Box>
-      )}
+      {/* The instrumentation scope used to render here as a small
+          attribution row at the top of the summary panel. It's now
+          pinned to the right of the SpanTabBar so it stays visible
+          when the user scrolls the summary content. */}
       <AccordionShell value={openSections} onValueChange={setOpenSections}>
         {sections.map((id, idx) => {
           const isFirst = idx === 0;

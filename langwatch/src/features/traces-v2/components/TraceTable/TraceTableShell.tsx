@@ -1,4 +1,5 @@
 import {
+  Box,
   Button,
   HStack,
   Icon,
@@ -44,16 +45,16 @@ export function TraceTableShell<T>({
       }}
     >
       {/*
-        Light mode: the header row reads gray against the white table
-        body — DevTools "Network" inversion. Dark mode keeps the
-        previous `bg.surface` (slight elevation against the dark
-        canvas) that operators already approved.
+        Light mode: the header row reads as a soft elevation against
+        the white table body — `bg.subtle` is lighter than the
+        previous `bg.muted`, which felt too dark per operator feedback.
+        Dark mode keeps the existing slight elevation token.
       */}
       <Thead
         position="sticky"
         top={0}
         zIndex={2}
-        bg={{ base: "bg.muted", _dark: "bg.surface" }}
+        bg={{ base: "bg.subtle", _dark: "bg.surface" }}
       >
         {table.getHeaderGroups().map((headerGroup) => (
           <Tr
@@ -108,10 +109,15 @@ function HeaderCell<T>({
     <Th
       width={useFixedWidth ? `${size}px` : undefined}
       minWidth={`${header.column.columnDef.minSize}px`}
+      // Clip header text at the cell boundary so labels like
+      // "DURATION" don't visually overflow when the column is sized
+      // narrow. Inner SortableHeaderButton handles ellipsis on the
+      // label itself; this is the belt-and-suspenders clip.
+      overflow="hidden"
       textAlign={align}
       textStyle="2xs"
       fontWeight={isActiveSort ? "600" : "500"}
-      color={isActiveSort ? "fg" : "fg.subtle/70"}
+      color={isActiveSort ? "fg" : "fg.muted"}
       textTransform="uppercase"
       letterSpacing="0.06em"
       whiteSpace="nowrap"
@@ -121,13 +127,16 @@ function HeaderCell<T>({
       zIndex={isStickyFirst ? 3 : undefined}
       bg={
         isActiveSort
-          ? "blue.subtle"
+          ? { base: "bg.muted", _dark: "bg.muted" }
           : isStickyFirst
-            ? { base: "bg.muted", _dark: "bg.surface" }
+            ? { base: "bg.subtle", _dark: "bg.surface" }
             : undefined
       }
+      // Visible 1px vertical separator between TH cells. `border.muted`
+      // sits between `border.subtle` (too faint to see on the new
+      // lighter header bg) and `border` (too loud against the gray).
       borderRightWidth="1px"
-      borderRightColor="border.subtle"
+      borderRightColor="border.muted"
       // Unified padding for every header — sortable + non-sortable share the
       // same Th paddings so the column titles line up across the row. The
       // sortable button below is `width: full` and only adds its own
@@ -191,10 +200,12 @@ function SortableHeaderButton({
       _focusVisible={{ bg: "transparent" }}
       role="group"
     >
-      <HStack gap={1}>
-        {children}
+      <HStack gap={1} minWidth={0} flex={1}>
+        <Box truncate flex={1} minWidth={0} textAlign={align}>
+          {children}
+        </Box>
         {isActive ? (
-          <Icon boxSize="12px" color="blue.fg">
+          <Icon boxSize="12px" color="fg" flexShrink={0}>
             {sortDirection === "desc" ? <ChevronDown /> : <ChevronUp />}
           </Icon>
         ) : (
@@ -208,6 +219,7 @@ function SortableHeaderButton({
             boxSize="12px"
             color="fg.muted"
             opacity={0.35}
+            flexShrink={0}
             _groupHover={{ opacity: 0.85 }}
             transition="opacity 0.1s ease"
           >

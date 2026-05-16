@@ -68,6 +68,14 @@ interface SpanTabBarProps {
    * metadata without claiming its own row.
    */
   rightSlot?: React.ReactNode;
+  /**
+   * Position of the Details pane in its `<PanelGroup>`. Drives where
+   * the collapse toggle sits — leftmost for a right-side pane (the
+   * horizontal split), rightmost for a bottom-stacked pane (vertical
+   * layout). Mirrors how Chrome DevTools' panel-position chooser
+   * decides which edge of the tab row gets the disclosure icon.
+   */
+  collapsePosition?: "leading" | "trailing";
 }
 
 function DrawerTabPresenceDot({
@@ -118,6 +126,7 @@ export const SpanTabBar = memo(function SpanTabBar({
   spanTree,
   promptCount,
   rightSlot,
+  collapsePosition = "leading",
 }: SpanTabBarProps) {
   const traceId = useDrawerStore((s) => s.traceId);
   const activeTab = useDrawerStore((s) => s.activeTab);
@@ -137,6 +146,31 @@ export const SpanTabBar = memo(function SpanTabBar({
   );
   const togglePaneCollapsed = useDrawerStore((s) => s.togglePaneCollapsed);
   const CollapseToggleIcon = detailCollapsed ? LuPanelTopOpen : LuPanelTopClose;
+
+  const collapseToggle = (
+    <Tooltip
+      content={detailCollapsed ? "Show details" : "Hide details"}
+      positioning={{
+        placement: collapsePosition === "leading" ? "right" : "left",
+      }}
+      openDelay={400}
+    >
+      <Flex
+        as="button"
+        align="center"
+        justify="center"
+        paddingX={1.5}
+        color="fg.muted"
+        cursor="pointer"
+        _hover={{ color: "fg" }}
+        aria-label={detailCollapsed ? "Show details" : "Hide details"}
+        onClick={() => togglePaneCollapsed("spanDetail")}
+        flexShrink={0}
+      >
+        <Icon as={CollapseToggleIcon} boxSize={3.5} />
+      </Flex>
+    </Tooltip>
+  );
 
   const selectedSpan = useMemo(
     () =>
@@ -168,8 +202,8 @@ export const SpanTabBar = memo(function SpanTabBar({
   return (
     <HStack
       gap="5px"
-      paddingLeft={2}
-      paddingRight={4}
+      paddingLeft={collapsePosition === "leading" ? 2 : 4}
+      paddingRight={collapsePosition === "leading" ? 4 : 2}
       borderBottomWidth="1px"
       borderColor="border"
       overflowX="auto"
@@ -179,28 +213,7 @@ export const SpanTabBar = memo(function SpanTabBar({
       bg={{ base: "bg.surface", _dark: "bg.panel" }}
       css={{ "&::-webkit-scrollbar": { display: "none" } }}
     >
-      {/* Collapse / expand the entire Details pane. Sits to the left
-          of the tabs, devtools-style. */}
-      <Tooltip
-        content={detailCollapsed ? "Show details" : "Hide details"}
-        positioning={{ placement: "right" }}
-        openDelay={400}
-      >
-        <Flex
-          as="button"
-          align="center"
-          justify="center"
-          paddingX={1.5}
-          color="fg.muted"
-          cursor="pointer"
-          _hover={{ color: "fg" }}
-          aria-label={detailCollapsed ? "Show details" : "Hide details"}
-          onClick={() => togglePaneCollapsed("spanDetail")}
-          flexShrink={0}
-        >
-          <Icon as={CollapseToggleIcon} boxSize={3.5} />
-        </Flex>
-      </Tooltip>
+      {collapsePosition === "leading" && collapseToggle}
 
       <DrawerTabButton
         label="Summary"
@@ -305,6 +318,16 @@ export const SpanTabBar = memo(function SpanTabBar({
           {rightSlot}
         </Flex>
       ) : null}
+      {collapsePosition === "trailing" && (
+        <Flex
+          align="center"
+          marginLeft={rightSlot ? 0 : "auto"}
+          flexShrink={0}
+          paddingLeft={2}
+        >
+          {collapseToggle}
+        </Flex>
+      )}
     </HStack>
   );
 });

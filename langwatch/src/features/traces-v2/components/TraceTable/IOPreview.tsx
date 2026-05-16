@@ -6,7 +6,6 @@ import { useDensityStore } from "../../stores/densityStore";
 import { formatPreview } from "../../utils/previewFormatter";
 import { tryParseChat } from "./chatContent";
 
-const VERTICAL_BAR = "\u2506";
 const COMFORTABLE_LABEL_WIDTH = "60px";
 
 interface IOPreviewProps {
@@ -77,14 +76,21 @@ const CompactRow: React.FC<CompactRowProps> = ({
   direction,
 }) => {
   const isInput = direction === "input";
-  const accent = isInput ? "blue.fg" : "green.fg";
+  // Brighter palette in light mode — the previous `*.fg` (slate-700ish)
+  // arrows read as grey on the row's near-white tint. The `*.500`
+  // step matches the evaluations-v3 chip palette so the two views
+  // feel consistent. Dark mode falls back to the `*.fg` step which
+  // already has the right contrast on the dark canvas.
+  const accent = isInput
+    ? { base: "blue.500", _dark: "blue.fg" }
+    : { base: "green.500", _dark: "green.fg" };
   const textColor = isInput ? "fg.muted" : "fg.subtle";
 
   return (
     <HStack gap={1} width="full" overflow="hidden" align="baseline">
-      <Text textStyle="2xs" color="fg.subtle/30" flexShrink={0} lineHeight="1">
-        {VERTICAL_BAR}
-      </Text>
+      {/* Removed the dashed vertical bar that used to sit before the
+          arrow icon — it read as visual noise and didn't add an
+          alignment cue the row tint isn't already providing. */}
       <Flex align="center" gap={1} flexShrink={0}>
         <Icon boxSize="10px" color={accent}>
           {isInput ? <ArrowUp /> : <ArrowDown />}
@@ -108,7 +114,7 @@ const CompactRow: React.FC<CompactRowProps> = ({
 
 const RoleIcon: React.FC<{
   row: { isChat: boolean; isTool: boolean };
-  color: string;
+  color: string | { base: string; _dark: string };
   direction: "input" | "output";
 }> = ({ row, color, direction }) => {
   if (direction === "input") {
@@ -140,7 +146,7 @@ const ComfortableIOPreview: React.FC<IOPreviewProps> = ({ input, output }) => (
     {input !== null && (
       <ComfortableRow
         label="Input"
-        labelColor="blue.fg"
+        labelColor={{ base: "blue.500", _dark: "blue.fg" }}
         textColor="fg.muted"
         text={formatPreview(input, { maxChars: 200 }).text}
       />
@@ -148,7 +154,7 @@ const ComfortableIOPreview: React.FC<IOPreviewProps> = ({ input, output }) => (
     {output !== null && (
       <ComfortableRow
         label="Output"
-        labelColor="green.fg"
+        labelColor={{ base: "green.500", _dark: "green.fg" }}
         textColor="fg"
         text={formatPreview(output, { maxChars: 200 }).text}
       />
@@ -158,7 +164,7 @@ const ComfortableIOPreview: React.FC<IOPreviewProps> = ({ input, output }) => (
 
 const ComfortableRow: React.FC<{
   label: string;
-  labelColor: string;
+  labelColor: string | { base: string; _dark: string };
   textColor: string;
   text: string;
 }> = ({ label, labelColor, textColor, text }) => (

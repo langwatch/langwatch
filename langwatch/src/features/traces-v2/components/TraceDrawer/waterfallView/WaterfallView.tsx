@@ -427,8 +427,11 @@ export const WaterfallView = memo(function WaterfallView({
           bottom={0}
           left="2px"
           width="1px"
-          bg="border.subtle"
-          opacity={0.6}
+          // Darker default so the Span/Timeline split is legible against
+          // the pane's lighter `bg.surface` — previous `border.subtle`
+          // at 0.6 opacity all but vanished in light mode.
+          bg="border.emphasized"
+          opacity={0.85}
           transition="all 0.15s ease"
         />
       </Box>
@@ -481,11 +484,14 @@ export const WaterfallView = memo(function WaterfallView({
         </Flex>
 
         {/* Timeline rows — driven by the tree's scroll position via transform.
-            No native scrollbar here; wheel events delegate to the tree. */}
+            No native scrollbar here; wheel events delegate to the tree.
+            A small right padding keeps the longest bars from kissing
+            the pane edge / resize divider. */}
         <Box
           flex={1}
           overflow="hidden"
           position="relative"
+          paddingRight={2}
           onWheel={handleTimelineWheel}
         >
           <Box

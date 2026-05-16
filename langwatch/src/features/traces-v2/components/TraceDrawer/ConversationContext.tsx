@@ -99,6 +99,7 @@ function extractReadableSnippet(
           if (msg && msg.role === prefer) {
             const single = formatPreview(JSON.stringify([msg]), {
               maxChars: MAX_PREVIEW,
+              newlines: "preserve",
             });
             if (single.text.trim()) return single.text;
           }
@@ -108,7 +109,10 @@ function extractReadableSnippet(
       /* fall through to formatPreview on raw input */
     }
   }
-  return formatPreview(raw, { maxChars: MAX_PREVIEW }).text;
+  return formatPreview(raw, {
+    maxChars: MAX_PREVIEW,
+    newlines: "preserve",
+  }).text;
 }
 
 /**
@@ -524,9 +528,14 @@ const TurnLine: React.FC<{
         }
         fontStyle={text ? "normal" : "italic"}
         fontWeight={emphasised && text && !isAssistant ? "medium" : "normal"}
-        truncate
         flex={1}
         minWidth={0}
+        // Real line breaks instead of the previous "↵" inline glyph —
+        // the snippet is short enough that letting it wrap to a couple
+        // of extra lines reads better than collapsing multiple lines
+        // into a single one with arrow runes.
+        whiteSpace="pre-wrap"
+        wordBreak="break-word"
       >
         {text ?? placeholder}
       </Text>

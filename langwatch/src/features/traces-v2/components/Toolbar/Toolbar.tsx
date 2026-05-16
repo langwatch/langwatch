@@ -1,9 +1,10 @@
 import { Button, Flex, Icon, IconButton } from "@chakra-ui/react";
-import { Compass, Download, Search, Tent } from "lucide-react";
+import { Bookmark, Compass, Download, Search, Tent } from "lucide-react";
 import type React from "react";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useTourEntryPoints } from "../../onboarding";
 import { useFindStore } from "../../stores/findStore";
+import { useViewStore } from "../../stores/viewStore";
 import { AutomateButton } from "./AutomateButton";
 import { ColumnsDropdown } from "./ColumnsDropdown";
 import { DensityToggle } from "./DensityToggle";
@@ -32,6 +33,31 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll }) => {
   // instead of hunting for an exit in the empty-state body.
   const { onLaunchTour, onEndTour, tourActive } = useTourEntryPoints();
 
+  // "Save Lens" outline button only surfaces when the active lens has
+  // pending local changes. Clicking it opens the same save-as-new flow
+  // the lens tab's overflow menu uses (browser prompt for the new
+  // name). Reverting is one keystroke away via the lens tab's right-
+  // click menu — we don't double up the affordance in the toolbar.
+  const activeLensId = useViewStore((s) => s.activeLensId);
+  const activeLensIsDraft = useViewStore((s) => s.isDraft(activeLensId));
+  const activeLensName = useViewStore(
+    (s) =>
+      s.allLenses.find((l) => l.id === activeLensId)?.name ?? "Current view",
+  );
+  const createLens = useViewStore((s) => s.createLens);
+
+  const handleSaveLens = () => {
+    if (typeof window === "undefined") return;
+    const name = window.prompt(
+      "Save current view as a new lens — name:",
+      `${activeLensName} (copy)`,
+    );
+    if (!name) return;
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    createLens(trimmed);
+  };
+
   return (
     <Flex
       align="center"
@@ -56,12 +82,49 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll }) => {
             aria-label={tourActive ? "End the tour" : "Take the tour"}
             aria-pressed={tourActive}
           >
-            <Icon boxSize={3.5} color="orange.fg">
+            {/* Brighter orange in light mode (matches the orange
+                indicator dot on the "All" lens tab) — `orange.fg` was
+                rendering as muted brown on the white toolbar surface. */}
+            <Icon
+              boxSize={3.5}
+              color={{ base: "orange.500", _dark: "orange.fg" }}
+            >
               {tourActive ? <Tent /> : <Compass />}
             </Icon>
             {tourActive ? "On safari" : "Tour"}
           </Button>
         </Tooltip>
+        {activeLensIsDraft && (
+          <Tooltip
+            content={
+              <Flex direction="column" gap={1} maxWidth="240px">
+                <span>
+                  You've changed the current view's filters, columns, or
+                  grouping. Click to save these as a new lens you can
+                  always come back to.
+                </span>
+                <span style={{ opacity: 0.7 }}>
+                  Right-click the lens tab → Revert local changes to
+                  discard.
+                </span>
+              </Flex>
+            }
+            positioning={{ placement: "bottom" }}
+          >
+            <Button
+              size="xs"
+              variant="outline"
+              colorPalette="orange"
+              onClick={handleSaveLens}
+              aria-label="Save current view as a new lens"
+            >
+              <Icon boxSize={3.5}>
+                <Bookmark />
+              </Icon>
+              Save lens
+            </Button>
+          </Tooltip>
+        )}
         <LiveIndicator />
         <TimeRangePicker />
         <ColumnsDropdown />

@@ -6,9 +6,11 @@ import type {
 } from "~/server/api/routers/tracesV2.schemas";
 import { IsolatedErrorBoundary } from "~/components/ui/IsolatedErrorBoundary";
 import { useDrawerStore } from "../../../stores/drawerStore";
+import { useTraceResources } from "../../../hooks/useTraceResources";
 import { parseTracePromptIds } from "../../../utils/promptAttributes";
 import { LlmPanel } from "../LlmPanel";
 import { PromptsPanel } from "../PromptsPanel";
+import { ScopeChip } from "../ScopeChip";
 import { SpanTabBar } from "../SpanTabBar";
 import { TraceAccordions } from "../traceAccordions";
 
@@ -16,6 +18,13 @@ interface SpanDetailPaneProps {
   trace: TraceHeader;
   spans: SpanTreeNode[];
   selectedSpan: SpanTreeNode | null;
+  /**
+   * Whether the panel sits below ("vertical") or to the right
+   * ("horizontal") of the visualization. Drives where the SpanTabBar's
+   * collapse toggle sits — on the right edge of the tab row when
+   * stacked below, on the left when side-by-side.
+   */
+  layout: "vertical" | "horizontal";
 }
 
 /**
@@ -33,11 +42,13 @@ export const SpanDetailPane = memo(function SpanDetailPane({
   trace,
   spans,
   selectedSpan,
+  layout,
 }: SpanDetailPaneProps) {
   const activeTab = useDrawerStore((s) => s.activeTab);
   const selectedSpanId = useDrawerStore((s) => s.selectedSpanId);
   const selectSpan = useDrawerStore((s) => s.selectSpan);
   const collapsed = useDrawerStore((s) => s.paneState.spanDetail.collapsed);
+  const resources = useTraceResources(trace.traceId);
 
   return (
     <Box
@@ -60,22 +71,8 @@ export const SpanDetailPane = memo(function SpanDetailPane({
           <SpanTabBar
             spanTree={spans}
             promptCount={parseTracePromptIds(trace.attributes).length}
-            rightSlot={
-              trace.attributes["scope.name"] || trace.attributes["service.name"]
-                ? (
-                  <InstrumentationScopeChip
-                    scopeName={
-                      (trace.attributes["scope.name"] as string | undefined) ??
-                      (trace.attributes["service.name"] as string | undefined) ??
-                      null
-                    }
-                    scopeVersion={
-                      trace.attributes["scope.version"] as string | undefined
-                    }
-                  />
-                )
-                : null
-            }
+            rightSlot={<ScopeChip scope={resources.scope} />}
+            collapsePosition={layout === "horizontal" ? "leading" : "trailing"}
           />
         </IsolatedErrorBoundary>
       </Box>
@@ -115,33 +112,3 @@ export const SpanDetailPane = memo(function SpanDetailPane({
   );
 });
 
-/**
- * Right-aligned chip in the SpanTabBar surfacing the instrumentation
- * scope. The scope tells the operator what library or runtime emitted
- * the spans — useful for triage but it's secondary metadata, so
- * pinning it to the tab row keeps it close to the panel without
- * stealing its own row.
- */
-function InstrumentationScopeChip({
-  scopeName,
-  scopeVersion,
-}: {
-  scopeName: string | null;
-  scopeVersion?: string;
-}) {
-  if (!scopeName) return null;
-  const label = scopeVersion ? `${scopeName} · ${scopeVersion}` : scopeName;
-  return (
-    <Box
-      as="span"
-      fontSize="xs"
-      color="fg.muted"
-      fontFamily="mono"
-      truncate
-      maxWidth="220px"
-      title={label}
-    >
-      {label}
-    </Box>
-  );
-}

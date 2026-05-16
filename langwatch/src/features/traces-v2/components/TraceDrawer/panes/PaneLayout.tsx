@@ -122,6 +122,7 @@ export function PaneLayout({
       trace={trace}
       spans={spans}
       selectedSpan={selectedSpan}
+      layout={layout}
     />
   );
 
@@ -246,22 +247,28 @@ function PaneResizeBar({ orientation }: { orientation: DrawerLayout }) {
     <Box
       role="separator"
       aria-orientation={isHorizontal ? "vertical" : "horizontal"}
-      // Transparent strip — the visible 1px line is the adjacent
-      // panel's border, this element is purely the drag handle. ZERO
-      // width / height in the layout direction so it doesn't double
-      // the visible separator. The transparent extra hit area lives
-      // ENTIRELY in the negative-margin overlap with the surrounding
-      // panels (margin pulls them into each other so the hit zone is
-      // 14px wide centered on the 0-width line).
+      // Zero-area parent so the resize handle claims no space in the
+      // layout — the visible 1px separator is the adjacent panel's
+      // border. The forgiving hit zone lives in a child rendered with
+      // `position: absolute` so it overlaps the surrounding panels by
+      // 6px on each side WITHOUT pushing them inward (the previous
+      // padding-based approach added 14px to the handle's layout
+      // width, which cut off the last viz tab inside the viz panel).
       width={isHorizontal ? "0px" : "100%"}
       height={isHorizontal ? "100%" : "0px"}
-      margin={isHorizontal ? "0 -7px" : "-7px 0"}
-      padding={isHorizontal ? "0 7px" : "7px 0"}
-      cursor={isHorizontal ? "col-resize" : "row-resize"}
-      // Reach above the panel contents so the cursor wins; panel
-      // bodies are below this in stacking order.
       position="relative"
-      zIndex={1}
-    />
+    >
+      <Box
+        position="absolute"
+        top={isHorizontal ? 0 : "-6px"}
+        bottom={isHorizontal ? 0 : "-6px"}
+        left={isHorizontal ? "-6px" : 0}
+        right={isHorizontal ? "-6px" : 0}
+        cursor={isHorizontal ? "col-resize" : "row-resize"}
+        // Above the adjacent panel contents so the cursor wins where
+        // the hit zone overlaps them. No bg — purely a hit target.
+        zIndex={2}
+      />
+    </Box>
   );
 }
