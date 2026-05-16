@@ -113,6 +113,34 @@ interface ViewState {
   renameLens: (lensId: string, name: string) => void;
   duplicateLens: (lensId: string) => string;
   deleteLens: (lensId: string) => void;
+  /**
+   * Replace all non-built-in lenses with the supplied list, sourced from
+   * the server (kind=v2-traces-lens). Built-in lenses are preserved in
+   * place, dismissed built-ins stay dismissed. Used by `useLensSync` to
+   * keep the store in lockstep with the SavedView table.
+   */
+  setUserLenses: (lenses: LensConfig[]) => void;
+}
+
+/**
+ * Optional bridge for mirroring lens mutations to the server. When set
+ * (typically by `useLensSync`), the store calls these alongside its
+ * local writes so localStorage stays a hot cache and the server stays
+ * the source of truth. Mutations are fire-and-forget — the hook owns
+ * refetch + error reporting.
+ */
+export interface LensSyncBridge {
+  create: (
+    lens: LensConfig & { /** Optional client-suggested id. */ id: string },
+  ) => void;
+  rename: (lensId: string, name: string) => void;
+  delete: (lensId: string) => void;
+}
+
+let lensSyncBridge: LensSyncBridge | null = null;
+
+export function setLensSyncBridge(bridge: LensSyncBridge | null): void {
+  lensSyncBridge = bridge;
 }
 
 const STORAGE_KEY = "langwatch:traces-v2:lenses:v2";
@@ -583,6 +611,7 @@ export const useViewStore = create<ViewState>((set, get) => ({
     };
     const allLenses = [...state.allLenses, newLens];
     persistCustomLenses(allLenses);
+    lensSyncBridge?.create(newLens);
     // Adopt the new lens as the active one. When overrides are present we
     // also push the saved values into live state so the table immediately
     // reflects the configured shape (otherwise the user sees the old grouping
@@ -628,6 +657,7 @@ export const useViewStore = create<ViewState>((set, get) => ({
         l.id === lensId ? { ...l, name } : l,
       );
       persistCustomLenses(allLenses);
+      lensSyncBridge?.rename(lensId, name);
       return { allLenses };
     }),
 
@@ -646,6 +676,7 @@ export const useViewStore = create<ViewState>((set, get) => ({
     };
     const allLenses = [...state.allLenses, newLens];
     persistCustomLenses(allLenses);
+    lensSyncBridge?.create(newLens);
     applyFilterTextFromLens(newLens.filterText);
     set({
       allLenses,
@@ -670,6 +701,7 @@ export const useViewStore = create<ViewState>((set, get) => ({
       persistDismissedBuiltInIds(dismissed);
     } else {
       persistCustomLenses(allLenses);
+      lensSyncBridge?.delete(lensId);
     }
     if (s.activeLensId !== lensId) {
       set({ allLenses, draftState: nextDraft });
@@ -685,6 +717,34 @@ export const useViewStore = create<ViewState>((set, get) => ({
       sort: firstLens.sort,
       grouping: firstLens.grouping,
       columnOrder: firstLens.columns,
+    });
+  },
+
+  setUserLenses: (lenses) => {
+    set((s) => {
+      const builtIns = s.allLenses.filter((l) => l.isBuiltIn);
+      const userLenses = lenses.map((l) => ({ ...l, isBuiltIn: false }));
+      const allLenses = [...builtIns, ...userLenses];
+      // Mirror to localStorage so a refresh has instant data before
+      // the tRPC query resolves — keeps the lens strip from flashing
+      // empty between mount and hydration.
+      persistCustomLenses(allLenses);
+      // If the active lens disappeared (deleted by another browser
+      // tab / teammate), fall back to the first available.
+      const activeStillPresent = allLenses.some(
+        (l) => l.id === s.activeLensId,
+      );
+      if (activeStillPresent) return { allLenses };
+      const next = allLenses[0];
+      if (!next) return { allLenses };
+      applyFilterTextFromLens(next.filterText);
+      return {
+        allLenses,
+        activeLensId: next.id,
+        sort: next.sort,
+        grouping: next.grouping,
+        columnOrder: next.columns,
+      };
     });
   },
 }));

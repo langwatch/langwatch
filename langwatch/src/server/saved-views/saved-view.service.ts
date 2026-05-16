@@ -83,6 +83,8 @@ export class SavedViewService {
   }: {
     projectId: string;
     input: {
+      /** Optional client-provided id — see router-level comment. */
+      id?: string;
       name: string;
       filters: Prisma.InputJsonValue;
       query?: string;
@@ -107,7 +109,7 @@ export class SavedViewService {
     const newOrder = (lastView?.order ?? -1) + 1;
 
     return await this.repository.create({
-      id: nanoid(),
+      id: input.id ?? nanoid(),
       projectId,
       userId: input.userId,
       name: input.name,

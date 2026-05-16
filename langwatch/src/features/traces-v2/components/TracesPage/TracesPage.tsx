@@ -5,6 +5,7 @@ import { ExportProgress } from "~/components/messages/ExportProgress";
 import { useTracesV2Presence } from "~/features/presence/hooks/useTracesV2Presence";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useLensFilterDirtySync } from "../../hooks/useLensFilterDirtySync";
+import { useLensSync } from "../../hooks/useLensSync";
 import { useProjectHasTraces } from "../../hooks/useProjectHasTraces";
 import { useResetSelectionOnViewChange } from "../../hooks/useResetSelectionOnViewChange";
 import { useRollingTimeRange } from "../../hooks/useRollingTimeRange";
@@ -64,6 +65,7 @@ export const TracesPage: React.FC = () => {
   useTracesV2Presence();
   useDebouncedFilterCommit();
   useLensFilterDirtySync();
+  useLensSync();
   useSidebarShortcut();
   useFindShortcut();
   useShortcutsHelpShortcut();
