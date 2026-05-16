@@ -422,6 +422,22 @@ export function PaneLayout({
           // state lands exactly on the SpanTabBar height — no trailing
           // empty band below the tab row.
           collapsedSize={detailCollapsedSize}
+          // Library-driven collapse/expand mirrors the store so a
+          // drag past `minSize` is the SAME state as clicking the
+          // "Hide details" button: the pane disappears AND the
+          // "Show details" affordance on the viz tab row appears.
+          // Without these the chevron / button wouldn't show because
+          // the store still thought the pane was expanded.
+          onCollapse={() => {
+            if (!useDrawerStore.getState().paneState.spanDetail.collapsed) {
+              togglePaneCollapsed("spanDetail");
+            }
+          }}
+          onExpand={() => {
+            if (useDrawerStore.getState().paneState.spanDetail.collapsed) {
+              togglePaneCollapsed("spanDetail");
+            }
+          }}
         >
           {detailPanel}
         </Panel>
