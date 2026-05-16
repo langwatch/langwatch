@@ -40,6 +40,8 @@ interface ActiveSearchEditorProps {
    * has typed, no matter how long it is.
    */
   onCursorAnchorChange?: (anchorX: number) => void;
+  /** Mirrors the editor's focus state so the parent can gate chrome. */
+  onFocusChange?: (focused: boolean) => void;
 }
 
 /**
@@ -57,9 +59,16 @@ export const ActiveSearchEditor: React.FC<ActiveSearchEditorProps> = ({
   onAiShortcut,
   onSuggestionOpenChange,
   onCursorAnchorChange,
+  onFocusChange,
 }) => {
-  const { editor, suggestion, acceptSuggestion, cursorAnchorX, endAnchorX } =
-    useFilterEditor({
+  const {
+    editor,
+    suggestion,
+    acceptSuggestion,
+    cursorAnchorX,
+    endAnchorX,
+    isFocused,
+  } = useFilterEditor({
       queryText,
       applyQueryText,
       onHasContentChange,
@@ -92,6 +101,10 @@ export const ActiveSearchEditor: React.FC<ActiveSearchEditorProps> = ({
     // typed regardless of caret moves or selection.
     onCursorAnchorChange?.(endAnchorX);
   }, [endAnchorX, onCursorAnchorChange]);
+
+  useEffect(() => {
+    onFocusChange?.(isFocused);
+  }, [isFocused, onFocusChange]);
 
   return (
     <>

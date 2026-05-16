@@ -194,6 +194,8 @@ interface FilterEditorApi {
    * everything.
    */
   endAnchorX: number;
+  /** Whether the editor currently holds focus. */
+  isFocused: boolean;
 }
 
 export function useFilterEditor({
@@ -213,6 +215,10 @@ export function useFilterEditor({
   // mid-text caret placement doesn't drag the hint on top of the
   // user's text. Always updated (regardless of dropdown state).
   const [endAnchorX, setEndAnchorX] = useState(0);
+  // TipTap's `editor.isFocused` doesn't trigger React renders. Mirror
+  // focus/blur into state so the SearchBar can hide chrome (inline
+  // submit hint, …) when the editor isn't actively engaged.
+  const [isFocused, setIsFocused] = useState(false);
 
   const editorRef = useRef<Editor | null>(null);
   const isProgrammaticRef = useRef(false);
@@ -394,9 +400,11 @@ export function useFilterEditor({
       refreshSuggestion(ed);
     },
     onFocus: ({ editor: ed }) => {
+      setIsFocused(true);
       refreshSuggestion(ed);
     },
     onBlur: ({ editor: ed }) => {
+      setIsFocused(false);
       applyQueryTextRef.current(ed.getText().trim());
       setSuggestion(CLOSED_SUGGESTION);
       setDropdownDismissed(false);
@@ -699,5 +707,6 @@ export function useFilterEditor({
     reset,
     cursorAnchorX,
     endAnchorX,
+    isFocused,
   };
 }

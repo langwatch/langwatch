@@ -1,4 +1,4 @@
-import { Box, chakra, Flex, HStack, Icon, Text } from "@chakra-ui/react";
+import { Box, chakra, Flex, Icon } from "@chakra-ui/react";
 import { Search } from "lucide-react";
 import { AnimatePresence } from "motion/react";
 import type React from "react";
@@ -93,6 +93,7 @@ export const SearchBar: React.FC = () => {
   const [aiMode, setAiMode] = useState(false);
   const [suggestionOpen, setSuggestionOpen] = useState(false);
   const [cursorAnchorX, setCursorAnchorX] = useState(0);
+  const [editorFocused, setEditorFocused] = useState(false);
   // When the user fires ⌘+⏎ on a typed query, we punt the text into AI
   // mode AND ask the composer to submit immediately. Tracked separately
   // from `aiMode` because the same flag would otherwise re-fire on every
@@ -308,6 +309,7 @@ export const SearchBar: React.FC = () => {
                 onAiShortcut={handleEditorAiShortcut}
                 onSuggestionOpenChange={setSuggestionOpen}
                 onCursorAnchorChange={setCursorAnchorX}
+                onFocusChange={setEditorFocused}
               />
             ) : (
               <PlaceholderEditor
@@ -317,12 +319,12 @@ export const SearchBar: React.FC = () => {
                 onTokenClick={setTokenAnchor}
               />
             )}
-            {hasContent && !suggestionOpen && !askAiNeedsProviderPrimer && (
-              <SearchSubmitHint
-                anchorX={cursorAnchorX}
-                onAskAi={() => handleEditorAiShortcut(queryText)}
-              />
-            )}
+            {hasContent &&
+              editorFocused &&
+              !suggestionOpen &&
+              !askAiNeedsProviderPrimer && (
+                <SearchSubmitHint anchorX={cursorAnchorX} />
+              )}
           </Box>
 
           <StatusBadge status={status} />
@@ -347,23 +349,24 @@ const IS_MAC =
 const MOD_KEY_SYMBOL = IS_MAC ? "⌘" : "Ctrl";
 
 /**
- * Plain one-liner hint that floats just after the typed content. No
- * Kbd chips, no two-tone text — every glyph is the same `fg.subtle`
- * gray so the whole line reads as a hint and nothing else. The Ask AI
- * fragment is still clickable for mouse-driven operators, but it
- * doesn't visually announce itself as "a button you must press".
+ * Plain one-liner hint that floats just after the typed content.
+ * Pure UTF-8 text — no Kbd chips, no clickable fragments. The whole
+ * thing reads as a single faint hint and never competes with the
+ * input for attention.
  */
-const SearchSubmitHint: React.FC<{
-  anchorX: number;
-  onAskAi: () => void;
-}> = ({ anchorX, onAskAi }) => (
-  <Text
+const SearchSubmitHint: React.FC<{ anchorX: number }> = ({ anchorX }) => (
+  <chakra.span
     position="absolute"
-    left={`${anchorX + 12}px`}
-    top="50%"
+    // Bigger gap (24px) so the hint doesn't crowd the last typed glyph.
+    left={`${anchorX + 24}px`}
+    // Pixel-nudge up (~1px from geometric center) — the hint text and
+    // the editor text use different font stacks, and Chakra's exact
+    // 50% transform leaves the hint baseline sitting visibly below
+    // the editor's typing line on light mode.
+    top="calc(50% - 1px)"
     transform="translateY(-50%)"
-    color="fg.subtle"
-    textStyle="xs"
+    color={{ base: "gray.400", _dark: "gray.500" }}
+    fontSize="xs"
     fontWeight="normal"
     whiteSpace="nowrap"
     overflow="hidden"
@@ -371,18 +374,6 @@ const SearchSubmitHint: React.FC<{
     pointerEvents="none"
     userSelect="none"
   >
-    {`Press ↵ to search, `}
-    <chakra.span
-      onMouseDown={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        onAskAi();
-      }}
-      cursor="pointer"
-      pointerEvents="auto"
-      _hover={{ textDecoration: "underline" }}
-    >
-      {`${MOD_KEY_SYMBOL}+↵ to Ask AI`}
-    </chakra.span>
-  </Text>
+    {`Press ${MOD_KEY_SYMBOL} + Enter to Ask AI`}
+  </chakra.span>
 );
