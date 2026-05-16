@@ -1,6 +1,6 @@
-import { Box, HStack, IconButton, Input, Text } from "@chakra-ui/react";
+import { Box, HStack, IconButton, Input, Text, VStack } from "@chakra-ui/react";
 import { useEffect, useId, useRef, useState } from "react";
-import { LuCheck, LuCircleHelp, LuX } from "react-icons/lu";
+import { LuCheck, LuX } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { toaster } from "~/components/ui/toaster";
@@ -129,11 +129,17 @@ export function EditableTraceName({
 
   if (!isEditing) {
     return (
-      <HStack
-        gap={1}
-        minWidth={0}
-        // Double-click anywhere in the title group to enter edit mode.
-        onDoubleClick={startEditing}
+      <Tooltip
+        content={
+          <VStack align="start" gap={0.5}>
+            <Text textStyle="xs">Trace name, derived from the root span.</Text>
+            <Text textStyle="xs" color="fg.muted">
+              Click to rename.
+            </Text>
+          </VStack>
+        }
+        positioning={{ placement: "bottom-start" }}
+        openDelay={400}
       >
         <Text
           fontWeight="semibold"
@@ -142,24 +148,21 @@ export function EditableTraceName({
           letterSpacing="-0.005em"
           minWidth={0}
           color={titleIsFallback ? "fg.muted" : undefined}
+          cursor="help"
+          onClick={startEditing}
+          onDoubleClick={startEditing}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              startEditing();
+            }
+          }}
         >
           {titleText}
         </Text>
-        <Tooltip
-          content="Trace name, derived from the root span. Click to rename."
-          positioning={{ placement: "bottom" }}
-        >
-          <IconButton
-            aria-label="Edit trace name"
-            size="2xs"
-            variant="ghost"
-            color="fg.subtle"
-            onClick={startEditing}
-          >
-            <LuCircleHelp size={12} />
-          </IconButton>
-        </Tooltip>
-      </HStack>
+      </Tooltip>
     );
   }
 

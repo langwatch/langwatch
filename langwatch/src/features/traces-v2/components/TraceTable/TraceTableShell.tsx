@@ -247,6 +247,7 @@ export function cellPropsFor(
   },
   leftBorderColor?: Color,
   index?: number,
+  rightBorderColor?: Color,
 ): {
   textAlign: "left" | "right";
   width: string | undefined;
@@ -273,7 +274,7 @@ export function cellPropsFor(
     width: useFixedWidth ? `${size}px` : undefined,
     minWidth: `${cell.column.columnDef.minSize ?? 0}px`,
     borderRightWidth: "1px",
-    borderRightColor: "border.subtle",
+    borderRightColor: rightBorderColor ?? "border.subtle",
     ...(index === 0 && leftBorderColor
       ? { borderLeftWidth: "2px", borderLeftColor: leftBorderColor }
       : {}),

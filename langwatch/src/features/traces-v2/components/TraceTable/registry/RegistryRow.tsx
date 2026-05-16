@@ -113,7 +113,7 @@ function RegistryRowComponent<TRow>({
       // visually melts into the addon block. The addon's own
       // `borderBottomWidth` keeps the separation from the next trace.
       borderBottomWidth="1px"
-      borderBottomColor="border.muted"
+      borderBottomColor={style.bottomSeparatorColor}
       outline={isFocused ? "1px solid" : undefined}
       outlineColor={isFocused ? "blue.fg" : undefined}
       cursor={onSelect || onToggleExpand ? "pointer" : "default"}
@@ -147,7 +147,7 @@ function RegistryRowComponent<TRow>({
             // `whiteSpace=nowrap` themselves; the Td-level clip is the
             // belt-and-suspenders that catches anything that doesn't.
             overflow="hidden"
-            {...cellPropsFor(cell, style.borderColor, i)}
+            {...cellPropsFor(cell, style.borderColor, i, style.separatorColor)}
           >
             {isLoading ? (
               isSelectCell ? null : (
@@ -183,7 +183,7 @@ function RegistryRowComponent<TRow>({
         borderLeftWidth="2px"
         borderLeftColor={style.borderColor}
         borderBottomWidth="1px"
-        borderBottomColor="border"
+        borderBottomColor={style.bottomSeparatorColor}
       >
         <SkeletonAddonRow rowIdx={skeletonRowIdx} />
       </Td>

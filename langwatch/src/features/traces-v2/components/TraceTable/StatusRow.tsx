@@ -11,6 +11,16 @@ export interface RowStyle {
   borderColor: Color;
   bg: Color;
   hoverBg: Color;
+  /**
+   * Per-cell vertical separator + row bottom border. Defaults to
+   * Chakra's subtle border tokens; error/warning variants tint it so
+   * the row separators stay visible against the red/yellow tinted bg
+   * (otherwise the grey separators get washed out and adjacent error
+   * rows visually melt into each other).
+   */
+  separatorColor: Color;
+  /** Slightly stronger separator for the row's bottom border. */
+  bottomSeparatorColor: Color;
 }
 
 export const ROW_STYLES: Record<RowVariant, RowStyle> = {
@@ -18,21 +28,29 @@ export const ROW_STYLES: Record<RowVariant, RowStyle> = {
     borderColor: "blue.fg",
     bg: "blue.fg/8",
     hoverBg: "blue.fg/10",
+    separatorColor: "border.subtle",
+    bottomSeparatorColor: "border.muted",
   },
   error: {
     borderColor: "red.fg",
     bg: "red.fg/3",
     hoverBg: "red.fg/8",
+    separatorColor: "red.fg/25",
+    bottomSeparatorColor: "red.fg/40",
   },
   warning: {
     borderColor: "yellow.fg",
     bg: "yellow.fg/3",
     hoverBg: "yellow.fg/8",
+    separatorColor: "yellow.fg/25",
+    bottomSeparatorColor: "yellow.fg/40",
   },
   default: {
     borderColor: "transparent",
     bg: "transparent",
     hoverBg: "fg.subtle/6",
+    separatorColor: "border.subtle",
+    bottomSeparatorColor: "border.muted",
   },
 };
 
@@ -77,6 +95,11 @@ export const StatusRowGroup: React.FC<StatusRowGroupProps> = ({
     data-new={isNew ? "true" : undefined}
     css={{
       "& > tr > td": { transition: "none" },
+      // Reveal `data-row-hover-reveal` children for the WHOLE row group
+      // — the main row AND any addon rows (IO preview, etc.). Without
+      // this, hovering the input/output addon row didn't reveal the
+      // trace ID because the rule lived on the main <Tr> only.
+      "&:hover [data-row-hover-reveal]": { opacity: 1 },
       ...(isNew && {
         "& > tr > td": {
           transition: "none",

@@ -76,14 +76,13 @@ const CompactRow: React.FC<CompactRowProps> = ({
   direction,
 }) => {
   const isInput = direction === "input";
-  // Brighter palette in light mode — the previous `*.fg` (slate-700ish)
-  // arrows read as grey on the row's near-white tint. The `*.500`
-  // step matches the evaluations-v3 chip palette so the two views
-  // feel consistent. Dark mode falls back to the `*.fg` step which
-  // already has the right contrast on the dark canvas.
+  // Vivid palette in light mode — `*.solid` matches the saturated tone
+  // the filter sidebar uses for the origin dots, so the table accents
+  // and the sidebar legend feel like the same palette. Dark mode keeps
+  // `*.fg` because against the dark canvas the solid step over-pops.
   const accent = isInput
-    ? { base: "blue.500", _dark: "blue.fg" }
-    : { base: "green.500", _dark: "green.fg" };
+    ? { base: "blue.solid", _dark: "blue.fg" }
+    : { base: "green.solid", _dark: "green.fg" };
   const textColor = isInput ? "fg.muted" : "fg.subtle";
 
   return (
@@ -146,7 +145,7 @@ const ComfortableIOPreview: React.FC<IOPreviewProps> = ({ input, output }) => (
     {input !== null && (
       <ComfortableRow
         label="Input"
-        labelColor={{ base: "blue.500", _dark: "blue.fg" }}
+        labelColor={{ base: "blue.solid", _dark: "blue.fg" }}
         textColor="fg.muted"
         text={formatPreview(input, { maxChars: 200 }).text}
       />
@@ -154,7 +153,7 @@ const ComfortableIOPreview: React.FC<IOPreviewProps> = ({ input, output }) => (
     {output !== null && (
       <ComfortableRow
         label="Output"
-        labelColor={{ base: "green.500", _dark: "green.fg" }}
+        labelColor={{ base: "green.solid", _dark: "green.fg" }}
         textColor="fg"
         text={formatPreview(output, { maxChars: 200 }).text}
       />

@@ -115,14 +115,44 @@ function VizTabPresenceDot({
   );
 }
 
-const TABS: {
+interface VizTabDef {
   value: VizTab;
   label: string;
   icon: typeof LuChartGantt;
   shortcut: string;
   palette: string;
   description: string;
-}[] = [
+}
+
+/**
+ * Shared icon + label + shortcut + presence-dot row used by both the
+ * in-row tab AND the overflow menu's dropdown entries. Keeping this in
+ * one place avoids the dropdown losing the icon / kbd hint when a tab
+ * is folded out of sight — the user sees the same affordance either
+ * way.
+ */
+function VizTabContent({
+  tab,
+  traceId,
+}: {
+  tab: VizTabDef;
+  traceId: string | null;
+}) {
+  return (
+    <>
+      <Icon as={tab.icon} boxSize={3.5} />
+      <Text textStyle="xs" lineHeight={1}>
+        {tab.label}
+      </Text>
+      <Kbd>{tab.shortcut}</Kbd>
+      {traceId ? (
+        <VizTabPresenceDot traceId={traceId} panel={tab.value} />
+      ) : null}
+    </>
+  );
+}
+
+const TABS: VizTabDef[] = [
   {
     value: "waterfall",
     label: "Waterfall",
@@ -213,7 +243,11 @@ export function VizPlaceholder({
     scrollerRef: tabScrollerRef,
     items: tabIds,
     activeId: vizTab,
-    reservePx: 40,
+    // Just enough headroom to fit the overflow trigger (~22px). The
+    // earlier 40px reserve was over-aggressive: tabs that visibly fit
+    // were still being folded into the menu because we were holding back
+    // a much larger margin than the trigger actually needs.
+    reservePx: 26,
   });
 
   const [height, setHeight] = useState(getStoredHeight);
@@ -388,7 +422,7 @@ export function VizPlaceholder({
             gap={0}
             overflowX="hidden"
             flexWrap="nowrap"
-            flexShrink={1}
+            flex="1"
             minWidth={0}
           >
             {TABS.map((tab) => {
@@ -411,12 +445,17 @@ export function VizPlaceholder({
                     marginY={1}
                     borderRadius="md"
                     cursor="pointer"
-                    // Inactive tabs keep their palette colour for the
-                    // label (Flame=orange, Span List=cyan, etc.) so the
-                    // strip reads as a colour-coded picker instead of
-                    // a wall of grey. Active state promotes contrast +
-                    // adds the subtle palette fill as a pill.
-                    color={`${tab.palette}.fg`}
+                    // Light mode: inactive tabs render in neutral grey so
+                    // the strip doesn't read as a wall of saturated
+                    // colour against the otherwise muted light surface.
+                    // Dark mode: keep the palette colour — against the
+                    // darker background the palette tones read as a
+                    // helpful colour-coded picker.
+                    color={
+                      isActive
+                        ? `${tab.palette}.fg`
+                        : { base: "fg.muted", _dark: `${tab.palette}.fg` }
+                    }
                     bg={isActive ? `${tab.palette}.subtle` : "transparent"}
                     flexShrink={0}
                     whiteSpace="nowrap"
@@ -428,17 +467,10 @@ export function VizPlaceholder({
                     onClick={() => handleVizTabChange(tab.value)}
                     fontWeight={isActive ? "600" : "500"}
                   >
-                    <Icon as={tab.icon} boxSize={3.5} />
-                    <Text textStyle="xs" lineHeight={1}>
-                      {tab.label}
-                    </Text>
-                    <Kbd>{tab.shortcut}</Kbd>
-                    {trace ? (
-                      <VizTabPresenceDot
-                        traceId={trace.traceId}
-                        panel={tab.value}
-                      />
-                    ) : null}
+                    <VizTabContent
+                      tab={tab}
+                      traceId={trace?.traceId ?? null}
+                    />
                   </Flex>
                 </Tooltip>
               );
@@ -448,6 +480,14 @@ export function VizPlaceholder({
                 (t) => ({
                   id: t.value,
                   label: t.label,
+                  // Mirror the in-row tab rendering so the dropdown row
+                  // carries the same icon + label + shortcut + presence
+                  // dot the user would have seen on the tab itself.
+                  content: (
+                    <HStack gap={1.5} flex={1} color={`${t.palette}.fg`}>
+                      <VizTabContent tab={t} traceId={trace?.traceId ?? null} />
+                    </HStack>
+                  ),
                 }),
               )}
               activeId={vizTab}

@@ -180,21 +180,22 @@ export function FlameBlock({
       >
         <Text
           textStyle="xs"
-          // In dark mode every block bg is dark enough to read white
-          // against. In light mode the non-emphasized blocks render as
-          // pastel tints (white would disappear) — read those as dark
-          // text. But the *emphasized* state in light mode is the
-          // saturated `${color}/100` fill — that's dark blue / dark
-          // purple / etc., and the previously-dark text on top became
-          // unreadable. Flip back to white text for emphasized blocks
-          // in light mode, and apply the lift shadow only where the
-          // text is actually dark.
-          color={isEmphasized ? "white" : "white/90"}
+          // Every non-dimmed flame block in this view runs at
+          // depthAlpha ≥ 0.7 (see DEPTH_FADE_FLOOR), so the fill is
+          // always a saturated/darkish colour — white text reads
+          // against it in BOTH modes. The earlier light-mode rule
+          // assumed pastel tints (gray.800 on top) and produced
+          // unreadable dark-on-dark text whenever the user landed on a
+          // saturated colour like `blue.solid`. Only the *dimmed* state
+          // (hover-dim siblings at ~0.2-0.3 alpha) needs dark text on
+          // top in light mode — there the fill is washed out enough
+          // that white would disappear.
+          color="white"
           _light={{
-            color: isEmphasized ? "white" : "gray.800",
-            textShadow: isEmphasized
-              ? "0 1px 1px rgba(0,0,0,0.35)"
-              : "0 1px 0 rgba(255,255,255,0.45)",
+            color: isDimmed ? "gray.800" : "white",
+            textShadow: isDimmed
+              ? "0 1px 0 rgba(255,255,255,0.45)"
+              : "0 1px 1px rgba(0,0,0,0.45)",
           }}
           truncate
           lineHeight={1}

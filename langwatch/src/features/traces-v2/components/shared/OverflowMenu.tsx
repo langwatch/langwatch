@@ -17,6 +17,14 @@ export interface OverflowMenuItem {
   endSlot?: React.ReactNode;
   /** Disable the menu row without removing it. */
   disabled?: boolean;
+  /**
+   * Full row content override. When provided, the menu item renders
+   * `content` instead of the default `icon` + `label` + `endSlot`
+   * arrangement — useful when the caller wants the dropdown row to
+   * mirror exactly what the in-row visible item renders (icon + label
+   * + kbd shortcut + counts, etc.) without re-plumbing each field.
+   */
+  content?: React.ReactNode;
 }
 
 interface OverflowMenuProps {
@@ -71,9 +79,13 @@ export const OverflowMenu: React.FC<OverflowMenuProps> = ({
             disabled={item.disabled}
             fontWeight={item.id === activeId ? "semibold" : undefined}
           >
-            {item.icon}
-            {item.label}
-            {item.endSlot}
+            {item.content ?? (
+              <>
+                {item.icon}
+                {item.label}
+                {item.endSlot}
+              </>
+            )}
           </MenuItem>
         ))}
       </MenuContent>

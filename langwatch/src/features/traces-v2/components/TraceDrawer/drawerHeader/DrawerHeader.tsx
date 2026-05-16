@@ -33,6 +33,7 @@ import type { TraceHeader } from "~/server/api/routers/tracesV2.schemas";
 import { useConversationContext } from "../../../hooks/useConversationContext";
 import { usePinnedAttributes } from "../../../hooks/usePinnedAttributes";
 import { useTraceDrawerNavigation } from "../../../hooks/useTraceDrawerNavigation";
+import { useSpanTree } from "../../../hooks/useSpanTree";
 import { useTraceHeader } from "../../../hooks/useTraceHeader";
 import { useTraceRefresh } from "../../../hooks/useTraceRefresh";
 import { useTraceResources } from "../../../hooks/useTraceResources";
@@ -75,6 +76,78 @@ interface DrawerHeaderProps {
   trace: TraceHeader;
   /** Parent's drawer-close handler (URL teardown). */
   onClose: () => void;
+}
+
+/**
+ * Trace status indicator. For error traces, the chip is clickable —
+ * jumps to the first span with an error so the user can investigate
+ * without having to scan the waterfall manually. OK traces render the
+ * dot non-interactively (just the help tooltip).
+ */
+function StatusChip({
+  trace,
+  statusColor,
+}: {
+  trace: TraceHeader;
+  statusColor: string;
+}) {
+  const selectSpan = useDrawerStore((s) => s.selectSpan);
+  const setActiveTab = useDrawerStore((s) => s.setActiveTab);
+  const spanTree = useSpanTree();
+  const firstErrorSpanId = useMemo(() => {
+    const spans = spanTree.data ?? [];
+    if (spans.length === 0) return null;
+    const errors = spans.filter((s) => s.status === "error");
+    if (errors.length === 0) return null;
+    errors.sort((a, b) => a.startTimeMs - b.startTimeMs);
+    return errors[0]!.spanId;
+  }, [spanTree.data]);
+
+  const isError = trace.status === "error";
+  const canJump = isError && firstErrorSpanId != null;
+  const tooltipContent = isError
+    ? canJump
+      ? "Jump to the first span with an error"
+      : "At least one span on this trace recorded an error"
+    : trace.status === "ok"
+      ? "No errors recorded on any span in this trace"
+      : `Trace status: ${trace.status}`;
+
+  const handleClick = () => {
+    if (!canJump) return;
+    selectSpan(firstErrorSpanId);
+    setActiveTab("summary");
+  };
+
+  return (
+    <Tooltip content={tooltipContent} positioning={{ placement: "bottom" }}>
+      <HStack
+        as={canJump ? "button" : "div"}
+        gap={1}
+        flexShrink={0}
+        cursor={canJump ? "pointer" : "help"}
+        onClick={canJump ? handleClick : undefined}
+        aria-label={canJump ? "Jump to first error span" : undefined}
+        paddingX={canJump ? 1 : 0}
+        paddingY={canJump ? 0.5 : 0}
+        borderRadius={canJump ? "md" : undefined}
+        _hover={canJump ? { bg: "red.fg/10" } : undefined}
+        transition="background 0.15s ease"
+      >
+        <Circle size="8px" bg={statusColor} flexShrink={0} />
+        {trace.status !== "ok" && (
+          <Text
+            textStyle="xs"
+            fontWeight="medium"
+            color={statusColor}
+            textTransform="capitalize"
+          >
+            {trace.status}
+          </Text>
+        )}
+      </HStack>
+    </Tooltip>
+  );
 }
 
 /**
@@ -222,6 +295,10 @@ export const DrawerHeader = memo(function DrawerHeader({
   const cacheCreationTokens = readNumberAttribute(
     trace.attributes,
     "gen_ai.usage.cache_creation.input_tokens",
+  );
+  const reasoningTokens = readNumberAttribute(
+    trace.attributes,
+    "gen_ai.usage.reasoning_tokens",
   );
 
   // If we have concrete input AND output token numbers to display, trust them
@@ -573,35 +650,7 @@ export const DrawerHeader = memo(function DrawerHeader({
             titleText={titleText}
             titleIsFallback={titleIsFallback}
           />
-          <HStack gap={1} flexShrink={0}>
-            <Tooltip
-              content={
-                trace.status === "ok"
-                  ? "No errors recorded on any span in this trace"
-                  : trace.status === "error"
-                    ? "At least one span on this trace recorded an error"
-                    : `Trace status: ${trace.status}`
-              }
-              positioning={{ placement: "bottom" }}
-            >
-              <Circle
-                size="8px"
-                bg={statusColor}
-                flexShrink={0}
-                cursor="help"
-              />
-            </Tooltip>
-            {trace.status !== "ok" && (
-              <Text
-                textStyle="xs"
-                fontWeight="medium"
-                color={statusColor}
-                textTransform="capitalize"
-              >
-                {trace.status}
-              </Text>
-            )}
-          </HStack>
+          <StatusChip trace={trace} statusColor={statusColor} />
           {conversationContext.total > 1 && (
             <ThreadProgressIndicator
               position={conversationContext.position}
@@ -817,18 +866,26 @@ export const DrawerHeader = memo(function DrawerHeader({
                   label="Output"
                   value={trace.outputTokens?.toLocaleString() ?? "—"}
                 />
-                {cacheReadTokens != null && (
-                  <TooltipRow
-                    label="Cache read"
-                    value={cacheReadTokens.toLocaleString()}
-                  />
-                )}
+                {/* Cached + reasoning tokens are always surfaced — both
+                    are material to cost and behaviour these days
+                    (provider cache hits flatten cost; reasoning tokens
+                    are billed but invisible in input/output). Missing
+                    values render as `—` rather than 0 so the reader can
+                    tell "we don't know" apart from "definitely zero". */}
+                <TooltipRow
+                  label="Cache read"
+                  value={cacheReadTokens?.toLocaleString() ?? "—"}
+                />
                 {cacheCreationTokens != null && (
                   <TooltipRow
                     label="Cache write"
                     value={cacheCreationTokens.toLocaleString()}
                   />
                 )}
+                <TooltipRow
+                  label="Reasoning"
+                  value={reasoningTokens?.toLocaleString() ?? "—"}
+                />
                 <Box height="1px" bg="border" marginY={1} />
                 <TooltipRow
                   label="Total"

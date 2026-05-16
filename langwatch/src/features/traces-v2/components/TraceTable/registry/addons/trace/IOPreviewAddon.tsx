@@ -27,8 +27,14 @@ export const IOPreviewAddon: AddonDef<TraceListItem> = {
         // strong enough to register against the row tint without
         // looking heavy.
         borderBottomWidth="1px"
-        borderBottomColor="border"
+        borderBottomColor={style.bottomSeparatorColor}
         overflow="hidden"
+        // The whole row group already forwards clicks to the drawer
+        // (StatusRowGroup.onClick), but without an explicit cursor the
+        // preview cell read as inert text — users hovered without
+        // realising it was clickable. The hand cursor mirrors the main
+        // trace row's affordance.
+        cursor="pointer"
       >
         <IOPreview input={row.input} output={row.output} />
       </Td>
