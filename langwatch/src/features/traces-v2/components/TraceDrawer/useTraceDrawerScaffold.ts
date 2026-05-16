@@ -140,6 +140,11 @@ export function useTraceDrawerScaffold(): TraceDrawerScaffold {
       void trpcUtils.tracesV2.spanTree.cancel();
     }
     setMaximized(false);
+    // Clear the store first — the page-level mount in `TracesPage`
+    // reads `traceId` from here, so unmounting it synchronously
+    // matches the click flow's synchronous open. The URL push that
+    // follows is just cleanup for deep-link / browser-history.
+    useDrawerStore.getState().closeDrawer();
     closeDrawer();
   }, [closeDrawer, setMaximized, trpcUtils, traceId]);
 

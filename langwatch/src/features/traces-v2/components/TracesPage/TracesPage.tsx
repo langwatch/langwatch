@@ -9,10 +9,13 @@ import { useLensSync } from "../../hooks/useLensSync";
 import { useProjectHasTraces } from "../../hooks/useProjectHasTraces";
 import { useResetSelectionOnViewChange } from "../../hooks/useResetSelectionOnViewChange";
 import { useRollingTimeRange } from "../../hooks/useRollingTimeRange";
+import { useTraceDrawerUrlHydrator } from "../../hooks/useTraceDrawerUrlHydrator";
 import { useTraceFreshness } from "../../hooks/useTraceFreshness";
 import { useTraceListExport } from "../../hooks/useTraceListExport";
 import { useTraceListQuery } from "../../hooks/useTraceListQuery";
 import { useURLSync } from "../../hooks/useURLSync";
+import { useDrawerStore } from "../../stores/drawerStore";
+import { TraceV2DrawerShell } from "../TraceDrawer";
 import { OnboardingHost } from "../../onboarding";
 import { useOnboardingStore } from "../../onboarding/store/onboardingStore";
 import {
@@ -66,6 +69,11 @@ export const TracesPage: React.FC = () => {
   useDebouncedFilterCommit();
   useLensFilterDirtySync();
   useLensSync();
+  // URL → drawer store sync so a deep link / browser-back still opens
+  // the drawer. The actual mount decision is in this component (see
+  // `traceDrawerMounted` below), so the click → render path doesn't
+  // wait for React Router to commit the URL change.
+  useTraceDrawerUrlHydrator();
   useSidebarShortcut();
   useFindShortcut();
   useShortcutsHelpShortcut();
@@ -176,10 +184,24 @@ export const TracesPage: React.FC = () => {
             {showEmptyState ? <EmptyResultsPane /> : <ResultsPane />}
           </HStack>
           <PageKeyboardShortcuts />
+          <TraceDrawerMount />
         </VStack>
       </OnboardingHost>
     </DensityProvider>
   );
+};
+
+/**
+ * Optimistic drawer mount. Reads `traceId` straight from the drawer
+ * store so a click → store-update → render lands in the same frame.
+ * The URL is still kept in sync (via openDrawer / closeDrawer in the
+ * scaffold), it just no longer gates the mount the way
+ * `CurrentDrawer` used to.
+ */
+const TraceDrawerMount: React.FC = () => {
+  const hasTrace = useDrawerStore((s) => !!s.traceId);
+  if (!hasTrace) return null;
+  return <TraceV2DrawerShell />;
 };
 
 const FilterAside: React.FC<{
