@@ -166,6 +166,13 @@ interface UseFilterEditorParams {
     currentValue: string;
     location: { start: number; end: number };
   }) => void;
+  /**
+   * Fired when the user presses ⌘+⏎ / Ctrl+⏎ while typing. The caller is
+   * expected to enter AI mode with the captured text auto-submitted, so
+   * a typed free-text query becomes an Ask-AI invocation in one keystroke
+   * instead of requiring a separate click on the Ask AI button.
+   */
+  onAiShortcut?: (currentText: string) => void;
 }
 
 interface FilterEditorApi {
@@ -187,6 +194,7 @@ export function useFilterEditor({
   onHasContentChange,
   valueResolver,
   onTokenClick,
+  onAiShortcut,
 }: UseFilterEditorParams): FilterEditorApi {
   const [suggestion, setSuggestion] =
     useState<SuggestionUIState>(CLOSED_SUGGESTION);
@@ -201,6 +209,7 @@ export function useFilterEditor({
   const suggestionRef = useLatestRef(suggestion);
   const dismissedRef = useLatestRef(dropdownDismissed);
   const valueResolverRef = useLatestRef(valueResolver);
+  const onAiShortcutRef = useLatestRef(onAiShortcut);
   // Tracks last reported hasContent so we only fire onHasContentChange when
   // it actually flips (not on every keystroke that keeps the state).
   const lastHasContentRef = useRef<boolean>(queryText.length > 0);
@@ -389,6 +398,21 @@ export function useFilterEditor({
       handleKeyDown: (view, event) => {
         const text = view.state.doc.textContent;
         const cursorPos = view.state.selection.from - PARAGRAPH_OFFSET;
+
+        // ⌘+⏎ / Ctrl+⏎ → punt the current text into Ask AI. We intercept
+        // before any of the autocomplete or submit logic runs so a held
+        // modifier always wins, even mid-autocomplete. Without content
+        // the shortcut still opens AI mode but with an empty seed (same
+        // as clicking the Ask AI button).
+        if (
+          event.key === "Enter" &&
+          (event.metaKey || event.ctrlKey) &&
+          onAiShortcutRef.current
+        ) {
+          event.preventDefault();
+          onAiShortcutRef.current(text);
+          return true;
+        }
 
         // `@` is a virtual trigger: it never enters the document. We anchor
         // the autocomplete to the cursor position and let subsequent typing

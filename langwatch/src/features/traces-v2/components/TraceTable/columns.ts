@@ -15,14 +15,15 @@ const traceColumnDefs = {
   time: traceCol.accessor("timestamp", {
     id: "time",
     header: "Time",
-    // Body content is always a short relative string (`16d`, `2m`, `now`)
-    // or a chevron + relative. 60px is wide enough for "TIME" header + sort
-    // caret and tight enough that the trace name doesn't sit a thumb's
-    // width away from the timestamp. Capping at 64px so a manual resize
-    // can't balloon it back out either.
-    size: 60,
-    minSize: 56,
-    maxSize: 64,
+    // 80px holds the "TIME" header + sort caret comfortably and gives the
+    // body content (`16d`, `2m`, `now`, or a chevron + relative) room to
+    // breathe without truncating. A 92px cap stops a manual resize from
+    // walking the column out to a thumb's width of empty space beside the
+    // trace name — the old 80px floor was right, the previous 60px clamp
+    // was too aggressive and truncated the header itself.
+    size: 80,
+    minSize: 80,
+    maxSize: 92,
     enableResizing: false,
   }),
   trace: traceCol.accessor("name", {

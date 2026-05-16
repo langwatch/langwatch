@@ -15,7 +15,7 @@ export const STANDARD_COLUMNS: readonly StandardColumnConfig[] = [
     section: "standard",
     visible: true,
     pinned: "left",
-    minWidth: 56,
+    minWidth: 80,
   },
   {
     id: "trace",

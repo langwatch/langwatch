@@ -21,6 +21,18 @@ interface ActiveSearchEditorProps {
     currentValue: string;
     location: { start: number; end: number };
   }) => void;
+  /**
+   * Fired on ⌘+⏎ / Ctrl+⏎. Carries the editor's current plain-text
+   * content so the parent can punt it into AI mode as the seed prompt.
+   */
+  onAiShortcut?: (currentText: string) => void;
+  /**
+   * Bubbles up whether the autocomplete dropdown is currently open. The
+   * SearchBar uses this to hide the inline "Press ⏎ to search…" hint
+   * while the user is mid-autocomplete (the hint would otherwise sit
+   * behind / next to the dropdown).
+   */
+  onSuggestionOpenChange?: (open: boolean) => void;
 }
 
 /**
@@ -35,6 +47,8 @@ export const ActiveSearchEditor: React.FC<ActiveSearchEditorProps> = ({
   onHasContentChange,
   valueResolver,
   onTokenClick,
+  onAiShortcut,
+  onSuggestionOpenChange,
 }) => {
   const { editor, suggestion, acceptSuggestion, cursorAnchorX } =
     useFilterEditor({
@@ -43,6 +57,7 @@ export const ActiveSearchEditor: React.FC<ActiveSearchEditorProps> = ({
       onHasContentChange,
       valueResolver,
       onTokenClick,
+      onAiShortcut,
     });
 
   useGlobalSlashFocus(editor);
@@ -53,6 +68,15 @@ export const ActiveSearchEditor: React.FC<ActiveSearchEditorProps> = ({
     editor.commands.focus();
     focusedRef.current = true;
   }, [autoFocus, editor]);
+
+  // Bubble suggestion open state up — the parent uses it to hide the
+  // inline AI-search hint while autocomplete is active. Mirrors the
+  // dropdown's own `open` check in SuggestionDropdown so the hint and
+  // dropdown never overlap.
+  useEffect(() => {
+    if (!onSuggestionOpenChange) return;
+    onSuggestionOpenChange(suggestion.state.open && suggestion.items.length > 0);
+  }, [suggestion.state.open, suggestion.items.length, onSuggestionOpenChange]);
 
   return (
     <>

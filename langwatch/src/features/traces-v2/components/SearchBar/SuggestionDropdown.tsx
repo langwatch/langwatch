@@ -41,7 +41,14 @@ export const SuggestionDropdown: React.FC<SuggestionDropdownProps> = ({
       zIndex={2050}
       minWidth="320px"
       bg="bg.panel"
-      boxShadow="0 0 0 1px var(--chakra-colors-border), 0 0 0 4px color-mix(in oklab, var(--chakra-colors-blue-solid) 14%, transparent), 0 18px 40px -12px color-mix(in oklab, #000 40%, transparent)"
+      borderWidth="1px"
+      borderColor="border"
+      // Match the standard Chakra popover shadow (no blue accent ring,
+      // no extra outer halo) — previously a custom double-ring made the
+      // dropdown read as a distinct visual primitive instead of "a
+      // popover anchored to the search bar". Lifts off the page with a
+      // soft layered shadow exactly like the other popovers in the app.
+      boxShadow="md"
       animation="suggestion-dropdown-fade 120ms ease-out"
       css={{
         "@keyframes suggestion-dropdown-fade": {

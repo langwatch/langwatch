@@ -12,6 +12,8 @@ interface FloatingAiBarProps {
   rect: FloatRect | null;
   onClose: () => void;
   initialPrompt?: string;
+  /** Forward to AiQueryComposer — fires submit on mount when set. */
+  autoSubmit?: boolean;
 }
 
 const AI_TIPS = [
@@ -40,6 +42,7 @@ export const FloatingAiBar: React.FC<FloatingAiBarProps> = ({
   rect,
   onClose,
   initialPrompt,
+  autoSubmit,
 }) => {
   const [pending, setPending] = useState(false);
   const tip = useCyclingTip(!pending);
@@ -86,6 +89,7 @@ export const FloatingAiBar: React.FC<FloatingAiBarProps> = ({
             onClose={onClose}
             onPendingChange={setPending}
             initialPrompt={initialPrompt}
+            autoSubmit={autoSubmit}
           />
         </Box>
       </motion.div>
