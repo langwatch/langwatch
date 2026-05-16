@@ -568,12 +568,9 @@ function buildInheritOption(
         label: `Suggested from ${providerName}`,
       };
     }
-    if (fromServer.source === "system") {
-      return {
-        model: fromServer.model,
-        label: "Inherit (from System)",
-      };
-    }
+    // `feature_override` / `role_default` carry a concrete scope name
+    // (organization / team / project). The "system" / env-var fallback
+    // is surfaced via `fromEffective` below, not the cascade endpoint.
     const scope = fromServer.scope ?? "cascade";
     return {
       model: fromServer.model,

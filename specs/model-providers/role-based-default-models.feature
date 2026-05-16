@@ -93,6 +93,13 @@ Feature: Role-based default models with per-scope overrides
     When I click the row's Edit button
     Then the drawer opens with the feature pre-selected and the Delete CTA enabled
 
+  @integration
+  Scenario: Deleting a config via the row menu removes the row
+    Given an existing override row in the Default Models table
+    When I open the row's 3-dot menu and pick Delete
+    Then the delete mutation fires for that config id
+    And the row is removed from the table after the query invalidates
+
   @integration @unimplemented
   Scenario: Saving a multi-scope override creates one ModelDefault row per scope but renders as one assignment
     Given I open the override drawer
