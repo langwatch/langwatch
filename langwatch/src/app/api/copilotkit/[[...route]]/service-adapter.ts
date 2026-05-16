@@ -28,6 +28,11 @@ import { extractStreamableOutput, type OutputConfig } from "./output-formatter";
 
 const logger = createLogger("PromptStudioAdapter");
 
+// Matches a `{{ input }}` Liquid placeholder (whitespace tolerated).
+// Used to detect whether a saved-prompt template message will absorb
+// the live chat turn or needs it appended separately.
+const TEMPLATE_INPUT_PLACEHOLDER_RE = /\{\{\s*input\s*\}\}/;
+
 type PromptStudioAdapterParams = {
   projectId: string;
 };
@@ -96,7 +101,37 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
       const formMsgs = (formValues.version.configData.messages ?? []).filter(
         (m) => m.role !== "system",
       );
-      const messagesHistory = [...formMsgs, ...messages]
+
+      // 2026-05-16 prompt-playground regression: the saved-prompt
+      // template carries `{{input}}` placeholders by default
+      // (llm-config.repository.ts:872), but PromptStudioAdapter never
+      // bound the live chat turn to the `input` variable — so
+      // `{{input}}` rendered to empty and the live user message was
+      // appended as a SEPARATE turn next to the template turn. Old
+      // langwatch_nlp's playground path treated the latest live user
+      // message as the `input` value; the new live turn was only
+      // appended when the template did NOT already reference
+      // `{{input}}`. Reproducing that heuristic here keeps the wire
+      // shape (`inputs.input` + `inputs.messages`) consistent with
+      // what nlpgo's buildMessages expects and what the saved prompt
+      // template assumes.
+      const lastLiveUserMsg = [...messages]
+        .reverse()
+        .find((m: any) => m.role === "user");
+      const templateUserMsgs = formMsgs.filter((m) => m.role === "user");
+      const templateUserReferencesInput = templateUserMsgs.some((m) =>
+        TEMPLATE_INPUT_PLACEHOLDER_RE.test(m.content ?? ""),
+      );
+      // Drop the latest live user turn from the history when the
+      // template's user-message will render it (otherwise the user
+      // sees the same content twice — once rendered, once live).
+      // Earlier copilot turns (assistant replies + prior user turns)
+      // still belong in the history.
+      const liveMessagesForHistory =
+        templateUserReferencesInput && lastLiveUserMsg
+          ? messages.filter((m: any) => m !== lastLiveUserMsg)
+          : messages;
+      const messagesHistory = [...formMsgs, ...liveMessagesForHistory]
         .map((message: any) => ({
           role: message.role,
           content: message.content,
@@ -121,6 +156,18 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
         },
         {} as Record<string, unknown>,
       );
+      // Bind the latest live user message's content to the `input`
+      // variable so saved-prompt `{{input}}` placeholders (in system
+      // OR template user messages) resolve to what the user actually
+      // typed. An explicit value from the Variables panel always
+      // wins — typing-then-overriding is the user's choice.
+      const lastLiveUserContent =
+        lastLiveUserMsg && typeof (lastLiveUserMsg as any).content === "string"
+          ? ((lastLiveUserMsg as any).content as string)
+          : undefined;
+      if (lastLiveUserContent !== undefined && variablesDict.input === undefined) {
+        variablesDict.input = lastLiveUserContent;
+      }
 
       // Build execute_flow event (inputs must be a dict)
       const rawEvent: StudioClientEvent = {
