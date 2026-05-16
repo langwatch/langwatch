@@ -29,23 +29,31 @@ Feature: Role-based default models with per-scope overrides
     And I have at least one enabled model provider on the organization
 
   # ============================================================================
-  # Main view: current default models + overrides list
+  # Main view: configs table + scope filter + empty state
   # ============================================================================
 
   @integration
-  Scenario: The Default Models section opens with the three effective lines
+  Scenario: The Default Models page shows the list of override rules
+    Given the caller can see at least one ModelDefaultConfig
     When I open the model providers settings page
     Then below the providers list I see a "Default Models" section
-    And the section shows exactly three lines: "Default", "Fast", "Embeddings"
-    And each line shows the model currently resolved for this project
-    And each line shows the inheritance hint (built-in / from organization / from team / from project)
+    And the section renders a table with one row per ModelDefaultConfig the caller can see
+    And the table header reads "Scopes / Default / Fast / Embeddings" plus a per-row Edit affordance
+    And above the table I see a scope filter ("All you can see" / "This Team" / "This Project" / "More Scopes ▸")
+    # The "three effective lines at the top" of the pre-redesign UI is
+    # gone; the table itself tells the cascade story. A specific-scope
+    # filter pick swaps to the resolved-cascade view (one row per role
+    # with the final inherited model rendered).
 
   @integration
-  Scenario: Each role line shows the effective model and where it comes from
-    Given the organization seeded "openai/gpt-5.5" for the Default role on onboarding
-    When I view the Default role line
-    Then I see "openai/gpt-5.5" next to the role name
-    And a subtle hint reads "from organization"
+  Scenario: A freshly onboarded org shows its three seeded org-scope rules
+    Given a fresh organization that enabled OpenAI on onboarding
+    When I open the Default Models section as an org admin
+    Then I see one row whose scope chip is "Organization · <org name>"
+    And the row's Default / Fast / Embeddings cells render the seeded models with provider icons (e.g. openai/gpt-5.5)
+    And no other rows are present
+    # Onboarding seeds ONE org-scope config with the three role keys
+    # populated (per rchaves's directive — defaults land at org scope).
 
   @integration @unimplemented
   Scenario: Embeddings has no per-feature expand because it has a single consumer
@@ -57,21 +65,19 @@ Feature: Role-based default models with per-scope overrides
     Then no expand chevron is shown on the Embeddings line
 
   # ============================================================================
-  # The flat overrides list (RBAC-style assignments)
+  # Multi-scope rules and cascade rendering
   # ============================================================================
 
-  @integration
-  Scenario: The overrides list shows one row per assignment, each row with its scope chips
-    Given the organization has an assignment {role=DEFAULT, model="openai/gpt-5.5", scopes=[organization]}
-    And an assignment {role=DEFAULT, model="anthropic/claude-sonnet-4-6", scopes=[team:Platform, project:web-app]}
+  @integration @unimplemented
+  Scenario: A multi-scope config renders ONE row with all its scope chips
+    Given the organization has a config { "DEFAULT": "openai/gpt-5.5" } attached to [Organization]
+    And a config { "DEFAULT": "anthropic/claude-sonnet-4-6" } attached to [Team Platform, Project web-app]
     When I open the Default Models section
-    Then I see two rows under "Overrides"
-    And the first row shows "openai/gpt-5.5" with one chip "Organization"
-    And the second row shows "anthropic/claude-sonnet-4-6" with two chips "Team Platform" and "Project web-app"
-    # The two rows above are one ModelDefault row per scope under the
-    # hood. The server groups by (role, featureKey, model) so the UI
-    # renders one logical "assignment" per group with the scopes as
-    # chips on the same row.
+    Then I see two rows in the table
+    And the first row shows one chip "Organization · Acme" with "openai/gpt-5.5" in the Default cell
+    And the second row shows two chips "Team Platform" and "Project web-app" with "anthropic/claude-sonnet-4-6" in the Default cell
+    # One ModelDefaultConfig row in storage with two scope attachments —
+    # rendered as one logical row with both chips on the same line.
 
   @integration
   Scenario: Adding an override opens a drawer with a scope chip picker and per-role model selectors
