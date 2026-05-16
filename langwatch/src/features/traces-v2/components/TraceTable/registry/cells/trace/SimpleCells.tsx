@@ -95,12 +95,7 @@ export const OriginCell = {
     return (
       <Badge
         size="sm"
-        // Light mode: lean on Chakra's `surface` variant so the chip
-        // carries a tinted border + saturated text rather than the
-        // washed-out `subtle` pastel fill. Dark mode keeps `subtle`
-        // because against the dark surface the pastel fills read fine
-        // and the brighter `surface` would over-pop.
-        variant={{ base: "surface", _dark: "subtle" }}
+        variant="subtle"
         colorPalette={palette}
         textTransform="capitalize"
         fontWeight="medium"

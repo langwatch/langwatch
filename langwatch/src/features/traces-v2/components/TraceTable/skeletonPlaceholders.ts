@@ -3,14 +3,6 @@ import type { TraceGroup } from "./registry";
 import type { TraceListItem } from "../../types/trace";
 
 /**
- * How many placeholder rows the table renders while loading. Tuned so
- * the skeleton fills a typical viewport without scrolling — letting it
- * shimmer indefinitely is preferable to leaving white space, but going
- * much higher pushes the first paint past the data arriving.
- */
-export const SKELETON_ROW_COUNT = 12;
-
-/**
  * Synthetic `TraceListItem` rows that drive the loading skeleton via
  * the real `TraceLensBody`. The goal is to render the exact same row /
  * cell / addon tree the user will see once data lands so the column

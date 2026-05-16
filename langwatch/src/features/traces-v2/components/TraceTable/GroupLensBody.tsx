@@ -7,6 +7,7 @@ import {
 } from "@tanstack/react-table";
 import type React from "react";
 import { useMemo, useState } from "react";
+import { useFilterStore } from "../../stores/filterStore";
 import { groupByForGrouping, type LensConfig } from "../../stores/viewStore";
 import type { TraceListItem } from "../../types/trace";
 import { buildGroupColumns } from "./columns";
@@ -17,10 +18,7 @@ import {
   type TraceGroup,
 } from "./registry";
 import { groupSelectColumnDef } from "./selectColumn";
-import {
-  buildGroupPlaceholderRows,
-  SKELETON_ROW_COUNT,
-} from "./skeletonPlaceholders";
+import { buildGroupPlaceholderRows } from "./skeletonPlaceholders";
 import { TraceTableShell } from "./TraceTableShell";
 import { useTraceTableVirtualizer } from "./useTraceTableVirtualizer";
 import { VirtualSpacer } from "./VirtualSpacer";
@@ -43,12 +41,10 @@ export const GroupLensBody: React.FC<GroupLensBodyProps> = ({
     () => (groupBy ? buildGroups(traces, groupBy) : []),
     [traces, groupBy],
   );
+  const pageSize = useFilterStore((s) => s.pageSize);
   const groups = useMemo(
-    () =>
-      isLoading
-        ? buildGroupPlaceholderRows(SKELETON_ROW_COUNT)
-        : realGroups,
-    [isLoading, realGroups],
+    () => (isLoading ? buildGroupPlaceholderRows(pageSize) : realGroups),
+    [isLoading, pageSize, realGroups],
   );
   const [openKeys, setOpenKeys] = useState<Set<string>>(() => new Set());
   const [sorting, setSorting] = useState<SortingState>([

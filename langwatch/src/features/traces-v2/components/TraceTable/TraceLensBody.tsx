@@ -13,13 +13,11 @@ import {
   getColumnSizingKey,
   useColumnSizingStore,
 } from "../../stores/columnSizingStore";
+import { useFilterStore } from "../../stores/filterStore";
 import { type LensConfig, useViewStore } from "../../stores/viewStore";
 import type { TraceListItem } from "../../types/trace";
 import { RegistryRow } from "./registry";
-import {
-  buildTracePlaceholderRows,
-  SKELETON_ROW_COUNT,
-} from "./skeletonPlaceholders";
+import { buildTracePlaceholderRows } from "./skeletonPlaceholders";
 import { TraceStatisticsProvider } from "./traceStatisticsContext";
 import { TraceTableShell } from "./TraceTableShell";
 import { useTraceLensColumns } from "./useTraceLensColumns";
@@ -46,10 +44,14 @@ export const TraceLensBody: React.FC<TraceLensBodyProps> = ({
   isLoading = false,
 }) => {
   // Substitute synthetic rows while loading so the real table builds
-  // the same column tree + addon rows we'll see once data lands.
+  // the same column tree + addon rows we'll see once data lands. We
+  // render exactly `pageSize` placeholders so the loading state fills
+  // the same vertical space the real page will occupy — no awkward
+  // half-filled table while the request is in flight.
+  const pageSize = useFilterStore((s) => s.pageSize);
   const effectiveTraces = useMemo(
-    () => (isLoading ? buildTracePlaceholderRows(SKELETON_ROW_COUNT) : traces),
-    [isLoading, traces],
+    () => (isLoading ? buildTracePlaceholderRows(pageSize) : traces),
+    [isLoading, pageSize, traces],
   );
   const { columns, registry, minWidth } = useTraceLensColumns({
     logicalColumnIds: lens.columns,

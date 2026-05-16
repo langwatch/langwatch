@@ -6,6 +6,7 @@ import type { TraceStatus } from "../../../types/trace";
 import {
   SkeletonAddonRow,
   SkeletonCellContent,
+  SkeletonSelectCell,
 } from "../SkeletonCellContent";
 import { ROW_STYLES, rowVariantFor, StatusRowGroup } from "../StatusRow";
 import { Tbody, Td, Tr } from "../TablePrimitives";
@@ -137,7 +138,18 @@ function RegistryRowComponent<TRow>({
             // the cell (including the edge padding) hit the checkbox Box,
             // not the Td. The Box stops propagation so the row's
             // drawer-open / expand handler does not also fire.
-            padding={isSelectCell ? 0 : `${tokens.rowPaddingY} 8px`}
+            // While loading, bump the row's vertical padding by 2px so
+            // the skeleton row matches the height the real row settles
+            // into once data lands (text + icon ascenders make the real
+            // row a hair taller than the bare skeleton bars). Reduces
+            // the visible "row grows" jump when the request resolves.
+            padding={
+              isSelectCell
+                ? 0
+                : isLoading
+                  ? `calc(${tokens.rowPaddingY} + 2px) 8px`
+                  : `${tokens.rowPaddingY} 8px`
+            }
             cursor={isSelectCell ? "pointer" : undefined}
             // Clip whatever the cell renders at the column boundary —
             // long unbreakable strings (trace IDs, model slugs, error
@@ -150,7 +162,9 @@ function RegistryRowComponent<TRow>({
             {...cellPropsFor(cell, style.borderColor, i, style.separatorColor)}
           >
             {isLoading ? (
-              isSelectCell ? null : (
+              isSelectCell ? (
+                <SkeletonSelectCell />
+              ) : (
                 <SkeletonCellContent
                   meta={meta}
                   rowIdx={skeletonRowIdx}
@@ -179,7 +193,11 @@ function RegistryRowComponent<TRow>({
       <Td
         colSpan={colCount}
         bg={style.bg}
-        padding={`${tokens.ioPaddingTop} 8px ${tokens.ioPaddingBottom} 76px`}
+        // Mirror image of the main-row bump: trim 2px off the
+        // skeleton addon's vertical padding so the combined
+        // skeleton (row + addon) height matches the real
+        // (row + IO preview) height once data lands.
+        padding={`calc(${tokens.ioPaddingTop} - 2px) 8px calc(${tokens.ioPaddingBottom} - 2px) 76px`}
         borderLeftWidth="2px"
         borderLeftColor={style.borderColor}
         borderBottomWidth="1px"

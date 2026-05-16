@@ -70,7 +70,7 @@ export const TraceTableLayout: React.FC<TraceTableLayoutProps> = ({
       </Box>
       <RefreshProgressBar />
       <NewTracesScrollUpIndicator scrollRef={scrollRef} />
-      {!isLoading && <Pagination totalHits={totalHits} />}
+      <Pagination totalHits={totalHits} isLoading={isLoading} />
     </Flex>
   );
 };

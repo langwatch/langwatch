@@ -7,6 +7,7 @@ import {
 } from "@tanstack/react-table";
 import type React from "react";
 import { useMemo, useState } from "react";
+import { useFilterStore } from "../../stores/filterStore";
 import type { LensConfig } from "../../stores/viewStore";
 import type { TraceListItem } from "../../types/trace";
 import { buildConversationColumns } from "./columns";
@@ -16,10 +17,7 @@ import {
 } from "./conversationGroups";
 import { conversationRegistry, RegistryRow } from "./registry";
 import { conversationSelectColumnDef } from "./selectColumn";
-import {
-  buildConversationPlaceholderRows,
-  SKELETON_ROW_COUNT,
-} from "./skeletonPlaceholders";
+import { buildConversationPlaceholderRows } from "./skeletonPlaceholders";
 import { TraceTableShell } from "./TraceTableShell";
 import { useTraceTableVirtualizer } from "./useTraceTableVirtualizer";
 import { VirtualSpacer } from "./VirtualSpacer";
@@ -41,12 +39,11 @@ export const ConversationLensBody: React.FC<ConversationLensBodyProps> = ({
     () => groupTracesByConversation(traces),
     [traces],
   );
+  const pageSize = useFilterStore((s) => s.pageSize);
   const groups = useMemo(
     () =>
-      isLoading
-        ? buildConversationPlaceholderRows(SKELETON_ROW_COUNT)
-        : realGroups,
-    [isLoading, realGroups],
+      isLoading ? buildConversationPlaceholderRows(pageSize) : realGroups,
+    [isLoading, pageSize, realGroups],
   );
   const columns = useMemo(
     () => [
