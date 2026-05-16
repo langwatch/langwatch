@@ -44,12 +44,13 @@ import {
   Edit,
   Folder,
   MoreVertical,
+  Pencil,
   Plus,
   SlidersHorizontal,
   Trash2,
   Users,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
@@ -178,7 +179,7 @@ export function DefaultModelsSection({
             Default Models
           </Heading>
           <Text fontSize="sm" color="fg.muted">
-            Define the default models to be used for language features.
+            Define the default models to be used for AI features across the platform.
           </Text>
         </VStack>
         <HStack gap={2}>
@@ -328,6 +329,7 @@ function AllConfigsView({
                   features={features}
                   configs={configs}
                   anchorScope={mostSpecificScope(c.scopes)}
+                  onEdit={() => onEdit(c)}
                 />
               </Table.Cell>
             ))}
@@ -390,12 +392,18 @@ function ConfigCell({
   features,
   configs,
   anchorScope,
+  onEdit,
 }: {
   role: ModelRoleKey;
   config: Record<string, string>;
   features: Payload["features"];
   configs: ConfigRow[];
   anchorScope: { type: "ORGANIZATION" | "TEAM" | "PROJECT"; id: string } | null;
+  /** Open the row's edit drawer. Wired to the hover-revealed pencil
+   *  next to each chip so the user can jump straight from "I want to
+   *  change this model" to the drawer without hunting for the 3-dot
+   *  menu. Edits the whole policy, not just the cell. */
+  onEdit: () => void;
 }) {
   // The table is a "final resolved state" view — every cell renders
   // the cascade-resolved role model for the row's scope, whether the
@@ -418,16 +426,63 @@ function ConfigCell({
 
   return (
     <VStack align="start" gap={1}>
-      <ModelChip model={resolvedRoleModel} size="sm" />
+      <ChipWithEdit onEdit={onEdit}>
+        <ModelChip model={resolvedRoleModel} size="sm" />
+      </ChipWithEdit>
       {featureOverrides.map((f) => (
-        <HStack key={f.key} gap={2} paddingLeft={4}>
+        <ChipWithEdit key={f.key} onEdit={onEdit} paddingLeft={4}>
           <Text fontSize="xs" color="fg.muted">
             {f.displayName}
           </Text>
           <ModelChip model={config[f.key]!} size="sm" />
-        </HStack>
+        </ChipWithEdit>
       ))}
     </VStack>
+  );
+}
+
+/**
+ * Hover-revealed pencil next to a model chip. Click jumps straight to
+ * the row's edit drawer — small UX trickery so the user doesn't have
+ * to hunt for the 3-dot menu when they're already eyeing the model
+ * they want to change. The drawer edits the whole policy, not just
+ * the cell, which matches the data model (one config = one JSON blob
+ * across roles).
+ */
+function ChipWithEdit({
+  children,
+  onEdit,
+  paddingLeft,
+}: {
+  children: React.ReactNode;
+  onEdit: () => void;
+  paddingLeft?: number;
+}) {
+  // Reveal a pencil button on cell hover. Chakra v3's `_groupHover`
+  // relies on a recipe wiring we don't have here, so the rule is
+  // expressed via raw CSS that's also more obvious about the intent:
+  // hover anywhere on this HStack → make `.chip-edit` visible.
+  return (
+    <HStack
+      gap={2}
+      paddingLeft={paddingLeft}
+      align="center"
+      css={{
+        "& .chip-edit": { opacity: 0, transition: "opacity 120ms" },
+        "&:hover .chip-edit, &:focus-within .chip-edit": { opacity: 1 },
+      }}
+    >
+      {children}
+      <IconButton
+        className="chip-edit"
+        size="xs"
+        variant="ghost"
+        aria-label="Edit policy"
+        onClick={onEdit}
+      >
+        <Pencil size={12} />
+      </IconButton>
+    </HStack>
   );
 }
 
