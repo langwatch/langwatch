@@ -107,19 +107,60 @@ export const WaterfallView = memo(function WaterfallView({
     });
   }, []);
 
-  const handleExpandAll = useCallback(() => {
-    setCollapsedIds(new Set());
-  }, []);
-
-  const handleCollapseAll = useCallback(() => {
-    const parentIds = new Set<string>();
-    for (const span of filteredSpans) {
-      if (filteredSpans.some((s) => s.parentSpanId === span.spanId)) {
-        parentIds.add(span.spanId);
+  // Parent spans keyed by depth — drives the Expand More / Collapse
+  // More step-through. Built from the same tree the rows render from
+  // so the depths line up with what the user sees.
+  const parentsByDepth = useMemo(() => {
+    const map = new Map<number, string[]>();
+    const walk = (nodes: typeof tree) => {
+      for (const node of nodes) {
+        if (node.children.length > 0) {
+          const list = map.get(node.depth) ?? [];
+          list.push(node.span.spanId);
+          map.set(node.depth, list);
+          walk(node.children);
+        }
       }
-    }
-    setCollapsedIds(parentIds);
-  }, [filteredSpans]);
+    };
+    walk(tree);
+    return map;
+  }, [tree]);
+
+  const handleCollapseMore = useCallback(() => {
+    // Collapse the deepest currently-expanded layer first, then the
+    // next layer up on subsequent clicks. Each click peels one level
+    // off the tree until only the root remains visible.
+    setCollapsedIds((prev) => {
+      const depths = [...parentsByDepth.keys()].sort((a, b) => b - a);
+      for (const d of depths) {
+        const parentsAtDepth = parentsByDepth.get(d) ?? [];
+        const stillExpanded = parentsAtDepth.filter((id) => !prev.has(id));
+        if (stillExpanded.length === 0) continue;
+        const next = new Set(prev);
+        for (const id of stillExpanded) next.add(id);
+        return next;
+      }
+      return prev;
+    });
+  }, [parentsByDepth]);
+
+  const handleExpandMore = useCallback(() => {
+    // Inverse of `handleCollapseMore` — reveal the shallowest collapsed
+    // layer per click, working back down toward the leaves.
+    setCollapsedIds((prev) => {
+      if (prev.size === 0) return prev;
+      const depths = [...parentsByDepth.keys()].sort((a, b) => a - b);
+      for (const d of depths) {
+        const parentsAtDepth = parentsByDepth.get(d) ?? [];
+        const collapsedAtDepth = parentsAtDepth.filter((id) => prev.has(id));
+        if (collapsedAtDepth.length === 0) continue;
+        const next = new Set(prev);
+        for (const id of collapsedAtDepth) next.delete(id);
+        return next;
+      }
+      return prev;
+    });
+  }, [parentsByDepth]);
 
   const handleSelectSpan = useCallback(
     (spanId: string) => {
@@ -297,14 +338,14 @@ export const WaterfallView = memo(function WaterfallView({
               </Tooltip>
             )}
             <ToolbarIconButton
-              tooltip="Expand all"
+              tooltip="Expand one level"
               icon={LuChevronsUpDown}
-              onClick={handleExpandAll}
+              onClick={handleExpandMore}
             />
             <ToolbarIconButton
-              tooltip="Collapse all"
+              tooltip="Collapse one level"
               icon={LuChevronsDownUp}
-              onClick={handleCollapseAll}
+              onClick={handleCollapseMore}
             />
           </HStack>
         </Flex>

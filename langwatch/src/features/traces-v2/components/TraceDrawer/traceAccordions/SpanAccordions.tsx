@@ -15,7 +15,7 @@ import { useTraceResources } from "../../../hooks/useTraceResources";
 import { AttributeTable } from "../AttributeTable";
 import { IOViewer } from "../IOViewer";
 import { hasPromptMetadata, PromptAccordion } from "../PromptAccordion";
-import { ScopeBlock, ScopeChip } from "../ScopeChip";
+import { ScopeBlock } from "../ScopeChip";
 import { AccordionShell, Section } from "./AccordionShell";
 import { EmptyEventsState, EmptyHint } from "./EmptyStates";
 import { EventCard } from "./EventCard";
@@ -96,16 +96,13 @@ export function SpanAccordions({
           </Text>
         </HStack>
       )}
-      {hasScope && (
-        <Box
-          paddingX={4}
-          paddingY={2}
-          borderBottomWidth="1px"
-          borderColor="border.muted"
-        >
-          <ScopeChip scope={spanScope} />
-        </Box>
-      )}
+      {/*
+        The instrumentation-scope chip lives in the SpanTabBar's
+        rightSlot now — rendering it here too duplicated it directly
+        below the tab row, which read as visual noise on every span
+        detail. The tab-bar chip already covers the same trace-level
+        attribution; nothing else to add here.
+      */}
       {detailQuery.isLoading ? (
         <VStack align="stretch" gap={2} padding={4}>
           <Skeleton height="32px" borderRadius="md" />

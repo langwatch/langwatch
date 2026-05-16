@@ -171,6 +171,12 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
             // redesign: no more single drawer scroller chasing
             // sections up and down.
             overflow="hidden"
+            // Clip the inner panel backgrounds (bg.surface in light
+            // mode) to the drawer's rounded chrome. Without this the
+            // white pane fills extend past the bottom-left corner of
+            // the drawer since Drawer.Content runs with overflow:visible
+            // (to let the ResizeRail pill escape the chrome).
+            borderRadius="lg"
             display="flex"
             flexDirection="column"
             minHeight={0}

@@ -67,27 +67,27 @@ export function PaneLayout({
   const detailPanelRef = useRef<ImperativePanelHandle>(null);
 
   // The Details panel's collapsed size has to equal the SpanTabBar's
-  // pixel height (vertical layout) so collapsing leaves the tab row
-  // flush at the bottom — no trailing empty band. In horizontal layout
-  // the panel collapses to a narrow vertical strip that still shows the
-  // tab bar's leading collapse toggle. react-resizable-panels only
-  // accepts percentages, so we measure the PanelGroup's actual size
-  // along the relevant axis and convert. ResizeObserver keeps it in
-  // sync as the drawer resizes.
+  // pixel height in vertical layout so collapsing leaves the tab row
+  // flush at the drawer bottom — no trailing empty band. In horizontal
+  // layout the panel goes to 0 (fully hidden); a "Show details" button
+  // in the viz panel's tab row re-exposes it. react-resizable-panels
+  // only accepts percentages, so we measure the PanelGroup's actual
+  // size along the relevant axis and convert.
   const vizDetailGroupRef = useRef<HTMLDivElement>(null);
   const [detailCollapsedSize, setDetailCollapsedSize] = useState<number>(6);
   useEffect(() => {
+    if (layout === "horizontal") {
+      // Fully hide the panel — the reopen affordance lives in the viz
+      // panel's tab row (see VizPlaceholder).
+      setDetailCollapsedSize(0);
+      return;
+    }
     const el = vizDetailGroupRef.current;
     if (!el) return;
     const measure = () => {
-      const dim = layout === "horizontal" ? el.clientWidth : el.clientHeight;
+      const dim = el.clientHeight;
       if (dim <= 0) return;
-      // Vertical: collapse to the full tab-bar height so the tab row
-      // sits flush at the drawer bottom. Horizontal: collapse to a
-      // narrow strip wide enough for the leading collapse toggle.
-      const targetPx =
-        layout === "horizontal" ? 36 : SPAN_TAB_BAR_HEIGHT_PX;
-      const pct = (targetPx / dim) * 100;
+      const pct = (SPAN_TAB_BAR_HEIGHT_PX / dim) * 100;
       setDetailCollapsedSize(Math.min(50, Math.max(1, pct)));
     };
     measure();
@@ -141,6 +141,7 @@ export function PaneLayout({
           onSelectSpan={selectSpan}
           onClearSpan={clearSpan}
           fillParent
+          paneLayout={layout}
         />
       </IsolatedErrorBoundary>
     </Box>

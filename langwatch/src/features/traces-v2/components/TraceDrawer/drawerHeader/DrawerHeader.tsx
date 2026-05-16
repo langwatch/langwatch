@@ -41,9 +41,9 @@ import { useFilterStore } from "../../../stores/filterStore";
 import type { PinnedAttribute } from "../../../stores/pinnedAttributesStore";
 import {
   abbreviateModel,
+  formatAbsoluteTime,
   formatCost,
   formatDuration,
-  formatRelativeTime,
   formatRelativeTimeAgo,
   formatTokens,
   SPAN_TYPE_COLORS,
@@ -711,19 +711,21 @@ export const DrawerHeader = memo(function DrawerHeader({
             }
             positioning={{ placement: "bottom" }}
           >
-            {/* Negative right margin pulls the X all the way to the
-                drawer's outer edge so its click target hugs the chrome
-                instead of compounding the row's right padding. The
-                button's own horizontal padding (3) provides the
-                clickable hit area. */}
+            {/* The X sits as close as practical to the drawer's right
+                chrome — tighter `paddingX` shrinks the glyph's halo
+                inside the hit area, and a larger negative `marginRight`
+                pushes the whole button rightward by the same amount so
+                the click target still hugs the edge. Operator feedback:
+                the previous spacing left a visible gap between the X
+                and the drawer border. */}
             <Button
               size="xs"
               variant="ghost"
               onClick={onClose}
               aria-label="Close drawer"
-              paddingX={3}
+              paddingX={1.5}
               minWidth="auto"
-              marginRight={-3}
+              marginRight={-4}
               color="fg.muted"
               _hover={{ bg: "bg.muted", color: "fg" }}
               _active={{ bg: "bg.emphasized" }}
@@ -897,17 +899,17 @@ export const DrawerHeader = memo(function DrawerHeader({
                 size="2xs"
               />
               <Tooltip
-                content={`First span recorded ${formatRelativeTime(
+                content={`First span recorded ${formatRelativeTimeAgo(
                   trace.timestamp,
-                )} ago (${new Date(trace.timestamp).toLocaleString()})`}
+                )} (${formatAbsoluteTime(trace.timestamp)})`}
                 positioning={{ placement: "bottom-end" }}
                 openDelay={400}
               >
                 <Text textStyle="xs" color="fg.subtle" cursor="help">
-                  {/* Render as "16 d ago" — splits the unit from the
-                      number so it reads as English, and the "ago"
-                      removes any ambiguity about direction. The trace
-                      table cell keeps the compact "16d" form. */}
+                  {/* Compact "16d ago" — keeps the unit attached to the
+                      number for tight surfaces while still carrying the
+                      natural-language "ago" hint. The tooltip resolves
+                      the absolute UTC timestamp. */}
                   {formatRelativeTimeAgo(trace.timestamp)}
                 </Text>
               </Tooltip>

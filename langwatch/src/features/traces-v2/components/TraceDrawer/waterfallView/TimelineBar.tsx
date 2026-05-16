@@ -52,9 +52,17 @@ export function TimelineBar({
       onClick={onSelect}
       onMouseEnter={onHoverStart}
       onMouseLeave={onHoverEnd}
-      opacity={isDimmed && !isSelected && !isHovered ? 0.4 : 1}
-      transition="opacity 0.1s ease"
-      bg={isSelected ? "blue.subtle" : isHovered ? "bg.muted" : undefined}
+      transition="background 0.1s ease"
+      // Light mode: neutral grey for selection so the non-selected rows
+      // don't need to be dimmed to stay legible — they keep full opacity.
+      // Dark mode: blue tint reads well against the dark panel.
+      bg={
+        isSelected
+          ? { base: "bg.emphasized", _dark: "blue.subtle" }
+          : isHovered
+            ? "bg.muted"
+            : undefined
+      }
     >
       {/* Bars live inside a smaller positioned containing block so the
           row's hover / selection background can still extend

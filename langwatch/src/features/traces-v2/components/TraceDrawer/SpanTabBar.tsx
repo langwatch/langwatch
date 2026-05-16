@@ -12,6 +12,8 @@ import {
   LuChevronDown,
   LuChevronRight,
   LuFileText,
+  LuPanelRightClose,
+  LuPanelRightOpen,
   LuPanelTopClose,
   LuPanelTopOpen,
   LuPin,
@@ -145,7 +147,18 @@ export const SpanTabBar = memo(function SpanTabBar({
     (s) => s.paneState.spanDetail.collapsed,
   );
   const togglePaneCollapsed = useDrawerStore((s) => s.togglePaneCollapsed);
-  const CollapseToggleIcon = detailCollapsed ? LuPanelTopOpen : LuPanelTopClose;
+  // Icon orientation tracks the pane's edge: horizontal layout puts the
+  // detail pane on the right, so the collapse chevron points
+  // right (LuPanelRight*); vertical stacks the detail pane on the
+  // bottom, so the chevron points up/down (LuPanelTop*).
+  const isHorizontalSplit = collapsePosition === "leading";
+  const CollapseToggleIcon = isHorizontalSplit
+    ? detailCollapsed
+      ? LuPanelRightOpen
+      : LuPanelRightClose
+    : detailCollapsed
+      ? LuPanelTopOpen
+      : LuPanelTopClose;
 
   const collapseToggle = (
     <Tooltip

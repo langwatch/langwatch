@@ -25,6 +25,8 @@ import {
   LuMessagesSquare,
   LuMinus,
   LuNetwork,
+  LuPanelRightOpen,
+  LuPanelTopOpen,
 } from "react-icons/lu";
 import { useShallow } from "zustand/react/shallow";
 import { Kbd } from "~/components/ops/shared/Kbd";
@@ -39,7 +41,7 @@ import type {
   SpanTreeNode,
   TraceHeader,
 } from "~/server/api/routers/tracesV2.schemas";
-import type { VizTab } from "../../stores/drawerStore";
+import { useDrawerStore, type VizTab } from "../../stores/drawerStore";
 import { SPAN_TYPE_COLORS } from "../../utils/formatters";
 import { FlameView } from "./flameView";
 import { NewSpanFlash } from "./NewSpanFlash";
@@ -73,6 +75,12 @@ interface VizPlaceholderProps {
    * independently sized panel.
    */
   fillParent?: boolean;
+  /**
+   * Layout orientation of the parent pane group. Drives which icon the
+   * "show details" affordance uses when the detail pane is collapsed —
+   * right-pointing for a side-by-side split, top/bottom for stacked.
+   */
+  paneLayout?: "horizontal" | "vertical";
 }
 
 const MIN_HEIGHT = 80;
@@ -181,7 +189,18 @@ export function VizPlaceholder({
   onClearSpan,
   onSwitchToSpanList,
   fillParent = false,
+  paneLayout,
 }: VizPlaceholderProps) {
+  // When the detail pane is hidden, surface a "Show details" affordance
+  // in the viz tab row so the user can bring it back without having to
+  // click a span. The detail pane also auto-reopens whenever a span is
+  // selected (see `drawerStore.selectSpan`); this is the manual escape
+  // for when the user wants to see the trace summary again.
+  const detailCollapsed = useDrawerStore(
+    (s) => s.paneState.spanDetail.collapsed,
+  );
+  const togglePaneCollapsed = useDrawerStore((s) => s.togglePaneCollapsed);
+
   const [height, setHeight] = useState(getStoredHeight);
   const [spanListSearch, setSpanListSearch] = useState("");
   const [spanListTypeFilter, setSpanListTypeFilter] = useState<
@@ -379,11 +398,17 @@ export function VizPlaceholder({
                       isActive ? `${tab.palette}.solid` : "transparent"
                     }
                     marginBottom="-1px"
-                    bg="transparent"
+                    // Active tab picks up the per-tab palette's subtle
+                    // fill so the row visually anchors which viz is
+                    // open without relying on the bottom border alone.
+                    bg={isActive ? `${tab.palette}.subtle` : "transparent"}
                     flexShrink={0}
                     whiteSpace="nowrap"
-                    _hover={{ color: `${tab.palette}.fg`, bg: "transparent" }}
-                    transition="color 0.15s ease, border-color 0.15s ease"
+                    _hover={{
+                      color: `${tab.palette}.fg`,
+                      bg: isActive ? `${tab.palette}.subtle` : "bg.muted",
+                    }}
+                    transition="color 0.15s ease, border-color 0.15s ease, background 0.15s ease"
                     onClick={() => handleVizTabChange(tab.value)}
                     fontWeight={isActive ? "600" : "500"}
                   >
@@ -442,6 +467,35 @@ export function VizPlaceholder({
                 </Flex>
               </Tooltip>
             </HStack>
+          )}
+          {fillParent && detailCollapsed && (
+            <Tooltip content="Show details" positioning={{ placement: "top" }}>
+              <Flex
+                as="button"
+                align="center"
+                justify="center"
+                width="28px"
+                marginX={1}
+                cursor="pointer"
+                color="fg.muted"
+                _hover={{ bg: "bg.muted", color: "fg" }}
+                borderRadius="md"
+                alignSelf="center"
+                height="26px"
+                flexShrink={0}
+                aria-label="Show details"
+                onClick={() => togglePaneCollapsed("spanDetail")}
+              >
+                <Icon
+                  as={
+                    paneLayout === "horizontal"
+                      ? LuPanelRightOpen
+                      : LuPanelTopOpen
+                  }
+                  boxSize={3.5}
+                />
+              </Flex>
+            </Tooltip>
           )}
         </Flex>
 

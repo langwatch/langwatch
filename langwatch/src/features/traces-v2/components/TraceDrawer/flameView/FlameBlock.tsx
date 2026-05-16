@@ -180,16 +180,21 @@ export function FlameBlock({
       >
         <Text
           textStyle="xs"
-          // In dark mode the saturated block bg is dark enough to read
-          // white text against; in light mode the same blocks render as
-          // pastel tints and white-on-pastel becomes invisible. Flip to
-          // a near-black foreground in light mode and drop the dark
-          // text-shadow that exists to lift white off colour — it
-          // becomes a fuzzy halo under dark text.
+          // In dark mode every block bg is dark enough to read white
+          // against. In light mode the non-emphasized blocks render as
+          // pastel tints (white would disappear) — read those as dark
+          // text. But the *emphasized* state in light mode is the
+          // saturated `${color}/100` fill — that's dark blue / dark
+          // purple / etc., and the previously-dark text on top became
+          // unreadable. Flip back to white text for emphasized blocks
+          // in light mode, and apply the lift shadow only where the
+          // text is actually dark.
           color={isEmphasized ? "white" : "white/90"}
           _light={{
-            color: isEmphasized ? "gray.900" : "gray.800",
-            textShadow: "0 1px 0 rgba(255,255,255,0.45)",
+            color: isEmphasized ? "white" : "gray.800",
+            textShadow: isEmphasized
+              ? "0 1px 1px rgba(0,0,0,0.35)"
+              : "0 1px 0 rgba(255,255,255,0.45)",
           }}
           truncate
           lineHeight={1}

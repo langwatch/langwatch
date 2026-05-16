@@ -1,4 +1,5 @@
-import { Accordion, Badge, Box, HStack, Text } from "@chakra-ui/react";
+import { Accordion, Badge, Box, HStack, Icon, Text } from "@chakra-ui/react";
+import { LuChevronDown } from "react-icons/lu";
 import { type ReactNode, useRef } from "react";
 import { PresenceSection } from "~/features/presence/components/PresenceSection";
 import { SectionPresenceDot } from "~/features/presence/components/SectionPresenceDot";
@@ -95,10 +96,15 @@ export function Section({
         _hover={{ bg: "bg.softHover", color: "fg" }}
         // Open state keeps the same white bg as closed — operator
         // feedback: the gray fill on open made the panel feel busy and
-        // broke the "white card, gray header row" idiom. Only the title
-        // color promotes to `fg` so the open section still reads as
-        // active.
-        _open={{ color: "fg" }}
+        // broke the "white card, gray header row" idiom. The title color
+        // promotes to `fg` AND a 1px bottom border slips in so the
+        // trigger reads as the open section's own header band, not as
+        // floating text above its content.
+        _open={{
+          color: "fg",
+          borderBottomWidth: "1px",
+          borderBottomColor: "border.muted",
+        }}
         cursor="pointer"
         // Each trigger pins flush with the SpanTabBar (no per-section
         // offset). The previous "Notion-style" stacking multiplied a
@@ -140,7 +146,13 @@ export function Section({
             />
           ) : null}
         </HStack>
-        <Accordion.ItemIndicator color="inherit" />
+        {/* Custom indicator at a fixed 12px so it matches the close /
+            expand icon in the LLM-Optimized header row above — the
+            default `<Accordion.ItemIndicator>` inherits the trigger's
+            font size and reads visibly larger than its neighbours. */}
+        <Accordion.ItemIndicator color="inherit">
+          <Icon as={LuChevronDown} boxSize={3} />
+        </Accordion.ItemIndicator>
       </Accordion.ItemTrigger>
       <Accordion.ItemContent>
         {trackPresence ? (

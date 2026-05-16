@@ -353,13 +353,47 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
       traceBackStack: [],
     }),
 
-  selectSpan: (spanId) => set({ selectedSpanId: spanId, activeTab: "span" }),
+  selectSpan: (spanId) =>
+    set((s) => {
+      // Selecting a span always reopens the detail pane — when the user
+      // explicitly hides it, the selection is cleared, so any subsequent
+      // span click reads as "open detail for this span", not "reselect
+      // an existing one". This makes the hide/reopen flow round-trip
+      // cleanly via span clicks alone.
+      const next: Partial<DrawerState> = {
+        selectedSpanId: spanId,
+        activeTab: "span",
+      };
+      if (s.paneState.spanDetail.collapsed) {
+        const updatedPanes: Record<PaneId, PaneState> = {
+          ...s.paneState,
+          spanDetail: { ...s.paneState.spanDetail, collapsed: false },
+        };
+        persistPaneState(updatedPanes);
+        next.paneState = updatedPanes;
+      }
+      return next;
+    }),
 
   clearSpan: () => set({ selectedSpanId: null, activeTab: "summary" }),
 
   setViewMode: (mode) => set({ viewMode: mode }),
   setVizTab: (tab) => set({ vizTab: tab }),
-  setActiveTab: (tab) => set({ activeTab: tab }),
+  setActiveTab: (tab) =>
+    set((s) => {
+      // Same auto-reopen rule as `selectSpan`: changing tabs implies the
+      // user wants the detail pane visible.
+      const next: Partial<DrawerState> = { activeTab: tab };
+      if (s.paneState.spanDetail.collapsed) {
+        const updatedPanes: Record<PaneId, PaneState> = {
+          ...s.paneState,
+          spanDetail: { ...s.paneState.spanDetail, collapsed: false },
+        };
+        persistPaneState(updatedPanes);
+        next.paneState = updatedPanes;
+      }
+      return next;
+    }),
   setMaximized: (value) => set({ isMaximized: value }),
   toggleMaximized: () => set((s) => ({ isMaximized: !s.isMaximized })),
 
@@ -397,17 +431,26 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
 
   togglePaneCollapsed: (id) =>
     set((s) => {
+      const wasCollapsed = s.paneState[id].collapsed;
       const next: Record<PaneId, PaneState> = {
         ...s.paneState,
         [id]: {
           ...s.paneState[id],
-          collapsed: !s.paneState[id].collapsed,
+          collapsed: !wasCollapsed,
           // Collapsing a maximized pane is nonsensical — drop maximize.
           maximizedWithinGroup: false,
         },
       };
       persistPaneState(next);
-      return { paneState: next };
+      // Hiding the span-detail pane clears the current selection so the
+      // next span click feels like opening a fresh detail view (which
+      // also auto-reopens the pane via `selectSpan`).
+      const stateUpdate: Partial<DrawerState> = { paneState: next };
+      if (id === "spanDetail" && !wasCollapsed) {
+        stateUpdate.selectedSpanId = null;
+        stateUpdate.activeTab = "summary";
+      }
+      return stateUpdate;
     }),
 
   togglePaneMaximized: (id) =>

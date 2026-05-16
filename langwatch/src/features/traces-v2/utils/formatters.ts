@@ -13,25 +13,36 @@ export function formatRelativeTime(timestamp: number): string {
 }
 
 /**
- * Verbose variant of `formatRelativeTime` for surfaces with more room —
- * splits the unit out (`16 d`) and appends `ago` so it reads naturally
- * without a tooltip. The table cells keep the compact `formatRelativeTime`
- * form to stay readable at small column widths.
+ * Compact relative-time formatter with an explicit "ago" suffix for
+ * drawer-header / detail surfaces. No space between the number and
+ * unit (`10m ago`, `16d ago`) so it stays tight at small sizes, but
+ * keeps the natural-language hint that the table-cell
+ * `formatRelativeTime` drops.
  */
 export function formatRelativeTimeAgo(timestamp: number): string {
   const diffMs = Date.now() - timestamp;
   if (diffMs < MS_PER_MINUTE) return "just now";
   if (diffMs < MS_PER_HOUR) {
-    return `${Math.floor(diffMs / MS_PER_MINUTE)} m ago`;
+    return `${Math.floor(diffMs / MS_PER_MINUTE)}m ago`;
   }
   if (diffMs < MS_PER_DAY) {
-    return `${Math.floor(diffMs / MS_PER_HOUR)} h ago`;
+    return `${Math.floor(diffMs / MS_PER_HOUR)}h ago`;
   }
-  return `${Math.floor(diffMs / MS_PER_DAY)} d ago`;
+  return `${Math.floor(diffMs / MS_PER_DAY)}d ago`;
 }
 
 export function formatAbsoluteTime(timestamp: number): string {
-  return new Date(timestamp).toLocaleString();
+  // Render in UTC and tag the suffix so engineers reading a trace can
+  // line up timestamps against their server logs without doing the TZ
+  // math in their heads. The previous `toLocaleString()` form rendered
+  // in the viewer's local time without saying so, which was ambiguous.
+  const d = new Date(timestamp);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(
+    d.getUTCDate(),
+  )} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(
+    d.getUTCSeconds(),
+  )} UTC`;
 }
 
 export function formatDuration(ms: number): string {
