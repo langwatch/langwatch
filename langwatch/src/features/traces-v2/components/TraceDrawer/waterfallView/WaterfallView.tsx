@@ -504,11 +504,14 @@ export const WaterfallView = memo(function WaterfallView({
           bottom={0}
           left="2px"
           width="1px"
-          // Darker default so the Span/Timeline split is legible against
-          // the pane's lighter `bg.surface` — previous `border.subtle`
-          // at 0.6 opacity all but vanished in light mode.
-          bg="border.emphasized"
-          opacity={0.85}
+          // Light mode: lean on the darker `border.emphasized` token so
+          // the divider doesn't vanish against the white-ish surface.
+          // Dark mode: drop to the regular `border` token (and a lower
+          // opacity) — `border.emphasized` reads brighter than the
+          // panel separators around it, which looked off-key in the
+          // dark theme.
+          bg={{ base: "border.emphasized", _dark: "border" }}
+          opacity={0.5}
           transition="all 0.15s ease"
         />
       </Box>

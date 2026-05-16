@@ -1,6 +1,6 @@
 import { Box, HStack, IconButton, Input, Text } from "@chakra-ui/react";
 import { useEffect, useId, useRef, useState } from "react";
-import { LuCheck, LuPencil, LuX } from "react-icons/lu";
+import { LuCheck, LuCircleHelp, LuX } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { toaster } from "~/components/ui/toaster";
@@ -134,18 +134,6 @@ export function EditableTraceName({
         minWidth={0}
         // Double-click anywhere in the title group to enter edit mode.
         onDoubleClick={startEditing}
-        // The pencil is hidden by default and revealed via this CSS hover
-        // rule. Chakra's `_groupHover` looks for `[role=group]` /
-        // `data-group` upstream, but those didn't fire reliably nested
-        // inside the existing HStack chain in the drawer header — a
-        // direct descendant selector here is bulletproof.
-        css={{
-          "&:hover [data-edit-trace-name-trigger]": { opacity: 1 },
-          // Keyboard users get the affordance via focus-within, which
-          // also covers the case where the IconButton itself is focused
-          // (Tab/Shift-Tab into it).
-          "&:focus-within [data-edit-trace-name-trigger]": { opacity: 1 },
-        }}
       >
         <Text
           fontWeight="semibold"
@@ -158,7 +146,7 @@ export function EditableTraceName({
           {titleText}
         </Text>
         <Tooltip
-          content="Edit trace name (or double-click the title)"
+          content="Trace name, derived from the root span. Click to rename."
           positioning={{ placement: "bottom" }}
         >
           <IconButton
@@ -166,12 +154,9 @@ export function EditableTraceName({
             size="2xs"
             variant="ghost"
             color="fg.subtle"
-            opacity={0}
-            transition="opacity 0.12s ease"
             onClick={startEditing}
-            data-edit-trace-name-trigger="true"
           >
-            <LuPencil size={12} />
+            <LuCircleHelp size={12} />
           </IconButton>
         </Tooltip>
       </HStack>

@@ -152,6 +152,15 @@ export function TreeRow({
                 ? "bg.muted"
                 : undefined
           }
+          // Dark mode keeps the pre-PR behaviour of fading non-selected
+          // rows when one is picked — the dark theme depends on that
+          // contrast to keep the focus row "popping". Light mode stays
+          // at full opacity (the neutral grey selection bg already
+          // pulls the eye there without help).
+          opacity={{
+            base: 1,
+            _dark: isDimmed && !isSelected && !isHovered ? 0.4 : 1,
+          }}
           _hover={{
             bg: isSelected
               ? { base: "bg.emphasized", _dark: "blue.subtle" }
@@ -161,7 +170,6 @@ export function TreeRow({
           onClick={onSelect}
           onMouseEnter={onHoverStart}
           onMouseLeave={onHoverEnd}
-          userSelect="none"
           flexShrink={0}
           transition="all 0.1s ease"
           borderLeftWidth={isSelected ? "2px" : "0px"}

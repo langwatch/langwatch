@@ -389,26 +389,24 @@ export function VizPlaceholder({
                     as="button"
                     align="center"
                     gap={1.5}
-                    paddingX={3}
-                    paddingY={2}
+                    paddingX={2}
+                    paddingY={1}
+                    marginY={1}
+                    borderRadius="md"
                     cursor="pointer"
-                    color={isActive ? `${tab.palette}.fg` : "fg.muted"}
-                    borderBottomWidth="2px"
-                    borderBottomColor={
-                      isActive ? `${tab.palette}.solid` : "transparent"
-                    }
-                    marginBottom="-1px"
-                    // Active tab picks up the per-tab palette's subtle
-                    // fill so the row visually anchors which viz is
-                    // open without relying on the bottom border alone.
+                    // Inactive tabs keep their palette colour for the
+                    // label (Flame=orange, Span List=cyan, etc.) so the
+                    // strip reads as a colour-coded picker instead of
+                    // a wall of grey. Active state promotes contrast +
+                    // adds the subtle palette fill as a pill.
+                    color={`${tab.palette}.fg`}
                     bg={isActive ? `${tab.palette}.subtle` : "transparent"}
                     flexShrink={0}
                     whiteSpace="nowrap"
                     _hover={{
-                      color: `${tab.palette}.fg`,
                       bg: isActive ? `${tab.palette}.subtle` : "bg.muted",
                     }}
-                    transition="color 0.15s ease, border-color 0.15s ease, background 0.15s ease"
+                    transition="background 0.15s ease"
                     onClick={() => handleVizTabChange(tab.value)}
                     fontWeight={isActive ? "600" : "500"}
                   >

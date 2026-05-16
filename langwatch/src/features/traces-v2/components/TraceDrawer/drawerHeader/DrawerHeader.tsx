@@ -10,10 +10,10 @@ import {
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import {
   LuArrowLeft,
+  LuLock,
+  LuLockOpen,
   LuMaximize2,
   LuMinimize2,
-  LuPanelRight,
-  LuPanelRightDashed,
   LuRefreshCw,
   LuX,
 } from "react-icons/lu";
@@ -574,7 +574,23 @@ export const DrawerHeader = memo(function DrawerHeader({
             titleIsFallback={titleIsFallback}
           />
           <HStack gap={1} flexShrink={0}>
-            <Circle size="8px" bg={statusColor} flexShrink={0} />
+            <Tooltip
+              content={
+                trace.status === "ok"
+                  ? "No errors recorded on any span in this trace"
+                  : trace.status === "error"
+                    ? "At least one span on this trace recorded an error"
+                    : `Trace status: ${trace.status}`
+              }
+              positioning={{ placement: "bottom" }}
+            >
+              <Circle
+                size="8px"
+                bg={statusColor}
+                flexShrink={0}
+                cursor="help"
+              />
+            </Tooltip>
             {trace.status !== "ok" && (
               <Text
                 textStyle="xs"
@@ -607,6 +623,29 @@ export const DrawerHeader = memo(function DrawerHeader({
         <HStack gap={1} flexShrink={0}>
           <Tooltip
             content={
+              pinned
+                ? "Docked — drawer stays open when you click outside. Click to undock."
+                : "Undocked — click outside (or press Esc) to close. Click to dock."
+            }
+            positioning={{ placement: "bottom" }}
+          >
+            <Button
+              size="xs"
+              variant="ghost"
+              onClick={togglePinned}
+              aria-label={
+                pinned
+                  ? "Undock drawer (click outside closes)"
+                  : "Dock drawer (click outside ignored)"
+              }
+              aria-pressed={pinned}
+              color={pinned ? "blue.fg" : "fg.muted"}
+            >
+              <Icon as={pinned ? LuLock : LuLockOpen} boxSize={3.5} />
+            </Button>
+          </Tooltip>
+          <Tooltip
+            content={
               <HStack gap={1}>
                 <Text>{isRefreshing ? "Refreshing…" : "Refresh"}</Text>
                 <Kbd>R</Kbd>
@@ -636,32 +675,6 @@ export const DrawerHeader = memo(function DrawerHeader({
               }
             >
               <Icon as={LuRefreshCw} boxSize={3.5} />
-            </Button>
-          </Tooltip>
-          <Tooltip
-            content={
-              pinned
-                ? "Docked — drawer stays open when you click outside. Click to undock."
-                : "Modal — click outside (or press Esc) to close. Click to dock."
-            }
-            positioning={{ placement: "bottom" }}
-          >
-            <Button
-              size="xs"
-              variant="ghost"
-              onClick={togglePinned}
-              aria-label={
-                pinned
-                  ? "Undock drawer (click outside closes)"
-                  : "Dock drawer (click outside ignored)"
-              }
-              aria-pressed={pinned}
-              color={pinned ? "blue.fg" : "fg.muted"}
-            >
-              <Icon
-                as={pinned ? LuPanelRight : LuPanelRightDashed}
-                boxSize={3.5}
-              />
             </Button>
           </Tooltip>
           <Tooltip
@@ -898,17 +911,29 @@ export const DrawerHeader = memo(function DrawerHeader({
                 size="2xs"
               />
               <Tooltip
-                content={`First span recorded ${formatRelativeTimeAgo(
-                  trace.timestamp,
-                )} (${formatAbsoluteTime(trace.timestamp)})`}
+                content={
+                  <VStack align="start" gap={0.5}>
+                    <Text textStyle="xs">
+                      First span recorded{" "}
+                      {formatRelativeTimeAgo(trace.timestamp)}
+                    </Text>
+                    <Text textStyle="xs" color="fg.muted">
+                      {formatAbsoluteTime(trace.timestamp)}
+                    </Text>
+                  </VStack>
+                }
                 positioning={{ placement: "bottom-end" }}
                 openDelay={400}
+                closeDelay={150}
+                interactive
               >
                 <Text textStyle="xs" color="fg.subtle" cursor="help">
                   {/* Compact "16d ago" — keeps the unit attached to the
                       number for tight surfaces while still carrying the
                       natural-language "ago" hint. The tooltip resolves
-                      the absolute UTC timestamp. */}
+                      the absolute UTC timestamp and is interactive so
+                      the user can hover over it and select / copy the
+                      date without it disappearing. */}
                   {formatRelativeTimeAgo(trace.timestamp)}
                 </Text>
               </Tooltip>

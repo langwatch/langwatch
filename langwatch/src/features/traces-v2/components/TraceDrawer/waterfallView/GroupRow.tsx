@@ -35,7 +35,6 @@ export function GroupRow({
       _hover={{ bg: "bg.muted" }}
       cursor="pointer"
       onClick={onToggle}
-      userSelect="none"
       flexShrink={0}
       borderLeftWidth="2px"
       borderLeftColor={color}
