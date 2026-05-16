@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  DRAWER_DEFAULT_WIDTH_PX,
   DRAWER_MAXIMIZE_EDGE_PX,
   DRAWER_MIN_WIDTH_PX,
   useDrawerStore,
@@ -98,11 +99,18 @@ describe("drawerStore.toggleSnapMaximize", () => {
 
   describe("given no prior width", () => {
     describe("when toggleSnapMaximize fires then restores", () => {
-      it("restores to 45% of the viewport as a sensible default", () => {
+      it("restores to DRAWER_DEFAULT_WIDTH_PX as a sensible default", () => {
         useDrawerStore.getState().toggleSnapMaximize(VIEWPORT_WIDTH);
         useDrawerStore.getState().toggleSnapMaximize(VIEWPORT_WIDTH);
         const state = useDrawerStore.getState();
-        expect(state.widthPx).toBe(Math.round(VIEWPORT_WIDTH * 0.45));
+        // Default is a flat px (deterministic first paint) instead of
+        // the previous 45% rule. Capped at the snap width on viewports
+        // narrower than the default so restore never lands wider than
+        // the snap target.
+        const snapWidth = VIEWPORT_WIDTH - DRAWER_MAXIMIZE_EDGE_PX;
+        expect(state.widthPx).toBe(
+          Math.min(DRAWER_DEFAULT_WIDTH_PX, snapWidth),
+        );
       });
     });
   });

@@ -1,6 +1,7 @@
 import { Box } from "@chakra-ui/react";
 import { useCallback, useEffect, useRef } from "react";
 import {
+  DRAWER_DEFAULT_WIDTH_PX,
   DRAWER_MAXIMIZE_EDGE_PX,
   DRAWER_MIN_WIDTH_PX,
   useDrawerStore,
@@ -36,8 +37,10 @@ export function ResizeRail() {
 
   const resolveCurrentWidth = useCallback(() => {
     if (widthPx !== null) return widthPx;
-    if (typeof window === "undefined") return DRAWER_MIN_WIDTH_PX;
-    return Math.round(window.innerWidth * 0.45);
+    if (typeof window === "undefined") return DRAWER_DEFAULT_WIDTH_PX;
+    // Cap at the viewport so a default wider than the window doesn't
+    // start the drag from off-screen.
+    return Math.min(DRAWER_DEFAULT_WIDTH_PX, window.innerWidth);
   }, [widthPx]);
 
   const handlePointerDown = useCallback(
@@ -133,9 +136,9 @@ export function ResizeRail() {
 
   // Determine whether the drawer is at the max-snap width. When it is,
   // we hide the pill — the rail is invisible chrome that only re-appears
-  // on hover for the operator to grab the edge back. The default 45%
-  // fallback (`widthPx === null`) is never "at max" so the pill is
-  // always visible there.
+  // on hover for the operator to grab the edge back. The default flat
+  // `DRAWER_DEFAULT_WIDTH_PX` fallback (`widthPx === null`) is never
+  // "at max" so the pill is always visible there.
   const atMaxSnap = (() => {
     if (typeof window === "undefined" || widthPx === null) return false;
     const max = window.innerWidth - DRAWER_MAXIMIZE_EDGE_PX;

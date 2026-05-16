@@ -27,11 +27,40 @@ export const IOPreview: React.FC<IOPreviewProps> = ({ input, output }) => {
  * isChat/isTool flags that drive the role icon. Both are cheap (each does
  * one JSON.parse attempt on the same input).
  */
-/** Inject the `↵` glyph just before each real newline so the reader
- * sees both: the symbol marks the soft break, the `\n` lets CSS render
- * the actual line wrap. */
+/**
+ * Render line breaks for the 2-line clamped preview cell.
+ *
+ * Trade-offs we're navigating:
+ *  - We want the `↵` glyph as an explicit "there was a break here"
+ *    marker, so wrapped text doesn't look like one continuous string.
+ *  - CSS `-webkit-line-clamp` can truncate anywhere — including right
+ *    after a glyph, which then renders as the ugly "…↵..." or pure
+ *    "↵..." (an empty line whose only content is the glyph followed
+ *    by the clamp ellipsis). Operator complaint, with screenshots.
+ *
+ * Strategy:
+ *  - Strip trailing whitespace/blank lines so the text never ends on
+ *    a break.
+ *  - Collapse runs of blank lines to a single break (no more "↵\n↵\n"
+ *    that renders as an empty middle line whose only character is the
+ *    glyph).
+ *  - Put the glyph at the START of every continuation line, not at
+ *    the END of the previous one. That way the clamp ellipsis lands
+ *    on real text content (or replaces it mid-word with "…"), never
+ *    on the glyph itself. Reads as "↳ continuation" rather than
+ *    "ends with ↵...".
+ */
 function withGlyphBreaks(text: string): string {
-  return text.replace(/\n/g, " ↵\n");
+  // 1. Normalise: trim trailing whitespace/newlines so we never end
+  //    on a hard break.
+  const trimmed = text.replace(/\s+$/u, "");
+  // 2. Split on newline runs (one or more), so consecutive blanks
+  //    collapse to a single break point.
+  const lines = trimmed.split(/\n+/);
+  if (lines.length <= 1) return trimmed;
+  // 3. Re-join with `\n↵ ` — leading-glyph style. The first line
+  //    has no prefix; every subsequent line is "↵ <content>".
+  return lines.join("\n↵ ");
 }
 
 function buildRow(raw: string | null): {

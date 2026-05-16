@@ -65,6 +65,15 @@ export function FlameBlock({
 
   const color =
     (SPAN_TYPE_COLORS[span.type ?? "span"] as string) ?? "gray.solid";
+  // `gray.solid` is too low-saturation for the white-on-fill recipe
+  // every other palette uses — at 85% alpha on a white canvas the
+  // result is a pale grey that white text dissolves into (operator
+  // report: "can't read the letters" on Scenario Turn / module /
+  // execute_event_loop_cycle bars). Dark mode is fine because the
+  // canvas is already dark. So flip text to `fg` only for grey
+  // palettes in light mode; everything else stays the saturated
+  // white-on-colour treatment.
+  const isLowContrastPalette = color === "gray.solid";
   const depthAlpha = Math.max(
     DEPTH_FADE_FLOOR,
     1 - depth * DEPTH_FADE_STEP,
@@ -196,18 +205,24 @@ export function FlameBlock({
       >
         <Text
           textStyle="xs"
-          // White text in both modes. Light mode's `lightBgAlphaPct`
-          // floor (see above) keeps every block saturated enough that
-          // white reads cleanly — no more dark-on-light fights when the
-          // alpha rolled into pastel territory. The text-shadow gives a
-          // half-pixel of lift against the saturated background so the
-          // glyphs don't melt into the colour. Even at the dimmed-state
-          // alpha (~55%), white over a `.solid` blue/purple/teal still
-          // beats the legibility of dark text on a pale tint.
-          color="white"
+          // White text in both modes for the saturated palettes
+          // (blue/green/purple/teal/orange/pink/cyan) — `lightBgAlphaPct`
+          // keeps the fill saturated enough that white reads cleanly.
+          // Grey-palette spans (span/module) get `fg` in light mode
+          // instead because grey.solid at 85% alpha is too pale for
+          // white text — dark mode stays white because the canvas
+          // already pushes the fill into a dark band.
+          color={isLowContrastPalette ? { base: "fg", _dark: "white" } : "white"}
           truncate
           lineHeight={1}
-          textShadow="0 1px 1px rgba(0,0,0,0.45)"
+          // Dark drop-shadow lifts white text off the saturated fills.
+          // On the grey-palette light-mode path we render dark text
+          // instead, where this same shadow would double-print the
+          // glyphs into bold-ish noise — drop it on that branch.
+          textShadow={{
+            base: isLowContrastPalette ? "none" : "0 1px 1px rgba(0,0,0,0.45)",
+            _dark: "0 1px 1px rgba(0,0,0,0.45)",
+          }}
         >
           <BlockLabel
             name={span.name}
