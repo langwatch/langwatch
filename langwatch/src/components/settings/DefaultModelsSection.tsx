@@ -53,6 +53,11 @@ import { useMemo, useState } from "react";
 
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
+import {
+  DEFAULT_EMBEDDINGS_MODEL,
+  DEFAULT_MODEL,
+  DEFAULT_TOPIC_CLUSTERING_MODEL,
+} from "~/utils/constants";
 
 import { DefaultModelOverrideDrawer } from "./DefaultModelOverrideDrawer";
 import {
@@ -321,6 +326,8 @@ function AllConfigsView({
                   role={role}
                   config={c.config as Record<string, string>}
                   features={features}
+                  configs={configs}
+                  anchorScope={mostSpecificScope(c.scopes)}
                 />
               </Table.Cell>
             ))}
@@ -381,38 +388,39 @@ function ConfigCell({
   role,
   config,
   features,
+  configs,
+  anchorScope,
 }: {
   role: ModelRoleKey;
   config: Record<string, string>;
   features: Payload["features"];
+  configs: ConfigRow[];
+  anchorScope: { type: "ORGANIZATION" | "TEAM" | "PROJECT"; id: string } | null;
 }) {
-  const roleModel = config[role];
-  const featureKeys = features
+  // The table is a "final resolved state" view — every cell renders
+  // the cascade-resolved role model for the row's scope, whether the
+  // policy on this row pins it or inherits it from a wider tier (or
+  // the System default). Pinned-vs-inherited is only differentiated
+  // inside the edit drawer, so the user never has to parse italics
+  // here to know "is gpt-x mine or someone else's?".
+  const resolvedRole = anchorScope
+    ? resolveAtScope(role, configs, anchorScope.type, anchorScope.id)
+    : null;
+  const resolvedRoleModel =
+    resolvedRole?.model ?? config[role] ?? SYSTEM_FALLBACK_BY_ROLE[role];
+
+  // Feature override rows render only when THIS policy pins a feature
+  // key AND its value differs from the role-resolved model — otherwise
+  // it would echo the chip directly above and add visual noise.
+  const featureOverrides = features
     .filter((f) => f.role === role && config[f.key])
-    .map((f) => f);
-  if (!roleModel && featureKeys.length === 0) {
-    return (
-      <Text fontSize="xs" color="fg.muted">
-        —
-      </Text>
-    );
-  }
+    .filter((f) => config[f.key] !== resolvedRoleModel);
+
   return (
     <VStack align="start" gap={1}>
-      {roleModel ? (
-        <ModelChip model={roleModel} size="sm" />
-      ) : featureKeys.length > 0 ? (
-        // Cue the user that THIS policy doesn't pin the role default —
-        // every feature line below is a single-feature override layered
-        // on whatever the cascade already resolves for the role. Without
-        // this hint the cell reads like "the role is gpt-4o-mini",
-        // which is wrong: the role is whatever the cascade hands out.
-        <Text fontSize="xs" color="fg.muted" fontStyle="italic">
-          role inherits
-        </Text>
-      ) : null}
-      {featureKeys.map((f) => (
-        <HStack key={f.key} gap={2} paddingLeft={roleModel ? 4 : 0}>
+      <ModelChip model={resolvedRoleModel} size="sm" />
+      {featureOverrides.map((f) => (
+        <HStack key={f.key} gap={2} paddingLeft={4}>
           <Text fontSize="xs" color="fg.muted">
             {f.displayName}
           </Text>
@@ -422,6 +430,38 @@ function ConfigCell({
     </VStack>
   );
 }
+
+/**
+ * Most-specific scope a policy attaches to in our cascade order
+ * (PROJECT > TEAM > ORGANIZATION). The cell uses this as the anchor
+ * for the cascade walk so a row showing "Team Platform + Project edge"
+ * resolves at the project (more specific) — the model the user would
+ * actually see in code running on that project.
+ */
+function mostSpecificScope(
+  scopes: ConfigRow["scopes"],
+): { type: "ORGANIZATION" | "TEAM" | "PROJECT"; id: string } | null {
+  const project = scopes.find((s) => s.type === "PROJECT");
+  if (project) return { type: "PROJECT", id: project.id };
+  const team = scopes.find((s) => s.type === "TEAM");
+  if (team) return { type: "TEAM", id: team.id };
+  const org = scopes.find((s) => s.type === "ORGANIZATION");
+  if (org) return { type: "ORGANIZATION", id: org.id };
+  return null;
+}
+
+/**
+ * System defaults for each role — mirrors `ROLE_CONSTANT` in
+ * `resolveModelForFeature.ts` so an "all you can see" cell on a
+ * fresh-install org never reads as empty. Sourced from
+ * `~/utils/constants` directly so the constants live in exactly one
+ * place.
+ */
+const SYSTEM_FALLBACK_BY_ROLE: Record<ModelRoleKey, string> = {
+  DEFAULT: DEFAULT_MODEL,
+  FAST: DEFAULT_TOPIC_CLUSTERING_MODEL,
+  EMBEDDINGS: DEFAULT_EMBEDDINGS_MODEL,
+};
 
 // ─── Resolved-at-scope view ────────────────────────────────────────
 
