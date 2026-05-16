@@ -41,6 +41,17 @@ interface RegistryRowProps<TRow> {
    * data layout — column widths, paddings, addon rows all match.
    */
   isLoading?: boolean;
+  /**
+   * Set on the first error row in a consecutive run of error rows so
+   * we can paint a matching top border. Without it, the leading row of
+   * a run is "open on top" — the row above it paints a grey bottom
+   * border, and the error row only paints a red bottom border, so the
+   * red bracket only closes the run on the underside.
+   *
+   * Computed once at the parent level (cheap O(n) pass over the visible
+   * rows) instead of having each row look at its neighbours.
+   */
+  isFirstOfErrorRun?: boolean;
   /** Forwarded to the outer <tbody> so the virtualizer can measure each row. */
   ref?: React.Ref<HTMLTableSectionElement>;
   "data-index"?: number;
@@ -61,6 +72,7 @@ function RegistryRowComponent<TRow>({
   onTogglePeek,
   onToggleExpand,
   isLoading = false,
+  isFirstOfErrorRun = false,
   ref,
   "data-index": dataIndex,
 }: RegistryRowProps<TRow>): React.ReactElement {
@@ -115,6 +127,10 @@ function RegistryRowComponent<TRow>({
       // `borderBottomWidth` keeps the separation from the next trace.
       borderBottomWidth="1px"
       borderBottomColor={style.bottomSeparatorColor}
+      borderTopWidth={isFirstOfErrorRun ? "1px" : undefined}
+      borderTopColor={
+        isFirstOfErrorRun ? style.bottomSeparatorColor : undefined
+      }
       outline={isFocused ? "1px solid" : undefined}
       outlineColor={isFocused ? "blue.fg" : undefined}
       cursor={onSelect || onToggleExpand ? "pointer" : "default"}
@@ -273,6 +289,7 @@ function areRegistryRowPropsEqual<TRow>(
     prev.isNew === next.isNew &&
     prev.rowDomId === next.rowDomId &&
     prev.isLoading === next.isLoading &&
+    prev.isFirstOfErrorRun === next.isFirstOfErrorRun &&
     prev.ref === next.ref &&
     prev["data-index"] === next["data-index"]
   );

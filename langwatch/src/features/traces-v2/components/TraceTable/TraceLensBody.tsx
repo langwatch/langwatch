@@ -129,6 +129,21 @@ export const TraceLensBody: React.FC<TraceLensBodyProps> = ({
   const rows = table.getRowModel().rows;
   const colSpan = columns.length;
 
+  // Precompute "is this the leading row of a consecutive error run?"
+  // for every row. Done once per render in O(n) instead of having each
+  // RegistryRow probe its neighbour. The flag drives the matching red
+  // top border that closes the run on the upper side — without it,
+  // the first error row's top edge is the previous (non-error) row's
+  // grey bottom border, which looks "open on top".
+  const isFirstOfErrorRun = useMemo(() => {
+    const flags = new Array<boolean>(rows.length);
+    for (let i = 0; i < rows.length; i++) {
+      const status = rows[i]!.original.status;
+      flags[i] = status === "error" && rows[i - 1]?.original.status !== "error";
+    }
+    return flags;
+  }, [rows]);
+
   const { virtualizer, paddingTop, paddingBottom } = useTraceTableVirtualizer({
     count: rows.length,
     addonCount: lens.addons.length,
@@ -171,6 +186,9 @@ export const TraceLensBody: React.FC<TraceLensBodyProps> = ({
                     : () => togglePeek(row.original.traceId)
                 }
                 isLoading={isLoading}
+                isFirstOfErrorRun={
+                  !isLoading && isFirstOfErrorRun[virtualItem.index]
+                }
               />
             );
           })}
