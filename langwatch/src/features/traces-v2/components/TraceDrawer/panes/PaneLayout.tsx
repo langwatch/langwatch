@@ -86,6 +86,11 @@ export function PaneLayout({
   const detailPanelRef = useRef<ImperativePanelHandle>(null);
   const ctxBodyGroupRef = useRef<HTMLDivElement>(null);
   const ctxContentRef = useRef<HTMLDivElement>(null);
+  const ctxHeaderRef = useRef<HTMLButtonElement>(null);
+  // Cache the last-known expanded content height so collapsing doesn't
+  // immediately collapse `ctxMaxSize` to the header height (which would
+  // make the next expand land on a hairline-thin pane).
+  const lastExpandedContentPx = useRef<number | null>(null);
 
   // Ctx Panel collapsed size has to equal the ContextHeader pixel height
   // so the collapsed strip sits flush with the body Panel — no trailing
@@ -94,43 +99,62 @@ export function PaneLayout({
   // user can't pull the divider down past the rows that exist
   // (operator feedback: "shouldn't be able to make it as tall as I want").
   const [ctxCollapsedSize, setCtxCollapsedSize] = useState<number>(6);
-  const [ctxMaxSize, setCtxMaxSize] = useState<number>(50);
+  const [ctxMaxSize, setCtxMaxSize] = useState<number>(45);
   useEffect(() => {
     const groupEl = ctxBodyGroupRef.current;
     if (!groupEl) return;
     const measure = () => {
       const dim = groupEl.clientHeight;
       if (dim <= 0) return;
-      // Header pixel → percentage of the ctx-body group.
-      const headerPct = (CTX_HEADER_HEIGHT_PX / dim) * 100;
-      setCtxCollapsedSize(Math.min(20, Math.max(1, headerPct)));
-      // Content natural height (header + rows + paddings). When the
-      // content ref hasn't measured yet, fall back to 35%.
+      const headerEl = ctxHeaderRef.current;
       const contentEl = ctxContentRef.current;
-      const naturalPx =
-        contentEl && contentEl.scrollHeight > 0
-          ? contentEl.scrollHeight
-          : null;
-      if (naturalPx === null) {
-        setCtxMaxSize(35);
-        return;
+      // Actual rendered header height — uses the runtime DOM rather
+      // than a guessed pixel constant, so density / font changes flow
+      // through automatically.
+      const headerPx = headerEl?.offsetHeight ?? CTX_HEADER_HEIGHT_PX;
+      // Content natural height — when expanded this is header + body
+      // rows; when collapsed only the header is rendered, so we
+      // fall back to the cached "last expanded" value to keep the
+      // max-size cap stable across collapse/expand cycles.
+      const measuredContentPx = contentEl?.scrollHeight ?? headerPx;
+      if (!ctxState.collapsed && measuredContentPx > headerPx + 8) {
+        lastExpandedContentPx.current = measuredContentPx;
       }
-      const maxPct = (naturalPx / dim) * 100;
-      // Clamp to a sane range so a giant conversation can still be sized
-      // down and a single-turn placeholder can still be opened.
-      setCtxMaxSize(Math.min(60, Math.max(headerPct + 4, maxPct)));
+      const effectiveContentPx =
+        lastExpandedContentPx.current ?? measuredContentPx;
+
+      const headerPct = (headerPx / dim) * 100;
+      setCtxCollapsedSize(Math.min(20, Math.max(1, headerPct)));
+
+      // +6px so the bottom row's border isn't visually clipped at the
+      // max drag position.
+      const naturalPct = ((effectiveContentPx + 6) / dim) * 100;
+      // Clamp:
+      //   lower bound — at least 12pct above header so even a single
+      //     placeholder turn opens to a visible strip,
+      //   upper bound — 65pct, leaving the body pane room to breathe
+      //     on tall conversations.
+      setCtxMaxSize(
+        Math.min(65, Math.max(headerPct + 12, naturalPct)),
+      );
     };
     measure();
     const groupObserver = new ResizeObserver(measure);
     groupObserver.observe(groupEl);
     let contentObserver: ResizeObserver | null = null;
+    let headerObserver: ResizeObserver | null = null;
     if (ctxContentRef.current) {
       contentObserver = new ResizeObserver(measure);
       contentObserver.observe(ctxContentRef.current);
     }
+    if (ctxHeaderRef.current) {
+      headerObserver = new ResizeObserver(measure);
+      headerObserver.observe(ctxHeaderRef.current);
+    }
     return () => {
       groupObserver.disconnect();
       contentObserver?.disconnect();
+      headerObserver?.disconnect();
     };
   }, [hasConversation, ctxState.collapsed]);
 
@@ -167,8 +191,40 @@ export function PaneLayout({
   useEffect(() => {
     const handle = ctxPanelRef.current;
     if (!handle) return;
-    if (ctxState.collapsed && !handle.isCollapsed()) handle.collapse();
-    else if (!ctxState.collapsed && handle.isCollapsed()) handle.expand();
+    if (ctxState.collapsed && !handle.isCollapsed()) {
+      handle.collapse();
+      return;
+    }
+    if (!ctxState.collapsed && handle.isCollapsed()) {
+      handle.expand();
+      // After expanding, snap to the actual content height so a
+      // 2-turn thread opens at its natural size instead of the
+      // library's saved default. We measure inside the rAF (after
+      // the body has laid out) rather than reading `ctxMaxSize`
+      // from the closure — the React state value is still stale
+      // at this point because ResizeObserver hasn't fired yet.
+      requestAnimationFrame(() => {
+        const h = ctxPanelRef.current;
+        if (!h || h.isCollapsed()) return;
+        const groupEl = ctxBodyGroupRef.current;
+        const contentEl = ctxContentRef.current;
+        const headerEl = ctxHeaderRef.current;
+        if (!groupEl) return;
+        const dim = groupEl.clientHeight;
+        if (dim <= 0) return;
+        const headerPx = headerEl?.offsetHeight ?? CTX_HEADER_HEIGHT_PX;
+        const contentPx = contentEl
+          ? Math.max(contentEl.scrollHeight, headerPx)
+          : headerPx;
+        const headerPct = (headerPx / dim) * 100;
+        const naturalPct = ((contentPx + 6) / dim) * 100;
+        const targetPct = Math.min(
+          65,
+          Math.max(headerPct + 12, naturalPct),
+        );
+        h.resize(targetPct);
+      });
+    }
   }, [ctxState.collapsed]);
   // Remember the user's manually-resized detail size so re-opening
   // after a "Hide details" round-trip lands back at the same width
@@ -253,6 +309,7 @@ export function PaneLayout({
         collapsed={ctxState.collapsed}
         onToggleCollapsed={() => togglePaneCollapsed("conversationContext")}
         contentRef={ctxContentRef}
+        headerRef={ctxHeaderRef}
       />
     </IsolatedErrorBoundary>
   ) : null;

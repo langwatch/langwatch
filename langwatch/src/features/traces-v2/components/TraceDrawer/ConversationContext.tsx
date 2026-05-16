@@ -42,6 +42,13 @@ interface ConversationContextProps {
    * infinite empty band" behaviour).
    */
   contentRef?: RefObject<HTMLDivElement | null>;
+  /**
+   * Optional ref attached to the header button. PaneLayout reads
+   * `offsetHeight` from this to set the collapsed Panel size pixel-
+   * accurately — no trailing band between the chevron strip and the
+   * viz tabs.
+   */
+  headerRef?: RefObject<HTMLButtonElement | null>;
 }
 
 /**
@@ -189,6 +196,7 @@ export const ConversationContext = memo(function ConversationContext({
   collapsed,
   onToggleCollapsed,
   contentRef,
+  headerRef,
 }: ConversationContextProps) {
   const density = useDensityStore((s) => s.density);
   const densityTokens = getDrawerDensityTokens(density);
@@ -261,6 +269,7 @@ export const ConversationContext = memo(function ConversationContext({
         collapsed={collapsed}
         onToggleCollapsed={onToggleCollapsed}
         densityPaddingY={densityTokens.sectionTriggerY}
+        buttonRef={headerRef}
       />
       {collapsed ? null : (
         <Box flex={1} minHeight={0} overflow="auto" paddingX={4} paddingY={3}>
@@ -290,6 +299,7 @@ function ContextHeader({
   collapsed,
   onToggleCollapsed,
   densityPaddingY,
+  buttonRef,
 }: {
   position: number;
   total: number;
@@ -298,9 +308,11 @@ function ContextHeader({
   onToggleCollapsed: () => void;
   /** Chakra spacing unit matching AccordionShell's section triggers. */
   densityPaddingY: number;
+  buttonRef?: RefObject<HTMLButtonElement | null>;
 }) {
   return (
     <chakra.button
+      ref={buttonRef}
       type="button"
       onClick={onToggleCollapsed}
       aria-expanded={!collapsed}
@@ -310,8 +322,11 @@ function ContextHeader({
       width="100%"
       paddingX={4}
       // Match the accordion section triggers below so all the strips in
-      // the drawer body share one rhythm.
-      paddingY={densityPaddingY}
+      // the drawer body share one rhythm. The accordion's `<HStack>` row
+      // adds a touch more visual height than `chakra.button` alone, so
+      // we bump paddingY by half a density step to keep the visible
+      // strip on the same beat.
+      paddingY={densityPaddingY + 0.5}
       bg="bg.surface"
       borderTopWidth="0"
       borderBottomWidth="1px"
