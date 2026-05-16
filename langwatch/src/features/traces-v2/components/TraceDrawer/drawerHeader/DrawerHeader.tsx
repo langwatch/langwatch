@@ -980,8 +980,9 @@ export const DrawerHeader = memo(function DrawerHeader({
 
         {/* Section 2: Source / tools chips (service, origin, scenario, sdk,
             prompts, annotations). Capped at 6 inline; surplus rolls into
-            the standard "+N more" popover. */}
-        {(primaryChips.length > 0 || chipsOverflow) && <PinDivider />}
+            the standard "+N more" popover. No PinDivider before this
+            section — the chip borders give enough visual grouping on
+            their own, the extra rule just read as a stray line. */}
         {primaryChips.map((c) => (
           <Chip key={c.id} {...c} />
         ))}
