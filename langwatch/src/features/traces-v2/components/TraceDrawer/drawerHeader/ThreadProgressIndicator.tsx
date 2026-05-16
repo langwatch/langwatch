@@ -129,7 +129,7 @@ export function ThreadProgressIndicator({
       <Popover.Trigger asChild>
         <Box
           as="button"
-          aria-label={`Conversation ${conversationId} — ${safePosition} of ${total}`}
+          aria-label={`Conversation ${conversationId}, ${safePosition} of ${total}`}
         >
           {body}
         </Box>

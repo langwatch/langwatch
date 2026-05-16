@@ -7,6 +7,8 @@ import {
   LuDatabase,
   LuExternalLink,
   LuKeyboard,
+  LuLock,
+  LuLockOpen,
   LuMessagesSquare,
   LuScanSearch,
   LuShare2,
@@ -23,6 +25,9 @@ interface TraceOverflowMenuProps {
   dejaViewHref: string | null;
   onOpenRawJson: () => void;
   onShowShortcuts: () => void;
+  /** Current dock state. When true the drawer stays open on outside clicks. */
+  pinned: boolean;
+  onTogglePinned: () => void;
 }
 
 /**
@@ -39,6 +44,8 @@ export function TraceOverflowMenu({
   dejaViewHref,
   onOpenRawJson,
   onShowShortcuts,
+  pinned,
+  onTogglePinned,
 }: TraceOverflowMenuProps) {
   const { openDrawer } = useDrawer();
 
@@ -134,6 +141,17 @@ export function TraceOverflowMenu({
         </Menu.Item>
 
         <Menu.Separator />
+
+        {/* Dock / undock lives in the overflow menu so the top-right
+            action cluster doesn't grow another low-frequency button.
+            Power users still have the button-equivalent in muscle
+            memory (the keyboard story is unchanged). */}
+        <Menu.Item value="dock" onClick={onTogglePinned}>
+          <HStack gap={2}>
+            <Icon as={pinned ? LuLock : LuLockOpen} boxSize={3.5} />
+            <Text>{pinned ? "Undock drawer" : "Dock drawer"}</Text>
+          </HStack>
+        </Menu.Item>
 
         <Menu.Item value="shortcuts" onClick={onShowShortcuts}>
           <HStack gap={2}>

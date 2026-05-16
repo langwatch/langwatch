@@ -62,7 +62,7 @@ const TIPS: Tip[] = [
     body: (
       <>
         Press <Kbd>Ctrl</Kbd>/<Kbd>⌘</Kbd> <Kbd>I</Kbd> to ask AI for help
-        building a query — describe what you want in plain English.
+        building a query. Describe what you want in plain English.
       </>
     ),
   },

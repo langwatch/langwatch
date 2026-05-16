@@ -206,7 +206,7 @@ const SyntaxHelpBody: React.FC<SyntaxHelpBodyProps> = ({
     <VStack align="stretch" gap={6} paddingX={5} paddingY={6}>
       <Section
         title="Cookbook"
-        caption="Click to add to your filter — stack as many as you like."
+        caption="Click to add to your filter. Stack as many as you like."
       >
         <ExampleCookbook onApply={apply} />
       </Section>

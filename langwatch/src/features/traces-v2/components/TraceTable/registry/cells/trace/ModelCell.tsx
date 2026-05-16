@@ -133,23 +133,45 @@ function renderModel(row: TraceListItem, density: Density) {
   const rawPrimary = row.models[0]!;
   const primary = abbreviateModel(rawPrimary);
   const rest = row.models.slice(1);
+  // Wrap the icon + label in a light grey badge so the model reads as
+  // a contained chip (parallels the Origin column's subtle Badge).
+  // Without the surrounding tag the small provider icon felt
+  // unprotected and the cell read as floating SVG + text.
   if (density === "compact") {
     return (
       <HStack gap={1.5}>
-        <ProviderIcon model={rawPrimary} size="compact" />
-        <MonoCell truncate whiteSpace={undefined}>
-          {primary}
-        </MonoCell>
+        <Badge
+          size="sm"
+          variant="subtle"
+          colorPalette="gray"
+          gap={1.5}
+          paddingX={2}
+          fontWeight="medium"
+        >
+          <ProviderIcon model={rawPrimary} size="compact" />
+          <MonoCell truncate whiteSpace={undefined}>
+            {primary}
+          </MonoCell>
+        </Badge>
         {rest.length > 0 && <ExtraModelsBadge models={rest} size="xs" />}
       </HStack>
     );
   }
   return (
     <HStack gap={2}>
-      <ProviderIcon model={rawPrimary} size="comfortable" />
-      <Text textStyle="sm" color="fg.muted" truncate>
-        {primary}
-      </Text>
+      <Badge
+        size="sm"
+        variant="subtle"
+        colorPalette="gray"
+        gap={2}
+        paddingX={2.5}
+        fontWeight="medium"
+      >
+        <ProviderIcon model={rawPrimary} size="comfortable" />
+        <Text textStyle="sm" color="fg.muted" truncate>
+          {primary}
+        </Text>
+      </Badge>
       {rest.length > 0 && <ExtraModelsBadge models={rest} size="sm" />}
     </HStack>
   );

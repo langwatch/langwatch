@@ -128,7 +128,7 @@ const BuiltInTooltip: React.FC<BuiltInTooltipProps> = ({
   if (!enabled) return <>{children}</>;
   return (
     <Tooltip
-      content="Built-in lens — duplicate to customise, right-click for options"
+      content="Built-in lens. Duplicate to customise, right-click for options."
       positioning={{ placement: "bottom" }}
     >
       {children}
@@ -174,7 +174,7 @@ const DraftDot: React.FC<{ lensId: string; lensName: string }> = ({
                 display="inline-block"
                 flexShrink={0}
                 cursor="pointer"
-                aria-label="Unsaved changes on this lens — click for options"
+                aria-label="Unsaved changes on this lens. Click for options."
                 onClick={(e) => {
                   e.stopPropagation();
                   setPopoverOpen((v) => !v);
@@ -189,7 +189,7 @@ const DraftDot: React.FC<{ lensId: string; lensName: string }> = ({
                 <Text as="span" color="fg" fontWeight="semibold">
                   {lensName}
                 </Text>
-                . These edits live in your browser only — save them as a
+                . These edits live in your browser only. Save them as a
                 new lens to keep them, or discard to snap back.
               </Text>
               <HStack gap={2} justify="flex-end">

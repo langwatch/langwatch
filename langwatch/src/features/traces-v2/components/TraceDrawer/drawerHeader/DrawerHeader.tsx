@@ -11,8 +11,6 @@ import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import {
   LuArrowLeft,
   LuCopy,
-  LuLock,
-  LuLockOpen,
   LuMaximize2,
   LuMinimize2,
   LuRefreshCw,
@@ -123,7 +121,7 @@ function TraceIdChip({ traceId }: { traceId: string }) {
       toaster.create({
         title: "Couldn't copy trace ID",
         description:
-          "Clipboard access is restricted. This can happen on non-HTTPS domains — copy the ID manually from the URL.",
+          "Clipboard access is restricted. This can happen on non-HTTPS domains. Copy the ID manually from the URL.",
         type: "error",
         duration: 6000,
       });
@@ -648,12 +646,21 @@ export const DrawerHeader = memo(function DrawerHeader({
 
   return (
     <VStack align="stretch" gap={2} paddingX={4} paddingTop={3}>
-      {/* Row 1: Title (back button + type badge + name + status) on the
-          left, presence + actions on the right — collapsed from two rows so
-          the trace name sits at the very top instead of after a near-empty
-          peer/actions strip. */}
-      <HStack justify="space-between" align="center" gap={2.5} minWidth={0}>
-        <HStack gap={2.5} minWidth={0} flex={1} flexWrap="wrap" align="center">
+      {/* Row 1: three-column header. Left column carries the title +
+          status, the middle column centers the Trace ID chip, the
+          right column holds the actions. Equal-flex columns keep the
+          ID centered regardless of how long the trace name gets — the
+          previous single HStack pushed the ID to the right of the
+          status chip, which made it look adrift in the middle of the
+          row depending on title length. */}
+      <Box
+        display="grid"
+        gridTemplateColumns="1fr auto 1fr"
+        alignItems="center"
+        gap={2.5}
+        minWidth={0}
+      >
+        <HStack gap={2.5} minWidth={0} flexWrap="wrap" align="center">
           {canGoBack && (
             <MenuRoot>
               <Tooltip
@@ -661,7 +668,7 @@ export const DrawerHeader = memo(function DrawerHeader({
                   <HStack gap={1}>
                     <Text>
                       {backStackDepth > 1
-                        ? `Back (${backStackDepth} traces) — right-click for full history`
+                        ? `Back (${backStackDepth} traces). Right-click for full history`
                         : "Back to previous trace"}
                     </Text>
                     <Kbd>B</Kbd>
@@ -745,7 +752,6 @@ export const DrawerHeader = memo(function DrawerHeader({
             titleIsFallback={titleIsFallback}
           />
           <StatusChip trace={trace} statusColor={statusColor} />
-          <TraceIdChip traceId={trace.traceId} />
           {conversationContext.total > 1 && (
             <ThreadProgressIndicator
               position={conversationContext.position}
@@ -764,30 +770,16 @@ export const DrawerHeader = memo(function DrawerHeader({
           )}
         </HStack>
 
-        <HStack gap={1} flexShrink={0}>
-          <Tooltip
-            content={
-              pinned
-                ? "Docked — drawer stays open when you click outside. Click to undock."
-                : "Undocked — click outside (or press Esc) to close. Click to dock."
-            }
-            positioning={{ placement: "bottom" }}
-          >
-            <Button
-              size="xs"
-              variant="ghost"
-              onClick={togglePinned}
-              aria-label={
-                pinned
-                  ? "Undock drawer (click outside closes)"
-                  : "Dock drawer (click outside ignored)"
-              }
-              aria-pressed={pinned}
-              color={pinned ? "blue.fg" : "fg.muted"}
-            >
-              <Icon as={pinned ? LuLock : LuLockOpen} boxSize={3.5} />
-            </Button>
-          </Tooltip>
+        {/* Center column — anchors the Trace ID chip in the middle of
+            the header regardless of how wide the title or action
+            clusters are. `justify-self: center` works with the
+            `auto`-sized middle column so the chip is laid out around
+            its own width rather than stretching across the column. */}
+        <Box justifySelf="center">
+          <TraceIdChip traceId={trace.traceId} />
+        </Box>
+
+        <HStack gap={1} flexShrink={0} justifySelf="end">
           <Tooltip
             content={
               <HStack gap={1}>
@@ -850,6 +842,8 @@ export const DrawerHeader = memo(function DrawerHeader({
             dejaViewHref={dejaView.href ?? null}
             onOpenRawJson={() => setRawOpen(true)}
             onShowShortcuts={() => setShortcutsOpen(true)}
+            pinned={pinned}
+            onTogglePinned={togglePinned}
           />
           <Box
             width="1px"
@@ -890,7 +884,7 @@ export const DrawerHeader = memo(function DrawerHeader({
             </Button>
           </Tooltip>
         </HStack>
-      </HStack>
+      </Box>
 
       {/* Row 2: Unified context strip. Three logical sections — performance
           metrics, pinned context, source/tools chips — flow into one wrapped

@@ -43,8 +43,8 @@ export const LiveIndicator: React.FC = () => {
       <Tooltip
         content={
           liveUpdatesEnabled
-            ? `${describeSseState(sseState, lastEventAt)} — click to pause`
-            : "Live updates paused — click to resume"
+            ? `${describeSseState(sseState, lastEventAt)}. Click to pause.`
+            : "Live updates paused. Click to resume."
         }
         positioning={{ placement: "bottom" }}
       >
@@ -98,12 +98,12 @@ function describeSseState(
   switch (state) {
     case "connected":
       return lastEventAt
-        ? `Live updates active — last event ${formatTimeAgo(lastEventAt)}`
+        ? `Live updates active. Last event ${formatTimeAgo(lastEventAt)}`
         : "Live updates active";
     case "connecting":
       return "Connecting to live updates...";
     case "error":
-      return "Live updates disconnected — click refresh to retry";
+      return "Live updates disconnected. Click refresh to retry.";
     case "disconnected":
       return "Live updates disabled";
   }
