@@ -368,9 +368,12 @@ export function PaneLayout({
       width="100%"
       minHeight={0}
       minWidth={0}
-      borderRightWidth={layout === "horizontal" ? "1px" : undefined}
-      borderBottomWidth={layout === "horizontal" ? undefined : "1px"}
-      borderColor="border"
+      // No edge border here — the visible 1px separator lives in
+      // PaneResizeBar so the hover-to-blue affordance can paint over
+      // the entire separator without being obscured by an underlying
+      // panel border. Was: borderRightWidth/borderBottomWidth here
+      // (the panel border doubled with the bar line under the old
+      // overlay-based handle).
       bg={{ base: "bg.surface", _dark: "bg.panel" }}
     >
       <IsolatedErrorBoundary
@@ -462,13 +465,15 @@ export function PaneLayout({
           {vizPanel}
         </Panel>
         <PanelResizeHandle
-          // Set the cursor on the library's own div too — without
-          // this its default (`ew-resize`/`ns-resize`) shows through
-          // any sub-pixel gap between our absolute overlay and its
-          // edges as a "different-looking" cursor that can't drag.
-          style={{
-            cursor: layout === "horizontal" ? "col-resize" : "row-resize",
-          }}
+          // `hitAreaMargins` extends the library's own pointer
+          // hit-area (and cursor coverage) past the visible handle.
+          // Using the library's mechanism instead of our own overlay
+          // ensures one cursor across the whole drag zone — our old
+          // overlay used `col-resize`/`row-resize` while the library
+          // forces `*{cursor: ew-resize !important}` globally inside
+          // its hit area, which read as two different cursors in
+          // adjacent slivers.
+          hitAreaMargins={{ coarse: 15, fine: 8 }}
         >
           <PaneResizeBar orientation={layout} />
         </PanelResizeHandle>
@@ -578,7 +583,7 @@ export function PaneLayout({
           >
             {ctxPane}
           </Panel>
-          <PanelResizeHandle style={{ cursor: "row-resize" }}>
+          <PanelResizeHandle hitAreaMargins={{ coarse: 15, fine: 8 }}>
             <PaneResizeBar orientation="vertical" />
           </PanelResizeHandle>
           <Panel id="body" order={2} defaultSize={82} minSize={20}>
@@ -598,43 +603,45 @@ export function PaneLayout({
  * outer Box so there's exactly one "I'm a divider" hit reported by the
  * browser, no matter where the user lands inside the strip.
  */
+/**
+ * Visible 1px separator. The hit zone + cursor are handled by
+ * `PanelResizeHandle` itself via `hitAreaMargins` — no transparent
+ * overlay needed. The line lights up blue on hover/drag using the
+ * library-set `data-resize-handle-state` attribute on the parent
+ * (values: `hover` | `drag` | `inactive`), so the user gets a clear
+ * "this is grabbable" affordance matching the waterfall surface.
+ */
 function PaneResizeBar({ orientation }: { orientation: DrawerLayout }) {
   const isHorizontal = orientation === "horizontal";
   return (
     <Box
-      role="separator"
-      aria-orientation={isHorizontal ? "vertical" : "horizontal"}
-      // Zero-area parent so the resize handle claims no space in the
-      // layout — the visible 1px separator is the adjacent panel's
-      // border. The forgiving hit zone lives in a child rendered with
-      // `position: absolute` so it overlaps the surrounding panels by
-      // 8px on each side WITHOUT pushing them inward.
+      // Zero-area parent (the visible line itself is 1px and centered
+      // on this parent via the absolute child below). Keeps the
+      // handle from claiming layout space — the adjacent panels can
+      // sit flush against the separator.
       width={isHorizontal ? "0px" : "100%"}
       height={isHorizontal ? "100%" : "0px"}
       position="relative"
-      // Set the resize cursor on this parent too — the parent
-      // belongs to `PanelResizeHandle`'s div tree, and the library's
-      // own default cursor on that div leaks through any sub-pixel
-      // gap between our absolute overlay and the library's edges
-      // (the result was a thin 2px band where the cursor read as
-      // `ew-resize`/`ns-resize` instead of our `col-resize`/
-      // `row-resize`, with no actual drag interaction).
-      cursor={isHorizontal ? "col-resize" : "row-resize"}
     >
       <Box
         position="absolute"
-        top={isHorizontal ? 0 : "-8px"}
-        bottom={isHorizontal ? 0 : "-8px"}
-        left={isHorizontal ? "-8px" : 0}
-        right={isHorizontal ? "-8px" : 0}
-        cursor={isHorizontal ? "col-resize" : "row-resize"}
-        // Above the adjacent panel contents so the cursor wins where
-        // the hit zone overlaps them. No bg — purely a hit target.
-        // Any sibling chrome that the operator needs to keep
-        // clickable when collapsed-against-this-handle (e.g., the
-        // "Show details" affordance in viz's tab row) must declare
-        // its own z-index >= 3 to win over this overlay.
-        zIndex={2}
+        top={isHorizontal ? 0 : "-0.5px"}
+        bottom={isHorizontal ? 0 : "-0.5px"}
+        left={isHorizontal ? "-0.5px" : 0}
+        right={isHorizontal ? "-0.5px" : 0}
+        // Default visible separator tone. Lit blue when the parent
+        // `[data-resize-handle-state]` (set by the library on its
+        // own root div) flips to `hover` or `drag`. CSS selector
+        // walks up to the handle root, so this stays scoped per
+        // handle instance — no cross-talk between sibling handles.
+        bg={{ base: "gray.200", _dark: "border.muted" }}
+        transition="background 100ms ease"
+        css={{
+          "[data-resize-handle-state='hover'] &, [data-resize-handle-state='drag'] &":
+            {
+              background: "var(--chakra-colors-blue-solid)",
+            },
+        }}
       />
     </Box>
   );
