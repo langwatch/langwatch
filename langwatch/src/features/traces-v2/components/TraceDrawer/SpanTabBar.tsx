@@ -217,8 +217,23 @@ export const SpanTabBar = memo(function SpanTabBar({
   const inlineCount = overflowing
     ? INLINE_KEEP_WHEN_OVERFLOW
     : pinnedSpans.length;
-  const inlinePinned = pinnedSpans.slice(0, inlineCount);
-  const overflowPinned = overflowing ? pinnedSpans.slice(inlineCount) : [];
+  // Both slices are memoized: they feed `tabDescriptors` → `tabIds` →
+  // `useOverflowVisibility`, whose effect resets state whenever the
+  // items array changes by reference. Before this memo each render
+  // produced a fresh slice, churning the dep, resetting the hidden
+  // set, triggering another render — infinite loop that the error
+  // boundary swallowed silently. The visible symptom was that closing
+  // the drawer didn't tear down its DOM, because the boundary kept
+  // re-mounting the subtree faster than the URL change could unmount
+  // the parent.
+  const inlinePinned = useMemo(
+    () => pinnedSpans.slice(0, inlineCount),
+    [pinnedSpans, inlineCount],
+  );
+  const overflowPinned = useMemo(
+    () => (overflowing ? pinnedSpans.slice(inlineCount) : []),
+    [pinnedSpans, inlineCount, overflowing],
+  );
 
   // Build a unified descriptor list (static tabs + dynamic span tabs) so
   // `useOverflowVisibility` can collapse anything that doesn't fit on
