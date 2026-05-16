@@ -13,11 +13,18 @@ import {
 interface TraceTableLayoutProps {
   totalHits: number;
   children: React.ReactNode;
+  /**
+   * When true, hide the pagination chrome (totals are unknown until
+   * the first response lands) but keep the table shell so the skeleton
+   * matches the eventual layout exactly.
+   */
+  isLoading?: boolean;
 }
 
 export const TraceTableLayout: React.FC<TraceTableLayoutProps> = ({
   totalHits,
   children,
+  isLoading = false,
 }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const ownedElRef = useRef<HTMLDivElement | null>(null);
@@ -63,7 +70,7 @@ export const TraceTableLayout: React.FC<TraceTableLayoutProps> = ({
       </Box>
       <RefreshProgressBar />
       <NewTracesScrollUpIndicator scrollRef={scrollRef} />
-      <Pagination totalHits={totalHits} />
+      {!isLoading && <Pagination totalHits={totalHits} />}
     </Flex>
   );
 };

@@ -3,9 +3,13 @@ import React, { useMemo } from "react";
 import { useDensityTokens } from "../../../hooks/useDensityTokens";
 import { useDensityStore } from "../../../stores/densityStore";
 import type { TraceStatus } from "../../../types/trace";
+import {
+  SkeletonAddonRow,
+  SkeletonCellContent,
+} from "../SkeletonCellContent";
 import { ROW_STYLES, rowVariantFor, StatusRowGroup } from "../StatusRow";
 import { Tbody, Td, Tr } from "../TablePrimitives";
-import { cellPropsFor } from "../TraceTableShell";
+import { type ColumnMeta, cellPropsFor } from "../TraceTableShell";
 import { SELECT_COLUMN_ID } from "./cells/SelectCells";
 import { pickCell, type Registry, type RowActions } from "./types";
 
@@ -28,6 +32,14 @@ interface RegistryRowProps<TRow> {
   onSelect?: () => void;
   onTogglePeek?: () => void;
   onToggleExpand?: () => void;
+  /**
+   * When true, render the same row + addon tree but swap every cell's
+   * content for skeleton bars. The real cells / addons are bypassed
+   * because the underlying row data is a synthetic placeholder. This
+   * keeps the loading skeleton perfectly aligned with the eventual
+   * data layout — column widths, paddings, addon rows all match.
+   */
+  isLoading?: boolean;
   /** Forwarded to the outer <tbody> so the virtualizer can measure each row. */
   ref?: React.Ref<HTMLTableSectionElement>;
   "data-index"?: number;
@@ -47,6 +59,7 @@ function RegistryRowComponent<TRow>({
   onSelect,
   onTogglePeek,
   onToggleExpand,
+  isLoading = false,
   ref,
   "data-index": dataIndex,
 }: RegistryRowProps<TRow>): React.ReactElement {
@@ -78,7 +91,11 @@ function RegistryRowComponent<TRow>({
         ),
     [addons, registry, tanstackRow.original, isExpanded, densityMode],
   );
-  const hasAddons = renderedAddons.length > 0;
+  // While loading, always render one placeholder addon row so the row's
+  // overall height matches the real data layout (the IO-preview addon
+  // is the common-case addon and dominates the row's height).
+  const hasAddons = isLoading || renderedAddons.length > 0;
+  const skeletonRowIdx = dataIndex ?? 0;
 
   const handleRowClick = () => {
     if (onSelect) {
@@ -106,6 +123,7 @@ function RegistryRowComponent<TRow>({
     >
       {visibleCells.map((cell, i) => {
         const isSelectCell = cell.column.id === SELECT_COLUMN_ID;
+        const meta = cell.column.columnDef.meta as ColumnMeta | undefined;
         return (
           <Td
             key={cell.id}
@@ -126,36 +144,62 @@ function RegistryRowComponent<TRow>({
             overflow="hidden"
             {...cellPropsFor(cell, style.borderColor, i)}
           >
-            {pickCell(registry, cell.column.id, densityMode, {
-              row: tanstackRow.original,
-              density: tokens,
-              densityMode,
-              isExpanded,
-              isSelected,
-              isFocused,
-              actions,
-            })}
+            {isLoading ? (
+              isSelectCell ? null : (
+                <SkeletonCellContent
+                  meta={meta}
+                  rowIdx={skeletonRowIdx}
+                  colIdx={i}
+                />
+              )
+            ) : (
+              pickCell(registry, cell.column.id, densityMode, {
+                row: tanstackRow.original,
+                density: tokens,
+                densityMode,
+                isExpanded,
+                isSelected,
+                isFocused,
+                actions,
+              })
+            )}
           </Td>
         );
       })}
     </Tr>
   );
 
-  const addonRows = renderedAddons.map((addon) => (
-    <React.Fragment key={addon.id}>
-      {addon.render({
-        row: tanstackRow.original,
-        density: tokens,
-        densityMode,
-        colSpan: colCount,
-        style,
-        isExpanded,
-        isSelected,
-        tanstackRow,
-        actions,
-      })}
-    </React.Fragment>
-  ));
+  const addonRows = isLoading ? (
+    <Tr>
+      <Td
+        colSpan={colCount}
+        bg={style.bg}
+        padding={`${tokens.ioPaddingTop} 8px ${tokens.ioPaddingBottom} 76px`}
+        borderLeftWidth="2px"
+        borderLeftColor={style.borderColor}
+        borderBottomWidth="1px"
+        borderBottomColor="border"
+      >
+        <SkeletonAddonRow rowIdx={skeletonRowIdx} />
+      </Td>
+    </Tr>
+  ) : (
+    renderedAddons.map((addon) => (
+      <React.Fragment key={addon.id}>
+        {addon.render({
+          row: tanstackRow.original,
+          density: tokens,
+          densityMode,
+          colSpan: colCount,
+          style,
+          isExpanded,
+          isSelected,
+          tanstackRow,
+          actions,
+        })}
+      </React.Fragment>
+    ))
+  );
 
   if (hoverScope === "unified") {
     return (
@@ -205,6 +249,7 @@ function areRegistryRowPropsEqual<TRow>(
     prev.isExpanded === next.isExpanded &&
     prev.isNew === next.isNew &&
     prev.rowDomId === next.rowDomId &&
+    prev.isLoading === next.isLoading &&
     prev.ref === next.ref &&
     prev["data-index"] === next["data-index"]
   );

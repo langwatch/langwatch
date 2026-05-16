@@ -17,6 +17,10 @@ import {
   type TraceGroup,
 } from "./registry";
 import { groupSelectColumnDef } from "./selectColumn";
+import {
+  buildGroupPlaceholderRows,
+  SKELETON_ROW_COUNT,
+} from "./skeletonPlaceholders";
 import { TraceTableShell } from "./TraceTableShell";
 import { useTraceTableVirtualizer } from "./useTraceTableVirtualizer";
 import { VirtualSpacer } from "./VirtualSpacer";
@@ -26,16 +30,25 @@ const GROUP_MIN_WIDTH = "880px";
 interface GroupLensBodyProps {
   traces: TraceListItem[];
   lens: LensConfig;
+  isLoading?: boolean;
 }
 
 export const GroupLensBody: React.FC<GroupLensBodyProps> = ({
   traces,
   lens,
+  isLoading = false,
 }) => {
   const groupBy = groupByForGrouping(lens.grouping);
-  const groups = useMemo(
+  const realGroups = useMemo(
     () => (groupBy ? buildGroups(traces, groupBy) : []),
     [traces, groupBy],
+  );
+  const groups = useMemo(
+    () =>
+      isLoading
+        ? buildGroupPlaceholderRows(SKELETON_ROW_COUNT)
+        : realGroups,
+    [isLoading, realGroups],
   );
   const [openKeys, setOpenKeys] = useState<Set<string>>(() => new Set());
   const [sorting, setSorting] = useState<SortingState>([
@@ -68,7 +81,8 @@ export const GroupLensBody: React.FC<GroupLensBodyProps> = ({
   });
   const virtualItems = virtualizer.getVirtualItems();
 
-  if (!groupBy || groups.length === 0) return <NoTracesToGroupMessage />;
+  if (!groupBy) return <NoTracesToGroupMessage />;
+  if (!isLoading && groups.length === 0) return <NoTracesToGroupMessage />;
 
   const toggleExpanded = (key: string) =>
     setOpenKeys((prev) => {
@@ -94,8 +108,11 @@ export const GroupLensBody: React.FC<GroupLensBodyProps> = ({
             addons={lens.addons}
             status={row.original.worstStatus}
             hoverScope="split"
-            isExpanded={openKeys.has(row.original.key)}
-            onToggleExpand={() => toggleExpanded(row.original.key)}
+            isExpanded={!isLoading && openKeys.has(row.original.key)}
+            onToggleExpand={
+              isLoading ? undefined : () => toggleExpanded(row.original.key)
+            }
+            isLoading={isLoading}
           />
         );
       })}

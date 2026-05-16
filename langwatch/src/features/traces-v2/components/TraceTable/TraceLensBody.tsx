@@ -16,6 +16,10 @@ import {
 import { type LensConfig, useViewStore } from "../../stores/viewStore";
 import type { TraceListItem } from "../../types/trace";
 import { RegistryRow } from "./registry";
+import {
+  buildTracePlaceholderRows,
+  SKELETON_ROW_COUNT,
+} from "./skeletonPlaceholders";
 import { TraceTableShell } from "./TraceTableShell";
 import { useTraceLensColumns } from "./useTraceLensColumns";
 import { useTraceLensKeyboard } from "./useTraceLensKeyboard";
@@ -26,13 +30,26 @@ interface TraceLensBodyProps {
   traces: TraceListItem[];
   lens: LensConfig;
   newIds: Set<string>;
+  /**
+   * When set, render skeleton placeholder rows through the real table
+   * shell so the loading state matches the eventual data layout (column
+   * widths, addon rows, paddings). See `SkeletonCellContent`.
+   */
+  isLoading?: boolean;
 }
 
 export const TraceLensBody: React.FC<TraceLensBodyProps> = ({
   traces,
   lens,
   newIds,
+  isLoading = false,
 }) => {
+  // Substitute synthetic rows while loading so the real table builds
+  // the same column tree + addon rows we'll see once data lands.
+  const effectiveTraces = useMemo(
+    () => (isLoading ? buildTracePlaceholderRows(SKELETON_ROW_COUNT) : traces),
+    [isLoading, traces],
+  );
   const { columns, registry, minWidth } = useTraceLensColumns({
     logicalColumnIds: lens.columns,
   });
@@ -90,7 +107,7 @@ export const TraceLensBody: React.FC<TraceLensBodyProps> = ({
   );
 
   const table = useReactTable({
-    data: traces,
+    data: effectiveTraces,
     columns,
     state: { sorting, columnSizing },
     onSortingChange: handleSortingChange,
@@ -132,13 +149,22 @@ export const TraceLensBody: React.FC<TraceLensBodyProps> = ({
               addons={lens.addons}
               status={row.original.status}
               hoverScope="unified"
-              isSelected={row.original.traceId === selectedTraceId}
-              isFocused={virtualItem.index === focusedIndex}
-              isExpanded={row.original.traceId === expandedTraceId}
-              isNew={newIds.has(row.original.traceId)}
+              isSelected={
+                !isLoading && row.original.traceId === selectedTraceId
+              }
+              isFocused={!isLoading && virtualItem.index === focusedIndex}
+              isExpanded={
+                !isLoading && row.original.traceId === expandedTraceId
+              }
+              isNew={!isLoading && newIds.has(row.original.traceId)}
               rowDomId={row.original.traceId}
-              onSelect={() => toggleTrace(row.original)}
-              onTogglePeek={() => togglePeek(row.original.traceId)}
+              onSelect={
+                isLoading ? undefined : () => toggleTrace(row.original)
+              }
+              onTogglePeek={
+                isLoading ? undefined : () => togglePeek(row.original.traceId)
+              }
+              isLoading={isLoading}
             />
           );
         })}
