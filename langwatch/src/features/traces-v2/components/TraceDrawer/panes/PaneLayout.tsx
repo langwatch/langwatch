@@ -95,6 +95,43 @@ export function PaneLayout({
   const ctxBodyGroupRef = useRef<HTMLDivElement>(null);
   const ctxContentRef = useRef<HTMLDivElement>(null);
   const ctxHeaderRef = useRef<HTMLButtonElement>(null);
+
+  // Mouse-capture leak guard. If the operator drags a resize handle
+  // off the browser window and releases the mouse out there, the
+  // pointerup never fires inside the document and react-resizable-
+  // panels' internal drag state stays "active". On return, the next
+  // click on the "Show details" button (or any other sibling) is
+  // intercepted by the still-tracking drag and looks dead. Synthesize
+  // a window-level pointerup whenever we regain focus or detect
+  // mouse movement with no buttons pressed — both signals mean any
+  // drag should be over.
+  useEffect(() => {
+    const flushDrag = () => {
+      try {
+        window.dispatchEvent(
+          new PointerEvent("pointerup", { bubbles: true, cancelable: true }),
+        );
+        window.dispatchEvent(
+          new MouseEvent("mouseup", { bubbles: true, cancelable: true }),
+        );
+      } catch {
+        // Older browsers without PointerEvent ctor — mouseup alone
+        // is enough for the legacy mousemove/mouseup listeners.
+      }
+    };
+    const onFocus = () => flushDrag();
+    const onMouseEnter = (e: MouseEvent) => {
+      // Pointer came back into the document with no buttons held —
+      // any drag that was open must have ended off-window.
+      if (e.buttons === 0) flushDrag();
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("mouseenter", onMouseEnter);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("mouseenter", onMouseEnter);
+    };
+  }, []);
   // Cache the last-known expanded content height so collapsing doesn't
   // immediately collapse `ctxMaxSize` to the header height (which would
   // make the next expand land on a hairline-thin pane).
