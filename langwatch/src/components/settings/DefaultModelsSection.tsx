@@ -399,7 +399,18 @@ function ConfigCell({
   }
   return (
     <VStack align="start" gap={1}>
-      {roleModel && <ModelChip model={roleModel} size="sm" />}
+      {roleModel ? (
+        <ModelChip model={roleModel} size="sm" />
+      ) : featureKeys.length > 0 ? (
+        // Cue the user that THIS policy doesn't pin the role default —
+        // every feature line below is a single-feature override layered
+        // on whatever the cascade already resolves for the role. Without
+        // this hint the cell reads like "the role is gpt-4o-mini",
+        // which is wrong: the role is whatever the cascade hands out.
+        <Text fontSize="xs" color="fg.muted" fontStyle="italic">
+          role inherits
+        </Text>
+      ) : null}
       {featureKeys.map((f) => (
         <HStack key={f.key} gap={2} paddingLeft={roleModel ? 4 : 0}>
           <Text fontSize="xs" color="fg.muted">
@@ -472,12 +483,20 @@ function ResolvedScopeView({
         const resolved = isProjectCurrent
           ? effective[role]
           : resolveAtScope(role, configs, targetScope.type, targetScope.id);
+        // Only surface a feature row when its resolved model actually
+        // overrides the role default at this scope — if the cascade
+        // picks the same model for the feature as for the role, the
+        // feature is implicitly inheriting and there's nothing to show.
+        // Skip noisy "Topic clustering | gpt-x" lines that just echo
+        // the FAST default sitting above them.
         const featureOverrides = featuresByRole[role]
           .map((f) => {
             const fr = isProjectCurrent
               ? null
               : resolveAtScope(f.key, configs, targetScope.type, targetScope.id);
-            return fr ? { feature: f, resolved: fr } : null;
+            if (!fr) return null;
+            if (resolved && fr.model === resolved.model) return null;
+            return { feature: f, resolved: fr };
           })
           .filter(Boolean) as Array<{
           feature: Payload["features"][number];

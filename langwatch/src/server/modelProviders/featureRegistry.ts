@@ -83,7 +83,10 @@ const REGISTRY: FeatureDescriptor[] = [
   {
     key: "analytics.topic_clustering_llm",
     role: "FAST",
-    displayName: "Topic clustering (LLM)",
+    // The role column header (FAST) and the EMBEDDINGS counterpart's
+    // own row make the LLM-vs-embedding split obvious in context — the
+    // "(LLM)" suffix only made the column read like a glossary entry.
+    displayName: "Topic clustering",
     description: "Names the clusters surfaced in Analytics → Topics.",
   },
 
@@ -91,7 +94,10 @@ const REGISTRY: FeatureDescriptor[] = [
   {
     key: "analytics.topic_clustering_embeddings",
     role: "EMBEDDINGS",
-    displayName: "Topic clustering (embeddings)",
+    // Same de-suffixing rationale as the FAST counterpart above. The
+    // EMBEDDINGS column / row header tells the user what kind of model
+    // this is without parenthetical clutter.
+    displayName: "Topic clustering",
     description:
       "Vectors used to group similar traces in Analytics → Topics.",
   },
