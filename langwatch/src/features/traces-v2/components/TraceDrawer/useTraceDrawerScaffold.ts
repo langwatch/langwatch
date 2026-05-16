@@ -54,12 +54,7 @@ export function useTraceDrawerScaffold(): TraceDrawerScaffold {
   // also stripping the `span` and other shared params from the URL).
   // `goBack` itself falls back to `closeDrawer` when the stack is at
   // its root, so deep links still close cleanly.
-  // `drawerOpen` is read inside `handleClose` to guard against
-  // unmount-fired `onOpenChange` callbacks (Chakra Drawer.Root
-  // sometimes fires close on cleanup) — if the URL has already moved
-  // to another drawer, we'd pop the freshly-pushed entry off the
-  // stack and lose what the operator just opened.
-  const { goBack, drawerOpen } = useDrawer();
+  const { goBack } = useDrawer();
 
   // The drawer store is the source of truth for `traceId` — see
   // `useTraceDrawerUrlHydrator` (mounted at the page level) for the
@@ -145,7 +140,14 @@ export function useTraceDrawerScaffold(): TraceDrawerScaffold {
     // fire onOpenChange on the unmounting v2 shell. Without this,
     // goBack() would pop the v1 entry we just pushed and the
     // operator would end up with no drawer at all.
-    if (!drawerOpen("traceV2Details")) return;
+    // Read from window.location directly because the `useDrawer()`
+    // helper would close over the previous render's `useRouter()`
+    // snapshot (memoised) and report stale "still v2" right as the
+    // URL transitions to traceDetails.
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("drawer.open") !== "traceV2Details") return;
+    }
     // Cancel any in-flight per-trace queries so closing during a slow
     // load doesn't leave the request running in the background, racing
     // against a future re-open of the same drawer (or a different
@@ -164,7 +166,7 @@ export function useTraceDrawerScaffold(): TraceDrawerScaffold {
     // follows is just cleanup for deep-link / browser-history.
     useDrawerStore.getState().closeDrawer();
     goBack();
-  }, [drawerOpen, goBack, setMaximized, trpcUtils, traceId]);
+  }, [goBack, setMaximized, trpcUtils, traceId]);
 
   const drawerContentRef = useRef<HTMLDivElement>(null);
   const drawerBodyRef = useRef<HTMLDivElement>(null);

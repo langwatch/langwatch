@@ -12,7 +12,7 @@ interface TraceDetailsDrawerProps {
 }
 
 export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
-  const { goBack, drawerOpen } = useDrawer();
+  const { goBack } = useDrawer();
   const commentState = useAnnotationCommentStore();
 
   const [traceView, setTraceView] = useState<"span" | "full">("span");
@@ -31,10 +31,18 @@ export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
         // Chakra fires onOpenChange on unmount-driven teardown — if
         // someone called `openDrawer("traceV2Details", …)` we'd already
         // have pushed the v2 entry onto the stack, then this handler's
-        // goBack() would pop it right off. The URL is the source of
-        // truth: only act if we're still the current drawer.
+        // goBack() would pop it right off. Read the URL straight from
+        // window.location rather than `useDrawer().drawerOpen()`:
+        // the latter reads from a memoised `useRouter()` snapshot
+        // that lags behind on unmount-fired callbacks (the closure
+        // captures the previous render's query), making the guard
+        // see "still traceDetails" right as the URL transitions to
+        // traceV2Details.
         if (open) return;
-        if (!drawerOpen("traceDetails")) return;
+        if (typeof window !== "undefined") {
+          const params = new URLSearchParams(window.location.search);
+          if (params.get("drawer.open") !== "traceDetails") return;
+        }
         goBack();
         commentState.resetComment();
       }}
