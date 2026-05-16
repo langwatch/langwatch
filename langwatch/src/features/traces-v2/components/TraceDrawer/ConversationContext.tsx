@@ -1,7 +1,6 @@
 import {
   Box,
   chakra,
-  Circle,
   Flex,
   HStack,
   Icon,
@@ -12,8 +11,6 @@ import {
 import { AnimatePresence, motion, type Variants } from "motion/react";
 import { memo, useCallback, useMemo } from "react";
 import {
-  LuArrowLeft,
-  LuArrowRight,
   LuChevronDown,
   LuCircleDashed,
   LuFlag,
@@ -26,9 +23,7 @@ import {
 } from "../../hooks/useConversationContext";
 import { useTraceDrawerNavigation } from "../../hooks/useTraceDrawerNavigation";
 import { useDrawerStore } from "../../stores/drawerStore";
-import { STATUS_COLORS } from "../../utils/formatters";
 import { formatPreview } from "../../utils/previewFormatter";
-import { TraceIdPeek } from "../TraceIdPeek";
 import { useDisplayRoleVisuals } from "./scenarioRoles";
 
 interface ConversationContextProps {
@@ -443,13 +438,6 @@ const ConversationRow = memo(function ConversationRow({
   // Visuals for both halves of a turn — user on top, assistant below.
   const userVisuals = useDisplayRoleVisuals("user");
   const assistantVisuals = useDisplayRoleVisuals("assistant");
-  const Affordance =
-    !isPlaceholder && row.position === "previous"
-      ? LuArrowLeft
-      : !isPlaceholder && row.position === "next"
-        ? LuArrowRight
-        : null;
-  const statusColor = STATUS_COLORS[row.status] as string;
 
   if (isPlaceholder) {
     const PlaceholderIcon = row.boundary === "start" ? LuFlag : LuCircleDashed;
@@ -464,7 +452,6 @@ const ConversationRow = memo(function ConversationRow({
         opacity={0.55}
         cursor="default"
       >
-        <Box width="18px" flexShrink={0} />
         <Icon
           as={PlaceholderIcon}
           boxSize={3.5}
@@ -496,12 +483,24 @@ const ConversationRow = memo(function ConversationRow({
         gap={2.5}
         paddingX={3}
         paddingY={2}
-        bg={isCurrent ? "blue.subtle" : "transparent"}
+        // Light mode: non-selected rows are the panel's neutral gray
+        // (`bg.muted`), the selected row pops as a clean white surface.
+        // Dark mode keeps the existing blue-subtle selection — against
+        // the dark canvas it reads as the intended highlight tone.
+        bg={
+          isCurrent
+            ? { base: "bg.surface", _dark: "blue.subtle" }
+            : { base: "bg.muted", _dark: "transparent" }
+        }
         borderBottomWidth={isLast ? 0 : "1px"}
         borderColor="border.muted"
         cursor={isCurrent ? "default" : "pointer"}
         onClick={isCurrent ? undefined : handleClick}
-        _hover={isCurrent ? undefined : { bg: "bg.muted" }}
+        _hover={
+          isCurrent
+            ? undefined
+            : { bg: { base: "bg.softHover", _dark: "bg.muted" } }
+        }
         transition="background 0.12s ease"
         textAlign="left"
         width="full"
@@ -512,12 +511,12 @@ const ConversationRow = memo(function ConversationRow({
                 "@keyframes tracesV2CurrentRowPulse": {
                   "0%": {
                     backgroundColor:
-                      "color-mix(in srgb, var(--chakra-colors-blue-500) 28%, transparent)",
+                      "color-mix(in srgb, var(--chakra-colors-blue-500) 18%, transparent)",
                     boxShadow:
-                      "inset 0 0 0 1px color-mix(in srgb, var(--chakra-colors-blue-500) 35%, transparent)",
+                      "inset 0 0 0 1px color-mix(in srgb, var(--chakra-colors-blue-500) 25%, transparent)",
                   },
                   "100%": {
-                    backgroundColor: "var(--chakra-colors-blue-subtle)",
+                    backgroundColor: "transparent",
                     boxShadow: "inset 0 0 0 1px transparent",
                   },
                 },
@@ -528,19 +527,6 @@ const ConversationRow = memo(function ConversationRow({
             : undefined
         }
       >
-        <Flex direction="column" align="center" gap={1} paddingTop={0.5}>
-          <TraceIdPeek traceId={row.traceId} />
-          {isCurrent ? (
-            <Circle size="8px" bg={statusColor} flexShrink={0} />
-          ) : Affordance ? (
-            <Icon
-              as={Affordance}
-              boxSize={3.5}
-              color="fg.subtle"
-              flexShrink={0}
-            />
-          ) : null}
-        </Flex>
         <VStack align="stretch" gap={1.5} flex={1} minWidth={0}>
           <TurnLine
             icon={userVisuals.Icon}
@@ -596,7 +582,7 @@ const TurnLine: React.FC<{
   return (
     <HStack
       gap={1.5}
-      align="center"
+      align="flex-start"
       paddingY={1}
       paddingX={isAssistant ? 2 : 1}
       paddingLeft={isAssistant ? 5 : 1}
@@ -612,13 +598,26 @@ const TurnLine: React.FC<{
           textStyle="xs"
           position="absolute"
           left={1.5}
-          top="50%"
-          transform="translateY(-50%)"
+          // Align with the first text line, not the bubble's vertical
+          // midpoint — multi-line replies otherwise pushed the glyph
+          // way below where it visually belongs ("↳ reply" is a
+          // first-line affordance, not a side decoration).
+          top="6px"
         >
           ↳
         </Text>
       )}
-      <Icon as={icon} boxSize={3.5} color={iconColor} flexShrink={0} />
+      <Icon
+        as={icon}
+        boxSize={3.5}
+        color={iconColor}
+        flexShrink={0}
+        // ~2px down so the icon's vertical center lines up with the
+        // first text line's center, not with the top edge — `boxSize`
+        // 3.5 (14px) inside `textStyle="xs"` (12px / 18px line) needs
+        // (18-14)/2 = 2px of nudge.
+        marginTop="2px"
+      />
       <Text
         textStyle="xs"
         color={
