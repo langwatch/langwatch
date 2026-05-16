@@ -154,29 +154,33 @@ const DraftDot: React.FC<{ lensId: string; lensName: string }> = ({
 
   return (
     <>
-      <PopoverRoot
-        open={popoverOpen}
-        onOpenChange={(e) => setPopoverOpen(e.open)}
+      <Tooltip
+        content="Unsaved changes — click to discard or save as new lens"
         positioning={{ placement: "bottom" }}
       >
-        <PopoverTrigger asChild>
-          <Box
-            as="button"
-            width="10px"
-            height="10px"
-            borderRadius="full"
-            backgroundColor="orange.solid"
-            display="inline-block"
-            marginLeft={1}
-            flexShrink={0}
-            cursor="pointer"
-            aria-label="Unsaved changes on this lens — click for options"
-            onClick={(e) => {
-              e.stopPropagation();
-              setPopoverOpen((v) => !v);
-            }}
-          />
-        </PopoverTrigger>
+        <Box display="inline-flex" marginLeft={0.5}>
+          <PopoverRoot
+            open={popoverOpen}
+            onOpenChange={(e) => setPopoverOpen(e.open)}
+            positioning={{ placement: "bottom" }}
+          >
+            <PopoverTrigger asChild>
+              <Box
+                as="button"
+                width="6px"
+                height="6px"
+                borderRadius="full"
+                backgroundColor="orange.solid"
+                display="inline-block"
+                flexShrink={0}
+                cursor="pointer"
+                aria-label="Unsaved changes on this lens — click for options"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setPopoverOpen((v) => !v);
+                }}
+              />
+            </PopoverTrigger>
         <PopoverContent width="280px">
           <PopoverBody>
             <Stack gap={3}>
@@ -215,7 +219,9 @@ const DraftDot: React.FC<{ lensId: string; lensName: string }> = ({
             </Stack>
           </PopoverBody>
         </PopoverContent>
-      </PopoverRoot>
+          </PopoverRoot>
+        </Box>
+      </Tooltip>
       <LensNameDialog
         open={saveDialogOpen}
         onOpenChange={setSaveDialogOpen}

@@ -115,7 +115,12 @@ export const editorStyles: SystemStyleObject = {
     borderTop: "1px solid",
     borderBottom: "1px solid",
     borderRight: "1px solid",
-    borderLeft: "1px solid",
+    // Intentionally NO borderLeft — the left half of the chip
+    // (`.filter-token`) paints its own right edge is omitted by design,
+    // and `marginLeft: -1px` here visually butts the two halves
+    // together. Adding a left border draws a faint inner divider that
+    // becomes obvious on hover when both halves take on the red.muted
+    // tint, looking like a misaligned middle stripe.
     borderColor: "blue.solid",
     borderTopRightRadius: "8px",
     borderBottomRightRadius: "8px",

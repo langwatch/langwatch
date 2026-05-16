@@ -25,6 +25,7 @@ import {
   MenuItem,
   MenuRoot,
 } from "~/components/ui/menu";
+import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
 import { TracePresenceAvatars } from "~/features/presence/components/TracePresenceAvatars";
 import { useDejaViewLink } from "~/hooks/useDejaViewLink";
@@ -87,14 +88,38 @@ interface DrawerHeaderProps {
  * this is for the case where they want to read the ID without leaving
  * the header.
  */
-function TraceIdChip({
-  traceId,
-  onCopy,
-}: {
-  traceId: string;
-  onCopy: () => void;
-}) {
+function TraceIdChip({ traceId }: { traceId: string }) {
   const short = traceId.slice(0, 5);
+  const handleCopy = async () => {
+    // navigator.clipboard requires a secure context (https or localhost).
+    // Surface a friendly hint when it fails so users running LangWatch on
+    // a plain-http internal domain understand what went wrong instead of
+    // seeing a silent no-op.
+    try {
+      if (
+        typeof navigator !== "undefined" &&
+        navigator.clipboard?.writeText
+      ) {
+        await navigator.clipboard.writeText(traceId);
+        toaster.create({
+          title: "Trace ID copied",
+          description: short + "…",
+          type: "success",
+          duration: 2500,
+        });
+        return;
+      }
+      throw new Error("clipboard unavailable");
+    } catch {
+      toaster.create({
+        title: "Couldn't copy trace ID",
+        description:
+          "Clipboard access is restricted. This can happen on non-HTTPS domains — copy the ID manually from the URL.",
+        type: "error",
+        duration: 6000,
+      });
+    }
+  };
   return (
     <Tooltip
       content="Trace ID — hover to see full, click to copy"
@@ -114,7 +139,7 @@ function TraceIdChip({
         fontFamily="mono"
         fontSize="2xs"
         aria-label={`Copy trace ID ${traceId}`}
-        onClick={onCopy}
+        onClick={() => void handleCopy()}
         css={{
           "& [data-hover-only]": { display: "none" },
           "&:hover": { color: "fg" },
@@ -708,8 +733,8 @@ export const DrawerHeader = memo(function DrawerHeader({
             titleText={titleText}
             titleIsFallback={titleIsFallback}
           />
-          <TraceIdChip traceId={trace.traceId} onCopy={handleCopyTraceId} />
           <StatusChip trace={trace} statusColor={statusColor} />
+          <TraceIdChip traceId={trace.traceId} />
           {conversationContext.total > 1 && (
             <ThreadProgressIndicator
               position={conversationContext.position}

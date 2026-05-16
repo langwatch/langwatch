@@ -35,15 +35,15 @@ export const ROW_STYLES: Record<RowVariant, RowStyle> = {
     borderColor: "red.fg",
     bg: "red.fg/3",
     hoverBg: "red.fg/8",
-    separatorColor: "red.fg/25",
-    bottomSeparatorColor: "red.fg/40",
+    separatorColor: "red.fg/15",
+    bottomSeparatorColor: "red.fg/20",
   },
   warning: {
     borderColor: "yellow.fg",
     bg: "yellow.fg/3",
     hoverBg: "yellow.fg/8",
-    separatorColor: "yellow.fg/25",
-    bottomSeparatorColor: "yellow.fg/40",
+    separatorColor: "yellow.fg/15",
+    bottomSeparatorColor: "yellow.fg/20",
   },
   default: {
     borderColor: "transparent",
@@ -123,10 +123,14 @@ export const StatusRowGroup: React.FC<StatusRowGroupProps> = ({
   </Tbody>
 );
 
+// Light mode steps the dot up to `.solid` so the indicator reads as the
+// same saturated tone the filter sidebar uses for its status legend. The
+// `.fg` token rendered too dark on the white table surface. Dark mode
+// keeps `.fg` because against the dark canvas the solid step over-pops.
 const STATUS_COLORS: Record<TraceStatus, Color> = {
-  error: "red.fg",
-  warning: "yellow.fg",
-  ok: "green.fg",
+  error: { base: "red.solid", _dark: "red.fg" },
+  warning: { base: "yellow.solid", _dark: "yellow.fg" },
+  ok: { base: "green.solid", _dark: "green.fg" },
 };
 
 export const StatusDot: React.FC<{ status: TraceStatus; size?: string }> = ({
