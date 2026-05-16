@@ -5,6 +5,7 @@ import {
   useMemo,
   useRef,
 } from "react";
+import { isDrawerSwapInProgress } from "~/components/messages/NewTracesPromo";
 import { useDrawer } from "~/hooks/useDrawer";
 import type {
   SpanTreeNode,
@@ -134,20 +135,14 @@ export function useTraceDrawerScaffold(): TraceDrawerScaffold {
 
   const trpcUtils = api.useUtils();
   const handleClose = useCallback(() => {
-    // Unmount-fired close guard: if the URL has already navigated to
-    // another drawer (e.g. opt-out → "Go back to old visualization"
-    // pushes traceDetails), Chakra's Drawer.Root cleanup may still
-    // fire onOpenChange on the unmounting v2 shell. Without this,
-    // goBack() would pop the v1 entry we just pushed and the
-    // operator would end up with no drawer at all.
-    // Read from window.location directly because the `useDrawer()`
-    // helper would close over the previous render's `useRouter()`
-    // snapshot (memoised) and report stale "still v2" right as the
-    // URL transitions to traceDetails.
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      if (params.get("drawer.open") !== "traceV2Details") return;
-    }
+    // Unmount-fired close guard: when the operator opts out via the
+    // overflow menu, we push the v1 drawer onto the stack which
+    // unmounts this shell. Chakra fires onOpenChange(false) on
+    // teardown — without this guard, the goBack() below would pop
+    // the v1 entry we just pushed and leave them with no drawer.
+    // The flag is set by `markDrawerSwapInProgress` and auto-clears
+    // on the next macrotask, so manual ✕/Esc closes still work.
+    if (isDrawerSwapInProgress()) return;
     // Cancel any in-flight per-trace queries so closing during a slow
     // load doesn't leave the request running in the background, racing
     // against a future re-open of the same drawer (or a different

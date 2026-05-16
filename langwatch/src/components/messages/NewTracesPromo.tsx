@@ -56,6 +56,40 @@ function snooze(projectId: string, mode: PromoMode): void {
 }
 
 /**
+ * Module-level transition flag for the v1↔v2 drawer swap.
+ *
+ * When the operator clicks "Try the new one" (or "Go back to old
+ * visualization") we open the target drawer via `openDrawer`, which
+ * unmounts the source drawer. Chakra's `<Drawer.Root open={true}>`
+ * fires `onOpenChange(false)` during that unmount — and the source
+ * drawer's handler unconditionally calls `goBack()` (legacy
+ * behaviour for X-click / Esc / outside-click), which pops the
+ * freshly-pushed entry off the drawer stack and reverts the URL.
+ *
+ * Per-render URL guards (`useDrawer().drawerOpen()`,
+ * `window.location.search`) turned out to be unreliable across the
+ * react-router → React commit → Chakra dispose chain. A synchronous
+ * module-level flag is bulletproof: set true before the swap,
+ * cleared on the next macrotask (a `setTimeout(0)` definitively
+ * runs after React has committed the unmount).
+ */
+let drawerSwapInProgress = false;
+
+export function markDrawerSwapInProgress(): void {
+  drawerSwapInProgress = true;
+  // setTimeout (not queueMicrotask) so the flag survives React's
+  // commit phase — microtasks can interleave with React work, but a
+  // macrotask is guaranteed to run after the current commit batch.
+  setTimeout(() => {
+    drawerSwapInProgress = false;
+  }, 0);
+}
+
+export function isDrawerSwapInProgress(): boolean {
+  return drawerSwapInProgress;
+}
+
+/**
  * Clear every per-project snooze key for the v2 promo so the banner
  * reappears on the next render. Called when the operator opts back
  * out of v2 from the new drawer's overflow menu — at that point we
@@ -172,6 +206,11 @@ export function NewTracesPromo({
       projectId,
       traceId,
     });
+    // Tell v1's onOpenChange-fired goBack to skip this swap (see
+    // `markDrawerSwapInProgress` docstring for the why). Must be set
+    // BEFORE openDrawer so the unmount that openDrawer triggers
+    // happens while the flag is true.
+    markDrawerSwapInProgress();
     // Optimistic store push so the v2 shell mounts on the next render
     // — `openDrawer` will sync the URL params on the current path.
     useDrawerStore.getState().openTrace(traceId, null);

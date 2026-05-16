@@ -2,7 +2,10 @@ import { useState } from "react";
 import { useDrawer } from "~/hooks/useDrawer";
 import { Drawer } from "../components/ui/drawer";
 import { useAnnotationCommentStore } from "../hooks/useAnnotationCommentStore";
-import { NewTracesPromo } from "./messages/NewTracesPromo";
+import {
+  isDrawerSwapInProgress,
+  NewTracesPromo,
+} from "./messages/NewTracesPromo";
 import { TraceDetails } from "./traces/TraceDetails";
 
 interface TraceDetailsDrawerProps {
@@ -28,21 +31,15 @@ export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
       placement="end"
       size={traceView === "full" ? "full" : "xl"}
       onOpenChange={({ open }) => {
-        // Chakra fires onOpenChange on unmount-driven teardown — if
-        // someone called `openDrawer("traceV2Details", …)` we'd already
-        // have pushed the v2 entry onto the stack, then this handler's
-        // goBack() would pop it right off. Read the URL straight from
-        // window.location rather than `useDrawer().drawerOpen()`:
-        // the latter reads from a memoised `useRouter()` snapshot
-        // that lags behind on unmount-fired callbacks (the closure
-        // captures the previous render's query), making the guard
-        // see "still traceDetails" right as the URL transitions to
-        // traceV2Details.
+        // Skip the goBack when we're in the middle of swapping to the
+        // v2 drawer (NewTracesPromo sets a module-level flag before
+        // calling openDrawer). Without this, Chakra's unmount-fired
+        // onOpenChange(false) pops the v2 entry off the drawer stack
+        // and the operator gets bounced back to v1.
+        // URL-based guards proved unreliable across the
+        // react-router → React commit → Chakra dispose chain.
         if (open) return;
-        if (typeof window !== "undefined") {
-          const params = new URLSearchParams(window.location.search);
-          if (params.get("drawer.open") !== "traceDetails") return;
-        }
+        if (isDrawerSwapInProgress()) return;
         goBack();
         commentState.resetComment();
       }}

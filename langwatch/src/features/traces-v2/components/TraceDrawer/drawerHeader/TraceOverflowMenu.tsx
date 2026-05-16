@@ -15,7 +15,10 @@ import {
   LuScanSearch,
   LuShare2,
 } from "react-icons/lu";
-import { resetTracesV2PromoSnooze } from "~/components/messages/NewTracesPromo";
+import {
+  markDrawerSwapInProgress,
+  resetTracesV2PromoSnooze,
+} from "~/components/messages/NewTracesPromo";
 import { Menu } from "~/components/ui/menu";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useConversationTurns } from "../../../hooks/useConversationTurns";
@@ -82,6 +85,10 @@ export function TraceOverflowMenu({
       surface: "drawer_overflow_menu",
       traceId,
     });
+    // Same transition flag as the v1→v2 swap — tells v2's
+    // handleClose to skip its unmount-fired goBack so we don't pop
+    // the v1 entry we're about to push.
+    markDrawerSwapInProgress();
     // Drop the v2 shell and hand the same trace back to the v1 drawer
     // on the current page — operator's mental anchor stays put.
     openDrawer("traceDetails", { traceId, selectedTab: "traceDetails" });
