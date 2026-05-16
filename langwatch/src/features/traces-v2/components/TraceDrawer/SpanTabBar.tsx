@@ -7,15 +7,15 @@ import {
   Icon,
   Text,
 } from "@chakra-ui/react";
-import { memo, useMemo } from "react";
+import { memo, useMemo, useRef } from "react";
 import {
   LuChevronDown,
   LuChevronRight,
   LuFileText,
+  LuPanelBottomClose,
+  LuPanelBottomOpen,
   LuPanelRightClose,
   LuPanelRightOpen,
-  LuPanelTopClose,
-  LuPanelTopOpen,
   LuPin,
   LuPinOff,
   LuX,
@@ -30,8 +30,10 @@ import {
   usePresenceStore,
 } from "~/features/presence/stores/presenceStore";
 import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
+import { useOverflowVisibility } from "../../hooks/useOverflowVisibility";
 import { usePrefetchSpanDetail } from "../../hooks/usePrefetchSpanDetail";
 import { type DrawerTab, useDrawerStore } from "../../stores/drawerStore";
+import { OverflowMenu } from "../shared/OverflowMenu";
 import {
   abbreviateModel,
   formatDuration,
@@ -150,15 +152,21 @@ export const SpanTabBar = memo(function SpanTabBar({
   // Icon orientation tracks the pane's edge: horizontal layout puts the
   // detail pane on the right, so the collapse chevron points
   // right (LuPanelRight*); vertical stacks the detail pane on the
-  // bottom, so the chevron points up/down (LuPanelTop*).
+  // *bottom*, so the icon shows a bottom-docked panel (LuPanelBottom*).
+  // The previous LuPanelTop* set was inverted — it depicted the panel
+  // docked at the top, which read backwards for a bottom-docked pane:
+  // collapsed showed the "panel popping down from above" arrow, expanded
+  // showed "panel sliding up". With LuPanelBottom*: collapsed (panel
+  // hidden) shows the bottom panel ready to spring up; expanded shows
+  // the bottom panel ready to collapse down.
   const isHorizontalSplit = collapsePosition === "leading";
   const CollapseToggleIcon = isHorizontalSplit
     ? detailCollapsed
       ? LuPanelRightOpen
       : LuPanelRightClose
     : detailCollapsed
-      ? LuPanelTopOpen
-      : LuPanelTopClose;
+      ? LuPanelBottomOpen
+      : LuPanelBottomClose;
 
   const collapseToggle = (
     <Tooltip
@@ -212,6 +220,221 @@ export const SpanTabBar = memo(function SpanTabBar({
   const inlinePinned = pinnedSpans.slice(0, inlineCount);
   const overflowPinned = overflowing ? pinnedSpans.slice(inlineCount) : [];
 
+  // Build a unified descriptor list (static tabs + dynamic span tabs) so
+  // `useOverflowVisibility` can collapse anything that doesn't fit on
+  // the strip into a single kebab menu — same pattern the viz tab row
+  // uses. Without this the strip just falls back to horizontal scroll,
+  // which on a narrow drawer hid Summary and LLM-Optimized behind a
+  // hidden-scrollbar overflow the user couldn't see.
+  type TabDescriptor = {
+    id: string;
+    activeId?: string;
+    label: string;
+    onSelect: () => void;
+    render: () => React.ReactNode;
+    /** Dropdown-row contents when this tab is folded into the menu. */
+    menuContent: React.ReactNode;
+  };
+  const tabDescriptors: TabDescriptor[] = useMemo(() => {
+    const list: TabDescriptor[] = [
+      {
+        id: "tab:summary",
+        activeId: activeTab === "summary" ? "tab:summary" : undefined,
+        label: "Summary",
+        onSelect: () => setActiveTab("summary"),
+        render: () => (
+          <DrawerTabButton
+            overflowId="tab:summary"
+            label="Summary"
+            shortcut="O"
+            tooltip="Show trace summary"
+            active={activeTab === "summary"}
+            activeColorPalette="blue"
+            onClick={() => setActiveTab("summary")}
+            traceId={traceId}
+            tab="summary"
+          />
+        ),
+        menuContent: (
+          <HStack gap={1.5}>
+            <Text>Summary</Text>
+            <Kbd>O</Kbd>
+          </HStack>
+        ),
+      },
+      {
+        id: "tab:llm",
+        activeId: activeTab === "llm" ? "tab:llm" : undefined,
+        label: "LLM-Optimized",
+        onSelect: () => setActiveTab("llm"),
+        render: () => (
+          <DrawerTabButton
+            overflowId="tab:llm"
+            label="LLM-Optimized"
+            shortcut="L"
+            tooltip="Token-efficient summary for an LLM"
+            active={activeTab === "llm"}
+            activeColorPalette="purple"
+            onClick={() => setActiveTab("llm")}
+            traceId={traceId}
+            tab="llm"
+          />
+        ),
+        menuContent: (
+          <HStack gap={1.5}>
+            <Text>LLM-Optimized</Text>
+            <Kbd>L</Kbd>
+          </HStack>
+        ),
+      },
+    ];
+    if (promptCount > 0) {
+      list.push({
+        id: "tab:prompts",
+        activeId: activeTab === "prompts" ? "tab:prompts" : undefined,
+        label: "Prompts",
+        onSelect: () => setActiveTab("prompts"),
+        render: () => (
+          <DrawerTabButton
+            overflowId="tab:prompts"
+            label="Prompts"
+            shortcut="P"
+            tooltip="Prompts used in this trace"
+            icon={<Icon as={LuFileText} boxSize={3.5} />}
+            active={activeTab === "prompts"}
+            activeColorPalette="blue"
+            onClick={() => setActiveTab("prompts")}
+            traceId={traceId}
+            tab="prompts"
+            badge={
+              <Badge size="xs" variant="subtle" colorPalette="blue">
+                {promptCount}
+              </Badge>
+            }
+          />
+        ),
+        menuContent: (
+          <HStack gap={1.5}>
+            <Icon as={LuFileText} boxSize={3.5} />
+            <Text>Prompts</Text>
+            <Kbd>P</Kbd>
+            <Badge size="xs" variant="subtle" colorPalette="blue">
+              {promptCount}
+            </Badge>
+          </HStack>
+        ),
+      });
+    }
+    inlinePinned.forEach((span) => {
+      const id = `span:${span.spanId}`;
+      list.push({
+        id,
+        activeId:
+          activeTab === "span" && selectedSpan?.spanId === span.spanId
+            ? id
+            : undefined,
+        label: span.name ?? span.spanId,
+        onSelect: () => selectSpan(span.spanId),
+        render: () => (
+          <SpanTab
+            overflowId={id}
+            span={span}
+            isActive={
+              activeTab === "span" && selectedSpan?.spanId === span.spanId
+            }
+            onClick={() => selectSpan(span.spanId)}
+            onHover={() => prefetchSpan(span.spanId)}
+            actionIcon={<Icon as={LuPinOff} boxSize={3} />}
+            actionLabel="Unpin span tab"
+            onAction={() => unpinSpan(span.spanId)}
+            presence={
+              traceId ? (
+                <SpanFocusPresenceDot traceId={traceId} spanId={span.spanId} />
+              ) : null
+            }
+          />
+        ),
+        menuContent: (
+          <HStack gap={1.5}>
+            <Text truncate maxWidth="200px">
+              {span.name ?? span.spanId}
+            </Text>
+          </HStack>
+        ),
+      });
+    });
+    if (selectedSpan && !isSelectedPinned) {
+      const id = "span:ephemeral";
+      list.push({
+        id,
+        activeId: activeTab === "span" ? id : undefined,
+        label: selectedSpan.name ?? selectedSpan.spanId,
+        onSelect: () => setActiveTab("span"),
+        render: () => (
+          <SpanTab
+            overflowId={id}
+            span={selectedSpan}
+            isActive={activeTab === "span"}
+            onClick={() => setActiveTab("span")}
+            actionIcon={<Icon as={LuPin} boxSize={3} />}
+            actionLabel="Pin span tab"
+            onAction={() => pinSpan(selectedSpan.spanId)}
+            secondaryActionIcon={<Icon as={LuX} boxSize={3} />}
+            secondaryActionLabel="Close span tab"
+            onSecondaryAction={clearSpan}
+            presence={
+              traceId ? (
+                <SpanFocusPresenceDot
+                  traceId={traceId}
+                  spanId={selectedSpan.spanId}
+                />
+              ) : null
+            }
+          />
+        ),
+        menuContent: (
+          <HStack gap={1.5}>
+            <Text truncate maxWidth="200px">
+              {selectedSpan.name ?? selectedSpan.spanId}
+            </Text>
+          </HStack>
+        ),
+      });
+    }
+    return list;
+  }, [
+    activeTab,
+    setActiveTab,
+    traceId,
+    promptCount,
+    inlinePinned,
+    selectedSpan,
+    isSelectedPinned,
+    selectSpan,
+    prefetchSpan,
+    unpinSpan,
+    pinSpan,
+    clearSpan,
+  ]);
+
+  const tabIds = useMemo(
+    () => tabDescriptors.map((d) => d.id),
+    [tabDescriptors],
+  );
+  const activeOverflowId =
+    tabDescriptors.find((d) => d.activeId)?.id ?? null;
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  // Reserve room for kebab trigger + optional rightSlot + the
+  // pinned-span overflow menu + the trailing collapse toggle. 96px gives
+  // enough headroom that the last visible tab doesn't bleed under those
+  // controls on a narrow drawer.
+  const hiddenTabIds = useOverflowVisibility({
+    scrollerRef,
+    items: tabIds,
+    activeId: activeOverflowId,
+    reservePx: 96,
+  });
+
   return (
     <HStack
       gap="5px"
@@ -219,125 +442,62 @@ export const SpanTabBar = memo(function SpanTabBar({
       paddingRight={collapsePosition === "leading" ? 4 : 2}
       borderBottomWidth="1px"
       borderColor="border"
-      overflowX="auto"
       flexShrink={0}
       align="stretch"
       minHeight="38px"
       bg={{ base: "bg.surface", _dark: "bg.panel" }}
-      css={{ "&::-webkit-scrollbar": { display: "none" } }}
     >
       {collapsePosition === "leading" && collapseToggle}
 
-      <DrawerTabButton
-        label="Summary"
-        shortcut="O"
-        tooltip="Show trace summary"
-        active={activeTab === "summary"}
-        activeColorPalette="blue"
-        onClick={() => setActiveTab("summary")}
-        traceId={traceId}
-        tab="summary"
-      />
-
-      <DrawerTabButton
-        label="LLM-Optimized"
-        shortcut="L"
-        tooltip="Token-efficient summary for an LLM"
-        active={activeTab === "llm"}
-        activeColorPalette="purple"
-        onClick={() => setActiveTab("llm")}
-        traceId={traceId}
-        tab="llm"
-      />
-
-      {/* Prompts tab — only when this trace used managed prompts. The chip
-          in the header is the lightweight peek; this tab is the full
-          rollup grouped by prompt + version. */}
-      {promptCount > 0 && (
-        <DrawerTabButton
-          label="Prompts"
-          shortcut="P"
-          tooltip="Prompts used in this trace"
-          icon={<Icon as={LuFileText} boxSize={3.5} />}
-          active={activeTab === "prompts"}
-          activeColorPalette="blue"
-          onClick={() => setActiveTab("prompts")}
-          traceId={traceId}
-          tab="prompts"
-          badge={
-            <Badge size="xs" variant="subtle" colorPalette="blue">
-              {promptCount}
-            </Badge>
-          }
+      <HStack
+        ref={scrollerRef}
+        gap="5px"
+        flex={1}
+        minWidth={0}
+        flexWrap="nowrap"
+        overflowX="hidden"
+        align="stretch"
+      >
+        {tabDescriptors.map((descriptor) => (
+          <Flex
+            key={descriptor.id}
+            display={hiddenTabIds.has(descriptor.id) ? "none" : "flex"}
+            align="stretch"
+            flexShrink={0}
+          >
+            {descriptor.render()}
+          </Flex>
+        ))}
+        {overflowPinned.length > 0 && (
+          <PinnedSpanOverflowMenu
+            spans={overflowPinned}
+            activeSpanId={
+              activeTab === "span" ? (selectedSpan?.spanId ?? null) : null
+            }
+            onSelectSpan={selectSpan}
+            onUnpinSpan={unpinSpan}
+          />
+        )}
+        <OverflowMenu
+          items={tabDescriptors
+            .filter((d) => hiddenTabIds.has(d.id))
+            .map((d) => ({ id: d.id, label: d.label, content: d.menuContent }))}
+          activeId={activeOverflowId}
+          onSelect={(id) => {
+            const descriptor = tabDescriptors.find((d) => d.id === id);
+            descriptor?.onSelect();
+          }}
+          ariaLabel="Show more tabs"
         />
-      )}
+      </HStack>
 
-      {/* Pinned span tabs — first N inline, the rest collapse into a
-          dropdown to keep the strip readable when many spans are pinned. */}
-      {inlinePinned.map((span) => (
-        <SpanTab
-          key={span.spanId}
-          span={span}
-          isActive={
-            activeTab === "span" && selectedSpan?.spanId === span.spanId
-          }
-          onClick={() => selectSpan(span.spanId)}
-          onHover={() => prefetchSpan(span.spanId)}
-          actionIcon={<Icon as={LuPinOff} boxSize={3} />}
-          actionLabel="Unpin span tab"
-          onAction={() => unpinSpan(span.spanId)}
-          presence={
-            traceId ? (
-              <SpanFocusPresenceDot traceId={traceId} spanId={span.spanId} />
-            ) : null
-          }
-        />
-      ))}
-      {overflowPinned.length > 0 && (
-        <PinnedSpanOverflowMenu
-          spans={overflowPinned}
-          activeSpanId={
-            activeTab === "span" ? (selectedSpan?.spanId ?? null) : null
-          }
-          onSelectSpan={selectSpan}
-          onUnpinSpan={unpinSpan}
-        />
-      )}
-
-      {/* Ephemeral span tab — only if selected span is not pinned */}
-      {selectedSpan && !isSelectedPinned && (
-        <SpanTab
-          span={selectedSpan}
-          isActive={activeTab === "span"}
-          onClick={() => setActiveTab("span")}
-          actionIcon={<Icon as={LuPin} boxSize={3} />}
-          actionLabel="Pin span tab"
-          onAction={() => pinSpan(selectedSpan.spanId)}
-          secondaryActionIcon={<Icon as={LuX} boxSize={3} />}
-          secondaryActionLabel="Close span tab"
-          onSecondaryAction={clearSpan}
-          presence={
-            traceId ? (
-              <SpanFocusPresenceDot
-                traceId={traceId}
-                spanId={selectedSpan.spanId}
-              />
-            ) : null
-          }
-        />
-      )}
       {rightSlot ? (
-        <Flex align="center" marginLeft="auto" flexShrink={0} paddingLeft={3}>
+        <Flex align="center" flexShrink={0} paddingLeft={3}>
           {rightSlot}
         </Flex>
       ) : null}
       {collapsePosition === "trailing" && (
-        <Flex
-          align="center"
-          marginLeft={rightSlot ? 0 : "auto"}
-          flexShrink={0}
-          paddingLeft={2}
-        >
+        <Flex align="center" flexShrink={0} paddingLeft={2}>
           {collapseToggle}
         </Flex>
       )}
@@ -356,6 +516,8 @@ interface DrawerTabButtonProps {
   badge?: React.ReactNode;
   traceId: string | null;
   tab: DrawerTab;
+  /** Marker for `useOverflowVisibility` measurement. */
+  overflowId?: string;
 }
 
 function DrawerTabButton({
@@ -369,6 +531,7 @@ function DrawerTabButton({
   badge,
   traceId,
   tab,
+  overflowId,
 }: DrawerTabButtonProps) {
   const activeBorder =
     activeColorPalette === "purple" ? "purple.solid" : "blue.solid";
@@ -397,6 +560,7 @@ function DrawerTabButton({
         height="38px"
         flexShrink={0}
         gap={1.5}
+        data-overflow-id={overflowId}
       >
         {icon}
         {label}
@@ -420,6 +584,8 @@ interface SpanTabProps {
   secondaryActionLabel?: string;
   onSecondaryAction?: () => void;
   presence?: React.ReactNode;
+  /** Marker for `useOverflowVisibility` measurement. */
+  overflowId?: string;
 }
 
 function SpanTab({
@@ -434,6 +600,7 @@ function SpanTab({
   secondaryActionLabel,
   onSecondaryAction,
   presence,
+  overflowId,
 }: SpanTabProps) {
   const activeBorderColor =
     (SPAN_TYPE_COLORS[span.type ?? "span"] as string) ?? "gray.solid";
@@ -460,6 +627,7 @@ function SpanTab({
         onFocus={onHover}
         _hover={{ bg: "bg.muted", color: "fg" }}
         transition="background 0.12s ease, color 0.12s ease"
+        data-overflow-id={overflowId}
       >
         <SpanTypeBadge type={span.type ?? "span"} />
         <Text

@@ -475,6 +475,11 @@ export function VizPlaceholder({
                 </Tooltip>
               );
             })}
+            {/* Spacer pushes the overflow trigger to the far right of
+                the tab row so it doesn't glue to the last visible tab.
+                Reads as "kebab menu = tab-row controls", not "kebab menu
+                = appendix to the rightmost tab". */}
+            <Box flex={1} minWidth={0} />
             <OverflowMenu
               items={TABS.filter((t) => hiddenTabIds.has(t.value)).map(
                 (t) => ({

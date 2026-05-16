@@ -45,17 +45,19 @@ export const DensityToggle: React.FC = () => {
       <Group attached>
         {OPTIONS.map(({ density: value, label, Icon }) => {
           const isActive = density === value;
-          // Active button looks pressed (emphasized bg + solid icon),
-          // inactive looks raised (transparent bg + faded icon). Reads
-          // as "this is the current state" instead of "this is the
-          // clickable one", which is what the previous mapping suggested.
+          // Active button reads as a calm flat surface (transparent bg,
+          // full-opacity icon), inactive sits on the muted/emphasized
+          // surface that says "available target". rchaves prefers this
+          // mapping — the active state is recognised by the *icon*
+          // crispness, the inactive button reads as the chip you can
+          // click to flip to.
           return (
             <IconButton
               key={value}
               aria-label={label}
               aria-pressed={isActive}
               variant="outline"
-              bg={isActive ? "bg.emphasized" : "transparent"}
+              bg={isActive ? "transparent" : "bg.emphasized"}
               size="2xs"
               onClick={toggle}
             >

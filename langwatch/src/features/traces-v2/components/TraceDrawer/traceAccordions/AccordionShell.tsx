@@ -94,14 +94,14 @@ export function Section({
         borderColor={{ base: "gray.200", _dark: "border.muted" }}
         transition="background 120ms ease, color 120ms ease"
         _hover={{ bg: "bg.softHover", color: "fg" }}
-        // Open state keeps the same white bg as closed — operator
-        // feedback: the gray fill on open made the panel feel busy and
-        // broke the "white card, gray header row" idiom. The title color
-        // promotes to `fg` AND a 1px bottom border slips in so the
-        // trigger reads as the open section's own header band, not as
-        // floating text above its content.
+        // Open state keeps the same white bg AND the same `fg.muted`
+        // title color as closed — operator feedback: promoting the
+        // title color on expand made the "INPUT AND OUTPUT" labels
+        // look heavier than their collapsed siblings, breaking the
+        // calm read of the section list. The chevron rotation alone
+        // signals state. A 1px bottom border still slips in so the
+        // trigger reads as the open section's own header band.
         _open={{
-          color: "fg",
           borderBottomWidth: "1px",
           borderBottomColor: { base: "gray.200", _dark: "border.muted" },
         }}
