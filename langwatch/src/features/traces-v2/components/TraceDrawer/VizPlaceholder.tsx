@@ -12,6 +12,7 @@ import {
   Suspense,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -31,6 +32,8 @@ import {
 import { useShallow } from "zustand/react/shallow";
 import { Kbd } from "~/components/ops/shared/Kbd";
 import { Tooltip } from "~/components/ui/tooltip";
+import { useOverflowVisibility } from "../../hooks/useOverflowVisibility";
+import { OverflowMenu } from "../shared/OverflowMenu";
 import { PeerCursorOverlay } from "~/features/presence/components/PeerCursorOverlay";
 import { PresenceMarker } from "~/features/presence/components/PresenceMarker";
 import {
@@ -201,6 +204,18 @@ export function VizPlaceholder({
   );
   const togglePaneCollapsed = useDrawerStore((s) => s.togglePaneCollapsed);
 
+  // Overflow detection for the viz tab row — when the container is
+  // narrow enough that some tabs would clip, they get folded into a
+  // single overflow menu rendered after the visible tabs.
+  const tabScrollerRef = useRef<HTMLDivElement>(null);
+  const tabIds = useMemo(() => TABS.map((t) => t.value), []);
+  const hiddenTabIds = useOverflowVisibility({
+    scrollerRef: tabScrollerRef,
+    items: tabIds,
+    activeId: vizTab,
+    reservePx: 40,
+  });
+
   const [height, setHeight] = useState(getStoredHeight);
   const [spanListSearch, setSpanListSearch] = useState("");
   const [spanListTypeFilter, setSpanListTypeFilter] = useState<
@@ -369,15 +384,16 @@ export function VizPlaceholder({
           minHeight="38px"
         >
           <HStack
+            ref={tabScrollerRef}
             gap={0}
-            overflowX="auto"
+            overflowX="hidden"
             flexWrap="nowrap"
             flexShrink={1}
             minWidth={0}
-            css={{ "&::-webkit-scrollbar": { display: "none" } }}
           >
             {TABS.map((tab) => {
               const isActive = vizTab === tab.value;
+              const isHidden = hiddenTabIds.has(tab.value);
               return (
                 <Tooltip
                   key={tab.value}
@@ -387,6 +403,7 @@ export function VizPlaceholder({
                 >
                   <Flex
                     as="button"
+                    data-overflow-id={tab.value}
                     align="center"
                     gap={1.5}
                     paddingX={2}
@@ -403,6 +420,7 @@ export function VizPlaceholder({
                     bg={isActive ? `${tab.palette}.subtle` : "transparent"}
                     flexShrink={0}
                     whiteSpace="nowrap"
+                    display={isHidden ? "none" : "flex"}
                     _hover={{
                       bg: isActive ? `${tab.palette}.subtle` : "bg.muted",
                     }}
@@ -425,6 +443,17 @@ export function VizPlaceholder({
                 </Tooltip>
               );
             })}
+            <OverflowMenu
+              items={TABS.filter((t) => hiddenTabIds.has(t.value)).map(
+                (t) => ({
+                  id: t.value,
+                  label: t.label,
+                }),
+              )}
+              activeId={vizTab}
+              onSelect={(id) => handleVizTabChange(id as VizTab)}
+              ariaLabel="Show more viz tabs"
+            />
           </HStack>
 
           {!fillParent && (
