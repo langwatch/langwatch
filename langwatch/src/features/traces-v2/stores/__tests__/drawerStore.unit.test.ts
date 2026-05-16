@@ -118,7 +118,7 @@ describe("drawerStore pane controls", () => {
           useDrawerStore.getState().paneState.visualization.collapsed,
         ).toBe(true);
         expect(
-          localStorage.getItem("langwatch:traces-v2:drawer-pane-state:v1"),
+          localStorage.getItem("langwatch:traces-v2:drawer-pane-state:v2"),
         ).not.toBeNull();
       });
     });
