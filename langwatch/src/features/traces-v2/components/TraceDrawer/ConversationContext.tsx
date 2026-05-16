@@ -273,26 +273,27 @@ export const ConversationContext = memo(function ConversationContext({
         buttonRef={headerRef}
       />
       {collapsed ? null : (
-        // `contentRef` lives on the SCROLL container itself (the
-        // overflow:auto box). Its `scrollHeight` then reflects the
-        // unclipped natural height of the rows — header + clip area
-        // measurement on the outer wrapper was always returning the
-        // Panel size, which meant the max-cap fought the drag and the
-        // expand-to-content snap landed on a tiny strip.
-        <Box
-          ref={contentRef}
-          flex={1}
-          minHeight={0}
-          overflow="auto"
-          paddingX={4}
-          paddingY={3}
-        >
-          <ContextBody
-            ctx={ctx}
-            rows={rows}
-            traceId={traceId}
-            onSelect={navigate}
-          />
+        // Two-level structure on purpose:
+        //   - outer Box `flex={1} overflow="auto"` — the scroll
+        //     container, fills the Panel's remaining space
+        //   - inner Box `ref={contentRef}` — naturally sized
+        //     (no flex, no overflow), so its `scrollHeight` /
+        //     `offsetHeight` always equals the row content's actual
+        //     height regardless of how tall the Panel gets
+        // Without the split, `scrollHeight` on an overflow:auto
+        // element clamps to `>= clientHeight` — dragging the Panel
+        // bigger made the measured "content height" grow with it,
+        // ctxMaxSize grew with it, and the drag had no real cap
+        // (visible as the slow-drag with infinite trailing whitespace).
+        <Box flex={1} minHeight={0} overflow="auto" paddingX={4} paddingY={3}>
+          <Box ref={contentRef}>
+            <ContextBody
+              ctx={ctx}
+              rows={rows}
+              traceId={traceId}
+              onSelect={navigate}
+            />
+          </Box>
         </Box>
       )}
     </Box>

@@ -42,6 +42,14 @@ const SPAN_TAB_BAR_HEIGHT_PX = 38;
 // Kept in sync with `ContextHeader` paddingY in `ConversationContext.tsx`.
 const CTX_HEADER_HEIGHT_PX = 36;
 
+// `contentRef` is attached to the inner row-wrapper Box inside the
+// scroll container (so `scrollHeight` doesn't get inflated by the
+// container's clientHeight). The scroll container itself has a
+// vertical paddingY={3} (6 * 2 = 24px) which the inner ref doesn't
+// see — add it back here so the pane's natural height is
+// `header + scroll-container-padding + content`.
+const CTX_SCROLL_VPAD_PX = 24;
+
 /**
  * Renders the trace drawer body as a stack of independently sized,
  * scrollable panels — Chrome DevTools "Network → Headers / Preview"
@@ -112,14 +120,17 @@ export function PaneLayout({
       // than a guessed pixel constant, so density / font changes flow
       // through automatically.
       const headerPx = headerEl?.offsetHeight ?? CTX_HEADER_HEIGHT_PX;
-      // `contentRef` is on the scroll container holding the rows; its
-      // `scrollHeight` reflects the rows' unclipped natural height.
-      // Total natural height of the pane = header + body. When
-      // collapsed the body isn't rendered, so `contentEl` is null and
-      // we fall back to the cached last-expanded value to keep the
-      // max-cap stable across collapse/expand cycles.
+      // `contentRef` is on a naturally-sized wrapper INSIDE the
+      // scroll container. `scrollHeight` is the rows' actual height
+      // — independent of the Panel's current pixel height, which is
+      // what stops the slow-drag feedback loop.
+      // Total natural pane height = header + scroll-container padding
+      // + content. When collapsed the body isn't rendered so we fall
+      // back to the cached last-expanded value to keep the max-cap
+      // stable across collapse/expand cycles.
       const bodyPx = contentEl?.scrollHeight ?? 0;
-      const fullPx = bodyPx > 0 ? headerPx + bodyPx : headerPx;
+      const fullPx =
+        bodyPx > 0 ? headerPx + CTX_SCROLL_VPAD_PX + bodyPx : headerPx;
       if (!ctxState.collapsed && bodyPx > 0) {
         lastExpandedContentPx.current = fullPx;
       }
@@ -229,11 +240,14 @@ export function PaneLayout({
         const dim = groupEl.clientHeight;
         if (dim <= 0) return;
         const headerPx = headerEl?.offsetHeight ?? CTX_HEADER_HEIGHT_PX;
-        // `contentRef` is the body scroll container — scrollHeight is
-        // the unclipped body height. Total natural pane height =
-        // header + body + 6px slack.
+        // `contentRef` is the inner row wrapper — `scrollHeight`
+        // gives the rows' real height. Pane natural height = header
+        // + scroll-container padding + body + 6px slack.
         const bodyPx = contentEl?.scrollHeight ?? 0;
-        const fullPx = bodyPx > 0 ? headerPx + bodyPx + 6 : headerPx;
+        const fullPx =
+          bodyPx > 0
+            ? headerPx + CTX_SCROLL_VPAD_PX + bodyPx + 6
+            : headerPx;
         // 350px ceiling on first-open even for long conversations;
         // the operator can still drag larger up to ctxMaxSize.
         const cappedPx = Math.min(fullPx, 350);
