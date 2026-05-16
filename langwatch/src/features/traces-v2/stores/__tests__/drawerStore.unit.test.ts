@@ -12,6 +12,13 @@ beforeEach(() => {
   const { setWidthPx, togglePaneCollapsed, togglePaneMaximized, paneState } =
     useDrawerStore.getState();
   setWidthPx(null);
+  // Explicitly clear the maximize fields that don't have a dedicated
+  // setter — leaking them across tests had crept in once before, so
+  // reset them via `setState` directly.
+  useDrawerStore.setState({
+    isMaximized: false,
+    preMaximizeWidthPx: null,
+  });
   // Reset pane state by toggling any "on" flags back off.
   (Object.keys(paneState) as Array<keyof typeof paneState>).forEach((id) => {
     if (paneState[id].collapsed) togglePaneCollapsed(id);

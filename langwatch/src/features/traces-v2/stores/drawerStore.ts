@@ -256,7 +256,15 @@ function readWidthFromStorage(): number | null {
     const raw = window.localStorage.getItem(WIDTH_STORAGE_KEY);
     if (raw === null) return null;
     const n = Number(raw);
-    return Number.isFinite(n) && n > 0 ? n : null;
+    if (!Number.isFinite(n) || n <= 0) return null;
+    // Clamp the persisted value against the *current* viewport so that
+    // a width remembered on a wide monitor doesn't push the drawer off
+    // the right edge when reloaded on a smaller laptop. The ResizeRail
+    // also re-clamps on `window.resize`, but that listener can't catch
+    // the initial-load case where the viewport changed between
+    // sessions.
+    const maxWidth = window.innerWidth - DRAWER_MAXIMIZE_EDGE_PX;
+    return Math.max(DRAWER_MIN_WIDTH_PX, Math.min(n, maxWidth));
   } catch {
     return null;
   }
@@ -404,14 +412,25 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
 
   togglePaneMaximized: (id) =>
     set((s) => {
-      const next: Record<PaneId, PaneState> = {
-        ...s.paneState,
-        [id]: {
-          ...s.paneState[id],
-          maximizedWithinGroup: !s.paneState[id].maximizedWithinGroup,
-          collapsed: false,
+      const currentlyMaximized = s.paneState[id].maximizedWithinGroup;
+      // Maximizing one pane should demote every sibling — exactly-one
+      // pane can be maximized at a time. Without this normalization a
+      // sequence of clicks could leave several panes flagged maximized
+      // and `PaneLayout` would hide all of them at once.
+      const next: Record<PaneId, PaneState> = (
+        Object.keys(s.paneState) as PaneId[]
+      ).reduce(
+        (acc, key) => {
+          acc[key] = {
+            ...s.paneState[key],
+            maximizedWithinGroup:
+              key === id ? !currentlyMaximized : false,
+            collapsed: key === id ? false : s.paneState[key].collapsed,
+          };
+          return acc;
         },
-      };
+        {} as Record<PaneId, PaneState>,
+      );
       persistPaneState(next);
       return { paneState: next };
     }),

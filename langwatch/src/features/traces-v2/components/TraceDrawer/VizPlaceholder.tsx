@@ -217,12 +217,16 @@ export function VizPlaceholder({
   // viz, not an opt-in surface.
   const hasData = spans.length > 0;
   useEffect(() => {
+    // In fillParent mode the parent <Panel> owns sizing — touching the
+    // local height (and persisting it) would silently clobber the
+    // user's preference for the next standalone (non-pane) render.
+    if (fillParent) return;
     if (hasData && height === 0) {
       setHeight(DEFAULT_HEIGHT);
       persistHeight(DEFAULT_HEIGHT);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasData]);
+  }, [hasData, fillParent]);
 
   // Handle cross-view navigation: waterfall group → span list
   const handleSwitchToSpanList = useCallback(

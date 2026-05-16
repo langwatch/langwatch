@@ -119,7 +119,16 @@ function PaneHeader({
   collapseLabel,
   maximizeLabel,
 }: PaneHeaderProps) {
-  const handleHeaderDoubleClick = () => {
+  const handleHeaderDoubleClick = (e: React.MouseEvent<HTMLElement>) => {
+    // Ignore double-clicks that bubble from the collapse / maximize
+    // buttons inside the header — those buttons have their own
+    // click handlers and a second click on them should not also
+    // toggle the maximize gesture. Walk up to see if the original
+    // target is a control.
+    const target = e.target as HTMLElement | null;
+    if (target && target.closest("[data-pane-control], [data-pane-collapse]")) {
+      return;
+    }
     // Double-click on the header is the keyboard-free maximize gesture.
     // Falls through to collapse when maximize is unavailable so the
     // double-click is never inert.
@@ -151,6 +160,7 @@ function PaneHeader({
     >
       <PaneButton
         type="button"
+        data-pane-collapse
         onClick={onToggleCollapsed}
         aria-label={collapseLabel}
         display="inline-flex"

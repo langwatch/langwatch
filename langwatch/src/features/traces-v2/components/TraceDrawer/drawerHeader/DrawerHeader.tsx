@@ -186,6 +186,12 @@ export const DrawerHeader = memo(function DrawerHeader({
   const selectSpan = useDrawerStore((s) => s.selectSpan);
   const toggleMaximized = useDrawerStore((s) => s.toggleMaximized);
   const toggleSnapMaximize = useDrawerStore((s) => s.toggleSnapMaximize);
+  // The Maximize / Restore icon drives the same width snap that
+  // double-clicking the edge grip uses — `widthPx` is the actual size
+  // signal, while the boolean `isMaximized` is kept in sync for
+  // components that read it to swap the icon label. The SSR / no-window
+  // branch falls through to `toggleMaximized()` so the button still
+  // does *something* visible during hydration.
   const handleMaximizeClick = () => {
     if (typeof window === "undefined") {
       toggleMaximized();

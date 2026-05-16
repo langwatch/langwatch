@@ -435,25 +435,15 @@ export const IOViewer = memo(function IOViewer({
                     ? 0
                     : 3
               }
-              opacity={
-                !isVirtualizingChat && !engaged && hasOverflow ? 0.6 : 1
-              }
+              opacity={1}
               transition="opacity 120ms ease-out"
-              maxHeight={
-                isVirtualizingChat
-                  ? undefined
-                  : engaged
-                    ? "min(90vh, 900px)"
-                    : "min(80vh, 600px)"
-              }
-              // Idle: overflow hidden so wheel falls through to the page.
-              // Engaged: overflow auto + `overscroll-behavior: auto` so the
-              // panel scrolls internally but chains back to the page at
-              // boundaries (no trap).
-              overflow={
-                isVirtualizingChat ? "hidden" : engaged ? "auto" : "hidden"
-              }
-              overscrollBehavior="auto"
+              // The IOViewer no longer manages its own scroll container.
+              // The parent pane (TraceDrawer's <Pane>) gives the section
+              // its own scroll viewport, so capping height here just
+              // creates a nested scrollbar inside an already-scrolling
+              // pane. Let the content render at its natural height and
+              // let the pane decide how much to show.
+              overflow="visible"
             >
               <IOViewerBody
                 format={format}

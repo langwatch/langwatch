@@ -82,12 +82,14 @@ Rule: Drawer maximise and restore
 
   Scenario: Maximise drawer with the M shortcut
     When the user presses M
-    Then `drawerStore.toggleMaximized()` runs
+    Then `drawerStore.toggleSnapMaximize(window.innerWidth)` runs
+    And the same width snap as the edge-grip double-click is applied
 
   Scenario: Restore drawer to its prior width
     Given the drawer is at the maximize snap width
     When the user double-clicks the edge grip (or presses M again)
-    Then `drawerStore.widthPx` returns to the previously remembered width
+    Then `drawerStore.toggleSnapMaximize(window.innerWidth)` runs
+    And `drawerStore.widthPx` returns to the previously remembered width
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -828,7 +830,8 @@ Rule: Keyboard shortcuts
 
   Scenario: M toggles maximize / restore
     When the user presses M
-    Then `toggleMaximized()` runs
+    Then `toggleSnapMaximize(window.innerWidth)` runs
+    And the drawer width snaps to (or restores from) the maximize edge
 
   Scenario: B navigates back through the per-drawer history stack
     Given `traceBackStack` is non-empty

@@ -99,11 +99,19 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
 
   // The drawer width is driven by the operator's drag (persisted in
   // drawerStore.widthPx). When `null`, we fall back to the legacy 45%
-  // viewport rule. Below the `md` breakpoint there isn't useful
-  // underlying surface to peek at — the drawer goes full viewport so
-  // the chrome stays usable on phones.
+  // viewport rule. Below the `md` breakpoint (~768px) there isn't
+  // useful underlying surface to peek at — the drawer goes full
+  // viewport so the chrome stays usable on phones. We also skip the
+  // inline override if the persisted width is wider than the current
+  // viewport, so a width remembered on a wide monitor never overflows
+  // a narrower window.
+  const viewportWidth =
+    typeof window !== "undefined" ? window.innerWidth : Infinity;
+  const isCompactViewport = viewportWidth < 768;
+  const widthFitsViewport =
+    widthPx !== null && widthPx <= viewportWidth;
   const contentWidthStyle =
-    widthPx !== null
+    widthPx !== null && !isCompactViewport && widthFitsViewport
       ? {
           width: `${widthPx}px`,
           maxWidth: `${widthPx}px`,
