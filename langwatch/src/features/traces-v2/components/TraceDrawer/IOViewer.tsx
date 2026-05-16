@@ -358,10 +358,12 @@ export const IOViewer = memo(function IOViewer({
             value={format}
             onChange={(f) => setFormat(f as ViewFormat)}
             options={formatOptions.map((opt) => {
-              // Output is always a single assistant message, so the
-              // thread/bubbles split has no meaning there — only embed
-              // the layout toggle for input/system chat history.
-              if (opt === "pretty" && isChat && mode !== "output") {
+              // Both layouts (thread / bubbles) are available for any
+              // chat-shaped content — input *or* output. Even with a
+              // single assistant reply, the operator may want the
+              // bubble visual; conversely, a multi-message output
+              // (rare but possible) benefits from the flat stack.
+              if (opt === "pretty" && isChat) {
                 return {
                   value: "pretty",
                   submodes: {

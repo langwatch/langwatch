@@ -15,10 +15,14 @@ const traceColumnDefs = {
   time: traceCol.accessor("timestamp", {
     id: "time",
     header: "Time",
-    // Sized for "TIME" + sort caret + padding without clamping; the
-    // body content (`16d`, `2m`, `now`) fits comfortably inside.
-    size: 80,
-    minSize: 80,
+    // Body content is always a short relative string (`16d`, `2m`, `now`)
+    // or a chevron + relative. 60px is wide enough for "TIME" header + sort
+    // caret and tight enough that the trace name doesn't sit a thumb's
+    // width away from the timestamp. Capping at 64px so a manual resize
+    // can't balloon it back out either.
+    size: 60,
+    minSize: 56,
+    maxSize: 64,
     enableResizing: false,
   }),
   trace: traceCol.accessor("name", {

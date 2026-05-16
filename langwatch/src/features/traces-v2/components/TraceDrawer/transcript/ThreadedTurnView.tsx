@@ -2,10 +2,11 @@ import { Box, chakra, Flex, HStack, Icon, Text } from "@chakra-ui/react";
 import { useMemo, useState } from "react";
 import { LuChevronRight, LuUser } from "react-icons/lu";
 import { getDisplayRoleVisuals, useIsScenarioRole } from "../scenarioRoles";
+import { FlatTurnView } from "./FlatTurnView";
 import { ROLE_COLORS, ROLE_ICONS, ROLE_LABELS } from "./RoleChip";
 import { TurnView } from "./TurnView";
 import { summarizeTurn } from "./turns";
-import type { ConversationTurn } from "./types";
+import type { ChatLayout, ConversationTurn } from "./types";
 
 /**
  * Collapsible Gmail-style turn row.
@@ -23,6 +24,7 @@ export function ThreadedTurnView({
   turn,
   defaultExpanded,
   collapseTools = false,
+  layout = "thread",
 }: {
   turn: ConversationTurn;
   /**
@@ -35,6 +37,14 @@ export function ThreadedTurnView({
   isLast?: boolean;
   defaultExpanded: boolean;
   collapseTools?: boolean;
+  /**
+   * Which expanded body to render. "thread" → flat ChatGPT-style stack
+   * (role chip on top, content below, no boxes). "bubbles" → the
+   * canonical bubble/card UI from `TurnView`. The collapsed compact
+   * row is identical for both — only the expanded body differs, so
+   * users can flip between the two without losing the structure.
+   */
+  layout?: ChatLayout;
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const summary = useMemo(() => summarizeTurn(turn), [turn]);
@@ -65,11 +75,19 @@ export function ThreadedTurnView({
   if (expanded) {
     return (
       <Box paddingY={0.5}>
-        <TurnView
-          turn={turn}
-          collapseTools={collapseTools}
-          onCollapse={() => setExpanded(false)}
-        />
+        {layout === "thread" ? (
+          <FlatTurnView
+            turn={turn}
+            collapseTools={collapseTools}
+            onCollapse={() => setExpanded(false)}
+          />
+        ) : (
+          <TurnView
+            turn={turn}
+            collapseTools={collapseTools}
+            onCollapse={() => setExpanded(false)}
+          />
+        )}
       </Box>
     );
   }

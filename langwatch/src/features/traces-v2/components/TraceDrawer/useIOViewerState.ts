@@ -39,12 +39,15 @@ export function useIOViewerState({
   mode,
 }: UseIOViewerStateArgs): IOViewerState {
   const [format, setFormat] = useState<ViewFormat>("pretty");
-  // For output mode, default to bubbles — there's only ever one assistant
-  // message, so a "Turn N" thread row is meaningless. For input mode (the
-  // full chat history), keep thread as the default.
-  const [chatLayout, setChatLayout] = useState<ChatLayout>(
-    mode === "output" ? "bubbles" : "thread",
-  );
+  // Thread layout is the default everywhere — it's the flat
+  // ChatGPT-style stack (role label + content stacked, no boxes), which
+  // reads naturally for both the full input history and the single
+  // assistant reply in output mode. Bubbles remain available as the
+  // alternative for operators who prefer the boxed card visual.
+  const [chatLayout, setChatLayout] = useState<ChatLayout>("thread");
+  // `mode` is retained on the API for future per-mode defaults but no
+  // longer drives the initial layout.
+  void mode;
   // Markdown sub-mode: rendered (with formatting + Shiki for code fences)
   // or source (raw markdown text, syntax-highlighted as markdown).
   const [markdownSubmode, setMarkdownSubmode] =
