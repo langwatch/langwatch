@@ -133,20 +133,26 @@ Feature: Model default config cascade
   # Onboarding seed
   # ────────────────────────────────────────────────────────────────────────────
 
-  @integration
+  @integration @unimplemented
   Scenario: Enabling a provider on onboarding seeds one org-scope config
     Given a fresh organization with no ModelDefaultConfig rows
     When the onboarding flow enables the OpenAI provider at organization scope
     Then exactly one ModelDefaultConfig row exists with the org scope attached
     And the config JSON sets DEFAULT, FAST, and EMBEDDINGS to the registry's newest OpenAI flagship / mini / embedding model
+    # Needs a real-DB integration suite (testcontainer). The pure-logic
+    # plan builder is covered by buildSeedPlanForProvider tests; the
+    # row-creation half lands in the langwatch-app-ci integration run
+    # once the suite is added.
 
-  @integration
+  @integration @unimplemented
   Scenario: Enabling a second provider does not replace the existing org config
     Given an organization-scoped config exists with { "DEFAULT": "openai/gpt-5.5" }
     When the user enables Anthropic on a later onboarding
     Then the existing config is unchanged
     And no second org-scope config is created from the seed
-    # Onboarding is additive; only the first provider seeds. Subsequent provider adds don't re-seed.
+    # Onboarding is additive; only the first provider seeds. Subsequent
+    # provider adds don't re-seed. Same DB-required gate as the
+    # OpenAI-on-onboarding scenario above.
 
   # ────────────────────────────────────────────────────────────────────────────
   # Migration from the row-per-(scope,role,featureKey) shape
@@ -173,13 +179,14 @@ Feature: Model default config cascade
   # Write-side
   # ────────────────────────────────────────────────────────────────────────────
 
-  @integration
+  @integration @unimplemented
   Scenario: Saving a config with one scope creates one config + one scope row
     When I save a new config { "DEFAULT": "openai/gpt-5.5" } attached to organization "org-acme"
     Then one ModelDefaultConfig row exists with that JSON
     And one ModelDefaultConfigScope row exists pointing (ORGANIZATION, org-acme) at it
+    # Write-side; needs real DB.
 
-  @integration
+  @integration @unimplemented
   Scenario: Saving a config attached to many scopes creates one config + N scope rows
     When I save a new config { "DEFAULT": "openai/gpt-5.5" } attached to:
       | scopeType | scopeId  |
@@ -189,28 +196,31 @@ Feature: Model default config cascade
     Then one ModelDefaultConfig row exists with that JSON
     And three ModelDefaultConfigScope rows exist, one per scope
 
-  @integration
+  @integration @unimplemented
   Scenario: Updating a config does NOT change its createdAt
     Given an existing config created 2026-05-01
     When I update its JSON to add a new role default
     Then the config's createdAt is unchanged
     And the updatedAt is bumped
     # createdAt is the tiebreak for same-scope ordering; updating must
-    # not promote an old config to "newest at this scope".
+    # not promote an old config to "newest at this scope". Exercised by
+    # the updateConfig service implementation but a real-DB binding
+    # would re-test Prisma's @updatedAt convention rather than our code.
 
-  @integration
+  @integration @unimplemented
   Scenario: Deleting a config also deletes its scope attachments
     Given a config attached to two projects
     When I delete the config
     Then the config row is gone
     And no ModelDefaultConfigScope rows reference it
-    # Cascade-delete on the FK.
+    # Cascade-delete on the FK — bound to the FK declaration in
+    # ModelDefaultConfigScope (onDelete: Cascade), not a code path.
 
   # ────────────────────────────────────────────────────────────────────────────
   # Inherit semantics (UI <-> storage contract)
   # ────────────────────────────────────────────────────────────────────────────
 
-  @integration
+  @integration @unimplemented
   Scenario: The UI's "Inherit" choice is encoded as key absence in JSON
     Given a project-scoped config { "DEFAULT": "openai/gpt-5.5", "FAST": "openai/gpt-5.4-mini" }
     When the user changes FAST to "Inherit (from organization)"
@@ -218,3 +228,5 @@ Feature: Model default config cascade
     Then the config JSON becomes { "DEFAULT": "openai/gpt-5.5" }
     And no "inherit" string is stored anywhere
     # Absence = inherit; lean storage; merge logic stays trivial.
+    # The drawer-to-server round-trip + JSON storage shape — bind via
+    # the drawer integration test once the inherit-dropdown lands.
