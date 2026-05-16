@@ -664,6 +664,10 @@ export const useViewStore = create<ViewState>((set, get) => ({
     const lens = s.allLenses.find((l) => l.id === lensId);
     if (!lens) return;
     if (s.allLenses.length <= 1) return;
+    // "All" is the lens of last resort — every other built-in or user
+    // lens can be deleted/dismissed, but the strip must always offer a
+    // way back to the unfiltered table.
+    if (lensId === "all-traces") return;
     const allLenses = s.allLenses.filter((l) => l.id !== lensId);
     const nextDraft = clearDraftFor(s.draftState, lensId);
     if (lens.isBuiltIn) {

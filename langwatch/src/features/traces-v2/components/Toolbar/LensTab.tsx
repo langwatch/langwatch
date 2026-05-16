@@ -301,6 +301,13 @@ const BuiltInLensMenuItems: React.FC<{
   const deleteLens = useViewStore((s) => s.deleteLens);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
 
+  // "All" is the table's home base — if a user could dismiss it
+  // they'd lose the "show me everything" entry point with no way back
+  // short of clearing localStorage. Lock it as undeletable. Other
+  // built-ins (Conversations, Errors, …) can still be hidden via the
+  // `dismissedBuiltInIds` set so power users keep a clean strip.
+  const isUndeletable = lensId === "all-traces";
+
   return (
     <>
       <MenuItem
@@ -322,8 +329,10 @@ const BuiltInLensMenuItems: React.FC<{
       <MenuSeparator />
       <MenuItem
         value="delete"
-        onClick={() => deleteLens(lensId)}
-        disabled={!canDelete}
+        onClick={() =>
+          !isUndeletable && canDelete && deleteLens(lensId)
+        }
+        disabled={isUndeletable || !canDelete}
         color="fg.error"
       >
         <LuTrash2 />
