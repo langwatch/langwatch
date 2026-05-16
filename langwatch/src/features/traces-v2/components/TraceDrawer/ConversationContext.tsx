@@ -227,6 +227,9 @@ export const ConversationContext = memo(function ConversationContext({
       display="flex"
       flexDirection="column"
       height="100%"
+      width="100%"
+      minHeight={0}
+      minWidth={0}
       bg="bg.surface"
     >
       <ContextHeader
