@@ -73,7 +73,7 @@ export function GroupRow({
       {/* Group info */}
       <Flex direction="column" flex={1} minWidth={0} gap={0} justify="center">
         <HStack gap={1.5} minWidth={0}>
-          <Text textStyle="xs" fontFamily="mono" color="fg" truncate>
+          <Text textStyle="xs" color="fg" truncate>
             {group.name}
           </Text>
           <Text

@@ -529,7 +529,6 @@ export const DrawerHeader = memo(function DrawerHeader({
                         </Text>
                         <Text
                           textStyle="xs"
-                          fontFamily="mono"
                           flex={1}
                           truncate
                         >

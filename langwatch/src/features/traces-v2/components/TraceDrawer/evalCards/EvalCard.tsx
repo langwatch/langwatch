@@ -162,13 +162,12 @@ export function EvalCard({
               textStyle="lg"
               fontWeight="bold"
               color={tone.color}
-              fontFamily="mono"
               lineHeight={1}
             >
               {scoreLabel}
             </Text>
             {scoreSubLabel && (
-              <Text textStyle="2xs" color="fg.subtle" fontFamily="mono">
+              <Text textStyle="2xs" color="fg.subtle">
                 {scoreSubLabel}
               </Text>
             )}
@@ -324,7 +323,6 @@ function EvalCardFooter({
               align="center"
               textStyle="2xs"
               color="blue.fg"
-              fontFamily="mono"
               cursor="pointer"
               onClick={() => eval_.spanId && onSelectSpan?.(eval_.spanId)}
               _hover={{ textDecoration: "underline" }}
@@ -334,7 +332,7 @@ function EvalCardFooter({
           </HStack>
         )}
         {meta.map((m, i) => (
-          <Text key={i} textStyle="2xs" fontFamily="mono">
+          <Text key={i} textStyle="2xs">
             {m}
           </Text>
         ))}
@@ -368,7 +366,6 @@ function EvalCardFooter({
             <DetailRow label="Label">
               <Text
                 textStyle="xs"
-                fontFamily="mono"
                 color="fg"
                 fontWeight="medium"
               >
@@ -391,7 +388,6 @@ function EvalCardFooter({
               <Text
                 textStyle="xs"
                 color={tone.fg}
-                fontFamily="mono"
                 whiteSpace="pre-wrap"
                 wordBreak="break-word"
               >
@@ -406,7 +402,6 @@ function EvalCardFooter({
                   <HStack align="flex-start" gap={2} minWidth={0}>
                     <Text
                       textStyle="2xs"
-                      fontFamily="mono"
                       color="fg.subtle"
                       flexShrink={0}
                       minWidth="80px"
@@ -415,7 +410,6 @@ function EvalCardFooter({
                     </Text>
                     <Text
                       textStyle="2xs"
-                      fontFamily="mono"
                       color="fg"
                       wordBreak="break-all"
                     >
@@ -427,7 +421,6 @@ function EvalCardFooter({
                   <HStack align="flex-start" gap={2} minWidth={0}>
                     <Text
                       textStyle="2xs"
-                      fontFamily="mono"
                       color="fg.subtle"
                       flexShrink={0}
                       minWidth="80px"
@@ -436,7 +429,6 @@ function EvalCardFooter({
                     </Text>
                     <Text
                       textStyle="2xs"
-                      fontFamily="mono"
                       color="fg"
                       wordBreak="break-all"
                     >
@@ -452,7 +444,6 @@ function EvalCardFooter({
               <Box
                 as="pre"
                 textStyle="2xs"
-                fontFamily="mono"
                 color="fg.muted"
                 whiteSpace="pre-wrap"
                 wordBreak="break-word"
@@ -475,7 +466,6 @@ function EvalCardFooter({
                   <HStack key={key} align="flex-start" gap={2} minWidth={0}>
                     <Text
                       textStyle="2xs"
-                      fontFamily="mono"
                       color="fg.subtle"
                       flexShrink={0}
                       minWidth="80px"
@@ -485,7 +475,6 @@ function EvalCardFooter({
                     <Box
                       as="pre"
                       textStyle="2xs"
-                      fontFamily="mono"
                       color="fg"
                       whiteSpace="pre-wrap"
                       wordBreak="break-word"

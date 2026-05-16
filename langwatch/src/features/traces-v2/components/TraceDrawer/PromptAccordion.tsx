@@ -61,7 +61,6 @@ export function PromptAccordion({ span }: PromptAccordionProps) {
         <Text
           textStyle="sm"
           fontWeight="bold"
-          fontFamily="mono"
           color={handle ? "fg" : "fg.muted"}
         >
           {handle ?? "Prompt (no handle on span)"}
@@ -116,7 +115,6 @@ export function PromptAccordion({ span }: PromptAccordionProps) {
                   width="120px"
                   flexShrink={0}
                   textStyle="xs"
-                  fontFamily="mono"
                   color="fg.muted"
                   transition="color 0.12s ease, font-weight 0.12s ease"
                   css={{
@@ -131,7 +129,6 @@ export function PromptAccordion({ span }: PromptAccordionProps) {
                 <Text
                   flex={1}
                   textStyle="xs"
-                  fontFamily="mono"
                   color="fg"
                   truncate
                   minWidth={0}

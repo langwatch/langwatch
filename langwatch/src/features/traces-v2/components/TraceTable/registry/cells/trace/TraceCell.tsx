@@ -58,7 +58,6 @@ const TraceContent: React.FC<{
           />
           <Text
             as="span"
-            fontFamily="mono"
             textStyle={idStyle}
             color="fg.subtle"
             whiteSpace="nowrap"
@@ -70,7 +69,6 @@ const TraceContent: React.FC<{
         </HStack>
       ) : (
         <Text
-          fontFamily="mono"
           textStyle={nameStyle}
           color="fg"
           userSelect="all"

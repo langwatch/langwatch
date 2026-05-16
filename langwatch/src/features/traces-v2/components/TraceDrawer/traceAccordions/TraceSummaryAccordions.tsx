@@ -210,7 +210,6 @@ export function TraceSummaryAccordions({
                   <Text
                     textStyle="xs"
                     color="red.fg"
-                    fontFamily="mono"
                     whiteSpace="pre-wrap"
                   >
                     {trace.error}

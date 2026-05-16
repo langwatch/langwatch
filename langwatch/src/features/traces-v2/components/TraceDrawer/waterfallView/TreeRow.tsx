@@ -101,7 +101,7 @@ export function TreeRow({
           </Text>
         )}
         {span.model && (
-          <Text textStyle="2xs" color="fg.muted" fontFamily="mono">
+          <Text textStyle="2xs" color="fg.muted">
             {span.model}
           </Text>
         )}
@@ -235,7 +235,6 @@ export function TreeRow({
             <Text
               textStyle="xs"
               color={isError ? "red.fg" : "fg"}
-              fontFamily="mono"
               truncate
               minWidth={0}
               lineHeight={1.2}
@@ -246,7 +245,6 @@ export function TreeRow({
               <Text
                 textStyle="xs"
                 color="fg.subtle"
-                fontFamily="mono"
                 truncate
                 lineHeight={1.2}
               >
@@ -284,7 +282,6 @@ export function TreeRow({
           <Text
             textStyle="xs"
             color="fg.muted"
-            fontFamily="mono"
             flexShrink={0}
             marginLeft={1}
             whiteSpace="nowrap"

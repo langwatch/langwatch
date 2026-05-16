@@ -142,7 +142,6 @@ export const Chip = forwardRef<HTMLDivElement, ChipProps>(function Chip(
         <Text
           textStyle="2xs"
           color={style.fg}
-          fontFamily="mono"
           textTransform="uppercase"
           letterSpacing="0.04em"
           fontWeight="medium"

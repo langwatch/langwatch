@@ -21,7 +21,6 @@ const Kbd: React.FC<{ children: React.ReactNode }> = ({ children }) => (
     paddingX="3px"
     paddingY="0px"
     fontSize="2xs"
-    fontFamily="mono"
     fontWeight="500"
     bg="bg.muted"
     color="fg"

@@ -20,7 +20,7 @@ export const TtftCell = {
     <MonoCell>{row.ttft != null ? formatDuration(row.ttft) : dash}</MonoCell>
   ),
   renderComfortable: ({ row }) => (
-    <Text textStyle="sm" color="fg.muted" textAlign="right" fontFamily="mono">
+    <Text textStyle="sm" color="fg.muted" textAlign="right">
       {row.ttft != null ? formatDuration(row.ttft) : dash}
     </Text>
   ),
@@ -35,7 +35,7 @@ export const UserIdCell = {
     </MonoCell>
   ),
   renderComfortable: ({ row }) => (
-    <Text textStyle="sm" color="fg.muted" truncate fontFamily="mono">
+    <Text textStyle="sm" color="fg.muted" truncate>
       {row.userId || dash}
     </Text>
   ),
@@ -50,7 +50,7 @@ export const ConversationIdCell = {
     </MonoCell>
   ),
   renderComfortable: ({ row }) => (
-    <Text textStyle="sm" color="fg.muted" truncate fontFamily="mono">
+    <Text textStyle="sm" color="fg.muted" truncate>
       {row.conversationId || dash}
     </Text>
   ),
@@ -81,7 +81,7 @@ export const TokensInCell = {
     </MonoCell>
   ),
   renderComfortable: ({ row }) => (
-    <Text textStyle="sm" color="fg.muted" textAlign="right" fontFamily="mono">
+    <Text textStyle="sm" color="fg.muted" textAlign="right">
       {row.inputTokens != null ? formatTokens(row.inputTokens) : dash}
     </Text>
   ),
@@ -96,7 +96,7 @@ export const TokensOutCell = {
     </MonoCell>
   ),
   renderComfortable: ({ row }) => (
-    <Text textStyle="sm" color="fg.muted" textAlign="right" fontFamily="mono">
+    <Text textStyle="sm" color="fg.muted" textAlign="right">
       {row.outputTokens != null ? formatTokens(row.outputTokens) : dash}
     </Text>
   ),

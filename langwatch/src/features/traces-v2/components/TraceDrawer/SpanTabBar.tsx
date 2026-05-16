@@ -468,13 +468,12 @@ function SpanTab({
           fontWeight="inherit"
           maxWidth="180px"
           truncate
-          fontFamily="mono"
         >
           {span.name}
         </Text>
 
         {span.type === "llm" && span.model != null && (
-          <Text textStyle="2xs" color="fg.subtle" fontFamily="mono">
+          <Text textStyle="2xs" color="fg.subtle">
             {abbreviateModel(span.model)}
           </Text>
         )}
@@ -608,7 +607,6 @@ function PinnedSpanOverflowMenu({
                 <SpanTypeBadge type={span.type ?? "span"} />
                 <Text
                   textStyle="xs"
-                  fontFamily="mono"
                   truncate
                   flex={1}
                   fontWeight={isActive ? "semibold" : "normal"}

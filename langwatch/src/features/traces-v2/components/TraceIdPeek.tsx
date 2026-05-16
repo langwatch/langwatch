@@ -171,7 +171,6 @@ function PeekPopoverContent({ traceId }: { traceId: string }) {
               <Text
                 textStyle="xs"
                 color="fg"
-                fontFamily="mono"
                 lineClamp={2}
                 whiteSpace="pre-wrap"
                 wordBreak="break-word"
@@ -193,7 +192,6 @@ function PeekPopoverContent({ traceId }: { traceId: string }) {
               <Text
                 textStyle="xs"
                 color="fg"
-                fontFamily="mono"
                 lineClamp={2}
                 whiteSpace="pre-wrap"
                 wordBreak="break-word"
@@ -220,7 +218,7 @@ function PeekPopoverContent({ traceId }: { traceId: string }) {
 
       {/* Footer */}
       <HStack padding={2} paddingX={3} justify="space-between">
-        <Text textStyle="2xs" color="fg.subtle" fontFamily="mono">
+        <Text textStyle="2xs" color="fg.subtle">
           {traceId.slice(0, 16)}...
         </Text>
         <Text textStyle="2xs" color="fg.subtle">
@@ -237,7 +235,7 @@ function PopoverMetric({ label, value }: { label: string; value: string }) {
       <Text textStyle="2xs" color="fg.subtle">
         {label}:
       </Text>
-      <Text textStyle="2xs" color="fg" fontFamily="mono" fontWeight="medium">
+      <Text textStyle="2xs" color="fg" fontWeight="medium">
         {value}
       </Text>
     </HStack>

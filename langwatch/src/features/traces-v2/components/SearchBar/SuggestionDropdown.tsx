@@ -79,7 +79,7 @@ const DropdownFooter: React.FC = () => {
       bg="bg.subtle"
       justify="space-between"
     >
-      <Text textStyle="2xs" color="fg.subtle" fontFamily="mono">
+      <Text textStyle="2xs" color="fg.subtle">
         ↑↓ navigate · ⏎ select · esc close
       </Text>
       <Button
@@ -253,7 +253,7 @@ const SuggestionRowView: React.FC<SuggestionRowProps> = ({
       }}
     >
       <HStack gap={2} minWidth={0} flex={1}>
-        <Text textStyle="xs" fontFamily="mono" flexShrink={0}>
+        <Text textStyle="xs" flexShrink={0}>
           <Text as="span" color="fg" fontWeight="medium">
             {primary}
           </Text>
@@ -279,7 +279,6 @@ const SuggestionRowView: React.FC<SuggestionRowProps> = ({
         <Text
           textStyle="2xs"
           color="fg.subtle"
-          fontFamily="mono"
           marginLeft={2}
         >
           {count}
@@ -313,7 +312,7 @@ const FieldMetaSummary: React.FC<{ meta: SearchFieldMeta }> = ({ meta }) => (
     >
       {meta.valueType}
     </Badge>
-    <Text textStyle="2xs" color="fg.subtle" fontFamily="mono" truncate>
+    <Text textStyle="2xs" color="fg.subtle" truncate>
       {TYPE_HINT[meta.valueType]}
     </Text>
     <Text textStyle="2xs" color="fg.subtle" truncate>

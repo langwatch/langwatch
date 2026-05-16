@@ -137,7 +137,6 @@ export function PinnedMetricPill({
         <Text
           textStyle="2xs"
           color={fg}
-          fontFamily="mono"
           textTransform="uppercase"
           letterSpacing="0.04em"
           fontWeight="medium"
@@ -167,7 +166,6 @@ export function PinnedMetricPill({
           <Text
             textStyle="xs"
             color={value == null ? "fg.subtle" : "fg"}
-            fontFamily="mono"
             fontWeight="medium"
             truncate
             minWidth={0}

@@ -155,7 +155,7 @@ const ConversationTurnRow: React.FC<ConversationTurnRowProps> = ({
         >
           <HStack gap={2} textStyle="xs">
             <TraceIdPeek traceId={trace.traceId} />
-            <Badge size="xs" variant="outline" fontFamily="mono" flexShrink={0}>
+            <Badge size="xs" variant="outline" flexShrink={0}>
               T{turnIndex + 1}
             </Badge>
             {trace.status === "error" && (
@@ -192,7 +192,6 @@ const ConversationTurnRow: React.FC<ConversationTurnRowProps> = ({
               <Text
                 textStyle="2xs"
                 color="fg.subtle"
-                fontFamily="mono"
                 flexShrink={0}
               >
                 {abbreviateModel(turnModel)}
@@ -246,7 +245,7 @@ const GapRow: React.FC<{
             <Icon boxSize="10px" color={color}>
               <Clock />
             </Icon>
-            <Text color={color} textStyle="2xs" fontFamily="mono">
+            <Text color={color} textStyle="2xs">
               {formatGapSeconds(seconds)}
               {isPause ? " pause" : ""}
             </Text>
@@ -285,7 +284,7 @@ const CountChip: React.FC<{
     <Icon boxSize="10px" color={iconColor}>
       {icon}
     </Icon>
-    <Text textStyle="2xs" color="fg.subtle" fontFamily="mono">
+    <Text textStyle="2xs" color="fg.subtle">
       {value}
     </Text>
   </HStack>
@@ -299,7 +298,7 @@ const EvaluationChip: React.FC<{
   return (
     <HStack gap={0.5} flexShrink={0}>
       <Circle size="6px" bg={failed ? "red.solid" : "green.solid"} />
-      <Text textStyle="2xs" color="fg.subtle" fontFamily="mono">
+      <Text textStyle="2xs" color="fg.subtle">
         {passed}/{evaluations.length}
       </Text>
     </HStack>

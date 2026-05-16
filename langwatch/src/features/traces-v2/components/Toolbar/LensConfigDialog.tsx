@@ -302,7 +302,6 @@ const FilterField: React.FC = () => {
           borderColor="border.subtle"
           borderRadius="sm"
           bg="bg.muted"
-          fontFamily="mono"
           fontSize="xs"
           color={hasFilter ? "fg" : "fg.subtle"}
           minHeight="32px"

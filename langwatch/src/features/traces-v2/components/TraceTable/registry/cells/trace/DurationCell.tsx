@@ -29,7 +29,7 @@ export const DurationCell = {
     const ratio = Math.min(row.durationMs / MAX_DURATION_MS, 1);
     return (
       <VStack gap={1} align="end">
-        <Text textStyle="sm" color="fg.muted" fontFamily="mono">
+        <Text textStyle="sm" color="fg.muted">
           {formatDuration(row.durationMs)}
         </Text>
         <Box width="56px" height="3px" bg="border.subtle" borderRadius="full">

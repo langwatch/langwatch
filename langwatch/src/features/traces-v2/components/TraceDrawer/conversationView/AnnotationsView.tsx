@@ -207,7 +207,6 @@ function AnnotationRow({
             borderColor="border.muted"
             paddingX={2}
             paddingY={1.5}
-            fontFamily="mono"
             fontSize="xs"
             whiteSpace="pre-wrap"
             maxHeight="160px"

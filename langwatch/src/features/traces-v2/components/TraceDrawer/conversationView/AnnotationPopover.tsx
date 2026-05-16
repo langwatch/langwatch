@@ -343,7 +343,6 @@ function SuggestBody({
         minHeight="180px"
         maxHeight="180px"
         resize="none"
-        fontFamily="mono"
         fontSize="sm"
         lineHeight="1.6"
         autoFocus
@@ -664,10 +663,10 @@ function DiffCounts({
 
   return (
     <HStack gap={2}>
-      <Text textStyle="2xs" color="green.fg" fontFamily="mono">
+      <Text textStyle="2xs" color="green.fg">
         +{counts.added}
       </Text>
-      <Text textStyle="2xs" color="red.fg" fontFamily="mono">
+      <Text textStyle="2xs" color="red.fg">
         −{counts.removed}
       </Text>
     </HStack>
@@ -700,7 +699,6 @@ function DiffPanel({ original, edited }: { original: string; edited: string }) {
       paddingY={2.5}
       overflowY="auto"
       overflowX="hidden"
-      fontFamily="mono"
       fontSize="xs"
       lineHeight="1.6"
       whiteSpace="pre-wrap"

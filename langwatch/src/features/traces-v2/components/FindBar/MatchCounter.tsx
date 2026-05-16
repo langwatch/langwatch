@@ -21,7 +21,6 @@ export function MatchCounter({
     <Text
       textStyle="2xs"
       color="fg.subtle"
-      fontFamily="mono"
       flexShrink={0}
       whiteSpace="nowrap"
     >

@@ -151,7 +151,6 @@ export function EditableTraceName({
           fontWeight="semibold"
           textStyle="md"
           truncate
-          fontFamily="mono"
           letterSpacing="-0.005em"
           minWidth={0}
           color={titleIsFallback ? "fg.muted" : undefined}
@@ -185,7 +184,6 @@ export function EditableTraceName({
         <Input
           ref={inputRef}
           size="xs"
-          fontFamily="mono"
           fontSize="md"
           fontWeight="semibold"
           value={draft}

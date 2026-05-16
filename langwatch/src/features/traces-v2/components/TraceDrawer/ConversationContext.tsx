@@ -225,11 +225,11 @@ export const ConversationContext = memo(function ConversationContext({
           Conversation Context
         </Text>
         {ctx.isLoading ? (
-          <Text textStyle="2xs" color="fg.subtle" fontFamily="mono">
+          <Text textStyle="2xs" color="fg.subtle">
             loading…
           </Text>
         ) : ctx.total > 0 ? (
-          <Text textStyle="2xs" color="fg.subtle" fontFamily="mono">
+          <Text textStyle="2xs" color="fg.subtle">
             turn {ctx.position} of {ctx.total}
           </Text>
         ) : null}

@@ -20,7 +20,7 @@ function ExtraModelsBadge({
       content={
         <VStack align="start" gap={0.5} paddingY={0.5}>
           {models.map((m) => (
-            <Text key={m} textStyle="xs" fontFamily="mono">
+            <Text key={m} textStyle="xs">
               {m}
             </Text>
           ))}
@@ -56,7 +56,7 @@ function renderModel(row: TraceListItem, density: Density) {
   }
   return (
     <HStack gap={2}>
-      <Text textStyle="sm" color="fg.muted" fontFamily="mono" truncate>
+      <Text textStyle="sm" color="fg.muted" truncate>
         {primary}
       </Text>
       {rest.length > 0 && <ExtraModelsBadge models={rest} size="sm" />}

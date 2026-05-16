@@ -87,7 +87,7 @@ export function SpanAccordions({
           borderColor="border.muted"
         >
           <Spinner size="xs" color="blue.fg" />
-          <Text textStyle="xs" color="fg.muted" fontFamily="mono" truncate>
+          <Text textStyle="xs" color="fg.muted" truncate>
             Loading span{" "}
             <Text as="span" color="fg">
               {span.name}
@@ -245,7 +245,6 @@ export function SpanAccordions({
                         <Text
                           textStyle="xs"
                           color="red.fg"
-                          fontFamily="mono"
                           whiteSpace="pre-wrap"
                           fontWeight="semibold"
                         >
@@ -259,7 +258,6 @@ export function SpanAccordions({
                           borderWidth="1px"
                           borderColor="border"
                           padding={2}
-                          fontFamily="mono"
                           textStyle="xs"
                           color="fg.muted"
                           whiteSpace="pre-wrap"

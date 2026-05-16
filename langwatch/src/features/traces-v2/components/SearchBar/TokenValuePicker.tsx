@@ -204,7 +204,6 @@ export const TokenValuePicker: React.FC<TokenValuePickerProps> = ({
             paddingX={0}
             height="22px"
             fontSize="xs"
-            fontFamily="mono"
             _focus={{ outline: "none", boxShadow: "none" }}
             autoFocus
           />
@@ -244,7 +243,7 @@ export const TokenValuePicker: React.FC<TokenValuePickerProps> = ({
                   }}
                 >
                   <HStack gap={2} minWidth={0} flex={1}>
-                    <Text textStyle="xs" fontFamily="mono" flexShrink={0}>
+                    <Text textStyle="xs" flexShrink={0}>
                       <Text as="span" color="fg.muted">
                         {anchor.field}
                       </Text>
@@ -269,7 +268,6 @@ export const TokenValuePicker: React.FC<TokenValuePickerProps> = ({
                   <Text
                     textStyle="2xs"
                     color="fg.subtle"
-                    fontFamily="mono"
                     marginLeft={2}
                   >
                     {v.count.toLocaleString()}
@@ -288,7 +286,7 @@ export const TokenValuePicker: React.FC<TokenValuePickerProps> = ({
           bg="bg.subtle"
           justify="space-between"
         >
-          <Text textStyle="2xs" color="fg.subtle" fontFamily="mono">
+          <Text textStyle="2xs" color="fg.subtle">
             ↑↓ navigate · ⏎ select · esc close
           </Text>
           <Button

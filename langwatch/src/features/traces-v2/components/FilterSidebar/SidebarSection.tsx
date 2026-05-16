@@ -218,7 +218,6 @@ export const SidebarSection: React.FC<SidebarSectionProps> = ({
                     <Text
                       textStyle="2xs"
                       color="fg.subtle"
-                      fontFamily="mono"
                       _hover={{ color: "fg" }}
                     >
                       {valueCount}

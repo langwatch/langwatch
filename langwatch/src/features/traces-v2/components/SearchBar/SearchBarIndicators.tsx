@@ -127,7 +127,7 @@ export const StatusBadge: React.FC<{
             >
               <Text textStyle="xs" color="fg.muted">
                 Searching for a phrase? Wrap it in quotes —{" "}
-                <Text as="span" fontFamily="mono" color="fg">
+                <Text as="span" color="fg">
                   &quot;refund policy&quot;
                 </Text>
                 .
