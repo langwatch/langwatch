@@ -1,9 +1,9 @@
 import { Box, chakra, Flex, HStack, Icon, Text } from "@chakra-ui/react";
 import { useMemo, useState } from "react";
-import { LuChevronRight, LuUser } from "react-icons/lu";
+import { LuChevronDown, LuUser } from "react-icons/lu";
 import { getDisplayRoleVisuals, useIsScenarioRole } from "../scenarioRoles";
 import { FlatTurnView } from "./FlatTurnView";
-import { ROLE_COLORS, ROLE_ICONS, ROLE_LABELS } from "./RoleChip";
+import { getRolePalette, ROLE_ICONS, ROLE_LABELS } from "./RoleChip";
 import { TurnView } from "./TurnView";
 import { summarizeTurn } from "./turns";
 import type { ChatLayout, ConversationTurn } from "./types";
@@ -65,7 +65,7 @@ export function ThreadedTurnView({
       ? getDisplayRoleVisuals(turn.kind, { isScenario: true })
       : null;
   const colorKey = scenarioVisuals?.displayRole ?? sourceRole;
-  const color = ROLE_COLORS[colorKey] ?? "fg.muted";
+  const palette = getRolePalette(colorKey);
   const RoleIcon = scenarioVisuals?.Icon ?? ROLE_ICONS[sourceRole] ?? LuUser;
   const label =
     scenarioVisuals?.label ??
@@ -73,8 +73,12 @@ export function ThreadedTurnView({
     sourceRole.toUpperCase();
 
   if (expanded) {
+    // Expanded body — FlatTurnView (or TurnView for bubble layout)
+    // owns its own header (whole-row clickable to collapse, same
+    // avatar size as below). No extra paddingY here so the expanded
+    // and collapsed rows occupy the same vertical rhythm.
     return (
-      <Box paddingY={0.5}>
+      <Box paddingY={1.5}>
         {layout === "thread" ? (
           <FlatTurnView
             turn={turn}
@@ -92,57 +96,63 @@ export function ThreadedTurnView({
     );
   }
 
+  // Collapsed row — chrome MUST match the expanded header so the row
+  // height doesn't jump when toggling. Same 24px solid avatar, same
+  // paddingY={1.5}, same paddingX={1.5}, same text style. Caret points
+  // ↓ to signal "click to open downward". (Operator complaint: collapsed
+  // version was visibly smaller / more centred than the expanded one.)
   return (
-    <chakra.button
-      type="button"
-      onClick={() => setExpanded(true)}
-      display="flex"
-      alignItems="center"
-      gap={1.5}
-      paddingY={0.5}
-      paddingX={1.5}
-      borderRadius="sm"
-      cursor="pointer"
-      _hover={{ bg: "bg.muted" }}
-      textAlign="left"
-      width="full"
-    >
-      <HStack gap={1.5} flexShrink={0}>
+    <Box paddingY={1.5}>
+      <chakra.button
+        type="button"
+        onClick={() => setExpanded(true)}
+        display="flex"
+        alignItems="center"
+        gap={2}
+        width="full"
+        paddingY={0.5}
+        paddingX={1.5}
+        borderRadius="sm"
+        cursor="pointer"
+        _hover={{ bg: "bg.muted" }}
+        textAlign="left"
+      >
         <Flex
-          width="14px"
-          height="14px"
+          width="24px"
+          height="24px"
           borderRadius="full"
-          bg="bg.subtle"
-          borderWidth="1px"
-          borderColor="border.subtle"
+          bg={palette.solid}
           align="center"
           justify="center"
           flexShrink={0}
         >
-          <Icon as={RoleIcon} boxSize="8px" color={color} />
+          <Icon as={RoleIcon} boxSize="13px" color={palette.contrast} />
         </Flex>
-        <Text
-          textStyle="2xs"
-          color={color}
-          fontWeight="600"
-          textTransform="uppercase"
-          letterSpacing="0.06em"
-          lineHeight={1.4}
-        >
-          {label}
-        </Text>
-      </HStack>
-      <Text
-        textStyle="xs"
-        color="fg.default"
-        truncate
-        flex={1}
-        minWidth={0}
-        lineHeight={1.4}
-      >
-        {summary}
-      </Text>
-      <Icon as={LuChevronRight} boxSize={2.5} color="fg.subtle" flexShrink={0} />
-    </chakra.button>
+        <HStack gap={2} flex={1} minWidth={0}>
+          <Text
+            textStyle="2xs"
+            color={palette.fg}
+            fontWeight="600"
+            textTransform="uppercase"
+            letterSpacing="0.06em"
+            lineHeight={1.4}
+            flexShrink={0}
+          >
+            {label}
+          </Text>
+          <Text
+            textStyle="xs"
+            color="fg.default"
+            truncate
+            flex={1}
+            minWidth={0}
+            lineHeight={1.4}
+          >
+            {summary}
+          </Text>
+        </HStack>
+        <Icon as={LuChevronDown} boxSize={3.5} color="fg.subtle" flexShrink={0} />
+      </chakra.button>
+    </Box>
   );
 }

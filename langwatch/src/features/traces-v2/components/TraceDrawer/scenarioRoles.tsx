@@ -89,8 +89,8 @@ export function getDisplayRoleVisuals(
   return role === "user"
     ? {
         displayRole: "assistant",
-        label: "SIMULATOR",
-        bubbleLabel: "Simulator",
+        label: "USER SIMULATOR",
+        bubbleLabel: "User Simulator",
         Icon: LuFlaskConical,
       }
     : {
