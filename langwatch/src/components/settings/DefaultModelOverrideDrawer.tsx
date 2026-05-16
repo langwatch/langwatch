@@ -42,7 +42,7 @@ import {
 import { Tooltip } from "~/components/ui/tooltip";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { allModelOptions } from "~/components/ModelSelector";
+import { modelSelectorOptions } from "~/components/ModelSelector";
 import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
 import { api, type RouterOutputs } from "~/utils/api";
@@ -178,7 +178,64 @@ export function DefaultModelOverrideDrawer({
     return m;
   }, [features]);
 
-  const modelOptions = useMemo(() => allModelOptions, []);
+  // Narrow the model picker to only providers enabled in the cascade
+  // visible to this project. Chat-mode models for DEFAULT/FAST roles;
+  // embedding-mode for EMBEDDINGS. Custom models registered on the
+  // provider (e.g. extra OpenAI deployment names) are folded in so
+  // self-serve admins see what they've added.
+  const projectProviders = api.modelProvider.getAllForProject.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project?.id && open, refetchOnMount: false },
+  );
+
+  const modelOptionsByRole = useMemo(() => {
+    const providers = projectProviders.data ?? {};
+    const enabledEntries = Object.entries(providers).filter(
+      ([, p]) => p?.enabled === true,
+    );
+    const enabledKeys = new Set(enabledEntries.map(([k]) => k));
+    // First-paint fallback: no providers loaded yet → list everything so
+    // the dropdown isn't visually broken while the query is in flight.
+    const filterByMode = (mode: "chat" | "embedding") => {
+      if (enabledEntries.length === 0) {
+        return modelSelectorOptions
+          .filter((o) => o.mode === mode)
+          .map((o) => o.value);
+      }
+      // Registry chat/embedding models from any enabled provider. This
+      // mirrors the ModelProviderDefaultSection logic — the registry is
+      // the broad pool; provider toggles narrow it.
+      const registryModels = modelSelectorOptions
+        .filter((o) => {
+          if (o.mode !== mode) return false;
+          const providerKey = o.value.split("/")[0] ?? "";
+          return enabledKeys.has(providerKey);
+        })
+        .map((o) => o.value);
+      // User-defined custom entries on each enabled provider. Custom
+      // models live in `customModels` / `customEmbeddingsModels`; bare
+      // string lists in `models` / `embeddingsModels` are registry
+      // enablement subsets and already covered above.
+      const customModels: string[] = [];
+      for (const [providerKey, providerData] of enabledEntries) {
+        if (!providerData) continue;
+        const customList =
+          mode === "embedding"
+            ? providerData.customEmbeddingsModels ?? []
+            : providerData.customModels ?? [];
+        for (const m of customList) {
+          if (m?.modelId) customModels.push(`${providerKey}/${m.modelId}`);
+        }
+      }
+      // Custom entries first so user-added models are easy to spot.
+      return Array.from(new Set([...customModels, ...registryModels]));
+    };
+    return {
+      DEFAULT: filterByMode("chat"),
+      FAST: filterByMode("chat"),
+      EMBEDDINGS: filterByMode("embedding"),
+    } satisfies Record<ModelRoleKey, string[]>;
+  }, [projectProviders.data]);
 
   const setOverride = useCallback((key: string, model: string | null) => {
     setConfig((prev) => {
@@ -301,7 +358,7 @@ export function DefaultModelOverrideDrawer({
                   onToggleExpand={() =>
                     setExpanded((prev) => ({ ...prev, [role]: !prev[role] }))
                   }
-                  modelOptions={modelOptions}
+                  modelOptions={modelOptionsByRole[role]}
                   onSetOverride={setOverride}
                 />
               ))}

@@ -56,6 +56,14 @@ vi.mock("~/utils/api", () => ({
           isLoading: false,
         }),
       },
+      getAllForProject: {
+        useQuery: () => ({
+          data: {
+            openai: { enabled: true, customModels: [], customEmbeddingsModels: [] },
+          },
+          isLoading: false,
+        }),
+      },
       saveDefaultModelsConfig: {
         useMutation: () => ({ mutateAsync: mockSave, isPending: false }),
       },
