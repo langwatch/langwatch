@@ -449,20 +449,39 @@ func (e *Engine) runSignature(ctx context.Context, execReq ExecuteRequest, node 
 }
 
 // signatureNeedsStructuredOutput returns true when the engine should
-// ask the LLM for a JSON-shaped response and parse it across multiple
-// outputs. True iff any output is typed json_schema OR there are 2+
-// outputs (multi-output requires field separation — assigning the raw
-// content to every declared output loses signal).
+// ask the LLM for a JSON-shaped response and parse it across one or
+// more typed outputs.
+//
+// Python parity — langwatch_nlp/langwatch_nlp/studio/dspy/template_
+// adapter.py:228-232 `_use_text_only_completion`: text-only iff there
+// are zero outputs OR a single output whose annotation is `str`.
+// Everything else (single bool, single float, single json_schema, OR
+// 2+ outputs) needs response_format on the LLM request so the model
+// returns a parseable JSON object the engine can coerce back into the
+// declared field types.
+//
+// Earlier revision (PR #4062 baseline) only triggered structured
+// outputs for json_schema-typed OR 2+ outputs. That missed single
+// `bool` / `float` outputs entirely: the engine sent no response_format,
+// the LLM replied with prose, and engine.go's fallback shoved that prose
+// into a typed slot as a raw string — manifesting as a blank chat bubble
+// in the playground (rchaves dogfood 2026-05-16) because the TS output-
+// formatter silently rejects type-mismatched values.
 func signatureNeedsStructuredOutput(outputs []dsl.Field) bool {
-	if len(outputs) >= 2 {
-		return true
+	if len(outputs) == 0 {
+		return false
 	}
 	for _, f := range outputs {
-		if f.Type == dsl.FieldTypeJSONSchema {
+		if f.Type != dsl.FieldTypeStr {
 			return true
 		}
 	}
-	return false
+	// All outputs are `str`: when there's exactly one, use the text-
+	// only fast path (Python's _use_text_only_completion). When there
+	// are multiple `str` outputs, we still need structured output —
+	// otherwise the same response text would be assigned to every
+	// declared output, losing signal.
+	return len(outputs) >= 2
 }
 
 // sanitizeSchemaName normalizes a string to OpenAI's

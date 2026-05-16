@@ -11,21 +11,41 @@ import (
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/dsl"
 )
 
-// TestSignatureNeedsStructuredOutput pins the policy: structured
-// response_format is requested when (a) any output is json_schema-typed
-// or (b) there are 2+ outputs (multi-output requires field separation).
+// TestSignatureNeedsStructuredOutput pins the Python-parity policy
+// (_use_text_only_completion at langwatch_nlp/langwatch_nlp/studio/dspy/
+// template_adapter.py:228-232): text-only fast path is taken iff there
+// are zero outputs OR a single output whose type is `str`. Everything
+// else needs response_format — including single `bool`, single `float`,
+// single `json_schema`, and any multi-output signature.
+//
+// Pre-fix this gate only fired for json_schema-typed or 2+ outputs;
+// single `bool` / single `float` slipped through, the LLM replied with
+// prose, and the engine shoved that prose into a typed slot. Manifested
+// as a blank chat bubble in the playground (rchaves dogfood 2026-05-16)
+// because the TS output-formatter silently rejects type-mismatched
+// values.
 func TestSignatureNeedsStructuredOutput(t *testing.T) {
 	cases := []struct {
 		name string
 		out  []dsl.Field
 		want bool
 	}{
-		{"single str", []dsl.Field{{Identifier: "a", Type: dsl.FieldTypeStr}}, false},
-		{"single int", []dsl.Field{{Identifier: "n", Type: dsl.FieldTypeInt}}, false},
-		{"single json_schema", []dsl.Field{{Identifier: "o", Type: dsl.FieldTypeJSONSchema}}, true},
-		{"two str", []dsl.Field{{Identifier: "a"}, {Identifier: "b"}}, true},
-		{"three mixed", []dsl.Field{{Identifier: "a"}, {Identifier: "b"}, {Identifier: "c"}}, true},
+		// Text-only fast path (Python parity).
 		{"empty", []dsl.Field{}, false},
+		{"single str", []dsl.Field{{Identifier: "a", Type: dsl.FieldTypeStr}}, false},
+
+		// Single non-str — was the gap, now correctly structured.
+		{"single bool", []dsl.Field{{Identifier: "passed", Type: dsl.FieldTypeBool}}, true},
+		{"single float", []dsl.Field{{Identifier: "score", Type: dsl.FieldTypeFloat}}, true},
+		{"single int", []dsl.Field{{Identifier: "n", Type: dsl.FieldTypeInt}}, true},
+		{"single json_schema", []dsl.Field{{Identifier: "o", Type: dsl.FieldTypeJSONSchema}}, true},
+		{"single list[str]", []dsl.Field{{Identifier: "tags", Type: dsl.FieldTypeListStr}}, true},
+		{"single dict", []dsl.Field{{Identifier: "meta", Type: dsl.FieldTypeDict}}, true},
+
+		// Multi-output always structured (assigning the same response
+		// to every declared output loses signal).
+		{"two str", []dsl.Field{{Identifier: "a", Type: dsl.FieldTypeStr}, {Identifier: "b", Type: dsl.FieldTypeStr}}, true},
+		{"three mixed", []dsl.Field{{Identifier: "a"}, {Identifier: "b"}, {Identifier: "c"}}, true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -52,6 +72,31 @@ func TestComposeSignatureResponseFormat_TwoStringOutputs(t *testing.T) {
 	assert.Equal(t, map[string]any{"type": "number"}, props["confidence"])
 	required := schema["required"].([]string)
 	assert.ElementsMatch(t, []string{"label", "confidence"}, required)
+}
+
+// TestComposeSignatureResponseFormat_SingleBool pins the rchaves
+// dogfood case (2026-05-16): a prompt with Structured Outputs ON and a
+// single output `passed: bool` must produce a response_format with a
+// boolean property so the LLM returns `{"passed": true}` instead of
+// prose. Pre-fix the gate predicate skipped this entirely and the
+// engine never sent response_format.
+func TestComposeSignatureResponseFormat_SingleBool(t *testing.T) {
+	rf := composeSignatureResponseFormat("Verifier", []dsl.Field{
+		{Identifier: "passed", Type: dsl.FieldTypeBool},
+	})
+	require.NotNil(t, rf, "single-bool output must produce a response_format (Python parity)")
+	assert.Equal(t, "json_schema", rf.Type)
+	js := rf.JSONSchema
+	assert.Equal(t, "Verifier", js["name"])
+	assert.Equal(t, true, js["strict"])
+	schema := js["schema"].(map[string]any)
+	assert.Equal(t, "object", schema["type"])
+	assert.Equal(t, false, schema["additionalProperties"])
+	props := schema["properties"].(map[string]any)
+	assert.Equal(t, map[string]any{"type": "boolean"}, props["passed"],
+		"the bool field must declare type:boolean so the LLM returns a JSON bool, not prose")
+	required := schema["required"].([]string)
+	assert.ElementsMatch(t, []string{"passed"}, required)
 }
 
 // TestComposeSignatureResponseFormat_JSONSchemaPassthrough proves a
