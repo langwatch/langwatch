@@ -174,6 +174,23 @@ export const AiPromptInput: React.FC<AiPromptInputProps> = ({
     ? { ...thinkingShimmerStyles, animation: "none" }
     : thinkingShimmerStyles;
 
+  // Pending mode swaps the Input for a shimmer Box that has no key
+  // handlers — without a global listener the user couldn't cancel an
+  // in-flight AI request with Esc. The mutation itself can't be aborted
+  // mid-flight (tRPC mutate has no native cancel), but `onClose` tears
+  // down the composer, which flips the host hook's `cancelledRef` so
+  // any late response is dropped on the floor and the user gets out.
+  useEffect(() => {
+    if (!isPending) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      onClose();
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [isPending, onClose]);
+
   return (
     <Flex align="center" gap={2} width="full" position="relative">
       <svg
@@ -268,14 +285,16 @@ export const AiPromptInput: React.FC<AiPromptInputProps> = ({
           </HStack>
         </Tooltip>
       )}
-      <Tooltip content="Exit AI mode (Esc)" openDelay={200}>
+      <Tooltip
+        content={isPending ? "Cancel (Esc)" : "Exit AI mode (Esc)"}
+        openDelay={200}
+      >
         <IconButton
-          aria-label="Exit AI mode"
+          aria-label={isPending ? "Cancel AI request" : "Exit AI mode"}
           size="2xs"
           variant="ghost"
           color="fg.subtle"
           onClick={onClose}
-          disabled={isPending}
         >
           <X size={13} />
         </IconButton>

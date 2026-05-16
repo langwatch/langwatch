@@ -14,6 +14,7 @@ import {
   LuMaximize2,
   LuMinimize2,
   LuRefreshCw,
+  LuX,
 } from "react-icons/lu";
 import { Kbd } from "~/components/ops/shared/Kbd";
 import {
@@ -22,7 +23,6 @@ import {
   MenuItem,
   MenuRoot,
 } from "~/components/ui/menu";
-import { CloseButton } from "~/components/ui/close-button";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
 import { TracePresenceAvatars } from "~/features/presence/components/TracePresenceAvatars";
@@ -833,12 +833,28 @@ export const DrawerHeader = memo(function DrawerHeader({
             }
             positioning={{ placement: "bottom" }}
           >
-            {/* Standard Chakra `CloseButton` — same affordance as
-                every other drawer in the app (online evaluations,
-                add-to-dataset, …). The previous custom Button with a
-                larger LuX icon was inconsistent with the rest of the
-                product. */}
-            <CloseButton size="sm" onClick={onClose} aria-label="Close drawer" />
+            {/* Plain ghost Button — the standard Chakra `CloseButton`
+                (IconButton wrapper) intermittently swallowed the click
+                under our Drawer.Root setup: the URL stripped fine but
+                the drawer didn't unmount, leaving the operator stuck.
+                A bare Button calling `onClose` directly is the same
+                pattern this drawer used pre-revamp and behaves
+                reliably across Chakra's Drawer focus management. */}
+            <Button
+              size="xs"
+              variant="ghost"
+              onClick={onClose}
+              aria-label="Close drawer"
+              paddingX={1.5}
+              paddingY={1.5}
+              height="auto"
+              minWidth="auto"
+              color="fg.muted"
+              _hover={{ bg: "bg.muted", color: "fg" }}
+              _active={{ bg: "bg.emphasized" }}
+            >
+              <Icon as={LuX} boxSize={4} strokeWidth={2.25} />
+            </Button>
           </Tooltip>
         </HStack>
       </HStack>

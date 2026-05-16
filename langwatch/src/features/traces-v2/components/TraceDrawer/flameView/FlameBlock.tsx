@@ -91,6 +91,19 @@ export function FlameBlock({
             ? depthAlpha * 0.3
             : depthAlpha) * 100,
   );
+  // Light mode runs on a much stronger floor: alpha-tinted `.solid`
+  // tokens against a white surface produce pale fills that white text
+  // disappears into. Pin every state to a "saturated, readable" floor
+  // and let the hover/select/dim states still nudge the alpha around
+  // without ever landing in unreadable-text territory. White text is
+  // legible against this whole band.
+  const lightBgAlphaPct = isEmphasized
+    ? 100
+    : isDimmed
+      ? 55
+      : isAncestor || isDirectChild
+        ? 95
+        : 85;
   const isZeroDuration = spanDur === 0;
 
   const parentDurMs = node.parent
@@ -154,7 +167,10 @@ export function FlameBlock({
         width={`${widthPct}%`}
         minWidth={`${MIN_BLOCK_PX}px`}
         height={`${ROW_HEIGHT}px`}
-        bg={`${color}/${bgAlphaPct}`}
+        bg={{
+          base: `${color}/${lightBgAlphaPct}`,
+          _dark: `${color}/${bgAlphaPct}`,
+        }}
         borderWidth={borderWidth}
         borderColor={borderColor}
         borderStyle={node.isOrphaned ? "dashed" : "solid"}
@@ -180,26 +196,18 @@ export function FlameBlock({
       >
         <Text
           textStyle="xs"
-          // Every non-dimmed flame block in this view runs at
-          // depthAlpha ≥ 0.7 (see DEPTH_FADE_FLOOR), so the fill is
-          // always a saturated/darkish colour — white text reads
-          // against it in BOTH modes. The earlier light-mode rule
-          // assumed pastel tints (gray.800 on top) and produced
-          // unreadable dark-on-dark text whenever the user landed on a
-          // saturated colour like `blue.solid`. Only the *dimmed* state
-          // (hover-dim siblings at ~0.2-0.3 alpha) needs dark text on
-          // top in light mode — there the fill is washed out enough
-          // that white would disappear.
+          // White text in both modes. Light mode's `lightBgAlphaPct`
+          // floor (see above) keeps every block saturated enough that
+          // white reads cleanly — no more dark-on-light fights when the
+          // alpha rolled into pastel territory. The text-shadow gives a
+          // half-pixel of lift against the saturated background so the
+          // glyphs don't melt into the colour. Even at the dimmed-state
+          // alpha (~55%), white over a `.solid` blue/purple/teal still
+          // beats the legibility of dark text on a pale tint.
           color="white"
-          _light={{
-            color: isDimmed ? "gray.800" : "white",
-            textShadow: isDimmed
-              ? "0 1px 0 rgba(255,255,255,0.45)"
-              : "0 1px 1px rgba(0,0,0,0.45)",
-          }}
           truncate
           lineHeight={1}
-          textShadow="0 1px 1px rgba(0,0,0,0.35)"
+          textShadow="0 1px 1px rgba(0,0,0,0.45)"
         >
           <BlockLabel
             name={span.name}

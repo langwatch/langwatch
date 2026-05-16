@@ -92,6 +92,7 @@ export const SearchBar: React.FC = () => {
   const [editorHasContent, setEditorHasContent] = useState(false);
   const [aiMode, setAiMode] = useState(false);
   const [suggestionOpen, setSuggestionOpen] = useState(false);
+  const [cursorAnchorX, setCursorAnchorX] = useState(0);
   // When the user fires ⌘+⏎ on a typed query, we punt the text into AI
   // mode AND ask the composer to submit immediately. Tracked separately
   // from `aiMode` because the same flag would otherwise re-fire on every
@@ -306,6 +307,7 @@ export const SearchBar: React.FC = () => {
                 onTokenClick={setTokenAnchor}
                 onAiShortcut={handleEditorAiShortcut}
                 onSuggestionOpenChange={setSuggestionOpen}
+                onCursorAnchorChange={setCursorAnchorX}
               />
             ) : (
               <PlaceholderEditor
@@ -315,11 +317,14 @@ export const SearchBar: React.FC = () => {
                 onTokenClick={setTokenAnchor}
               />
             )}
+            {hasContent && !suggestionOpen && !askAiNeedsProviderPrimer && (
+              <SearchSubmitHint
+                anchorX={cursorAnchorX}
+                onAskAi={() => handleEditorAiShortcut(queryText)}
+              />
+            )}
           </Box>
 
-          {hasContent && !suggestionOpen && !askAiNeedsProviderPrimer && (
-            <SearchSubmitHint onAskAi={() => handleEditorAiShortcut(queryText)} />
-          )}
           <StatusBadge status={status} />
           <SearchTipsPopover />
           {hasContent ? (
@@ -342,45 +347,61 @@ const IS_MAC =
 const MOD_KEY_SYMBOL = IS_MAC ? "⌘" : "Ctrl";
 
 /**
- * Inline "Press ⏎ to search · ⌘+⏎ to Ask AI" hint that renders at the
- * right edge of the search input whenever the operator has typed
- * content and the autocomplete dropdown isn't currently open. The Ask AI
- * chunk is a clickable button so a mouse-driven user gets the same
- * affordance as the keyboard shortcut.
+ * Inline "Press ⏎ to search filters, ⌘+⏎ to Ask AI" hint rendered as
+ * plain gray text pinned just after the typed content (anchored to the
+ * editor's cursor position). Looks like a continuation of the input —
+ * which is exactly the point: it's a hint, not a button row. The Ask
+ * AI clause is still clickable so a mouse-driven operator can punt
+ * the query to AI without learning the shortcut. The whole thing
+ * disappears mid-autocomplete so it never competes with the dropdown.
  */
-const SearchSubmitHint: React.FC<{ onAskAi: () => void }> = ({ onAskAi }) => (
-  <HStack
-    gap={1.5}
-    flexShrink={0}
-    paddingX={1}
+const SearchSubmitHint: React.FC<{
+  anchorX: number;
+  onAskAi: () => void;
+}> = ({ anchorX, onAskAi }) => (
+  <Text
+    position="absolute"
+    // Pin just past the cursor with a small gap. The cursor anchor is
+    // measured from the editor's left edge; the typing area starts at
+    // the same origin, so this lands exactly after the last typed
+    // glyph. Capped at the editor's right edge by `maxWidth` below.
+    left={`${anchorX + 12}px`}
+    top="50%"
+    transform="translateY(-50%)"
     color="fg.subtle"
-    textStyle="2xs"
-    aria-hidden={false}
+    textStyle="xs"
+    fontWeight="normal"
+    whiteSpace="nowrap"
+    overflow="hidden"
+    textOverflow="ellipsis"
+    maxWidth="calc(100% - var(--cursor-anchor, 0px))"
+    // The editor itself owns clicks for caret placement — the hint
+    // shouldn't intercept them. We still re-enable pointer events on
+    // the Ask AI fragment so it remains clickable.
+    pointerEvents="none"
+    userSelect="none"
   >
-    <HStack gap={1}>
-      <Kbd>↵</Kbd>
-      <Text>search</Text>
-    </HStack>
-    <Text color="border.muted">·</Text>
-    <chakra.button
-      type="button"
-      onClick={onAskAi}
-      // mouseDown so we beat the editor's onBlur — the click would
-      // otherwise refocus + race with AI mode entry.
-      onMouseDown={(e) => e.preventDefault()}
-      display="inline-flex"
-      alignItems="center"
-      gap={1}
+    {"Press "}
+    <Kbd>↵</Kbd>
+    {" to search, "}
+    <chakra.span
+      onMouseDown={(e) => {
+        // mouseDown so we beat the editor's onBlur — the click would
+        // otherwise race with AI mode entry.
+        e.preventDefault();
+        e.stopPropagation();
+        onAskAi();
+      }}
       cursor="pointer"
-      paddingX={1}
-      paddingY={0.5}
-      borderRadius="sm"
-      _hover={{ color: "fg.muted", bg: "bg.muted" }}
-      transition="color 0.12s ease, background 0.12s ease"
+      pointerEvents="auto"
+      color="fg.muted"
+      _hover={{ color: "fg" }}
+      transition="color 0.12s ease"
     >
       <Kbd>{MOD_KEY_SYMBOL}</Kbd>
+      <chakra.span marginX={0.5} />
       <Kbd>↵</Kbd>
-      <Text>Ask AI</Text>
-    </chakra.button>
-  </HStack>
+      {" to Ask AI"}
+    </chakra.span>
+  </Text>
 );

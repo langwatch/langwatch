@@ -33,6 +33,13 @@ interface ActiveSearchEditorProps {
    * behind / next to the dropdown).
    */
   onSuggestionOpenChange?: (open: boolean) => void;
+  /**
+   * Bubbles up the cursor's pixel offset from the editor's left edge.
+   * The SearchBar renders an inline "Press ⏎ to search…" hint pinned
+   * to this offset so the hint floats just after whatever the user
+   * has typed, no matter how long it is.
+   */
+  onCursorAnchorChange?: (anchorX: number) => void;
 }
 
 /**
@@ -49,6 +56,7 @@ export const ActiveSearchEditor: React.FC<ActiveSearchEditorProps> = ({
   onTokenClick,
   onAiShortcut,
   onSuggestionOpenChange,
+  onCursorAnchorChange,
 }) => {
   const { editor, suggestion, acceptSuggestion, cursorAnchorX } =
     useFilterEditor({
@@ -77,6 +85,10 @@ export const ActiveSearchEditor: React.FC<ActiveSearchEditorProps> = ({
     if (!onSuggestionOpenChange) return;
     onSuggestionOpenChange(suggestion.state.open && suggestion.items.length > 0);
   }, [suggestion.state.open, suggestion.items.length, onSuggestionOpenChange]);
+
+  useEffect(() => {
+    onCursorAnchorChange?.(cursorAnchorX);
+  }, [cursorAnchorX, onCursorAnchorChange]);
 
   return (
     <>
