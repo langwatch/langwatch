@@ -30,22 +30,15 @@ const PANE_GROUP_STORAGE_PREFIX = "langwatch:traces-v2:drawer-panel-sizes";
 
 /**
  * Renders the trace drawer body as a stack of independently sized,
- * scrollable panes — Chrome DevTools "Network → Headers / Preview"
+ * scrollable panels — Chrome DevTools "Network → Headers / Preview"
  * model.
  *
- * Three logical panes:
- *
- *   1. Conversation Context (only when the trace belongs to a conversation)
- *      — always sits on top in both layouts, collapsible.
- *   2. Visualization (waterfall / flame / span list / topology / sequence)
- *      — fills the rest of the available space.
- *   3. Span Detail (SpanTabBar + active panel: summary / llm / prompts / span)
- *      — sits next to Visualization in horizontal layout, below it in
- *      vertical.
- *
- * Each pane owns its own scroll container. The drawer body never
- * scrolls. Panel sizes persist to localStorage via react-resizable-panels'
- * built-in `autoSaveId`.
+ * Per operator feedback, only the optional **Conversation Context**
+ * panel is wrapped in a `<Pane>` (it gets a real titled header bar
+ * with a collapse chevron). The **Visualization** and **Details**
+ * panels carry no extra Pane chrome — their own tab strips
+ * (VizPlaceholder's viz-tab row and SpanTabBar respectively) are the
+ * chrome. The Details collapse affordance lives inside SpanTabBar.
  */
 export function PaneLayout({
   trace,
@@ -65,15 +58,41 @@ export function PaneLayout({
 
   const hasConversation = !!trace.conversationId;
   const ctxState = paneState.conversationContext;
-  const vizState = paneState.visualization;
   const detailState = paneState.spanDetail;
 
-  const vizPane = (
-    <Pane
-      title="Visualization"
-      collapsed={vizState.collapsed}
-      onToggleCollapsed={() => togglePaneCollapsed("visualization")}
-      position={layout === "horizontal" ? "left" : "top"}
+  const ctxPanelRef = useRef<ImperativePanelHandle>(null);
+  const detailPanelRef = useRef<ImperativePanelHandle>(null);
+
+  useEffect(() => {
+    const handle = ctxPanelRef.current;
+    if (!handle) return;
+    if (ctxState.collapsed && !handle.isCollapsed()) handle.collapse();
+    else if (!ctxState.collapsed && handle.isCollapsed()) handle.expand();
+  }, [ctxState.collapsed]);
+  useEffect(() => {
+    const handle = detailPanelRef.current;
+    if (!handle) return;
+    // When details collapses, shrink the Panel to the SpanTabBar
+    // height so only the tab row remains visible. When expanded,
+    // restore the persisted relative size.
+    if (detailState.collapsed && !handle.isCollapsed()) handle.collapse();
+    else if (!detailState.collapsed && handle.isCollapsed()) handle.expand();
+  }, [detailState.collapsed]);
+
+  // The Visualization panel renders its own tab strip as chrome — no
+  // outer Pane wrapper. A 1px border on the side facing the Details
+  // panel is the visible shared separator (the resize handle overlays
+  // it with a wider invisible hit area).
+  const vizPanel = (
+    <Box
+      height="100%"
+      width="100%"
+      minHeight={0}
+      minWidth={0}
+      borderRightWidth={layout === "horizontal" ? "1px" : undefined}
+      borderBottomWidth={layout === "horizontal" ? undefined : "1px"}
+      borderColor="border"
+      bg={{ base: "bg.surface", _dark: "bg.panel" }}
     >
       <IsolatedErrorBoundary
         scope="Couldn't render visualisation"
@@ -91,22 +110,19 @@ export function PaneLayout({
           fillParent
         />
       </IsolatedErrorBoundary>
-    </Pane>
+    </Box>
   );
 
-  const detailPane = (
-    <Pane
-      title="Details"
-      collapsed={detailState.collapsed}
-      onToggleCollapsed={() => togglePaneCollapsed("spanDetail")}
-      position={layout === "horizontal" ? "right" : "bottom"}
-    >
-      <SpanDetailPane
-        trace={trace}
-        spans={spans}
-        selectedSpan={selectedSpan}
-      />
-    </Pane>
+  // The Details panel renders its own SpanTabBar as chrome (with the
+  // collapse toggle sitting at the leftmost edge of the tab row). When
+  // collapsed, the Panel itself shrinks to the SpanTabBar height —
+  // SpanDetailPane handles hiding its content area.
+  const detailPanel = (
+    <SpanDetailPane
+      trace={trace}
+      spans={spans}
+      selectedSpan={selectedSpan}
+    />
   );
 
   const ctxPane = hasConversation ? (
@@ -130,41 +146,10 @@ export function PaneLayout({
     </Pane>
   ) : null;
 
-  // PanelGroup auto-save IDs include the orientation so a width
-  // remembered for a vertical stack doesn't get reapplied as a
-  // horizontal split (and vice versa) — they're different size axes.
   const vizDetailGroupId =
     layout === "horizontal"
       ? `${PANE_GROUP_STORAGE_PREFIX}:viz-detail:h`
       : `${PANE_GROUP_STORAGE_PREFIX}:viz-detail:v`;
-
-  const vizPanelRef = useRef<ImperativePanelHandle>(null);
-  const detailPanelRef = useRef<ImperativePanelHandle>(null);
-  const ctxPanelRef = useRef<ImperativePanelHandle>(null);
-
-  useEffect(() => {
-    const handle = ctxPanelRef.current;
-    if (!handle) return;
-    if (ctxState.collapsed && !handle.isCollapsed()) handle.collapse();
-    else if (!ctxState.collapsed && handle.isCollapsed()) handle.expand();
-  }, [ctxState.collapsed]);
-
-  // Sync `paneState[...].collapsed` to the underlying Panel via the
-  // imperative API. Without this, collapsing the pane only hides its
-  // content while the parent `<Panel>` still reserves the full size —
-  // the freed space wouldn't flow to the sibling.
-  useEffect(() => {
-    const handle = vizPanelRef.current;
-    if (!handle) return;
-    if (vizState.collapsed && !handle.isCollapsed()) handle.collapse();
-    else if (!vizState.collapsed && handle.isCollapsed()) handle.expand();
-  }, [vizState.collapsed]);
-  useEffect(() => {
-    const handle = detailPanelRef.current;
-    if (!handle) return;
-    if (detailState.collapsed && !handle.isCollapsed()) handle.collapse();
-    else if (!detailState.collapsed && handle.isCollapsed()) handle.expand();
-  }, [detailState.collapsed]);
 
   const vizDetailGroup = (
     <PanelGroup
@@ -173,15 +158,12 @@ export function PaneLayout({
       style={{ flex: 1, minHeight: 0, minWidth: 0 }}
     >
       <Panel
-        ref={vizPanelRef}
         id="viz"
         order={1}
         defaultSize={layout === "horizontal" ? 55 : 50}
         minSize={15}
-        collapsible
-        collapsedSize={4}
       >
-        {vizPane}
+        {vizPanel}
       </Panel>
       <PanelResizeHandle>
         <PaneResizeBar orientation={layout} />
@@ -191,11 +173,12 @@ export function PaneLayout({
         id="detail"
         order={2}
         defaultSize={layout === "horizontal" ? 45 : 50}
-        minSize={15}
+        minSize={5}
         collapsible
-        collapsedSize={4}
+        // Collapsed = SpanTabBar height only (~38px out of ~700px ≈ 5.5%).
+        collapsedSize={6}
       >
-        {detailPane}
+        {detailPanel}
       </Panel>
     </PanelGroup>
   );
@@ -214,8 +197,6 @@ export function PaneLayout({
     );
   }
 
-  // Conversation context wraps the rest in a vertical PanelGroup so
-  // operators can drag its share too.
   return (
     <Flex
       flex={1}
@@ -252,12 +233,12 @@ export function PaneLayout({
 }
 
 /**
- * Visual treatment for the `<PanelResizeHandle>` slot. Devtools-style:
- * the panes are glued together with no visible gap and no inline pill —
- * the only visible separator is the pane's own 1px bottom border. The
- * handle itself is a slightly wider transparent strip that overlays
- * that line so the operator still has a forgiving drag target. Cursor
- * is the only on-screen hint that the line is interactive.
+ * The visible separator between two panels AND the drag hit zone in a
+ * single element — no pseudo-elements, no nested layers. The element
+ * is the line: 1px wide (or tall) `border`, an outer transparent strip
+ * that's wider so the cursor target is forgiving. Cursor lives on the
+ * outer Box so there's exactly one "I'm a divider" hit reported by the
+ * browser, no matter where the user lands inside the strip.
  */
 function PaneResizeBar({ orientation }: { orientation: DrawerLayout }) {
   const isHorizontal = orientation === "horizontal";
@@ -265,30 +246,22 @@ function PaneResizeBar({ orientation }: { orientation: DrawerLayout }) {
     <Box
       role="separator"
       aria-orientation={isHorizontal ? "vertical" : "horizontal"}
-      // Zero box width — the handle is rendered as a transparent
-      // overlay via the `::after` pseudo so it doesn't take any space
-      // in the flex layout. Panes therefore sit flush against each
-      // other; the 1px separator the operator sees is the pane's own
-      // border, not this element.
+      // Transparent strip — the visible 1px line is the adjacent
+      // panel's border, this element is purely the drag handle. ZERO
+      // width / height in the layout direction so it doesn't double
+      // the visible separator. The transparent extra hit area lives
+      // ENTIRELY in the negative-margin overlap with the surrounding
+      // panels (margin pulls them into each other so the hit zone is
+      // 14px wide centered on the 0-width line).
       width={isHorizontal ? "0px" : "100%"}
       height={isHorizontal ? "100%" : "0px"}
-      position="relative"
+      margin={isHorizontal ? "0 -7px" : "-7px 0"}
+      padding={isHorizontal ? "0 7px" : "7px 0"}
       cursor={isHorizontal ? "col-resize" : "row-resize"}
-      css={{
-        // Generous invisible hit area centered on the (zero-width)
-        // separator line. 7px on each side of the line covers both
-        // sub-pixel rendering and trackpad imprecision without making
-        // the gap visible.
-        "&::after": {
-          content: '""',
-          position: "absolute",
-          ...(isHorizontal
-            ? { top: 0, bottom: 0, left: "-7px", right: "-7px" }
-            : { left: 0, right: 0, top: "-7px", bottom: "-7px" }),
-          background: "transparent",
-        },
-      }}
+      // Reach above the panel contents so the cursor wins; panel
+      // bodies are below this in stacking order.
+      position="relative"
+      zIndex={1}
     />
   );
 }
-

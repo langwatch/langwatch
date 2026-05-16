@@ -29,13 +29,14 @@ export function AccordionShell({
 }
 
 /**
- * Height of the `SpanTabBar` (Summary / LLM-Optimized / pinned span tabs)
- * that sits sticky at `top: 0` of the drawer body. Accordion triggers
- * have to pin *below* it or they end up hidden behind the tab strip
- * (the bar has `zIndex: 2`, triggers have `zIndex: 1`). Keep this in
- * sync with `SpanTabBar`'s `minHeight` (38px).
+ * Accordion triggers pin at `top: 0` of their scroll container. In the
+ * new pane layout the `SpanTabBar` lives **outside** the accordions'
+ * scroll container — it's part of the Span Detail pane's header chrome.
+ * Older versions of this file offset by the tab-bar height because
+ * the bar shared the same scroll surface, which left a visible
+ * empty band above each sticky section.
  */
-const SPAN_TAB_BAR_HEIGHT_PX = 38;
+const SPAN_TAB_BAR_HEIGHT_PX = 0;
 
 export function Section({
   value,

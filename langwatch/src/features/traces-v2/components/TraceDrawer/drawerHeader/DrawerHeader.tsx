@@ -44,6 +44,7 @@ import {
   formatCost,
   formatDuration,
   formatRelativeTime,
+  formatRelativeTimeAgo,
   formatTokens,
   SPAN_TYPE_COLORS,
   STATUS_COLORS,
@@ -710,6 +711,11 @@ export const DrawerHeader = memo(function DrawerHeader({
             }
             positioning={{ placement: "bottom" }}
           >
+            {/* Negative right margin pulls the X all the way to the
+                drawer's outer edge so its click target hugs the chrome
+                instead of compounding the row's right padding. The
+                button's own horizontal padding (3) provides the
+                clickable hit area. */}
             <Button
               size="xs"
               variant="ghost"
@@ -717,6 +723,7 @@ export const DrawerHeader = memo(function DrawerHeader({
               aria-label="Close drawer"
               paddingX={3}
               minWidth="auto"
+              marginRight={-3}
               color="fg.muted"
               _hover={{ bg: "bg.muted", color: "fg" }}
               _active={{ bg: "bg.emphasized" }}
@@ -889,9 +896,21 @@ export const DrawerHeader = memo(function DrawerHeader({
                 max={5}
                 size="2xs"
               />
-              <Text textStyle="xs" color="fg.subtle">
-                {formatRelativeTime(trace.timestamp)}
-              </Text>
+              <Tooltip
+                content={`First span recorded ${formatRelativeTime(
+                  trace.timestamp,
+                )} ago (${new Date(trace.timestamp).toLocaleString()})`}
+                positioning={{ placement: "bottom-end" }}
+                openDelay={400}
+              >
+                <Text textStyle="xs" color="fg.subtle" cursor="help">
+                  {/* Render as "16 d ago" — splits the unit from the
+                      number so it reads as English, and the "ago"
+                      removes any ambiguity about direction. The trace
+                      table cell keeps the compact "16d" form. */}
+                  {formatRelativeTimeAgo(trace.timestamp)}
+                </Text>
+              </Tooltip>
             </HStack>
           }
         />

@@ -335,18 +335,28 @@ export function VizPlaceholder({
         flexDirection={fillParent ? "column" : undefined}
         minHeight={0}
       >
-        {/* Tab bar */}
+        {/* Tab bar — text + underline style, no gray pill background.
+            Mirrors the Trace / Conversation mode switcher. Tabs scroll
+            horizontally rather than wrapping when the row is narrower
+            than its content. */}
         <Flex
-          align="center"
+          align="stretch"
           justify="space-between"
-          paddingX={3}
-          paddingY={1.5}
+          paddingX={2}
           borderBottomWidth={isMinimized ? "0px" : "1px"}
-          borderColor="border.subtle"
-          bg={{ base: "bg.muted", _dark: "bg.subtle/40" }}
+          borderColor="border"
+          bg={{ base: "bg.surface", _dark: "bg.panel" }}
           flexShrink={0}
+          minHeight="38px"
         >
-          <HStack gap={0.5}>
+          <HStack
+            gap={0}
+            overflowX="auto"
+            flexWrap="nowrap"
+            flexShrink={1}
+            minWidth={0}
+            css={{ "&::-webkit-scrollbar": { display: "none" } }}
+          >
             {TABS.map((tab) => {
               const isActive = vizTab === tab.value;
               return (
@@ -360,21 +370,22 @@ export function VizPlaceholder({
                     as="button"
                     align="center"
                     gap={1.5}
-                    paddingX={2.5}
-                    paddingY={1}
-                    borderRadius="md"
+                    paddingX={3}
+                    paddingY={2}
                     cursor="pointer"
-                    bg={isActive ? `${tab.palette}.subtle` : "transparent"}
-                    color={`${tab.palette}.fg`}
-                    _hover={{
-                      bg: isActive
-                        ? `${tab.palette}.subtle`
-                        : `${tab.palette}.subtle/40`,
-                    }}
-                    _active={{ transform: "scale(0.96)" }}
-                    transition="background 0.15s ease, transform 0.1s ease"
+                    color={isActive ? `${tab.palette}.fg` : "fg.muted"}
+                    borderBottomWidth="2px"
+                    borderBottomColor={
+                      isActive ? `${tab.palette}.solid` : "transparent"
+                    }
+                    marginBottom="-1px"
+                    bg="transparent"
+                    flexShrink={0}
+                    whiteSpace="nowrap"
+                    _hover={{ color: `${tab.palette}.fg`, bg: "transparent" }}
+                    transition="color 0.15s ease, border-color 0.15s ease"
                     onClick={() => handleVizTabChange(tab.value)}
-                    fontWeight="medium"
+                    fontWeight={isActive ? "600" : "500"}
                   >
                     <Icon as={tab.icon} boxSize={3.5} />
                     <Text textStyle="xs" lineHeight={1}>

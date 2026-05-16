@@ -12,6 +12,24 @@ export function formatRelativeTime(timestamp: number): string {
   return `${Math.floor(diffMs / MS_PER_DAY)}d`;
 }
 
+/**
+ * Verbose variant of `formatRelativeTime` for surfaces with more room —
+ * splits the unit out (`16 d`) and appends `ago` so it reads naturally
+ * without a tooltip. The table cells keep the compact `formatRelativeTime`
+ * form to stay readable at small column widths.
+ */
+export function formatRelativeTimeAgo(timestamp: number): string {
+  const diffMs = Date.now() - timestamp;
+  if (diffMs < MS_PER_MINUTE) return "just now";
+  if (diffMs < MS_PER_HOUR) {
+    return `${Math.floor(diffMs / MS_PER_MINUTE)} m ago`;
+  }
+  if (diffMs < MS_PER_DAY) {
+    return `${Math.floor(diffMs / MS_PER_HOUR)} h ago`;
+  }
+  return `${Math.floor(diffMs / MS_PER_DAY)} d ago`;
+}
+
 export function formatAbsoluteTime(timestamp: number): string {
   return new Date(timestamp).toLocaleString();
 }
