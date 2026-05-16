@@ -55,6 +55,32 @@ function snooze(projectId: string, mode: PromoMode): void {
   }
 }
 
+/**
+ * Clear every per-project snooze key for the v2 promo so the banner
+ * reappears on the next render. Called when the operator opts back
+ * out of v2 from the new drawer's overflow menu — at that point we
+ * want the promo to be available again the next time they open the
+ * legacy drawer, not stuck in "snoozed for 7 days".
+ *
+ * Also dispatches the in-tab event the promo subscribes to so the
+ * currently-mounted promo (if any) re-runs its `isSnoozed` check
+ * without waiting for a remount.
+ */
+export function resetTracesV2PromoSnooze(): void {
+  if (typeof window === "undefined") return;
+  try {
+    const toDelete: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(STORAGE_PREFIX)) toDelete.push(key);
+    }
+    for (const key of toDelete) localStorage.removeItem(key);
+    window.dispatchEvent(new CustomEvent("langwatch:traces-v2-promo-reset"));
+  } catch {
+    // best-effort
+  }
+}
+
 function openCrispChat(): boolean {
   if (typeof window === "undefined") return false;
   const crisp = (
@@ -102,6 +128,19 @@ export function NewTracesPromo({
 
   useEffect(() => {
     if (projectId) setDismissed(isSnoozed(projectId, mode));
+  }, [projectId, mode]);
+
+  // Re-evaluate dismissed when the operator opts out of v2 from the
+  // new drawer (which calls `resetTracesV2PromoSnooze` and dispatches
+  // this event). Without this subscription the banner would stay
+  // hidden until the 7-day snooze expired or the page reloaded.
+  useEffect(() => {
+    const onReset = () => {
+      if (projectId) setDismissed(isSnoozed(projectId, mode));
+    };
+    window.addEventListener("langwatch:traces-v2-promo-reset", onReset);
+    return () =>
+      window.removeEventListener("langwatch:traces-v2-promo-reset", onReset);
   }, [projectId, mode]);
 
   if (!hasMounted || !projectSlug || tracesV2FlagLoading || dismissed) {

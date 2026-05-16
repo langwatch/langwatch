@@ -15,6 +15,7 @@ import {
   LuScanSearch,
   LuShare2,
 } from "react-icons/lu";
+import { resetTracesV2PromoSnooze } from "~/components/messages/NewTracesPromo";
 import { Menu } from "~/components/ui/menu";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useConversationTurns } from "../../../hooks/useConversationTurns";
@@ -72,6 +73,11 @@ export function TraceOverflowMenu({
 
   const handleSwitchBackToV1 = useCallback(() => {
     setTracesV2Preferred(false);
+    // Operator just opted out — clear the "Try the new one" snooze
+    // so the next legacy-drawer open re-surfaces the promo. Without
+    // this, the banner stays hidden for the full 7-day snooze window
+    // that the original opt-in click set.
+    resetTracesV2PromoSnooze();
     posthog.capture("traces_v2_opt_out", {
       surface: "drawer_overflow_menu",
       traceId,

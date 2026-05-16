@@ -47,7 +47,19 @@ interface TraceDrawerScaffold {
  * from `useDrawerStore` by the layout component.
  */
 export function useTraceDrawerScaffold(): TraceDrawerScaffold {
-  const { closeDrawer } = useDrawer();
+  // `goBack` so closing the v2 drawer pops just our entry off the
+  // drawer stack — e.g. clicking ✕ from a trace opened via the
+  // scenarioRunDetail drawer restores that scenario drawer instead
+  // of nuking the whole drawer-state (which `closeDrawer` would do,
+  // also stripping the `span` and other shared params from the URL).
+  // `goBack` itself falls back to `closeDrawer` when the stack is at
+  // its root, so deep links still close cleanly.
+  // `drawerOpen` is read inside `handleClose` to guard against
+  // unmount-fired `onOpenChange` callbacks (Chakra Drawer.Root
+  // sometimes fires close on cleanup) — if the URL has already moved
+  // to another drawer, we'd pop the freshly-pushed entry off the
+  // stack and lose what the operator just opened.
+  const { goBack, drawerOpen } = useDrawer();
 
   // The drawer store is the source of truth for `traceId` — see
   // `useTraceDrawerUrlHydrator` (mounted at the page level) for the
@@ -127,6 +139,13 @@ export function useTraceDrawerScaffold(): TraceDrawerScaffold {
 
   const trpcUtils = api.useUtils();
   const handleClose = useCallback(() => {
+    // Unmount-fired close guard: if the URL has already navigated to
+    // another drawer (e.g. opt-out → "Go back to old visualization"
+    // pushes traceDetails), Chakra's Drawer.Root cleanup may still
+    // fire onOpenChange on the unmounting v2 shell. Without this,
+    // goBack() would pop the v1 entry we just pushed and the
+    // operator would end up with no drawer at all.
+    if (!drawerOpen("traceV2Details")) return;
     // Cancel any in-flight per-trace queries so closing during a slow
     // load doesn't leave the request running in the background, racing
     // against a future re-open of the same drawer (or a different
@@ -144,8 +163,8 @@ export function useTraceDrawerScaffold(): TraceDrawerScaffold {
     // matches the click flow's synchronous open. The URL push that
     // follows is just cleanup for deep-link / browser-history.
     useDrawerStore.getState().closeDrawer();
-    closeDrawer();
-  }, [closeDrawer, setMaximized, trpcUtils, traceId]);
+    goBack();
+  }, [drawerOpen, goBack, setMaximized, trpcUtils, traceId]);
 
   const drawerContentRef = useRef<HTMLDivElement>(null);
   const drawerBodyRef = useRef<HTMLDivElement>(null);
