@@ -126,41 +126,4 @@ export function IOViewerBody({
 }
 
 /** Click-to-engage scrim for the idle preview state. */
-export function IOViewerEngageScrim({
-  flushChatCard,
-  onEngage,
-}: {
-  flushChatCard: boolean;
-  onEngage: () => void;
-}) {
-  return (
-    <Box
-      position="absolute"
-      inset={0}
-      cursor="zoom-in"
-      onClick={onEngage}
-      display="flex"
-      alignItems="flex-end"
-      justifyContent="center"
-      paddingBottom={2}
-      background="linear-gradient(to bottom, transparent 60%, var(--chakra-colors-bg-subtle) 100%)"
-      borderRadius={flushChatCard ? "0" : "md"}
-    >
-      <Text
-        textStyle="2xs"
-        color="fg.muted"
-        fontWeight="medium"
-        bg="bg.surface"
-        paddingX={2}
-        paddingY={0.5}
-        borderRadius="full"
-        borderWidth="1px"
-        borderColor="border"
-      >
-        Click to interact
-      </Text>
-    </Box>
-  );
-}
-
 export { COMPACT_MAX_HEIGHT_PX, EXPANDED_MAX_HEIGHT_PX };

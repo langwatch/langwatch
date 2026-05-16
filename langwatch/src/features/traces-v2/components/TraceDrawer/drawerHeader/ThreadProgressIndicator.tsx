@@ -66,7 +66,7 @@ export function ThreadProgressIndicator({
       {isLoading ? (
         <Spinner size="xs" color="blue.solid" borderWidth="1.5px" />
       ) : null}
-      <Text textStyle="2xs" color="fg.subtle" fontFamily="mono">
+      <Text textStyle="2xs" color="fg.subtle">
         {safePosition} / {total}
       </Text>
       <Box
@@ -129,7 +129,7 @@ export function ThreadProgressIndicator({
       <Popover.Trigger asChild>
         <Box
           as="button"
-          aria-label={`Conversation ${conversationId} — ${safePosition} of ${total}`}
+          aria-label={`Conversation ${conversationId}, ${safePosition} of ${total}`}
         >
           {body}
         </Box>
@@ -144,7 +144,6 @@ export function ThreadProgressIndicator({
               <HStack gap={1.5} width="full">
                 <Text
                   textStyle="xs"
-                  fontFamily="mono"
                   truncate
                   flex={1}
                   minWidth={0}

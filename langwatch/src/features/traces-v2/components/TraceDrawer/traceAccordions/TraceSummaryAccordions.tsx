@@ -10,7 +10,7 @@ import { useTraceResources } from "../../../hooks/useTraceResources";
 import { AttributeTable } from "../AttributeTable";
 import { EvalsList } from "../evalCards";
 import { IOViewer } from "../IOViewer";
-import { ScopeBlock, ScopeChip } from "../ScopeChip";
+import { ScopeBlock } from "../ScopeChip";
 import { AccordionShell, Section } from "./AccordionShell";
 import { EmptyEventsState, EmptyHint } from "./EmptyStates";
 import { EventCard } from "./EventCard";
@@ -58,6 +58,31 @@ export function TraceSummaryAccordions({
     [richEvals, spans],
   );
 
+  // Spans flagged with status=error, sorted deepest-first so the most
+  // specific failure (the leaf that actually threw) leads the pill row.
+  // The trace's `error` summary covers the *what*; these pills cover the
+  // *where* — clicking one jumps to the span's details. If span data
+  // hasn't loaded yet we fall back to the summary-only layout.
+  const errorSpans = useMemo(() => {
+    if (!hasError || spans.length === 0) return [];
+    const byId = new Map(spans.map((s) => [s.spanId, s]));
+    const depthOf = (spanId: string): number => {
+      let depth = 0;
+      let cur: SpanTreeNode | undefined = byId.get(spanId);
+      while (cur?.parentSpanId) {
+        const parent = byId.get(cur.parentSpanId);
+        if (!parent) break;
+        depth += 1;
+        cur = parent;
+      }
+      return depth;
+    };
+    return spans
+      .filter((s) => s.status === "error")
+      .map((s) => ({ span: s, depth: depthOf(s.spanId) }))
+      .sort((a, b) => b.depth - a.depth);
+  }, [spans, hasError]);
+
   const sections = useMemo(() => {
     const list: Array<
       "io" | "attributes" | "scope" | "evals" | "events" | "exceptions"
@@ -92,16 +117,10 @@ export function TraceSummaryAccordions({
 
   return (
     <Box>
-      {hasScope && (
-        <Box
-          paddingX={4}
-          paddingY={2}
-          borderBottomWidth="1px"
-          borderColor="border.muted"
-        >
-          <ScopeChip scope={resources.scope} />
-        </Box>
-      )}
+      {/* The instrumentation scope used to render here as a small
+          attribution row at the top of the summary panel. It's now
+          pinned to the right of the SpanTabBar so it stays visible
+          when the user scrolls the summary content. */}
       <AccordionShell value={openSections} onValueChange={setOpenSections}>
         {sections.map((id, idx) => {
           const isFirst = idx === 0;
@@ -198,30 +217,59 @@ export function TraceSummaryAccordions({
                 isFirst={isFirst}
                 open={isOpen}
               >
-                <HStack
-                  gap={2}
-                  paddingX={3}
-                  paddingY={2}
-                  borderRadius="sm"
-                  bg="red.subtle"
-                  align="flex-start"
-                >
-                  <Icon
-                    as={LuCircleX}
-                    boxSize={4}
-                    color="red.fg"
-                    flexShrink={0}
-                    marginTop={0.5}
-                  />
-                  <Text
-                    textStyle="xs"
-                    color="red.fg"
-                    fontFamily="mono"
-                    whiteSpace="pre-wrap"
+                <VStack align="stretch" gap={2}>
+                  <HStack
+                    gap={2}
+                    paddingX={3}
+                    paddingY={2}
+                    borderRadius="sm"
+                    bg="red.subtle"
+                    align="flex-start"
                   >
-                    {trace.error}
-                  </Text>
-                </HStack>
+                    <Icon
+                      as={LuCircleX}
+                      boxSize={4}
+                      color="red.fg"
+                      flexShrink={0}
+                      marginTop={0.5}
+                    />
+                    <Text textStyle="xs" color="red.fg" whiteSpace="pre-wrap">
+                      {trace.error}
+                    </Text>
+                  </HStack>
+                  {/* Pills for spans flagged with status=error, deepest
+                      first. The summary up top tells you *what* broke;
+                      these tell you *where* — click to jump to the span
+                      and see the per-span exception payload. */}
+                  {errorSpans.length > 0 && (
+                    <HStack gap={1.5} flexWrap="wrap" align="center">
+                      <Text
+                        textStyle="2xs"
+                        color="fg.muted"
+                        textTransform="uppercase"
+                        letterSpacing="0.04em"
+                      >
+                        Spans with errors
+                      </Text>
+                      {errorSpans.map(({ span }) => (
+                        <Button
+                          key={span.spanId}
+                          size="2xs"
+                          variant="outline"
+                          colorPalette="red"
+                          onClick={() => onSelectSpan?.(span.spanId)}
+                          paddingX={2}
+                          height="22px"
+                          fontWeight="medium"
+                        >
+                          <Text truncate maxWidth="220px">
+                            {span.name}
+                          </Text>
+                        </Button>
+                      ))}
+                    </HStack>
+                  )}
+                </VStack>
               </Section>
             );
           }

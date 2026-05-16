@@ -275,7 +275,7 @@ function SelectedVsLastUsedCallout({
             <Text textStyle="2xs" color="fg.muted">
               The pin resolved to a different concrete prompt than what was
               recorded as last used. Common when a tag like{" "}
-              <Text as="span" fontFamily="mono">
+              <Text as="span">
                 production
               </Text>{" "}
               moves between deploys.
@@ -412,7 +412,6 @@ function PromptIdentityRow({
       </Text>
       <Text
         textStyle="sm"
-        fontFamily="mono"
         color="fg"
         truncate
         flex={1}
@@ -457,7 +456,6 @@ function PromptUsageCard({
           <Text
             textStyle="sm"
             fontWeight="bold"
-            fontFamily="mono"
             truncate
             minWidth={0}
           >
@@ -519,7 +517,6 @@ function PromptUsageCard({
                   width="120px"
                   flexShrink={0}
                   textStyle="xs"
-                  fontFamily="mono"
                   color="fg.muted"
                 >
                   {key}
@@ -527,7 +524,6 @@ function PromptUsageCard({
                 <Text
                   flex={1}
                   textStyle="xs"
-                  fontFamily="mono"
                   color="fg"
                   truncate
                   minWidth={0}
@@ -553,7 +549,7 @@ function PromptUsageCard({
             Spans
           </Text>
           {spanIds.length > 0 && (
-            <Text textStyle="2xs" color="fg.muted" fontFamily="mono">
+            <Text textStyle="2xs" color="fg.muted">
               {spanIds.length}
             </Text>
           )}
@@ -627,7 +623,6 @@ function SpanRow({
     >
       <Text
         textStyle="xs"
-        fontFamily="mono"
         color="fg"
         truncate
         flex={1}
@@ -636,7 +631,7 @@ function SpanRow({
         {span?.name ?? spanId}
       </Text>
       {span?.model && (
-        <Text textStyle="2xs" color="fg.subtle" fontFamily="mono">
+        <Text textStyle="2xs" color="fg.subtle">
           {abbreviateModel(span.model)}
         </Text>
       )}

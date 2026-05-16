@@ -7,7 +7,6 @@ export const TraceIdCell = {
   label: "Trace ID",
   render: ({ row }) => (
     <Text
-      fontFamily="mono"
       textStyle="xs"
       color="fg.subtle"
       truncate

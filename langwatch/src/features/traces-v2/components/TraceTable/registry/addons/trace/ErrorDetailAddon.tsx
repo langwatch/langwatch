@@ -26,7 +26,7 @@ export const ErrorDetailAddon: AddonDef<TraceListItem> = {
           <Text textStyle="xs" color="fg.subtle" flexShrink={0}>
             ╰
           </Text>
-          <Text textStyle="xs" fontFamily="mono" color="red.fg" truncate>
+          <Text textStyle="xs" color="red.fg" truncate>
             ▸ {row.errorSpanName ?? "(root)"} — {row.error}
           </Text>
         </Flex>

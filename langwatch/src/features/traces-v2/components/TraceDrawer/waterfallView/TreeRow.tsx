@@ -101,7 +101,7 @@ export function TreeRow({
           </Text>
         )}
         {span.model && (
-          <Text textStyle="2xs" color="fg.muted" fontFamily="mono">
+          <Text textStyle="2xs" color="fg.muted">
             {span.model}
           </Text>
         )}
@@ -140,18 +140,44 @@ export function TreeRow({
           gap={0}
           paddingLeft={`${depth * INDENT_PX + 4}px`}
           paddingRight={2}
-          bg={isSelected ? "blue.subtle" : isHovered ? "bg.muted" : undefined}
-          opacity={isDimmed && !isSelected && !isHovered ? 0.5 : 1}
-          _hover={{ bg: isSelected ? "blue.subtle" : "bg.muted" }}
+          // Light mode picks up a neutral grey for selection (`bg.emphasized`)
+          // rather than a blue tint — keeps the row visually distinct from
+          // the hover state without competing with the bar's own colour.
+          // Dark mode keeps the existing blue tint, which reads well against
+          // the dark panel.
+          bg={
+            isSelected
+              ? { base: "bg.emphasized", _dark: "blue.subtle" }
+              : isHovered
+                ? "bg.muted"
+                : undefined
+          }
+          // Dark mode keeps the pre-PR behaviour of fading non-selected
+          // rows when one is picked — the dark theme depends on that
+          // contrast to keep the focus row "popping". Light mode stays
+          // at full opacity (the neutral grey selection bg already
+          // pulls the eye there without help).
+          opacity={{
+            base: 1,
+            _dark: isDimmed && !isSelected && !isHovered ? 0.4 : 1,
+          }}
+          _hover={{
+            bg: isSelected
+              ? { base: "bg.emphasized", _dark: "blue.subtle" }
+              : "bg.muted",
+          }}
           cursor="pointer"
           onClick={onSelect}
           onMouseEnter={onHoverStart}
           onMouseLeave={onHoverEnd}
-          userSelect="none"
           flexShrink={0}
           transition="all 0.1s ease"
           borderLeftWidth={isSelected ? "2px" : "0px"}
-          borderLeftColor={isSelected ? "blue.solid" : "transparent"}
+          borderLeftColor={
+            isSelected
+              ? { base: "fg.muted", _dark: "blue.solid" }
+              : "transparent"
+          }
         >
           {/* Chevron */}
           <Flex
@@ -214,27 +240,19 @@ export function TreeRow({
             gap={0}
             justify="center"
           >
-            <HStack gap={1} minWidth={0}>
-              <Text
-                textStyle="xs"
-                color={isError ? "red.fg" : "fg"}
-                fontFamily="mono"
-                truncate
-                flex={1}
-                minWidth={0}
-                lineHeight={1.2}
-              >
-                {span.name}
-              </Text>
-              {signals.length > 0 && (
-                <LangwatchSignalBadges signals={signals} />
-              )}
-            </HStack>
+            <Text
+              textStyle="xs"
+              color={isError ? "red.fg" : "fg"}
+              truncate
+              minWidth={0}
+              lineHeight={1.2}
+            >
+              {span.name}
+            </Text>
             {isLlm && (
               <Text
                 textStyle="xs"
                 color="fg.subtle"
-                fontFamily="mono"
                 truncate
                 lineHeight={1.2}
               >
@@ -242,6 +260,20 @@ export function TreeRow({
               </Text>
             )}
           </Flex>
+
+          {/* Signal badges — sit on the row, not inside the name column,
+              so they vertically center against the full row height
+              instead of clinging to the top line on two-line LLM rows. */}
+          {signals.length > 0 && (
+            <Flex
+              align="center"
+              flexShrink={0}
+              marginLeft={1}
+              alignSelf="center"
+            >
+              <LangwatchSignalBadges signals={signals} />
+            </Flex>
+          )}
 
           {/* Error indicator */}
           {isError && (
@@ -258,7 +290,6 @@ export function TreeRow({
           <Text
             textStyle="xs"
             color="fg.muted"
-            fontFamily="mono"
             flexShrink={0}
             marginLeft={1}
             whiteSpace="nowrap"

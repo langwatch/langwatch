@@ -180,7 +180,6 @@ export function Minimap({
           <Text
             textStyle="2xs"
             color="fg.subtle"
-            fontFamily="mono"
             lineHeight={1}
           >
             {formatDuration(fullDur)}

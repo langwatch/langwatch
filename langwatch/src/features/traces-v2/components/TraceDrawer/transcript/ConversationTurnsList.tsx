@@ -321,15 +321,15 @@ interface TurnRowProps {
 }
 
 function TurnRow({ turn, index, total, layout, collapseTools }: TurnRowProps) {
-  if (layout === "bubbles") {
-    return <TurnView turn={turn} collapseTools={collapseTools} />;
-  }
-  // Thread layout: default-expand the last turn (always), plus the
-  // immediately-prior assistant turn on short threads. User turns stay
-  // collapsed unless they're the actual last turn — they're usually the
-  // prompt the operator already knows they sent. Anchoring "always expand
-  // the last turn" first ensures a final user message stays open instead
-  // of leaving the previous assistant turn expanded with the latest user
+  // Both layouts route through ThreadedTurnView so every turn can
+  // collapse/expand. The expanded body is what differs: "thread" picks
+  // the flat ChatGPT-style stack, "bubbles" picks the boxed cards.
+  // Default-expand the last turn (always), plus the immediately-prior
+  // assistant turn on short threads. User turns stay collapsed unless
+  // they're the actual last turn — they're usually the prompt the
+  // operator already knows they sent. Anchoring "always expand the last
+  // turn" first ensures a final user message stays open instead of
+  // leaving the previous assistant turn expanded with the latest user
   // turn collapsed.
   const isLast = index === total - 1;
   const isLong = total > LONG_THREAD_THRESHOLD;
@@ -346,6 +346,7 @@ function TurnRow({ turn, index, total, layout, collapseTools }: TurnRowProps) {
       isLast={isLast}
       defaultExpanded={defaultExpanded}
       collapseTools={collapseTools}
+      layout={layout}
     />
   );
 }

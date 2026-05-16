@@ -35,7 +35,6 @@ export function GroupRow({
       _hover={{ bg: "bg.muted" }}
       cursor="pointer"
       onClick={onToggle}
-      userSelect="none"
       flexShrink={0}
       borderLeftWidth="2px"
       borderLeftColor={color}
@@ -73,7 +72,7 @@ export function GroupRow({
       {/* Group info */}
       <Flex direction="column" flex={1} minWidth={0} gap={0} justify="center">
         <HStack gap={1.5} minWidth={0}>
-          <Text textStyle="xs" fontFamily="mono" color="fg" truncate>
+          <Text textStyle="xs" color="fg" truncate>
             {group.name}
           </Text>
           <Text

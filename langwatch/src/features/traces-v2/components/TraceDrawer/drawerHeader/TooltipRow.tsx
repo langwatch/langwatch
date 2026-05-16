@@ -8,7 +8,6 @@ export function TooltipRow({ label, value }: { label: string; value: string }) {
       </Text>
       <Text
         textStyle="xs"
-        fontFamily="mono"
         color="fg"
         textAlign="right"
         // Long values (conversation IDs, scenario run IDs) need to wrap

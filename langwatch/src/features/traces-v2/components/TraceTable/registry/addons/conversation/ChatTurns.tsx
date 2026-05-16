@@ -134,7 +134,7 @@ const TurnGap: React.FC<{ seconds: number }> = ({ seconds }) => {
         <Icon boxSize="12px" color={color}>
           <Clock />
         </Icon>
-        <Text textStyle="xs" fontFamily="mono" color={color}>
+        <Text textStyle="xs" color={color}>
           {formatGapSeconds(seconds)}
           {isPause ? " pause" : ""}
         </Text>
@@ -181,7 +181,7 @@ const TurnDivider: React.FC<{
         <Text textStyle="2xs" color="fg.subtle">
           ·
         </Text>
-        <Text textStyle="2xs" color="fg.subtle" fontFamily="mono">
+        <Text textStyle="2xs" color="fg.subtle">
           {formatDuration(trace.durationMs)}
         </Text>
         <Box marginLeft={1}>

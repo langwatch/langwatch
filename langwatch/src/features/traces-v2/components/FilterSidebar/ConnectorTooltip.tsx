@@ -56,7 +56,7 @@ export const ConnectorTooltip: React.FC<ConnectorTooltipProps> = ({
       >
         Linked by OR
       </Box>
-      <Box fontSize="xs" fontFamily="mono" lineHeight="1.5">
+      <Box fontSize="xs" lineHeight="1.5">
         {group.members.map((m, i) => (
           <Box key={i}>
             {m.negated && (

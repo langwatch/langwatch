@@ -34,10 +34,42 @@ export interface DrawerUrlState {
   selectedSpanId: string | null;
 }
 
+/**
+ * Per-pane state inside the drawer body. Panes are independently sizable
+ * (via `<PanelResizeHandle>`), collapsible to a header bar, and
+ * temporarily maximizable within their group (double-click on header
+ * hides siblings until toggled off). See trace-drawer-panes.feature.
+ */
+export interface PaneState {
+  collapsed: boolean;
+  /** When set, this pane is maximized within its PanelGroup. */
+  maximizedWithinGroup: boolean;
+}
+
+export type PaneId =
+  | "conversationContext"
+  | "visualization"
+  | "spanDetail";
+
 interface DrawerState extends DrawerUrlState {
   isOpen: boolean;
   isMaximized: boolean;
   shortcutsOpen: boolean;
+  /**
+   * Operator-driven drawer width in pixels. `null` means "fall back to
+   * the default 45% viewport rule". When the user drags the left-edge
+   * grip we write the resolved pixel value here so the drawer position
+   * follows the cursor in real time. Persisted to localStorage.
+   */
+  widthPx: number | null;
+  /**
+   * Snapshot of `widthPx` taken before maximizing so the next
+   * double-click on the grip can restore the operator's chosen width
+   * rather than the abstract 45% default.
+   */
+  preMaximizeWidthPx: number | null;
+  /** Per-pane state keyed by `PaneId`. Persisted. */
+  paneState: Record<PaneId, PaneState>;
   /**
    * When true, clicking outside the drawer panel does NOT dismiss it —
    * the user closes via the explicit X button, Esc, or double-click.
@@ -69,6 +101,15 @@ interface DrawerState extends DrawerUrlState {
   setActiveTab: (tab: DrawerTab) => void;
   setMaximized: (value: boolean) => void;
   toggleMaximized: () => void;
+  setWidthPx: (px: number | null) => void;
+  /**
+   * Double-click handler: if not at the snap-maximize width, snap to it
+   * (remembering the current width); if already snapped, restore the
+   * remembered width.
+   */
+  toggleSnapMaximize: (viewportWidth: number) => void;
+  togglePaneCollapsed: (id: PaneId) => void;
+  togglePaneMaximized: (id: PaneId) => void;
   setShortcutsOpen: (value: boolean) => void;
   setPinned: (value: boolean) => void;
   togglePinned: () => void;
@@ -173,6 +214,27 @@ function readInitialFromURL(): InitialFromURL {
 const initial = readInitialFromURL();
 
 const PINNED_STORAGE_KEY = "langwatch:traces-v2:drawer-pinned:v1";
+const WIDTH_STORAGE_KEY = "langwatch:traces-v2:drawer-width-px:v1";
+// Bumped to v2 with the conversationContext default flipped to collapsed.
+// Bumping the key resets everyone to the new default; users who flipped
+// it open in v1 will need to flip again, but that's the right migration
+// for "starts closed now."
+const PANE_STATE_STORAGE_KEY = "langwatch:traces-v2:drawer-pane-state:v2";
+
+/** Drawer width clamps. Min so chrome stays usable; max so the page edge
+ * remains clickable for the "click-outside" affordance. */
+export const DRAWER_MIN_WIDTH_PX = 360;
+export const DRAWER_MAXIMIZE_EDGE_PX = 10;
+export const DRAWER_RESTORE_EDGE_PX = 80;
+
+const DEFAULT_PANE_STATE: Record<PaneId, PaneState> = {
+  // Conversation context starts collapsed by default — most traces are
+  // single-turn anyway, and the user can flip it open per-session via
+  // the chevron (preference persists in localStorage).
+  conversationContext: { collapsed: true, maximizedWithinGroup: false },
+  visualization: { collapsed: false, maximizedWithinGroup: false },
+  spanDetail: { collapsed: false, maximizedWithinGroup: false },
+};
 
 function readPinnedFromStorage(): boolean {
   if (typeof window === "undefined") return true;
@@ -195,11 +257,74 @@ function persistPinned(value: boolean) {
   }
 }
 
+function readWidthFromStorage(): number | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(WIDTH_STORAGE_KEY);
+    if (raw === null) return null;
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n <= 0) return null;
+    // Clamp the persisted value against the *current* viewport so that
+    // a width remembered on a wide monitor doesn't push the drawer off
+    // the right edge when reloaded on a smaller laptop. The ResizeRail
+    // also re-clamps on `window.resize`, but that listener can't catch
+    // the initial-load case where the viewport changed between
+    // sessions.
+    const maxWidth = window.innerWidth - DRAWER_MAXIMIZE_EDGE_PX;
+    return Math.max(DRAWER_MIN_WIDTH_PX, Math.min(n, maxWidth));
+  } catch {
+    return null;
+  }
+}
+
+function persistWidth(value: number | null) {
+  if (typeof window === "undefined") return;
+  try {
+    if (value === null) {
+      window.localStorage.removeItem(WIDTH_STORAGE_KEY);
+    } else {
+      window.localStorage.setItem(WIDTH_STORAGE_KEY, String(Math.round(value)));
+    }
+  } catch {
+    // Best-effort persistence.
+  }
+}
+
+function readPaneStateFromStorage(): Record<PaneId, PaneState> {
+  if (typeof window === "undefined") return DEFAULT_PANE_STATE;
+  try {
+    const raw = window.localStorage.getItem(PANE_STATE_STORAGE_KEY);
+    if (raw === null) return DEFAULT_PANE_STATE;
+    const parsed = JSON.parse(raw) as Partial<Record<PaneId, PaneState>>;
+    return {
+      conversationContext:
+        parsed.conversationContext ?? DEFAULT_PANE_STATE.conversationContext,
+      visualization:
+        parsed.visualization ?? DEFAULT_PANE_STATE.visualization,
+      spanDetail: parsed.spanDetail ?? DEFAULT_PANE_STATE.spanDetail,
+    };
+  } catch {
+    return DEFAULT_PANE_STATE;
+  }
+}
+
+function persistPaneState(value: Record<PaneId, PaneState>) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(PANE_STATE_STORAGE_KEY, JSON.stringify(value));
+  } catch {
+    // Best-effort persistence.
+  }
+}
+
 export const useDrawerStore = create<DrawerState>((set, get) => ({
   isOpen: initial.isOpen,
   isMaximized: false,
   shortcutsOpen: false,
   pinned: readPinnedFromStorage(),
+  widthPx: readWidthFromStorage(),
+  preMaximizeWidthPx: null,
+  paneState: readPaneStateFromStorage(),
   traceId: initial.traceId,
   occurredAtMs: initial.occurredAtMs,
   selectedSpanId: initial.selectedSpanId,
@@ -235,15 +360,130 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
       traceBackStack: [],
     }),
 
-  selectSpan: (spanId) => set({ selectedSpanId: spanId, activeTab: "span" }),
+  selectSpan: (spanId) =>
+    set((s) => {
+      // Selecting a span always reopens the detail pane — when the user
+      // explicitly hides it, the selection is cleared, so any subsequent
+      // span click reads as "open detail for this span", not "reselect
+      // an existing one". This makes the hide/reopen flow round-trip
+      // cleanly via span clicks alone.
+      const next: Partial<DrawerState> = {
+        selectedSpanId: spanId,
+        activeTab: "span",
+      };
+      if (s.paneState.spanDetail.collapsed) {
+        const updatedPanes: Record<PaneId, PaneState> = {
+          ...s.paneState,
+          spanDetail: { ...s.paneState.spanDetail, collapsed: false },
+        };
+        persistPaneState(updatedPanes);
+        next.paneState = updatedPanes;
+      }
+      return next;
+    }),
 
   clearSpan: () => set({ selectedSpanId: null, activeTab: "summary" }),
 
   setViewMode: (mode) => set({ viewMode: mode }),
   setVizTab: (tab) => set({ vizTab: tab }),
-  setActiveTab: (tab) => set({ activeTab: tab }),
+  setActiveTab: (tab) =>
+    set((s) => {
+      // Same auto-reopen rule as `selectSpan`: changing tabs implies the
+      // user wants the detail pane visible.
+      const next: Partial<DrawerState> = { activeTab: tab };
+      if (s.paneState.spanDetail.collapsed) {
+        const updatedPanes: Record<PaneId, PaneState> = {
+          ...s.paneState,
+          spanDetail: { ...s.paneState.spanDetail, collapsed: false },
+        };
+        persistPaneState(updatedPanes);
+        next.paneState = updatedPanes;
+      }
+      return next;
+    }),
   setMaximized: (value) => set({ isMaximized: value }),
   toggleMaximized: () => set((s) => ({ isMaximized: !s.isMaximized })),
+
+  setWidthPx: (px) => {
+    const next = px === null ? null : Math.max(DRAWER_MIN_WIDTH_PX, px);
+    persistWidth(next);
+    set({ widthPx: next });
+  },
+
+  toggleSnapMaximize: (viewportWidth) =>
+    set((s) => {
+      const snapWidth = Math.max(
+        DRAWER_MIN_WIDTH_PX,
+        viewportWidth - DRAWER_MAXIMIZE_EDGE_PX,
+      );
+      const isAtSnap =
+        s.widthPx !== null && Math.abs(s.widthPx - snapWidth) < 2;
+      if (isAtSnap) {
+        const restore =
+          s.preMaximizeWidthPx ?? Math.round(viewportWidth * 0.45);
+        persistWidth(restore);
+        return {
+          widthPx: restore,
+          preMaximizeWidthPx: null,
+          isMaximized: false,
+        };
+      }
+      persistWidth(snapWidth);
+      return {
+        preMaximizeWidthPx: s.widthPx ?? Math.round(viewportWidth * 0.45),
+        widthPx: snapWidth,
+        isMaximized: true,
+      };
+    }),
+
+  togglePaneCollapsed: (id) =>
+    set((s) => {
+      const wasCollapsed = s.paneState[id].collapsed;
+      const next: Record<PaneId, PaneState> = {
+        ...s.paneState,
+        [id]: {
+          ...s.paneState[id],
+          collapsed: !wasCollapsed,
+          // Collapsing a maximized pane is nonsensical — drop maximize.
+          maximizedWithinGroup: false,
+        },
+      };
+      persistPaneState(next);
+      // Hiding the span-detail pane clears the current selection so the
+      // next span click feels like opening a fresh detail view (which
+      // also auto-reopens the pane via `selectSpan`).
+      const stateUpdate: Partial<DrawerState> = { paneState: next };
+      if (id === "spanDetail" && !wasCollapsed) {
+        stateUpdate.selectedSpanId = null;
+        stateUpdate.activeTab = "summary";
+      }
+      return stateUpdate;
+    }),
+
+  togglePaneMaximized: (id) =>
+    set((s) => {
+      const currentlyMaximized = s.paneState[id].maximizedWithinGroup;
+      // Maximizing one pane should demote every sibling — exactly-one
+      // pane can be maximized at a time. Without this normalization a
+      // sequence of clicks could leave several panes flagged maximized
+      // and `PaneLayout` would hide all of them at once.
+      const next: Record<PaneId, PaneState> = (
+        Object.keys(s.paneState) as PaneId[]
+      ).reduce(
+        (acc, key) => {
+          acc[key] = {
+            ...s.paneState[key],
+            maximizedWithinGroup:
+              key === id ? !currentlyMaximized : false,
+            collapsed: key === id ? false : s.paneState[key].collapsed,
+          };
+          return acc;
+        },
+        {} as Record<PaneId, PaneState>,
+      );
+      persistPaneState(next);
+      return { paneState: next };
+    }),
   setShortcutsOpen: (value) => set({ shortcutsOpen: value }),
 
   setPinned: (value) => {

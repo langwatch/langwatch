@@ -302,7 +302,7 @@ function buildSelectedPromptChipDef(
     onClick: spanId ? () => onSelectSpan(spanId) : undefined,
     tooltip: (
       <VStack align="stretch" gap={1} minWidth="220px" maxWidth="300px">
-        <Text textStyle="sm" fontWeight="semibold" fontFamily="mono">
+        <Text textStyle="sm" fontWeight="semibold">
           {selectedId}
         </Text>
         <Text textStyle="2xs" color="fg.muted">
@@ -365,11 +365,11 @@ function buildLastUsedPromptChipDef({
     tooltip: (
       <VStack align="stretch" gap={1.5} minWidth="240px" maxWidth="320px">
         <HStack gap={2}>
-          <Text textStyle="sm" fontWeight="semibold" fontFamily="mono">
+          <Text textStyle="sm" fontWeight="semibold">
             {handle}
           </Text>
           {versionNumber != null && (
-            <Text textStyle="xs" color="fg.muted" fontFamily="mono">
+            <Text textStyle="xs" color="fg.muted">
               v{versionNumber}
             </Text>
           )}
@@ -440,7 +440,6 @@ function SdkRow({ label, value }: { label: string; value: string }) {
       </Text>
       <Text
         textStyle="xs"
-        fontFamily="mono"
         color="fg"
         textAlign="right"
         wordBreak="break-all"

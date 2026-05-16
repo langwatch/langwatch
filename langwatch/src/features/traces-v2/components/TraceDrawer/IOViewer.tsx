@@ -21,7 +21,7 @@ import {
 } from "react-icons/lu";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { AnnotationPopover } from "./conversationView/AnnotationPopover";
-import { IOViewerBody, IOViewerEngageScrim } from "./IOViewerBody";
+import { IOViewerBody } from "./IOViewerBody";
 import { safePrettyJson } from "./JsonHighlight";
 import { SegmentedToggle } from "./SegmentedToggle";
 import {
@@ -358,10 +358,12 @@ export const IOViewer = memo(function IOViewer({
             value={format}
             onChange={(f) => setFormat(f as ViewFormat)}
             options={formatOptions.map((opt) => {
-              // Output is always a single assistant message, so the
-              // thread/bubbles split has no meaning there — only embed
-              // the layout toggle for input/system chat history.
-              if (opt === "pretty" && isChat && mode !== "output") {
+              // Both layouts (thread / bubbles) are available for any
+              // chat-shaped content — input *or* output. Even with a
+              // single assistant reply, the operator may want the
+              // bubble visual; conversely, a multi-message output
+              // (rare but possible) benefits from the flat stack.
+              if (opt === "pretty" && isChat) {
                 return {
                   value: "pretty",
                   submodes: {
@@ -422,62 +424,57 @@ export const IOViewer = memo(function IOViewer({
       {!collapsed && (
         <>
           <Box ref={engagedRef} position="relative">
+            {/* Two-layer structure so the horizontal scrollbar (used by
+                wide single-line JSON, code blocks, etc) sits flush
+                with the outer rounded border rather than inside the
+                padding. The OUTER box owns the border / radius and
+                clips horizontally; the INNER box owns the padding so
+                content gets breathing room while the scrollbar hugs
+                the outer edge. */}
             <Box
               ref={previewBoxRef}
               bg={flushChatCard ? "transparent" : "bg.subtle"}
               borderRadius={flushChatCard ? "0" : "md"}
               borderWidth={flushChatCard ? "0" : "1px"}
               borderColor="border"
-              padding={
-                flushChatCard
-                  ? 0
-                  : format === "markdown" || isVirtualizingChat
-                    ? 0
-                    : 3
-              }
-              opacity={
-                !isVirtualizingChat && !engaged && hasOverflow ? 0.6 : 1
-              }
+              overflowX={flushChatCard ? "visible" : "auto"}
+              overflowY="visible"
+              opacity={1}
               transition="opacity 120ms ease-out"
-              maxHeight={
-                isVirtualizingChat
-                  ? undefined
-                  : engaged
-                    ? "min(90vh, 900px)"
-                    : "min(80vh, 600px)"
-              }
-              // Idle: overflow hidden so wheel falls through to the page.
-              // Engaged: overflow auto + `overscroll-behavior: auto` so the
-              // panel scrolls internally but chains back to the page at
-              // boundaries (no trap).
-              overflow={
-                isVirtualizingChat ? "hidden" : engaged ? "auto" : "hidden"
-              }
-              overscrollBehavior="auto"
             >
-              <IOViewerBody
-                format={format}
-                isChat={isChat}
-                canJson={canJson}
-                prettyJsonContent={prettyJsonContent}
-                markdownBody={markdownBody}
-                markdownSubmode={markdownSubmode}
-                conversationTurns={conversationTurns}
-                chatLayout={chatLayout}
-                inlineBlocks={inlineBlocks}
-                hasInlineRichContent={hasInlineRichContent}
-                displayContent={displayContent}
-                isLong={isLong}
-                expanded={expanded}
-                mode={mode}
-              />
+              <Box
+                padding={
+                  flushChatCard
+                    ? 0
+                    : format === "markdown" || isVirtualizingChat
+                      ? 0
+                      : 3
+                }
+              >
+                <IOViewerBody
+                  format={format}
+                  isChat={isChat}
+                  canJson={canJson}
+                  prettyJsonContent={prettyJsonContent}
+                  markdownBody={markdownBody}
+                  markdownSubmode={markdownSubmode}
+                  conversationTurns={conversationTurns}
+                  chatLayout={chatLayout}
+                  inlineBlocks={inlineBlocks}
+                  hasInlineRichContent={hasInlineRichContent}
+                  displayContent={displayContent}
+                  isLong={isLong}
+                  expanded={expanded}
+                  mode={mode}
+                />
+              </Box>
             </Box>
-            {!isVirtualizingChat && !engaged && hasOverflow && (
-              <IOViewerEngageScrim
-                flushChatCard={flushChatCard}
-                onEngage={() => setEngaged(true)}
-              />
-            )}
+            {/*
+              The "Click to interact" scrim previously sat here. The new
+              drawer pane layout gives every IOViewer its own scroll
+              container, so wheel events scope to the pane the cursor is
+              over — no opt-in handshake needed.
+            */}
           </Box>
 
           {isLong && (

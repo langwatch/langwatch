@@ -3,6 +3,7 @@ import { LuUser } from "react-icons/lu";
 import { RenderedMarkdown } from "../markdownView";
 import type { DisplayRoleVisuals } from "../scenarioRoles";
 import { BlockStack } from "./BlockStack";
+import { TurnCollapseChevron } from "./TurnCollapseChevron";
 import { asMarkdownBody } from "./parsing";
 import type { ChatMessage, ContentBlock } from "./types";
 
@@ -19,6 +20,7 @@ export function UserTurnBubble({
   toolCalls,
   visuals,
   collapseTools = false,
+  onCollapse,
 }: {
   blocks: ContentBlock[];
   toolCalls: NonNullable<ChatMessage["tool_calls"]>;
@@ -29,6 +31,7 @@ export function UserTurnBubble({
    */
   visuals?: DisplayRoleVisuals;
   collapseTools?: boolean;
+  onCollapse?: () => void;
 }) {
   const HeaderIcon = visuals?.Icon ?? LuUser;
   const headerLabel = visuals?.bubbleLabel ?? "User";
@@ -73,6 +76,12 @@ export function UserTurnBubble({
             >
               {headerLabel}
             </Text>
+            {onCollapse && (
+              <>
+                <Box flex={1} />
+                <TurnCollapseChevron onClick={onCollapse} />
+              </>
+            )}
           </HStack>
           <Box color="fg" textStyle="xs" lineHeight="1.6">
             {text ? (
@@ -120,6 +129,12 @@ export function UserTurnBubble({
         >
           {headerLabel}
         </Text>
+        {onCollapse && (
+          <>
+            <Box flex={1} />
+            <TurnCollapseChevron onClick={onCollapse} />
+          </>
+        )}
       </HStack>
       <BlockStack
         blocks={blocks}

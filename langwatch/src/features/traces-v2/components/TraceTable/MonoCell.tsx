@@ -3,7 +3,6 @@ import type React from "react";
 
 export const MonoCell: React.FC<TextProps> = ({ children, ...rest }) => (
   <Text
-    fontFamily="mono"
     color="fg.muted"
     whiteSpace="nowrap"
     textStyle="xs"

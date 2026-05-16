@@ -522,12 +522,18 @@ model SavedView {
     query     String?
     period    Json?
     order     Int      @default(0)
+    /// Discriminator for the two storage shapes that share this table:
+    ///   - "v1-traces-filter" (default) — legacy /messages page filter map saved views
+    ///   - "v2-traces-lens"             — new traces v2 lens configs (columns, addons, grouping, sort, filterText) encoded inside `filters` JSON
+    /// Each client filters by its own kind on read so neither sees the other's rows.
+    kind      String   @default("v1-traces-filter")
     createdAt DateTime @default(now())
     updatedAt DateTime @default(now()) @updatedAt
 
     @@index([projectId])
     @@index([projectId, order])
     @@index([userId])
+    @@index([projectId, kind, order])
 }
 
 model CustomGraph {

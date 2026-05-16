@@ -38,16 +38,38 @@ export class SavedViewService {
    * Returns project-level views (userId IS NULL) plus the user's personal views.
    * Auto-seeds with default origin views on first access.
    */
-  async getAll({ projectId, userId }: { projectId: string; userId?: string }) {
-    const count = await this.repository.count({ projectId, userId });
+  async getAll({
+    projectId,
+    userId,
+    kind,
+  }: {
+    projectId: string;
+    userId?: string;
+    /**
+     * Storage shape to read. Omit for the legacy default
+     * ("v1-traces-filter"). The new traces v2 lens UI passes
+     * "v2-traces-lens" so it never sees the legacy rows. Only the
+     * default kind triggers seed/backfill — the v2 client owns its own
+     * defaults code-side.
+     */
+    kind?: string;
+  }) {
+    // Only seed origin-bucket defaults for the legacy kind. The new
+    // traces v2 lens system seeds its built-in lenses client-side from
+    // code, so triggering server-side seed on first access here would
+    // double-populate the user's tab strip.
+    const isLegacyKind = !kind || kind === "v1-traces-filter";
 
-    if (count === 0) {
-      await this.seedViews({ projectId });
-    } else {
-      await this.backfillMissingSeedViews({ projectId });
+    if (isLegacyKind) {
+      const count = await this.repository.count({ projectId, userId, kind });
+      if (count === 0) {
+        await this.seedViews({ projectId });
+      } else {
+        await this.backfillMissingSeedViews({ projectId });
+      }
     }
 
-    return await this.repository.findAll({ projectId, userId });
+    return await this.repository.findAll({ projectId, userId, kind });
   }
 
   /**
@@ -61,18 +83,33 @@ export class SavedViewService {
   }: {
     projectId: string;
     input: {
+      /** Optional client-provided id — see router-level comment. */
+      id?: string;
       name: string;
       filters: Prisma.InputJsonValue;
       query?: string;
       period?: Prisma.InputJsonValue;
       userId?: string;
+      /**
+       * Storage shape. Omit for the legacy "v1-traces-filter" default;
+       * the new traces v2 lens client sends "v2-traces-lens" so its
+       * rows stay isolated from the legacy /messages UI.
+       */
+      kind?: string;
     };
   }) {
-    const lastView = await this.repository.findLast({ projectId });
+    // `order` is scoped to the kind so the two storage shapes maintain
+    // independent ordering — otherwise a brand new v2 lens would land at
+    // the end of the legacy ordering and look misplaced when the legacy
+    // UI is later opened.
+    const lastView = await this.repository.findLast({
+      projectId,
+      kind: input.kind,
+    });
     const newOrder = (lastView?.order ?? -1) + 1;
 
     return await this.repository.create({
-      id: nanoid(),
+      id: input.id ?? nanoid(),
       projectId,
       userId: input.userId,
       name: input.name,
@@ -80,6 +117,7 @@ export class SavedViewService {
       query: input.query,
       period: input.period,
       order: newOrder,
+      kind: input.kind,
     });
   }
 

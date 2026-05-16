@@ -30,6 +30,8 @@ const REFRESH_SPIN_KEYFRAMES = {
 export const LiveIndicator: React.FC = () => {
   const sseState = useSseStatusStore((s) => s.sseConnectionState);
   const lastEventAt = useSseStatusStore((s) => s.lastEventAt);
+  const liveUpdatesEnabled = useSseStatusStore((s) => s.liveUpdatesEnabled);
+  const toggleLiveUpdates = useSseStatusStore((s) => s.toggleLiveUpdates);
   const isRefreshing = useRefreshUIStore((s) => s.isRefreshing);
   const refresh = useTraceListRefresh();
 
@@ -39,10 +41,26 @@ export const LiveIndicator: React.FC = () => {
   return (
     <Flex align="center" gap={1}>
       <Tooltip
-        content={describeSseState(sseState, lastEventAt)}
+        content={
+          liveUpdatesEnabled
+            ? `${describeSseState(sseState, lastEventAt)}. Click to pause.`
+            : "Live updates paused. Click to resume."
+        }
         positioning={{ placement: "bottom" }}
       >
-        <Flex align="center" gap={1} cursor="default" paddingX={1}>
+        <Flex
+          as="button"
+          align="center"
+          gap={1}
+          paddingX={1}
+          cursor="pointer"
+          color={liveUpdatesEnabled ? "fg" : "fg.subtle"}
+          onClick={toggleLiveUpdates}
+          aria-label={
+            liveUpdatesEnabled ? "Pause live updates" : "Resume live updates"
+          }
+          aria-pressed={liveUpdatesEnabled}
+        >
           {isConnected ? <Wifi size={12} /> : <WifiOff size={12} />}
           <Box
             width="6px"
@@ -80,12 +98,12 @@ function describeSseState(
   switch (state) {
     case "connected":
       return lastEventAt
-        ? `Live updates active — last event ${formatTimeAgo(lastEventAt)}`
+        ? `Live updates active. Last event ${formatTimeAgo(lastEventAt)}`
         : "Live updates active";
     case "connecting":
       return "Connecting to live updates...";
     case "error":
-      return "Live updates disconnected — click refresh to retry";
+      return "Live updates disconnected. Click refresh to retry.";
     case "disconnected":
       return "Live updates disabled";
   }

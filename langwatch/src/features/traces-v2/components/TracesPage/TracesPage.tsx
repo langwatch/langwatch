@@ -5,13 +5,17 @@ import { ExportProgress } from "~/components/messages/ExportProgress";
 import { useTracesV2Presence } from "~/features/presence/hooks/useTracesV2Presence";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useLensFilterDirtySync } from "../../hooks/useLensFilterDirtySync";
+import { useLensSync } from "../../hooks/useLensSync";
 import { useProjectHasTraces } from "../../hooks/useProjectHasTraces";
 import { useResetSelectionOnViewChange } from "../../hooks/useResetSelectionOnViewChange";
 import { useRollingTimeRange } from "../../hooks/useRollingTimeRange";
+import { useTraceDrawerUrlHydrator } from "../../hooks/useTraceDrawerUrlHydrator";
 import { useTraceFreshness } from "../../hooks/useTraceFreshness";
 import { useTraceListExport } from "../../hooks/useTraceListExport";
 import { useTraceListQuery } from "../../hooks/useTraceListQuery";
 import { useURLSync } from "../../hooks/useURLSync";
+import { useDrawerStore } from "../../stores/drawerStore";
+import { TraceV2DrawerShell } from "../TraceDrawer";
 import { OnboardingHost } from "../../onboarding";
 import { useOnboardingStore } from "../../onboarding/store/onboardingStore";
 import {
@@ -64,6 +68,12 @@ export const TracesPage: React.FC = () => {
   useTracesV2Presence();
   useDebouncedFilterCommit();
   useLensFilterDirtySync();
+  useLensSync();
+  // URL → drawer store sync so a deep link / browser-back still opens
+  // the drawer. The actual mount decision is in this component (see
+  // `traceDrawerMounted` below), so the click → render path doesn't
+  // wait for React Router to commit the URL change.
+  useTraceDrawerUrlHydrator();
   useSidebarShortcut();
   useFindShortcut();
   useShortcutsHelpShortcut();
@@ -174,10 +184,24 @@ export const TracesPage: React.FC = () => {
             {showEmptyState ? <EmptyResultsPane /> : <ResultsPane />}
           </HStack>
           <PageKeyboardShortcuts />
+          <TraceDrawerMount />
         </VStack>
       </OnboardingHost>
     </DensityProvider>
   );
+};
+
+/**
+ * Optimistic drawer mount. Reads `traceId` straight from the drawer
+ * store so a click → store-update → render lands in the same frame.
+ * The URL is still kept in sync (via openDrawer / closeDrawer in the
+ * scaffold), it just no longer gates the mount the way
+ * `CurrentDrawer` used to.
+ */
+const TraceDrawerMount: React.FC = () => {
+  const hasTrace = useDrawerStore((s) => !!s.traceId);
+  if (!hasTrace) return null;
+  return <TraceV2DrawerShell />;
 };
 
 const FilterAside: React.FC<{
@@ -280,7 +304,17 @@ const ResultsPane: React.FC = React.memo(() => {
         }}
       />
       <Box flex={1} minHeight={0} position="relative">
-        <Box height="full" overflow="auto" bg="bg.muted">
+        {/*
+          Light mode: the table sits on a pure-white surface so the eye
+          anchors on the gray sticky header row above it (DevTools
+          "Network" inversion). Dark mode keeps the legacy muted dark
+          background that operators already approved.
+        */}
+        <Box
+          height="full"
+          overflow="auto"
+          bg={{ base: "bg.surface", _dark: "bg.muted" }}
+        >
           <TraceTable />
         </Box>
         <FindBar />

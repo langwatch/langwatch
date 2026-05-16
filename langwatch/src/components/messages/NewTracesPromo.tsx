@@ -7,10 +7,12 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import posthog from "posthog-js";
 import { useEffect, useState } from "react";
 import { LuArrowRight, LuMessageCircle, LuSparkles, LuX } from "react-icons/lu";
 import { Link } from "~/components/ui/link";
 import { Tooltip } from "~/components/ui/tooltip";
+import { setTracesV2Preferred } from "~/features/traces-v2/hooks/useTracesV2Preference";
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
@@ -48,6 +50,32 @@ function snooze(projectId: string, mode: PromoMode): void {
     );
   } catch {
     // No-op: best-effort dismissal.
+  }
+}
+
+/**
+ * Clear every per-project snooze key for the v2 promo so the banner
+ * reappears on the next render. Called when the operator opts back
+ * out of v2 from the new drawer's overflow menu — at that point we
+ * want the promo to be available again the next time they open the
+ * legacy drawer, not stuck in "snoozed for 7 days".
+ *
+ * Also dispatches the in-tab event the promo subscribes to so the
+ * currently-mounted promo (if any) re-runs its `isSnoozed` check
+ * without waiting for a remount.
+ */
+export function resetTracesV2PromoSnooze(): void {
+  if (typeof window === "undefined") return;
+  try {
+    const toDelete: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(STORAGE_PREFIX)) toDelete.push(key);
+    }
+    for (const key of toDelete) localStorage.removeItem(key);
+    window.dispatchEvent(new CustomEvent("langwatch:traces-v2-promo-reset"));
+  } catch {
+    // best-effort
   }
 }
 
@@ -95,6 +123,19 @@ export function NewTracesPromo({
     if (projectId) setDismissed(isSnoozed(projectId, mode));
   }, [projectId, mode]);
 
+  // Re-evaluate dismissed when the operator opts out of v2 from the
+  // new drawer (which calls `resetTracesV2PromoSnooze` and dispatches
+  // this event). Without this subscription the banner would stay
+  // hidden until the 7-day snooze expired or the page reloaded.
+  useEffect(() => {
+    const onReset = () => {
+      if (projectId) setDismissed(isSnoozed(projectId, mode));
+    };
+    window.addEventListener("langwatch:traces-v2-promo-reset", onReset);
+    return () =>
+      window.removeEventListener("langwatch:traces-v2-promo-reset", onReset);
+  }, [projectId, mode]);
+
   if (!hasMounted || !projectSlug || tracesV2FlagLoading || dismissed) {
     return null;
   }
@@ -104,9 +145,43 @@ export function NewTracesPromo({
     setDismissed(true);
   };
 
-  const v2Href = traceId
-    ? `/${projectSlug}/traces?drawer.open=traceV2Details&drawer.traceId=${encodeURIComponent(traceId)}`
-    : `/${projectSlug}/traces`;
+  // Going hard-nav rather than openDrawer: the v1→v2 swap kept losing
+  // races against Chakra's unmount-fired onOpenChange (which calls
+  // goBack and pops the freshly-pushed v2 entry). Two rounds of
+  // increasingly elaborate guards (URL snapshot, live window.location,
+  // module-level transition flag) still misfired under live testing.
+  // A full window.location navigation gives us a deterministic clean
+  // slate — every in-flight drawer state is dropped, the page reloads
+  // with traceV2Details as the only drawer. v1 is going away soon
+  // anyway, so the page reload cost is short-lived.
+  const handleTryV2 = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!traceId) {
+      if (projectSlug) {
+        window.location.href = `/${projectSlug}/traces`;
+      }
+      return;
+    }
+    setTracesV2Preferred(true);
+    posthog.capture("traces_v2_opt_in", {
+      surface: "promo_banner",
+      projectId,
+      traceId,
+    });
+    if (projectId) snooze(projectId, mode);
+    // Preserve every non-drawer query param (`span`, filters, time
+    // range, …) so the underlying scenario / list view stays put;
+    // only swap the drawer.* params.
+    const url = new URL(window.location.href);
+    const drawerKeys: string[] = [];
+    url.searchParams.forEach((_, key) => {
+      if (key.startsWith("drawer.")) drawerKeys.push(key);
+    });
+    for (const key of drawerKeys) url.searchParams.delete(key);
+    url.searchParams.set("drawer.open", "traceV2Details");
+    url.searchParams.set("drawer.traceId", traceId);
+    window.location.href = url.toString();
+  };
 
   const requestAccessMailto = `mailto:support@langwatch.ai?subject=${encodeURIComponent(
     "Early access to the new Trace Explorer",
@@ -204,22 +279,22 @@ export function NewTracesPromo({
         )}
       </VStack>
       {mode === "try" ? (
-        <Link href={v2Href} aria-label="Open new Trace Explorer">
-          <Button
-            size={isCompact ? "xs" : "sm"}
-            bg="white"
-            color="purple.700"
-            fontWeight="600"
-            paddingX={isCompact ? 3 : 4}
-            boxShadow="0 1px 2px rgba(0, 0, 0, 0.12)"
-            _hover={{ bg: "white/90", transform: "translateY(-1px)" }}
-            _active={{ bg: "white/80", transform: "translateY(0)" }}
-            transition="background-color 0.12s ease, transform 0.12s ease"
-          >
-            Try the new one
-            <Icon as={LuArrowRight} boxSize={3.5} marginLeft={1} />
-          </Button>
-        </Link>
+        <Button
+          size={isCompact ? "xs" : "sm"}
+          aria-label="Try the new Trace Explorer"
+          bg="white"
+          color="purple.700"
+          fontWeight="600"
+          paddingX={isCompact ? 3 : 4}
+          boxShadow="0 1px 2px rgba(0, 0, 0, 0.12)"
+          _hover={{ bg: "white/90", transform: "translateY(-1px)" }}
+          _active={{ bg: "white/80", transform: "translateY(0)" }}
+          transition="background-color 0.12s ease, transform 0.12s ease"
+          onClick={handleTryV2}
+        >
+          Try the new one
+          <Icon as={LuArrowRight} boxSize={3.5} marginLeft={1} />
+        </Button>
       ) : (
         <Link
           href={requestAccessMailto}

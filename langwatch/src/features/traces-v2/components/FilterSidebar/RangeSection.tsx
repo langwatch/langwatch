@@ -168,7 +168,6 @@ export const RangeSection: React.FC<RangeSectionProps> = ({
           <Text
             textStyle="2xs"
             color="blue.fg"
-            fontFamily="mono"
             fontWeight="500"
           >
             {summary}
@@ -223,7 +222,7 @@ export const RangeSection: React.FC<RangeSectionProps> = ({
             </HStack>
           </>
         ) : (
-          <Text textStyle="2xs" color="fg.subtle" fontFamily="mono">
+          <Text textStyle="2xs" color="fg.subtle">
             {formatValue(min)}
           </Text>
         )}
@@ -280,7 +279,6 @@ const RangeEndpointInput: React.FC<RangeEndpointInputProps> = ({
       minHeight="20px"
       textAlign={align}
       textStyle="2xs"
-      fontFamily="mono"
       color="fg.subtle"
       border="none"
       bg="transparent"

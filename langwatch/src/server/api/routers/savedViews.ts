@@ -19,7 +19,15 @@ export const savedViewsRouter = createTRPCRouter({
    * Auto-seeds with default origin views on first access.
    */
   getAll: protectedProcedure
-    .input(z.object({ projectId: z.string() }))
+    .input(
+      z.object({
+        projectId: z.string(),
+        // Storage shape to read. Omit for the legacy default
+        // ("v1-traces-filter") so existing callers keep working;
+        // traces v2 passes "v2-traces-lens" to scope to its own rows.
+        kind: z.string().optional(),
+      }),
+    )
     .use(checkProjectPermission("traces:view"))
     .use(savedViewErrorHandler)
     .query(async ({ ctx, input }) => {
@@ -27,6 +35,7 @@ export const savedViewsRouter = createTRPCRouter({
       return await service.getAll({
         projectId: input.projectId,
         userId: ctx.session.user.id,
+        kind: input.kind,
       });
     }),
 
@@ -50,6 +59,17 @@ export const savedViewsRouter = createTRPCRouter({
           })
           .optional(),
         scope: z.enum(["project", "myself"]).default("project"),
+        // Storage shape. Omit for the legacy default
+        // ("v1-traces-filter"). Traces v2 passes "v2-traces-lens".
+        kind: z.string().optional(),
+        // Optional client-provided id. Traces v2 generates lens ids
+        // locally so the in-store active id keeps pointing at the same
+        // row after the server roundtrip completes — otherwise the
+        // active lens would be invalidated by the refetch (server id
+        // ≠ client id) and the tab strip would snap back to the first
+        // built-in. Accepts strings that look like client-side lens
+        // ids (`custom-...`). Server still generates one if omitted.
+        id: z.string().min(1).max(128).optional(),
       }),
     )
     .use(checkProjectPermission("traces:view"))
@@ -59,11 +79,13 @@ export const savedViewsRouter = createTRPCRouter({
       return await service.createView({
         projectId: input.projectId,
         input: {
+          id: input.id,
           name: input.name,
           filters: input.filters as Prisma.InputJsonValue,
           query: input.query,
           period: input.period as Prisma.InputJsonValue | undefined,
           userId: input.scope === "myself" ? ctx.session.user.id : undefined,
+          kind: input.kind,
         },
       });
     }),

@@ -37,7 +37,7 @@ export const AutomateButton: React.FC = () => {
   return (
     <PopoverRoot positioning={{ placement: "bottom-end" }}>
       <Tooltip
-        content="Automations from a filter — coming soon"
+        content="Automations from a filter. Coming soon."
         positioning={{ placement: "bottom" }}
       >
         <PopoverTrigger asChild>

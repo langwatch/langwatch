@@ -224,7 +224,17 @@ export const TRACE_DRAWER_SHORTCUTS: ShortcutEntry[] = [
     displayKeys: ["M"],
     group: "View",
     description: "Maximize / restore",
-    run: ({ store }) => store.toggleMaximized(),
+    run: ({ store }) => {
+      if (typeof window === "undefined") {
+        store.toggleMaximized();
+        return;
+      }
+      // The maximize gesture now drives the same width snap that
+      // double-clicking the edge grip uses — the boolean `isMaximized`
+      // is still updated for components that show a Maximize/Restore
+      // icon label, but the actual size change comes from `widthPx`.
+      store.toggleSnapMaximize(window.innerWidth);
+    },
   },
   {
     matchKeys: ["r", "R"],

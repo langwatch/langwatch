@@ -236,7 +236,7 @@ const ConversationSkeleton: React.FC<{ conversationId: string }> = ({
         >
           Conversation
         </Text>
-        <Text textStyle="xs" color="fg.subtle" fontFamily="mono" truncate>
+        <Text textStyle="xs" color="fg.subtle" truncate>
           {conversationId}
         </Text>
         <Box flex={1} />
@@ -340,7 +340,7 @@ const ConversationHeader: React.FC<{
     >
       Conversation
     </Text>
-    <Text textStyle="xs" color="fg.subtle" fontFamily="mono" truncate>
+    <Text textStyle="xs" color="fg.subtle" truncate>
       {conversationId}
     </Text>
     <Box flex={1} />

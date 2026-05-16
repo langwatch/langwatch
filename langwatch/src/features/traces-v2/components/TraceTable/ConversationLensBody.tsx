@@ -7,6 +7,7 @@ import {
 } from "@tanstack/react-table";
 import type React from "react";
 import { useMemo, useState } from "react";
+import { useFilterStore } from "../../stores/filterStore";
 import type { LensConfig } from "../../stores/viewStore";
 import type { TraceListItem } from "../../types/trace";
 import { buildConversationColumns } from "./columns";
@@ -16,6 +17,7 @@ import {
 } from "./conversationGroups";
 import { conversationRegistry, RegistryRow } from "./registry";
 import { conversationSelectColumnDef } from "./selectColumn";
+import { buildConversationPlaceholderRows } from "./skeletonPlaceholders";
 import { TraceTableShell } from "./TraceTableShell";
 import { useTraceTableVirtualizer } from "./useTraceTableVirtualizer";
 import { VirtualSpacer } from "./VirtualSpacer";
@@ -25,13 +27,24 @@ const CONVERSATION_MIN_WIDTH = "880px";
 interface ConversationLensBodyProps {
   traces: TraceListItem[];
   lens: LensConfig;
+  isLoading?: boolean;
 }
 
 export const ConversationLensBody: React.FC<ConversationLensBodyProps> = ({
   traces,
   lens,
+  isLoading = false,
 }) => {
-  const groups = useMemo(() => groupTracesByConversation(traces), [traces]);
+  const realGroups = useMemo(
+    () => groupTracesByConversation(traces),
+    [traces],
+  );
+  const pageSize = useFilterStore((s) => s.pageSize);
+  const groups = useMemo(
+    () =>
+      isLoading ? buildConversationPlaceholderRows(pageSize) : realGroups,
+    [isLoading, pageSize, realGroups],
+  );
   const columns = useMemo(
     () => [
       conversationSelectColumnDef,
@@ -64,7 +77,7 @@ export const ConversationLensBody: React.FC<ConversationLensBodyProps> = ({
   });
   const virtualItems = virtualizer.getVirtualItems();
 
-  if (groups.length === 0) return <NoConversationsMessage />;
+  if (!isLoading && groups.length === 0) return <NoConversationsMessage />;
 
   const toggleExpanded = (id: string) =>
     setExpandedKey((prev) => (prev === id ? null : id));
@@ -85,8 +98,15 @@ export const ConversationLensBody: React.FC<ConversationLensBodyProps> = ({
             addons={lens.addons}
             status={row.original.worstStatus}
             hoverScope="split"
-            isExpanded={expandedKey === row.original.conversationId}
-            onToggleExpand={() => toggleExpanded(row.original.conversationId)}
+            isExpanded={
+              !isLoading && expandedKey === row.original.conversationId
+            }
+            onToggleExpand={
+              isLoading
+                ? undefined
+                : () => toggleExpanded(row.original.conversationId)
+            }
+            isLoading={isLoading}
           />
         );
       })}

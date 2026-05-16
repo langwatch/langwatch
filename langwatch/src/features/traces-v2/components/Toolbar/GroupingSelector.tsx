@@ -29,7 +29,7 @@ export const GroupingSelector: React.FC = () => {
         <Button
           size="xs"
           variant={grouping === "flat" ? "outline" : "subtle"}
-          aria-label={`Group rows — currently ${GROUPING_OPTIONS[grouping]}`}
+          aria-label={`Group rows. Currently ${GROUPING_OPTIONS[grouping]}.`}
           gap={1}
           paddingX={2}
         >

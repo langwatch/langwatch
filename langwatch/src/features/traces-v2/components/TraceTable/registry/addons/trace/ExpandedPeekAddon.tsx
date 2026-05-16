@@ -233,7 +233,6 @@ const PeekSpanRow: React.FC<{
         </Text>
         <Text
           textStyle="2xs"
-          fontFamily="mono"
           color={isError ? "red.fg" : "fg"}
           truncate
         >
@@ -267,7 +266,6 @@ const PeekSpanRow: React.FC<{
 
       <Text
         textStyle="2xs"
-        fontFamily="mono"
         color="fg.muted"
         flexShrink={0}
         width="52px"

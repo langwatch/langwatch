@@ -36,6 +36,7 @@ import { useUpgradeModalStore } from "../stores/upgradeModalStore";
 import { api } from "../utils/api";
 import { findCurrentRoute, projectRoutes, type Route } from "../utils/routes";
 import { trackEvent } from "../utils/tracking";
+import { GlobalTraceV2DrawerMount } from "../features/traces-v2/components/GlobalTraceV2DrawerMount";
 import { AnnouncementBanner } from "./AnnouncementBanner";
 import { CurrentDrawer } from "./CurrentDrawer";
 import { FullLogo } from "./icons/FullLogo";
@@ -756,6 +757,11 @@ export const DashboardLayout = ({
               )}
 
             <CurrentDrawer />
+            {/* v2 trace drawer is mounted globally so cross-page opens
+                (e.g. clicking "Try the new one" from a /simulations
+                drawer) actually render the shell. Self-skips on
+                /[project]/traces where TracesPage already mounts it. */}
+            <GlobalTraceV2DrawerMount />
 
             {userIsPartOfTeam ? (
               <ErrorBoundary FallbackComponent={PageErrorFallback} resetKeys={[router.pathname]}>

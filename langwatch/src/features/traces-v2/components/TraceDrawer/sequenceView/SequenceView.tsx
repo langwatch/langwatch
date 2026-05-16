@@ -325,7 +325,7 @@ export function SequenceView({
               <Text textStyle="sm" color="fg.error">
                 Could not render sequence diagram
               </Text>
-              <Text textStyle="xs" color="fg.muted" fontFamily="mono">
+              <Text textStyle="xs" color="fg.muted">
                 {error}
               </Text>
             </VStack>

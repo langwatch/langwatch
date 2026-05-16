@@ -1,4 +1,5 @@
-import { Accordion, Badge, Box, HStack, Text } from "@chakra-ui/react";
+import { Accordion, Badge, Box, HStack, Icon, Text } from "@chakra-ui/react";
+import { LuChevronDown } from "react-icons/lu";
 import { type ReactNode, useRef } from "react";
 import { PresenceSection } from "~/features/presence/components/PresenceSection";
 import { SectionPresenceDot } from "~/features/presence/components/SectionPresenceDot";
@@ -29,13 +30,14 @@ export function AccordionShell({
 }
 
 /**
- * Height of the `SpanTabBar` (Summary / LLM-Optimized / pinned span tabs)
- * that sits sticky at `top: 0` of the drawer body. Accordion triggers
- * have to pin *below* it or they end up hidden behind the tab strip
- * (the bar has `zIndex: 2`, triggers have `zIndex: 1`). Keep this in
- * sync with `SpanTabBar`'s `minHeight` (38px).
+ * Accordion triggers pin at `top: 0` of their scroll container. In the
+ * new pane layout the `SpanTabBar` lives **outside** the accordions'
+ * scroll container — it's part of the Span Detail pane's header chrome.
+ * Older versions of this file offset by the tab-bar height because
+ * the bar shared the same scroll surface, which left a visible
+ * empty band above each sticky section.
  */
-const SPAN_TAB_BAR_HEIGHT_PX = 38;
+const SPAN_TAB_BAR_HEIGHT_PX = 0;
 
 export function Section({
   value,
@@ -81,18 +83,40 @@ export function Section({
     >
       <Accordion.ItemTrigger
         width="100%"
+        display="flex"
+        // Pin both the HStack (with title + count) and the indicator
+        // to the trigger's vertical centre. Without this, the indicator
+        // inherits the trigger's default cross-axis alignment which
+        // shifted with the chevron's rotation state — closed read as
+        // "drifted down", open read as "drifted up".
+        alignItems="center"
         paddingX={4}
-        paddingY={tokens.sectionTriggerY}
+        // +0.5 density step (~2px each side) over the raw token —
+        // operator feedback: the section triggers felt cramped, this
+        // gives the row a touch of breathing room without breaking
+        // the rhythm with the ctx header above (which already runs
+        // at `densityPaddingY + 0.5`).
+        paddingY={tokens.sectionTriggerY + 0.5}
         // Solid bg under sticky so content scrolling underneath is
         // occluded — without it the title would overlap the content
         // beneath when pinned. `bg.surface` matches the drawer body.
         bg="bg.surface"
         color="fg.muted"
         borderTopWidth={isFirst ? "0" : "1px"}
-        borderColor="border.muted"
+        borderColor={{ base: "gray.200", _dark: "border.muted" }}
         transition="background 120ms ease, color 120ms ease"
         _hover={{ bg: "bg.softHover", color: "fg" }}
-        _open={{ bg: "bg.softHover", color: "fg" }}
+        // Open state keeps the same white bg AND the same `fg.muted`
+        // title color as closed — operator feedback: promoting the
+        // title color on expand made the "INPUT AND OUTPUT" labels
+        // look heavier than their collapsed siblings, breaking the
+        // calm read of the section list. The chevron rotation alone
+        // signals state. A 1px bottom border still slips in so the
+        // trigger reads as the open section's own header band.
+        _open={{
+          borderBottomWidth: "1px",
+          borderBottomColor: { base: "gray.200", _dark: "border.muted" },
+        }}
         cursor="pointer"
         // Each trigger pins flush with the SpanTabBar (no per-section
         // offset). The previous "Notion-style" stacking multiplied a
@@ -134,7 +158,30 @@ export function Section({
             />
           ) : null}
         </HStack>
-        <Accordion.ItemIndicator color="inherit" />
+        {/* Custom indicator at a fixed 12px so it matches the close /
+            expand icon in the LLM-Optimized header row above — the
+            default `<Accordion.ItemIndicator>` inherits the trigger's
+            font size and reads visibly larger than its neighbours.
+            Explicit `_open` rotation because our own `display: flex`
+            override won the cascade against the default slot recipe
+            — the chevron would otherwise either not rotate at all,
+            or rotate the wrong direction. Closed = chevron-down,
+            open = rotate(180deg) = chevron-up.
+            `alignSelf: center` keeps the icon anchored to the
+            trigger's vertical midline through both states. */}
+        <Accordion.ItemIndicator
+          color="inherit"
+          display="flex"
+          alignItems="center"
+          alignSelf="center"
+          lineHeight={0}
+          transition="transform 120ms ease"
+          transformOrigin="center"
+          transform="rotate(0deg)"
+          _open={{ transform: "rotate(180deg)" }}
+        >
+          <Icon as={LuChevronDown} boxSize={3} />
+        </Accordion.ItemIndicator>
       </Accordion.ItemTrigger>
       <Accordion.ItemContent>
         {trackPresence ? (

@@ -28,7 +28,12 @@ const STORAGE_KEY = "langwatch:traces-v2:ui";
 type Persisted = Pick<UIState, "sidebarCollapsed">;
 
 const DEFAULT_PERSISTED: Persisted = {
-  sidebarCollapsed: true,
+  // Default to open — the filter sidebar is the primary discovery surface
+  // for the table, and starting collapsed left first-time users (and
+  // anyone who cleared localStorage) staring at a rail of icons. Users
+  // who prefer the slim view can still collapse it, and that choice
+  // persists.
+  sidebarCollapsed: false,
 };
 
 function loadPersistedUI(): Persisted {

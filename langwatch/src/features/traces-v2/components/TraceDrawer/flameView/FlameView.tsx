@@ -654,7 +654,6 @@ export const FlameView = memo(function FlameView({
                       textStyle="xs"
                       color={isLast ? "fg" : "fg.muted"}
                       fontWeight={isLast ? "medium" : "normal"}
-                      fontFamily="mono"
                       truncate
                       maxWidth="200px"
                     >
@@ -719,7 +718,6 @@ export const FlameView = memo(function FlameView({
           <>
             <Text
               textStyle="xs"
-              fontFamily="mono"
               fontWeight="medium"
               color="fg"
               truncate
@@ -751,7 +749,6 @@ export const FlameView = memo(function FlameView({
                   <Text
                     textStyle="xs"
                     color="fg.muted"
-                    fontFamily="mono"
                     truncate
                     maxWidth="160px"
                   >
@@ -827,7 +824,6 @@ export const FlameView = memo(function FlameView({
                   whiteSpace="nowrap"
                   userSelect="none"
                   top="3px"
-                  fontFamily="mono"
                 >
                   {tick.label}
                 </Text>
@@ -1027,7 +1023,7 @@ export const FlameView = memo(function FlameView({
                   boxShadow="md"
                   whiteSpace="nowrap"
                 >
-                  <Text textStyle="xs" fontFamily="mono" fontWeight="medium">
+                  <Text textStyle="xs" fontWeight="medium">
                     {formatDuration(selDur)}
                   </Text>
                 </Flex>

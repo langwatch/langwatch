@@ -30,7 +30,6 @@ export const ConversationSummaryLine: React.FC<SummaryProps> = ({ group }) => {
       flexWrap="wrap"
       textStyle="xs"
       color="fg.subtle"
-      fontFamily="mono"
     >
       <Text>{group.traces.length} turns</Text>
       <Separator />

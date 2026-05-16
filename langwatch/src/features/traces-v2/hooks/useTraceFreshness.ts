@@ -108,9 +108,16 @@ export function useTraceFreshness() {
     [trpcUtils, project?.id],
   );
 
+  // Honour the operator's "live updates" preference — when disabled,
+  // skip subscribing and force the connection state to disconnected so
+  // the toolbar indicator reads correctly.
+  const liveUpdatesEnabled = useSseStatusStore(
+    (s) => s.liveUpdatesEnabled,
+  );
+
   const { connectionState, lastEventAt } = useTraceUpdateListener({
     projectId: project?.id ?? "",
-    enabled: !!project?.id,
+    enabled: !!project?.id && liveUpdatesEnabled,
     onTraceSummaryUpdated,
     onSpanStored,
     debounceMs: 2000,
@@ -118,8 +125,10 @@ export function useTraceFreshness() {
   });
 
   useEffect(() => {
-    setSseConnectionState(connectionState);
-  }, [connectionState, setSseConnectionState]);
+    setSseConnectionState(
+      liveUpdatesEnabled ? connectionState : "disconnected",
+    );
+  }, [connectionState, liveUpdatesEnabled, setSseConnectionState]);
 
   useEffect(() => {
     if (lastEventAt > 0) {

@@ -91,6 +91,19 @@ export function FlameBlock({
             ? depthAlpha * 0.3
             : depthAlpha) * 100,
   );
+  // Light mode runs on a much stronger floor: alpha-tinted `.solid`
+  // tokens against a white surface produce pale fills that white text
+  // disappears into. Pin every state to a "saturated, readable" floor
+  // and let the hover/select/dim states still nudge the alpha around
+  // without ever landing in unreadable-text territory. White text is
+  // legible against this whole band.
+  const lightBgAlphaPct = isEmphasized
+    ? 100
+    : isDimmed
+      ? 55
+      : isAncestor || isDirectChild
+        ? 95
+        : 85;
   const isZeroDuration = spanDur === 0;
 
   const parentDurMs = node.parent
@@ -154,7 +167,10 @@ export function FlameBlock({
         width={`${widthPct}%`}
         minWidth={`${MIN_BLOCK_PX}px`}
         height={`${ROW_HEIGHT}px`}
-        bg={`${color}/${bgAlphaPct}`}
+        bg={{
+          base: `${color}/${lightBgAlphaPct}`,
+          _dark: `${color}/${bgAlphaPct}`,
+        }}
         borderWidth={borderWidth}
         borderColor={borderColor}
         borderStyle={node.isOrphaned ? "dashed" : "solid"}
@@ -180,21 +196,18 @@ export function FlameBlock({
       >
         <Text
           textStyle="xs"
-          // In dark mode the saturated block bg is dark enough to read
-          // white text against; in light mode the same blocks render as
-          // pastel tints and white-on-pastel becomes invisible. Flip to
-          // a near-black foreground in light mode and drop the dark
-          // text-shadow that exists to lift white off colour — it
-          // becomes a fuzzy halo under dark text.
-          color={isEmphasized ? "white" : "white/90"}
-          _light={{
-            color: isEmphasized ? "gray.900" : "gray.800",
-            textShadow: "0 1px 0 rgba(255,255,255,0.45)",
-          }}
+          // White text in both modes. Light mode's `lightBgAlphaPct`
+          // floor (see above) keeps every block saturated enough that
+          // white reads cleanly — no more dark-on-light fights when the
+          // alpha rolled into pastel territory. The text-shadow gives a
+          // half-pixel of lift against the saturated background so the
+          // glyphs don't melt into the colour. Even at the dimmed-state
+          // alpha (~55%), white over a `.solid` blue/purple/teal still
+          // beats the legibility of dark text on a pale tint.
+          color="white"
           truncate
           lineHeight={1}
-          userSelect="none"
-          textShadow="0 1px 1px rgba(0,0,0,0.35)"
+          textShadow="0 1px 1px rgba(0,0,0,0.45)"
         >
           <BlockLabel
             name={span.name}
