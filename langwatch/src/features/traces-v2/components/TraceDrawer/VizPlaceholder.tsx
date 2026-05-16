@@ -65,6 +65,14 @@ interface VizPlaceholderProps {
   onSelectSpan: (spanId: string) => void;
   onClearSpan: () => void;
   onSwitchToSpanList?: (nameFilter: string, typeFilter: string) => void;
+  /**
+   * When true, the viz fills its parent's full height — the internal
+   * height state and the bottom resize handle are skipped because the
+   * parent (`<PanelGroup>` from `react-resizable-panels`) owns sizing.
+   * Used by the new pane layout where every section is its own
+   * independently sized panel.
+   */
+  fillParent?: boolean;
 }
 
 const MIN_HEIGHT = 80;
@@ -172,6 +180,7 @@ export function VizPlaceholder({
   onSelectSpan,
   onClearSpan,
   onSwitchToSpanList,
+  fillParent = false,
 }: VizPlaceholderProps) {
   const [height, setHeight] = useState(getStoredHeight);
   const [spanListSearch, setSpanListSearch] = useState("");
@@ -182,30 +191,21 @@ export function VizPlaceholder({
   const dragStartY = useRef(0);
   const dragStartHeight = useRef(0);
 
-  // Click-to-interact: viz panels capture wheel/drag events that would
-  // otherwise scroll the drawer body. Same pattern as IOViewer — overlay
-  // sits on top until the user opts in by clicking; clicking outside the
-  // viz disengages it. Switching tabs resets engagement.
-  const [vizEngaged, setVizEngaged] = useState(false);
+  // The previous "Click to interact" scrim is gone — the new pane
+  // layout (TraceDrawerShell + react-resizable-panels) gives each viz
+  // its own scroll container, so wheel events naturally scope to the
+  // pane the cursor is over. No need for an opt-in overlay.
   const vizEngagedRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    setVizEngaged(false);
-  }, [vizTab]);
-  useEffect(() => {
-    if (!vizEngaged) return;
-    const onPointerDown = (e: MouseEvent) => {
-      const target = e.target as Node | null;
-      if (!target || !vizEngagedRef.current) return;
-      if (vizEngagedRef.current.contains(target)) return;
-      setVizEngaged(false);
-    };
-    document.addEventListener("mousedown", onPointerDown);
-    return () => document.removeEventListener("mousedown", onPointerDown);
-  }, [vizEngaged]);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const isMinimized = height === 0;
-  const isCollapsed = !isMinimized && height <= MIN_HEIGHT + 20;
+  // In fillParent mode the parent <Panel> owns sizing, so the local
+  // minimize/collapse states are irrelevant — the viz simply fills the
+  // available space. We coerce them to false so all the conditional
+  // rendering below behaves as if the panel were at its normal height.
+  const isMinimized = fillParent ? false : height === 0;
+  const isCollapsed = fillParent
+    ? false
+    : !isMinimized && height <= MIN_HEIGHT + 20;
 
   const persistHeight = useCallback((h: number) => {
     localStorage.setItem(STORAGE_KEY, String(h));
@@ -316,8 +316,21 @@ export function VizPlaceholder({
   }, [height, persistHeight]);
 
   return (
-    <Box ref={containerRef}>
-      <Box overflow="hidden" bg="bg.panel">
+    <Box
+      ref={containerRef}
+      height={fillParent ? "100%" : undefined}
+      display={fillParent ? "flex" : undefined}
+      flexDirection={fillParent ? "column" : undefined}
+      minHeight={0}
+    >
+      <Box
+        overflow="hidden"
+        bg={{ base: "bg.surface", _dark: "bg.panel" }}
+        flex={fillParent ? 1 : undefined}
+        display={fillParent ? "flex" : undefined}
+        flexDirection={fillParent ? "column" : undefined}
+        minHeight={0}
+      >
         {/* Tab bar */}
         <Flex
           align="center"
@@ -326,7 +339,8 @@ export function VizPlaceholder({
           paddingY={1.5}
           borderBottomWidth={isMinimized ? "0px" : "1px"}
           borderColor="border.subtle"
-          bg="bg.subtle/40"
+          bg={{ base: "bg.muted", _dark: "bg.subtle/40" }}
+          flexShrink={0}
         >
           <HStack gap={0.5}>
             {TABS.map((tab) => {
@@ -375,55 +389,66 @@ export function VizPlaceholder({
             })}
           </HStack>
 
-          <HStack gap={1.5}>
-            <Tooltip
-              content={
-                isMinimized
-                  ? "Show"
-                  : height >= EXPANDED_HEIGHT
-                    ? "Minimize"
-                    : "Expand"
-              }
-              positioning={{ placement: "top" }}
-            >
-              <Flex
-                as="button"
-                align="center"
-                justify="center"
-                width="24px"
-                height="24px"
-                borderRadius="md"
-                cursor="pointer"
-                color="fg.muted"
-                _hover={{ bg: "bg.muted", color: "fg" }}
-                transition="all 0.15s ease"
-                onClick={handleCycleSize}
+          {!fillParent && (
+            <HStack gap={1.5}>
+              <Tooltip
+                content={
+                  isMinimized
+                    ? "Show"
+                    : height >= EXPANDED_HEIGHT
+                      ? "Minimize"
+                      : "Expand"
+                }
+                positioning={{ placement: "top" }}
               >
-                <Icon
-                  as={
-                    isMinimized
-                      ? LuChevronDown
-                      : height >= EXPANDED_HEIGHT
-                        ? LuMinus
-                        : LuChevronUp
-                  }
-                  boxSize={3.5}
-                />
-              </Flex>
-            </Tooltip>
-          </HStack>
+                <Flex
+                  as="button"
+                  align="center"
+                  justify="center"
+                  width="24px"
+                  height="24px"
+                  borderRadius="md"
+                  cursor="pointer"
+                  color="fg.muted"
+                  _hover={{ bg: "bg.muted", color: "fg" }}
+                  transition="all 0.15s ease"
+                  onClick={handleCycleSize}
+                >
+                  <Icon
+                    as={
+                      isMinimized
+                        ? LuChevronDown
+                        : height >= EXPANDED_HEIGHT
+                          ? LuMinus
+                          : LuChevronUp
+                    }
+                    boxSize={3.5}
+                  />
+                </Flex>
+              </Tooltip>
+            </HStack>
+          )}
         </Flex>
 
         {/* Visualization content */}
         {!isMinimized && (
           <Box
             ref={vizEngagedRef}
-            height={`${height}px`}
-            overflow="hidden"
-            transition={isDragging.current ? "none" : "height 0.2s ease"}
+            height={fillParent ? undefined : `${height}px`}
+            flex={fillParent ? 1 : undefined}
+            minHeight={0}
+            overflow={fillParent ? "auto" : "hidden"}
+            transition={
+              fillParent
+                ? undefined
+                : isDragging.current
+                  ? "none"
+                  : "height 0.2s ease"
+            }
             onClick={isCollapsed ? handleExpandFromCollapsed : undefined}
             cursor={isCollapsed ? "pointer" : "default"}
             position="relative"
+            style={fillParent ? { overflowAnchor: "none" } : undefined}
           >
             <NewSpanFlash
               spanCount={spans.length}
@@ -479,39 +504,18 @@ export function VizPlaceholder({
                 />
               )}
             </PeerCursorOverlay>
-            {!isCollapsed && !vizEngaged && spans.length > 0 && !isLoading && (
-              <Box
-                position="absolute"
-                inset={0}
-                cursor="zoom-in"
-                onClick={() => setVizEngaged(true)}
-                display="flex"
-                alignItems="flex-end"
-                justifyContent="center"
-                paddingBottom={2}
-                background="linear-gradient(to bottom, transparent 70%, var(--chakra-colors-bg-subtle) 100%)"
-                zIndex={5}
-              >
-                <Text
-                  textStyle="2xs"
-                  color="fg.muted"
-                  fontWeight="medium"
-                  bg="bg.surface"
-                  paddingX={2}
-                  paddingY={0.5}
-                  borderRadius="full"
-                  borderWidth="1px"
-                  borderColor="border"
-                >
-                  Click to interact
-                </Text>
-              </Box>
-            )}
+            {/*
+              The "Click to interact" scrim used to sit here. With the
+              pane layout giving each viz its own scroll container, the
+              overlay is redundant — wheel events scope to the pane the
+              cursor is over and never bleed into the drawer body.
+            */}
           </Box>
         )}
 
-        {/* Resize handle */}
-        {!isMinimized && (
+        {/* Resize handle — only in stand-alone (legacy) mode; the new
+            pane layout uses <PanelResizeHandle> instead. */}
+        {!fillParent && !isMinimized && (
           <Flex
             align="center"
             justify="center"

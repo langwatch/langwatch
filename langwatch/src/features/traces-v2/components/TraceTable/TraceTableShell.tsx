@@ -43,7 +43,18 @@ export function TraceTableShell<T>({
         zIndex: 1,
       }}
     >
-      <Thead position="sticky" top={0} zIndex={2} bg="bg.surface">
+      {/*
+        Light mode: the header row reads gray against the white table
+        body — DevTools "Network" inversion. Dark mode keeps the
+        previous `bg.surface` (slight elevation against the dark
+        canvas) that operators already approved.
+      */}
+      <Thead
+        position="sticky"
+        top={0}
+        zIndex={2}
+        bg={{ base: "bg.muted", _dark: "bg.surface" }}
+      >
         {table.getHeaderGroups().map((headerGroup) => (
           <Tr
             key={headerGroup.id}
@@ -112,7 +123,7 @@ function HeaderCell<T>({
         isActiveSort
           ? "blue.subtle"
           : isStickyFirst
-            ? "bg.surface"
+            ? { base: "bg.muted", _dark: "bg.surface" }
             : undefined
       }
       borderRightWidth="1px"

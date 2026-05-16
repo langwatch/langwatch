@@ -21,7 +21,7 @@ import {
 } from "react-icons/lu";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { AnnotationPopover } from "./conversationView/AnnotationPopover";
-import { IOViewerBody, IOViewerEngageScrim } from "./IOViewerBody";
+import { IOViewerBody } from "./IOViewerBody";
 import { safePrettyJson } from "./JsonHighlight";
 import { SegmentedToggle } from "./SegmentedToggle";
 import {
@@ -472,12 +472,12 @@ export const IOViewer = memo(function IOViewer({
                 mode={mode}
               />
             </Box>
-            {!isVirtualizingChat && !engaged && hasOverflow && (
-              <IOViewerEngageScrim
-                flushChatCard={flushChatCard}
-                onEngage={() => setEngaged(true)}
-              />
-            )}
+            {/*
+              The "Click to interact" scrim previously sat here. The new
+              drawer pane layout gives every IOViewer its own scroll
+              container, so wheel events scope to the pane the cursor is
+              over — no opt-in handshake needed.
+            */}
           </Box>
 
           {isLong && (

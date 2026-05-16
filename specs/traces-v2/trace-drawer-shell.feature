@@ -61,28 +61,33 @@ Rule: Drawer layout
 # ─────────────────────────────────────────────────────────────────────────────
 # DRAWER MAXIMISE AND RESTORE
 # ─────────────────────────────────────────────────────────────────────────────
+#
+# Superseded by trace-drawer-panes.feature: the drawer is now continuously
+# draggable (not just a binary maximize/restore toggle). The scenarios
+# below describe the keyboard/double-click shortcuts only; for drag
+# behaviour see trace-drawer-panes.feature.
 
 Rule: Drawer maximise and restore
-  The drawer can expand to full content width, hiding the filters and table.
+  The drawer can snap to full content width and back via a double-click or
+  the M shortcut.
 
   Background:
     Given the user is authenticated
     And the drawer is open in overlay mode
 
-  Scenario: Maximise drawer by double-clicking header or edge grip
-    When the user double-clicks the drawer header (or the left-edge grip)
-    Then `drawerStore.toggleMaximized()` runs
-    And `Drawer.Content.maxWidth` becomes `calc(100vw - 10px)`
-    And a left-edge w-resize cursor + bouncing affordance signals "drag to restore"
+  Scenario: Maximise drawer by double-clicking the edge grip
+    When the user double-clicks the left-edge grip
+    Then `drawerStore.widthPx` is set to `viewport - 10px`
+    And the previous width is remembered for the next double-click
 
   Scenario: Maximise drawer with the M shortcut
     When the user presses M
     Then `drawerStore.toggleMaximized()` runs
 
-  Scenario: Restore drawer to overlay mode
-    Given the drawer is maximised
+  Scenario: Restore drawer to its prior width
+    Given the drawer is at the maximize snap width
     When the user double-clicks the edge grip (or presses M again)
-    Then `Drawer.Content.maxWidth` returns to "45%"
+    Then `drawerStore.widthPx` returns to the previously remembered width
 
 
 # ─────────────────────────────────────────────────────────────────────────────

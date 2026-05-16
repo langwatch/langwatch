@@ -280,7 +280,17 @@ const ResultsPane: React.FC = React.memo(() => {
         }}
       />
       <Box flex={1} minHeight={0} position="relative">
-        <Box height="full" overflow="auto" bg="bg.muted">
+        {/*
+          Light mode: the table sits on a pure-white surface so the eye
+          anchors on the gray sticky header row above it (DevTools
+          "Network" inversion). Dark mode keeps the legacy muted dark
+          background that operators already approved.
+        */}
+        <Box
+          height="full"
+          overflow="auto"
+          bg={{ base: "bg.surface", _dark: "bg.muted" }}
+        >
           <TraceTable />
         </Box>
         <FindBar />

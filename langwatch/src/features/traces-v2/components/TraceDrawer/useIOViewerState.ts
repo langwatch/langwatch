@@ -2,7 +2,6 @@ import {
   type Dispatch,
   type RefObject,
   type SetStateAction,
-  useEffect,
   useRef,
   useState,
 } from "react";
@@ -53,25 +52,15 @@ export function useIOViewerState({
   const [expanded, setExpanded] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
 
-  // Two-mode interaction: idle = panel is a static preview that lets wheel
-  // events pass through to the page. Engaged (after a click) = fully
-  // interactive with internal scroll. Clicking anywhere outside the panel
-  // disengages it. Combined with `overscroll-behavior: auto` below, the
-  // panel never traps scroll either at boundaries or globally.
-  const [engaged, setEngaged] = useState(false);
+  // The previous two-mode interaction (idle vs. engaged) existed because
+  // the IOViewer sat inside a single, full-drawer scroll container —
+  // wheel events captured inside the panel would compete with the drawer
+  // scroller. The new pane layout (TraceDrawerShell) gives every section
+  // its own scroll container, so wheel events naturally scope to the
+  // pane the cursor is over. The panel is now permanently "engaged" and
+  // there is no outside-click disengage listener.
+  const [engaged, setEngaged] = useState(true);
   const engagedRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!engaged) return;
-    const onPointerDown = (e: MouseEvent) => {
-      const target = e.target as Node | null;
-      if (!target || !engagedRef.current) return;
-      if (engagedRef.current.contains(target)) return;
-      setEngaged(false);
-    };
-    document.addEventListener("mousedown", onPointerDown);
-    return () => document.removeEventListener("mousedown", onPointerDown);
-  }, [engaged]);
 
   return {
     format,

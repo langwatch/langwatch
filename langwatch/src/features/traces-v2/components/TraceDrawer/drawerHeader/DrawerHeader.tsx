@@ -185,6 +185,14 @@ export const DrawerHeader = memo(function DrawerHeader({
   const setActiveTab = useDrawerStore((s) => s.setActiveTab);
   const selectSpan = useDrawerStore((s) => s.selectSpan);
   const toggleMaximized = useDrawerStore((s) => s.toggleMaximized);
+  const toggleSnapMaximize = useDrawerStore((s) => s.toggleSnapMaximize);
+  const handleMaximizeClick = () => {
+    if (typeof window === "undefined") {
+      toggleMaximized();
+      return;
+    }
+    toggleSnapMaximize(window.innerWidth);
+  };
   const setShortcutsOpen = useDrawerStore((s) => s.setShortcutsOpen);
 
   const { canGoBack, goBack, goBackTo, backStackDepth, backStack } =
@@ -662,7 +670,7 @@ export const DrawerHeader = memo(function DrawerHeader({
             <Button
               size="xs"
               variant="ghost"
-              onClick={toggleMaximized}
+              onClick={handleMaximizeClick}
               aria-label={isMaximized ? "Restore drawer" : "Maximize drawer"}
             >
               <Icon

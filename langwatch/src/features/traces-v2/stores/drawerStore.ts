@@ -34,10 +34,42 @@ export interface DrawerUrlState {
   selectedSpanId: string | null;
 }
 
+/**
+ * Per-pane state inside the drawer body. Panes are independently sizable
+ * (via `<PanelResizeHandle>`), collapsible to a header bar, and
+ * temporarily maximizable within their group (double-click on header
+ * hides siblings until toggled off). See trace-drawer-panes.feature.
+ */
+export interface PaneState {
+  collapsed: boolean;
+  /** When set, this pane is maximized within its PanelGroup. */
+  maximizedWithinGroup: boolean;
+}
+
+export type PaneId =
+  | "conversationContext"
+  | "visualization"
+  | "spanDetail";
+
 interface DrawerState extends DrawerUrlState {
   isOpen: boolean;
   isMaximized: boolean;
   shortcutsOpen: boolean;
+  /**
+   * Operator-driven drawer width in pixels. `null` means "fall back to
+   * the default 45% viewport rule". When the user drags the left-edge
+   * grip we write the resolved pixel value here so the drawer position
+   * follows the cursor in real time. Persisted to localStorage.
+   */
+  widthPx: number | null;
+  /**
+   * Snapshot of `widthPx` taken before maximizing so the next
+   * double-click on the grip can restore the operator's chosen width
+   * rather than the abstract 45% default.
+   */
+  preMaximizeWidthPx: number | null;
+  /** Per-pane state keyed by `PaneId`. Persisted. */
+  paneState: Record<PaneId, PaneState>;
   /**
    * When true, clicking outside the drawer panel does NOT dismiss it —
    * the user closes via the explicit X button, Esc, or double-click.
@@ -69,6 +101,15 @@ interface DrawerState extends DrawerUrlState {
   setActiveTab: (tab: DrawerTab) => void;
   setMaximized: (value: boolean) => void;
   toggleMaximized: () => void;
+  setWidthPx: (px: number | null) => void;
+  /**
+   * Double-click handler: if not at the snap-maximize width, snap to it
+   * (remembering the current width); if already snapped, restore the
+   * remembered width.
+   */
+  toggleSnapMaximize: (viewportWidth: number) => void;
+  togglePaneCollapsed: (id: PaneId) => void;
+  togglePaneMaximized: (id: PaneId) => void;
   setShortcutsOpen: (value: boolean) => void;
   setPinned: (value: boolean) => void;
   togglePinned: () => void;
@@ -173,6 +214,20 @@ function readInitialFromURL(): InitialFromURL {
 const initial = readInitialFromURL();
 
 const PINNED_STORAGE_KEY = "langwatch:traces-v2:drawer-pinned:v1";
+const WIDTH_STORAGE_KEY = "langwatch:traces-v2:drawer-width-px:v1";
+const PANE_STATE_STORAGE_KEY = "langwatch:traces-v2:drawer-pane-state:v1";
+
+/** Drawer width clamps. Min so chrome stays usable; max so the page edge
+ * remains clickable for the "click-outside" affordance. */
+export const DRAWER_MIN_WIDTH_PX = 360;
+export const DRAWER_MAXIMIZE_EDGE_PX = 10;
+export const DRAWER_RESTORE_EDGE_PX = 80;
+
+const DEFAULT_PANE_STATE: Record<PaneId, PaneState> = {
+  conversationContext: { collapsed: false, maximizedWithinGroup: false },
+  visualization: { collapsed: false, maximizedWithinGroup: false },
+  spanDetail: { collapsed: false, maximizedWithinGroup: false },
+};
 
 function readPinnedFromStorage(): boolean {
   if (typeof window === "undefined") return true;
@@ -195,11 +250,66 @@ function persistPinned(value: boolean) {
   }
 }
 
+function readWidthFromStorage(): number | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(WIDTH_STORAGE_KEY);
+    if (raw === null) return null;
+    const n = Number(raw);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  } catch {
+    return null;
+  }
+}
+
+function persistWidth(value: number | null) {
+  if (typeof window === "undefined") return;
+  try {
+    if (value === null) {
+      window.localStorage.removeItem(WIDTH_STORAGE_KEY);
+    } else {
+      window.localStorage.setItem(WIDTH_STORAGE_KEY, String(Math.round(value)));
+    }
+  } catch {
+    // Best-effort persistence.
+  }
+}
+
+function readPaneStateFromStorage(): Record<PaneId, PaneState> {
+  if (typeof window === "undefined") return DEFAULT_PANE_STATE;
+  try {
+    const raw = window.localStorage.getItem(PANE_STATE_STORAGE_KEY);
+    if (raw === null) return DEFAULT_PANE_STATE;
+    const parsed = JSON.parse(raw) as Partial<Record<PaneId, PaneState>>;
+    return {
+      conversationContext:
+        parsed.conversationContext ?? DEFAULT_PANE_STATE.conversationContext,
+      visualization:
+        parsed.visualization ?? DEFAULT_PANE_STATE.visualization,
+      spanDetail: parsed.spanDetail ?? DEFAULT_PANE_STATE.spanDetail,
+    };
+  } catch {
+    return DEFAULT_PANE_STATE;
+  }
+}
+
+function persistPaneState(value: Record<PaneId, PaneState>) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(PANE_STATE_STORAGE_KEY, JSON.stringify(value));
+  } catch {
+    // Best-effort persistence.
+  }
+}
+
 export const useDrawerStore = create<DrawerState>((set, get) => ({
   isOpen: initial.isOpen,
   isMaximized: false,
   shortcutsOpen: false,
   pinned: readPinnedFromStorage(),
+  widthPx: readWidthFromStorage(),
+  preMaximizeWidthPx: null,
+  paneState: readPaneStateFromStorage(),
   traceId: initial.traceId,
   occurredAtMs: initial.occurredAtMs,
   selectedSpanId: initial.selectedSpanId,
@@ -244,6 +354,67 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
   setActiveTab: (tab) => set({ activeTab: tab }),
   setMaximized: (value) => set({ isMaximized: value }),
   toggleMaximized: () => set((s) => ({ isMaximized: !s.isMaximized })),
+
+  setWidthPx: (px) => {
+    const next = px === null ? null : Math.max(DRAWER_MIN_WIDTH_PX, px);
+    persistWidth(next);
+    set({ widthPx: next });
+  },
+
+  toggleSnapMaximize: (viewportWidth) =>
+    set((s) => {
+      const snapWidth = Math.max(
+        DRAWER_MIN_WIDTH_PX,
+        viewportWidth - DRAWER_MAXIMIZE_EDGE_PX,
+      );
+      const isAtSnap =
+        s.widthPx !== null && Math.abs(s.widthPx - snapWidth) < 2;
+      if (isAtSnap) {
+        const restore =
+          s.preMaximizeWidthPx ?? Math.round(viewportWidth * 0.45);
+        persistWidth(restore);
+        return {
+          widthPx: restore,
+          preMaximizeWidthPx: null,
+          isMaximized: false,
+        };
+      }
+      persistWidth(snapWidth);
+      return {
+        preMaximizeWidthPx: s.widthPx ?? Math.round(viewportWidth * 0.45),
+        widthPx: snapWidth,
+        isMaximized: true,
+      };
+    }),
+
+  togglePaneCollapsed: (id) =>
+    set((s) => {
+      const next: Record<PaneId, PaneState> = {
+        ...s.paneState,
+        [id]: {
+          ...s.paneState[id],
+          collapsed: !s.paneState[id].collapsed,
+          // Collapsing a maximized pane is nonsensical — drop maximize.
+          maximizedWithinGroup: false,
+        },
+      };
+      persistPaneState(next);
+      return { paneState: next };
+    }),
+
+  togglePaneMaximized: (id) =>
+    set((s) => {
+      const next: Record<PaneId, PaneState> = {
+        ...s.paneState,
+        [id]: {
+          ...s.paneState[id],
+          maximizedWithinGroup: !s.paneState[id].maximizedWithinGroup,
+          collapsed: false,
+        },
+      };
+      persistPaneState(next);
+      return { paneState: next };
+    }),
   setShortcutsOpen: (value) => set({ shortcutsOpen: value }),
 
   setPinned: (value) => {
