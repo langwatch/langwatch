@@ -88,8 +88,17 @@ interface DrawerHeaderProps {
  * this is for the case where they want to read the ID without leaving
  * the header.
  */
+/**
+ * Trace ID chip rendered with the same Chip component the metric pills
+ * use (Duration / Spans / Cost / …) so the drawer header reads as one
+ * consistent strip rather than the trace ID floating with its own
+ * styling. 8 chars short by default — git's short-SHA convention, long
+ * enough to be uniquely scannable but still fits beside the trace name.
+ * On hover the short id swaps to the full id and a copy icon appears;
+ * clicking anywhere on the chip copies to the clipboard.
+ */
 function TraceIdChip({ traceId }: { traceId: string }) {
-  const short = traceId.slice(0, 5);
+  const short = traceId.slice(0, 8);
   const handleCopy = async () => {
     // navigator.clipboard requires a secure context (https or localhost).
     // Surface a friendly hint when it fails so users running LangWatch on
@@ -120,44 +129,46 @@ function TraceIdChip({ traceId }: { traceId: string }) {
       });
     }
   };
-  return (
-    <Tooltip
-      content="Trace ID — hover to see full, click to copy"
-      positioning={{ placement: "bottom" }}
-      openDelay={500}
+  const value = (
+    <Box
+      display="inline-flex"
+      alignItems="center"
+      gap={1}
+      fontFamily="mono"
+      // Hover affordances: swap short text for full id, reveal the copy
+      // icon. CSS-only so we don't need a React state per row of header.
+      css={{
+        "& [data-hover-only]": { display: "none" },
+        ".chip-root:hover & [data-hover-only]": { display: "inline-flex" },
+        ".chip-root:hover & [data-collapsed]": { display: "none" },
+        ".chip-root:hover & [data-expanded]": { display: "inline" },
+      }}
     >
-      <HStack
-        as="button"
-        gap={1}
-        paddingX={1.5}
-        paddingY={0.5}
-        borderRadius="md"
-        bg={{ base: "blackAlpha.50", _dark: "whiteAlpha.100" }}
-        color="fg.muted"
-        cursor="pointer"
-        flexShrink={0}
-        fontFamily="mono"
-        fontSize="2xs"
-        aria-label={`Copy trace ID ${traceId}`}
-        onClick={() => void handleCopy()}
-        css={{
-          "& [data-hover-only]": { display: "none" },
-          "&:hover": { color: "fg" },
-          "&:hover [data-hover-only]": { display: "inline-flex" },
-          "&:hover [data-collapsed]": { display: "none" },
-          "&:hover [data-expanded]": { display: "inline" },
-        }}
-        _hover={{ bg: { base: "blackAlpha.100", _dark: "whiteAlpha.200" } }}
+      <Text as="span" data-collapsed textStyle="xs" color="fg" fontWeight="medium">
+        {short}
+      </Text>
+      <Text
+        as="span"
+        data-expanded
+        textStyle="xs"
+        color="fg"
+        fontWeight="medium"
+        display="none"
       >
-        <Text as="span" data-collapsed>
-          {short}
-        </Text>
-        <Text as="span" data-expanded display="none">
-          {traceId}
-        </Text>
-        <Icon as={LuCopy} boxSize={3} data-hover-only />
-      </HStack>
-    </Tooltip>
+        {traceId}
+      </Text>
+      <Icon as={LuCopy} boxSize={3} color="fg.muted" data-hover-only />
+    </Box>
+  );
+  return (
+    <Chip
+      label="Trace ID"
+      value={value}
+      tone="neutral"
+      onClick={() => void handleCopy()}
+      tooltip="Hover to see full ID, click to copy"
+      ariaLabel={`Copy trace ID ${traceId}`}
+    />
   );
 }
 
