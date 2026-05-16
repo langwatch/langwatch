@@ -304,6 +304,13 @@ export default function ModelsPage() {
                       <ProviderScopeChips
                         scopes={namedScopes}
                         fallbackScopeType={(provider as any).scopeType}
+                        // Env-var-fed defaults arrive with no `id` and no
+                        // scopes; tag them so the chip column reads
+                        // "System" instead of empty.
+                        system={
+                          !(provider as any).id &&
+                          (!namedScopes || namedScopes.length === 0)
+                        }
                       />
                     </Table.Cell>
                     <Table.Cell textAlign="right">

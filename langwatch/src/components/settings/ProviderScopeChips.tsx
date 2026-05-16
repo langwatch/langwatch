@@ -1,5 +1,5 @@
 import { Badge, HStack, Text } from "@chakra-ui/react";
-import { Building2, Folder, Users } from "lucide-react";
+import { Building2, Folder, Server, Users } from "lucide-react";
 
 type ScopeEntry = {
   scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
@@ -28,10 +28,20 @@ type ScopeEntry = {
 export function ProviderScopeChips({
   scopes,
   fallbackScopeType,
+  system,
   size = "sm",
 }: {
   scopes?: ScopeEntry[];
   fallbackScopeType?: "ORGANIZATION" | "TEAM" | "PROJECT";
+  /**
+   * When true and no scopes are attached, render a "System" chip
+   * instead of nothing. The caller sets this when it knows the row
+   * represents an env-var-fed / built-in provider (no DB row, no
+   * scope rows) so the Scope column never reads empty. In-progress
+   * drawer / picker states that happen to have no scopes selected
+   * yet should NOT pass this — they want the bare empty render.
+   */
+  system?: boolean;
   size?: "sm" | "xs";
 }) {
   const entries: ScopeEntry[] = scopes && scopes.length > 0
@@ -39,8 +49,22 @@ export function ProviderScopeChips({
     : fallbackScopeType
       ? [{ scopeType: fallbackScopeType, scopeId: "" }]
       : [];
-  if (entries.length === 0) return null;
   const iconSize = size === "xs" ? 10 : 12;
+  if (entries.length === 0) {
+    if (!system) return null;
+    // Matches the "from System" labelling the default-model resolver
+    // uses for the same conceptual tier (env-var-fed defaults).
+    return (
+      <HStack gap={1} wrap="wrap">
+        <Badge colorPalette="gray" variant="subtle" size={size}>
+          <HStack gap={1}>
+            <Server size={iconSize} aria-hidden />
+            <Text>System</Text>
+          </HStack>
+        </Badge>
+      </HStack>
+    );
+  }
   return (
     <HStack gap={1} wrap="wrap">
       {entries.map((entry) => {

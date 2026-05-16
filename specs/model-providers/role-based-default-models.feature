@@ -33,6 +33,19 @@ Feature: Role-based default models with per-scope overrides
   # ============================================================================
 
   @integration
+  Scenario: System chip renders for env-var-fed providers
+    # An OpenAI / Anthropic / Gemini row that's enabled purely via .env
+    # on the host arrives at the UI with no DB id and no scope rows.
+    # The Scope column reads "System" in that case — matching the
+    # "from System" labelling the default-model resolver uses for the
+    # same conceptual tier. In-progress drawer/picker states with an
+    # empty selection still render nothing (no false "System").
+    Given a model provider with no DB row and no attached scopes
+    When I view the model-providers settings table
+    Then the row's Scope column renders a "System" chip with a server icon
+    And the same component in an in-progress drawer renders nothing for an empty selection
+
+  @integration
   Scenario: The Default Models page shows the list of override rules
     Given the caller can see at least one ModelDefaultConfig
     When I open the model providers settings page
