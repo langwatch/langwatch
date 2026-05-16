@@ -461,7 +461,15 @@ export function PaneLayout({
         >
           {vizPanel}
         </Panel>
-        <PanelResizeHandle>
+        <PanelResizeHandle
+          // Set the cursor on the library's own div too — without
+          // this its default (`ew-resize`/`ns-resize`) shows through
+          // any sub-pixel gap between our absolute overlay and its
+          // edges as a "different-looking" cursor that can't drag.
+          style={{
+            cursor: layout === "horizontal" ? "col-resize" : "row-resize",
+          }}
+        >
           <PaneResizeBar orientation={layout} />
         </PanelResizeHandle>
         <Panel
@@ -570,7 +578,7 @@ export function PaneLayout({
           >
             {ctxPane}
           </Panel>
-          <PanelResizeHandle>
+          <PanelResizeHandle style={{ cursor: "row-resize" }}>
             <PaneResizeBar orientation="vertical" />
           </PanelResizeHandle>
           <Panel id="body" order={2} defaultSize={82} minSize={20}>
@@ -600,19 +608,25 @@ function PaneResizeBar({ orientation }: { orientation: DrawerLayout }) {
       // layout — the visible 1px separator is the adjacent panel's
       // border. The forgiving hit zone lives in a child rendered with
       // `position: absolute` so it overlaps the surrounding panels by
-      // 6px on each side WITHOUT pushing them inward (the previous
-      // padding-based approach added 14px to the handle's layout
-      // width, which cut off the last viz tab inside the viz panel).
+      // 8px on each side WITHOUT pushing them inward.
       width={isHorizontal ? "0px" : "100%"}
       height={isHorizontal ? "100%" : "0px"}
       position="relative"
+      // Set the resize cursor on this parent too — the parent
+      // belongs to `PanelResizeHandle`'s div tree, and the library's
+      // own default cursor on that div leaks through any sub-pixel
+      // gap between our absolute overlay and the library's edges
+      // (the result was a thin 2px band where the cursor read as
+      // `ew-resize`/`ns-resize` instead of our `col-resize`/
+      // `row-resize`, with no actual drag interaction).
+      cursor={isHorizontal ? "col-resize" : "row-resize"}
     >
       <Box
         position="absolute"
-        top={isHorizontal ? 0 : "-6px"}
-        bottom={isHorizontal ? 0 : "-6px"}
-        left={isHorizontal ? "-6px" : 0}
-        right={isHorizontal ? "-6px" : 0}
+        top={isHorizontal ? 0 : "-8px"}
+        bottom={isHorizontal ? 0 : "-8px"}
+        left={isHorizontal ? "-8px" : 0}
+        right={isHorizontal ? "-8px" : 0}
         cursor={isHorizontal ? "col-resize" : "row-resize"}
         // Above the adjacent panel contents so the cursor wins where
         // the hit zone overlaps them. No bg — purely a hit target.
