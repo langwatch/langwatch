@@ -9,7 +9,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { AnimatePresence, motion, type Variants } from "motion/react";
-import { memo, useCallback, useMemo } from "react";
+import { memo, type RefObject, useCallback, useMemo } from "react";
 import {
   LuChevronDown,
   LuCircleDashed,
@@ -22,6 +22,10 @@ import {
   useConversationContext,
 } from "../../hooks/useConversationContext";
 import { useTraceDrawerNavigation } from "../../hooks/useTraceDrawerNavigation";
+import {
+  getDrawerDensityTokens,
+  useDensityStore,
+} from "../../stores/densityStore";
 import { useDrawerStore } from "../../stores/drawerStore";
 import { formatPreview } from "../../utils/previewFormatter";
 import { useDisplayRoleVisuals } from "./scenarioRoles";
@@ -31,6 +35,13 @@ interface ConversationContextProps {
   traceId: string;
   collapsed: boolean;
   onToggleCollapsed: () => void;
+  /**
+   * Optional ref the parent attaches so it can measure the natural
+   * content height. PaneLayout uses this to cap the ctx Panel's
+   * resizable range at the rows that actually exist (no "drag to
+   * infinite empty band" behaviour).
+   */
+  contentRef?: RefObject<HTMLDivElement | null>;
 }
 
 /**
@@ -177,7 +188,10 @@ export const ConversationContext = memo(function ConversationContext({
   traceId,
   collapsed,
   onToggleCollapsed,
+  contentRef,
 }: ConversationContextProps) {
+  const density = useDensityStore((s) => s.density);
+  const densityTokens = getDrawerDensityTokens(density);
   const { navigateToTrace } = useTraceDrawerNavigation();
   const viewMode = useDrawerStore((s) => s.viewMode);
   const ctx = useConversationContext(conversationId, traceId);
@@ -219,6 +233,7 @@ export const ConversationContext = memo(function ConversationContext({
 
   return (
     <Box
+      ref={contentRef}
       display="flex"
       flexDirection="column"
       height="100%"
@@ -226,14 +241,18 @@ export const ConversationContext = memo(function ConversationContext({
       minHeight={0}
       minWidth={0}
       // Light mode tone stack (lightest → darkest):
-      //   panel bg = `bg.subtle` — very light gray, slightly lighter
-      //     than the Span header tone, sits behind the rows
-      //   non-selected row = `bg.surface` (white) — pops cleanly
-      //   selected row    = `bg.muted` — calm gray indent that reads
-      //     as "this is the current turn" without shouting in blue
-      // Dark mode keeps the validated palette: panel = surface,
-      // selection still uses `blue.subtle` (set on the row itself).
-      bg={{ base: "bg.subtle", _dark: "bg.surface" }}
+      //   panel bg     = `bg.surface` (white) — header + content both
+      //                  sit on white, matching the accordion sections
+      //                  below
+      //   row borders  = `gray.300` (light only) so the inner card
+      //                  reads as a slightly darker frame against the
+      //                  white surround
+      //   non-selected = bg.surface (white) — no tint on rows or on
+      //                  the assistant reply line
+      //   selected     = `gray.200` — a tad darker than the previous
+      //                  `bg.muted`, reads clearly as "this row"
+      // Dark mode keeps the validated palette.
+      bg={{ base: "bg.surface", _dark: "bg.surface" }}
     >
       <ContextHeader
         position={ctx.position}
@@ -241,6 +260,7 @@ export const ConversationContext = memo(function ConversationContext({
         isLoading={ctx.isLoading}
         collapsed={collapsed}
         onToggleCollapsed={onToggleCollapsed}
+        densityPaddingY={densityTokens.sectionTriggerY}
       />
       {collapsed ? null : (
         <Box flex={1} minHeight={0} overflow="auto" paddingX={4} paddingY={3}>
@@ -269,12 +289,15 @@ function ContextHeader({
   isLoading,
   collapsed,
   onToggleCollapsed,
+  densityPaddingY,
 }: {
   position: number;
   total: number;
   isLoading: boolean;
   collapsed: boolean;
   onToggleCollapsed: () => void;
+  /** Chakra spacing unit matching AccordionShell's section triggers. */
+  densityPaddingY: number;
 }) {
   return (
     <chakra.button
@@ -286,18 +309,18 @@ function ContextHeader({
       gap={2}
       width="100%"
       paddingX={4}
-      paddingY={2}
-      // Header sits on the same subtle tone as the panel body in
-      // light mode so the chrome reads as a single strip.
-      bg={{ base: "bg.subtle", _dark: "bg.surface" }}
+      // Match the accordion section triggers below so all the strips in
+      // the drawer body share one rhythm.
+      paddingY={densityPaddingY}
+      bg="bg.surface"
       borderTopWidth="0"
-      borderBottomWidth={collapsed ? 0 : "1px"}
+      borderBottomWidth="1px"
       borderColor={{ base: "gray.200", _dark: "border.muted" }}
       color="fg.muted"
       cursor="pointer"
       textAlign="left"
       transition="background 120ms ease, color 120ms ease"
-      _hover={{ bg: { base: "bg.subtle", _dark: "bg.softHover" }, color: "fg" }}
+      _hover={{ bg: "bg.softHover", color: "fg" }}
       flexShrink={0}
     >
       <Icon as={LuMessageCircle} boxSize={3} color="inherit" />
@@ -325,7 +348,10 @@ function ContextHeader({
         boxSize={3}
         color="inherit"
         transition="transform 120ms ease"
-        transform={collapsed ? "rotate(-90deg)" : "rotate(0deg)"}
+        // Collapsed = chevron points up (rotate 180); expanded = points
+        // down. Matches the accordion sections below where "open" means
+        // chevron-down.
+        transform={collapsed ? "rotate(180deg)" : "rotate(0deg)"}
       />
     </chakra.button>
   );
@@ -363,7 +389,7 @@ function ContextBody({
               paddingY={2}
               gap={2.5}
               borderBottomWidth={i === 2 ? 0 : "1px"}
-              borderColor="border.muted"
+              borderColor={{ base: "gray.300", _dark: "border.muted" }}
             >
               <Skeleton height="14px" width="56px" borderRadius="sm" />
               <Skeleton height="14px" width="14px" borderRadius="full" />
@@ -382,7 +408,7 @@ function ContextBody({
           paddingX={3}
           borderRadius="md"
           borderWidth="1px"
-          borderColor="border.muted"
+          borderColor={{ base: "gray.300", _dark: "border.muted" }}
           bg="bg.panel"
         >
           <Text textStyle="2xs" color="fg.subtle">
@@ -398,7 +424,10 @@ function ContextBody({
           position="relative"
           borderRadius="md"
           borderWidth="1px"
-          borderColor="border.muted"
+          // Light mode uses a deeper gray than `border.muted` so the
+          // card frame reads against the white panel surface. Dark
+          // mode keeps the validated muted border.
+          borderColor={{ base: "gray.300", _dark: "border.muted" }}
           bg="bg.panel"
           overflow="hidden"
         >
@@ -493,25 +522,24 @@ const ConversationRow = memo(function ConversationRow({
         gap={2.5}
         paddingX={3}
         paddingY={2}
-        // Light mode: non-selected rows are clean white (`bg.surface`)
-        // and pop against the slightly-gray panel; the selected row
-        // sinks into a calm `bg.muted` indent — the same gray the
-        // INPUT / USER block uses elsewhere in the drawer, no blue.
-        // Dark mode keeps the validated `blue.subtle` selection
-        // against the dark canvas.
+        // Light mode: non-selected rows = white (no tint anywhere,
+        // including on the assistant reply line below); selected row
+        // = `gray.200` (a tad darker than the previous `bg.muted` so
+        // the current-turn indent reads clearly without blue).
+        // Dark mode keeps the validated `blue.subtle` selection.
         bg={
           isCurrent
-            ? { base: "bg.muted", _dark: "blue.subtle" }
+            ? { base: "gray.200", _dark: "blue.subtle" }
             : { base: "bg.surface", _dark: "transparent" }
         }
         borderBottomWidth={isLast ? 0 : "1px"}
-        borderColor="border.muted"
+        borderColor={{ base: "gray.300", _dark: "border.muted" }}
         cursor={isCurrent ? "default" : "pointer"}
         onClick={isCurrent ? undefined : handleClick}
         _hover={
           isCurrent
             ? undefined
-            : { bg: { base: "bg.subtle", _dark: "bg.muted" } }
+            : { bg: { base: "gray.50", _dark: "bg.muted" } }
         }
         transition="background 0.12s ease"
         textAlign="left"
@@ -542,7 +570,10 @@ const ConversationRow = memo(function ConversationRow({
         <VStack align="stretch" gap={1.5} flex={1} minWidth={0}>
           <TurnLine
             icon={userVisuals.Icon}
-            iconColor="fg"
+            // Input / user side = blue. Matches the IOPreview's INPUT
+            // label and the up-arrow chip used on the trace list rows
+            // (lighter than `blue.fg` so the icon doesn't shout).
+            iconColor={{ base: "blue.500", _dark: "blue.fg" }}
             text={row.userText}
             emphasised={isCurrent}
             placeholder="(no user message)"
@@ -550,7 +581,9 @@ const ConversationRow = memo(function ConversationRow({
           />
           <TurnLine
             icon={assistantVisuals.Icon}
-            iconColor="blue.fg"
+            // Output / assistant side = green. Matches the IOPreview's
+            // OUTPUT label and the down-arrow chip on the trace list.
+            iconColor={{ base: "green.solid", _dark: "green.fg" }}
             text={row.assistantText}
             emphasised={isCurrent}
             placeholder="(no assistant response)"
@@ -584,7 +617,7 @@ const ConversationRow = memo(function ConversationRow({
  */
 const TurnLine: React.FC<{
   icon: React.ElementType;
-  iconColor: string;
+  iconColor: string | Record<string, string>;
   text: string | null;
   emphasised: boolean;
   placeholder: string;
@@ -599,7 +632,9 @@ const TurnLine: React.FC<{
       paddingX={isAssistant ? 2 : 1}
       paddingLeft={isAssistant ? 5 : 1}
       borderRadius="sm"
-      bg={isAssistant ? "bg.muted" : undefined}
+      // No bg on the assistant reply line — the indented `↳` glyph
+      // alone signals "this is the reply". The previous `bg.muted`
+      // tint was reading as a selection on every row.
       position="relative"
     >
       {isAssistant && (

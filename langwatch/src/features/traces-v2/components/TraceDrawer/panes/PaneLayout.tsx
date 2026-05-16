@@ -35,6 +35,13 @@ const PANE_GROUP_STORAGE_PREFIX =
 // SpanTabBar minHeight. Keep in sync with SpanTabBar.tsx.
 const SPAN_TAB_BAR_HEIGHT_PX = 38;
 
+// Conversation Context header is one row of the accordion-density
+// padding plus its borders. Used both to pin the collapsed Panel size
+// to header height exactly (no trailing band) and as a sentinel
+// minimum when content height measurement hasn't resolved yet.
+// Kept in sync with `ContextHeader` paddingY in `ConversationContext.tsx`.
+const CTX_HEADER_HEIGHT_PX = 36;
+
 /**
  * Renders the trace drawer body as a stack of independently sized,
  * scrollable panels — Chrome DevTools "Network → Headers / Preview"
@@ -77,6 +84,55 @@ export function PaneLayout({
 
   const ctxPanelRef = useRef<ImperativePanelHandle>(null);
   const detailPanelRef = useRef<ImperativePanelHandle>(null);
+  const ctxBodyGroupRef = useRef<HTMLDivElement>(null);
+  const ctxContentRef = useRef<HTMLDivElement>(null);
+
+  // Ctx Panel collapsed size has to equal the ContextHeader pixel height
+  // so the collapsed strip sits flush with the body Panel — no trailing
+  // empty band beneath the chevron. Same pattern as detailCollapsedSize.
+  // Ctx Panel max size caps drag at the measured content height so the
+  // user can't pull the divider down past the rows that exist
+  // (operator feedback: "shouldn't be able to make it as tall as I want").
+  const [ctxCollapsedSize, setCtxCollapsedSize] = useState<number>(6);
+  const [ctxMaxSize, setCtxMaxSize] = useState<number>(50);
+  useEffect(() => {
+    const groupEl = ctxBodyGroupRef.current;
+    if (!groupEl) return;
+    const measure = () => {
+      const dim = groupEl.clientHeight;
+      if (dim <= 0) return;
+      // Header pixel → percentage of the ctx-body group.
+      const headerPct = (CTX_HEADER_HEIGHT_PX / dim) * 100;
+      setCtxCollapsedSize(Math.min(20, Math.max(1, headerPct)));
+      // Content natural height (header + rows + paddings). When the
+      // content ref hasn't measured yet, fall back to 35%.
+      const contentEl = ctxContentRef.current;
+      const naturalPx =
+        contentEl && contentEl.scrollHeight > 0
+          ? contentEl.scrollHeight
+          : null;
+      if (naturalPx === null) {
+        setCtxMaxSize(35);
+        return;
+      }
+      const maxPct = (naturalPx / dim) * 100;
+      // Clamp to a sane range so a giant conversation can still be sized
+      // down and a single-turn placeholder can still be opened.
+      setCtxMaxSize(Math.min(60, Math.max(headerPct + 4, maxPct)));
+    };
+    measure();
+    const groupObserver = new ResizeObserver(measure);
+    groupObserver.observe(groupEl);
+    let contentObserver: ResizeObserver | null = null;
+    if (ctxContentRef.current) {
+      contentObserver = new ResizeObserver(measure);
+      contentObserver.observe(ctxContentRef.current);
+    }
+    return () => {
+      groupObserver.disconnect();
+      contentObserver?.disconnect();
+    };
+  }, [hasConversation, ctxState.collapsed]);
 
   // The Details panel's collapsed size has to equal the SpanTabBar's
   // pixel height in vertical layout so collapsing leaves the tab row
@@ -196,6 +252,7 @@ export function PaneLayout({
         traceId={trace.traceId}
         collapsed={ctxState.collapsed}
         onToggleCollapsed={() => togglePaneCollapsed("conversationContext")}
+        contentRef={ctxContentRef}
       />
     </IsolatedErrorBoundary>
   ) : null;
@@ -278,29 +335,35 @@ export function PaneLayout({
       direction="column"
       bg={{ base: "bg.surface", _dark: "bg.panel" }}
     >
-      <PanelGroup
-        direction="vertical"
-        autoSaveId={`${PANE_GROUP_STORAGE_PREFIX}:ctx-body:v`}
-        style={{ flex: 1, minHeight: 0, minWidth: 0 }}
+      <Box
+        ref={ctxBodyGroupRef}
+        style={{ flex: 1, minHeight: 0, minWidth: 0, display: "flex" }}
       >
-        <Panel
-          ref={ctxPanelRef}
-          id="ctx"
-          order={1}
-          defaultSize={ctxState.collapsed ? 4 : 18}
-          minSize={4}
-          collapsible
-          collapsedSize={4}
+        <PanelGroup
+          direction="vertical"
+          autoSaveId={`${PANE_GROUP_STORAGE_PREFIX}:ctx-body:v`}
+          style={{ flex: 1, minHeight: 0, minWidth: 0 }}
         >
-          {ctxPane}
-        </Panel>
-        <PanelResizeHandle>
-          <PaneResizeBar orientation="vertical" />
-        </PanelResizeHandle>
-        <Panel id="body" order={2} defaultSize={82} minSize={20}>
-          {vizDetailGroup}
-        </Panel>
-      </PanelGroup>
+          <Panel
+            ref={ctxPanelRef}
+            id="ctx"
+            order={1}
+            defaultSize={ctxState.collapsed ? ctxCollapsedSize : ctxMaxSize}
+            minSize={ctxCollapsedSize}
+            maxSize={ctxMaxSize}
+            collapsible
+            collapsedSize={ctxCollapsedSize}
+          >
+            {ctxPane}
+          </Panel>
+          <PanelResizeHandle>
+            <PaneResizeBar orientation="vertical" />
+          </PanelResizeHandle>
+          <Panel id="body" order={2} defaultSize={82} minSize={20}>
+            {vizDetailGroup}
+          </Panel>
+        </PanelGroup>
+      </Box>
     </Flex>
   );
 }

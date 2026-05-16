@@ -215,7 +215,11 @@ const initial = readInitialFromURL();
 
 const PINNED_STORAGE_KEY = "langwatch:traces-v2:drawer-pinned:v1";
 const WIDTH_STORAGE_KEY = "langwatch:traces-v2:drawer-width-px:v1";
-const PANE_STATE_STORAGE_KEY = "langwatch:traces-v2:drawer-pane-state:v1";
+// Bumped to v2 with the conversationContext default flipped to collapsed.
+// Bumping the key resets everyone to the new default; users who flipped
+// it open in v1 will need to flip again, but that's the right migration
+// for "starts closed now."
+const PANE_STATE_STORAGE_KEY = "langwatch:traces-v2:drawer-pane-state:v2";
 
 /** Drawer width clamps. Min so chrome stays usable; max so the page edge
  * remains clickable for the "click-outside" affordance. */
@@ -224,7 +228,10 @@ export const DRAWER_MAXIMIZE_EDGE_PX = 10;
 export const DRAWER_RESTORE_EDGE_PX = 80;
 
 const DEFAULT_PANE_STATE: Record<PaneId, PaneState> = {
-  conversationContext: { collapsed: false, maximizedWithinGroup: false },
+  // Conversation context starts collapsed by default — most traces are
+  // single-turn anyway, and the user can flip it open per-session via
+  // the chevron (preference persists in localStorage).
+  conversationContext: { collapsed: true, maximizedWithinGroup: false },
   visualization: { collapsed: false, maximizedWithinGroup: false },
   spanDetail: { collapsed: false, maximizedWithinGroup: false },
 };

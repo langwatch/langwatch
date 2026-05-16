@@ -83,6 +83,13 @@ export function Section({
     >
       <Accordion.ItemTrigger
         width="100%"
+        display="flex"
+        // Pin both the HStack (with title + count) and the indicator
+        // to the trigger's vertical centre. Without this, the indicator
+        // inherits the trigger's default cross-axis alignment which
+        // shifted with the chevron's rotation state — closed read as
+        // "drifted down", open read as "drifted up".
+        alignItems="center"
         paddingX={4}
         paddingY={tokens.sectionTriggerY}
         // Solid bg under sticky so content scrolling underneath is
@@ -149,8 +156,17 @@ export function Section({
         {/* Custom indicator at a fixed 12px so it matches the close /
             expand icon in the LLM-Optimized header row above — the
             default `<Accordion.ItemIndicator>` inherits the trigger's
-            font size and reads visibly larger than its neighbours. */}
-        <Accordion.ItemIndicator color="inherit">
+            font size and reads visibly larger than its neighbours.
+            `display: flex` + `alignSelf: center` keep the chevron
+            anchored to the trigger's vertical middle regardless of
+            rotation state. */}
+        <Accordion.ItemIndicator
+          color="inherit"
+          display="flex"
+          alignItems="center"
+          alignSelf="center"
+          lineHeight={0}
+        >
           <Icon as={LuChevronDown} boxSize={3} />
         </Accordion.ItemIndicator>
       </Accordion.ItemTrigger>

@@ -5,7 +5,7 @@ import {
   useMemo,
   useRef,
 } from "react";
-import { useDrawer, useDrawerParams } from "~/hooks/useDrawer";
+import { useDrawer } from "~/hooks/useDrawer";
 import type {
   SpanTreeNode,
   TraceHeader,
@@ -48,27 +48,14 @@ interface TraceDrawerScaffold {
  */
 export function useTraceDrawerScaffold(): TraceDrawerScaffold {
   const { closeDrawer } = useDrawer();
-  const params = useDrawerParams();
 
-  const traceId = params.traceId;
-  const occurredAtMsParam = useMemo(() => {
-    if (!params.t) return null;
-    const n = Number(params.t);
-    return Number.isFinite(n) && n > 0 ? n : null;
-  }, [params.t]);
-
-  // Hydrate the per-trace identity into the store so the data hooks
-  // (header, span tree, evaluations, …) can read it via selector. We skip
-  // the call when the store already matches the URL — without that guard,
-  // a hard reload onto `?traceId=X&span=Y` would call `openTrace` and
-  // wipe the span the URL just hydrated.
-  const openTraceInStore = useDrawerStore((s) => s.openTrace);
-  useEffect(() => {
-    if (!traceId) return;
-    const { traceId: storeTraceId, occurredAtMs } = useDrawerStore.getState();
-    if (storeTraceId === traceId && occurredAtMs === occurredAtMsParam) return;
-    openTraceInStore(traceId, occurredAtMsParam);
-  }, [traceId, occurredAtMsParam, openTraceInStore]);
+  // The drawer store is the source of truth for `traceId` — see
+  // `useTraceDrawerUrlHydrator` (mounted at the page level) for the
+  // URL → store sync. Reading from the store here avoids the close →
+  // immediate reopen race where the URL push lags one tick behind the
+  // synchronous `store.openTrace` call, which previously read as a
+  // brief "No trace selected" empty state between drawers.
+  const traceId = useDrawerStore((s) => s.traceId) ?? undefined;
 
   // Single source of truth — the drawer store. URL is just a serialization.
   useDrawerUrlSync();
