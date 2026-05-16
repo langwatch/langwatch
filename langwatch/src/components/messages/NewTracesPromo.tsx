@@ -90,6 +90,11 @@ export function NewTracesPromo({
   const mode: PromoMode = tracesV2Enabled ? "try" : "request";
   const [dismissed, setDismissed] = useState(false);
   const [hasMounted, setHasMounted] = useState(false);
+  // Must be called above the early-return guard below — Rules of
+  // Hooks: every hook needs to fire on every render, in the same
+  // order. The previous render with `!hasMounted` skipped this and
+  // tripped "Rendered more hooks than during the previous render".
+  const { openDrawer } = useDrawer();
 
   useEffect(() => {
     setHasMounted(true);
@@ -111,7 +116,6 @@ export function NewTracesPromo({
   // When opening v2 in-place we want the click → drawer-render to be
   // synchronous (no URL round-trip). The v2 drawer mount reads from
   // the drawer store, so we push there first before flipping the URL.
-  const { openDrawer } = useDrawer();
   const handleTryV2 = (e: React.MouseEvent) => {
     e.preventDefault();
     if (!traceId) {
