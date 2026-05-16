@@ -224,13 +224,14 @@ export function PaneLayout({
     }
     if (!ctxState.collapsed && handle.isCollapsed()) {
       handle.expand();
-      // After expanding, snap to the actual content height so a
-      // 2-turn thread opens at its natural size instead of the
-      // library's saved default. We measure inside the rAF (after
-      // the body has laid out) rather than reading `ctxMaxSize`
-      // from the closure — the React state value is still stale
-      // at this point because ResizeObserver hasn't fired yet.
-      requestAnimationFrame(() => {
+      // After expanding, snap to the actual content height. Layout
+      // settles over multiple frames — especially when we got here
+      // via a tab switch (the ConversationContext subtree was just
+      // remounted), the first rAF can land on an intermediate size
+      // where only some rows have laid out. We re-measure across a
+      // few frames and bump the target up whenever the content turns
+      // out taller than what we previously resized to.
+      const snap = (attempt: number) => {
         const h = ctxPanelRef.current;
         if (!h || h.isCollapsed()) return;
         const groupEl = ctxBodyGroupRef.current;
@@ -240,9 +241,6 @@ export function PaneLayout({
         const dim = groupEl.clientHeight;
         if (dim <= 0) return;
         const headerPx = headerEl?.offsetHeight ?? CTX_HEADER_HEIGHT_PX;
-        // `contentRef` is the inner row wrapper — `scrollHeight`
-        // gives the rows' real height. Pane natural height = header
-        // + scroll-container padding + body + 6px slack.
         const bodyPx = contentEl?.scrollHeight ?? 0;
         const fullPx =
           bodyPx > 0
@@ -256,8 +254,16 @@ export function PaneLayout({
           headerPct + 12,
           (cappedPx / dim) * 100,
         );
-        h.resize(targetPct);
-      });
+        const currentPct = h.getSize();
+        // Only grow — if a later rAF measures smaller (e.g., layout
+        // settled into a slimmer state) leave the pane where it is
+        // rather than yanking it down on the user.
+        if (targetPct > currentPct + 0.5) h.resize(targetPct);
+        if (attempt < 3) {
+          requestAnimationFrame(() => snap(attempt + 1));
+        }
+      };
+      requestAnimationFrame(() => snap(0));
     }
   }, [ctxState.collapsed]);
   // Remember the user's manually-resized detail size so re-opening
