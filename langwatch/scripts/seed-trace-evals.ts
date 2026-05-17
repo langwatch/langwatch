@@ -26,46 +26,86 @@ async function main() {
   });
 
   const now = new Date();
-  const samples = [
+  const samples: Array<{
+    evaluatorId: string;
+    evaluatorType: string;
+    evaluatorName: string;
+    status: "processed" | "skipped" | "error";
+    passed: boolean | null;
+    score: number | null;
+    label: string | null;
+    details: string;
+    error: string | null;
+  }> = [
     {
       evaluatorId: "presidio/pii_detection",
       evaluatorType: "presidio/pii_detection",
       evaluatorName: "PII Detection",
-      status: "processed" as const,
+      status: "processed",
       passed: true,
       score: null,
       label: null,
       details: "No PII entities detected in the message.",
+      error: null,
     },
     {
       evaluatorId: "ragas/faithfulness",
       evaluatorType: "ragas/faithfulness",
       evaluatorName: "Faithfulness",
-      status: "processed" as const,
+      status: "processed",
       passed: false,
       score: null,
       label: null,
       details: "Answer not grounded in retrieved context.",
+      error: null,
     },
     {
       evaluatorId: "lingua/language_detection",
       evaluatorType: "lingua/language_detection",
       evaluatorName: "Language Detection",
-      status: "processed" as const,
+      status: "processed",
       passed: null,
       score: 0.92,
       label: "English",
       details: "Detected English with 92% confidence.",
+      error: null,
     },
     {
       evaluatorId: "ragas/answer_relevancy",
       evaluatorType: "ragas/answer_relevancy",
       evaluatorName: "Answer Relevancy",
-      status: "processed" as const,
+      status: "processed",
       passed: false,
       score: 0.34,
       label: "low relevancy",
       details: "Answer is only weakly grounded in the retrieved context.",
+      error: null,
+    },
+    // No-verdict states — exercise the SKIPPED / ERROR chip badges
+    // without depending on whatever evaluations the seed trace already
+    // happens to carry.
+    {
+      evaluatorId: "azure/content_safety",
+      evaluatorType: "azure/content_safety",
+      evaluatorName: "Content Safety",
+      status: "skipped",
+      passed: null,
+      score: null,
+      label: null,
+      details:
+        "Azure Safety provider not configured. Configure it in Settings → Model Providers to run this evaluator.",
+      error: null,
+    },
+    {
+      evaluatorId: "openai/moderation",
+      evaluatorType: "openai/moderation",
+      evaluatorName: "Moderation",
+      status: "error",
+      passed: null,
+      score: null,
+      label: null,
+      details: "OpenAI moderation request timed out after 30s.",
+      error: "OpenAI moderation request timed out after 30s.",
     },
   ];
 
@@ -88,7 +128,7 @@ async function main() {
         label: s.label,
         details: s.details,
         inputs: null,
-        error: null,
+        error: s.error,
         errorDetails: null,
         createdAt: now,
         updatedAt: now,
