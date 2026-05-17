@@ -86,6 +86,14 @@ vi.mock("~/env.mjs", () => ({
   },
 }));
 
+// mintStorageUri queries the BYOC dataplane config; no Prisma is wired in
+// the test, so stub the lookup to return null and let the URI fall back
+// to the local-FS path (LANGWATCH_LOCAL_STORAGE_PATH, overridden per-test
+// via withTmpStorage).
+vi.mock("~/server/dataplane-s3", () => ({
+  getS3ConfigForProject: vi.fn().mockResolvedValue(null),
+}));
+
 // ---------------------------------------------------------------------------
 // Globals
 // ---------------------------------------------------------------------------

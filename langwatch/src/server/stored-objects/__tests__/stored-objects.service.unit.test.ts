@@ -49,6 +49,16 @@ vi.mock("~/utils/logger/server", () => ({
   }),
 }));
 
+// mintStorageUri calls getS3ConfigForProject to resolve the per-project
+// dataplane bucket (BYOC fix). The unit test never wires Prisma so we
+// stub the lookup to always return null — that path falls through to
+// env.S3_BUCKET_NAME (also mocked above to an empty string), and the
+// service ends up minting file:// URIs. The integration test exercises
+// the real lookup with testcontainers.
+vi.mock("~/server/dataplane-s3", () => ({
+  getS3ConfigForProject: vi.fn().mockResolvedValue(null),
+}));
+
 // ---------------------------------------------------------------------------
 // Imports after mocks
 // ---------------------------------------------------------------------------
