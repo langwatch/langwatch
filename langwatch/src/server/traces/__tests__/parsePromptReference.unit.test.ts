@@ -209,6 +209,27 @@ describe("parsePromptReference()", () => {
         promptVariables: null,
       });
     });
+
+    it("prefers the explicit langwatch.prompt.handle attribute over the raw prompt.id", () => {
+      // The python-sdk + nlpgo emit Prompt.compile with the raw
+      // configId in `prompt.id` AND the canonical slug in
+      // `prompt.handle`. Without this preference, downstream surfaces
+      // (toasts on lookup failure, deep-link labels) showed the
+      // unreadable configId instead of the slug.
+      const attrs = {
+        "langwatch.prompt.id": "prompt_ekZriphlRjDGWW-u1Vglw",
+        "langwatch.prompt.handle": "testtest2",
+        "langwatch.prompt.version.id": "prompt_version__15tZH2WRCGjtqJ5bQoaN",
+        "langwatch.prompt.version.number": 1,
+      };
+      expect(parsePromptReference(attrs)).toEqual({
+        promptHandle: "testtest2",
+        promptVersionNumber: 1,
+        promptVersionId: "prompt_version__15tZH2WRCGjtqJ5bQoaN",
+        promptTag: null,
+        promptVariables: null,
+      });
+    });
   });
 
   describe("when old separate format is present", () => {
@@ -302,14 +323,22 @@ describe("parsePromptReference()", () => {
       });
     });
 
-    it("flat-format prompt.id overrides legacy handle attribute", () => {
+    it("flat-format pairs prompt.id (raw identifier) with prompt.handle (canonical slug) when both are present", () => {
+      // Wire-format shift from #4094 (prompt-spans parity): the SDK now
+      // deliberately emits BOTH `prompt.id` (raw configId — opaque,
+      // stable, useful for storage lookup) AND `prompt.handle`
+      // (canonical user-facing slug) on the same span. When both are
+      // present, the user-facing handle wins for `promptHandle` — the
+      // raw configId is unreadable in toasts and deep-link labels.
+      // Pre-#4094, only one of the two attributes was expected on any
+      // given span, so this case was a transitional-emit oddity.
       const attrs = {
-        "langwatch.prompt.id": "team/new-prompt",
-        "langwatch.prompt.handle": "team/old-prompt",
+        "langwatch.prompt.id": "prompt_configIdForStorage",
+        "langwatch.prompt.handle": "team/canonical-slug",
         "langwatch.prompt.version.number": "9",
       };
       expect(parsePromptReference(attrs)).toEqual({
-        promptHandle: "team/new-prompt",
+        promptHandle: "team/canonical-slug",
         promptVersionNumber: 9,
         promptVersionId: null,
         promptTag: null,

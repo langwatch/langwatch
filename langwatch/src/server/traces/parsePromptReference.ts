@@ -81,10 +81,23 @@ export function parsePromptReference(
   // Flat format: bare-slug `prompt.id` with version carried in its own
   // attribute. Pair with `version.number` if present so the rollup gets a
   // human-readable version too.
+  //
+  // Prefer the explicit `langwatch.prompt.handle` attribute when present:
+  // the python-sdk + nlpgo emit BOTH on Prompt.compile (id=raw configId,
+  // handle=canonical slug). Falling back to the raw configId-as-handle
+  // here meant downstream surfaces (toast on lookup failure, "Open in
+  // Prompts" label fallback) showed the unreadable configId instead of
+  // the canonical handle. When there's no handle attribute (older SDK
+  // shape that only emitted prompt.id), fall back to prompt.id itself.
   if (typeof promptId === "string" && promptId.length > 0) {
     const versionNumber = parseVersionNumber(attrs[ATTR_PROMPT_VERSION_NUMBER]);
+    const handleAttr = attrs[ATTR_PROMPT_HANDLE];
+    const promptHandle =
+      typeof handleAttr === "string" && handleAttr.length > 0
+        ? handleAttr
+        : promptId;
     return {
-      promptHandle: promptId,
+      promptHandle,
       promptVersionNumber: versionNumber,
       promptVersionId: versionId,
       promptTag: null,
