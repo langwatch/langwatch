@@ -128,7 +128,16 @@ export const useModelSelectionOptions = (
 
   const modelOption = selectOptions.find((opt) => opt.value === model);
 
-  return { modelOption, selectOptions, groupedByProvider };
+  return {
+    modelOption,
+    selectOptions,
+    groupedByProvider,
+    /** True when the project has zero models of the requested mode
+     *  available. Lets callers that render their own trigger (e.g.
+     *  LLMConfigField) swap to the empty-state callout instead of
+     *  echoing back the stale persisted value. */
+    isEmpty: selectOptions.length === 0,
+  };
 };
 
 export const ModelSelector = React.memo(function ModelSelector({
