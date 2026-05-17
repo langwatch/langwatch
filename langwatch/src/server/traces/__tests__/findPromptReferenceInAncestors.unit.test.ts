@@ -188,6 +188,77 @@ describe("findPromptReferenceInAncestors()", () => {
     });
   });
 
+  describe("when the python-sdk get+compile sibling pair share a millisecond", () => {
+    it("merges variables across both, picking compile's identity", () => {
+      // Real-world surface from the prompt-spans rollout: the SDK
+      // emits PromptApiService.get + Prompt.compile as a same-parent
+      // sibling pair. ClickHouse stores StartTime at millisecond
+      // resolution, so the two spans collapse onto the same startTime
+      // for the trace UI ancestor walk. Pre-fix, strict greater-than
+      // tie-breaking made get win on iteration order — losing every
+      // user-facing variable that lives on compile and leaving the
+      // playground Variables panel empty.
+      const spans = [
+        {
+          spanId: "parent-span",
+          parentSpanId: null,
+          startTime: 100,
+          attributes: {},
+        },
+        {
+          spanId: "get-span",
+          parentSpanId: "parent-span",
+          startTime: 200,
+          attributes: {
+            // Combined "<handle>:<version>" form is the get-span stamp.
+            "langwatch.prompt.id": "support-router:6",
+            // Get carries the internal dispatch arg as a variable.
+            "langwatch.prompt.variables": JSON.stringify({
+              type: "json",
+              value: { prompt_id: "prompt_supportrouter_xyz" },
+            }),
+          },
+        },
+        {
+          spanId: "compile-span",
+          parentSpanId: "parent-span",
+          // Same millisecond as get — the post-CH round-trip reality.
+          startTime: 200,
+          attributes: {
+            "langwatch.prompt.id": "prompt_supportrouter_xyz",
+            "langwatch.prompt.handle": "support-router",
+            "langwatch.prompt.version.number": 6,
+            // Compile carries the user's actual template variables.
+            "langwatch.prompt.variables": JSON.stringify({
+              type: "json",
+              value: { example: "foobar", input: "how big is mars?" },
+            }),
+          },
+        },
+        {
+          spanId: "llm-span",
+          parentSpanId: "parent-span",
+          startTime: 200,
+          attributes: {},
+        },
+      ];
+
+      const result = findPromptReferenceInAncestors({
+        targetSpanId: "llm-span",
+        spans,
+      });
+
+      // User-facing variables from compile must survive the merge.
+      // prompt_id from get is preserved too (defense in depth — the
+      // Go-side filter for that internal key lives in a separate PR).
+      expect(result?.promptVariables).toEqual({
+        prompt_id: "prompt_supportrouter_xyz",
+        example: "foobar",
+        input: "how big is mars?",
+      });
+    });
+  });
+
   describe("when multiple sibling spans have prompt refs", () => {
     it("picks the one with the latest startTime (closest preceding)", () => {
       const spans = [

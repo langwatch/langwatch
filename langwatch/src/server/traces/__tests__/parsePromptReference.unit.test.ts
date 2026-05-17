@@ -410,6 +410,33 @@ describe("parsePromptReference()", () => {
       expect(result.promptTag).toBeNull();
       expect(result.promptVariables).toEqual({ name: "Alice" });
     });
+
+    it("JSON-encodes object/array values instead of stringifying to '[object Object]'", () => {
+      // Real-world surface: a `messages` template body (array of
+      // {role, content}) leaked into prompt variables. Pre-fix this
+      // rendered as the literal "[object Object]" in the playground
+      // Variables panel — useless for both display AND for round-
+      // tripping the value back through the form.
+      const attrs = {
+        "langwatch.prompt.id": "team/sample-prompt:3",
+        "langwatch.prompt.variables": JSON.stringify({
+          type: "json",
+          value: {
+            example: "foobar",
+            messages: [
+              { role: "user", content: "{{input}}" },
+            ],
+            metadata: { project: "acme" },
+          },
+        }),
+      };
+      const result = parsePromptReference(attrs);
+      expect(result.promptVariables).toEqual({
+        example: "foobar",
+        messages: '[{"role":"user","content":"{{input}}"}]',
+        metadata: '{"project":"acme"}',
+      });
+    });
   });
 
   describe("when prompt variables are present (flat keys)", () => {

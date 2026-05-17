@@ -161,10 +161,28 @@ function parseVariablesBlob(raw: unknown): Record<string, string> | null {
     }
     const result: Record<string, string> = {};
     for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
-      result[key] = String(val);
+      result[key] = stringifyVariableValue(val);
     }
     return result;
   } catch {
     return null;
+  }
+}
+
+/**
+ * Serializes a single variable value into the string form the playground
+ * variables panel can render. Strings pass through; numbers, booleans,
+ * null/undefined use String(); anything else (objects, arrays — e.g. a
+ * `messages` template body that leaked into variables) is JSON-encoded
+ * so the panel never renders the useless literal "[object Object]".
+ */
+function stringifyVariableValue(val: unknown): string {
+  if (typeof val === "string") return val;
+  if (val === null || val === undefined) return String(val);
+  if (typeof val === "number" || typeof val === "boolean") return String(val);
+  try {
+    return JSON.stringify(val);
+  } catch {
+    return String(val);
   }
 }

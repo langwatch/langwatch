@@ -152,8 +152,21 @@ export function findPromptReferenceInAncestors({
 }
 
 /**
- * Among the children of a given parent, finds the one with a prompt reference
- * that started at or most recently before the target span's startTime.
+ * Among the children of a given parent, finds the closest preceding sibling
+ * with a prompt reference AND merges variables across all matching preceding
+ * siblings. The "closest preceding" sibling supplies the prompt identity
+ * (handle, version, tag, versionId). Variables from earlier siblings are
+ * unioned underneath later ones — later wins on key collision.
+ *
+ * Why the merge: the python-sdk emits prompts as a pair of sibling spans —
+ * `PromptApiService.get` first, then `Prompt.compile` — both carry a
+ * prompt reference, both have their own `langwatch.prompt.variables`. Get's
+ * variables map carries the dispatch internals (e.g. `prompt_id`), compile's
+ * carries the user's actual template kwargs. ClickHouse stores StartTime at
+ * millisecond resolution, so the two spans typically share the same
+ * `startTime` — strict greater-than tie-breaking made get win on iteration
+ * order, dropping the user-facing variables from compile and leaving the
+ * playground variables panel empty.
  *
  * Same-millisecond siblings are included because SDK patterns like
  * `Prompt.compile` and the LLM span often start at the exact same ms.
@@ -172,19 +185,44 @@ function findClosestPrecedingSibling({
   const children = childrenByParent.get(parentId);
   if (!children) return null;
 
-  let bestRef: PromptReference | null = null;
-  let bestStartTime = -Infinity;
-
+  // Collect every preceding sibling that resolves to a prompt reference,
+  // ordered by startTime ascending. The last entry supplies the identity;
+  // every entry contributes its variables (later overrides earlier).
+  const preceding: Array<{ ref: PromptReference; startTime: number }> = [];
   for (const child of children) {
     if (excludeSpanIds.has(child.spanId)) continue;
     if (child.startTime > targetStartTime) continue;
 
     const ref = parsePromptReference(child.attributes);
-    if (ref.promptHandle && child.startTime > bestStartTime) {
-      bestRef = ref;
-      bestStartTime = child.startTime;
+    if (ref.promptHandle) {
+      preceding.push({ ref, startTime: child.startTime });
     }
   }
 
-  return bestRef;
+  if (preceding.length === 0) return null;
+
+  preceding.sort((a, b) => a.startTime - b.startTime);
+
+  const identity = preceding[preceding.length - 1]!.ref;
+  const mergedVariables = mergeVariables(preceding.map((p) => p.ref));
+  return { ...identity, promptVariables: mergedVariables };
+}
+
+/**
+ * Union prompt variables across multiple references in iteration order.
+ * Later entries override earlier on key collision (so compile beats get
+ * on overlap, and a stale ancestor never displaces a fresh closer match).
+ * Returns null only when every entry's variables are null/empty.
+ */
+function mergeVariables(
+  refs: PromptReference[],
+): Record<string, string> | null {
+  const merged: Record<string, string> = {};
+  for (const r of refs) {
+    if (!r.promptVariables) continue;
+    for (const [k, v] of Object.entries(r.promptVariables)) {
+      merged[k] = v;
+    }
+  }
+  return Object.keys(merged).length > 0 ? merged : null;
 }
