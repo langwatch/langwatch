@@ -44,7 +44,13 @@ export function SpanAccordions({
     !!detail?.params && Object.keys(detail.params).length > 0;
   const hasAttributes = hasSpanAttrs || hasResourceAttrs;
   const hasScope = !!spanScope?.name;
-  const hasPrompt = !!detail && hasPromptMetadata(detail.params);
+  // LLM spans always get a Prompt section even without metadata — the
+  // accordion still surfaces "Open in Playground" so operators can pick
+  // up the conversation regardless of whether a managed prompt was tied
+  // to the call. Matches the legacy SpanDetails behaviour.
+  const isLlmSpan = span.type === "llm";
+  const hasPrompt =
+    isLlmSpan || (!!detail && hasPromptMetadata(detail.params));
   const hasError = span.status === "error" || !!detail?.error;
   const hasEvents = !!detail?.events && detail.events.length > 0;
 
