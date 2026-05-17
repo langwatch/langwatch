@@ -2,6 +2,7 @@ import { z } from "zod";
 import { createLogger } from "~/utils/logger/server";
 import { featureFlagService } from "../../featureFlag";
 import { FRONTEND_FEATURE_FLAGS } from "../../featureFlag/frontendFeatureFlags";
+import type { FeatureFlagKey } from "../../featureFlag/registry";
 import { skipPermissionCheck } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
@@ -58,8 +59,12 @@ export const featureFlagRouter = createTRPCRouter({
         "Feature flag check requested",
       );
 
+      // `input.flag` is runtime-validated against FRONTEND_FEATURE_FLAGS
+      // (a subset of registered PRODUCT keys), so the cast is safe;
+      // FRONTEND_FEATURE_FLAGS is wider than the inferred zod enum value
+      // type, hence the explicit FeatureFlagKey narrowing.
       const enabled = await featureFlagService.isEnabled(
-        input.flag,
+        input.flag as FeatureFlagKey,
         userId,
         false,
         {

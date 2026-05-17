@@ -55,7 +55,12 @@ function createMockProjectionDefinition(
   return {
     name,
     groupKeyFn: options?.groupKeyFn,
-    options: options?.killSwitch ? { killSwitch: options.killSwitch } : undefined,
+    // Test fixture: passing-through arbitrary customKey strings is OK
+    // here because the registry guard lives on the public service
+    // signature, not on the queue-manager input shape.
+    options: options?.killSwitch
+      ? ({ killSwitch: options.killSwitch } as { killSwitch: { customKey?: any } })
+      : undefined,
   };
 }
 

@@ -709,6 +709,57 @@ export function getReactorMetadata(): ReactorMetadata[] {
   });
 }
 
+/**
+ * One descriptor per ES kill-switch key that the registered pipelines
+ * will generate at runtime. Used by the Ops Feature Flags page to list
+ * every togglable kill switch, even ones that have no postgres row yet.
+ *
+ * Names follow `es-<aggregate>-<componentType>-<componentName>-killswitch`
+ * (see src/server/event-sourcing/utils/killSwitch.ts).
+ */
+export interface KillSwitchDescriptor {
+  key: string;
+  aggregateType: string;
+  componentType: "projection" | "mapProjection" | "command";
+  componentName: string;
+  pipelineName: string;
+}
+
+export function getKillSwitchDescriptors(): KillSwitchDescriptor[] {
+  const out: KillSwitchDescriptor[] = [];
+  for (const def of getDefinitions()) {
+    const { name: pipelineName, aggregateType } = def.metadata;
+    for (const { definition } of def.foldProjections.values()) {
+      out.push({
+        key: `es-${aggregateType}-projection-${definition.name}-killswitch`,
+        aggregateType,
+        componentType: "projection",
+        componentName: definition.name,
+        pipelineName,
+      });
+    }
+    for (const { definition } of def.mapProjections.values()) {
+      out.push({
+        key: `es-${aggregateType}-mapProjection-${definition.name}-killswitch`,
+        aggregateType,
+        componentType: "mapProjection",
+        componentName: definition.name,
+        pipelineName,
+      });
+    }
+    for (const cmd of def.commands) {
+      out.push({
+        key: `es-${aggregateType}-command-${cmd.name}-killswitch`,
+        aggregateType,
+        componentType: "command",
+        componentName: cmd.name,
+        pipelineName,
+      });
+    }
+  }
+  return out;
+}
+
 export function getDejaViewProjections(): DejaViewProjection[] {
   return getDefinitions().flatMap((def) =>
     Array.from(def.foldProjections.values()).map(({ definition: d }) => ({
