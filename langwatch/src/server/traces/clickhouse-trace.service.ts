@@ -26,6 +26,7 @@ import {
   mapTraceSummaryToTrace,
 } from "./mappers";
 import { findPromptReferenceInAncestors } from "./findPromptReferenceInAncestors";
+import { parseLLMSpanMessages } from "./parseLLMSpanMessages";
 import { parsePromptReference } from "./parsePromptReference";
 import type {
   AggregationFiltersInput,
@@ -1067,65 +1068,13 @@ export class ClickHouseTraceService {
     _protections: Protections,
   ): PromptStudioSpanResult {
     const attrs = row.SpanAttributes;
-    const messages: PromptStudioSpanResult["messages"] = [];
-
-    // Extract input messages from gen_ai.input.messages (OTel GenAI
-    // semantic convention — what newer SDKs emit, including the system
-    // message), or fall back to legacy gen_ai.prompt / langwatch.input.
-    // Without gen_ai.input.messages the system prompt was being dropped
-    // from the playground form on third-party-traced spans.
-    const inputStr =
-      (attrs["gen_ai.input.messages"] as string) ??
-      (attrs["gen_ai.prompt"] as string) ??
-      (attrs["langwatch.input"] as string);
-    if (inputStr) {
-      try {
-        const parsed = JSON.parse(inputStr);
-        if (parsed.type === "chat_messages" && Array.isArray(parsed.value)) {
-          messages.push(...parsed.value);
-        } else if (Array.isArray(parsed)) {
-          // Raw array of message objects (without TypedValueJson wrapper)
-          for (const item of parsed) {
-            if (item && typeof item === "object" && typeof item.content === "string") {
-              messages.push({ role: item.role ?? "user", content: item.content });
-            }
-          }
-        } else if (typeof parsed.value === "string") {
-          messages.push({ role: "user", content: parsed.value });
-        } else if (typeof parsed === "string") {
-          messages.push({ role: "user", content: parsed });
-        }
-      } catch {
-        messages.push({ role: "user", content: inputStr });
-      }
-    }
-
-    // Extract output messages from gen_ai.completion, gen_ai.output.messages, or langwatch.output
-    const outputStr =
-      (attrs["gen_ai.completion"] as string) ??
-      (attrs["gen_ai.output.messages"] as string) ??
-      (attrs["langwatch.output"] as string);
-    if (outputStr) {
-      try {
-        const parsed = JSON.parse(outputStr);
-        if (parsed.type === "chat_messages" && Array.isArray(parsed.value)) {
-          messages.push(...parsed.value);
-        } else if (Array.isArray(parsed)) {
-          // Raw array of message objects (without TypedValueJson wrapper)
-          for (const item of parsed) {
-            if (item && typeof item === "object" && typeof item.content === "string") {
-              messages.push({ role: item.role ?? "assistant", content: item.content });
-            }
-          }
-        } else if (typeof parsed.value === "string") {
-          messages.push({ role: "assistant", content: parsed.value });
-        } else if (typeof parsed === "string") {
-          messages.push({ role: "assistant", content: parsed });
-        }
-      } catch {
-        messages.push({ role: "assistant", content: outputStr });
-      }
-    }
+    // Pure extraction of input + output messages from the span's
+    // attributes. Lives in parseLLMSpanMessages.ts so the wire-shape
+    // contract — including the single-message-object form nlpgo emits
+    // for langwatch.output — is unit-testable without standing up the
+    // full service. See that file's docstring for the shape catalog.
+    const messages: PromptStudioSpanResult["messages"] =
+      parseLLMSpanMessages(attrs);
 
     // Extract LLM config
     const model =
