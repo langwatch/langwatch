@@ -894,10 +894,18 @@ describe.skipIf(!shouldRun)(
         expect(
           linkedToParent.length,
           `no span has ParentSpanId == inbound ${PARENT_SPAN_ID} — ` +
-            `startStudioSpan failed to extract the W3C parent context. ` +
-            `Spans seen: ${rows
-              .map((r) => `${r.SpanName}(parent=${r.ParentSpanId ?? "<root>"})`)
-              .join(", ")}`,
+            `startStudioSpan failed to extract the W3C parent context.\n` +
+            `Spans seen in CH: ${
+              rows
+                .map(
+                  (r) =>
+                    `${r.SpanName}(span_id=${r.SpanId}, parent=${
+                      r.ParentSpanId ?? "<root>"
+                    })`,
+                )
+                .join(", ") || "(none)"
+            }\n` +
+            `Pipeline diagnostic:\n${buildDiagnostic()}`,
         ).toBeGreaterThan(0);
       },
       300_000,
