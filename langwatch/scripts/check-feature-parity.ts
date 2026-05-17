@@ -349,7 +349,7 @@ function isFollowedByGoTestFunc(src: string, start: number): boolean {
       continue;
     }
     const rest = src.slice(i);
-    return /^func\s+Test[A-Za-z0-9_]*\s*\(/.test(rest);
+    return /^func\s+Test[A-Za-z0-9_]*\s*\(\s*[A-Za-z_][A-Za-z0-9_]*\s+\*testing\.T\s*\)/.test(rest);
   }
   return false;
 }

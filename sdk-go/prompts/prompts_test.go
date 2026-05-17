@@ -12,10 +12,9 @@ import (
 
 	"github.com/langwatch/langwatch/sdk-go/internal/testutil"
 	"github.com/langwatch/langwatch/sdk-go/prompts"
-	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
-	otelsdktrace "go.opentelemetry.io/otel/sdk/trace"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
 // installRecorder swaps the global tracer provider for one whose spans
@@ -25,8 +24,8 @@ import (
 func installRecorder(t *testing.T) (*testutil.MockExporter, func()) {
 	t.Helper()
 	exporter := testutil.NewMockExporter()
-	tp := otelsdktrace.NewTracerProvider(
-		otelsdktrace.WithSyncer(exporter),
+	tp := sdktrace.NewTracerProvider(
+		sdktrace.WithSyncer(exporter),
 	)
 	prior := otel.GetTracerProvider()
 	otel.SetTracerProvider(tp)
