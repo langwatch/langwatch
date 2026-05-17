@@ -139,7 +139,7 @@ describe("FeatureFlagService", () => {
   });
 
   describe("given a PRODUCT-scoped flag", () => {
-    describe("when the legacy service answers", () => {
+    describe("when no store row exists", () => {
       it("delegates to the legacy (PostHog) service", async () => {
         const { service, legacy } = buildService();
         (legacy.isEnabled as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
@@ -156,15 +156,26 @@ describe("FeatureFlagService", () => {
       });
     });
 
-    describe("when the legacy service throws and a store value exists", () => {
-      it("falls back to the store value (self-hosted parity)", async () => {
+    describe("when an operator override row exists in the store", () => {
+      it("uses the store value without touching the legacy service", async () => {
         const { service, store, legacy } = buildService();
         await store.set(PRODUCT_FLAG, true);
-        (legacy.isEnabled as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
-          new Error("PostHog unreachable"),
-        );
         const enabled = await service.isEnabled(PRODUCT_FLAG, "user-1", false);
         expect(enabled).toBe(true);
+        expect(legacy.isEnabled).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when an operator disables a PRODUCT flag via the store", () => {
+      it("returns false even when PostHog would have said true", async () => {
+        const { service, store, legacy } = buildService();
+        await store.set(PRODUCT_FLAG, false);
+        (legacy.isEnabled as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+          true,
+        );
+        const enabled = await service.isEnabled(PRODUCT_FLAG, "user-1", true);
+        expect(enabled).toBe(false);
+        expect(legacy.isEnabled).not.toHaveBeenCalled();
       });
     });
   });

@@ -22,11 +22,14 @@ import type { FeatureFlagOptions, FeatureFlagServiceInterface } from "./types";
  *    path that exists specifically so hot-path event-sourcing reactors
  *    don't generate per-tenant PostHog traffic.
  *
- *  - PRODUCT (UI features, A/B tests): env override -> PostHog (when
- *    configured) -> postgres store (operator override / self-hosted
- *    fallback) -> registry default. PostHog keeps user targeting and
- *    rollouts; postgres exists so self-hosted installs without PostHog
- *    can still flip product flags.
+ *  - PRODUCT (UI features, A/B tests): env override -> postgres store
+ *    (operator override) -> PostHog (when configured) -> registry
+ *    default. Operator-set rows in /ops/feature-flags win so the Ops
+ *    UI actually flips the flag — without that, both concrete legacy
+ *    backends (PostHog and memory) swallow their own failures and
+ *    return the registry default, so a postgres-only fallback after
+ *    PostHog would be unreachable on the happy path. PostHog keeps
+ *    user targeting and rollouts when no DB override exists.
  *
  *  - Unregistered keys: legacy path (env -> PostHog/memory). Kept for
  *    back-compat with flags that haven't been migrated into the
@@ -95,22 +98,22 @@ export class FeatureFlagService implements FeatureFlagServiceInterface {
     }
 
     if (definition?.scope === "PRODUCT") {
-      try {
-        const fromLegacy = await this.legacy.isEnabled(
-          flagKey,
-          distinctId,
-          definition.defaultValue,
-          options,
-        );
-        return fromLegacy;
-      } catch (error) {
-        this.logger.warn(
-          { flagKey, error: error instanceof Error ? error.message : error },
-          "PRODUCT flag legacy resolution failed, falling back to postgres",
-        );
-        const stored = await this.store.get(flagKey);
-        return stored ?? definition.defaultValue;
-      }
+      // Operator override via /ops/feature-flags wins. Both legacy
+      // backends (PostHog and memory) catch their own failures and
+      // return the registry default, so a try/catch around legacy
+      // never falls through to postgres on its own. Checking the
+      // store first keeps the Ops UI usable for self-hosted installs
+      // and during PostHog outages without losing PostHog's user
+      // targeting on flags that have no DB override.
+      const stored = await this.store.get(flagKey);
+      if (stored !== null) return stored;
+
+      return await this.legacy.isEnabled(
+        flagKey,
+        distinctId,
+        definition.defaultValue,
+        options,
+      );
     }
 
     return this.legacy.isEnabled(flagKey, distinctId, defaultValue, options);

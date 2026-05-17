@@ -772,12 +772,20 @@ export const opsRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      // Only allow writes for keys the code registry recognizes,
-      // either as an explicit flag or via a family prefix. Stops typos
-      // from creating orphan rows that drift forever after the flag
-      // they were meant for has been renamed.
-      const def = resolveFlagDefinition(input.key);
-      if (!def) {
+      // Restrict writes to keys the system actively knows about:
+      // explicit registry entries or kill-switch descriptors currently
+      // advertised by the live pipeline graph. Family-prefix matching
+      // alone is too permissive — `es-foo-bar-killswitch` passes
+      // `resolveFlagDefinition` even with no pipeline component on the
+      // other end, so a typo would create an orphan row that never
+      // affects anything.
+      const isExplicitKey = listFeatureFlags().some(
+        (f) => f.key === input.key,
+      );
+      const isLiveKillSwitch = getKillSwitchDescriptors().some(
+        (d) => d.key === input.key,
+      );
+      if (!isExplicitKey && !isLiveKillSwitch) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: `Unknown feature flag key: ${input.key}`,
