@@ -162,7 +162,12 @@ export function PinnedAwareJsonView({
             css={{
               "& pre, & code": {
                 background: "transparent !important",
-                fontSize: "0.78em",
+                // Bumped from 0.78em (~9 px under xs, ~7 px under
+                // 2xs parents) — operator readability floor is 10 px
+                // everywhere. `max(rem, em)` gives scaled-but-floored
+                // sizing: ~11 px in xs contexts, 10 px hard floor in
+                // tighter parents.
+                fontSize: "max(0.625rem, 0.92em)",
                 lineHeight: "1.6",
                 padding: "0 !important",
                 margin: "0 !important",
