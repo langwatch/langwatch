@@ -201,10 +201,10 @@ export function extractPromptReference(
     if (versionRaw != null) {
       const version = Number(versionRaw);
       if (Number.isInteger(version) && version > 0) {
-        return { handle: promptId, versionNumber: version, tag: null, variables };
+        return { handle: promptId, versionNumber: version, tag: null, variables, draft };
       }
     }
-    return { handle: promptId, versionNumber: null, tag: null, variables };
+    return { handle: promptId, versionNumber: null, tag: null, variables, draft };
   }
 
   return null;
