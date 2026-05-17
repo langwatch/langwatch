@@ -52,7 +52,7 @@ func TestPromptSpansExecuteComponent_VariablesCaptureIsBestEffort(t *testing.T) 
 	t.Skip(promptSpansPendingMsg)
 }
 
-/** @scenario "Studio Run-Component dispatch propagates origin=\"workflow\" to both prompt spans" */
+/** @scenario 'Studio Run-Component dispatch propagates origin="workflow" to both prompt spans' */
 func TestPromptSpansExecuteComponent_OriginWorkflowPropagatedToBothSpans(t *testing.T) {
 	t.Skip(promptSpansPendingMsg)
 }

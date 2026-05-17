@@ -17,18 +17,18 @@ import { describe, it } from "vitest";
 const PENDING = "pending: nlpgo prompt-span emission + sdk-go/prompts wiring in this PR";
 
 describe("prompt-spans trace-UI consumer parity", () => {
-  /** @scenario "trace drawer surfaces \"Open in Prompts\" with the exact handle and version" */
+  /** @scenario 'trace drawer surfaces "Open in Prompts" with the exact handle and version' */
   it.skip("renders Open <handle>:<version> in the drawer menu from compile-span attrs", () => {
     // PENDING
     void PENDING;
   });
 
-  /** @scenario "clicking a row in experiment results opens the trace drawer with \"Open in Prompts\"" */
+  /** @scenario 'clicking a row in experiment results opens the trace drawer with "Open in Prompts"' */
   it.skip("evaluations-v3 result-cell click opens drawer with the row's prompt reference", () => {
     void PENDING;
   });
 
-  /** @scenario "trace drawer surfaces the draft state on the \"Open in Prompts\" affordance" */
+  /** @scenario 'trace drawer surfaces the draft state on the "Open in Prompts" affordance' */
   it.skip("renders \"Open <handle>:<version> (unsaved edits)\" when langwatch.prompt.draft=true", () => {
     void PENDING;
   });
