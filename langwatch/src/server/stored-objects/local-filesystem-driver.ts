@@ -19,9 +19,17 @@ import type { Readable } from "node:stream";
 import type { StorageDriver } from "./storage-driver";
 import { getUriScheme } from "./uri";
 import { ObjectNotFoundError } from "./errors";
+import { createLogger } from "~/utils/logger/server";
+
+const logger = createLogger("langwatch:stored-objects:local-filesystem-driver");
 
 /**
- * Converts a `file:///rest` URI to an absolute filesystem path `/rest`.
+ * Converts a `file:` URI to an absolute filesystem path.
+ *
+ * Handles both `file:///abs/path` (authority + abs path) and `file:/abs/path`
+ * (no authority) per RFC 8089, and percent-decodes the path. Using a hand
+ * rolled `uri.slice("file://".length)` is brittle: `file:/tmp/foo` becomes
+ * `tmp/foo` (a relative path) and percent-escaped characters survive.
  *
  * @throws if the URI does not use the `file:` scheme.
  */
@@ -32,8 +40,8 @@ function parseFileUri(uri: string): string {
       `LocalFilesystemDriver only handles file: URIs, got: "${uri}"`,
     );
   }
-  // file:///absolute/path — strip the "file://" prefix to get "/absolute/path"
-  return uri.slice("file://".length);
+  const parsed = new URL(uri);
+  return decodeURIComponent(parsed.pathname);
 }
 
 /**
@@ -81,11 +89,15 @@ export class LocalFilesystemDriver implements StorageDriver {
       await fs.writeFile(tmpPath, bytes);
       await fs.rename(tmpPath, finalPath);
     } catch (err) {
-      // Best-effort cleanup of the orphaned tmp file.
+      // Best-effort cleanup of the orphaned tmp file. ENOENT is fine (the
+      // file was already gone). Any other unlink error is logged but does
+      // NOT mask the original write/rename error the caller cares about.
       await fs.unlink(tmpPath).catch((unlinkErr: NodeJS.ErrnoException) => {
         if (unlinkErr.code !== "ENOENT") {
-          // Not found is fine — already gone. Swallow any other error too
-          // since we're in a cleanup path and the original error takes priority.
+          logger.warn(
+            { tmpPath, finalPath, unlinkErr },
+            "failed to clean up orphaned tmp file after write failure",
+          );
         }
       });
       throw err;

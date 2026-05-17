@@ -10,10 +10,16 @@
 -- identical content uploaded under the same project is deduplicated at write
 -- time without a read-before-write.
 --
+-- Table name is intentionally unqualified — per project convention, migrations
+-- run inside the database resolved from the connection string, so qualifying
+-- with ${CLICKHOUSE_DATABASE}. is both redundant and incorrect on installs
+-- where the env var isn't set. CREATE TABLE IF NOT EXISTS makes this
+-- migration idempotent.
+--
 -- Engine: ReplacingMergeTree / ReplicatedReplacingMergeTree (based on CLICKHOUSE_CLUSTER)
 -- ============================================================================
 
-CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.stored_objects
+CREATE TABLE IF NOT EXISTS stored_objects
 (
     id String CODEC(ZSTD(1)),
     project_id String CODEC(ZSTD(1)),
@@ -41,10 +47,8 @@ SETTINGS index_granularity = 8192${CLICKHOUSE_STORAGE_POLICY_SETTING};
 -- +goose Down
 -- Down migrations are intentionally commented out to prevent accidental data loss.
 -- To roll back, uncomment and run manually.
--- +goose ENVSUB ON
 -- +goose StatementBegin
 
--- DROP TABLE IF EXISTS ${CLICKHOUSE_DATABASE}.stored_objects SYNC;
+-- DROP TABLE IF EXISTS stored_objects SYNC;
 
 -- +goose StatementEnd
--- +goose ENVSUB OFF

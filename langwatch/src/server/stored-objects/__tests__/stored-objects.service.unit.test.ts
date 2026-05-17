@@ -68,7 +68,6 @@ function makeRepository(): StoredObjectsRepository {
     insert: vi.fn().mockResolvedValue(undefined),
     findById: vi.fn().mockResolvedValue(null),
     findBySha256: vi.fn().mockResolvedValue(null),
-    findProjectByObjectId: vi.fn().mockResolvedValue(null),
   } as unknown as StoredObjectsRepository;
 }
 
@@ -280,48 +279,13 @@ describe("getById", () => {
   });
 });
 
-describe("resolveOwnerProject", () => {
-  let repo: StoredObjectsRepository;
-  let registry: StorageRegistry;
-  let service: StoredObjectsService;
-
-  beforeEach(() => {
-    repo = makeRepository();
-    registry = makeRegistry();
-    service = new StoredObjectsService(repo, registry);
-  });
-
-  describe("when a row exists", () => {
-    it("returns the projectId", async () => {
-      vi.mocked(repo.findProjectByObjectId).mockResolvedValue({ projectId: "proj-42" });
-
-      const result = await service.resolveOwnerProject({ id: "some-object-id" });
-
-      expect(result).toEqual({ projectId: "proj-42" });
-      expect(repo.findProjectByObjectId).toHaveBeenCalledOnce();
-      expect(repo.findProjectByObjectId).toHaveBeenCalledWith({ id: "some-object-id" });
-    });
-  });
-
-  describe("when no row exists", () => {
-    it("returns null", async () => {
-      vi.mocked(repo.findProjectByObjectId).mockResolvedValue(null);
-
-      const result = await service.resolveOwnerProject({ id: "unknown-id" });
-
-      expect(result).toBeNull();
-    });
-  });
-});
-
 describe("StoredObjectsService surface", () => {
   /** @scenario "StoredObjectsService exposes storeFromBytes, getById, cascadeDeleteProject, cascadeDeleteOwner" */
-  it("exposes storeFromBytes, getById, resolveOwnerProject, cascadeDeleteProject, cascadeDeleteOwner", () => {
+  it("exposes storeFromBytes, getById, cascadeDeleteProject, cascadeDeleteOwner", () => {
     const service = new StoredObjectsService(makeRepository(), makeRegistry());
 
     expect(typeof service.storeFromBytes).toBe("function");
     expect(typeof service.getById).toBe("function");
-    expect(typeof service.resolveOwnerProject).toBe("function");
     expect(typeof service.cascadeDeleteProject).toBe("function");
     expect(typeof service.cascadeDeleteOwner).toBe("function");
   });

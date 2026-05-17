@@ -17,6 +17,7 @@ import {
   storedObjectReadFailureCounter,
 } from "~/server/metrics";
 import { createLogger } from "~/utils/logger/server";
+import { getS3ConfigForProject } from "~/server/dataplane-s3";
 import { ObjectNotFoundError } from "./errors";
 import type { StoredObject } from "./stored-object";
 import type { StoredObjectsRepository } from "./stored-objects.repository";
@@ -54,11 +55,13 @@ function deriveStoredObjectId({
     .update(`${projectId}:${sha256}`)
     .digest();
 
-  // Mutate the bytes in place per RFC 4122 §4.3 (Name-Based UUIDs / v5)
-  // Byte 6: version = 0101xxxx → set high nibble to 0101
-  hash[6] = ((hash[6]! & 0x0f) | 0x50) as number;
-  // Byte 8: variant = 10xxxxxx → set high two bits to 10
-  hash[8] = ((hash[8]! & 0x3f) | 0x80) as number;
+  // Mutate the bytes in place per RFC 4122 §4.3 (Name-Based UUIDs / v5):
+  //  - Byte 6 high nibble = 0101 (version = 5)
+  //  - Byte 8 high two bits = 10 (variant = RFC 4122)
+  // No `as number` cast needed — bitwise ops on Uint8Array elements
+  // return numbers; the assignment back into the buffer is well-typed.
+  hash[6] = (hash[6]! & 0x0f) | 0x50;
+  hash[8] = (hash[8]! & 0x3f) | 0x80;
 
   const hex = hash.toString("hex", 0, 16);
   return [
@@ -71,25 +74,37 @@ function deriveStoredObjectId({
 }
 
 /**
- * Returns the storage URI for a new object based on current env configuration.
+ * Returns the storage URI for a new object, resolving the bucket per-project.
  *
- * When `S3_BUCKET_NAME` is set the object goes to S3; otherwise it lands on
- * the local filesystem at `LANGWATCH_LOCAL_STORAGE_PATH` (mirrors the legacy
- * `StorageService.getLocalStoragePath` pattern).
+ * Resolution precedence (matches createS3Client in src/server/storage.ts):
+ *  1. BYOC: per-project private dataplane bucket from `getS3ConfigForProject`.
+ *  2. Global: `env.S3_BUCKET_NAME`.
+ *  3. Fallback: local filesystem at `env.LANGWATCH_LOCAL_STORAGE_PATH`.
+ *
+ * Without the per-project resolution, a BYOC tenant's persisted `storage_uri`
+ * column would encode the wrong (global) bucket while the actual write goes
+ * to the private bucket. That mismatch breaks reads and tenant isolation,
+ * since `S3Driver` parses the URI to determine the bucket on GET.
  */
-function mintStorageUri({
+async function mintStorageUri({
   projectId,
   sha256,
 }: {
   projectId: string;
   sha256: string;
-}): string {
-  const s3Bucket = env.S3_BUCKET_NAME;
-  if (s3Bucket && s3Bucket.trim() !== "") {
+}): Promise<string> {
+  const privateConfig = await getS3ConfigForProject(projectId);
+  const s3Bucket =
+    privateConfig?.bucket ??
+    (env.S3_BUCKET_NAME && env.S3_BUCKET_NAME.trim() !== ""
+      ? env.S3_BUCKET_NAME
+      : undefined);
+
+  if (s3Bucket) {
     return mintS3Uri({ bucket: s3Bucket, projectId, sha256 });
   }
   const root =
-    process.env.LANGWATCH_LOCAL_STORAGE_PATH ?? "/var/lib/langwatch/objects";
+    env.LANGWATCH_LOCAL_STORAGE_PATH ?? "/var/lib/langwatch/objects";
   return mintFileUri({ root, projectId, sha256 });
 }
 
@@ -168,7 +183,7 @@ export class StoredObjectsService {
           return { id: existing.id, mediaType, isDuplicate: true };
         }
 
-        const storageUri = mintStorageUri({ projectId, sha256 });
+        const storageUri = await mintStorageUri({ projectId, sha256 });
 
         // PUT first: if storage rejects, never write the CH row
         try {
@@ -197,7 +212,24 @@ export class StoredObjectsService {
           inserted_at: now,
         };
 
-        await this.repository.insert({ projectId, row });
+        // Compensating cleanup: if the CH insert fails after a successful
+        // PUT, the bytes would be orphaned in storage (no row points at
+        // them). Best-effort delete the just-written object so we don't
+        // leak storage. The original insert error is what the caller sees.
+        try {
+          await this.repository.insert({ projectId, row });
+        } catch (insertError) {
+          getStoredObjectWriteFailureCounter(purpose).inc();
+          try {
+            await this.registry.delete(storageUri);
+          } catch (deleteError) {
+            logger.warn(
+              { projectId, id, storageUri, deleteError, insertError },
+              "compensating delete failed; bytes may be orphaned",
+            );
+          }
+          throw insertError;
+        }
 
         span.setAttribute("stored_object.dedup_hit", false);
         return { id, mediaType, isDuplicate: false };
@@ -264,24 +296,6 @@ export class StoredObjectsService {
         }
       },
     );
-  }
-
-  /**
-   * Resolves the owning project for a stored_object id.
-   *
-   * Performs a cross-tenant repository lookup to find the project_id for the
-   * given object id. Returns null if no row matches. Callers must gate access
-   * with a project-membership check once the project is resolved.
-   *
-   * See StoredObjectsRepository.findProjectByObjectId for the rationale on the
-   * tenant-filter exception.
-   */
-  async resolveOwnerProject({
-    id,
-  }: {
-    id: string;
-  }): Promise<{ projectId: string } | null> {
-    return this.repository.findProjectByObjectId({ id });
   }
 
   /**

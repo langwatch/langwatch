@@ -9,7 +9,7 @@
  * Uses native HTML5 <audio>, <img>, <video> — no third-party player library.
  */
 import { Badge, Box, Text, VStack } from "@chakra-ui/react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -105,39 +105,47 @@ export function MediaPart({ part }: MediaPartProps) {
 
   const [status, setStatus] = useState<LoadStatus>(isUrlBased ? "loading" : "ok");
 
-  // For URL-based parts, verify the file is reachable after the element reports an error.
-  // We optimistically render and check on error, keeping the happy path cost-free.
+  // For URL-based parts, verify the file is reachable after the element reports
+  // an error. We optimistically render and check on error, keeping the happy
+  // path cost-free.
   useEffect(() => {
     if (!isUrlBased) {
       setStatus("ok");
     }
   }, [isUrlBased]);
 
+  // Probe at most once per <src>: a single failed audio/video element can fire
+  // `error` repeatedly while the browser retries decoders, and a long scenario
+  // can render the same file id in many places. Without a guard, each render
+  // would hit /api/files/:id again.
+  const probedRef = useRef<string | null>(null);
+
   function handleLoad() {
     setStatus("ok");
   }
 
   function handleError() {
-    // Probe the URL to distinguish "missing" from other network errors
-    fetch(src, { method: "GET", credentials: "include" })
+    // Don't re-probe the same src after the first error; subsequent error
+    // events for the same URL are noise (browser retry loops).
+    if (probedRef.current === src) return;
+    probedRef.current = src;
+
+    // HEAD probe: distinguishes "missing" (404 with our status: missing
+    // shape) from "error" (5xx / network) without downloading the full
+    // payload again. The files route supports HEAD with the same auth
+    // and response headers as GET.
+    fetch(src, { method: "HEAD", credentials: "include" })
       .then((r) => {
         if (r.status === 404) {
           setStatus("missing");
+        } else if (r.ok) {
+          // The element reported error but HEAD says the bytes are
+          // available — likely a transient decode failure. Show error so
+          // the user knows something went wrong; the bytes themselves
+          // aren't gone.
+          setStatus("error");
         } else {
-          // Try to parse body for {status: "missing"} shape
-          return r.json().then((body: unknown) => {
-            if (
-              typeof body === "object" &&
-              body !== null &&
-              (body as Record<string, unknown>).status === "missing"
-            ) {
-              setStatus("missing");
-            } else {
-              setStatus("error");
-            }
-          }).catch(() => {
-            setStatus("error");
-          });
+          setStatus("error");
         }
       })
       .catch(() => {
@@ -203,7 +211,11 @@ export function MediaPart({ part }: MediaPartProps) {
           data-testid="media-part-audio"
           controls
           src={src}
-          onLoad={handleLoad}
+          // `onLoad` does not fire on <audio>/<video>; the right hook is
+          // `onLoadedData` (metadata + first frame ready) — fires only
+          // after the browser has actually decoded enough to play, so
+          // setting status="ok" here reflects what the user can do.
+          onLoadedData={handleLoad}
           onError={handleError}
           style={{ width: "100%", maxWidth: "400px" }}
         />
@@ -233,7 +245,8 @@ export function MediaPart({ part }: MediaPartProps) {
           data-testid="media-part-video"
           controls
           src={src}
-          onLoad={handleLoad}
+          // See audio above — `onLoad` does not fire on <video>.
+          onLoadedData={handleLoad}
           onError={handleError}
           style={{ maxWidth: "400px", maxHeight: "300px", borderRadius: "6px" }}
         />

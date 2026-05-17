@@ -27,18 +27,35 @@ import { projectFactory } from "~/factories/project.factory";
 // Hoisted mocks
 // ---------------------------------------------------------------------------
 
-// Control resolveOwnerProject and getById per test
+// Control resolveStoredObjectOwner (cross-tenant lookup) and the service's
+// project-scoped getById per test. The lookup helper lives in its own
+// module to keep the unsafe shared-client surface separated from
+// project-scoped repository CRUD; mock it independently.
 const mockResolveOwnerProject = vi.fn();
 const mockGetById = vi.fn();
 
+vi.mock("~/server/stored-objects/stored-objects-cross-tenant-lookup", () => ({
+  resolveStoredObjectOwner: mockResolveOwnerProject,
+}));
+
 vi.mock("~/server/stored-objects/stored-objects-factory", () => ({
   createStoredObjectsService: vi.fn(() => ({
-    resolveOwnerProject: mockResolveOwnerProject,
     getById: mockGetById,
     storeFromBytes: vi.fn(),
     cascadeDeleteProject: vi.fn(),
     cascadeDeleteOwner: vi.fn(),
   })),
+}));
+
+// Disable the rate limiter for this suite — the route adds it via
+// rateLimit(); we want the test to exercise the response shape, not the
+// limiter behavior.
+vi.mock("~/server/rateLimit", () => ({
+  rateLimit: vi.fn().mockResolvedValue({
+    allowed: true,
+    remaining: 119,
+    resetAt: Date.now() + 60_000,
+  }),
 }));
 
 // Suppress logger noise

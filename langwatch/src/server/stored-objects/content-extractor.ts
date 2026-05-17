@@ -16,6 +16,7 @@ import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import { z } from "zod";
 import { createLogger } from "~/utils/logger/server";
+import { binaryInputPartSchema } from "./binary-part";
 import type { StoredObjectsService } from "./stored-objects.service";
 
 const tracer = getLangWatchTracer("langwatch.stored-objects.content-extractor");
@@ -99,6 +100,23 @@ async function processContentPart({
     return { part: rewrittenPart, ref };
   }
 
+  // binary parts: enforce exactly-one-of(data, url, id) at the boundary
+  // before we touch them. AG-UI's InputContentSchema permits the
+  // ambiguous "all three set" / "none set" cases; rejecting them here
+  // matches the runtime invariant the extractor depends on. A failed
+  // safeParse falls back to "no inline data to extract" — the caller's
+  // degraded-passthrough path takes care of the rest.
+  if (part.type === "binary") {
+    const refined = binaryInputPartSchema.safeParse(part);
+    if (!refined.success) {
+      logger.debug(
+        { error: refined.error.message },
+        "binary part violates exactly-one-of(data,url,id); passing through unchanged",
+      );
+      return { part, ref: null };
+    }
+  }
+
   // binary parts where data is set and id/url are not already present
   if (
     part.type === "binary" &&
@@ -141,27 +159,114 @@ async function processContentPart({
 }
 
 // ---------------------------------------------------------------------------
+// Per-message walker
+// ---------------------------------------------------------------------------
+
+interface ExtractionParams {
+  projectId: string;
+  purpose: string;
+  ownerKind: string;
+  ownerId: string;
+  service: StoredObjectsService;
+}
+
+/**
+ * Walks a single message's `content` array, externalizing inline media.
+ *
+ * - Returns the same message reference when nothing was rewritten (no
+ *   content array, or a part failed AG-UI parse and the whole message
+ *   is passed through unchanged). Reference identity lets the event
+ *   dispatcher above detect "no-op" without diffing the bytes.
+ * - On `storeFromBytes` failure, the error propagates out — the caller
+ *   maps it to a 5xx and rolls back the event.
+ */
+async function rewriteMessage(
+  rawMessage: Record<string, unknown>,
+  params: ExtractionParams,
+): Promise<{ message: Record<string, unknown>; refs: ExtractedRef[] }> {
+  if (!Array.isArray(rawMessage.content)) {
+    return { message: rawMessage, refs: [] };
+  }
+
+  const parsedParts: InputContentPart[] = [];
+  for (const raw of rawMessage.content as unknown[]) {
+    const result = InputContentSchema.safeParse(raw);
+    if (!result.success) {
+      logger.debug(
+        { error: result.error.message },
+        "content part failed AG-UI parse — passing message through unchanged",
+      );
+      return { message: rawMessage, refs: [] };
+    }
+    parsedParts.push(result.data);
+  }
+
+  const refs: ExtractedRef[] = [];
+  const rewrittenParts: InputContentPart[] = [];
+  for (const part of parsedParts) {
+    const { part: rewritten, ref } = await processContentPart({
+      part,
+      ...params,
+    });
+    rewrittenParts.push(rewritten);
+    if (ref !== null) refs.push(ref);
+  }
+  return { message: { ...rawMessage, content: rewrittenParts }, refs };
+}
+
+/**
+ * Walks every message in an event's `messages` array.
+ *
+ * Returns the original `messages` reference (and an empty refs list) when
+ * no message changed. Preserves reference identity at the event level so
+ * the dispatcher can short-circuit cleanly.
+ */
+async function rewriteMessageArray(
+  messages: unknown[],
+  params: ExtractionParams,
+): Promise<{ messages: unknown[]; refs: ExtractedRef[]; changed: boolean }> {
+  const out: unknown[] = [];
+  const allRefs: ExtractedRef[] = [];
+  let changed = false;
+  for (const m of messages) {
+    if (m && typeof m === "object" && !Array.isArray(m)) {
+      const { message: rewritten, refs } = await rewriteMessage(
+        m as Record<string, unknown>,
+        params,
+      );
+      if (rewritten !== m) changed = true;
+      out.push(rewritten);
+      allRefs.push(...refs);
+    } else {
+      out.push(m);
+    }
+  }
+  return { messages: out, refs: allRefs, changed };
+}
+
+// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
 /**
  * Walks an event payload, finds inline media parts in message content arrays,
- * externalizes them via `service.storeFromBytes`, and returns a new event with
- * the parts rewritten to reference stored objects by URL.
+ * externalizes them via `service.storeFromBytes`, and returns a new event
+ * with the parts rewritten to reference stored objects by URL.
+ *
+ * Supports two event shapes:
+ *  - Shape A: `event.message` (TEXT_MESSAGE_END) — one message.
+ *  - Shape B: `event.messages[]` (MESSAGE_SNAPSHOT) — an array of messages.
  *
  * Behaviour:
- * - If the event has no `message` or `message.content` is not an array, returns
- *   the event unchanged with an empty refs list.
- * - If `message.content` exists but fails AG-UI `InputContentSchema` validation
- *   for individual parts, the event is returned unchanged (degraded fallback).
- * - On `storeFromBytes` failure, the error is rethrown (caller returns 5xx).
+ *  - If the event has no recognizable message field, returns it unchanged
+ *    with an empty refs list.
+ *  - If a content part fails AG-UI `InputContentSchema` validation, the
+ *    whole message passes through unchanged ("degraded, not broken").
+ *  - On `storeFromBytes` failure, the error is rethrown — the route maps
+ *    it to a 5xx.
  *
- * @param event - A parsed scenarioEventSchema value.
- * @param projectId - The owning project's ID (tenant).
- * @param ownerKind - The entity kind that owns these objects (e.g. "scenario_run").
- * @param ownerId - The entity ID that owns these objects (e.g. the scenarioRunId).
- * @param purpose - Label for metrics/observability (e.g. "scenario_event").
- * @param service - The StoredObjectsService instance.
+ * Adding a new event shape with media content: implement a third dispatch
+ * branch below; the per-message walker is reusable as-is.
  */
 export async function extractInlineMediaFromEvent({
   event,
@@ -195,97 +300,39 @@ export async function extractInlineMediaFromEvent({
         return { rewrittenEvent: event, refs: [] };
       }
 
-      const allRefs: ExtractedRef[] = [];
-
-      // Per-message walker: parses `content` parts via AG-UI and rewrites
-      // inline data → URL refs. Returns the rewritten message and any refs.
-      // On parse failure, returns the message unchanged so the event still
-      // ingests in a degraded-but-not-broken state.
-      const rewriteMessage = async (
-        rawMessage: Record<string, unknown>,
-      ): Promise<Record<string, unknown>> => {
-        if (!Array.isArray(rawMessage.content)) return rawMessage;
-
-        const rawParts: unknown[] = rawMessage.content;
-        const parsedParts: InputContentPart[] = [];
-        for (const raw of rawParts) {
-          const result = InputContentSchema.safeParse(raw);
-          if (!result.success) {
-            logger.debug(
-              { error: result.error.message },
-              "content part failed AG-UI parse — passing message through unchanged",
-            );
-            return rawMessage;
-          }
-          parsedParts.push(result.data);
-        }
-
-        const rewrittenParts: InputContentPart[] = [];
-        for (const part of parsedParts) {
-          // storeFromBytes throws propagate out — caller maps to 5xx.
-          const { part: rewritten, ref } = await processContentPart({
-            part,
-            projectId,
-            purpose,
-            ownerKind,
-            ownerId,
-            service,
-          });
-          rewrittenParts.push(rewritten);
-          if (ref !== null) allRefs.push(ref);
-        }
-
-        return { ...rawMessage, content: rewrittenParts };
+      const params: ExtractionParams = {
+        projectId,
+        purpose,
+        ownerKind,
+        ownerId,
+        service,
       };
-
       const eventObj = event as Record<string, unknown>;
 
-      // Shape A: TEXT_MESSAGE_END style — `event.message` is the single message.
-      // `rewriteMessage` returns the same reference when nothing changed (no
-      // content array, or a parse failure that triggers the degraded
-      // fallback). Preserve reference identity of the event in that case so
-      // callers and tests can assert "unchanged" via === / toBe.
+      // Shape A: `event.message` is a single message object.
       if (
         eventObj.message &&
         typeof eventObj.message === "object" &&
         !Array.isArray(eventObj.message)
       ) {
-        const originalMessage = eventObj.message as Record<string, unknown>;
-        const rewrittenMessage = await rewriteMessage(originalMessage);
-        span.setAttribute("stored_objects.refs_extracted", allRefs.length);
-        if (rewrittenMessage === originalMessage) {
-          return { rewrittenEvent: event, refs: allRefs };
+        const original = eventObj.message as Record<string, unknown>;
+        const { message, refs } = await rewriteMessage(original, params);
+        span.setAttribute("stored_objects.refs_extracted", refs.length);
+        if (message === original) {
+          return { rewrittenEvent: event, refs };
         }
-        return {
-          rewrittenEvent: { ...eventObj, message: rewrittenMessage },
-          refs: allRefs,
-        };
+        return { rewrittenEvent: { ...eventObj, message }, refs };
       }
 
-      // Shape B: MESSAGE_SNAPSHOT style — `event.messages` is an array of messages.
+      // Shape B: `event.messages` is an array of message objects.
       if (Array.isArray(eventObj.messages)) {
-        const originalMessages = eventObj.messages;
-        const rewrittenMessages: unknown[] = [];
-        let anyChanged = false;
-        for (const m of originalMessages) {
-          if (m && typeof m === "object" && !Array.isArray(m)) {
-            const rewritten = await rewriteMessage(
-              m as Record<string, unknown>,
-            );
-            if (rewritten !== m) anyChanged = true;
-            rewrittenMessages.push(rewritten);
-          } else {
-            rewrittenMessages.push(m);
-          }
-        }
-        span.setAttribute("stored_objects.refs_extracted", allRefs.length);
-        if (!anyChanged) {
-          return { rewrittenEvent: event, refs: allRefs };
-        }
-        return {
-          rewrittenEvent: { ...eventObj, messages: rewrittenMessages },
-          refs: allRefs,
-        };
+        const { messages, refs, changed } = await rewriteMessageArray(
+          eventObj.messages,
+          params,
+        );
+        span.setAttribute("stored_objects.refs_extracted", refs.length);
+        if (!changed) return { rewrittenEvent: event, refs };
+        return { rewrittenEvent: { ...eventObj, messages }, refs };
       }
 
       span.setAttribute("stored_objects.refs_extracted", 0);

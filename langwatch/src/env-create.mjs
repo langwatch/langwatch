@@ -114,6 +114,11 @@ export function createEnvConfig() {
       S3_ACCESS_KEY_ID: z.string().optional(),
       S3_SECRET_ACCESS_KEY: z.string().optional(),
       S3_BUCKET_NAME: z.string().optional(),
+      // Root path used by the stored-objects LocalFilesystemDriver when S3 is
+      // not configured. Defaults to /var/lib/langwatch/objects inside the
+      // service. Self-hosting operators running multi-pod deployments MUST
+      // configure object storage instead — the local-FS path is dev-only.
+      LANGWATCH_LOCAL_STORAGE_PATH: z.string().optional(),
       DATASET_STORAGE_LOCAL: z.boolean().optional(),
       CREDENTIALS_SECRET: z.string().optional(),
       AZURE_AD_CLIENT_ID: z.string().optional(),
@@ -253,6 +258,7 @@ export function createEnvConfig() {
       S3_ACCESS_KEY_ID: process.env.S3_ACCESS_KEY_ID,
       S3_SECRET_ACCESS_KEY: process.env.S3_SECRET_ACCESS_KEY,
       S3_BUCKET_NAME: process.env.S3_BUCKET_NAME,
+      LANGWATCH_LOCAL_STORAGE_PATH: process.env.LANGWATCH_LOCAL_STORAGE_PATH,
       DATASET_STORAGE_LOCAL:
         process.env.DATASET_STORAGE_LOCAL === "1" ||
         process.env.DATASET_STORAGE_LOCAL?.toLowerCase() === "true",

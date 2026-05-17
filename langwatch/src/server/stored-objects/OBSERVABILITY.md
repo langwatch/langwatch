@@ -13,7 +13,7 @@
 
 The `/api/scenario-events` route is wrapped in a SERVER span via `tracerMiddleware({name: "scenario-events"})`. The span's `tenant.id` is added post-handler by the middleware from `c.var.project.id`.
 
-The `/api/files/:id` route (Phase H) should use `tracerMiddleware({name: "files"})` and set `stored_object.id` on the active span inside the handler.
+The `/api/files/:id` route uses `tracerMiddleware({name: "files"})` and sets `stored_object.id` on the active span inside the handler.
 
 ## Prometheus Metrics
 
