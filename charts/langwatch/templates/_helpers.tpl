@@ -120,18 +120,19 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   {{- end }}
 {{- end }}
 
-{{/* Validate dataplane storage configuration.
-     Stored-objects (scenario media externalization) requires either:
-       1. app.datasetObjectStorage.enabled = true with a real object backend, OR
-       2. app.storedObjects.localFilesystem.enabled = true with replicaCount=1
-          (single-pod dev/small-tier deployments only — pods don't share FS).
-     Without one of these, scenario events with inline media would silently
-     write to the container's ephemeral writable layer and lose data on
-     every pod restart. Refuse to render rather than silently leak. */}}
-{{- $hasDataplaneStorage := or .Values.app.datasetObjectStorage.enabled .Values.app.storedObjects.localFilesystem.enabled }}
-{{- if not $hasDataplaneStorage }}
-  {{- $errors = append $errors "scenario-events stored objects require object storage: set app.datasetObjectStorage.enabled=true (S3/MinIO/Azure-compatible) or app.storedObjects.localFilesystem.enabled=true (single-replica only). See dev/docs for the trade-offs." }}
-{{- end }}
+{{/* Validate dataplane storage configuration for stored-objects.
+     Hard-fail conditions (real misconfigurations):
+       - localFilesystem.enabled AND replicaCount > 1: pods don't share
+         a local filesystem, so multi-pod with local-FS is guaranteed
+         data loss. Refuse to render.
+     Soft conditions (logged but not blocking, see helpers for the
+     diagnostic ConfigMap):
+       - Neither datasetObjectStorage.enabled nor localFilesystem.enabled
+         is set. Scenario events with inline media will write to the
+         container's ephemeral writable layer; operators MUST configure
+         one of the two for any non-toy deployment. The chart still
+         renders so existing single-pod self-host installs keep working
+         on upgrade. */}}
 {{- if .Values.app.storedObjects.localFilesystem.enabled }}
   {{- if gt (int .Values.app.replicaCount) 1 }}
     {{- $errors = append $errors "app.storedObjects.localFilesystem.enabled requires replicaCount=1 (pods don't share a local filesystem). Use app.datasetObjectStorage.enabled instead for multi-replica deployments." }}
