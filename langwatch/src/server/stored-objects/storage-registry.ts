@@ -10,17 +10,39 @@ import { getUriScheme } from "./uri";
 
 /**
  * Routes storage operations to the correct driver by extracting the URI scheme.
+ *
+ * The `azure-blob` driver is optional: deployments that have not configured
+ * Azure credentials don't need it registered. The registry throws a
+ * descriptive error if a URI of an unregistered scheme is dispatched.
  */
 export class StorageRegistry {
-  private readonly drivers: { s3: StorageDriver; file: StorageDriver };
+  private readonly drivers: {
+    s3: StorageDriver;
+    file: StorageDriver;
+    "azure-blob"?: StorageDriver;
+  };
 
-  constructor({ s3, file }: { s3: StorageDriver; file: StorageDriver }) {
-    this.drivers = { s3, file };
+  constructor({
+    s3,
+    file,
+    "azure-blob": azureBlob,
+  }: {
+    s3: StorageDriver;
+    file: StorageDriver;
+    "azure-blob"?: StorageDriver;
+  }) {
+    this.drivers = { s3, file, "azure-blob": azureBlob };
   }
 
   private driverFor(uri: string): StorageDriver {
     const scheme = getUriScheme(uri);
-    return this.drivers[scheme];
+    const driver = this.drivers[scheme];
+    if (!driver) {
+      throw new Error(
+        `Storage scheme "${scheme}" is not configured in this deployment (uri: ${uri})`,
+      );
+    }
+    return driver;
   }
 
   get(uri: string): Promise<Readable> {

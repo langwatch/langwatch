@@ -2,11 +2,12 @@
  * Content-addressed URI helpers for stored objects.
  *
  * Supported schemes:
- *   s3://   — objects stored in an S3-compatible bucket
- *   file:// — objects stored on the local filesystem
+ *   s3://         — objects stored in an S3-compatible bucket
+ *   file://       — objects stored on the local filesystem
+ *   azure-blob:// — objects stored in an Azure Blob Storage container
  */
 
-const SUPPORTED_SCHEMES = ["s3", "file"] as const;
+const SUPPORTED_SCHEMES = ["s3", "file", "azure-blob"] as const;
 type UriScheme = (typeof SUPPORTED_SCHEMES)[number];
 
 /**
@@ -44,6 +45,30 @@ export function mintFileUri({
 }): string {
   const normalizedRoot = root.startsWith("/") ? root : `/${root}`;
   return `file://${normalizedRoot}/${projectId}/${sha256}`;
+}
+
+/**
+ * Mints an Azure-Blob content-addressed URI.
+ *
+ * Azure has containers (the rough analogue of an S3 bucket) and blobs
+ * (the analogue of an S3 key). We encode the account name in the
+ * host position so a single deployment can address multiple storage
+ * accounts side-by-side if needed.
+ *
+ * @returns `azure-blob://{accountName}/{container}/{projectId}/{sha256}`
+ */
+export function mintAzureBlobUri({
+  accountName,
+  container,
+  projectId,
+  sha256,
+}: {
+  accountName: string;
+  container: string;
+  projectId: string;
+  sha256: string;
+}): string {
+  return `azure-blob://${accountName}/${container}/${projectId}/${sha256}`;
 }
 
 /**
