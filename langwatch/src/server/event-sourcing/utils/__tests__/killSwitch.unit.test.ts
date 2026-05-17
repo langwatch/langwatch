@@ -132,7 +132,10 @@ describe("isComponentDisabled", () => {
         componentType: "command",
         componentName: "test",
         tenantId: "tenant-1",
-        customKey: "my-custom-flag",
+        // Cast through `any` because the test deliberately uses a
+        // non-registered key to exercise the fallback path; production
+        // callers must pass a `FeatureFlagKey`.
+        customKey: "my-custom-flag" as any,
       });
 
       expect(ffs.isEnabled).toHaveBeenCalledWith(

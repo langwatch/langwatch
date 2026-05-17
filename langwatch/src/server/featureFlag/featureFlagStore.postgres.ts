@@ -15,10 +15,10 @@ import { TtlCache } from "../utils/ttlCache";
  * to match the existing kill-switch TTL: an operator flipping a flag
  * from the Ops UI sees it propagate cluster-wide within a minute, and
  * misses fall back to a single SELECT against postgres per pod per
- * minute per flag — orders of magnitude below the PostHog cost the
+ * minute per flag, orders of magnitude below the PostHog cost the
  * SYSTEM scope is replacing.
  *
- * "Not set" is a distinct state from "set to false" — registry defaults
+ * "Not set" is a distinct state from "set to false": registry defaults
  * apply only when there is no row. We cache the tri-state explicitly so
  * a cache hit for an absent row doesn't shadow a registry default with
  * `false`.
@@ -45,7 +45,7 @@ export class FeatureFlagStorePostgres {
   );
   // Per-pod in-process cache. Sits in front of Redis so the trace-
   // processing reactor (called per event) does not generate a Redis GET
-  // per event. Map + timestamp is plenty — no LRU bound because the key
+  // per event. Map + timestamp is plenty; no LRU bound because the key
   // space is bounded by the registry size.
   private readonly local = new Map<string, { value: boolean | null; expiresAt: number }>();
 
@@ -87,7 +87,7 @@ export class FeatureFlagStorePostgres {
   private writeLocal(key: string, value: boolean | null, now: number): void {
     this.local.set(key, { value, expiresAt: now + LOCAL_TTL_MS });
     if (this.local.size <= LOCAL_MAX_KEYS) return;
-    // Cap exceeded — first prune expired entries; if still over cap,
+    // Cap exceeded: first prune expired entries; if still over cap,
     // drop oldest insertions until we're back under.
     for (const [k, v] of this.local) {
       if (v.expiresAt <= now) this.local.delete(k);
@@ -103,8 +103,8 @@ export class FeatureFlagStorePostgres {
   }
 
   /**
-   * Operator write — invalidates the per-pod cache entry immediately so
-   * subsequent reads on this pod see the new value; other pods catch up
+   * Operator write: invalidates the per-pod cache entry immediately so
+   * subsequent reads on this pod see the new value. Other pods catch up
    * within `KILL_SWITCH_CACHE_TTL_MS` via natural TTL expiry. No pub/sub
    * channel by design (kept the Redis load minimal; the 60 s lag is
    * acceptable for kill switches and operator UI ops).
@@ -125,7 +125,7 @@ export class FeatureFlagStorePostgres {
 
   async clear(key: string, lastEditedBy: string | null): Promise<void> {
     // `deleteMany` is idempotent (no-op when the row is absent) and
-    // bubbles real DB errors up to the caller — unlike the previous
+    // bubbles real DB errors up to the caller, unlike the previous
     // `.delete(...).catch(() => undefined)` which silently swallowed
     // write failures and made the Ops UI report success on failure.
     await prisma.featureFlag.deleteMany({ where: { key } });
@@ -136,8 +136,8 @@ export class FeatureFlagStorePostgres {
 
   /**
    * Bulk read for the Ops UI listing. Returns every row currently in
-   * postgres regardless of registry status — operators need to see
-   * orphaned rows from removed flags so they can clean them up.
+   * postgres regardless of registry status, so operators can see
+   * orphaned rows from removed flags and clean them up.
    */
   async listAll(): Promise<
     Array<{ key: string; enabled: boolean; lastEditedBy: string | null; updatedAt: Date }>

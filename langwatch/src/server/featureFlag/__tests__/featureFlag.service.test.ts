@@ -19,8 +19,8 @@ vi.mock("../featureFlagService.memory", () => ({
   },
 }));
 
-// Store stub — registry-aware paths are exercised in the resolver
-// suite. Here we just need an inert dependency so the constructor
+// Store stub. Registry-aware paths are exercised in the resolver
+// suite; here we just need an inert dependency so the constructor
 // doesn't reach into the real Prisma client.
 function buildNoopStore(): FeatureFlagStorePostgres {
   return {
@@ -59,7 +59,7 @@ describe("FeatureFlagService", () => {
           store: buildNoopStore(),
         });
 
-        const result = await service.isEnabled("some-flag", "user-1", false);
+        const result = await service.isEnabled("some-flag" as never, "user-1", false);
 
         expect(result).toBe(true);
         expect(legacy.isEnabled).toHaveBeenCalledWith(
@@ -78,7 +78,7 @@ describe("FeatureFlagService", () => {
         });
 
         const options = { projectId: "proj-123" };
-        await service.isEnabled("some-flag", "user-1", true, options);
+        await service.isEnabled("some-flag" as never, "user-1", true, options);
 
         expect(legacy.isEnabled).toHaveBeenCalledWith(
           "some-flag",
@@ -96,7 +96,7 @@ describe("FeatureFlagService", () => {
         });
 
         const options = { organizationId: "org-456" };
-        await service.isEnabled("some-flag", "user-1", false, options);
+        await service.isEnabled("some-flag" as never, "user-1", false, options);
 
         expect(legacy.isEnabled).toHaveBeenCalledWith(
           "some-flag",
@@ -124,7 +124,7 @@ describe("FeatureFlagService", () => {
           const service = FeatureFlagService.create();
 
           const result = await service.isEnabled(
-            "release_ui_simulations_menu_enabled",
+            "release_ui_simulations_menu_enabled" as never,
             "user-123",
             false,
           );
@@ -139,7 +139,7 @@ describe("FeatureFlagService", () => {
           const service = FeatureFlagService.create();
 
           const result = await service.isEnabled(
-            "release_ui_simulations_menu_enabled",
+            "release_ui_simulations_menu_enabled" as never,
             "user-123",
             true,
           );
@@ -168,7 +168,7 @@ describe("FeatureFlagService", () => {
           store: buildNoopStore(),
         });
 
-        const result = await service.isEnabled("some_flag", "user-1", false);
+        const result = await service.isEnabled("some_flag" as never, "user-1", false);
 
         expect(result).toBe(true);
         expect(legacy.isEnabled).not.toHaveBeenCalled();
@@ -182,7 +182,7 @@ describe("FeatureFlagService", () => {
           store: buildNoopStore(),
         });
 
-        const result = await service.isEnabled("different_flag", "u", false);
+        const result = await service.isEnabled("different_flag" as never, "u", false);
 
         expect(result).toBe(false);
         expect(legacy.isEnabled).toHaveBeenCalled();
@@ -196,7 +196,7 @@ describe("FeatureFlagService", () => {
           store: buildNoopStore(),
         });
 
-        const result = await service.isEnabled("spaced_flag", "u", false);
+        const result = await service.isEnabled("spaced_flag" as never, "u", false);
 
         expect(result).toBe(true);
       });
@@ -226,7 +226,7 @@ describe("FeatureFlagService", () => {
         const service = FeatureFlagService.create();
 
         const result = await service.isEnabled(
-          "release_ui_simulations_menu_enabled",
+          "release_ui_simulations_menu_enabled" as never,
           "u",
           true,
         );

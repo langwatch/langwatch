@@ -1,17 +1,27 @@
 import type { createLogger } from "~/utils/logger/server";
 import { KILL_SWITCH_CACHE_TTL_MS } from "../../featureFlag/constants";
+import type {
+  EsKillSwitchKey,
+  FeatureFlagKey,
+} from "../../featureFlag/registry";
 import type { FeatureFlagServiceInterface } from "../../featureFlag/types";
 import type { AggregateType } from "../domain/aggregateType";
+
+export type KillSwitchComponentType = "projection" | "mapProjection" | "command";
 
 /**
  * Generates a feature flag key for a component kill switch.
  * Pattern: es-{aggregateType}-{componentType}-{componentName}-killswitch
+ *
+ * Return type is the typed `EsKillSwitchKey` template literal so callers
+ * passing the result to `featureFlagService.isEnabled` satisfy the
+ * `FeatureFlagKey` constraint without a cast.
  */
 export function generateKillSwitchKey(
   aggregateType: AggregateType,
-  componentType: "projection" | "mapProjection" | "command",
+  componentType: KillSwitchComponentType,
   componentName: string,
-): string {
+): EsKillSwitchKey {
   return `es-${aggregateType}-${componentType}-${componentName}-killswitch`;
 }
 
@@ -30,17 +40,17 @@ export async function isComponentDisabled({
 }: {
   featureFlagService: FeatureFlagServiceInterface | undefined;
   aggregateType: AggregateType;
-  componentType: "projection" | "mapProjection" | "command";
+  componentType: KillSwitchComponentType;
   componentName: string;
   tenantId: string;
-  customKey?: string;
+  customKey?: FeatureFlagKey;
   logger?: ReturnType<typeof createLogger>;
 }): Promise<boolean> {
   if (!featureFlagService) {
     return false;
   }
 
-  const flagKey =
+  const flagKey: FeatureFlagKey =
     customKey ?? generateKillSwitchKey(aggregateType, componentType, componentName);
 
   try {

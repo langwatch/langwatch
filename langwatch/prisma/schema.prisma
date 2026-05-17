@@ -1809,20 +1809,20 @@ model GatewayCacheRule {
     @@index([organizationId, enabled, priority])
 }
 
-// FeatureFlag — postgres-backed value for one registered flag, used to
-// keep system-scoped kill switches and pipeline toggles off PostHog (see
-// specs/ops/internal-feature-flags.feature). The in-code registry holds
-// metadata (scope, description, default); this table just holds the
-// current operator-set value. Absence of a row means "use the registry
-// default".
+// FeatureFlag stores the postgres-backed value for one registered
+// flag, used to keep system-scoped kill switches and pipeline toggles
+// off PostHog (see specs/ops/internal-feature-flags.feature). The
+// in-code registry holds metadata (scope, description, default); this
+// table just holds the current operator-set value. Absence of a row
+// means "use the registry default".
 //
-// One row per flag key. No per-tenant overrides — system kill switches
+// One row per flag key. No per-tenant overrides: system kill switches
 // flip cluster-wide; PostHog still owns user/A-B targeting for product
 // flags via the PRODUCT scope path in featureFlagService.
 model FeatureFlag {
     key          String   @id
     enabled      Boolean
-    // Last operator to flip the value. Free-form string (user id) — no FK
+    // Last operator to flip the value. Free-form string (user id), no FK
     // because the same table serves SaaS and self-hosted installs where
     // the User table is not guaranteed to share lifecycle with this row.
     lastEditedBy String?

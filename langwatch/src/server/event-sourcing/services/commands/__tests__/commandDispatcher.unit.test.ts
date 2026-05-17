@@ -321,7 +321,9 @@ describe("processCommand", () => {
 
     it("forwards killSwitchOptions.customKey when provided", async () => {
       const params = createDefaultParams({
-        killSwitchOptions: { customKey: "my-custom-key" },
+        // Test-only: arbitrary string accepted via cast because the
+        // FeatureFlagKey constraint lives on production call sites.
+        killSwitchOptions: { customKey: "my-custom-key" as any },
       });
 
       await processCommand(params);

@@ -35,7 +35,7 @@ interface FlagRow {
 export function FeatureFlagsContent() {
   const { scope } = useOpsPermission();
   // OpsScope is { kind: "none" | "platform" }. Mutating endpoints are
-  // gated server-side by ops:manage — we keep the UI in sync by
+  // gated server-side by ops:manage, so we keep the UI in sync by
   // disabling the toggle for non-platform users.
   const canManage = scope?.kind === "platform";
   const publicEnv = usePublicEnv();
@@ -96,14 +96,14 @@ export function FeatureFlagsContent() {
           from this LangWatch postgres database. They never round-trip to
           PostHog, so flipping them is fast and free.{" "}
           {isSaas
-            ? "Product-scoped flags still resolve through PostHog for user targeting and A/B tests — postgres values here only apply as an emergency override."
+            ? "Product-scoped flags still resolve through PostHog for user targeting and A/B tests; postgres values here only apply as an emergency override."
             : "Product-scoped flags fall back to this postgres store when PostHog is not configured."}
         </Text>
       </Box>
 
       <ScopeSection
         heading="System"
-        description="Backend kill switches and pipeline toggles. Always resolved from postgres / env / registry default — PostHog is never consulted."
+        description="Backend kill switches and pipeline toggles. Always resolved from postgres, env, or registry default. PostHog is never consulted."
         rows={grouped.system}
         canManage={canManage}
         isSaas={isSaas}
@@ -121,8 +121,8 @@ export function FeatureFlagsContent() {
         heading="Product"
         description={
           isSaas
-            ? "UI features and A/B tests. Source of truth is PostHog — postgres value here is an emergency override only."
-            : "UI features. Self-hosted install: postgres value here is the source of truth (PostHog not configured)."
+            ? "UI features and A/B tests. Source of truth is PostHog; postgres value here is an emergency override only."
+            : "UI features. On this self-hosted install, the postgres value here is the source of truth."
         }
         rows={grouped.product}
         canManage={canManage}
@@ -284,7 +284,7 @@ function FlagRowView({
             </Text>
             <ScopeBadge scope={row.scope} />
             {showProductWarning && (
-              <Tooltip content="PRODUCT flags normally resolve through PostHog. Setting a postgres value here will override PostHog for every caller — emergency use only.">
+              <Tooltip content="PRODUCT flags normally resolve through PostHog. Setting a postgres value here will override PostHog for every caller; emergency use only.">
                 <Badge colorPalette="yellow" size="sm" variant="subtle">
                   PostHog managed
                 </Badge>
@@ -326,7 +326,7 @@ function FlagRowView({
             <Text fontSize="xs">
               {row.updatedAt
                 ? new Date(row.updatedAt).toLocaleString()
-                : "—"}
+                : ""}
             </Text>
             <HStack gap={2}>
               <Text fontSize="xs" color="fg.muted">

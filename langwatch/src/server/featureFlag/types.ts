@@ -15,11 +15,15 @@ export interface FeatureFlagOptions {
 
 /**
  * Common interface for feature flag services.
+ *
+ * `flagKey` is intentionally typed as `string` here rather than
+ * `FeatureFlagKey`: this interface is also implemented by the legacy
+ * PostHog and memory backends which must accept arbitrary keys for
+ * back-compat with flags that pre-date the registry. The public
+ * `FeatureFlagService.isEnabled` overload below tightens the key type
+ * to `FeatureFlagKey` so new call sites get the type guarantee.
  */
 export interface FeatureFlagServiceInterface {
-  /**
-   * Check if a feature flag is enabled for a given user or tenant/project.
-   */
   isEnabled(
     flagKey: string,
     distinctId: string,

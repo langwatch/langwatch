@@ -7,6 +7,7 @@ import {
   FeatureFlagStorePostgres,
   getFeatureFlagStore,
 } from "./featureFlagStore.postgres";
+import type { FeatureFlagKey } from "./registry";
 import { resolveFlagDefinition } from "./registry";
 import type { FeatureFlagOptions, FeatureFlagServiceInterface } from "./types";
 
@@ -53,6 +54,20 @@ export class FeatureFlagService implements FeatureFlagServiceInterface {
     return new FeatureFlagService();
   }
 
+  /**
+   * Type-checked overload. `flagKey` is constrained to the union of
+   * registered flag keys plus the `es-*-killswitch` family template
+   * literal, so unregistered string literals fail at compile time.
+   * Internally still accepts arbitrary strings via the implementation
+   * signature so the legacy PostHog and memory backends keep working
+   * with flags that pre-date the registry.
+   */
+  async isEnabled(
+    flagKey: FeatureFlagKey,
+    distinctId: string,
+    defaultValue?: boolean,
+    options?: FeatureFlagOptions,
+  ): Promise<boolean>;
   async isEnabled(
     flagKey: string,
     distinctId: string,

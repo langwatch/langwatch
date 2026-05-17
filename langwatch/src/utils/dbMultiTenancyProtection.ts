@@ -111,7 +111,7 @@ const EXEMPT_MODELS = [
   "ModelProviderScope",
   /**
    * FeatureFlag is cluster-wide, not project-scoped. One row per flag
-   * key — operators flip them from /ops/feature-flags, applying to the
+   * key; operators flip them from /ops/feature-flags, applying to the
    * whole install. No projectId column by design; this is the table
    * that keeps system-scoped kill switches off PostHog.
    */

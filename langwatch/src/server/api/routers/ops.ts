@@ -6,13 +6,17 @@ import { checkOpsPermission } from "~/server/api/rbac";
 import { getApp } from "~/server/app-layer/app";
 import { DASHBOARD_EVENT } from "~/server/app-layer/ops/metrics-collector";
 import type { DashboardData } from "~/server/app-layer/ops/types";
-import { getProjectionMetadata, getReactorMetadata } from "~/server/event-sourcing/pipelineRegistry";
+import {
+  getKillSwitchDescriptors,
+  getProjectionMetadata,
+  getReactorMetadata,
+} from "~/server/event-sourcing/pipelineRegistry";
 import { AnomalyStateStore } from "~/server/observability/anomalyState";
 import { connection } from "~/server/redis";
 import {
   getFeatureFlagStore,
-  listExplicitFlags,
-  listFamilies,
+  listFeatureFlagFamilies,
+  listFeatureFlags,
   resolveFlagDefinition,
 } from "~/server/featureFlag";
 import { checkFlagEnvOverride } from "~/server/featureFlag/envOverride";
@@ -653,7 +657,7 @@ export const opsRouter = createTRPCRouter({
    * (registry default vs postgres override vs env override) before
    * flipping anything.
    *
-   * Read-only — no PostHog calls happen on this path either, so opening
+   * Read-only: no PostHog calls happen on this path either, so opening
    * the page does not cost a flag call.
    */
   listFeatureFlags: protectedProcedure
@@ -661,8 +665,8 @@ export const opsRouter = createTRPCRouter({
     .query(async () => {
       const store = getFeatureFlagStore();
       const stored = await store.listAll();
-      const explicit = listExplicitFlags();
-      const families = listFamilies();
+      const explicit = listFeatureFlags();
+      const families = listFeatureFlagFamilies();
       const explicitKeys = new Set(explicit.map((e) => e.key));
 
       const explicitRows = explicit.map((def) => {
@@ -684,11 +688,47 @@ export const opsRouter = createTRPCRouter({
         };
       });
 
-      // Postgres rows that don't match an explicit registry entry. They
-      // belong either to a family (e.g. the `es-` killswitch family) or
-      // to a removed flag. Operators see both so they can clean up.
-      const familyRows = stored
-        .filter((s) => !explicitKeys.has(s.key))
+      // Pre-seed every generated kill-switch key from the live pipeline
+      // graph. Operators see the full set of toggleable es-* switches
+      // even before anyone has flipped them in postgres, which was the
+      // whole point of moving them off PostHog: discoverability.
+      const generatedKillSwitches = getKillSwitchDescriptors();
+
+      // Merge: combine generated descriptors with any postgres rows
+      // that don't have an explicit registry entry. Postgres value wins
+      // the row but the descriptor provides the metadata.
+      const familyKeysSeen = new Set<string>();
+      const familyRows = generatedKillSwitches.map((desc) => {
+        familyKeysSeen.add(desc.key);
+        const row = stored.find((s) => s.key === desc.key);
+        const def = resolveFlagDefinition(desc.key);
+        const envOverride = checkFlagEnvOverride(desc.key, def?.legacyEnvVar);
+        const effective =
+          envOverride ?? row?.enabled ?? def?.defaultValue ?? false;
+        return {
+          key: desc.key,
+          scope: def?.scope ?? "SYSTEM",
+          defaultValue: def?.defaultValue ?? false,
+          description: def?.description
+            ? `${def.description} (${desc.pipelineName}: ${desc.componentType} ${desc.componentName})`
+            : `Pipeline ${desc.pipelineName} ${desc.componentType} ${desc.componentName}.`,
+          family: def?.family ?? null,
+          storedValue: row?.enabled ?? null,
+          envOverride: envOverride ?? null,
+          effective,
+          lastEditedBy: row?.lastEditedBy ?? null,
+          updatedAt: row?.updatedAt ?? null,
+        };
+      });
+
+      // Stored postgres rows that match neither an explicit registry
+      // entry nor a generated descriptor. Either orphans from removed
+      // pipeline components or rows for keys we no longer recognize;
+      // surface them so operators can clean up.
+      const orphanRows = stored
+        .filter(
+          (s) => !explicitKeys.has(s.key) && !familyKeysSeen.has(s.key),
+        )
         .map((s) => {
           const def = resolveFlagDefinition(s.key);
           const envOverride = checkFlagEnvOverride(
@@ -712,7 +752,7 @@ export const opsRouter = createTRPCRouter({
         });
 
       return {
-        flags: [...explicitRows, ...familyRows],
+        flags: [...explicitRows, ...familyRows, ...orphanRows],
         families: families.map((f) => ({
           family: f.family,
           keyPrefix: f.keyPrefix,
@@ -732,7 +772,7 @@ export const opsRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      // Only allow writes for keys the code registry recognizes —
+      // Only allow writes for keys the code registry recognizes,
       // either as an explicit flag or via a family prefix. Stops typos
       // from creating orphan rows that drift forever after the flag
       // they were meant for has been renamed.

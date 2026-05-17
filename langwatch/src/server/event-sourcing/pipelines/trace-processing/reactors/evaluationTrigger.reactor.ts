@@ -94,7 +94,7 @@ export function createEvaluationTriggerReactor(
       } else if (guardDisabled) {
         logger.warn(
           { tenantId, observedTraceId: traceId },
-          "ops_es_causality_loop_guard_disabled is on — loop guard bypassed",
+          "ops_es_causality_loop_guard_disabled is on, loop guard bypassed",
         );
       }
 

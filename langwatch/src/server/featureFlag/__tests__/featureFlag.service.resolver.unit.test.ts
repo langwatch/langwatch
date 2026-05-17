@@ -4,7 +4,7 @@
  * Resolver-level coverage for the registry-driven feature flag service.
  *
  * Uses an in-memory store double instead of postgres because the only
- * Prisma surface area is a single `findUnique` and `upsert` — Prisma
+ * Prisma surface area is a single `findUnique` and `upsert`, so Prisma
  * itself doesn't need re-testing. The interesting behaviour is the
  * resolver's branching across env / store / legacy / registry-default,
  * and especially the load-bearing invariant that SYSTEM-scoped flags
@@ -52,7 +52,7 @@ function buildService() {
   const store = new InMemoryStore();
   const service = new FeatureFlagService({
     legacy,
-    // Store double — same shape as FeatureFlagStorePostgres; we only
+    // Store double matching FeatureFlagStorePostgres shape; we only
     // exercise the resolver path so the additional methods are unused.
     store: store as unknown as FeatureFlagStorePostgres,
   });
@@ -175,8 +175,11 @@ describe("FeatureFlagService", () => {
       (legacy.isEnabled as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
         true,
       );
+      // Cast: deliberately a non-registered flag to assert the
+      // legacy-fallback path. Production callers can't reach this branch
+      // because the FeatureFlagKey signature wouldn't accept the key.
       const enabled = await service.isEnabled(
-        UNREGISTERED_FLAG,
+        UNREGISTERED_FLAG as never,
         "user-1",
         false,
       );
