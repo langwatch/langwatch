@@ -1058,9 +1058,13 @@ export class ClickHouseTraceService {
     const attrs = row.SpanAttributes;
     const messages: PromptStudioSpanResult["messages"] = [];
 
-    // Extract input messages from gen_ai.prompt or langwatch.input
-    // Note: langwatch.input includes system messages; gen_ai.input.messages does not
+    // Extract input messages from gen_ai.input.messages (OTel GenAI
+    // semantic convention — what newer SDKs emit, including the system
+    // message), or fall back to legacy gen_ai.prompt / langwatch.input.
+    // Without gen_ai.input.messages the system prompt was being dropped
+    // from the playground form on third-party-traced spans.
     const inputStr =
+      (attrs["gen_ai.input.messages"] as string) ??
       (attrs["gen_ai.prompt"] as string) ??
       (attrs["langwatch.input"] as string);
     if (inputStr) {
