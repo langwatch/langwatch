@@ -224,4 +224,55 @@ describe("<MediaPart/>", () => {
       expect(screen.queryByTestId("media-part-missing")).not.toBeInTheDocument();
     });
   });
+
+  describe("when the browser fires loadeddata on a URL-shape audio part", () => {
+    /** @scenario "MediaPart audio playback reports a non-zero duration once the browser has decoded the media" */
+    it("the <audio> element exposes controls and a non-zero duration so the play button is enabled", async () => {
+      render(
+        <MediaPart
+          part={{
+            type: "audio",
+            source: {
+              type: "url",
+              value: "/api/files/playable-audio-id",
+              mimeType: "audio/mp3",
+            },
+          }}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      const audio = screen.getByTestId("media-part-audio") as HTMLAudioElement;
+
+      // jsdom does not actually decode media, so the browser would fire
+      // `loadeddata` once it has the first sample buffer. Simulate that
+      // event and inject a realistic duration value on the element — both
+      // are what a real browser hands to MediaPart when the bytes load.
+      Object.defineProperty(audio, "duration", {
+        configurable: true,
+        get: () => 12.5, // 12.5 seconds — any positive value is enough for AC39
+      });
+      audio.dispatchEvent(new Event("loadeddata"));
+
+      // The element must be the same `<audio>` (no transition to the
+      // error placeholder on the happy path).
+      await waitFor(() => {
+        expect(screen.getByTestId("media-part-audio")).toBeInTheDocument();
+      });
+
+      // Duration is positive — the AC39 acceptance for "player duration
+      // is greater than zero".
+      expect(audio.duration).toBeGreaterThan(0);
+
+      // The native browser play button is exposed through the `controls`
+      // attribute. With duration > 0 and `controls` on, the browser
+      // enables the play button — there's no extra MediaPart-side gating
+      // to assert beyond these two.
+      expect(audio).toHaveAttribute("controls");
+
+      // The "missing" / "error" placeholders must NOT appear.
+      expect(screen.queryByTestId("media-part-missing")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("media-part-error")).not.toBeInTheDocument();
+    });
+  });
 });
