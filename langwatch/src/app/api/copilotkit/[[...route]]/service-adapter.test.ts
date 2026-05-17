@@ -340,29 +340,71 @@ describe("PromptStudioAdapter", () => {
       expect(envelope.payload.inputs.input).toBe("test7");
     });
 
-    it("appends the live turn normally when the template has no {{input}} user-slot", async () => {
+    it("absorbs the live turn when the template references {{input}} only in the system message", async () => {
+      // 2026-05-17 dogfood (rchaves on a 'Messages mode' prompt): the
+      // template's USER message is plain text ('answer it') and only
+      // the SYSTEM contains `{{input}}`. The live chat must still be
+      // absorbed (bound to inputs.input) and NOT also appended as a
+      // duplicate user turn — Python parity is "absorb when {{input}}
+      // is ANYWHERE in the template", not "only when a user template
+      // contains it".
       const { eventSource } = createMockEventSource();
       await runProcess(
         adapter,
         buildRequestWithChat({
           additionalParams: buildAdditionalParams({
             messages: [
-              // system references {{input}} for var binding, but there
-              // is NO template user turn to absorb the live message,
-              // so it must still appear as its own turn.
-              { role: "system", content: "Echo {{input}} back" },
+              { role: "system", content: "Reply about {{input}}" },
+              { role: "user", content: "answer it" },
             ],
           }),
-          chatMessages: [{ role: "user", content: "test7" }],
+          chatMessages: [{ role: "user", content: "how much is 2+3" }],
           eventSource,
         }),
       );
 
       const envelope = lastPostedEvent();
       const sent: { role: string; content: string }[] = envelope.payload.inputs.messages;
-      expect(sent).toEqual([{ role: "user", content: "test7" }]);
-      // Still bind input so the system's {{input}} resolves.
-      expect(envelope.payload.inputs.input).toBe("test7");
+      // ONE user turn — the template's explicit "answer it". The
+      // live "how much is 2+3" is absorbed into inputs.input, not
+      // appended as a second user turn.
+      const userTurns = sent.filter((m) => m.role === "user");
+      expect(userTurns).toEqual([{ role: "user", content: "answer it" }]);
+      // The live chat is the value for {{input}} resolution.
+      expect(envelope.payload.inputs.input).toBe("how much is 2+3");
+    });
+
+    it("appends the live turn normally when the template doesn't reference {{input}} anywhere", async () => {
+      // Negative-direction guard for the absorb heuristic. When NO
+      // template message (system or user) references `{{input}}`,
+      // the live chat turn must still appear as its own user
+      // message — otherwise users in 'Messages mode' with no
+      // placeholder would have their chat silently dropped.
+      const { eventSource } = createMockEventSource();
+      await runProcess(
+        adapter,
+        buildRequestWithChat({
+          additionalParams: buildAdditionalParams({
+            messages: [
+              { role: "system", content: "Be terse" },
+              { role: "user", content: "answer it" },
+            ],
+          }),
+          chatMessages: [{ role: "user", content: "how much is 2+3" }],
+          eventSource,
+        }),
+      );
+
+      const envelope = lastPostedEvent();
+      const sent: { role: string; content: string }[] = envelope.payload.inputs.messages;
+      expect(sent).toEqual([
+        { role: "user", content: "answer it" },
+        { role: "user", content: "how much is 2+3" },
+      ]);
+      // No `{{input}}` placeholder anywhere → no need to bind, but
+      // bind still happens via the falsy-input fallback (kept for
+      // back-compat with prompts that consume `input` indirectly).
+      expect(envelope.payload.inputs.input).toBe("how much is 2+3");
     });
 
     it("does not override an explicit `input` value from the Variables panel", async () => {
