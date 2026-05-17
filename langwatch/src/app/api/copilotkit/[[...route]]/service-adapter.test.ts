@@ -385,6 +385,53 @@ describe("PromptStudioAdapter", () => {
       const envelope = lastPostedEvent();
       expect(envelope.payload.inputs.input).toBe("explicit-value");
     });
+
+    // 2026-05-17 prod regression: PromptStudioAdapter shipped to prod
+    // skipping the bind because variablesDict.input was DEFINED but
+    // empty-string. The saved-prompt template declares `input` in
+    // configData.inputs, so the Variables tab UI always emits a row
+    // `{identifier:"input", value:""}` even when the user typed nothing
+    // — strict `=== undefined` missed that and left `{{input}}` empty
+    // (then the absorb step dropped the live "test7" turn for good
+    // measure, so the LLM only saw the system message and rambled
+    // about playground variables). The earlier 5 unit tests passed
+    // because they either omitted `input` from variables entirely or
+    // supplied an explicit non-empty value — neither matches the
+    // real-form "declared with empty default" shape that ships from
+    // the UI. Falsy-check now treats missing OR empty as "panel not
+    // set" so the live turn correctly fills the placeholder.
+    it("binds the live user message when Variables panel has `input` declared with empty-string default", async () => {
+      const { eventSource } = createMockEventSource();
+      await runProcess(
+        adapter,
+        buildRequestWithChat({
+          additionalParams: buildAdditionalParams({
+            messages: [
+              { role: "system", content: "Reply using {{input}} verbatim" },
+              { role: "user", content: "{{input}}" },
+            ],
+            // This is the EXACT shape PromptPlaygroundChat ships from
+            // the UI when the user hasn't typed into the Variables tab:
+            // the row exists (because configData.inputs declares it),
+            // but its `value` is the empty string. Pre-fix
+            // `variablesDict.input === undefined` was false → bind
+            // skipped → `{{input}}` resolved to ""  → "test7" lost
+            // entirely (absorb dropped the live turn for the template
+            // slot that then rendered to empty).
+            variables: [{ identifier: "input", value: "" }],
+          }),
+          chatMessages: [{ role: "user", content: "test7" }],
+          eventSource,
+        }),
+      );
+
+      const envelope = lastPostedEvent();
+      // CORE ASSERTION — bind happened despite the declared-but-empty
+      // panel row. This is the field nlpgo reads to interpolate the
+      // template's `{{input}}` placeholders against, both in the
+      // system and the user-message slot.
+      expect(envelope.payload.inputs.input).toBe("test7");
+    });
   });
 
   describe("when forwardedParameters.model contains malformed JSON", () => {

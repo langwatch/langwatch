@@ -159,13 +159,25 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
       // Bind the latest live user message's content to the `input`
       // variable so saved-prompt `{{input}}` placeholders (in system
       // OR template user messages) resolve to what the user actually
-      // typed. An explicit value from the Variables panel always
-      // wins — typing-then-overriding is the user's choice.
+      // typed. An explicit non-empty value from the Variables panel
+      // always wins — typing-then-overriding is the user's choice.
+      //
+      // Falsy-check (not `=== undefined`): the saved-prompt template
+      // declares `input` as a variable in its `inputs` list, so the
+      // form's variablesDict ALWAYS carries an `input` key even when
+      // the user hasn't typed anything into the Variables panel — its
+      // default is empty-string. A strict-undefined check missed that
+      // case and left `input` empty, causing `{{input}}` to render to
+      // "" AND the live "test7" turn to be dropped by the absorb step
+      // below — exactly the 2026-05-17 prod regression. Treating
+      // missing/empty as "panel not set" preserves the user's intent:
+      // typing an explicit non-empty value still wins; not typing
+      // anything correctly falls back to the chat message.
       const lastLiveUserContent =
         lastLiveUserMsg && typeof (lastLiveUserMsg as any).content === "string"
           ? ((lastLiveUserMsg as any).content as string)
           : undefined;
-      if (lastLiveUserContent !== undefined && variablesDict.input === undefined) {
+      if (lastLiveUserContent !== undefined && !variablesDict.input) {
         variablesDict.input = lastLiveUserContent;
       }
 
