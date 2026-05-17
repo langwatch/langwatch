@@ -79,11 +79,23 @@ vi.mock("~/server/metrics", () => ({
   storedObjectReadFailureCounter: { inc: vi.fn() },
 }));
 
-// env mock — no S3 bucket so URI defaults to file://
+// env mock — no S3 bucket so URI defaults to file://. LANGWATCH_LOCAL_STORAGE_PATH
+// is exposed via a getter that reads process.env at lookup time so withTmpStorage()
+// (which mutates process.env per-test) actually takes effect when the service
+// reads `env.LANGWATCH_LOCAL_STORAGE_PATH`. Without this, the service would
+// fall back to the hardcoded /var/lib/langwatch default and EACCES on CI.
 vi.mock("~/env.mjs", () => ({
-  env: {
-    S3_BUCKET_NAME: "",
-  },
+  env: new Proxy(
+    { S3_BUCKET_NAME: "" },
+    {
+      get(target, prop, receiver) {
+        if (prop === "LANGWATCH_LOCAL_STORAGE_PATH") {
+          return process.env.LANGWATCH_LOCAL_STORAGE_PATH;
+        }
+        return Reflect.get(target, prop, receiver);
+      },
+    },
+  ),
 }));
 
 // mintStorageUri queries the BYOC dataplane config; no Prisma is wired in

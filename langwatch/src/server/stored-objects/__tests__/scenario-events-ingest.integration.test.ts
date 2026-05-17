@@ -25,6 +25,10 @@ import { projectFactory } from "~/factories/project.factory";
 // ---------------------------------------------------------------------------
 
 // Mock heavy app-layer dependencies so the handler can run without Redis etc.
+// `usage.checkLimit` is consumed by `blockTraceUsageExceededMiddleware` on
+// the `/*` chain before the POST handler; without it the middleware throws
+// "Cannot read properties of undefined (reading 'checkLimit')" and the
+// onError handler turns that into a 500 — masking the route logic entirely.
 vi.mock("~/server/app-layer/app", () => ({
   getApp: () => ({
     simulations: {
@@ -38,6 +42,15 @@ vi.mock("~/server/app-layer/app", () => ({
     },
     broadcast: {
       broadcastToTenantRateLimited: vi.fn().mockResolvedValue(undefined),
+    },
+    usage: {
+      checkLimit: vi.fn().mockResolvedValue({ exceeded: false }),
+    },
+    planProvider: {
+      getActivePlan: vi.fn().mockResolvedValue({ name: "free" }),
+    },
+    usageLimits: {
+      notifyPlanLimitReached: vi.fn().mockResolvedValue(undefined),
     },
   }),
 }));

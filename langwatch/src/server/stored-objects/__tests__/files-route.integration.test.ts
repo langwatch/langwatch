@@ -31,8 +31,16 @@ import { projectFactory } from "~/factories/project.factory";
 // project-scoped getById per test. The lookup helper lives in its own
 // module to keep the unsafe shared-client surface separated from
 // project-scoped repository CRUD; mock it independently.
-const mockResolveOwnerProject = vi.fn();
-const mockGetById = vi.fn();
+//
+// vi.mock factories are hoisted above all top-level `const`s, so referring
+// to a plain `const fn = vi.fn()` from inside the factory throws
+// `Cannot access ... before initialization` at module-load time. vi.hoisted
+// runs in the same hoisted phase, so the mocks below can capture the same
+// fn reference that the test body uses to drive behavior.
+const { mockResolveOwnerProject, mockGetById } = vi.hoisted(() => ({
+  mockResolveOwnerProject: vi.fn(),
+  mockGetById: vi.fn(),
+}));
 
 vi.mock("~/server/stored-objects/stored-objects-cross-tenant-lookup", () => ({
   resolveStoredObjectOwner: mockResolveOwnerProject,
@@ -197,13 +205,17 @@ describe("GET /api/files/:id", () => {
 
   describe("when the row exists and storage has the bytes (case 5)", () => {
     /** @scenario "GET /api/files/:id streams the bytes for an existing row" */
-    it("streams the bytes with correct Content-Type and 200 status", async () => {
+    it("streams the bytes with a safe Content-Type and 200 status", async () => {
+      // image/png is on the safeMediaType allowlist — it's preserved as-is.
+      // Anything outside the allowlist (text/*, scripts, html, json...) is
+      // forced to application/octet-stream by the security policy that
+      // landed in this PR to close the stored-XSS surface on /api/files/:id.
       const fileId = `stored-${nanoid(8)}`;
       const content = "hello-world-bytes";
       const row = makeStoredObjectRow({
         id: fileId,
         project_id: projectAId,
-        media_type: "text/plain",
+        media_type: "image/png",
         size_bytes: Buffer.from(content).length,
       });
 
@@ -220,7 +232,7 @@ describe("GET /api/files/:id", () => {
       });
 
       expect(res.status).toBe(200);
-      expect(res.headers.get("Content-Type")).toBe("text/plain");
+      expect(res.headers.get("Content-Type")).toBe("image/png");
       expect(res.headers.get("Content-Length")).toBe(String(Buffer.from(content).length));
 
       const body = await res.text();
