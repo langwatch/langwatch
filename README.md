@@ -161,7 +161,12 @@ Please read our [Contribution Guidelines](https://github.com/langwatch/langwatch
 
 ## ✍️ License
 
-Please read our [LICENSE.md](/LICENSE.md) file.
+LangWatch is dual-licensed:
+
+- **Apache 2.0** for everything outside `langwatch/ee/`. See [LICENSE.md](/LICENSE.md).
+- **LangWatch Enterprise License** for `langwatch/ee/` (SCIM, audit logs, billing and plan management, and similar enterprise modules). Free for local development, evaluation, and testing; production use requires a commercial license. See [langwatch/ee/LICENSE.md](/langwatch/ee/LICENSE.md).
+
+The published SDKs (`typescript-sdk/`, `python-sdk/`) and the embeddable MCP server (`mcp-server/`) ship under the MIT License.
 
 ## 👮‍♀️ Security + Compliance
 
