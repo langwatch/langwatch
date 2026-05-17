@@ -70,8 +70,8 @@ Feature: Prompt spans — unsaved/applied prompt version (draft) carries the bas
   Scenario: trace drawer surfaces the draft state on the "Open in Prompts" affordance
     Given a draft execution has produced a Prompt.compile span with "langwatch.prompt.draft" = true
     When I open the trace details drawer for the resulting LLM span
-    Then the "Open in Prompts" menu shows "Open support-router:6 (unsaved edits)"
-    And clicking it opens the playground at version 6 of "support-router"
+    Then the prompt panel renders an "unsaved edits" indicator alongside the version chip
+    And the "Open prompt" button still resolves to the base reference (handle "support-router", version 6)
     And the Variables panel is pre-filled with the variables captured on the compile span
     # The TS-side reload preference ("prefer trace messages over saved-version messages when draft=true")
     # is owned by a follow-up trace-UI spec, not by nlpgo. Only the draft=true emission contract lives here.
