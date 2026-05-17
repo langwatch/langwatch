@@ -172,20 +172,9 @@ export const ModelSelector = React.memo(function ModelSelector({
   const { selectOptions, groupedByProvider, isEmpty } =
     useModelSelectionOptions(options, model, mode);
 
-  // Honest empty state: when the project has zero enabled providers
-  // (or zero models of the requested mode), render a guided callout
-  // instead of the dropdown. The prior behaviour was to render the
-  // System fallback string ("openai/gpt-5.2") in gray, which looked
-  // like a real selection but errored at runtime.
-  if (isEmpty) {
-    return (
-      <NoModelsConfiguredCallout
-        size={size}
-        forFeatureLabel={forFeatureLabel}
-      />
-    );
-  }
-
+  // ALL hooks must run unconditionally — keep the empty-state early
+  // return *after* every hook below so we don't violate React's rules
+  // of hooks when isEmpty flips between renders.
   const [modelSearch, setModelSearch] = useState("");
 
   // Filter models by search and group by provider
@@ -247,6 +236,20 @@ export const ModelSelector = React.memo(function ModelSelector({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modelSearch]);
+
+  // Honest empty state: when the project has zero enabled providers
+  // (or zero models of the requested mode), render a guided callout
+  // instead of the dropdown. The prior behaviour was to render the
+  // System fallback string ("openai/gpt-5.2") in gray, which looked
+  // like a real selection but errored at runtime.
+  if (isEmpty) {
+    return (
+      <NoModelsConfiguredCallout
+        size={size}
+        forFeatureLabel={forFeatureLabel}
+      />
+    );
+  }
 
   return (
     <Select.Root

@@ -5,6 +5,11 @@ import { useFormContext, useWatch } from "react-hook-form";
 import { LLMConfigPopover } from "~/components/llmPromptConfigs/LLMConfigPopover";
 import { LLMModelDisplay } from "~/components/llmPromptConfigs/LLMModelDisplay";
 import { toInternalKey } from "~/components/llmPromptConfigs/parameterConfig";
+import {
+  allModelOptions,
+  useModelSelectionOptions,
+} from "~/components/ModelSelector";
+import { NoModelsConfiguredCallout } from "~/components/NoModelsConfiguredCallout";
 import { Popover } from "~/components/ui/popover";
 import type { LLMConfig } from "~/optimization_studio/types/dsl";
 
@@ -73,6 +78,18 @@ export const EvaluatorLLMConfigField = ({ prefix }: { prefix: string }) => {
     },
     [prefix, setValue],
   );
+
+  // Skip the popover trigger entirely when the project has zero
+  // enabled providers — same honest empty state used by the prompt
+  // playground and workflow LLM-node pickers.
+  const { isEmpty } = useModelSelectionOptions(
+    allModelOptions,
+    llmConfig.model,
+    "chat",
+  );
+  if (isEmpty) {
+    return <NoModelsConfiguredCallout size="sm" />;
+  }
 
   return (
     <Popover.Root positioning={{ placement: "bottom-start" }}>
