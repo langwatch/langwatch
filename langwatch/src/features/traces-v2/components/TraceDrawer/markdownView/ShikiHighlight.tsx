@@ -64,14 +64,12 @@ export function ShikiCodeBlock({
                 background: "transparent !important",
                 // Bumped from 0.78/0.8em which landed at ~9 px (or
                 // as low as ~7 px when nested under a 2xs textStyle
-                // parent) — operator complaint: "no fonts should be
-                // 7px, minimum 10px everywhere". `max(rem, em)` gives
-                // us both: scales with the parent up to a comfortable
-                // ~11 px in `xs` (12 px) contexts, never dips below
-                // an absolute 10 px floor in tighter parents.
-                fontSize: flush
-                  ? "max(0.625rem, 0.95em)"
-                  : "max(0.625rem, 0.92em)",
+                // parent) — operator minimum is 10 px everywhere.
+                // Absolute `0.625rem` pins exactly there regardless of
+                // parent textStyle: no em-scaling drift up to 11–12 px
+                // in `xs` contexts, no drift down under tighter
+                // parents either.
+                fontSize: "0.625rem",
                 lineHeight: "1.55",
                 padding: "0 !important",
                 margin: "0 !important",

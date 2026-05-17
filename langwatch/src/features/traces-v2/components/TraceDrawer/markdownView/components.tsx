@@ -143,11 +143,9 @@ export function buildMarkdownComponents(colorMode: string) {
           <Text
             as="code"
             fontFamily="mono"
-            // `max(rem, em)` enforces a 10 px hard floor — operator
-            // wants no text below 10 px anywhere. In xs (12 px) body
-            // contexts this stays at the original 0.85em ≈ 10.2 px;
-            // in 2xs (10 px) parents the floor kicks in.
-            fontSize="max(0.625rem, 0.85em)"
+            // Flat 10 px — operator minimum, matches the bumped
+            // ShikiCodeBlock / JsonHighlight code-block sizing.
+            fontSize="0.625rem"
             paddingX={1}
             paddingY="1px"
             borderRadius="xs"
