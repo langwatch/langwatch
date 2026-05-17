@@ -637,10 +637,13 @@ export const DrawerHeader = memo(function DrawerHeader({
     onSelectSpan: selectSpan,
     onOpenPromptsTab: () => setActiveTab("prompts"),
   });
-  // Source chips: cap inline at 6 — anything beyond rolls into the "+N more"
-  // popover so the strip stays scannable for traces with many capabilities.
+  // Source chips: cap inline at 10 so multi-evaluator traces don't hide
+  // their second & third verdicts in the overflow popover by default —
+  // eval status is the highest-signal data on the strip, not something
+  // to bury after a half-dozen capabilities. Anything beyond 10 still
+  // rolls into "+N more" so the row stays scannable.
   const { primary: primaryChips, overflowChip: chipsOverflow } =
-    splitChipsForOverflow(chipDefs, 6);
+    splitChipsForOverflow(chipDefs, 10);
   // Pins: auto-pins (identity/run/tag) always inline, custom pins capped at
   // 3 inline with the rest in a "+N pinned" popover. Anyone can pin
   // arbitrary attributes, so this keeps the row from running away.

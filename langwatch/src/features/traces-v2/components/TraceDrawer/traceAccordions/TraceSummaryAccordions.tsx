@@ -1,6 +1,7 @@
 import { Box, Button, HStack, Icon, Text, VStack } from "@chakra-ui/react";
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { LuCircleX } from "react-icons/lu";
+import { useFocusSectionStore } from "../../../stores/focusSectionStore";
 import type {
   SpanTreeNode,
   TraceHeader,
@@ -115,8 +116,44 @@ export function TraceSummaryAccordions({
     events: hasEventsContent,
   });
 
+  // Observe focus-section signals from external surfaces (header chips,
+  // overflow menus, …). When a request matches this trace, ensure the
+  // requested section is in `openSections` and scroll it into view.
+  const containerRef = useRef<HTMLDivElement>(null);
+  const pendingFocus = useFocusSectionStore((s) => s.pending);
+  const clearFocus = useFocusSectionStore((s) => s.clear);
+  useEffect(() => {
+    if (!pendingFocus) return;
+    if (pendingFocus.traceId !== trace.traceId) return;
+    if (!sections.includes(pendingFocus.section as never)) return;
+    setOpenSections(
+      openSections.includes(pendingFocus.section)
+        ? openSections
+        : [...openSections, pendingFocus.section],
+    );
+    // Wait one frame so the accordion has actually expanded before we
+    // measure + scroll. Two rAFs because the first only flushes the
+    // open-state setState; layout commits on the second.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const el = containerRef.current?.querySelector<HTMLElement>(
+          `[data-section="${pendingFocus.section}"]`,
+        );
+        el?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    });
+    clearFocus();
+  }, [
+    pendingFocus,
+    trace.traceId,
+    sections,
+    openSections,
+    setOpenSections,
+    clearFocus,
+  ]);
+
   return (
-    <Box>
+    <Box ref={containerRef}>
       {/* The instrumentation scope used to render here as a small
           attribution row at the top of the summary panel. It's now
           pinned to the right of the SpanTabBar so it stays visible

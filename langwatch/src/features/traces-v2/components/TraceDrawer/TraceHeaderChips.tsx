@@ -1,20 +1,23 @@
-import { Avatar, Box, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import { Avatar, Box, Circle, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { Lightbulb } from "lucide-react";
 import {
   LuBookMarked,
+  LuCircleAlert,
   LuCircleDashed,
+  LuCircleSlash,
   LuCode,
   LuGlobe,
-  LuHistory,
   LuMessageSquare,
   LuServer,
   LuSparkles,
   LuTriangleAlert,
 } from "react-icons/lu";
+import { getEvalChipDisplay } from "~/utils/evaluationResults";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { TraceHeader } from "~/server/api/routers/tracesV2.schemas";
 import { api } from "~/utils/api";
 import { useConversationTurns } from "../../hooks/useConversationTurns";
+import type { RichEval } from "../../hooks/useTraceEvaluations";
 import {
   type PromptChipState,
   type SdkInfoLike,
@@ -49,7 +52,12 @@ export function TraceHeaderChips({
     onSelectSpan,
     onOpenPromptsTab,
   });
-  return <ChipBar chips={chipDefs} endSlot={endSlot} />;
+  // Trace header has plenty of horizontal room and eval/prompt chips are
+  // load-bearing signal — let up to 10 chips ride the strip before
+  // collapsing into the "+N more" pill, otherwise the second & third
+  // eval verdicts (the most actionable ones in a multi-evaluator setup)
+  // get hidden by default.
+  return <ChipBar chips={chipDefs} maxVisible={10} endSlot={endSlot} />;
 }
 
 /**
@@ -215,6 +223,8 @@ function buildChipDef(
         }),
         priority,
       };
+    case "eval":
+      return { ...buildEvalChipDef(data.eval, data.onClick), priority };
   }
 }
 
@@ -340,11 +350,16 @@ function buildLastUsedPromptChipDef({
     : driftFromSelection || outOfDate
       ? "yellow"
       : "blue";
+  // Drop the leading history glyph on the happy path — the purple status
+  // dot + the "Prompt" label already say what this chip is, and the icon
+  // was just visual noise next to the verbose handle. We do keep the
+  // warning glyph for drift / out-of-date so the chip's tone change isn't
+  // the only signal that something's off.
   const icon = state.missing
     ? LuCircleDashed
     : driftFromSelection || outOfDate
       ? LuTriangleAlert
-      : LuHistory;
+      : undefined;
 
   const onClick = () => {
     if (spanId) {
@@ -430,6 +445,183 @@ function buildLastUsedPromptChipDef({
       ? `Jump to the span that ran prompt ${handle}`
       : `Open prompt ${handle} in the Prompts tab`,
   };
+}
+
+function buildEvalChipDef(ev: RichEval, onClick: () => void): ChipDef {
+  // Single source of truth for color / status label / score formatting.
+  // The trace-list `EvalChip`, the v3 EvaluatorChip, and this header
+  // chip all derive their display from `getEvalChipDisplay` so the
+  // visuals never drift between surfaces.
+  const display = getEvalChipDisplay({
+    name: ev.name,
+    evaluatorId: ev.evaluatorId,
+    status: ev.status,
+    score: ev.score,
+    label: ev.label,
+    passed: ev.passed,
+  });
+  // Header eval chips always render on a neutral bg — colored backgrounds
+  // would turn the strip into a rainbow when several evaluators land on a
+  // trace. The status colour shows up in the leading dot + the
+  // pass/fail label text, matching the trace-table EvalChip and the v3
+  // EvaluatorChip exactly.
+  const tone = "neutral" as const;
+  const valueNode = (
+    <HStack gap={1} flexShrink={0} align="center">
+      <Text textStyle="xs" color="fg" fontWeight="medium" truncate>
+        {display.displayName}
+      </Text>
+      {/* Trailing verdict — for skipped/error this is a tinted badge;
+          for boolean Pass/Fail it's colored text; for numeric it's
+          a muted-foreground numeral. Mirrors the trace-table EvalChip. */}
+      {display.status === "skipped" ? (
+        <NoVerdictMicroBadge icon={LuCircleSlash} label="SKIPPED" />
+      ) : display.status === "error" ? (
+        <NoVerdictMicroBadge icon={LuCircleAlert} label="ERROR" />
+      ) : display.scoreText ? (
+        <Text textStyle="2xs" fontWeight="semibold" color="fg.muted">
+          {display.scoreText}
+        </Text>
+      ) : display.passLabel ? (
+        <Text
+          textStyle="2xs"
+          fontWeight="semibold"
+          color={display.passLabel.color}
+        >
+          {display.passLabel.text}
+        </Text>
+      ) : null}
+    </HStack>
+  );
+  return {
+    id: `eval:${ev.evaluationId}`,
+    label: "Eval",
+    value: valueNode,
+    // No leading icon — the colored status dot is the eval's identity
+    // and reads from the shared `EVALUATION_STATUS_COLORS` map so it
+    // matches the v3 EvaluatorChip and the trace-list EvalChip exactly
+    // (skipped = yellow, error = red, etc.).
+    dot: display.color,
+    tone,
+    onClick,
+    ariaLabel: `Eval ${display.displayName}: ${display.statusLabel}${display.scoreText ? ` ${display.scoreText}` : ""}`,
+    tooltip: (
+      <VStack align="stretch" gap={1.5} minWidth="240px" maxWidth="340px">
+        <HStack gap={2}>
+          <Circle size="10px" bg={display.color} flexShrink={0} />
+          <Text textStyle="sm" fontWeight="semibold" truncate>
+            {display.displayName}
+          </Text>
+        </HStack>
+        <HStack justify="space-between" gap={3}>
+          <Text textStyle="2xs" color="fg.muted">
+            Status
+          </Text>
+          <Text textStyle="2xs" fontWeight="semibold" color={display.color}>
+            {display.statusLabel}
+          </Text>
+        </HStack>
+        {display.scoreText && (
+          <HStack justify="space-between" gap={3}>
+            <Text textStyle="2xs" color="fg.muted">
+              Score
+            </Text>
+            <Text textStyle="2xs" fontWeight="semibold">
+              {display.scoreText}
+            </Text>
+          </HStack>
+        )}
+        {ev.label && (
+          <HStack justify="space-between" gap={3}>
+            <Text textStyle="2xs" color="fg.muted">
+              Label
+            </Text>
+            <Text textStyle="2xs" fontWeight="semibold">
+              {ev.label}
+            </Text>
+          </HStack>
+        )}
+        {ev.reasoning && (
+          <VStack
+            align="stretch"
+            gap={0.5}
+            paddingTop={1.5}
+            borderTopWidth="1px"
+            borderColor="border.muted"
+          >
+            <Text textStyle="2xs" color="fg.muted">
+              Reasoning
+            </Text>
+            <Text textStyle="2xs" color="fg" whiteSpace="pre-wrap">
+              {ev.reasoning}
+            </Text>
+          </VStack>
+        )}
+        {ev.errorMessage && (
+          <VStack
+            align="stretch"
+            gap={0.5}
+            paddingTop={1.5}
+            borderTopWidth="1px"
+            borderColor="border.muted"
+          >
+            <Text textStyle="2xs" color="red.fg">
+              Error
+            </Text>
+            <Text textStyle="2xs" color="fg" whiteSpace="pre-wrap">
+              {ev.errorMessage}
+            </Text>
+          </VStack>
+        )}
+        <Text
+          textStyle="2xs"
+          color="fg.subtle"
+          paddingTop={1}
+          borderTopWidth="1px"
+          borderColor="border.muted"
+        >
+          Click to jump to the Evals section
+        </Text>
+      </VStack>
+    ),
+  };
+}
+
+/**
+ * Tiny inline "no verdict" badge for the eval chip's value slot. Matches
+ * the visual language of the EvalCard's status tag (tinted bg, leading
+ * icon, uppercase letter-spaced label) so the same status reads the same
+ * way at every scale: chip → list pill → card header.
+ */
+function NoVerdictMicroBadge({
+  icon,
+  label,
+}: {
+  icon: typeof LuCircleSlash;
+  label: string;
+}) {
+  return (
+    <HStack
+      gap={0.5}
+      paddingX={1}
+      borderRadius="sm"
+      borderWidth="1px"
+      borderColor="border.muted"
+      bg="bg.muted"
+      flexShrink={0}
+      lineHeight="1"
+    >
+      <Icon as={icon} boxSize={2.5} color="fg.muted" />
+      <Text
+        textStyle="2xs"
+        fontWeight="bold"
+        color="fg.muted"
+        letterSpacing="0.04em"
+      >
+        {label}
+      </Text>
+    </HStack>
+  );
 }
 
 function SdkRow({ label, value }: { label: string; value: string }) {

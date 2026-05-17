@@ -18,8 +18,10 @@ import {
   LuSparkles,
   LuTriangleAlert,
 } from "react-icons/lu";
+import { Link } from "~/components/ui/link";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useDrawer } from "~/hooks/useDrawer";
+import { useGoToSpanInPlaygroundTabUrlBuilder } from "~/prompts/prompt-playground/hooks/useLoadSpanIntoPromptPlayground";
 import type {
   SpanDetail,
   SpanTreeNode,
@@ -456,6 +458,14 @@ function PromptUsageCard({
   const variableEntries = Object.entries(variables).sort(([a], [b]) =>
     a.localeCompare(b),
   );
+  const { buildUrl } = useGoToSpanInPlaygroundTabUrlBuilder();
+  // Prefer the first emitting span (Prompt.compile / PromptApiService.get)
+  // — the server-side playground loader walks descendants/siblings to
+  // find the actual llm call for it.
+  const playgroundSpanId = spanIds[0] ?? null;
+  const playgroundHref = playgroundSpanId
+    ? (buildUrl(playgroundSpanId)?.toString() ?? "")
+    : "";
 
   return (
     <VStack align="stretch" gap={3} paddingX={4} paddingY={4}>
@@ -491,15 +501,25 @@ function PromptUsageCard({
             </Badge>
           )}
         </HStack>
-        <Button
-          size="xs"
-          variant="ghost"
-          gap={1}
-          onClick={() => onOpenPromptEditor(ref.handle)}
-        >
-          <Icon as={LuExternalLink} boxSize={3} />
-          Open prompt
-        </Button>
+        <HStack gap={1}>
+          <Button
+            size="xs"
+            variant="ghost"
+            gap={1}
+            onClick={() => onOpenPromptEditor(ref.handle)}
+          >
+            <Icon as={LuExternalLink} boxSize={3} />
+            Open prompt
+          </Button>
+          {playgroundHref && (
+            <Link href={playgroundHref} isExternal variant="plain">
+              <Button size="xs" variant="ghost" gap={1}>
+                <Icon as={LuExternalLink} boxSize={3} />
+                Open in Playground
+              </Button>
+            </Link>
+          )}
+        </HStack>
       </HStack>
 
       {/* Variables */}

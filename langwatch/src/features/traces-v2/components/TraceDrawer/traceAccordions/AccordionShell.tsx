@@ -78,6 +78,7 @@ export function Section({
     <Accordion.Item
       value={value}
       border="0"
+      data-section={value}
       data-section-label={title}
       data-section-count={count ?? ""}
     >
