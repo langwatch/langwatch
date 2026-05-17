@@ -19,6 +19,7 @@ import {
 } from "~/components/ModelSelector";
 import { NoModelsConfiguredCallout } from "~/components/NoModelsConfiguredCallout";
 import { Popover } from "~/components/ui/popover";
+import { Tooltip } from "~/components/ui/tooltip";
 import type { PromptConfigFormValues } from "~/prompts";
 import type { LlmConfigOutputType } from "~/types";
 
@@ -89,7 +90,26 @@ export const ModelSelectFieldMini = React.memo(function ModelSelectFieldMini({
     // Skip the popover trigger entirely when the project has zero
     // enabled providers — clicking the chip would just open a dropdown
     // with no items. Honest empty-state callout instead.
-    return <NoModelsConfiguredCallout size="sm" />;
+    //
+    // The prompt-playground surface gets an open-by-default tooltip
+    // ('Set up a model to get started') because the playground tries
+    // to actually run the prompt the moment the user hits Send, so
+    // the empty model picker is a far higher-stakes blocker here
+    // than in the workflow / evaluator drawers. Chakra's tooltip
+    // closes naturally on mouseout and re-opens on mouseover.
+    return (
+      <Tooltip
+        content="Set up a model to get started"
+        defaultOpen
+        openDelay={0}
+        showArrow
+        positioning={{ placement: "top" }}
+      >
+        <Box>
+          <NoModelsConfiguredCallout size="sm" />
+        </Box>
+      </Tooltip>
+    );
   }
 
   return (

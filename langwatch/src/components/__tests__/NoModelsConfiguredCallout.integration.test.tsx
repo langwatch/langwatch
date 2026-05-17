@@ -55,19 +55,17 @@ describe("NoModelsConfiguredCallout", () => {
 
   it("renders the standalone callout with a settings deeplink that opens in a new tab", () => {
     render(withProviders(<NoModelsConfiguredCallout />));
-    expect(
-      screen.getByTestId("no-models-configured-callout"),
-    ).toBeInTheDocument();
+    const callout = screen.getByTestId("no-models-configured-callout");
+    expect(callout).toBeInTheDocument();
     expect(screen.getByText(/No models configured/i)).toBeInTheDocument();
-    const cta = screen.getByTestId("no-models-configured-cta");
-    expect(cta).toBeInTheDocument();
-    // Button asChild collapses into the Link's anchor; href + target
-    // can live on either the test-id element OR a nested <a>.
-    const anchor =
-      cta.tagName === "A" ? cta : (cta.querySelector("a") as HTMLAnchorElement);
-    expect(anchor).not.toBeNull();
-    expect(anchor.getAttribute("href")).toMatch(/\/settings\/model-providers/);
-    expect(anchor.getAttribute("target")).toBe("_blank");
+    expect(screen.getByTestId("no-models-configured-cta")).toBeInTheDocument();
+    // The whole callout is the anchor (rchaves: 'clicking anywhere
+    // should take them to setup'), not the inner button.
+    expect(callout.tagName).toBe("A");
+    expect(callout.getAttribute("href")).toMatch(
+      /\/settings\/model-providers/,
+    );
+    expect(callout.getAttribute("target")).toBe("_blank");
   });
 
   it("includes the surface-specific label when forFeatureLabel is provided", () => {
