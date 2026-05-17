@@ -18,9 +18,9 @@
  *   - if `messages` ever leaks through, parseVariablesBlob JSON-encodes
  *     it instead of rendering "[object Object]"
  *
- * Run: npx tsx scripts/dogfood-prompt-vars.ts
+ * Run: npx tsx scripts/dogfood/prompts/prompt-vars.ts
  */
-import { findPromptReferenceInAncestors } from "../src/server/traces/findPromptReferenceInAncestors";
+import { findPromptReferenceInAncestors } from "../../../src/server/traces/findPromptReferenceInAncestors";
 
 const PARENT = "parent-span";
 const TARGET = "llm-span";
