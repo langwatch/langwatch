@@ -62,7 +62,14 @@ export function ShikiCodeBlock({
             css={{
               "& pre, & code": {
                 background: "transparent !important",
-                fontSize: flush ? "0.8em" : "0.78em",
+                // Bumped from 0.78/0.8em which landed at ~9 px (or
+                // as low as ~7 px when nested under a 2xs textStyle
+                // parent) — operator minimum is 10 px everywhere.
+                // Absolute `0.625rem` pins exactly there regardless of
+                // parent textStyle: no em-scaling drift up to 11–12 px
+                // in `xs` contexts, no drift down under tighter
+                // parents either.
+                fontSize: "0.625rem",
                 lineHeight: "1.55",
                 padding: "0 !important",
                 margin: "0 !important",

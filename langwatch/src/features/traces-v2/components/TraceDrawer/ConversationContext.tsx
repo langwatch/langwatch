@@ -233,11 +233,17 @@ export const ConversationContext = memo(function ConversationContext({
   );
 
   if (!conversationId) return null;
-  // A single-turn conversation has no "context" worth showing — every
-  // row would be a Start/End placeholder around the trace the user is
-  // already looking at. Bail out so the parent can skip rendering the
-  // pane entirely (no header, no resize handle, no empty band).
-  if (!ctx.isLoading && ctx.total <= 1) return null;
+  // Earlier this also bailed out on `!ctx.isLoading && ctx.total <= 1`
+  // ("don't show a context pane for a single-turn conversation"). That
+  // produced a worse failure mode in practice: while `ctx.isLoading`
+  // the header rendered, then a frame later the count resolved to 1
+  // and the entire pane vanished — leaving a blank band between the
+  // Trace tabs and the waterfall whose only resolution was a page
+  // reload. Since the pane defaults to collapsed
+  // (`DEFAULT_PANE_STATE.conversationContext.collapsed = true` in
+  // drawerStore.ts), keeping it always-rendered for any trace with a
+  // `conversationId` costs nothing visually — collapsed it's just a
+  // 36px header — and removes the load → unmount → blank-band flash.
 
   return (
     <Box
