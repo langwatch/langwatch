@@ -112,6 +112,22 @@ type Options struct {
 	// admin token. When true, OTLPHeaders is ignored (the per-tenant
 	// processors set their own auth).
 	MultiTenant bool
+	// SyncExport=true swaps each tenant's BatchSpanProcessor for a
+	// SimpleSpanProcessor (sync OnEnd → exporter). Only honored when
+	// MultiTenant=true. Purpose: deterministic test mode. The default
+	// async BSP buffers spans for up to 5s then exports in batches;
+	// under heavy concurrent test load on a saturated CI runner this
+	// has been observed to extend the end-to-end "span emitted at
+	// nlpgo → row in ClickHouse" wall-clock past any reasonable poll
+	// budget. SimpleSpanProcessor blocks span.End() until the OTLP
+	// roundtrip completes, so by the time the HTTP handler returns,
+	// every span for that request has already been delivered to the
+	// collector — no batching, no scheduled-delay window, no flake
+	// surface. NEVER enable in production: synchronous export makes
+	// every span pay the full collector RTT on the request hot path,
+	// and a stalled collector wedges the request thread. Gated on the
+	// NLPGO_SPAN_SYNC env var in deps.go.
+	SyncExport bool
 }
 
 // Provider holds the configured OTel SDK providers.
@@ -185,6 +201,9 @@ func New(ctx context.Context, opts Options) (*Provider, error) {
 			rootSampler = sdktrace.AlwaysSample()
 		}
 		router := NewTenantRouter(opts.OTLPEndpoint)
+		if opts.SyncExport {
+			router.newProcessor = newSyncTenantProcessor
+		}
 		tp := sdktrace.NewTracerProvider(
 			sdktrace.WithResource(res),
 			sdktrace.WithSpanProcessor(NewBaggageAttributeProcessor(AutoStampedBaggageKeys...)),

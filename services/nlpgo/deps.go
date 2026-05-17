@@ -40,11 +40,22 @@ func configureNLPGoOTel(ctx context.Context, cfg Config, nodeID string) (*otelse
 			endpoint = strings.TrimRight(endpoint, "/") + "/v1/traces"
 		}
 	}
+	// NLPGO_SPAN_SYNC=1 swaps the per-tenant BatchSpanProcessor for a
+	// SimpleSpanProcessor — every span.End() blocks on the OTLP
+	// roundtrip. The integration test
+	// langwatch/src/server/nlpgo/__tests__/traceparent-roundtrip.integration.test.ts
+	// flips this on so it can assert on persisted spans without
+	// chasing async BSP-flush windows under saturated-CI scheduler
+	// contention. Production deployments must leave this off — async
+	// batching is what keeps the request hot path independent of
+	// collector RTT.
+	syncExport := strings.TrimSpace(os.Getenv("NLPGO_SPAN_SYNC")) == "1"
 	return otelsetup.New(ctx, otelsetup.Options{
 		NodeID:       nodeID,
 		OTLPEndpoint: endpoint,
 		SampleRatio:  cfg.OTel.SampleRatio,
 		MultiTenant:  true,
+		SyncExport:   syncExport,
 	})
 }
 

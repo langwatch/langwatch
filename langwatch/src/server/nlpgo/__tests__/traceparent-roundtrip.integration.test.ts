@@ -219,6 +219,24 @@ describe.skipIf(!shouldRun)(
     let tenantId: ReturnType<typeof createTestTenantId>;
     let tenantIdString: string;
 
+    // Diagnostic capture for when the CH assertion fails — without this,
+    // "expected 0 to be greater than 0" gives no signal about which stage
+    // of the pipeline (nlpgo emit / wire shape / fold/projection / CH
+    // write) actually broke. We always capture; we only DUMP on failure.
+    interface OtlpDelivery {
+      receivedAt: number;
+      url: string;
+      traceIds: string[];
+      spanCount: number;
+      spanNames: string[];
+    }
+    const otlpDeliveries: OtlpDelivery[] = [];
+    // Cap the stderr ring buffer so a chatty subprocess can't OOM the
+    // vitest worker — 256 KiB is more than enough to hold the trailing
+    // panic / error context that actually matters.
+    const NLPGO_STDERR_CAP = 256 * 1024;
+    let nlpgoStderrBuf = "";
+
     function createTracePipeline() {
       const clickHouseClient = getTestClickHouseClient();
       const redisConnection = getTestRedisConnection();
@@ -316,6 +334,12 @@ describe.skipIf(!shouldRun)(
     }
 
     beforeAll(async () => {
+      // Reset per-suite diagnostic state. The capture arrays are module-
+      // scoped to keep the fake server's request handler simple — flush
+      // them here so a re-running suite doesn't show stale wire data.
+      otlpDeliveries.length = 0;
+      nlpgoStderrBuf = "";
+
       // Flush Redis once so reactor-job orphans from prior runs don't
       // log "Unknown job in global queue" noise (matches the
       // loopPrevention.reactor.integration.test.ts pattern).
@@ -367,6 +391,29 @@ describe.skipIf(!shouldRun)(
                 const decoded = ExportTraceServiceRequest.decode(
                   new Uint8Array(body),
                 );
+                // Capture before dispatching into the pipeline so that
+                // a downstream throw doesn't blank the diagnostic.
+                const traceIds = new Set<string>();
+                const spanNames: string[] = [];
+                let spanCount = 0;
+                for (const rs of decoded.resourceSpans ?? []) {
+                  for (const ss of rs.scopeSpans ?? []) {
+                    for (const s of ss.spans ?? []) {
+                      spanCount++;
+                      traceIds.add(
+                        Buffer.from(s.traceId).toString("hex"),
+                      );
+                      spanNames.push(s.name);
+                    }
+                  }
+                }
+                otlpDeliveries.push({
+                  receivedAt: Date.now(),
+                  url,
+                  traceIds: [...traceIds],
+                  spanCount,
+                  spanNames,
+                });
                 await traceCollection.handleOtlpTraceRequest(
                   tenantIdString,
                   decoded,
@@ -415,11 +462,26 @@ describe.skipIf(!shouldRun)(
       const binary = ensureNlpgoBinary();
 
       // Spawn the pre-built binary. It boots in ~1s.
+      //
+      // NLPGO_SPAN_SYNC=1 forces nlpgo to use SimpleSpanProcessor
+      // instead of BatchSpanProcessor for its per-tenant exporters.
+      // Without this, BSP buffers spans for up to 5s before exporting
+      // in async batches; on a saturated CI runner that 5s window
+      // plus the forceFlushMiddleware's 5s timeout has been observed
+      // to stretch the end-to-end "span emitted at nlpgo → row in
+      // CH" wall-clock past any reasonable poll budget (three prior
+      // widenings: 45s → 120s → 240s, still flaked). Sync export
+      // makes the OTLP roundtrip part of the request lifecycle, so
+      // by the time fetch() resolves every span for that request has
+      // already been delivered to the fake langwatch HTTP server.
+      // The only remaining async hop is the event-sourcing pipeline
+      // → ClickHouse fold/projection.
       nlpgoProcess = spawn(binary, ["nlpgo"], {
         cwd: REPO_ROOT,
         env: {
           ...process.env,
           NLPGO_CHILD_BYPASS: "true",
+          NLPGO_SPAN_SYNC: "1",
           SERVER_ADDR: `:${NLPGO_PORT}`,
           LANGWATCH_ENDPOINT: langwatchUrl,
           NLPGO_ENGINE_LANGWATCH_BASE_URL: langwatchUrl,
@@ -428,8 +490,20 @@ describe.skipIf(!shouldRun)(
         detached: true,
       });
       const drain = (label: "out" | "err", chunk: Buffer) => {
+        const text = chunk.toString();
+        // Always keep a rolling tail of stderr so the assertion message
+        // can attach the trailing context when CH shows zero spans —
+        // otherwise the only signal is "expected 0 to be greater than 0"
+        // with no clue whether nlpgo panicked, never bound the port, or
+        // emitted under the wrong trace_id.
+        if (label === "err") {
+          nlpgoStderrBuf += text;
+          if (nlpgoStderrBuf.length > NLPGO_STDERR_CAP) {
+            nlpgoStderrBuf = nlpgoStderrBuf.slice(-NLPGO_STDERR_CAP);
+          }
+        }
         if (process.env.NLPGO_TEST_LOG === "1") {
-          process.stderr.write(`[nlpgo:${label}] ${chunk.toString()}`);
+          process.stderr.write(`[nlpgo:${label}] ${text}`);
         }
       };
       // Must drain BOTH pipes — leaving stdout unconsumed will block the
@@ -667,13 +741,49 @@ describe.skipIf(!shouldRun)(
           await sleep(500);
         }
 
+        // Build a diagnostic summary that splits the pipeline into its
+        // observable stages, so the assertion message tells us WHICH
+        // stage broke instead of a bare "expected 0 to be greater than 0".
+        const buildDiagnostic = (): string => {
+          const traceIdsSeen = new Set<string>();
+          let totalSpans = 0;
+          for (const d of otlpDeliveries) {
+            for (const t of d.traceIds) traceIdsSeen.add(t);
+            totalSpans += d.spanCount;
+          }
+          const otlpForInbound = otlpDeliveries.filter((d) =>
+            d.traceIds.includes(PARENT_TRACE_ID),
+          );
+          const otherTraceIds = [...traceIdsSeen].filter(
+            (t) => t !== PARENT_TRACE_ID,
+          );
+          const stderrTail = nlpgoStderrBuf.slice(-4000);
+          return [
+            `inbound trace_id: ${PARENT_TRACE_ID}`,
+            `OTLP requests received by fake langwatch: ${otlpDeliveries.length}`,
+            `  → carrying inbound trace_id: ${otlpForInbound.length}`,
+            `  → other trace_ids seen on the wire: ${
+              otherTraceIds.length === 0 ? "(none)" : otherTraceIds.join(", ")
+            }`,
+            `total spans across all OTLP deliveries: ${totalSpans}`,
+            `span names on the wire: ${
+              otlpDeliveries.flatMap((d) => d.spanNames).join(", ") || "(none)"
+            }`,
+            `CH rows under inbound trace_id: ${rows.length}`,
+            `nlpgo stderr tail (last 4000 chars):\n${
+              stderrTail || "(empty — nlpgo logged nothing on stderr)"
+            }`,
+          ].join("\n");
+        };
+
         // CORE ASSERTION 1 — spans landed in CH under the INBOUND trace_id.
         // Pre-fix, this query would return zero rows because nlpgo
         // had emitted them under a fresh trace_id.
         expect(
           rows.length,
           `no spans landed in CH under the inbound trace_id ${PARENT_TRACE_ID} — ` +
-            `nlpgo either didn't emit OTLP or emitted them under a different trace_id (the 2026-05-14 bug)`,
+            `nlpgo either didn't emit OTLP or emitted them under a different trace_id (the 2026-05-14 bug).\n` +
+            `Pipeline diagnostic:\n${buildDiagnostic()}`,
         ).toBeGreaterThan(0);
 
         // CORE ASSERTION 2 — every row matches the inbound trace_id.
