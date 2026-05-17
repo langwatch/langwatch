@@ -46,7 +46,6 @@ import { MainMenu, MENU_WIDTH_COMPACT, MENU_WIDTH_EXPANDED } from "./MainMenu";
 import { SavedViewsBar } from "./messages/SavedViewsBar";
 import { ProjectAvatar } from "./ProjectAvatar";
 import { SdkRadarBanner } from "./SdkRadarBanner";
-import { MissingModelModal } from "./MissingModelModal";
 import { UpgradeModal } from "./UpgradeModal";
 import { Link } from "./ui/link";
 import { Menu } from "./ui/menu";
@@ -808,11 +807,12 @@ export const DashboardLayout = ({
         </Box>
       </HStack>
       <GlobalUpgradeModal />
-      {/* Singleton modal opened by the tRPC / QueryCache interceptors when
-          an AI-powered feature can't resolve a model. Mirrors the
-          UpgradeModal mount pattern. See specs/model-providers/
-          missing-model-popup.feature. */}
-      <MissingModelModal />
+      {/* No MissingModelModal mount — the global tRPC / QueryCache
+          interceptors emit a sticky orange toast via
+          `showMissingModelToast` (deduped per (featureKey, role)).
+          Toast lives in the toaster portal that's already at the app
+          root; nothing else to mount here. See
+          specs/model-providers/missing-model-popup.feature. */}
     </Box>
   );
 };

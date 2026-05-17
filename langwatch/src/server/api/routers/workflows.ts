@@ -20,6 +20,8 @@ import {
 import type { Unpacked } from "../../../utils/types";
 import { DatasetService } from "../../datasets/dataset.service";
 import { enforceLicenseLimit } from "../../license-enforcement";
+import { wrapAiCall } from "../../modelProviders/aiCallFailedError";
+import { featureByKey } from "../../modelProviders/featureRegistry";
 import { getVercelAIModel } from "../../modelProviders/utils";
 import { isNlpGoEnabled } from "../../nlpgo/nlpgoFetch";
 import { checkProjectPermission, hasProjectPermission } from "../rbac";
@@ -1069,7 +1071,18 @@ export const workflowRouter = createTRPCRouter({
         "New Version",
       );
 
-      const commitMessage = await generateText({
+      // ModelNotConfiguredError passes through untouched (its own
+      // toast surface); every other provider/SDK failure surfaces as
+      // AiCallFailedError so the frontend can render the "double-check
+      // your model configuration" hint toast instead of a raw 500.
+      const commitFeature = featureByKey("workflows.commit_message");
+      if (!commitFeature) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "workflows.commit_message feature is not registered",
+        });
+      }
+      const commitMessage = await wrapAiCall(commitFeature, async () => generateText({
         model: await getVercelAIModel(input.projectId),
         providerOptions: {
           openai: {
@@ -1122,7 +1135,7 @@ ${diff}
           type: "tool",
           toolName: "commitMessage",
         },
-      });
+      }));
 
       const result = commitMessage.toolResults?.find(
         (t) => t.toolName === "commitMessage",

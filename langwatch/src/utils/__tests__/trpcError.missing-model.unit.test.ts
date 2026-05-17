@@ -26,7 +26,7 @@ function buildError(
 
 describe("extractMissingModelInfo()", () => {
   describe("when the cause carries the MODEL_NOT_CONFIGURED code", () => {
-    /** @scenario A tRPC call that throws ModelNotConfigured opens the popup */
+    /** @scenario A tRPC call that throws ModelNotConfigured opens the toast */
     it("returns the featureKey, displayName, role, and projectId", () => {
       const err = buildError({
         code: "MODEL_NOT_CONFIGURED",

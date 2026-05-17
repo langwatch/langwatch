@@ -33,8 +33,12 @@ import {
   markAsHandledByLiteMemberHandler,
   markAsHandledByMissingModelHandler,
 } from "./trpcError";
-import { useMissingModelModalStore } from "../stores/missingModelModalStore";
+import {
+  showAiCallFailedToast,
+  showMissingModelToast,
+} from "../components/MissingModelToast";
 import { useUpgradeModalStore } from "../stores/upgradeModalStore";
+import { extractAiCallFailedInfo } from "./trpcError";
 import { useState, type ReactNode } from "react";
 
 const getBaseUrl = () => {
@@ -162,15 +166,27 @@ function createQueryClientConfig() {
           });
         }
         // Check for ModelNotConfiguredError — surfaced when an AI-powered
-        // feature can't resolve a model anywhere in the scope chain. The
-        // singleton store dedups identical (featureKey, role) calls while
-        // the modal is on screen, so retry storms only show one modal.
+        // feature can't resolve a model anywhere in the scope chain.
+        // Emits a sticky orange toast (deduped per (featureKey, role)
+        // toast id) instead of a focus-trapping modal: explicit user
+        // actions still get a clear, actionable nudge but background
+        // flows (auto-save, prefetch) don't get blocked behind a Dialog.
         const missingModelInfo = extractMissingModelInfo(error);
         if (missingModelInfo) {
           if (error instanceof Error) {
             markAsHandledByMissingModelHandler(error);
           }
-          useMissingModelModalStore.getState().open(missingModelInfo);
+          showMissingModelToast(missingModelInfo);
+        }
+        // A successful resolve that still produced a provider error
+        // (bad key, 5xx, timed-out) arrives without MODEL_NOT_CONFIGURED
+        // but with an AI_CALL_FAILED discriminator. Surface a softer
+        // toast nudging the user to verify their model configuration —
+        // most provider errors at this layer trace back to a misset key
+        // or a wrong model id.
+        const aiFailedInfo = extractAiCallFailedInfo(error);
+        if (aiFailedInfo) {
+          showAiCallFailedToast(aiFailedInfo);
         }
         // Non-license/non-restriction errors bubble up to component-level handlers
       },
@@ -186,14 +202,18 @@ function createQueryClientConfig() {
           markAsHandledByLiteMemberHandler(error);
         }
         // Queries (e.g. fetching a result that requires an LLM call
-        // server-side) can also surface a ModelNotConfiguredError. Open
-        // the same modal so background fetches don't fail silently.
+        // server-side) can also surface a ModelNotConfiguredError. Same
+        // toast surface as the mutation path.
         const missingModelInfo = extractMissingModelInfo(error);
         if (missingModelInfo) {
           if (error instanceof Error) {
             markAsHandledByMissingModelHandler(error);
           }
-          useMissingModelModalStore.getState().open(missingModelInfo);
+          showMissingModelToast(missingModelInfo);
+        }
+        const aiFailedInfo = extractAiCallFailedInfo(error);
+        if (aiFailedInfo) {
+          showAiCallFailedToast(aiFailedInfo);
         }
       },
     }),

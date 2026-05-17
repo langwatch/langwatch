@@ -31,6 +31,7 @@ import { ZodError } from "zod";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { DomainError } from "~/server/app-layer/domain-error";
+import { AiCallFailedError } from "~/server/modelProviders/aiCallFailedError";
 import { ModelNotConfiguredError } from "~/server/modelProviders/modelNotConfiguredError";
 import { getLogLevelFromStatusCode } from "../middleware/requestLogging";
 import { createLogger } from "../../utils/logger/server";
@@ -155,13 +156,28 @@ export function errorFormatterForTesting({
         }
       : null;
 
+  // Surface AiCallFailedError on the wire so the frontend interceptor
+  // in `utils/trpcError.ts::extractAiCallFailedInfo` can show the
+  // "double-check your model configuration" toast. Same cause-channel
+  // as MODEL_NOT_CONFIGURED — different discriminator code.
+  const aiCallFailedCause =
+    error.cause instanceof AiCallFailedError
+      ? {
+          code: error.cause.cause,
+          featureKey: error.cause.featureKey,
+          featureDisplayName: error.cause.featureDisplayName,
+          role: error.cause.role,
+          errorMessage: error.cause.originalErrorMessage,
+        }
+      : null;
+
   return {
     ...shape,
     data: {
       ...shape.data,
       zodError:
         error.cause instanceof ZodError ? error.cause.flatten() : null,
-      cause: missingModelCause ?? limitInfo,
+      cause: missingModelCause ?? aiCallFailedCause ?? limitInfo,
       domainError,
     },
   };
