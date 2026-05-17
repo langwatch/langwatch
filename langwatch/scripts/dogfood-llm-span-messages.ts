@@ -94,7 +94,9 @@ const checks = [
       messages.findIndex(
         (m) => m.role === "assistant" && m.content === "You're welcome.",
       ),
-    got: messages.map((m) => `${m.role}:${m.content.slice(0, 20)}`).join(" -> "),
+    got: messages
+      .map((m) => `${m.role}:${String(m.content ?? "").slice(0, 20)}`)
+      .join(" -> "),
   },
 ];
 for (const c of checks) {

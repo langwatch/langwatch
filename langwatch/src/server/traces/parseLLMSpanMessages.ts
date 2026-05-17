@@ -96,7 +96,9 @@ function pushDecoded(
       ) {
         const role = (item as { role?: unknown }).role;
         out.push({
-          role: typeof role === "string" ? role : defaultRole,
+          role: (typeof role === "string"
+            ? role
+            : defaultRole) as ChatMessage["role"],
           content: (item as { content: string }).content,
         });
       }
@@ -111,7 +113,9 @@ function pushDecoded(
   ) {
     const role = (parsed as { role?: unknown }).role;
     out.push({
-      role: typeof role === "string" ? role : defaultRole,
+      role: (typeof role === "string"
+        ? role
+        : defaultRole) as ChatMessage["role"],
       content: (parsed as { content: string }).content,
     });
     return;
