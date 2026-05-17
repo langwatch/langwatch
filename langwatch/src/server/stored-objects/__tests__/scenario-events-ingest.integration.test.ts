@@ -95,13 +95,23 @@ vi.mock("~/server/stored-objects/stored-objects-factory", () => ({
   })),
 }));
 
-// Suppress logger noise
+// Logger — shared mock so tests can inspect the structured log entries the
+// route emits (e.g. AC34: the ingest log line must list every stored_objects
+// id extracted for an event). Each createLogger() call returns the same
+// proxy backed by a single vi.fn() ledger keyed by level.
+const { mockLogInfo, mockLogWarn, mockLogError, mockLogDebug } = vi.hoisted(() => ({
+  mockLogInfo: vi.fn(),
+  mockLogWarn: vi.fn(),
+  mockLogError: vi.fn(),
+  mockLogDebug: vi.fn(),
+}));
+
 vi.mock("~/utils/logger/server", () => ({
   createLogger: () => ({
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-    debug: vi.fn(),
+    info: mockLogInfo,
+    warn: mockLogWarn,
+    error: mockLogError,
+    debug: mockLogDebug,
   }),
 }));
 
@@ -346,6 +356,49 @@ describe("POST /api/scenario-events (ingest)", () => {
       });
 
       expect(res.status).toBe(401);
+    });
+  });
+
+  describe("when an event extracts one or more stored_objects ids", () => {
+    /** @scenario "Ingest logs list every stored_objects id extracted for an event" */
+    it("the ingest log line carries every stored_objects id that was created or reused", async () => {
+      // Two distinct mock returns, one per inline file part the event carries.
+      const id1 = `stored-${nanoid(8)}`;
+      mockStoreFromBytes.mockResolvedValueOnce({
+        id: id1,
+        mediaType: "image/png",
+        isDuplicate: false,
+      });
+
+      mockLogInfo.mockClear();
+
+      const scenarioRunId = `run-${nanoid(6)}`;
+      const body = makeEventWithInlineImage(scenarioRunId);
+
+      const res = await app.request("/api/scenario-events", {
+        method: "POST",
+        headers: {
+          "X-Auth-Token": testApiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+
+      expect(res.status).toBe(201);
+
+      // The route emits a log line of the shape:
+      //   logger.info({ stored_object_ids: [id1, ...], projectId, scenarioRunId, count }, msg)
+      // Find that call and assert every minted id is present in the
+      // structured field. Operators rely on this line to correlate
+      // events to the rows their cascade-delete eventually touches.
+      const matchingCall = mockLogInfo.mock.calls.find((args) => {
+        const ctx = args[0] as { stored_object_ids?: unknown };
+        return Array.isArray(ctx?.stored_object_ids);
+      });
+
+      expect(matchingCall, "expected an info-level log with stored_object_ids").toBeDefined();
+      const ctx = matchingCall![0] as { stored_object_ids: string[] };
+      expect(ctx.stored_object_ids).toContain(id1);
     });
   });
 });

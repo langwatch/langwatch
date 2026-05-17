@@ -68,6 +68,8 @@ import type { StoredObjectsRepository } from "../stored-objects.repository";
 import { StoredObjectsService, deriveStoredObjectId } from "../stored-objects.service";
 import type { StorageRegistry } from "../storage-registry";
 import { ObjectNotFoundError } from "../errors";
+import * as dataplaneS3 from "~/server/dataplane-s3";
+import { env as mockedEnv } from "~/env.mjs";
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -188,6 +190,55 @@ describe("storeFromBytes", () => {
     });
   });
 
+  describe("when the repository insert fails after a successful storage put", () => {
+    /** @scenario "DB insert failure after a successful storage PUT triggers compensating storage delete" */
+    it("issues a compensating storage delete and surfaces the original error to the caller", async () => {
+      // Setup: storage PUT succeeds, repository INSERT throws.
+      vi.mocked(repo.findBySha256).mockResolvedValue(null);
+      const chError = new Error("ClickHouse insert failed");
+      vi.mocked(repo.insert).mockRejectedValueOnce(chError);
+
+      // Capture the URI that was used for PUT so we can assert the
+      // compensating delete targets exactly the same URI.
+      let putUri: string | undefined;
+      vi.mocked(registry.put).mockImplementation(async (uri: string) => {
+        putUri = uri;
+      });
+
+      await expect(service.storeFromBytes(STORE_PARAMS)).rejects.toThrow(
+        "ClickHouse insert failed",
+      );
+
+      // Storage was attempted (so the compensating delete makes sense)
+      expect(registry.put).toHaveBeenCalledOnce();
+      expect(putUri).toBeDefined();
+
+      // The compensating delete fires at the same URI we just wrote to.
+      // Without it the bytes would orphan in S3/disk with no row pointing
+      // to them — a measurable storage leak under retried 5xx scenarios.
+      expect(registry.delete).toHaveBeenCalledWith(putUri);
+    });
+  });
+
+  describe("when the ClickHouse insert returns an error (case from CH async_insert path)", () => {
+    /** @scenario "ClickHouse insert errors surface synchronously to the caller" */
+    it("the service rejects with the underlying error and does not swallow", async () => {
+      // The repository wraps ClickHouse `client.insert()` with the
+      // `wait_for_async_insert=1` setting (configured in
+      // stored-objects.repository.ts) precisely so that CH errors come
+      // back to the caller synchronously instead of being silently
+      // dropped on the async_insert queue. The service must surface that
+      // error untouched — no try/catch swallow, no degraded fallback.
+      vi.mocked(repo.findBySha256).mockResolvedValue(null);
+      const chError = new Error("DB::NetException: connection refused");
+      vi.mocked(repo.insert).mockRejectedValueOnce(chError);
+
+      await expect(service.storeFromBytes(STORE_PARAMS)).rejects.toThrow(
+        "DB::NetException: connection refused",
+      );
+    });
+  });
+
   describe("when called twice with identical input", () => {
     it("returns the same deterministic id", async () => {
       // First call: miss → store
@@ -285,6 +336,75 @@ describe("getById", () => {
       await expect(
         service.getById({ projectId: PROJECT_ID, id: "obj-1" }),
       ).rejects.toThrow("network timeout");
+    });
+  });
+});
+
+describe("mintStorageUri (BYOC bucket selection — observed through the inserted row)", () => {
+  let repo: StoredObjectsRepository;
+  let registry: StorageRegistry;
+  let service: StoredObjectsService;
+
+  beforeEach(() => {
+    repo = makeRepository();
+    registry = makeRegistry();
+    service = new StoredObjectsService(repo, registry);
+    vi.mocked(repo.findBySha256).mockResolvedValue(null);
+  });
+
+  describe("when the project has a private dataplane bucket configured", () => {
+    /** @scenario "For a project with a per-project private dataplane bucket, mintStorageUri uses the project bucket, not the global one" */
+    it("mints the URI under the project bucket and ignores the global S3_BUCKET_NAME", async () => {
+      // Project A has its own bucket. The dataplane lookup returns it.
+      vi.mocked(dataplaneS3.getS3ConfigForProject).mockResolvedValueOnce({
+        bucket: "dataplane-acme",
+        endpoint: undefined,
+        accessKeyId: undefined,
+        secretAccessKey: undefined,
+        keySalt: undefined,
+      });
+      // Even though a global is set, the per-project value wins.
+      (mockedEnv as { S3_BUCKET_NAME?: string }).S3_BUCKET_NAME =
+        "langwatch-storage-prod";
+
+      try {
+        await service.storeFromBytes(STORE_PARAMS);
+      } finally {
+        (mockedEnv as { S3_BUCKET_NAME?: string }).S3_BUCKET_NAME = undefined;
+      }
+
+      // Storage URI used for both the PUT and the inserted row points to
+      // the per-project bucket, never the global one.
+      expect(registry.put).toHaveBeenCalledOnce();
+      const putUri = vi.mocked(registry.put).mock.calls[0]![0];
+      expect(putUri).toMatch(/^s3:\/\/dataplane-acme\//);
+      expect(putUri).not.toMatch(/langwatch-storage-prod/);
+
+      const insertedRow = vi.mocked(repo.insert).mock.calls[0]![0].row;
+      expect(insertedRow.storage_uri).toMatch(/^s3:\/\/dataplane-acme\//);
+    });
+  });
+
+  describe("when the project has no private bucket but a global S3_BUCKET_NAME is set", () => {
+    /** @scenario "For a project without per-project storage configured, mintStorageUri falls back to the global S3_BUCKET_NAME" */
+    it("mints the URI under the global bucket so the storage_uri matches what the read path will use", async () => {
+      vi.mocked(dataplaneS3.getS3ConfigForProject).mockResolvedValueOnce(null);
+      (mockedEnv as { S3_BUCKET_NAME?: string }).S3_BUCKET_NAME =
+        "langwatch-storage-prod";
+
+      try {
+        await service.storeFromBytes(STORE_PARAMS);
+      } finally {
+        (mockedEnv as { S3_BUCKET_NAME?: string }).S3_BUCKET_NAME = undefined;
+      }
+
+      const putUri = vi.mocked(registry.put).mock.calls[0]![0];
+      expect(putUri).toMatch(/^s3:\/\/langwatch-storage-prod\//);
+
+      // The row's storage_uri is the authoritative read address (BYOC
+      // invariant) — it must match what we just wrote to.
+      const insertedRow = vi.mocked(repo.insert).mock.calls[0]![0].row;
+      expect(insertedRow.storage_uri).toBe(putUri);
     });
   });
 });

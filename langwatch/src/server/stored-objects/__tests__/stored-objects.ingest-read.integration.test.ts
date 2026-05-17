@@ -56,13 +56,22 @@ vi.mock("~/utils/logger/server", () => ({
   }),
 }));
 
-// LangWatch tracer — pass-through shim so spans don't blow up
+// LangWatch tracer — pass-through shim that records every span name into
+// a shared ledger so tests can assert observability without having to
+// stand up the real OTel SDK. The ledger is module-scoped so any test in
+// this file can read it; the `tracerSpanNames` array is exported for
+// use in the observability test below.
+const { tracerSpanNames } = vi.hoisted(() => ({
+  tracerSpanNames: [] as string[],
+}));
+
 vi.mock("langwatch", () => ({
   getLangWatchTracer: () => ({
     withActiveSpan: (
-      _name: string,
+      name: string,
       ...args: unknown[]
     ) => {
+      tracerSpanNames.push(name);
       const fn = args.length === 1 ? args[0] : args[1];
       const span: { setAttribute: ReturnType<typeof vi.fn> } = { setAttribute: vi.fn() };
       return (fn as (s: typeof span) => Promise<unknown>)(span);
@@ -452,6 +461,43 @@ describe("StoredObjectsService (ingest + read path)", () => {
     });
   });
 
+  describe("when telemetry spans are observed across ingest and read", () => {
+    /** @scenario "OpenTelemetry spans wrap extraction during ingest and reads via /api/files/:id" */
+    it("records a span for storeFromBytes (ingest) and another for getById (read)", async () => {
+      await withTmpStorage(async () => {
+        // Reset the shared span ledger so this assertion only sees the
+        // names recorded inside this test body (other tests in the file
+        // share the mock).
+        tracerSpanNames.length = 0;
+
+        const service = buildService(PROJECT_A);
+        const bytes = makeBytes(`telemetry-${nanoid(6)}`);
+
+        // Ingest path: a span must be recorded
+        const stored = await service.storeFromBytes({
+          projectId: PROJECT_A,
+          purpose: "scenario_event",
+          ownerKind: "scenario_run",
+          ownerId: `run-${nanoid(6)}`,
+          mediaType: "text/plain",
+          bytes,
+        });
+        await waitForRow(ch, PROJECT_A, stored.id);
+
+        // Read path: a span must be recorded
+        await service.getById({ projectId: PROJECT_A, id: stored.id });
+
+        expect(tracerSpanNames.length).toBeGreaterThanOrEqual(2);
+        expect(
+          tracerSpanNames.some((s) => /storeFromBytes|StoredObjectsService\.store/i.test(s)),
+        ).toBe(true);
+        expect(
+          tracerSpanNames.some((s) => /getById|StoredObjectsService\.get/i.test(s)),
+        ).toBe(true);
+      });
+    });
+  });
+
   describe("given a stored object row written during event ingest (cascade contract case 9)", () => {
     describe("when the row is queried directly from ClickHouse", () => {
       /** @scenario "Stored objects rows are tenant-tagged so a future project-purge can cascade" */
@@ -485,5 +531,6 @@ describe("StoredObjectsService (ingest + read path)", () => {
         });
       });
     });
+
   });
 });
