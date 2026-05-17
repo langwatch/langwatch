@@ -161,16 +161,9 @@ Please read our [Contribution Guidelines](https://github.com/langwatch/langwatch
 
 ## ✍️ License
 
-Apache 2.0 covers everything in this repository except for these carve-outs, each governed by its own license file:
+LangWatch is Apache 2.0, except for the enterprise modules (SCIM, audit logs, license and billing management, etc.) which live under `langwatch/ee/` and need a commercial license for production use. The SDKs (`typescript-sdk`, `python-sdk`, `mcp-server`) are MIT.
 
-| Path | License |
-|------|---------|
-| `langwatch/ee/` | [LangWatch Enterprise License](/langwatch/ee/LICENSE.md) (free for dev / eval / tests; production use needs a commercial license) |
-| `typescript-sdk/` | [MIT](/typescript-sdk/LICENSE) |
-| `python-sdk/` | [MIT](/python-sdk/LICENSE) |
-| `mcp-server/` | [MIT](/mcp-server/LICENSE) |
-
-Full Apache 2.0 text and the carve-out table are in [`LICENSE.md`](/LICENSE.md).
+See [`LICENSE.md`](/LICENSE.md), [`NOTICE`](/NOTICE), and [`langwatch/ee/LICENSE.md`](/langwatch/ee/LICENSE.md) for the full text and the per-folder breakdown.
 
 ## 👮‍♀️ Security + Compliance
 
