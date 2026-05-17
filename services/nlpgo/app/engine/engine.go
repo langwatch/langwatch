@@ -1257,9 +1257,38 @@ func emitPromptSpans(ctx context.Context, node *dsl.Node, inputs map[string]any)
 		Handle:        handle,
 		VersionID:     versionID,
 		VersionNumber: versionNumber,
-		Variables:     inputs,
+		Variables:     filterPromptCompileVariables(inputs),
 		Draft:         draft,
 	})
+}
+
+// filterPromptCompileVariables strips dispatch-internal keys from the
+// inputs map before they reach the Prompt.compile span. The signature
+// node's `inputs` carries both user template variables (the things a
+// `{{var}}` placeholder binds to) AND envelope-shape keys the engine
+// uses to route conversation history — only the former belong on
+// `langwatch.prompt.variables`. Surfacing the latter at the trace-UI
+// resume path renders them as Variables-panel form rows ("messages =
+// [object Object]"), which is the 2026-05-17 prod regression caught
+// in the merged #4094 dogfood.
+//
+// Reserved keys mirror what buildMessages consults for conversation
+// history (engine.go:1299): `messages` and `chat_messages`. Both are
+// dropped here regardless of value shape — even an empty-array
+// messages field is dispatch envelope, not a user variable.
+func filterPromptCompileVariables(inputs map[string]any) map[string]any {
+	if len(inputs) == 0 {
+		return inputs
+	}
+	out := make(map[string]any, len(inputs))
+	for k, v := range inputs {
+		switch k {
+		case "messages", "chat_messages":
+			continue
+		}
+		out[k] = v
+	}
+	return out
 }
 
 // buildMessages constructs the OpenAI-style chat history for a

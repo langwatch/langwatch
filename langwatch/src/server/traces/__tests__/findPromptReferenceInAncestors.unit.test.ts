@@ -248,13 +248,95 @@ describe("findPromptReferenceInAncestors()", () => {
         spans,
       });
 
-      // User-facing variables from compile must survive the merge.
-      // prompt_id from get is preserved too (defense in depth — the
-      // Go-side filter for that internal key lives in a separate PR).
+      // User-facing variables from compile survive the merge.
+      // prompt_id (from get's dispatch envelope) is dropped by the
+      // merger's INTERNAL_PROMPT_VARIABLE_KEYS filter — see paired
+      // bug #3 fix; the panel never surfaces SDK call args as
+      // template variables.
       expect(result?.promptVariables).toEqual({
-        prompt_id: "prompt_supportrouter_xyz",
         example: "foobar",
         input: "how big is mars?",
+      });
+    });
+  });
+
+  describe("when get-span carries only dispatch internals and compile is missing", () => {
+    it("returns null variables instead of surfacing prompt_id as a user var", () => {
+      // 2026-05-17 prod report (bug #3 from the merged #4094 dogfood):
+      // when the trace has *only* the get span (e.g. compile failed to
+      // emit, or wasn't recorded), the merger previously returned the
+      // get's variables map verbatim — which only contains prompt_id.
+      // The playground then rendered a Variables panel with a single
+      // "prompt_id = prompt_…" row, which is meaningless to the user.
+      // After the filter, the merger drops the internal-only map and
+      // returns null so the panel falls back to the prompt's declared
+      // inputs without injected noise.
+      const spans = [
+        { spanId: "parent-span", parentSpanId: null, startTime: 100, attributes: {} },
+        {
+          spanId: "get-span",
+          parentSpanId: "parent-span",
+          startTime: 200,
+          attributes: {
+            "langwatch.prompt.id": "support-router:6",
+            "langwatch.prompt.variables": JSON.stringify({
+              type: "json",
+              value: { prompt_id: "prompt_gg9YhtFllFNrMixRXXslv", tag: "production" },
+            }),
+          },
+        },
+        { spanId: "llm-span", parentSpanId: "parent-span", startTime: 200, attributes: {} },
+      ];
+
+      const result = findPromptReferenceInAncestors({
+        targetSpanId: "llm-span",
+        spans,
+      });
+
+      expect(result?.promptHandle).toBe("support-router");
+      expect(result?.promptVariables).toBeNull();
+    });
+  });
+
+  describe("when compile carries a leaked 'messages' field alongside user vars", () => {
+    it("strips 'messages' but preserves the user variables", () => {
+      // Defense-in-depth for traces emitted before nlpgo's emit-side
+      // filter landed. The compile span's variables map carries the
+      // dispatch envelope's `messages` array (the chat history the
+      // engine injects). The Variables panel must show only the
+      // user-declared template vars.
+      const spans = [
+        { spanId: "parent-span", parentSpanId: null, startTime: 100, attributes: {} },
+        {
+          spanId: "compile-span",
+          parentSpanId: "parent-span",
+          startTime: 200,
+          attributes: {
+            "langwatch.prompt.id": "prompt_x",
+            "langwatch.prompt.handle": "my-prompt",
+            "langwatch.prompt.version.number": 2,
+            "langwatch.prompt.variables": JSON.stringify({
+              type: "json",
+              value: {
+                input: "hello",
+                example: "foobar",
+                messages: [{ role: "user", content: "{{input}}" }],
+                chat_messages: [{ role: "assistant", content: "hi" }],
+              },
+            }),
+          },
+        },
+        { spanId: "llm-span", parentSpanId: "parent-span", startTime: 200, attributes: {} },
+      ];
+
+      const result = findPromptReferenceInAncestors({
+        targetSpanId: "llm-span",
+        spans,
+      });
+
+      expect(result?.promptVariables).toEqual({
+        input: "hello",
+        example: "foobar",
       });
     });
   });

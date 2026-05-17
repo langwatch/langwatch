@@ -209,10 +209,39 @@ function findClosestPrecedingSibling({
 }
 
 /**
+ * Keys that the python-sdk emits onto `langwatch.prompt.variables` as
+ * part of the dispatch envelope rather than as user template variables.
+ * Surfacing them in the playground's Variables panel on resume creates
+ * meaningless rows ("prompt_id = prompt_gg9YhtFllFNrMixRXXslv", "messages
+ * = [object Object]") — caught in the 2026-05-17 post-merge dogfood.
+ *
+ * Sources:
+ *  - `prompt_id` + `tag`: kwargs python's PromptApiService.get records
+ *    onto its variables map (prompt_service_tracing.py).
+ *  - `messages` + `chat_messages`: conversation history the
+ *    PromptStudioAdapter / Studio engine injects into the signature
+ *    node's inputs alongside user vars; nlpgo's filter strips them on
+ *    emit going forward but old traces still carry them.
+ *
+ * Filtering at the merger (rather than at parse) keeps the user's
+ * intent crystal clear in storage — the trace still records what the
+ * SDK actually sent — and only hides the noise at the resume UI.
+ */
+const INTERNAL_PROMPT_VARIABLE_KEYS = new Set<string>([
+  "prompt_id",
+  "tag",
+  "messages",
+  "chat_messages",
+]);
+
+/**
  * Union prompt variables across multiple references in iteration order.
  * Later entries override earlier on key collision (so compile beats get
  * on overlap, and a stale ancestor never displaces a fresh closer match).
- * Returns null only when every entry's variables are null/empty.
+ * Dispatch-internal keys (see {@link INTERNAL_PROMPT_VARIABLE_KEYS}) are
+ * skipped — they belong to the SDK's call envelope, not the prompt's
+ * declared variables. Returns null only when every remaining entry is
+ * null/empty.
  */
 function mergeVariables(
   refs: PromptReference[],
@@ -221,6 +250,7 @@ function mergeVariables(
   for (const r of refs) {
     if (!r.promptVariables) continue;
     for (const [k, v] of Object.entries(r.promptVariables)) {
+      if (INTERNAL_PROMPT_VARIABLE_KEYS.has(k)) continue;
       merged[k] = v;
     }
   }
