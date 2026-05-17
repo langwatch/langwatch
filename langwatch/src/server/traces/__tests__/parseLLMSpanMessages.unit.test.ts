@@ -21,6 +21,33 @@ describe("parseLLMSpanMessages()", () => {
     });
   });
 
+  describe("when chat_messages typed-wrapper items omit role (CR consistency)", () => {
+    // Pre-fix, the typed-wrapper branch trusted the ChatMessage type
+    // assertion and let `{content}` items through with `role` left
+    // `undefined`. The bare-array and single-object branches both
+    // default missing roles to `defaultRole` — the wrapper branch now
+    // matches them so the shape coming out is consistent regardless
+    // of which envelope carried the payload.
+    it("defaults missing role to defaultRole, matching the other branches", () => {
+      const attrs = {
+        "langwatch.input": JSON.stringify({
+          type: "chat_messages",
+          value: [
+            { content: "no role here" },
+            { role: "user", content: "explicit role" },
+            { role: 42, content: "non-string role" },
+          ],
+        }),
+      };
+      const result = parseLLMSpanMessages(attrs);
+      expect(result).toEqual([
+        { role: "user", content: "no role here" },
+        { role: "user", content: "explicit role" },
+        { role: "user", content: "non-string role" },
+      ]);
+    });
+  });
+
   describe("when input carries a bare array of message objects (nlpgo langwatch.input shape)", () => {
     it("extracts each entry with its embedded role", () => {
       const attrs = {

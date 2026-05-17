@@ -88,12 +88,26 @@ function pushDecoded(
     (parsed as { type?: unknown }).type === "chat_messages" &&
     Array.isArray((parsed as { value?: unknown }).value)
   ) {
-    out.push(
-      ...((parsed as { value: ChatMessage[] }).value.filter(
-        (m): m is ChatMessage =>
-          !!m && typeof m === "object" && typeof m.content === "string",
-      )),
-    );
+    // Normalize role for every entry the same way the bare-array and
+    // single-object branches do — an item with a missing or non-string
+    // role gets `defaultRole`. Pre-fix this branch trusted the typed-
+    // wrapper assertion and let invalid roles through, producing an
+    // inconsistent shape vs the sibling branches.
+    for (const item of (parsed as { value: unknown[] }).value) {
+      if (
+        item &&
+        typeof item === "object" &&
+        typeof (item as { content?: unknown }).content === "string"
+      ) {
+        const role = (item as { role?: unknown }).role;
+        out.push({
+          role: (typeof role === "string"
+            ? role
+            : defaultRole) as ChatMessage["role"],
+          content: (item as { content: string }).content,
+        });
+      }
+    }
   } else if (Array.isArray(parsed)) {
     for (const item of parsed) {
       if (
