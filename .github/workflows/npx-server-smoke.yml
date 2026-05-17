@@ -191,13 +191,32 @@ jobs:
           # because of this).
           set -eo pipefail
           base=${RESOLVED_BASE}
-          curl -fsS "http://127.0.0.1:$base/api/health"            | tee /tmp/health-app.json
+          # The Wait step only gates on langwatch /api/health (~13s on a
+          # cold runner), but langevals normally finishes its fastapi boot
+          # + evaluator discovery ~1-2s later (~14-15s). One-shot probes
+          # raced langevals and intermittently failed on all runners.
+          # Retry each endpoint for up to 60s — same pattern the CLI
+          # orchestrator uses internally.
+          probe() {
+            local name="$1" url="$2" out="$3"
+            for i in $(seq 1 60); do
+              if curl -fsS "$url" > "$out" 2>/dev/null; then
+                echo "✓ $name healthy after ${i}s"
+                cat "$out"; echo
+                return 0
+              fi
+              sleep 1
+            done
+            echo "✗ $name never responded at $url"
+            return 1
+          }
+          probe app       "http://127.0.0.1:$base/api/health"      /tmp/health-app.json
           # nlpgo only serves /healthz (chi-routed liveness). /health
           # falls through to goOnlyModeFallback OR the proxypass
           # 502-after-hang loop and is not a valid probe.
-          curl -fsS "http://127.0.0.1:$((base + 1))/healthz"       | tee /tmp/health-nlp.json
-          curl -fsS "http://127.0.0.1:$((base + 2))/"              | tee /tmp/health-langevals.json
-          curl -fsS "http://127.0.0.1:$((base + 3))/healthz"       | tee /tmp/health-gateway.json
+          probe nlpgo     "http://127.0.0.1:$((base + 1))/healthz" /tmp/health-nlp.json
+          probe langevals "http://127.0.0.1:$((base + 2))/"        /tmp/health-langevals.json
+          probe gateway   "http://127.0.0.1:$((base + 3))/healthz" /tmp/health-gateway.json
 
       # Belt-and-suspenders for the beta.8 → beta.9 regression: the smoke
       # matrix happily passed for weeks while aigateway was being silently
