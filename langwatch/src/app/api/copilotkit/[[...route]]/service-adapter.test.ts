@@ -330,14 +330,64 @@ describe("PromptStudioAdapter", () => {
 
       const envelope = lastPostedEvent();
       const sent: { role: string; content: string }[] = envelope.payload.inputs.messages;
-      // Template's `{{input}}` turn + 2 prior live turns (older question
-      // + older reply). The latest "test7" turn is absorbed.
+      // Prior live history (older question + older reply) FIRST, then
+      // the template's `{{input}}` slot which renders to the latest
+      // "test7" turn at the END. Pre-2026-05-17 the order was inverted
+      // — `{{input}}` shipped at index 0 and the live history trailed
+      // behind, so the LLM read the latest user input as if it came
+      // BEFORE every prior turn. The screenshot from rchaves caught
+      // this: 'huh?' (latest) landed at messages[1] right after the
+      // system prompt, with 'how big is mars?' (older) following.
       expect(sent.map((m) => m.content)).toEqual([
-        "{{input}}",
         "older question",
         "older reply",
+        "{{input}}",
       ]);
       expect(envelope.payload.inputs.input).toBe("test7");
+    });
+
+    // 2026-05-17 prod regression — caught after #4098 merged.
+    // rchaves: "huh?" was the LATEST user message in the playground,
+    // but the trace shows it injected at messages[1] right after the
+    // system slot, with the actual conversation history ("how big is
+    // mars?", assistant reply, "thanks bro!", assistant reply)
+    // following it. This test replays the exact multi-turn shape that
+    // surfaced the bug.
+    it("places the latest user turn at the END of the messages array, not after the system slot", async () => {
+      const { eventSource } = createMockEventSource();
+      await runProcess(
+        adapter,
+        buildRequestWithChat({
+          additionalParams: buildAdditionalParams({
+            messages: [
+              { role: "system", content: "Welcome" },
+              { role: "user", content: "{{input}}" },
+            ],
+          }),
+          chatMessages: [
+            { role: "user", content: "how big is mars?" },
+            { role: "assistant", content: "Mars is 6,779 km in diameter." },
+            { role: "user", content: "thanks bro!" },
+            { role: "assistant", content: "You're welcome." },
+            { role: "user", content: "huh?" },
+          ],
+          eventSource,
+        }),
+      );
+
+      const envelope = lastPostedEvent();
+      const sent: { role: string; content: string }[] = envelope.payload.inputs.messages;
+      // Chronological history (everything BEFORE the latest user turn)
+      // + template's `{{input}}` slot at the end, which the downstream
+      // render will resolve to "huh?".
+      expect(sent.map((m) => ({ role: m.role, content: m.content }))).toEqual([
+        { role: "user", content: "how big is mars?" },
+        { role: "assistant", content: "Mars is 6,779 km in diameter." },
+        { role: "user", content: "thanks bro!" },
+        { role: "assistant", content: "You're welcome." },
+        { role: "user", content: "{{input}}" },
+      ]);
+      expect(envelope.payload.inputs.input).toBe("huh?");
     });
 
     it("absorbs the live turn when the template references {{input}} only in the system message", async () => {
