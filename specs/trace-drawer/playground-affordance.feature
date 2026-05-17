@@ -41,6 +41,13 @@ Feature: Open in Playground from anywhere a prompt is shown in the trace drawer
     Then the playground loads using the nearest llm child or sibling
     And the prompt accordion is populated as if the user had clicked from that llm directly
 
+  Scenario: Resolver falls back to the earliest trace llm when no child or sibling matches
+    Given the user is viewing a non-llm span with no llm descendants
+    And no sibling llm started at or after the requested span
+    When the user clicks "Open in Playground" in the Prompt accordion
+    Then the playground loads using the earliest llm in the trace
+    And the prompt accordion is populated from that earliest llm's data
+
   Scenario: Open in Playground on a Prompts tab usage card
     Given the v2 trace drawer's Prompts tab lists at least one prompt usage
     When the user clicks "Open in Playground" on a usage card

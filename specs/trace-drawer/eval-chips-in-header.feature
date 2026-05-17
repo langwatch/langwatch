@@ -20,7 +20,7 @@ Feature: Eval chips in the trace drawer header
   Scenario: Hovering an eval chip shows its full detail popover
     Given the operator hovers an eval chip
     Then the same popover that the trace list table uses appears
-    With the eval's full name, score / pass-fail, and any error / explanation
+    And the popover shows the eval's full name, score / pass-fail, and any error / explanation
 
   Scenario: Clicking an eval chip jumps to the Evals accordion
     Given the operator clicks an eval chip

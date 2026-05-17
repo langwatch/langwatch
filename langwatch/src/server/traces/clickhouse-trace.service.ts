@@ -2179,17 +2179,22 @@ function findNearestLlm<T extends PromptStudioCandidateRow>(
     }
   }
 
-  // 2. Sibling llm under the same parent that started at/after the
-  //    requested span. Prefer earliest such, so we land on the *next*
-  //    call, not one further down the chain.
-  if (requested.ParentSpanId) {
-    const siblings = (childrenByParent.get(requested.ParentSpanId) ?? [])
-      .filter((s) => s.SpanId !== requested.SpanId && isLlm(s))
-      .sort((a, b) => a.StartTime - b.StartTime);
-    const nextOrSame = siblings.find((s) => s.StartTime >= requested.StartTime);
-    if (nextOrSame) return nextOrSame;
-    if (siblings.length > 0) return siblings[0] ?? null;
-  }
+  // 2. Sibling llm under the same parent (or root-level peer if the
+  //    requested span has no parent) that started at/after the requested
+  //    span. Earliest qualifying sibling wins, so we land on the *next*
+  //    call rather than one further down the chain. Siblings that
+  //    started *before* the requested span do NOT count — those belong
+  //    to an earlier turn and would open an unrelated playground
+  //    context — so the search falls through to step 3 instead.
+  const siblingPool =
+    requested.ParentSpanId == null
+      ? rows.filter((r) => r.ParentSpanId == null)
+      : (childrenByParent.get(requested.ParentSpanId) ?? []);
+  const siblings = siblingPool
+    .filter((s) => s.SpanId !== requested.SpanId && isLlm(s))
+    .sort((a, b) => a.StartTime - b.StartTime);
+  const nextOrSame = siblings.find((s) => s.StartTime >= requested.StartTime);
+  if (nextOrSame) return nextOrSame;
 
   // 3. Earliest llm in the trace.
   return llmRows.sort((a, b) => a.StartTime - b.StartTime)[0] ?? null;

@@ -1,5 +1,5 @@
 import { Box, Button, HStack, Icon, Input, Text } from "@chakra-ui/react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { LuCheck, LuCopy, LuPin, LuPinOff } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -46,7 +46,17 @@ function useLabelColumnWidth() {
     }
   }, []);
 
-  return [width, setAndPersist] as const;
+  const applyDelta = useCallback((deltaPx: number) => {
+    setWidth((prev) => {
+      const clamped = clampLabelWidth(prev + deltaPx);
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(LABEL_WIDTH_STORAGE_KEY, String(clamped));
+      }
+      return clamped;
+    });
+  }, []);
+
+  return [width, setAndPersist, applyDelta] as const;
 }
 
 /**
@@ -472,13 +482,8 @@ export function AttributeTable({
 }: AttributeTableProps) {
   const [viewMode, setViewMode] = useState<AttrViewMode>("flat");
   const [searchTerm, setSearchTerm] = useState("");
-  const [labelWidth, setLabelWidth] = useLabelColumnWidth();
-  const handleLabelResize = useCallback(
-    (delta: number) => {
-      setLabelWidth(labelWidth + delta);
-    },
-    [labelWidth, setLabelWidth],
-  );
+  const [labelWidth, , applyLabelDelta] = useLabelColumnWidth();
+  const handleLabelResize = applyLabelDelta;
 
   const flatAttrs = useMemo(() => flattenAttributes(attributes), [attributes]);
   const flatResAttrs = useMemo(
