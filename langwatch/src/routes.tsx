@@ -406,6 +406,10 @@ const routes: RouteObject[] = [
   { path: "/ops", ...page(() => import("./pages/ops/index")) },
   { path: "/ops/queues", ...page(() => import("./pages/ops/queues")) },
   { path: "/ops/dejaview", ...page(() => import("./pages/ops/dejaview")) },
+  {
+    path: "/ops/feature-flags",
+    ...page(() => import("./pages/ops/feature-flags")),
+  },
   { path: "/ops/foundry", ...page(() => import("./pages/ops/foundry")) },
   {
     path: "/ops/projections",
