@@ -4,8 +4,11 @@ import {
   type ScenarioChipData,
   useScenarioChipData,
 } from "../components/TraceDrawer/ScenarioChip";
+import { useDrawerStore } from "../stores/drawerStore";
 import { useFilterStore } from "../stores/filterStore";
+import { useFocusSectionStore } from "../stores/focusSectionStore";
 import { parseSdkInfo, type SdkInfo } from "../utils/sdkInfo";
+import { type RichEval, useTraceEvaluations } from "./useTraceEvaluations";
 import { usePromptByHandle } from "./usePromptByHandle";
 
 export interface SdkInfoLike {
@@ -55,6 +58,11 @@ export type TraceHeaderChipData =
       state: PromptChipState;
       driftFromSelection: boolean;
       outOfDate: boolean;
+    }
+  | {
+      kind: "eval";
+      eval: RichEval;
+      onClick: () => void;
     };
 
 interface UseTraceHeaderChipsOptions {
@@ -167,6 +175,26 @@ export function useTraceHeaderChips(
       state: lastUsedState,
       driftFromSelection,
       outOfDate: isOutOfDate,
+    });
+  }
+
+  // One chip per evaluation result. Click jumps to the trace Summary
+  // Evals accordion and scrolls it into view — operators previously had
+  // to expand the drawer past the metadata strip to see any eval
+  // signal, even on heavily-evaluated traces.
+  const { rich: evals } = useTraceEvaluations();
+  const setViewMode = useDrawerStore((s) => s.setViewMode);
+  const setActiveTab = useDrawerStore((s) => s.setActiveTab);
+  const requestFocus = useFocusSectionStore((s) => s.request);
+  for (const ev of evals) {
+    chips.push({
+      kind: "eval",
+      eval: ev,
+      onClick: () => {
+        setViewMode("trace");
+        setActiveTab("summary");
+        requestFocus({ traceId: trace.traceId, section: "evals" });
+      },
     });
   }
 

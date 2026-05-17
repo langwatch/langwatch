@@ -1,9 +1,10 @@
-import { Avatar, Box, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import { Avatar, Box, Circle, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { Lightbulb } from "lucide-react";
 import {
   LuBookMarked,
   LuCircleDashed,
   LuCode,
+  LuGauge,
   LuGlobe,
   LuHistory,
   LuMessageSquare,
@@ -15,6 +16,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { TraceHeader } from "~/server/api/routers/tracesV2.schemas";
 import { api } from "~/utils/api";
 import { useConversationTurns } from "../../hooks/useConversationTurns";
+import type { RichEval } from "../../hooks/useTraceEvaluations";
 import {
   type PromptChipState,
   type SdkInfoLike,
@@ -215,6 +217,8 @@ function buildChipDef(
         }),
         priority,
       };
+    case "eval":
+      return { ...buildEvalChipDef(data.eval, data.onClick), priority };
   }
 }
 
@@ -429,6 +433,166 @@ function buildLastUsedPromptChipDef({
     ariaLabel: spanId
       ? `Jump to the span that ran prompt ${handle}`
       : `Open prompt ${handle} in the Prompts tab`,
+  };
+}
+
+function evalStatusTone(
+  ev: RichEval,
+): "green" | "red" | "yellow" | "neutral" {
+  switch (ev.status) {
+    case "pass":
+      return "green";
+    case "fail":
+      return "red";
+    case "error":
+    case "warning":
+      return "yellow";
+    case "skipped":
+    default:
+      return "neutral";
+  }
+}
+
+function evalStatusDot(ev: RichEval): string {
+  switch (ev.status) {
+    case "pass":
+      return "green.solid";
+    case "fail":
+      return "red.solid";
+    case "error":
+    case "warning":
+      return "yellow.solid";
+    case "skipped":
+    default:
+      return "gray.solid";
+  }
+}
+
+function evalStatusLabel(ev: RichEval): string {
+  switch (ev.status) {
+    case "pass":
+      return "Pass";
+    case "fail":
+      return "Fail";
+    case "error":
+      return "Error";
+    case "skipped":
+      return "Skipped";
+    case "warning":
+      return "Warning";
+    default:
+      return "—";
+  }
+}
+
+function formatEvalScore(ev: RichEval): string | null {
+  if (typeof ev.score !== "number") return null;
+  return ev.score <= 1 ? ev.score.toFixed(2) : ev.score.toFixed(1);
+}
+
+function buildEvalChipDef(ev: RichEval, onClick: () => void): ChipDef {
+  const tone = evalStatusTone(ev);
+  const dot = evalStatusDot(ev);
+  const score = formatEvalScore(ev);
+  const displayName = ev.name || ev.evaluatorId;
+  const statusLabel = evalStatusLabel(ev);
+  // For pass / fail we already show the colour-coded dot — the trailing
+  // value reads as the score (or the verdict label when there's no
+  // numeric score). For skipped / error use the status label so the
+  // chip is never just `<name>` with no signal.
+  const value = score
+    ? `${displayName} ${score}`
+    : ev.status === "pass" || ev.status === "fail"
+      ? `${displayName} ${statusLabel}`
+      : `${displayName} ${statusLabel}`;
+  return {
+    id: `eval:${ev.evaluationId}`,
+    label: "Eval",
+    value,
+    icon: LuGauge,
+    dot,
+    tone,
+    onClick,
+    ariaLabel: `Eval ${displayName}: ${statusLabel}${score ? ` ${score}` : ""}`,
+    tooltip: (
+      <VStack align="stretch" gap={1.5} minWidth="240px" maxWidth="340px">
+        <HStack gap={2}>
+          <Circle size="8px" bg={dot} flexShrink={0} />
+          <Text textStyle="sm" fontWeight="semibold" truncate>
+            {displayName}
+          </Text>
+        </HStack>
+        <HStack justify="space-between" gap={3}>
+          <Text textStyle="2xs" color="fg.muted">
+            Status
+          </Text>
+          <Text textStyle="2xs" fontWeight="semibold">
+            {statusLabel}
+          </Text>
+        </HStack>
+        {score && (
+          <HStack justify="space-between" gap={3}>
+            <Text textStyle="2xs" color="fg.muted">
+              Score
+            </Text>
+            <Text textStyle="2xs" fontWeight="semibold">
+              {score}
+            </Text>
+          </HStack>
+        )}
+        {ev.label && (
+          <HStack justify="space-between" gap={3}>
+            <Text textStyle="2xs" color="fg.muted">
+              Label
+            </Text>
+            <Text textStyle="2xs" fontWeight="semibold">
+              {ev.label}
+            </Text>
+          </HStack>
+        )}
+        {ev.reasoning && (
+          <VStack
+            align="stretch"
+            gap={0.5}
+            paddingTop={1.5}
+            borderTopWidth="1px"
+            borderColor="border.muted"
+          >
+            <Text textStyle="2xs" color="fg.muted">
+              Reasoning
+            </Text>
+            <Text textStyle="2xs" color="fg" whiteSpace="pre-wrap">
+              {ev.reasoning}
+            </Text>
+          </VStack>
+        )}
+        {ev.errorMessage && (
+          <VStack
+            align="stretch"
+            gap={0.5}
+            paddingTop={1.5}
+            borderTopWidth="1px"
+            borderColor="border.muted"
+          >
+            <Text textStyle="2xs" color="red.fg">
+              Error
+            </Text>
+            <Text textStyle="2xs" color="fg" whiteSpace="pre-wrap">
+              {ev.errorMessage}
+            </Text>
+          </VStack>
+        )}
+        <Text
+          textStyle="2xs"
+          color="fg.subtle"
+          paddingTop={1}
+          borderTopWidth="1px"
+          borderColor="border.muted"
+        >
+          Click to jump to the Evals section
+        </Text>
+      </VStack>
+    ),
   };
 }
 

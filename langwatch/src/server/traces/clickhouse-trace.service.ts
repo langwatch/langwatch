@@ -964,16 +964,27 @@ export class ClickHouseTraceService {
             StatusMessage: string | null;
           }>;
 
-          const row = allRows.find((r) => r.SpanId === spanId);
-          if (!row) {
+          const requestedRow = allRows.find((r) => r.SpanId === spanId);
+          if (!requestedRow) {
             return null;
           }
 
-          // Check if this is an LLM span by looking at attributes
-          const spanType = row.SpanAttributes["langwatch.span.type"] as
-            | string
-            | undefined;
-          if (spanType !== "llm") {
+          // If the caller pointed us at a non-llm span (e.g. the user
+          // clicked "Open in Playground" from the Prompt.compile or
+          // PromptApiService.get span, or from the Prompts tab usage
+          // card), resolve to the nearest llm in the trace that the
+          // operator most likely meant: a descendant first, then a
+          // sibling that started at or after the requested span. The
+          // playground form needs an llm span's messages + llm config —
+          // anything else lands as "No prompts open".
+          const requestedType = requestedRow.SpanAttributes[
+            "langwatch.span.type"
+          ] as string | undefined;
+          const row =
+            requestedType === "llm"
+              ? requestedRow
+              : (findNearestLlm(allRows, requestedRow) ?? null);
+          if (!row) {
             return null;
           }
 
@@ -1010,7 +1021,7 @@ export class ClickHouseTraceService {
             });
 
             const ancestorRef = findPromptReferenceInAncestors({
-              targetSpanId: spanId,
+              targetSpanId: row.SpanId,
               spans: ancestorSpans,
             });
             if (ancestorRef?.promptHandle) {
@@ -2117,6 +2128,71 @@ interface JoinedTraceSpanRow extends TraceSummaryRow {
   ss_DroppedAttributesCount: number | null;
   ss_DroppedEventsCount: number | null;
   ss_DroppedLinksCount: number | null;
+}
+
+interface PromptStudioCandidateRow {
+  SpanId: string;
+  ParentSpanId: string | null;
+  SpanAttributes: Record<string, unknown>;
+  StartTime: number;
+}
+
+/**
+ * Given a non-llm span the operator clicked "Open in Playground" from
+ * (typically `Prompt.compile` or `PromptApiService.get`), find the
+ * nearest llm in the same trace to load instead. Preference order:
+ *   1. Closest descendant llm under the requested span — usually a child
+ *      llm call that consumed the just-compiled prompt.
+ *   2. Sibling llm under the same parent that started after the
+ *      requested span — the next llm call in the chain.
+ *   3. First llm in the trace by start time as a last resort.
+ * Returns null when the trace genuinely has no llm spans.
+ */
+function findNearestLlm<T extends PromptStudioCandidateRow>(
+  rows: T[],
+  requested: T,
+): T | null {
+  const isLlm = (r: T) =>
+    (r.SpanAttributes["langwatch.span.type"] as string | undefined) === "llm";
+
+  const llmRows = rows.filter(isLlm);
+  if (llmRows.length === 0) return null;
+
+  // 1. Descendant llm closest to the requested span (smallest depth diff).
+  const childrenByParent = new Map<string, T[]>();
+  for (const r of rows) {
+    if (!r.ParentSpanId) continue;
+    const list = childrenByParent.get(r.ParentSpanId);
+    if (list) list.push(r);
+    else childrenByParent.set(r.ParentSpanId, [r]);
+  }
+  const visited = new Set<string>();
+  const queue: T[] = [requested];
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    if (visited.has(current.SpanId)) continue;
+    visited.add(current.SpanId);
+    const children = childrenByParent.get(current.SpanId) ?? [];
+    for (const child of children) {
+      if (isLlm(child)) return child;
+      queue.push(child);
+    }
+  }
+
+  // 2. Sibling llm under the same parent that started at/after the
+  //    requested span. Prefer earliest such, so we land on the *next*
+  //    call, not one further down the chain.
+  if (requested.ParentSpanId) {
+    const siblings = (childrenByParent.get(requested.ParentSpanId) ?? [])
+      .filter((s) => s.SpanId !== requested.SpanId && isLlm(s))
+      .sort((a, b) => a.StartTime - b.StartTime);
+    const nextOrSame = siblings.find((s) => s.StartTime >= requested.StartTime);
+    if (nextOrSame) return nextOrSame;
+    if (siblings.length > 0) return siblings[0] ?? null;
+  }
+
+  // 3. Earliest llm in the trace.
+  return llmRows.sort((a, b) => a.StartTime - b.StartTime)[0] ?? null;
 }
 
 /**

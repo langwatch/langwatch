@@ -9,14 +9,12 @@ import {
 } from "@chakra-ui/react";
 import { useMemo } from "react";
 import {
-  LuChevronDown,
   LuCopy,
   LuExternalLink,
   LuPencil,
 } from "react-icons/lu";
 import { useDrawer } from "~/hooks/useDrawer";
 import { Link } from "~/components/ui/link";
-import { Menu } from "~/components/ui/menu";
 import { useGoToSpanInPlaygroundTabUrlBuilder } from "~/prompts/prompt-playground/hooks/useLoadSpanIntoPromptPlayground";
 import type { SpanDetail } from "~/server/api/routers/tracesV2.schemas";
 import {
@@ -59,13 +57,6 @@ export function PromptAccordion({ span }: PromptAccordionProps) {
 
   const rawHandle = ref?.handle ?? null;
   const displayHandle = resolvedHandle ?? rawHandle;
-  const isLlmSpan = span.type === "llm";
-  const promptRefLabel =
-    rawHandle && ref?.versionNumber != null
-      ? `${rawHandle}:${ref.versionNumber}`
-      : rawHandle && ref?.tag
-        ? `${rawHandle}:${ref.tag}`
-        : rawHandle;
 
   // No-prompt llm spans don't reach this component anymore (the IOViewer
   // header carries the Playground affordance for that case). When we do
@@ -203,38 +194,25 @@ export function PromptAccordion({ span }: PromptAccordionProps) {
             <Icon as={LuPencil} boxSize={3} />
             Open prompt
           </Button>
-          {isLlmSpan && (
-            <Menu.Root>
-              <Menu.Trigger asChild>
-                <Button size="xs" variant="ghost" gap={1}>
-                  <Icon as={LuExternalLink} boxSize={3} />
-                  Open in Playground
-                  <Icon as={LuChevronDown} boxSize={2.5} />
-                </Button>
-              </Menu.Trigger>
-              <Menu.Content>
-                <Menu.Item value="open-existing" asChild>
-                  <Link
-                    href={
-                      buildUrl(span.spanId, "open-existing")?.toString() ?? ""
-                    }
-                    isExternal
-                  >
-                    Open {promptRefLabel ?? "prompt"}
-                  </Link>
-                </Menu.Item>
-                <Menu.Item value="create-new" asChild>
-                  <Link
-                    href={
-                      buildUrl(span.spanId, "create-new")?.toString() ?? ""
-                    }
-                    isExternal
-                  >
-                    Create new prompt
-                  </Link>
-                </Menu.Item>
-              </Menu.Content>
-            </Menu.Root>
+          {/* Single smart-default button: server resolves to the
+              linked llm when this span isn't an llm itself
+              (Prompt.compile, PromptApiService.get), opens the
+              existing prompt at the traced version when one is
+              linked, or creates a fresh tab otherwise. Same
+              affordance the IOViewer header carries on llm spans —
+              kept identical here so behavior is predictable
+              wherever a prompt is surfaced. */}
+          {buildUrl(span.spanId) && (
+            <Link
+              href={buildUrl(span.spanId)?.toString() ?? ""}
+              isExternal
+              variant="plain"
+            >
+              <Button size="xs" variant="ghost" gap={1}>
+                <Icon as={LuExternalLink} boxSize={3} />
+                Open in Playground
+              </Button>
+            </Link>
           )}
         </HStack>
       )}
