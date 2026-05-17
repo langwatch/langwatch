@@ -153,7 +153,13 @@ export function extractPromptReference(
   if (!params) return null;
 
   const variables = parsePromptVariables(params);
-  const draft = readAttribute(params, "langwatch.prompt.draft") === true;
+  // Accept both native boolean true (OTLP wire) and the stringified
+  // "true" form (ClickHouse SpanAttributes stringifies scalar attrs on
+  // ingestion, so an `attribute.Bool(true)` from nlpgo lands as the
+  // string "true" on read). Anything else is treated as not-draft —
+  // matches python-sdk's omission convention.
+  const draftRaw = readAttribute(params, "langwatch.prompt.draft");
+  const draft = draftRaw === true || draftRaw === "true";
 
   const promptId = readAttribute(params, "langwatch.prompt.id");
   if (typeof promptId === "string" && promptId.includes(":")) {

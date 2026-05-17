@@ -89,6 +89,14 @@ function aggregatePromptUsage(
         usage.variables[k] = v;
       }
     }
+    // Propagate draft=true forward. The flag lives on Prompt.compile
+    // but the first span we see for a given prompt may be the
+    // sibling PromptApiService.get which doesn't carry it — without
+    // this merge the usage.ref.draft would be locked to the get
+    // span's `false` and the "unsaved edits" chip never renders.
+    if (ref.draft && !usage.ref.draft) {
+      usage.ref = { ...usage.ref, draft: true };
+    }
   }
 
   const ordered: PromptUsage[] = [];
@@ -469,6 +477,17 @@ function PromptUsageCard({
           {ref.tag && (
             <Badge size="sm" variant="outline" colorPalette="blue">
               {ref.tag}
+            </Badge>
+          )}
+          {ref.draft && (
+            // Executed config diverged from the saved version (user
+            // edited inline without saving). Amber chip so operators
+            // know "Open prompt" lands on the base version, not the
+            // diverged messages in the trace. Mirrors the same chip
+            // in PromptAccordion.tsx — kept in sync for parity across
+            // the two prompt-surfacing components in the drawer.
+            <Badge size="sm" variant="subtle" colorPalette="orange">
+              unsaved edits
             </Badge>
           )}
         </HStack>

@@ -76,6 +76,26 @@ describe("extractPromptReference", () => {
       });
       expect(ref?.draft).toBe(true);
     });
+
+    it("accepts the stringified \"true\" form (ClickHouse SpanAttributes path)", () => {
+      // Regression caught during 2026-05-17 dogfood: the ClickHouse
+      // SpanAttributes column stringifies scalar OTel attrs on ingest,
+      // so an `attribute.Bool(true)` from nlpgo lands as the literal
+      // string "true" by the time the trace API serves it back. A
+      // strict `=== true` check returned false and the "unsaved edits"
+      // chip never rendered. The reader now accepts both boolean true
+      // and the string form.
+      const refFlat = extractPromptReference({
+        "langwatch.prompt.id": "support-router:6",
+        "langwatch.prompt.draft": "true",
+      });
+      expect(refFlat?.draft).toBe(true);
+
+      const refNested = extractPromptReference({
+        langwatch: { prompt: { id: "support-router:6", draft: "true" } },
+      });
+      expect(refNested?.draft).toBe(true);
+    });
   });
 
   describe("when langwatch.prompt.draft is explicitly false or absent", () => {
