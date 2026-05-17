@@ -606,10 +606,13 @@ describe.skipIf(!shouldRun)(
         // subprocess + pipeline tests under a 4-wide vitest pool; on a
         // saturated CI runner the chain has been observed to need well
         // past 45s purely from scheduler contention (the spans DO land,
-        // just late). 120s deadline absorbs all three plus that
-        // contention with margin — widening the budget cannot mask a
-        // real regression because the assertions below still require the
-        // spans to actually arrive under the inbound trace_id.
+        // just late). First widening (45s→120s, 90s→180s outer) absorbed
+        // most contention but still flaked at ~194s total. 240s deadline
+        // + 300s outer it() budget below absorb the long tail too. The
+        // budget widenings cannot mask a real regression because the
+        // assertions still require the spans to actually arrive under
+        // the inbound trace_id — they just give the documented async
+        // chain more wall-clock on a fully saturated CI runner.
         //
         // CRITICAL: we must NOT exit the loop on the first non-empty
         // result. The studio root span ends AFTER its children, so BSP
@@ -657,7 +660,7 @@ describe.skipIf(!shouldRun)(
           );
 
         let rows: SpanRow[] = [];
-        const deadline = Date.now() + 120_000;
+        const deadline = Date.now() + 240_000;
         while (Date.now() < deadline) {
           rows = await fetchRows();
           if (rows.length > 0 && hasLinkedSpan(rows)) break;
@@ -696,7 +699,7 @@ describe.skipIf(!shouldRun)(
               .join(", ")}`,
         ).toBeGreaterThan(0);
       },
-      180_000,
+      300_000,
     );
   },
 );
