@@ -200,7 +200,10 @@ jobs:
           probe() {
             local name="$1" url="$2" out="$3"
             for i in $(seq 1 60); do
-              if curl -fsS "$url" > "$out" 2>/dev/null; then
+              # --connect-timeout caps TCP setup so a single network hang
+              # can't eat the whole 60s budget; --max-time caps the full
+              # request so a slow-bodied response can't either.
+              if curl -fsS --connect-timeout 2 --max-time 5 "$url" > "$out" 2>/dev/null; then
                 echo "✓ $name healthy after ${i}s"
                 cat "$out"; echo
                 return 0
