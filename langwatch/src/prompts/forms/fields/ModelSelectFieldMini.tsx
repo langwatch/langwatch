@@ -13,6 +13,11 @@ import {
   type OutputType,
 } from "~/components/llmPromptConfigs/LLMConfigPopover";
 import { LLMModelDisplay } from "~/components/llmPromptConfigs/LLMModelDisplay";
+import {
+  allModelOptions,
+  useModelSelectionOptions,
+} from "~/components/ModelSelector";
+import { NoModelsConfiguredCallout } from "~/components/NoModelsConfiguredCallout";
 import { Popover } from "~/components/ui/popover";
 import type { PromptConfigFormValues } from "~/prompts";
 import type { LlmConfigOutputType } from "~/types";
@@ -68,6 +73,24 @@ export const ModelSelectFieldMini = React.memo(function ModelSelectFieldMini({
     },
     [outputsFieldArray],
   );
+
+  // Hooked at the top level (not inside Controller's render callback) so
+  // React doesn't complain about conditional hook order. The current
+  // form value lives in form state; reading it here for the empty-state
+  // check is cheap and the picker re-renders on form changes anyway.
+  const watchedLlm = useWatch({ control, name: "version.configData.llm" });
+  const { isEmpty } = useModelSelectionOptions(
+    allModelOptions,
+    watchedLlm?.model ?? "",
+    "chat",
+  );
+
+  if (isEmpty) {
+    // Skip the popover trigger entirely when the project has zero
+    // enabled providers — clicking the chip would just open a dropdown
+    // with no items. Honest empty-state callout instead.
+    return <NoModelsConfiguredCallout size="full" />;
+  }
 
   return (
     <Controller
