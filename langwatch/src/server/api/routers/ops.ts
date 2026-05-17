@@ -9,6 +9,13 @@ import type { DashboardData } from "~/server/app-layer/ops/types";
 import { getProjectionMetadata, getReactorMetadata } from "~/server/event-sourcing/pipelineRegistry";
 import { AnomalyStateStore } from "~/server/observability/anomalyState";
 import { connection } from "~/server/redis";
+import {
+  getFeatureFlagStore,
+  listExplicitFlags,
+  listFamilies,
+  resolveFlagDefinition,
+} from "~/server/featureFlag";
+import { checkFlagEnvOverride } from "~/server/featureFlag/envOverride";
 
 const opsViewPermission = checkOpsPermission({ permission: "ops:view" });
 
@@ -638,5 +645,106 @@ export const opsRouter = createTRPCRouter({
       const store = new AnomalyStateStore(connection);
       await store.clear(input.tenantId, input.kind);
       return { dismissed: true };
+    }),
+
+  /**
+   * Lists every registered feature flag plus any orphaned postgres
+   * rows. Operators use this to see the source of truth for each flag
+   * (registry default vs postgres override vs env override) before
+   * flipping anything.
+   *
+   * Read-only — no PostHog calls happen on this path either, so opening
+   * the page does not cost a flag call.
+   */
+  listFeatureFlags: protectedProcedure
+    .use(opsViewPermission)
+    .query(async () => {
+      const store = getFeatureFlagStore();
+      const stored = await store.listAll();
+      const explicit = listExplicitFlags();
+      const families = listFamilies();
+      const explicitKeys = new Set(explicit.map((e) => e.key));
+
+      const explicitRows = explicit.map((def) => {
+        const row = stored.find((s) => s.key === def.key);
+        const envOverride = checkFlagEnvOverride(def.key, def.legacyEnvVar);
+        const effective =
+          envOverride ?? row?.enabled ?? def.defaultValue;
+        return {
+          key: def.key,
+          scope: def.scope,
+          defaultValue: def.defaultValue,
+          description: def.description,
+          family: def.family ?? null,
+          storedValue: row?.enabled ?? null,
+          envOverride: envOverride ?? null,
+          effective,
+          lastEditedBy: row?.lastEditedBy ?? null,
+          updatedAt: row?.updatedAt ?? null,
+        };
+      });
+
+      // Postgres rows that don't match an explicit registry entry. They
+      // belong either to a family (e.g. the `es-` killswitch family) or
+      // to a removed flag. Operators see both so they can clean up.
+      const familyRows = stored
+        .filter((s) => !explicitKeys.has(s.key))
+        .map((s) => {
+          const def = resolveFlagDefinition(s.key);
+          const envOverride = checkFlagEnvOverride(
+            s.key,
+            def?.legacyEnvVar,
+          );
+          const effective =
+            envOverride ?? s.enabled ?? def?.defaultValue ?? false;
+          return {
+            key: s.key,
+            scope: def?.scope ?? "SYSTEM",
+            defaultValue: def?.defaultValue ?? false,
+            description: def?.description ?? "Orphaned postgres flag row (no longer registered).",
+            family: def?.family ?? null,
+            storedValue: s.enabled,
+            envOverride: envOverride ?? null,
+            effective,
+            lastEditedBy: s.lastEditedBy,
+            updatedAt: s.updatedAt,
+          };
+        });
+
+      return {
+        flags: [...explicitRows, ...familyRows],
+        families: families.map((f) => ({
+          family: f.family,
+          keyPrefix: f.keyPrefix,
+          scope: f.scope,
+          defaultValue: f.defaultValue,
+          description: f.description,
+        })),
+      };
+    }),
+
+  setFeatureFlag: protectedProcedure
+    .use(opsManagePermission)
+    .input(
+      z.object({
+        key: z.string().min(1).max(200),
+        enabled: z.boolean(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await getFeatureFlagStore().set(
+        input.key,
+        input.enabled,
+        ctx.session.user.id,
+      );
+      return { ok: true };
+    }),
+
+  clearFeatureFlag: protectedProcedure
+    .use(opsManagePermission)
+    .input(z.object({ key: z.string().min(1).max(200) }))
+    .mutation(async ({ ctx, input }) => {
+      await getFeatureFlagStore().clear(input.key, ctx.session.user.id);
+      return { ok: true };
     }),
 });

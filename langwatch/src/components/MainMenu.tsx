@@ -4,6 +4,7 @@ import {
   Activity,
   Anvil,
   Film,
+  Flag,
   Gauge,
   History,
   KeyRound,
@@ -523,6 +524,13 @@ const OpsSection = ({ showExpanded }: { showExpanded: boolean }) => {
         label="Deja View"
         href="/ops/dejaview"
         isActive={router.pathname.startsWith("/ops/dejaview")}
+        showLabel={showExpanded}
+      />
+      <SideMenuLink
+        icon={Flag}
+        label="Feature Flags"
+        href="/ops/feature-flags"
+        isActive={router.pathname.startsWith("/ops/feature-flags")}
         showLabel={showExpanded}
       />
       {isAdminUser && (

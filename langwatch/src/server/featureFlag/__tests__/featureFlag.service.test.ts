@@ -42,7 +42,7 @@ describe("FeatureFlagService", () => {
 
       it("delegates to underlying service", async () => {
         const mockService = { isEnabled: vi.fn().mockResolvedValue(true) };
-        vi.spyOn(service as any, "service", "get").mockReturnValue(mockService);
+        vi.spyOn(service as any, "legacy", "get").mockReturnValue(mockService);
 
         const result = await service.isEnabled("some-flag", "user-1", false);
 
@@ -57,7 +57,7 @@ describe("FeatureFlagService", () => {
 
       it("passes projectId to underlying service", async () => {
         const mockService = { isEnabled: vi.fn().mockResolvedValue(true) };
-        vi.spyOn(service as any, "service", "get").mockReturnValue(mockService);
+        vi.spyOn(service as any, "legacy", "get").mockReturnValue(mockService);
 
         const options = { projectId: "proj-123" };
         await service.isEnabled("some-flag", "user-1", true, options);
@@ -72,7 +72,7 @@ describe("FeatureFlagService", () => {
 
       it("passes organizationId to underlying service", async () => {
         const mockService = { isEnabled: vi.fn().mockResolvedValue(true) };
-        vi.spyOn(service as any, "service", "get").mockReturnValue(mockService);
+        vi.spyOn(service as any, "legacy", "get").mockReturnValue(mockService);
 
         const options = { organizationId: "org-456" };
         await service.isEnabled("some-flag", "user-1", false, options);
@@ -143,7 +143,7 @@ describe("FeatureFlagService", () => {
         process.env.FEATURE_FLAG_FORCE_ENABLE = "some_flag,other_flag";
         const service = FeatureFlagService.create();
         const mockSub = { isEnabled: vi.fn().mockResolvedValue(false) };
-        vi.spyOn(service as any, "service", "get").mockReturnValue(mockSub);
+        vi.spyOn(service as any, "legacy", "get").mockReturnValue(mockSub);
 
         const result = await service.isEnabled("some_flag", "user-1", false);
 
@@ -155,7 +155,7 @@ describe("FeatureFlagService", () => {
         process.env.FEATURE_FLAG_FORCE_ENABLE = "only_this_flag";
         const service = FeatureFlagService.create();
         const mockSub = { isEnabled: vi.fn().mockResolvedValue(false) };
-        vi.spyOn(service as any, "service", "get").mockReturnValue(mockSub);
+        vi.spyOn(service as any, "legacy", "get").mockReturnValue(mockSub);
 
         const result = await service.isEnabled("different_flag", "u", false);
 
@@ -167,7 +167,7 @@ describe("FeatureFlagService", () => {
         process.env.FEATURE_FLAG_FORCE_ENABLE = "  spaced_flag  , other ";
         const service = FeatureFlagService.create();
         const mockSub = { isEnabled: vi.fn().mockResolvedValue(false) };
-        vi.spyOn(service as any, "service", "get").mockReturnValue(mockSub);
+        vi.spyOn(service as any, "legacy", "get").mockReturnValue(mockSub);
 
         const result = await service.isEnabled("spaced_flag", "u", false);
 
@@ -179,7 +179,7 @@ describe("FeatureFlagService", () => {
         delete process.env.POSTHOG_KEY;
         const service = FeatureFlagService.create();
         const mockMemorySub = { isEnabled: vi.fn().mockResolvedValue(false) };
-        vi.spyOn(service as any, "service", "get").mockReturnValue(
+        vi.spyOn(service as any, "legacy", "get").mockReturnValue(
           mockMemorySub,
         );
 
