@@ -1,24 +1,23 @@
 ## LangWatch License
 
-LangWatch uses a dual-licensing model:
+This repository contains multiple components licensed separately. The Apache
+License 2.0 (reproduced in full below) applies to all files in this repository
+**except** for the following carve-outs, which are governed by their own
+license files:
 
-- **Apache License 2.0** — Everything outside `langwatch/ee/` is licensed under
-  the Apache License, Version 2.0. The full text of the license is reproduced
-  below.
+| Path | License | License file |
+|------|---------|--------------|
+| `langwatch/ee/` | LangWatch Enterprise License | [`langwatch/ee/LICENSE.md`](langwatch/ee/LICENSE.md) |
+| `typescript-sdk/` | MIT | [`typescript-sdk/LICENSE`](typescript-sdk/LICENSE) |
+| `python-sdk/` | MIT | [`python-sdk/LICENSE`](python-sdk/LICENSE) |
+| `mcp-server/` | MIT | [`mcp-server/LICENSE`](mcp-server/LICENSE) |
 
-- **LangWatch Enterprise License** — Contents under `langwatch/ee/` (and any
-  files explicitly marked as enterprise-only) are governed by the LangWatch
-  Enterprise License, located at [`langwatch/ee/LICENSE.md`](langwatch/ee/LICENSE.md).
-  These enterprise modules — SCIM, audit logs, plan/billing management, and
-  similar — are NOT covered by Apache 2.0 and require a commercial license for
-  production use.
+The `langwatch/ee/` directory contains enterprise modules (SCIM, audit logs,
+plan and billing management, and similar). Free for local development,
+evaluation, and tests; production use requires a commercial license.
 
 Third-party dependencies retain their original licenses, granted by their
 respective copyright holders.
-
-The official SDKs (`typescript-sdk/`, `python-sdk/`) and the embeddable MCP
-server (`mcp-server/`) are published as separate packages under the MIT
-License — see each package's own `LICENSE` / `package.json` for details.
 
 ---
 
