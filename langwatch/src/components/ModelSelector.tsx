@@ -169,18 +169,15 @@ export const ModelSelector = React.memo(function ModelSelector({
    *  Optional; the callout falls back to a generic message. */
   forFeatureLabel?: string;
 }) {
-  const { selectOptions, groupedByProvider } = useModelSelectionOptions(
-    options,
-    model,
-    mode,
-  );
+  const { selectOptions, groupedByProvider, isEmpty } =
+    useModelSelectionOptions(options, model, mode);
 
   // Honest empty state: when the project has zero enabled providers
   // (or zero models of the requested mode), render a guided callout
   // instead of the dropdown. The prior behaviour was to render the
   // System fallback string ("openai/gpt-5.2") in gray, which looked
   // like a real selection but errored at runtime.
-  if (selectOptions.length === 0) {
+  if (isEmpty) {
     return (
       <NoModelsConfiguredCallout
         size={size}

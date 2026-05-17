@@ -65,13 +65,19 @@ export function NoModelsConfiguredCallout({
 
   return (
     <Box
-      as="a"
-      href={settingsHref}
-      target="_blank"
-      rel="noopener noreferrer"
-      onClick={(e: React.MouseEvent) => {
-        e.preventDefault();
-        openSettings();
+      // Whole row is clickable. Rendered as a div (not an <a>) because
+      // Chakra's global anchor styles in this app fragment the rounded
+      // border (showed up as detached corner brackets — #4073 round 4).
+      // a11y is preserved via role=link + tabIndex + keyboard handler.
+      role="link"
+      tabIndex={0}
+      aria-label={`Set up models${featureSuffix}, opens settings in a new tab`}
+      onClick={openSettings}
+      onKeyDown={(e: React.KeyboardEvent) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          openSettings();
+        }
       }}
       width={size === "full" ? "100%" : "auto"}
       borderWidth="1px"
@@ -83,7 +89,11 @@ export function NoModelsConfiguredCallout({
       cursor="pointer"
       transition="background 0.15s, border-color 0.15s"
       _hover={{ bg: "bg.subtle", borderColor: "border.emphasized" }}
-      textDecoration="none"
+      _focusVisible={{
+        outline: "2px solid",
+        outlineColor: "border.emphasized",
+        outlineOffset: "2px",
+      }}
       data-testid="no-models-configured-callout"
     >
       <HStack gap={2} align="center" justify="space-between" wrap="nowrap">

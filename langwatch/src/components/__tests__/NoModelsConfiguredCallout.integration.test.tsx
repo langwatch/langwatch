@@ -53,19 +53,25 @@ function withProviders(ui: React.ReactNode) {
 describe("NoModelsConfiguredCallout", () => {
   afterEach(() => cleanup());
 
-  it("renders the standalone callout with a settings deeplink that opens in a new tab", () => {
+  it("renders the standalone callout with a clickable row that opens settings in a new tab", () => {
+    const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
     render(withProviders(<NoModelsConfiguredCallout />));
     const callout = screen.getByTestId("no-models-configured-callout");
     expect(callout).toBeInTheDocument();
     expect(screen.getByText(/No models configured/i)).toBeInTheDocument();
     expect(screen.getByTestId("no-models-configured-cta")).toBeInTheDocument();
-    // The whole callout is the anchor (rchaves: 'clicking anywhere
-    // should take them to setup'), not the inner button.
-    expect(callout.tagName).toBe("A");
-    expect(callout.getAttribute("href")).toMatch(
-      /\/settings\/model-providers/,
+    // Whole row is clickable (rchaves: 'clicking anywhere should take
+    // them to setup'). Rendered as a div with role=link rather than an
+    // anchor — the app's global anchor styles fragmented the rounded
+    // border. Clicking calls window.open with the target URL.
+    expect(callout.getAttribute("role")).toBe("link");
+    callout.click();
+    expect(openSpy).toHaveBeenCalledWith(
+      expect.stringMatching(/\/settings\/model-providers/),
+      "_blank",
+      "noopener,noreferrer",
     );
-    expect(callout.getAttribute("target")).toBe("_blank");
+    openSpy.mockRestore();
   });
 
   it("includes the surface-specific label when forFeatureLabel is provided", () => {
