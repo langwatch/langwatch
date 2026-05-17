@@ -52,7 +52,12 @@ export function TraceHeaderChips({
     onSelectSpan,
     onOpenPromptsTab,
   });
-  return <ChipBar chips={chipDefs} endSlot={endSlot} />;
+  // Trace header has plenty of horizontal room and eval/prompt chips are
+  // load-bearing signal — let up to 10 chips ride the strip before
+  // collapsing into the "+N more" pill, otherwise the second & third
+  // eval verdicts (the most actionable ones in a multi-evaluator setup)
+  // get hidden by default.
+  return <ChipBar chips={chipDefs} maxVisible={10} endSlot={endSlot} />;
 }
 
 /**
