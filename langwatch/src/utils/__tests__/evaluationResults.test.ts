@@ -323,12 +323,15 @@ describe("EVALUATION_STATUS_COLORS", () => {
     expect(EVALUATION_STATUS_COLORS.processed).toBe("blue.500");
   });
 
-  it("has correct color for error (red)", () => {
-    expect(EVALUATION_STATUS_COLORS.error).toBe("red.500");
+  it("uses a deeper red for error than for fail so the two states stay distinct", () => {
+    expect(EVALUATION_STATUS_COLORS.error).toBe("red.700");
+    expect(EVALUATION_STATUS_COLORS.error).not.toBe(
+      EVALUATION_STATUS_COLORS.failed,
+    );
   });
 
-  it("has correct color for skipped (yellow)", () => {
-    expect(EVALUATION_STATUS_COLORS.skipped).toBe("yellow.500");
+  it("renders skipped as gray — it's a setup state, not a verdict", () => {
+    expect(EVALUATION_STATUS_COLORS.skipped).toBe("gray.500");
   });
 });
 

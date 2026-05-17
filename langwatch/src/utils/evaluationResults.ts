@@ -122,7 +122,11 @@ export const parseEvaluationResult = (
 };
 
 /**
- * Status indicator colors for evaluation results.
+ * Status indicator colors for evaluation results — single source of
+ * truth for dots, popover accents, score-bar fills, and any other
+ * "one colour per status" rendering across the trace list, the v2
+ * drawer header, the Evals accordion cards, and the v3 evaluator
+ * chips. Update here and every surface follows.
  */
 export const EVALUATION_STATUS_COLORS = {
   pending: "gray.400",
@@ -130,8 +134,32 @@ export const EVALUATION_STATUS_COLORS = {
   passed: "green.500",
   failed: "red.500",
   processed: "blue.500", // Neutral color for score-only evaluators (no pass/fail)
-  error: "red.500", // Errors should be red like failures
-  skipped: "yellow.500",
+  // Errors get a deeper red so they read as "the evaluator broke",
+  // distinct from a fail verdict (which is a clean red.500).
+  error: "red.700",
+  // Skipped is a setup state, not a verdict — render gray so it doesn't
+  // compete for attention next to real pass/fail rows.
+  skipped: "gray.500",
+} as const;
+
+/**
+ * Tag rendering pairs for evaluation statuses — bg / fg combinations
+ * tuned for readability on light surfaces, used by the Evals accordion
+ * card's status pill and any future "filled chip" surface. Always
+ * derived from the same enum as `EVALUATION_STATUS_COLORS` so the
+ * dot colour and the tag colour can't drift out of step.
+ */
+export const EVALUATION_STATUS_TONES = {
+  pending: { bg: "gray.subtle", fg: "fg.muted" },
+  running: { bg: "blue.subtle", fg: "blue.fg" },
+  passed: { bg: "green.subtle", fg: "green.fg" },
+  failed: { bg: "red.subtle", fg: "red.fg" },
+  processed: { bg: "blue.subtle", fg: "blue.fg" },
+  // Darker red foreground to match the deeper dot — keeps the
+  // "this broke" reading from collapsing into a plain fail.
+  error: { bg: "red.subtle", fg: "red.700" },
+  // Gray-on-gray skipped tone — neutral, low-attention.
+  skipped: { bg: "bg.muted", fg: "fg.muted" },
 } as const;
 
 /**
