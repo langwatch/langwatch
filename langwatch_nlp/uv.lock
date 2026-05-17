@@ -13,6 +13,10 @@ resolution-markers = [
     "python_full_version < '3.12'",
 ]
 
+[options]
+exclude-newer = "2026-05-10T06:01:18.960386Z"
+exclude-newer-span = "P7D"
+
 [manifest]
 overrides = [{ name = "python-multipart", specifier = ">=0.0.27" }]
 
@@ -1887,7 +1891,7 @@ examples = [
     { name = "langchain-openai", specifier = ">=0.3.0,<1.0.0" },
     { name = "langchain-text-splitters", specifier = ">=0.3.0,<1.0.0" },
     { name = "langgraph", specifier = ">=1.0.0,<2.0.0" },
-    { name = "langsmith", specifier = ">=0.6.3" },
+    { name = "langsmith", specifier = ">=0.8.0" },
     { name = "litellm", specifier = ">=1.52.1" },
     { name = "nltk", specifier = ">=3.9.4" },
     { name = "openai", specifier = ">=1.68.2,<2.8.0" },
@@ -1900,7 +1904,7 @@ examples = [
     { name = "pydantic", specifier = ">=2.11.0" },
     { name = "pypdf", specifier = ">=6.8.0" },
     { name = "pytest", specifier = ">=7.4.2,<8.0.0" },
-    { name = "python-dotenv", specifier = "==1.2.1" },
+    { name = "python-dotenv", specifier = "==1.2.2" },
     { name = "strands-agents", extras = ["otel"], specifier = ">=1.14.0,<2.0.0" },
     { name = "streamlit", specifier = ">=1.37.1,<2.0.0" },
     { name = "unstructured", extras = ["pdf"], specifier = ">=0.18.18" },
@@ -1909,7 +1913,7 @@ examples = [
 tests = [
     { name = "factory-boy", specifier = ">=3.3.3" },
     { name = "pytest-asyncio", specifier = ">=0.21.2" },
-    { name = "python-dotenv", specifier = "==1.2.1" },
+    { name = "python-dotenv", specifier = "==1.2.2" },
 ]
 
 [[package]]

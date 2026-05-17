@@ -25,5 +25,8 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["langevals_lingua"]
 
+[tool.uv]
+exclude-newer = "7 days"
+
 [tool.uv.sources]
 langevals-core = { workspace = true }

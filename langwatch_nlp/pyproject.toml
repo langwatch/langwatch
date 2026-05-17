@@ -48,6 +48,7 @@ dev = [
 ]
 
 [tool.uv]
+exclude-newer = "7 days"
 package = false
 override-dependencies = ["python-multipart>=0.0.27"]
 
