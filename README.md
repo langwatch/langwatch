@@ -161,7 +161,9 @@ Please read our [Contribution Guidelines](https://github.com/langwatch/langwatch
 
 ## ✍️ License
 
-Please read our [LICENSE.md](/LICENSE.md) file.
+LangWatch is Apache 2.0, except for the enterprise modules (SCIM, audit logs, license and billing management, etc.) which live under `langwatch/ee/` and need a commercial license for production use. The SDKs (`typescript-sdk`, `python-sdk`, `mcp-server`) are MIT.
+
+See [`LICENSE.md`](/LICENSE.md), [`NOTICE`](/NOTICE), and [`langwatch/ee/LICENSE.md`](/langwatch/ee/LICENSE.md) for the full text and the per-folder breakdown.
 
 ## 👮‍♀️ Security + Compliance
 
