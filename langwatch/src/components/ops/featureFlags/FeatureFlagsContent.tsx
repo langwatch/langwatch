@@ -1,6 +1,7 @@
 import {
   Badge,
   Box,
+  Button,
   Center,
   HStack,
   Heading,
@@ -106,9 +107,14 @@ export function FeatureFlagsContent() {
         rows={grouped.system}
         canManage={canManage}
         isSaas={isSaas}
-        onToggle={(key, enabled) => setFlag.mutateAsync({ key, enabled })}
-        onClear={(key) => clearFlag.mutateAsync({ key })}
-        pendingKey={setFlag.variables?.key ?? clearFlag.variables?.key}
+        onToggle={({ key, enabled }) =>
+          setFlag.mutateAsync({ key, enabled })
+        }
+        onClear={({ key }) => clearFlag.mutateAsync({ key })}
+        pendingKey={
+          (setFlag.isPending ? setFlag.variables?.key : undefined) ??
+          (clearFlag.isPending ? clearFlag.variables?.key : undefined)
+        }
       />
 
       <ScopeSection
@@ -121,9 +127,14 @@ export function FeatureFlagsContent() {
         rows={grouped.product}
         canManage={canManage}
         isSaas={isSaas}
-        onToggle={(key, enabled) => setFlag.mutateAsync({ key, enabled })}
-        onClear={(key) => clearFlag.mutateAsync({ key })}
-        pendingKey={setFlag.variables?.key ?? clearFlag.variables?.key}
+        onToggle={({ key, enabled }) =>
+          setFlag.mutateAsync({ key, enabled })
+        }
+        onClear={({ key }) => clearFlag.mutateAsync({ key })}
+        pendingKey={
+          (setFlag.isPending ? setFlag.variables?.key : undefined) ??
+          (clearFlag.isPending ? clearFlag.variables?.key : undefined)
+        }
       />
 
       {query.data?.families && query.data.families.length > 0 && (
@@ -180,8 +191,8 @@ function ScopeSection({
   rows: FlagRow[];
   canManage: boolean;
   isSaas: boolean;
-  onToggle: (key: string, enabled: boolean) => Promise<unknown>;
-  onClear: (key: string) => Promise<unknown>;
+  onToggle: (input: { key: string; enabled: boolean }) => Promise<unknown>;
+  onClear: (input: { key: string }) => Promise<unknown>;
   pendingKey: string | undefined;
 }) {
   return (
@@ -237,8 +248,8 @@ function FlagRowView({
   row: FlagRow;
   canManage: boolean;
   showProductWarning: boolean;
-  onToggle: (key: string, enabled: boolean) => Promise<unknown>;
-  onClear: (key: string) => Promise<unknown>;
+  onToggle: (input: { key: string; enabled: boolean }) => Promise<unknown>;
+  onClear: (input: { key: string }) => Promise<unknown>;
   pending: boolean;
 }) {
   const [optimistic, setOptimistic] = useState<boolean | null>(null);
@@ -253,7 +264,7 @@ function FlagRowView({
   const onChange = async (next: boolean) => {
     setOptimistic(next);
     try {
-      await onToggle(row.key, next);
+      await onToggle({ key: row.key, enabled: next });
     } finally {
       setOptimistic(null);
     }
@@ -318,15 +329,20 @@ function FlagRowView({
                 {row.lastEditedBy ?? "unknown"}
               </Text>
               {canManage && (
-                <Text
+                <Button
+                  type="button"
+                  variant="plain"
+                  size="xs"
                   fontSize="xs"
                   color="blue.500"
-                  cursor="pointer"
                   textDecoration="underline"
-                  onClick={() => void onClear(row.key)}
+                  paddingX={0}
+                  height="auto"
+                  minWidth="auto"
+                  onClick={() => void onClear({ key: row.key })}
                 >
                   clear
-                </Text>
+                </Button>
               )}
             </HStack>
           </VStack>

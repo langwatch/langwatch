@@ -30,6 +30,12 @@ const CACHE_PREFIX = "feature_flag_store:";
 // killed flag still propagates within seconds, but long enough that
 // per-event reactor calls collapse to a Map lookup on the hot path.
 const LOCAL_TTL_MS = 5_000;
+// Hard cap on the in-process map size so dynamically-named keys
+// (e.g. arbitrary unregistered flag lookups) can't grow memory
+// indefinitely. Expired entries are pruned lazily on writes; when
+// the cap is still exceeded after pruning, the oldest insertions
+// (Map iteration is insertion-ordered) are evicted to fit.
+const LOCAL_MAX_KEYS = 5_000;
 
 export class FeatureFlagStorePostgres {
   private readonly logger = createLogger("langwatch:feature-flag-store");
@@ -51,12 +57,13 @@ export class FeatureFlagStorePostgres {
   async get(key: string): Promise<boolean | null> {
     const localHit = this.local.get(key);
     const now = Date.now();
-    if (localHit && localHit.expiresAt > now) {
-      return localHit.value;
+    if (localHit) {
+      if (localHit.expiresAt > now) return localHit.value;
+      this.local.delete(key);
     }
     const cached = await this.cache.get(key);
     if (cached !== undefined) {
-      this.local.set(key, { value: cached.enabled, expiresAt: now + LOCAL_TTL_MS });
+      this.writeLocal(key, cached.enabled, now);
       return cached.enabled;
     }
     try {
@@ -66,7 +73,7 @@ export class FeatureFlagStorePostgres {
       });
       const value = row?.enabled ?? null;
       await this.cache.set(key, { enabled: value });
-      this.local.set(key, { value, expiresAt: now + LOCAL_TTL_MS });
+      this.writeLocal(key, value, now);
       return value;
     } catch (error) {
       this.logger.warn(
@@ -74,6 +81,24 @@ export class FeatureFlagStorePostgres {
         "feature flag store read failed, falling back to registry default",
       );
       return null;
+    }
+  }
+
+  private writeLocal(key: string, value: boolean | null, now: number): void {
+    this.local.set(key, { value, expiresAt: now + LOCAL_TTL_MS });
+    if (this.local.size <= LOCAL_MAX_KEYS) return;
+    // Cap exceeded — first prune expired entries; if still over cap,
+    // drop oldest insertions until we're back under.
+    for (const [k, v] of this.local) {
+      if (v.expiresAt <= now) this.local.delete(k);
+    }
+    if (this.local.size <= LOCAL_MAX_KEYS) return;
+    const overflow = this.local.size - LOCAL_MAX_KEYS;
+    let dropped = 0;
+    for (const k of this.local.keys()) {
+      this.local.delete(k);
+      dropped += 1;
+      if (dropped >= overflow) break;
     }
   }
 
@@ -99,9 +124,11 @@ export class FeatureFlagStorePostgres {
   }
 
   async clear(key: string, lastEditedBy: string | null): Promise<void> {
-    await prisma.featureFlag
-      .delete({ where: { key } })
-      .catch(() => undefined);
+    // `deleteMany` is idempotent (no-op when the row is absent) and
+    // bubbles real DB errors up to the caller — unlike the previous
+    // `.delete(...).catch(() => undefined)` which silently swallowed
+    // write failures and made the Ops UI report success on failure.
+    await prisma.featureFlag.deleteMany({ where: { key } });
     await this.cache.delete(key);
     this.local.delete(key);
     this.logger.debug({ key, lastEditedBy }, "feature flag cleared");

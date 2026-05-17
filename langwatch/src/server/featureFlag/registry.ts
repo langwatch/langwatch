@@ -41,6 +41,13 @@ export interface FeatureFlagDefinition {
 
 export interface FeatureFlagFamily {
   keyPrefix: string;
+  /**
+   * Optional required suffix on top of the prefix. Used to narrow a
+   * family to a specific generated shape (e.g. `es-...-killswitch`)
+   * so unrelated keys that merely start with the prefix don't get
+   * misclassified into the family's scope.
+   */
+  keySuffix?: string;
   scope: FeatureFlagScope;
   defaultValue: boolean;
   description: string;
@@ -116,6 +123,7 @@ const FAMILIES: FeatureFlagFamily[] = [
   // each new (tenant × component) combination minted a fresh cache key.
   {
     keyPrefix: "es-",
+    keySuffix: "-killswitch",
     scope: "SYSTEM",
     defaultValue: false,
     description:
@@ -141,15 +149,15 @@ export function resolveFlagDefinition(
   const explicit = EXPLICIT_BY_KEY.get(key);
   if (explicit) return explicit;
   for (const fam of FAMILIES) {
-    if (key.startsWith(fam.keyPrefix)) {
-      return {
-        key,
-        scope: fam.scope,
-        defaultValue: fam.defaultValue,
-        description: fam.description,
-        family: fam.family,
-      };
-    }
+    if (!key.startsWith(fam.keyPrefix)) continue;
+    if (fam.keySuffix && !key.endsWith(fam.keySuffix)) continue;
+    return {
+      key,
+      scope: fam.scope,
+      defaultValue: fam.defaultValue,
+      description: fam.description,
+      family: fam.family,
+    };
   }
   return undefined;
 }

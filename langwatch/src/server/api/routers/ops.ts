@@ -732,6 +732,17 @@ export const opsRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      // Only allow writes for keys the code registry recognizes —
+      // either as an explicit flag or via a family prefix. Stops typos
+      // from creating orphan rows that drift forever after the flag
+      // they were meant for has been renamed.
+      const def = resolveFlagDefinition(input.key);
+      if (!def) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Unknown feature flag key: ${input.key}`,
+        });
+      }
       await getFeatureFlagStore().set(
         input.key,
         input.enabled,

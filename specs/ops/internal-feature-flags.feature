@@ -59,6 +59,24 @@ Feature: Internal feature flag system for system-level kill switches
       When code checks the flag
       Then the flag resolves enabled for this pod regardless of postgres
 
+    Scenario: family-prefixed kill switch resolves SYSTEM without an explicit registry entry
+      Given the registry declares the event-sourcing kill switch family
+            covering keys that start with the family prefix and end with
+            the kill-switch suffix
+      And no explicit registry entry exists for one specific generated
+          kill switch key in that family
+      When code checks that generated kill switch key
+      Then the flag resolves as SYSTEM scope inherited from the family
+      And no PostHog call is made
+
+    Scenario: legacy env variable name keeps working after a flag is renamed into the registry
+      Given a SYSTEM flag whose registry definition declares the older
+            uppercase env variable name that was used before the flag
+            moved into the registry
+      And the legacy env variable is set to enable the flag
+      When code checks the new registry key
+      Then the flag resolves enabled from the legacy env override
+
   Rule: PRODUCT flags keep PostHog with a postgres fallback
 
     Scenario: PRODUCT flag with PostHog reachable consults PostHog for user targeting
@@ -105,6 +123,14 @@ Feature: Internal feature flag system for system-level kill switches
       Then the postgres flag store is updated
       And the change is broadcast to every pod via the shared cache invalidation channel
       And the page reflects the new effective value without a manual refresh
+
+    Scenario: Operator clears a SYSTEM flag override to restore the registry default
+      Given the postgres flag store has a row for a SYSTEM flag setting it
+            opposite to its registry default
+      When the operator clicks "clear" next to the flag on the Ops UI
+      Then the postgres row is removed
+      And the flag resolves to its registry default again
+      And the page row shows source "registry default" and last edit "never"
 
     Scenario: Ops page warns when a PRODUCT flag is being managed on a SaaS install
       Given the installation is running in SaaS mode with PostHog enabled
