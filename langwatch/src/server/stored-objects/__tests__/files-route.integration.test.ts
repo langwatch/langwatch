@@ -232,6 +232,7 @@ describe("GET /api/files/:id", () => {
   });
 
   describe("when no row exists in CH for the given id (case 7 — not_found)", () => {
+    /** @scenario "GET /api/files/:id returns 404 with status not_found when no row exists for the id" */
     it("returns 404 with body { status: 'not_found' }", async () => {
       const nonExistentId = `nonexistent-${nanoid(12)}`;
 
@@ -250,6 +251,7 @@ describe("GET /api/files/:id", () => {
 
   describe("when the caller is authenticated for a different project than the file owner (403)", () => {
     /** @scenario "GET /api/files/:id enforces project ownership through the shared permission check" */
+    /** @scenario "GET /api/files/:id resolves the owning project from the row id before applying the membership check" */
     it("returns 403 forbidden without streaming any bytes", async () => {
       const fileId = `stored-${nanoid(8)}`;
 

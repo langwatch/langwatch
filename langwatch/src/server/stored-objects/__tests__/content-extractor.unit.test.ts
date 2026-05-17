@@ -229,6 +229,7 @@ describe("extractInlineMediaFromEvent", () => {
   });
 
   describe("when an event has a binary part with data field", () => {
+    /** @scenario "Binary part variant with inline data is externalized to id and url" */
     it("calls storeFromBytes, sets id and url, and clears data", async () => {
       const base64Payload = makeBase64Payload("binary-content");
       const mimeType = "application/octet-stream";
@@ -338,6 +339,7 @@ describe("extractInlineMediaFromEvent", () => {
   });
 
   describe("when the event message content fails AG-UI parse", () => {
+    /** @scenario "Content parts that fail AG-UI parse cause the message to pass through unchanged" */
     it("returns the event unchanged and no refs", async () => {
       const service = makeService();
 
