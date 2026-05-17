@@ -39,7 +39,8 @@ graph LR
     Workers -->|"NLP"| NLP["LangWatch NLP"]
     App -->|"queries"| CH
     App -->|"control plane"| PG["PostgreSQL"]
-    CH -->|"cold storage"| S3["S3"]
+    App -->|"scenario media"| S3["S3"]
+    CH -->|"cold storage"| S3
 ```
 
 See [Architecture & Infrastructure](/self-hosting/infrastructure/architecture) for a detailed breakdown of networking, scaling, and storage tiers, and [AI Gateway → Self-hosting](/ai-gateway/self-hosting/helm) for the gateway sub-chart setup if you want to terminate LLM traffic on your own perimeter.

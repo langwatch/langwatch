@@ -151,6 +151,7 @@ The `langwatch/clickhouse-serverless` Docker image is a performance-tweaked Clic
 - ClickHouse cold storage (tiered after TTL)
 - ClickHouse backups (full + incremental)
 - Dataset storage (optional)
+- **Scenario media externalization** — audio/image/video/document bytes extracted from `/api/scenario-events` payloads and served back via `GET /api/files/:id`. The bucket is content-addressed under `{projectId}/{sha256}`. This is the most write-heavy of the four surfaces because it fires on every applicable event, not on opt-in user action.
 
 ## Event Sourcing Pipeline
 

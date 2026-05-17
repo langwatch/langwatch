@@ -401,4 +401,91 @@ describe("extractInlineMediaFromEvent", () => {
       expect(refs[1]!.isDuplicate).toBe(true);
     });
   });
+
+  describe("when the event is a MESSAGE_SNAPSHOT with messages[] containing inline media", () => {
+    /** @scenario "Extractor handles MESSAGE_SNAPSHOT events with messages[] in addition to TEXT_MESSAGE_END events with single message" */
+    it("walks every message in the messages array and rewrites inline parts", async () => {
+      const base64 = makeBase64Payload("snapshot-payload");
+      const service = makeService();
+
+      // MESSAGE_SNAPSHOT shape: `messages` is the array of messages, and
+      // the top-level `message` field is absent — the extractor must
+      // route by shape, not by parse-fallback.
+      const event = {
+        type: "MESSAGE_SNAPSHOT",
+        timestamp: 1000,
+        batchRunId: "batch-1",
+        scenarioId: "scen-1",
+        scenarioRunId: "run-abc",
+        scenarioSetId: "default",
+        messages: [
+          {
+            role: "user",
+            content: "no media here",
+          },
+          {
+            role: "assistant",
+            content: [
+              {
+                type: "audio",
+                source: { type: "data", value: base64, mimeType: "audio/mpeg" },
+              },
+            ],
+          },
+        ],
+      };
+
+      const { rewrittenEvent, refs } = await extractInlineMediaFromEvent({
+        ...BASE_PARAMS,
+        event,
+        service,
+      });
+
+      // Exactly one inline part across the two messages was externalized.
+      expect(refs).toHaveLength(1);
+
+      const rewritten = rewrittenEvent as { messages: unknown[] };
+      // First message was a string — unchanged in place.
+      expect(rewritten.messages[0]).toEqual({
+        role: "user",
+        content: "no media here",
+      });
+
+      // Second message's audio part is now a URL reference.
+      const secondMsg = rewritten.messages[1] as {
+        role: string;
+        content: Array<{ type: string; source: { type: string; value: string } }>;
+      };
+      expect(secondMsg.role).toBe("assistant");
+      expect(secondMsg.content).toHaveLength(1);
+      expect(secondMsg.content[0]!.type).toBe("audio");
+      expect(secondMsg.content[0]!.source.type).toBe("url");
+      expect(secondMsg.content[0]!.source.value).toBe("/api/files/stored-id-1");
+    });
+  });
+
+  describe("when a binary part declares both data and url (violating exactly-one-of)", () => {
+    /** @scenario "Binary part variant rejects parts that carry data plus an explicit id or url" */
+    it("passes the message through unchanged and does not call storeFromBytes", async () => {
+      const service = makeService();
+      const event = makeEventWithContent([
+        {
+          type: "binary",
+          mimeType: "audio/mpeg",
+          data: makeBase64Payload("ambiguous"),
+          url: "/api/files/already-set",
+        },
+      ]);
+
+      const { rewrittenEvent, refs } = await extractInlineMediaFromEvent({
+        ...BASE_PARAMS,
+        event,
+        service,
+      });
+
+      expect(rewrittenEvent).toBe(event);
+      expect(refs).toHaveLength(0);
+      expect(service.storeFromBytes).not.toHaveBeenCalled();
+    });
+  });
 });

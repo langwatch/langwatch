@@ -177,4 +177,51 @@ describe("<MediaPart/>", () => {
       expect(screen.getByTestId("media-part-missing")).toHaveTextContent("missing");
     });
   });
+
+  describe("when an audio fetch returns a transient 502 (storage error, not missing)", () => {
+    beforeEach(() => {
+      // HEAD probe returns 502 — the row exists but the storage backend
+      // reported a transient failure. MediaPart should land on the "error"
+      // state, not "missing", so the user knows the bytes weren't gone,
+      // they just couldn't be served right now.
+      vi.spyOn(global, "fetch").mockResolvedValue(
+        new Response(JSON.stringify({ error: "file temporarily unavailable" }), {
+          status: 502,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it("renders an error-badge placeholder (distinct from missing)", async () => {
+      render(
+        <MediaPart
+          part={{
+            type: "audio",
+            source: {
+              type: "url",
+              value: "/api/files/transient-error-id",
+              mimeType: "audio/mp3",
+            },
+          }}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      const audio = screen.getByTestId("media-part-audio") as HTMLAudioElement;
+      audio.dispatchEvent(new Event("error"));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("media-part-error")).toBeInTheDocument();
+      });
+
+      expect(screen.getByTestId("media-part-error")).toHaveTextContent("audio");
+      expect(screen.getByTestId("media-part-error")).toHaveTextContent("error");
+      // The "missing" placeholder must NOT be shown — that's a different state.
+      expect(screen.queryByTestId("media-part-missing")).not.toBeInTheDocument();
+    });
+  });
 });

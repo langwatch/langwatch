@@ -60,44 +60,62 @@ function findSourceFiles(dir: string): string[] {
 // Test
 // ---------------------------------------------------------------------------
 
+/**
+ * Directories we scan for "stored_objects" references that would imply
+ * an automatic purge / retention / GC job. We deliberately go wider than
+ * /server/background because a purge can also be triggered from a tRPC
+ * router (project archive flow), a scenario lifecycle hook, or any other
+ * scheduler.
+ *
+ * Note: each entry is allowed to mention "stored_objects" if the file
+ * path is in the allowlist below — that's where the documented surface
+ * lives.
+ */
+const SCAN_DIRS: readonly string[] = [
+  "src/server/background",
+  "src/server/api/routers",
+  "src/server/scenarios",
+];
+
+/**
+ * Paths where mentions of `stored_objects` are expected and reviewed.
+ * Anything outside the allowlist that references the table is flagged.
+ */
+const SCAN_ALLOWLIST = /^src\/server\/stored-objects\//;
+
+function findOffendingStoredObjectsRefs(absDir: string): string[] {
+  const files = findSourceFiles(absDir);
+  return files
+    .filter((filePath) => /stored_objects/i.test(fs.readFileSync(filePath, "utf8")))
+    .map((f) => path.relative(REPO_ROOT, f))
+    .filter((rel) => !SCAN_ALLOWLIST.test(rel));
+}
+
 describe("AC16 — no automatic retention, GC, or orphan reaping for stored_objects", () => {
-  describe("when the background worker directory is scanned for stored_objects references", () => {
+  describe("when the background worker, tRPC routers, and scenarios trees are scanned for stored_objects references", () => {
     /** @scenario "No automatic retention, time-based GC, or orphan reaping runs" */
-    it("finds no background job that references stored_objects", () => {
-      const backgroundDir = path.join(REPO_ROOT, "src/server/background");
-      const sourceFiles = findSourceFiles(backgroundDir);
-
-      const offendingFiles = sourceFiles.filter((filePath) => {
-        const content = fs.readFileSync(filePath, "utf8");
-        return /stored_objects/i.test(content);
-      });
-
-      // If this assertion fails, a new background job references stored_objects.
-      // Before adding such a job, review AC16 in the RFC and update this test
-      // to explicitly allow the reference with a clear rationale.
+    it("finds no scheduler that references stored_objects", () => {
+      const offending: string[] = [];
+      for (const dir of SCAN_DIRS) {
+        const abs = path.join(REPO_ROOT, dir);
+        offending.push(...findOffendingStoredObjectsRefs(abs));
+      }
+      // If this assertion fails, something outside the stored-objects
+      // module references stored_objects. Before adding such a reference,
+      // review AC16 in the RFC and either:
+      //   - confirm the reference is NOT a retention/GC/orphan-reaper, then
+      //     update SCAN_ALLOWLIST with a one-line rationale, or
+      //   - delete the reference.
       // AC16 forbids automatic retention, time-based GC, or orphan reaping.
-      const offendingPaths = offendingFiles.map((f) =>
-        path.relative(REPO_ROOT, f),
-      );
-      expect(offendingPaths).toEqual([]);
+      expect(offending).toEqual([]);
     });
   });
 
   describe("when the queue definitions are scanned for stored_objects references", () => {
     it("finds no queue that enqueues stored_objects GC work", () => {
       const queuesDir = path.join(REPO_ROOT, "src/server/background/queues");
-      const sourceFiles = findSourceFiles(queuesDir);
-
-      const offendingFiles = sourceFiles.filter((filePath) => {
-        const content = fs.readFileSync(filePath, "utf8");
-        return /stored_objects/i.test(content);
-      });
-
-      // AC16 forbids automatic retention GC queues for stored_objects.
-      const offendingPaths = offendingFiles.map((f) =>
-        path.relative(REPO_ROOT, f),
-      );
-      expect(offendingPaths).toEqual([]);
+      const offending = findOffendingStoredObjectsRefs(queuesDir);
+      expect(offending).toEqual([]);
     });
   });
 });

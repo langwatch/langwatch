@@ -31,9 +31,12 @@ import {
 import { ValidationError } from "~/server/event-sourcing/services/errorHandling";
 
 function buildMessageRestJson(messageFields: Record<string, unknown>): string {
-  // Preserve structured content (array of AG-UI parts) so the renderer can
-  // route media parts through <MediaPart>. Flat-string content goes to the
-  // top-level Content column and is omitted here.
+  // When `content` is an array, preserve it in Rest so the renderer can route
+  // each part through <MediaPart>. Flat-string content goes to the top-level
+  // Content column and is omitted here. The AG-UI `parts` field (alternative
+  // location for content parts on ChatMessage) is already preserved via the
+  // ...restFields spread below; only `content` needs the special-case to
+  // bypass the flat-string column.
   const { id, role, content, trace_id, ...restFields } = messageFields;
   const rest: Record<string, unknown> = { ...restFields };
   if (Array.isArray(content)) {

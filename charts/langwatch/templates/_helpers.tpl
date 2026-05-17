@@ -120,6 +120,24 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   {{- end }}
 {{- end }}
 
+{{/* Validate dataplane storage configuration.
+     Stored-objects (scenario media externalization) requires either:
+       1. app.datasetObjectStorage.enabled = true with a real object backend, OR
+       2. app.storedObjects.localFilesystem.enabled = true with replicaCount=1
+          (single-pod dev/small-tier deployments only — pods don't share FS).
+     Without one of these, scenario events with inline media would silently
+     write to the container's ephemeral writable layer and lose data on
+     every pod restart. Refuse to render rather than silently leak. */}}
+{{- $hasDataplaneStorage := or .Values.app.datasetObjectStorage.enabled .Values.app.storedObjects.localFilesystem.enabled }}
+{{- if not $hasDataplaneStorage }}
+  {{- $errors = append $errors "scenario-events stored objects require object storage: set app.datasetObjectStorage.enabled=true (S3/MinIO/Azure-compatible) or app.storedObjects.localFilesystem.enabled=true (single-replica only). See dev/docs for the trade-offs." }}
+{{- end }}
+{{- if .Values.app.storedObjects.localFilesystem.enabled }}
+  {{- if gt (int .Values.app.replicaCount) 1 }}
+    {{- $errors = append $errors "app.storedObjects.localFilesystem.enabled requires replicaCount=1 (pods don't share a local filesystem). Use app.datasetObjectStorage.enabled instead for multi-replica deployments." }}
+  {{- end }}
+{{- end }}
+
 {{/* Validate dataset storage secrets */}}
 {{- if .Values.app.datasetObjectStorage.enabled }}
   {{- if eq .Values.app.datasetObjectStorage.provider "awsS3" }}
@@ -448,11 +466,19 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- include "langwatch.secretOrValue" (dict "envName" "METRICS_API_KEY" "fieldValues" .Values.app.telemetry.metrics.apiKey) }}
 {{- end }}
 
-# Dataset Object Storage (shared between app and workers)
+# Dataplane Object Storage (shared between datasets and stored-objects;
+# emitted under the legacy `datasetObjectStorage` value key for
+# backwards compatibility — bucket carries BOTH dataset uploads and
+# externalized scenario media in this release).
 {{- if .Values.app.datasetObjectStorage.enabled }}
 - name: USE_S3_STORAGE
   value: "true"
-- name: S3_BUCKET
+# Emit S3_BUCKET_NAME — the app/server reads this name across all
+# storage code paths (storage.ts, stored-objects.service.ts,
+# env-create.mjs). The legacy `S3_BUCKET` env was a no-op for every
+# vanilla helm install because nothing read it; emitting it was a
+# silent bug that this fix resolves by aligning on S3_BUCKET_NAME.
+- name: S3_BUCKET_NAME
   value: {{ .Values.app.datasetObjectStorage.bucket | quote }}
 {{- if eq .Values.app.datasetObjectStorage.provider "awsS3" }}
 {{- include "langwatch.secretOrValue" (dict "envName" "S3_ENDPOINT" "fieldValues" .Values.app.datasetObjectStorage.providers.awsS3.endpoint) }}
@@ -460,6 +486,16 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- include "langwatch.secretOrValue" (dict "envName" "S3_SECRET_ACCESS_KEY" "fieldValues" .Values.app.datasetObjectStorage.providers.awsS3.secretAccessKey) }}
 {{- include "langwatch.secretOrValue" (dict "envName" "S3_KEY_SALT" "fieldValues" .Values.app.datasetObjectStorage.providers.awsS3.keySalt) }}
 {{- end }}
+{{- else if .Values.app.storedObjects.localFilesystem.enabled }}
+# Single-replica local-filesystem fallback for stored-objects. ONLY safe
+# when replicaCount == 1 because pods don't share a filesystem; a
+# multi-pod deployment will end up with each pod able to read only the
+# subset of files it personally wrote. The chart enforces the single
+# replica constraint via a validation rule and the PVC is RWO by
+# default. NOT for production. Operators who need multi-replica MUST
+# enable datasetObjectStorage with a real object-storage backend.
+- name: LANGWATCH_LOCAL_STORAGE_PATH
+  value: {{ .Values.app.storedObjects.localFilesystem.path | quote }}
 {{- end }}
 {{- end }}
 

@@ -203,14 +203,17 @@ async function rewriteMessage(
 
   const refs: ExtractedRef[] = [];
   const rewrittenParts: InputContentPart[] = [];
+  let changed = false;
   for (const part of parsedParts) {
     const { part: rewritten, ref } = await processContentPart({
       part,
       ...params,
     });
+    if (rewritten !== part) changed = true;
     rewrittenParts.push(rewritten);
     if (ref !== null) refs.push(ref);
   }
+  if (!changed) return { message: rawMessage, refs };
   return { message: { ...rawMessage, content: rewrittenParts }, refs };
 }
 

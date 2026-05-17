@@ -274,6 +274,24 @@ app:
           ## @param app.datasetObjectStorage.providers.awsS3.keySalt.secretKeyRef [object] Secret ref for optional key salt.
           secretKeyRef: { name: "", key: "" }
 
+  # Stored Objects - externalized scenario media (audio, image, PDF) extracted
+  # from scenario events. By default, stored-objects share the bucket
+  # configured under app.datasetObjectStorage above — one dataplane bucket
+  # carrying both surfaces. Operators who can't use object storage (small
+  # single-pod self-host) can opt into a local-filesystem fallback below;
+  # this is dev-only and refuses to render with replicaCount > 1.
+  ## @extra app.storedObjects Stored-objects (scenario media) configuration.
+  ## @param app.storedObjects.localFilesystem.enabled [default: false] Use a local-FS path for stored-objects bytes when object storage is not configured.
+  ## @param app.storedObjects.localFilesystem.path [string, default: /var/lib/langwatch/objects] Mount point that the LocalFilesystemDriver writes under.
+  ## @param app.storedObjects.localFilesystem.size [string, default: 10Gi] PVC size for the stored-objects volume.
+  ## @param app.storedObjects.localFilesystem.storageClassName [string] PVC storageClassName (cluster default if empty).
+  storedObjects:
+    localFilesystem:
+      enabled: false
+      path: /var/lib/langwatch/objects
+      size: 10Gi
+      storageClassName: ""
+
   # Email notification configuration
   # Enables sending alerts and notifications via email
   ## @extra app.email Email provider configuration.
