@@ -140,7 +140,7 @@ export const Chip = forwardRef<HTMLDivElement, ChipProps>(function Chip(
       minWidth={0}
       className="chip-root"
     >
-      {dot && <Circle size="6px" bg={dot} flexShrink={0} />}
+      {dot && <Circle size="8px" bg={dot} flexShrink={0} />}
       {icon && <Icon as={icon} boxSize={3} color={style.fg} flexShrink={0} />}
       {label && (
         <Text

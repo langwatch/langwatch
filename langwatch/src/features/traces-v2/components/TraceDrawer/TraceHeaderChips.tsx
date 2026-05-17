@@ -2,16 +2,17 @@ import { Avatar, Box, Circle, HStack, Icon, Text, VStack } from "@chakra-ui/reac
 import { Lightbulb } from "lucide-react";
 import {
   LuBookMarked,
+  LuCircleAlert,
   LuCircleDashed,
+  LuCircleSlash,
   LuCode,
-  LuGauge,
   LuGlobe,
-  LuHistory,
   LuMessageSquare,
   LuServer,
   LuSparkles,
   LuTriangleAlert,
 } from "react-icons/lu";
+import { getEvalChipDisplay } from "~/utils/evaluationResults";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { TraceHeader } from "~/server/api/routers/tracesV2.schemas";
 import { api } from "~/utils/api";
@@ -344,11 +345,16 @@ function buildLastUsedPromptChipDef({
     : driftFromSelection || outOfDate
       ? "yellow"
       : "blue";
+  // Drop the leading history glyph on the happy path — the purple status
+  // dot + the "Prompt" label already say what this chip is, and the icon
+  // was just visual noise next to the verbose handle. We do keep the
+  // warning glyph for drift / out-of-date so the chip's tone change isn't
+  // the only signal that something's off.
   const icon = state.missing
     ? LuCircleDashed
     : driftFromSelection || outOfDate
       ? LuTriangleAlert
-      : LuHistory;
+      : undefined;
 
   const onClick = () => {
     if (spanId) {
@@ -436,107 +442,100 @@ function buildLastUsedPromptChipDef({
   };
 }
 
-function evalStatusTone(
-  ev: RichEval,
+function evalChipTone(
+  status: ReturnType<typeof getEvalChipDisplay>["status"],
 ): "green" | "red" | "yellow" | "neutral" {
-  switch (ev.status) {
-    case "pass":
+  switch (status) {
+    case "passed":
       return "green";
-    case "fail":
+    case "failed":
       return "red";
     case "error":
-    case "warning":
       return "yellow";
     case "skipped":
+    case "processed":
+    case "running":
+    case "pending":
     default:
       return "neutral";
   }
 }
 
-function evalStatusDot(ev: RichEval): string {
-  switch (ev.status) {
-    case "pass":
-      return "green.solid";
-    case "fail":
-      return "red.solid";
-    case "error":
-    case "warning":
-      return "yellow.solid";
-    case "skipped":
-    default:
-      return "gray.solid";
-  }
-}
-
-function evalStatusLabel(ev: RichEval): string {
-  switch (ev.status) {
-    case "pass":
-      return "Pass";
-    case "fail":
-      return "Fail";
-    case "error":
-      return "Error";
-    case "skipped":
-      return "Skipped";
-    case "warning":
-      return "Warning";
-    default:
-      return "—";
-  }
-}
-
-function formatEvalScore(ev: RichEval): string | null {
-  if (typeof ev.score !== "number") return null;
-  return ev.score <= 1 ? ev.score.toFixed(2) : ev.score.toFixed(1);
-}
-
 function buildEvalChipDef(ev: RichEval, onClick: () => void): ChipDef {
-  const tone = evalStatusTone(ev);
-  const dot = evalStatusDot(ev);
-  const score = formatEvalScore(ev);
-  const displayName = ev.name || ev.evaluatorId;
-  const statusLabel = evalStatusLabel(ev);
-  // For pass / fail we already show the colour-coded dot — the trailing
-  // value reads as the score (or the verdict label when there's no
-  // numeric score). For skipped / error use the status label so the
-  // chip is never just `<name>` with no signal.
-  const value = score
-    ? `${displayName} ${score}`
-    : ev.status === "pass" || ev.status === "fail"
-      ? `${displayName} ${statusLabel}`
-      : `${displayName} ${statusLabel}`;
+  // Single source of truth for color / status label / score formatting.
+  // The trace-list `EvalChip`, the v3 EvaluatorChip, and this header
+  // chip all derive their display from `getEvalChipDisplay` so the
+  // visuals never drift between surfaces.
+  const display = getEvalChipDisplay({
+    name: ev.name,
+    evaluatorId: ev.evaluatorId,
+    status: ev.status,
+    score: ev.score,
+    label: ev.label,
+    passed: ev.passed,
+  });
+  const tone = evalChipTone(display.status);
+  const valueNode = (
+    <HStack gap={1} flexShrink={0} align="center">
+      <Text textStyle="xs" color="fg" fontWeight="medium" truncate>
+        {display.displayName}
+      </Text>
+      {/* Trailing verdict — for skipped/error this is a tinted badge;
+          for boolean Pass/Fail it's colored text; for numeric it's
+          a muted-foreground numeral. Mirrors the trace-table EvalChip. */}
+      {display.status === "skipped" ? (
+        <NoVerdictMicroBadge icon={LuCircleSlash} label="SKIPPED" />
+      ) : display.status === "error" ? (
+        <NoVerdictMicroBadge icon={LuCircleAlert} label="ERROR" />
+      ) : display.scoreText ? (
+        <Text textStyle="2xs" fontWeight="semibold" color="fg.muted">
+          {display.scoreText}
+        </Text>
+      ) : display.passLabel ? (
+        <Text
+          textStyle="2xs"
+          fontWeight="semibold"
+          color={display.passLabel.color}
+        >
+          {display.passLabel.text}
+        </Text>
+      ) : null}
+    </HStack>
+  );
   return {
     id: `eval:${ev.evaluationId}`,
     label: "Eval",
-    value,
-    icon: LuGauge,
-    dot,
+    value: valueNode,
+    // No leading icon — the colored status dot is the eval's identity.
+    // Skipped/error swap the dot for the inline badge so the chip never
+    // shows both.
+    dot: display.noVerdict ? undefined : display.color,
     tone,
     onClick,
-    ariaLabel: `Eval ${displayName}: ${statusLabel}${score ? ` ${score}` : ""}`,
+    ariaLabel: `Eval ${display.displayName}: ${display.statusLabel}${display.scoreText ? ` ${display.scoreText}` : ""}`,
     tooltip: (
       <VStack align="stretch" gap={1.5} minWidth="240px" maxWidth="340px">
         <HStack gap={2}>
-          <Circle size="8px" bg={dot} flexShrink={0} />
+          <Circle size="10px" bg={display.color} flexShrink={0} />
           <Text textStyle="sm" fontWeight="semibold" truncate>
-            {displayName}
+            {display.displayName}
           </Text>
         </HStack>
         <HStack justify="space-between" gap={3}>
           <Text textStyle="2xs" color="fg.muted">
             Status
           </Text>
-          <Text textStyle="2xs" fontWeight="semibold">
-            {statusLabel}
+          <Text textStyle="2xs" fontWeight="semibold" color={display.color}>
+            {display.statusLabel}
           </Text>
         </HStack>
-        {score && (
+        {display.scoreText && (
           <HStack justify="space-between" gap={3}>
             <Text textStyle="2xs" color="fg.muted">
               Score
             </Text>
             <Text textStyle="2xs" fontWeight="semibold">
-              {score}
+              {display.scoreText}
             </Text>
           </HStack>
         )}
@@ -594,6 +593,43 @@ function buildEvalChipDef(ev: RichEval, onClick: () => void): ChipDef {
       </VStack>
     ),
   };
+}
+
+/**
+ * Tiny inline "no verdict" badge for the eval chip's value slot. Matches
+ * the visual language of the EvalCard's status tag (tinted bg, leading
+ * icon, uppercase letter-spaced label) so the same status reads the same
+ * way at every scale: chip → list pill → card header.
+ */
+function NoVerdictMicroBadge({
+  icon,
+  label,
+}: {
+  icon: typeof LuCircleSlash;
+  label: string;
+}) {
+  return (
+    <HStack
+      gap={0.5}
+      paddingX={1}
+      borderRadius="sm"
+      borderWidth="1px"
+      borderColor="border.muted"
+      bg="bg.muted"
+      flexShrink={0}
+      lineHeight="1"
+    >
+      <Icon as={icon} boxSize={2.5} color="fg.muted" />
+      <Text
+        textStyle="2xs"
+        fontWeight="bold"
+        color="fg.muted"
+        letterSpacing="0.04em"
+      >
+        {label}
+      </Text>
+    </HStack>
+  );
 }
 
 function SdkRow({ label, value }: { label: string; value: string }) {
