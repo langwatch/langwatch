@@ -116,3 +116,9 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+// Dev-only replace so nlpgo + other root-module consumers can use the
+// sdk-go/prompts package added in this branch. Remove when sdk-go is
+// released at a version that includes the prompts package (planned via
+// release-please on the sdk-go component before this PR merges).
+replace github.com/langwatch/langwatch/sdk-go => ./sdk-go

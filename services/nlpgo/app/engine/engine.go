@@ -20,6 +20,7 @@ import (
 	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/trace"
 
+	"github.com/langwatch/langwatch/sdk-go/prompts"
 	"github.com/langwatch/langwatch/services/nlpgo/app"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/agentblock"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/codeblock"
@@ -393,6 +394,17 @@ func (e *Engine) runSignature(ctx context.Context, execReq ExecuteRequest, node 
 	if llmCfg != nil && llmCfg.Model != nil {
 		model, provider = splitModel(*llmCfg.Model)
 	}
+	// Emit the PromptApiService.get + Prompt.compile span pair when this
+	// signature node is bound to a saved prompt config (configId set on
+	// the DSL). Both spans inherit ctx's current span as parent so they
+	// land as siblings of the LLM span emitted below — the shape the
+	// trace-UI ancestor walk in findPromptReferenceInAncestors.ts
+	// depends on. Saved-version: id/handle/version attrs carry the base
+	// reference and draft is omitted. Inline-edited: same identity stays
+	// on, plus langwatch.prompt.draft=true so the drawer can label it as
+	// "(unsaved edits)".
+	emitPromptSpans(ctx, node, inputs)
+
 	messages := buildMessages(node, inputs)
 	req := app.LLMRequest{
 		Model:    model,
@@ -1203,6 +1215,51 @@ func splitModel(s string) (model, provider string) {
 		return s, ""
 	}
 	return s[idx+1:], s[:idx]
+}
+
+// emitPromptSpans writes the PromptApiService.get + Prompt.compile span
+// pair when a signature node is bound to a saved prompt config. No-ops
+// for ad-hoc / unbound signature nodes (text-in/text-out without a
+// configId) so trace shapes only inherit the prompt-ancestry overhead
+// when the trace-UI deep-link can actually resolve to a saved prompt.
+//
+// Wire-format reference: python-sdk prompt_service_tracing.py +
+// prompt_tracing.py. Bound by specs/nlp-go/prompt-spans-*.feature.
+func emitPromptSpans(ctx context.Context, node *dsl.Node, inputs map[string]any) {
+	if node == nil || node.Data.PromptConfigID == nil {
+		return
+	}
+	configID := *node.Data.PromptConfigID
+
+	handle := ""
+	if node.Data.PromptHandle != nil {
+		handle = *node.Data.PromptHandle
+	}
+	versionID := ""
+	versionNumber := 0
+	if node.Data.VersionMetadata != nil {
+		versionID = node.Data.VersionMetadata.VersionID
+		versionNumber = node.Data.VersionMetadata.VersionNumber
+	}
+	draft := false
+	if node.Data.PromptDraft != nil {
+		draft = *node.Data.PromptDraft
+	}
+
+	prompts.EmitGet(ctx, prompts.GetSpec{
+		PromptID:      configID,
+		Handle:        handle,
+		VersionNumber: versionNumber,
+	})
+
+	prompts.EmitCompile(ctx, prompts.CompileSpec{
+		PromptID:      configID,
+		Handle:        handle,
+		VersionID:     versionID,
+		VersionNumber: versionNumber,
+		Variables:     inputs,
+		Draft:         draft,
+	})
 }
 
 // buildMessages constructs the OpenAI-style chat history for a
