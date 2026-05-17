@@ -98,6 +98,11 @@ function mergeSignatureLocalConfig(
     })),
     parameters,
     localPromptConfig: undefined,
+    // Flag the dispatch as diverged from the saved version so nlpgo
+    // stamps langwatch.prompt.draft on Prompt.compile. Base configId /
+    // handle / versionMetadata (spread above via ...data) stay intact
+    // so the trace-UI can still resolve the resume target.
+    promptDraft: true,
   };
 
   return { ...node, data: mergedData };
