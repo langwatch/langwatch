@@ -118,17 +118,28 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
       const lastLiveUserMsg = [...messages]
         .reverse()
         .find((m: any) => m.role === "user");
-      const templateUserMsgs = formMsgs.filter((m) => m.role === "user");
-      const templateUserReferencesInput = templateUserMsgs.some((m) =>
+      // Broaden the absorb-check to ANY template message (system +
+      // user templates), not just user-role templates. Old
+      // langwatch_nlp's playground heuristic was 'append the live
+      // turn only if `{{input}}` is not in the template' — i.e.
+      // ANYWHERE in the template. The 2026-05-17 follow-up to #4087
+      // (rchaves dogfood) hit the gap: switching the prompt editor to
+      // 'Messages' mode with `{{input}}` ONLY in the system message
+      // and a user template like 'answer it' caused the live chat
+      // input to be duplicated as a second user turn, because the
+      // narrower 'templateUserMsgs only' check returned false.
+      const allTemplateMsgs = formValues.version.configData.messages ?? [];
+      const templateReferencesInput = allTemplateMsgs.some((m) =>
         TEMPLATE_INPUT_PLACEHOLDER_RE.test(m.content ?? ""),
       );
-      // Drop the latest live user turn from the history when the
-      // template's user-message will render it (otherwise the user
-      // sees the same content twice — once rendered, once live).
-      // Earlier copilot turns (assistant replies + prior user turns)
-      // still belong in the history.
+      // Drop the latest live user turn from the history when ANY
+      // template message (system or user) will absorb it through
+      // `{{input}}` (otherwise the user sees the same content twice
+      // — once via `{{input}}` rendering, once live). Earlier copilot
+      // turns (assistant replies + prior user turns) still belong in
+      // the history.
       const liveMessagesForHistory =
-        templateUserReferencesInput && lastLiveUserMsg
+        templateReferencesInput && lastLiveUserMsg
           ? messages.filter((m: any) => m !== lastLiveUserMsg)
           : messages;
       const messagesHistory = [...formMsgs, ...liveMessagesForHistory]
