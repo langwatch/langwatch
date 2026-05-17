@@ -15,7 +15,15 @@ ARG TARGETARCH
 # Dependency layer (cached until go.mod/go.sum change). The module cache is
 # arch-independent, but keying both caches by TARGETARCH keeps buildx from
 # churning a shared dir when producing multiple platforms in the same job.
+#
+# sdk-go is copied here too because the root go.mod carries a local
+# `replace github.com/langwatch/langwatch/sdk-go => ./sdk-go` (added in
+# the prompt-spans-parity PR so nlpgo can import the new prompts/
+# sub-package before sdk-go is cut at a version that includes it).
+# Without sdk-go present, `go mod download` 404s on the replaced module.
+# Remove the sdk-go COPY when the replace directive in go.mod drops.
 COPY go.mod go.sum ./
+COPY sdk-go/go.mod sdk-go/go.sum ./sdk-go/
 RUN --mount=type=cache,target=/go/pkg/mod,id=go-mod-${TARGETARCH} \
     go mod download && go mod verify
 
@@ -23,6 +31,9 @@ RUN --mount=type=cache,target=/go/pkg/mod,id=go-mod-${TARGETARCH} \
 COPY cmd/ cmd/
 COPY pkg/ pkg/
 COPY services/ services/
+# sdk-go full source for the same reason as the go.mod COPY above —
+# remove when the replace directive drops.
+COPY sdk-go/ sdk-go/
 ARG VERSION=dev
 RUN --mount=type=cache,target=/go/pkg/mod,id=go-mod-${TARGETARCH} \
     --mount=type=cache,target=/root/.cache/go-build,id=go-build-${TARGETARCH} \
