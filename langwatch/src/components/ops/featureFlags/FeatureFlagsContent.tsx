@@ -265,6 +265,10 @@ function FlagRowView({
     setOptimistic(next);
     try {
       await onToggle({ key: row.key, enabled: next });
+    } catch {
+      // Mutation onError already surfaces the failure via toast; we
+      // swallow here to keep the unhandled-rejection warning out of
+      // the console.
     } finally {
       setOptimistic(null);
     }
@@ -339,7 +343,14 @@ function FlagRowView({
                   paddingX={0}
                   height="auto"
                   minWidth="auto"
-                  onClick={() => void onClear({ key: row.key })}
+                  disabled={pending}
+                  onClick={() => {
+                    void onClear({ key: row.key }).catch(() => {
+                      // Error already surfaced via mutation onError
+                      // toast; we suppress the rejection here so
+                      // it doesn't leak as an unhandled rejection.
+                    });
+                  }}
                 >
                   clear
                 </Button>
