@@ -102,7 +102,10 @@ const ActionButton = forwardRef<
 
 function PlaygroundButton({ spanId }: { spanId: string }) {
   const { buildUrl } = useGoToSpanInPlaygroundTabUrlBuilder();
-  const href = buildUrl(spanId, "create-new")?.toString() ?? "";
+  // No explicit action — the playground loader auto-detects: opens the
+  // existing managed prompt at the traced version when one is linked,
+  // creates a fresh tab when not. One button, smart default.
+  const href = buildUrl(spanId)?.toString() ?? "";
   if (!href) return null;
   return (
     <Button
