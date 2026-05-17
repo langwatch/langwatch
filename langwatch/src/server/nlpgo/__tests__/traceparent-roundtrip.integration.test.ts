@@ -229,6 +229,13 @@ describe.skipIf(!shouldRun)(
       traceIds: string[];
       spanCount: number;
       spanNames: string[];
+      // Captured AFTER handleOtlpTraceRequest returns — when this is
+      // non-zero the wire arrived fine but the collection service
+      // dropped/deduped/failed spans before they reached the event
+      // store. errorMessage carries the per-span reason if any.
+      rejectedSpans?: number;
+      collectionErrorMessage?: string;
+      collectionThrew?: string;
     }
     const otlpDeliveries: OtlpDelivery[] = [];
     // Cap the stderr ring buffer so a chatty subprocess can't OOM the
@@ -407,18 +414,31 @@ describe.skipIf(!shouldRun)(
                     }
                   }
                 }
-                otlpDeliveries.push({
+                const delivery: OtlpDelivery = {
                   receivedAt: Date.now(),
                   url,
                   traceIds: [...traceIds],
                   spanCount,
                   spanNames,
-                });
-                await traceCollection.handleOtlpTraceRequest(
-                  tenantIdString,
-                  decoded,
-                  "DISABLED",
-                );
+                };
+                otlpDeliveries.push(delivery);
+                try {
+                  const collectionResult =
+                    await traceCollection.handleOtlpTraceRequest(
+                      tenantIdString,
+                      decoded,
+                      "DISABLED",
+                    );
+                  delivery.rejectedSpans = collectionResult.rejectedSpans;
+                  delivery.collectionErrorMessage =
+                    collectionResult.errorMessage;
+                } catch (err) {
+                  delivery.collectionThrew =
+                    err instanceof Error
+                      ? `${err.message}\n${err.stack ?? ""}`
+                      : String(err);
+                  throw err;
+                }
                 res.statusCode = 200;
                 res.setHeader("Content-Type", "application/json");
                 res.end(JSON.stringify({ partialSuccess: {} }));
@@ -757,6 +777,16 @@ describe.skipIf(!shouldRun)(
           const otherTraceIds = [...traceIdsSeen].filter(
             (t) => t !== PARENT_TRACE_ID,
           );
+          const totalRejected = otlpDeliveries.reduce(
+            (s, d) => s + (d.rejectedSpans ?? 0),
+            0,
+          );
+          const collectionErrors = otlpDeliveries
+            .map((d) => d.collectionErrorMessage)
+            .filter((m): m is string => !!m && m.length > 0);
+          const collectionThrows = otlpDeliveries
+            .map((d) => d.collectionThrew)
+            .filter((m): m is string => !!m);
           const stderrTail = nlpgoStderrBuf.slice(-4000);
           return [
             `inbound trace_id: ${PARENT_TRACE_ID}`,
@@ -768,6 +798,22 @@ describe.skipIf(!shouldRun)(
             `total spans across all OTLP deliveries: ${totalSpans}`,
             `span names on the wire: ${
               otlpDeliveries.flatMap((d) => d.spanNames).join(", ") || "(none)"
+            }`,
+            // Collection-service stage — between the wire and the event
+            // store. Non-zero rejectedSpans means the spans hit the
+            // service but were dropped/deduped/failed; collectionErrors
+            // carries the per-span reason; collectionThrows means the
+            // service crashed mid-call.
+            `collection-service rejected spans: ${totalRejected}`,
+            `collection-service errors: ${
+              collectionErrors.length === 0
+                ? "(none)"
+                : collectionErrors.join(" | ")
+            }`,
+            `collection-service threw: ${
+              collectionThrows.length === 0
+                ? "(none)"
+                : collectionThrows.join("\n---\n")
             }`,
             `CH rows under inbound trace_id: ${rows.length}`,
             `nlpgo stderr tail (last 4000 chars):\n${
