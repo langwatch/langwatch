@@ -23,6 +23,7 @@ import { InputGroup } from "./ui/input-group";
 import { Link } from "./ui/link";
 import { Select } from "./ui/select";
 import { LuSettings2 } from "react-icons/lu";
+import { NoModelsConfiguredCallout } from "./NoModelsConfiguredCallout";
 
 export type ModelOption = {
   label: string;
@@ -137,6 +138,7 @@ export const ModelSelector = React.memo(function ModelSelector({
   size = "md",
   mode,
   showConfigureAction = false,
+  forFeatureLabel,
 }: {
   model: string;
   options: string[];
@@ -145,12 +147,30 @@ export const ModelSelector = React.memo(function ModelSelector({
   mode?: "chat" | "embedding";
   /** When true, shows a "Configure available models" link at the bottom of the dropdown */
   showConfigureAction?: boolean;
+  /** Surface-specific label used in the empty-state callout when no
+   *  models are available — e.g. "for AI search", "for evaluators".
+   *  Optional; the callout falls back to a generic message. */
+  forFeatureLabel?: string;
 }) {
   const { selectOptions, groupedByProvider } = useModelSelectionOptions(
     options,
     model,
     mode,
   );
+
+  // Honest empty state: when the project has zero enabled providers
+  // (or zero models of the requested mode), render a guided callout
+  // instead of the dropdown. The prior behaviour was to render the
+  // System fallback string ("openai/gpt-5.2") in gray, which looked
+  // like a real selection but errored at runtime.
+  if (selectOptions.length === 0) {
+    return (
+      <NoModelsConfiguredCallout
+        size={size}
+        forFeatureLabel={forFeatureLabel}
+      />
+    );
+  }
 
   const [modelSearch, setModelSearch] = useState("");
 
