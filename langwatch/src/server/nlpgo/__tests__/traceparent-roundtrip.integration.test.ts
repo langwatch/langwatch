@@ -753,12 +753,49 @@ describe.skipIf(!shouldRun)(
             (r) => (r.ParentSpanId ?? "").toLowerCase() === PARENT_SPAN_ID,
           );
 
+        // Count event_log rows for the inbound trace_id. recordSpan's
+        // aggregateId IS the trace_id, so this tells us whether the
+        // command actually persisted events to the event store. Split
+        // from fetchRows on purpose: event_log empty + stored_spans
+        // empty means the command never dispatched (collection-service
+        // bug, queue-not-routing, etc.); event_log non-empty + stored_
+        // spans empty means the map projection isn't consuming
+        // (groupQueue worker not draining, projection error, etc.).
+        async function countEventLogRows(): Promise<number> {
+          const result = await ch.query({
+            query: `
+              SELECT count() AS n
+              FROM event_log
+              WHERE TenantId = {tenantId:String}
+                AND AggregateType = 'trace'
+                AND AggregateId = {traceId:String}
+            `,
+            query_params: {
+              tenantId: tenantIdString,
+              traceId: PARENT_TRACE_ID,
+            },
+            format: "JSONEachRow",
+          });
+          const rs = await result.json<{ n: number | string }>();
+          return Number(rs[0]?.n ?? 0);
+        }
+
         let rows: SpanRow[] = [];
+        let eventLogCount = 0;
         const deadline = Date.now() + 240_000;
         while (Date.now() < deadline) {
           rows = await fetchRows();
           if (rows.length > 0 && hasLinkedSpan(rows)) break;
           await sleep(500);
+        }
+        // Capture event_log count AFTER the polling loop so the
+        // diagnostic shows the most-up-to-date pipeline state — if
+        // events landed late but projection still didn't fire, we see
+        // it.
+        try {
+          eventLogCount = await countEventLogRows();
+        } catch {
+          eventLogCount = -1;
         }
 
         // Build a diagnostic summary that splits the pipeline into its
@@ -815,6 +852,14 @@ describe.skipIf(!shouldRun)(
                 ? "(none)"
                 : collectionThrows.join("\n---\n")
             }`,
+            // Event store stage — between the collection service and
+            // the map projection. -1 means the diagnostic query itself
+            // threw (CH down, schema drift). Non-zero count + zero CH
+            // rows narrows the bug to the spanStorage map projection /
+            // groupQueue worker. Zero count + collection-service
+            // rejected=0 + no throw narrows the bug to the command
+            // dispatch path.
+            `event_log rows under inbound trace_id: ${eventLogCount}`,
             `CH rows under inbound trace_id: ${rows.length}`,
             `nlpgo stderr tail (last 4000 chars):\n${
               stderrTail || "(empty — nlpgo logged nothing on stderr)"
