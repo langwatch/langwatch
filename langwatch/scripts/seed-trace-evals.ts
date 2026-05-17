@@ -11,9 +11,6 @@
  */
 import { EvaluationRunClickHouseRepository } from "../src/server/app-layer/evaluations/repositories/evaluation-run.clickhouse.repository";
 import { getClickHouseClientForProject } from "../src/server/clickhouse/clickhouseClient";
-import { randomBytes } from "crypto";
-
-const ulid = () => randomBytes(10).toString("hex");
 
 async function main() {
   const projectId = process.env.PROJECT_ID;
