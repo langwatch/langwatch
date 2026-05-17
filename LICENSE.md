@@ -1,26 +1,3 @@
-## LangWatch License
-
-This repository contains multiple components licensed separately. The Apache
-License 2.0 (reproduced in full below) applies to all files in this repository
-**except** for the following carve-outs, which are governed by their own
-license files:
-
-| Path | License | License file |
-|------|---------|--------------|
-| `langwatch/ee/` | LangWatch Enterprise License | [`langwatch/ee/LICENSE.md`](langwatch/ee/LICENSE.md) |
-| `typescript-sdk/` | MIT | [`typescript-sdk/LICENSE`](typescript-sdk/LICENSE) |
-| `python-sdk/` | MIT | [`python-sdk/LICENSE`](python-sdk/LICENSE) |
-| `mcp-server/` | MIT | [`mcp-server/LICENSE`](mcp-server/LICENSE) |
-
-The `langwatch/ee/` directory contains enterprise modules (SCIM, audit logs,
-plan and billing management, and similar). Free for local development,
-evaluation, and tests; production use requires a commercial license.
-
-Third-party dependencies retain their original licenses, granted by their
-respective copyright holders.
-
----
-
                                  Apache License
                            Version 2.0, January 2004
                         http://www.apache.org/licenses/
