@@ -11,10 +11,12 @@
  *
  * Expected post-fix output (printed below):
  *   - identity (handle, versionNumber) comes from compile (latest tie)
- *   - variables include example, input (user-facing) + prompt_id
- *     preserved underneath (defense in depth — Go-side filter handles
- *     fresh emits)
- *   - messages is JSON-encoded, NOT "[object Object]"
+ *   - variables include example, input (user-facing only) — internal
+ *     dispatch keys like `prompt_id` are stripped by the merger's
+ *     INTERNAL_PROMPT_VARIABLE_KEYS filter (defense in depth: the
+ *     Go-side filter also strips them at emit time on fresh traces)
+ *   - if `messages` ever leaks through, parseVariablesBlob JSON-encodes
+ *     it instead of rendering "[object Object]"
  *
  * Run: npx tsx scripts/dogfood-prompt-vars.ts
  */
