@@ -163,6 +163,40 @@ func TestEmitPromptSpans_EmptyInputsRecordsEmptyVariablesMap(t *testing.T) {
 	assert.Equal(t, `{"type":"json","value":{}}`, compileAttrs["langwatch.prompt.variables"])
 }
 
+// Regression for the 2026-05-17 prod report (#4094 post-merge dogfood):
+// the playground forwarder injects `messages` (and the studio path
+// `chat_messages`) alongside user template variables in the signature
+// node's `inputs` map. Both are dispatch envelope, not user vars —
+// surfacing them on `langwatch.prompt.variables` makes the trace-UI
+// resume render them as Variables-panel rows ("messages = [object
+// Object]"). Filter them out at the emit boundary; legitimate user
+// vars in the same payload must pass through untouched.
+func TestEmitPromptSpans_FiltersDispatchEnvelopeKeysFromCompileVariables(t *testing.T) {
+	rec := withRecorder(t)
+
+	node := signatureNodeWithPromptConfig(nil)
+	emitPromptSpans(context.Background(), node, map[string]any{
+		"input":   "how big is mars?",
+		"example": "foobar",
+		"messages": []any{
+			map[string]any{"role": "user", "content": "{{input}}"},
+		},
+		"chat_messages": []any{
+			map[string]any{"role": "assistant", "content": "prior turn"},
+		},
+	})
+
+	ended := rec.Ended()
+	require.Len(t, ended, 2)
+
+	compileAttrs := attrMap(ended[1].Attributes())
+	assert.Equal(t,
+		`{"type":"json","value":{"example":"foobar","input":"how big is mars?"}}`,
+		compileAttrs["langwatch.prompt.variables"],
+		"messages + chat_messages are dispatch envelope and must be stripped from langwatch.prompt.variables; user vars (input, example) must survive",
+	)
+}
+
 func TestEmitPromptSpans_GetCompileAreSiblingsUnderSameParent(t *testing.T) {
 	rec := withRecorder(t)
 
