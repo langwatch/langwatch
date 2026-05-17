@@ -455,30 +455,40 @@ Feature: Externalize event byte content to stored_objects
     And the default value works under "make quickstart" without further configuration
 
   # ---------------------------------------------------------------
-  # Deferred scope — covered in follow-up issues, not in this PR
+  # Cloud provider matrix (AC37)
   # ---------------------------------------------------------------
-  #
-  # AC37 — Azure Blob Storage backend (Azure-tenant cloud matrix). The
-  # StorageDriver interface and StorageRegistry already support adding a
-  # new scheme; the Azure-specific implementation is deferred until an
-  # Azure-tenant deployment actually requests it. Filed as a separate
-  # follow-up issue rather than carried as a permanently-unbound spec.
-  #
-  # AC38 — Project-delete cascade (rows + bytes). The
-  # `cascadeDeleteProject` and `cascadeDeleteOwner` methods exist on
-  # StoredObjectsService as stubs that log a warning; integrating them
-  # with the platform's project-delete handler and writing the real
-  # purge implementation is a separate write-path PR. Splitting keeps
-  # the externalization (this PR) scoped to ingest + read.
-  #
-  # AC39 — MediaPart audio playback duration over a real audio file in
-  # a real browser. Requires Playwright + a checked-in audio fixture;
-  # the integration test for the same surface (MediaPart error branch
-  # + onLoadedData wiring) lives in
-  # src/components/simulations/__tests__/MediaPart.integration.test.tsx
-  # and is sufficient regression coverage for this PR. End-to-end audio
-  # playback verification through a headless browser is scheduled
-  # alongside the broader scenarios-e2e suite, not here.
+
+  @integration
+  Scenario: Azure Blob Storage is supported as a stored-objects backend via a distinct URI scheme
+    Given an Azure-tenant deployment with Azure Blob configured
+    When the service mints a storage URI for a project
+    Then the URI uses an azure-blob scheme distinct from s3 and file
+    And the storage registry dispatches the URI to an Azure Blob driver
+    And both GET and PUT round-trip the same bytes
+
+  # ---------------------------------------------------------------
+  # Project-delete cascade (AC38)
+  # ---------------------------------------------------------------
+
+  @integration
+  Scenario: When a project is deleted, cascadeDeleteProject removes both the stored_objects rows and the underlying bytes
+    Given a project with N stored_objects rows across several owners
+    When the platform's project-delete handler invokes cascadeDeleteProject for that project
+    Then every stored_objects row for the project is deleted from ClickHouse
+    And every byte object at the corresponding storage URIs is deleted from the storage backend
+    And subsequent GET /api/files/:id for any of those ids returns 404 with status not_found
+
+  # ---------------------------------------------------------------
+  # UI playback contract (AC39) — drives onLoadedData/onCanPlay correctness
+  # ---------------------------------------------------------------
+
+  @integration
+  Scenario: MediaPart audio playback reports a non-zero duration once the browser has decoded the media
+    Given a real audio file is stored and referenced by a trace message
+    When the trace timeline renders the MediaPart
+    Then the audio element fires loadeddata or canplay
+    And the player's duration is greater than zero
+    And the play button is enabled
 
   # --- AC Coverage Map ---
   # AC1  "stored_objects table with documented schema"                       -> Scenario: Stored objects metadata table exists with the documented shape

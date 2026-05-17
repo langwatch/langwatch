@@ -299,23 +299,66 @@ export class StoredObjectsService {
   }
 
   /**
-   * Stub for future cascade delete on project deletion.
+   * Cascade-deletes every stored object owned by a project: deletes the
+   * bytes from the storage backend first, then deletes the stored_objects
+   * rows from ClickHouse.
    *
-   * Logs a warning so the gap is visible in logs. The actual purge
-   * implementation is deferred to a future issue.
+   * Bytes-before-rows ordering is intentional. If we deleted rows first and
+   * then crashed mid-cascade, the bytes would orphan in S3/disk with no row
+   * pointing at them — irrecoverably (we no longer know which keys to
+   * delete). Bytes-first means a crash leaves rows that point at missing
+   * bytes; GET /api/files/:id returns 404-missing for those, which is the
+   * graceful degradation we already handle on the read path.
+   *
+   * Each individual byte-delete is best-effort: a single storage failure
+   * does not halt the cascade. The error is logged and counted so the
+   * operator can sweep up orphans later. The CH delete only runs after
+   * all bytes have been attempted.
    */
   async cascadeDeleteProject({ projectId }: { projectId: string }): Promise<void> {
-    logger.warn(
-      { projectId },
-      "StoredObjectsService.cascadeDeleteProject called but not yet implemented — objects will not be purged",
+    return tracer.withActiveSpan(
+      "StoredObjectsService.cascadeDeleteProject",
+      { kind: SpanKind.INTERNAL, attributes: { "tenant.id": projectId } },
+      async (span) => {
+        const rows = await this.repository.findAllByProject({ projectId });
+        span.setAttribute("stored_objects.count", rows.length);
+
+        if (rows.length === 0) {
+          return;
+        }
+
+        let bytesDeleted = 0;
+        let byteDeleteFailures = 0;
+        for (const row of rows) {
+          try {
+            await this.registry.delete(row.storage_uri);
+            bytesDeleted++;
+          } catch (error) {
+            byteDeleteFailures++;
+            logger.warn(
+              { projectId, id: row.id, storageUri: row.storage_uri, error },
+              "cascadeDeleteProject: failed to delete bytes; row will still be removed",
+            );
+          }
+        }
+        span.setAttribute("stored_objects.bytes_deleted", bytesDeleted);
+        span.setAttribute("stored_objects.byte_delete_failures", byteDeleteFailures);
+
+        await this.repository.deleteByProject({ projectId });
+        logger.info(
+          { projectId, rowsCount: rows.length, bytesDeleted, byteDeleteFailures },
+          "cascadeDeleteProject completed",
+        );
+      },
     );
   }
 
   /**
-   * Stub for future cascade delete when an owner entity is removed.
+   * Cascade-deletes every stored object for a single (project, owner) tuple.
    *
-   * Logs a warning so the gap is visible in logs. The actual purge
-   * implementation is deferred to a future issue.
+   * Used when the owning trace, span, or scenario run is deleted but the
+   * project itself remains. Same bytes-before-rows ordering as
+   * `cascadeDeleteProject` — see that method's docstring for the rationale.
    */
   async cascadeDeleteOwner({
     projectId,
@@ -326,9 +369,51 @@ export class StoredObjectsService {
     ownerKind: string;
     ownerId: string;
   }): Promise<void> {
-    logger.warn(
-      { projectId, ownerKind, ownerId },
-      "StoredObjectsService.cascadeDeleteOwner called but not yet implemented — objects will not be purged",
+    return tracer.withActiveSpan(
+      "StoredObjectsService.cascadeDeleteOwner",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "tenant.id": projectId,
+          "stored_object.owner_kind": ownerKind,
+          "stored_object.owner_id": ownerId,
+        },
+      },
+      async (span) => {
+        const rows = await this.repository.findAllByProject({
+          projectId,
+          ownerKind,
+          ownerId,
+        });
+        span.setAttribute("stored_objects.count", rows.length);
+
+        if (rows.length === 0) {
+          return;
+        }
+
+        let bytesDeleted = 0;
+        let byteDeleteFailures = 0;
+        for (const row of rows) {
+          try {
+            await this.registry.delete(row.storage_uri);
+            bytesDeleted++;
+          } catch (error) {
+            byteDeleteFailures++;
+            logger.warn(
+              { projectId, ownerKind, ownerId, id: row.id, storageUri: row.storage_uri, error },
+              "cascadeDeleteOwner: failed to delete bytes; row will still be removed",
+            );
+          }
+        }
+        span.setAttribute("stored_objects.bytes_deleted", bytesDeleted);
+        span.setAttribute("stored_objects.byte_delete_failures", byteDeleteFailures);
+
+        await this.repository.deleteByProject({ projectId, ownerKind, ownerId });
+        logger.info(
+          { projectId, ownerKind, ownerId, rowsCount: rows.length, bytesDeleted, byteDeleteFailures },
+          "cascadeDeleteOwner completed",
+        );
+      },
     );
   }
 }

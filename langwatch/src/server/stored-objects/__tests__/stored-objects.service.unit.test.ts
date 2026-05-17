@@ -80,6 +80,8 @@ function makeRepository(): StoredObjectsRepository {
     insert: vi.fn().mockResolvedValue(undefined),
     findById: vi.fn().mockResolvedValue(null),
     findBySha256: vi.fn().mockResolvedValue(null),
+    findAllByProject: vi.fn().mockResolvedValue([]),
+    deleteByProject: vi.fn().mockResolvedValue(undefined),
   } as unknown as StoredObjectsRepository;
 }
 

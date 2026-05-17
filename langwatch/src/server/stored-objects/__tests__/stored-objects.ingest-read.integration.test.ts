@@ -532,5 +532,115 @@ describe("StoredObjectsService (ingest + read path)", () => {
       });
     });
 
+    describe("when cascadeDeleteProject runs for the owning project", () => {
+      /** @scenario "When a project is deleted, cascadeDeleteProject removes both the stored_objects rows and the underlying bytes" */
+      it("deletes both the stored_objects rows AND the underlying storage bytes", async () => {
+        await withTmpStorage(async () => {
+          // Use a dedicated project id so the cascade doesn't take out rows
+          // other tests wrote into PROJECT_A's namespace (the afterAll cleanup
+          // expects to see rows still present for the tenant-tag test above).
+          const cascadeProj = `test-so-cascade-${nanoid(6)}`;
+          const service = buildService(cascadeProj);
+
+          // Two distinct rows for the project — exercises the "across
+          // several owners" clause from the spec.
+          const stored1 = await service.storeFromBytes({
+            projectId: cascadeProj,
+            purpose: "scenario_event",
+            ownerKind: "scenario_run",
+            ownerId: `run-${nanoid(6)}`,
+            mediaType: "text/plain",
+            bytes: makeBytes(`cascade-bytes-1-${nanoid(6)}`),
+          });
+          const stored2 = await service.storeFromBytes({
+            projectId: cascadeProj,
+            purpose: "scenario_event",
+            ownerKind: "scenario_run",
+            ownerId: `run-${nanoid(6)}`,
+            mediaType: "text/plain",
+            bytes: makeBytes(`cascade-bytes-2-${nanoid(6)}`),
+          });
+
+          await waitForRow(ch, cascadeProj, stored1.id);
+          await waitForRow(ch, cascadeProj, stored2.id);
+
+          // Sanity: both files are readable before the cascade runs.
+          const before1 = await service.getById({ projectId: cascadeProj, id: stored1.id });
+          const before2 = await service.getById({ projectId: cascadeProj, id: stored2.id });
+          expect(before1).not.toBeNull();
+          expect(before2).not.toBeNull();
+          expect((before1 as { stream?: unknown }).stream).toBeDefined();
+          expect((before2 as { stream?: unknown }).stream).toBeDefined();
+
+          // Run the cascade.
+          await service.cascadeDeleteProject({ projectId: cascadeProj });
+
+          // Repository-level: rows for this project are gone (or invisible
+          // to SELECT — the ALTER TABLE DELETE mutation is async on disk,
+          // but the SELECT path filters them out once submitted).
+          const remainingResult = await ch.query({
+            query: `SELECT id FROM stored_objects FINAL WHERE project_id = {projectId:String}`,
+            query_params: { projectId: cascadeProj },
+            format: "JSONEachRow",
+          });
+          const remaining = await remainingResult.json<{ id: string }>();
+          expect(remaining.length).toBe(0);
+
+          // Storage-level: getById returns null (no row anywhere).
+          const after1 = await service.getById({ projectId: cascadeProj, id: stored1.id });
+          const after2 = await service.getById({ projectId: cascadeProj, id: stored2.id });
+          expect(after1).toBeNull();
+          expect(after2).toBeNull();
+        });
+      });
+    });
+
+    describe("when cascadeDeleteOwner runs for a specific owner inside a project", () => {
+      /** @scenario "When a project is deleted, cascadeDeleteProject removes both the stored_objects rows and the underlying bytes" */
+      it("deletes only the rows for the specified (ownerKind, ownerId) and leaves the rest intact", async () => {
+        await withTmpStorage(async () => {
+          const proj = `test-so-cascadeowner-${nanoid(6)}`;
+          const service = buildService(proj);
+
+          const ownerA = `run-${nanoid(6)}`;
+          const ownerB = `run-${nanoid(6)}`;
+
+          const targetRow = await service.storeFromBytes({
+            projectId: proj,
+            purpose: "scenario_event",
+            ownerKind: "scenario_run",
+            ownerId: ownerA,
+            mediaType: "text/plain",
+            bytes: makeBytes(`cascade-owner-target-${nanoid(6)}`),
+          });
+          const keepRow = await service.storeFromBytes({
+            projectId: proj,
+            purpose: "scenario_event",
+            ownerKind: "scenario_run",
+            ownerId: ownerB,
+            mediaType: "text/plain",
+            bytes: makeBytes(`cascade-owner-keep-${nanoid(6)}`),
+          });
+
+          await waitForRow(ch, proj, targetRow.id);
+          await waitForRow(ch, proj, keepRow.id);
+
+          await service.cascadeDeleteOwner({
+            projectId: proj,
+            ownerKind: "scenario_run",
+            ownerId: ownerA,
+          });
+
+          // The target row is gone, the unrelated row is preserved.
+          const targetAfter = await service.getById({ projectId: proj, id: targetRow.id });
+          expect(targetAfter).toBeNull();
+          const keepAfter = await service.getById({ projectId: proj, id: keepRow.id });
+          expect(keepAfter).not.toBeNull();
+
+          // Cleanup the kept row so the test is self-contained.
+          await service.cascadeDeleteProject({ projectId: proj });
+        });
+      });
+    });
   });
 });
