@@ -128,6 +128,14 @@ export const useModelSelectionOptions = (
 
   const modelOption = selectOptions.find((opt) => opt.value === model);
 
+  // Local dev escape hatch so the no-models UX is visually testable
+  // without wiping the project's env-var-backed providers. URL toggle
+  // only fires in dev builds.
+  const forceEmpty =
+    !import.meta.env.PROD &&
+    typeof window !== "undefined" &&
+    window.location.search.includes("__no_models=1");
+
   return {
     modelOption,
     selectOptions,
@@ -136,7 +144,7 @@ export const useModelSelectionOptions = (
      *  available. Lets callers that render their own trigger (e.g.
      *  LLMConfigField) swap to the empty-state callout instead of
      *  echoing back the stale persisted value. */
-    isEmpty: selectOptions.length === 0,
+    isEmpty: selectOptions.length === 0 || forceEmpty,
   };
 };
 

@@ -89,7 +89,7 @@ export const ModelSelectFieldMini = React.memo(function ModelSelectFieldMini({
     // Skip the popover trigger entirely when the project has zero
     // enabled providers — clicking the chip would just open a dropdown
     // with no items. Honest empty-state callout instead.
-    return <NoModelsConfiguredCallout size="full" />;
+    return <NoModelsConfiguredCallout size="sm" />;
   }
 
   return (

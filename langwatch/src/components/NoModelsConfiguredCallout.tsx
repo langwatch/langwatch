@@ -9,21 +9,21 @@
  * at runtime. This callout is the honest "you haven't configured
  * anything yet, here's where to go" affordance.
  *
- * Visual hierarchy is tuned for the LLMConfigField slot in prompt /
- * workflow / evaluator drawers:
- *   row 1: small Settings icon · bold "No models configured" title
- *   row 2: muted helper line explaining the consequence
- *   row 3-aligned: outline "Set up models →" button that opens
- *     /settings/model-providers in a new tab so the user doesn't lose
- *     the surface they were on. tRPC's focus refetch picks up freshly
- *     configured providers when the user returns to this tab.
+ * Two layouts driven by the `size` prop:
+ *   - "sm" / "full" (the inline replacement for a popover trigger):
+ *     single row, icon + title + outline CTA. Compact enough to fit
+ *     the slot a model chip used to occupy in prompt drawer / workflow
+ *     LLM node / evaluator headers.
+ *   - "md" (the standalone usage, e.g. an empty-state card in a form):
+ *     two rows, with a helper line under the title explaining the
+ *     consequence.
  *
- * The smaller variants (size="sm") collapse the helper line — keeps
- * the row height compatible with inline dropdown triggers in places
- * like the optimization studio's LLM node properties panel.
+ * The CTA is an external link to /settings/model-providers — opens in
+ * a new tab so the user doesn't lose the surface they were on. tRPC's
+ * focus refetch picks up freshly configured providers when the user
+ * returns to this tab.
  *
- * See specs/model-providers/no-models-empty-state.feature for the
- * behavioural contract.
+ * See specs/model-providers/no-models-empty-state.feature.
  */
 import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { ArrowUpRight, Settings2 } from "lucide-react";
@@ -46,10 +46,12 @@ export function NoModelsConfiguredCallout({
     ? `/${project.slug}/settings/model-providers`
     : "/settings/model-providers";
 
-  const compact = size === "sm";
-  const titleSize = compact ? "xs" : "sm";
-  const bodySize = compact ? "xs" : "sm";
-  const iconSize = compact ? 14 : 16;
+  // Compact layout: single row (icon + title + button). Used when
+  // we're replacing a popover trigger that lived in a narrow slot.
+  // The `md` variant gets the helper line; it's reserved for the
+  // standalone use case where the callout sits on its own row in a
+  // form.
+  const compact = size !== "md";
   const featureSuffix = forFeatureLabel ? ` for ${forFeatureLabel}` : "";
 
   return (
@@ -59,38 +61,38 @@ export function NoModelsConfiguredCallout({
       borderColor="border"
       borderRadius="md"
       bg="bg.subtle"
-      paddingX={compact ? 3 : 4}
-      paddingY={compact ? 2 : 3}
+      paddingX={3}
+      paddingY={2}
       data-testid="no-models-configured-callout"
     >
       <HStack
-        gap={compact ? 2 : 3}
-        align={compact ? "center" : "start"}
+        gap={2}
+        align="center"
         justify="space-between"
+        wrap="nowrap"
       >
-        <HStack gap={compact ? 2 : 3} align="start" flex="1" minWidth={0}>
-          <Box
-            marginTop={compact ? 0 : "2px"}
-            color="fg.muted"
-            flexShrink={0}
-            aria-hidden
-          >
-            <Settings2 size={iconSize} />
+        <HStack gap={2} align="center" flex="1" minWidth={0}>
+          <Box color="fg.muted" flexShrink={0} aria-hidden>
+            <Settings2 size={14} />
           </Box>
-          <VStack align="start" gap={compact ? 0 : 1} flex="1" minWidth={0}>
-            <Text fontSize={titleSize} fontWeight="medium" lineClamp={1}>
+          <VStack align="start" gap={0} flex="1" minWidth={0}>
+            <Text
+              fontSize="xs"
+              fontWeight="medium"
+              lineClamp={1}
+              data-testid="no-models-configured-title"
+            >
               No models configured{featureSuffix}
             </Text>
             {!compact && (
-              <Text fontSize={bodySize} color="fg.muted" lineClamp={2}>
-                Pick a provider and add a key so this surface has
-                something to call.
+              <Text fontSize="xs" color="fg.muted" lineClamp={2}>
+                Pick a provider and add a key.
               </Text>
             )}
           </VStack>
         </HStack>
         <Button
-          size={compact ? "xs" : "sm"}
+          size="xs"
           variant="outline"
           asChild
           data-testid="no-models-configured-cta"
@@ -102,8 +104,8 @@ export function NoModelsConfiguredCallout({
             _hover={{ textDecoration: "none" }}
           >
             <HStack gap={1}>
-              <Text>Set up models</Text>
-              <ArrowUpRight size={compact ? 12 : 14} aria-hidden />
+              <Text>Set up</Text>
+              <ArrowUpRight size={12} aria-hidden />
             </HStack>
           </Link>
         </Button>

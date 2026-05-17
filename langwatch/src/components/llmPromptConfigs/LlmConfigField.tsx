@@ -62,7 +62,7 @@ export function LLMConfigField({
   // provider key to back it, so don't echo it as if it were a real
   // selection — show the honest empty-state callout instead.
   if (noModelsConfigured) {
-    return <NoModelsConfiguredCallout size="full" />;
+    return <NoModelsConfiguredCallout size="sm" />;
   }
 
   return (
