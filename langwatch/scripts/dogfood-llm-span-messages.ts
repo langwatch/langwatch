@@ -20,7 +20,7 @@
  */
 import { parseLLMSpanMessages } from "../src/server/traces/parseLLMSpanMessages";
 
-const attrs = {
+const attrs: Record<string, unknown> = {
   // nlpgo serializes the LLM request prompt as a bare array of
   // app.ChatMessage. Matches the 5-turn screenshot shape from
   // rchaves's bug report: system + 4 chat turns.
@@ -46,9 +46,9 @@ console.log("=".repeat(72));
 console.log("INPUT — attribute shape nlpgo's endLLMSpan stamps");
 console.log("=".repeat(72));
 console.log("  langwatch.input  (bare array of app.ChatMessage):");
-console.log("    " + attrs["langwatch.input"]);
+console.log("    " + String(attrs["langwatch.input"]));
 console.log("  langwatch.output (single app.ChatMessage object):");
-console.log("    " + attrs["langwatch.output"]);
+console.log("    " + String(attrs["langwatch.output"]));
 console.log();
 console.log("=".repeat(72));
 console.log("OUTPUT — what useLoadSpanIntoPromptPlayground feeds the chat");

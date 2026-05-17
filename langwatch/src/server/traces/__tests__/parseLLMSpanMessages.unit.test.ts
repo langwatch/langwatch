@@ -124,6 +124,63 @@ describe("parseLLMSpanMessages()", () => {
     });
   });
 
+  describe("when a recognized envelope produces zero entries (CR fallback guard)", () => {
+    // Without the `before = out.length` guard added per the major CR
+    // on parseLLMSpanMessages.ts:87, these cases silently dropped the
+    // payload from the playground resume even though raw content was
+    // present on the attribute. Falling back to a single raw-content
+    // turn keeps something visible instead of pretending the LLM said
+    // nothing — visible-but-ugly beats invisible-and-lost.
+
+    it("falls back to raw content when chat_messages envelope has an empty value array", () => {
+      const attrs = {
+        "langwatch.output": JSON.stringify({
+          type: "chat_messages",
+          value: [],
+        }),
+      };
+      const result = parseLLMSpanMessages(attrs);
+      expect(result).toHaveLength(1);
+      expect(result[0]?.role).toBe("assistant");
+      expect(result[0]?.content).toBe(attrs["langwatch.output"]);
+    });
+
+    it("falls back to raw content when chat_messages envelope value has only malformed items", () => {
+      const attrs = {
+        "langwatch.output": JSON.stringify({
+          type: "chat_messages",
+          value: [{ role: "assistant" }, { wrong: "shape" }],
+        }),
+      };
+      const result = parseLLMSpanMessages(attrs);
+      expect(result).toHaveLength(1);
+      expect(result[0]?.role).toBe("assistant");
+      expect(result[0]?.content).toBe(attrs["langwatch.output"]);
+    });
+
+    it("falls back to raw content for a bare empty array", () => {
+      const attrs = {
+        "langwatch.input": JSON.stringify([]),
+      };
+      const result = parseLLMSpanMessages(attrs);
+      expect(result).toHaveLength(1);
+      expect(result[0]?.role).toBe("user");
+      expect(result[0]?.content).toBe(attrs["langwatch.input"]);
+    });
+
+    it("falls back to raw content for an unrecognized object envelope", () => {
+      const attrs = {
+        "langwatch.output": JSON.stringify({
+          custom_envelope: { something: "weird" },
+        }),
+      };
+      const result = parseLLMSpanMessages(attrs);
+      expect(result).toHaveLength(1);
+      expect(result[0]?.role).toBe("assistant");
+      expect(result[0]?.content).toBe(attrs["langwatch.output"]);
+    });
+  });
+
   describe("when input has gen_ai.input.messages set and gen_ai.prompt also present", () => {
     it("prefers gen_ai.input.messages (the newer-SDK key)", () => {
       const attrs = {

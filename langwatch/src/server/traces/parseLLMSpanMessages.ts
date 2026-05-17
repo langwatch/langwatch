@@ -72,6 +72,16 @@ function pushDecoded(
     return;
   }
 
+  // Track baseline so we can detect the "all branches matched a
+  // structure but produced zero entries" case — e.g. `{type:"chat_
+  // messages", value:[]}` or `{type:"chat_messages", value:[{bad}]}`
+  // where every item failed the filter. Without this guard the
+  // attribute would be silently dropped from the playground resume
+  // even though we had a payload to surface. Falling back to a single
+  // raw-content turn keeps something visible in the chat instead of
+  // pretending the LLM said nothing.
+  const before = out.length;
+
   if (
     parsed &&
     typeof parsed === "object" &&
@@ -84,10 +94,7 @@ function pushDecoded(
           !!m && typeof m === "object" && typeof m.content === "string",
       )),
     );
-    return;
-  }
-
-  if (Array.isArray(parsed)) {
+  } else if (Array.isArray(parsed)) {
     for (const item of parsed) {
       if (
         item &&
@@ -103,10 +110,7 @@ function pushDecoded(
         });
       }
     }
-    return;
-  }
-
-  if (
+  } else if (
     parsed &&
     typeof parsed === "object" &&
     typeof (parsed as { content?: unknown }).content === "string"
@@ -118,19 +122,23 @@ function pushDecoded(
         : defaultRole) as ChatMessage["role"],
       content: (parsed as { content: string }).content,
     });
-    return;
+  } else {
+    const wrapped =
+      parsed && typeof parsed === "object"
+        ? (parsed as { value?: unknown }).value
+        : undefined;
+    if (typeof wrapped === "string") {
+      out.push({ role: defaultRole, content: wrapped });
+    } else if (typeof parsed === "string") {
+      out.push({ role: defaultRole, content: parsed });
+    }
   }
 
-  const wrapped =
-    parsed && typeof parsed === "object"
-      ? (parsed as { value?: unknown }).value
-      : undefined;
-  if (typeof wrapped === "string") {
-    out.push({ role: defaultRole, content: wrapped });
-    return;
-  }
-  if (typeof parsed === "string") {
-    out.push({ role: defaultRole, content: parsed });
-    return;
+  // Last-resort fallback: a payload was present but every recognized
+  // shape produced zero entries (empty array, malformed items,
+  // unrecognized envelope). Surface the raw string so the trace is
+  // never silently empty — visible-but-ugly beats invisible-and-lost.
+  if (out.length === before) {
+    out.push({ role: defaultRole, content: raw });
   }
 }
