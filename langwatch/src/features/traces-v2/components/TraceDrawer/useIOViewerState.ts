@@ -2,9 +2,11 @@ import {
   type Dispatch,
   type RefObject,
   type SetStateAction,
+  useCallback,
   useRef,
   useState,
 } from "react";
+import { create } from "zustand";
 import type { ChatLayout } from "./transcript";
 
 export type ViewFormat = "pretty" | "text" | "json" | "markdown";
@@ -31,6 +33,26 @@ interface IOViewerState {
 }
 
 /**
+ * Shared chat-layout preference across every IOViewer instance.
+ *
+ * Operator complaint: toggling thread↔bubbles in INPUT didn't affect
+ * OUTPUT (and vice-versa), even though they're two halves of the
+ * same conversation. The toggle now lives in a tiny module-level
+ * store so both panels read and write the same value.
+ *
+ * Thread is the default — flat ChatGPT-style stack reads naturally
+ * for both the full input history and the single assistant reply.
+ */
+interface ChatLayoutPrefState {
+  chatLayout: ChatLayout;
+  setChatLayout: (next: ChatLayout) => void;
+}
+const useChatLayoutPref = create<ChatLayoutPrefState>((set) => ({
+  chatLayout: "thread",
+  setChatLayout: (next) => set({ chatLayout: next }),
+}));
+
+/**
  * State + outside-click bookkeeping for the IOViewer panel. Engaged mode
  * dismisses on a `mousedown` outside the engaged ref so the panel never
  * traps wheel scroll once the user moves on.
@@ -39,12 +61,24 @@ export function useIOViewerState({
   mode,
 }: UseIOViewerStateArgs): IOViewerState {
   const [format, setFormat] = useState<ViewFormat>("pretty");
-  // Thread layout is the default everywhere — it's the flat
-  // ChatGPT-style stack (role label + content stacked, no boxes), which
-  // reads naturally for both the full input history and the single
-  // assistant reply in output mode. Bubbles remain available as the
-  // alternative for operators who prefer the boxed card visual.
-  const [chatLayout, setChatLayout] = useState<ChatLayout>("thread");
+  const chatLayout = useChatLayoutPref((s) => s.chatLayout);
+  // Wrap the store setter as a `SetStateAction` so the existing IOViewer
+  // call sites (`setChatLayout(v as ChatLayout)`, etc.) keep typechecking
+  // without churn. The functional-updater branch evaluates against the
+  // LATEST store state (not the render-time `chatLayout` closure), so
+  // concurrent updates from multiple subscribers compose correctly
+  // (CodeRabbit suggestion, PR #4084).
+  const setChatLayout = useCallback<Dispatch<SetStateAction<ChatLayout>>>(
+    (value) => {
+      useChatLayoutPref.setState((state) => ({
+        chatLayout:
+          typeof value === "function"
+            ? (value as (prev: ChatLayout) => ChatLayout)(state.chatLayout)
+            : value,
+      }));
+    },
+    [],
+  );
   // `mode` is retained on the API for future per-mode defaults but no
   // longer drives the initial layout.
   void mode;

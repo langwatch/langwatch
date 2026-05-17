@@ -4,6 +4,7 @@ import { useColorMode } from "~/components/ui/color-mode";
 import { Drawer } from "~/components/ui/drawer";
 import { IsolatedErrorBoundary } from "~/components/ui/IsolatedErrorBoundary";
 import {
+  DRAWER_DEFAULT_WIDTH_PX,
   DRAWER_MIN_WIDTH_PX,
   useDrawerStore,
 } from "../../stores/drawerStore";
@@ -105,26 +106,28 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
   }
 
   // The drawer width is driven by the operator's drag (persisted in
-  // drawerStore.widthPx). When `null`, we fall back to the legacy 45%
-  // viewport rule. Below the `md` breakpoint (~768px) there isn't
-  // useful underlying surface to peek at — the drawer goes full
-  // viewport so the chrome stays usable on phones. We also skip the
-  // inline override if the persisted width is wider than the current
-  // viewport, so a width remembered on a wide monitor never overflows
-  // a narrower window.
+  // drawerStore.widthPx). Until they drag, we use a flat
+  // `DRAWER_DEFAULT_WIDTH_PX` (920) instead of the previous 45% rule
+  // — a deterministic first-paint width that doesn't visibly shift
+  // when the user later drags and the persisted px replaces the %.
+  // Below the `md` breakpoint (~768px) the drawer goes full viewport
+  // so the chrome stays usable on phones. We also cap any
+  // persisted/default width against the current viewport so a width
+  // remembered on a wide monitor never overflows a narrower window.
   const viewportWidth =
     typeof window !== "undefined" ? window.innerWidth : Infinity;
   const isCompactViewport = viewportWidth < 768;
-  const widthFitsViewport =
-    widthPx !== null && widthPx <= viewportWidth;
-  const contentWidthStyle =
-    widthPx !== null && !isCompactViewport && widthFitsViewport
-      ? {
-          width: `${widthPx}px`,
-          maxWidth: `${widthPx}px`,
-          minWidth: `${DRAWER_MIN_WIDTH_PX}px`,
-        }
-      : undefined;
+  const effectiveWidthPx = Math.min(
+    widthPx ?? DRAWER_DEFAULT_WIDTH_PX,
+    viewportWidth,
+  );
+  const contentWidthStyle = isCompactViewport
+    ? undefined
+    : {
+        width: `${effectiveWidthPx}px`,
+        maxWidth: `${effectiveWidthPx}px`,
+        minWidth: `${DRAWER_MIN_WIDTH_PX}px`,
+      };
 
   return (
     <Drawer.Root
@@ -153,16 +156,13 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
           bg="transparent"
           ref={drawerContentRef}
           paddingX={0}
-          maxWidth={
-            contentWidthStyle
-              ? undefined
-              : { base: "100vw", md: "45%" }
-          }
-          width={
-            contentWidthStyle
-              ? undefined
-              : { base: "100vw", md: "auto" }
-          }
+          // When `contentWidthStyle` is set (non-compact viewports) the
+          // inline style below owns width/maxWidth. The fallback here
+          // only matters on compact viewports (<md), where we want
+          // the drawer full-bleed — the operator can't drag on a
+          // phone-sized window anyway.
+          maxWidth={contentWidthStyle ? undefined : "100vw"}
+          width={contentWidthStyle ? undefined : "100vw"}
           // The ResizeRail renders the visible pill in a 10px gutter
           // *outside* the drawer's left edge. Allow horizontal overflow
           // so that bit isn't clipped; the body itself still clips its

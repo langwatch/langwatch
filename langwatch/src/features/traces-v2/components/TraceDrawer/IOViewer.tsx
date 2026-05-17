@@ -276,11 +276,13 @@ export const IOViewer = memo(function IOViewer({
   // with nested scroll containers.
   const isVirtualizingChat =
     format === "pretty" && isChat && conversationTurns.length >= VIRTUALIZE_AT;
-  // Output mode + chat = a single AssistantTurnCard. That card already has
-  // its own purple-bordered chrome; wrapping it in the IOViewer's outer
-  // card makes a card-in-card. Drop the outer chrome there so the
-  // assistant card sits flush at the root of the section.
-  const flushChatCard = format === "pretty" && isChat && mode === "output";
+  // Pretty + chat: every individual turn already paints its own role
+  // chrome (bubble, card, or thread row with an avatar header). The
+  // outer IOViewer "bg.subtle + border" box around them just looks
+  // like a redundant container — operator complaint: "remove this
+  // gray box around the input, why does it exist?". Applies whether
+  // we're rendering the input history or the output reply.
+  const flushChatCard = format === "pretty" && isChat;
 
   // Track whether the preview box's content actually exceeds its visible
   // height. The "Click to interact" scrim only makes sense when there's

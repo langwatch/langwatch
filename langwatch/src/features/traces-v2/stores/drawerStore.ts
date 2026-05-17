@@ -227,6 +227,17 @@ export const DRAWER_MIN_WIDTH_PX = 360;
 export const DRAWER_MAXIMIZE_EDGE_PX = 10;
 export const DRAWER_RESTORE_EDGE_PX = 80;
 
+/**
+ * Initial drawer width before the operator has dragged it once.
+ * Flat px (no viewport % math) so first-paint is deterministic — the
+ * previous `45%` fallback meant the drawer width visibly shifted
+ * after the user first dragged because the persisted px and the
+ * computed % rarely matched. Once the operator drags, the chosen
+ * width is persisted to localStorage and this default no longer
+ * applies. Clamped at the call sites against the current viewport.
+ */
+export const DRAWER_DEFAULT_WIDTH_PX = 920;
+
 const DEFAULT_PANE_STATE: Record<PaneId, PaneState> = {
   // Conversation context starts collapsed by default — most traces are
   // single-turn anyway, and the user can flip it open per-session via
@@ -420,7 +431,8 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
         s.widthPx !== null && Math.abs(s.widthPx - snapWidth) < 2;
       if (isAtSnap) {
         const restore =
-          s.preMaximizeWidthPx ?? Math.round(viewportWidth * 0.45);
+          s.preMaximizeWidthPx ??
+          Math.min(DRAWER_DEFAULT_WIDTH_PX, snapWidth);
         persistWidth(restore);
         return {
           widthPx: restore,
@@ -430,7 +442,8 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
       }
       persistWidth(snapWidth);
       return {
-        preMaximizeWidthPx: s.widthPx ?? Math.round(viewportWidth * 0.45),
+        preMaximizeWidthPx:
+          s.widthPx ?? Math.min(DRAWER_DEFAULT_WIDTH_PX, snapWidth),
         widthPx: snapWidth,
         isMaximized: true,
       };
