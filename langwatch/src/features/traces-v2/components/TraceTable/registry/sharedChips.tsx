@@ -95,7 +95,6 @@ function NoVerdictBadge({ label, icon: Icon }: { label: string; icon: IconType }
 
 export const EvalChip: React.FC<{ eval_: TraceEvalResult }> = ({ eval_ }) => {
   const display = getEvalChipDisplay(eval_);
-  const noVerdict = display.noVerdict;
 
   return (
     <HoverCard.Root
@@ -116,11 +115,10 @@ export const EvalChip: React.FC<{ eval_: TraceEvalResult }> = ({ eval_ }) => {
           flexShrink={0}
           onClick={(e: React.MouseEvent) => e.stopPropagation()}
         >
-          {/* The "no verdict" badge already carries its own icon + label
-              so the leading dot would just be noise. */}
-          {!noVerdict && (
-            <Circle size="10px" bg={display.color} flexShrink={0} />
-          )}
+          {/* Dot always renders so every chip lines up regardless of
+              whether the trailing slot is a score, a Pass/Fail label,
+              or a no-verdict badge. */}
+          <Circle size="10px" bg={display.color} flexShrink={0} />
           <Text
             textStyle="2xs"
             fontWeight="medium"

@@ -10,12 +10,8 @@ import {
 } from "@chakra-ui/react";
 import { type ReactNode, useState } from "react";
 import { LuCircleAlert, LuCircleSlash, LuQuote } from "react-icons/lu";
-import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import {
-  AZURE_SAFETY_NOT_CONFIGURED_MESSAGE,
-  AZURE_SAFETY_PROVIDER_KEY,
-} from "~/server/app-layer/evaluations/azure-safety-env";
+import { AZURE_SAFETY_NOT_CONFIGURED_MESSAGE } from "~/server/app-layer/evaluations/azure-safety-env";
 import { formatCost, formatDuration } from "../../../utils/formatters";
 import { RunHistorySparkline } from "./RunHistorySparkline";
 import { type EvalEntry, formatInputValue, isNoVerdict, STATUS } from "./utils";
@@ -30,7 +26,6 @@ export function EvalCard({
   const { name, score, scoreType, status } = eval_;
   const tone = STATUS[status] ?? STATUS.warning;
   const noVerdict = isNoVerdict(status);
-  const { openDrawer } = useDrawer();
   const { project, organization } = useOrganizationTeamProject();
 
   let scoreLabel = "";
@@ -230,22 +225,16 @@ export function EvalCard({
                 primaryStatusText === AZURE_SAFETY_NOT_CONFIGURED_MESSAGE ? (
                   <>
                     Azure Safety provider not configured. Configure it in{" "}
-                    <chakra.button
-                      type="button"
+                    <chakra.a
+                      href="/settings/model-providers"
+                      target="_blank"
+                      rel="noopener noreferrer"
                       color="blue.fg"
                       textDecoration="underline"
-                      onClick={() => {
-                        if (!project?.id) return;
-                        openDrawer("editModelProvider", {
-                          projectId: project.id,
-                          organizationId: organization?.id,
-                          providerKey: AZURE_SAFETY_PROVIDER_KEY,
-                          modelProviderId: "new",
-                        });
-                      }}
+                      onClick={(e) => e.stopPropagation()}
                     >
                       Settings → Model Providers
-                    </chakra.button>{" "}
+                    </chakra.a>{" "}
                     to run this evaluator.
                   </>
                 ) : (
