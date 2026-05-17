@@ -142,7 +142,10 @@ function ColumnResizeHandle({
         position: "absolute",
         top: 0,
         bottom: 0,
-        left: "2px",
+        // Centre the 1px line on `labelWidth` so it lands exactly at the
+        // label cell's right edge — otherwise the gray cell bg bleeds
+        // a pixel past the line and looks like the divider is broken.
+        left: "3px",
         width: "1px",
         transition: "background 100ms ease, width 100ms ease",
         background: state === "idle" ? "border" : "blue.solid",
