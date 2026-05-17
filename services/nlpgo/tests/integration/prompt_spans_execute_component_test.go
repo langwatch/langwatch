@@ -15,11 +15,39 @@
 
 package integration_test
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
 
 /** @scenario "PromptApiService.get sibling carries the combined handle:version id" */
 func TestPromptSpansExecuteComponent_GetSiblingCarriesCombinedId(t *testing.T) {
-	t.Skip(promptSpansPendingMsg)
+	// Real assertion (Lane D, 1/3). Other stubs in this file stay
+	// t.Skip — the engine helper is unit-tested at
+	// services/nlpgo/app/engine/prompt_spans_emit_test.go; this
+	// integration test pins the dispatch boundary calls it correctly.
+	body := signatureWorkflowBody(t, signatureNodeOpts{
+		ConfigID:      "prompt_4RXLJtB9Cj-OA1BaLpxWc",
+		Handle:        "pizza-prompt",
+		VersionID:     "prompt_version_I21kDsHKtr5wQm9k1Dap2",
+		VersionNumber: 6,
+		Instructions:  "You are a helpful assistant.",
+	}, map[string]any{"input": "ping"})
+
+	fx, _ := runPromptSpansDispatch(t, body)
+
+	get := fx.FindPromptSpan(t, "PromptApiService.get")
+	getAttrs := promptSpanAttrs(get)
+	assert.Equal(t, "pizza-prompt:6", getAttrs["langwatch.prompt.id"],
+		"PromptApiService.get must carry combined handle:version id (the resume target the trace-UI reads)")
+
+	// Variables envelope must carry the prompt_id input the python
+	// decorator records. Decoded shape: {"type":"json","value":{"prompt_id":"..."}}
+	rawVars, ok := getAttrs["langwatch.prompt.variables"].(string)
+	assert.True(t, ok, "langwatch.prompt.variables must be set as a JSON string")
+	assert.Contains(t, rawVars, `"prompt_id":"prompt_4RXLJtB9Cj-OA1BaLpxWc"`,
+		"variables envelope must include the prompt_id input")
 }
 
 /** @scenario "Prompt.compile sibling carries the full prompt identity and the substituted variables" */

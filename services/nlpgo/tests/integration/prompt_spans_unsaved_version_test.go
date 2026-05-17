@@ -11,11 +11,42 @@
 
 package integration_test
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
 
 /** @scenario "playground draft — user edits a message inline then sends" */
 func TestPromptSpansUnsavedVersion_PlaygroundDraftPreservesBasePlusFlag(t *testing.T) {
-	t.Skip(promptSpansPendingMsg)
+	// Real assertion (Lane D, 1/3 in this file). Other stubs stay
+	// t.Skip — the draft-flag wiring is unit-tested at
+	// services/nlpgo/app/engine/prompt_spans_emit_test.go; this
+	// integration test pins that the dispatch boundary preserves
+	// the base identity AND stamps the flag.
+	body := signatureWorkflowBody(t, signatureNodeOpts{
+		ConfigID:      "support-router",
+		Handle:        "support-router",
+		VersionID:     "prompt_version_abc",
+		VersionNumber: 6,
+		Draft:         true,
+		Instructions:  "You are a terse assistant.",
+		TemplateMsgs:  []map[string]any{{"role": "user", "content": "{{input}}"}},
+	}, map[string]any{"input": "draft test"})
+
+	fx, _ := runPromptSpansDispatch(t, body)
+
+	compile := fx.FindPromptSpan(t, "Prompt.compile")
+	attrs := promptSpanAttrs(compile)
+
+	assert.Equal(t, true, attrs["langwatch.prompt.draft"],
+		"draft executions must stamp langwatch.prompt.draft=true on Prompt.compile")
+	// Base reference stays populated as the resume target — the
+	// trace-UI surfaces "Open support-router:6 (unsaved edits)".
+	assert.Equal(t, "support-router", attrs["langwatch.prompt.id"])
+	assert.Equal(t, "support-router", attrs["langwatch.prompt.handle"])
+	assert.Equal(t, "prompt_version_abc", attrs["langwatch.prompt.version.id"])
+	assert.Equal(t, int64(6), attrs["langwatch.prompt.version.number"])
 }
 
 /** @scenario "eval-v3 draft — TargetCell localPromptConfig overrides saved outputs" */
