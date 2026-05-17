@@ -497,11 +497,11 @@ function buildEvalChipDef(ev: RichEval, onClick: () => void): ChipDef {
     id: `eval:${ev.evaluationId}`,
     label: "Eval",
     value: valueNode,
-    // No leading icon — the colored status dot is the eval's identity.
-    // Even skipped/error keep the dot (in a muted color) so eval chips
-    // line up vertically with their siblings; the SKIPPED / ERROR badge
-    // sits at the trailing edge as the verdict.
-    dot: display.noVerdict ? "fg.muted" : display.color,
+    // No leading icon — the colored status dot is the eval's identity
+    // and reads from the shared `EVALUATION_STATUS_COLORS` map so it
+    // matches the v3 EvaluatorChip and the trace-list EvalChip exactly
+    // (skipped = yellow, error = red, etc.).
+    dot: display.color,
     tone,
     onClick,
     ariaLabel: `Eval ${display.displayName}: ${display.statusLabel}${display.scoreText ? ` ${display.scoreText}` : ""}`,
