@@ -20,7 +20,24 @@ Feature: Prompt spans on the playground — trace→playground resume parity wit
 
   Background:
     Given the nlpgo service is running and the project is on the Go-NLP execution path
-    And the Studio playground is open on a prompt with handle "support-router" at saved version 6
+    And a saved prompt exists with config id "prompt_supportrouter_xyz", handle "support-router", and saved version 6 (version id "prompt_version_supportrouter_v6")
+    And the Studio playground is open on that prompt
+
+  # ============================================================================
+  # Identity contract (locked, matches python-sdk + integration tests)
+  # ============================================================================
+  #   PromptApiService.get span:
+  #     langwatch.prompt.variables = {"type":"json","value":{"prompt_id":"<configId>"}}
+  #     langwatch.prompt.id        = "<handle>:<versionNumber>"   (combined, only when both resolved)
+  #   Prompt.compile span:
+  #     langwatch.prompt.id             = "<configId>"            (RAW, not the combined form)
+  #     langwatch.prompt.handle         = "<handle>"
+  #     langwatch.prompt.version.id     = "<versionId>"
+  #     langwatch.prompt.version.number = <versionNumber>
+  #     langwatch.prompt.variables      = {"type":"json","value":{...userKwargs...}}
+  # The combined "<handle>:<version>" form lives ONLY on PromptApiService.get
+  # (python prompt_service_tracing.py:53-57). Prompt.compile carries the raw
+  # configId per python prompt_tracing.py:30 (`getattr(prompt, "id", None)`).
 
   # ============================================================================
   # Saved-version path — the default trace→playground resume target
@@ -30,15 +47,16 @@ Feature: Prompt spans on the playground — trace→playground resume parity wit
   Scenario: playground send on a saved prompt version emits a get+compile span pair
     When I send "how do I refund?" through the playground chat
     Then the trace contains a span named "PromptApiService.get"
-    And that span has attribute "langwatch.prompt.variables" set to a JSON string of shape
+    And that get span has attribute "langwatch.prompt.variables" set to a JSON string of shape
       """
-      {"type":"json","value":{"prompt_id":"support-router"}}
+      {"type":"json","value":{"prompt_id":"prompt_supportrouter_xyz"}}
       """
+    And the get span has attribute "langwatch.prompt.id" equal to "support-router:6"
     And the trace contains a span named "Prompt.compile" emitted after the get span
-    And the compile span has attribute "langwatch.prompt.id" equal to "support-router:6"
+    And the compile span has attribute "langwatch.prompt.id" equal to "prompt_supportrouter_xyz"
     And the compile span has attribute "langwatch.prompt.handle" equal to "support-router"
+    And the compile span has attribute "langwatch.prompt.version.id" equal to "prompt_version_supportrouter_v6"
     And the compile span has attribute "langwatch.prompt.version.number" equal to 6
-    And the compile span has a non-empty "langwatch.prompt.version.id"
     And the compile span has attribute "langwatch.prompt.variables" containing every declared template variable populated with the values used for this send
     # Live chat content goes to the LLM-span messages, not to compile vars; see scenario 4 for declared-variable fidelity.
     And "PromptApiService.get", "Prompt.compile", and the LLM span are three siblings under the same parent (the per-event-type root span for playground)

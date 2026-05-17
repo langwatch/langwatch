@@ -26,7 +26,13 @@ Feature: Prompt spans — unsaved/applied prompt version (draft) carries the bas
 
   Background:
     Given the nlpgo service is running and the project is on the Go-NLP execution path
-    And a saved prompt "support-router" at version 6 exists with its current canonical body
+    And a saved prompt exists with config id "prompt_supportrouter_xyz", handle "support-router", and saved version 6 (version id "prompt_version_supportrouter_v6")
+
+  # Identity contract (see prompt-spans-playground.feature for the locked
+  # wire-format reference). draft=true is stamped on Prompt.compile ALONGSIDE
+  # the unchanged base identity (raw configId on compile.langwatch.prompt.id,
+  # combined "handle:version" on get.langwatch.prompt.id, handle + version.id +
+  # version.number separately on compile).
 
   # ============================================================================
   # Base reference preserved + draft=true on every surface
@@ -38,10 +44,10 @@ Feature: Prompt spans — unsaved/applied prompt version (draft) carries the bas
     And I edited the system message inline without clicking Save
     When I send "test" through the playground chat
     Then the trace contains a "PromptApiService.get" span with attribute "langwatch.prompt.id" equal to "support-router:6"
-    And the trace contains a "Prompt.compile" span with attribute "langwatch.prompt.id" equal to "support-router:6"
+    And the trace contains a "Prompt.compile" span with attribute "langwatch.prompt.id" equal to "prompt_supportrouter_xyz"
     And the compile span has attribute "langwatch.prompt.handle" equal to "support-router"
+    And the compile span has attribute "langwatch.prompt.version.id" equal to "prompt_version_supportrouter_v6"
     And the compile span has attribute "langwatch.prompt.version.number" equal to 6
-    And the compile span has a non-empty "langwatch.prompt.version.id"
     And the compile span has attribute "langwatch.prompt.draft" equal to true
 
   @integration @v1
@@ -49,7 +55,9 @@ Feature: Prompt spans — unsaved/applied prompt version (draft) carries the bas
     Given the experiment "support-quality-q1" targets "support-router" at version 6
     And the user applied an inline edit via TargetCell.tsx without saving (localPromptConfig set)
     When the experiment runs
-    Then every row's compile span has "langwatch.prompt.id" = "support-router:6" (base reference preserved)
+    Then every row's compile span has "langwatch.prompt.id" = "prompt_supportrouter_xyz" (raw configId, base reference preserved)
+    And every row's compile span has "langwatch.prompt.handle" = "support-router"
+    And every row's compile span has "langwatch.prompt.version.number" = 6
     And every row's compile span has "langwatch.prompt.draft" = true
     And the saved prompt at version 6 in the database remains unchanged
 
@@ -58,7 +66,9 @@ Feature: Prompt spans — unsaved/applied prompt version (draft) carries the bas
     Given a workflow has a signature node bound to "support-router" version 6
     And the user opened the signature drawer and changed the temperature without saving back
     When the workflow runs
-    Then that node's Prompt.compile span has "langwatch.prompt.id" = "support-router:6"
+    Then that node's Prompt.compile span has "langwatch.prompt.id" = "prompt_supportrouter_xyz" (raw configId)
+    And that node's Prompt.compile span has "langwatch.prompt.handle" = "support-router"
+    And that node's Prompt.compile span has "langwatch.prompt.version.number" = 6
     And that node's Prompt.compile span has "langwatch.prompt.draft" = true
     And the saved prompt at version 6 in the database remains unchanged
 

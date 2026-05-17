@@ -16,11 +16,14 @@ Feature: Prompt spans on nlpgo execute_component — Studio "Open in Prompts" re
 
     @integration @prompt-spans @execute-component
     Scenario: PromptApiService.get sibling carries the combined handle:version id
-      Given a saved prompt with handle "pizza-prompt" version 6 attached to a signature node
+      Given a saved prompt with id "prompt_4RXLJtB9Cj-OA1BaLpxWc" handle "pizza-prompt" version 6 attached to a signature node
       When the engine dispatches the node via execute_component
       Then a span named "PromptApiService.get" is emitted as a sibling of the LLM span
       And the span has attribute "langwatch.prompt.id" = "pizza-prompt:6"
-      And the span has attribute "langwatch.prompt.variables" matching JSON {"type":"json","value":{"prompt_id":"pizza-prompt"}}
+      And the span has attribute "langwatch.prompt.variables" matching JSON {"type":"json","value":{"prompt_id":"prompt_4RXLJtB9Cj-OA1BaLpxWc"}}
+      # variables.value.prompt_id mirrors the value the dispatcher passed to .get() — the
+      # raw configId from node.Data.PromptConfigID, matching prompt_spans_execute_component_test.go.
+      # The combined "<handle>:<version>" form is the langwatch.prompt.id stamp, not the variables.
 
     @integration @prompt-spans @execute-component
     Scenario: Prompt.compile sibling carries the full prompt identity and the substituted variables

@@ -18,8 +18,13 @@ Feature: Prompt spans on Evaluations v3 — per-row prompt context for resumable
 
   Background:
     Given the nlpgo service is running and the project is on the Go-NLP execution path
-    And an Evaluations v3 experiment named "support-quality-q1" targets a prompt "support-router" at saved version 6
+    And a saved prompt exists with config id "prompt_supportrouter_xyz", handle "support-router", and saved version 6
+    And an Evaluations v3 experiment named "support-quality-q1" targets that prompt
     And the experiment's dataset has 3 rows with column "input" populated
+
+  # Identity contract (see prompt-spans-playground.feature for the locked
+  # wire-format reference). Combined "<handle>:<version>" lives only on
+  # PromptApiService.get; Prompt.compile carries the raw configId.
 
   # ============================================================================
   # Per-row span emission — one pair per dataset row, scoped to that row's vars
@@ -30,7 +35,8 @@ Feature: Prompt spans on Evaluations v3 — per-row prompt context for resumable
     When I run the experiment
     Then the run produces exactly 3 spans named "PromptApiService.get" (one per row)
     And the run produces exactly 3 spans named "Prompt.compile" (one per row)
-    And every compile span has attribute "langwatch.prompt.id" equal to "support-router:6"
+    And every get span has attribute "langwatch.prompt.id" equal to "support-router:6" (the combined handle:version stamp)
+    And every compile span has attribute "langwatch.prompt.id" equal to "prompt_supportrouter_xyz" (the raw configId)
     And every compile span has attribute "langwatch.prompt.handle" equal to "support-router"
     And every compile span has attribute "langwatch.prompt.version.number" equal to 6
     And each compile span has attribute "langwatch.prompt.variables" containing that row's "input" value (not a different row's)
