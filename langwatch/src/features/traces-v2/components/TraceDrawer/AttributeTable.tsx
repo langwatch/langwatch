@@ -68,18 +68,16 @@ function useLabelColumnWidth() {
  * the v2 surface without a custom theme.
  */
 /**
- * Single full-height column divider that overlays the attribute table's
- * flat container. Mirrors the resize affordance of the drawer's pane
- * separator (`react-resizable-panels`): a 1px static line that lights up
- * blue on hover/drag and spans the entire column rather than splitting
- * per-row. Placement is absolute at `left: labelWidth - 1` so the
- * underlying row layout stays untouched and no nested grid is needed.
+ * Per-row 4px resize handle that sits flush with the right border of
+ * the label cell. Idle state is invisible; hover/drag lights up the
+ * blue stripe. Resize state lives on the shared `useLabelColumnWidth`
+ * hook so dragging any row's handle resizes the whole column in
+ * lockstep — visually scoped to the row the operator grabbed, but
+ * functionally global.
  */
-function ColumnResizeHandle({
-  labelWidth,
+function LabelResizeHandle({
   onResize,
 }: {
-  labelWidth: number;
   onResize: (deltaPx: number) => void;
 }) {
   const [state, setState] = useState<"idle" | "hover" | "drag">("idle");
@@ -108,9 +106,6 @@ function ColumnResizeHandle({
     }
   };
 
-  // The clickable / hit area is wider than the visible line so the
-  // affordance is easy to grab; the line itself stays at 1px so the
-  // table layout reads as "solid divider that gets a blue glow on hover".
   return (
     <Box
       role="separator"
@@ -127,32 +122,21 @@ function ColumnResizeHandle({
       onPointerLeave={() => {
         if (state === "hover") setState("idle");
       }}
-      position="absolute"
-      top={0}
-      bottom={0}
-      // The label cell's right border lands at `labelWidth`; center the
-      // 6px-wide hit area on that line so dragging feels like grabbing
-      // the divider itself instead of the cell next to it.
-      style={{ left: `${labelWidth - 3}px` }}
-      width="6px"
+      width="4px"
+      flexShrink={0}
       cursor="col-resize"
-      zIndex={1}
+      alignSelf="stretch"
+      position="relative"
+      marginRight="-1px"
       _before={{
         content: '""',
         position: "absolute",
         top: 0,
         bottom: 0,
-        // Centre the 1px line on `labelWidth` so it lands exactly at the
-        // label cell's right edge — otherwise the gray cell bg bleeds
-        // a pixel past the line and looks like the divider is broken.
-        left: "3px",
-        width: "1px",
-        transition: "background 100ms ease, width 100ms ease",
-        background: state === "idle" ? "border" : "blue.solid",
-        // Bloom to a slightly thicker line on hover/drag so the active
-        // state reads at a glance without overwhelming the calm idle.
-        boxShadow:
-          state === "drag" ? "0 0 0 1px var(--chakra-colors-blue-solid)" : "none",
+        left: "1px",
+        right: "1px",
+        transition: "background 100ms ease",
+        background: state === "idle" ? "transparent" : "blue.solid",
       }}
     />
   );
@@ -327,6 +311,7 @@ function FlatRow({
   isLast,
   onTogglePin,
   labelWidth,
+  onLabelResize,
 }: {
   attrKey: string;
   value: unknown;
@@ -335,6 +320,7 @@ function FlatRow({
   isLast: boolean;
   onTogglePin: () => void;
   labelWidth: number;
+  onLabelResize: (deltaPx: number) => void;
 }) {
   const display = formatValue(value);
   return (
@@ -379,6 +365,7 @@ function FlatRow({
           {attrKey}
         </Text>
       </Tooltip>
+      <LabelResizeHandle onResize={onLabelResize} />
       {/* Pretty-print column. Heuristic format detection picks chat / json
           / text / leaf; non-leaf values render a `📋 format` pill that
           opens a popover with the prettified payload + an override row.
@@ -462,13 +449,8 @@ function AttrSection({
           borderRadius="md"
           borderWidth="1px"
           borderColor="border"
-          // Drop `overflow: hidden` so the resize handle's thicker drag
-          // glow can bleed slightly outside the card without clipping —
-          // gives the affordance a touch of "this is grabbable" without
-          // breaking the card's rounded silhouette (rows still respect
-          // the border-radius via their own bg).
+            overflow="hidden"
           bg="bg.panel"
-          position="relative"
         >
           {sortedEntries.map(([key, val], i) => (
             <FlatRow
@@ -480,12 +462,9 @@ function AttrSection({
               isLast={i === sortedEntries.length - 1}
               onTogglePin={() => togglePin({ source, key })}
               labelWidth={labelWidth}
+              onLabelResize={onLabelResize}
             />
           ))}
-          <ColumnResizeHandle
-            labelWidth={labelWidth}
-            onResize={onLabelResize}
-          />
         </Box>
       ) : (
         <Box

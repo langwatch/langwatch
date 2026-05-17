@@ -447,25 +447,6 @@ function buildLastUsedPromptChipDef({
   };
 }
 
-function evalChipTone(
-  status: ReturnType<typeof getEvalChipDisplay>["status"],
-): "green" | "red" | "yellow" | "neutral" {
-  switch (status) {
-    case "passed":
-      return "green";
-    case "failed":
-      return "red";
-    case "error":
-      return "yellow";
-    case "skipped":
-    case "processed":
-    case "running":
-    case "pending":
-    default:
-      return "neutral";
-  }
-}
-
 function buildEvalChipDef(ev: RichEval, onClick: () => void): ChipDef {
   // Single source of truth for color / status label / score formatting.
   // The trace-list `EvalChip`, the v3 EvaluatorChip, and this header
@@ -479,7 +460,12 @@ function buildEvalChipDef(ev: RichEval, onClick: () => void): ChipDef {
     label: ev.label,
     passed: ev.passed,
   });
-  const tone = evalChipTone(display.status);
+  // Header eval chips always render on a neutral bg — colored backgrounds
+  // would turn the strip into a rainbow when several evaluators land on a
+  // trace. The status colour shows up in the leading dot + the
+  // pass/fail label text, matching the trace-table EvalChip and the v3
+  // EvaluatorChip exactly.
+  const tone = "neutral" as const;
   const valueNode = (
     <HStack gap={1} flexShrink={0} align="center">
       <Text textStyle="xs" color="fg" fontWeight="medium" truncate>
@@ -512,9 +498,10 @@ function buildEvalChipDef(ev: RichEval, onClick: () => void): ChipDef {
     label: "Eval",
     value: valueNode,
     // No leading icon — the colored status dot is the eval's identity.
-    // Skipped/error swap the dot for the inline badge so the chip never
-    // shows both.
-    dot: display.noVerdict ? undefined : display.color,
+    // Even skipped/error keep the dot (in a muted color) so eval chips
+    // line up vertically with their siblings; the SKIPPED / ERROR badge
+    // sits at the trailing edge as the verdict.
+    dot: display.noVerdict ? "fg.muted" : display.color,
     tone,
     onClick,
     ariaLabel: `Eval ${display.displayName}: ${display.statusLabel}${display.scoreText ? ` ${display.scoreText}` : ""}`,
