@@ -71,7 +71,7 @@ export class FeatureFlagService implements FeatureFlagServiceInterface {
   async isEnabled(
     flagKey: string,
     distinctId: string,
-    defaultValue = true,
+    defaultValue = false,
     options?: FeatureFlagOptions,
   ): Promise<boolean> {
     const definition = resolveFlagDefinition(flagKey);

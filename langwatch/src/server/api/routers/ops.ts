@@ -795,6 +795,10 @@ export const opsRouter = createTRPCRouter({
     .use(opsManagePermission)
     .input(z.object({ key: z.string().min(1).max(200) }))
     .mutation(async ({ ctx, input }) => {
+      // Deliberately permissive: listFeatureFlags surfaces orphan rows
+      // (DB keys that no longer match the registry or pipeline graph)
+      // so operators can delete them. Validating the key here would
+      // break that cleanup path.
       await getFeatureFlagStore().clear(input.key, ctx.session.user.id);
       return { ok: true };
     }),
