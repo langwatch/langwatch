@@ -71,10 +71,20 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     userId: string;
     teamId: string;
   }): Promise<OrganizationUserRole | null> {
+    // The Prisma multitenancy middleware rejects `OrganizationUser`
+    // queries that don't pin an `organizationId` in the where clause.
+    // Resolve teamId -> organizationId first, then look up the
+    // membership directly — keeps the middleware happy without
+    // exempting the model.
+    const team = await this.prisma.team.findUnique({
+      where: { id: teamId },
+      select: { organizationId: true },
+    });
+    if (!team) return null;
     const orgUser = await this.prisma.organizationUser.findFirst({
       where: {
         userId,
-        organization: { teams: { some: { id: teamId } } },
+        organizationId: team.organizationId,
       },
       select: { role: true },
     });
