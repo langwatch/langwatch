@@ -21,11 +21,12 @@ FROM golang:1.26.2-bookworm AS nlpgo-build
 ARG TARGETARCH
 WORKDIR /src
 COPY go.mod go.sum ./
-# sdk-go's go.mod is needed alongside the root's because go.mod has
-# `replace github.com/langwatch/langwatch/sdk-go => ./sdk-go` (added
-# in the prompt-spans-parity PR so nlpgo can import the new prompts/
-# sub-package before sdk-go is cut at a version that includes it).
-# Remove the sdk-go COPY when the replace directive in go.mod drops.
+# Monorepo: sdk-go is in-tree and resolved via `replace ... => ./sdk-go`
+# in the root go.mod, so its go.mod must land in the build context
+# before `go mod download` runs. Full sdk-go source is copied below
+# alongside pkg/services/cmd. Same pattern python-sdk + langwatch_nlp
+# use — keeping the dependency in-tree means sdk-go changes flow with
+# nlpgo changes in the same commit, no publish-then-bump ping-pong.
 COPY sdk-go/go.mod sdk-go/go.sum ./sdk-go/
 RUN go mod download
 COPY pkg ./pkg

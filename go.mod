@@ -117,8 +117,12 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-// Dev-only replace so nlpgo + other root-module consumers can use the
-// sdk-go/prompts package added in this branch. Remove when sdk-go is
-// released at a version that includes the prompts package (planned via
-// release-please on the sdk-go component before this PR merges).
+// Monorepo: the in-tree sdk-go directory IS the source of truth for
+// every root-module consumer (nlpgo, aigateway, …). Changes to sdk-go
+// flow with nlpgo changes in the same commit — same pattern python-sdk
+// + langwatch_nlp use, and the reason a monorepo exists in the first
+// place. The `require` line above pins a published version for
+// external (out-of-tree) consumers who fetch via the proxy;
+// release-please cuts those tags. In this repo, this replace always
+// wins.
 replace github.com/langwatch/langwatch/sdk-go => ./sdk-go

@@ -16,12 +16,12 @@ ARG TARGETARCH
 # arch-independent, but keying both caches by TARGETARCH keeps buildx from
 # churning a shared dir when producing multiple platforms in the same job.
 #
-# sdk-go is copied here too because the root go.mod carries a local
-# `replace github.com/langwatch/langwatch/sdk-go => ./sdk-go` (added in
-# the prompt-spans-parity PR so nlpgo can import the new prompts/
-# sub-package before sdk-go is cut at a version that includes it).
-# Without sdk-go present, `go mod download` 404s on the replaced module.
-# Remove the sdk-go COPY when the replace directive in go.mod drops.
+# Monorepo: sdk-go is in-tree and resolved via `replace ... => ./sdk-go`
+# in the root go.mod, so its go.mod must land in the build context
+# before `go mod download` runs. Same pattern python-sdk + langwatch_nlp
+# use — sdk-go changes flow with nlpgo changes in the same commit, no
+# publish-then-bump ping-pong. Full sdk-go source is copied below
+# alongside the other build inputs.
 COPY go.mod go.sum ./
 COPY sdk-go/go.mod sdk-go/go.sum ./sdk-go/
 RUN --mount=type=cache,target=/go/pkg/mod,id=go-mod-${TARGETARCH} \
@@ -31,8 +31,8 @@ RUN --mount=type=cache,target=/go/pkg/mod,id=go-mod-${TARGETARCH} \
 COPY cmd/ cmd/
 COPY pkg/ pkg/
 COPY services/ services/
-# sdk-go full source for the same reason as the go.mod COPY above —
-# remove when the replace directive drops.
+# sdk-go full source — the in-tree dependency resolved via `replace`
+# in the root go.mod (see comment on the COPY of sdk-go/go.mod above).
 COPY sdk-go/ sdk-go/
 ARG VERSION=dev
 RUN --mount=type=cache,target=/go/pkg/mod,id=go-mod-${TARGETARCH} \
