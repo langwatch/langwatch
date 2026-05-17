@@ -13,7 +13,6 @@ import {
   LuCopy,
   LuExternalLink,
   LuPencil,
-  LuPlay,
 } from "react-icons/lu";
 import { useDrawer } from "~/hooks/useDrawer";
 import { Link } from "~/components/ui/link";
@@ -68,34 +67,11 @@ export function PromptAccordion({ span }: PromptAccordionProps) {
         ? `${rawHandle}:${ref.tag}`
         : rawHandle;
 
-  // The accordion is mounted in two situations:
-  //   (a) span has prompt metadata of its own (handle/variables) — render
-  //       the full pane with the Open-in-Prompts menu.
-  //   (b) span is an `llm` with no metadata — surface only the "Open in
-  //       Playground" affordance so operators can still continue the
-  //       conversation; nothing else to show.
+  // No-prompt llm spans don't reach this component anymore (the IOViewer
+  // header carries the Playground affordance for that case). When we do
+  // render and only partial metadata is present, fall back to a hint
+  // instead of an empty section.
   if (!ref && variableEntries.length === 0) {
-    if (isLlmSpan) {
-      return (
-        <VStack align="stretch" gap={2} paddingY={2}>
-          <Text textStyle="xs" color="fg.muted" paddingX={2}>
-            No managed prompt detected on this LLM call. You can still open
-            it in the Playground to continue the conversation.
-          </Text>
-          <HStack gap={1} paddingX={2}>
-            <Link
-              href={buildUrl(span.spanId, "create-new")?.toString() ?? ""}
-              isExternal
-            >
-              <Button size="xs" variant="ghost" gap={1}>
-                <Icon as={LuPlay} boxSize={3} />
-                Open in Playground
-              </Button>
-            </Link>
-          </HStack>
-        </VStack>
-      );
-    }
     return (
       <Box paddingX={2} paddingY={3}>
         <Text textStyle="xs" color="fg.muted">

@@ -44,13 +44,10 @@ export function SpanAccordions({
     !!detail?.params && Object.keys(detail.params).length > 0;
   const hasAttributes = hasSpanAttrs || hasResourceAttrs;
   const hasScope = !!spanScope?.name;
-  // LLM spans always get a Prompt section even without metadata — the
-  // accordion still surfaces "Open in Playground" so operators can pick
-  // up the conversation regardless of whether a managed prompt was tied
-  // to the call. Matches the legacy SpanDetails behaviour.
-  const isLlmSpan = span.type === "llm";
-  const hasPrompt =
-    isLlmSpan || (!!detail && hasPromptMetadata(detail.params));
+  // Prompt section only when there's actual prompt metadata. The no-prompt
+  // case is covered by the "Open in Playground" affordance on the IOViewer
+  // header — no value in rendering an empty Prompt accordion next to it.
+  const hasPrompt = !!detail && hasPromptMetadata(detail.params);
   const hasError = span.status === "error" || !!detail?.error;
   const hasEvents = !!detail?.events && detail.events.length > 0;
 
@@ -139,6 +136,8 @@ export function SpanAccordions({
                           label="Input"
                           content={detail.input}
                           mode="input"
+                          spanId={detail.spanId}
+                          spanType={detail.type}
                         />
                       )}
                       {detail?.output && (
@@ -146,6 +145,8 @@ export function SpanAccordions({
                           label="Output"
                           content={detail.output}
                           mode="output"
+                          spanId={detail.spanId}
+                          spanType={detail.type}
                         />
                       )}
                     </VStack>
