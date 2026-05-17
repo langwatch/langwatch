@@ -358,10 +358,9 @@ describe("mintStorageUri (BYOC bucket selection — observed through the inserte
       // Project A has its own bucket. The dataplane lookup returns it.
       vi.mocked(dataplaneS3.getS3ConfigForProject).mockResolvedValueOnce({
         bucket: "dataplane-acme",
-        endpoint: undefined,
-        accessKeyId: undefined,
-        secretAccessKey: undefined,
-        keySalt: undefined,
+        endpoint: "https://s3.amazonaws.com",
+        accessKeyId: "test-key",
+        secretAccessKey: "test-secret",
       });
       // Even though a global is set, the per-project value wins.
       (mockedEnv as { S3_BUCKET_NAME?: string }).S3_BUCKET_NAME =
