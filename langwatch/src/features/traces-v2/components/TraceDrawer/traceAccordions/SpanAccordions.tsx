@@ -44,6 +44,9 @@ export function SpanAccordions({
     !!detail?.params && Object.keys(detail.params).length > 0;
   const hasAttributes = hasSpanAttrs || hasResourceAttrs;
   const hasScope = !!spanScope?.name;
+  // Prompt section only when there's actual prompt metadata. The no-prompt
+  // case is covered by the "Open in Playground" affordance on the IOViewer
+  // header — no value in rendering an empty Prompt accordion next to it.
   const hasPrompt = !!detail && hasPromptMetadata(detail.params);
   const hasError = span.status === "error" || !!detail?.error;
   const hasEvents = !!detail?.events && detail.events.length > 0;
@@ -133,6 +136,8 @@ export function SpanAccordions({
                           label="Input"
                           content={detail.input}
                           mode="input"
+                          spanId={detail.spanId}
+                          spanType={detail.type}
                         />
                       )}
                       {detail?.output && (
@@ -140,6 +145,8 @@ export function SpanAccordions({
                           label="Output"
                           content={detail.output}
                           mode="output"
+                          spanId={detail.spanId}
+                          spanType={detail.type}
                         />
                       )}
                     </VStack>

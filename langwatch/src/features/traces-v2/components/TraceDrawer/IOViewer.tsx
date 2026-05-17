@@ -18,8 +18,10 @@ import {
   LuList,
   LuMessageSquare,
   LuPencil,
+  LuPlay,
 } from "react-icons/lu";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useGoToSpanInPlaygroundTabUrlBuilder } from "~/prompts/prompt-playground/hooks/useLoadSpanIntoPromptPlayground";
 import { AnnotationPopover } from "./conversationView/AnnotationPopover";
 import { IOViewerBody } from "./IOViewerBody";
 import { safePrettyJson } from "./JsonHighlight";
@@ -62,6 +64,15 @@ interface IOViewerProps {
    * span), so per-span IOViewers leave this undefined.
    */
   traceId?: string;
+  /**
+   * Span this IOViewer is rendering. When set on an `llm` span the header
+   * surfaces an "Open in Playground" affordance — the chat history is the
+   * natural place to pick the conversation back up, especially for
+   * third-party traces with no managed prompt tied to the call.
+   */
+  spanId?: string;
+  /** Span type — `llm` enables the Playground affordance. */
+  spanType?: string;
 }
 
 const ActionButton = forwardRef<
@@ -88,6 +99,36 @@ const ActionButton = forwardRef<
     </Button>
   );
 });
+
+function PlaygroundButton({ spanId }: { spanId: string }) {
+  const { buildUrl } = useGoToSpanInPlaygroundTabUrlBuilder();
+  // No explicit action — the playground loader auto-detects: opens the
+  // existing managed prompt at the traced version when one is linked,
+  // creates a fresh tab when not. One button, smart default.
+  const href = buildUrl(spanId)?.toString() ?? "";
+  if (!href) return null;
+  return (
+    <Button
+      asChild
+      size="xs"
+      variant="ghost"
+      color="fg.muted"
+      gap={1.5}
+      paddingX={2}
+      height="22px"
+    >
+      <a
+        href={href}
+        target="_blank"
+        rel="noreferrer noopener"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <Icon as={LuPlay} boxSize={3} />
+        Open in Playground
+      </a>
+    </Button>
+  );
+}
 
 function AnnotateButton({ traceId }: { traceId: string }) {
   const { hasPermission } = useOrganizationTeamProject();
@@ -160,6 +201,8 @@ export const IOViewer = memo(function IOViewer({
   content,
   mode = "input",
   traceId,
+  spanId,
+  spanType,
 }: IOViewerProps) {
   const parsed = useMemo(() => tryParseJSON(content), [content]);
   // Coerce parsed into a chat message array — handles top-level arrays,
@@ -419,6 +462,9 @@ export const IOViewer = memo(function IOViewer({
         {!collapsed && traceId && <AnnotateButton traceId={traceId} />}
         {!collapsed && traceId && mode === "output" && (
           <SuggestCorrectionButton traceId={traceId} output={content} />
+        )}
+        {!collapsed && spanType === "llm" && spanId && mode === "input" && (
+          <PlaygroundButton spanId={spanId} />
         )}
         <CopyButton text={content} />
       </HStack>

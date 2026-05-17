@@ -53,12 +53,11 @@ export function PromptBrowserWindowContent() {
     },
   );
 
-  // Show loading skeleton while tab data is being fetched — no form initialization
-  if (tab?.data.loading) {
-    const layoutMode: LayoutMode = isSingleWindow ? "horizontal" : "vertical";
-    return <PromptTabLoadingSkeleton layoutMode={layoutMode} />;
-  }
-
+  // All hooks must run on every render — `useMemo` below used to sit
+  // after an early-return for `tab?.data.loading`, which crashed React
+  // with "Rendered more hooks than during the previous render" the
+  // moment the loading flag flipped to false (one extra hook in the
+  // next render).
   const currentValues = tab?.data.form.currentValues;
   const versionNumber = tab?.data.meta.versionNumber;
   const initialConfigValues = useMemo(
@@ -66,10 +65,15 @@ export function PromptBrowserWindowContent() {
     [currentValues],
   );
 
-  if (!initialConfigValues) return null;
-
   // Use horizontal layout when there's only one window
   const layoutMode: LayoutMode = isSingleWindow ? "horizontal" : "vertical";
+
+  // Show loading skeleton while tab data is being fetched — no form initialization
+  if (tab?.data.loading) {
+    return <PromptTabLoadingSkeleton layoutMode={layoutMode} />;
+  }
+
+  if (!initialConfigValues) return null;
 
   // Key includes version to force remount when version changes externally (e.g., upgrade clicked)
   // This ensures react-hook-form gets fresh defaultValues

@@ -43,6 +43,13 @@ export function flattenParamsToPromptAttributes(
   const attrs: Record<string, unknown> = {};
 
   for (const key of PROMPT_ATTRIBUTE_KEYS) {
+    // Flat-keyed shape first (`params["langwatch.prompt.id"]`) — that's
+    // how OTel attributes land before ingestion un-flattens them, and
+    // some SDK paths leave them as-is. Fall back to nested walk after.
+    if (params[key] !== undefined) {
+      attrs[key] = params[key];
+      continue;
+    }
     const segments = key.split(".");
     let current: unknown = params;
     for (const segment of segments) {

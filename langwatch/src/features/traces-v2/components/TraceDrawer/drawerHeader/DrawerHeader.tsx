@@ -110,7 +110,12 @@ function TraceIdChip({ traceId }: { traceId: string }) {
         await navigator.clipboard.writeText(traceId);
         toaster.create({
           title: "Trace ID copied",
-          description: short + "…",
+          // Show the full id so the operator can verify what landed on
+          // their clipboard at a glance. The chip shows a short id by
+          // design (git-SHA convention) but the toast has the real
+          // estate — operator report: the previous "<8 chars>…" felt
+          // truncated for no benefit.
+          description: traceId,
           type: "success",
           duration: 2500,
         });

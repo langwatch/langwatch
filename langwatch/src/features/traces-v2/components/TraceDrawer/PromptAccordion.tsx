@@ -8,13 +8,22 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useMemo } from "react";
-import { LuCopy, LuExternalLink, LuPencil } from "react-icons/lu";
+import {
+  LuChevronDown,
+  LuCopy,
+  LuExternalLink,
+  LuPencil,
+} from "react-icons/lu";
 import { useDrawer } from "~/hooks/useDrawer";
+import { Link } from "~/components/ui/link";
+import { Menu } from "~/components/ui/menu";
+import { useGoToSpanInPlaygroundTabUrlBuilder } from "~/prompts/prompt-playground/hooks/useLoadSpanIntoPromptPlayground";
 import type { SpanDetail } from "~/server/api/routers/tracesV2.schemas";
 import {
   extractPromptReference,
   hasPromptMetadata,
 } from "../../utils/promptAttributes";
+import { usePromptByHandle } from "../../hooks/usePromptByHandle";
 
 export { hasPromptMetadata };
 
@@ -27,20 +36,41 @@ interface PromptAccordionProps {
  * pulls its weight even when only some `langwatch.prompt.*` keys made it
  * onto the span. The trace-level Prompts tab is the rollup view; this is
  * the per-span deep dive.
+ *
+ * Always renders on `llm` spans, even when no prompt metadata exists —
+ * the "Open in Playground" action still works (it creates a brand-new
+ * playground tab from the LLM span's input/output) so operators can
+ * continue any LLM call regardless of whether a managed prompt was tied
+ * to it. Mirrors the old SpanDetails behaviour.
  */
 export function PromptAccordion({ span }: PromptAccordionProps) {
   const { openDrawer } = useDrawer();
   const ref = useMemo(() => extractPromptReference(span.params), [span]);
+  const { buildUrl } = useGoToSpanInPlaygroundTabUrlBuilder();
+  // SDK sometimes emits the opaque slug-id (`prompt_xxx`) instead of the
+  // human handle (`pizza-prompt`) on `langwatch.prompt.id`. Resolve to the
+  // friendlier handle for display while keeping the raw value for the
+  // playground deep-link.
+  const { resolvedHandle } = usePromptByHandle(ref?.handle ?? null);
 
   const variableEntries = ref?.variables
     ? Object.entries(ref.variables).sort(([a], [b]) => a.localeCompare(b))
     : [];
 
-  // Section visibility is gated upstream by `hasPromptMetadata`, so we
-  // get here whenever any `langwatch.prompt.*` key exists. When the
-  // reference itself didn't parse (variables-only, or a bare slug we
-  // can't parse without a handle key) we still surface the variables —
-  // partial info beats an empty section.
+  const rawHandle = ref?.handle ?? null;
+  const displayHandle = resolvedHandle ?? rawHandle;
+  const isLlmSpan = span.type === "llm";
+  const promptRefLabel =
+    rawHandle && ref?.versionNumber != null
+      ? `${rawHandle}:${ref.versionNumber}`
+      : rawHandle && ref?.tag
+        ? `${rawHandle}:${ref.tag}`
+        : rawHandle;
+
+  // No-prompt llm spans don't reach this component anymore (the IOViewer
+  // header carries the Playground affordance for that case). When we do
+  // render and only partial metadata is present, fall back to a hint
+  // instead of an empty section.
   if (!ref && variableEntries.length === 0) {
     return (
       <Box paddingX={2} paddingY={3}>
@@ -52,8 +82,6 @@ export function PromptAccordion({ span }: PromptAccordionProps) {
     );
   }
 
-  const handle = ref?.handle ?? null;
-
   return (
     <VStack align="stretch" gap={3} paddingY={2}>
       {/* Header */}
@@ -61,9 +89,9 @@ export function PromptAccordion({ span }: PromptAccordionProps) {
         <Text
           textStyle="sm"
           fontWeight="bold"
-          color={handle ? "fg" : "fg.muted"}
+          color={displayHandle ? "fg" : "fg.muted"}
         >
-          {handle ?? "Prompt (no handle on span)"}
+          {displayHandle ?? "Prompt (no handle on span)"}
         </Text>
         {ref?.versionNumber != null && (
           <Badge size="sm" variant="subtle">
@@ -164,23 +192,50 @@ export function PromptAccordion({ span }: PromptAccordionProps) {
       )}
 
       {/* Actions */}
-      {handle && (
+      {rawHandle && (
         <HStack gap={1} paddingX={2}>
           <Button
             size="xs"
             variant="ghost"
             gap={1}
-            onClick={() => openDrawer("promptEditor", { promptId: handle })}
+            onClick={() => openDrawer("promptEditor", { promptId: rawHandle })}
           >
             <Icon as={LuPencil} boxSize={3} />
             Open prompt
           </Button>
-          {/* Playground action stays disabled until the playground drawer
-              accepts span input + variables as deep-link params. */}
-          <Button size="xs" variant="ghost" gap={1} disabled>
-            <Icon as={LuExternalLink} boxSize={3} />
-            Open in Playground
-          </Button>
+          {isLlmSpan && (
+            <Menu.Root>
+              <Menu.Trigger asChild>
+                <Button size="xs" variant="ghost" gap={1}>
+                  <Icon as={LuExternalLink} boxSize={3} />
+                  Open in Playground
+                  <Icon as={LuChevronDown} boxSize={2.5} />
+                </Button>
+              </Menu.Trigger>
+              <Menu.Content>
+                <Menu.Item value="open-existing" asChild>
+                  <Link
+                    href={
+                      buildUrl(span.spanId, "open-existing")?.toString() ?? ""
+                    }
+                    isExternal
+                  >
+                    Open {promptRefLabel ?? "prompt"}
+                  </Link>
+                </Menu.Item>
+                <Menu.Item value="create-new" asChild>
+                  <Link
+                    href={
+                      buildUrl(span.spanId, "create-new")?.toString() ?? ""
+                    }
+                    isExternal
+                  >
+                    Create new prompt
+                  </Link>
+                </Menu.Item>
+              </Menu.Content>
+            </Menu.Root>
+          )}
         </HStack>
       )}
     </VStack>

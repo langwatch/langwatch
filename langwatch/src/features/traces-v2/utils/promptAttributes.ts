@@ -193,6 +193,20 @@ export function extractPromptReference(
     return { handle, versionNumber: null, tag: null, variables, draft };
   }
 
+  // Bare-slug `prompt.id` (no colon, no separate handle attribute) — the
+  // ingestion-side `parsePromptReference` accepts this; mirror it here so
+  // the v2 accordion lights up on llm spans that the server enriched
+  // via ancestor lookup (which writes nested `langwatch.prompt.id` only).
+  if (typeof promptId === "string" && promptId.length > 0) {
+    if (versionRaw != null) {
+      const version = Number(versionRaw);
+      if (Number.isInteger(version) && version > 0) {
+        return { handle: promptId, versionNumber: version, tag: null, variables };
+      }
+    }
+    return { handle: promptId, versionNumber: null, tag: null, variables };
+  }
+
   return null;
 }
 

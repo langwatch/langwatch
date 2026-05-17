@@ -100,7 +100,18 @@ export function useTraceHeaderChips(
   });
 
   const lastUsedHandle = trace.lastUsedPromptId;
-  const { latestVersion, missing } = usePromptByHandle(lastUsedHandle);
+  const { latestVersion, missing, resolvedHandle: lastUsedResolvedHandle } =
+    usePromptByHandle(lastUsedHandle);
+  // SDKs sometimes emit the opaque slug-id (`prompt_xxx`) instead of the
+  // human handle (`pizza-prompt`). When the live prompt config resolves a
+  // friendlier handle, prefer it in the chip — fall back to the raw id so
+  // we still surface *something* while the lookup is in flight or for
+  // unmanaged prompts.
+  const lastUsedDisplayHandle = lastUsedResolvedHandle ?? lastUsedHandle;
+  const { resolvedHandle: selectedResolvedHandle } = usePromptByHandle(
+    trace.selectedPromptId,
+  );
+  const selectedDisplayId = selectedResolvedHandle ?? trace.selectedPromptId;
   const lastUsedState: PromptChipState = { latestVersion, missing };
 
   const driftFromSelection =
@@ -142,7 +153,7 @@ export function useTraceHeaderChips(
   if (trace.selectedPromptId && driftFromSelection) {
     chips.push({
       kind: "promptSelected",
-      selectedId: trace.selectedPromptId,
+      selectedId: selectedDisplayId ?? trace.selectedPromptId,
       spanId: trace.selectedPromptSpanId,
     });
   }
@@ -150,7 +161,7 @@ export function useTraceHeaderChips(
   if (trace.lastUsedPromptId) {
     chips.push({
       kind: "promptLastUsed",
-      handle: trace.lastUsedPromptId,
+      handle: lastUsedDisplayHandle ?? trace.lastUsedPromptId,
       versionNumber: trace.lastUsedPromptVersionNumber,
       spanId: trace.lastUsedPromptSpanId,
       state: lastUsedState,
