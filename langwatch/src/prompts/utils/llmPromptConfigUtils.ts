@@ -676,6 +676,7 @@ export function versionedPromptToOptimizationStudioNodeData(
     | "localPromptConfig"
     | "promptId"
     | "promptVersionId"
+    | "promptDraft"
   >
 > {
   return {

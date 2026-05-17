@@ -17,6 +17,7 @@ import type {
   StudioServerEvent,
 } from "~/optimization_studio/types/events";
 import type { runtimeInputsSchema } from "~/prompts/schemas";
+import { versionMetadataToNodeFormat } from "~/prompts/schemas/version-metadata-schema";
 import type { PromptConfigFormValues } from "~/prompts/types";
 import { buildLLMConfig } from "~/server/prompt-config/llmConfigBuilder";
 import type { ChatMessage } from "~/server/tracer/types";
@@ -390,14 +391,24 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
 
   /**
    * Builds node data configuration for LLM prompt component from form values.
-   * Converts form configuration into component parameters including LLM settings, instructions, and messages.
+   * Converts form configuration into component parameters including LLM
+   * settings, instructions, and messages.
+   *
+   * Prompt-span parity: when the form originates from a saved prompt
+   * (configId / handle / versionMetadata present on the form values),
+   * those fields ride along on the dispatched node so nlpgo's engine
+   * emits the PromptApiService.get + Prompt.compile span pair with the
+   * full identity — the trace drawer's "Open in Prompts" deep-link
+   * resolves cleanly back to the playground at the resume target.
+   * Fresh ad-hoc prompts (no configId on the form) omit those fields,
+   * matching the python-sdk "Create new prompt" path.
+   *
    * @param params - Form values and message history to convert
-   * @returns LLM prompt component configuration without configId
    */
   private buildNodeData(params: {
     formValues: PromptConfigFormValues;
     messagesHistory: ChatMessage[];
-  }): Omit<LlmPromptConfigComponent, "configId"> {
+  }): LlmPromptConfigComponent {
     const { formValues, messagesHistory } = params;
 
     // Extract system prompt from messages array
@@ -408,6 +419,16 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
     return {
       name: "LLM Node",
       description: "LLM calling node",
+      // Pass-through identity fields so nlpgo can stamp the prompt
+      // spans. Each is conditional on presence: ad-hoc playground sends
+      // omit the keys, mirroring the python-sdk omission convention.
+      // versionMetadata uses the canonical form→node converter
+      // (versionCreatedAt is a Date in form state, ISO string on the wire).
+      ...(formValues.configId !== undefined && { configId: formValues.configId }),
+      ...(formValues.handle !== undefined && { handle: formValues.handle }),
+      ...(formValues.versionMetadata !== undefined && {
+        versionMetadata: versionMetadataToNodeFormat(formValues.versionMetadata),
+      }),
       parameters: [
         {
           identifier: "llm",

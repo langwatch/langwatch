@@ -116,3 +116,13 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+// Monorepo: the in-tree sdk-go directory IS the source of truth for
+// every root-module consumer (nlpgo, aigateway, …). Changes to sdk-go
+// flow with nlpgo changes in the same commit — same pattern python-sdk
+// + langwatch_nlp use, and the reason a monorepo exists in the first
+// place. The `require` line above pins a published version for
+// external (out-of-tree) consumers who fetch via the proxy;
+// release-please cuts those tags. In this repo, this replace always
+// wins.
+replace github.com/langwatch/langwatch/sdk-go => ./sdk-go

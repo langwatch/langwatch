@@ -16,6 +16,16 @@ export interface PromptReference {
   tag: string | null;
   /** Variable values that were filled into the template, sorted-friendly. */
   variables: Record<string, string> | null;
+  /**
+   * True when the executed config diverged from the saved version named
+   * by `handle` + `versionNumber` (user edited inline without saving).
+   * The base reference still points at the resume target; consumers
+   * append "(unsaved edits)" to the "Open in Prompts" label so the user
+   * knows the trace's messages won't match the saved version verbatim.
+   * Stamped on Prompt.compile as `langwatch.prompt.draft = true`;
+   * absent in the saved-version case (omission convention).
+   */
+  draft: boolean;
 }
 
 /**
@@ -83,14 +93,14 @@ export function parsePromptIdString(raw: string): PromptReference | null {
   if (slug.length === 0) return null;
 
   if (suffix.length === 0 || suffix === "latest") {
-    return { handle: slug, versionNumber: null, tag: null, variables: null };
+    return { handle: slug, versionNumber: null, tag: null, variables: null, draft: false };
   }
 
   const parsed = Number(suffix);
   if (Number.isInteger(parsed) && parsed > 0) {
-    return { handle: slug, versionNumber: parsed, tag: null, variables: null };
+    return { handle: slug, versionNumber: parsed, tag: null, variables: null, draft: false };
   }
-  return { handle: slug, versionNumber: null, tag: suffix, variables: null };
+  return { handle: slug, versionNumber: null, tag: suffix, variables: null, draft: false };
 }
 
 /**
@@ -143,6 +153,13 @@ export function extractPromptReference(
   if (!params) return null;
 
   const variables = parsePromptVariables(params);
+  // Accept both native boolean true (OTLP wire) and the stringified
+  // "true" form (ClickHouse SpanAttributes stringifies scalar attrs on
+  // ingestion, so an `attribute.Bool(true)` from nlpgo lands as the
+  // string "true" on read). Anything else is treated as not-draft —
+  // matches python-sdk's omission convention.
+  const draftRaw = readAttribute(params, "langwatch.prompt.draft");
+  const draft = draftRaw === true || draftRaw === "true";
 
   const promptId = readAttribute(params, "langwatch.prompt.id");
   if (typeof promptId === "string" && promptId.includes(":")) {
@@ -153,13 +170,13 @@ export function extractPromptReference(
     if (slug.length > 0 && suffix.length > 0 && suffix !== "latest") {
       const parsed = Number(suffix);
       if (Number.isInteger(parsed) && parsed > 0) {
-        return { handle: slug, versionNumber: parsed, tag: null, variables };
+        return { handle: slug, versionNumber: parsed, tag: null, variables, draft };
       }
-      return { handle: slug, versionNumber: null, tag: suffix, variables };
+      return { handle: slug, versionNumber: null, tag: suffix, variables, draft };
     }
 
     if (slug.length > 0) {
-      return { handle: slug, versionNumber: null, tag: null, variables };
+      return { handle: slug, versionNumber: null, tag: null, variables, draft };
     }
   }
 
@@ -170,10 +187,10 @@ export function extractPromptReference(
     if (versionRaw != null) {
       const version = Number(versionRaw);
       if (Number.isInteger(version) && version > 0) {
-        return { handle, versionNumber: version, tag: null, variables };
+        return { handle, versionNumber: version, tag: null, variables, draft };
       }
     }
-    return { handle, versionNumber: null, tag: null, variables };
+    return { handle, versionNumber: null, tag: null, variables, draft };
   }
 
   return null;

@@ -75,6 +75,15 @@ export function PromptAccordion({ span }: PromptAccordionProps) {
             {ref.tag}
           </Badge>
         )}
+        {ref?.draft && (
+          // The executed config diverged from the saved version (user
+          // edited inline without saving). Surfaced as an amber chip so
+          // operators know clicking "Open prompt" lands on the BASE
+          // version, not the diverged messages in the trace.
+          <Badge size="sm" variant="subtle" colorPalette="orange">
+            unsaved edits
+          </Badge>
+        )}
       </HStack>
 
       {/* Variables */}

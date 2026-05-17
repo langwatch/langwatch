@@ -15,7 +15,15 @@ ARG TARGETARCH
 # Dependency layer (cached until go.mod/go.sum change). The module cache is
 # arch-independent, but keying both caches by TARGETARCH keeps buildx from
 # churning a shared dir when producing multiple platforms in the same job.
+#
+# Monorepo: sdk-go is in-tree and resolved via `replace ... => ./sdk-go`
+# in the root go.mod, so its go.mod must land in the build context
+# before `go mod download` runs. Same pattern python-sdk + langwatch_nlp
+# use — sdk-go changes flow with nlpgo changes in the same commit, no
+# publish-then-bump ping-pong. Full sdk-go source is copied below
+# alongside the other build inputs.
 COPY go.mod go.sum ./
+COPY sdk-go/go.mod sdk-go/go.sum ./sdk-go/
 RUN --mount=type=cache,target=/go/pkg/mod,id=go-mod-${TARGETARCH} \
     go mod download && go mod verify
 
@@ -23,6 +31,9 @@ RUN --mount=type=cache,target=/go/pkg/mod,id=go-mod-${TARGETARCH} \
 COPY cmd/ cmd/
 COPY pkg/ pkg/
 COPY services/ services/
+# sdk-go full source — the in-tree dependency resolved via `replace`
+# in the root go.mod (see comment on the COPY of sdk-go/go.mod above).
+COPY sdk-go/ sdk-go/
 ARG VERSION=dev
 RUN --mount=type=cache,target=/go/pkg/mod,id=go-mod-${TARGETARCH} \
     --mount=type=cache,target=/root/.cache/go-build,id=go-build-${TARGETARCH} \

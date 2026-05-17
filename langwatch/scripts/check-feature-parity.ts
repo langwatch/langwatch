@@ -58,6 +58,18 @@ const DEFAULT_BATS_TEST_ROOTS: string[] = [
 ];
 
 /**
+ * Roots scanned for Go `_test.go` files. Go-side scenarios use the same
+ * `@scenario` token as TS, but the proximity check looks for a
+ * `func TestXxx(t *testing.T) {` line instead of `it(` / `test(`. Without
+ * this scan path, scenarios pinned to Go integration tests under
+ * `services/nlpgo/` would have no way to satisfy parity and would either
+ * require @unimplemented forever or a fake TS skip-stub.
+ */
+const DEFAULT_GO_TEST_ROOTS: string[] = [
+  "services/nlpgo",
+];
+
+/**
  * Feature files whose unbound `@unit` / `@integration` scenarios are
  * tolerated (non-fatal) during migration. These files still parse; their
  * counts surface in the `legacy` block of `--json` output and in the
@@ -81,6 +93,7 @@ const LEGACY_UNBOUND: string[] = [
 
 const TEST_FILE_RE = /\.test\.tsx?$/;
 const BATS_FILE_RE = /\.bats$/;
+const GO_TEST_FILE_RE = /_test\.go$/;
 const FEATURE_FILE_RE = /\.feature$/;
 const SKIP_DIR = new Set(["node_modules", ".next", "dist", "build"]);
 
@@ -303,6 +316,72 @@ function isNextLineBatsTest(lines: string[], startLineIdx: number): boolean {
   return false;
 }
 
+/**
+ * Go binding form (block-comment, matches the TS form byte-for-byte):
+ *
+ *   /\*\* @scenario "PromptApiService.get sibling carries the combined handle:version id" *\/
+ *   func TestPromptSpansExecuteComponent_GetSiblingCarriesCombinedId(t *testing.T) {
+ *     t.Skip(promptSpansPendingMsg)
+ *   }
+ *
+ * Same ANNOTATION_RE that handles TS — only the proximity check differs:
+ * we require the next non-blank, non-comment token to be `func Test...`.
+ */
+function isFollowedByGoTestFunc(src: string, start: number): boolean {
+  const len = src.length;
+  let i = start;
+  while (i < len) {
+    const ch = src[i];
+    if (ch === " " || ch === "\t" || ch === "\n" || ch === "\r") {
+      i++;
+      continue;
+    }
+    if (ch === "/" && src[i + 1] === "*") {
+      const close = src.indexOf("*/", i + 2);
+      if (close === -1) return false;
+      i = close + 2;
+      continue;
+    }
+    if (ch === "/" && src[i + 1] === "/") {
+      const nl = src.indexOf("\n", i);
+      if (nl === -1) return false;
+      i = nl + 1;
+      continue;
+    }
+    const rest = src.slice(i);
+    return /^func\s+Test[A-Za-z0-9_]*\s*\(\s*[A-Za-z_][A-Za-z0-9_]*\s+\*testing\.T\s*\)/.test(rest);
+  }
+  return false;
+}
+
+function collectGoBindings(testRoots: string[]): CollectedBinding[] {
+  const bindings: CollectedBinding[] = [];
+  const files: string[] = [];
+  for (const r of testRoots) {
+    files.push(
+      ...walkFiles(resolve(REPO_ROOT, r), (n) => GO_TEST_FILE_RE.test(n))
+    );
+  }
+
+  for (const file of files) {
+    const src = readFileSync(file, "utf8");
+    let m: RegExpExecArray | null;
+    ANNOTATION_RE.lastIndex = 0;
+    while ((m = ANNOTATION_RE.exec(src)) !== null) {
+      const title = (m[1] ?? m[2] ?? m[3] ?? "").trim();
+      if (!title) continue;
+      if (!isFollowedByGoTestFunc(src, m.index + m[0].length)) continue;
+      const line = src.slice(0, m.index).split("\n").length;
+      bindings.push({
+        title,
+        ref: { file: relative(REPO_ROOT, file), line },
+      });
+    }
+  }
+
+  return bindings;
+}
+
 function collectBatsBindings(testRoots: string[]): CollectedBinding[] {
   const bindings: CollectedBinding[] = [];
   const files: string[] = [];
@@ -457,6 +536,7 @@ function main(): void {
   const bindings = [
     ...collectAllBindings(DEFAULT_TEST_ROOTS),
     ...collectBatsBindings(DEFAULT_BATS_TEST_ROOTS),
+    ...collectGoBindings(DEFAULT_GO_TEST_ROOTS),
   ];
   const bindingsByTitle = indexByTitle(bindings);
 

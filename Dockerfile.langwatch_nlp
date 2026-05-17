@@ -10,9 +10,17 @@ FROM --platform=$BUILDPLATFORM golang:1.26.2-bookworm AS nlpgo-build
 ARG TARGETARCH
 WORKDIR /src
 COPY go.mod go.sum ./
+# Monorepo: sdk-go is in-tree and resolved via `replace ... => ./sdk-go`
+# in the root go.mod, so its go.mod must land in the build context
+# before `go mod download` runs. Full sdk-go source is copied below
+# alongside pkg/services/cmd. Same pattern python-sdk + langwatch_nlp
+# use — keeping the dependency in-tree means sdk-go changes flow with
+# nlpgo changes in the same commit, no publish-then-bump ping-pong.
+COPY sdk-go/go.mod sdk-go/go.sum ./sdk-go/
 RUN go mod download
 COPY pkg ./pkg
 COPY services ./services
+COPY sdk-go ./sdk-go
 COPY cmd ./cmd
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH:-amd64} \
     go build -ldflags="-s -w" -o /out/service ./cmd/service

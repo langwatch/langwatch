@@ -5,12 +5,7 @@ import type {
 import type { NodeWithOptionalPosition } from "../../../../../../../types";
 import { DEFAULT_MODEL } from "../../../../../../../utils/constants";
 
-type LlmSignatureNode = Omit<
-  NodeWithOptionalPosition<LlmPromptConfigComponent>,
-  "data"
-> & {
-  data: Omit<LlmPromptConfigComponent, "configId">;
-};
+type LlmSignatureNode = NodeWithOptionalPosition<LlmPromptConfigComponent>;
 
 const DEFAULT_SIGNATURE_NODE_PROPERTIES = (
   model: string,
