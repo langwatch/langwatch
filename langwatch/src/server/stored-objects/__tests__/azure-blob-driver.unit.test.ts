@@ -8,6 +8,7 @@
  *   - GET/PUT/DELETE/HEAD round-trip the right HTTP shapes
  *   - 404s from Azure surface as ObjectNotFoundError on GET
  */
+import crypto from "node:crypto";
 import { Readable } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AzureBlobDriver } from "../azure-blob-driver";
@@ -238,6 +239,113 @@ describe("AzureBlobDriver", () => {
       const driver = newDriver();
       fetchSpy.mockResolvedValueOnce(new Response("", { status: 503 }));
       await expect(driver.exists(URI)).rejects.toThrow(/503/);
+    });
+  });
+
+  describe("given a fixed-input vector (known-answer test for SharedKey HMAC)", () => {
+    /**
+     * KAT vector — all inputs are fixed so any regression in canonicalization
+     * order, positional string-to-sign slots, or HMAC construction fails this
+     * test deterministically rather than silently producing a header that passes
+     * a prefix regex but Azure rejects with a 403.
+     *
+     * Canonical string-to-sign (14 newline-separated fields):
+     *   PUT\n
+     *   \n                                    ← Content-Encoding (empty)
+     *   \n                                    ← Content-Language (empty)
+     *   11\n                                  ← Content-Length
+     *   \n                                    ← Content-MD5 (empty)
+     *   application/octet-stream\n            ← Content-Type
+     *   \n                                    ← Date legacy (empty)
+     *   \n                                    ← If-Modified-Since (empty)
+     *   \n                                    ← If-Match (empty)
+     *   \n                                    ← If-None-Match (empty)
+     *   \n                                    ← If-Unmodified-Since (empty)
+     *   \n                                    ← Range (empty)
+     *   x-ms-blob-type:BlockBlob\n            ← canonicalized headers (sorted)
+     *   x-ms-date:Wed, 23 Oct 2013 09:49:06 GMT\n
+     *   x-ms-version:2021-12-02\n
+     *   /myaccount/stored-objects/proj-1/kat-blob  ← canonicalized resource
+     *
+     * HMAC-SHA256 of the above string with key
+     *   Buffer.from("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
+     * (before base64-encoding the key) produces the expected signature below.
+     *
+     * To reproduce independently:
+     *   node -e "
+     *     const c=require('crypto');
+     *     const key=Buffer.from('MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWYwMTIzNDU2Nzg5YWJjZGVmMDEyMzQ1Njc4OWFiY2RlZg==','base64');
+     *     const sts='PUT\n\n\n11\n\napplication/octet-stream\n\n\n\n\n\n\nx-ms-blob-type:BlockBlob\nx-ms-date:Wed, 23 Oct 2013 09:49:06 GMT\nx-ms-version:2021-12-02\n/myaccount/stored-objects/proj-1/kat-blob';
+     *     console.log(c.createHmac('sha256',key).update(sts,'utf8').digest('base64'));
+     *   "
+     */
+    const KAT_ACCOUNT_NAME = "myaccount";
+    // Raw bytes: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" (64 ASCII chars)
+    const KAT_ACCOUNT_KEY = Buffer.from(
+      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    ).toString("base64");
+    const KAT_CONTAINER = "stored-objects";
+    const KAT_BLOB_PATH = "proj-1/kat-blob";
+    const KAT_URI = `azure-blob://${KAT_ACCOUNT_NAME}/${KAT_CONTAINER}/${KAT_BLOB_PATH}`;
+    const KAT_TIMESTAMP = "Wed, 23 Oct 2013 09:49:06 GMT";
+    const KAT_BODY = Buffer.from("hello world"); // 11 bytes
+
+    // Offline-computed expected signature (see derivation above).
+    const KAT_EXPECTED_AUTH =
+      "SharedKey myaccount:cLBL2cZBVlJlZk1g7S4IahPge8ljBVvWYqomzG4ZZQ8=";
+
+    it("produces the exact SharedKey Authorization header for fixed inputs", async () => {
+      // Fix Date so the driver's `new Date().toUTCString()` returns the
+      // deterministic timestamp baked into the KAT vector above.
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date(KAT_TIMESTAMP));
+
+      const driver = new AzureBlobDriver({
+        accountName: KAT_ACCOUNT_NAME,
+        accountKey: KAT_ACCOUNT_KEY,
+      });
+
+      fetchSpy.mockResolvedValueOnce(new Response("", { status: 201 }));
+      await driver.put(KAT_URI, KAT_BODY, "application/octet-stream");
+
+      vi.useRealTimers();
+
+      const [, init] = fetchSpy.mock.calls[0]!;
+      const headers = init.headers as Record<string, string>;
+      expect(headers.Authorization).toBe(KAT_EXPECTED_AUTH);
+    });
+
+    it("recomputes the same signature when the same inputs are fed to the raw HMAC", () => {
+      // This sub-test validates the KAT vector itself is self-consistent —
+      // the expected value is not a magic constant but matches inline crypto.
+      const stringToSign = [
+        "PUT",
+        "",
+        "",
+        String(KAT_BODY.length),
+        "",
+        "application/octet-stream",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        [
+          `x-ms-blob-type:BlockBlob`,
+          `x-ms-date:${KAT_TIMESTAMP}`,
+          `x-ms-version:2021-12-02`,
+        ].join("\n"),
+        `/${KAT_ACCOUNT_NAME}/${KAT_CONTAINER}/${KAT_BLOB_PATH}`,
+      ].join("\n");
+
+      const keyBytes = Buffer.from(KAT_ACCOUNT_KEY, "base64");
+      const signature = crypto
+        .createHmac("sha256", keyBytes)
+        .update(stringToSign, "utf8")
+        .digest("base64");
+
+      expect(`SharedKey ${KAT_ACCOUNT_NAME}:${signature}`).toBe(KAT_EXPECTED_AUTH);
     });
   });
 
