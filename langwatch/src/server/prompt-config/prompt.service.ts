@@ -6,6 +6,9 @@ import type {
 } from "@prisma/client";
 import type { z } from "zod";
 import { createLogger } from "~/utils/logger";
+import { ModelProviderService } from "../modelProviders/modelProvider.service";
+import { ProjectService } from "../app-layer/projects/project.service";
+import { PrismaProjectRepository } from "../app-layer/projects/repositories/project.prisma.repository";
 import {
   deriveResponseFormatFromOutputs,
   type inputsSchema,
@@ -439,6 +442,16 @@ export class PromptService {
       );
     }
 
+    // Resolve the effective default model before entering the transaction so
+    // env-fallback providers are considered (new self-host / dev projects).
+    const projectService = new ProjectService(
+      new PrismaProjectRepository(this.prisma),
+      ModelProviderService.create(this.prisma),
+    );
+    const resolvedDefaultModel = await projectService.resolveDefaultModel(
+      params.projectId,
+    );
+
     const config = await this.repository.createConfigWithInitialVersion({
       configData: {
         name: params.handle,
@@ -449,6 +462,7 @@ export class PromptService {
         authorId: params.authorId,
         copiedFromPromptId: null,
       },
+      resolvedDefaultModel,
       versionData: shouldCreateVersion
         ? {
             configData: this.transformToDbFormat({

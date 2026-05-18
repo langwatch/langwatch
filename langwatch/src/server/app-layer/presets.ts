@@ -38,6 +38,7 @@ import { NullOrganizationRepository } from "./organizations/repositories/organiz
 import { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
 import { ProjectService } from "./projects/project.service";
 import { PrismaProjectRepository } from "./projects/repositories/project.prisma.repository";
+import { ModelProviderService } from "../modelProviders/modelProvider.service";
 import { NullProjectRepository } from "./projects/repositories/project.repository";
 import { DspyStepService } from "./dspy-steps/dspy-step.service";
 import { DspyStepClickHouseRepository } from "./dspy-steps/repositories/dspy-step.clickhouse.repository";
@@ -154,7 +155,10 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
 
   const broadcast = new BroadcastService(redis);
   const projects = traced(
-    new ProjectService(new PrismaProjectRepository(prisma)),
+    new ProjectService(
+      new PrismaProjectRepository(prisma),
+      ModelProviderService.create(prisma),
+    ),
     "ProjectService",
   );
   const presence = new PresenceService(

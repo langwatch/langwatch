@@ -457,8 +457,15 @@ export class LlmConfigRepository {
     > & {
       prompt?: string;
     };
+    /**
+     * Pre-resolved default model from ProjectService.resolveDefaultModel().
+     * When provided, this takes precedence over project.defaultModel so that
+     * env-fallback providers are correctly reflected in newly-created configs.
+     * When omitted, falls back to project.defaultModel ?? DEFAULT_MODEL.
+     */
+    resolvedDefaultModel?: string | null;
   }): Promise<LlmConfigWithLatestVersion> {
-    const { configData, versionData } = params;
+    const { configData, versionData, resolvedDefaultModel } = params;
 
     // Sanity check on the authorId
     if (
@@ -493,7 +500,9 @@ export class LlmConfigRepository {
         },
       });
       const { project } = newConfig;
-      const defaultModel = project.defaultModel ?? DEFAULT_MODEL;
+      // Use pre-resolved model when provided (prefers env-fallback providers);
+      // fall back to project.defaultModel ?? DEFAULT_MODEL for backwards compat.
+      const defaultModel = resolvedDefaultModel ?? project.defaultModel ?? DEFAULT_MODEL;
 
       // Set the version data to the provided version data, or undefined if no version data is provided.
       let newVersionData: Partial<CreateLlmConfigVersionParams> | undefined =
