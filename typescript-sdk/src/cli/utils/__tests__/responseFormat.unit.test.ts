@@ -17,6 +17,7 @@ const materialized = (
   model: "openai/gpt-5.4-mini",
   messages: [{ role: "system", content: "classify" }],
   prompt: "classify",
+  config: {},
   updatedAt: "2026-05-15T00:00:00.000Z",
   ...overrides,
 });
