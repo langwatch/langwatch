@@ -52,15 +52,17 @@ function pickAnthropic(
   modelIds: string[],
   variant: Variant,
 ): string | undefined {
-  const family = variant === "flagship" ? "sonnet" : "haiku";
+  // Anthropic intentionally maps both flagship and mini to the latest
+  // sonnet. Haiku trails sonnet by a wide enough margin on the assistive
+  // tasks (search, autocomplete, topic clustering) that even the FAST
+  // role is better served by sonnet. Mirrors the server-side seed plan.
   const candidates: Candidate[] = [];
   for (const id of modelIds) {
-    const m = new RegExp(`^anthropic\\/claude-${family}-(\\d+)-(\\d+)$`).exec(
-      id,
-    );
+    const m = /^anthropic\/claude-sonnet-(\d+)-(\d+)$/.exec(id);
     if (!m) continue;
     candidates.push({ id, major: Number(m[1]), minor: Number(m[2]) });
   }
+  void variant;
   return rankCandidates(candidates);
 }
 

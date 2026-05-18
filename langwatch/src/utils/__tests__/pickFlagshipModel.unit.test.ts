@@ -67,14 +67,17 @@ describe("pickFlagshipFromOptions", () => {
       );
     });
 
-    it("picks the newest claude-haiku as mini", () => {
+    it("picks the newest claude-sonnet as mini too", () => {
+      // Anthropic intentionally maps FAST to sonnet (not haiku). Haiku
+      // trails sonnet by a wide enough margin on assistive tasks that
+      // we use sonnet across the board for this provider.
       const options = [
         "anthropic/claude-haiku-4-5",
         "anthropic/claude-sonnet-4-6",
-        "anthropic/claude-haiku-3-7",
+        "anthropic/claude-sonnet-3-7",
       ];
       expect(pickFlagshipFromOptions("anthropic", "mini", options)).toBe(
-        "anthropic/claude-haiku-4-5",
+        "anthropic/claude-sonnet-4-6",
       );
     });
   });

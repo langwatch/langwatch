@@ -138,9 +138,14 @@ export function buildSeedPlanForProvider(
     };
   }
   if (provider === "anthropic") {
+    // Anthropic's haiku trails sonnet by a wide enough margin on the
+    // tasks we hit (search, autocomplete, topic clustering) that users
+    // are better served by sonnet across the board. Both roles point
+    // at the latest sonnet; per-feature overrides can still narrow it.
+    const sonnet = pickLatestAnthropicChat("sonnet");
     return {
-      DEFAULT: pickLatestAnthropicChat("sonnet"),
-      FAST: pickLatestAnthropicChat("haiku"),
+      DEFAULT: sonnet,
+      FAST: sonnet,
       // Anthropic ships no embeddings model.
     };
   }

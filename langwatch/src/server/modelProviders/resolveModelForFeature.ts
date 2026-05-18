@@ -1,24 +1,17 @@
 import type { ModelDefaultScopeType, PrismaClient } from "@prisma/client";
 
 import {
-  DEFAULT_EMBEDDINGS_MODEL,
-  DEFAULT_MODEL,
-  DEFAULT_TOPIC_CLUSTERING_MODEL,
-} from "../../utils/constants";
-
-import {
   featureByKey,
   type FeatureDescriptor,
   type ModelRole,
 } from "./featureRegistry";
 import { ModelNotConfiguredError } from "./modelNotConfiguredError";
 
-export type ResolutionSource = "feature_override" | "role_default" | "system";
+export type ResolutionSource = "feature_override" | "role_default";
 export type ResolutionScope =
   | "project"
   | "team"
   | "organization"
-  | "system"
   | null;
 
 export interface Resolution {
@@ -32,23 +25,6 @@ interface Ctx {
   prisma: PrismaClient;
   projectId: string;
 }
-
-/**
- * System-default models for each role. Surfaced as scope="system" when
- * nothing higher in the cascade (or in the legacy B2 columns) has a
- * value, so the UI can render "from System" / "Inherit (System default)"
- * consistently with how env-var-driven model providers are labelled
- * elsewhere. If even this fallback is missing for a role the resolver
- * throws `ModelNotConfiguredError`.
- */
-const ROLE_CONSTANT: Record<ModelRole, string | null> = {
-  DEFAULT: DEFAULT_MODEL,
-  // Topic clustering's existing LLM constant is the most accurate "fast
-  // background model" fallback we have today. Per-feature overrides and
-  // the role-level default at any scope still take precedence.
-  FAST: DEFAULT_TOPIC_CLUSTERING_MODEL,
-  EMBEDDINGS: DEFAULT_EMBEDDINGS_MODEL,
-};
 
 interface ScopeChain {
   projectId: string;
@@ -276,9 +252,13 @@ function legacyColumnFor(
  *   2. Legacy B2 scalar column at project → team → org (compat
  *      fallback; removed in the follow-up PR once writes have drained
  *      off the legacy columns).
- *   3. System role default (scope="system"). Same env-var-style framing
- *      as model providers — never "built-in".
- *   4. ModelNotConfiguredError.
+ *   3. ModelNotConfiguredError.
+ *
+ * There is intentionally no global system fallback. If nothing is
+ * configured at any scope (and no legacy column carries a value), AI
+ * features for that role are disabled until the user configures a
+ * default. The frontend's tRPC interceptor maps the thrown error to a
+ * sticky toast prompting the user to update their defaults.
  */
 export async function resolveModelForFeature(
   featureKey: string,
@@ -341,21 +321,8 @@ export async function resolveModelForFeature(
     }
   }
 
-  // 3. System default for the role. Surfaced as scope="system" so the
-  // UI can label it the same as any other env-var-driven LangWatch
-  // primitive instead of inventing a "built-in" concept the user has
-  // never met.
-  const constant = ROLE_CONSTANT[feature.role];
-  if (constant) {
-    return {
-      model: constant,
-      source: "system",
-      scope: "system",
-      feature,
-    };
-  }
-
-  // 4. Nothing left to fall back on.
+  // 3. Nothing in the cascade. AI features for this role are disabled
+  // until the user configures a default.
   throw new ModelNotConfiguredError(
     feature.key,
     feature.role,

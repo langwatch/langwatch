@@ -139,23 +139,20 @@ describe("resolveModelForFeature (unit)", () => {
     ).rejects.toThrow(/Unknown feature key/);
   });
 
-  /** @scenario An empty database falls back to the built-in constant */
-  it("falls back to the System default for DEFAULT when nothing is configured", async () => {
+  /** @scenario An empty database throws ModelNotConfiguredError */
+  it("throws ModelNotConfiguredError when nothing is configured", async () => {
     const prisma = fakePrisma({ project: PROJECT, configs: [] });
-    const r = await resolveModelForFeature("prompt.create_default", {
-      prisma,
-      projectId: PROJECT.id,
-    });
-    // The label users see in the UI is "from System" / "Inherit (System
-    // default)" — never "built-in". That contract starts here, with the
-    // resolver emitting source="system" and scope="system" for the
-    // baked-in role constant. Prod-sim: the same path runs without any
-    // env-fed scalar columns (PROJECT has all legacy fields null), so
-    // this scenario also pins down the "no env vars in prod" case.
-    expect(r.source).toBe("system");
-    expect(r.scope).toBe("system");
-    expect(typeof r.model).toBe("string");
-    expect(r.model.length).toBeGreaterThan(0);
+    // There is no global system fallback. If no scope in the cascade
+    // (and no legacy column) carries the role, AI features for that
+    // role are disabled until the user configures a default. The
+    // frontend's tRPC interceptor maps this to a sticky toast prompting
+    // the user to update their defaults.
+    await expect(
+      resolveModelForFeature("prompt.create_default", {
+        prisma,
+        projectId: PROJECT.id,
+      }),
+    ).rejects.toThrow(/No model configured/i);
   });
 
   /** @scenario An org-scoped config sets the DEFAULT for every project in that org */

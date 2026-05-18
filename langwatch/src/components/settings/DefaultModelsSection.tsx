@@ -58,11 +58,6 @@ import React, { useMemo, useState } from "react";
 
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
-import {
-  DEFAULT_EMBEDDINGS_MODEL,
-  DEFAULT_MODEL,
-  DEFAULT_TOPIC_CLUSTERING_MODEL,
-} from "~/utils/constants";
 
 import { DefaultModelOverrideDrawer } from "./DefaultModelOverrideDrawer";
 import {
@@ -450,21 +445,24 @@ function ConfigCell({
   const isInvalid = (model: string) =>
     !!enabledProviderKeys &&
     !enabledProviderKeys.has(model.split("/")[0] ?? "");
-  // The table is a "final resolved state" view — every cell renders
+  // The table is a "final resolved state" view: every cell renders
   // the cascade-resolved role model for the row's scope, whether the
-  // policy on this row pins it or inherits it from a wider tier (or
-  // the System default). Pinned-vs-inherited is only differentiated
-  // inside the edit drawer, so the user never has to parse italics
-  // here to know "is gpt-x mine or someone else's?".
+  // policy on this row pins it or inherits it from a wider tier.
+  // Pinned-vs-inherited is only differentiated inside the edit drawer,
+  // so the user never has to parse italics here to know "is gpt-x mine
+  // or someone else's?". If nothing in the cascade carries the role,
+  // the cell renders a "Not configured" badge prompting the user to
+  // update; AI features for this role are disabled at this scope until
+  // they do.
   const resolvedRole = anchorScope
     ? resolveAtScope(role, configs, anchorScope.type, anchorScope.id)
     : null;
-  const resolvedRoleModel =
-    resolvedRole?.model ?? config[role] ?? SYSTEM_FALLBACK_BY_ROLE[role];
+  const resolvedRoleModel = resolvedRole?.model ?? config[role] ?? null;
 
   // Feature override rows render only when THIS policy pins a feature
-  // key AND its value differs from the role-resolved model — otherwise
-  // it would echo the chip directly above and add visual noise.
+  // key AND its value differs from the role-resolved model. If the role
+  // is itself unresolved, any feature override IS the new effective
+  // value so we surface it regardless.
   const featureOverrides = features
     .filter((f) => f.role === role && config[f.key])
     .filter((f) => config[f.key] !== resolvedRoleModel);
@@ -472,11 +470,17 @@ function ConfigCell({
   return (
     <VStack align="start" gap={1}>
       <ChipWithEdit onEdit={onEdit}>
-        <ModelChip
-          model={resolvedRoleModel}
-          size="sm"
-          invalid={isInvalid(resolvedRoleModel)}
-        />
+        {resolvedRoleModel ? (
+          <ModelChip
+            model={resolvedRoleModel}
+            size="sm"
+            invalid={isInvalid(resolvedRoleModel)}
+          />
+        ) : (
+          <Badge colorPalette="orange" variant="subtle">
+            Not configured
+          </Badge>
+        )}
       </ChipWithEdit>
       {featureOverrides.map((f) => (
         <ChipWithEdit key={f.key} onEdit={onEdit} paddingLeft={4}>
@@ -557,19 +561,6 @@ function mostSpecificScope(
   if (org) return { type: "ORGANIZATION", id: org.id };
   return null;
 }
-
-/**
- * System defaults for each role — mirrors `ROLE_CONSTANT` in
- * `resolveModelForFeature.ts` so an "all you can see" cell on a
- * fresh-install org never reads as empty. Sourced from
- * `~/utils/constants` directly so the constants live in exactly one
- * place.
- */
-const SYSTEM_FALLBACK_BY_ROLE: Record<ModelRoleKey, string> = {
-  DEFAULT: DEFAULT_MODEL,
-  FAST: DEFAULT_TOPIC_CLUSTERING_MODEL,
-  EMBEDDINGS: DEFAULT_EMBEDDINGS_MODEL,
-};
 
 // ─── Resolved-at-scope view ────────────────────────────────────────
 
@@ -668,9 +659,7 @@ function ResolvedScopeView({
                     invalid={isInvalid(resolved.model)}
                   />
                   <Text fontSize="xs" color="fg.muted">
-                    {resolved.source === "system"
-                      ? "from System"
-                      : `from ${resolved.scope}`}
+                    from {resolved.scope}
                   </Text>
                 </HStack>
               ) : (

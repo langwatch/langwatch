@@ -50,10 +50,11 @@ Feature: Model default config cascade
   #      config that has the role set wins for "role default". Same
   #      first-set-key-wins per scope tier, but lower tier always beats
   #      higher tier even if higher tier was created later.
-  #   6. Fallback: System default for that role — surfaced as
-  #      source="system", scope="system" so the UI says "from System" /
-  #      "Inherit (System default)", never "built-in".
-  #   7. Final fallback: ModelNotConfiguredError.
+  #   6. ModelNotConfiguredError. There is intentionally no global
+  #      system fallback. If nothing in the cascade carries the role,
+  #      AI features for that role are disabled at that scope until the
+  #      user configures a default; the frontend tRPC interceptor maps
+  #      the thrown error to a sticky toast prompting an update.
 
   Background:
     Given a project belongs to a team in an organization
@@ -64,16 +65,15 @@ Feature: Model default config cascade
   # ────────────────────────────────────────────────────────────────────────────
 
   @integration
-  Scenario: An empty database falls back to the built-in constant
+  Scenario: An empty database throws ModelNotConfiguredError
     Given no ModelDefaultConfig rows exist anywhere
     And the legacy B2 scalar columns are unset on every scope (prod-sim)
     When I resolve "prompt.create_default" for any project
-    Then the resolver returns the built-in DEFAULT constant
-    And source is "system"
-    And scope is "system"
-    # Surfaced as scope="system" so the UI never has to invent a
-    # "built-in" label — same vocabulary as env-var-driven model
-    # providers elsewhere in LangWatch.
+    Then the resolver throws ModelNotConfiguredError
+    # There is no global system fallback. AI features for the DEFAULT
+    # role are disabled at this project until the user configures one
+    # at PROJECT, TEAM, or ORGANIZATION scope. The frontend tRPC
+    # interceptor maps the error to a sticky toast prompting an update.
 
   @integration
   Scenario: An org-scoped config sets the DEFAULT for every project in that org
