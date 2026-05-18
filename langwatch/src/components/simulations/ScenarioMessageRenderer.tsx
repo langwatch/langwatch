@@ -263,16 +263,17 @@ function flattenMixed(content: unknown[], msg: RawMessage): DisplayItem[] {
         const text = (o["text"] ?? o["content"] ?? "") as string;
         if (text) items.push({ kind: "text", id: `${msg.id}-c${i}`, role: msg.role ?? "assistant", content: text, traceId: msg.trace_id });
       } else if ((o["type"] === "image" || o["type"] === "audio" || o["type"] === "video") && o["source"]) {
-        // AG-UI media parts with source.type="url"|"data" (Phase I externalized shape).
-        // Narrow off the binary arm of MediaPartData by extracting only the
-        // {type, source}-shaped variants — the discriminated union's binary arm
-        // has no `source` property so referencing MediaPartData["source"] directly
-        // is a type error.
-        type MediaSourcePart = Extract<MediaPartData, { source: unknown }>;
-        const part: MediaSourcePart = {
-          type: o["type"] as MediaSourcePart["type"],
-          source: o["source"] as MediaSourcePart["source"],
-        };
+        // AG-UI media parts with source.type="url"|"data" (Phase I
+        // externalized shape). We can't write a single literal that satisfies
+        // MediaPartData's discriminated union here: the union splits on the
+        // `source.type` discriminant, and the upstream `unknown` doesn't
+        // narrow at this site. Cast the whole part to MediaPartData — runtime
+        // shape is validated by the surrounding `o["source"]` guard plus the
+        // downstream MediaPart renderer's branching on `source.type`.
+        const part = {
+          type: o["type"] as "image" | "audio" | "video",
+          source: o["source"],
+        } as MediaPartData;
         items.push({ kind: "media", id: `${msg.id}-media${i}`, part, traceId: msg.trace_id });
       } else if (o["type"] === "binary" && o["mimeType"]) {
         // AG-UI binary part

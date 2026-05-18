@@ -25,6 +25,7 @@ import crypto from "node:crypto";
 import { nanoid } from "nanoid";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ClickHouseClient } from "@clickhouse/client";
+import * as clickhouseClientModule from "~/server/clickhouse/clickhouseClient";
 import {
   startTestContainers,
   stopTestContainers,
@@ -157,10 +158,11 @@ beforeAll(async () => {
   const containers = await startTestContainers();
   ch = containers.clickHouseClient;
 
-  // Wire the mock now that ch is available
-  const chModule = await import("~/server/clickhouse/clickhouseClient");
-  vi.mocked(chModule.getClickHouseClientForProject).mockResolvedValue(ch);
-  vi.mocked(chModule.getSharedClickHouseClient).mockReturnValue(ch);
+  // Wire the mock now that ch is available. The vi.mock factory above
+  // replaced these exports with mock fns at module-load; we only need
+  // to set their return values here, not re-import.
+  vi.mocked(clickhouseClientModule.getClickHouseClientForProject).mockResolvedValue(ch);
+  vi.mocked(clickhouseClientModule.getSharedClickHouseClient).mockReturnValue(ch);
 }, 90_000);
 
 afterAll(async () => {

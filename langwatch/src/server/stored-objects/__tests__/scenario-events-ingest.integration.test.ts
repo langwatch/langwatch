@@ -214,8 +214,10 @@ let testProjectId: string;
 let testProjectSlug: string;
 let orgId: string;
 let teamId: string;
+let previousBaseHost: string | undefined;
 
 beforeAll(async () => {
+  previousBaseHost = process.env.BASE_HOST;
   // Persist a real project so the authMiddleware can resolve the API key
   const org = await prisma.organization.create({
     data: {
@@ -273,7 +275,11 @@ afterAll(async () => {
       console.warn("Unexpected cleanup error in scenario-events-ingest integration suite:", error);
     }
   }
-  delete process.env.BASE_HOST;
+  if (previousBaseHost === undefined) {
+    delete process.env.BASE_HOST;
+  } else {
+    process.env.BASE_HOST = previousBaseHost;
+  }
 });
 
 // ---------------------------------------------------------------------------

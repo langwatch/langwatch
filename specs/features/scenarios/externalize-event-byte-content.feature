@@ -328,8 +328,9 @@ Feature: Externalize event byte content to stored_objects
     Given the storage driver accepts the PUT
     But the stored_objects row insert fails
     When the service surfaces the error
-    Then the just-written storage object is best-effort deleted
-    And no orphaned bytes remain at the storage URI
+    Then a compensating delete is invoked on the storage URI
+    And when that delete succeeds no orphaned bytes remain at the storage URI
+    And when that delete itself fails the service still surfaces the original DB error without throwing the delete error
 
   @integration
   Scenario: ClickHouse insert errors surface synchronously to the caller
