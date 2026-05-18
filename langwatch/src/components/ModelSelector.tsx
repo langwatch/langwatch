@@ -5,6 +5,7 @@ import {
   Field,
   HStack,
   Input,
+  Skeleton,
   Text,
 } from "@chakra-ui/react";
 import { Search, Settings } from "lucide-react";
@@ -140,6 +141,11 @@ export const useModelSelectionOptions = (
     modelOption,
     selectOptions,
     groupedByProvider,
+    /** True while the providers query is in flight. Callers that
+     *  render their own trigger should show a skeleton instead of the
+     *  empty-state callout so the user doesn't see a "No models
+     *  configured" flash before the data resolves. */
+    isLoading: modelProviders.isLoading,
     /** True when the project has zero models of the requested mode
      *  available. Lets callers that render their own trigger (e.g.
      *  LLMConfigField) swap to the empty-state callout instead of
@@ -169,7 +175,7 @@ export const ModelSelector = React.memo(function ModelSelector({
    *  Optional; the callout falls back to a generic message. */
   forFeatureLabel?: string;
 }) {
-  const { selectOptions, groupedByProvider, isEmpty } =
+  const { selectOptions, groupedByProvider, isEmpty, isLoading } =
     useModelSelectionOptions(options, model, mode);
 
   // ALL hooks must run unconditionally — keep the empty-state early
@@ -236,6 +242,18 @@ export const ModelSelector = React.memo(function ModelSelector({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modelSearch]);
+
+  // Skeleton while the providers query is in flight so the empty
+  // state doesn't flash before the data resolves.
+  if (isLoading) {
+    return (
+      <Skeleton
+        width={size === "full" ? "full" : size === "sm" ? "180px" : "240px"}
+        height={size === "sm" ? "28px" : "40px"}
+        borderRadius="md"
+      />
+    );
+  }
 
   // Honest empty state: when the project has zero enabled providers
   // (or zero models of the requested mode), render a guided callout

@@ -1,4 +1,9 @@
-import { Box, HStack, Popover as ChakraPopover } from "@chakra-ui/react";
+import {
+  Box,
+  HStack,
+  Popover as ChakraPopover,
+  Skeleton,
+} from "@chakra-ui/react";
 import React, { useCallback, useState } from "react";
 import { ChevronDown } from "react-feather";
 import {
@@ -80,11 +85,19 @@ export const ModelSelectFieldMini = React.memo(function ModelSelectFieldMini({
   // form value lives in form state; reading it here for the empty-state
   // check is cheap and the picker re-renders on form changes anyway.
   const watchedLlm = useWatch({ control, name: "version.configData.llm" });
-  const { isEmpty } = useModelSelectionOptions(
+  const { isEmpty, isLoading } = useModelSelectionOptions(
     allModelOptions,
     watchedLlm?.model ?? "",
     "chat",
   );
+
+  if (isLoading) {
+    // While the providers query is in flight, render a chip-shaped
+    // placeholder instead of falling through to the empty-state callout
+    // (which would flash "No models configured" for a frame before the
+    // data resolves).
+    return <Skeleton width="180px" height="32px" borderRadius="md" />;
+  }
 
   if (isEmpty) {
     // Skip the popover trigger entirely when the project has zero

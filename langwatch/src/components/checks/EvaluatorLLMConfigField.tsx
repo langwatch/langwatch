@@ -1,4 +1,4 @@
-import { Box, HStack } from "@chakra-ui/react";
+import { Box, HStack, Skeleton } from "@chakra-ui/react";
 import { useCallback, useMemo } from "react";
 import { ChevronDown } from "react-feather";
 import { useFormContext, useWatch } from "react-hook-form";
@@ -81,12 +81,17 @@ export const EvaluatorLLMConfigField = ({ prefix }: { prefix: string }) => {
 
   // Skip the popover trigger entirely when the project has zero
   // enabled providers — same honest empty state used by the prompt
-  // playground and workflow LLM-node pickers.
-  const { isEmpty } = useModelSelectionOptions(
+  // playground and workflow LLM-node pickers. While the providers
+  // query is in flight, render a skeleton so the empty state doesn't
+  // flash before the data resolves.
+  const { isEmpty, isLoading } = useModelSelectionOptions(
     allModelOptions,
     llmConfig.model,
     "chat",
   );
+  if (isLoading) {
+    return <Skeleton width="full" height="40px" borderRadius="md" />;
+  }
   if (isEmpty) {
     return <NoModelsConfiguredCallout size="sm" />;
   }
