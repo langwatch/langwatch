@@ -43,6 +43,7 @@ export default function ModelsPage() {
   const { openDrawer, drawerOpen: isDrawerOpen } = useDrawer();
   const isProviderDrawerOpen = isDrawerOpen("editModelProvider");
   const updateMutation = api.modelProvider.update.useMutation();
+  const deleteMutation = api.modelProvider.delete.useMutation();
   const [providerToDisable, setProviderToDisable] = useState<{
     id?: string;
     provider: string;
@@ -402,15 +403,14 @@ export default function ModelsPage() {
               </Dialog.ActionTrigger>
               <Button
                 colorPalette="red"
-                loading={updateMutation.isPending}
+                loading={deleteMutation.isPending}
                 onClick={async () => {
                   if (!providerToDisable) return;
                   if (!project?.id) return;
-                  await updateMutation.mutateAsync({
+                  await deleteMutation.mutateAsync({
                     id: providerToDisable.id,
                     projectId: project.id,
                     provider: providerToDisable.provider,
-                    enabled: false,
                   });
                   setProviderToDisable(null);
                   await refetch();
