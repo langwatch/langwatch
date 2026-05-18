@@ -113,6 +113,15 @@ export function createEnvConfig() {
       S3_ENDPOINT: z.string().optional(),
       S3_ACCESS_KEY_ID: z.string().optional(),
       S3_SECRET_ACCESS_KEY: z.string().optional(),
+      // Optional STS session token. Required for temporary credentials
+      // (SSO local dev, STS:AssumeRole, etc.). For long-lived IAM-user
+      // keys this stays unset.
+      S3_SESSION_TOKEN: z.string().optional(),
+      // AWS region for the S3 client. The legacy default "auto" is the
+      // R2 / MinIO convention; real AWS S3 needs a real region
+      // (eu-central-1, us-east-1, etc.) or SigV4 fails with
+      // SignatureDoesNotMatch.
+      S3_REGION: z.string().optional(),
       S3_BUCKET_NAME: z.string().optional(),
       // Root path used by the stored-objects LocalFilesystemDriver when S3 is
       // not configured. Defaults to /var/lib/langwatch/objects inside the
@@ -270,6 +279,8 @@ export function createEnvConfig() {
       S3_ENDPOINT: process.env.S3_ENDPOINT,
       S3_ACCESS_KEY_ID: process.env.S3_ACCESS_KEY_ID,
       S3_SECRET_ACCESS_KEY: process.env.S3_SECRET_ACCESS_KEY,
+      S3_SESSION_TOKEN: process.env.S3_SESSION_TOKEN,
+      S3_REGION: process.env.S3_REGION,
       S3_BUCKET_NAME: process.env.S3_BUCKET_NAME,
       LANGWATCH_LOCAL_STORAGE_PATH: process.env.LANGWATCH_LOCAL_STORAGE_PATH,
       LOCAL_STORAGE_PATH: process.env.LOCAL_STORAGE_PATH,
