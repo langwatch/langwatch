@@ -9,10 +9,12 @@ import {
 	VStack,
 } from "@chakra-ui/react";
 import { MeshGradient } from "@paper-design/shaders-react";
+import posthog from "posthog-js";
 import { useEffect, useState } from "react";
 import { LuArrowRight, LuSparkles, LuX } from "react-icons/lu";
 import { Link } from "~/components/ui/link";
 import { Tooltip } from "~/components/ui/tooltip";
+import { setTracesV2Preferred } from "~/features/traces-v2/hooks/useTracesV2Preference";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { useColorModeValue } from "../ui/color-mode";
@@ -82,6 +84,20 @@ export function TracesV2HomeBanner() {
 	const handleDismiss = () => {
 		if (projectId) snooze(projectId);
 		setDismissed(true);
+	};
+
+	// Flip the per-device preference so `useTraceDetailsDrawer` opens
+	// the v2 drawer everywhere else in the app after the user clicks
+	// through the home banner — without this, opening a trace from the
+	// messages table would still land on v1 even though they just opted
+	// in here.
+	const handleTryV2 = () => {
+		setTracesV2Preferred(true);
+		posthog.capture("traces_v2_opt_in", {
+			surface: "home_banner",
+			projectId,
+		});
+		if (projectId) snooze(projectId);
 	};
 
 	const v2Href = `/${projectSlug}/traces`;
@@ -177,7 +193,11 @@ export function TracesV2HomeBanner() {
 						A faster, friendlier tracing experience, built on everything we learned from v1. Take it for a spin and tell us what you think.
 					</Text>
 					<HStack gap={2} marginTop={1.5}>
-						<Link href={v2Href} aria-label="Open new Trace Explorer">
+						<Link
+							href={v2Href}
+							onClick={handleTryV2}
+							aria-label="Open new Trace Explorer"
+						>
 							<Button
 								size="sm"
 								bg="white"
