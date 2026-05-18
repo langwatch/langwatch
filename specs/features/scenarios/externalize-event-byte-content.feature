@@ -300,12 +300,27 @@ Feature: Externalize event byte content to stored_objects
     And the event payload remains a valid MESSAGE_SNAPSHOT shape
 
   @integration
-  Scenario: Content parts that fail AG-UI parse cause the message to pass through unchanged
+  Scenario: Content parts with an unrecognised shape cause the message to pass through unchanged
     Given a message whose content array contains a part with an unrecognized type
     When the extractor walks the part list
     Then no part is rewritten
     And no stored_objects row is inserted
     And the original message object reference is preserved so callers can detect no-op
+
+  @unit
+  Scenario: OpenAI-shaped image_url parts with data: URIs are extracted to stored objects
+    Given a message content part of type image_url whose image_url.url is a data: URI carrying base64 bytes
+    When the extractor processes the part
+    Then a stored_objects row is created keyed on the content sha256
+    And the original part's image_url.url is rewritten to "/api/files/<id>"
+    And other image_url fields (such as detail) are preserved
+
+  @unit
+  Scenario: image_url parts with http(s) URLs pass through unchanged — not re-hosted
+    Given a message content part of type image_url whose image_url.url is an https URL
+    When the extractor processes the part
+    Then no stored_objects row is created
+    And the part passes through unchanged
 
   @integration
   Scenario: Binary part variant with inline data is externalized to id and url
@@ -321,6 +336,54 @@ Feature: Externalize event byte content to stored_objects
     Then the AG-UI schema rejects it as invalid
     Given a binary part with both data and url set
     Then the AG-UI schema rejects it as invalid
+
+  # ---------------------------------------------------------------
+  # S3 client credential mode handling (AC40)
+  # ---------------------------------------------------------------
+  #
+  # createS3Client must support every credential mode operators use in
+  # production: static IAM-user keys for self-host, temporary STS
+  # credentials for SSO local dev, and keyless (default credential
+  # provider chain) for IRSA on EKS / instance profile on EC2.
+
+  @unit
+  Scenario: S3 client uses explicit credentials when env keys are present
+    Given S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY are set in env
+    When createS3Client constructs the @aws-sdk/client-s3 S3Client
+    Then the constructor receives a credentials object with the access key and secret
+    And no sessionToken is included unless S3_SESSION_TOKEN is also set
+
+  @unit
+  Scenario: S3 client forwards sessionToken when set so SSO/STS credentials work
+    Given S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY, and S3_SESSION_TOKEN are all set
+    When createS3Client constructs the S3Client
+    Then the constructor receives all three fields inside the credentials object
+
+  @unit
+  Scenario: S3 client omits credentials so the SDK default provider chain handles IRSA and instance profiles
+    Given neither S3_ACCESS_KEY_ID nor S3_SECRET_ACCESS_KEY is set in env
+    When createS3Client constructs the S3Client
+    Then the constructor receives no credentials field at all
+    And the @aws-sdk default credential provider chain (IRSA, instance profile, ECS task role, ~/.aws/credentials) handles authentication
+
+  @unit
+  Scenario: S3 client honors S3_REGION env for real AWS deployments instead of the R2/MinIO 'auto' default
+    Given S3_REGION is set to a real AWS region like eu-central-1
+    When createS3Client constructs the S3Client
+    Then the constructor receives that region value
+
+  @unit
+  Scenario: S3 client defaults region to 'auto' for R2 and MinIO compatibility
+    Given S3_REGION is not set in env
+    When createS3Client constructs the S3Client
+    Then the constructor receives region "auto" (the Cloudflare R2 / MinIO convention)
+
+  @unit
+  Scenario: S3 client falls back to default chain when credentials are partial — prevents misleading 'empty string credentials' bug
+    Given only S3_ACCESS_KEY_ID is set but S3_SECRET_ACCESS_KEY is not
+    When createS3Client constructs the S3Client
+    Then no credentials field is passed (partial pair would crash the SDK with an empty-string-credentials error)
+    And the SDK default credential provider chain is allowed to resolve auth instead
 
   @integration
   Scenario: DB insert failure after a successful storage PUT triggers compensating storage delete
@@ -524,7 +587,7 @@ Feature: Externalize event byte content to stored_objects
   # AC21 "Integration suite covers full ingest/read/cascade contract"        -> Scenario: Integration suite covers every documented ingest and read shape
   # AC22 "Local FS driver atomic PUT regression"                             -> Scenario: Local filesystem driver write is atomic under interruption
   # AC23 "Extractor handles MESSAGE_SNAPSHOT and TEXT_MESSAGE_END shapes"    -> Scenario: Extractor handles MESSAGE_SNAPSHOT events with messages[] in addition to TEXT_MESSAGE_END events with single message
-  # AC24 "Degraded passthrough on AG-UI parse failure"                       -> Scenario: Content parts that fail AG-UI parse cause the message to pass through unchanged
+  # AC24 "Degraded passthrough on unrecognised content-part shape"           -> Scenario: Content parts with an unrecognised shape cause the message to pass through unchanged
   # AC25 "Binary part variant in AG-UI content union"                        -> Scenario: Binary part variant with inline data is externalized to id and url
   #                                                                          -> Scenario: Binary part variant rejects parts that carry data plus an explicit id or url
   # AC26 "Compensating storage cleanup on DB insert failure"                 -> Scenario: DB insert failure after a successful storage PUT triggers compensating storage delete

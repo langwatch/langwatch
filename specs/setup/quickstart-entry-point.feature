@@ -32,7 +32,7 @@ Feature: make quickstart is the single dev environment entry point with intent-b
   @unit @unimplemented
   Scenario: quickstart asks "what are you working on?" with five intent-based modes
     When I run "make quickstart" with no arguments
-    Then the prompt lists modes: frontend-only, backend-shared, migration, nlp, full-local
+    Then the prompt lists modes: frontend-only, all-local, migration, nlp, full-local
     And each mode has a one-line description of what services start and what URLs are rewritten
 
   @unit @unimplemented
@@ -63,8 +63,8 @@ Feature: make quickstart is the single dev environment entry point with intent-b
   # --- URL rewrite per mode (#3860 AC#6) ---
 
   @unit
-  Scenario: backend-shared overrides only DATABASE_URL, REDIS_URL, CLICKHOUSE_URL
-    When write_overrides is called with mode=backend-shared
+  Scenario: all-local overrides only DATABASE_URL, REDIS_URL, CLICKHOUSE_URL
+    When write_overrides is called with mode=all-local
     Then langwatch/.env.dev-up contains DATABASE_URL pointing at postgres:5432
     And REDIS_URL pointing at redis:6379
     And CLICKHOUSE_URL pointing at clickhouse:8123
@@ -78,8 +78,8 @@ Feature: make quickstart is the single dev environment entry point with intent-b
     And REDIS_URL is not overridden
 
   @unit
-  Scenario: nlp adds LANGWATCH_NLP_SERVICE and LANGEVALS_ENDPOINT on top of backend
-    When write_overrides is called with mode=nlp
+  Scenario: all-local-nlp adds LANGWATCH_NLP_SERVICE and LANGEVALS_ENDPOINT on top of all-local
+    When write_overrides is called with mode=all-local-nlp
     Then LANGWATCH_NLP_SERVICE points at langwatch_nlp:5561
     And LANGEVALS_ENDPOINT points at langevals:5562
     And the three backend URLs are also overridden
@@ -92,13 +92,13 @@ Feature: make quickstart is the single dev environment entry point with intent-b
   @unit @unimplemented
   Scenario: contributor's .env is the source of truth for non-overridden values
     Given langwatch/.env defines OPENAI_API_KEY and LANGWATCH_NLP_SERVICE
-    When I run "make quickstart backend-shared"
+    When I run "make quickstart all-local"
     Then OPENAI_API_KEY in the running container is the value from .env
     And LANGWATCH_NLP_SERVICE is the value from .env (no override for this mode)
 
   @unit
   Scenario: write_overrides replaces langwatch/.env.dev-up — does not append
-    Given a previous run wrote backend-shared overrides
+    Given a previous run wrote all-local overrides
     When write_overrides runs again with mode=frontend-only
     Then langwatch/.env.dev-up no longer contains DATABASE_URL
     And only the frontend-only override (NEXTAUTH_PROVIDER) remains
@@ -108,15 +108,15 @@ Feature: make quickstart is the single dev environment entry point with intent-b
   @integration @unimplemented
   Scenario: postgres volume is shared across worktrees
     Given two worktrees of the langwatch repo
-    When worktree A runs "make quickstart backend-shared" and signs up a user
+    When worktree A runs "make quickstart all-local" and signs up a user
     And worktree A stops with "make down"
-    And worktree B runs "make quickstart backend-shared"
+    And worktree B runs "make quickstart all-local"
     Then the user signed up in worktree A is present in worktree B
 
   @integration @unimplemented
   Scenario: simultaneous postgres up across worktrees is detected
-    Given worktree A has postgres up via "make quickstart backend-shared"
-    When worktree B runs "make quickstart backend-shared"
+    Given worktree A has postgres up via "make quickstart all-local"
+    When worktree B runs "make quickstart all-local"
     Then quickstart errors with a clear message naming the colliding compose project
     And exits non-zero
 
@@ -131,7 +131,7 @@ Feature: make quickstart is the single dev environment entry point with intent-b
   @integration @unimplemented
   Scenario: starting a second worktree reuses the existing redis
     Given worktree A has the dev environment up
-    When worktree B runs "make quickstart backend-shared"
+    When worktree B runs "make quickstart all-local"
     Then no second redis container is started
     And worktree B reuses worktree A's redis on host :6379
 
@@ -140,7 +140,7 @@ Feature: make quickstart is the single dev environment entry point with intent-b
   @unit @unimplemented
   Scenario: quickstart errors when langwatch/.env has IS_SAAS=true with BLOCK_LOCAL_HTTP_CALLS=false
     Given langwatch/.env contains IS_SAAS=true and BLOCK_LOCAL_HTTP_CALLS=false
-    When I run "make quickstart backend-shared"
+    When I run "make quickstart all-local"
     Then quickstart exits non-zero with a SSRF-guard error message
 
   @integration @unimplemented

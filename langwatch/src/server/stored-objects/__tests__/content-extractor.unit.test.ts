@@ -337,14 +337,97 @@ describe("extractInlineMediaFromEvent", () => {
     });
   });
 
-  describe("when the event message content fails AG-UI parse", () => {
-    /** @scenario "Content parts that fail AG-UI parse cause the message to pass through unchanged" */
+  describe("when a content part has an unrecognised shape", () => {
+    /** @scenario "Content parts with an unrecognised shape cause the message to pass through unchanged" */
     it("returns the event unchanged and no refs", async () => {
       const service = makeService();
 
-      // Put an invalid part (unknown type) in the content array
+      // Put an unrecognised part (unknown type) in the content array. The
+      // walker falls through to its `unknown` handler (no-op) and leaves
+      // the part untouched — "degraded, not broken".
       const event = makeEventWithContent([
-        { type: "not-a-valid-ag-ui-type", someField: "value" },
+        { type: "not-a-known-shape", someField: "value" },
+      ]);
+
+      const { rewrittenEvent, refs } = await extractInlineMediaFromEvent({
+        ...BASE_PARAMS,
+        event,
+        service,
+      });
+
+      expect(rewrittenEvent).toBe(event);
+      expect(refs).toHaveLength(0);
+      expect(service.storeFromBytes).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when an event has an image_url part with a base64 data URI (production shape)", () => {
+    /** @scenario "OpenAI-shaped image_url parts with data: URIs are extracted to stored objects" */
+    it("extracts the bytes and rewrites image_url.url to /api/files/<id>", async () => {
+      const base64Payload = makeBase64Payload("image-bytes");
+      const mimeType = "image/png";
+      const service = makeService({
+        storeFromBytes: vi.fn().mockResolvedValue({
+          id: "so_image_url_one",
+          mediaType: mimeType,
+          isDuplicate: false,
+        }),
+      });
+
+      const event = makeEventWithContent([
+        {
+          type: "image_url",
+          image_url: {
+            url: `data:${mimeType};base64,${base64Payload}`,
+            detail: "high",
+          },
+        },
+      ]);
+
+      const { rewrittenEvent, refs } = await extractInlineMediaFromEvent({
+        ...BASE_PARAMS,
+        event,
+        service,
+      });
+
+      expect(service.storeFromBytes).toHaveBeenCalledOnce();
+      expect(service.storeFromBytes).toHaveBeenCalledWith(
+        expect.objectContaining({
+          mediaType: mimeType,
+          bytes: Buffer.from("image-bytes"),
+        }),
+      );
+      const rewritten = rewrittenEvent as {
+        message: {
+          content: Array<{
+            type: string;
+            image_url: { url: string; detail?: string };
+          }>;
+        };
+      };
+      expect(rewritten.message.content[0]).toEqual({
+        type: "image_url",
+        image_url: {
+          url: "/api/files/so_image_url_one",
+          detail: "high",
+        },
+      });
+      expect(refs).toEqual([
+        expect.objectContaining({ id: "so_image_url_one", isDuplicate: false }),
+      ]);
+    });
+  });
+
+  describe("when an event has an image_url part with an http URL (not a data URI)", () => {
+    /** @scenario "image_url parts with http(s) URLs pass through unchanged — not re-hosted" */
+    it("returns the event unchanged and does not call the storage service", async () => {
+      const service = makeService();
+
+      const event = makeEventWithContent([
+        {
+          type: "image_url",
+          image_url: { url: "https://cdn.example.com/image.png" },
+        },
       ]);
 
       const { rewrittenEvent, refs } = await extractInlineMediaFromEvent({

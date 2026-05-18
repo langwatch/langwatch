@@ -1,20 +1,30 @@
 /**
- * content-extractor.ts — walks AG-UI event payloads, externalizes inline media.
+ * content-extractor.ts — walks scenario message payloads, externalizes inline media.
  *
- * For every message content part that carries inline byte data (image/audio/video/document
- * with source.type="data", or binary parts with the data field set), this module:
+ * For every message content part that carries inline byte data, this module:
  *  1. Decodes the base64 payload.
  *  2. Calls `service.storeFromBytes` to content-address the bytes.
  *  3. Rewrites the part to reference the stored object by URL.
  *
- * The walker is deliberately narrow: it only touches the fields it understands and
- * leaves everything else untouched. If the content array fails AG-UI schema validation
- * the entire event is returned unchanged ("degraded, not broken").
+ * The walker speaks the langwatch tracer's `chatRichContentSchema` shape (the
+ * production contract — see `src/server/tracer/types.ts`), not AG-UI's
+ * `InputContentSchema`. The two vocabularies overlap on `binary` but diverge
+ * on image carriers: production sends `{type:"image_url", image_url:{url}}`
+ * (OpenAI-shaped, possibly a `data:` URI). The visitor's `legacyImageUrl`
+ * branch handles that case.
+ *
+ * Shape rules:
+ *  - `binary` with `data` set → extract, rewrite to `id + url + data:undefined`
+ *  - `image_url` with `image_url.url` starting `data:` → extract, rewrite to
+ *    `image_url.url = /api/files/<id>`
+ *  - everything else (text, tool_call, tool_result, image_url with http URLs,
+ *    bare image, unknown shapes) → pass through unchanged
+ *
+ * The walker is deliberately narrow: it only touches the fields it understands
+ * and leaves everything else untouched ("degraded, not broken").
  */
-import { InputContentSchema } from "@ag-ui/core";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import { z } from "zod";
 import { createLogger } from "~/utils/logger/server";
 import { binaryInputPartSchema } from "./binary-part";
 import { isReadbackSafe } from "./safe-media-types";
@@ -44,12 +54,35 @@ export interface ExtractedRef {
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-/** AG-UI content part union type inferred from the schema. */
-type InputContentPart = z.infer<typeof InputContentSchema>;
+/**
+ * Parse a `data:` URI into its mime type + base64 payload. Returns null when
+ * the input isn't a `data:<mime>;base64,<...>` shape; non-base64 data URIs
+ * (`data:<mime>,<urlencoded>`) are out of scope — extraction is for binary
+ * payloads only, not for short URL-encoded text data.
+ *
+ * Spec: RFC 2397, but only the `base64` form. Examples we accept:
+ *   data:image/png;base64,iVBORw0KGgo...
+ *   data:audio/wav;base64,UklGR...
+ */
+function parseBase64DataUri(
+  uri: string,
+): { mimeType: string; base64: string } | null {
+  if (!uri.startsWith("data:")) return null;
+  const commaIdx = uri.indexOf(",");
+  if (commaIdx === -1) return null;
+  const header = uri.slice(5, commaIdx); // strip "data:"
+  const payload = uri.slice(commaIdx + 1);
+  if (!header.endsWith(";base64")) return null;
+  const mimeType = header.slice(0, -7); // strip ";base64"
+  if (!mimeType) return null;
+  return { mimeType, base64: payload };
+}
 
 /**
  * Rewrites a single content part, storing any inline bytes via the service.
- * Returns the (possibly new) part and an optional ref.
+ * Returns the (possibly new) part and an optional ref. `part` is unknown
+ * because the upstream walker no longer pre-validates against a single
+ * schema — the visitor's shape-dispatch handles each variant directly.
  */
 async function processContentPart({
   part,
@@ -59,16 +92,17 @@ async function processContentPart({
   ownerId,
   service,
 }: {
-  part: InputContentPart;
+  part: unknown;
   projectId: string;
   purpose: string;
   ownerKind: string;
   ownerId: string;
   service: StoredObjectsService;
-}): Promise<{ part: InputContentPart; ref: ExtractedRef | null }> {
-  const noOp = { part, ref: null } as const;
+}): Promise<{ part: unknown; ref: ExtractedRef | null }> {
+  type Out = { part: unknown; ref: ExtractedRef | null };
+  const noOp: Out = { part, ref: null };
 
-  const result = await visitContentPartAsync(part, {
+  const result = await visitContentPartAsync<Out>(part, {
     text: () => noOp,
     toolCall: () => noOp,
     toolResult: () => noOp,
@@ -109,10 +143,10 @@ async function processContentPart({
         ownerId,
       };
 
-      const rewrittenPart: InputContentPart = {
-        ...part,
+      const rewrittenPart = {
+        ...(part as Record<string, unknown>),
         source: { type: "url", value: `/api/files/${stored.id}`, mimeType },
-      } as InputContentPart;
+      };
 
       return { part: rewrittenPart, ref };
     },
@@ -157,12 +191,88 @@ async function processContentPart({
         ownerId,
       };
 
-      const rewrittenPart: InputContentPart = {
-        ...part,
+      const rewrittenPart = {
+        ...(part as Record<string, unknown>),
         id: stored.id,
         url: `/api/files/${stored.id}`,
         data: undefined,
-      } as InputContentPart;
+      };
+
+      return { part: rewrittenPart, ref };
+    },
+
+    // Production scenario messages use the OpenAI-shaped image_url variant.
+    // Extract when the URL is a base64 data: URI; pass through http(s) URLs
+    // unchanged (already externalized by the SDK, or pointing at an
+    // external CDN we shouldn't re-host).
+    async imageUrl(url) {
+      const parsed = parseBase64DataUri(url);
+      if (!parsed) return noOp;
+
+      const { mimeType, base64 } = parsed;
+      const bytes = Buffer.from(base64, "base64");
+      const stored = await service.storeFromBytes({
+        projectId,
+        purpose,
+        ownerKind,
+        ownerId,
+        mediaType: mimeType,
+        bytes,
+      });
+
+      const ref: ExtractedRef = {
+        id: stored.id,
+        isDuplicate: stored.isDuplicate,
+        purpose,
+        ownerKind,
+        ownerId,
+      };
+
+      const original = part as Record<string, unknown>;
+      const originalImageUrl =
+        typeof original.image_url === "object" && original.image_url !== null
+          ? (original.image_url as Record<string, unknown>)
+          : {};
+      const rewrittenPart = {
+        ...original,
+        image_url: {
+          ...originalImageUrl,
+          url: `/api/files/${stored.id}`,
+        },
+      };
+
+      return { part: rewrittenPart, ref };
+    },
+
+    // Bare {image: "data:..."} is rare in production but seen in some
+    // older fixtures. Handle the data-URI case symmetrically.
+    async bareImage(src) {
+      const parsed = parseBase64DataUri(src);
+      if (!parsed) return noOp;
+
+      const { mimeType, base64 } = parsed;
+      const bytes = Buffer.from(base64, "base64");
+      const stored = await service.storeFromBytes({
+        projectId,
+        purpose,
+        ownerKind,
+        ownerId,
+        mediaType: mimeType,
+        bytes,
+      });
+
+      const ref: ExtractedRef = {
+        id: stored.id,
+        isDuplicate: stored.isDuplicate,
+        purpose,
+        ownerKind,
+        ownerId,
+      };
+
+      const rewrittenPart = {
+        ...(part as Record<string, unknown>),
+        image: `/api/files/${stored.id}`,
+      };
 
       return { part: rewrittenPart, ref };
     },
@@ -187,11 +297,17 @@ interface ExtractionParams {
  * Walks a single message's `content` array, externalizing inline media.
  *
  * - Returns the same message reference when nothing was rewritten (no
- *   content array, or a part failed AG-UI parse and the whole message
- *   is passed through unchanged). Reference identity lets the event
- *   dispatcher above detect "no-op" without diffing the bytes.
+ *   content array, or no part contained extractable bytes). Reference
+ *   identity lets the event dispatcher above detect "no-op" without
+ *   diffing the bytes.
  * - On `storeFromBytes` failure, the error propagates out — the caller
  *   maps it to a 5xx and rolls back the event.
+ *
+ * No upstream Zod gate: each part is dispatched to the visitor by shape,
+ * unknown shapes pass through unchanged. This is intentionally lenient
+ * because the production message vocabulary (`chatRichContentSchema` —
+ * see `src/server/tracer/types.ts`) covers more variants than any single
+ * library schema, including `image_url` with data URIs.
  */
 async function rewriteMessage(
   rawMessage: Record<string, unknown>,
@@ -201,28 +317,15 @@ async function rewriteMessage(
     return { message: rawMessage, refs: [] };
   }
 
-  const parsedParts: InputContentPart[] = [];
-  for (const raw of rawMessage.content as unknown[]) {
-    const result = InputContentSchema.safeParse(raw);
-    if (!result.success) {
-      logger.debug(
-        { error: result.error.message },
-        "content part failed AG-UI parse — passing message through unchanged",
-      );
-      return { message: rawMessage, refs: [] };
-    }
-    parsedParts.push(result.data);
-  }
-
   const refs: ExtractedRef[] = [];
-  const rewrittenParts: InputContentPart[] = [];
+  const rewrittenParts: unknown[] = [];
   let changed = false;
-  for (const part of parsedParts) {
+  for (const raw of rawMessage.content as unknown[]) {
     const { part: rewritten, ref } = await processContentPart({
-      part,
+      part: raw,
       ...params,
     });
-    if (rewritten !== part) changed = true;
+    if (rewritten !== raw) changed = true;
     rewrittenParts.push(rewritten);
     if (ref !== null) refs.push(ref);
   }

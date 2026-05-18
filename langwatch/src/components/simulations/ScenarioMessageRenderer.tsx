@@ -277,8 +277,8 @@ function flattenMixed(content: unknown[], msg: RawMessage): DisplayItem[] {
       }),
       toolCall: (part) => ({ kind: "tool_call" as const, id: `${msg.id}-tu${i}`, name: part.name, arguments: part.arguments, traceId: msg.trace_id }),
       toolResult: (part) => ({ kind: "tool_result" as const, id: `${msg.id}-tr${i}`, result: part.result, traceId: msg.trace_id }),
-      legacyImageUrl: (url) => ({ kind: "image" as const, id: `${msg.id}-img${i}`, src: url, traceId: msg.trace_id }),
-      legacyImage: (src) => ({ kind: "image" as const, id: `${msg.id}-img${i}`, src, traceId: msg.trace_id }),
+      imageUrl: (url) => ({ kind: "image" as const, id: `${msg.id}-img${i}`, src: url, traceId: msg.trace_id }),
+      bareImage: (src) => ({ kind: "image" as const, id: `${msg.id}-img${i}`, src, traceId: msg.trace_id }),
     });
     if (result) items.push(result);
   });

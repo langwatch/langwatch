@@ -1,13 +1,15 @@
 /**
- * visitContentPart — shared decoder for the AG-UI content-part union.
+ * visitContentPart — shared decoder for the message content-part union.
  *
  * Both the server-side content extractor and the client-side message renderer
  * need to case-split on the same shape. Without a shared decoder each new
- * AG-UI part type requires shotgun surgery across both files.
+ * part type requires shotgun surgery across both files.
  *
- * The server visitor only handles `media` and `binary` (Zod-validated input).
- * The client visitor also handles legacy `image_url`, bare `image`, and
- * `tool_call`/`tool_result` shapes that the server's Zod gate already rejects.
+ * The walker speaks langwatch's tracer `chatRichContentSchema` plus the
+ * AG-UI `image`/`audio`/`video`/`document` source-shape (for forward-compat
+ * with the AG-UI rollout). Every production message variant — `text`,
+ * `image_url`, `binary`, `tool_call`, `tool_result`, bare image — has a
+ * visitor branch.
  */
 
 // ---------------------------------------------------------------------------
@@ -30,15 +32,17 @@ export interface BinaryPart {
 }
 
 /**
- * Synchronous visitor over the AG-UI content-part union.
+ * Synchronous visitor over the production message content-part union.
  *
  * - `text` — {type:"text", text:"..."} or bare string
- * - `media` — image/audio/video/document with a typed source
- * - `binary` — binary part
+ * - `media` — image/audio/video/document with a typed source (AG-UI shape)
+ * - `binary` — {type:"binary", mimeType, data?, url?, id?}
+ * - `imageUrl` — OpenAI {type:"image_url", image_url:{url:"..."}}.
+ *   This is the production shape for image content (data: URI or
+ *   already-externalized URL). Not legacy — actively in use.
+ * - `bareImage` — {image:"..."} shape (rare; some fixtures)
  * - `toolCall` — tool_use / tool_call shapes
  * - `toolResult` — tool_result shape
- * - `legacyImageUrl` — OpenAI {type:"image_url", image_url:{url:"..."}}
- * - `legacyImage` — bare {image:"..."} shape
  * - `unknown` — anything unrecognised (optional, defaults to no-op)
  */
 export type ContentPartVisitor<R> = {
@@ -50,13 +54,13 @@ export type ContentPartVisitor<R> = {
   binary(part: BinaryPart): R;
   toolCall(part: { name: string; arguments: unknown }): R;
   toolResult(part: { result: unknown }): R;
-  legacyImageUrl?(url: string): R;
-  legacyImage?(src: string): R;
+  imageUrl?(url: string): R;
+  bareImage?(src: string): R;
   unknown?(value: unknown): R;
 };
 
 /**
- * Async-capable visitor over the AG-UI content-part union.
+ * Async-capable visitor over the production message content-part union.
  *
  * Each handler may return `R` or `Promise<R>`. Use with `visitContentPartAsync`
  * when the visitor needs to perform I/O (e.g. uploading bytes to object storage).
@@ -70,8 +74,8 @@ export type AsyncContentPartVisitor<R> = {
   binary(part: BinaryPart): R | Promise<R>;
   toolCall(part: { name: string; arguments: unknown }): R | Promise<R>;
   toolResult(part: { result: unknown }): R | Promise<R>;
-  legacyImageUrl?(url: string): R | Promise<R>;
-  legacyImage?(src: string): R | Promise<R>;
+  imageUrl?(url: string): R | Promise<R>;
+  bareImage?(src: string): R | Promise<R>;
   unknown?(value: unknown): R | Promise<R>;
 };
 
@@ -148,7 +152,8 @@ export function visitContentPart<R>(
     return visitor.toolResult({ result: o["content"] ?? o["result"] });
   }
 
-  // legacy: OpenAI image_url shape {type:"image_url", image_url:{url:"..."}}
+  // OpenAI-shaped image: {type:"image_url", image_url:{url:"..."}}
+  // (production shape; data: URI extraction handled by visitor)
   if (
     o["type"] === "image_url" &&
     typeof o["image_url"] === "object" &&
@@ -156,16 +161,16 @@ export function visitContentPart<R>(
     (o["image_url"] as Record<string, unknown>)["url"]
   ) {
     const url = (o["image_url"] as Record<string, unknown>)["url"] as string;
-    return visitor.legacyImageUrl
-      ? visitor.legacyImageUrl(url)
+    return visitor.imageUrl
+      ? visitor.imageUrl(url)
       : visitor.unknown?.(part);
   }
 
-  // legacy: bare image {image:"..."}
+  // Bare {image:"..."} shape (rare; some fixtures)
   if (o["image"]) {
     const src = o["image"] as string;
-    return visitor.legacyImage
-      ? visitor.legacyImage(src)
+    return visitor.bareImage
+      ? visitor.bareImage(src)
       : visitor.unknown?.(part);
   }
 
@@ -243,7 +248,8 @@ export async function visitContentPartAsync<R>(
     return visitor.toolResult({ result: o["content"] ?? o["result"] });
   }
 
-  // legacy: OpenAI image_url shape {type:"image_url", image_url:{url:"..."}}
+  // OpenAI-shaped image: {type:"image_url", image_url:{url:"..."}}
+  // (production shape; data: URI extraction handled by visitor)
   if (
     o["type"] === "image_url" &&
     typeof o["image_url"] === "object" &&
@@ -251,16 +257,16 @@ export async function visitContentPartAsync<R>(
     (o["image_url"] as Record<string, unknown>)["url"]
   ) {
     const url = (o["image_url"] as Record<string, unknown>)["url"] as string;
-    return visitor.legacyImageUrl
-      ? visitor.legacyImageUrl(url)
+    return visitor.imageUrl
+      ? visitor.imageUrl(url)
       : visitor.unknown?.(part);
   }
 
-  // legacy: bare image {image:"..."}
+  // Bare {image:"..."} shape (rare; some fixtures)
   if (o["image"]) {
     const src = o["image"] as string;
-    return visitor.legacyImage
-      ? visitor.legacyImage(src)
+    return visitor.bareImage
+      ? visitor.bareImage(src)
       : visitor.unknown?.(part);
   }
 

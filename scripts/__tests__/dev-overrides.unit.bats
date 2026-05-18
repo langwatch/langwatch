@@ -38,6 +38,7 @@ teardown() {
 
 # --- all-local ---
 
+# @scenario "all-local overrides only DATABASE_URL, REDIS_URL, CLICKHOUSE_URL"
 @test "all-local rewrites DATABASE_URL, REDIS_URL, CLICKHOUSE_URL only" {
   write_dev_overrides all-local "$OUT"
   result=$(cat "$OUT")
@@ -51,6 +52,7 @@ teardown() {
 
 # --- all-local-nlp ---
 
+# @scenario "all-local-nlp adds LANGWATCH_NLP_SERVICE and LANGEVALS_ENDPOINT on top of all-local"
 @test "all-local-nlp adds LANGWATCH_NLP_SERVICE and LANGEVALS_ENDPOINT on top of all-local" {
   write_dev_overrides all-local-nlp "$OUT"
   result=$(cat "$OUT")
@@ -107,6 +109,7 @@ teardown() {
 
 # --- frontend-only ---
 
+# @scenario "frontend-only mode starts no compose containers"
 @test "frontend-only writes only NEXTAUTH_PROVIDER (no compose, no URL overrides)" {
   write_dev_overrides frontend-only "$OUT"
   result=$(cat "$OUT")
@@ -119,6 +122,7 @@ teardown() {
 
 # --- migration ---
 
+# @scenario "migration uses localhost host-port URLs for prisma migrate from host"
 @test "migration uses localhost host-port URLs (not docker-network names)" {
   # postgres + clickhouse exposed on the host so `pnpm prisma migrate` from
   # the host can reach them. Redis isn't started, so no REDIS_URL override.
@@ -132,6 +136,7 @@ teardown() {
 
 # --- full-local ---
 
+# @scenario "full-local overrides every infrastructure URL"
 @test "full-local writes all five infrastructure URLs" {
   write_dev_overrides full-local "$OUT"
   result=$(cat "$OUT")
@@ -150,6 +155,7 @@ teardown() {
 
 # --- idempotency ---
 
+# @scenario "write_overrides replaces langwatch/.env.dev-up — does not append"
 @test "second call replaces (not appends) the overlay file" {
   write_dev_overrides all-local "$OUT"
   write_dev_overrides frontend-only "$OUT"
