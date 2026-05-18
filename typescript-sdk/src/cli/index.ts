@@ -666,6 +666,69 @@ modelProviderCmd
     await impl(provider, options);
   });
 
+// Add model-default command group (cascading default models)
+const modelDefaultCmd = program
+  .command("model-default")
+  .description(
+    "Manage cascading default models (per role/feature, per scope: project/team/organization)",
+  );
+
+modelDefaultCmd
+  .command("list")
+  .description("Show the effective resolution + every config you can read")
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (options: { format?: string }) => {
+    const { listModelDefaultsCommand: impl } = await import(
+      "./commands/model-defaults/list.js"
+    );
+    await impl(options);
+  });
+
+modelDefaultCmd
+  .command("set <key> <model>")
+  .description(
+    "Set a default model for a role (DEFAULT|FAST|EMBEDDINGS) or registered feature key. Defaults to project scope; pass --scope team|organization for higher tiers.",
+  )
+  .option("--scope <scope>", "Scope tier: project (default), team, or organization", "project")
+  .option(
+    "--scope-id <id>",
+    "Explicit scope id. Defaults to the API key's project / its team / its organization.",
+  )
+  .option("-f, --format <format>", "Output format: text (default) or json", "text")
+  .action(
+    async (
+      key: string,
+      model: string,
+      options: { scope?: "project" | "team" | "organization"; scopeId?: string; format?: string },
+    ) => {
+      const { setModelDefaultCommand: impl } = await import(
+        "./commands/model-defaults/set.js"
+      );
+      await impl(key, model, options);
+    },
+  );
+
+modelDefaultCmd
+  .command("unset <key>")
+  .description("Remove a default model for a role or feature key at the chosen scope")
+  .option("--scope <scope>", "Scope tier: project (default), team, or organization", "project")
+  .option(
+    "--scope-id <id>",
+    "Explicit scope id. Defaults to the API key's project / its team / its organization.",
+  )
+  .option("-f, --format <format>", "Output format: text (default) or json", "text")
+  .action(
+    async (
+      key: string,
+      options: { scope?: "project" | "team" | "organization"; scopeId?: string; format?: string },
+    ) => {
+      const { unsetModelDefaultCommand: impl } = await import(
+        "./commands/model-defaults/unset.js"
+      );
+      await impl(key, options);
+    },
+  );
+
 // Add virtual-keys command group (AI Gateway)
 const virtualKeysCmd = program
   .command("virtual-keys")

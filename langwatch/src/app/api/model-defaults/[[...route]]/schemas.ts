@@ -51,6 +51,18 @@ const effectiveResolutionSchema = z
   .nullable();
 
 export const apiResponseModelDefaultsSchema = z.object({
+  /**
+   * Identity of the project this snapshot is for (echoed from the
+   * API-key context) plus its team + organization. CLI / API consumers
+   * use these ids to form scope refs for follow-up POST/PUT/DELETE
+   * calls without a separate whoami round trip.
+   */
+  scope: z.object({
+    projectId: z.string(),
+    teamId: z.string().nullable(),
+    organizationId: z.string().nullable(),
+    organizationName: z.string().nullable(),
+  }),
   effective: z.object({
     DEFAULT: effectiveResolutionSchema,
     FAST: effectiveResolutionSchema,

@@ -78,6 +78,12 @@ app.get(
 
     return c.json(
       apiResponseModelDefaultsSchema.parse({
+        scope: {
+          projectId: snapshot.projectId,
+          teamId: snapshot.teamId,
+          organizationId: snapshot.organizationId,
+          organizationName: snapshot.organizationName,
+        },
         effective: snapshot.effective,
         configs: snapshot.configs.map((c) => ({
           id: c.id,
