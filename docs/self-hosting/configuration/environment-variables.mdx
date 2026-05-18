@@ -110,17 +110,17 @@ Each SSO provider requires specific variables. See [SSO Configuration](/self-hos
 
 ## Object Storage (S3)
 
-The dataplane S3 bucket carries **two** surfaces:
+The dataplane S3 bucket is the general file-storage layer for all externalized byte content. Current consumers:
 
-- **Dataset storage** — opt-in via `DATASET_OBJECT_STORAGE_ENABLED`. Persists rows uploaded through the dataset UI.
-- **Scenario media externalization** — automatic for every applicable scenario event. The `/api/scenario-events` ingest path extracts inline `audio` / `image` / `video` / `document` bytes from incoming events, content-addresses them under `{projectId}/{sha256}`, and rewrites the event payload to reference the stored object by id. The bytes are served back via `GET /api/files/:id`.
+- **Stored objects (scenario media)** — automatic for every applicable scenario event. The `/api/scenario-events` ingest path extracts inline `audio` / `image` / `video` / `document` bytes from incoming events, content-addresses them under `{projectId}/{sha256}`, and rewrites the event payload to reference the stored object by id. The bytes are served back via `GET /api/files/:id`.
+- **Dataset uploads** — enabled via `DATASET_OBJECT_STORAGE_ENABLED`. Persists rows uploaded through the dataset UI. This flag exists for backwards compatibility with deployments that configured datasets separately; both consumers share the same `S3_BUCKET_NAME` bucket.
 
-When `S3_BUCKET_NAME` is set, both surfaces use that bucket. When it's not set, scenario media falls back to the local filesystem at `LANGWATCH_LOCAL_STORAGE_PATH` (dev-only — see warning below).
+When `S3_BUCKET_NAME` is set, all consumers use that bucket. When it is not set, stored-objects fall back to the local filesystem at `LANGWATCH_LOCAL_STORAGE_PATH` (dev-only — see warning below).
 
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `S3_BUCKET_NAME` | Dataplane bucket shared by datasets + stored-objects | — |
-| `DATASET_OBJECT_STORAGE_ENABLED` | Enable S3 for dataset uploads (separate from scenario media) | `false` |
+| `DATASET_OBJECT_STORAGE_ENABLED` | Enable S3 for dataset uploads (backwards-compat flag; uses the shared `S3_BUCKET_NAME` bucket) | `false` |
 | `DATASET_OBJECT_STORAGE_PROVIDER` | Storage provider (`awsS3`) | `awsS3` |
 | `DATASET_OBJECT_STORAGE_BUCKET` | Bucket name for dataset uploads (defaults to `S3_BUCKET_NAME`) | `langwatch-dataset` |
 | `S3_ENDPOINT` | Custom S3 endpoint (for MinIO, etc.) | — |

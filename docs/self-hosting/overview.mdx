@@ -39,7 +39,7 @@ graph LR
     Workers -->|"NLP"| NLP["LangWatch NLP"]
     App -->|"queries"| CH
     App -->|"control plane"| PG["PostgreSQL"]
-    App -->|"scenario media"| S3["S3"]
+    App -->|"externalized byte content<br/>(scenario media, datasets, …)"| S3["S3"]
     CH -->|"cold storage"| S3
 ```
 
