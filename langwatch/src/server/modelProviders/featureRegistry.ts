@@ -81,6 +81,18 @@ const REGISTRY: FeatureDescriptor[] = [
     description: "Generates synthetic agent scenarios from a goal.",
   },
   {
+    key: "datasets.generator",
+    role: "FAST",
+    displayName: "Dataset generator",
+    description: "Generates synthetic dataset rows from a description.",
+  },
+  {
+    key: "translate.text",
+    role: "FAST",
+    displayName: "Inline translation",
+    description: "Translates user-supplied text into English.",
+  },
+  {
     key: "analytics.topic_clustering_llm",
     role: "FAST",
     // The role column header (FAST) and the EMBEDDINGS counterpart's

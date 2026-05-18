@@ -110,7 +110,7 @@ export class ScenarioExecutionOrchestrator {
   private async resolveDefaultModel(projectId: string): Promise<string | null> {
     try {
       const resolved = await this.deps.modelResolver.resolve(
-        "prompt.create_default",
+        "scenarios.generator",
         projectId,
       );
       return resolved;

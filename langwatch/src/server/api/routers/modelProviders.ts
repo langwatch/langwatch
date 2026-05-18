@@ -410,39 +410,61 @@ export const modelProviderRouter = createTRPCRouter({
         projects: writableProjects,
       };
 
-      // All configs visible from this project's vantage point: any
-      // config attached at THIS org / one of its teams / one of its
-      // projects. Read-visibility is broader than write-permission —
-      // the user can see the whole policy landscape that affects
-      // them, even if they can only edit their own scopes.
-      const allTeamIds = organizationId
-        ? (
-            await ctx.prisma.team.findMany({
-              where: { organizationId },
-              select: { id: true },
-            })
-          ).map((t) => t.id)
-        : teamId
-          ? [teamId]
-          : [];
-      const allProjectIds = organizationId
-        ? (
-            await ctx.prisma.project.findMany({
-              where: { team: { organizationId } },
-              select: { id: true },
-            })
-          ).map((p) => p.id)
-        : [projectId];
+      // Read-visibility is built from scopes the caller can actually
+      // *read*, not the union of every scope in the organization. A
+      // project-only viewer must not receive policy rows attached to
+      // sibling teams / projects they have no read permission on —
+      // doing so leaks the org-wide policy landscape and the names of
+      // its scopes to anyone with project:view on a single project.
+      const canReadOrg =
+        !!organizationId &&
+        (await hasOrganizationPermission(
+          ctx,
+          organizationId,
+          "organization:view",
+        ));
+      let readableTeamIds: string[] = [];
+      let readableProjectIds: string[] = [projectId];
+      if (organizationId) {
+        const orgTeams = await ctx.prisma.team.findMany({
+          where: { organizationId },
+          select: { id: true },
+        });
+        const teamRead = await Promise.all(
+          orgTeams.map(async (t) => ({
+            id: t.id,
+            readable: await hasTeamPermission(ctx, t.id, "team:view"),
+          })),
+        );
+        readableTeamIds = teamRead.filter((t) => t.readable).map((t) => t.id);
+
+        const orgProjects = await ctx.prisma.project.findMany({
+          where: { team: { organizationId } },
+          select: { id: true },
+        });
+        const projectRead = await Promise.all(
+          orgProjects.map(async (p) => ({
+            id: p.id,
+            readable: await hasProjectPermission(ctx, p.id, "project:view"),
+          })),
+        );
+        readableProjectIds = projectRead
+          .filter((p) => p.readable)
+          .map((p) => p.id);
+      } else if (teamId) {
+        const teamReadable = await hasTeamPermission(ctx, teamId, "team:view");
+        if (teamReadable) readableTeamIds = [teamId];
+      }
 
       const visibleScopeFilter = [
-        organizationId
+        canReadOrg && organizationId
           ? { scopeType: "ORGANIZATION" as const, scopeId: organizationId }
           : null,
-        allTeamIds.length > 0
-          ? { scopeType: "TEAM" as const, scopeId: { in: allTeamIds } }
+        readableTeamIds.length > 0
+          ? { scopeType: "TEAM" as const, scopeId: { in: readableTeamIds } }
           : null,
-        allProjectIds.length > 0
-          ? { scopeType: "PROJECT" as const, scopeId: { in: allProjectIds } }
+        readableProjectIds.length > 0
+          ? { scopeType: "PROJECT" as const, scopeId: { in: readableProjectIds } }
           : null,
       ].filter(Boolean) as Array<{
         scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";

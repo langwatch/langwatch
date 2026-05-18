@@ -112,7 +112,7 @@ app.post("/generate", async (c) => {
   }
 
   try {
-    const model = await getVercelAIModel(projectId);
+    const model = await getVercelAIModel(projectId, undefined, "scenarios.generator");
 
     const userPrompt = currentScenario
       ? `Current scenario:\n${JSON.stringify(currentScenario, null, 2)}\n\nUser request: ${prompt}`

@@ -84,7 +84,7 @@ ${dataset}`,
     ],
   } as UIMessage);
 
-  const model = await getVercelAIModel(projectId);
+  const model = await getVercelAIModel(projectId, undefined, "datasets.generator");
   const result = streamText({
     model,
     messages: await convertToModelMessages(messages),

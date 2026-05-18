@@ -6,6 +6,7 @@ import {
 } from "../api/routers/modelProviders.utils";
 import { prisma } from "../db";
 import { nlpgoProxyBaseURL } from "../nlpgo/nlpgoFetch";
+import { ModelNotConfiguredError } from "./modelNotConfiguredError";
 import type { MaybeStoredModelProvider } from "./registry";
 import { resolveModelForFeature } from "./resolveModelForFeature";
 
@@ -102,7 +103,11 @@ async function resolveModel({
   if (explicit) return explicit;
 
   // 2. Cascade-resolved default for the given feature key. Throws
-  //    ModelNotConfiguredError when nothing is set at any scope.
+  //    ModelNotConfiguredError when nothing is set at any scope —
+  //    that error MUST propagate so the tRPC interceptor maps it to
+  //    MODEL_NOT_CONFIGURED and the frontend opens the missing-model
+  //    popup with the feature+role in context. Swallowing it here
+  //    would silently substitute an unrelated model.
   try {
     const resolved = await resolveModelForFeature(featureKey, {
       prisma,
@@ -110,10 +115,11 @@ async function resolveModel({
     });
     const providerKey = resolved.model.split("/")[0] ?? "";
     if (modelProviders[providerKey]?.enabled) return resolved.model;
-  } catch {
-    // Fall through to the "any enabled provider" rescue below; the
-    // caller's tRPC interceptor handles the empty-cascade case
-    // separately via ModelNotConfiguredError on the route boundary.
+  } catch (err) {
+    if (err instanceof ModelNotConfiguredError) throw err;
+    // Otherwise fall through to the "any enabled provider" rescue;
+    // resolver-internal errors (DB, race) get the conservative
+    // recovery path.
   }
 
   // 3. Find any enabled provider with a usable custom model.
