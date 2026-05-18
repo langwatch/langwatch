@@ -122,9 +122,9 @@ interface ProviderSeedPlan {
 /**
  * The seed plan for a given provider. Each populated role becomes a
  * top-level key in the seeded ModelDefaultConfig's JSON. Missing roles
- * are skipped — Anthropic, for instance, has no embeddings model, so
- * EMBEDDINGS stays absent (= "inherit from parent scope", which at
- * org-scope means "fall back to the built-in role constant").
+ * are skipped (a chat-only provider seeds DEFAULT + FAST but not
+ * EMBEDDINGS), which means the role inherits from a higher scope or
+ * resolves to ModelNotConfiguredError when nothing covers it.
  */
 export function buildSeedPlanForProvider(
   provider: string,
@@ -156,11 +156,11 @@ export function buildSeedPlanForProvider(
     };
   }
   if (provider === "voyage") {
-    // Voyage is embedding-only: Anthropic's recommended embedding
-    // partner. The seed plan populates only EMBEDDINGS so an
-    // anthropic-only org can pair Anthropic for DEFAULT + FAST with
-    // Voyage for EMBEDDINGS without falling through the cascade to
-    // OpenAI as a side effect.
+    // Voyage is embedding-only. The seed plan populates only
+    // EMBEDDINGS so adding Voyage at a scope contributes its
+    // embedding model without injecting opinions about DEFAULT or
+    // FAST. Chat / fast roles still resolve through whichever other
+    // providers the scope has configured.
     return { EMBEDDINGS: pickLatestEmbedding("voyage") };
   }
   // No special-case for the provider yet — leave the plan empty so

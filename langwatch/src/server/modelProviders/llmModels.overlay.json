@@ -15,7 +15,7 @@
       "defaultParameters": null,
       "modality": "text->embeddings",
       "mode": "embedding",
-      "description": "Voyage AI's flagship general-purpose embedding model with strong retrieval quality across domains. Recommended embedding partner where an Anthropic-only setup would otherwise have no embeddings option.",
+      "description": "Voyage AI's flagship general-purpose embedding model with strong retrieval quality across domains.",
       "supportsImageInput": false,
       "supportsAudioInput": false,
       "supportsImageOutput": false,

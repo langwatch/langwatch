@@ -388,10 +388,9 @@ function RoleRow({
   const ChevronIcon = expanded ? ChevronDown : ChevronRight;
 
   // EMBEDDINGS-specific: when no provider enabled at the picked scope
-  // ships an embedding API (Anthropic-only being the canonical case —
-  // they don't expose embeddings, the docs link to Voyage), the
-  // selector has nothing to offer. Dim the row + tell the user what
-  // would unlock it instead of pretending the field is functional.
+  // ships an embedding API, the selector has nothing to offer. Dim
+  // the row and tell the user what would unlock it instead of
+  // pretending the field is functional.
   const unsupportedAtScope = role === "EMBEDDINGS" && modelOptions.length === 0;
 
   return (
