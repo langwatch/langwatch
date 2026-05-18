@@ -1,5 +1,4 @@
 import {
-  Badge,
   Box,
   Button,
   Card,
@@ -44,11 +43,6 @@ import {
   DEFAULT_TOPIC_CLUSTERING_MODEL,
 } from "../../utils/constants";
 import { filterProvidersByScope } from "../../utils/filterProvidersByScope";
-import {
-  isProviderEffectiveDefault,
-  isProviderUsedForDefaultModels,
-  shouldAutoEnableAsDefault,
-} from "../../utils/modelProviderHelpers";
 
 export default function ModelsPage() {
   const { project, organization, team, hasPermission } =
@@ -136,21 +130,6 @@ export default function ModelsPage() {
       ],
     }));
   }, []);
-
-  // Check if provider is used for the Default Model only (badge display)
-  // When there's only one enabled provider, it is the default by definition
-  const isDefaultProvider = (providerKey: string) => {
-    return shouldAutoEnableAsDefault({
-      providerKey,
-      project,
-      enabledProvidersCount: enabledProviders.length,
-    });
-  };
-
-  // Check if provider is used for any default models (for delete prevention)
-  const isProviderUsedForAnyDefault = (providerKey: string) => {
-    return isProviderEffectiveDefault(providerKey, project);
-  };
 
   const utils = api.useContext();
 
@@ -318,9 +297,6 @@ export default function ModelsPage() {
                             providerSpec?.name ??
                             provider.provider}
                         </Text>
-                        {isDefaultProvider(provider.provider) && (
-                          <Badge colorPalette="blue">Default Model</Badge>
-                        )}
                       </HStack>
                     </Table.Cell>
                     <Table.Cell>
@@ -426,40 +402,11 @@ export default function ModelsPage() {
               <Dialog.Title>Delete {providerToDisable?.name}?</Dialog.Title>
             </Dialog.Header>
             <Dialog.Body>
-              {providerToDisable &&
-              isProviderUsedForAnyDefault(providerToDisable.provider) ? (
-                <VStack gap={3} align="start">
-                  <Text>
-                    This provider is currently being used for one or more
-                    default models and cannot be deleted.
-                  </Text>
-                  <Text fontWeight="medium">
-                    Please change the following before deleting:
-                  </Text>
-                  <VStack gap={2} align="start" paddingLeft={4}>
-                    {isProviderUsedForDefaultModels(
-                      providerToDisable.provider,
-                      project?.defaultModel ?? null,
-                      null,
-                      null,
-                    ) && <Text>• Default Model</Text>}
-                    {isProviderUsedForDefaultModels(
-                      providerToDisable.provider,
-                      null,
-                      null,
-                      project?.embeddingsModel ?? null,
-                    ) && <Text>• Embeddings Model</Text>}
-                    {isProviderUsedForDefaultModels(
-                      providerToDisable.provider,
-                      null,
-                      project?.topicClusteringModel ?? null,
-                      null,
-                    ) && <Text>• Topic Clustering Model</Text>}
-                  </VStack>
-                </VStack>
-              ) : (
-                <Text>This provider will no longer be available for use.</Text>
-              )}
+              <Text>This provider will no longer be available for use.</Text>
+              <Text fontSize="sm" color="fg.muted" marginTop={2}>
+                Default model configs that reference this provider will
+                surface as &ldquo;Update needed&rdquo; in the table below.
+              </Text>
             </Dialog.Body>
             <Dialog.Footer>
               <Dialog.ActionTrigger asChild>
@@ -468,11 +415,6 @@ export default function ModelsPage() {
               <Button
                 colorPalette="red"
                 loading={updateMutation.isPending}
-                disabled={
-                  providerToDisable
-                    ? isProviderUsedForAnyDefault(providerToDisable.provider)
-                    : false
-                }
                 onClick={async () => {
                   if (!providerToDisable) return;
                   if (!project?.id) return;
