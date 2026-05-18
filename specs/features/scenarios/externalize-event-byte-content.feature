@@ -221,12 +221,11 @@ Feature: Externalize event byte content to stored_objects
   # ---------------------------------------------------------------
 
   @unit
-  Scenario: StoredObjectsService exposes storeFromBytes, getById, cascadeDeleteProject, cascadeDeleteOwner
+  Scenario: StoredObjectsService exposes storeFromBytes, getById, deleteOwnedBy
     Given the StoredObjectsService class
     Then it exposes storeFromBytes
     And it exposes getById
-    And it exposes cascadeDeleteProject
-    And it exposes cascadeDeleteOwner
+    And it exposes deleteOwnedBy
     And it depends on StoredObjectsRepository and the storage registry as interfaces
 
   @unit
@@ -472,9 +471,9 @@ Feature: Externalize event byte content to stored_objects
   # ---------------------------------------------------------------
 
   @integration
-  Scenario: When a project is deleted, cascadeDeleteProject removes both the stored_objects rows and the underlying bytes
+  Scenario: When a project is deleted, deleteOwnedBy removes both the stored_objects rows and the underlying bytes
     Given a project with N stored_objects rows across several owners
-    When the platform's project-delete handler invokes cascadeDeleteProject for that project
+    When the platform's project-delete handler invokes deleteOwnedBy for that project
     Then every stored_objects row for the project is deleted from ClickHouse
     And every byte object at the corresponding storage URIs is deleted from the storage backend
     And subsequent GET /api/files/:id for any of those ids returns 404 with status not_found
@@ -517,7 +516,7 @@ Feature: Externalize event byte content to stored_objects
   # AC14 "Missing badge placeholder when GET returns status missing"         -> Scenario: Trace timeline shows a missing badge when the byte content is no longer retrievable
   # AC15 "Rows carry project_id; future purge handler cascades"              -> Scenario: Stored objects rows are tenant-tagged so a future project-purge can cascade
   # AC16 "No automatic retention, GC, or orphan reaping"                     -> Scenario: No automatic retention, time-based GC, or orphan reaping runs
-  # AC17 "Layered route -> service -> (repo | storage) with Zod data"       -> Scenario: StoredObjectsService exposes storeFromBytes, getById, cascadeDeleteProject, cascadeDeleteOwner
+  # AC17 "Layered route -> service -> (repo | storage) with Zod data"       -> Scenario: StoredObjectsService exposes storeFromBytes, getById, deleteOwnedBy
   #                                                                          -> Scenario: Route handlers delegate to the service and never touch the repository directly
   # AC18 "OpenTelemetry spans on ingest extraction and on file reads"        -> Scenario: OpenTelemetry spans wrap extraction during ingest and reads via /api/files/:id
   # AC19 "Counter/histogram metrics for extract, dedup, failures, size"      -> Scenario: Prometheus metrics emit for ingest, dedup, write and read failures, and size distribution
@@ -544,5 +543,5 @@ Feature: Externalize event byte content to stored_objects
   # AC36 "Self-hosting docs cover scenario media + LANGWATCH_LOCAL_STORAGE_PATH" -> Scenario: Self-hosting docs describe scenario media externalization, the LANGWATCH_LOCAL_STORAGE_PATH env, and the shared dataplane bucket
   #                                                                          -> Scenario: .env.example carries LANGWATCH_LOCAL_STORAGE_PATH with a sensible local default
   # AC37 "Azure Blob support (decision required, separate PR OK)"            -> Scenario: Azure Blob Storage is supported as a stored-objects backend via a distinct URI scheme
-  # AC38 "Project-delete cascade removes rows AND bytes"                     -> Scenario: When a project is deleted, cascadeDeleteProject removes both the stored_objects rows and the underlying bytes
+  # AC38 "Project-delete cascade removes rows AND bytes"                     -> Scenario: When a project is deleted, deleteOwnedBy removes both the stored_objects rows and the underlying bytes
   # AC39 "MediaPart playback contract (onLoadedData / non-zero duration)"    -> Scenario: MediaPart audio playback reports a non-zero duration once the browser has decoded the media

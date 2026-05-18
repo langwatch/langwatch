@@ -74,7 +74,7 @@ describe("Helm chart deployment surface for stored-objects", () => {
   });
 
   describe("when neither dataplane S3 nor local-FS is configured", () => {
-    /** @scenario "Vanilla helm install with no object storage configured refuses to start instead of silently writing to ephemeral container storage" */
+    /** @scenario "Vanilla helm install with no object storage configured surfaces the unconfigured-storage condition diagnostically and renders anyway" */
     it("the chart surfaces the unconfigured-storage condition diagnostically", () => {
       const helpers = readRepoFile("charts/langwatch/templates/_helpers.tpl");
 
@@ -108,13 +108,17 @@ describe("Self-hosting docs cover the stored-objects deployment surface", () => 
   });
 
   describe("when the architecture overview is loaded", () => {
-    /** @scenario "Self-hosting docs describe scenario media externalization, the LANGWATCH_LOCAL_STORAGE_PATH env, and the shared dataplane bucket" */
-    it("the architecture diagram shows an App -> S3 arrow for scenario media", () => {
+    /** @scenario "Self-hosting docs describe stored-objects (scenario media, datasets, ...) externalization, the LANGWATCH_LOCAL_STORAGE_PATH env, and the shared dataplane bucket" */
+    it("the architecture diagram shows an App -> S3 arrow for externalized byte content", () => {
       const overview = readRepoFile("docs/self-hosting/overview.mdx");
 
       // Diagram edge added in this PR — the existing CH->S3 cold-storage
-      // arrow is not enough; the App pod itself writes scenario media.
-      expect(overview).toMatch(/App\s*-->\s*\|"scenario media"\|\s*S3/);
+      // arrow is not enough; the App pod itself writes externalized bytes
+      // (scenario media, datasets, ...) into the shared dataplane bucket.
+      // The label was reframed during PR #4058 review from "scenario media"
+      // to "externalized byte content" so the docs accurately name S3 as
+      // the general file-storage layer.
+      expect(overview).toMatch(/App\s*-->\s*\|"externalized byte content[^"]*"\|\s*S3/);
     });
   });
 });
