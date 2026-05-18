@@ -1,6 +1,7 @@
 import { Readable } from "node:stream";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
+import type { MiddlewareHandler } from "hono";
 import { prisma } from "~/server/db";
 import { requireProjectPermission } from "~/server/auth/permissions";
 import { rateLimit } from "~/server/rateLimit";
