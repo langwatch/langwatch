@@ -2,16 +2,16 @@ from typing import Any, Dict, List, Literal, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from langwatch.generated.models.get_api_prompts_by_id_response_200 import (
+from langwatch.generated.langwatch_rest_api_client.models.get_api_prompts_by_id_response_200 import (
     GetApiPromptsByIdResponse200,
 )
-from langwatch.generated.models.post_api_prompts_response_200 import (
+from langwatch.generated.langwatch_rest_api_client.models.post_api_prompts_response_200 import (
     PostApiPromptsResponse200,
 )
-from langwatch.generated.models.put_api_prompts_by_id_response_200 import (
+from langwatch.generated.langwatch_rest_api_client.models.put_api_prompts_by_id_response_200 import (
     PutApiPromptsByIdResponse200,
 )
-from langwatch.generated.types import Unset
+from langwatch.generated.langwatch_rest_api_client.types import Unset
 
 
 class ResponseFormat(BaseModel):
