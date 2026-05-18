@@ -108,7 +108,6 @@ export const EditModelProviderForm = ({
   const [state, actions] = useModelProviderForm({
     provider,
     projectId,
-    project,
     enabledProvidersCount,
     isUsingEnvVars,
     teamId: team?.id,

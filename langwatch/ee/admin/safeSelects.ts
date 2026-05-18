@@ -57,8 +57,5 @@ export const PROJECT_SAFE_SELECT = {
   capturedInputVisibility: true,
   capturedOutputVisibility: true,
   traceSharingEnabled: true,
-  defaultModel: true,
-  topicClusteringModel: true,
-  embeddingsModel: true,
   archivedAt: true,
 } as const satisfies Prisma.ProjectSelect;

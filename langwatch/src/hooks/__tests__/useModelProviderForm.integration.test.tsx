@@ -42,13 +42,6 @@ vi.mock("../../utils/api", () => ({
         }),
       },
     },
-    project: {
-      updateProjectDefaultModels: {
-        useMutation: () => ({
-          mutateAsync: vi.fn().mockResolvedValue({}),
-        }),
-      },
-    },
   },
 }));
 
@@ -86,72 +79,10 @@ describe("useModelProviderForm()", () => {
   });
 
   describe("Credential Input Persistence (Bug Fix Validation)", () => {
-    it("preserves user input when project object reference is stable (memoized)", () => {
-      const provider = createOpenAIProvider();
-      // Memoization ensures stable reference - this is the fix in ModelProviderSetup.tsx
-      const stableProject = { defaultModel: "openai/gpt-4o" };
-
-      const { result, rerender } = renderHook(
-        ({ project }) =>
-          useModelProviderForm({
-            provider,
-            projectId: "test-project-id",
-            project,
-            enabledProvidersCount: 2,
-          }),
-        { initialProps: { project: stableProject } },
-      );
-
-      // User types in an API key
-      act(() => {
-        result.current[1].setCustomKey("OPENAI_API_KEY", "sk-user-typing");
-      });
-
-      expect(result.current[0].customKeys.OPENAI_API_KEY).toBe(
-        "sk-user-typing",
-      );
-
-      // Re-render with SAME reference (simulating memoized project)
-      rerender({ project: stableProject });
-
-      // Key should be preserved because project reference is stable
-      expect(result.current[0].customKeys.OPENAI_API_KEY).toBe(
-        "sk-user-typing",
-      );
-    });
-
-    it("preserves user input when project object reference changes but values are identical", () => {
-      const provider = createOpenAIProvider();
-      const project1 = { defaultModel: "openai/gpt-4o" };
-      const project2 = { defaultModel: "openai/gpt-4o" }; // Same value, different object
-
-      const { result, rerender } = renderHook(
-        ({ project }) =>
-          useModelProviderForm({
-            provider,
-            projectId: "test-project-id",
-            project,
-            enabledProvidersCount: 2,
-          }),
-        { initialProps: { project: project1 } },
-      );
-
-      // User types in an API key
-      act(() => {
-        result.current[1].setCustomKey("OPENAI_API_KEY", "sk-user-typing");
-      });
-
-      expect(result.current[0].customKeys.OPENAI_API_KEY).toBe(
-        "sk-user-typing",
-      );
-
-      // Re-render with NEW reference but same values — should NOT reset
-      rerender({ project: project2 });
-
-      expect(result.current[0].customKeys.OPENAI_API_KEY).toBe(
-        "sk-user-typing",
-      );
-    });
+    // The legacy "project reference stability" tests are gone with the
+    // project param (its default-model fields were the data source).
+    // The remaining "form resets when provider changes" case still
+    // pins the core regression contract.
 
     it("resets form when provider actually changes", () => {
       const openaiProvider = createOpenAIProvider();
@@ -171,7 +102,6 @@ describe("useModelProviderForm()", () => {
           useModelProviderForm({
             provider,
             projectId: "test-project-id",
-            project: null,
             enabledProvidersCount: 2,
           }),
         { initialProps: { provider: openaiProvider } },
@@ -201,7 +131,6 @@ describe("useModelProviderForm()", () => {
         useModelProviderForm({
           provider,
           projectId: "test-project-id",
-          project: null,
           enabledProvidersCount: 2,
         }),
       );
@@ -223,7 +152,6 @@ describe("useModelProviderForm()", () => {
         useModelProviderForm({
           provider,
           projectId: "test-project-id",
-          project: null,
           enabledProvidersCount: 2,
         }),
       );
@@ -247,7 +175,6 @@ describe("useModelProviderForm()", () => {
         useModelProviderForm({
           provider,
           projectId: "test-project-id",
-          project: null,
           enabledProvidersCount: 2,
         }),
       );
@@ -269,7 +196,6 @@ describe("useModelProviderForm()", () => {
         useModelProviderForm({
           provider,
           projectId: "test-project-id",
-          project: null,
           enabledProvidersCount: 2,
         }),
       );
@@ -290,7 +216,6 @@ describe("useModelProviderForm()", () => {
         useModelProviderForm({
           provider,
           projectId: "test-project-id",
-          project: null,
           enabledProvidersCount: 2,
         }),
       );
@@ -323,7 +248,6 @@ describe("useModelProviderForm()", () => {
         useModelProviderForm({
           provider,
           projectId: "test-project-id",
-          project,
           enabledProvidersCount: 1,
         }),
       );
@@ -339,7 +263,6 @@ describe("useModelProviderForm()", () => {
         useModelProviderForm({
           provider,
           projectId: "test-project-id",
-          project,
           enabledProvidersCount: 2,
         }),
       );
@@ -355,7 +278,6 @@ describe("useModelProviderForm()", () => {
         useModelProviderForm({
           provider,
           projectId: "test-project-id",
-          project,
           enabledProvidersCount: 2,
         }),
       );
@@ -380,7 +302,6 @@ describe("useModelProviderForm()", () => {
         useModelProviderForm({
           provider,
           projectId: "test-project-id",
-          project: null,
           enabledProvidersCount: 2,
         }),
       );
@@ -397,7 +318,6 @@ describe("useModelProviderForm()", () => {
         useModelProviderForm({
           provider,
           projectId: "test-project-id",
-          project: null,
           enabledProvidersCount: 2,
         }),
       );
@@ -425,7 +345,6 @@ describe("useModelProviderForm()", () => {
         useModelProviderForm({
           provider,
           projectId: "test-project-id",
-          project: null,
           enabledProvidersCount: 2,
         }),
       );
@@ -464,7 +383,6 @@ describe("useModelProviderForm()", () => {
           useModelProviderForm({
             provider,
             projectId: "test-project-id",
-            project: null,
             enabledProvidersCount: 2,
           }),
         );
@@ -485,7 +403,6 @@ describe("useModelProviderForm()", () => {
           useModelProviderForm({
             provider,
             projectId: "test-project-id",
-            project: null,
             enabledProvidersCount: 2,
           }),
         );
@@ -505,7 +422,6 @@ describe("useModelProviderForm()", () => {
           useModelProviderForm({
             provider,
             projectId: "test-project-id",
-            project: null,
             enabledProvidersCount: 2,
           }),
         );
@@ -525,7 +441,6 @@ describe("useModelProviderForm()", () => {
           useModelProviderForm({
             provider,
             projectId: "test-project-id",
-            project: null,
             enabledProvidersCount: 2,
           }),
         );
@@ -555,7 +470,6 @@ describe("useModelProviderForm()", () => {
           useModelProviderForm({
             provider,
             projectId: "test-project-id",
-            project: null,
             enabledProvidersCount: 2,
           }),
         );
@@ -578,7 +492,6 @@ describe("useModelProviderForm()", () => {
           useModelProviderForm({
             provider,
             projectId: "test-project-id",
-            project: null,
             enabledProvidersCount: 2,
           }),
         );
@@ -600,7 +513,6 @@ describe("useModelProviderForm()", () => {
           useModelProviderForm({
             provider,
             projectId: "test-project-id",
-            project: null,
             enabledProvidersCount: 2,
           }),
         );
@@ -624,7 +536,6 @@ describe("useModelProviderForm()", () => {
           useModelProviderForm({
             provider,
             projectId: "test-project-id",
-            project: null,
             enabledProvidersCount: 2,
           }),
         );
@@ -654,7 +565,6 @@ describe("useModelProviderForm()", () => {
           useModelProviderForm({
             provider,
             projectId: "test-project-id",
-            project: null,
             enabledProvidersCount: 2,
           }),
         );
@@ -695,7 +605,6 @@ describe("useModelProviderForm()", () => {
             useModelProviderForm({
               provider,
               projectId: "test-project-id",
-              project: null,
               enabledProvidersCount: 2,
             }),
           { initialProps: { provider: initialProvider } },
@@ -730,7 +639,6 @@ describe("useModelProviderForm()", () => {
         useModelProviderForm({
           provider,
           projectId: "test-project-id",
-          project: null,
           enabledProvidersCount: 2,
         }),
       );
@@ -754,7 +662,6 @@ describe("useModelProviderForm()", () => {
         useModelProviderForm({
           provider,
           projectId: "test-project-id",
-          project: null,
           enabledProvidersCount: 2,
         }),
       );
@@ -793,7 +700,6 @@ describe("useModelProviderForm()", () => {
         useModelProviderForm({
           provider,
           projectId: "test-project-id",
-          project: null,
           enabledProvidersCount: 2,
         }),
       );
@@ -819,7 +725,6 @@ describe("useModelProviderForm()", () => {
         useModelProviderForm({
           provider,
           projectId: "test-project-id",
-          project,
           enabledProvidersCount: 1,
         }),
       );
@@ -849,7 +754,6 @@ describe("useModelProviderForm()", () => {
         useModelProviderForm({
           provider,
           projectId: "test-project-id",
-          project,
           enabledProvidersCount: 1,
         }),
       );
@@ -867,7 +771,6 @@ describe("useModelProviderForm()", () => {
         useModelProviderForm({
           provider,
           projectId: "test-project-id",
-          project,
           enabledProvidersCount: 2,
         }),
       );
@@ -884,7 +787,6 @@ describe("useModelProviderForm()", () => {
         useModelProviderForm({
           provider,
           projectId: "test-project-id",
-          project: null,
           enabledProvidersCount: 2,
         }),
       );
@@ -903,7 +805,6 @@ describe("useModelProviderForm()", () => {
         useModelProviderForm({
           provider,
           projectId: "test-project-id",
-          project: null,
           enabledProvidersCount: 2,
         }),
       );

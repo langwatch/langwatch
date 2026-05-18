@@ -173,12 +173,6 @@ model Team {
     updatedAt       DateTime        @default(now()) @updatedAt
     archivedAt      DateTime?
     gatewayBudgets  GatewayBudget[] @relation("TeamScopedGatewayBudgets")
-    // Team-level default models for LangWatch features. Projects inherit
-    // when their own value is null; teams inherit from the organization
-    // when their value is null. See utils/modelProviderHelpers.ts.
-    defaultModel            String?
-    topicClusteringModel    String?
-    embeddingsModel         String?
     @@index([organizationId])
 }
 
@@ -207,12 +201,6 @@ model Organization {
     ssoDomain              String?              @unique
     ssoProvider            String?
     presenceEnabled        Boolean              @default(true)
-
-    // Organization-level default models. Teams and projects inherit when
-    // their own value is null. See utils/modelProviderHelpers.ts.
-    defaultModel            String?
-    topicClusteringModel    String?
-    embeddingsModel         String?
 
     promoCode     String?
     stripeCustomerId String?      @unique
@@ -327,9 +315,6 @@ model Project {
     annotations              Annotation[]
     modelProviders           ModelProvider[]
     projectSecrets           ProjectSecret[]
-    defaultModel             String?
-    topicClusteringModel     String?
-    embeddingsModel          String?
     TriggerSent              TriggerSent[]
     annotationScores         AnnotationScore[]
     publicShares             PublicShare[]

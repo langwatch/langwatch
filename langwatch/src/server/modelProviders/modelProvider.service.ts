@@ -273,13 +273,11 @@ export class ModelProviderService {
         }
       }
 
-      // Update project default model if provided
-      if (defaultModel !== undefined) {
-        await tx.project.update({
-          where: { id: projectId },
-          data: { defaultModel },
-        });
-      }
+      // The legacy `defaultModel` parameter is accepted in the input
+      // shape for backwards compatibility but no longer writes anywhere.
+      // Default-model writes go through `setRoleAtScope` against
+      // ModelDefaultConfig (see useProviderFormSubmit).
+      void defaultModel;
 
       return result;
     });

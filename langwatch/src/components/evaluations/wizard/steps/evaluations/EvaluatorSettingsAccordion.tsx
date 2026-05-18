@@ -47,7 +47,7 @@ export const EvaluatorSettingsAccordion = () => {
       : evaluatorType && availableEvaluators
         ? getEvaluatorDefaultSettings(
             availableEvaluators[evaluatorType as EvaluatorTypes],
-            project,
+            undefined,
           )
         : undefined;
 

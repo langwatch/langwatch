@@ -220,37 +220,11 @@ describe("Model Providers API", () => {
       });
     });
 
-    describe("when setting defaultModel without provider prefix", () => {
-      it("stores defaultModel with provider prefix prepended", async () => {
-        const res = await helpers.api.put("/api/model-providers/openai", {
-          enabled: true,
-          defaultModel: "gpt-4o",
-        });
-
-        expect(res.status).toBe(200);
-
-        const project = await prisma.project.findUnique({
-          where: { id: testProjectId },
-        });
-        expect(project?.defaultModel).toBe("openai/gpt-4o");
-      });
-    });
-
-    describe("when setting defaultModel with provider prefix already", () => {
-      it("stores defaultModel as-is without double-prefixing", async () => {
-        const res = await helpers.api.put("/api/model-providers/openai", {
-          enabled: true,
-          defaultModel: "openai/gpt-4o",
-        });
-
-        expect(res.status).toBe(200);
-
-        const project = await prisma.project.findUnique({
-          where: { id: testProjectId },
-        });
-        expect(project?.defaultModel).toBe("openai/gpt-4o");
-      });
-    });
+    // The legacy `defaultModel` write path on the REST API is gone
+    // along with the Project.defaultModel scalar column. Defaults now
+    // live in ModelDefaultConfig and are mutated through the tRPC
+    // model-provider router (createConfig / updateConfig /
+    // setRoleAtScope / setFeatureAtScope).
 
     describe("when given an invalid provider", () => {
       it("returns 400", async () => {

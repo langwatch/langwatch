@@ -31,14 +31,6 @@ export type ScopeSelection = {
 export type UseModelProviderFormParams = {
   provider: MaybeStoredModelProvider;
   projectId: string | undefined;
-  project:
-    | {
-        defaultModel?: string | null;
-        topicClusteringModel?: string | null;
-        embeddingsModel?: string | null;
-      }
-    | null
-    | undefined;
   enabledProvidersCount: number;
   isUsingEnvVars?: boolean;
   // Principal-style scope context (iter 108). The team+org IDs come from
@@ -125,7 +117,6 @@ export function useModelProviderForm(
   const {
     provider,
     projectId,
-    project,
     enabledProvidersCount,
     isUsingEnvVars,
     teamId,

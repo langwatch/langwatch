@@ -72,8 +72,6 @@ export function useProviderFormSubmit({
 }): UseProviderFormSubmitReturn {
   const utils = api.useContext();
   const updateMutation = api.modelProvider.update.useMutation();
-  const updateProjectDefaultModelsMutation =
-    api.project.updateProjectDefaultModels.useMutation();
   // B3 redesign: the user's onboarding picks for the three role models
   // need to win over the additive seed (which fills in the registry
   // flagship). After the provider create lands, we replay those picks
@@ -172,9 +170,9 @@ export function useProviderFormSubmit({
 
       // Block save when "use as default provider" is enabled but the
       // selected default model belongs to a different provider — otherwise
-      // updateProjectDefaultModels would silently persist a contradiction
-      // (this provider becomes the default while the model still points
-      // elsewhere). See #3785.
+      // the setRoleAssignmentForScope replay below would silently persist
+      // a contradiction (this provider becomes the default while the
+      // model still points elsewhere). See #3785.
       if (useAsDefaultProvider) {
         const prefix = `${provider.provider}/`;
         const mismatched: string[] = [];
@@ -352,7 +350,6 @@ export function useProviderFormSubmit({
     onSuccess,
     onError,
     updateMutation,
-    updateProjectDefaultModelsMutation,
     setRoleAssignmentMutation,
     utils,
   ]);

@@ -210,7 +210,7 @@ export function useEvaluatorEditorController(
 
   const defaultSettings = useMemo(() => {
     if (!evaluatorDef || !project) return {};
-    return getEvaluatorDefaultSettings(evaluatorDef, project) ?? {};
+    return getEvaluatorDefaultSettings(evaluatorDef, undefined) ?? {};
   }, [evaluatorDef, project]);
 
   const forceUserToDecideAName =

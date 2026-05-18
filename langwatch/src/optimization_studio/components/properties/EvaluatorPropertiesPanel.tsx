@@ -418,7 +418,7 @@ function InlineEvaluatorPanel({ node }: { node: Node<Evaluator> }) {
     };
 
     setDefaultSettings(
-      getEvaluatorDefaultSettings(evaluatorDefinition, project),
+      getEvaluatorDefaultSettings(evaluatorDefinition, undefined),
       "settings",
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
