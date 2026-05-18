@@ -24,21 +24,8 @@
  * role-level pick alone.
  */
 
-import {
-  Box,
-  Button,
-  HStack,
-  Text,
-  VStack,
-  Wrap,
-} from "@chakra-ui/react";
-import {
-  Building2,
-  ChevronDown,
-  ChevronRight,
-  Folder,
-  Users,
-} from "lucide-react";
+import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -620,72 +607,26 @@ function ScopeSection({
   currentTeamId?: string | null;
   currentProjectId?: string | null;
 }) {
-  const quickPicks: Array<{
-    label: string;
-    icon: React.ReactElement;
-    scope: ScopeChipPickerEntry;
-  }> = [];
-  if (currentOrganizationId && available.organization) {
-    quickPicks.push({
-      label: "Organization",
-      icon: <Building2 size={14} aria-hidden />,
-      scope: { scopeType: "ORGANIZATION", scopeId: currentOrganizationId },
-    });
-  }
-  if (currentTeamId) {
-    quickPicks.push({
-      label: "This team",
-      icon: <Users size={14} aria-hidden />,
-      scope: { scopeType: "TEAM", scopeId: currentTeamId },
-    });
-  }
-  if (currentProjectId) {
-    quickPicks.push({
-      label: "This project",
-      icon: <Folder size={14} aria-hidden />,
-      scope: { scopeType: "PROJECT", scopeId: currentProjectId },
-    });
-  }
-
-  const isQuickPickActive = (target: ScopeChipPickerEntry) =>
-    scopes.length === 1 &&
-    scopes[0]!.scopeType === target.scopeType &&
-    scopes[0]!.scopeId === target.scopeId;
-
+  // Quick-picks + Multiple chip + collapsible dropdown all live inside
+  // ScopeChipPicker now — single source of truth. The wrapper used to
+  // render its own quick-pick row above the picker; that duplicated
+  // the same state derivation in two places (and one always lagged the
+  // other by a re-render). See ScopeChipPicker docs for the contract.
   return (
-    <VStack align="start" width="full" gap={2}>
-      {quickPicks.length > 0 && (
-        <Wrap gap={2} role="group" aria-label="Quick scope">
-          {quickPicks.map((pick) => {
-            const active = isQuickPickActive(pick.scope);
-            return (
-              <Button
-                key={`${pick.scope.scopeType}:${pick.scope.scopeId}`}
-                type="button"
-                size="xs"
-                variant={active ? "solid" : "outline"}
-                aria-pressed={active}
-                onClick={() => onChange([pick.scope])}
-                data-testid={`quick-scope-${pick.scope.scopeType.toLowerCase()}`}
-              >
-                <HStack gap={1}>
-                  {pick.icon}
-                  <Text>{pick.label}</Text>
-                </HStack>
-              </Button>
-            );
-          })}
-        </Wrap>
-      )}
-      <ScopeChipPicker
-        value={scopes}
-        onChange={onChange}
-        organizationId={available.organization?.id}
-        organizationName={available.organization?.name}
-        availableTeams={available.teams}
-        availableProjects={available.projects}
-        label=""
-      />
-    </VStack>
+    <ScopeChipPicker
+      value={scopes}
+      onChange={onChange}
+      organizationId={available.organization?.id}
+      organizationName={available.organization?.name}
+      availableTeams={available.teams}
+      availableProjects={available.projects}
+      label=""
+      showQuickPicks
+      currentOrganizationId={
+        available.organization ? currentOrganizationId ?? null : null
+      }
+      currentTeamId={currentTeamId ?? null}
+      currentProjectId={currentProjectId ?? null}
+    />
   );
 }

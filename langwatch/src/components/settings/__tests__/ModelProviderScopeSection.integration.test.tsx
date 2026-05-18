@@ -104,6 +104,43 @@ describe("Model provider scope — quick-add chips", () => {
     ]);
   });
 
+  /** @scenario 'Multiple' chip is auto-selected when scopes don't match a single quick-pick */
+  it("auto-selects Multiple when initial scopes don't match a single quick-pick", () => {
+    // Two scopes from different tiers => Multiple should be solid +
+    // dropdown should be visible (combobox role present).
+    renderSection({
+      scopes: [
+        { scopeType: "ORGANIZATION", scopeId: "org-acme" },
+        { scopeType: "PROJECT", scopeId: "proj-web-app" },
+      ],
+    });
+    const multiple = quickGroup().getByRole("button", { name: /multiple/i });
+    expect(multiple).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("combobox")).toBeInTheDocument();
+  });
+
+  /** @scenario Single matching scope hides the multi-select dropdown */
+  it("collapses the dropdown when the active scope is a quick-pick", () => {
+    renderSection({
+      scopes: [{ scopeType: "PROJECT", scopeId: "proj-web-app" }],
+    });
+    const project = quickGroup().getByRole("button", { name: /this project/i });
+    expect(project).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+  });
+
+  /** @scenario Clicking Multiple reveals the dropdown without clearing scopes */
+  it("clicking Multiple opens the dropdown while keeping the existing selection", () => {
+    renderSection({
+      scopes: [{ scopeType: "PROJECT", scopeId: "proj-web-app" }],
+    });
+    fireEvent.click(quickGroup().getByRole("button", { name: /multiple/i }));
+    expect(screen.getByRole("combobox")).toBeInTheDocument();
+    expect(
+      quickGroup().getByRole("button", { name: /this project/i }),
+    ).toHaveAttribute("aria-pressed", "false");
+  });
+
   it("hides chips a user cannot pick (no team / no org context)", () => {
     // Personal-account project: no org, no team — section is invisible.
     render(

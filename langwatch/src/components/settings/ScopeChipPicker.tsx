@@ -1,12 +1,14 @@
 import {
   Box,
+  Button,
   createListCollection,
   HStack,
   Text,
   VStack,
+  Wrap,
 } from "@chakra-ui/react";
-import { Building2, Folder, Users } from "lucide-react";
-import { useMemo } from "react";
+import { Building2, CheckCheck, Folder, Users } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 
 import { Select } from "../ui/select";
 import { SmallLabel } from "../SmallLabel";
@@ -87,6 +89,10 @@ export function ScopeChipPicker({
   availableProjects,
   label = "Scope",
   showSummary = true,
+  showQuickPicks = false,
+  currentOrganizationId,
+  currentTeamId,
+  currentProjectId,
 }: {
   value: ScopeChipPickerEntry[];
   onChange: (next: ScopeChipPickerEntry[]) => void;
@@ -104,6 +110,20 @@ export function ScopeChipPicker({
   label?: string;
   /** When false, hides the helper "Shared across …" line below the field. */
   showSummary?: boolean;
+  /** When true, render the Organization/Team/Project quick-pick chip
+   *  row above the field and collapse the multi-select dropdown by
+   *  default. Clicking the 4th "Multiple" chip (CheckCheck icon)
+   *  reveals the dropdown for fine-grained selection. The 99% case is
+   *  one scope; this keeps the picker quiet for that case and the
+   *  rare multi-scope policies stay one click away. */
+  showQuickPicks?: boolean;
+  /** Current org/team/project IDs that drive the quick-pick chips.
+   *  Independent from `organizationId/teamId/projectId` (which feed
+   *  the dropdown options) so the quick-picks always pin to the
+   *  user's working context even when the dropdown lists more. */
+  currentOrganizationId?: string | null;
+  currentTeamId?: string | null;
+  currentProjectId?: string | null;
 }) {
   const options = useMemo<ScopeOption[]>(() => {
     const out: ScopeOption[] = [];
@@ -165,9 +185,113 @@ export function ScopeChipPicker({
     [value],
   );
 
+  // Quick-pick row + collapsible-multi mode. See `showQuickPicks` prop.
+  const quickPicks = useMemo(() => {
+    const out: Array<{
+      key: "ORGANIZATION" | "TEAM" | "PROJECT";
+      label: string;
+      icon: React.ReactElement;
+      scope: ScopeChipPickerEntry;
+    }> = [];
+    if (currentOrganizationId) {
+      out.push({
+        key: "ORGANIZATION",
+        label: "Organization",
+        icon: <Building2 size={14} aria-hidden />,
+        scope: { scopeType: "ORGANIZATION", scopeId: currentOrganizationId },
+      });
+    }
+    if (currentTeamId) {
+      out.push({
+        key: "TEAM",
+        label: "This team",
+        icon: <Users size={14} aria-hidden />,
+        scope: { scopeType: "TEAM", scopeId: currentTeamId },
+      });
+    }
+    if (currentProjectId) {
+      out.push({
+        key: "PROJECT",
+        label: "This project",
+        icon: <Folder size={14} aria-hidden />,
+        scope: { scopeType: "PROJECT", scopeId: currentProjectId },
+      });
+    }
+    return out;
+  }, [currentOrganizationId, currentTeamId, currentProjectId]);
+
+  const matchingQuickPick = useMemo(() => {
+    if (value.length !== 1) return null;
+    const s = value[0]!;
+    return (
+      quickPicks.find(
+        (qp) =>
+          qp.scope.scopeType === s.scopeType && qp.scope.scopeId === s.scopeId,
+      ) ?? null
+    );
+  }, [value, quickPicks]);
+
+  // `multipleMode` is local UI state: when true the dropdown is
+  // visible and the "Multiple" chip is highlighted. Derived from the
+  // current selection on mount + whenever the selection changes from
+  // outside (editing an existing config), then becomes user-driven —
+  // clicking a quick-pick flips it off, clicking Multiple flips it on.
+  const derivedMultiple = !matchingQuickPick;
+  const [multipleMode, setMultipleMode] = useState(derivedMultiple);
+  useEffect(() => {
+    setMultipleMode(derivedMultiple);
+  }, [derivedMultiple]);
+
+  const dropdownVisible = !showQuickPicks || multipleMode;
+
   return (
     <VStack align="start" width="full" gap={2}>
       <SmallLabel>{label}</SmallLabel>
+      {showQuickPicks && quickPicks.length > 0 && (
+        <Wrap gap={2} role="group" aria-label="Quick scope">
+          {quickPicks.map((pick) => {
+            const active = matchingQuickPick?.key === pick.key && !multipleMode;
+            return (
+              <Button
+                key={`${pick.scope.scopeType}:${pick.scope.scopeId}`}
+                type="button"
+                size="xs"
+                variant={active ? "solid" : "outline"}
+                aria-pressed={active}
+                onClick={() => {
+                  setMultipleMode(false);
+                  onChange([pick.scope]);
+                }}
+                data-testid={`quick-scope-${pick.scope.scopeType.toLowerCase()}`}
+              >
+                <HStack gap={1}>
+                  {pick.icon}
+                  <Text>{pick.label}</Text>
+                </HStack>
+              </Button>
+            );
+          })}
+          {/* 4th chip — collapses to the same fast path for the 99%
+              one-scope case but exposes the multi-select dropdown for
+              the long tail (one policy attached to N projects /
+              cross-team rules). Active whenever the current selection
+              doesn't reduce to a single quick-pick scope. */}
+          <Button
+            type="button"
+            size="xs"
+            variant={multipleMode ? "solid" : "outline"}
+            aria-pressed={multipleMode}
+            onClick={() => setMultipleMode(true)}
+            data-testid="quick-scope-multiple"
+          >
+            <HStack gap={1}>
+              <CheckCheck size={14} aria-hidden />
+              <Text>Multiple</Text>
+            </HStack>
+          </Button>
+        </Wrap>
+      )}
+      {dropdownVisible && (
       <Select.Root
         collection={collection}
         value={selectedValues}
@@ -250,6 +374,7 @@ export function ScopeChipPicker({
           )}
         </Select.Content>
       </Select.Root>
+      )}
       {showSummary && (
         <Box>
           <Text fontSize="xs" color="gray.600">
