@@ -43,6 +43,21 @@ describe("Feature: Prompt version tags", () => {
       },
     });
 
+    // Seed an org-scope DEFAULT model so prompt creation does not throw
+    // ModelNotConfiguredError. The cascade resolver requires a value at
+    // some scope; covering the org tier is the cheapest setup that
+    // applies to both testProject and otherProject.
+    await prisma.modelDefaultConfig.create({
+      data: {
+        config: { DEFAULT: "openai/gpt-4o-mini" },
+        scopes: {
+          create: [
+            { scopeType: "ORGANIZATION", scopeId: testOrganization.id },
+          ],
+        },
+      },
+    });
+
     // Seed production and staging tags for the test org
     await prisma.promptTag.createMany({
       data: SEEDED_TAGS.map((tag) => ({
@@ -69,6 +84,12 @@ describe("Feature: Prompt version tags", () => {
     });
     await prisma.promptTag.deleteMany({
       where: { organizationId: testOrganization.id },
+    });
+    await prisma.modelDefaultConfigScope.deleteMany({
+      where: { scopeType: "ORGANIZATION", scopeId: testOrganization.id },
+    });
+    await prisma.modelDefaultConfig.deleteMany({
+      where: { scopes: { none: {} } },
     });
     await prisma.project.deleteMany({
       where: { id: { in: [testProject.id, otherProject.id] } },

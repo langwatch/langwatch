@@ -93,6 +93,20 @@ describe("Prompts API", () => {
     testApiKey = testProject.apiKey;
     testProjectId = testProject.id;
 
+    // The CSS-cascade resolver requires a model to be configured at
+    // PROJECT, TEAM, or ORG scope for `prompt.create_default` —
+    // otherwise prompt creation throws `ModelNotConfiguredError`. Seed
+    // a project-scoped DEFAULT so the prompt-api tests can create
+    // prompts without depending on a fallback model.
+    await prisma.modelDefaultConfig.create({
+      data: {
+        config: { DEFAULT: "openai/gpt-4o-mini" },
+        scopes: {
+          create: [{ scopeType: "PROJECT", scopeId: testProjectId }],
+        },
+      },
+    });
+
     // Update the mock config with the correct project ID
     mockConfig = llmPromptConfigFactory.build({
       projectId: testProjectId,
@@ -127,6 +141,13 @@ describe("Prompts API", () => {
     // Clean up test data
     await prisma.llmPromptConfig.deleteMany({
       where: { projectId: testProjectId },
+    });
+
+    await prisma.modelDefaultConfigScope.deleteMany({
+      where: { scopeType: "PROJECT", scopeId: testProjectId },
+    });
+    await prisma.modelDefaultConfig.deleteMany({
+      where: { scopes: { none: {} } },
     });
 
     await prisma.project.delete({
