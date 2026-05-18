@@ -1,10 +1,14 @@
 /**
  * LocalFilesystemDriver — StorageDriver implementation over the local filesystem.
  *
- * **Dev-only.** This driver stores objects under `file:///root/...` paths on the
- * local filesystem. It is suitable for `make dev` single-pod environments only.
- * Multi-pod Kubernetes deployments MUST NOT use this driver because pods do not
- * share a local filesystem. The default production path is S3Driver.
+ * **Single-replica only.** This driver stores objects under `file:///root/...`
+ * paths on the local filesystem. Multi-pod Kubernetes deployments MUST NOT use
+ * this driver because pods do not share a local filesystem. Single-replica
+ * self-host installs (small footprints, hobbyist / air-gapped / pre-pilot
+ * deployments) and `make quickstart` local-dev environments can use it safely;
+ * the Helm chart enforces the constraint by refusing to render
+ * `localFilesystem.enabled=true` together with `replicaCount > 1`. Operators
+ * who outgrow single-replica should switch to S3Driver / AzureBlobDriver.
  *
  * Atomicity invariant: PUT writes to a `.tmp.<rand>` sibling first, then uses
  * `fs.rename` (POSIX rename(2)) to atomically replace the final path. The final
@@ -47,7 +51,7 @@ function parseFileUri(uri: string): string {
 /**
  * StorageDriver implementation backed by the local filesystem.
  *
- * See class-level JSDoc for dev-only constraints and atomicity guarantees.
+ * See class-level JSDoc for single-replica constraints and atomicity guarantees.
  */
 export class LocalFilesystemDriver implements StorageDriver {
   /**

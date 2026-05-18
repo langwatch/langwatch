@@ -8,9 +8,11 @@
  *      `getS3ConfigForProject`. Tenant-owned; never silently bypassed.
  *   2. Global S3: `env.S3_BUCKET_NAME`, when set and non-empty.
  *   3. Local filesystem: `env.LANGWATCH_LOCAL_STORAGE_PATH` (or a
- *      documented default). Dev-only — operators of multi-pod
- *      deployments must configure S3 (the chart's `replicaCount > 1`
- *      + `localFilesystem.enabled` combination hard-fails).
+ *      documented default). Single-replica only — fine for small
+ *      self-host / hobbyist / air-gapped / pre-pilot installs, but
+ *      operators of multi-pod deployments must configure S3 (the
+ *      chart's `replicaCount > 1` + `localFilesystem.enabled`
+ *      combination hard-fails).
  *
  * Previously the precedence was encoded twice: once in
  * `defaultMintStorageUri` (stored-objects.service.ts) for scenario

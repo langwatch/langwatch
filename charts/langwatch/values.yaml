@@ -278,8 +278,9 @@ app:
   # from scenario events. By default, stored-objects share the bucket
   # configured under app.datasetObjectStorage above — one dataplane bucket
   # carrying both surfaces. Operators who can't use object storage (small
-  # single-pod self-host) can opt into a local-filesystem fallback below;
-  # this is dev-only and refuses to render with replicaCount > 1.
+  # single-replica self-host, hobbyist, air-gapped, pre-pilot deployments)
+  # can opt into a local-filesystem fallback below; the chart refuses to
+  # render with replicaCount > 1 because pods don't share a local filesystem.
   ## @extra app.storedObjects Stored-objects (scenario media) configuration.
   ## @param app.storedObjects.localFilesystem.enabled [default: false] Use a local-FS path for stored-objects bytes when object storage is not configured.
   ## @param app.storedObjects.localFilesystem.path [string, default: /var/lib/langwatch/objects] Mount point that the LocalFilesystemDriver writes under.

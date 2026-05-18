@@ -24239,7 +24239,7 @@ The dataplane S3 bucket is the general file-storage layer for all externalized b
 - **Stored objects (scenario media)** — automatic for every applicable scenario event. The `/api/scenario-events` ingest path extracts inline `audio` / `image` / `video` / `document` bytes from incoming events, content-addresses them under `{projectId}/{sha256}`, and rewrites the event payload to reference the stored object by id. The bytes are served back via `GET /api/files/:id`.
 - **Dataset uploads** — enabled via `DATASET_OBJECT_STORAGE_ENABLED`. Persists rows uploaded through the dataset UI. This flag exists for backwards compatibility with deployments that configured datasets separately; both consumers share the same `S3_BUCKET_NAME` bucket.
 
-When `S3_BUCKET_NAME` is set, all consumers use that bucket. When it is not set, stored-objects fall back to the local filesystem at `LANGWATCH_LOCAL_STORAGE_PATH` (dev-only — see warning below).
+When `S3_BUCKET_NAME` is set, all consumers use that bucket. When it is not set, stored-objects fall back to the local filesystem at `LANGWATCH_LOCAL_STORAGE_PATH` — fine for single-replica installs, **not** for horizontally-scaled deployments (see warning below).
 
 | Variable | Description | Default |
 |----------|-------------|---------|
@@ -24258,7 +24258,7 @@ When running on AWS with IRSA (IAM Roles for Service Accounts), you don't need t
 </Note>
 
 <Warning>
-`LANGWATCH_LOCAL_STORAGE_PATH` is **dev-only**. Multi-pod Kubernetes deployments must NOT rely on it: pods do not share a local filesystem, so a write from pod A is invisible to pod B and bytes vanish on every pod restart. Use `S3_BUCKET_NAME` (or the equivalent Helm `app.datasetObjectStorage.enabled` toggle) for any deployment with `replicaCount > 1`.
+`LANGWATCH_LOCAL_STORAGE_PATH` is **single-replica only**. Multi-pod Kubernetes deployments must NOT rely on it: pods do not share a local filesystem, so a write from pod A is invisible to pod B and bytes vanish on every pod restart. Single-replica self-host installs (small footprints, hobbyist / air-gapped / pre-pilot deployments) can use it safely — the Helm chart refuses to render `localFilesystem.enabled=true` together with `replicaCount > 1` so the misconfiguration can't reach a cluster. Use `S3_BUCKET_NAME` (or the equivalent Helm `app.datasetObjectStorage.enabled` toggle) for any horizontally-scaled deployment.
 </Warning>
 
 ## Email
