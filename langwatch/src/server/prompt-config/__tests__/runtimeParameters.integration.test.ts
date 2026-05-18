@@ -1,10 +1,14 @@
 import type { Organization, Project, Team } from "@prisma/client";
 import { nanoid } from "nanoid";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { prisma } from "~/server/db";
 import { projectFactory } from "~/factories/project.factory";
 import { PromptService, type VersionedPrompt } from "../prompt.service";
 import { SEEDED_TAGS } from "~/prompts/constants/tags";
+
+vi.mock("~/server/modelProviders/resolveModelForFeature", () => ({
+  resolveModelForFeature: vi.fn().mockResolvedValue({ model: "openai/gpt-5-mini" }),
+}));
 
 describe("Feature: Prompt runtime parameters", () => {
   let testOrganization: Organization;
