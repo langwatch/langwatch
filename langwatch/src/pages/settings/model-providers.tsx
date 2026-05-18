@@ -179,47 +179,26 @@ export default function ModelsPage() {
             credential to a different project, which the new scope
             picker makes explicit instead.
           */}
-          <Menu.Root>
-            <Tooltip
-              content="You need model provider manage permissions to add new providers."
-              disabled={hasModelProvidersManagePermission}
+          <AddModelProviderMenu
+            addableProviders={addableProviders}
+            disabled={!hasModelProvidersManagePermission}
+            disabledReason="You need model provider manage permissions to add new providers."
+            onPick={(providerKey) => {
+              if (!project?.id) return;
+              openDrawer("editModelProvider", {
+                projectId: project.id,
+                organizationId: organization?.id,
+                providerKey,
+                modelProviderId: "new",
+              });
+            }}
+          >
+            <PageLayout.HeaderButton
+              disabled={!hasModelProvidersManagePermission}
             >
-              <Menu.Trigger asChild>
-                <PageLayout.HeaderButton
-                  disabled={!hasModelProvidersManagePermission}
-                >
-                  <Plus /> Add Model Provider
-                </PageLayout.HeaderButton>
-              </Menu.Trigger>
-            </Tooltip>
-            <Menu.Content>
-              {addableProviders.map((provider) => (
-                <Menu.Item
-                  key={provider.provider}
-                  value={provider.provider}
-                  onClick={() => {
-                    if (!project?.id) return;
-                    // Always open a blank form — lets users configure
-                    // a second (or third…) instance of an already-
-                    // configured provider at a different scope.
-                    openDrawer("editModelProvider", {
-                      projectId: project.id,
-                      organizationId: organization?.id,
-                      providerKey: provider.provider,
-                      modelProviderId: "new",
-                    });
-                  }}
-                >
-                  <HStack gap={3}>
-                    <Box width="20px" height="20px">
-                      {provider.icon}
-                    </Box>
-                    <Text>{provider.name}</Text>
-                  </HStack>
-                </Menu.Item>
-              ))}
-            </Menu.Content>
-          </Menu.Root>
+              <Plus /> Add Model Provider
+            </PageLayout.HeaderButton>
+          </AddModelProviderMenu>
         </HStack>
 
         {isLoading ? (
@@ -230,11 +209,44 @@ export default function ModelsPage() {
               <EmptyState.Indicator>
                 <BrainCircuit size={24} />
               </EmptyState.Indicator>
-              <VStack textAlign="center">
-                <EmptyState.Title>No model providers</EmptyState.Title>
-                <EmptyState.Description>
-                  Add a model provider to get started
-                </EmptyState.Description>
+              <VStack textAlign="center" gap={3}>
+                <VStack textAlign="center" gap={1}>
+                  <EmptyState.Title>No model providers</EmptyState.Title>
+                  <EmptyState.Description>
+                    Add a model provider to get started
+                  </EmptyState.Description>
+                </VStack>
+                {/* Empty-state CTA mirrors the page header — same Menu
+                    content, same RBAC gate, same click handler. Without
+                    a CTA right where the user is looking, the only path
+                    forward was the top-right button which is easy to
+                    miss on a fresh empty screen. */}
+                <AddModelProviderMenu
+                  addableProviders={addableProviders}
+                  disabled={!hasModelProvidersManagePermission}
+                  disabledReason="You need model provider manage permissions to add new providers."
+                  onPick={(providerKey) => {
+                    if (!project?.id) return;
+                    openDrawer("editModelProvider", {
+                      projectId: project.id,
+                      organizationId: organization?.id,
+                      providerKey,
+                      modelProviderId: "new",
+                    });
+                  }}
+                >
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={!hasModelProvidersManagePermission}
+                    data-testid="empty-state-add-model-provider"
+                  >
+                    <HStack gap={1}>
+                      <Plus size={14} />
+                      <Text>Add Model Provider</Text>
+                    </HStack>
+                  </Button>
+                </AddModelProviderMenu>
               </VStack>
             </EmptyState.Content>
           </EmptyState.Root>
@@ -502,6 +514,53 @@ export function TopicClusteringModel() {
         {hook.isSaving && <Spinner size="sm" marginRight={2} />}
       </HStack>
     </HorizontalFormControl>
+  );
+}
+
+/**
+ * Shared "Add Model Provider" menu — same provider list, same RBAC
+ * gate, same click handler — wrapped around whatever trigger the
+ * caller passes (header button in the page top-right + outline button
+ * in the empty state). Keeping both callsites on a single helper means
+ * the provider list never drifts between the two surfaces.
+ */
+function AddModelProviderMenu({
+  children,
+  addableProviders,
+  disabled,
+  disabledReason,
+  onPick,
+}: {
+  children: React.ReactNode;
+  addableProviders: Array<{
+    provider: string;
+    name: string;
+    icon: React.ReactNode;
+  }>;
+  disabled: boolean;
+  disabledReason: string;
+  onPick: (providerKey: string) => void;
+}) {
+  return (
+    <Menu.Root>
+      <Tooltip content={disabledReason} disabled={!disabled}>
+        <Menu.Trigger asChild>{children}</Menu.Trigger>
+      </Tooltip>
+      <Menu.Content>
+        {addableProviders.map((provider) => (
+          <Menu.Item
+            key={provider.provider}
+            value={provider.provider}
+            onClick={() => onPick(provider.provider)}
+          >
+            <HStack gap={3}>
+              <Box width="20px" height="20px">{provider.icon}</Box>
+              <Text>{provider.name}</Text>
+            </HStack>
+          </Menu.Item>
+        ))}
+      </Menu.Content>
+    </Menu.Root>
   );
 }
 
