@@ -143,7 +143,23 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
         templateReferencesInput && lastLiveUserMsg
           ? messages.filter((m: any) => m !== lastLiveUserMsg)
           : messages;
-      const messagesHistory = [...formMsgs, ...liveMessagesForHistory]
+      // Order matters: when the template absorbs the latest live
+      // turn via `{{input}}`, the template's `{{input}}`-bearing
+      // user slot must land at the END of the messages array so
+      // it represents the LATEST turn. Putting formMsgs first
+      // shipped `{{input}}` at index 1 right after system, with the
+      // actual conversation history pushed behind it — the LLM then
+      // saw the latest user turn as if it came BEFORE every prior
+      // turn (prod regression: a long history ended up trailing the
+      // most recent question). When the template does NOT reference
+      // `{{input}}`, formMsgs is preamble/scaffolding (e.g. a fixed
+      // `user("answer it")` role-instruction in 'Messages mode') and
+      // stays at the front — the live history then appends as normal.
+      const messagesHistory = (
+        templateReferencesInput && lastLiveUserMsg
+          ? [...liveMessagesForHistory, ...formMsgs]
+          : [...formMsgs, ...liveMessagesForHistory]
+      )
         .map((message: any) => ({
           role: message.role,
           content: message.content,

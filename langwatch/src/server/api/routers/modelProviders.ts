@@ -18,6 +18,7 @@ import { ModelProviderService } from "../../modelProviders/modelProvider.service
 import { resolveModelForFeature } from "../../modelProviders/resolveModelForFeature";
 import { buildSeedPlanForProvider } from "../../modelProviders/seedOnboardingDefaults";
 import {
+  batchScopePermissions,
   checkOrganizationPermission,
   checkProjectPermission,
   hasOrganizationPermission,
@@ -350,34 +351,39 @@ export const modelProviderRouter = createTRPCRouter({
           organizationId,
           "organization:manage",
         );
-        const orgTeams = await ctx.prisma.team.findMany({
-          where: { organizationId },
-          select: { id: true, name: true },
-          orderBy: { name: "asc" },
+        const [orgTeams, orgProjects] = await Promise.all([
+          ctx.prisma.team.findMany({
+            where: { organizationId },
+            select: { id: true, name: true },
+            orderBy: { name: "asc" },
+          }),
+          ctx.prisma.project.findMany({
+            where: { team: { organizationId } },
+            select: { id: true, name: true, teamId: true },
+            orderBy: { name: "asc" },
+          }),
+        ]);
+        const projectTeamId: Record<string, string> = {};
+        for (const p of orgProjects) projectTeamId[p.id] = p.teamId;
+        const teamManageBatch = await batchScopePermissions(ctx, {
+          organizationId,
+          teamIds: orgTeams.map((t) => t.id),
+          projectIds: [],
+          projectTeamId: {},
+          permission: "team:manage",
         });
-        const teamWritable = await Promise.all(
-          orgTeams.map(async (t) => ({
-            ...t,
-            writable: await hasTeamPermission(ctx, t.id, "team:manage"),
-          })),
-        );
-        writableTeams = teamWritable
-          .filter((t) => t.writable)
+        const projectUpdateBatch = await batchScopePermissions(ctx, {
+          organizationId,
+          teamIds: [],
+          projectIds: orgProjects.map((p) => p.id),
+          projectTeamId,
+          permission: "project:update",
+        });
+        writableTeams = orgTeams
+          .filter((t) => teamManageBatch.teams.get(t.id))
           .map(({ id, name }) => ({ id, name }));
-
-        const orgProjects = await ctx.prisma.project.findMany({
-          where: { team: { organizationId } },
-          select: { id: true, name: true, teamId: true },
-          orderBy: { name: "asc" },
-        });
-        const projectWritable = await Promise.all(
-          orgProjects.map(async (p) => ({
-            ...p,
-            writable: await hasProjectPermission(ctx, p.id, "project:update"),
-          })),
-        );
-        writableProjects = projectWritable
-          .filter((p) => p.writable)
+        writableProjects = orgProjects
+          .filter((p) => projectUpdateBatch.projects.get(p.id))
           .map(({ id, name, teamId }) => ({ id, name, teamId }));
       } else {
         // Personal-account project (no org/team): only project scope.
@@ -426,30 +432,39 @@ export const modelProviderRouter = createTRPCRouter({
       let readableTeamIds: string[] = [];
       let readableProjectIds: string[] = [projectId];
       if (organizationId) {
-        const orgTeams = await ctx.prisma.team.findMany({
-          where: { organizationId },
-          select: { id: true },
-        });
-        const teamRead = await Promise.all(
-          orgTeams.map(async (t) => ({
-            id: t.id,
-            readable: await hasTeamPermission(ctx, t.id, "team:view"),
-          })),
-        );
-        readableTeamIds = teamRead.filter((t) => t.readable).map((t) => t.id);
-
-        const orgProjects = await ctx.prisma.project.findMany({
-          where: { team: { organizationId } },
-          select: { id: true },
-        });
-        const projectRead = await Promise.all(
-          orgProjects.map(async (p) => ({
-            id: p.id,
-            readable: await hasProjectPermission(ctx, p.id, "project:view"),
-          })),
-        );
-        readableProjectIds = projectRead
-          .filter((p) => p.readable)
+        const [orgTeams, orgProjects] = await Promise.all([
+          ctx.prisma.team.findMany({
+            where: { organizationId },
+            select: { id: true },
+          }),
+          ctx.prisma.project.findMany({
+            where: { team: { organizationId } },
+            select: { id: true, teamId: true },
+          }),
+        ]);
+        const projectTeamId: Record<string, string> = {};
+        for (const p of orgProjects) projectTeamId[p.id] = p.teamId;
+        const [teamReadBatch, projectReadBatch] = await Promise.all([
+          batchScopePermissions(ctx, {
+            organizationId,
+            teamIds: orgTeams.map((t) => t.id),
+            projectIds: [],
+            projectTeamId: {},
+            permission: "team:view",
+          }),
+          batchScopePermissions(ctx, {
+            organizationId,
+            teamIds: [],
+            projectIds: orgProjects.map((p) => p.id),
+            projectTeamId,
+            permission: "project:view",
+          }),
+        ]);
+        readableTeamIds = orgTeams
+          .filter((t) => teamReadBatch.teams.get(t.id))
+          .map((t) => t.id);
+        readableProjectIds = orgProjects
+          .filter((p) => projectReadBatch.projects.get(p.id))
           .map((p) => p.id);
       } else if (teamId) {
         const teamReadable = await hasTeamPermission(ctx, teamId, "team:view");
@@ -547,6 +562,25 @@ export const modelProviderRouter = createTRPCRouter({
       // Projects, each alphabetical) so chip render order is stable
       // across reloads.
       const scopeRank = { ORGANIZATION: 0, TEAM: 1, PROJECT: 2 } as const;
+      // Build the readable-scope set so we can prune scope attachments
+      // the caller is not allowed to see. The Prisma query above
+      // matches configs that have AT LEAST one readable scope, but the
+      // returned `scopes` array carries every attachment on each
+      // matched config — including ones in other readable teams /
+      // projects the caller has no access to. Mirror the input filter
+      // when projecting the response.
+      const readableTeamIdSet = new Set(readableTeamIds);
+      const readableProjectIdSet = new Set(readableProjectIds);
+      const isReadableScope = (
+        scopeType: "ORGANIZATION" | "TEAM" | "PROJECT",
+        scopeId: string,
+      ): boolean => {
+        if (scopeType === "ORGANIZATION") {
+          return canReadOrg && scopeId === organizationId;
+        }
+        if (scopeType === "TEAM") return readableTeamIdSet.has(scopeId);
+        return readableProjectIdSet.has(scopeId);
+      };
       const configs = configRows.map((c) => ({
         id: c.id,
         config: c.config as Record<string, string>,
@@ -554,6 +588,7 @@ export const modelProviderRouter = createTRPCRouter({
         updatedAt: c.updatedAt,
         authorId: c.authorId,
         scopes: c.scopes
+          .filter((s) => isReadableScope(s.scopeType, s.scopeId))
           .map((s) => ({
             type: s.scopeType,
             id: s.scopeId,
@@ -767,6 +802,47 @@ export const modelProviderRouter = createTRPCRouter({
       if (!project) throw new Error("Project not found");
       const teamId = project.teamId;
       const organizationId = project.team?.organizationId ?? null;
+
+      // Cross-tenant guard: the caller picks scopes by id, so a hostile
+      // request could pass a scopeId from another org and have us walk
+      // its cascade. Validate every picked id resolves to the SAME org
+      // as `input.projectId` before going further.
+      if (!organizationId) {
+        throw new Error("Project has no organization; cannot resolve scopes.");
+      }
+      const pickedTeamIds = input.scopes
+        .filter((s) => s.scopeType === "TEAM")
+        .map((s) => s.scopeId);
+      const pickedProjectIds = input.scopes
+        .filter((s) => s.scopeType === "PROJECT")
+        .map((s) => s.scopeId);
+      const pickedOrgIds = input.scopes
+        .filter((s) => s.scopeType === "ORGANIZATION")
+        .map((s) => s.scopeId);
+      if (pickedOrgIds.some((id) => id !== organizationId)) {
+        throw new Error("Scope organization does not match project organization.");
+      }
+      if (pickedTeamIds.length > 0) {
+        const sameOrgTeams = await ctx.prisma.team.findMany({
+          where: { id: { in: pickedTeamIds }, organizationId },
+          select: { id: true },
+        });
+        if (sameOrgTeams.length !== new Set(pickedTeamIds).size) {
+          throw new Error("Scope team does not belong to project organization.");
+        }
+      }
+      if (pickedProjectIds.length > 0) {
+        const sameOrgProjects = await ctx.prisma.project.findMany({
+          where: {
+            id: { in: pickedProjectIds },
+            team: { organizationId },
+          },
+          select: { id: true },
+        });
+        if (sameOrgProjects.length !== new Set(pickedProjectIds).size) {
+          throw new Error("Scope project does not belong to project organization.");
+        }
+      }
 
       // The cascade we want to surface is "what would a project see
       // inside the most-specific picked scope". Pick the most-specific

@@ -7,6 +7,7 @@ import type {
 import { nanoid } from "nanoid";
 import { DEFAULT_MODEL } from "~/utils/constants";
 import { resolveModelForFeature } from "~/server/modelProviders/resolveModelForFeature";
+import { ModelNotConfiguredError } from "~/server/modelProviders/modelNotConfiguredError";
 import { createLogger } from "../../../utils/logger/server";
 import { SchemaVersion } from "../enums";
 import { NotFoundError } from "../errors";
@@ -490,11 +491,10 @@ export class LlmConfigRepository {
           scope: configData.scope,
         },
       });
-      // Resolve the project's DEFAULT model via the cascade. When no
-      // scope has a default configured we fall back to DEFAULT_MODEL
-      // so the new prompt draft can still render with a placeholder;
-      // the user will be prompted to pick a model the first time they
-      // open it.
+      // Resolve the project's DEFAULT model via the cascade. We let
+      // ModelNotConfiguredError propagate so the missing-model toast
+      // fires; only swallow resolver-internal crashes and fall back to
+      // DEFAULT_MODEL as a last-resort placeholder.
       let defaultModel: string;
       try {
         const resolved = await resolveModelForFeature(
@@ -502,7 +502,8 @@ export class LlmConfigRepository {
           { prisma: this.prisma, projectId: configData.projectId },
         );
         defaultModel = resolved.model;
-      } catch {
+      } catch (err) {
+        if (err instanceof ModelNotConfiguredError) throw err;
         defaultModel = DEFAULT_MODEL;
       }
 

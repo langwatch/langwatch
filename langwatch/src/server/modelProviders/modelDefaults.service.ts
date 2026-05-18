@@ -1,4 +1,5 @@
 import type { ModelDefaultScopeType, PrismaClient } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 
 import {
   allFeatures,
@@ -8,7 +9,7 @@ import {
 } from "./featureRegistry";
 
 interface Ctx {
-  prisma: PrismaClient;
+  prisma: PrismaClient | Prisma.TransactionClient;
 }
 
 export type ScopeAttachment = {
@@ -37,7 +38,7 @@ export type ScopeAttachment = {
  * same scope. Caught on rchaves's 2026-05-18 dogfood.
  */
 async function lockScope(
-  tx: Pick<PrismaClient, "$queryRaw">,
+  tx: Pick<Prisma.TransactionClient, "$queryRaw">,
   scopeType: ModelDefaultScopeType,
   scopeId: string,
 ): Promise<void> {
@@ -168,14 +169,25 @@ export async function updateConfig(
       (c) => !desired.has(`${c.scopeType}::${c.scopeId}`),
     );
 
-    await ctx.prisma.$transaction([
-      ctx.prisma.modelDefaultConfig.update({
+    // Scope mutation needs the multi-statement batch form of
+    // `$transaction`, which only the root Prisma client exposes —
+    // transaction clients themselves do not. Fail loudly if some
+    // future caller passes a tx client into this branch rather than
+    // hiding the crash behind a runtime cast.
+    if (!("$transaction" in ctx.prisma)) {
+      throw new Error(
+        "modelDefaults.updateConfig: scope updates must be called with a root PrismaClient, not a transaction client.",
+      );
+    }
+    const prisma = ctx.prisma as PrismaClient;
+    await prisma.$transaction([
+      prisma.modelDefaultConfig.update({
         where: { id: params.id },
         data,
       }),
       ...(toAdd.length > 0
         ? [
-            ctx.prisma.modelDefaultConfigScope.createMany({
+            prisma.modelDefaultConfigScope.createMany({
               data: toAdd.map((s) => ({
                 configId: params.id,
                 scopeType: s.scopeType,
@@ -186,7 +198,7 @@ export async function updateConfig(
         : []),
       ...(toRemove.length > 0
         ? [
-            ctx.prisma.modelDefaultConfigScope.deleteMany({
+            prisma.modelDefaultConfigScope.deleteMany({
               where: { id: { in: toRemove.map((c) => c.id) } },
             }),
           ]
@@ -293,8 +305,8 @@ async function upsertKeyAtScope(
     authorId?: string | null;
   },
 ): Promise<void> {
-  await ctx.prisma.$transaction(async (tx) => {
-    await lockScope(tx as unknown as PrismaClient, params.scopeType, params.scopeId);
+  await (ctx.prisma as PrismaClient).$transaction(async (tx) => {
+    await lockScope(tx, params.scopeType, params.scopeId);
 
     const attached = await tx.modelDefaultConfigScope.findMany({
       where: { scopeType: params.scopeType, scopeId: params.scopeId },
@@ -313,7 +325,7 @@ async function upsertKeyAtScope(
       if (!target) return;
       const next = { ...((target.config ?? {}) as Record<string, unknown>) };
       delete next[params.key];
-      await updateConfig({ prisma: tx as unknown as PrismaClient }, {
+      await updateConfig({ prisma: tx }, {
         id: target.id,
         config: next,
         authorId: params.authorId,
@@ -326,7 +338,7 @@ async function upsertKeyAtScope(
         ...((target.config ?? {}) as Record<string, unknown>),
         [params.key]: params.model,
       };
-      await updateConfig({ prisma: tx as unknown as PrismaClient }, {
+      await updateConfig({ prisma: tx }, {
         id: target.id,
         config: next,
         authorId: params.authorId,
@@ -334,7 +346,7 @@ async function upsertKeyAtScope(
       return;
     }
 
-    await createConfig({ prisma: tx as unknown as PrismaClient }, {
+    await createConfig({ prisma: tx }, {
       config: { [params.key]: params.model },
       scopes: [{ scopeType: params.scopeType, scopeId: params.scopeId }],
       authorId: params.authorId ?? null,

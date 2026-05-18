@@ -371,6 +371,18 @@ const domainErrorMiddleware = t.middleware(async ({ next }) => {
       cause: result.error.cause,
     });
   }
+  if (!result.ok && result.error.cause instanceof AiCallFailedError) {
+    // Same shape as ModelNotConfiguredError: re-raise as BAD_REQUEST so
+    // the wire code matches the user-actionable nature of the toast
+    // ("double-check your model configuration") instead of falling
+    // through as a generic 500 that monitoring + retry policies treat
+    // as a server fault.
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: result.error.cause.message,
+      cause: result.error.cause,
+    });
+  }
   return result;
 });
 

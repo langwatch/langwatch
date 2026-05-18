@@ -115,8 +115,21 @@ async function resolveModel({
     });
     const providerKey = resolved.model.split("/")[0] ?? "";
     if (modelProviders[providerKey]?.enabled) return resolved.model;
+    // Cascade picked a model but the backing provider is disabled.
+    // Silently swapping to a random enabled provider is dangerous (the
+    // user thinks they're calling the one they configured); surface
+    // the disabled state so the operator can re-enable or re-pick.
+    throw new Error(
+      `Model "${resolved.model}" is configured at ${resolved.scope} scope for "${featureKey}", but its provider "${providerKey}" is currently disabled. Re-enable it in Settings → Model Providers, or pick a different default.`,
+    );
   } catch (err) {
     if (err instanceof ModelNotConfiguredError) throw err;
+    if (
+      err instanceof Error &&
+      err.message.includes("is currently disabled")
+    ) {
+      throw err;
+    }
     // Otherwise fall through to the "any enabled provider" rescue;
     // resolver-internal errors (DB, race) get the conservative
     // recovery path.
