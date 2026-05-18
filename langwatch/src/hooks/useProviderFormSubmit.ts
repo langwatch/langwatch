@@ -284,43 +284,80 @@ export function useProviderFormSubmit({
           : scopeType && scopeId
             ? [{ scopeType, scopeId }]
             : [];
-        const writes: Array<Promise<unknown>> = [];
+        type RoleWrite = {
+          label: string;
+          promise: Promise<unknown>;
+        };
+        const writes: RoleWrite[] = [];
         for (const s of targetScopes) {
           if (projectDefaultModel) {
-            writes.push(
-              setRoleAssignmentMutation.mutateAsync({
+            writes.push({
+              label: `Default at ${s.scopeType.toLowerCase()}`,
+              promise: setRoleAssignmentMutation.mutateAsync({
                 scopeType: s.scopeType,
                 scopeId: s.scopeId,
                 role: "DEFAULT",
                 model: projectDefaultModel,
               }),
-            );
+            });
           }
           if (projectTopicClusteringModel) {
-            writes.push(
-              setRoleAssignmentMutation.mutateAsync({
+            writes.push({
+              label: `Fast at ${s.scopeType.toLowerCase()}`,
+              promise: setRoleAssignmentMutation.mutateAsync({
                 scopeType: s.scopeType,
                 scopeId: s.scopeId,
                 role: "FAST",
                 model: projectTopicClusteringModel,
               }),
-            );
+            });
           }
           if (projectEmbeddingsModel) {
-            writes.push(
-              setRoleAssignmentMutation.mutateAsync({
+            writes.push({
+              label: `Embeddings at ${s.scopeType.toLowerCase()}`,
+              promise: setRoleAssignmentMutation.mutateAsync({
                 scopeType: s.scopeType,
                 scopeId: s.scopeId,
                 role: "EMBEDDINGS",
                 model: projectEmbeddingsModel,
               }),
-            );
+            });
           }
         }
         // Best-effort: a single failed scope (e.g. RBAC blocks an org
-        // write for a non-admin) shouldn't kill the whole submit — log
-        // and continue. The provider row is already created.
-        await Promise.allSettled(writes);
+        // write for a non-admin) shouldn't kill the whole submit — the
+        // provider row is already created. But silent allSettled would
+        // also hide ALL three role writes failing, leaving the user
+        // with a "Model Provider Updated" success toast and an empty
+        // cascade. Capture rejections and surface them as a warning.
+        const results = await Promise.allSettled(writes.map((w) => w.promise));
+        const failed = results
+          .map((r, i) => ({ r, label: writes[i]!.label }))
+          .filter((x): x is { r: PromiseRejectedResult; label: string } =>
+            x.r.status === "rejected",
+          );
+        if (failed.length > 0) {
+          const reasons = failed
+            .map(
+              (f) =>
+                `${f.label}: ${
+                  f.r.reason instanceof Error
+                    ? f.r.reason.message
+                    : String(f.r.reason)
+                }`,
+            )
+            .join("; ");
+          toaster.create({
+            title:
+              failed.length === writes.length
+                ? "Default model assignments failed"
+                : "Some default model assignments failed",
+            description: reasons,
+            type: "warning",
+            duration: 8000,
+            meta: { closable: true },
+          });
+        }
         await utils.modelProvider.getDefaultModelsForProject.invalidate({
           projectId,
         });
