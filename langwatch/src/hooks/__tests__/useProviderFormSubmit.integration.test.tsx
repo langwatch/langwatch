@@ -266,6 +266,29 @@ describe("useProviderFormSubmit()", () => {
 
         expect(mockSetRoleAssignmentMutateAsync).not.toHaveBeenCalled();
       });
+
+      it("still invalidates getDefaultModelsForProject so the section refetches the auto-seeded row", async () => {
+        // First-provider create runs seedOnboardingDefaultsForProvider
+        // server-side regardless of the "use as default provider" checkbox.
+        // The Default Models card on the settings page binds to
+        // getDefaultModelsForProject, so it MUST be invalidated even when
+        // the user didn't opt into the user-pick replay — otherwise the
+        // section reads stale "no configs" until window-focus refetch.
+        const snapshot = buildSnapshot({
+          useAsDefaultProvider: false,
+          projectDefaultModel: null,
+          projectTopicClusteringModel: null,
+          projectEmbeddingsModel: null,
+          scopes: [{ scopeType: "PROJECT", scopeId: "proj-1" }],
+        });
+        const { result } = renderSubmitHook({ snapshot });
+
+        await act(async () => {
+          await result.current.submit();
+        });
+
+        expect(mockDefaultModelsInvalidate).toHaveBeenCalled();
+      });
     });
   });
 

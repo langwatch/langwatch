@@ -358,20 +358,22 @@ export function useProviderFormSubmit({
             meta: { closable: true },
           });
         }
-        await utils.modelProvider.getDefaultModelsForProject.invalidate({
-          projectId,
-        });
       }
 
       // Invalidate every cached provider/resolved-default query so the
       // prompts page, evaluation wizard, and any other surface that
       // gates UI on "are there enabled providers?" picks up the new
-      // state without needing a window-focus refetch.
+      // state without needing a window-focus refetch. getDefaultModelsForProject
+      // is in this unconditional list because the server's first-provider
+      // auto-seed (seedOnboardingDefaultsForProvider) runs regardless of
+      // the "use as default provider" checkbox — so the DefaultModelsSection
+      // card needs to refetch even when the user didn't opt into the replay.
       await Promise.all([
         utils.modelProvider.getAllForProject.invalidate(),
         utils.modelProvider.getAllForProjectForFrontend.invalidate(),
         utils.modelProvider.listAllForProjectForFrontend.invalidate(),
         utils.modelProvider.getResolvedDefault.invalidate(),
+        utils.modelProvider.getDefaultModelsForProject.invalidate(),
       ]);
 
       toaster.create({
