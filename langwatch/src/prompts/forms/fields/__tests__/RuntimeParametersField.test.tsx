@@ -86,6 +86,6 @@ describe("<RuntimeParametersField />", () => {
     });
     fireEvent.change(editor, { target: { value: "{invalid" } });
 
-    expect(screen.getByText("Config must be valid JSON")).toBeInTheDocument();
+    expect(screen.getByText("Parameters must be valid JSON")).toBeInTheDocument();
   });
 });

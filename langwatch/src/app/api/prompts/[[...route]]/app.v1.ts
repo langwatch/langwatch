@@ -789,7 +789,7 @@ const assignTagResponseSchema = z.object({
                     differences: z.array(z.string()),
                     remoteConfigData:
                       getLatestConfigVersionSchema().shape.configData,
-                    remoteConfig: z.record(z.string(), z.unknown()).optional(),
+                    remoteParameters: z.record(z.string(), z.unknown()).optional(),
                   })
                   .optional(),
               }),

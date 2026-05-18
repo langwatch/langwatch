@@ -102,7 +102,7 @@ Feature: Prompt runtime parameters
   Scenario: Prompt playground shows runtime parameters as read-only version data
     Given prompt "search-agent" has latest parameters {"readonly": true}
     When I view "search-agent" in the prompt playground
-    Then the Config tab displays {"readonly": true}
+    Then the Parameters tab displays {"readonly": true}
 
   @unit @unimplemented
   Scenario: Runtime parameters validation accepts object JSON values
