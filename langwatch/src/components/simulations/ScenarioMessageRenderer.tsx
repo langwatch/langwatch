@@ -3,6 +3,7 @@ import { useMemo, useRef, useEffect } from "react";
 import { Settings } from "react-feather";
 import type { StreamingMessage } from "~/hooks/useSimulationStreamingState";
 import type { ScenarioMessageSnapshotEvent } from "~/server/scenarios/scenario-event.types";
+import { visitContentPart } from "~/server/stored-objects/visit-content-part";
 import { TraceMessage } from "../copilot-kit/TraceMessage";
 import { Markdown } from "../Markdown";
 import { RenderInputOutput } from "../traces/RenderInputOutput";
@@ -253,49 +254,30 @@ function flattenContent(msg: RawMessage): DisplayItem[] {
 function flattenMixed(content: unknown[], msg: RawMessage): DisplayItem[] {
   const items: DisplayItem[] = [];
   content.forEach((item, i) => {
-    if (typeof item === "string") {
-      items.push({ kind: "text", id: `${msg.id}-c${i}`, role: msg.role ?? "assistant", content: item, traceId: msg.trace_id });
-    } else if (typeof item === "object" && item !== null) {
-      // Narrow to a property bag so we can safely access arbitrary keys below.
-      const o = item as Record<string, unknown>;
-      if (o["type"] === "text" || (!o["type"] && o["text"])) {
-        // Handles: {type:"text", text:"..."}, {type:"text", content:"..."}, {text:"..."}
-        const text = (o["text"] ?? o["content"] ?? "") as string;
-        if (text) items.push({ kind: "text", id: `${msg.id}-c${i}`, role: msg.role ?? "assistant", content: text, traceId: msg.trace_id });
-      } else if ((o["type"] === "image" || o["type"] === "audio" || o["type"] === "video") && o["source"]) {
-        // AG-UI media parts with source.type="url"|"data" (Phase I
-        // externalized shape). We can't write a single literal that satisfies
-        // MediaPartData's discriminated union here: the union splits on the
-        // `source.type` discriminant, and the upstream `unknown` doesn't
-        // narrow at this site. Cast the whole part to MediaPartData — runtime
-        // shape is validated by the surrounding `o["source"]` guard plus the
-        // downstream MediaPart renderer's branching on `source.type`.
-        const part = {
-          type: o["type"] as "image" | "audio" | "video",
-          source: o["source"],
-        } as MediaPartData;
-        items.push({ kind: "media", id: `${msg.id}-media${i}`, part, traceId: msg.trace_id });
-      } else if (o["type"] === "binary" && o["mimeType"]) {
-        // AG-UI binary part
-        const part: MediaPartData = {
-          type: "binary",
-          mimeType: o["mimeType"] as string,
-          id: o["id"] as string | undefined,
-          url: o["url"] as string | undefined,
-          data: o["data"] as string | undefined,
-          filename: o["filename"] as string | undefined,
-        };
-        items.push({ kind: "media", id: `${msg.id}-media${i}`, part, traceId: msg.trace_id });
-      } else if (o["type"] === "image_url" && typeof o["image_url"] === "object" && o["image_url"] !== null && (o["image_url"] as Record<string, unknown>)["url"]) {
-        items.push({ kind: "image", id: `${msg.id}-img${i}`, src: (o["image_url"] as Record<string, unknown>)["url"] as string, traceId: msg.trace_id });
-      } else if (o["image"]) {
-        items.push({ kind: "image", id: `${msg.id}-img${i}`, src: o["image"] as string, traceId: msg.trace_id });
-      } else if (o["type"] === "tool_use" || o["type"] === "tool_call") {
-        items.push({ kind: "tool_call", id: `${msg.id}-tu${i}`, name: (o["name"] ?? o["toolName"] ?? "tool") as string, arguments: o["arguments"] ?? o["input"] ?? o["args"], traceId: msg.trace_id });
-      } else if (o["type"] === "tool_result") {
-        items.push({ kind: "tool_result", id: `${msg.id}-tr${i}`, result: o["content"] ?? o["result"], traceId: msg.trace_id });
-      }
-    }
+    const result = visitContentPart(item, {
+      text: (text) => text
+        ? { kind: "text" as const, id: `${msg.id}-c${i}`, role: msg.role ?? "assistant", content: text, traceId: msg.trace_id }
+        : undefined,
+      media: (part) => ({
+        kind: "media" as const,
+        id: `${msg.id}-media${i}`,
+        // Cast: MediaPartData's discriminated union splits on source.type;
+        // runtime shape is validated by the upstream source guard.
+        part: { type: part.type, source: part.source } as MediaPartData,
+        traceId: msg.trace_id,
+      }),
+      binary: (part) => ({
+        kind: "media" as const,
+        id: `${msg.id}-media${i}`,
+        part: part as MediaPartData,
+        traceId: msg.trace_id,
+      }),
+      toolCall: (part) => ({ kind: "tool_call" as const, id: `${msg.id}-tu${i}`, name: part.name, arguments: part.arguments, traceId: msg.trace_id }),
+      toolResult: (part) => ({ kind: "tool_result" as const, id: `${msg.id}-tr${i}`, result: part.result, traceId: msg.trace_id }),
+      legacyImageUrl: (url) => ({ kind: "image" as const, id: `${msg.id}-img${i}`, src: url, traceId: msg.trace_id }),
+      legacyImage: (src) => ({ kind: "image" as const, id: `${msg.id}-img${i}`, src, traceId: msg.trace_id }),
+    });
+    if (result) items.push(result);
   });
   return items;
 }

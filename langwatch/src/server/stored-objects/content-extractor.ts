@@ -19,6 +19,7 @@ import { createLogger } from "~/utils/logger/server";
 import { binaryInputPartSchema } from "./binary-part";
 import { isReadbackSafe } from "./safe-media-types";
 import type { StoredObjectsService } from "./stored-objects.service";
+import { visitContentPart } from "./visit-content-part";
 
 const tracer = getLangWatchTracer("langwatch.stored-objects.content-extractor");
 
@@ -65,112 +66,109 @@ async function processContentPart({
   ownerId: string;
   service: StoredObjectsService;
 }): Promise<{ part: InputContentPart; ref: ExtractedRef | null }> {
-  // image / audio / video / document parts with source.type="data"
-  if (
-    (part.type === "image" ||
-      part.type === "audio" ||
-      part.type === "video" ||
-      part.type === "document") &&
-    part.source.type === "data"
-  ) {
-    const { value: base64, mimeType } = part.source;
+  const noOp = { part, ref: null } as const;
 
-    // For document parts, reject MIME types the read path can't faithfully
-    // serve. The /api/files route downgrades anything outside the allowlist to
-    // application/octet-stream, so text/csv, application/json, etc. would
-    // ingest silently but come back as a blob download. Pass through unchanged
-    // rather than corrupt the round-trip.
-    if (part.type === "document" && !isReadbackSafe(mimeType)) {
-      logger.debug(
-        { mimeType },
-        "document part has an unsafe MIME type — passing through unchanged",
-      );
-      return { part, ref: null };
-    }
+  const result = await visitContentPart(part, {
+    text: () => noOp,
+    toolCall: () => noOp,
+    toolResult: () => noOp,
 
-    const bytes = Buffer.from(base64, "base64");
+    async media(mediaPart) {
+      if (mediaPart.source.type !== "data") return noOp;
 
-    const result = await service.storeFromBytes({
-      projectId,
-      purpose,
-      ownerKind,
-      ownerId,
-      mediaType: mimeType,
-      bytes,
-    });
+      const { value: base64, mimeType } = mediaPart.source;
 
-    const ref: ExtractedRef = {
-      id: result.id,
-      isDuplicate: result.isDuplicate,
-      purpose,
-      ownerKind,
-      ownerId,
-    };
+      // For document parts, reject MIME types the read path can't faithfully
+      // serve. The /api/files route downgrades anything outside the allowlist to
+      // application/octet-stream, so text/csv, application/json, etc. would
+      // ingest silently but come back as a blob download. Pass through unchanged
+      // rather than corrupt the round-trip.
+      if (mediaPart.type === "document" && !isReadbackSafe(mimeType)) {
+        logger.debug(
+          { mimeType },
+          "document part has an unsafe MIME type — passing through unchanged",
+        );
+        return noOp;
+      }
 
-    const rewrittenPart: InputContentPart = {
-      ...part,
-      source: { type: "url", value: `/api/files/${result.id}`, mimeType },
-    };
+      const bytes = Buffer.from(base64, "base64");
+      const stored = await service.storeFromBytes({
+        projectId,
+        purpose,
+        ownerKind,
+        ownerId,
+        mediaType: mimeType,
+        bytes,
+      });
 
-    return { part: rewrittenPart, ref };
-  }
+      const ref: ExtractedRef = {
+        id: stored.id,
+        isDuplicate: stored.isDuplicate,
+        purpose,
+        ownerKind,
+        ownerId,
+      };
 
-  // binary parts: enforce exactly-one-of(data, url, id) at the boundary
-  // before we touch them. AG-UI's InputContentSchema permits the
-  // ambiguous "all three set" / "none set" cases; rejecting them here
-  // matches the runtime invariant the extractor depends on. A failed
-  // safeParse falls back to "no inline data to extract" — the caller's
-  // degraded-passthrough path takes care of the rest.
-  if (part.type === "binary") {
-    const refined = binaryInputPartSchema.safeParse(part);
-    if (!refined.success) {
-      logger.debug(
-        { error: refined.error.message },
-        "binary part violates exactly-one-of(data,url,id); passing through unchanged",
-      );
-      return { part, ref: null };
-    }
-  }
+      const rewrittenPart: InputContentPart = {
+        ...part,
+        source: { type: "url", value: `/api/files/${stored.id}`, mimeType },
+      } as InputContentPart;
 
-  // binary parts where data is set and id/url are not already present
-  if (
-    part.type === "binary" &&
-    part.data !== undefined &&
-    part.id === undefined &&
-    part.url === undefined
-  ) {
-    const { data, mimeType } = part;
-    const bytes = Buffer.from(data, "base64");
+      return { part: rewrittenPart, ref };
+    },
 
-    const result = await service.storeFromBytes({
-      projectId,
-      purpose,
-      ownerKind,
-      ownerId,
-      mediaType: mimeType,
-      bytes,
-    });
+    async binary(binPart) {
+      // Enforce exactly-one-of(data, url, id) at the boundary before touching.
+      // AG-UI's InputContentSchema permits the ambiguous cases; rejecting them
+      // here matches the runtime invariant the extractor depends on.
+      const refined = binaryInputPartSchema.safeParse(binPart);
+      if (!refined.success) {
+        logger.debug(
+          { error: refined.error.message },
+          "binary part violates exactly-one-of(data,url,id); passing through unchanged",
+        );
+        return noOp;
+      }
 
-    const ref: ExtractedRef = {
-      id: result.id,
-      isDuplicate: result.isDuplicate,
-      purpose,
-      ownerKind,
-      ownerId,
-    };
+      if (
+        binPart.data === undefined ||
+        binPart.id !== undefined ||
+        binPart.url !== undefined
+      ) {
+        return noOp;
+      }
 
-    const rewrittenPart: InputContentPart = {
-      ...part,
-      id: result.id,
-      url: `/api/files/${result.id}`,
-      data: undefined,
-    };
+      const { data, mimeType } = binPart;
+      const bytes = Buffer.from(data, "base64");
+      const stored = await service.storeFromBytes({
+        projectId,
+        purpose,
+        ownerKind,
+        ownerId,
+        mediaType: mimeType,
+        bytes,
+      });
 
-    return { part: rewrittenPart, ref };
-  }
+      const ref: ExtractedRef = {
+        id: stored.id,
+        isDuplicate: stored.isDuplicate,
+        purpose,
+        ownerKind,
+        ownerId,
+      };
 
-  // No inline data to extract — return unchanged
-  return { part, ref: null };
+      const rewrittenPart: InputContentPart = {
+        ...part,
+        id: stored.id,
+        url: `/api/files/${stored.id}`,
+        data: undefined,
+      } as InputContentPart;
+
+      return { part: rewrittenPart, ref };
+    },
+  });
+
+  return result ?? noOp;
 }
 
 // ---------------------------------------------------------------------------
