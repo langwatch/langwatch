@@ -21,7 +21,7 @@ export {
   resolveFlagDefinition,
 } from "./registry";
 export type {
-  FeatureFlagOptions,
+  FeatureFlagEvaluateOptions,
   FeatureFlagServiceInterface,
 } from "./types";
 export {

@@ -210,7 +210,9 @@ export async function isNlpGoEnabled(
 ): Promise<boolean> {
   const organizationId =
     opts.organizationId ?? (await resolveOrganizationId(opts.projectId));
-  return featureFlagService.isEnabled(NLP_GO_FLAG, opts.projectId, false, {
+  return featureFlagService.isEnabled(NLP_GO_FLAG, {
+    distinctId: opts.projectId,
+    defaultValue: false,
     projectId: opts.projectId,
     organizationId,
   });

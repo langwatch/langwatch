@@ -46,11 +46,6 @@ export const MainMenu = React.memo(function MainMenu({
     useOrganizationTeamProject();
   const [isHovered, setIsHovered] = useState(false);
 
-  const { enabled: tracesV2Enabled } = useFeatureFlag(
-    "release_ui_traces_v2_enabled",
-    { projectId: project?.id, enabled: !!project },
-  );
-
   const pendingItemsCount = api.annotation.getPendingItemsCount.useQuery(
     { projectId: project?.id ?? "" },
     { enabled: !!project?.id },
@@ -158,18 +153,16 @@ export const MainMenu = React.memo(function MainMenu({
               isActive={router.pathname.includes("/messages")}
               showLabel={showExpanded}
             />
-            {tracesV2Enabled && (
-              <PageMenuLink
-                path={projectRoutes.traces_v2.path}
-                icon={featureIcons.traces_v2.icon}
-                label={projectRoutes.traces_v2.title}
-                project={project}
-                isActive={router.pathname.includes("/traces")}
-                showLabel={showExpanded}
-                beta="Trace Explorer is in beta — expect rough edges. Share feedback or report issues on Slack, or open one at https://github.com/langwatch/langwatch/issues/new/choose."
-                betaLabel="Beta"
-              />
-            )}
+            <PageMenuLink
+              path={projectRoutes.traces_v2.path}
+              icon={featureIcons.traces_v2.icon}
+              label={projectRoutes.traces_v2.title}
+              project={project}
+              isActive={router.pathname.includes("/traces")}
+              showLabel={showExpanded}
+              beta="Trace Explorer is in beta. Expect rough edges; share feedback or report issues on Slack, or open one at https://github.com/langwatch/langwatch/issues/new/choose."
+              betaLabel="Beta"
+            />
 
             <Text
               fontSize="11px"

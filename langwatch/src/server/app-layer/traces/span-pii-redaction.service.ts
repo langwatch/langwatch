@@ -288,8 +288,7 @@ export class OtlpSpanPiiRedactionService {
   ): Promise<PIICheckOptions | null> {
     const disabled = await featureFlagService.isEnabled(
       "ops_pii_redaction_disabled",
-      "span-pii-service",
-      false,
+      { distinctId: "span-pii-service", defaultValue: false },
     );
     if (disabled) return null;
     if (piiRedactionLevel === "DISABLED") return null;

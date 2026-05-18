@@ -195,7 +195,6 @@ export function CommandBar() {
     idResult,
     groupedItems,
     project?.slug,
-    project?.id,
   );
 
   // Easter egg effects

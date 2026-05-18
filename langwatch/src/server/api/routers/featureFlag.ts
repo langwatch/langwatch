@@ -65,9 +65,9 @@ export const featureFlagRouter = createTRPCRouter({
       // type, hence the explicit FeatureFlagKey narrowing.
       const enabled = await featureFlagService.isEnabled(
         input.flag as FeatureFlagKey,
-        userId,
-        false,
         {
+          distinctId: userId,
+          defaultValue: false,
           projectId: input.projectId,
           organizationId: input.organizationId,
         },

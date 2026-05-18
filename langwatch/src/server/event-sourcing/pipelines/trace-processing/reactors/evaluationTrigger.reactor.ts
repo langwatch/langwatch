@@ -75,8 +75,7 @@ export function createEvaluationTriggerReactor(
       // via the standard env-override path (uppercased flag key).
       const guardDisabled = await featureFlagService.isEnabled(
         CAUSALITY_LOOP_GUARD_DISABLED_FLAG,
-        tenantId,
-        false,
+        { distinctId: tenantId, defaultValue: false },
       );
 
       if (!guardDisabled && isSpanReceivedEvent(event)) {

@@ -47,7 +47,7 @@ PostHog is **never** called on the SYSTEM path. PRODUCT keeps PostHog as the sou
 ### Adding a new flag
 
 1. Add a `FEATURE_FLAGS` entry with `scope: "SYSTEM" | "PRODUCT"`, `defaultValue`, `description`. For SYSTEM flags migrated from an existing env variable, set `legacyEnvVar` so the old name keeps working.
-2. Call `featureFlagService.isEnabled("your_new_flag_key", distinctId, defaultValue?, options?)`. The key is type-checked against `FeatureFlagKey`.
+2. Call `featureFlagService.isEnabled("your_new_flag_key", { distinctId, defaultValue?, projectId?, organizationId?, cacheTtlMs? })`. The key is type-checked against `FeatureFlagKey` via the shared `FeatureFlagServiceInterface`, so unregistered keys fail at compile time even when the service is dependency-injected.
 3. Flip from `/ops/feature-flags` at runtime without a redeploy. For PRODUCT flags, prefer flipping in PostHog directly so user targeting rules apply.
 
 ### Adding a new family
@@ -91,15 +91,15 @@ FeatureFlagService                                 env override
 PRODUCT flags target users / projects / orgs through PostHog `personProperties`:
 
 ```typescript
-await featureFlagService.isEnabled(
-  "release_ui_simulations_menu_enabled",
-  userId,
-  false,
-  { projectId: "proj_123", organizationId: "org_456" },
-);
+await featureFlagService.isEnabled("release_ui_simulations_menu_enabled", {
+  distinctId: userId,
+  defaultValue: false,
+  projectId: "proj_123",
+  organizationId: "org_456",
+});
 ```
 
-PostHog receives these as `personProperties.project_id` and `personProperties.organization_id` for release condition evaluation. SYSTEM flags ignore `options` since they're cluster-wide.
+PostHog receives these as `personProperties.project_id` and `personProperties.organization_id` for release condition evaluation. SYSTEM flags ignore `projectId` / `organizationId` since they're cluster-wide.
 
 ## Environment Overrides
 

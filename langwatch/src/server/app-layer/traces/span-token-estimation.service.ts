@@ -151,9 +151,11 @@ export class OtlpSpanTokenEstimationService {
     // hot path and a cache miss = one billable PostHog /flags request.
     const globalDisabled = await this.deps.featureFlagService.isEnabled(
       GLOBAL_KILL_SWITCH_KEY,
-      "global",
-      false,
-      { cacheTtlMs: KILL_SWITCH_CACHE_TTL_MS },
+      {
+        distinctId: "global",
+        defaultValue: false,
+        cacheTtlMs: KILL_SWITCH_CACHE_TTL_MS,
+      },
     );
     if (globalDisabled) return true;
 
@@ -161,9 +163,12 @@ export class OtlpSpanTokenEstimationService {
     if (tenantId) {
       const projectDisabled = await this.deps.featureFlagService.isEnabled(
         PROJECT_KILL_SWITCH_KEY,
-        tenantId,
-        false,
-        { projectId: tenantId, cacheTtlMs: KILL_SWITCH_CACHE_TTL_MS },
+        {
+          distinctId: tenantId,
+          defaultValue: false,
+          projectId: tenantId,
+          cacheTtlMs: KILL_SWITCH_CACHE_TTL_MS,
+        },
       );
       if (projectDisabled) return true;
     }

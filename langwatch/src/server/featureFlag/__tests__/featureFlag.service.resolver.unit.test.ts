@@ -79,7 +79,7 @@ describe("FeatureFlagService", () => {
     describe("when nothing overrides it", () => {
       it("resolves to the registry default and never calls the legacy service", async () => {
         const { service, legacy } = buildService();
-        const enabled = await service.isEnabled(SYSTEM_FLAG, "tenant-a", true);
+        const enabled = await service.isEnabled(SYSTEM_FLAG, { distinctId: "tenant-a", defaultValue: true });
         expect(enabled).toBe(false);
         expect(legacy.isEnabled).not.toHaveBeenCalled();
       });
@@ -89,7 +89,7 @@ describe("FeatureFlagService", () => {
       it("uses the store value and never calls the legacy service", async () => {
         const { service, store, legacy } = buildService();
         await store.set(SYSTEM_FLAG, true);
-        const enabled = await service.isEnabled(SYSTEM_FLAG, "tenant-a", false);
+        const enabled = await service.isEnabled(SYSTEM_FLAG, { distinctId: "tenant-a", defaultValue: false });
         expect(enabled).toBe(true);
         expect(legacy.isEnabled).not.toHaveBeenCalled();
       });
@@ -100,7 +100,7 @@ describe("FeatureFlagService", () => {
         const { service, store, legacy } = buildService();
         await store.set(SYSTEM_FLAG, false);
         process.env.OPS_ES_CAUSALITY_LOOP_GUARD_DISABLED = "1";
-        const enabled = await service.isEnabled(SYSTEM_FLAG, "tenant-a", false);
+        const enabled = await service.isEnabled(SYSTEM_FLAG, { distinctId: "tenant-a", defaultValue: false });
         expect(enabled).toBe(true);
         expect(legacy.isEnabled).not.toHaveBeenCalled();
       });
@@ -110,7 +110,7 @@ describe("FeatureFlagService", () => {
       it("honors LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD for back-compat", async () => {
         const { service, legacy } = buildService();
         process.env.LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD = "1";
-        const enabled = await service.isEnabled(SYSTEM_FLAG, "tenant-a", false);
+        const enabled = await service.isEnabled(SYSTEM_FLAG, { distinctId: "tenant-a", defaultValue: false });
         expect(enabled).toBe(true);
         expect(legacy.isEnabled).not.toHaveBeenCalled();
       });
@@ -121,7 +121,7 @@ describe("FeatureFlagService", () => {
     describe("when no store row exists", () => {
       it("resolves to family default off and skips the legacy service", async () => {
         const { service, legacy } = buildService();
-        const enabled = await service.isEnabled(FAMILY_FLAG, "tenant-a", false);
+        const enabled = await service.isEnabled(FAMILY_FLAG, { distinctId: "tenant-a", defaultValue: false });
         expect(enabled).toBe(false);
         expect(legacy.isEnabled).not.toHaveBeenCalled();
       });
@@ -131,7 +131,7 @@ describe("FeatureFlagService", () => {
       it("returns true and still skips the legacy service", async () => {
         const { service, store, legacy } = buildService();
         await store.set(FAMILY_FLAG, true);
-        const enabled = await service.isEnabled(FAMILY_FLAG, "tenant-a", false);
+        const enabled = await service.isEnabled(FAMILY_FLAG, { distinctId: "tenant-a", defaultValue: false });
         expect(enabled).toBe(true);
         expect(legacy.isEnabled).not.toHaveBeenCalled();
       });
@@ -145,14 +145,15 @@ describe("FeatureFlagService", () => {
         (legacy.isEnabled as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
           true,
         );
-        const enabled = await service.isEnabled(PRODUCT_FLAG, "user-1", false);
+        const enabled = await service.isEnabled(PRODUCT_FLAG, {
+          distinctId: "user-1",
+          defaultValue: false,
+        });
         expect(enabled).toBe(true);
-        expect(legacy.isEnabled).toHaveBeenCalledWith(
-          PRODUCT_FLAG,
-          "user-1",
-          false,
-          undefined,
-        );
+        expect(legacy.isEnabled).toHaveBeenCalledWith(PRODUCT_FLAG, {
+          distinctId: "user-1",
+          defaultValue: false,
+        });
       });
     });
 
@@ -160,7 +161,7 @@ describe("FeatureFlagService", () => {
       it("uses the store value without touching the legacy service", async () => {
         const { service, store, legacy } = buildService();
         await store.set(PRODUCT_FLAG, true);
-        const enabled = await service.isEnabled(PRODUCT_FLAG, "user-1", false);
+        const enabled = await service.isEnabled(PRODUCT_FLAG, { distinctId: "user-1", defaultValue: false });
         expect(enabled).toBe(true);
         expect(legacy.isEnabled).not.toHaveBeenCalled();
       });
@@ -173,7 +174,7 @@ describe("FeatureFlagService", () => {
         (legacy.isEnabled as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
           true,
         );
-        const enabled = await service.isEnabled(PRODUCT_FLAG, "user-1", true);
+        const enabled = await service.isEnabled(PRODUCT_FLAG, { distinctId: "user-1", defaultValue: true });
         expect(enabled).toBe(false);
         expect(legacy.isEnabled).not.toHaveBeenCalled();
       });
@@ -189,11 +190,10 @@ describe("FeatureFlagService", () => {
       // Cast: deliberately a non-registered flag to assert the
       // legacy-fallback path. Production callers can't reach this branch
       // because the FeatureFlagKey signature wouldn't accept the key.
-      const enabled = await service.isEnabled(
-        UNREGISTERED_FLAG as never,
-        "user-1",
-        false,
-      );
+      const enabled = await service.isEnabled(UNREGISTERED_FLAG as never, {
+        distinctId: "user-1",
+        defaultValue: false,
+      });
       expect(enabled).toBe(true);
       expect(legacy.isEnabled).toHaveBeenCalled();
     });
