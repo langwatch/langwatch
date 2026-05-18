@@ -26,6 +26,7 @@ describe("Feature: Model Defaults REST API", () => {
 
   const authHeaders = () => ({
     Authorization: `Bearer ${bootstrapToken}`,
+    "X-Project-Id": testProjectId,
     "Content-Type": "application/json",
   });
 
@@ -122,7 +123,24 @@ describe("Feature: Model Defaults REST API", () => {
   });
 
   afterAll(async () => {
-    await prisma.modelDefaultConfig.deleteMany({});
+    // Scope cleanup to test data only — repo-wide mass-delete protection
+    // (src/utils/dbMassDeleteProtection.ts) rejects deleteMany with an
+    // empty where. Filter by the scope rows we created for this org.
+    await prisma.modelDefaultConfig
+      .deleteMany({
+        where: {
+          scopes: {
+            some: {
+              OR: [
+                { scopeType: "ORGANIZATION", scopeId: testOrganization.id },
+                { scopeType: "TEAM", scopeId: testTeam.id },
+                { scopeType: "PROJECT", scopeId: testProjectId },
+              ],
+            },
+          },
+        },
+      })
+      .catch(() => {});
     await prisma.roleBinding
       .deleteMany({ where: { organizationId: testOrganization.id } })
       .catch(() => {});
