@@ -9,10 +9,7 @@ import { requireProjectPermission } from "~/server/auth/permissions";
 import { rateLimit } from "~/server/rateLimit";
 import { resolveStoredObjectOwner } from "~/server/stored-objects/stored-objects-cross-tenant-lookup";
 import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
-import {
-  SAFE_MEDIA_TYPE_PREFIXES,
-  SAFE_MEDIA_TYPES_EXACT,
-} from "~/server/stored-objects/safe-media-types";
+import { isReadbackSafe } from "~/server/stored-objects/safe-media-types";
 import {
   authMiddleware,
   handleError,
@@ -129,11 +126,7 @@ const dualAuth: MiddlewareHandler<{ Variables: Variables }> = async (
  * extractor — widen it in safe-media-types.ts and both surfaces update.
  */
 function safeMediaType(mediaType: string): string {
-  if (SAFE_MEDIA_TYPES_EXACT.has(mediaType)) return mediaType;
-  if (SAFE_MEDIA_TYPE_PREFIXES.some((p) => mediaType.startsWith(p))) {
-    return mediaType;
-  }
-  return "application/octet-stream";
+  return isReadbackSafe(mediaType) ? mediaType : "application/octet-stream";
 }
 
 function sanitizeFilenameSegment(id: string): string {

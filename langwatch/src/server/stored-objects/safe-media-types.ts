@@ -28,7 +28,6 @@ export const SAFE_MEDIA_TYPE_PREFIXES = [
  */
 export const SAFE_MEDIA_TYPES_EXACT = new Set([
   "application/pdf",
-  "application/octet-stream",
 ]);
 
 /**
