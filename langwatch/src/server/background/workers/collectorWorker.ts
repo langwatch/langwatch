@@ -451,8 +451,7 @@ const processCollectorJob_ = async (
 
   const piiRedactionDisabled = await featureFlagService.isEnabled(
     "ops_pii_redaction_disabled",
-    project.id,
-    false,
+    { distinctId: project.id, defaultValue: false },
   );
   if (!piiRedactionDisabled && project.piiRedactionLevel !== "DISABLED") {
     const piiEnforced = env.NODE_ENV === "production";

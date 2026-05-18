@@ -54,12 +54,11 @@ export async function isComponentDisabled({
     customKey ?? generateKillSwitchKey(aggregateType, componentType, componentName);
 
   try {
-    const isDisabled = await featureFlagService.isEnabled(
-      flagKey,
-      tenantId,
-      false,
-      { cacheTtlMs: KILL_SWITCH_CACHE_TTL_MS },
-    );
+    const isDisabled = await featureFlagService.isEnabled(flagKey, {
+      distinctId: tenantId,
+      defaultValue: false,
+      cacheTtlMs: KILL_SWITCH_CACHE_TTL_MS,
+    });
     if (isDisabled && logger) {
       logger.debug(
         { componentName, componentType, tenantId, flagKey },

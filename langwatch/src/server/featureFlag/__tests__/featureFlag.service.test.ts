@@ -59,15 +59,16 @@ describe("FeatureFlagService", () => {
           store: buildNoopStore(),
         });
 
-        const result = await service.isEnabled("some-flag" as never, "user-1", false);
+        const result = await service.isEnabled("some-flag" as never, {
+          distinctId: "user-1",
+          defaultValue: false,
+        });
 
         expect(result).toBe(true);
-        expect(legacy.isEnabled).toHaveBeenCalledWith(
-          "some-flag",
-          "user-1",
-          false,
-          undefined,
-        );
+        expect(legacy.isEnabled).toHaveBeenCalledWith("some-flag", {
+          distinctId: "user-1",
+          defaultValue: false,
+        });
       });
 
       it("forwards projectId to the legacy service", async () => {
@@ -77,15 +78,17 @@ describe("FeatureFlagService", () => {
           store: buildNoopStore(),
         });
 
-        const options = { projectId: "proj-123" };
-        await service.isEnabled("some-flag" as never, "user-1", true, options);
+        await service.isEnabled("some-flag" as never, {
+          distinctId: "user-1",
+          defaultValue: true,
+          projectId: "proj-123",
+        });
 
-        expect(legacy.isEnabled).toHaveBeenCalledWith(
-          "some-flag",
-          "user-1",
-          true,
-          options,
-        );
+        expect(legacy.isEnabled).toHaveBeenCalledWith("some-flag", {
+          distinctId: "user-1",
+          defaultValue: true,
+          projectId: "proj-123",
+        });
       });
 
       it("forwards organizationId to the legacy service", async () => {
@@ -95,15 +98,17 @@ describe("FeatureFlagService", () => {
           store: buildNoopStore(),
         });
 
-        const options = { organizationId: "org-456" };
-        await service.isEnabled("some-flag" as never, "user-1", false, options);
+        await service.isEnabled("some-flag" as never, {
+          distinctId: "user-1",
+          defaultValue: false,
+          organizationId: "org-456",
+        });
 
-        expect(legacy.isEnabled).toHaveBeenCalledWith(
-          "some-flag",
-          "user-1",
-          false,
-          options,
-        );
+        expect(legacy.isEnabled).toHaveBeenCalledWith("some-flag", {
+          distinctId: "user-1",
+          defaultValue: false,
+          organizationId: "org-456",
+        });
       });
     });
 
@@ -125,8 +130,7 @@ describe("FeatureFlagService", () => {
 
           const result = await service.isEnabled(
             "release_ui_simulations_menu_enabled" as never,
-            "user-123",
-            false,
+            { distinctId: "user-123", defaultValue: false },
           );
 
           expect(result).toBe(true);
@@ -140,8 +144,7 @@ describe("FeatureFlagService", () => {
 
           const result = await service.isEnabled(
             "release_ui_simulations_menu_enabled" as never,
-            "user-123",
-            true,
+            { distinctId: "user-123", defaultValue: true },
           );
 
           expect(result).toBe(false);
@@ -168,7 +171,10 @@ describe("FeatureFlagService", () => {
           store: buildNoopStore(),
         });
 
-        const result = await service.isEnabled("some_flag" as never, "user-1", false);
+        const result = await service.isEnabled("some_flag" as never, {
+          distinctId: "user-1",
+          defaultValue: false,
+        });
 
         expect(result).toBe(true);
         expect(legacy.isEnabled).not.toHaveBeenCalled();
@@ -182,7 +188,10 @@ describe("FeatureFlagService", () => {
           store: buildNoopStore(),
         });
 
-        const result = await service.isEnabled("different_flag" as never, "u", false);
+        const result = await service.isEnabled("different_flag" as never, {
+          distinctId: "u",
+          defaultValue: false,
+        });
 
         expect(result).toBe(false);
         expect(legacy.isEnabled).toHaveBeenCalled();
@@ -196,7 +205,10 @@ describe("FeatureFlagService", () => {
           store: buildNoopStore(),
         });
 
-        const result = await service.isEnabled("spaced_flag" as never, "u", false);
+        const result = await service.isEnabled("spaced_flag" as never, {
+          distinctId: "u",
+          defaultValue: false,
+        });
 
         expect(result).toBe(true);
       });
@@ -212,8 +224,7 @@ describe("FeatureFlagService", () => {
 
         const result = await service.isEnabled(
           "release_ui_ai_gateway_menu_enabled",
-          "u",
-          false,
+          { distinctId: "u", defaultValue: false },
         );
 
         expect(result).toBe(true);
@@ -227,8 +238,7 @@ describe("FeatureFlagService", () => {
 
         const result = await service.isEnabled(
           "release_ui_simulations_menu_enabled" as never,
-          "u",
-          true,
+          { distinctId: "u", defaultValue: true },
         );
 
         expect(result).toBe(false);
