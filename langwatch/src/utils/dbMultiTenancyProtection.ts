@@ -123,22 +123,42 @@ type ScopedModelConfig = {
   validateCreateData: (data: any) => string | null;
 };
 
+/**
+ * A scopeId value is acceptable when it's either a string (single
+ * id) or a Prisma list filter `{ in: [...] }` with a non-empty array.
+ * Both shapes constrain the query to a finite, caller-known scope
+ * set; `{}` or a bare `{ in: [] }` would not, so we keep them out.
+ */
+const isScopeIdValue = (value: any): boolean => {
+  if (typeof value === "string") return true;
+  if (
+    value &&
+    typeof value === "object" &&
+    Array.isArray(value.in) &&
+    value.in.length > 0 &&
+    value.in.every((v: any) => typeof v === "string")
+  ) {
+    return true;
+  }
+  return false;
+};
+
 const hasScopePredicate = (where: any): boolean => {
   if (!where || typeof where !== "object") return false;
   // Top-level (scopeType, scopeId) — typical for join tables filtering by one scope.
-  if (
-    typeof where.scopeType === "string" &&
-    typeof where.scopeId === "string"
-  ) {
+  if (typeof where.scopeType === "string" && isScopeIdValue(where.scopeId)) {
     return true;
   }
   // Nested through a `scopes` relation (`{ scopes: { some: ... } }`),
   // either a single predicate or an OR-list. Every OR-branch must be
   // a valid scope predicate so a query can't sneak in `{ OR: [{}] }`
-  // and walk every row.
+  // and walk every row. scopeId accepts both `string` and `{ in: [...] }`
+  // shapes — the cascade walker passes lists for TEAM / PROJECT tiers
+  // (every team in the org / every project in the org the caller can
+  // see), and that list IS the tenancy constraint.
   const some = where.scopes?.some;
   if (some && typeof some === "object") {
-    if (typeof some.scopeType === "string" && typeof some.scopeId === "string") {
+    if (typeof some.scopeType === "string" && isScopeIdValue(some.scopeId)) {
       return true;
     }
     if (
@@ -148,7 +168,7 @@ const hasScopePredicate = (where: any): boolean => {
         (o: any) =>
           o &&
           typeof o.scopeType === "string" &&
-          typeof o.scopeId === "string",
+          isScopeIdValue(o.scopeId),
       )
     ) {
       return true;

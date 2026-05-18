@@ -366,6 +366,84 @@ describe("guardProjectId — SCOPED_MODELS (ModelDefaultConfig family)", () => {
     });
   });
 
+  describe("ModelDefaultConfig.findMany with scopeId: { in: [...] } list predicate", () => {
+    /** @scenario List-shaped scopeId predicates pass the scope check */
+    it("does NOT throw — org admins read across N teams + M projects via Prisma's { in: [...] } list", async () => {
+      // getDefaultModelsForProject builds visibleScopeFilter with this
+      // exact shape: one ORG branch with a string scopeId, plus TEAM
+      // and PROJECT branches whose scopeId is { in: [...] } over every
+      // team / project the caller can see. The list IS the tenancy
+      // constraint.
+      await expect(
+        runGuard({
+          model: "ModelDefaultConfig",
+          action: "findMany",
+          args: {
+            where: {
+              scopes: {
+                some: {
+                  OR: [
+                    { scopeType: "ORGANIZATION", scopeId: "org_01" },
+                    { scopeType: "TEAM", scopeId: { in: ["t_a", "t_b"] } },
+                    {
+                      scopeType: "PROJECT",
+                      scopeId: { in: ["p_a", "p_b", "p_c"] },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("ModelDefaultConfig.findMany with scopeId: { in: [] } empty list", () => {
+    /** @scenario Empty in-lists are not a valid tenancy constraint */
+    it("THROWS — empty list constrains to zero scopes, so the branch is unsafe", async () => {
+      await expect(
+        runGuard({
+          model: "ModelDefaultConfig",
+          action: "findMany",
+          args: {
+            where: {
+              scopes: {
+                some: {
+                  OR: [{ scopeType: "TEAM", scopeId: { in: [] } }],
+                },
+              },
+            },
+          },
+        }),
+      ).rejects.toThrow(/row id or scope predicate/);
+    });
+  });
+
+  describe("ModelDefaultConfig.findMany with one OR branch missing scopeId", () => {
+    /** @scenario A single bad OR branch invalidates the whole scope predicate */
+    it("THROWS — every OR branch must constrain a tenancy boundary", async () => {
+      await expect(
+        runGuard({
+          model: "ModelDefaultConfig",
+          action: "findMany",
+          args: {
+            where: {
+              scopes: {
+                some: {
+                  OR: [
+                    { scopeType: "ORGANIZATION", scopeId: "org_01" },
+                    { scopeType: "TEAM" } as any,
+                  ],
+                },
+              },
+            },
+          },
+        }),
+      ).rejects.toThrow(/row id or scope predicate/);
+    });
+  });
+
   describe("ModelDefaultConfig.findMany with AND-wrapped scope predicate", () => {
     it("does NOT throw — exclude-id pattern wraps in AND but a child clause carries scope", async () => {
       await expect(
