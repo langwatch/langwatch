@@ -1,14 +1,16 @@
 #!/bin/bash
-# Development environment launcher (single entry point — #3860 AC#1).
+# Development environment launcher.
 #
 # Usage:
-#   scripts/dev.sh                # interactive mode picker
+#   scripts/dev.sh                # interactive preset picker
+#   scripts/dev.sh all-local      # local CH+PG+Redis+app, no NLP
+#   scripts/dev.sh all-local-nlp  # all-local + langwatch_nlp + langevals
+#   scripts/dev.sh dev-storage    # local CH+PG+Redis, stored-objects -> dev S3
+#   scripts/dev.sh dev-infra      # everything against shared dev infra (no compose)
 #   scripts/dev.sh frontend-only  # no compose, pure pnpm dev against .env URLs
-#   scripts/dev.sh backend-shared # postgres + redis + clickhouse + app, URLs → local
-#   scripts/dev.sh migration      # postgres + clickhouse on host ports, run migrations from host
-#   scripts/dev.sh nlp            # backend + nlp + langevals; nlp/langevals URLs → local
-#   scripts/dev.sh full-local     # --profile full; all infrastructure URLs → local
-#   scripts/dev.sh help           # non-interactive mode reference
+#   scripts/dev.sh migration      # postgres + clickhouse on host ports for prisma migrate
+#   scripts/dev.sh full-local     # all-local-nlp + workers + bullboard + ai-server
+#   scripts/dev.sh help           # non-interactive preset reference
 #   scripts/dev.sh down           # stop all services
 #   scripts/dev.sh ps | logs | clean | rebuild
 set -e
@@ -17,44 +19,50 @@ COMPOSE="docker compose -f compose.dev.yml"
 COMPOSE_MIGRATION="docker compose -f compose.dev.yml -f compose.dev.migration.yml"
 
 # ---------------------------------------------------------------------------
-# Help mode (#3860 AC#8) — non-interactive reference
+# Help — non-interactive reference
 # ---------------------------------------------------------------------------
 if [ "${1:-}" = "help" ]; then
   cat <<'EOF'
 LangWatch dev environment
 
-Modes — pass as the first arg or pick interactively:
+Presets — pass as the first arg or pick interactively:
+
+  all-local       Local postgres + redis + clickhouse + app. No NLP.
+                  Stored-objects fall back to local-FS. Fast iteration default.
+
+  all-local-nlp   all-local + langwatch_nlp + langevals containers.
+
+  dev-storage     Local CH + PG + Redis. Stored-objects route to the dev S3
+                  bucket runtime-storage-dev in lw-dev (eu-central-1). Real
+                  AWS S3 driver under test without polluting shared dev tables.
+                  Requires fresh AWS SSO credentials in langwatch/.env — run
+                  `bash langwatch/scripts/refresh-dev-s3-env.sh` first if
+                  S3_SESSION_TOKEN is missing or stale.
+
+  dev-infra       Everything against shared dev infrastructure (dev CH,
+                  dev PG, dev Redis, dev S3, dev NLP). No compose. Most
+                  faithful e2e. WARNING: other developers see your data.
 
   frontend-only   No compose. Pure `pnpm dev` against the URLs in your
-                  langwatch/.env. Fastest — for UI / design / static iteration.
-                  (default — hit enter at the prompt)
-
-  backend-shared  Local postgres + redis + clickhouse + app. Overrides
-                  DATABASE_URL, REDIS_URL, CLICKHOUSE_URL → local containers.
-                  Other URLs come from your .env unchanged.
+                  langwatch/.env. UI / design / static iteration.
 
   migration       postgres + clickhouse on HOST ports (5432 / 8123). Run
                   `pnpm prisma migrate dev` and `pnpm clickhouse:migrate`
-                  from your host shell. Overrides DATABASE_URL, CLICKHOUSE_URL.
+                  from your host shell.
 
-  nlp             backend + langwatch_nlp + langevals. Overrides
-                  DATABASE_URL, REDIS_URL, CLICKHOUSE_URL, LANGWATCH_NLP_SERVICE,
-                  LANGEVALS_ENDPOINT → local containers.
+  full-local      Kitchen-sink local: all-local-nlp + workers + bullboard +
+                  ai-server. Slowest boot.
 
-  full-local      --profile full (everything: workers, scenarios, bullboard,
-                  ai-server, nlp). Overrides every infrastructure URL → local.
-
-URL-override model: each mode writes `langwatch/.env.dev-up` listing only
-the URLs whose services are starting locally for that mode. compose loads
-this overlay AFTER langwatch/.env (your source of truth), so non-overridden
-URLs keep their .env values (#3860 AC#2 / AC#6).
+URL-override model: each preset writes `langwatch/.env.dev-up` listing only
+the URLs whose services start locally. compose loads this overlay AFTER
+langwatch/.env (your source of truth), so non-overridden URLs keep their
+.env values. CREDENTIALS NEVER GO IN THE OVERLAY — only non-rotating
+infra shape (bucket/endpoint/region/connection-host).
 
 Stateful volumes (langwatch-db-data, langwatch-clickhouse-data,
 langwatch-redis-data) are shared across worktrees — sign up once, persist
 across worktree switches. Only one worktree can have a given stateful
 container `up` at a time; quickstart fails fast on collision.
-
-Stateless redis exposes host :6379.
 
 Other actions:
   down / logs / ps / clean / rebuild   meta operations on the running stack
@@ -63,9 +71,7 @@ EOF
 fi
 
 # ---------------------------------------------------------------------------
-# Auto-detect worktree for container/volume isolation. Stateful volumes
-# (langwatch-db-data etc.) are stable shared names regardless of project
-# (#3860 AC#4); per-worktree node_modules still need the prefix.
+# Auto-detect worktree for container/volume isolation.
 # ---------------------------------------------------------------------------
 if git rev-parse --is-inside-work-tree &>/dev/null; then
   WORKTREE_NAME=$(basename "$(git rev-parse --show-toplevel)")
@@ -79,7 +85,7 @@ if git rev-parse --is-inside-work-tree &>/dev/null; then
   fi
 fi
 
-LAST_CHOICE_FILE="/tmp/.langwatch-dev-last-choice-v3-${COMPOSE_PROJECT_NAME:-langwatch}"
+LAST_CHOICE_FILE="/tmp/.langwatch-dev-last-choice-v4-${COMPOSE_PROJECT_NAME:-langwatch}"
 
 # ---------------------------------------------------------------------------
 # Pre-flight checks
@@ -93,7 +99,7 @@ check_env_files() {
     missing=1
   fi
   if [ ! -f "langwatch_nlp/.env" ]; then
-    echo "WARNING: langwatch_nlp/.env not found (needed for nlp / full-local modes)"
+    echo "WARNING: langwatch_nlp/.env not found (needed for all-local-nlp / full-local presets)"
     echo "  → cp langwatch_nlp/.env.example langwatch_nlp/.env"
     missing=1
   fi
@@ -107,14 +113,7 @@ check_env_files() {
   fi
 }
 
-# Fail-fast on insecure SaaS-mode config (#3860 AC#7).
-# Patterns accept unquoted, single-quoted, and double-quoted values — all
-# valid `.env` syntax.
-#
-# The app code reads `BLOCK_LOCAL_HTTP_CALLS` as `!!env.BLOCK_LOCAL_HTTP_CALLS`,
-# i.e. truthy / falsy in JS terms — absence and explicit `false` both
-# disable SSRF blocking. So with `IS_SAAS=true`, we need the var present AND
-# set to a truthy value (true / 1 / yes), not just "not literally false".
+# Fail-fast on insecure SaaS-mode config.
 check_saas_ssrf_guard() {
   if [ ! -f "langwatch/.env" ]; then return 0; fi
   if ! grep -qE "^IS_SAAS[[:space:]]*=[[:space:]]*['\"]?true['\"]?[[:space:]]*$" langwatch/.env; then
@@ -131,10 +130,7 @@ EOF
   fi
 }
 
-# Detect cross-worktree collision on shared stateful volumes (#3860 AC#4).
-# Includes redis even though it's a singleton — a second worktree's compose
-# project would still try to start its own redis container against the
-# shared volume and fail with a less-helpful binding error.
+# Detect cross-worktree collision on shared stateful volumes.
 check_stateful_collision() {
   local me="${COMPOSE_PROJECT_NAME:-langwatch}"
   local vol cid project
@@ -155,14 +151,8 @@ EOF
 }
 
 # Detect a host-side process holding port 6379 before redis tries to bind.
-# Compose's own error is `Error response from daemon: ports are not available`,
-# which sends contributors hunting through compose for a problem that's
-# actually `redis-server` running on the host. Only fires when we're about
-# to start the redis container (skipped in frontend-only mode where the
-# caller passes SKIP_HOST_REDIS_CHECK=1).
 check_host_redis_collision() {
   [ "${SKIP_HOST_REDIS_CHECK:-0}" = "1" ] && return 0
-  # ss is in iproute2, present on every modern Linux + WSL; lsof on macOS.
   local pid=""
   if command -v lsof >/dev/null 2>&1; then
     pid=$(lsof -iTCP:6379 -sTCP:LISTEN -t 2>/dev/null | head -n1)
@@ -181,6 +171,32 @@ EOF
   exit 1
 }
 
+# When a preset routes stored-objects to dev S3, the operator's .env must
+# carry fresh AWS SSO credentials (S3_SESSION_TOKEN). We don't auto-refresh
+# (interactive SSO browser would block headless launches); we warn loudly
+# with the one command that fixes it.
+check_dev_s3_credentials() {
+  if [ ! -f "langwatch/.env" ]; then
+    return 0
+  fi
+  local has_token
+  has_token=$(grep -E "^S3_SESSION_TOKEN[[:space:]]*=[[:space:]]*['\"]?.+['\"]?[[:space:]]*$" langwatch/.env || true)
+  if [ -z "$has_token" ]; then
+    cat >&2 <<'EOF'
+ERROR: dev-storage preset routes stored-objects to runtime-storage-dev (real
+       AWS S3 in lw-dev), but langwatch/.env has no S3_SESSION_TOKEN set.
+       Refresh AWS SSO credentials first:
+
+         bash langwatch/scripts/refresh-dev-s3-env.sh
+
+       That script logs into SSO and writes S3_ACCESS_KEY_ID,
+       S3_SECRET_ACCESS_KEY, S3_SESSION_TOKEN into langwatch/.env. Then
+       re-run this preset.
+EOF
+    exit 1
+  fi
+}
+
 ensure_prepared() {
   check_env_files
   check_saas_ssrf_guard
@@ -197,26 +213,24 @@ ensure_prepared() {
 }
 
 # ---------------------------------------------------------------------------
-# URL overrides per mode (#3860 AC#2 / AC#6).
-# Delegates to scripts/lib/write-dev-overrides.sh — same helper is sourced by
-# scripts/dev-up.sh so the two launchers can't drift on the overlay format.
+# URL overrides per preset. Delegates to scripts/lib/write-dev-overrides.sh.
 # ---------------------------------------------------------------------------
 . "$(dirname "$0")/lib/write-dev-overrides.sh"
 
 write_overrides() {
-  local mode="$1"
+  local preset="$1"
   local out="langwatch/.env.dev-up"
-  write_dev_overrides "$mode" "$out"
+  write_dev_overrides "$preset" "$out"
   if [ -s "$out" ]; then
-    echo "URL overrides for mode=$mode written to $out:"
+    echo "URL overrides for preset=$preset written to $out:"
     sed 's/^/  /' "$out" >&2
   else
-    echo "No URL overrides for mode=$mode — your langwatch/.env values are used as-is."
+    echo "No URL overrides for preset=$preset — your langwatch/.env values are used as-is."
   fi
 }
 
 # ---------------------------------------------------------------------------
-# Free-port detection (used in non-frontend modes for app/bullboard/ai-server)
+# Free-port detection
 # ---------------------------------------------------------------------------
 find_free_port() {
   local port=$1
@@ -227,37 +241,84 @@ find_free_port() {
 }
 
 # ---------------------------------------------------------------------------
-# Mode runners
+# Preset runners
 # ---------------------------------------------------------------------------
 
-run_frontend_only() {
-  echo "Mode: frontend-only — no compose. Run 'pnpm dev' from langwatch/ to start."
-  write_overrides frontend-only
-  echo ""
-  echo "Tip: pure UI / design / static iteration. URLs come from langwatch/.env."
-  echo "     For services on top: switch to backend-shared, nlp, or full-local."
-}
-
-run_backend_shared() {
+run_all_local() {
   ensure_prepared
   export APP_PORT=$(find_free_port 5560)
   . "$(dirname "$0")/lib/sanitize-dev-env.sh"
   sanitize_localhost_dev_env
-  write_overrides backend-shared
-  echo "Starting: postgres + redis + clickhouse + app (mode=backend-shared)"
+  write_overrides all-local
+  echo "Starting: postgres + redis + clickhouse + app (preset=all-local)"
   $COMPOSE up
 }
 
+run_all_local_nlp() {
+  ensure_prepared
+  export APP_PORT=$(find_free_port 5560)
+  export BULLBOARD_PORT=$(find_free_port 6380)
+  . "$(dirname "$0")/lib/sanitize-dev-env.sh"
+  sanitize_localhost_dev_env
+  write_overrides all-local-nlp
+  echo "Starting: backend + langwatch_nlp + langevals (preset=all-local-nlp)"
+  $COMPOSE --profile nlp up
+}
+
+run_dev_storage() {
+  check_dev_s3_credentials
+  ensure_prepared
+  export APP_PORT=$(find_free_port 5560)
+  . "$(dirname "$0")/lib/sanitize-dev-env.sh"
+  sanitize_localhost_dev_env
+  write_overrides dev-storage
+  echo "Starting: postgres + redis + clickhouse + app (preset=dev-storage)"
+  echo "  Stored-objects route to s3://runtime-storage-dev/ via SSO credentials in langwatch/.env"
+  $COMPOSE up
+}
+
+run_dev_infra() {
+  # No compose — everything in shared dev. We still warn loudly so the
+  # operator knows what they're about to write into.
+  cat <<'EOF'
+
+╔════════════════════════════════════════════════════════════╗
+║              dev-infra preset                              ║
+╠════════════════════════════════════════════════════════════╣
+║  This routes EVERY service against shared dev              ║
+║  infrastructure. Other developers will see your data       ║
+║  in dev CH and dev Postgres. Test scenarios you run will   ║
+║  appear in dev observability boards.                       ║
+║                                                            ║
+║  Use a recognizable identifier in scenario/test names so   ║
+║  others can filter them out.                               ║
+╚════════════════════════════════════════════════════════════╝
+
+EOF
+  read -p "Continue? [y/N]: " confirm
+  case "$confirm" in
+    [yY]|[yY]es) ;;
+    *) exit 1 ;;
+  esac
+  check_dev_s3_credentials
+  write_overrides dev-infra
+  echo ""
+  echo "preset=dev-infra. No compose started; run 'pnpm dev' from langwatch/ to start the app."
+  echo "URLs come from langwatch/.env which must be pointed at shared dev."
+}
+
+run_frontend_only() {
+  write_overrides frontend-only
+  echo "Preset: frontend-only — no compose. Run 'pnpm dev' from langwatch/ to start."
+  echo ""
+  echo "Tip: pure UI / design / static iteration. URLs come from langwatch/.env."
+  echo "     For services on top: switch to all-local, all-local-nlp, or full-local."
+}
+
 run_migration() {
-  # Use the same prep path as backend-shared / nlp / full-local so a fresh
-  # clone running migration as its first mode still has node_modules and
-  # the generated Prisma client available for the host-side
-  # `pnpm prisma migrate dev` call below. Migration mode only starts
-  # postgres + clickhouse — redis isn't bound to :6379 here, so a
-  # host-side redis is irrelevant; skip that collision check.
   SKIP_HOST_REDIS_CHECK=1 ensure_prepared
   write_overrides migration
-  echo "Starting: postgres + clickhouse with HOST ports (mode=migration)"
+  echo "Starting: postgres + clickhouse with HOST ports (preset=migration)"
   $COMPOSE_MIGRATION up -d postgres clickhouse
   cat <<EOF
 
@@ -274,17 +335,6 @@ Stop with: scripts/dev.sh down
 EOF
 }
 
-run_nlp() {
-  ensure_prepared
-  export APP_PORT=$(find_free_port 5560)
-  export BULLBOARD_PORT=$(find_free_port 6380)
-  . "$(dirname "$0")/lib/sanitize-dev-env.sh"
-  sanitize_localhost_dev_env
-  write_overrides nlp
-  echo "Starting: backend + langwatch_nlp + langevals (mode=nlp)"
-  $COMPOSE --profile nlp up
-}
-
 run_full_local() {
   ensure_prepared
   export APP_PORT=$(find_free_port 5560)
@@ -293,7 +343,7 @@ run_full_local() {
   . "$(dirname "$0")/lib/sanitize-dev-env.sh"
   sanitize_localhost_dev_env
   write_overrides full-local
-  echo "Starting: --profile full (mode=full-local)"
+  echo "Starting: --profile full (preset=full-local)"
   $COMPOSE --profile full up
 }
 
@@ -326,16 +376,13 @@ run_meta() {
       docker volume rm "${VOLUME_PREFIX:-langwatch}-app-modules" 2>/dev/null || true
       docker volume rm "${VOLUME_PREFIX:-langwatch}-bullboard-modules" 2>/dev/null || true
       docker volume rm "${VOLUME_PREFIX:-langwatch}-goose-bin" 2>/dev/null || true
-      # The menu text promises a restart after the rebuild — honor that by
-      # re-execing with the last selected mode. Falls back to the
-      # interactive prompt when no prior mode is remembered.
-      local last_mode=""
-      [ -f "$LAST_CHOICE_FILE" ] && last_mode=$(cat "$LAST_CHOICE_FILE")
-      if [ -n "$last_mode" ] && [ "$last_mode" != "rebuild" ]; then
-        echo "Restarting with last mode: $last_mode"
-        exec "$0" "$last_mode"
+      local last_preset=""
+      [ -f "$LAST_CHOICE_FILE" ] && last_preset=$(cat "$LAST_CHOICE_FILE")
+      if [ -n "$last_preset" ] && [ "$last_preset" != "rebuild" ]; then
+        echo "Restarting with last preset: $last_preset"
+        exec "$0" "$last_preset"
       else
-        echo "No prior mode remembered — run a mode (e.g. 'scripts/dev.sh backend-shared') to start."
+        echo "No prior preset remembered — run a preset (e.g. 'scripts/dev.sh all-local') to start."
       fi
       ;;
   esac
@@ -345,31 +392,32 @@ run_meta() {
 # Dispatch
 # ---------------------------------------------------------------------------
 
-# If sourced (e.g. by bats tests), expose functions and stop here. Keeps the
-# helpers unit-testable without running the prompt.
+# If sourced (e.g. by bats tests), expose functions and stop here.
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
   return 0
 fi
 
-# If a mode arg is provided, run it non-interactively.
+# Non-interactive: preset name as first arg.
 if [ -n "${1:-}" ]; then
   case "$1" in
+    all-local)                     run_all_local ;;
+    all-local-nlp)                 run_all_local_nlp ;;
+    dev-storage)                   run_dev_storage ;;
+    dev-infra)                     run_dev_infra ;;
     frontend-only|frontend)        run_frontend_only ;;
-    backend-shared|backend)        run_backend_shared ;;
     migration|migrations)          run_migration ;;
-    nlp)                           run_nlp ;;
     full-local|full)               run_full_local ;;
     down|logs|ps|clean|rebuild)    run_meta "$1" ;;
     *)
-      echo "Unknown mode: $1" >&2
-      echo "Run 'scripts/dev.sh help' for the mode list." >&2
+      echo "Unknown preset: $1" >&2
+      echo "Run 'scripts/dev.sh help' for the preset list." >&2
       exit 1
       ;;
   esac
   exit 0
 fi
 
-# Otherwise interactive prompt.
+# Interactive prompt.
 LAST=""
 [ -f "$LAST_CHOICE_FILE" ] && LAST=$(cat "$LAST_CHOICE_FILE")
 
@@ -379,50 +427,50 @@ cat <<'EOF'
 ║              LangWatch Development Environment             ║
 ╚════════════════════════════════════════════════════════════╝
 
-What are you working on?
+Pick a preset:
 
-  1) frontend-only    UI / design — no compose, fastest. URLs from .env.
-  2) backend-shared   postgres + redis + clickhouse + app, URLs → local.
-  3) migration        postgres + clickhouse on host ports for prisma migrate.
-  4) nlp              backend + langwatch_nlp + langevals, all URLs → local.
-  5) full-local       --profile full (workers, bullboard, ai-server, …).
+  1) all-local       Local CH + PG + Redis + app. No NLP. Fast iteration.
+  2) all-local-nlp   all-local + langwatch_nlp + langevals.
+  3) dev-storage     Local DBs, stored-objects -> runtime-storage-dev (real AWS S3).
+  4) dev-infra       Shared dev infra everywhere. Most faithful e2e.
+  5) frontend-only   No compose. UI / design / static iteration.
+  6) migration       postgres + clickhouse on host ports for prisma migrate.
+  7) full-local      Kitchen-sink local: all-local-nlp + workers + bullboard + ai-server.
 
-  d) down             stop all services
-  l) logs             tail compose logs
-  p) ps               show running services
-  c) clean            stop + remove ALL data (shared volumes too)
-  r) rebuild          remove container node_modules + restart
+  d) down            stop all services
+  l) logs            tail compose logs
+  p) ps              show running services
+  c) clean           stop + remove ALL data (shared volumes too)
+  r) rebuild         remove container node_modules + restart
   q) quit
 
 EOF
 if [ -n "$LAST" ]; then
   echo "Hit enter to repeat last: ${LAST}"
 else
-  echo "Hit enter for frontend-only (the default)."
+  echo "Hit enter for all-local (the default)."
 fi
 echo ""
 
-read -p "Choice [1-5/d/l/p/c/r/q]: " choice
-# Enter selects the saved choice if present, else the documented default.
+read -p "Choice [1-7/d/l/p/c/r/q]: " choice
 if [ -z "$choice" ]; then
   if [ -n "$LAST" ]; then
     choice="$LAST"
   else
-    choice="frontend-only"
+    choice="all-local"
   fi
 fi
 
 case "$choice" in
-  1|frontend-only|frontend)
-    echo "frontend-only" > "$LAST_CHOICE_FILE"; run_frontend_only ;;
-  2|backend-shared|backend)
-    echo "backend-shared" > "$LAST_CHOICE_FILE"; run_backend_shared ;;
-  3|migration|migrations)
-    echo "migration" > "$LAST_CHOICE_FILE"; run_migration ;;
-  4|nlp)
-    echo "nlp" > "$LAST_CHOICE_FILE"; run_nlp ;;
-  5|full-local|full)
-    echo "full-local" > "$LAST_CHOICE_FILE"; run_full_local ;;
+  1|all-local)         echo "all-local" > "$LAST_CHOICE_FILE"; run_all_local ;;
+  2|all-local-nlp)     echo "all-local-nlp" > "$LAST_CHOICE_FILE"; run_all_local_nlp ;;
+  3|dev-storage)       echo "dev-storage" > "$LAST_CHOICE_FILE"; run_dev_storage ;;
+  4|dev-infra)         echo "dev-infra" > "$LAST_CHOICE_FILE"; run_dev_infra ;;
+  5|frontend-only|frontend)
+                       echo "frontend-only" > "$LAST_CHOICE_FILE"; run_frontend_only ;;
+  6|migration|migrations)
+                       echo "migration" > "$LAST_CHOICE_FILE"; run_migration ;;
+  7|full-local|full)   echo "full-local" > "$LAST_CHOICE_FILE"; run_full_local ;;
   d|D|down)            run_meta down ;;
   l|L|logs)            run_meta logs ;;
   p|P|ps)              run_meta ps ;;

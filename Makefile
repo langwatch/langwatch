@@ -28,9 +28,10 @@ help:
 	@echo "    make boxd-fork-issue ISSUE=<n>      fork + worktree + tmux+claude in VM"
 	@echo "    make boxd-connect-{pr,branch,issue} <ARG>=<v>   attach to the in-VM session"
 	@echo ""
-	@echo "  Deprecated (use 'make quickstart' — kept for one release):"
-	@echo "    make dev / dev-nlp / dev-scenarios / dev-test / dev-full"
-	@echo "    make dev-up / dev-down / dev-logs"
+	@echo "  Per-worktree isolated stacks (for AI agents / parallel work):"
+	@echo "    make dev-up [PROFILE=full]            start isolated containers"
+	@echo "    make dev-down                          stop isolated containers"
+	@echo "    make dev-logs                          tail isolated logs"
 	@echo ""
 	@echo "  See: dev/docs/adr/004-docker-dev-environment.md, dev/docs/boxd-makefile.md"
 
@@ -83,27 +84,10 @@ service-watch:
 			--build.include_ext "go" \
 			--build.exclude_dir "tmp,vendor,node_modules"
 
-# Deprecation warning for dev* targets — kept for one release. (#3860 AC#9)
-# Each maps onto the equivalent quickstart mode so the URL-override behavior
-# is consistent regardless of which alias the user invoked.
-_dev-deprecation-warning:
-	@printf '\033[33m[deprecated] make %s → make quickstart (or ./scripts/dev.sh <mode>)\033[0m\n' "$(MAKECMDGOALS)" >&2
-	@printf 'See: dev/docs/adr/004-docker-dev-environment.md\n' >&2
-
-dev: _dev-deprecation-warning
-	@./scripts/dev.sh backend-shared
-
-dev-nlp: _dev-deprecation-warning
-	@./scripts/dev.sh nlp
-
-dev-scenarios: _dev-deprecation-warning
-	@./scripts/dev.sh full-local
-
-dev-test: _dev-deprecation-warning
-	@./scripts/dev.sh full-local
-
-dev-full: _dev-deprecation-warning
-	@./scripts/dev.sh full-local
+# The dev* shim targets were removed in #4053. Use `make quickstart`
+# (interactive) or `./scripts/dev.sh <preset>` directly. Preset list:
+# all-local, all-local-nlp, dev-storage, dev-infra, frontend-only,
+# migration, full-local.
 
 # Stop all services
 down:
