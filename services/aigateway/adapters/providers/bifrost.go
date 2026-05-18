@@ -91,6 +91,10 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 		return r.dispatchResponses(ctx, req, provider, model, cred)
 	}
 
+	if req.Type == domain.RequestTypeEmbeddings {
+		return r.dispatchEmbeddings(ctx, req, provider, model, cred)
+	}
+
 	if req.Type == domain.RequestTypePassthrough {
 		return r.dispatchPassthrough(ctx, req, provider, model, cred)
 	}
@@ -195,6 +199,48 @@ func (r *BifrostRouter) dispatchResponses(
 		Body:       body,
 		StatusCode: http.StatusOK,
 		Usage:      extractResponsesUsage(resp),
+	}, nil
+}
+
+// dispatchEmbeddings routes /v1/embeddings traffic through Bifrost's
+// EmbeddingRequest endpoint. The inbound body is OpenAI-shape
+// ({"model": "...", "input": "..."}); we parse it into Bifrost's
+// EmbeddingInput one-of (Text / Texts / Embedding / Embeddings) and
+// Bifrost translates to the provider's native wire format for
+// OpenAI / Gemini / Cohere etc.
+//
+// Anthropic ships no embeddings API; if a caller routes embeddings to
+// an Anthropic credential we let Bifrost surface the provider's reject
+// directly (no special-casing here keeps the error surface honest).
+func (r *BifrostRouter) dispatchEmbeddings(
+	ctx context.Context,
+	req *domain.Request,
+	provider bfschemas.ModelProvider,
+	model string,
+	cred domain.Credential,
+) (*domain.Response, error) {
+	bfReq, err := buildEmbeddingRequest(req, provider, model)
+	if err != nil {
+		return nil, herr.New(ctx, domain.ErrBadRequest, herr.M{"reason": err.Error()})
+	}
+	bfCtx := bfschemas.NewBifrostContext(withCredential(ctx, cred), time.Time{})
+
+	resp, berr := r.bf.EmbeddingRequest(bfCtx, bfReq)
+	if berr != nil {
+		if rawBody, status, ok := rawResponseFromBifrostError(berr); ok {
+			return &domain.Response{
+				Body:       rawBody,
+				StatusCode: status,
+			}, nil
+		}
+		return nil, classifyBifrostError(ctx, berr)
+	}
+
+	body, _ := sonic.Marshal(resp)
+	return &domain.Response{
+		Body:       body,
+		StatusCode: http.StatusOK,
+		Usage:      extractEmbeddingUsage(resp),
 	}, nil
 }
 
@@ -651,6 +697,21 @@ func extractResponsesUsage(resp *bfschemas.BifrostResponsesResponse) domain.Usag
 	return domain.Usage{
 		PromptTokens:     resp.Usage.InputTokens,
 		CompletionTokens: resp.Usage.OutputTokens,
+		TotalTokens:      resp.Usage.TotalTokens,
+	}
+}
+
+// extractEmbeddingUsage maps Bifrost's embedding usage block. Embedding
+// endpoints only consume input tokens (no output text), so
+// CompletionTokens stays zero and the prompt total goes into both
+// PromptTokens and TotalTokens to keep the cost math simple downstream.
+func extractEmbeddingUsage(resp *bfschemas.BifrostEmbeddingResponse) domain.Usage {
+	if resp == nil || resp.Usage == nil {
+		return domain.Usage{}
+	}
+	return domain.Usage{
+		PromptTokens:     resp.Usage.PromptTokens,
+		CompletionTokens: 0,
 		TotalTokens:      resp.Usage.TotalTokens,
 	}
 }
