@@ -186,6 +186,14 @@ vi.mock("~/utils/api", () => ({
         isLoading: false,
       }),
     },
+    modelProvider: {
+      getResolvedDefault: {
+        useQuery: () => ({
+          data: { model: "openai/gpt-4", source: "test", scope: "PROJECT" },
+          isLoading: false,
+        }),
+      },
+    },
     prompts: {
       getByIdOrHandle: {
         useQuery: () => mockGetByIdOrHandle(),
