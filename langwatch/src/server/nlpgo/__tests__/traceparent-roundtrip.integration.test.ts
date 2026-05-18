@@ -548,9 +548,13 @@ describe.skipIf(!shouldRun)(
         }
       });
 
-      // Health check on the pre-built binary — boots in ~1s, give it
-      // 30s on a slow CI runner.
-      await waitForNlpgoHealth(30_000);
+      // Health check on the pre-built binary. The binary itself boots
+      // in ~1s, but on a saturated CI runner the spawn + healthz path
+      // has been observed to stretch past 30s (the lifecycle includes
+      // child-bypass setup + per-tenant exporter init). 30s was too
+      // tight and `retry: 1` on the it() doesn't cover beforeAll, so
+      // a single slow boot kills the suite outright. Bump to 120s.
+      await waitForNlpgoHealth(120_000);
     }, 700_000); // build (up to 600s cold) + boot + health window
 
     afterAll(async () => {
