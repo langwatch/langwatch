@@ -33,7 +33,7 @@ import {
   Heading,
   HStack,
   IconButton,
-  Spinner,
+  Skeleton,
   Table,
   Text,
   VStack,
@@ -157,14 +157,22 @@ export function DefaultModelsSection({
 
   if (dataQuery.isLoading || !dataQuery.data) {
     return (
-      <Card.Root width="full" data-testid="default-models-section">
-        <Card.Body>
-          <HStack gap={3}>
-            <Spinner size="sm" />
-            <Text>Loading default models…</Text>
-          </HStack>
-        </Card.Body>
-      </Card.Root>
+      <VStack
+        gap={3}
+        width="full"
+        align="stretch"
+        data-testid="default-models-section"
+      >
+        <VStack align="start" gap={1}>
+          <Heading as="h3" size="md">
+            Default Models
+          </Heading>
+          <Text fontSize="sm" color="fg.muted">
+            AI features across the platform: prompt creation, evaluations, traces search, topic clustering and more
+          </Text>
+        </VStack>
+        <DefaultModelsTableSkeleton />
+      </VStack>
     );
   }
 
@@ -754,5 +762,50 @@ function ScopeChip({
         <Text>{name}</Text>
       </HStack>
     </Badge>
+  );
+}
+
+function DefaultModelsTableSkeleton() {
+  return (
+    <Card.Root
+      width="full"
+      overflow="hidden"
+      data-testid="default-models-table-skeleton"
+    >
+      <Card.Body paddingY={0} paddingX={0}>
+        <Table.Root variant="line" size="md" width="full">
+          <Table.Header>
+            <Table.Row>
+              <Table.ColumnHeader>Scopes</Table.ColumnHeader>
+              <Table.ColumnHeader>Default</Table.ColumnHeader>
+              <Table.ColumnHeader>Fast</Table.ColumnHeader>
+              <Table.ColumnHeader>Embeddings</Table.ColumnHeader>
+              <Table.ColumnHeader textAlign="right" />
+            </Table.Row>
+          </Table.Header>
+          <Table.Body>
+            {[0, 1, 2].map((i) => (
+              <Table.Row key={i}>
+                <Table.Cell>
+                  <Skeleton width="100px" height="20px" borderRadius="full" />
+                </Table.Cell>
+                <Table.Cell>
+                  <Skeleton width="160px" height="16px" />
+                </Table.Cell>
+                <Table.Cell>
+                  <Skeleton width="160px" height="16px" />
+                </Table.Cell>
+                <Table.Cell>
+                  <Skeleton width="160px" height="16px" />
+                </Table.Cell>
+                <Table.Cell textAlign="right">
+                  <Skeleton width="24px" height="24px" borderRadius="md" marginLeft="auto" />
+                </Table.Cell>
+              </Table.Row>
+            ))}
+          </Table.Body>
+        </Table.Root>
+      </Card.Body>
+    </Card.Root>
   );
 }
