@@ -24,12 +24,15 @@ interface ScenarioMessageRendererProps {
   messages: ScenarioMessageSnapshotEvent["messages"];
   streamingMessages?: StreamingMessage[];
   variant: "grid" | "drawer";
+  /** Project that owns the stored objects in this message thread. Forwarded to MediaPart for server-side probes. */
+  projectId: string;
 }
 
 export function ScenarioMessageRenderer({
   messages,
   streamingMessages,
   variant,
+  projectId,
 }: ScenarioMessageRendererProps) {
   const smallerView = variant === "grid";
   const endRef = useRef<HTMLDivElement>(null);
@@ -115,7 +118,7 @@ export function ScenarioMessageRenderer({
           case "media":
             return (
               <VStack key={item.id} align="flex-start" width="100%">
-                <MediaPart part={item.part} />
+                <MediaPart part={item.part} projectId={projectId} />
               </VStack>
             );
 
@@ -254,7 +257,7 @@ function flattenContent(msg: RawMessage): DisplayItem[] {
 function flattenMixed(content: unknown[], msg: RawMessage): DisplayItem[] {
   const items: DisplayItem[] = [];
   content.forEach((item, i) => {
-    const result = visitContentPart(item, {
+    const result = visitContentPart<DisplayItem | undefined>(item, {
       text: (text) => text
         ? { kind: "text" as const, id: `${msg.id}-c${i}`, role: msg.role ?? "assistant", content: text, traceId: msg.trace_id }
         : undefined,

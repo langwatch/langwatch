@@ -30,7 +30,7 @@ export interface BinaryPart {
 }
 
 /**
- * Visitor over the AG-UI content-part union.
+ * Synchronous visitor over the AG-UI content-part union.
  *
  * - `text` — {type:"text", text:"..."} or bare string
  * - `media` — image/audio/video/document with a typed source
@@ -55,6 +55,26 @@ export type ContentPartVisitor<R> = {
   unknown?(value: unknown): R;
 };
 
+/**
+ * Async-capable visitor over the AG-UI content-part union.
+ *
+ * Each handler may return `R` or `Promise<R>`. Use with `visitContentPartAsync`
+ * when the visitor needs to perform I/O (e.g. uploading bytes to object storage).
+ */
+export type AsyncContentPartVisitor<R> = {
+  text(text: string): R | Promise<R>;
+  media(part: {
+    type: "image" | "audio" | "video" | "document";
+    source: ContentSource;
+  }): R | Promise<R>;
+  binary(part: BinaryPart): R | Promise<R>;
+  toolCall(part: { name: string; arguments: unknown }): R | Promise<R>;
+  toolResult(part: { result: unknown }): R | Promise<R>;
+  legacyImageUrl?(url: string): R | Promise<R>;
+  legacyImage?(src: string): R | Promise<R>;
+  unknown?(value: unknown): R | Promise<R>;
+};
+
 // ---------------------------------------------------------------------------
 // Dispatcher
 // ---------------------------------------------------------------------------
@@ -72,6 +92,101 @@ export function visitContentPart<R>(
   part: unknown,
   visitor: ContentPartVisitor<R>,
 ): R | undefined {
+  // Bare string
+  if (typeof part === "string") {
+    return visitor.text(part);
+  }
+
+  if (typeof part !== "object" || part === null) {
+    return visitor.unknown?.(part);
+  }
+
+  const o = part as Record<string, unknown>;
+
+  // text parts: {type:"text", text/content:"..."} or {text:"..."} (no type)
+  if (o["type"] === "text" || (!o["type"] && o["text"])) {
+    const text = (o["text"] ?? o["content"] ?? "") as string;
+    return visitor.text(text);
+  }
+
+  // media parts: image / audio / video / document with a source object
+  if (
+    (o["type"] === "image" ||
+      o["type"] === "audio" ||
+      o["type"] === "video" ||
+      o["type"] === "document") &&
+    o["source"]
+  ) {
+    return visitor.media({
+      type: o["type"] as "image" | "audio" | "video" | "document",
+      source: o["source"] as ContentSource,
+    });
+  }
+
+  // binary parts
+  if (o["type"] === "binary" && o["mimeType"]) {
+    return visitor.binary({
+      type: "binary",
+      mimeType: o["mimeType"] as string,
+      data: o["data"] as string | undefined,
+      url: o["url"] as string | undefined,
+      id: o["id"] as string | undefined,
+      filename: o["filename"] as string | undefined,
+    });
+  }
+
+  // tool_use / tool_call
+  if (o["type"] === "tool_use" || o["type"] === "tool_call") {
+    return visitor.toolCall({
+      name: (o["name"] ?? o["toolName"] ?? "tool") as string,
+      arguments: o["arguments"] ?? o["input"] ?? o["args"],
+    });
+  }
+
+  // tool_result
+  if (o["type"] === "tool_result") {
+    return visitor.toolResult({ result: o["content"] ?? o["result"] });
+  }
+
+  // legacy: OpenAI image_url shape {type:"image_url", image_url:{url:"..."}}
+  if (
+    o["type"] === "image_url" &&
+    typeof o["image_url"] === "object" &&
+    o["image_url"] !== null &&
+    (o["image_url"] as Record<string, unknown>)["url"]
+  ) {
+    const url = (o["image_url"] as Record<string, unknown>)["url"] as string;
+    return visitor.legacyImageUrl
+      ? visitor.legacyImageUrl(url)
+      : visitor.unknown?.(part);
+  }
+
+  // legacy: bare image {image:"..."}
+  if (o["image"]) {
+    const src = o["image"] as string;
+    return visitor.legacyImage
+      ? visitor.legacyImage(src)
+      : visitor.unknown?.(part);
+  }
+
+  return visitor.unknown?.(part);
+}
+
+// ---------------------------------------------------------------------------
+// Async dispatcher
+// ---------------------------------------------------------------------------
+
+/**
+ * Async variant of `visitContentPart`. Dispatches a single raw content-part to
+ * the matching handler on an `AsyncContentPartVisitor<R>`, awaiting the result.
+ *
+ * Use this on the server side where handlers perform I/O (e.g. writing bytes to
+ * object storage). For purely synchronous visitors, prefer `visitContentPart`.
+ */
+export async function visitContentPartAsync<R>(
+  part: unknown,
+  visitor: AsyncContentPartVisitor<R>,
+): Promise<R | undefined> {
   // Bare string
   if (typeof part === "string") {
     return visitor.text(part);

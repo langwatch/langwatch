@@ -19,7 +19,7 @@ import { createLogger } from "~/utils/logger/server";
 import { binaryInputPartSchema } from "./binary-part";
 import { isReadbackSafe } from "./safe-media-types";
 import type { StoredObjectsService } from "./stored-objects.service";
-import { visitContentPart } from "./visit-content-part";
+import { visitContentPartAsync } from "./visit-content-part";
 
 const tracer = getLangWatchTracer("langwatch.stored-objects.content-extractor");
 
@@ -68,7 +68,7 @@ async function processContentPart({
 }): Promise<{ part: InputContentPart; ref: ExtractedRef | null }> {
   const noOp = { part, ref: null } as const;
 
-  const result = await visitContentPart(part, {
+  const result = await visitContentPartAsync(part, {
     text: () => noOp,
     toolCall: () => noOp,
     toolResult: () => noOp,
