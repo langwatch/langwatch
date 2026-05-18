@@ -63,25 +63,25 @@ export const EditModelProviderForm = ({
 
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
-  // Get provider - first try by ID, then fallback to provider key.
-  // The `modelProviderId === "new"` sentinel forces a blank form even
-  // when the same providerKey is already configured — that's the
-  // multi-instance flow (iter 109): a user can have multiple OpenAI
-  // rows at different scopes, and the "Add Model Provider" menu routes
-  // through this path.
+  // Find the row this form is editing. Three inputs to the lookup:
+  //   - `modelProviderId === "new"` → always blank, never pre-fill from
+  //     an existing row. The Add Model Provider menu sets this so the
+  //     user can stand up a second instance of an already-configured
+  //     provider type without colliding with the first.
+  //   - `modelProviderId === "<cuid>"` → edit that specific row. With
+  //     multi-instance enabled the providers Record dedupes by provider
+  //     string and may not contain this row, so we don't fall back on
+  //     `providers[providerKey]` if the id lookup misses (that fallback
+  //     used to silently swap the user's intended row for whichever
+  //     same-type row happened to win the dedupe).
+  //   - `modelProviderId` undefined → no specific target, fresh blank
+  //     (deep-link from evaluator selector or similar).
   const provider: MaybeStoredModelProvider = useMemo(() => {
-    const isExplicitNew = modelProviderId === "new";
-    if (providers && !isExplicitNew) {
-      // First try to find by ID
-      if (modelProviderId) {
-        const existing = Object.values(providers).find(
-          (p) => p.id === modelProviderId,
-        );
-        if (existing) return existing;
-      }
-      // Fallback: find by provider key
-      const byKey = providers[providerKey];
-      if (byKey) return byKey;
+    if (providers && modelProviderId && modelProviderId !== "new") {
+      const existing = Object.values(providers).find(
+        (p) => p.id === modelProviderId,
+      );
+      if (existing) return existing;
     }
     return {
       provider: providerKey,
