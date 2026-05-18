@@ -33,7 +33,4 @@ export const organizationFactory = Factory.define<
   licenseExpiresAt: null,
   licenseLastValidatedAt: null,
   presenceEnabled: false,
-  defaultModel: null,
-  topicClusteringModel: null,
-  embeddingsModel: null,
 }));
