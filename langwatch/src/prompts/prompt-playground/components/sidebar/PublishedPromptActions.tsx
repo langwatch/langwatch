@@ -49,6 +49,12 @@ export function PublishedPromptActions({
   const syncFromSource = api.prompts.syncFromSource.useMutation();
   const utils = api.useContext();
 
+  // Cascade-resolved model for new-tab "view history" prompts.
+  const resolvedDefault = api.modelProvider.getResolvedDefault.useQuery(
+    { projectId: project?.id ?? "", featureKey: "prompt.create_default" },
+    { enabled: !!project?.id },
+  );
+
   const isCopiedPrompt = !!prompt?.copiedFromPromptId;
   const hasCopies = (prompt?._count?.copiedPrompts ?? 0) > 0;
 
@@ -168,14 +174,9 @@ export function PublishedPromptActions({
               value="view-history"
               onClick={() => {
                 if (!prompt) return;
-                const projectDefaultModel = project?.defaultModel;
-                const normalizedDefaultModel =
-                  typeof projectDefaultModel === "string"
-                    ? projectDefaultModel
-                    : undefined;
                 const defaultValues = computeInitialFormValuesForPrompt({
                   prompt,
-                  defaultModel: normalizedDefaultModel,
+                  defaultModel: resolvedDefault.data?.model ?? "",
                   useSystemMessage: true,
                 });
                 addTab({
