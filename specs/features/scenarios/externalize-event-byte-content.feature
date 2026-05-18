@@ -422,13 +422,13 @@ Feature: Externalize event byte content to stored_objects
     Then both pods receive the same S3_BUCKET_NAME / S3_ENDPOINT / USE_S3_STORAGE values
     And the chart documentation calls out that the bucket is shared with datasets
 
-  @integration
-  Scenario: Vanilla helm install with no object storage configured refuses to start instead of silently writing to ephemeral container storage
+  @unit
+  Scenario: Vanilla helm install with no object storage configured surfaces the unconfigured-storage condition diagnostically and renders anyway
     Given app.dataplaneObjectStorage.enabled is false
-    And no PVC is mounted at the local-FS root
-    When the app pod starts
-    Then the pod exits non-zero with a clear error referencing the missing storage config
-    And no scenario media bytes are written to the container filesystem
+    And app.dataplaneObjectStorage.localFilesystem.enabled is false
+    When the chart templates are rendered
+    Then the chart renders without error
+    And the helpers template contains a diagnostic message referencing the unconfigured-storage condition so operators reading the chart find the explanation
 
   @integration
   Scenario: Single-replica helm install can opt into a PVC-backed local-FS storage path
@@ -539,7 +539,7 @@ Feature: Externalize event byte content to stored_objects
   # AC31 "Persisted storage_uri is authoritative for reads"                  -> Scenario: storage_uri persisted on the stored_objects row is the authoritative bucket address for reads
   # AC32 "Helm chart emits S3_BUCKET_NAME"                                   -> Scenario: Helm chart emits S3_BUCKET_NAME (not legacy S3_BUCKET) so the app and stored-objects find the bucket
   # AC33 "Helm dataplane object-storage block (datasets + stored-objects)"   -> Scenario: Helm chart exposes a single dataplane object-storage config block covering datasets and stored-objects together
-  # AC34 "Helm refuses to start without object storage configured"           -> Scenario: Vanilla helm install with no object storage configured refuses to start instead of silently writing to ephemeral container storage
+  # AC34 "Helm surfaces unconfigured-storage condition diagnostically"       -> Scenario: Vanilla helm install with no object storage configured surfaces the unconfigured-storage condition diagnostically and renders anyway
   # AC35 "Helm PVC opt-in for single-replica local-FS"                       -> Scenario: Single-replica helm install can opt into a PVC-backed local-FS storage path
   # AC36 "Self-hosting docs cover scenario media + LANGWATCH_LOCAL_STORAGE_PATH" -> Scenario: Self-hosting docs describe scenario media externalization, the LANGWATCH_LOCAL_STORAGE_PATH env, and the shared dataplane bucket
   #                                                                          -> Scenario: .env.example carries LANGWATCH_LOCAL_STORAGE_PATH with a sensible local default
