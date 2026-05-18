@@ -12748,7 +12748,7 @@
                         },
                         "default": []
                       },
-                      "config": {
+                      "parameters": {
                         "type": "object",
                         "additionalProperties": {},
                         "default": {}
@@ -12771,7 +12771,7 @@
                       "outputs",
                       "model",
                       "tags",
-                      "config"
+                      "parameters"
                     ]
                   }
                 }
@@ -13297,7 +13297,7 @@
                       },
                       "default": []
                     },
-                    "config": {
+                    "parameters": {
                       "type": "object",
                       "additionalProperties": {},
                       "default": {}
@@ -13320,7 +13320,7 @@
                     "outputs",
                     "model",
                     "tags",
-                    "config"
+                    "parameters"
                   ]
                 }
               }
@@ -14528,7 +14528,7 @@
                       },
                       "default": []
                     },
-                    "config": {
+                    "parameters": {
                       "type": "object",
                       "additionalProperties": {},
                       "default": {}
@@ -14551,7 +14551,7 @@
                     "outputs",
                     "model",
                     "tags",
-                    "config"
+                    "parameters"
                   ]
                 }
               }
@@ -15126,7 +15126,7 @@
                       },
                       "default": []
                     },
-                    "config": {
+                    "parameters": {
                       "type": "object",
                       "additionalProperties": {},
                       "default": {}
@@ -15149,7 +15149,7 @@
                     "outputs",
                     "model",
                     "tags",
-                    "config"
+                    "parameters"
                   ]
                 }
               }
@@ -16033,7 +16033,7 @@
                           },
                           "default": []
                         },
-                        "config": {
+                        "parameters": {
                           "type": "object",
                           "additionalProperties": {},
                           "default": {}
@@ -16056,7 +16056,7 @@
                         "outputs",
                         "model",
                         "tags",
-                        "config"
+                        "parameters"
                       ]
                     },
                     "conflictInfo": {
@@ -16997,7 +16997,7 @@
                       "model"
                     ]
                   },
-                  "config": {
+                  "parameters": {
                     "type": "object",
                     "additionalProperties": {}
                   },
@@ -17630,7 +17630,7 @@
                         },
                         "default": []
                       },
-                      "config": {
+                      "parameters": {
                         "type": "object",
                         "additionalProperties": {},
                         "default": {}
@@ -17653,7 +17653,7 @@
                       "outputs",
                       "model",
                       "tags",
-                      "config"
+                      "parameters"
                     ]
                   }
                 }
@@ -18211,7 +18211,7 @@
                       },
                       "default": []
                     },
-                    "config": {
+                    "parameters": {
                       "type": "object",
                       "additionalProperties": {},
                       "default": {}
@@ -18234,7 +18234,7 @@
                     "outputs",
                     "model",
                     "tags",
-                    "config"
+                    "parameters"
                   ]
                 }
               }

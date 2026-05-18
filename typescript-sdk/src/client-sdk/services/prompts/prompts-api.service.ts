@@ -34,7 +34,7 @@ const syncResultSchema = z.object({
       localVersion: z.number(),
       remoteVersion: z.number(),
       differences: z.array(z.string()),
-      remoteParametersData: z.unknown(),
+      remoteConfigData: z.unknown(),
     })
     .passthrough()
     .optional(),
@@ -55,7 +55,7 @@ export interface SyncResult {
     localVersion: number;
     remoteVersion: number;
     differences: string[];
-    remoteParametersData: ConfigData;
+    remoteConfigData: ConfigData;
     remoteParameters?: RuntimeParameters;
   };
 }
