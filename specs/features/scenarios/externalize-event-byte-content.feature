@@ -442,7 +442,7 @@ Feature: Externalize event byte content to stored_objects
   # ---------------------------------------------------------------
 
   @unit
-  Scenario: Self-hosting docs describe scenario media externalization, the LANGWATCH_LOCAL_STORAGE_PATH env, and the shared dataplane bucket
+  Scenario: Self-hosting docs describe stored-objects (scenario media, datasets, ...) externalization, the LANGWATCH_LOCAL_STORAGE_PATH env, and the shared dataplane bucket
     Given the self-hosting environment-variables docs
     Then they list LANGWATCH_LOCAL_STORAGE_PATH with its default and rationale
     And they explain that the dataplane S3 bucket is shared between datasets and scenario media
@@ -540,7 +540,7 @@ Feature: Externalize event byte content to stored_objects
   # AC33 "Helm dataplane object-storage block (datasets + stored-objects)"   -> Scenario: Helm chart exposes a single dataplane object-storage config block covering datasets and stored-objects together
   # AC34 "Helm surfaces unconfigured-storage condition diagnostically"       -> Scenario: Vanilla helm install with no object storage configured surfaces the unconfigured-storage condition diagnostically and renders anyway
   # AC35 "Helm PVC opt-in for single-replica local-FS"                       -> Scenario: Single-replica helm install can opt into a PVC-backed local-FS storage path
-  # AC36 "Self-hosting docs cover scenario media + LANGWATCH_LOCAL_STORAGE_PATH" -> Scenario: Self-hosting docs describe scenario media externalization, the LANGWATCH_LOCAL_STORAGE_PATH env, and the shared dataplane bucket
+  # AC36 "Self-hosting docs cover scenario media + LANGWATCH_LOCAL_STORAGE_PATH" -> Scenario: Self-hosting docs describe stored-objects (scenario media, datasets, ...) externalization, the LANGWATCH_LOCAL_STORAGE_PATH env, and the shared dataplane bucket
   #                                                                          -> Scenario: .env.example carries LANGWATCH_LOCAL_STORAGE_PATH with a sensible local default
   # AC37 "Azure Blob support (decision required, separate PR OK)"            -> Scenario: Azure Blob Storage is supported as a stored-objects backend via a distinct URI scheme
   # AC38 "Project-delete cascade removes rows AND bytes"                     -> Scenario: When a project is deleted, deleteOwnedBy removes both the stored_objects rows and the underlying bytes

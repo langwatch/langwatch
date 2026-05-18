@@ -91,7 +91,7 @@ describe("Helm chart deployment surface for stored-objects", () => {
 
 describe("Self-hosting docs cover the stored-objects deployment surface", () => {
   describe("when the environment-variables doc is loaded", () => {
-    /** @scenario "Self-hosting docs describe scenario media externalization, the LANGWATCH_LOCAL_STORAGE_PATH env, and the shared dataplane bucket" */
+    /** @scenario "Self-hosting docs describe stored-objects (scenario media, datasets, ...) externalization, the LANGWATCH_LOCAL_STORAGE_PATH env, and the shared dataplane bucket" */
     it("documents LANGWATCH_LOCAL_STORAGE_PATH and the shared dataplane bucket", () => {
       const doc = readRepoFile("docs/self-hosting/configuration/environment-variables.mdx");
 
