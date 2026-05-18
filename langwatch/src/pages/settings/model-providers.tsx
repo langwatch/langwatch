@@ -100,6 +100,16 @@ export default function ModelsPage() {
     return Object.values(providers).filter((provider) => provider.enabled);
   }, [providers]);
 
+  // Provider-key set the Default Models table uses to flag cells whose
+  // `provider/...` model id no longer maps to an enabled provider. Use
+  // the ALL set, not the scope-filtered one — a default config attached
+  // at TEAM scope is still valid even when the table is filtered to
+  // PROJECT, because the cascade reaches it from the team tier.
+  const enabledProviderKeys = useMemo(
+    () => new Set(allEnabledProviders.map((p) => p.provider)),
+    [allEnabledProviders],
+  );
+
   // Client-side filter for the scope dropdown at the top of the page.
   // The list query returns every provider the caller can see; this just
   // narrows the visible rows. See specs/model-providers/scope-filter.feature.
@@ -389,14 +399,17 @@ export default function ModelsPage() {
           </Card.Root>
         )}
 
-        {/* Default Models section only renders once the project has at
-            least one enabled provider. With zero providers the section
-            below the empty-state would just be confusing — there's
-            nothing to pick a default from. */}
-        {!isLoading && enabledProviders.length > 0 && (
+        {/* Default Models renders whenever the project has providers
+            OR has orphan default-model configs. The section hides
+            itself when BOTH are empty (fresh accounts only) — old
+            accounts that nuked their providers still see the table
+            so they can spot + fix the now-invalid orphan defaults. */}
+        {!isLoading && (
           <DefaultModelsSection
             filter={scopeFilter}
             onFilterChange={setScopeFilter}
+            enabledProviderKeys={enabledProviderKeys}
+            noProvidersConfigured={enabledProviders.length === 0}
           />
         )}
 

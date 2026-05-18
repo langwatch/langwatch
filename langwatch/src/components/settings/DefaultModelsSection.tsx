@@ -86,11 +86,25 @@ interface DefaultModelsSectionProps {
    *  and standalone embeddings). */
   filter?: ScopeFilter;
   onFilterChange?: (next: ScopeFilter) => void;
+  /** Provider keys currently enabled + reachable from the active scope
+   *  set, e.g. `new Set(["anthropic"])`. Used to flag default-model
+   *  cells whose `provider/...` prefix isn't in the set as invalid /
+   *  needs-update. Pass `null` (or omit) to skip the check — useful for
+   *  standalone embeddings where the page can't tell. */
+  enabledProviderKeys?: Set<string> | null;
+  /** Whether the parent already knows the project has zero enabled
+   *  providers. The section hides itself entirely when this is true
+   *  AND the user also has zero configs (fresh accounts). Old accounts
+   *  that nuked their providers keep seeing the orphan-config table so
+   *  they can fix it. */
+  noProvidersConfigured?: boolean;
 }
 
 export function DefaultModelsSection({
   filter: controlledFilter,
   onFilterChange,
+  enabledProviderKeys,
+  noProvidersConfigured = false,
 }: DefaultModelsSectionProps = {}) {
   const { project, team, organization } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
@@ -157,6 +171,15 @@ export function DefaultModelsSection({
 
   const data = dataQuery.data;
 
+  // Fresh accounts (no providers + no configs) hide the section
+  // entirely so the page reads as a single "add a provider to get
+  // started" affordance. Old accounts that nuked their providers but
+  // still have orphan configs DO see the table (with red 'Update
+  // needed' badges) so they can rebuild from there.
+  if (noProvidersConfigured && data.configs.length === 0) {
+    return null;
+  }
+
   const openAdd = () => {
     setEditing(undefined);
     setDrawerOpen(true);
@@ -220,6 +243,7 @@ export function DefaultModelsSection({
           onEdit={openEdit}
           onDelete={handleDelete}
           onAdd={openAdd}
+          enabledProviderKeys={enabledProviderKeys ?? null}
         />
       ) : (
         <Card.Root width="full" overflow="hidden">
@@ -231,6 +255,7 @@ export function DefaultModelsSection({
                 onEdit={openEdit}
                 onDelete={handleDelete}
                 onAdd={openAdd}
+                enabledProviderKeys={enabledProviderKeys ?? null}
               />
             ) : (
               <ResolvedScopeView
@@ -240,6 +265,7 @@ export function DefaultModelsSection({
                 featuresByRole={featuresByRole}
                 currentTeamId={team?.id}
                 currentProjectId={project?.id}
+                enabledProviderKeys={enabledProviderKeys ?? null}
               />
             )}
           </Card.Body>
@@ -272,12 +298,14 @@ function AllConfigsView({
   onEdit,
   onDelete,
   onAdd,
+  enabledProviderKeys,
 }: {
   configs: ConfigRow[];
   features: Payload["features"];
   onEdit: (c: ConfigRow) => void;
   onDelete: (c: ConfigRow) => void;
   onAdd: () => void;
+  enabledProviderKeys: Set<string> | null;
 }) {
   if (configs.length === 0) {
     return (
@@ -337,6 +365,7 @@ function AllConfigsView({
                   configs={configs}
                   anchorScope={mostSpecificScope(c.scopes)}
                   onEdit={() => onEdit(c)}
+                  enabledProviderKeys={enabledProviderKeys}
                 />
               </Table.Cell>
             ))}
@@ -400,6 +429,7 @@ function ConfigCell({
   configs,
   anchorScope,
   onEdit,
+  enabledProviderKeys,
 }: {
   role: ModelRoleKey;
   config: Record<string, string>;
@@ -411,7 +441,11 @@ function ConfigCell({
    *  change this model" to the drawer without hunting for the 3-dot
    *  menu. Edits the whole policy, not just the cell. */
   onEdit: () => void;
+  enabledProviderKeys: Set<string> | null;
 }) {
+  const isInvalid = (model: string) =>
+    !!enabledProviderKeys &&
+    !enabledProviderKeys.has(model.split("/")[0] ?? "");
   // The table is a "final resolved state" view — every cell renders
   // the cascade-resolved role model for the row's scope, whether the
   // policy on this row pins it or inherits it from a wider tier (or
@@ -434,14 +468,22 @@ function ConfigCell({
   return (
     <VStack align="start" gap={1}>
       <ChipWithEdit onEdit={onEdit}>
-        <ModelChip model={resolvedRoleModel} size="sm" />
+        <ModelChip
+          model={resolvedRoleModel}
+          size="sm"
+          invalid={isInvalid(resolvedRoleModel)}
+        />
       </ChipWithEdit>
       {featureOverrides.map((f) => (
         <ChipWithEdit key={f.key} onEdit={onEdit} paddingLeft={4}>
           <Text fontSize="xs" color="fg.muted">
             {f.displayName}
           </Text>
-          <ModelChip model={config[f.key]!} size="sm" />
+          <ModelChip
+            model={config[f.key]!}
+            size="sm"
+            invalid={isInvalid(config[f.key]!)}
+          />
         </ChipWithEdit>
       ))}
     </VStack>
@@ -534,6 +576,7 @@ function ResolvedScopeView({
   featuresByRole,
   currentTeamId,
   currentProjectId,
+  enabledProviderKeys,
 }: {
   filter: ScopeFilter;
   configs: ConfigRow[];
@@ -541,7 +584,11 @@ function ResolvedScopeView({
   featuresByRole: Record<ModelRoleKey, Payload["features"]>;
   currentTeamId?: string | null;
   currentProjectId?: string | null;
+  enabledProviderKeys: Set<string> | null;
 }) {
+  const isInvalid = (model: string) =>
+    !!enabledProviderKeys &&
+    !enabledProviderKeys.has(model.split("/")[0] ?? "");
   // For "this team" / "this project" / "specific scope" we render the
   // cascade-resolved view. For the project the user is currently in
   // the server already pre-computed `effective`. For other scopes we
@@ -612,7 +659,10 @@ function ResolvedScopeView({
               </Box>
               {resolved ? (
                 <HStack gap={2}>
-                  <ModelChip model={resolved.model} />
+                  <ModelChip
+                    model={resolved.model}
+                    invalid={isInvalid(resolved.model)}
+                  />
                   <Text fontSize="xs" color="fg.muted">
                     {resolved.source === "system"
                       ? "from System"
@@ -641,7 +691,11 @@ function ResolvedScopeView({
                     <Box width="160px" flexShrink={0}>
                       <Text fontSize="xs">{feature.displayName}</Text>
                     </Box>
-                    <ModelChip model={resolved.model} size="sm" />
+                    <ModelChip
+                      model={resolved.model}
+                      size="sm"
+                      invalid={isInvalid(resolved.model)}
+                    />
                     <Text fontSize="xs" color="fg.muted">
                       from {resolved.scope}
                     </Text>

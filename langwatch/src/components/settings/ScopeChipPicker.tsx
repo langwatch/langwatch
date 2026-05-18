@@ -233,20 +233,25 @@ export function ScopeChipPicker({
 
   // `multipleMode` is local UI state: when true the dropdown is
   // visible and the "Multiple" chip is highlighted. Derived from the
-  // current selection on mount + whenever the selection changes from
-  // outside (editing an existing config), then becomes user-driven —
-  // clicking a quick-pick flips it off, clicking Multiple flips it on.
+  // current selection on mount; afterwards it only auto-FLIPS-ON (when
+  // an external selection change creates a multi-scope state) and
+  // NEVER auto-flips-off. The reverse direction would collapse the
+  // dropdown mid-edit — e.g. a user in Multiple mode who deselects
+  // one of two scopes transiently has a single-quick-pick value, and
+  // collapsing the dropdown before they pick the second team is the
+  // exact UX paper-cut that surfaced on 2026-05-18. Quick-pick chip
+  // clicks are the only path that turns multipleMode off.
   const derivedMultiple = !matchingQuickPick;
   const [multipleMode, setMultipleMode] = useState(derivedMultiple);
   useEffect(() => {
-    setMultipleMode(derivedMultiple);
+    if (derivedMultiple) setMultipleMode(true);
   }, [derivedMultiple]);
 
   const dropdownVisible = !showQuickPicks || multipleMode;
 
   return (
-    <VStack align="start" width="full" gap={2}>
-      <SmallLabel>{label}</SmallLabel>
+    <VStack align="start" width="full" gap={1}>
+      {label && <SmallLabel>{label}</SmallLabel>}
       {showQuickPicks && quickPicks.length > 0 && (
         <Wrap gap={2} role="group" aria-label="Quick scope">
           {quickPicks.map((pick) => {

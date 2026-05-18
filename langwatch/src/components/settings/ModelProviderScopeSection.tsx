@@ -125,9 +125,10 @@ export function ProviderScopeSection({
   // inside ScopeChipPicker now. The wrapper used to render its own
   // quick-pick row above the picker; folded into ScopeChipPicker so
   // both this surface and the default-models drawer share the same
-  // state machine.
+  // state machine. Tight gap between label + chips matches rchaves's
+  // 2026-05-18 polish ask.
   return (
-    <VStack align="start" width="full" gap={2}>
+    <VStack align="start" width="full" gap={1}>
       <SmallLabel>Scope</SmallLabel>
       <ScopeChipPicker
         value={state.scopes}
