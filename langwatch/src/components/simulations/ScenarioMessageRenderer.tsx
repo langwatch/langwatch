@@ -250,41 +250,45 @@ function flattenContent(msg: RawMessage): DisplayItem[] {
   return [];
 }
 
-function flattenMixed(content: any[], msg: RawMessage): DisplayItem[] {
+function flattenMixed(content: unknown[], msg: RawMessage): DisplayItem[] {
   const items: DisplayItem[] = [];
   content.forEach((item, i) => {
     if (typeof item === "string") {
       items.push({ kind: "text", id: `${msg.id}-c${i}`, role: msg.role ?? "assistant", content: item, traceId: msg.trace_id });
-    } else if (typeof item === "object" && (item.type === "text" || (!item.type && item.text))) {
-      // Handles: {type:"text", text:"..."}, {type:"text", content:"..."}, {text:"..."}
-      const text = item.text ?? item.content ?? "";
-      if (text) items.push({ kind: "text", id: `${msg.id}-c${i}`, role: msg.role ?? "assistant", content: text, traceId: msg.trace_id });
-    } else if (typeof item === "object" && (item.type === "image" || item.type === "audio" || item.type === "video") && item.source) {
-      // AG-UI media parts with source.type="url"|"data" (Phase I externalized shape)
-      const part: MediaPartData = {
-        type: item.type as "image" | "audio" | "video",
-        source: item.source,
-      };
-      items.push({ kind: "media", id: `${msg.id}-media${i}`, part, traceId: msg.trace_id });
-    } else if (typeof item === "object" && item.type === "binary" && item.mimeType) {
-      // AG-UI binary part
-      const part: MediaPartData = {
-        type: "binary",
-        mimeType: item.mimeType,
-        id: item.id,
-        url: item.url,
-        data: item.data,
-        filename: item.filename,
-      };
-      items.push({ kind: "media", id: `${msg.id}-media${i}`, part, traceId: msg.trace_id });
-    } else if (typeof item === "object" && item.type === "image_url" && item.image_url?.url) {
-      items.push({ kind: "image", id: `${msg.id}-img${i}`, src: item.image_url.url, traceId: msg.trace_id });
-    } else if (typeof item === "object" && item.image) {
-      items.push({ kind: "image", id: `${msg.id}-img${i}`, src: item.image, traceId: msg.trace_id });
-    } else if (item.type === "tool_use" || item.type === "tool_call") {
-      items.push({ kind: "tool_call", id: `${msg.id}-tu${i}`, name: item.name ?? item.toolName ?? "tool", arguments: item.arguments ?? item.input ?? item.args, traceId: msg.trace_id });
-    } else if (item.type === "tool_result") {
-      items.push({ kind: "tool_result", id: `${msg.id}-tr${i}`, result: item.content ?? item.result, traceId: msg.trace_id });
+    } else if (typeof item === "object" && item !== null) {
+      // Narrow to a property bag so we can safely access arbitrary keys below.
+      const o = item as Record<string, unknown>;
+      if (o["type"] === "text" || (!o["type"] && o["text"])) {
+        // Handles: {type:"text", text:"..."}, {type:"text", content:"..."}, {text:"..."}
+        const text = (o["text"] ?? o["content"] ?? "") as string;
+        if (text) items.push({ kind: "text", id: `${msg.id}-c${i}`, role: msg.role ?? "assistant", content: text, traceId: msg.trace_id });
+      } else if ((o["type"] === "image" || o["type"] === "audio" || o["type"] === "video") && o["source"]) {
+        // AG-UI media parts with source.type="url"|"data" (Phase I externalized shape)
+        const part: MediaPartData = {
+          type: o["type"] as "image" | "audio" | "video",
+          source: o["source"] as MediaPartData["source"],
+        };
+        items.push({ kind: "media", id: `${msg.id}-media${i}`, part, traceId: msg.trace_id });
+      } else if (o["type"] === "binary" && o["mimeType"]) {
+        // AG-UI binary part
+        const part: MediaPartData = {
+          type: "binary",
+          mimeType: o["mimeType"] as string,
+          id: o["id"] as string | undefined,
+          url: o["url"] as string | undefined,
+          data: o["data"] as string | undefined,
+          filename: o["filename"] as string | undefined,
+        };
+        items.push({ kind: "media", id: `${msg.id}-media${i}`, part, traceId: msg.trace_id });
+      } else if (o["type"] === "image_url" && typeof o["image_url"] === "object" && o["image_url"] !== null && (o["image_url"] as Record<string, unknown>)["url"]) {
+        items.push({ kind: "image", id: `${msg.id}-img${i}`, src: (o["image_url"] as Record<string, unknown>)["url"] as string, traceId: msg.trace_id });
+      } else if (o["image"]) {
+        items.push({ kind: "image", id: `${msg.id}-img${i}`, src: o["image"] as string, traceId: msg.trace_id });
+      } else if (o["type"] === "tool_use" || o["type"] === "tool_call") {
+        items.push({ kind: "tool_call", id: `${msg.id}-tu${i}`, name: (o["name"] ?? o["toolName"] ?? "tool") as string, arguments: o["arguments"] ?? o["input"] ?? o["args"], traceId: msg.trace_id });
+      } else if (o["type"] === "tool_result") {
+        items.push({ kind: "tool_result", id: `${msg.id}-tr${i}`, result: o["content"] ?? o["result"], traceId: msg.trace_id });
+      }
     }
   });
   return items;
