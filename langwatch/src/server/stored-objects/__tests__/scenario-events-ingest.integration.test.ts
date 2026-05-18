@@ -256,8 +256,22 @@ afterAll(async () => {
     await prisma.project.deleteMany({ where: { id: testProjectId } });
     await prisma.team.deleteMany({ where: { id: teamId } });
     await prisma.organization.deleteMany({ where: { id: orgId } });
-  } catch {
-    /* ignore — see comment above */
+  } catch (error) {
+    // The integration suite's postgres schema does not always include the
+    // unified-PAT ApiKey table; deleting a project that has related ApiKey
+    // rows would FK-cascade through a missing table and throw P2003 (FK
+    // constraint failed) or P2021 (table does not exist). Swallow ONLY
+    // those two known shapes — anything else means cleanup is genuinely
+    // misconfigured and the test author needs to see the error.
+    const knownMissingFixture =
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      (error.code === "P2003" || error.code === "P2021");
+    if (!knownMissingFixture) {
+      // eslint-disable-next-line no-console
+      console.warn("Unexpected cleanup error in scenario-events-ingest integration suite:", error);
+    }
   }
   delete process.env.BASE_HOST;
 });
