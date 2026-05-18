@@ -414,6 +414,16 @@ export default function ModelsPage() {
                   });
                   setProviderToDisable(null);
                   await refetch();
+                  // Invalidate every cross-page query that gates UI on
+                  // "are there enabled providers?" so the prompts page
+                  // and evaluation wizard pick up the deletion without
+                  // a window-focus refetch.
+                  await Promise.all([
+                    utils.modelProvider.getAllForProject.invalidate(),
+                    utils.modelProvider.getAllForProjectForFrontend.invalidate(),
+                    utils.modelProvider.getResolvedDefault.invalidate(),
+                    utils.modelProvider.getDefaultModelsForProject.invalidate(),
+                  ]);
                 }}
               >
                 Delete

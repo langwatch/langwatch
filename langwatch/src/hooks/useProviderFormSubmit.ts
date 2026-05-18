@@ -326,6 +326,16 @@ export function useProviderFormSubmit({
         });
       }
 
+      // Invalidate every cached provider/resolved-default query so the
+      // prompts page, evaluation wizard, and any other surface that
+      // gates UI on "are there enabled providers?" picks up the new
+      // state without needing a window-focus refetch.
+      await Promise.all([
+        utils.modelProvider.getAllForProject.invalidate(),
+        utils.modelProvider.getAllForProjectForFrontend.invalidate(),
+        utils.modelProvider.getResolvedDefault.invalidate(),
+      ]);
+
       toaster.create({
         title: "Model Provider Updated",
         type: "success",

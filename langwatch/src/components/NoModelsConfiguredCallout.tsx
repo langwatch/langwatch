@@ -29,7 +29,6 @@
  */
 import { Box, Button, HStack, Text } from "@chakra-ui/react";
 import { ArrowUpRight } from "lucide-react";
-import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { modelProviderIcons } from "../server/modelProviders/iconsMap";
 
 interface Props {
@@ -44,15 +43,12 @@ interface Props {
  *  Order matters: front icon shows fully, the others peek out behind. */
 const STACKED_PROVIDERS = ["openai", "anthropic", "gemini"] as const;
 
+const SETTINGS_HREF = "/settings/model-providers";
+
 export function NoModelsConfiguredCallout({
   size = "md",
   forFeatureLabel,
 }: Props) {
-  const { project } = useOrganizationTeamProject();
-  const settingsHref = project
-    ? `/${project.slug}/settings/model-providers`
-    : "/settings/model-providers";
-
   const featureSuffix = forFeatureLabel ? ` for ${forFeatureLabel}` : "";
 
   // Whole-row click navigates to settings in a new tab. The inner button
@@ -60,7 +56,7 @@ export function NoModelsConfiguredCallout({
   // not an anchor (nested anchors are invalid HTML); the wrapper Box
   // owns the navigation.
   const openSettings = () => {
-    window.open(settingsHref, "_blank", "noopener,noreferrer");
+    window.open(SETTINGS_HREF, "_blank", "noopener,noreferrer");
   };
 
   return (

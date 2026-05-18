@@ -125,7 +125,10 @@ export function DefaultModelsSection({
   const handleDelete = async (c: ConfigRow) => {
     try {
       await deleteMutation.mutateAsync({ id: c.id });
-      await utils.modelProvider.getDefaultModelsForProject.invalidate();
+      await Promise.all([
+        utils.modelProvider.getDefaultModelsForProject.invalidate(),
+        utils.modelProvider.getResolvedDefault.invalidate(),
+      ]);
       toaster.create({
         title: "Config deleted",
         type: "success",

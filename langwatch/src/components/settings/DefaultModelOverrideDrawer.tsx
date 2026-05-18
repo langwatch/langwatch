@@ -251,7 +251,13 @@ export function DefaultModelOverrideDrawer({
           scopeId: s.scopeId,
         })),
       });
-      await utils.modelProvider.getDefaultModelsForProject.invalidate();
+      // Invalidate the local table query plus the resolved-default
+      // query so the prompts page, evaluation wizard, and other
+      // consumers of the cascaded default model pick up the change.
+      await Promise.all([
+        utils.modelProvider.getDefaultModelsForProject.invalidate(),
+        utils.modelProvider.getResolvedDefault.invalidate(),
+      ]);
       toaster.create({
         title: editing ? "Config updated" : "Config added",
         type: "success",
