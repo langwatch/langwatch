@@ -1,5 +1,5 @@
 .PHONY: help start sync-all-openapi user-delete-dry-run user-delete es-delete-dry-run es-delete
-.PHONY: down logs clean ps quickstart quickstart-help worktree
+.PHONY: down logs clean ps quickstart quickstart-help worktree refresh-dev-s3
 .PHONY: dev-up dev-down dev-logs setup-hooks service service-watch test-scripts
 .PHONY: _dev-up-deprecation-warning
 
@@ -12,6 +12,7 @@ help:
 	@echo "    make quickstart all-local           local CH+PG+Redis+app, no NLP (fast iteration default)"
 	@echo "    make quickstart all-local-nlp       all-local + langwatch_nlp + langevals"
 	@echo "    make quickstart dev-storage         local DBs, stored-objects -> dev S3 (runtime-storage-dev)"
+	@echo "    make refresh-dev-s3                 rotate AWS SSO creds in .env (run before dev-storage)"
 	@echo "    make quickstart dev-infra           everything against shared dev infra (no compose)"
 	@echo "    make quickstart frontend-only       no compose; pure pnpm dev against your .env URLs"
 	@echo "    make quickstart migration           postgres + clickhouse on host ports (prisma migrate)"
@@ -91,6 +92,13 @@ service-watch:
 # (interactive) or `./scripts/dev.sh <preset>` directly. Preset list:
 # all-local, all-local-nlp, dev-storage, dev-infra, frontend-only,
 # migration, full-local.
+
+# Refresh AWS SSO credentials in langwatch/.env so `make quickstart
+# dev-storage` can talk to runtime-storage-dev. SSO temporary tokens
+# expire ~hourly; this rotates the three S3_*_KEY/TOKEN lines in
+# langwatch/.env, leaving S3_BUCKET_NAME/S3_ENDPOINT/S3_REGION alone.
+refresh-dev-s3:
+	@bash langwatch/scripts/refresh-dev-s3-env.sh
 
 # Run all *.unit.bats tests under scripts/__tests__/. Dev-only — these
 # tests cover shell behavior of `dev.sh` / `write-dev-overrides.sh` /

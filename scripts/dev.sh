@@ -172,29 +172,43 @@ EOF
 }
 
 # When a preset routes stored-objects to dev S3, the operator's .env must
-# carry fresh AWS SSO credentials (S3_SESSION_TOKEN). We don't auto-refresh
-# (interactive SSO browser would block headless launches); we warn loudly
-# with the one command that fixes it.
+# carry fresh AWS SSO credentials (S3_SESSION_TOKEN). Auto-run the
+# refresh script if missing — it's interactive (opens SSO in a browser)
+# but the alternative is failing with a hint that the operator then
+# manually executes, which is more friction for the common case.
+# Skip with QUICKSTART_NO_REFRESH=1 if you want to manage creds manually
+# (e.g. you've pasted in an IAM-user access key instead of using SSO).
 check_dev_s3_credentials() {
   if [ ! -f "langwatch/.env" ]; then
     return 0
   fi
   local has_token
   has_token=$(grep -E "^S3_SESSION_TOKEN[[:space:]]*=[[:space:]]*['\"]?.+['\"]?[[:space:]]*$" langwatch/.env || true)
-  if [ -z "$has_token" ]; then
+  if [ -n "$has_token" ]; then
+    return 0
+  fi
+
+  if [ "${QUICKSTART_NO_REFRESH:-0}" = "1" ]; then
     cat >&2 <<'EOF'
-ERROR: dev-storage preset routes stored-objects to runtime-storage-dev (real
-       AWS S3 in lw-dev), but langwatch/.env has no S3_SESSION_TOKEN set.
-       Refresh AWS SSO credentials first:
-
-         bash langwatch/scripts/refresh-dev-s3-env.sh
-
-       That script logs into SSO and writes S3_ACCESS_KEY_ID,
-       S3_SECRET_ACCESS_KEY, S3_SESSION_TOKEN into langwatch/.env. Then
-       re-run this preset.
+ERROR: dev-storage requires S3_SESSION_TOKEN in langwatch/.env but
+       QUICKSTART_NO_REFRESH=1 was set. Set the credentials manually
+       (e.g. an IAM user's access key) or unset QUICKSTART_NO_REFRESH
+       and let the launcher rotate SSO creds for you.
 EOF
     exit 1
   fi
+
+  echo "No S3_SESSION_TOKEN in langwatch/.env — auto-refreshing AWS SSO credentials..."
+  if ! bash langwatch/scripts/refresh-dev-s3-env.sh; then
+    cat >&2 <<'EOF'
+ERROR: refresh-dev-s3-env.sh failed. Inspect the output above. Common causes:
+  - lw-dev-sso profile not configured (~/.aws/config)
+  - aws CLI not installed
+  - SSO browser flow declined / timed out
+EOF
+    exit 1
+  fi
+  echo "Credentials refreshed; continuing with dev-storage."
 }
 
 ensure_prepared() {
