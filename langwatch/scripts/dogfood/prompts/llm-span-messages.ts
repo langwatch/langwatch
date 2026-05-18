@@ -16,9 +16,9 @@
  * reply at the end — exactly what the playground's chat panel needs
  * to resume the conversation.
  *
- * Run: npx tsx scripts/dogfood-llm-span-messages.ts
+ * Run: npx tsx scripts/dogfood/prompts/llm-span-messages.ts
  */
-import { parseLLMSpanMessages } from "../src/server/traces/parseLLMSpanMessages";
+import { parseLLMSpanMessages } from "../../../src/server/traces/parseLLMSpanMessages";
 
 const attrs: Record<string, unknown> = {
   // nlpgo serializes the LLM request prompt as a bare array of
