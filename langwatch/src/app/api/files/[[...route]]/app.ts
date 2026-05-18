@@ -143,6 +143,79 @@ function jsonResponse(
 }
 
 /**
+ * Checks that the caller (API key or session user) is allowed to read a file
+ * owned by `ownerProjectId`. Throws HTTPException(403) or HTTPException(401)
+ * on failure; returns void on success.
+ */
+async function authorizeFileRead({
+  apiKeyProjectId,
+  userId,
+  ownerProjectId,
+}: {
+  apiKeyProjectId: string | undefined;
+  userId: string | undefined;
+  ownerProjectId: string;
+}): Promise<void> {
+  if (apiKeyProjectId) {
+    if (apiKeyProjectId !== ownerProjectId) {
+      throw new HTTPException(403, { message: "forbidden" });
+    }
+  } else if (userId) {
+    try {
+      await requireProjectPermission({
+        userId,
+        projectId: ownerProjectId,
+        permission: "scenarios:view",
+        prisma,
+      });
+    } catch {
+      throw new HTTPException(403, { message: "forbidden" });
+    }
+  } else {
+    throw new HTTPException(401, { message: "unauthenticated" });
+  }
+}
+
+/**
+ * Builds the 200 response for a stored-object read. Applies the safe
+ * Content-Type allowlist, Content-Disposition, Content-Length, and all
+ * security headers. For HEAD requests the stream is drained and the body is
+ * omitted; for GET the stream is forwarded.
+ */
+function streamFileResponse({
+  row,
+  stream,
+  method,
+  mediaType,
+}: {
+  row: { id: string; size_bytes: number };
+  stream: import("node:stream").Readable;
+  method: "GET" | "HEAD";
+  mediaType: string;
+}): Response {
+  const contentType = safeMediaType(mediaType);
+  const filename = sanitizeFilenameSegment(row.id);
+
+  const headers: Record<string, string> = {
+    "Content-Type": contentType,
+    "Content-Length": String(row.size_bytes),
+    "Content-Disposition": `inline; filename="${filename}"`,
+    ...FILES_RESPONSE_BASE_HEADERS,
+  };
+
+  if (method === "HEAD") {
+    // Drain the stream so the storage driver doesn't leak a socket / fd.
+    stream.destroy?.();
+    return new Response(null, { status: 200, headers });
+  }
+
+  return new Response(Readable.toWeb(stream) as ReadableStream, {
+    status: 200,
+    headers,
+  });
+}
+
+/**
  * GET /api/files/:id
  *
  * Streams the bytes for the given stored object id.
@@ -214,24 +287,7 @@ async function handleFileRead(
   }
 
   // Step 3: project-membership gate.
-  if (apiKeyProjectId) {
-    if (apiKeyProjectId !== owner.projectId) {
-      throw new HTTPException(403, { message: "forbidden" });
-    }
-  } else if (userId) {
-    try {
-      await requireProjectPermission({
-        userId,
-        projectId: owner.projectId,
-        permission: "scenarios:view",
-        prisma,
-      });
-    } catch {
-      throw new HTTPException(403, { message: "forbidden" });
-    }
-  } else {
-    throw new HTTPException(401, { message: "unauthenticated" });
-  }
+  await authorizeFileRead({ apiKeyProjectId, userId, ownerProjectId: owner.projectId });
 
   // Step 4: project-scoped read.
   const service = createStoredObjectsService({ projectId: owner.projectId });
@@ -251,26 +307,12 @@ async function handleFileRead(
     return jsonResponse({ status: "missing" }, 404);
   }
 
-  const { row, stream } = result;
-  const contentType = safeMediaType(row.media_type);
-  const filename = sanitizeFilenameSegment(row.id);
-
-  const headers: Record<string, string> = {
-    "Content-Type": contentType,
-    "Content-Length": String(row.size_bytes),
-    "Content-Disposition": `inline; filename="${filename}"`,
-    ...FILES_RESPONSE_BASE_HEADERS,
-  };
-
-  if (options.method === "HEAD") {
-    // Drain the stream so the storage driver doesn't leak a socket / fd.
-    stream.destroy?.();
-    return new Response(null, { status: 200, headers });
-  }
-
-  return new Response(Readable.toWeb(stream) as ReadableStream, {
-    status: 200,
-    headers,
+  // Step 5: build and return the response.
+  return streamFileResponse({
+    row: result.row,
+    stream: result.stream,
+    method: options.method,
+    mediaType: result.row.media_type,
   });
 }
 
