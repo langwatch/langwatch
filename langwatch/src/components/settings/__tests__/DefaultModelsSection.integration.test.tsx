@@ -44,6 +44,7 @@ vi.mock("~/utils/api", () => ({
     useContext: () => ({
       modelProvider: {
         getDefaultModelsForProject: { invalidate: mockInvalidate },
+        getResolvedDefault: { invalidate: vi.fn() },
       },
     }),
     modelProvider: {
@@ -60,6 +61,23 @@ vi.mock("~/utils/api", () => ({
         useQuery: () => ({
           data: {
             openai: { enabled: true, customModels: [], customEmbeddingsModels: [] },
+          },
+          isLoading: false,
+        }),
+      },
+      listAllForProjectForFrontend: {
+        useQuery: () => ({
+          data: {
+            providers: [
+              {
+                id: "mp_test",
+                name: "OpenAI",
+                provider: "openai",
+                enabled: true,
+                customModels: null,
+                customEmbeddingsModels: null,
+              },
+            ],
           },
           isLoading: false,
         }),
