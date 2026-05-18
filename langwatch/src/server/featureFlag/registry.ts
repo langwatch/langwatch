@@ -139,12 +139,6 @@ export const FEATURE_FLAGS = [
     defaultValue: false,
     description: "Reveals the AI Gateway menu in the project sidebar.",
   },
-  {
-    key: "release_ui_traces_v2_enabled",
-    scope: "PRODUCT",
-    defaultValue: false,
-    description: "Routes the /messages and trace detail surfaces to the v2 UI.",
-  },
 ] as const satisfies readonly FeatureFlagDefinition[];
 
 export const FEATURE_FLAG_FAMILIES = [

@@ -13,7 +13,6 @@ import { Eye } from "lucide-react";
 import type React from "react";
 import { type ReactNode, useState } from "react";
 import { useDrawer } from "~/hooks/useDrawer";
-import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import {
@@ -46,21 +45,14 @@ interface TracePreviewHoverCardProps {
  * trigger you put inside it. Use it to add a hover-peek to any element
  * already mounted next to a trace — buttons, links, badges — without
  * needing a standalone trigger like the eye icon.
- *
- * Gated on the `release_ui_traces_v2_enabled` flag the same way the
- * old standalone `<TraceIdPeek>` was — without v2 there's nothing to
- * peek at, so we return the trigger unchanged.
  */
 export const TracePreviewHoverCard: React.FC<TracePreviewHoverCardProps> = ({
   traceId,
   children,
   placement = "bottom-start",
 }) => {
-  const { enabled } = useFeatureFlag("release_ui_traces_v2_enabled");
   const [hasHovered, setHasHovered] = useState(false);
   const [open, setOpen] = useState(false);
-
-  if (!enabled) return <>{children}</>;
 
   return (
     <HoverCard.Root
@@ -105,10 +97,7 @@ interface TraceIdPeekProps {
  * `<TracePreviewHoverCard>` directly so the eye doesn't crowd the row.
  */
 export const TraceIdPeek: React.FC<TraceIdPeekProps> = ({ traceId }) => {
-  const { enabled } = useFeatureFlag("release_ui_traces_v2_enabled");
   const { openDrawer } = useDrawer();
-
-  if (!enabled) return null;
 
   const handleOpenDrawer = (e: React.MouseEvent) => {
     e.stopPropagation();
