@@ -134,18 +134,6 @@ export const FEATURE_FLAGS = [
     description: "Shows the SDK radar banner card on the home page.",
   },
   {
-    key: "release_ui_dark_mode_enabled",
-    scope: "PRODUCT",
-    defaultValue: false,
-    description: "Enables the dark-mode toggle in the user profile menu.",
-  },
-  {
-    key: "release_ui_negate_filters_enabled",
-    scope: "PRODUCT",
-    defaultValue: false,
-    description: "Enables negate-filter chips on the messages / traces filters.",
-  },
-  {
     key: "release_ui_ai_gateway_menu_enabled",
     scope: "PRODUCT",
     defaultValue: false,

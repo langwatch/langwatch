@@ -38,9 +38,6 @@ export function useFilteredCommands(
   projectId: string | undefined,
   isDevMode: boolean,
 ): FilteredCommands {
-  const { enabled: isDarkModeEnabled } = useFeatureFlag(
-    "release_ui_dark_mode_enabled",
-  );
   const { enabled: isTracesV2Enabled } = useFeatureFlag(
     "release_ui_traces_v2_enabled",
     { projectId, enabled: !!projectId },
@@ -171,9 +168,9 @@ export function useFilteredCommands(
     return filterCommands(availableCommands, query);
   }, [query, isSaas]);
 
-  // Filter theme commands based on query (only when dark mode flag is enabled)
+  // Filter theme commands based on query
   const filteredTheme = useMemo(() => {
-    if (!isDarkModeEnabled || !query.trim()) return [];
+    if (!query.trim()) return [];
 
     const lowerQuery = query.toLowerCase().trim();
 
@@ -189,7 +186,7 @@ export function useFilteredCommands(
     }
 
     return filterCommands(themeCommands, query);
-  }, [query, isDarkModeEnabled]);
+  }, [query]);
 
   // Filter page-specific commands based on current route
   const router = useRouter();

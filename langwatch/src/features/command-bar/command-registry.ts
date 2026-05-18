@@ -590,7 +590,7 @@ export const supportCommands: Command[] = [
 ];
 
 /**
- * Theme switching commands (only shown when dark mode feature flag is enabled).
+ * Theme switching commands.
  */
 export const themeCommands: Command[] = [
   {
