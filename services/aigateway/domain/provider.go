@@ -12,6 +12,14 @@ const (
 	ProviderBedrock   ProviderID = "bedrock"
 	ProviderVertex    ProviderID = "vertex"
 	ProviderGemini    ProviderID = "gemini"
+	// Voyage is direct-API only (Anthropic's recommended embedding
+	// partner). Bifrost has no Voyage ModelProvider enum; the gateway
+	// proxies Voyage embeddings via a thin direct HTTP path —
+	// Voyage's wire format is OpenAI-compatible so no body
+	// translation is needed. Voyage ships embeddings only; chat /
+	// messages / responses calls against a Voyage credential land on
+	// a clean unsupported-request-type error.
+	ProviderVoyage ProviderID = "voyage"
 )
 
 // Credential holds the resolved credentials for a provider.

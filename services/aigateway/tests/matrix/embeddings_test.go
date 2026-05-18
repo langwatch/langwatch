@@ -107,16 +107,12 @@ func TestGemini_Embeddings_Batch(t *testing.T) {
 	runEmbeddingCell(t, geminiEmbeddingsCell(t, "batch", embeddingBody_Batch))
 }
 
-// TestVoyage_Embeddings_Simple stays under the live_embeddings tag and
-// is enabled once the gateway's Voyage direct-HTTP adapter ships (P4
-// of the rollout — Bifrost has no Voyage ModelProvider enum, so this
-// path requires a separate provider adapter). Kept here so the test
-// is discoverable from the matrix layout.
 func TestVoyage_Embeddings_Simple(t *testing.T) {
-	if os.Getenv("VOYAGE_ENABLED") == "" {
-		t.Skip("voyage gateway adapter not yet shipped; set VOYAGE_ENABLED=1 to run")
-	}
 	runEmbeddingCell(t, voyageEmbeddingsCell(t, "simple", embeddingBody_Simple))
+}
+
+func TestVoyage_Embeddings_Batch(t *testing.T) {
+	runEmbeddingCell(t, voyageEmbeddingsCell(t, "batch", embeddingBody_Batch))
 }
 
 // runEmbeddingCell is the embeddings-flavoured runner. It mirrors

@@ -9,12 +9,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/tidwall/gjson"
+	"github.com/tidwall/sjson"
 
 	"github.com/bytedance/sonic"
 	bifrost "github.com/maximhq/bifrost/core"
@@ -81,11 +83,21 @@ func (r *BifrostRouter) Close() {
 // to an Anthropic-family provider; sending it to OpenAI is a caller
 // error and Bifrost/OpenAI will reject accordingly.
 func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred domain.Credential) (*domain.Response, error) {
-	provider := mapProvider(cred.ProviderID)
 	model := req.Model
 	if req.Resolved != nil {
 		model = req.Resolved.ModelID
 	}
+
+	// Voyage is not a Bifrost ModelProvider (its enum doesn't include
+	// Voyage). The gateway proxies directly to api.voyageai.com — wire
+	// format is OpenAI-compatible so no body translation is required.
+	// Voyage ships embeddings only; any other request type lands on a
+	// clean unsupported-type error.
+	if cred.ProviderID == domain.ProviderVoyage {
+		return r.dispatchVoyageDirect(ctx, req, model, cred)
+	}
+
+	provider := mapProvider(cred.ProviderID)
 
 	if req.Type == domain.RequestTypeResponses {
 		return r.dispatchResponses(ctx, req, provider, model, cred)
@@ -241,6 +253,88 @@ func (r *BifrostRouter) dispatchEmbeddings(
 		Body:       body,
 		StatusCode: http.StatusOK,
 		Usage:      extractEmbeddingUsage(resp),
+	}, nil
+}
+
+// dispatchVoyageDirect proxies an embedding request directly to
+// api.voyageai.com. Voyage isn't in Bifrost's ModelProvider enum, so
+// the gateway bypasses Bifrost for Voyage-credentialed traffic. The
+// Voyage wire format is OpenAI-compatible (same `{"input": ..., "model": ...}`
+// shape, same `{"data": [{"embedding": [...]}], "usage": {...}}`
+// response), so the gateway forwards the body verbatim and surfaces
+// the upstream response as-is.
+//
+// Non-embedding request types fail cleanly here. Voyage ships no
+// chat/messages/responses APIs.
+func (r *BifrostRouter) dispatchVoyageDirect(
+	ctx context.Context,
+	req *domain.Request,
+	model string,
+	cred domain.Credential,
+) (*domain.Response, error) {
+	if req.Type != domain.RequestTypeEmbeddings {
+		return nil, herr.New(ctx, domain.ErrBadRequest, herr.M{
+			"reason": fmt.Sprintf("voyage credentials only accept embedding requests; got %s", req.Type),
+		})
+	}
+
+	// Voyage accepts the OpenAI shape verbatim. If the model id in the
+	// resolved cred is provider-prefixed (`voyage/voyage-3.5`), strip
+	// the prefix — Voyage's API just wants the bare model name.
+	bodyBytes := req.Body
+	if model != "" {
+		stripped := strings.TrimPrefix(model, "voyage/")
+		// Rewrite the model field on the JSON body to the bare name —
+		// keeps the gateway in control of which model lands at the
+		// provider regardless of what the caller put in the body.
+		var err error
+		bodyBytes, err = sjson.SetBytes(bodyBytes, "model", stripped)
+		if err != nil {
+			return nil, herr.New(ctx, domain.ErrBadRequest, herr.M{"reason": fmt.Sprintf("rewrite model on body: %v", err)})
+		}
+	}
+
+	httpReq, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodPost,
+		"https://api.voyageai.com/v1/embeddings",
+		bytes.NewReader(bodyBytes),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("voyage direct request: %w", err)
+	}
+	httpReq.Header.Set("Authorization", "Bearer "+cred.APIKey)
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 60 * time.Second}
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("voyage direct dispatch: %w", err)
+	}
+	defer resp.Body.Close()
+	raw, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("voyage direct read body: %w", err)
+	}
+
+	// Pull usage off the response for the gateway's cost-accounting
+	// pipeline. Voyage returns `usage: {total_tokens: N}` (no separate
+	// prompt/completion split — embedding endpoints only consume
+	// prompt tokens).
+	usage := domain.Usage{}
+	if resp.StatusCode == http.StatusOK {
+		total := int(gjson.GetBytes(raw, "usage.total_tokens").Int())
+		usage = domain.Usage{
+			PromptTokens:     total,
+			CompletionTokens: 0,
+			TotalTokens:      total,
+		}
+	}
+
+	return &domain.Response{
+		Body:       raw,
+		StatusCode: resp.StatusCode,
+		Usage:      usage,
 	}, nil
 }
 
