@@ -180,7 +180,14 @@ async function handleFileRead(
   // before hitting any throttle.
   const apiKeyProjectId = c.get("apiKeyProjectId");
   const userId = c.get("userId");
-  const callerKey = apiKeyProjectId ?? userId ?? "unknown";
+  const callerKey = apiKeyProjectId ?? userId;
+  if (!callerKey) {
+    // dualAuth guarantees one of these is set by the time we reach the
+    // rate-limit step; reaching this branch means a future refactor of
+    // dualAuth broke its contract. Refuse rather than fall back to a
+    // shared "unknown" bucket (DoS amplification surface).
+    throw new HTTPException(500, { message: "rate-limit key unresolved" });
+  }
   const rl = await rateLimit({
     key: `files-route:caller:${callerKey}`,
     windowSeconds: FILES_RATE_LIMIT_WINDOW_SECONDS,
