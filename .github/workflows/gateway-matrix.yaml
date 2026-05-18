@@ -34,7 +34,7 @@ on:
       providers:
         description: 'Build tags (space-separated). Default = all six.'
         type: string
-        default: 'live_openai live_anthropic live_gemini live_bedrock live_azure live_vertex'
+        default: 'live_openai live_anthropic live_gemini live_bedrock live_azure live_vertex live_embeddings'
       run_id_label:
         description: 'Optional label appended to trace tags for grep.'
         type: string
@@ -108,6 +108,12 @@ jobs:
       TEST_VK_BEDROCK: ${{ secrets.MATRIX_TEST_VK_BEDROCK }}
       TEST_VK_AZURE: ${{ secrets.MATRIX_TEST_VK_AZURE }}
       TEST_VK_VERTEX: ${{ secrets.MATRIX_TEST_VK_VERTEX }}
+      # Voyage VK + API key — used by the live_embeddings matrix once
+      # the Voyage direct-HTTP gateway adapter ships (Bifrost has no
+      # Voyage ModelProvider enum). The embeddings_test.go cell skips
+      # when VOYAGE_ENABLED is unset so this stays inert until then.
+      TEST_VK_VOYAGE: ${{ secrets.MATRIX_TEST_VK_VOYAGE }}
+      VOYAGE_API_KEY: ${{ secrets.MATRIX_VOYAGE_API_KEY }}
       LW_PROJECT_API_KEY: ${{ secrets.MATRIX_LW_PROJECT_API_KEY }}
 
     services:
@@ -194,7 +200,7 @@ jobs:
           # still produces useful coverage signal — a missing-cred
           # cell t.Skips with a clear reason instead of silently
           # being absent from the report.
-          MATRIX_TAGS: ${{ github.event.inputs.providers || 'live_openai live_anthropic live_gemini live_bedrock live_azure live_vertex' }}
+          MATRIX_TAGS: ${{ github.event.inputs.providers || 'live_openai live_anthropic live_gemini live_bedrock live_azure live_vertex live_embeddings' }}
         run: |
           go test -tags="$MATRIX_TAGS" -v -count=1 -timeout 1200s \
             ./tests/matrix/... 2>&1 | tee /tmp/matrix.log
