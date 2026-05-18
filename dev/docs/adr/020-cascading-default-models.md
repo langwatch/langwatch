@@ -1,4 +1,4 @@
-## ADR-020: CSS-cascade default models with one policy attached to N scopes
+## ADR-020: Cascading default models with one policy attached to N scopes
 
 **Date:** 2026-05-18
 
@@ -20,7 +20,7 @@ A second issue surfaced on 2026-05-18: the original implementation put the new t
 
 ## Decision
 
-We replace the row-per-(scope, role, featureKey) `ModelDefault` shape with a CSS-cascade JSON policy attached to N scopes via a dedicated join, and we add a per-model predicate validator to the multitenancy guard so neither parent nor join can be queried without a tenancy clause.
+We replace the row-per-(scope, role, featureKey) `ModelDefault` shape with a cascading JSON policy attached to N scopes via a dedicated join, and we add a per-model predicate validator to the multitenancy guard so neither parent nor join can be queried without a tenancy clause.
 
 Concretely:
 
