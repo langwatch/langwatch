@@ -1,6 +1,3 @@
-import { Box, HStack, Text } from "@chakra-ui/react";
-import { AlertCircle } from "lucide-react";
-
 import { toaster } from "./ui/toaster";
 
 /**
@@ -73,32 +70,17 @@ export function showMissingModelToast(info: MissingModelInfo): void {
   const roleLabel = ROLE_LABEL[info.role];
   const href = settingsHref(info);
 
+  const description =
+    info.canConfigure === false
+      ? `Ask an organization or project admin to set a ${roleLabel} model.`
+      : `Pick a ${roleLabel} model in Model Providers settings to enable ${info.featureDisplayName}.`;
+
   toaster.create({
     id,
-    type: "warning",
+    type: "error",
     duration: Infinity,
-    title: (
-      <HStack gap={2} align="center">
-        <AlertCircle size={16} color="var(--chakra-colors-orange-fg)" />
-        <Text fontWeight="medium">
-          Model not configured for {info.featureDisplayName}
-        </Text>
-      </HStack>
-    ) as unknown as string,
-    description: (
-      <Box fontSize="sm" color="fg.muted">
-        {info.canConfigure === false ? (
-          <Text>
-            Ask an organization or project admin to set a {roleLabel} model.
-          </Text>
-        ) : (
-          <Text>
-            Pick a {roleLabel} model in Model Providers settings to enable{" "}
-            {info.featureDisplayName}.
-          </Text>
-        )}
-      </Box>
-    ) as unknown as string,
+    title: `Model not configured for ${info.featureDisplayName}`,
+    description,
     action:
       info.canConfigure === false
         ? undefined
@@ -141,26 +123,16 @@ export function showAiCallFailedToast(info: AiCallFailedInfo): void {
   const roleLabel = ROLE_LABEL[info.role];
   const href = settingsHref({ ...info, canConfigure: true });
 
+  const description = info.errorMessage
+    ? `Double-check your ${roleLabel} model configuration in Model Providers. ${info.errorMessage}`
+    : `Double-check your ${roleLabel} model configuration in Model Providers.`;
+
   toaster.create({
     id,
     type: "error",
     duration: 10000,
-    title: (
-      <Text fontWeight="medium">{info.featureDisplayName} failed</Text>
-    ) as unknown as string,
-    description: (
-      <Box fontSize="sm" color="fg.muted">
-        <Text>
-          Double-check your {roleLabel} model configuration in Model
-          Providers.
-        </Text>
-        {info.errorMessage && (
-          <Text marginTop="1" fontSize="xs" color="fg.subtle">
-            {info.errorMessage}
-          </Text>
-        )}
-      </Box>
-    ) as unknown as string,
+    title: `${info.featureDisplayName} failed`,
+    description,
     action: {
       label: "Open settings",
       onClick: () => {
