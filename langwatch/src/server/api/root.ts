@@ -60,6 +60,7 @@ import { gatewayProvidersRouter } from "./routers/gatewayProviders";
 import { virtualKeysRouter } from "./routers/virtualKeys";
 import { workflowRouter } from "./routers/workflows";
 import { opsRouter } from "./routers/ops";
+import { storedObjectsRouter } from "./routers/stored-objects.router";
 
 const coreRouters = {
   agents: agentsRouter,
@@ -116,6 +117,7 @@ const coreRouters = {
   apiKey: apiKeyRouter,
   group: groupRouter,
   ops: opsRouter,
+  storedObjects: storedObjectsRouter,
   virtualKeys: virtualKeysRouter,
   gatewayProviders: gatewayProvidersRouter,
   gatewayBudgets: gatewayBudgetsRouter,

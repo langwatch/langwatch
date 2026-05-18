@@ -10,6 +10,7 @@
  */
 import { Badge, Box, Text, VStack } from "@chakra-ui/react";
 import { useEffect, useRef, useState } from "react";
+import { api } from "~/utils/api";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -41,6 +42,15 @@ export type MediaPartData =
 // Helpers
 // ---------------------------------------------------------------------------
 
+/**
+ * Extracts the stored-object id from a /api/files/:id URL, or returns null
+ * when the URL does not match that pattern (e.g. an external URL).
+ */
+function extractStoredObjectId(url: string): string | null {
+  const match = /\/api\/files\/([^/?#]+)/.exec(url);
+  return match?.[1] ?? null;
+}
+
 /** Resolve the media category from either a structured type or a mimeType string. */
 function resolveMediaCategory(
   type: string,
@@ -65,13 +75,15 @@ type LoadStatus = "loading" | "ok" | "missing" | "error";
 
 interface MediaPartProps {
   part: MediaPartData;
+  /** Project that owns this stored object. Required for the server-side existence probe. */
+  projectId: string;
 }
 
 /**
  * Renders a single AG-UI media content part as a native HTML5 media element,
  * a data: URI, or a missing-badge placeholder.
  */
-export function MediaPart({ part }: MediaPartProps) {
+export function MediaPart({ part, projectId }: MediaPartProps) {
   // Resolve src and category from the part shape
   let src: string;
   let mimeType: string | undefined;
@@ -107,9 +119,32 @@ export function MediaPart({ part }: MediaPartProps) {
 
   // Probe at most once per <src>: a single failed audio/video element can fire
   // `error` repeatedly while the browser retries decoders, and a long scenario
-  // can render the same file id in many places. Without a guard, each render
-  // would hit /api/files/:id again.
+  // can render the same file id in many places.
   const probedRef = useRef<string | null>(null);
+  // When true, the tRPC existence probe is fired once to distinguish
+  // "missing" (row absent) from "error" (transient failure).
+  const [probeEnabled, setProbeEnabled] = useState(false);
+
+  // Extract the stored-object id from the URL so the tRPC probe can look it up.
+  const storedObjectId = isUrlBased ? extractStoredObjectId(src) : null;
+
+  // Server-side existence probe via tRPC — replaces the native fetch HEAD probe.
+  // Inherits session auth automatically; no CORS / credential issues.
+  const { data: probeData } = api.storedObjects.headById.useQuery(
+    { projectId, id: storedObjectId ?? "" },
+    { enabled: probeEnabled && !!storedObjectId && !!projectId },
+  );
+
+  // When the probe result arrives, map it to a load status.
+  useEffect(() => {
+    if (!probeData) return;
+    if (!probeData.exists) {
+      setStatus("missing");
+    } else {
+      // Row exists but the browser element still errored — transient decode failure.
+      setStatus("error");
+    }
+  }, [probeData]);
 
   // When the src changes (parent swaps to a different file id or switches from
   // URL-based to inline-data), reset both the load status and the probe guard
@@ -117,6 +152,7 @@ export function MediaPart({ part }: MediaPartProps) {
   useEffect(() => {
     setStatus(isUrlBased ? "loading" : "ok");
     probedRef.current = null;
+    setProbeEnabled(false);
   }, [src, isUrlBased]);
 
   function handleLoad() {
@@ -129,27 +165,10 @@ export function MediaPart({ part }: MediaPartProps) {
     if (probedRef.current === src) return;
     probedRef.current = src;
 
-    // HEAD probe: distinguishes "missing" (404 with our status: missing
-    // shape) from "error" (5xx / network) without downloading the full
-    // payload again. The files route supports HEAD with the same auth
-    // and response headers as GET.
-    fetch(src, { method: "HEAD", credentials: "include" })
-      .then((r) => {
-        if (r.status === 404) {
-          setStatus("missing");
-        } else if (r.ok) {
-          // The element reported error but HEAD says the bytes are
-          // available — likely a transient decode failure. Show error so
-          // the user knows something went wrong; the bytes themselves
-          // aren't gone.
-          setStatus("error");
-        } else {
-          setStatus("error");
-        }
-      })
-      .catch(() => {
-        setStatus("error");
-      });
+    // Enable the tRPC probe to distinguish "missing" (row absent) from
+    // "error" (transient network/decode failure). The probe result is
+    // handled in the useEffect above.
+    setProbeEnabled(true);
   }
 
   // Missing or error placeholder

@@ -4,25 +4,62 @@
  * Integration tests for the MediaPart component.
  * Verifies that AG-UI media content parts render as native HTML5 elements,
  * fall back to data: URIs for legacy inline-data parts, and show a missing
- * placeholder when a URL-based fetch indicates the object is gone.
+ * placeholder when the tRPC existence probe indicates the object is gone.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { MediaPart } from "../MediaPart";
+
+// ---------------------------------------------------------------------------
+// tRPC mock — controls what api.storedObjects.headById.useQuery returns.
+// The mock respects the `enabled` option: when disabled it always returns
+// { data: undefined } so the probe effect does not fire prematurely.
+// ---------------------------------------------------------------------------
+
+const mockHeadByIdData = vi.fn(() => undefined as undefined | { exists: boolean; mediaType?: string });
+
+vi.mock("~/utils/api", () => ({
+  api: {
+    storedObjects: {
+      headById: {
+        useQuery: (
+          _input: unknown,
+          opts: { enabled?: boolean } | undefined,
+        ) => {
+          // Only return data when the query is enabled (i.e. after an error event).
+          if (!opts?.enabled) return { data: undefined };
+          return { data: mockHeadByIdData() };
+        },
+      },
+    },
+  },
+}));
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
+const TEST_PROJECT_ID = "proj_test";
+
 describe("<MediaPart/>", () => {
-  afterEach(cleanup);
+  afterEach(() => {
+    cleanup();
+    mockHeadByIdData.mockReset();
+    // Default: no data (probe not yet completed)
+    mockHeadByIdData.mockReturnValue(undefined);
+  });
 
   describe("when a message has a url-shape audio part", () => {
     /** @scenario "Trace timeline renders the new file id shape as an inline media tag" */
     it("renders an <audio> element pointing at the URL", () => {
       render(
         <MediaPart
+          projectId={TEST_PROJECT_ID}
           part={{
             type: "audio",
             source: {
@@ -45,6 +82,7 @@ describe("<MediaPart/>", () => {
     it("renders an <img> element for a url-shape image part", () => {
       render(
         <MediaPart
+          projectId={TEST_PROJECT_ID}
           part={{
             type: "image",
             source: {
@@ -66,6 +104,7 @@ describe("<MediaPart/>", () => {
     it("renders a <video> element for a url-shape video part", () => {
       render(
         <MediaPart
+          projectId={TEST_PROJECT_ID}
           part={{
             type: "video",
             source: {
@@ -93,6 +132,7 @@ describe("<MediaPart/>", () => {
 
       render(
         <MediaPart
+          projectId={TEST_PROJECT_ID}
           part={{
             type: "audio",
             source: {
@@ -116,6 +156,7 @@ describe("<MediaPart/>", () => {
 
       render(
         <MediaPart
+          projectId={TEST_PROJECT_ID}
           part={{
             type: "image",
             source: {
@@ -134,24 +175,15 @@ describe("<MediaPart/>", () => {
     });
   });
 
-  describe("when an audio fetch returns status missing", () => {
-    beforeEach(() => {
-      vi.spyOn(global, "fetch").mockResolvedValue(
-        new Response(JSON.stringify({ status: "missing" }), {
-          status: 404,
-          headers: { "Content-Type": "application/json" },
-        }),
-      );
-    });
-
-    afterEach(() => {
-      vi.restoreAllMocks();
-    });
-
+  describe("when the tRPC probe returns exists: false (missing)", () => {
     /** @scenario "Trace timeline shows a missing badge when the byte content is no longer retrievable" */
     it("renders a missing-badge placeholder labeled with the mediaType", async () => {
+      // Prime the mock so the query returns { exists: false } once the probe is enabled.
+      mockHeadByIdData.mockReturnValue({ exists: false });
+
       render(
         <MediaPart
+          projectId={TEST_PROJECT_ID}
           part={{
             type: "audio",
             source: {
@@ -168,7 +200,7 @@ describe("<MediaPart/>", () => {
       const audio = screen.getByTestId("media-part-audio") as HTMLAudioElement;
       audio.dispatchEvent(new Event("error"));
 
-      // After the error, MediaPart fetches and detects 404 → shows placeholder
+      // After the error, the tRPC probe result (exists: false) drives the placeholder
       await waitFor(() => {
         expect(screen.getByTestId("media-part-missing")).toBeInTheDocument();
       });
@@ -178,27 +210,15 @@ describe("<MediaPart/>", () => {
     });
   });
 
-  describe("when an audio fetch returns a transient 502 (storage error, not missing)", () => {
-    beforeEach(() => {
-      // HEAD probe returns 502 — the row exists but the storage backend
-      // reported a transient failure. MediaPart should land on the "error"
-      // state, not "missing", so the user knows the bytes weren't gone,
-      // they just couldn't be served right now.
-      vi.spyOn(global, "fetch").mockResolvedValue(
-        new Response(JSON.stringify({ error: "file temporarily unavailable" }), {
-          status: 502,
-          headers: { "Content-Type": "application/json" },
-        }),
-      );
-    });
-
-    afterEach(() => {
-      vi.restoreAllMocks();
-    });
-
+  describe("when the tRPC probe returns exists: true (storage transient error, not missing)", () => {
     it("renders an error-badge placeholder (distinct from missing)", async () => {
+      // Row exists in ClickHouse but the browser element still errored — transient
+      // decode / storage failure. MediaPart should land on "error", not "missing".
+      mockHeadByIdData.mockReturnValue({ exists: true, mediaType: "audio/mp3" });
+
       render(
         <MediaPart
+          projectId={TEST_PROJECT_ID}
           part={{
             type: "audio",
             source: {
@@ -230,6 +250,7 @@ describe("<MediaPart/>", () => {
     it("the <audio> element exposes controls and a non-zero duration so the play button is enabled", async () => {
       render(
         <MediaPart
+          projectId={TEST_PROJECT_ID}
           part={{
             type: "audio",
             source: {
