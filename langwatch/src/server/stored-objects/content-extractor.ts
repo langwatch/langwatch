@@ -17,6 +17,7 @@ import { getLangWatchTracer } from "langwatch";
 import { z } from "zod";
 import { createLogger } from "~/utils/logger/server";
 import { binaryInputPartSchema } from "./binary-part";
+import { isReadbackSafe } from "./safe-media-types";
 import type { StoredObjectsService } from "./stored-objects.service";
 
 const tracer = getLangWatchTracer("langwatch.stored-objects.content-extractor");
@@ -73,6 +74,20 @@ async function processContentPart({
     part.source.type === "data"
   ) {
     const { value: base64, mimeType } = part.source;
+
+    // For document parts, reject MIME types the read path can't faithfully
+    // serve. The /api/files route downgrades anything outside the allowlist to
+    // application/octet-stream, so text/csv, application/json, etc. would
+    // ingest silently but come back as a blob download. Pass through unchanged
+    // rather than corrupt the round-trip.
+    if (part.type === "document" && !isReadbackSafe(mimeType)) {
+      logger.debug(
+        { mimeType },
+        "document part has an unsafe MIME type — passing through unchanged",
+      );
+      return { part, ref: null };
+    }
+
     const bytes = Buffer.from(base64, "base64");
 
     const result = await service.storeFromBytes({

@@ -488,4 +488,94 @@ describe("extractInlineMediaFromEvent", () => {
       expect(service.storeFromBytes).not.toHaveBeenCalled();
     });
   });
+
+  describe("when a document part has an unsafe MIME type (not in the read-path allowlist)", () => {
+    it("passes through text/csv document parts unchanged and does not call storeFromBytes", async () => {
+      const service = makeService();
+      const event = makeEventWithContent([
+        {
+          type: "document",
+          source: {
+            type: "data",
+            value: makeBase64Payload("col1,col2\nval1,val2"),
+            mimeType: "text/csv",
+          },
+        },
+      ]);
+
+      const { rewrittenEvent, refs } = await extractInlineMediaFromEvent({
+        ...BASE_PARAMS,
+        event,
+        service,
+      });
+
+      expect(rewrittenEvent).toBe(event);
+      expect(refs).toHaveLength(0);
+      expect(service.storeFromBytes).not.toHaveBeenCalled();
+    });
+
+    it("passes through application/json document parts unchanged and does not call storeFromBytes", async () => {
+      const service = makeService();
+      const event = makeEventWithContent([
+        {
+          type: "document",
+          source: {
+            type: "data",
+            value: makeBase64Payload('{"key":"value"}'),
+            mimeType: "application/json",
+          },
+        },
+      ]);
+
+      const { rewrittenEvent, refs } = await extractInlineMediaFromEvent({
+        ...BASE_PARAMS,
+        event,
+        service,
+      });
+
+      expect(rewrittenEvent).toBe(event);
+      expect(refs).toHaveLength(0);
+      expect(service.storeFromBytes).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a document part has a safe MIME type (application/pdf)", () => {
+    it("stores the bytes and rewrites the part to source.type=url", async () => {
+      const base64Payload = makeBase64Payload("%PDF-1.4 fake pdf bytes");
+      const mimeType = "application/pdf";
+      const storedId = "stored-pdf-id";
+
+      const service = makeService({
+        storeFromBytes: vi.fn().mockResolvedValue({
+          id: storedId,
+          mediaType: mimeType,
+          isDuplicate: false,
+        }),
+      });
+
+      const event = makeEventWithContent([
+        {
+          type: "document",
+          source: { type: "data", value: base64Payload, mimeType },
+        },
+      ]);
+
+      const { rewrittenEvent, refs } = await extractInlineMediaFromEvent({
+        ...BASE_PARAMS,
+        event,
+        service,
+      });
+
+      expect(service.storeFromBytes).toHaveBeenCalledOnce();
+      expect(refs).toHaveLength(1);
+      expect(refs[0]!.id).toBe(storedId);
+
+      const content = (rewrittenEvent as { message: { content: unknown[] } }).message.content;
+      expect(content).toHaveLength(1);
+      expect(content[0]).toMatchObject({
+        type: "document",
+        source: { type: "url", value: `/api/files/${storedId}`, mimeType },
+      });
+    });
+  });
 });

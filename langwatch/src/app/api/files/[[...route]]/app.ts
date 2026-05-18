@@ -10,6 +10,10 @@ import { rateLimit } from "~/server/rateLimit";
 import { resolveStoredObjectOwner } from "~/server/stored-objects/stored-objects-cross-tenant-lookup";
 import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
 import {
+  SAFE_MEDIA_TYPE_PREFIXES,
+  SAFE_MEDIA_TYPES_EXACT,
+} from "~/server/stored-objects/safe-media-types";
+import {
   authMiddleware,
   handleError,
   loggerMiddleware,
@@ -109,25 +113,17 @@ const dualAuth: MiddlewareHandler<{ Variables: Variables }> = async (
 };
 
 /**
- * Media types we'll serve with the requested Content-Type. Anything else
- * is coerced to application/octet-stream to neutralize MIME sniffing and
- * stored-XSS primitives (an attacker can't trick a browser into
- * interpreting their payload as text/html or application/javascript).
+ * Resolves the Content-Type header for a stored-object response.
  *
- * Conservative on purpose — operators can widen the list when a new
- * media kind ships through scenario events.
+ * Returns the requested mediaType when it is in the shared SAFE_MEDIA_TYPES
+ * allowlist (see `safe-media-types.ts`). Anything else is coerced to
+ * application/octet-stream to neutralize MIME sniffing and stored-XSS
+ * primitives (an attacker can't trick a browser into interpreting their
+ * payload as text/html or application/javascript).
+ *
+ * The allowlist is the single source of truth shared with the ingest-path
+ * extractor — widen it in safe-media-types.ts and both surfaces update.
  */
-const SAFE_MEDIA_TYPE_PREFIXES = [
-  "audio/",
-  "image/",
-  "video/",
-] as const;
-
-const SAFE_MEDIA_TYPES_EXACT = new Set([
-  "application/pdf",
-  "application/octet-stream",
-]);
-
 function safeMediaType(mediaType: string): string {
   if (SAFE_MEDIA_TYPES_EXACT.has(mediaType)) return mediaType;
   if (SAFE_MEDIA_TYPE_PREFIXES.some((p) => mediaType.startsWith(p))) {

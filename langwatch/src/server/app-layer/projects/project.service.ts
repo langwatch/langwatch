@@ -8,6 +8,7 @@ import { KSUID_RESOURCES } from "~/utils/constants";
 import { slugify } from "~/utils/slugify";
 import { createLogger } from "~/utils/logger/server";
 import { captureException } from "~/utils/posthogErrorCapture";
+import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
 import type {
   PaginatedResult,
   PresenceConfig,
@@ -166,6 +167,19 @@ export class ProjectService {
     id: string;
     organizationId: string;
   }): Promise<Project> {
+    // Cascade-delete stored-object bytes BEFORE the archive so BYOC S3 credentials
+    // are still resolvable from the live project row. Wrapped in try/catch so a
+    // cascade failure never blocks the user-facing project deletion — orphan bytes
+    // can be swept up later, but a blocked deletion is a worse UX.
+    try {
+      await createStoredObjectsService({ projectId: id }).cascadeDeleteProject({ projectId: id });
+    } catch (error) {
+      logger.warn(
+        { projectId: id, error },
+        "cascadeDeleteProject failed during project archive; continuing with archive — orphan bytes may need manual cleanup",
+      );
+    }
+
     const project = await this.repo.archive({ id, organizationId });
     if (!project) throw new ProjectNotFoundError("Project not found");
     return project;
