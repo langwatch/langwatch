@@ -12,6 +12,10 @@ import {
   DEFAULT_TOPIC_CLUSTERING_MODEL,
 } from "../../utils/constants";
 import { isProviderDefaultModel } from "../../utils/modelProviderHelpers";
+import {
+  pickFlagshipFromOptions,
+  pickLatestEmbeddingFromOptions,
+} from "../../utils/pickFlagshipModel";
 import { modelSelectorOptions } from "../ModelSelector";
 import { SmallLabel } from "../SmallLabel";
 import { Switch } from "../ui/switch";
@@ -139,17 +143,29 @@ export const DefaultProviderSection = ({
               // if the current state values don't belong to this provider
               // Only set if there are options available, otherwise allow custom input
               if (details.checked) {
+                // For each role, prefer (in order): the existing
+                // state value if it already targets this provider, the
+                // family-flagship pick from the registry (so a fresh
+                // Gemini drawer picks `gemini-3.1-pro-preview` instead
+                // of whatever's first in alphabetical order), the
+                // global DEFAULT_MODEL constant if it happens to match,
+                // and finally the first option as a last resort.
                 if (
                   !state.projectDefaultModel?.startsWith(
                     `${provider.provider}/`,
                   ) &&
                   chatOptions.length > 0
                 ) {
-                  const defaultModel = DEFAULT_MODEL.startsWith(
-                    `${provider.provider}/`,
-                  )
-                    ? DEFAULT_MODEL
-                    : chatOptions[0];
+                  const flagship = pickFlagshipFromOptions(
+                    provider.provider,
+                    "flagship",
+                    chatOptions,
+                  );
+                  const defaultModel =
+                    flagship ??
+                    (DEFAULT_MODEL.startsWith(`${provider.provider}/`)
+                      ? DEFAULT_MODEL
+                      : chatOptions[0]);
                   actions.setProjectDefaultModel(defaultModel ?? null);
                 }
                 if (
@@ -158,12 +174,18 @@ export const DefaultProviderSection = ({
                   ) &&
                   chatOptions.length > 0
                 ) {
+                  const mini = pickFlagshipFromOptions(
+                    provider.provider,
+                    "mini",
+                    chatOptions,
+                  );
                   const defaultModel =
-                    DEFAULT_TOPIC_CLUSTERING_MODEL.startsWith(
+                    mini ??
+                    (DEFAULT_TOPIC_CLUSTERING_MODEL.startsWith(
                       `${provider.provider}/`,
                     )
                       ? DEFAULT_TOPIC_CLUSTERING_MODEL
-                      : chatOptions[0];
+                      : chatOptions[0]);
                   actions.setProjectTopicClusteringModel(defaultModel ?? null);
                 }
                 if (
@@ -172,11 +194,15 @@ export const DefaultProviderSection = ({
                   ) &&
                   embeddingOptions.length > 0
                 ) {
-                  const defaultModel = embeddingOptions.includes(
-                    DEFAULT_EMBEDDINGS_MODEL,
-                  )
-                    ? DEFAULT_EMBEDDINGS_MODEL
-                    : embeddingOptions[0];
+                  const embedding = pickLatestEmbeddingFromOptions(
+                    provider.provider,
+                    embeddingOptions,
+                  );
+                  const defaultModel =
+                    embedding ??
+                    (embeddingOptions.includes(DEFAULT_EMBEDDINGS_MODEL)
+                      ? DEFAULT_EMBEDDINGS_MODEL
+                      : embeddingOptions[0]);
                   actions.setProjectEmbeddingsModel(defaultModel ?? null);
                 }
               }

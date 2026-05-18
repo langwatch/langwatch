@@ -36,6 +36,48 @@ function pickLatestOpenAIChat(suffixFilter: "plain" | "mini"): string | undefine
   return candidates[0]?.id;
 }
 
+/**
+ * Picks the newest Gemini chat model in the requested family. Gemini
+ * ids look like `gemini/gemini-<major>.<minor>-<variant>` or
+ * `gemini/gemini-<major>.<minor>-<variant>-preview`. We sort numerically
+ * on (major, minor) so the latest version wins regardless of the
+ * "-preview" suffix.
+ *
+ * Variants we care about:
+ *   - "pro" (or "pro-preview"): the flagship, used for DEFAULT
+ *   - "flash" or "flash-lite": the mini, used for FAST
+ *
+ * Matching is permissive on the suffix so `gemini-3.1-pro-preview`
+ * beats `gemini-3.0-pro` even though the former has the longer
+ * suffix.
+ */
+function pickLatestGeminiChat(family: "pro" | "flash"): string | undefined {
+  const candidates: { id: string; major: number; minor: number }[] = [];
+  for (const model of Object.values(REGISTRY)) {
+    if (model.provider !== "gemini" || model.mode !== "chat") continue;
+    const m = /^gemini\/gemini-(\d+)\.(\d+)-([a-z-]+)$/.exec(model.id);
+    if (!m) continue;
+    const [, major, minor, suffix] = m;
+    // "pro" matches "pro", "pro-preview". "flash" matches "flash",
+    // "flash-lite", "flash-thinking", etc. Most-specific family wins:
+    // if the caller asks for flash, don't match pro-flash hybrids.
+    const matchesFamily =
+      family === "pro"
+        ? /^pro(-|$)/.test(suffix!)
+        : /^flash(-|$)/.test(suffix!);
+    if (!matchesFamily) continue;
+    candidates.push({
+      id: model.id,
+      major: Number(major),
+      minor: Number(minor),
+    });
+  }
+  candidates.sort((a, b) =>
+    b.major !== a.major ? b.major - a.major : b.minor - a.minor,
+  );
+  return candidates[0]?.id;
+}
+
 /** Picks the newest `anthropic/claude-<variant>-<major>-<minor>` chat model. */
 function pickLatestAnthropicChat(variant: string): string | undefined {
   const candidates: { id: string; major: number; minor: number }[] = [];
@@ -100,6 +142,13 @@ export function buildSeedPlanForProvider(
       DEFAULT: pickLatestAnthropicChat("sonnet"),
       FAST: pickLatestAnthropicChat("haiku"),
       // Anthropic ships no embeddings model.
+    };
+  }
+  if (provider === "gemini") {
+    return {
+      DEFAULT: pickLatestGeminiChat("pro"),
+      FAST: pickLatestGeminiChat("flash"),
+      EMBEDDINGS: pickLatestEmbedding("gemini"),
     };
   }
   // No special-case for the provider yet — leave the plan empty so

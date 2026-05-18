@@ -17,6 +17,34 @@ export type ScopeAttachment = {
 };
 
 /**
+ * Acquire a transaction-scoped Postgres advisory lock keyed by the
+ * (scopeType, scopeId) pair. Serialises concurrent `setRoleAtScope` /
+ * `setFeatureAtScope` calls at the same scope so the
+ *   findMany → (create | update)
+ * pattern can't race three concurrent provider-submit mutations into
+ * three separate ModelDefaultConfig rows. The lock is held only for
+ * the duration of the surrounding `$transaction`; unrelated scopes
+ * (or unrelated orgs) never contend.
+ *
+ * `pg_advisory_xact_lock(bigint)` takes a 64-bit int; we hash the
+ * scope key with Postgres' `hashtextextended` (deterministic, no
+ * collisions in practice for the scope-id space) to get one.
+ *
+ * The bug this prevents: useProviderFormSubmit fans out 3 concurrent
+ * mutations (DEFAULT / FAST / EMBEDDINGS) on the same scope. Without
+ * the lock, all three see no existing config and each creates a fresh
+ * one, leaving 3 separate ModelDefaultConfig rows attached to the
+ * same scope. Caught on rchaves's 2026-05-18 dogfood.
+ */
+async function lockScope(
+  tx: Pick<PrismaClient, "$queryRaw">,
+  scopeType: ModelDefaultScopeType,
+  scopeId: string,
+): Promise<void> {
+  await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`mdc:${scopeType}:${scopeId}`}, 0))`;
+}
+
+/**
  * Allowed keys in a ModelDefaultConfig JSON: role names + every
  * feature key registered today. Anything else is silently dropped at
  * the write boundary so a typo can't leak into storage.
@@ -205,44 +233,12 @@ export async function setRoleAtScope(
   if (!valid.has(params.role)) {
     throw new Error(`Unknown role: "${params.role}".`);
   }
-
-  // Pick the config to mutate: if multiple are attached at this
-  // exact scope, take the newest (matches the resolver's same-scope
-  // tiebreak so the user's edit affects the row they actually see).
-  const attached = await ctx.prisma.modelDefaultConfigScope.findMany({
-    where: { scopeType: params.scopeType, scopeId: params.scopeId },
-    select: { config: { select: { id: true, config: true, createdAt: true } } },
-  });
-  attached.sort(
-    (a, b) =>
-      (b.config.createdAt?.getTime() ?? 0) -
-      (a.config.createdAt?.getTime() ?? 0),
-  );
-  const target = attached[0]?.config;
-
-  if (params.model === null) {
-    // Clearing a key the active config doesn't have is a no-op.
-    if (!target) return;
-    const next = { ...((target.config ?? {}) as Record<string, unknown>) };
-    delete next[params.role];
-    await updateConfig(ctx, { id: target.id, config: next, authorId: params.authorId });
-    return;
-  }
-
-  if (target) {
-    const next = {
-      ...((target.config ?? {}) as Record<string, unknown>),
-      [params.role]: params.model,
-    };
-    await updateConfig(ctx, { id: target.id, config: next, authorId: params.authorId });
-    return;
-  }
-
-  // No config attached at this scope — create one with just this role.
-  await createConfig(ctx, {
-    config: { [params.role]: params.model },
-    scopes: [{ scopeType: params.scopeType, scopeId: params.scopeId }],
-    authorId: params.authorId ?? null,
+  await upsertKeyAtScope(ctx, {
+    scopeType: params.scopeType,
+    scopeId: params.scopeId,
+    key: params.role,
+    model: params.model,
+    authorId: params.authorId,
   });
 }
 
@@ -263,38 +259,85 @@ export async function setFeatureAtScope(
   if (!featureByKey(params.featureKey)) {
     throw new Error(`Unknown feature key: "${params.featureKey}".`);
   }
-
-  const attached = await ctx.prisma.modelDefaultConfigScope.findMany({
-    where: { scopeType: params.scopeType, scopeId: params.scopeId },
-    select: { config: { select: { id: true, config: true, createdAt: true } } },
+  await upsertKeyAtScope(ctx, {
+    scopeType: params.scopeType,
+    scopeId: params.scopeId,
+    key: params.featureKey,
+    model: params.model,
+    authorId: params.authorId,
   });
-  attached.sort(
-    (a, b) =>
-      (b.config.createdAt?.getTime() ?? 0) -
-      (a.config.createdAt?.getTime() ?? 0),
-  );
-  const target = attached[0]?.config;
+}
 
-  if (params.model === null) {
-    if (!target) return;
-    const next = { ...((target.config ?? {}) as Record<string, unknown>) };
-    delete next[params.featureKey];
-    await updateConfig(ctx, { id: target.id, config: next, authorId: params.authorId });
-    return;
-  }
+/**
+ * Shared upsert path for setRoleAtScope + setFeatureAtScope. Runs
+ * inside a `$transaction` so the advisory lock is released exactly
+ * when the write commits / rolls back, and so concurrent callers at
+ * the same scope serialise without contending across scopes.
+ *
+ *  1. Acquire the per-scope advisory lock (release on tx end).
+ *  2. Look for an existing config attached to the scope. If multiple,
+ *     pick the newest (matches the resolver's same-scope tiebreak
+ *     so the user's edit affects the row they actually see).
+ *  3. If model is null, remove the key from the existing config (or
+ *     no-op if no config carries it).
+ *  4. Otherwise merge the key into the existing config or create a
+ *     fresh one with just this key.
+ */
+async function upsertKeyAtScope(
+  ctx: Ctx,
+  params: {
+    scopeType: ModelDefaultScopeType;
+    scopeId: string;
+    key: string;
+    model: string | null;
+    authorId?: string | null;
+  },
+): Promise<void> {
+  await ctx.prisma.$transaction(async (tx) => {
+    await lockScope(tx as unknown as PrismaClient, params.scopeType, params.scopeId);
 
-  if (target) {
-    const next = {
-      ...((target.config ?? {}) as Record<string, unknown>),
-      [params.featureKey]: params.model,
-    };
-    await updateConfig(ctx, { id: target.id, config: next, authorId: params.authorId });
-    return;
-  }
+    const attached = await tx.modelDefaultConfigScope.findMany({
+      where: { scopeType: params.scopeType, scopeId: params.scopeId },
+      select: {
+        config: { select: { id: true, config: true, createdAt: true } },
+      },
+    });
+    attached.sort(
+      (a, b) =>
+        (b.config.createdAt?.getTime() ?? 0) -
+        (a.config.createdAt?.getTime() ?? 0),
+    );
+    const target = attached[0]?.config;
 
-  await createConfig(ctx, {
-    config: { [params.featureKey]: params.model },
-    scopes: [{ scopeType: params.scopeType, scopeId: params.scopeId }],
-    authorId: params.authorId ?? null,
+    if (params.model === null) {
+      if (!target) return;
+      const next = { ...((target.config ?? {}) as Record<string, unknown>) };
+      delete next[params.key];
+      await updateConfig({ prisma: tx as unknown as PrismaClient }, {
+        id: target.id,
+        config: next,
+        authorId: params.authorId,
+      });
+      return;
+    }
+
+    if (target) {
+      const next = {
+        ...((target.config ?? {}) as Record<string, unknown>),
+        [params.key]: params.model,
+      };
+      await updateConfig({ prisma: tx as unknown as PrismaClient }, {
+        id: target.id,
+        config: next,
+        authorId: params.authorId,
+      });
+      return;
+    }
+
+    await createConfig({ prisma: tx as unknown as PrismaClient }, {
+      config: { [params.key]: params.model },
+      scopes: [{ scopeType: params.scopeType, scopeId: params.scopeId }],
+      authorId: params.authorId ?? null,
+    });
   });
 }
