@@ -333,6 +333,7 @@ export function useProviderFormSubmit({
       await Promise.all([
         utils.modelProvider.getAllForProject.invalidate(),
         utils.modelProvider.getAllForProjectForFrontend.invalidate(),
+        utils.modelProvider.listAllForProjectForFrontend.invalidate(),
         utils.modelProvider.getResolvedDefault.invalidate(),
       ]);
 

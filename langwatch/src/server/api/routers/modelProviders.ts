@@ -32,6 +32,7 @@ import {
 import {
   getProjectModelProviders,
   getProjectModelProvidersForFrontend,
+  listProjectModelProvidersForFrontend,
 } from "./modelProviders.utils";
 import { isManagedProvider } from "../../../../ee/managed-providers/managedBedrockConfig";
 
@@ -74,6 +75,20 @@ export const modelProviderRouter = createTRPCRouter({
         projectId,
         hasSetupPermission,
       );
+    }),
+  /**
+   * List shape: one entry per stored ModelProvider row, no collapsing
+   * by provider key. Use this for surfaces that need to render every
+   * row (the settings page Model Providers table) rather than the
+   * narrowest-scope-per-provider view returned by
+   * `getAllForProjectForFrontend`. Multi-instance setups (e.g. two
+   * "OpenAI" rows at different scopes) appear as two distinct entries.
+   */
+  listAllForProjectForFrontend: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .use(checkProjectPermission("project:view"))
+    .query(async ({ input }) => {
+      return await listProjectModelProvidersForFrontend(input.projectId);
     }),
   update: protectedProcedure
     .input(

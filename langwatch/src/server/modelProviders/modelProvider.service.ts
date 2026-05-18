@@ -143,6 +143,81 @@ export class ModelProviderService {
   }
 
   /**
+   * List shape of every ModelProvider accessible to a project — one
+   * entry per stored row, no collapsing by provider key. The page-level
+   * Model Providers table needs this so it can render multi-instance
+   * setups (e.g. "OpenAI — Org" + "OpenAI — Project override") as two
+   * rows; the `Record<provider, …>` shape returned by
+   * `getProjectModelProvidersForFrontend` silently drops the loser.
+   *
+   * API keys are masked.
+   */
+  async listProjectModelProvidersForFrontend(
+    projectId: string,
+  ): Promise<MaybeStoredModelProvider[]> {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+    });
+    if (!project) throw new Error("Project not found");
+
+    const defaultProviders = this.buildDefaultProviders(project);
+    const savedProviders = await this.repository.findAllAccessibleForProject(
+      projectId,
+    );
+
+    return savedProviders
+      .filter((mp) => this.shouldKeepModelProvider(mp, defaultProviders))
+      .map((mp) => {
+        const defaultProvider = defaultProviders[mp.provider];
+        const customModels = toLegacyCompatibleCustomModels(
+          mp.customModels,
+          "chat",
+        );
+        const customEmbeddingsModels = toLegacyCompatibleCustomModels(
+          mp.customEmbeddingsModels,
+          "embedding",
+        );
+        const narrowestScope = this.pickNarrowestScope(mp.scopes);
+        const masked = (mp.customKeys
+          ? Object.fromEntries(
+              Object.entries(
+                mp.customKeys as Record<string, unknown>,
+              ).map(([key, value]) => [
+                key,
+                KEY_CHECK.some((k) => key.includes(k))
+                  ? MASKED_KEY_PLACEHOLDER
+                  : value,
+              ]),
+            )
+          : null) as MaybeStoredModelProvider["customKeys"];
+        const provider_: MaybeStoredModelProvider = {
+          id: mp.id,
+          name: mp.name,
+          provider: mp.provider,
+          enabled: mp.enabled,
+          customKeys: masked,
+          models: defaultProvider?.models ?? null,
+          embeddingsModels: defaultProvider?.embeddingsModels ?? null,
+          customModels: customModels.length > 0 ? customModels : null,
+          customEmbeddingsModels:
+            customEmbeddingsModels.length > 0 ? customEmbeddingsModels : null,
+          deploymentMapping: mp.deploymentMapping,
+          disabledByDefault: defaultProvider?.disabledByDefault,
+          extraHeaders: mp.extraHeaders as
+            | { key: string; value: string }[]
+            | null,
+          scopes: mp.scopes.map((s) => ({
+            scopeType: s.scopeType as "ORGANIZATION" | "TEAM" | "PROJECT",
+            scopeId: s.scopeId,
+          })),
+          scopeType: narrowestScope.scopeType,
+          scopeId: narrowestScope.scopeId,
+        };
+        return provider_;
+      });
+  }
+
+  /**
    * Updates or creates a model provider.
    *
    * Business rules:

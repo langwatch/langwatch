@@ -26,7 +26,6 @@ import SettingsLayout from "../../components/SettingsLayout";
 import { Dialog } from "../../components/ui/dialog";
 import { Menu } from "../../components/ui/menu";
 import { Tooltip } from "../../components/ui/tooltip";
-import { useModelProvidersSettings } from "../../hooks/useModelProvidersSettings";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { modelProviderIcons } from "../../server/modelProviders/iconsMap";
 import { modelProviders as modelProvidersRegistry } from "../../server/modelProviders/registry";
@@ -36,9 +35,18 @@ export default function ModelsPage() {
   const { project, organization, team, hasPermission } =
     useOrganizationTeamProject();
   const hasModelProvidersManagePermission = hasPermission("project:manage");
-  const { providers, isLoading, refetch } = useModelProvidersSettings({
-    projectId: project?.id,
-  });
+  // The settings page renders one row per stored ModelProvider — the
+  // Record-by-provider-key shape returned by `useModelProvidersSettings`
+  // collapses multi-instance setups (two "OpenAI" rows at different
+  // scopes) into a single entry and silently drops the loser. Use the
+  // flat list endpoint instead so the table reflects every row.
+  const listQuery = api.modelProvider.listAllForProjectForFrontend.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project?.id },
+  );
+  const allProvidersList = listQuery.data?.providers ?? [];
+  const isLoading = listQuery.isLoading;
+  const refetch = listQuery.refetch;
 
   const { openDrawer, drawerOpen: isDrawerOpen } = useDrawer();
   const isProviderDrawerOpen = isDrawerOpen("editModelProvider");
@@ -79,9 +87,8 @@ export default function ModelsPage() {
   }, [organization]);
 
   const allEnabledProviders = useMemo(() => {
-    if (!providers) return [];
-    return Object.values(providers).filter((provider) => provider.enabled);
-  }, [providers]);
+    return allProvidersList.filter((provider) => provider.enabled);
+  }, [allProvidersList]);
 
   // Provider-key set the Default Models table uses to flag cells whose
   // `provider/...` model id no longer maps to an enabled provider. Use
@@ -422,6 +429,7 @@ export default function ModelsPage() {
                   await Promise.all([
                     utils.modelProvider.getAllForProject.invalidate(),
                     utils.modelProvider.getAllForProjectForFrontend.invalidate(),
+                    utils.modelProvider.listAllForProjectForFrontend.invalidate(),
                     utils.modelProvider.getResolvedDefault.invalidate(),
                     utils.modelProvider.getDefaultModelsForProject.invalidate(),
                   ]);
