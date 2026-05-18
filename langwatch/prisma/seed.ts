@@ -56,8 +56,33 @@ async function main() {
     },
   });
 
+  // Seed a default-model config at the organization scope so prompt-
+  // create + workflow runs in e2e tests resolve a model without
+  // requiring CI to also seed model-providers. Mirrors production
+  // first-provider onboarding: a fresh org needs SOMETHING the
+  // cascade can hand back before any prompt/eval can land.
+  const defaultConfig = await prisma.modelDefaultConfig.create({
+    data: {
+      id: nanoid(),
+      config: {
+        DEFAULT: "openai/gpt-5-mini",
+        FAST: "openai/gpt-5-mini",
+        EMBEDDINGS: "openai/text-embedding-3-small",
+      },
+    },
+  });
+  await prisma.modelDefaultConfigScope.create({
+    data: {
+      id: nanoid(),
+      configId: defaultConfig.id,
+      scopeType: "ORGANIZATION",
+      scopeId: organization.id,
+    },
+  });
+
   console.log(`✅ Created test project with ID: ${project.id}`);
   console.log(`✅ API Key: ${project.apiKey}`);
+  console.log(`✅ Seeded default-model config at organization scope`);
 }
 
 main()
