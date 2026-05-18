@@ -92,17 +92,18 @@ service-watch:
 # all-local, all-local-nlp, dev-storage, dev-infra, frontend-only,
 # migration, full-local.
 
-# Run all *.unit.bats tests under scripts/__tests__/. Wired into CI's
-# `ci-scripts-test` job so shell-script behavior gates merges the same
-# way TypeScript unit tests do. Requires `bats` (`brew install bats-core`
-# locally; installed via apt-get on Ubuntu CI runners).
+# Run all *.unit.bats tests under scripts/__tests__/. Dev-only — these
+# tests cover shell behavior of `dev.sh` / `write-dev-overrides.sh` /
+# `worktree.sh` / `boxd-fork.sh`. CI does NOT run them; the launchers
+# are local dev tools, not part of the shipped product. If you're
+# editing one of those scripts, run `make test-scripts` to verify.
 #
-# We deliberately glob only *.unit.bats, not all *.bats. The
-# *.integration.bats files (boxd-fork, worktree) exercise scripts that
-# shell out to git / docker / external CLIs against the contributor's
-# real filesystem; running them in CI either flakes or requires fixtures
-# that don't exist in a fresh checkout. Integration coverage for those
-# is owned by their respective workflows, not this target.
+# Requires `bats` (`brew install bats-core` on macOS,
+# `sudo apt-get install -y bats` on Linux).
+#
+# Globs only *.unit.bats — the *.integration.bats files shell out to
+# git / docker / external CLIs against the real filesystem and need
+# fixtures.
 test-scripts:
 	@if ! command -v bats >/dev/null 2>&1; then \
 		echo "ERROR: bats not installed. Install with:" >&2; \
