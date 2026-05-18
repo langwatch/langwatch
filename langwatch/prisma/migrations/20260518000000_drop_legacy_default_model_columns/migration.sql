@@ -17,6 +17,20 @@
 -- the openai/gpt-4o-mini constant on fresh accounts. If a project
 -- has no role configured at any scope, AI features throw
 -- ModelNotConfiguredError and the user sees a sticky toast.
+--
+-- Rolling-update decision (decided on this PR after the deep-review
+-- raised the column-not-found-during-rollout risk):
+--   The DROP runs in the same release as the code that stops reading
+--   the columns. Prisma applies migrations before the new pod set
+--   finishes rolling, so any pod still on the previous release would
+--   crash on its next SELECT against these columns until the rollout
+--   finishes. We accept that window — the prod DB has a recent
+--   backup, the affected SELECT paths are cosmetic (default-model
+--   prefill, settings render), and we prefer dropping the dead
+--   columns in one shot over carrying a "schema clean / data dead"
+--   split across two releases. If a future migration of this shape
+--   hits a hotter path, defer the physical DROP to a follow-up
+--   instead.
 
 ALTER TABLE "Organization"
     DROP COLUMN IF EXISTS "defaultModel",
