@@ -71,36 +71,40 @@ const dualAuth: MiddlewareHandler<{ Variables: Variables }> = async (
   c,
   next,
 ) => {
-  try {
-    await authMiddleware(c, async () => {
-      /* no-op: just want the side effect of populating c.var.project */
-    });
-    const project = c.get("project");
-    if (project) {
-      c.set("apiKeyProjectId", project.id);
-      return await next();
-    }
-    // authMiddleware returned without throwing AND without populating
-    // c.var.project. This violates the contract documented above: a
-    // successful API-key auth MUST set c.var.project as its side effect.
-    // If we reach this point it means authMiddleware now requires `next`
-    // to actually run before it flushes its side effects. Fail loudly
-    // instead of silently falling through to session auth and granting
-    // access under a completely different identity model.
-    throw new HTTPException(500, {
-      message:
-        "dualAuth: authMiddleware returned without populating c.var.project " +
-        "and without throwing an auth error — noop-next contract violated",
-    });
-  } catch (err) {
-    if (err instanceof HTTPException) {
-      const status = err.status as number;
-      // 401 / 403 — fall through to session auth. Anything else is a real
-      // server-side failure; let it bubble up to onError as a 5xx.
-      if (status !== 401 && status !== 403) throw err;
-    } else {
-      // Non-HTTPException: don't swallow.
-      throw err;
+  // Skip the API-key path entirely when the caller didn't send credentials —
+  // authMiddleware ALWAYS rejects a credential-less request with a 401 JSON
+  // response (not a thrown HTTPException), and an unconditional invocation
+  // would leave c.res populated with a 401 body that no downstream cares
+  // about. Detect both Authorization header forms (Basic / Bearer) and the
+  // legacy X-Auth-Token header.
+  const hasApiKeyCredentials =
+    c.req.header("authorization") != null ||
+    c.req.header("x-auth-token") != null;
+
+  if (hasApiKeyCredentials) {
+    try {
+      await authMiddleware(c, async () => {
+        /* no-op: just want the side effect of populating c.var.project */
+      });
+      const project = c.get("project");
+      if (project) {
+        c.set("apiKeyProjectId", project.id);
+        return await next();
+      }
+      // authMiddleware returned without throwing AND without populating
+      // c.var.project — it produced a 401 JSON response via c.json() (its
+      // failure shape for malformed/expired credentials). Fall through to
+      // session auth: the caller may also have a valid session cookie.
+    } catch (err) {
+      if (err instanceof HTTPException) {
+        const status = err.status as number;
+        // 401 / 403 — fall through to session auth. Anything else is a real
+        // server-side failure; let it bubble up to onError as a 5xx.
+        if (status !== 401 && status !== 403) throw err;
+      } else {
+        // Non-HTTPException: don't swallow.
+        throw err;
+      }
     }
   }
 
