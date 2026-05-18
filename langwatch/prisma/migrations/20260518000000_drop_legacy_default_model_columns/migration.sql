@@ -12,38 +12,23 @@
 -- consumer all go through `resolveModelForFeature` or the
 -- `modelProvider.getResolvedDefault` tRPC query.
 --
--- ----------------------------------------------------------------
--- Rolling-update safety: the physical DROP is intentionally
--- deferred to a later migration. Prisma applies migrations before
--- the new pod set finishes rolling, so any pod still on the previous
--- release would crash on its next `SELECT defaultModel ...` against
--- the rolled-back schema. Removing the columns from `schema.prisma`
--- in the same release as this DROP would not help either — the old
--- client image still references them.
---
--- Two-phase plan:
---   Phase 1 (this release): schema removes the fields so new pods
---   stop reading them. Physical columns remain so old pods continue
---   to work until the rollout finishes.
---   Phase 2 (next release, post-rollout): a follow-up migration
---   uncomments the DROPs below and runs them.
--- ----------------------------------------------------------------
+-- This completes the directive that drove the cascade: no global
+-- system fallback, no legacy compat tier, no implicit fallback to
+-- the openai/gpt-4o-mini constant on fresh accounts. If a project
+-- has no role configured at any scope, AI features throw
+-- ModelNotConfiguredError and the user sees a sticky toast.
 
--- Phase 2 (run only after the schema-removal release is fully rolled
--- out across all pods):
---   ALTER TABLE "Organization"
---       DROP COLUMN IF EXISTS "defaultModel",
---       DROP COLUMN IF EXISTS "topicClusteringModel",
---       DROP COLUMN IF EXISTS "embeddingsModel";
---
---   ALTER TABLE "Team"
---       DROP COLUMN IF EXISTS "defaultModel",
---       DROP COLUMN IF EXISTS "topicClusteringModel",
---       DROP COLUMN IF EXISTS "embeddingsModel";
---
---   ALTER TABLE "Project"
---       DROP COLUMN IF EXISTS "defaultModel",
---       DROP COLUMN IF EXISTS "topicClusteringModel",
---       DROP COLUMN IF EXISTS "embeddingsModel";
+ALTER TABLE "Organization"
+    DROP COLUMN IF EXISTS "defaultModel",
+    DROP COLUMN IF EXISTS "topicClusteringModel",
+    DROP COLUMN IF EXISTS "embeddingsModel";
 
-SELECT 1;
+ALTER TABLE "Team"
+    DROP COLUMN IF EXISTS "defaultModel",
+    DROP COLUMN IF EXISTS "topicClusteringModel",
+    DROP COLUMN IF EXISTS "embeddingsModel";
+
+ALTER TABLE "Project"
+    DROP COLUMN IF EXISTS "defaultModel",
+    DROP COLUMN IF EXISTS "topicClusteringModel",
+    DROP COLUMN IF EXISTS "embeddingsModel";
