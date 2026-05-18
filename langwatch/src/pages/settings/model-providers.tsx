@@ -7,7 +7,6 @@ import {
   HStack,
   Skeleton,
   Spacer,
-  Spinner,
   Table,
   Text,
   VStack,
@@ -23,25 +22,14 @@ import { useEffect, useMemo, useState } from "react";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { useDrawer } from "~/hooks/useDrawer";
 import { api } from "~/utils/api";
-import { HorizontalFormControl } from "../../components/HorizontalFormControl";
-import {
-  ModelSelector,
-  modelSelectorOptions,
-} from "../../components/ModelSelector";
 import SettingsLayout from "../../components/SettingsLayout";
 import { Dialog } from "../../components/ui/dialog";
 import { Menu } from "../../components/ui/menu";
 import { Tooltip } from "../../components/ui/tooltip";
-import { useEmbeddingsModel } from "../../hooks/useEmbeddingsModel";
 import { useModelProvidersSettings } from "../../hooks/useModelProvidersSettings";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { useTopicClusteringModel } from "../../hooks/useTopicClusteringModel";
 import { modelProviderIcons } from "../../server/modelProviders/iconsMap";
 import { modelProviders as modelProvidersRegistry } from "../../server/modelProviders/registry";
-import {
-  DEFAULT_EMBEDDINGS_MODEL,
-  DEFAULT_TOPIC_CLUSTERING_MODEL,
-} from "../../utils/constants";
 import { filterProvidersByScope } from "../../utils/filterProvidersByScope";
 
 export default function ModelsPage() {
@@ -439,39 +427,6 @@ export default function ModelsPage() {
   );
 }
 
-export function TopicClusteringModel() {
-  const { project } = useOrganizationTeamProject();
-  const hook = useTopicClusteringModel({
-    projectId: project?.id,
-    initialValue:
-      project?.topicClusteringModel ?? DEFAULT_TOPIC_CLUSTERING_MODEL,
-  });
-
-  return (
-    <HorizontalFormControl
-      label="Topic Clustering Model"
-      helper="For generating topic names"
-      paddingY={4}
-      borderBottomWidth="1px"
-    >
-      <HStack>
-        <ModelSelector
-          model={hook.value}
-          options={modelSelectorOptions
-            .filter((option) => option.mode === "chat")
-            .map((option) => option.value)}
-          onChange={(model) => {
-            hook.setValue(model);
-            void hook.update(model);
-          }}
-          mode="chat"
-        />
-        {hook.isSaving && <Spinner size="sm" marginRight={2} />}
-      </HStack>
-    </HorizontalFormControl>
-  );
-}
-
 /**
  * Shared "Add Model Provider" menu — same provider list, same RBAC
  * gate, same click handler — wrapped around whatever trigger the
@@ -562,33 +517,3 @@ function ProvidersTableSkeleton() {
   );
 }
 
-export function EmbeddingsModel() {
-  const { project } = useOrganizationTeamProject();
-  const hook = useEmbeddingsModel({
-    projectId: project?.id,
-    initialValue: project?.embeddingsModel ?? DEFAULT_EMBEDDINGS_MODEL,
-  });
-
-  return (
-    <HorizontalFormControl
-      label="Embeddings Model"
-      helper="For embeddings to be used in topic clustering and evaluations"
-      paddingY={4}
-    >
-      <HStack>
-        <ModelSelector
-          model={hook.value}
-          options={modelSelectorOptions
-            .filter((option) => option.mode === "embedding")
-            .map((option) => option.value)}
-          onChange={(model) => {
-            hook.setValue(model);
-            void hook.update(model);
-          }}
-          mode="embedding"
-        />
-        {hook.isSaving && <Spinner size="sm" marginRight={2} />}
-      </HStack>
-    </HorizontalFormControl>
-  );
-}

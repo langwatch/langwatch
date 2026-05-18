@@ -11,6 +11,7 @@ import {
 import { useShallow } from "zustand/react/shallow";
 import { useAnimatedFocusElementById } from "../../../../../../hooks/useAnimatedFocusElementById";
 import { useOrganizationTeamProject } from "../../../../../../hooks/useOrganizationTeamProject";
+import { api } from "../../../../../../utils/api";
 import { ExecutionStepAccordion } from "../../../components/ExecutionStepAccordion";
 import { StepRadio } from "../../../components/StepButton";
 import {
@@ -28,6 +29,14 @@ export function ExecutionMethodSelectionStepAccordion({
   onSelect: (executionMethod: OfflineExecutionMethod) => void;
 }) {
   const { project } = useOrganizationTeamProject();
+  // Cascade-resolved DEFAULT model — fed to the executor node factory
+  // via the slice's `defaultModel` param. Empty string is a valid
+  // hand-off (the LLM-node UI surfaces the missing default at first
+  // run via the MissingModelToast).
+  const resolvedDefault = api.modelProvider.getResolvedDefault.useQuery(
+    { projectId: project?.id ?? "", featureKey: "prompt.create_default" },
+    { enabled: !!project?.id },
+  );
   const updateNodeInternals = useUpdateNodeInternals();
   const { executionMethod, upsertExecutorNodeByType, setWizardState } =
     useEvaluationWizardStore(
@@ -83,7 +92,7 @@ export function ExecutionMethodSelectionStepAccordion({
           onClick={() => {
             const nodeId = upsertExecutorNodeByType({
               type: "signature",
-              project,
+              defaultModel: resolvedDefault.data?.model ?? "",
             });
             updateNodeInternals(nodeId);
             handleOptionClick("offline_prompt");
@@ -96,7 +105,7 @@ export function ExecutionMethodSelectionStepAccordion({
           onClick={() => {
             const nodeId = upsertExecutorNodeByType({
               type: "code",
-              project,
+              defaultModel: resolvedDefault.data?.model ?? "",
             });
             updateNodeInternals(nodeId);
             handleOptionClick("offline_code_execution");

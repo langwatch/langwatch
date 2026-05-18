@@ -5,7 +5,6 @@ import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import SettingsLayout from "../../components/SettingsLayout";
 import { toaster } from "../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { EmbeddingsModel, TopicClusteringModel } from "./model-providers";
 
 function TopicClusteringSettings() {
   const { project } = useOrganizationTeamProject({
@@ -18,6 +17,12 @@ function TopicClusteringSettings() {
     <SettingsLayout>
       <VStack gap={6} width="full" align="start">
         <Heading as="h2">Topic Clustering</Heading>
+        <Text fontSize="sm" color="fg.muted">
+          The model and embeddings used for topic clustering are
+          configured in <strong>Settings → Model Providers → Default
+          Models</strong> (the `analytics.topic_clustering_llm` and
+          `analytics.topic_clustering_embeddings` feature keys).
+        </Text>
 
         <TopicClusteringCard project={project} />
       </VStack>
@@ -51,11 +56,6 @@ function TopicClusteringCard({ project }: { project: { id: string } }) {
 
   return (
     <VStack gap={6} width="full" align="start" paddingBottom={12}>
-      <VStack gap={0} width="full" align="stretch">
-        <TopicClusteringModel />
-        <EmbeddingsModel />
-      </VStack>
-
       <Card.Root width="full">
         <Card.Header>
           <Heading>Manual Topic Clustering</Heading>

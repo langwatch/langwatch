@@ -297,9 +297,11 @@ export function useModelProviderForm(
     provider.customModels,
     provider.customEmbeddingsModels,
     provider.extraHeaders,
-    project?.defaultModel,
-    project?.topicClusteringModel,
-    project?.embeddingsModel,
+    // The reset re-fires when provider mutations propagate; the
+    // resolved default models come from
+    // `api.modelProvider.getResolvedDefault` at the actual consumer of
+    // each role chip, so we don't need to subscribe at the reducer
+    // level any more.
     enabledProvidersCount,
   ]);
 
