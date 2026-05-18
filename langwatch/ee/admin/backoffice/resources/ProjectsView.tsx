@@ -57,9 +57,6 @@ interface AdminProject {
   capturedInputVisibility: ProjectSensitiveDataVisibilityLevel;
   capturedOutputVisibility: ProjectSensitiveDataVisibilityLevel;
   traceSharingEnabled: boolean;
-  defaultModel: string | null;
-  topicClusteringModel: string | null;
-  embeddingsModel: string | null;
   archivedAt: string | null;
   createdAt: string;
 }
@@ -208,9 +205,6 @@ interface FormState {
   capturedInputVisibility: ProjectSensitiveDataVisibilityLevel;
   capturedOutputVisibility: ProjectSensitiveDataVisibilityLevel;
   traceSharingEnabled: boolean;
-  defaultModel: string;
-  topicClusteringModel: string;
-  embeddingsModel: string;
   s3Endpoint: string;
   s3AccessKeyId: string;
   s3SecretAccessKey: string;
@@ -246,9 +240,6 @@ function ProjectEditDrawer({
       capturedInputVisibility: project.capturedInputVisibility,
       capturedOutputVisibility: project.capturedOutputVisibility,
       traceSharingEnabled: !!project.traceSharingEnabled,
-      defaultModel: project.defaultModel ?? "",
-      topicClusteringModel: project.topicClusteringModel ?? "",
-      embeddingsModel: project.embeddingsModel ?? "",
       // S3 credentials are write-only: the server strips them from
       // read payloads (ee/admin/safeSelects.ts), so the form always
       // starts empty. Typing a value replaces the stored secret;
@@ -288,12 +279,6 @@ function ProjectEditDrawer({
       data.capturedOutputVisibility = form.capturedOutputVisibility;
     if (form.traceSharingEnabled !== !!project.traceSharingEnabled)
       data.traceSharingEnabled = form.traceSharingEnabled;
-    if (form.defaultModel !== (project.defaultModel ?? ""))
-      data.defaultModel = nullIfEmpty(form.defaultModel);
-    if (form.topicClusteringModel !== (project.topicClusteringModel ?? ""))
-      data.topicClusteringModel = nullIfEmpty(form.topicClusteringModel);
-    if (form.embeddingsModel !== (project.embeddingsModel ?? ""))
-      data.embeddingsModel = nullIfEmpty(form.embeddingsModel);
     // Write-only credentials — only forward fields the user typed into;
     // an empty input means "leave the stored secret alone". Nothing we
     // received from the server can be compared against because the
@@ -459,31 +444,6 @@ function ProjectEditDrawer({
                   placeholder="e.g. https://app.acme.com/users/{{userId}}"
                 />
               </Field.Root>
-              <Field.Root>
-                <Field.Label>Default model</Field.Label>
-                <Input
-                  value={form.defaultModel}
-                  onChange={(e) => setField("defaultModel", e.target.value)}
-                  placeholder="e.g. openai/gpt-5-mini"
-                />
-              </Field.Root>
-              <Field.Root>
-                <Field.Label>Topic clustering model</Field.Label>
-                <Input
-                  value={form.topicClusteringModel}
-                  onChange={(e) =>
-                    setField("topicClusteringModel", e.target.value)
-                  }
-                />
-              </Field.Root>
-              <Field.Root>
-                <Field.Label>Embeddings model</Field.Label>
-                <Input
-                  value={form.embeddingsModel}
-                  onChange={(e) => setField("embeddingsModel", e.target.value)}
-                />
-              </Field.Root>
-
               <SectionHeading>Project S3</SectionHeading>
               <Text fontSize="xs" color="fg.muted">
                 Credentials below are write-only — the server never reads them

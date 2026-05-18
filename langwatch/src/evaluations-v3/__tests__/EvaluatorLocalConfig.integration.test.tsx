@@ -100,6 +100,14 @@ let _updateMutationOnSuccess:
 
 vi.mock("~/utils/api", () => ({
   api: {
+    modelProvider: {
+      getResolvedDefault: {
+        useQuery: () => ({
+          data: { model: "openai/gpt-4", source: "test", scope: "PROJECT" },
+          isLoading: false,
+        }),
+      },
+    },
     useContext: () => ({
       evaluators: {
         getAll: { invalidate: vi.fn() },

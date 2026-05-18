@@ -176,3 +176,54 @@ Feature: Onboarding Flow
     When the API key is being validated
     Then the "Save" button shows a loading indicator
     And the button is disabled during validation
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # Provider seed plan
+  # ────────────────────────────────────────────────────────────────────────────
+  # buildSeedPlanForProvider runs at onboarding time when the user
+  # enables a provider for the first time; the returned plan becomes
+  # the ModelDefaultConfig JSON that lands at org scope. Each provider
+  # has its own quirks.
+
+  @integration
+  Scenario: OpenAI seed plan populates all three roles
+    Given OpenAI is the provider being enabled at onboarding
+    When the seed plan is computed
+    Then DEFAULT resolves to the latest plain gpt-X.Y
+    And FAST resolves to the latest gpt-X.Y-mini
+    And EMBEDDINGS resolves to the latest text-embedding-N
+
+  @integration
+  Scenario: Anthropic FAST defaults to sonnet not haiku
+    Given Anthropic is the provider being enabled at onboarding
+    When the seed plan is computed
+    Then DEFAULT and FAST both resolve to the same latest claude-sonnet
+    # Haiku trails sonnet by a wide enough margin on assistive tasks
+    # that mapping FAST to haiku produces worse output at marginal cost
+    # savings. Sonnet is the price/speed sweet spot across the board.
+
+  @integration
+  Scenario: Anthropic seed plan omits EMBEDDINGS
+    Given Anthropic is the provider being enabled at onboarding
+    When the seed plan is computed
+    Then EMBEDDINGS stays absent so the cascade walks up to a sibling
+         provider that does ship an embedding API
+
+  @integration
+  Scenario: Gemini DEFAULT prefers pro (incl. -preview) over flash
+    Given Gemini is the provider being enabled at onboarding
+    When the seed plan is computed
+    Then DEFAULT resolves to a gemini-pro variant (including -preview)
+    And FAST resolves to a gemini-flash variant
+    And EMBEDDINGS resolves to a gemini-embedding model
+
+  @integration
+  Scenario: Voyage seed plan populates only EMBEDDINGS
+    Given Voyage is the provider being enabled at onboarding
+    When the seed plan is computed
+    Then EMBEDDINGS resolves to voyage-3.5
+    And DEFAULT stays absent
+    And FAST stays absent
+    # Voyage is embedding-only. The cascade walks up for DEFAULT and
+    # FAST so an Anthropic+Voyage org has Anthropic chat + Voyage
+    # embeddings without falling through to OpenAI.

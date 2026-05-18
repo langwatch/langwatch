@@ -7,10 +7,8 @@ import { CostReferenceType, CostType, type Project } from "@prisma/client";
 import { fetch as fetchHTTP2 } from "fetch-h2";
 import { nanoid } from "nanoid";
 import { env } from "../../env.mjs";
-import {
-  DEFAULT_TOPIC_CLUSTERING_MODEL,
-  OPENAI_EMBEDDING_DIMENSION,
-} from "../../utils/constants";
+import { OPENAI_EMBEDDING_DIMENSION } from "../../utils/constants";
+import { resolveModelForFeature } from "../modelProviders/resolveModelForFeature";
 import { createLogger } from "../../utils/logger/server";
 import { getExtractedInput } from "../../utils/traceExtraction";
 import {
@@ -556,11 +554,15 @@ async function fetchTracesFromElasticsearch(
 }
 
 const getProjectTopicClusteringModelProvider = async (project: Project) => {
-  const topicClusteringModel =
-    project.topicClusteringModel ?? DEFAULT_TOPIC_CLUSTERING_MODEL;
-  if (!topicClusteringModel) {
-    throw new Error("Topic clustering model not set");
-  }
+  // Resolve the analytics.topic_clustering_llm feature at the project's
+  // cascade. Throws ModelNotConfiguredError when nothing is set at any
+  // scope; the topic-clustering pipeline catches and skips clustering
+  // for the run while logging the gap.
+  const resolved = await resolveModelForFeature(
+    "analytics.topic_clustering_llm",
+    { prisma, projectId: project.id },
+  );
+  const topicClusteringModel = resolved.model;
   const provider = topicClusteringModel.split("/")[0];
   if (!provider) {
     throw new Error("Topic clustering provider not set");

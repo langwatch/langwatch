@@ -6,6 +6,8 @@ import type {
 } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { DEFAULT_MODEL } from "~/utils/constants";
+import { resolveModelForFeature } from "~/server/modelProviders/resolveModelForFeature";
+import { ModelNotConfiguredError } from "~/server/modelProviders/modelNotConfiguredError";
 import { createLogger } from "../../../utils/logger/server";
 import { SchemaVersion } from "../enums";
 import { NotFoundError } from "../errors";
@@ -488,12 +490,22 @@ export class LlmConfigRepository {
           handle: configData.handle,
           scope: configData.scope,
         },
-        include: {
-          project: true,
-        },
       });
-      const { project } = newConfig;
-      const defaultModel = project.defaultModel ?? DEFAULT_MODEL;
+      // Resolve the project's DEFAULT model via the cascade. We let
+      // ModelNotConfiguredError propagate so the missing-model toast
+      // fires; only swallow resolver-internal crashes and fall back to
+      // DEFAULT_MODEL as a last-resort placeholder.
+      let defaultModel: string;
+      try {
+        const resolved = await resolveModelForFeature(
+          "prompt.create_default",
+          { prisma: this.prisma, projectId: configData.projectId },
+        );
+        defaultModel = resolved.model;
+      } catch (err) {
+        if (err instanceof ModelNotConfiguredError) throw err;
+        defaultModel = DEFAULT_MODEL;
+      }
 
       // Set the version data to the provided version data, or undefined if no version data is provided.
       let newVersionData: Partial<CreateLlmConfigVersionParams> | undefined =

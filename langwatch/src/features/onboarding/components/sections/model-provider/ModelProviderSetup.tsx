@@ -13,6 +13,7 @@ import {
   type MaybeStoredModelProvider,
   modelProviders as modelProvidersRegistry,
 } from "../../../../../server/modelProviders/registry";
+import { api } from "../../../../../utils/api";
 import { createLogger } from "../../../../../utils/logger";
 import {
   hasUserEnteredNewApiKey,
@@ -106,6 +107,12 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id;
 
+  // Cascade-resolved model for onboarding "default chat model" seed value.
+  const resolvedDefault = api.modelProvider.getResolvedDefault.useQuery(
+    { projectId: projectId ?? "", featureKey: "prompt.create_default" },
+    { enabled: !!projectId },
+  );
+
   const backendModelProviderKey = useMemo(() => {
     if (meta?.backendModelProviderKey) {
       return meta.backendModelProviderKey;
@@ -147,22 +154,16 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
 
   const projectForForm = useMemo(
     () => ({
-      defaultModel: meta?.defaultModel ?? project?.defaultModel ?? null,
-      topicClusteringModel: project?.topicClusteringModel ?? null,
-      embeddingsModel: project?.embeddingsModel ?? null,
+      defaultModel: meta?.defaultModel ?? resolvedDefault.data?.model ?? null,
+      topicClusteringModel: null,
+      embeddingsModel: null,
     }),
-    [
-      meta?.defaultModel,
-      project?.defaultModel,
-      project?.topicClusteringModel,
-      project?.embeddingsModel,
-    ],
+    [meta?.defaultModel, resolvedDefault.data?.model],
   );
 
   const [state, actions] = useModelProviderForm({
     provider,
     projectId,
-    project: projectForForm,
     enabledProvidersCount: 1, // Onboarding always sets up the first provider
     isUsingEnvVars,
     onSuccess: () => {

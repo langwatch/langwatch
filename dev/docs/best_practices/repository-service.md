@@ -71,6 +71,7 @@ export class DatasetRepository {
 - Methods are simple CRUD operations
 - No default resolution or business validation
 - Can include project-scoping guards at data level
+- Allocates user-facing ids via `generate(KSUID_RESOURCES.X).toString()` — see [ksuids.md](./ksuids.md). Don't rely on the Prisma column default for any entity that shows up in a URL, API response, or export.
 
 ## Service Layer
 

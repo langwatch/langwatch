@@ -182,3 +182,408 @@ describe("guardProjectId — project-scoped gateway models still guarded", () =>
     });
   });
 });
+
+/**
+ * Regression tests for SCOPED_MODELS — the stricter alternative to
+ * EXEMPT_MODELS. These tables don't have a projectId column to
+ * constrain on, but EVERY query must still carry a tenancy predicate
+ * (row id, scope, or parent FK). A bare `findMany({})` must throw.
+ *
+ * Root cause: rchaves on 2026-05-18 dogfood pointed out that putting
+ * ModelProvider + ModelDefaultConfig in EXEMPT_MODELS lets a
+ * programmer accidentally write a cross-tenant query and have it
+ * silently pass. The fix is per-model predicate enforcement, not a
+ * full bypass.
+ */
+describe("guardProjectId — SCOPED_MODELS (ModelProvider family)", () => {
+  describe("ModelProvider.findMany without any tenancy predicate", () => {
+    /** @scenario A query without a tenancy predicate throws */
+    it("THROWS — bare findMany must not walk every tenant", async () => {
+      await expect(
+        runGuard({
+          model: "ModelProvider",
+          action: "findMany",
+          args: { where: {} },
+        }),
+      ).rejects.toThrow(/projectId.*row id.*scope predicate/);
+    });
+  });
+
+  describe("ModelProvider.findMany with the cascade-walk OR predicate", () => {
+    /** @scenario A query with scope predicate succeeds */
+    it("does NOT throw — scope OR ladder is the canonical access pattern", async () => {
+      await expect(
+        runGuard({
+          model: "ModelProvider",
+          action: "findMany",
+          args: {
+            where: {
+              scopes: {
+                some: {
+                  OR: [
+                    { scopeType: "PROJECT", scopeId: "proj_01" },
+                    { scopeType: "TEAM", scopeId: "team_01" },
+                    { scopeType: "ORGANIZATION", scopeId: "org_01" },
+                  ],
+                },
+              },
+            },
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("ModelProvider.findFirst by id alone", () => {
+    /** @scenario A single-row lookup by id passes */
+    it("does NOT throw — id IS the tenancy proof for single-row lookup", async () => {
+      await expect(
+        runGuard({
+          model: "ModelProvider",
+          action: "findFirst",
+          args: { where: { id: "mp_01" } },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("ModelProvider.findMany with legacy projectId predicate", () => {
+    it("does NOT throw — legacy projectId column is still a valid tenancy clause", async () => {
+      await expect(
+        runGuard({
+          model: "ModelProvider",
+          action: "findMany",
+          args: { where: { projectId: "proj_01" } },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("ModelProvider.create without scopes AND without projectId", () => {
+    /** @scenario A create without scopes or projectId throws */
+    it("THROWS — every create needs either projectId or scopes in the payload", async () => {
+      await expect(
+        runGuard({
+          model: "ModelProvider",
+          action: "create",
+          args: { data: { provider: "openai", enabled: true } },
+        }),
+      ).rejects.toThrow(/either a 'projectId' or a 'scopes' relation/);
+    });
+  });
+
+  describe("ModelProvider.create with scopes relation", () => {
+    /** @scenario A nested-create through the scopes relation passes */
+    it("does NOT throw — nested-create through the scopes relation carries tenancy", async () => {
+      await expect(
+        runGuard({
+          model: "ModelProvider",
+          action: "create",
+          args: {
+            data: {
+              provider: "openai",
+              enabled: true,
+              scopes: {
+                create: [{ scopeType: "ORGANIZATION", scopeId: "org_01" }],
+              },
+            },
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("ModelProviderScope.findMany without modelProviderId or scope", () => {
+    /** @scenario Join-table bare findMany throws */
+    it("THROWS — bare findMany on the join walks every tenant's bindings", async () => {
+      await expect(
+        runGuard({
+          model: "ModelProviderScope",
+          action: "findMany",
+          args: { where: {} },
+        }),
+      ).rejects.toThrow(/row id.*modelProviderId.*scope predicate/);
+    });
+  });
+
+  describe("ModelProviderScope.findMany with modelProviderId", () => {
+    /** @scenario Join-table read with parent FK passes */
+    it("does NOT throw — parent FK is the tenancy proof for joins", async () => {
+      await expect(
+        runGuard({
+          model: "ModelProviderScope",
+          action: "findMany",
+          args: { where: { modelProviderId: "mp_01" } },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("ModelProviderScope.deleteMany without parent FK or scope", () => {
+    /** @scenario Join-table deleteMany requires a parent FK or scope predicate */
+    it("THROWS — bare deleteMany would wipe every tenant's bindings", async () => {
+      await expect(
+        runGuard({
+          model: "ModelProviderScope",
+          action: "deleteMany",
+          args: { where: {} },
+        }),
+      ).rejects.toThrow(/row id.*modelProviderId.*scope predicate/);
+    });
+  });
+});
+
+describe("guardProjectId — SCOPED_MODELS (ModelDefaultConfig family)", () => {
+  describe("ModelDefaultConfig.findMany without any tenancy predicate", () => {
+    it("THROWS — would walk every tenant's defaults", async () => {
+      await expect(
+        runGuard({
+          model: "ModelDefaultConfig",
+          action: "findMany",
+          args: { where: {} },
+        }),
+      ).rejects.toThrow(/row id or scope predicate/);
+    });
+  });
+
+  describe("ModelDefaultConfig.findMany with scopes.some.OR cascade", () => {
+    it("does NOT throw — canonical resolver pattern", async () => {
+      await expect(
+        runGuard({
+          model: "ModelDefaultConfig",
+          action: "findMany",
+          args: {
+            where: {
+              scopes: {
+                some: {
+                  OR: [
+                    { scopeType: "PROJECT", scopeId: "proj_01" },
+                    { scopeType: "TEAM", scopeId: "team_01" },
+                    { scopeType: "ORGANIZATION", scopeId: "org_01" },
+                  ],
+                },
+              },
+            },
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("ModelDefaultConfig.findMany with scopeId: { in: [...] } list predicate", () => {
+    /** @scenario List-shaped scopeId predicates pass the scope check */
+    it("does NOT throw — org admins read across N teams + M projects via Prisma's { in: [...] } list", async () => {
+      // getDefaultModelsForProject builds visibleScopeFilter with this
+      // exact shape: one ORG branch with a string scopeId, plus TEAM
+      // and PROJECT branches whose scopeId is { in: [...] } over every
+      // team / project the caller can see. The list IS the tenancy
+      // constraint.
+      await expect(
+        runGuard({
+          model: "ModelDefaultConfig",
+          action: "findMany",
+          args: {
+            where: {
+              scopes: {
+                some: {
+                  OR: [
+                    { scopeType: "ORGANIZATION", scopeId: "org_01" },
+                    { scopeType: "TEAM", scopeId: { in: ["t_a", "t_b"] } },
+                    {
+                      scopeType: "PROJECT",
+                      scopeId: { in: ["p_a", "p_b", "p_c"] },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("ModelDefaultConfig.findMany with scopeId: { in: [] } empty list", () => {
+    /** @scenario Empty in-lists are not a valid tenancy constraint */
+    it("THROWS — empty list constrains to zero scopes, so the branch is unsafe", async () => {
+      await expect(
+        runGuard({
+          model: "ModelDefaultConfig",
+          action: "findMany",
+          args: {
+            where: {
+              scopes: {
+                some: {
+                  OR: [{ scopeType: "TEAM", scopeId: { in: [] } }],
+                },
+              },
+            },
+          },
+        }),
+      ).rejects.toThrow(/row id or scope predicate/);
+    });
+  });
+
+  describe("ModelDefaultConfig.findMany with one OR branch missing scopeId", () => {
+    /** @scenario A single bad OR branch invalidates the whole scope predicate */
+    it("THROWS — every OR branch must constrain a tenancy boundary", async () => {
+      await expect(
+        runGuard({
+          model: "ModelDefaultConfig",
+          action: "findMany",
+          args: {
+            where: {
+              scopes: {
+                some: {
+                  OR: [
+                    { scopeType: "ORGANIZATION", scopeId: "org_01" },
+                    { scopeType: "TEAM" } as any,
+                  ],
+                },
+              },
+            },
+          },
+        }),
+      ).rejects.toThrow(/row id or scope predicate/);
+    });
+  });
+
+  describe("ModelDefaultConfig.findMany with AND-wrapped scope predicate", () => {
+    it("does NOT throw — exclude-id pattern wraps in AND but a child clause carries scope", async () => {
+      await expect(
+        runGuard({
+          model: "ModelDefaultConfig",
+          action: "findMany",
+          args: {
+            where: {
+              AND: [
+                { id: { not: "cfg_01" } },
+                {
+                  scopes: {
+                    some: {
+                      OR: [
+                        { scopeType: "TEAM", scopeId: "team_01" },
+                      ],
+                    },
+                  },
+                },
+              ],
+            },
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("ModelDefaultConfig.update by id", () => {
+    it("does NOT throw — id is the tenancy proof", async () => {
+      await expect(
+        runGuard({
+          model: "ModelDefaultConfig",
+          action: "update",
+          args: {
+            where: { id: "cfg_01" },
+            data: { config: { DEFAULT: "openai/gpt-5.5" } },
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("ModelDefaultConfig.create without scopes", () => {
+    it("THROWS — every config must attach to at least one scope at create time", async () => {
+      await expect(
+        runGuard({
+          model: "ModelDefaultConfig",
+          action: "create",
+          args: { data: { config: { DEFAULT: "openai/gpt-5.5" } } },
+        }),
+      ).rejects.toThrow(/scopes/);
+    });
+  });
+
+  describe("ModelDefaultConfig.create with nested scopes relation", () => {
+    it("does NOT throw — nested create through the scopes relation", async () => {
+      await expect(
+        runGuard({
+          model: "ModelDefaultConfig",
+          action: "create",
+          args: {
+            data: {
+              config: { DEFAULT: "openai/gpt-5.5" },
+              scopes: {
+                create: [{ scopeType: "ORGANIZATION", scopeId: "org_01" }],
+              },
+            },
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("ModelDefaultConfigScope.findMany without configId or scope", () => {
+    it("THROWS — bare findMany walks every tenant's attachments", async () => {
+      await expect(
+        runGuard({
+          model: "ModelDefaultConfigScope",
+          action: "findMany",
+          args: { where: {} },
+        }),
+      ).rejects.toThrow(/row id.*configId.*scope predicate/);
+    });
+  });
+
+  describe("ModelDefaultConfigScope.findMany with configId", () => {
+    it("does NOT throw — parent FK is the tenancy proof for joins", async () => {
+      await expect(
+        runGuard({
+          model: "ModelDefaultConfigScope",
+          action: "findMany",
+          args: { where: { configId: "cfg_01" } },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("ModelDefaultConfigScope.createMany with configId+scope per record", () => {
+    it("does NOT throw — every entry has the join-shape tenancy keys", async () => {
+      await expect(
+        runGuard({
+          model: "ModelDefaultConfigScope",
+          action: "createMany",
+          args: {
+            data: [
+              {
+                configId: "cfg_01",
+                scopeType: "ORGANIZATION",
+                scopeId: "org_01",
+              },
+              { configId: "cfg_01", scopeType: "TEAM", scopeId: "team_01" },
+            ],
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("ModelDefaultConfigScope.createMany missing scopeId on one entry", () => {
+    it("THROWS — every entry must carry the full join shape", async () => {
+      await expect(
+        runGuard({
+          model: "ModelDefaultConfigScope",
+          action: "createMany",
+          args: {
+            data: [
+              {
+                configId: "cfg_01",
+                scopeType: "ORGANIZATION",
+                scopeId: "org_01",
+              },
+              { configId: "cfg_01", scopeType: "TEAM" } as any,
+            ],
+          },
+        }),
+      ).rejects.toThrow(/configId.*scopeType.*scopeId/);
+    });
+  });
+});

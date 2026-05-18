@@ -9,12 +9,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/tidwall/gjson"
+	"github.com/tidwall/sjson"
 
 	"github.com/bytedance/sonic"
 	bifrost "github.com/maximhq/bifrost/core"
@@ -30,6 +32,11 @@ import (
 type BifrostRouter struct {
 	bf     *bifrost.Bifrost
 	logger *zap.Logger
+	// voyageClient is the single HTTP client reused for every direct
+	// Voyage request so connection pooling actually works. Building a
+	// new http.Client per request would defeat keep-alive and risk
+	// port exhaustion under embedding throughput.
+	voyageClient *http.Client
 }
 
 // BifrostOptions configures the bifrost router.
@@ -52,7 +59,11 @@ func NewBifrostRouter(ctx context.Context, opts BifrostOptions) (*BifrostRouter,
 	if err != nil {
 		return nil, fmt.Errorf("bifrost init: %w", err)
 	}
-	return &BifrostRouter{bf: bf, logger: opts.Logger}, nil
+	return &BifrostRouter{
+		bf:           bf,
+		logger:       opts.Logger,
+		voyageClient: &http.Client{Timeout: 60 * time.Second},
+	}, nil
 }
 
 // Close releases the underlying Bifrost connection pool. Safe to call
@@ -81,14 +92,28 @@ func (r *BifrostRouter) Close() {
 // to an Anthropic-family provider; sending it to OpenAI is a caller
 // error and Bifrost/OpenAI will reject accordingly.
 func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred domain.Credential) (*domain.Response, error) {
-	provider := mapProvider(cred.ProviderID)
 	model := req.Model
 	if req.Resolved != nil {
 		model = req.Resolved.ModelID
 	}
 
+	// Voyage is not a Bifrost ModelProvider (its enum doesn't include
+	// Voyage). The gateway proxies directly to api.voyageai.com — wire
+	// format is OpenAI-compatible so no body translation is required.
+	// Voyage ships embeddings only; any other request type lands on a
+	// clean unsupported-type error.
+	if cred.ProviderID == domain.ProviderVoyage {
+		return r.dispatchVoyageDirect(ctx, req, model, cred)
+	}
+
+	provider := mapProvider(cred.ProviderID)
+
 	if req.Type == domain.RequestTypeResponses {
 		return r.dispatchResponses(ctx, req, provider, model, cred)
+	}
+
+	if req.Type == domain.RequestTypeEmbeddings {
+		return r.dispatchEmbeddings(ctx, req, provider, model, cred)
 	}
 
 	if req.Type == domain.RequestTypePassthrough {
@@ -195,6 +220,129 @@ func (r *BifrostRouter) dispatchResponses(
 		Body:       body,
 		StatusCode: http.StatusOK,
 		Usage:      extractResponsesUsage(resp),
+	}, nil
+}
+
+// dispatchEmbeddings routes /v1/embeddings traffic through Bifrost's
+// EmbeddingRequest endpoint. The inbound body is OpenAI-shape
+// ({"model": "...", "input": "..."}); we parse it into Bifrost's
+// EmbeddingInput one-of (Text / Texts / Embedding / Embeddings) and
+// Bifrost translates to the provider's native wire format for
+// OpenAI / Gemini / Cohere etc.
+//
+// Anthropic ships no embeddings API; if a caller routes embeddings to
+// an Anthropic credential we let Bifrost surface the provider's reject
+// directly (no special-casing here keeps the error surface honest).
+func (r *BifrostRouter) dispatchEmbeddings(
+	ctx context.Context,
+	req *domain.Request,
+	provider bfschemas.ModelProvider,
+	model string,
+	cred domain.Credential,
+) (*domain.Response, error) {
+	bfReq, err := buildEmbeddingRequest(req, provider, model)
+	if err != nil {
+		return nil, herr.New(ctx, domain.ErrBadRequest, herr.M{"reason": err.Error()})
+	}
+	bfCtx := bfschemas.NewBifrostContext(withCredential(ctx, cred), time.Time{})
+
+	resp, berr := r.bf.EmbeddingRequest(bfCtx, bfReq)
+	if berr != nil {
+		if rawBody, status, ok := rawResponseFromBifrostError(berr); ok {
+			return &domain.Response{
+				Body:       rawBody,
+				StatusCode: status,
+			}, nil
+		}
+		return nil, classifyBifrostError(ctx, berr)
+	}
+
+	body, _ := sonic.Marshal(resp)
+	return &domain.Response{
+		Body:       body,
+		StatusCode: http.StatusOK,
+		Usage:      extractEmbeddingUsage(resp),
+	}, nil
+}
+
+// dispatchVoyageDirect proxies an embedding request directly to
+// api.voyageai.com. Voyage isn't in Bifrost's ModelProvider enum, so
+// the gateway bypasses Bifrost for Voyage-credentialed traffic. The
+// Voyage wire format is OpenAI-compatible (same `{"input": ..., "model": ...}`
+// shape, same `{"data": [{"embedding": [...]}], "usage": {...}}`
+// response), so the gateway forwards the body verbatim and surfaces
+// the upstream response as-is.
+//
+// Non-embedding request types fail cleanly here. Voyage ships no
+// chat/messages/responses APIs.
+func (r *BifrostRouter) dispatchVoyageDirect(
+	ctx context.Context,
+	req *domain.Request,
+	model string,
+	cred domain.Credential,
+) (*domain.Response, error) {
+	if req.Type != domain.RequestTypeEmbeddings {
+		return nil, herr.New(ctx, domain.ErrBadRequest, herr.M{
+			"reason": fmt.Sprintf("voyage credentials only accept embedding requests; got %s", req.Type),
+		})
+	}
+
+	// Voyage accepts the OpenAI shape verbatim. If the model id in the
+	// resolved cred is provider-prefixed (`voyage/voyage-3.5`), strip
+	// the prefix — Voyage's API just wants the bare model name.
+	bodyBytes := req.Body
+	if model != "" {
+		stripped := strings.TrimPrefix(model, "voyage/")
+		// Rewrite the model field on the JSON body to the bare name —
+		// keeps the gateway in control of which model lands at the
+		// provider regardless of what the caller put in the body.
+		var err error
+		bodyBytes, err = sjson.SetBytes(bodyBytes, "model", stripped)
+		if err != nil {
+			return nil, herr.New(ctx, domain.ErrBadRequest, herr.M{"reason": fmt.Sprintf("rewrite model on body: %v", err)})
+		}
+	}
+
+	httpReq, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodPost,
+		"https://api.voyageai.com/v1/embeddings",
+		bytes.NewReader(bodyBytes),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("voyage direct request: %w", err)
+	}
+	httpReq.Header.Set("Authorization", "Bearer "+cred.APIKey)
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := r.voyageClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("voyage direct dispatch: %w", err)
+	}
+	defer resp.Body.Close()
+	raw, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("voyage direct read body: %w", err)
+	}
+
+	// Pull usage off the response for the gateway's cost-accounting
+	// pipeline. Voyage returns `usage: {total_tokens: N}` (no separate
+	// prompt/completion split — embedding endpoints only consume
+	// prompt tokens).
+	usage := domain.Usage{}
+	if resp.StatusCode == http.StatusOK {
+		total := int(gjson.GetBytes(raw, "usage.total_tokens").Int())
+		usage = domain.Usage{
+			PromptTokens:     total,
+			CompletionTokens: 0,
+			TotalTokens:      total,
+		}
+	}
+
+	return &domain.Response{
+		Body:       raw,
+		StatusCode: resp.StatusCode,
+		Usage:      usage,
 	}, nil
 }
 
@@ -651,6 +799,21 @@ func extractResponsesUsage(resp *bfschemas.BifrostResponsesResponse) domain.Usag
 	return domain.Usage{
 		PromptTokens:     resp.Usage.InputTokens,
 		CompletionTokens: resp.Usage.OutputTokens,
+		TotalTokens:      resp.Usage.TotalTokens,
+	}
+}
+
+// extractEmbeddingUsage maps Bifrost's embedding usage block. Embedding
+// endpoints only consume input tokens (no output text), so
+// CompletionTokens stays zero and the prompt total goes into both
+// PromptTokens and TotalTokens to keep the cost math simple downstream.
+func extractEmbeddingUsage(resp *bfschemas.BifrostEmbeddingResponse) domain.Usage {
+	if resp == nil || resp.Usage == nil {
+		return domain.Usage{}
+	}
+	return domain.Usage{
+		PromptTokens:     resp.Usage.PromptTokens,
+		CompletionTokens: 0,
 		TotalTokens:      resp.Usage.TotalTokens,
 	}
 }

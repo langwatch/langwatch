@@ -31,14 +31,6 @@ export type ScopeSelection = {
 export type UseModelProviderFormParams = {
   provider: MaybeStoredModelProvider;
   projectId: string | undefined;
-  project:
-    | {
-        defaultModel?: string | null;
-        topicClusteringModel?: string | null;
-        embeddingsModel?: string | null;
-      }
-    | null
-    | undefined;
   enabledProvidersCount: number;
   isUsingEnvVars?: boolean;
   // Principal-style scope context (iter 108). The team+org IDs come from
@@ -125,7 +117,6 @@ export function useModelProviderForm(
   const {
     provider,
     projectId,
-    project,
     enabledProvidersCount,
     isUsingEnvVars,
     teamId,
@@ -209,7 +200,6 @@ export function useModelProviderForm(
   const customModelsHook = useCustomModels({ provider });
   const defaultProviderHook = useDefaultProviderSelection({
     provider,
-    project,
     enabledProvidersCount,
   });
 
@@ -284,7 +274,7 @@ export function useModelProviderForm(
     const nextUseApiGateway = credentialKeysHook.reset(provider);
     extraHeadersHook.reset(provider, nextUseApiGateway);
     customModelsHook.reset(provider);
-    defaultProviderHook.reset(provider, project, enabledProvidersCount);
+    defaultProviderHook.reset(provider, enabledProvidersCount);
     formSubmitHook.reset();
     setName(
       (provider as { name?: string }).name ??
@@ -298,9 +288,11 @@ export function useModelProviderForm(
     provider.customModels,
     provider.customEmbeddingsModels,
     provider.extraHeaders,
-    project?.defaultModel,
-    project?.topicClusteringModel,
-    project?.embeddingsModel,
+    // The reset re-fires when provider mutations propagate; the
+    // resolved default models come from
+    // `api.modelProvider.getResolvedDefault` at the actual consumer of
+    // each role chip, so we don't need to subscribe at the reducer
+    // level any more.
     enabledProvidersCount,
   ]);
 

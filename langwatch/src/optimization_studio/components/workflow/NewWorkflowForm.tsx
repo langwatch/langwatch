@@ -16,7 +16,6 @@ import { useLicenseEnforcement } from "../../../hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import { api } from "../../../utils/api";
 import { isHandledByGlobalHandler } from "../../../utils/trpcError";
-import { DEFAULT_MODEL } from "../../../utils/constants";
 import { trackEvent } from "../../../utils/tracking";
 import type { Workflow } from "../../types/dsl";
 import { EmojiPickerModal } from "../properties/modals/EmojiPickerModal";
@@ -163,6 +162,12 @@ export const NewWorkflowForm = ({
   const router = useRouter();
   const emojiPicker = useDisclosure();
 
+  // Cascade-resolved model for workflow LLM node defaults.
+  const resolvedDefault = api.modelProvider.getResolvedDefault.useQuery(
+    { projectId: project?.id ?? "", featureKey: "studio.autocomplete" },
+    { enabled: !!project?.id },
+  );
+
   const [defaultIcon] = useState(
     template.icon && template.icon !== "🧩"
       ? template.icon
@@ -199,7 +204,7 @@ export const NewWorkflowForm = ({
       icon: data.icon ?? defaultIcon,
       default_llm: {
         ...template.default_llm,
-        model: project?.defaultModel ?? DEFAULT_MODEL,
+        model: resolvedDefault.data?.model ?? "",
       },
     };
 

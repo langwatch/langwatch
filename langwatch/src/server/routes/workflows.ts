@@ -70,7 +70,7 @@ app.post("/code-completion", async (c) => {
   }
 
   try {
-    const model = await getVercelAIModel(projectId);
+    const model = await getVercelAIModel(projectId, undefined, "studio.autocomplete");
 
     const copilot = new CompletionCopilot(undefined, {
       model: async (prompt) => {

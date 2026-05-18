@@ -3,7 +3,7 @@ import { getMaxTokenLimit } from "~/components/llmPromptConfigs/utils/tokenUtils
 import { useModelProvidersSettings } from "~/hooks/useModelProvidersSettings";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { buildDefaultFormValues } from "~/prompts/utils/buildDefaultFormValues";
-import { DEFAULT_MODEL } from "~/utils/constants";
+import { api } from "~/utils/api";
 import { useDraggableTabsBrowserStore } from "../prompt-playground-store/DraggableTabsBrowserStore";
 
 /**
@@ -28,6 +28,15 @@ export function useCreateDraftPrompt() {
   const { modelMetadata } = useModelProvidersSettings({ projectId: project?.id });
   const { addTab } = useDraggableTabsBrowserStore(({ addTab }) => ({ addTab }));
 
+  // Cascade-resolved model for "new prompt" surfaces. Returns null when
+  // nothing is configured at any scope (post system-tier removal) — the
+  // form falls back to an empty string and the MissingModelToast picks
+  // it up at the first send. No client-side system fallback.
+  const resolvedDefault = api.modelProvider.getResolvedDefault.useQuery(
+    { projectId: project?.id ?? "", featureKey: "prompt.create_default" },
+    { enabled: !!project?.id },
+  );
+
   /**
    * createDraftPrompt
    * Single Responsibility: Creates a new draft prompt tab with default configuration values.
@@ -35,8 +44,10 @@ export function useCreateDraftPrompt() {
    * @returns Promise resolving to object with defaultValues
    */
   const createDraftPrompt = useCallback(async () => {
-    const defaultModel = project?.defaultModel ?? DEFAULT_MODEL;
-    const defaultModelMetadata = modelMetadata?.[defaultModel];
+    const defaultModel = resolvedDefault.data?.model ?? "";
+    const defaultModelMetadata = defaultModel
+      ? modelMetadata?.[defaultModel]
+      : undefined;
     const maxTokens = getMaxTokenLimit(defaultModelMetadata);
 
     // Use unified defaults with project model override if available
@@ -78,7 +89,7 @@ export function useCreateDraftPrompt() {
     }, 100);
 
     return { defaultValues };
-  }, [addTab, modelMetadata, project?.defaultModel]);
+  }, [addTab, modelMetadata, resolvedDefault.data?.model]);
 
   return { createDraftPrompt };
 }

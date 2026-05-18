@@ -6,6 +6,9 @@ import { resolver, validator as zValidator } from "hono-openapi/zod";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { badRequestSchema } from "~/app/api/shared/schemas";
+import { prisma } from "~/server/db";
+import { ModelNotConfiguredError } from "~/server/modelProviders/modelNotConfiguredError";
+import { resolveModelForFeature } from "~/server/modelProviders/resolveModelForFeature";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createLogger } from "~/utils/logger/server";
 import {
@@ -180,13 +183,38 @@ app.post(
       "Creating evaluator",
     );
 
+    // Resolve the project's DEFAULT and EMBEDDINGS models via the
+    // cascade. ModelNotConfiguredError propagates so the global
+    // domain-error middleware can surface the typed missing-model
+    // response — the PR's "no global system fallback" contract bars
+    // falling back to a hardcoded OpenAI constant when nothing is
+    // configured. Only unrelated resolver-internal errors (DB, race)
+    // become null and let createWithDefaults render with placeholders.
+    const swallowNonMissingConfig = (err: unknown): null => {
+      if (err instanceof ModelNotConfiguredError) throw err;
+      return null;
+    };
+    const [resolvedDefault, resolvedEmbedding] = await Promise.all([
+      resolveModelForFeature("evaluator.create_default", {
+        prisma,
+        projectId: project.id,
+      }).catch(swallowNonMissingConfig),
+      resolveModelForFeature("analytics.topic_clustering_embeddings", {
+        prisma,
+        projectId: project.id,
+      }).catch(swallowNonMissingConfig),
+    ]);
+
     const evaluator = await service.createWithDefaults({
       id: `evaluator_${nanoid()}`,
       projectId: project.id,
       name: data.name,
       type: "evaluator",
       config: data.config as Prisma.InputJsonValue,
-      project,
+      resolved: {
+        defaultModel: resolvedDefault?.model ?? null,
+        embeddingsModel: resolvedEmbedding?.model ?? null,
+      },
     });
 
     const enriched = await service.enrichWithFields(evaluator);

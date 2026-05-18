@@ -19,6 +19,7 @@ import {
   type MaybeStoredModelProvider,
   modelProviders,
 } from "./registry";
+import { seedOnboardingDefaultsForProvider } from "./seedOnboardingDefaults";
 
 /**
  * Minimal ctx slice this service uses to authorize scope-level writes.
@@ -142,6 +143,81 @@ export class ModelProviderService {
   }
 
   /**
+   * List shape of every ModelProvider accessible to a project — one
+   * entry per stored row, no collapsing by provider key. The page-level
+   * Model Providers table needs this so it can render multi-instance
+   * setups (e.g. "OpenAI — Org" + "OpenAI — Project override") as two
+   * rows; the `Record<provider, …>` shape returned by
+   * `getProjectModelProvidersForFrontend` silently drops the loser.
+   *
+   * API keys are masked.
+   */
+  async listProjectModelProvidersForFrontend(
+    projectId: string,
+  ): Promise<MaybeStoredModelProvider[]> {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+    });
+    if (!project) throw new Error("Project not found");
+
+    const defaultProviders = this.buildDefaultProviders(project);
+    const savedProviders = await this.repository.findAllAccessibleForProject(
+      projectId,
+    );
+
+    return savedProviders
+      .filter((mp) => this.shouldKeepModelProvider(mp, defaultProviders))
+      .map((mp) => {
+        const defaultProvider = defaultProviders[mp.provider];
+        const customModels = toLegacyCompatibleCustomModels(
+          mp.customModels,
+          "chat",
+        );
+        const customEmbeddingsModels = toLegacyCompatibleCustomModels(
+          mp.customEmbeddingsModels,
+          "embedding",
+        );
+        const narrowestScope = this.pickNarrowestScope(mp.scopes);
+        const masked = (mp.customKeys
+          ? Object.fromEntries(
+              Object.entries(
+                mp.customKeys as Record<string, unknown>,
+              ).map(([key, value]) => [
+                key,
+                KEY_CHECK.some((k) => key.includes(k))
+                  ? MASKED_KEY_PLACEHOLDER
+                  : value,
+              ]),
+            )
+          : null) as MaybeStoredModelProvider["customKeys"];
+        const provider_: MaybeStoredModelProvider = {
+          id: mp.id,
+          name: mp.name,
+          provider: mp.provider,
+          enabled: mp.enabled,
+          customKeys: masked,
+          models: defaultProvider?.models ?? null,
+          embeddingsModels: defaultProvider?.embeddingsModels ?? null,
+          customModels: customModels.length > 0 ? customModels : null,
+          customEmbeddingsModels:
+            customEmbeddingsModels.length > 0 ? customEmbeddingsModels : null,
+          deploymentMapping: mp.deploymentMapping,
+          disabledByDefault: defaultProvider?.disabledByDefault,
+          extraHeaders: mp.extraHeaders as
+            | { key: string; value: string }[]
+            | null,
+          scopes: mp.scopes.map((s) => ({
+            scopeType: s.scopeType as "ORGANIZATION" | "TEAM" | "PROJECT",
+            scopeId: s.scopeId,
+          })),
+          scopeType: narrowestScope.scopeType,
+          scopeId: narrowestScope.scopeId,
+        };
+        return provider_;
+      });
+  }
+
+  /**
    * Updates or creates a model provider.
    *
    * Business rules:
@@ -188,12 +264,11 @@ export class ModelProviderService {
       customKeys,
     );
 
-    // Find existing provider
-    const existingProvider = await this.findExistingProvider(
-      id,
-      provider,
-      projectId,
-    );
+    // Find existing provider. Absent `id` means an explicit create — we
+    // intentionally do NOT auto-match by (provider, projectId) here,
+    // since that would clobber an existing row at a different scope when
+    // a user adds a second instance of the same provider type.
+    const existingProvider = await this.findExistingProvider(id, projectId);
 
     // Resolve input scope set. Callers may pass `scopes: [...]` directly,
     // or a single-scope pair via the legacy `scopeType`/`scopeId` fields.
@@ -248,18 +323,62 @@ export class ModelProviderService {
           customKeysProvided,
           tx,
         );
+
+        // Onboarding seed: writes one role-level ModelDefault row per
+        // role the provider can fulfill (DEFAULT / FAST / EMBEDDINGS),
+        // at every scope the new credential is bound to. Strictly
+        // additive — `seedOnboardingDefaultsForProvider` skips any
+        // (scope, role) pair that already has a row, so enabling a
+        // second provider later can't silently replace a user's
+        // configured choice. Without this wiring the seed function is
+        // dead code; the bug surfaces as a fresh org showing
+        // "not configured" on every role despite having a provider
+        // enabled. See
+        // specs/model-providers/model-resolver-and-registry.feature.
+        const targetScopes: ScopeInput[] = scopes ?? [
+          { scopeType: "PROJECT", scopeId: projectId },
+        ];
+        for (const scope of targetScopes) {
+          await seedOnboardingDefaultsForProvider({
+            prisma: tx as unknown as PrismaClient,
+            provider,
+            scopeType: scope.scopeType,
+            scopeId: scope.scopeId,
+          });
+        }
       }
 
-      // Update project default model if provided
-      if (defaultModel !== undefined) {
-        await tx.project.update({
-          where: { id: projectId },
-          data: { defaultModel },
-        });
-      }
+      // The legacy `defaultModel` parameter is accepted in the input
+      // shape for backwards compatibility but no longer writes anywhere.
+      // Default-model writes go through `setRoleAtScope` against
+      // ModelDefaultConfig (see useProviderFormSubmit).
+      void defaultModel;
 
       return result;
     });
+  }
+
+  /**
+   * Upsert-by-provider-key path for the REST endpoint
+   * `PUT /api/model-providers/:provider`. The REST contract identifies a
+   * row by provider string within a project (legacy single-instance shape);
+   * if a project-scoped row exists for that provider we update it,
+   * otherwise we create one. The tRPC `update` procedure goes through the
+   * id-based path and never lands here, so the multi-instance create flow
+   * from the UI is unaffected.
+   */
+  async upsertByProviderKey(
+    input: UpdateModelProviderInput,
+    ctx?: AuthzContext,
+  ) {
+    const existing = await this.repository.findByProvider(
+      input.provider,
+      input.projectId,
+    );
+    return await this.updateModelProvider(
+      { ...input, id: existing?.id },
+      ctx,
+    );
   }
 
   /**
@@ -613,15 +732,22 @@ export class ModelProviderService {
     return { validatedKeys, customKeysProvided };
   }
 
+  /**
+   * Look up the existing row a write targets. When the caller supplies an
+   * `id`, that's an explicit edit. When `id` is absent, this is an explicit
+   * create: returning `null` here lets `updateModelProvider` go straight to
+   * `createNew` instead of falling through to a scope-blind
+   * `findByProvider` match that silently clobbers the first existing row
+   * of the same provider type (the multi-instance override bug). The
+   * REST upsert-by-provider-key entrypoint uses
+   * `upsertByProviderKey` below, not this code path.
+   */
   private async findExistingProvider(
     id: string | undefined,
-    provider: string,
     projectId: string,
   ) {
-    if (id) {
-      return await this.repository.findById(id, projectId);
-    }
-    return await this.repository.findByProvider(provider, projectId);
+    if (!id) return null;
+    return await this.repository.findById(id, projectId);
   }
 
   private async updateExisting(

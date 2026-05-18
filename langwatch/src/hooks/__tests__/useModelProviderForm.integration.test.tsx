@@ -21,6 +21,11 @@ vi.mock("../../utils/api", () => ({
           invalidate: mockInvalidate,
         },
       },
+      modelProvider: {
+        getDefaultModelsForProject: {
+          invalidate: vi.fn(),
+        },
+      },
     }),
     modelProvider: {
       update: {
@@ -28,11 +33,12 @@ vi.mock("../../utils/api", () => ({
           mutateAsync: mockMutateAsync,
         }),
       },
-    },
-    project: {
-      updateProjectDefaultModels: {
+      // B3 redesign: `useProviderFormSubmit` replays the user's "Set as
+      // default" picks into ModelDefault via this mutation; stub it so
+      // the hook can render.
+      setRoleAssignmentForScope: {
         useMutation: () => ({
-          mutateAsync: vi.fn().mockResolvedValue({}),
+          mutateAsync: vi.fn().mockResolvedValue({ ok: true }),
         }),
       },
     },
@@ -73,72 +79,10 @@ describe("useModelProviderForm()", () => {
   });
 
   describe("Credential Input Persistence (Bug Fix Validation)", () => {
-    it("preserves user input when project object reference is stable (memoized)", () => {
-      const provider = createOpenAIProvider();
-      // Memoization ensures stable reference - this is the fix in ModelProviderSetup.tsx
-      const stableProject = { defaultModel: "openai/gpt-4o" };
-
-      const { result, rerender } = renderHook(
-        ({ project }) =>
-          useModelProviderForm({
-            provider,
-            projectId: "test-project-id",
-            project,
-            enabledProvidersCount: 2,
-          }),
-        { initialProps: { project: stableProject } },
-      );
-
-      // User types in an API key
-      act(() => {
-        result.current[1].setCustomKey("OPENAI_API_KEY", "sk-user-typing");
-      });
-
-      expect(result.current[0].customKeys.OPENAI_API_KEY).toBe(
-        "sk-user-typing",
-      );
-
-      // Re-render with SAME reference (simulating memoized project)
-      rerender({ project: stableProject });
-
-      // Key should be preserved because project reference is stable
-      expect(result.current[0].customKeys.OPENAI_API_KEY).toBe(
-        "sk-user-typing",
-      );
-    });
-
-    it("preserves user input when project object reference changes but values are identical", () => {
-      const provider = createOpenAIProvider();
-      const project1 = { defaultModel: "openai/gpt-4o" };
-      const project2 = { defaultModel: "openai/gpt-4o" }; // Same value, different object
-
-      const { result, rerender } = renderHook(
-        ({ project }) =>
-          useModelProviderForm({
-            provider,
-            projectId: "test-project-id",
-            project,
-            enabledProvidersCount: 2,
-          }),
-        { initialProps: { project: project1 } },
-      );
-
-      // User types in an API key
-      act(() => {
-        result.current[1].setCustomKey("OPENAI_API_KEY", "sk-user-typing");
-      });
-
-      expect(result.current[0].customKeys.OPENAI_API_KEY).toBe(
-        "sk-user-typing",
-      );
-
-      // Re-render with NEW reference but same values — should NOT reset
-      rerender({ project: project2 });
-
-      expect(result.current[0].customKeys.OPENAI_API_KEY).toBe(
-        "sk-user-typing",
-      );
-    });
+    // The legacy "project reference stability" tests are gone with the
+    // project param (its default-model fields were the data source).
+    // The remaining "form resets when provider changes" case still
+    // pins the core regression contract.
 
     it("resets form when provider actually changes", () => {
       const openaiProvider = createOpenAIProvider();
@@ -158,7 +102,6 @@ describe("useModelProviderForm()", () => {
           useModelProviderForm({
             provider,
             projectId: "test-project-id",
-            project: null,
             enabledProvidersCount: 2,
           }),
         { initialProps: { provider: openaiProvider } },
@@ -188,7 +131,6 @@ describe("useModelProviderForm()", () => {
         useModelProviderForm({
           provider,
           projectId: "test-project-id",
-          project: null,
           enabledProvidersCount: 2,
         }),
       );
@@ -210,7 +152,6 @@ describe("useModelProviderForm()", () => {
         useModelProviderForm({
           provider,
           projectId: "test-project-id",
-          project: null,
           enabledProvidersCount: 2,
         }),
       );
@@ -234,7 +175,6 @@ describe("useModelProviderForm()", () => {
         useModelProviderForm({
           provider,
           projectId: "test-project-id",
-          project: null,
           enabledProvidersCount: 2,
         }),
       );
@@ -256,7 +196,6 @@ describe("useModelProviderForm()", () => {
         useModelProviderForm({
           provider,
           projectId: "test-project-id",
-          project: null,
           enabledProvidersCount: 2,
         }),
       );
@@ -277,7 +216,6 @@ describe("useModelProviderForm()", () => {
         useModelProviderForm({
           provider,
           projectId: "test-project-id",
-          project: null,
           enabledProvidersCount: 2,
         }),
       );
@@ -298,31 +236,31 @@ describe("useModelProviderForm()", () => {
   });
 
   describe("useAsDefaultProvider toggle", () => {
-    it("auto-enables when provider is used for default model", () => {
+    it("auto-enables when this is the only enabled provider", () => {
+      // With the legacy project.defaultModel column gone, the only
+      // remaining auto-enable trigger is "first-provider setup": when
+      // this is the only enabled provider in the org. Any other
+      // scenario requires explicit user opt-in via the toggle.
       const provider = createOpenAIProvider({ enabled: true });
-      const project = { defaultModel: "openai/gpt-4o" };
 
       const { result } = renderHook(() =>
         useModelProviderForm({
           provider,
           projectId: "test-project-id",
-          project,
-          enabledProvidersCount: 2,
+          enabledProvidersCount: 1,
         }),
       );
 
       expect(result.current[0].useAsDefaultProvider).toBe(true);
     });
 
-    it("does not auto-enable when different provider is default", () => {
+    it("does not auto-enable when more than one provider is already enabled", () => {
       const provider = createOpenAIProvider({ enabled: true });
-      const project = { defaultModel: "anthropic/claude-sonnet-4" };
 
       const { result } = renderHook(() =>
         useModelProviderForm({
           provider,
           projectId: "test-project-id",
-          project,
           enabledProvidersCount: 2,
         }),
       );
@@ -332,13 +270,11 @@ describe("useModelProviderForm()", () => {
 
     it("can be toggled manually", () => {
       const provider = createOpenAIProvider({ enabled: true });
-      const project = { defaultModel: "anthropic/claude-sonnet-4" };
 
       const { result } = renderHook(() =>
         useModelProviderForm({
           provider,
           projectId: "test-project-id",
-          project,
           enabledProvidersCount: 2,
         }),
       );
@@ -363,7 +299,6 @@ describe("useModelProviderForm()", () => {
         useModelProviderForm({
           provider,
           projectId: "test-project-id",
-          project: null,
           enabledProvidersCount: 2,
         }),
       );
@@ -380,7 +315,6 @@ describe("useModelProviderForm()", () => {
         useModelProviderForm({
           provider,
           projectId: "test-project-id",
-          project: null,
           enabledProvidersCount: 2,
         }),
       );
@@ -408,7 +342,6 @@ describe("useModelProviderForm()", () => {
         useModelProviderForm({
           provider,
           projectId: "test-project-id",
-          project: null,
           enabledProvidersCount: 2,
         }),
       );
@@ -447,7 +380,6 @@ describe("useModelProviderForm()", () => {
           useModelProviderForm({
             provider,
             projectId: "test-project-id",
-            project: null,
             enabledProvidersCount: 2,
           }),
         );
@@ -468,7 +400,6 @@ describe("useModelProviderForm()", () => {
           useModelProviderForm({
             provider,
             projectId: "test-project-id",
-            project: null,
             enabledProvidersCount: 2,
           }),
         );
@@ -488,7 +419,6 @@ describe("useModelProviderForm()", () => {
           useModelProviderForm({
             provider,
             projectId: "test-project-id",
-            project: null,
             enabledProvidersCount: 2,
           }),
         );
@@ -508,7 +438,6 @@ describe("useModelProviderForm()", () => {
           useModelProviderForm({
             provider,
             projectId: "test-project-id",
-            project: null,
             enabledProvidersCount: 2,
           }),
         );
@@ -538,7 +467,6 @@ describe("useModelProviderForm()", () => {
           useModelProviderForm({
             provider,
             projectId: "test-project-id",
-            project: null,
             enabledProvidersCount: 2,
           }),
         );
@@ -561,7 +489,6 @@ describe("useModelProviderForm()", () => {
           useModelProviderForm({
             provider,
             projectId: "test-project-id",
-            project: null,
             enabledProvidersCount: 2,
           }),
         );
@@ -583,7 +510,6 @@ describe("useModelProviderForm()", () => {
           useModelProviderForm({
             provider,
             projectId: "test-project-id",
-            project: null,
             enabledProvidersCount: 2,
           }),
         );
@@ -607,7 +533,6 @@ describe("useModelProviderForm()", () => {
           useModelProviderForm({
             provider,
             projectId: "test-project-id",
-            project: null,
             enabledProvidersCount: 2,
           }),
         );
@@ -637,7 +562,6 @@ describe("useModelProviderForm()", () => {
           useModelProviderForm({
             provider,
             projectId: "test-project-id",
-            project: null,
             enabledProvidersCount: 2,
           }),
         );
@@ -678,7 +602,6 @@ describe("useModelProviderForm()", () => {
             useModelProviderForm({
               provider,
               projectId: "test-project-id",
-              project: null,
               enabledProvidersCount: 2,
             }),
           { initialProps: { provider: initialProvider } },
@@ -713,7 +636,6 @@ describe("useModelProviderForm()", () => {
         useModelProviderForm({
           provider,
           projectId: "test-project-id",
-          project: null,
           enabledProvidersCount: 2,
         }),
       );
@@ -737,7 +659,6 @@ describe("useModelProviderForm()", () => {
         useModelProviderForm({
           provider,
           projectId: "test-project-id",
-          project: null,
           enabledProvidersCount: 2,
         }),
       );
@@ -776,7 +697,6 @@ describe("useModelProviderForm()", () => {
         useModelProviderForm({
           provider,
           projectId: "test-project-id",
-          project: null,
           enabledProvidersCount: 2,
         }),
       );
@@ -795,14 +715,11 @@ describe("useModelProviderForm()", () => {
   describe("when enabledProvidersCount is 1", () => {
     it("auto-enables useAsDefaultProvider", () => {
       const provider = createOpenAIProvider({ enabled: false });
-      // Project default model is anthropic, NOT openai -- yet toggle should auto-enable
-      const project = { defaultModel: "anthropic/claude-sonnet-4" };
 
       const { result } = renderHook(() =>
         useModelProviderForm({
           provider,
           projectId: "test-project-id",
-          project,
           enabledProvidersCount: 1,
         }),
       );
@@ -810,7 +727,12 @@ describe("useModelProviderForm()", () => {
       expect(result.current[0].useAsDefaultProvider).toBe(true);
     });
 
-    it("resolves projectDefaultModel to provider model", () => {
+    it("starts projectDefaultModel as null; selector picks fill it later", () => {
+      // With the legacy default-model columns gone, the form no longer
+      // pre-fills the selector from project.defaultModel. The drawer's
+      // ModelProviderDefaultSection picks a flagship from
+      // modelSelectorOptions when the "Use as default" toggle flips
+      // on. From the hook's perspective the field starts null.
       const provider: MaybeStoredModelProvider = {
         provider: "azure",
         enabled: false,
@@ -821,93 +743,32 @@ describe("useModelProviderForm()", () => {
         deploymentMapping: null,
         extraHeaders: [],
       };
-      // Project default is openai, which does not match azure
-      const project = { defaultModel: "openai/gpt-5.2" };
 
       const { result } = renderHook(() =>
         useModelProviderForm({
           provider,
           projectId: "test-project-id",
-          project,
           enabledProvidersCount: 1,
         }),
       );
 
-      // Should resolve to first stored model from the azure provider
-      expect(result.current[0].projectDefaultModel).toBe("azure/gpt-4o");
-    });
-
-    it("keeps existing default model when it already matches provider", () => {
-      const provider: MaybeStoredModelProvider = {
-        provider: "azure",
-        enabled: false,
-        customKeys: null,
-        models: ["gpt-4o", "gpt-4-turbo"],
-        embeddingsModels: null,
-        disabledByDefault: true,
-        deploymentMapping: null,
-        extraHeaders: [],
-      };
-      // Project default already starts with azure/
-      const project = { defaultModel: "azure/gpt-4-turbo" };
-
-      const { result } = renderHook(() =>
-        useModelProviderForm({
-          provider,
-          projectId: "test-project-id",
-          project,
-          enabledProvidersCount: 1,
-        }),
-      );
-
-      // Should keep the existing azure model, not override with first stored model
-      expect(result.current[0].projectDefaultModel).toBe("azure/gpt-4-turbo");
+      expect(result.current[0].projectDefaultModel).toBeNull();
     });
   });
 
   describe("when enabledProvidersCount is greater than 1", () => {
     it("does not auto-enable useAsDefaultProvider", () => {
       const provider = createOpenAIProvider({ enabled: false });
-      // Project default model is anthropic, NOT openai
-      const project = { defaultModel: "anthropic/claude-sonnet-4" };
 
       const { result } = renderHook(() =>
         useModelProviderForm({
           provider,
           projectId: "test-project-id",
-          project,
           enabledProvidersCount: 2,
         }),
       );
 
       expect(result.current[0].useAsDefaultProvider).toBe(false);
-    });
-
-    it("does not resolve models to provider", () => {
-      const provider: MaybeStoredModelProvider = {
-        provider: "azure",
-        enabled: false,
-        customKeys: null,
-        models: ["gpt-4o"],
-        embeddingsModels: null,
-        disabledByDefault: true,
-        deploymentMapping: null,
-        extraHeaders: [],
-      };
-      // Project default is openai, which does not match azure
-      const project = { defaultModel: "openai/gpt-5.2" };
-
-      const { result } = renderHook(() =>
-        useModelProviderForm({
-          provider,
-          projectId: "test-project-id",
-          project,
-          enabledProvidersCount: 2,
-        }),
-      );
-
-      // Should stay as-is since enabledProvidersCount > 1
-      expect(result.current[0].projectDefaultModel).toBe("openai/gpt-5.2");
     });
   });
 
@@ -919,7 +780,6 @@ describe("useModelProviderForm()", () => {
         useModelProviderForm({
           provider,
           projectId: "test-project-id",
-          project: null,
           enabledProvidersCount: 2,
         }),
       );
@@ -938,7 +798,6 @@ describe("useModelProviderForm()", () => {
         useModelProviderForm({
           provider,
           projectId: "test-project-id",
-          project: null,
           enabledProvidersCount: 2,
         }),
       );

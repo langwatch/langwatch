@@ -5,6 +5,7 @@ import {
   Field,
   HStack,
   Input,
+  Skeleton,
   Text,
 } from "@chakra-ui/react";
 import { Search, Settings } from "lucide-react";
@@ -23,6 +24,7 @@ import { InputGroup } from "./ui/input-group";
 import { Link } from "./ui/link";
 import { Select } from "./ui/select";
 import { LuSettings2 } from "react-icons/lu";
+import { NoModelsConfiguredCallout } from "./NoModelsConfiguredCallout";
 
 export type ModelOption = {
   label: string;
@@ -65,7 +67,7 @@ export const useModelSelectionOptions = (
   const { project } = useOrganizationTeamProject();
   const modelProviders = api.modelProvider.getAllForProject.useQuery(
     { projectId: project?.id ?? "" },
-    { enabled: !!project?.id, refetchOnMount: false },
+    { enabled: !!project?.id },
   );
 
   const allModels = getCustomModels(
@@ -127,7 +129,29 @@ export const useModelSelectionOptions = (
 
   const modelOption = selectOptions.find((opt) => opt.value === model);
 
-  return { modelOption, selectOptions, groupedByProvider };
+  // Local dev escape hatch so the no-models UX is visually testable
+  // without wiping the project's env-var-backed providers. URL toggle
+  // only fires in dev builds.
+  const forceEmpty =
+    !import.meta.env.PROD &&
+    typeof window !== "undefined" &&
+    window.location.search.includes("__no_models=1");
+
+  return {
+    modelOption,
+    selectOptions,
+    groupedByProvider,
+    /** True while the providers query is in flight. Callers that
+     *  render their own trigger should show a skeleton instead of the
+     *  empty-state callout so the user doesn't see a "No models
+     *  configured" flash before the data resolves. */
+    isLoading: modelProviders.isLoading,
+    /** True when the project has zero models of the requested mode
+     *  available. Lets callers that render their own trigger (e.g.
+     *  LLMConfigField) swap to the empty-state callout instead of
+     *  echoing back the stale persisted value. */
+    isEmpty: selectOptions.length === 0 || forceEmpty,
+  };
 };
 
 export const ModelSelector = React.memo(function ModelSelector({
@@ -137,6 +161,7 @@ export const ModelSelector = React.memo(function ModelSelector({
   size = "md",
   mode,
   showConfigureAction = false,
+  forFeatureLabel,
 }: {
   model: string;
   options: string[];
@@ -145,13 +170,17 @@ export const ModelSelector = React.memo(function ModelSelector({
   mode?: "chat" | "embedding";
   /** When true, shows a "Configure available models" link at the bottom of the dropdown */
   showConfigureAction?: boolean;
+  /** Surface-specific label used in the empty-state callout when no
+   *  models are available — e.g. "for AI search", "for evaluators".
+   *  Optional; the callout falls back to a generic message. */
+  forFeatureLabel?: string;
 }) {
-  const { selectOptions, groupedByProvider } = useModelSelectionOptions(
-    options,
-    model,
-    mode,
-  );
+  const { selectOptions, groupedByProvider, isEmpty, isLoading } =
+    useModelSelectionOptions(options, model, mode);
 
+  // ALL hooks must run unconditionally — keep the empty-state early
+  // return *after* every hook below so we don't violate React's rules
+  // of hooks when isEmpty flips between renders.
   const [modelSearch, setModelSearch] = useState("");
 
   // Filter models by search and group by provider
@@ -213,6 +242,32 @@ export const ModelSelector = React.memo(function ModelSelector({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modelSearch]);
+
+  // Skeleton while the providers query is in flight so the empty
+  // state doesn't flash before the data resolves.
+  if (isLoading) {
+    return (
+      <Skeleton
+        width={size === "full" ? "full" : size === "sm" ? "180px" : "240px"}
+        height={size === "sm" ? "28px" : "40px"}
+        borderRadius="md"
+      />
+    );
+  }
+
+  // Honest empty state: when the project has zero enabled providers
+  // (or zero models of the requested mode), render a guided callout
+  // instead of the dropdown. The prior behaviour was to render the
+  // System fallback string ("openai/gpt-5.2") in gray, which looked
+  // like a real selection but errored at runtime.
+  if (isEmpty) {
+    return (
+      <NoModelsConfiguredCallout
+        size={size}
+        forFeatureLabel={forFeatureLabel}
+      />
+    );
+  }
 
   return (
     <Select.Root

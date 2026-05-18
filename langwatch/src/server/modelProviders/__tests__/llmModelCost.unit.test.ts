@@ -110,15 +110,17 @@ describe("getStaticModelCosts", () => {
 
   describe("given model entries whose vendor-prefixed key length hides the matched suffix length", () => {
     afterEach(() => {
-      vi.doUnmock("../llmModels.json");
+      vi.doUnmock("../loadModelCatalog");
       vi.resetModules();
     });
 
     describe("when static model costs are built", () => {
       it("orders entries by matched model suffix, not vendor-prefixed key length", async () => {
         vi.resetModules();
-        vi.doMock("../llmModels.json", () => ({
-          default: {
+        vi.doMock("../loadModelCatalog", () => ({
+          llmModels: {
+            updatedAt: "test",
+            modelCount: 2,
             models: {
               "verylongvendor/abc": {
                 pricing: {

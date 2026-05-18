@@ -807,6 +807,12 @@ export const DashboardLayout = ({
         </Box>
       </HStack>
       <GlobalUpgradeModal />
+      {/* No MissingModelModal mount — the global tRPC / QueryCache
+          interceptors emit a sticky orange toast via
+          `showMissingModelToast` (deduped per (featureKey, role)).
+          Toast lives in the toaster portal that's already at the app
+          root; nothing else to mount here. See
+          specs/model-providers/missing-model-popup.feature. */}
     </Box>
   );
 };

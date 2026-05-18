@@ -84,7 +84,7 @@ export async function generateTraceQueryFromPrompt(
   const systemPrompt = buildSystemPrompt(fieldsBlock);
   const messages: ModelMessage[] = [{ role: "user", content: input.prompt }];
 
-  const model = await getVercelAIModel(input.projectId);
+  const model = await getVercelAIModel(input.projectId, undefined, "traces.ai_search");
 
   let lastQuery = "";
   let lastError = "Unknown error";
@@ -167,7 +167,7 @@ export async function generateTraceAction(
   const fieldsBlock = await buildFieldsBlock(input);
   const systemPrompt = buildActionSystemPrompt(fieldsBlock);
 
-  const model = await getVercelAIModel(input.projectId);
+  const model = await getVercelAIModel(input.projectId, undefined, "traces.ai_search");
 
   let lastError = "Unknown error";
   let lastQuery = "";

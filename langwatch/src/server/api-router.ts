@@ -13,6 +13,7 @@ import { app as evaluatorsApp } from "../app/api/evaluators/[[...route]]/app";
 import { app as exportTracesApp } from "../app/api/export/traces/[[...route]]/app";
 import { app as gatewayPlatformApp } from "../app/api/gateway-platform/[[...route]]/app";
 import { app as graphsApp } from "../app/api/graphs/[[...route]]/app";
+import { app as modelDefaultsApp } from "../app/api/model-defaults/[[...route]]/app";
 import { app as modelProvidersApp } from "../app/api/model-providers/[[...route]]/app";
 import { app as monitorsApp } from "../app/api/monitors/[[...route]]/app";
 import { app as apiKeysApp } from "../app/api/api-keys/[[...route]]/app";
@@ -80,6 +81,7 @@ export function createApiRouter() {
   api.route("/", exportTracesApp);
   api.route("/", gatewayPlatformApp);
   api.route("/", graphsApp);
+  api.route("/", modelDefaultsApp);
   api.route("/", modelProvidersApp);
   api.route("/", monitorsApp);
   api.route("/", apiKeysApp);

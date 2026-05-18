@@ -13,7 +13,6 @@ import { InputGroup } from "../../components/ui/input-group";
 import { toaster } from "../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
-import { DEFAULT_MODEL } from "../../utils/constants";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import type { Workflow } from "../types/dsl";
 import { useVersionState } from "./History";
@@ -79,7 +78,14 @@ export function NewVersionFields({
     form,
   });
 
-  const defaultModel = project?.defaultModel ?? DEFAULT_MODEL;
+  // Cascade-resolved model for studio LLM defaults (used to gate
+  // auto-generated commit messages).
+  const resolvedDefault = api.modelProvider.getResolvedDefault.useQuery(
+    { projectId: project?.id ?? "", featureKey: "studio.autocomplete" },
+    { enabled: !!project?.id },
+  );
+
+  const defaultModel = resolvedDefault.data?.model ?? "";
   const { modelOption } = useModelSelectionOptions(
     allModelOptions,
     defaultModel,

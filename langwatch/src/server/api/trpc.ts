@@ -31,6 +31,8 @@ import { ZodError } from "zod";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { DomainError } from "~/server/app-layer/domain-error";
+import { AiCallFailedError } from "~/server/modelProviders/aiCallFailedError";
+import { ModelNotConfiguredError } from "~/server/modelProviders/modelNotConfiguredError";
 import { getLogLevelFromStatusCode } from "../middleware/requestLogging";
 import { createLogger } from "../../utils/logger/server";
 import { captureException } from "../../utils/posthogErrorCapture";
@@ -111,35 +113,79 @@ export const createTRPCContext = async (opts: CreateNextContextOptions) => {
  * errors on the backend.
  */
 
-const t = initTRPC.context<typeof createTRPCContext>().create({
-  transformer: superjson,
-  errorFormatter({ shape, error }) {
-    // Extract limit info if present in cause
-    const cause = error.cause as
-      | { limitType?: string; current?: number; max?: number }
-      | undefined;
-    const limitInfo = cause?.limitType
+/**
+ * Extracted for testing — see
+ * langwatch/src/server/api/__tests__/modelNotConfigured.trpc.integration.test.ts.
+ * Keep `errorFormatter` in `t.create` calling this so production and
+ * tests exercise the same code path.
+ */
+export function errorFormatterForTesting({
+  shape,
+  error,
+}: {
+  shape: any;
+  error: { cause?: unknown; message?: string };
+}) {
+  const cause = error.cause as
+    | { limitType?: string; current?: number; max?: number }
+    | undefined;
+  const limitInfo = cause?.limitType
+    ? {
+        limitType: cause.limitType,
+        current: cause.current,
+        max: cause.max,
+      }
+    : null;
+
+  const domainError =
+    error.cause instanceof DomainError ? error.cause.serialize() : null;
+
+  // Surface ModelNotConfiguredError on the wire so the frontend
+  // interceptor in `utils/trpcError.ts::extractMissingModelInfo` can
+  // open the missing-model modal. `cause` carries a stable
+  // discriminator (`code: "MODEL_NOT_CONFIGURED"`) plus the feature
+  // metadata the modal needs to render + deep-link.
+  const missingModelCause =
+    error.cause instanceof ModelNotConfiguredError
       ? {
-          limitType: cause.limitType,
-          current: cause.current,
-          max: cause.max,
+          code: error.cause.cause,
+          featureKey: error.cause.featureKey,
+          featureDisplayName: error.cause.featureDisplayName,
+          role: error.cause.role,
+          projectId: error.cause.projectId,
         }
       : null;
 
-    const domainError =
-      error.cause instanceof DomainError ? error.cause.serialize() : null;
+  // Surface AiCallFailedError on the wire so the frontend interceptor
+  // in `utils/trpcError.ts::extractAiCallFailedInfo` can show the
+  // "double-check your model configuration" toast. Same cause-channel
+  // as MODEL_NOT_CONFIGURED — different discriminator code.
+  const aiCallFailedCause =
+    error.cause instanceof AiCallFailedError
+      ? {
+          code: error.cause.cause,
+          featureKey: error.cause.featureKey,
+          featureDisplayName: error.cause.featureDisplayName,
+          role: error.cause.role,
+          errorMessage: error.cause.originalErrorMessage,
+        }
+      : null;
 
-    return {
-      ...shape,
-      data: {
-        ...shape.data,
-        zodError:
-          error.cause instanceof ZodError ? error.cause.flatten() : null,
-        cause: limitInfo,
-        domainError,
-      },
-    };
-  },
+  return {
+    ...shape,
+    data: {
+      ...shape.data,
+      zodError:
+        error.cause instanceof ZodError ? error.cause.flatten() : null,
+      cause: missingModelCause ?? aiCallFailedCause ?? limitInfo,
+      domainError,
+    },
+  };
+}
+
+const t = initTRPC.context<typeof createTRPCContext>().create({
+  transformer: superjson,
+  errorFormatter: errorFormatterForTesting,
 });
 
 /**
@@ -312,6 +358,29 @@ const domainErrorMiddleware = t.middleware(async ({ next }) => {
       code: domainErrorToTRPCCode(domainError),
       message: domainError.message,
       cause: domainError,
+    });
+  }
+  if (!result.ok && result.error.cause instanceof ModelNotConfiguredError) {
+    // Re-raise as a typed BAD_REQUEST TRPCError so the errorFormatter
+    // serialises the cause into `data.cause` for the frontend
+    // interceptor. Without this middleware the error falls through as
+    // INTERNAL_SERVER_ERROR and the missing-model modal never opens.
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: result.error.cause.message,
+      cause: result.error.cause,
+    });
+  }
+  if (!result.ok && result.error.cause instanceof AiCallFailedError) {
+    // Same shape as ModelNotConfiguredError: re-raise as BAD_REQUEST so
+    // the wire code matches the user-actionable nature of the toast
+    // ("double-check your model configuration") instead of falling
+    // through as a generic 500 that monitoring + retry policies treat
+    // as a server fault.
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: result.error.cause.message,
+      cause: result.error.cause,
     });
   }
   return result;

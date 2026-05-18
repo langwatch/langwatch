@@ -75,7 +75,6 @@ export const projectRouter = createTRPCRouter({
         language: project.language,
         framework: project.framework,
         firstMessage: true,
-        topicClusteringModel: null,
         apiKey: "",
         teamId: "",
         createdAt: new Date(),
@@ -402,149 +401,10 @@ export const projectRouter = createTRPCRouter({
 
       return { success: true, projectSlug: updatedProject.slug };
     }),
-  updateEmbeddingsModel: protectedProcedure
-    .input(
-      z.object({
-        projectId: z.string(),
-        embeddingsModel: z.string(),
-      }),
-    )
-    .use(checkProjectPermission("project:update"))
-    .mutation(async ({ input, ctx }) => {
-      const prisma = ctx.prisma;
-      const project = await prisma.project.findUnique({
-        where: { id: input.projectId },
-      });
-
-      if (!project) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Project not found",
-        });
-      }
-
-      const updatedProject = await prisma.project.update({
-        where: { id: input.projectId },
-        data: {
-          embeddingsModel: input.embeddingsModel,
-        },
-      });
-
-      return { success: true, projectSlug: updatedProject.slug };
-    }),
-  updateTopicClusteringModel: protectedProcedure
-    .input(
-      z.object({
-        projectId: z.string(),
-        topicClusteringModel: z.string(),
-      }),
-    )
-    .use(checkProjectPermission("project:update"))
-    .mutation(async ({ input, ctx }) => {
-      const prisma = ctx.prisma;
-      const project = await prisma.project.findUnique({
-        where: { id: input.projectId },
-      });
-
-      if (!project) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Project not found",
-        });
-      }
-
-      const updatedProject = await prisma.project.update({
-        where: { id: input.projectId },
-        data: {
-          topicClusteringModel: input.topicClusteringModel,
-        },
-      });
-
-      return { success: true, projectSlug: updatedProject.slug };
-    }),
-  updateDefaultModel: protectedProcedure
-    .input(
-      z.object({
-        projectId: z.string(),
-        defaultModel: z.string(),
-      }),
-    )
-    .use(checkProjectPermission("project:update"))
-    .mutation(async ({ input, ctx }) => {
-      const prisma = ctx.prisma;
-      const project = await prisma.project.findUnique({
-        where: { id: input.projectId },
-      });
-
-      if (!project) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Project not found",
-        });
-      }
-
-      const updatedProject = await prisma.project.update({
-        where: { id: input.projectId },
-        data: {
-          defaultModel: input.defaultModel,
-        },
-      });
-
-      return { success: true, projectSlug: updatedProject.slug };
-    }),
-  updateProjectDefaultModels: protectedProcedure
-    .input(
-      z.object({
-        projectId: z.string(),
-        defaultModel: z.string().optional(),
-        topicClusteringModel: z.string().optional(),
-        embeddingsModel: z.string().optional(),
-      }),
-    )
-    .use(checkProjectPermission("project:update"))
-    .mutation(async ({ input, ctx }) => {
-      const prisma = ctx.prisma;
-
-      const project = await prisma.project.findUnique({
-        where: { id: input.projectId },
-      });
-
-      if (!project) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Project not found",
-        });
-      }
-
-      // Build update data only for provided fields
-      const updateData: {
-        defaultModel?: string;
-        topicClusteringModel?: string;
-        embeddingsModel?: string;
-      } = {};
-
-      if (input.defaultModel !== undefined) {
-        updateData.defaultModel = input.defaultModel;
-      }
-      if (input.topicClusteringModel !== undefined) {
-        updateData.topicClusteringModel = input.topicClusteringModel;
-      }
-      if (input.embeddingsModel !== undefined) {
-        updateData.embeddingsModel = input.embeddingsModel;
-      }
-
-      // Skip update if no fields to update
-      if (Object.keys(updateData).length === 0) {
-        return { success: true, projectSlug: project.slug };
-      }
-
-      const updatedProject = await prisma.project.update({
-        where: { id: input.projectId },
-        data: updateData,
-      });
-
-      return { success: true, projectSlug: updatedProject.slug };
-    }),
+  // Legacy default-model mutations have been removed alongside the
+  // Organization/Team/Project scalar columns they wrote to. Defaults
+  // now live in ModelDefaultConfig; the canonical mutation surface is
+  // modelProvider.{createConfig,updateConfig,deleteConfig,setRoleAtScope,setFeatureAtScope}.
   getFieldRedactionStatus: protectedProcedure
     .input(
       z.object({

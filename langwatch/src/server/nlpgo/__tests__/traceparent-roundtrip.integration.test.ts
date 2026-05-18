@@ -349,9 +349,18 @@ describe.skipIf(!shouldRun)(
 
       // Flush Redis once so reactor-job orphans from prior runs don't
       // log "Unknown job in global queue" noise (matches the
-      // loopPrevention.reactor.integration.test.ts pattern).
+      // loopPrevention.reactor.integration.test.ts pattern). Wrap in
+      // a one-retry helper so a transient ETIMEDOUT on a saturated CI
+      // runner doesn't kill the whole suite before the test even runs.
       const redis = getTestRedisConnection();
-      if (redis) await redis.flushall();
+      if (redis) {
+        try {
+          await redis.flushall();
+        } catch {
+          await sleep(2_000);
+          await redis.flushall();
+        }
+      }
 
       tracePipeline = createTracePipeline();
       tenantId = createTestTenantId();
@@ -539,9 +548,13 @@ describe.skipIf(!shouldRun)(
         }
       });
 
-      // Health check on the pre-built binary — boots in ~1s, give it
-      // 30s on a slow CI runner.
-      await waitForNlpgoHealth(30_000);
+      // Health check on the pre-built binary. The binary itself boots
+      // in ~1s, but on a saturated CI runner the spawn + healthz path
+      // has been observed to stretch past 30s (the lifecycle includes
+      // child-bypass setup + per-tenant exporter init). 30s was too
+      // tight and `retry: 1` on the it() doesn't cover beforeAll, so
+      // a single slow boot kills the suite outright. Bump to 120s.
+      await waitForNlpgoHealth(120_000);
     }, 700_000); // build (up to 600s cold) + boot + health window
 
     afterAll(async () => {
@@ -669,8 +682,14 @@ describe.skipIf(!shouldRun)(
       };
     }
 
+    // 300s per attempt + retry: 1 → two attempts max. Boy-scouts pass
+    // on the CI flake: transient Redis/ClickHouse connect ETIMEDOUTs
+    // (saturated runner) get a second chance before the suite is
+    // declared red. A real regression — nlpgo emitting the wrong
+    // trace_id — fails both attempts and surfaces normally.
     it(
       "every span persisted in ClickHouse shares the inbound trace_id, and at least one links back to the inbound span_id",
+      { timeout: 300_000, retry: 1 },
       async () => {
         const traceparent = `00-${PARENT_TRACE_ID}-${PARENT_SPAN_ID}-01`;
         const body = makeWorkflowBody(PARENT_TRACE_ID);
@@ -908,7 +927,6 @@ describe.skipIf(!shouldRun)(
             `Pipeline diagnostic:\n${buildDiagnostic()}`,
         ).toBeGreaterThan(0);
       },
-      300_000,
     );
   },
 );

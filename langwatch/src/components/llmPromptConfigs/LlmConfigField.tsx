@@ -11,6 +11,7 @@ import type { LLMConfig } from "~/optimization_studio/types/dsl";
 import type { ModelOption } from "~/server/topicClustering/types";
 import { Popover } from "../ui/popover";
 import { LLMModelDisplay } from "./LLMModelDisplay";
+import { NoModelsConfiguredCallout } from "../NoModelsConfiguredCallout";
 
 type LLMConfigFieldProps = {
   llmConfig: LLMConfig;
@@ -24,6 +25,12 @@ type LLMConfigFieldProps = {
   onOutputsChange?: (outputs: Output[]) => void;
   /** Whether to show the structured outputs section */
   showStructuredOutputs?: boolean;
+  /** True when the project has zero enabled providers / models for
+   *  the requested mode. Renders the empty-state callout in place of
+   *  the model-picker trigger so the user never sees a stale persisted
+   *  model id (e.g. "openai/gpt-5.2") pretending to be a working
+   *  selection on a fresh account. */
+  noModelsConfigured?: boolean;
 };
 
 /**
@@ -42,12 +49,21 @@ export function LLMConfigField({
   outputs,
   onOutputsChange,
   showStructuredOutputs = false,
+  noModelsConfigured = false,
 }: LLMConfigFieldProps) {
   const [popoverOpen, setPopoverOpen] = useState(false);
   const { model } = llmConfig ?? {};
 
   // Check if the model is disabled (has line-through styling)
   const isModelDisabled = modelOption?.isDisabled ?? false;
+
+  // No providers configured on the project: skip the popover entirely.
+  // The model id stored on this LLMConfig is meaningless without a
+  // provider key to back it, so don't echo it as if it were a real
+  // selection — show the honest empty-state callout instead.
+  if (noModelsConfigured) {
+    return <NoModelsConfiguredCallout size="sm" />;
+  }
 
   return (
     <>

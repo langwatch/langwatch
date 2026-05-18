@@ -150,7 +150,11 @@ export class ModelProviderRepository {
           | undefined,
         extraHeaders: data.extraHeaders ?? [],
         scopes: {
-          create: scopes.map((scope) => ({ scopeType: scope.scopeType, scopeId: scope.scopeId })),
+          create: scopes.map((scope) => ({
+            id: generate(KSUID_RESOURCES.MODEL_PROVIDER_SCOPE).toString(),
+            scopeType: scope.scopeType,
+            scopeId: scope.scopeId,
+          })),
         },
       },
       include: { scopes: true },
@@ -186,6 +190,7 @@ export class ModelProviderRepository {
         });
         await workingTx.modelProviderScope.createMany({
           data: scopes.map((scope) => ({
+            id: generate(KSUID_RESOURCES.MODEL_PROVIDER_SCOPE).toString(),
             modelProviderId: id,
             scopeType: scope.scopeType,
             scopeId: scope.scopeId,
