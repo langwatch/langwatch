@@ -7,8 +7,8 @@
  *   azure-blob:// — objects stored in an Azure Blob Storage container
  */
 
-const SUPPORTED_SCHEMES = ["s3", "file", "azure-blob"] as const;
-type UriScheme = (typeof SUPPORTED_SCHEMES)[number];
+export const SUPPORTED_SCHEMES = ["s3", "file", "azure-blob"] as const;
+export type UriScheme = (typeof SUPPORTED_SCHEMES)[number];
 
 /**
  * Mints an S3 content-addressed URI.

@@ -105,20 +105,19 @@ export function MediaPart({ part }: MediaPartProps) {
 
   const [status, setStatus] = useState<LoadStatus>(isUrlBased ? "loading" : "ok");
 
-  // For URL-based parts, verify the file is reachable after the element reports
-  // an error. We optimistically render and check on error, keeping the happy
-  // path cost-free.
-  useEffect(() => {
-    if (!isUrlBased) {
-      setStatus("ok");
-    }
-  }, [isUrlBased]);
-
   // Probe at most once per <src>: a single failed audio/video element can fire
   // `error` repeatedly while the browser retries decoders, and a long scenario
   // can render the same file id in many places. Without a guard, each render
   // would hit /api/files/:id again.
   const probedRef = useRef<string | null>(null);
+
+  // When the src changes (parent swaps to a different file id or switches from
+  // URL-based to inline-data), reset both the load status and the probe guard
+  // so the new src's first error is not silently swallowed.
+  useEffect(() => {
+    setStatus(isUrlBased ? "loading" : "ok");
+    probedRef.current = null;
+  }, [src, isUrlBased]);
 
   function handleLoad() {
     setStatus("ok");

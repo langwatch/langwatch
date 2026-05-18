@@ -61,45 +61,45 @@ function findSourceFiles(dir: string): string[] {
 // ---------------------------------------------------------------------------
 
 /**
- * Directories we scan for "stored_objects" references that would imply
- * an automatic purge / retention / GC job. We deliberately go wider than
- * /server/background because a purge can also be triggered from a tRPC
- * router (project archive flow), a scenario lifecycle hook, or any other
- * scheduler.
+ * Paths (relative to REPO_ROOT) where mentions of `stored_objects` are
+ * expected and reviewed. Anything outside the allowlist that references
+ * the table is flagged.
  *
- * Note: each entry is allowed to mention "stored_objects" if the file
- * path is in the allowlist below — that's where the documented surface
- * lives.
+ * Add a new entry here only when the reference has been audited against
+ * AC16 — it must NOT be a retention/GC/orphan-reaper.
  */
-const SCAN_DIRS: readonly string[] = [
-  "src/server/background",
-  "src/server/api/routers",
-  "src/server/scenarios",
+const SCAN_ALLOWLIST: ReadonlyArray<RegExp> = [
+  // The stored-objects module itself is the legitimate home for all
+  // service, repository, and driver code that references the table.
+  /^src\/server\/stored-objects\//,
+  // tracer/types.ts references "stored_objects" only in a JSDoc comment
+  // that documents the BinaryPart shape — it is not a GC or retention
+  // reference. Audited: no delete/update/truncate on stored_objects.
+  /^src\/server\/tracer\/types\.ts$/,
 ];
 
-/**
- * Paths where mentions of `stored_objects` are expected and reviewed.
- * Anything outside the allowlist that references the table is flagged.
- */
-const SCAN_ALLOWLIST = /^src\/server\/stored-objects\//;
+function isAllowlisted(rel: string): boolean {
+  return SCAN_ALLOWLIST.some((pattern) => pattern.test(rel));
+}
 
 function findOffendingStoredObjectsRefs(absDir: string): string[] {
   const files = findSourceFiles(absDir);
   return files
     .filter((filePath) => /stored_objects/i.test(fs.readFileSync(filePath, "utf8")))
     .map((f) => path.relative(REPO_ROOT, f))
-    .filter((rel) => !SCAN_ALLOWLIST.test(rel));
+    .filter((rel) => !isAllowlisted(rel));
 }
 
 describe("AC16 — no automatic retention, GC, or orphan reaping for stored_objects", () => {
-  describe("when the background worker, tRPC routers, and scenarios trees are scanned for stored_objects references", () => {
+  describe("when all of src/server is scanned for stored_objects references", () => {
     /** @scenario "No automatic retention, time-based GC, or orphan reaping runs" */
-    it("finds no scheduler that references stored_objects", () => {
-      const offending: string[] = [];
-      for (const dir of SCAN_DIRS) {
-        const abs = path.join(REPO_ROOT, dir);
-        offending.push(...findOffendingStoredObjectsRefs(abs));
-      }
+    it("finds no file outside the stored-objects module that references stored_objects", () => {
+      // Walk the entire server tree so that future surfaces (jobs/, routes/,
+      // webhooks/, etc.) are covered automatically. Adding a reference
+      // anywhere under src/server (outside the allowlist) will fail this
+      // test and force a deliberate review of AC16.
+      const serverDir = path.join(REPO_ROOT, "src/server");
+      const offending = findOffendingStoredObjectsRefs(serverDir);
       // If this assertion fails, something outside the stored-objects
       // module references stored_objects. Before adding such a reference,
       // review AC16 in the RFC and either:

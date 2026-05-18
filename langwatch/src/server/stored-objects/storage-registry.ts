@@ -7,6 +7,7 @@
 import type { Readable } from "node:stream";
 import type { StorageDriver } from "./storage-driver";
 import { getUriScheme } from "./uri";
+import type { UriScheme } from "./uri";
 
 /**
  * Routes storage operations to the correct driver by extracting the URI scheme.
@@ -14,13 +15,14 @@ import { getUriScheme } from "./uri";
  * The `azure-blob` driver is optional: deployments that have not configured
  * Azure credentials don't need it registered. The registry throws a
  * descriptive error if a URI of an unregistered scheme is dispatched.
+ *
+ * The field uses `Partial<Record<UriScheme, StorageDriver>>` so that adding
+ * a new scheme only requires one constant change in uri.ts — no field or
+ * constructor edits needed here. The constructor still requires s3 and file
+ * explicitly so callers can't accidentally omit the mandatory drivers.
  */
 export class StorageRegistry {
-  private readonly drivers: {
-    s3: StorageDriver;
-    file: StorageDriver;
-    "azure-blob"?: StorageDriver;
-  };
+  private readonly drivers: Partial<Record<UriScheme, StorageDriver>>;
 
   constructor({
     s3,
