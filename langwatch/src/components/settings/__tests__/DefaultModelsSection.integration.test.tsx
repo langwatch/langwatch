@@ -3,7 +3,7 @@
  *
  * Integration tests for the redesigned Default Models settings table
  * + override drawer (B3.4 rework — flat ModelDefaultConfig policies
- * with CSS-cascade JSON payloads, n:n scope attachments).
+ * with cascading JSON payloads, n:n scope attachments).
  *
  * Coverage:
  *  - The "All you can see" view renders a table with one row per

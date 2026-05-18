@@ -241,7 +241,7 @@ export const modelProviderRouter = createTRPCRouter({
    * Shape mirrors RBAC: three effective default models for THIS
    * project at the top (the resolver's "what would I actually use
    * here" answer), then a flat list of `ModelDefaultConfig` rows —
-   * each carrying its CSS-cascade JSON payload + the scopes it
+   * each carrying its cascading JSON payload + the scopes it
    * attaches to. The UI groups, filters, or pivots this list itself
    * (per-scope drilldown is a client-side filter, not a separate
    * server call).

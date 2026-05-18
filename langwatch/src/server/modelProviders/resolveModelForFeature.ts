@@ -134,7 +134,7 @@ function tierForConfig(
   config: ConfigForChain,
   chain: ScopeChain,
 ): "project" | "team" | "organization" | null {
-  // CSS-cascade: most-specific tier wins. If a single config attaches
+  // Cascading: most-specific tier wins. If a single config attaches
   // at multiple tiers in our chain (rare but legal — e.g. org + a
   // specific project), prefer the most specific one when picking the
   // "scope" attribute we surface back to callers.
@@ -175,7 +175,7 @@ const TIER_ORDER: Array<"project" | "team" | "organization"> = [
  * specs/model-providers/model-default-config-cascade.feature for the
  * full contract.
  *
- * Resolution order (CSS-cascade):
+ * Resolution order (cascading):
  *   1. Tier-by-tier (project → team → org). Within a tier, configs
  *      sorted by createdAt DESC; the first config that has the
  *      featureKey set wins for "feature override", the first that has

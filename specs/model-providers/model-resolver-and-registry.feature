@@ -3,7 +3,7 @@ Feature: Model resolver and feature registry
   I want one resolver that maps a feature key to a configured model and one error type when nothing is configured
   So that every AI-powered feature picks the right model through the same call and surfaces the missing-model popup the same way.
 
-  # The storage shape and the CSS-cascade walk live in
+  # The storage shape and the cascading walk live in
   # specs/model-providers/model-default-config-cascade.feature. This file
   # is laser-focused on the stable contract every caller depends on:
   # the ModelNotConfiguredError shape and the dev-facing registry

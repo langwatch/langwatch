@@ -94,7 +94,7 @@ describe("Prompts API", () => {
     testApiKey = testProject.apiKey;
     testProjectId = testProject.id;
 
-    // The CSS-cascade resolver requires a model to be configured at
+    // The cascading resolver requires a model to be configured at
     // PROJECT, TEAM, or ORG scope for `prompt.create_default` —
     // otherwise prompt creation throws `ModelNotConfiguredError`. Seed
     // a project-scoped DEFAULT so the prompt-api tests can create

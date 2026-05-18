@@ -704,7 +704,7 @@ function ResolvedScopeView({
 }
 
 /**
- * Client-side CSS-cascade walk for a single key at a given scope. The
+ * Client-side cascading walk for a single key at a given scope. The
  * server is the source of truth (it serves `effective` for the current
  * project) — this fallback only fires when the user picks "this team"
  * or "more scopes ▸ <other team/project>" since the server only
