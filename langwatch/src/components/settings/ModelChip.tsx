@@ -81,7 +81,7 @@ export function ModelChip({
 
   return (
     <Tooltip
-      content={`${providerKey} provider isn't enabled here — AI features reading this default will fail until you re-add it or pick a different model.`}
+      content={`${providerKey} provider isn't enabled here. AI features reading this default will fail until you re-add it or pick a different model.`}
       positioning={{ placement: "top" }}
       showArrow
     >

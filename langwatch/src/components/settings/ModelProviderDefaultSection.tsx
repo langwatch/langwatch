@@ -247,7 +247,7 @@ export const DefaultProviderSection = ({
                 `${provider.provider}/`,
               ) && (
                 <Text fontSize="xs" color="orange.600" marginTop={1}>
-                  Persisted default belongs to a different provider — pick a{" "}
+                  Persisted default belongs to a different provider, pick a{" "}
                   {providerName} model to switch.
                 </Text>
               )}
@@ -272,7 +272,7 @@ export const DefaultProviderSection = ({
                 `${provider.provider}/`,
               ) && (
                 <Text fontSize="xs" color="orange.600" marginTop={1}>
-                  Persisted default belongs to a different provider — pick a{" "}
+                  Persisted default belongs to a different provider, pick a{" "}
                   {providerName} model to switch.
                 </Text>
               )}

@@ -58,7 +58,7 @@ const ROLE_LABEL: Record<ModelRoleKey, string> = {
 const ROLE_BLURB: Record<ModelRoleKey, string> = {
   DEFAULT:
     "Picked when a prompt or evaluator is created, and any high-stakes call without a specific override.",
-  FAST: "Background and assistive surfaces — search, autocomplete, commit messages, topic clustering.",
+  FAST: "Background and assistive surfaces like search, autocomplete, commit messages, topic clustering.",
   EMBEDDINGS: "Semantic vectors used by topic clustering and similar features.",
 };
 
