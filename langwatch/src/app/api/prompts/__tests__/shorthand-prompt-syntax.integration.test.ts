@@ -23,6 +23,7 @@ describe("Feature: Shorthand prompt tag syntax (REST API)", () => {
   let testOrganization: Organization;
   let testTeam: Team;
   let testProject: Project;
+  let testDefaultConfigId: string;
 
   const makeRequest = (path: string, options?: RequestInit) =>
     app.request(path, {
@@ -66,7 +67,7 @@ describe("Feature: Shorthand prompt tag syntax (REST API)", () => {
 
     // Cascade resolver requires a DEFAULT model at some scope to create
     // a prompt; seed an org-scope row.
-    await prisma.modelDefaultConfig.create({
+    const seededDefault = await prisma.modelDefaultConfig.create({
       data: {
         config: { DEFAULT: "openai/gpt-4o-mini" },
         scopes: {
@@ -75,7 +76,9 @@ describe("Feature: Shorthand prompt tag syntax (REST API)", () => {
           ],
         },
       },
+      select: { id: true },
     });
+    testDefaultConfigId = seededDefault.id;
 
     await prisma.promptTag.createMany({
       data: [
@@ -92,9 +95,11 @@ describe("Feature: Shorthand prompt tag syntax (REST API)", () => {
     await prisma.modelDefaultConfigScope.deleteMany({
       where: { scopeType: "ORGANIZATION", scopeId: testOrganization.id },
     });
-    await prisma.modelDefaultConfig.deleteMany({
-      where: { scopes: { none: {} } },
-    });
+    if (testDefaultConfigId) {
+      await prisma.modelDefaultConfig.deleteMany({
+        where: { id: testDefaultConfigId },
+      });
+    }
     await prisma.project.delete({ where: { id: testProjectId } });
     await prisma.team.delete({ where: { id: testTeam.id } });
     await prisma.promptTag.deleteMany({ where: { organizationId: testOrganization.id } });

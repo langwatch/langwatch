@@ -12,6 +12,7 @@ describe("Feature: Prompt version tags", () => {
   let testProject: Project;
   let otherProject: Project;
   let service: PromptService;
+  let testDefaultConfigId: string;
 
   beforeEach(async () => {
     testOrganization = await prisma.organization.create({
@@ -47,7 +48,7 @@ describe("Feature: Prompt version tags", () => {
     // ModelNotConfiguredError. The cascade resolver requires a value at
     // some scope; covering the org tier is the cheapest setup that
     // applies to both testProject and otherProject.
-    await prisma.modelDefaultConfig.create({
+    const seededDefault = await prisma.modelDefaultConfig.create({
       data: {
         config: { DEFAULT: "openai/gpt-4o-mini" },
         scopes: {
@@ -56,7 +57,9 @@ describe("Feature: Prompt version tags", () => {
           ],
         },
       },
+      select: { id: true },
     });
+    testDefaultConfigId = seededDefault.id;
 
     // Seed production and staging tags for the test org
     await prisma.promptTag.createMany({
@@ -88,9 +91,11 @@ describe("Feature: Prompt version tags", () => {
     await prisma.modelDefaultConfigScope.deleteMany({
       where: { scopeType: "ORGANIZATION", scopeId: testOrganization.id },
     });
-    await prisma.modelDefaultConfig.deleteMany({
-      where: { scopes: { none: {} } },
-    });
+    if (testDefaultConfigId) {
+      await prisma.modelDefaultConfig.deleteMany({
+        where: { id: testDefaultConfigId },
+      });
+    }
     await prisma.project.deleteMany({
       where: { id: { in: [testProject.id, otherProject.id] } },
     });

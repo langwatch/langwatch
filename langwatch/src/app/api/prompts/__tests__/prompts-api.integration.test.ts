@@ -29,6 +29,7 @@ describe("Prompts API", () => {
   let testOrganization: Organization;
   let testTeam: Team;
   let testProject: Project;
+  let testDefaultConfigId: string;
   let helpers: {
     api: {
       put: (path: string, body: any) => Response | Promise<Response>;
@@ -98,14 +99,16 @@ describe("Prompts API", () => {
     // otherwise prompt creation throws `ModelNotConfiguredError`. Seed
     // a project-scoped DEFAULT so the prompt-api tests can create
     // prompts without depending on a fallback model.
-    await prisma.modelDefaultConfig.create({
+    const seededDefault = await prisma.modelDefaultConfig.create({
       data: {
         config: { DEFAULT: "openai/gpt-4o-mini" },
         scopes: {
           create: [{ scopeType: "PROJECT", scopeId: testProjectId }],
         },
       },
+      select: { id: true },
     });
+    testDefaultConfigId = seededDefault.id;
 
     // Update the mock config with the correct project ID
     mockConfig = llmPromptConfigFactory.build({
@@ -146,9 +149,11 @@ describe("Prompts API", () => {
     await prisma.modelDefaultConfigScope.deleteMany({
       where: { scopeType: "PROJECT", scopeId: testProjectId },
     });
-    await prisma.modelDefaultConfig.deleteMany({
-      where: { scopes: { none: {} } },
-    });
+    if (testDefaultConfigId) {
+      await prisma.modelDefaultConfig.deleteMany({
+        where: { id: testDefaultConfigId },
+      });
+    }
 
     await prisma.project.delete({
       where: { id: testProjectId },
