@@ -39,25 +39,12 @@ export function missingModelToastId(info: MissingModelInfo): string {
   return `missing-model:${info.role}:${info.featureKey}`;
 }
 
-function currentProjectSlug(): string | null {
-  if (typeof window === "undefined") return null;
-  const segments = window.location.pathname.split("/").filter(Boolean);
-  // App URLs are `/{slug}/...` for project-scoped pages; first segment
-  // is the slug. Reserved prefixes ("settings", "auth", "onboarding")
-  // don't carry a project slug, so we treat them as "no slug" and the
-  // settings link falls back to the bare path.
-  const first = segments[0];
-  if (!first) return null;
-  if (["settings", "auth", "onboarding", "api"].includes(first)) return null;
-  return first;
-}
-
 function settingsHref(info: MissingModelInfo): string {
-  const slug = info.projectSlug ?? currentProjectSlug();
-  const base = slug
-    ? `/${slug}/settings/model-providers`
-    : "/settings/model-providers";
-  return `${base}#role-${info.role.toLowerCase()}`;
+  // /settings/model-providers is a top-level route in the Vite app —
+  // the legacy `/${slug}/settings/...` shape 404s now. Project slug is
+  // kept on MissingModelInfo for analytics / future deep-linking but
+  // isn't part of the URL.
+  return `/settings/model-providers#role-${info.role.toLowerCase()}`;
 }
 
 /**
