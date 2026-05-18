@@ -66,6 +66,7 @@ vi.mock("~/server/dataplane-s3", () => ({
 import type { StoredObject } from "../stored-object";
 import type { StoredObjectsRepository } from "../stored-objects.repository";
 import { StoredObjectsService, deriveStoredObjectId } from "../stored-objects.service";
+import type { MintStorageUri } from "../stored-objects.service";
 import type { StorageRegistry } from "../storage-registry";
 import { ObjectNotFoundError } from "../errors";
 import * as dataplaneS3 from "~/server/dataplane-s3";
@@ -130,11 +131,15 @@ describe("storeFromBytes", () => {
   let repo: StoredObjectsRepository;
   let registry: StorageRegistry;
   let service: StoredObjectsService;
+  let mockMintStorageUri: ReturnType<typeof vi.fn> & MintStorageUri;
 
   beforeEach(() => {
     repo = makeRepository();
     registry = makeRegistry();
-    service = new StoredObjectsService(repo, registry);
+    mockMintStorageUri = vi.fn(async ({ projectId, sha256 }: { projectId: string; sha256: string }) =>
+      `file:///tmp/${projectId}/${sha256}`,
+    ) as ReturnType<typeof vi.fn> & MintStorageUri;
+    service = new StoredObjectsService(repo, registry, mockMintStorageUri);
   });
 
   describe("when the content is new for the project", () => {
@@ -284,7 +289,9 @@ describe("getById", () => {
   beforeEach(() => {
     repo = makeRepository();
     registry = makeRegistry();
-    service = new StoredObjectsService(repo, registry);
+    const mintStub: MintStorageUri = async ({ projectId, sha256 }) =>
+      `file:///tmp/${projectId}/${sha256}`;
+    service = new StoredObjectsService(repo, registry, mintStub);
   });
 
   describe("when the row exists and storage has the bytes", () => {
@@ -413,7 +420,9 @@ describe("mintStorageUri (BYOC bucket selection — observed through the inserte
 describe("StoredObjectsService surface", () => {
   /** @scenario "StoredObjectsService exposes storeFromBytes, getById, cascadeDeleteProject, cascadeDeleteOwner" */
   it("exposes storeFromBytes, getById, cascadeDeleteProject, cascadeDeleteOwner", () => {
-    const service = new StoredObjectsService(makeRepository(), makeRegistry());
+    const mintStub: MintStorageUri = async ({ projectId, sha256 }) =>
+      `file:///tmp/${projectId}/${sha256}`;
+    const service = new StoredObjectsService(makeRepository(), makeRegistry(), mintStub);
 
     expect(typeof service.storeFromBytes).toBe("function");
     expect(typeof service.getById).toBe("function");

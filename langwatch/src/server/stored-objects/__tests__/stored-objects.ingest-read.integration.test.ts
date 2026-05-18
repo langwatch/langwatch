@@ -33,6 +33,7 @@ import { LocalFilesystemDriver } from "../local-filesystem-driver";
 import { StorageRegistry } from "../storage-registry";
 import { StoredObjectsRepository } from "../stored-objects.repository";
 import { StoredObjectsService } from "../stored-objects.service";
+import type { MintStorageUri } from "../stored-objects.service";
 import { mintFileUri } from "../uri";
 
 // ---------------------------------------------------------------------------
@@ -88,31 +89,11 @@ vi.mock("~/server/metrics", () => ({
   storedObjectReadFailureCounter: { inc: vi.fn() },
 }));
 
-// env mock — no S3 bucket so URI defaults to file://. LANGWATCH_LOCAL_STORAGE_PATH
-// is exposed via a getter that reads process.env at lookup time so withTmpStorage()
-// (which mutates process.env per-test) actually takes effect when the service
-// reads `env.LANGWATCH_LOCAL_STORAGE_PATH`. Without this, the service would
-// fall back to the hardcoded /var/lib/langwatch default and EACCES on CI.
+// env mock — mintStorageUri is now injected (see buildService below), so the
+// env mock only needs to exist to prevent the real env.mjs from failing on
+// missing variables in the test environment.
 vi.mock("~/env.mjs", () => ({
-  env: new Proxy(
-    { S3_BUCKET_NAME: "" },
-    {
-      get(target, prop, receiver) {
-        if (prop === "LANGWATCH_LOCAL_STORAGE_PATH") {
-          return process.env.LANGWATCH_LOCAL_STORAGE_PATH;
-        }
-        return Reflect.get(target, prop, receiver);
-      },
-    },
-  ),
-}));
-
-// mintStorageUri queries the BYOC dataplane config; no Prisma is wired in
-// the test, so stub the lookup to return null and let the URI fall back
-// to the local-FS path (LANGWATCH_LOCAL_STORAGE_PATH, overridden per-test
-// via withTmpStorage).
-vi.mock("~/server/dataplane-s3", () => ({
-  getS3ConfigForProject: vi.fn().mockResolvedValue(null),
+  env: { S3_BUCKET_NAME: "" },
 }));
 
 // ---------------------------------------------------------------------------
@@ -209,30 +190,30 @@ afterEach(async () => {
 /**
  * Builds a fully-wired StoredObjectsService for the given project,
  * using a LocalFilesystemDriver rooted at tmpDir.
+ *
+ * A mint stub is injected so tests don't need to mock the dataplane-s3
+ * module. The stub produces the same file:// URIs that defaultMintStorageUri
+ * would generate when LANGWATCH_LOCAL_STORAGE_PATH=tmpDir, keeping the
+ * read-back path consistent without any module-level mock.
  */
 function buildService(projectId: string): StoredObjectsService {
   const driver = new LocalFilesystemDriver();
   const registry = new StorageRegistry({ file: driver, s3: driver });
   const repository = new StoredObjectsRepository();
-  return new StoredObjectsService(repository, registry);
+  // tmpDir is a `let` captured by reference — reads the current per-test value
+  // at call time (set in beforeEach / withTmpStorage).
+  const mintUri: MintStorageUri = async ({ projectId: pid, sha256 }) =>
+    mintFileUri({ root: tmpDir, projectId: pid, sha256 });
+  return new StoredObjectsService(repository, registry, mintUri);
 }
 
 /**
- * Mints a `file://` URI under tmpDir so storage hits the test temp dir.
- * We override the default LANGWATCH_LOCAL_STORAGE_PATH by patching
- * process.env so the driver writes under the per-test tmpdir instead of
- * /var/lib/langwatch (which CI runners can't write to).
+ * Runs `fn` within a per-test tmpDir scope. The injected mint stub in
+ * `buildService` reads `tmpDir` by reference, so storage URIs produced inside
+ * this wrapper point at the per-test temporary directory.
  */
 function withTmpStorage(fn: () => Promise<void>): Promise<void> {
-  const original = process.env.LANGWATCH_LOCAL_STORAGE_PATH;
-  process.env.LANGWATCH_LOCAL_STORAGE_PATH = tmpDir;
-  return fn().finally(() => {
-    if (original === undefined) {
-      delete process.env.LANGWATCH_LOCAL_STORAGE_PATH;
-    } else {
-      process.env.LANGWATCH_LOCAL_STORAGE_PATH = original;
-    }
-  });
+  return fn();
 }
 
 // ---------------------------------------------------------------------------

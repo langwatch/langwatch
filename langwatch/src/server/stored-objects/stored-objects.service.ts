@@ -74,6 +74,13 @@ function deriveStoredObjectId({
 }
 
 /**
+ * A function that returns the storage URI for a new object given a project id
+ * and SHA-256 content hash. Injected into `StoredObjectsService` so tests can
+ * supply a per-call stub without module-level mocking.
+ */
+export type MintStorageUri = (args: { projectId: string; sha256: string }) => Promise<string>;
+
+/**
  * Returns the storage URI for a new object, resolving the bucket per-project.
  *
  * Resolution precedence (matches createS3Client in src/server/storage.ts):
@@ -86,7 +93,7 @@ function deriveStoredObjectId({
  * to the private bucket. That mismatch breaks reads and tenant isolation,
  * since `S3Driver` parses the URI to determine the bucket on GET.
  */
-async function mintStorageUri({
+async function defaultMintStorageUri({
   projectId,
   sha256,
 }: {
@@ -111,13 +118,15 @@ async function mintStorageUri({
 /**
  * Service for storing and retrieving externalized byte content.
  *
- * Inject `repository` and `registry` for testing; the production singleton
- * is exported as `storedObjectsService`.
+ * Inject `repository`, `registry`, and optionally `mintStorageUri` for
+ * testing. The production singleton uses `defaultMintStorageUri` as the
+ * default so callers that omit the third arg are unaffected.
  */
 export class StoredObjectsService {
   constructor(
     private readonly repository: StoredObjectsRepository,
     private readonly registry: StorageRegistry,
+    private readonly mintStorageUri: MintStorageUri = defaultMintStorageUri,
   ) {}
 
   /**
@@ -183,7 +192,7 @@ export class StoredObjectsService {
           return { id: existing.id, mediaType, isDuplicate: true };
         }
 
-        const storageUri = await mintStorageUri({ projectId, sha256 });
+        const storageUri = await this.mintStorageUri({ projectId, sha256 });
 
         // PUT first: if storage rejects, never write the CH row
         try {
