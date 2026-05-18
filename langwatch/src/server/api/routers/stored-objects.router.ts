@@ -6,7 +6,6 @@
  * inherited from the tRPC session, which avoids the CORS / credential
  * fragility of a native HEAD probe.
  */
-import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { checkProjectPermission } from "~/server/api/rbac";

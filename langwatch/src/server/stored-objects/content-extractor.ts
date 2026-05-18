@@ -427,7 +427,6 @@ async function rewriteMessage(
   if (contentArray === null) {
     return { message: rawMessage, refs: [] };
   }
-  const contentWasStringified = !Array.isArray(rawMessage.content);
 
   const refs: ExtractedRef[] = [];
   const rewrittenParts: unknown[] = [];
