@@ -292,5 +292,5 @@ spec:
         {{- if .Values.app.storedObjects.localFilesystem.enabled }}
         - name: stored-objects-data
           persistentVolumeClaim:
-            claimName: {{ include "langwatch.fullname" . }}-stored-objects
+            claimName: {{ .Release.Name }}-stored-objects
         {{- end }}
