@@ -1,6 +1,11 @@
 import type { ModelDefaultScopeType, PrismaClient } from "@prisma/client";
-import { Prisma } from "@prisma/client";
 
+import type { Session } from "~/server/auth";
+import {
+  hasOrganizationPermission,
+  hasProjectPermission,
+  hasTeamPermission,
+} from "../api/rbac";
 import {
   allFeatures,
   featureByKey,
@@ -19,8 +24,70 @@ interface Ctx {
   prisma: ModelDefaultsPrisma;
 }
 
+export type AuthCtx = {
+  prisma: PrismaClient;
+  session: Session | null;
+};
+
 function repoFor(ctx: Ctx): ModelDefaultsRepository {
   return new ModelDefaultsRepository(ctx.prisma);
+}
+
+/**
+ * RBAC guard for the role/feature default writers. Each scope demands
+ * a different permission so a project admin can't silently push a role
+ * default up to the organization scope. Mirrors the model-providers
+ * update mutation's scope-aware authz, and is the single gate both
+ * the tRPC router and the Hono /api/model-defaults route call.
+ */
+export async function assertCanWriteScope(
+  ctx: AuthCtx,
+  scopeType: "ORGANIZATION" | "TEAM" | "PROJECT",
+  scopeId: string,
+): Promise<void> {
+  if (!ctx.session?.user?.id) {
+    throw new Error("Not authenticated");
+  }
+  if (scopeType === "ORGANIZATION") {
+    if (
+      !(await hasOrganizationPermission(
+        ctx as { prisma: PrismaClient; session: Session },
+        scopeId,
+        "organization:manage",
+      ))
+    ) {
+      throw new Error("Missing organization:manage permission");
+    }
+    return;
+  }
+  if (scopeType === "TEAM") {
+    if (!(await hasTeamPermission(ctx, scopeId, "team:manage"))) {
+      throw new Error("Missing team:manage permission");
+    }
+    return;
+  }
+  if (!(await hasProjectPermission(ctx, scopeId, "project:update"))) {
+    throw new Error("Missing project:update permission");
+  }
+}
+
+/**
+ * Load the current scope attachments for a config row. Used by the
+ * delete + save-config auth gates so callers can verify they're allowed
+ * to touch every attachment.
+ */
+export async function getScopeAttachmentsForConfig(
+  ctx: Ctx,
+  configId: string,
+): Promise<ScopeAttachment[]> {
+  const scopes = await ctx.prisma.modelDefaultConfigScope.findMany({
+    where: { configId },
+    select: { scopeType: true, scopeId: true },
+  });
+  return scopes.map((s) => ({
+    scopeType: s.scopeType,
+    scopeId: s.scopeId,
+  }));
 }
 
 /**

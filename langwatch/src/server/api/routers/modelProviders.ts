@@ -1,29 +1,28 @@
-import type { ModelDefaultScopeType } from "@prisma/client";
 import { z } from "zod";
 import { customModelUpdateInputSchema } from "../../modelProviders/customModel.schema";
 import {
-  allFeatures,
   featureByKey,
   MODEL_ROLES,
-  type ModelRole,
 } from "../../modelProviders/featureRegistry";
 import {
+  getDefaultModelsSnapshot,
+  getInheritedValuesForScopes,
+  getResolvedDefaultForFeature,
+} from "../../modelProviders/modelDefaults.read";
+import {
+  assertCanWriteScope,
   createConfig,
   deleteConfig,
+  getScopeAttachmentsForConfig,
   setFeatureAtScope,
   setRoleAtScope,
   updateConfig,
 } from "../../modelProviders/modelDefaults.service";
 import { ModelProviderService } from "../../modelProviders/modelProvider.service";
-import { resolveModelForFeature } from "../../modelProviders/resolveModelForFeature";
-import { buildSeedPlanForProvider } from "../../modelProviders/seedOnboardingDefaults";
 import {
-  batchScopePermissions,
   checkOrganizationPermission,
   checkProjectPermission,
-  hasOrganizationPermission,
   hasProjectPermission,
-  hasTeamPermission,
 } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import {
@@ -267,357 +266,17 @@ export const modelProviderRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("project:view"))
     .query(async ({ input, ctx }) => {
-      if (!featureByKey(input.featureKey)) {
-        return null;
-      }
-      try {
-        const resolved = await resolveModelForFeature(input.featureKey, {
-          prisma: ctx.prisma,
-          projectId: input.projectId,
-        });
-        return {
-          model: resolved.model,
-          source: resolved.source,
-          scope: resolved.scope,
-        };
-      } catch {
-        return null;
-      }
+      return getResolvedDefaultForFeature(ctx, {
+        projectId: input.projectId,
+        featureKey: input.featureKey,
+      });
     }),
 
   getDefaultModelsForProject: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .use(checkProjectPermission("project:view"))
     .query(async ({ input, ctx }) => {
-      const { projectId } = input;
-      const project = await ctx.prisma.project.findUnique({
-        where: { id: projectId },
-        select: {
-          id: true,
-          teamId: true,
-          team: {
-            select: {
-              organizationId: true,
-              organization: { select: { id: true, name: true } },
-            },
-          },
-        },
-      });
-      if (!project) {
-        throw new Error("Project not found");
-      }
-      const teamId = project.teamId;
-      const organizationId = project.team?.organizationId ?? null;
-      const organizationName = project.team?.organization?.name ?? null;
-
-      const features = allFeatures();
-
-      // Effective resolution per role (drives the three top-of-page
-      // lines). Uses one feature per role as a proxy — the resolver's
-      // role-level walk is shared across all features in a role.
-      const effective: Record<
-        ModelRole,
-        { model: string; source: string; scope: string | null } | null
-      > = { DEFAULT: null, FAST: null, EMBEDDINGS: null };
-      for (const role of MODEL_ROLES) {
-        const proxy = features.find((x) => x.role === role);
-        if (!proxy) continue;
-        try {
-          const r = await resolveModelForFeature(proxy.key, {
-            prisma: ctx.prisma,
-            projectId,
-          });
-          effective[role] = {
-            model: r.model,
-            source: r.source,
-            scope: r.scope,
-          };
-        } catch {
-          effective[role] = null;
-        }
-      }
-
-      // Available scopes for the override drawer's chip picker. Limited
-      // to scopes the caller can write at: org needs organization:manage,
-      // team needs team:manage, project needs project:update. The drawer
-      // hides chips the caller can't act on so we never invite a write
-      // that would 403 on save.
-      let canWriteOrg = false;
-      let writableTeams: { id: string; name: string }[] = [];
-      let writableProjects: { id: string; name: string; teamId: string }[] = [];
-      if (organizationId) {
-        canWriteOrg = await hasOrganizationPermission(
-          ctx,
-          organizationId,
-          "organization:manage",
-        );
-        const [orgTeams, orgProjects] = await Promise.all([
-          ctx.prisma.team.findMany({
-            where: { organizationId },
-            select: { id: true, name: true },
-            orderBy: { name: "asc" },
-          }),
-          ctx.prisma.project.findMany({
-            where: { team: { organizationId } },
-            select: { id: true, name: true, teamId: true },
-            orderBy: { name: "asc" },
-          }),
-        ]);
-        const projectTeamId: Record<string, string> = {};
-        for (const p of orgProjects) projectTeamId[p.id] = p.teamId;
-        const teamManageBatch = await batchScopePermissions(ctx, {
-          organizationId,
-          teamIds: orgTeams.map((t) => t.id),
-          projectIds: [],
-          projectTeamId: {},
-          permission: "team:manage",
-        });
-        const projectUpdateBatch = await batchScopePermissions(ctx, {
-          organizationId,
-          teamIds: [],
-          projectIds: orgProjects.map((p) => p.id),
-          projectTeamId,
-          permission: "project:update",
-        });
-        writableTeams = orgTeams
-          .filter((t) => teamManageBatch.teams.get(t.id))
-          .map(({ id, name }) => ({ id, name }));
-        writableProjects = orgProjects
-          .filter((p) => projectUpdateBatch.projects.get(p.id))
-          .map(({ id, name, teamId }) => ({ id, name, teamId }));
-      } else {
-        // Personal-account project (no org/team): only project scope.
-        const writable = await hasProjectPermission(
-          ctx,
-          projectId,
-          "project:update",
-        );
-        if (writable) {
-          writableProjects = [
-            {
-              id: projectId,
-              name: (
-                await ctx.prisma.project.findUnique({
-                  where: { id: projectId },
-                  select: { name: true },
-                })
-              )?.name ?? projectId,
-              teamId: teamId ?? "",
-            },
-          ];
-        }
-      }
-      const available = {
-        organization:
-          canWriteOrg && organizationId
-            ? { id: organizationId, name: organizationName ?? organizationId }
-            : null,
-        teams: writableTeams,
-        projects: writableProjects,
-      };
-
-      // Read-visibility is built from scopes the caller can actually
-      // *read*, not the union of every scope in the organization. A
-      // project-only viewer must not receive policy rows attached to
-      // sibling teams / projects they have no read permission on —
-      // doing so leaks the org-wide policy landscape and the names of
-      // its scopes to anyone with project:view on a single project.
-      const canReadOrg =
-        !!organizationId &&
-        (await hasOrganizationPermission(
-          ctx,
-          organizationId,
-          "organization:view",
-        ));
-      let readableTeamIds: string[] = [];
-      let readableProjectIds: string[] = [projectId];
-      if (organizationId) {
-        const [orgTeams, orgProjects] = await Promise.all([
-          ctx.prisma.team.findMany({
-            where: { organizationId },
-            select: { id: true },
-          }),
-          ctx.prisma.project.findMany({
-            where: { team: { organizationId } },
-            select: { id: true, teamId: true },
-          }),
-        ]);
-        const projectTeamId: Record<string, string> = {};
-        for (const p of orgProjects) projectTeamId[p.id] = p.teamId;
-        const [teamReadBatch, projectReadBatch] = await Promise.all([
-          batchScopePermissions(ctx, {
-            organizationId,
-            teamIds: orgTeams.map((t) => t.id),
-            projectIds: [],
-            projectTeamId: {},
-            permission: "team:view",
-          }),
-          batchScopePermissions(ctx, {
-            organizationId,
-            teamIds: [],
-            projectIds: orgProjects.map((p) => p.id),
-            projectTeamId,
-            permission: "project:view",
-          }),
-        ]);
-        readableTeamIds = orgTeams
-          .filter((t) => teamReadBatch.teams.get(t.id))
-          .map((t) => t.id);
-        readableProjectIds = orgProjects
-          .filter((p) => projectReadBatch.projects.get(p.id))
-          .map((p) => p.id);
-      } else if (teamId) {
-        const teamReadable = await hasTeamPermission(ctx, teamId, "team:view");
-        if (teamReadable) readableTeamIds = [teamId];
-      }
-
-      const visibleScopeFilter = [
-        canReadOrg && organizationId
-          ? { scopeType: "ORGANIZATION" as const, scopeId: organizationId }
-          : null,
-        readableTeamIds.length > 0
-          ? { scopeType: "TEAM" as const, scopeId: { in: readableTeamIds } }
-          : null,
-        readableProjectIds.length > 0
-          ? { scopeType: "PROJECT" as const, scopeId: { in: readableProjectIds } }
-          : null,
-      ].filter(Boolean) as Array<{
-        scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
-        scopeId: string | { in: string[] };
-      }>;
-
-      const configRows =
-        visibleScopeFilter.length > 0
-          ? await ctx.prisma.modelDefaultConfig.findMany({
-              where: {
-                scopes: { some: { OR: visibleScopeFilter } },
-              },
-              select: {
-                id: true,
-                config: true,
-                createdAt: true,
-                updatedAt: true,
-                authorId: true,
-                scopes: {
-                  select: {
-                    id: true,
-                    scopeType: true,
-                    scopeId: true,
-                  },
-                },
-              },
-              orderBy: { createdAt: "desc" },
-            })
-          : [];
-
-      // Resolve scope names so the UI can render chips without an
-      // extra round trip. Pull only the ids we actually saw.
-      const seenTeamIds = Array.from(
-        new Set(
-          configRows.flatMap((c) =>
-            c.scopes
-              .filter((s) => s.scopeType === "TEAM")
-              .map((s) => s.scopeId),
-          ),
-        ),
-      );
-      const seenProjectIds = Array.from(
-        new Set(
-          configRows.flatMap((c) =>
-            c.scopes
-              .filter((s) => s.scopeType === "PROJECT")
-              .map((s) => s.scopeId),
-          ),
-        ),
-      );
-      const [seenTeams, seenProjects] = await Promise.all([
-        seenTeamIds.length > 0
-          ? ctx.prisma.team.findMany({
-              where: { id: { in: seenTeamIds } },
-              select: { id: true, name: true },
-            })
-          : Promise.resolve([] as { id: string; name: string }[]),
-        seenProjectIds.length > 0
-          ? ctx.prisma.project.findMany({
-              where: { id: { in: seenProjectIds } },
-              select: { id: true, name: true },
-            })
-          : Promise.resolve([] as { id: string; name: string }[]),
-      ]);
-      const teamNameById = new Map(seenTeams.map((t) => [t.id, t.name]));
-      const projectNameById = new Map(
-        seenProjects.map((p) => [p.id, p.name]),
-      );
-      const scopeName = (
-        scopeType: "ORGANIZATION" | "TEAM" | "PROJECT",
-        scopeId: string,
-      ): string => {
-        if (scopeType === "ORGANIZATION")
-          return organizationName ?? scopeId;
-        if (scopeType === "TEAM") return teamNameById.get(scopeId) ?? scopeId;
-        return projectNameById.get(scopeId) ?? scopeId;
-      };
-
-      // Sort scopes within each config (Organization → Teams →
-      // Projects, each alphabetical) so chip render order is stable
-      // across reloads.
-      const scopeRank = { ORGANIZATION: 0, TEAM: 1, PROJECT: 2 } as const;
-      // Build the readable-scope set so we can prune scope attachments
-      // the caller is not allowed to see. The Prisma query above
-      // matches configs that have AT LEAST one readable scope, but the
-      // returned `scopes` array carries every attachment on each
-      // matched config — including ones in other readable teams /
-      // projects the caller has no access to. Mirror the input filter
-      // when projecting the response.
-      const readableTeamIdSet = new Set(readableTeamIds);
-      const readableProjectIdSet = new Set(readableProjectIds);
-      const isReadableScope = (
-        scopeType: "ORGANIZATION" | "TEAM" | "PROJECT",
-        scopeId: string,
-      ): boolean => {
-        if (scopeType === "ORGANIZATION") {
-          return canReadOrg && scopeId === organizationId;
-        }
-        if (scopeType === "TEAM") return readableTeamIdSet.has(scopeId);
-        return readableProjectIdSet.has(scopeId);
-      };
-      const configs = configRows.map((c) => ({
-        id: c.id,
-        config: c.config as Record<string, string>,
-        createdAt: c.createdAt,
-        updatedAt: c.updatedAt,
-        authorId: c.authorId,
-        scopes: c.scopes
-          .filter((s) => isReadableScope(s.scopeType, s.scopeId))
-          .map((s) => ({
-            type: s.scopeType,
-            id: s.scopeId,
-            name: scopeName(s.scopeType, s.scopeId),
-          }))
-          .sort((x, y) => {
-            if (x.type !== y.type)
-              return scopeRank[x.type] - scopeRank[y.type];
-            return x.name.localeCompare(y.name);
-          }),
-      }));
-
-      const featureProjection = features.map((f) => ({
-        key: f.key,
-        role: f.role,
-        displayName: f.displayName,
-        description: f.description,
-      }));
-
-      return {
-        projectId,
-        teamId,
-        organizationId,
-        organizationName,
-        effective,
-        configs,
-        available,
-        features: featureProjection,
-      };
+      return getDefaultModelsSnapshot(ctx, { projectId: input.projectId });
     }),
 
   /**
@@ -785,314 +444,11 @@ export const modelProviderRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("project:view"))
     .query(async ({ input, ctx }) => {
-      // Build a per-key map of {model, source, scope?} the cascade
-      // would resolve to for each role + feature key, if no value
-      // were set on the picked scopes themselves. This is deliberately
-      // ONE answer per key — the resolution at runtime is per-scope,
-      // but the drawer surfaces a single "if you inherit, here's what
-      // you'd get" hint that's good enough for the user to decide.
-      const project = await ctx.prisma.project.findUnique({
-        where: { id: input.projectId },
-        select: {
-          id: true,
-          teamId: true,
-          team: { select: { organizationId: true } },
-        },
+      return getInheritedValuesForScopes(ctx, {
+        projectId: input.projectId,
+        scopes: input.scopes,
+        excludeConfigId: input.excludeConfigId,
       });
-      if (!project) throw new Error("Project not found");
-      const teamId = project.teamId;
-      const organizationId = project.team?.organizationId ?? null;
-
-      // Cross-tenant guard: the caller picks scopes by id, so a hostile
-      // request could pass a scopeId from another org and have us walk
-      // its cascade. Validate every picked id resolves to the SAME org
-      // as `input.projectId` before going further.
-      if (!organizationId) {
-        throw new Error("Project has no organization; cannot resolve scopes.");
-      }
-      const pickedTeamIds = input.scopes
-        .filter((s) => s.scopeType === "TEAM")
-        .map((s) => s.scopeId);
-      const pickedProjectIds = input.scopes
-        .filter((s) => s.scopeType === "PROJECT")
-        .map((s) => s.scopeId);
-      const pickedOrgIds = input.scopes
-        .filter((s) => s.scopeType === "ORGANIZATION")
-        .map((s) => s.scopeId);
-      if (pickedOrgIds.some((id) => id !== organizationId)) {
-        throw new Error("Scope organization does not match project organization.");
-      }
-      if (pickedTeamIds.length > 0) {
-        const sameOrgTeams = await ctx.prisma.team.findMany({
-          where: { id: { in: pickedTeamIds }, organizationId },
-          select: { id: true },
-        });
-        if (sameOrgTeams.length !== new Set(pickedTeamIds).size) {
-          throw new Error("Scope team does not belong to project organization.");
-        }
-      }
-      if (pickedProjectIds.length > 0) {
-        const sameOrgProjects = await ctx.prisma.project.findMany({
-          where: {
-            id: { in: pickedProjectIds },
-            team: { organizationId },
-          },
-          select: { id: true },
-        });
-        if (sameOrgProjects.length !== new Set(pickedProjectIds).size) {
-          throw new Error("Scope project does not belong to project organization.");
-        }
-      }
-
-      // The cascade we want to surface is "what would a project see
-      // inside the most-specific picked scope". Pick the most-specific
-      // tier in the picked set (PROJECT beats TEAM beats ORGANIZATION).
-      const tierRank = { PROJECT: 0, TEAM: 1, ORGANIZATION: 2 } as const;
-      const sortedPicked = [...input.scopes].sort(
-        (a, b) => tierRank[a.scopeType] - tierRank[b.scopeType],
-      );
-      const referenceScope = sortedPicked[0]!;
-
-      // Resolve the chain that "anchors" the cascade walk. For a
-      // picked PROJECT scope, anchor is that project's team + org.
-      // For a TEAM, anchor is the team itself + its org. For an
-      // ORGANIZATION, only the org tier matters.
-      let chainTeamId: string | null = null;
-      let chainOrganizationId: string | null = null;
-      if (referenceScope.scopeType === "PROJECT") {
-        const refProject = await ctx.prisma.project.findUnique({
-          where: { id: referenceScope.scopeId },
-          select: {
-            teamId: true,
-            team: { select: { organizationId: true } },
-          },
-        });
-        chainTeamId = refProject?.teamId ?? null;
-        chainOrganizationId = refProject?.team?.organizationId ?? null;
-      } else if (referenceScope.scopeType === "TEAM") {
-        const refTeam = await ctx.prisma.team.findUnique({
-          where: { id: referenceScope.scopeId },
-          select: { organizationId: true },
-        });
-        chainTeamId = referenceScope.scopeId;
-        chainOrganizationId = refTeam?.organizationId ?? null;
-      } else {
-        chainOrganizationId = referenceScope.scopeId;
-      }
-
-      // Build the set of (scopeType, scopeId) pairs to exclude from
-      // the cascade — the picked scopes themselves are treated as
-      // "not yet set" so we surface what the user would inherit.
-      const excludedScopes = new Set(
-        input.scopes.map((s) => `${s.scopeType}::${s.scopeId}`),
-      );
-
-      // Tiers to walk: PROJECT (referenceScope if it's a project) →
-      // TEAM (chainTeamId) → ORGANIZATION (chainOrganizationId).
-      const tiers: Array<{
-        tier: "project" | "team" | "organization";
-        scopeType: ModelDefaultScopeType;
-        scopeId: string;
-      }> = [];
-      if (
-        referenceScope.scopeType === "PROJECT" &&
-        !excludedScopes.has(`PROJECT::${referenceScope.scopeId}`)
-      ) {
-        tiers.push({
-          tier: "project",
-          scopeType: "PROJECT",
-          scopeId: referenceScope.scopeId,
-        });
-      }
-      if (chainTeamId && !excludedScopes.has(`TEAM::${chainTeamId}`)) {
-        tiers.push({
-          tier: "team",
-          scopeType: "TEAM",
-          scopeId: chainTeamId,
-        });
-      }
-      if (
-        chainOrganizationId &&
-        !excludedScopes.has(`ORGANIZATION::${chainOrganizationId}`)
-      ) {
-        tiers.push({
-          tier: "organization",
-          scopeType: "ORGANIZATION",
-          scopeId: chainOrganizationId,
-        });
-      }
-
-      // Pull every config attached at any tier in the walk. Exclude
-      // configs the caller is editing (excludeConfigId) and configs
-      // whose ONLY attachment is to an excluded scope (so a multi-
-      // scope config that ALSO attaches to a non-excluded scope
-      // still contributes — the resolver doesn't care about the
-      // attachment we're ignoring, just whether any attachment
-      // hits the walk's tier).
-      const tierScopeIds = tiers.map((t) => ({
-        scopeType: t.scopeType,
-        scopeId: t.scopeId,
-      }));
-      const candidateConfigs =
-        tierScopeIds.length > 0
-          ? await ctx.prisma.modelDefaultConfig.findMany({
-              where: {
-                AND: [
-                  input.excludeConfigId
-                    ? { id: { not: input.excludeConfigId } }
-                    : {},
-                  { scopes: { some: { OR: tierScopeIds } } },
-                ],
-              },
-              select: {
-                id: true,
-                config: true,
-                createdAt: true,
-                scopes: {
-                  select: { scopeType: true, scopeId: true },
-                },
-              },
-            })
-          : [];
-
-      // Helper: read a string value from a config's JSON.
-      const readKey = (cfg: unknown, key: string): string | null => {
-        if (typeof cfg !== "object" || cfg === null) return null;
-        const v = (cfg as Record<string, unknown>)[key];
-        return typeof v === "string" && v.length > 0 ? v : null;
-      };
-
-      // Walk the cascade for a single key (role or feature key).
-      // Returns the first hit, tier-by-tier specificity, within-tier
-      // by createdAt DESC.
-      type Hit = {
-        model: string;
-        source: "feature_override" | "role_default";
-        scope: "project" | "team" | "organization";
-      };
-      const walkKey = (key: string, isFeatureKey: boolean): Hit | null => {
-        for (const t of tiers) {
-          const attached = candidateConfigs
-            .filter((c) =>
-              c.scopes.some(
-                (s) =>
-                  s.scopeType === t.scopeType && s.scopeId === t.scopeId,
-              ),
-            )
-            .sort(
-              (a, b) =>
-                b.createdAt.getTime() - a.createdAt.getTime(),
-            );
-          for (const c of attached) {
-            const value = readKey(c.config, key);
-            if (value) {
-              return {
-                model: value,
-                source: isFeatureKey ? "feature_override" : "role_default",
-                scope: t.tier,
-              };
-            }
-          }
-        }
-        return null;
-      };
-
-      // Inference fallback: when cascade returns nothing for a role,
-      // and there's a provider enabled at any visible scope, suggest
-      // the registry's latest-flagship / mini / embedding for that
-      // role. Reuses buildSeedPlanForProvider — same heuristic the
-      // onboarding seed uses, so a fresh org's "Inherit" placeholder
-      // matches what they'd see if they re-ran the seed.
-      const providers = organizationId
-        ? await ctx.prisma.modelProvider.findMany({
-            where: {
-              enabled: true,
-              scopes: {
-                some: {
-                  OR: [
-                    { scopeType: "ORGANIZATION", scopeId: organizationId },
-                    teamId
-                      ? { scopeType: "TEAM", scopeId: teamId }
-                      : { scopeType: "TEAM", scopeId: "__none__" },
-                    { scopeType: "PROJECT", scopeId: input.projectId },
-                  ],
-                },
-              },
-            },
-            select: { provider: true, scopes: { select: { scopeType: true } } },
-            orderBy: { createdAt: "asc" },
-          })
-        : [];
-      const inferenceProvider = providers[0]?.provider;
-      const inferencePlan = inferenceProvider
-        ? buildSeedPlanForProvider(inferenceProvider)
-        : {};
-
-      // Build the response. One entry per role; one entry per feature
-      // key. For features the cascade walk targets the feature key
-      // first; the role's value is the fallback.
-      const features = allFeatures();
-      const inherited: Record<
-        string,
-        {
-          model: string;
-          source: "feature_override" | "role_default" | "inferred";
-          scope: "project" | "team" | "organization" | null;
-          inferredFromProvider?: string;
-        } | null
-      > = {};
-
-      for (const role of MODEL_ROLES) {
-        const hit = walkKey(role, false);
-        if (hit) {
-          inherited[role] = hit;
-          continue;
-        }
-        const inferredModel = (inferencePlan as Record<string, string | undefined>)[
-          role
-        ];
-        if (inferredModel && inferenceProvider) {
-          inherited[role] = {
-            model: inferredModel,
-            source: "inferred",
-            scope: null,
-            inferredFromProvider: inferenceProvider,
-          };
-          continue;
-        }
-        inherited[role] = null;
-      }
-
-      for (const f of features) {
-        // For a feature key: the cascade can have either the feature
-        // key itself OR the role default. Feature-key match wins.
-        const featureHit = walkKey(f.key, true);
-        if (featureHit) {
-          inherited[f.key] = featureHit;
-          continue;
-        }
-        // Fall back to whatever the role inherits — keeps the dropdown
-        // saying "Inherit (from organization)" for a feature row even
-        // when only the role default is set higher up the chain.
-        const roleHit = inherited[f.role];
-        if (roleHit) {
-          inherited[f.key] = roleHit;
-          continue;
-        }
-        inherited[f.key] = null;
-      }
-
-      return {
-        inherited,
-        // Echo the reference scope so the UI can confirm which scope
-        // the inheritance preview was computed against. Useful when
-        // the picked set is heterogeneous and the user wonders why
-        // "(from organization)" rather than "(from team)".
-        referenceScope: {
-          scopeType: referenceScope.scopeType,
-          scopeId: referenceScope.scopeId,
-        },
-      };
     }),
 });
 
@@ -1142,23 +498,15 @@ async function saveConfigPermissionMiddleware({
     await assertCanWriteScope(ctx, s.scopeType, s.scopeId);
   }
   if (input.id) {
-    const existing = await ctx.prisma.modelDefaultConfigScope.findMany({
-      where: { configId: input.id },
-      select: { scopeType: true, scopeId: true },
-    });
+    const existing = await getScopeAttachmentsForConfig(ctx, input.id);
     const desired = new Set(
       input.scopes.map((s) => `${s.scopeType}::${s.scopeId}`),
     );
     const removed = existing.filter(
-      (e: { scopeType: string; scopeId: string }) =>
-        !desired.has(`${e.scopeType}::${e.scopeId}`),
+      (e) => !desired.has(`${e.scopeType}::${e.scopeId}`),
     );
     for (const r of removed) {
-      await assertCanWriteScope(
-        ctx,
-        r.scopeType as "ORGANIZATION" | "TEAM" | "PROJECT",
-        r.scopeId,
-      );
+      await assertCanWriteScope(ctx, r.scopeType, r.scopeId);
     }
   }
   ctx.permissionChecked = true;
@@ -1180,52 +528,11 @@ async function deleteConfigPermissionMiddleware({
   input: { id: string };
   next: () => Promise<unknown>;
 }): Promise<unknown> {
-  const scopes = await ctx.prisma.modelDefaultConfigScope.findMany({
-    where: { configId: input.id },
-    select: { scopeType: true, scopeId: true },
-  });
+  const scopes = await getScopeAttachmentsForConfig(ctx, input.id);
   for (const s of scopes) {
-    await assertCanWriteScope(
-      ctx,
-      s.scopeType as "ORGANIZATION" | "TEAM" | "PROJECT",
-      s.scopeId,
-    );
+    await assertCanWriteScope(ctx, s.scopeType, s.scopeId);
   }
   ctx.permissionChecked = true;
   return next();
-}
-
-/**
- * RBAC guard for the role/feature default writers. Each scope demands a
- * different permission so a project admin can't silently push a role
- * default up to the organization scope. Mirrors the model-providers
- * update mutation's scope-aware authz.
- */
-async function assertCanWriteScope(
-  ctx: any,
-  scopeType: "ORGANIZATION" | "TEAM" | "PROJECT",
-  scopeId: string,
-): Promise<void> {
-  if (!ctx.session?.user?.id) {
-    throw new Error("Not authenticated");
-  }
-  if (scopeType === "ORGANIZATION") {
-    if (
-      !(await hasOrganizationPermission(ctx, scopeId, "organization:manage"))
-    ) {
-      throw new Error("Missing organization:manage permission");
-    }
-    return;
-  }
-  if (scopeType === "TEAM") {
-    if (!(await hasTeamPermission(ctx, scopeId, "team:manage"))) {
-      throw new Error("Missing team:manage permission");
-    }
-    return;
-  }
-  // PROJECT
-  if (!(await hasProjectPermission(ctx, scopeId, "project:update"))) {
-    throw new Error("Missing project:update permission");
-  }
 }
 
