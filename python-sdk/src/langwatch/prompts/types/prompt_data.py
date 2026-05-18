@@ -13,19 +13,7 @@ from langwatch.generated.langwatch_rest_api_client.models.put_api_prompts_by_id_
 )
 from langwatch.generated.langwatch_rest_api_client.types import Unset
 
-
-class ResponseFormat(BaseModel):
-    """Response format configuration for structured outputs."""
-
-    type: str
-    json_schema: Optional[Any] = None
-
-
-class Message(BaseModel):
-    """A chat message with role and content."""
-
-    role: Literal["system", "user", "assistant"]
-    content: str
+from .structures import Message, ResponseFormat
 
 
 class PromptData(BaseModel):
