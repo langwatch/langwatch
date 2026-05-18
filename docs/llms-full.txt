@@ -28193,6 +28193,86 @@ The hybrid setup requires coordination with our team to configure the secure con
 
 ---
 
+# FILE: ./api-reference/agents/create-agents.mdx
+
+---
+title: "Create a new agent"
+openapi: "POST /api/agents"
+---
+
+---
+
+# FILE: ./api-reference/agents/delete-agents.mdx
+
+---
+title: "Archive an agent"
+openapi: "DELETE /api/agents/{id}"
+---
+
+---
+
+# FILE: ./api-reference/agents/get-agents.mdx
+
+---
+title: "Get an agent by its id"
+openapi: "GET /api/agents/{id}"
+---
+
+---
+
+# FILE: ./api-reference/agents/list-agents.mdx
+
+---
+title: "List all non-archived agents for the project"
+openapi: "GET /api/agents"
+---
+
+---
+
+# FILE: ./api-reference/agents/overview.mdx
+
+---
+title: "Overview"
+description: "Manage AI agent configurations. Create, update, and organize agents that are tracked and evaluated in LangWatch."
+---
+
+## Intro
+
+Manage AI agent configurations. Create, update, and organize agents that are tracked and evaluated in LangWatch.
+
+---
+
+# FILE: ./api-reference/agents/update-agents.mdx
+
+---
+title: "Update an agent by its id"
+openapi: "PATCH /api/agents/{id}"
+---
+
+---
+
+# FILE: ./api-reference/analytics/create-timeseries.mdx
+
+---
+title: "Create Timeseries"
+openapi: "POST /api/analytics/timeseries"
+---
+
+---
+
+# FILE: ./api-reference/analytics/overview.mdx
+
+---
+title: "Overview"
+description: "Query analytics timeseries data with metrics, aggregations, and filters."
+---
+
+## Intro
+
+Query analytics timeseries data with metrics, aggregations, and filters.
+
+---
+
 # FILE: ./api-reference/annotations/create-annotation-trace.mdx
 
 ---
@@ -28377,11 +28457,190 @@ openapi: 'POST /api/trigger/slack'
 
 ---
 
+# FILE: ./api-reference/dashboards/create-dashboards.mdx
+
+---
+title: "Create a new dashboard"
+openapi: "POST /api/dashboards"
+---
+
+---
+
+# FILE: ./api-reference/dashboards/delete-dashboards.mdx
+
+---
+title: "Delete a dashboard and its graphs"
+openapi: "DELETE /api/dashboards/{id}"
+---
+
+---
+
+# FILE: ./api-reference/dashboards/get-dashboards.mdx
+
+---
+title: "Get a dashboard by its id, including its graphs"
+openapi: "GET /api/dashboards/{id}"
+---
+
+---
+
+# FILE: ./api-reference/dashboards/list-dashboards.mdx
+
+---
+title: "List Dashboards"
+openapi: "GET /api/dashboards"
+---
+
+---
+
+# FILE: ./api-reference/dashboards/overview.mdx
+
+---
+title: "Overview"
+description: "Manage custom analytics dashboards. Create, reorder, and organize dashboards with custom graphs."
+---
+
+## Intro
+
+Manage custom analytics dashboards. Create, reorder, and organize dashboards with custom graphs.
+
+---
+
+# FILE: ./api-reference/dashboards/update-dashboards.mdx
+
+---
+title: "Rename a dashboard"
+openapi: "PATCH /api/dashboards/{id}"
+---
+
+---
+
+# FILE: ./api-reference/dashboards/update-reorder.mdx
+
+---
+title: "Update Reorder"
+openapi: "PUT /api/dashboards/reorder"
+---
+
+---
+
+# FILE: ./api-reference/datasets/action-records.mdx
+
+---
+title: "Create records in a dataset in batch"
+openapi: "POST /api/dataset/{slugOrId}/records"
+---
+
+---
+
+# FILE: ./api-reference/datasets/action-upload.mdx
+
+---
+title: "Upload a file"
+openapi: "POST /api/dataset/{slugOrId}/upload"
+---
+
+---
+
+# FILE: ./api-reference/datasets/create-dataset.mdx
+
+---
+title: "Create a new dataset"
+openapi: "POST /api/dataset"
+---
+
+---
+
+# FILE: ./api-reference/datasets/create-upload.mdx
+
+---
+title: "Create a new dataset from an uploaded file"
+openapi: "POST /api/dataset/upload"
+---
+
+---
+
+# FILE: ./api-reference/datasets/delete-dataset.mdx
+
+---
+title: "Archive a dataset"
+openapi: "DELETE /api/dataset/{slugOrId}"
+---
+
+---
+
+# FILE: ./api-reference/datasets/delete-records.mdx
+
+---
+title: "Delete records from a dataset by IDs"
+openapi: "DELETE /api/dataset/{slugOrId}/records"
+---
+
+---
+
+# FILE: ./api-reference/datasets/get-dataset.mdx
+
+---
+title: "Get a dataset by its slug or id"
+openapi: "GET /api/dataset/{slugOrId}"
+---
+
+---
+
+# FILE: ./api-reference/datasets/get-records.mdx
+
+---
+title: "List records for a dataset"
+openapi: "GET /api/dataset/{slugOrId}/records"
+---
+
+---
+
+# FILE: ./api-reference/datasets/list-dataset.mdx
+
+---
+title: "List all non-archived datasets for the project"
+openapi: "GET /api/dataset"
+---
+
+---
+
+# FILE: ./api-reference/datasets/overview.mdx
+
+---
+title: "Overview"
+description: "Manage datasets for evaluations, experiments, and fine-tuning. Create, update, upload, and manage records programmatically."
+---
+
+## Intro
+
+Manage datasets for evaluations, experiments, and fine-tuning. Create, update, upload, and manage records programmatically.
+
+---
+
 # FILE: ./api-reference/datasets/post-dataset-entries.mdx
 
 ---
 title: 'Add dataset entries programmatically using the LangWatch API to build evaluation sets for LLM testing and agent validation.'
 openapi: 'POST /api/dataset/{slug}/entries'
+---
+
+---
+
+# FILE: ./api-reference/datasets/update-dataset.mdx
+
+---
+title: "Update a dataset by its slug or id"
+openapi: "PATCH /api/dataset/{slugOrId}"
+---
+
+---
+
+# FILE: ./api-reference/datasets/update-records.mdx
+
+---
+title: "Update or create a record in a dataset"
+openapi: "PATCH /api/dataset/{slugOrId}/records/{recordId}"
 ---
 
 ---
@@ -28400,6 +28659,95 @@ openapi: 'POST /plants'
 ---
 title: 'Delete Plant'
 openapi: 'DELETE /plants/{id}'
+---
+
+---
+
+# FILE: ./api-reference/evaluations/action-run.mdx
+
+---
+title: "Create Run"
+openapi: "POST /api/evaluations/v3/{slug}/run"
+---
+
+---
+
+# FILE: ./api-reference/evaluations/get-runs.mdx
+
+---
+title: "Get Runs"
+openapi: "GET /api/evaluations/v3/runs/{runId}"
+---
+
+---
+
+# FILE: ./api-reference/evaluations/overview.mdx
+
+---
+title: "Overview"
+description: "Run and monitor evaluation experiments. Start evaluation runs and poll for progress and results."
+---
+
+## Intro
+
+Run and monitor evaluation experiments. Start evaluation runs and poll for progress and results.
+
+---
+
+# FILE: ./api-reference/evaluators-config/create-evaluators.mdx
+
+---
+title: "Create a new evaluator"
+openapi: "POST /api/evaluators"
+---
+
+---
+
+# FILE: ./api-reference/evaluators-config/delete-evaluators.mdx
+
+---
+title: "Archive"
+openapi: "DELETE /api/evaluators/{id}"
+---
+
+---
+
+# FILE: ./api-reference/evaluators-config/get-evaluators.mdx
+
+---
+title: "Get a specific evaluator by ID or slug"
+openapi: "GET /api/evaluators/{idOrSlug}"
+---
+
+---
+
+# FILE: ./api-reference/evaluators-config/list-evaluators.mdx
+
+---
+title: "Get all evaluators for a project"
+openapi: "GET /api/evaluators"
+---
+
+---
+
+# FILE: ./api-reference/evaluators-config/overview.mdx
+
+---
+title: "Overview"
+description: "Manage evaluator configurations for your project. Create, update, and organize evaluators used for online evaluations, guardrails, and experiments."
+---
+
+## Intro
+
+Manage evaluator configurations for your project. Create, update, and organize evaluators used for online evaluations, guardrails, and experiments.
+
+---
+
+# FILE: ./api-reference/evaluators-config/update-evaluators.mdx
+
+---
+title: "Update an existing evaluator"
+openapi: "PUT /api/evaluators/{id}"
 ---
 
 ---
@@ -28883,6 +29231,385 @@ openapi: post /langevals/valid_format/evaluate
 ---
 ---
 
+# FILE: ./api-reference/gateway-budgets/archive-budget.mdx
+
+---
+title: "Archive budget"
+openapi: "DELETE /api/gateway/v1/budgets/{id}"
+---
+
+---
+
+# FILE: ./api-reference/gateway-budgets/create-budget.mdx
+
+---
+title: "Create budget"
+openapi: "POST /api/gateway/v1/budgets"
+---
+
+---
+
+# FILE: ./api-reference/gateway-budgets/list-budgets-applicable-to-the-project.mdx
+
+---
+title: "List budgets applicable to the project"
+openapi: "GET /api/gateway/v1/budgets"
+---
+
+---
+
+# FILE: ./api-reference/gateway-budgets/overview.mdx
+
+---
+title: "Overview"
+description: "Manage spending budgets for the AI Gateway. Set cost limits per project, team, or virtual key with configurable time windows."
+---
+
+## Intro
+
+Manage spending budgets for the AI Gateway. Set cost limits per project, team, or virtual key with configurable time windows.
+
+---
+
+# FILE: ./api-reference/gateway-budgets/update-budget.mdx
+
+---
+title: "Update budget"
+openapi: "PATCH /api/gateway/v1/budgets/{id}"
+---
+
+---
+
+# FILE: ./api-reference/gateway-cache-rules/archive-a-cache-rule.mdx
+
+---
+title: "Archive a cache rule"
+openapi: "DELETE /api/gateway/v1/cache-rules/{id}"
+---
+
+---
+
+# FILE: ./api-reference/gateway-cache-rules/create-a-cache-rule.mdx
+
+---
+title: "Create a cache rule"
+openapi: "POST /api/gateway/v1/cache-rules"
+---
+
+---
+
+# FILE: ./api-reference/gateway-cache-rules/get-a-cache-rule.mdx
+
+---
+title: "Get a cache rule"
+openapi: "GET /api/gateway/v1/cache-rules/{id}"
+---
+
+---
+
+# FILE: ./api-reference/gateway-cache-rules/list-cache-control-rules.mdx
+
+---
+title: "List cache-control rules"
+openapi: "GET /api/gateway/v1/cache-rules"
+---
+
+---
+
+# FILE: ./api-reference/gateway-cache-rules/overview.mdx
+
+---
+title: "Overview"
+description: "Manage cache-control rules for the AI Gateway. Configure semantic caching to reduce latency and costs for repeated queries."
+---
+
+## Intro
+
+Manage cache-control rules for the AI Gateway. Configure semantic caching to reduce latency and costs for repeated queries.
+
+---
+
+# FILE: ./api-reference/gateway-cache-rules/update-a-cache-rule.mdx
+
+---
+title: "Update a cache rule"
+openapi: "PATCH /api/gateway/v1/cache-rules/{id}"
+---
+
+---
+
+# FILE: ./api-reference/gateway-providers/bind-a-model-provider-to-the-gateway.mdx
+
+---
+title: "Bind a model provider to the gateway"
+openapi: "POST /api/gateway/v1/providers"
+---
+
+---
+
+# FILE: ./api-reference/gateway-providers/disable-provider-binding.mdx
+
+---
+title: "Disable provider binding"
+openapi: "DELETE /api/gateway/v1/providers/{id}"
+---
+
+---
+
+# FILE: ./api-reference/gateway-providers/list-provider-bindings.mdx
+
+---
+title: "List provider bindings"
+openapi: "GET /api/gateway/v1/providers"
+---
+
+---
+
+# FILE: ./api-reference/gateway-providers/overview.mdx
+
+---
+title: "Overview"
+description: "Manage provider credential bindings for the AI Gateway. Bind model providers (OpenAI, Anthropic, etc.) to enable routing through the gateway."
+---
+
+## Intro
+
+Manage provider credential bindings for the AI Gateway. Bind model providers (OpenAI, Anthropic, etc.) to enable routing through the gateway.
+
+---
+
+# FILE: ./api-reference/gateway-providers/update-provider-binding.mdx
+
+---
+title: "Update provider binding"
+openapi: "PATCH /api/gateway/v1/providers/{id}"
+---
+
+---
+
+# FILE: ./api-reference/gateway-virtual-keys/create-virtual-key.mdx
+
+---
+title: "Create virtual key"
+openapi: "POST /api/gateway/v1/virtual-keys"
+---
+
+---
+
+# FILE: ./api-reference/gateway-virtual-keys/get-virtual-key.mdx
+
+---
+title: "Get virtual key"
+openapi: "GET /api/gateway/v1/virtual-keys/{id}"
+---
+
+---
+
+# FILE: ./api-reference/gateway-virtual-keys/list-virtual-keys.mdx
+
+---
+title: "List virtual keys"
+openapi: "GET /api/gateway/v1/virtual-keys"
+---
+
+---
+
+# FILE: ./api-reference/gateway-virtual-keys/overview.mdx
+
+---
+title: "Overview"
+description: "Manage virtual keys for the AI Gateway. Virtual keys abstract provider credentials and enable usage tracking, rate limiting, and access control."
+---
+
+## Intro
+
+Manage virtual keys for the AI Gateway. Virtual keys abstract provider credentials and enable usage tracking, rate limiting, and access control.
+
+---
+
+# FILE: ./api-reference/gateway-virtual-keys/revoke-virtual-key.mdx
+
+---
+title: "Revoke virtual key"
+openapi: "POST /api/gateway/v1/virtual-keys/{id}/revoke"
+---
+
+---
+
+# FILE: ./api-reference/gateway-virtual-keys/rotate-virtual-key-secret.mdx
+
+---
+title: "Rotate virtual key secret"
+openapi: "POST /api/gateway/v1/virtual-keys/{id}/rotate"
+---
+
+---
+
+# FILE: ./api-reference/gateway-virtual-keys/update-virtual-key.mdx
+
+---
+title: "Update virtual key"
+openapi: "PATCH /api/gateway/v1/virtual-keys/{id}"
+---
+
+---
+
+# FILE: ./api-reference/graphs/create-graphs.mdx
+
+---
+title: "Create a custom graph on a dashboard"
+openapi: "POST /api/graphs"
+---
+
+---
+
+# FILE: ./api-reference/graphs/delete-graphs.mdx
+
+---
+title: "Delete a custom graph"
+openapi: "DELETE /api/graphs/{id}"
+---
+
+---
+
+# FILE: ./api-reference/graphs/get-graphs.mdx
+
+---
+title: "Get a custom graph by its ID"
+openapi: "GET /api/graphs/{id}"
+---
+
+---
+
+# FILE: ./api-reference/graphs/list-graphs.mdx
+
+---
+title: "List Graphs"
+openapi: "GET /api/graphs"
+---
+
+---
+
+# FILE: ./api-reference/graphs/overview.mdx
+
+---
+title: "Overview"
+description: "Manage custom analytics graphs within dashboards. Create, update, and configure graph visualizations."
+---
+
+## Intro
+
+Manage custom analytics graphs within dashboards. Create, update, and configure graph visualizations.
+
+---
+
+# FILE: ./api-reference/graphs/update-graphs.mdx
+
+---
+title: "Update Graphs"
+openapi: "PATCH /api/graphs/{id}"
+---
+
+---
+
+# FILE: ./api-reference/model-providers/list-model-providers.mdx
+
+---
+title: "List Model Providers"
+openapi: "GET /api/model-providers"
+---
+
+---
+
+# FILE: ./api-reference/model-providers/overview.mdx
+
+---
+title: "Overview"
+description: "Manage model provider configurations (API keys for OpenAI, Anthropic, etc.) used across the platform."
+---
+
+## Intro
+
+Manage model provider configurations (API keys for OpenAI, Anthropic, etc.) used across the platform.
+
+---
+
+# FILE: ./api-reference/model-providers/update-model-providers.mdx
+
+---
+title: "Create or update a model provider"
+openapi: "PUT /api/model-providers/{provider}"
+---
+
+---
+
+# FILE: ./api-reference/monitors/action-toggle.mdx
+
+---
+title: "Enable or disable a monitor"
+openapi: "POST /api/monitors/{id}/toggle"
+---
+
+---
+
+# FILE: ./api-reference/monitors/create-monitors.mdx
+
+---
+title: "Create a new online evaluation monitor"
+openapi: "POST /api/monitors"
+---
+
+---
+
+# FILE: ./api-reference/monitors/delete-monitors.mdx
+
+---
+title: "Delete a monitor"
+openapi: "DELETE /api/monitors/{id}"
+---
+
+---
+
+# FILE: ./api-reference/monitors/get-monitors.mdx
+
+---
+title: "Get a monitor by its ID"
+openapi: "GET /api/monitors/{id}"
+---
+
+---
+
+# FILE: ./api-reference/monitors/list-monitors.mdx
+
+---
+title: "List Monitors"
+openapi: "GET /api/monitors"
+---
+
+---
+
+# FILE: ./api-reference/monitors/overview.mdx
+
+---
+title: "Overview"
+description: "Manage online evaluation monitors that automatically evaluate traces as they arrive. Create, update, enable/disable, and delete monitors."
+---
+
+## Intro
+
+Manage online evaluation monitors that automatically evaluate traces as they arrive. Create, update, enable/disable, and delete monitors.
+
+---
+
+# FILE: ./api-reference/monitors/update-monitors.mdx
+
+---
+title: "Update a monitor"
+openapi: "PATCH /api/monitors/{id}"
+---
+
+---
+
 # FILE: ./api-reference/projects/archive-project.mdx
 
 ---
@@ -28979,6 +29706,24 @@ openapi: "PATCH /api/projects/{id}"
 
 ---
 
+# FILE: ./api-reference/prompts/action-restore.mdx
+
+---
+title: "Restore a prompt to a previous version"
+openapi: "POST /api/prompts/{id}/versions/{versionId}/restore"
+---
+
+---
+
+# FILE: ./api-reference/prompts/action-sync.mdx
+
+---
+title: "Sync/upsert a prompt with local content"
+openapi: "POST /api/prompts/{id}/sync"
+---
+
+---
+
 # FILE: ./api-reference/prompts/create-prompt-version.mdx
 
 ---
@@ -28997,11 +29742,29 @@ openapi: "POST /api/prompts"
 
 ---
 
+# FILE: ./api-reference/prompts/create-tags.mdx
+
+---
+title: "Create Tags"
+openapi: "POST /api/prompts/tags"
+---
+
+---
+
 # FILE: ./api-reference/prompts/delete-prompt.mdx
 
 ---
 title: "Delete prompt"
 openapi: "DELETE /api/prompts/{id}"
+---
+
+---
+
+# FILE: ./api-reference/prompts/delete-tags.mdx
+
+---
+title: "Delete Tags"
+openapi: "DELETE /api/prompts/tags/{tag}"
 ---
 
 ---
@@ -29029,6 +29792,15 @@ openapi: "GET /api/prompts/{id}"
 ---
 title: "Get prompts"
 openapi: "GET /api/prompts"
+---
+
+---
+
+# FILE: ./api-reference/prompts/list-tags.mdx
+
+---
+title: "List Tags"
+openapi: "GET /api/prompts/tags"
 ---
 
 ---
@@ -29067,11 +29839,29 @@ To make a call to the Prompts API, you will need to pass through your LangWatch 
 
 ---
 
+# FILE: ./api-reference/prompts/put-update-tags.mdx
+
+---
+title: "Rename a prompt tag definition"
+openapi: "PUT /api/prompts/tags/{tag}"
+---
+
+---
+
 # FILE: ./api-reference/prompts/update-prompt.mdx
 
 ---
 title: "Update prompt"
 openapi: "PUT /api/prompts/{id}"
+---
+
+---
+
+# FILE: ./api-reference/prompts/update-tags.mdx
+
+---
+title: "Assign a tag"
+openapi: "PUT /api/prompts/{id}/tags/{tag}"
 ---
 
 ---
@@ -29128,72 +29918,267 @@ To make a call to the Saved Evaluators API, you will need to pass through your L
 
 ---
 
-# FILE: ./api-reference/scenarios/create-event.mdx
+# FILE: ./api-reference/scenario-events/create-scenario-events.mdx
 
 ---
-openapi: post /api/scenario-events
+title: "Create a new scenario event"
+openapi: "POST /api/scenario-events"
 ---
+
+---
+
+# FILE: ./api-reference/scenario-events/delete-scenario-events.mdx
+
+---
+title: "Delete all events"
+openapi: "DELETE /api/scenario-events"
+---
+
+---
+
+# FILE: ./api-reference/scenario-events/overview.mdx
+
+---
+title: "Overview"
+description: "Create and manage scenario execution events."
+---
+
+## Intro
+
+Create and manage scenario execution events.
+
+---
+
+# FILE: ./api-reference/scenarios/create-scenarios.mdx
+
+---
+title: "Create a new scenario"
+openapi: "POST /api/scenarios"
+---
+
+---
+
+# FILE: ./api-reference/scenarios/delete-scenarios.mdx
+
+---
+title: "Archive"
+openapi: "DELETE /api/scenarios/{id}"
+---
+
+---
+
+# FILE: ./api-reference/scenarios/get-scenarios.mdx
+
+---
+title: "Get a specific scenario by ID"
+openapi: "GET /api/scenarios/{id}"
+---
+
+---
+
+# FILE: ./api-reference/scenarios/list-scenarios.mdx
+
+---
+title: "Get all scenarios for a project"
+openapi: "GET /api/scenarios"
+---
+
 ---
 
 # FILE: ./api-reference/scenarios/overview.mdx
 
 ---
-title: Overview
+title: "Overview"
+description: "Manage test scenarios for agent simulations. Create, update, and organize scenarios that define test cases for your AI agents."
 ---
 
-# Scenario Event Schema
+## Intro
 
-The Simulations visualizer is powered by a single endpoint that receives events from your test runs. All events are sent via a `POST` request to the following endpoint:
-
-```
-/api/scenario-events
-```
-
-The request body should be a JSON object representing one of the event types described below. These events allow LangWatch to reconstruct the entire history of your simulation sets, batches, and individual scenario runs.
-
-For a detailed look at the request and response models, see the [Create Event endpoint reference](/api-reference/scenarios/create-event).
-
-## Common Properties
-
-All scenario events share a common set of properties to identify and organize them:
-
--   `type`: The specific type of the event.
--   `timestamp`: A Unix timestamp (in milliseconds) of when the event occurred.
--   `batchRunId`: An ID that groups all scenarios run within the same test execution or process.
--   `scenarioId`: A stable identifier for a specific scenario (e.g., "test_vegetarian_recipe").
--   `scenarioRunId`: A unique ID for a single execution of a scenario.
--   `scenarioSetId`: The top-level grouping for a collection of scenarios, which defaults to `"default"`.
+Manage test scenarios for agent simulations. Create, update, and organize scenarios that define test cases for your AI agents.
 
 ---
 
-## Event Types
+# FILE: ./api-reference/scenarios/update-scenarios.mdx
 
-There are three main types of events that you can send.
+---
+title: "Update an existing scenario"
+openapi: "PUT /api/scenarios/{id}"
+---
 
-### 1. `SCENARIO_RUN_STARTED`
+---
 
-This event marks the beginning of a new scenario run.
+# FILE: ./api-reference/secrets/create-secrets.mdx
 
--   **`metadata`**:
-    -   `name`: The display name of the scenario.
-    -   `description`: A longer description of what the scenario tests.
+---
+title: "Create a new project secret"
+openapi: "POST /api/secrets"
+---
 
-### 2. `SCENARIO_MESSAGE_SNAPSHOT`
+---
 
-This event captures the state of the conversation at a specific point in time. It includes an array of messages exchanged between the user, agent, and tools.
+# FILE: ./api-reference/secrets/delete-secrets.mdx
 
--   **`messages`**: An array of message objects. The schema for these messages (user, assistant, tool, etc.) is detailed in the OpenAPI specification.
+---
+title: "Delete a secret"
+openapi: "DELETE /api/secrets/{id}"
+---
 
-### 3. `SCENARIO_RUN_FINISHED`
+---
 
-This event marks the end of a scenario run and includes the final results.
+# FILE: ./api-reference/secrets/get-secrets.mdx
 
--   **`status`**: The final status of the run (`SUCCESS`, `FAILED`, `ERROR`, etc.).
--   **`results`**: An object containing the final verdict from a Judge Agent, including:
-    -   `verdict`: The final outcome (`success`, `failure`).
-    -   `reasoning`: The explanation for the verdict.
-    -   `metCriteria`: A list of criteria that were satisfied.
-    -   `unmetCriteria`: A list of criteria that were not met.
+---
+title: "Get a secret by its ID"
+openapi: "GET /api/secrets/{id}"
+---
+
+---
+
+# FILE: ./api-reference/secrets/list-secrets.mdx
+
+---
+title: "List all secrets for the project"
+openapi: "GET /api/secrets"
+---
+
+---
+
+# FILE: ./api-reference/secrets/overview.mdx
+
+---
+title: "Overview"
+description: "Manage project secrets used for external integrations. Values are encrypted at rest and never returned in API responses."
+---
+
+## Intro
+
+Manage project secrets used for external integrations. Values are encrypted at rest and never returned in API responses.
+
+---
+
+# FILE: ./api-reference/secrets/update-secrets.mdx
+
+---
+title: "Update a secret's value"
+openapi: "PUT /api/secrets/{id}"
+---
+
+---
+
+# FILE: ./api-reference/simulation-runs/get-simulation-runs.mdx
+
+---
+title: "Get a single simulation run by its ID"
+openapi: "GET /api/simulation-runs/{scenarioRunId}"
+---
+
+---
+
+# FILE: ./api-reference/simulation-runs/list-list.mdx
+
+---
+title: "List batch summaries for a scenario set"
+openapi: "GET /api/simulation-runs/batches/list"
+---
+
+---
+
+# FILE: ./api-reference/simulation-runs/list-simulation-runs.mdx
+
+---
+title: "List Simulation Runs"
+openapi: "GET /api/simulation-runs"
+---
+
+---
+
+# FILE: ./api-reference/simulation-runs/overview.mdx
+
+---
+title: "Overview"
+description: "Query simulation run results. List runs, get batch summaries, and retrieve individual run details."
+---
+
+## Intro
+
+Query simulation run results. List runs, get batch summaries, and retrieve individual run details.
+
+---
+
+# FILE: ./api-reference/suites/action-duplicate.mdx
+
+---
+title: "Duplicate a suite"
+openapi: "POST /api/suites/{id}/duplicate"
+---
+
+---
+
+# FILE: ./api-reference/suites/action-run.mdx
+
+---
+title: "Trigger a suite run"
+openapi: "POST /api/suites/{id}/run"
+---
+
+---
+
+# FILE: ./api-reference/suites/create-suites.mdx
+
+---
+title: "Create a new suite"
+openapi: "POST /api/suites"
+---
+
+---
+
+# FILE: ./api-reference/suites/delete-suites.mdx
+
+---
+title: "Archive"
+openapi: "DELETE /api/suites/{id}"
+---
+
+---
+
+# FILE: ./api-reference/suites/get-suites.mdx
+
+---
+title: "Get a suite"
+openapi: "GET /api/suites/{id}"
+---
+
+---
+
+# FILE: ./api-reference/suites/list-suites.mdx
+
+---
+title: "List all non-archived suites"
+openapi: "GET /api/suites"
+---
+
+---
+
+# FILE: ./api-reference/suites/overview.mdx
+
+---
+title: "Overview"
+description: "Manage test suites (run plans) that group scenarios for batch execution. Create, update, duplicate, and trigger suite runs."
+---
+
+## Intro
+
+Manage test suites (run plans) that group scenarios for batch execution. Create, update, duplicate, and trigger suite runs.
+
+---
+
+# FILE: ./api-reference/suites/update-suites.mdx
+
+---
+title: "Update a suite"
+openapi: "PATCH /api/suites/{id}"
+---
+
 ---
 
 # FILE: ./api-reference/teams/archive-team.mdx
@@ -29376,6 +30361,113 @@ The older `/api/trace/search` and `/api/trace/{id}` endpoints still work but are
 ---
 title: 'Search traces'
 openapi: 'POST /api/traces/search'
+---
+
+---
+
+# FILE: ./api-reference/triggers/create-triggers.mdx
+
+---
+title: "Create a new trigger"
+openapi: "POST /api/triggers"
+---
+
+---
+
+# FILE: ./api-reference/triggers/delete-triggers.mdx
+
+---
+title: "Delete"
+openapi: "DELETE /api/triggers/{id}"
+---
+
+---
+
+# FILE: ./api-reference/triggers/get-triggers.mdx
+
+---
+title: "Get a trigger by its ID"
+openapi: "GET /api/triggers/{id}"
+---
+
+---
+
+# FILE: ./api-reference/triggers/list-triggers.mdx
+
+---
+title: "List all active triggers"
+openapi: "GET /api/triggers"
+---
+
+---
+
+# FILE: ./api-reference/triggers/overview.mdx
+
+---
+title: "Overview"
+description: "Manage automation triggers that fire actions based on trace events. Create Slack notifications, webhooks, and other automated responses."
+---
+
+## Intro
+
+Manage automation triggers that fire actions based on trace events. Create Slack notifications, webhooks, and other automated responses.
+
+---
+
+# FILE: ./api-reference/triggers/update-triggers.mdx
+
+---
+title: "Update a trigger"
+openapi: "PATCH /api/triggers/{id}"
+---
+
+---
+
+# FILE: ./api-reference/workflows/delete-workflows.mdx
+
+---
+title: "Archive"
+openapi: "DELETE /api/workflows/{id}"
+---
+
+---
+
+# FILE: ./api-reference/workflows/get-workflows.mdx
+
+---
+title: "Get a workflow by its ID"
+openapi: "GET /api/workflows/{id}"
+---
+
+---
+
+# FILE: ./api-reference/workflows/list-workflows.mdx
+
+---
+title: "List all non-archived workflows for the project"
+openapi: "GET /api/workflows"
+---
+
+---
+
+# FILE: ./api-reference/workflows/overview.mdx
+
+---
+title: "Overview"
+description: "Manage Optimization Studio workflows. List, update, and archive workflows used for prompt optimization and agent design."
+---
+
+## Intro
+
+Manage Optimization Studio workflows. List, update, and archive workflows used for prompt optimization and agent design.
+
+---
+
+# FILE: ./api-reference/workflows/update-workflows.mdx
+
+---
+title: "Update a workflow's metadata"
+openapi: "PATCH /api/workflows/{id}"
 ---
 
 ---
