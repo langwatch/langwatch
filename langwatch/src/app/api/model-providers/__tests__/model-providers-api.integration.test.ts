@@ -226,6 +226,36 @@ describe("Model Providers API", () => {
     // model-provider router (createConfig / updateConfig /
     // setRoleAtScope / setFeatureAtScope).
 
+    describe("when the project has no defaults yet", () => {
+      it("seeds a ModelDefaultConfig row on first-provider create", async () => {
+        // No provider rows on this project yet — the next PUT below
+        // is the "first provider" event. ModelProviderService.createNew
+        // runs seedOnboardingDefaultsForProvider, which should land a
+        // ModelDefaultConfig row at PROJECT scope.
+        const before = await prisma.modelDefaultConfig.count({
+          where: {
+            scopes: { some: { scopeType: "PROJECT", scopeId: testProjectId } },
+          },
+        });
+
+        const res = await helpers.api.put("/api/model-providers/openai", {
+          enabled: true,
+          customKeys: { OPENAI_API_KEY: "sk-seed-default-test" },
+        });
+        // 200 happy path or 400 when CREDENTIALS_SECRET is unset (same
+        // env-skip the other PUT tests in this file accept). The seed
+        // only runs when the create lands, so we early-exit on 400.
+        if (res.status !== 200) return;
+
+        const after = await prisma.modelDefaultConfig.count({
+          where: {
+            scopes: { some: { scopeType: "PROJECT", scopeId: testProjectId } },
+          },
+        });
+        expect(after).toBeGreaterThan(before);
+      });
+    });
+
     describe("when given an invalid provider", () => {
       it("returns 400", async () => {
         const res = await helpers.api.put(
