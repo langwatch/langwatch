@@ -8,7 +8,6 @@ import { createHash } from "node:crypto";
 import type { Readable } from "node:stream";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import { env } from "~/env.mjs";
 import {
   getStoredObjectDedupHitCounter,
   getStoredObjectExtractCounter,
@@ -17,8 +16,11 @@ import {
   storedObjectReadFailureCounter,
 } from "~/server/metrics";
 import { createLogger } from "~/utils/logger/server";
-import { getS3ConfigForProject } from "~/server/dataplane-s3";
 import { ObjectNotFoundError } from "./errors";
+import {
+  redactStorageUri,
+  resolveProjectStorageDestination,
+} from "./project-storage-destination";
 import type { StoredObject } from "./stored-object";
 import type { StoredObjectsRepository } from "./stored-objects.repository";
 import type { StorageRegistry } from "./storage-registry";
@@ -81,17 +83,14 @@ function deriveStoredObjectId({
 export type MintStorageUri = (args: { projectId: string; sha256: string }) => Promise<string>;
 
 /**
- * Returns the storage URI for a new object, resolving the bucket per-project.
+ * Returns the storage URI for a new object, delegating destination
+ * resolution to the shared `resolveProjectStorageDestination` so that
+ * this service module does not encode the precedence rules itself.
  *
- * Resolution precedence (matches createS3Client in src/server/storage.ts):
- *  1. BYOC: per-project private dataplane bucket from `getS3ConfigForProject`.
- *  2. Global: `env.S3_BUCKET_NAME`.
- *  3. Fallback: local filesystem at `env.LANGWATCH_LOCAL_STORAGE_PATH`.
- *
- * Without the per-project resolution, a BYOC tenant's persisted `storage_uri`
- * column would encode the wrong (global) bucket while the actual write goes
- * to the private bucket. That mismatch breaks reads and tenant isolation,
- * since `S3Driver` parses the URI to determine the bucket on GET.
+ * If `resolveProjectStorageDestination` throws (e.g. a transient DB
+ * error while reading BYOC config), the error propagates — falling
+ * back silently to the global bucket on a transient error would risk
+ * spilling a BYOC tenant's bytes into the wrong account.
  */
 async function defaultMintStorageUri({
   projectId,
@@ -100,19 +99,11 @@ async function defaultMintStorageUri({
   projectId: string;
   sha256: string;
 }): Promise<string> {
-  const privateConfig = await getS3ConfigForProject(projectId);
-  const s3Bucket =
-    privateConfig?.bucket ??
-    (env.S3_BUCKET_NAME && env.S3_BUCKET_NAME.trim() !== ""
-      ? env.S3_BUCKET_NAME
-      : undefined);
-
-  if (s3Bucket) {
-    return mintS3Uri({ bucket: s3Bucket, projectId, sha256 });
+  const destination = await resolveProjectStorageDestination(projectId);
+  if (destination.kind === "s3") {
+    return mintS3Uri({ bucket: destination.bucket, projectId, sha256 });
   }
-  const root =
-    env.LANGWATCH_LOCAL_STORAGE_PATH ?? "/var/lib/langwatch/objects";
-  return mintFileUri({ root, projectId, sha256 });
+  return mintFileUri({ root: destination.root, projectId, sha256 });
 }
 
 /**
@@ -200,7 +191,16 @@ export class StoredObjectsService {
         } catch (error) {
           getStoredObjectWriteFailureCounter(purpose).inc();
           logger.error(
-            { projectId, id, sha256, storageUri, error },
+            {
+              projectId,
+              id,
+              sha256,
+              // Redact bucket / account / install-path segments — for
+              // BYOC tenants, the raw URI would carry their private
+              // bucket name into shared log sinks.
+              storageUri: redactStorageUri(storageUri),
+              error,
+            },
             "Failed to PUT stored object bytes",
           );
           throw error;
@@ -233,7 +233,13 @@ export class StoredObjectsService {
             await this.registry.delete(storageUri);
           } catch (deleteError) {
             logger.warn(
-              { projectId, id, storageUri, deleteError, insertError },
+              {
+                projectId,
+                id,
+                storageUri: redactStorageUri(storageUri),
+                deleteError,
+                insertError,
+              },
               "compensating delete failed; bytes may be orphaned",
             );
           }
