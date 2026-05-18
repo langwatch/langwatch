@@ -125,8 +125,33 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
     [groupedByProvider, modelSearch],
   );
 
-  // Flatten for collection
-  const allFilteredModels = filteredGroups.flatMap((group) => group.models);
+  // Render the inherit placeholder in the trigger when the user hasn't
+  // picked anything. Uses the inherited model's icon + family at 0.55
+  // opacity so it reads as "this is what you'd get if you don't
+  // override" instead of an empty / broken selector.
+  const inheritIcon = inheritOption
+    ? modelProviderIcons[
+        inheritOption.model.split("/")[0] as keyof typeof modelProviderIcons
+      ]
+    : null;
+
+  // Flatten for collection. When an inherit option is present we MUST
+  // include it as a collection item — Chakra's Select uses the
+  // collection for keyboard nav, click-to-select, and hover highlight.
+  // Rendering a Select.Item whose value isn't in the collection makes
+  // it look interactive but silently un-selectable (hover stays on the
+  // first real item below it).
+  const inheritItem: ModelOption | null = inheritOption
+    ? {
+        value: INHERIT_SENTINEL,
+        label: inheritOption.label,
+        icon: inheritIcon,
+      }
+    : null;
+  const allFilteredModels: ModelOption[] = [
+    ...(inheritItem ? [inheritItem] : []),
+    ...filteredGroups.flatMap((group) => group.models),
+  ];
 
   const modelCollection = createListCollection({
     items: allFilteredModels,
@@ -137,16 +162,6 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
     selectedItem?.icon ??
     modelProviderIcons[model.split("/")[0] as keyof typeof modelProviderIcons];
   const isUnknown = !!model && !selectedItem;
-
-  // Render the inherit placeholder in the trigger when the user hasn't
-  // picked anything. Uses the inherited model's icon + family at 0.55
-  // opacity so it reads as "this is what you'd get if you don't
-  // override" instead of an empty / broken selector.
-  const inheritIcon = inheritOption
-    ? modelProviderIcons[
-        inheritOption.model.split("/")[0] as keyof typeof modelProviderIcons
-      ]
-    : null;
 
   const selectValueText = !model && inheritOption ? (
     <HStack overflow="hidden" gap={2} align="center" opacity={0.55}>
@@ -268,43 +283,37 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
             </InputGroup>
           </Box>
         </Field.Root>
-        {inheritOption && (
-          <Select.ItemGroup
-            label={
-              <Text fontSize="xs" fontWeight="medium" color="fg.muted">
-                Cascade
-              </Text>
-            }
+        {inheritOption && inheritItem && (
+          // Free-standing item at the top of the dropdown — no group
+          // wrapper, no label. The prior "Cascade" group header was
+          // jargon ("cascade" is implementation talk, not a thing
+          // users think about); leaving the Inherit row to read on
+          // its own is enough context.
+          <Select.Item
+            item={inheritItem}
+            data-testid="provider-model-selector-inherit"
           >
-            <Select.Item
-              item={{
-                value: INHERIT_SENTINEL,
-                label: inheritOption.label,
-              }}
-              data-testid="provider-model-selector-inherit"
-            >
-              <HStack gap={2}>
-                {inheritIcon && (
-                  <Box width={MODEL_ICON_SIZE} minWidth={MODEL_ICON_SIZE}>
-                    {inheritIcon}
-                  </Box>
-                )}
-                <Box>
-                  <Text fontSize="sm" fontWeight="medium">
-                    {inheritOption.label}
-                  </Text>
-                  <Text
-                    fontSize="xs"
-                    color="fg.muted"
-                    fontFamily="mono"
-                    lineClamp={1}
-                  >
-                    {inheritOption.model.split("/").slice(1).join("/")}
-                  </Text>
+            <HStack gap={2}>
+              {inheritIcon && (
+                <Box width={MODEL_ICON_SIZE} minWidth={MODEL_ICON_SIZE}>
+                  {inheritIcon}
                 </Box>
-              </HStack>
-            </Select.Item>
-          </Select.ItemGroup>
+              )}
+              <Box>
+                <Text fontSize="sm" fontWeight="medium">
+                  {inheritOption.label}
+                </Text>
+                <Text
+                  fontSize="xs"
+                  color="fg.muted"
+                  fontFamily="mono"
+                  lineClamp={1}
+                >
+                  {inheritOption.model.split("/").slice(1).join("/")}
+                </Text>
+              </Box>
+            </HStack>
+          </Select.Item>
         )}
         {filteredGroups.map((group) => (
           <Select.ItemGroup
