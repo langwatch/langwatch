@@ -9,8 +9,7 @@
  * import from leaf modules like `~/utils/constants`.
  */
 
-// @ts-ignore - JSON import
-import * as llmModelsRaw from "./llmModels.json";
+import { llmModels } from "./loadModelCatalog";
 
 interface RegistryEntry {
   id: string;
@@ -18,11 +17,7 @@ interface RegistryEntry {
   mode: "chat" | "embedding";
 }
 
-interface Registry {
-  models: Record<string, RegistryEntry>;
-}
-
-const registry = llmModelsRaw as unknown as Registry;
+const registry = llmModels as unknown as { models: Record<string, RegistryEntry> };
 
 const FLAGSHIP_PATTERN = /^([a-z0-9_-]+)\/([a-z]+)-(\d+)\.(\d+)$/;
 

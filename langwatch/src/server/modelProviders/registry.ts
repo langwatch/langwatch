@@ -1,11 +1,8 @@
 import type { ModelProvider } from "@prisma/client";
 import { z } from "zod";
 import type { CustomModelEntry } from "./customModel.schema";
-// @ts-ignore - JSON import
-import * as llmModelsRaw from "./llmModels.json";
-import type { LLMModelEntry, LLMModelRegistry } from "./llmModels.types";
-
-const llmModels = llmModelsRaw as unknown as LLMModelRegistry;
+import { llmModels } from "./loadModelCatalog";
+import type { LLMModelEntry } from "./llmModels.types";
 
 // ============================================================================
 // Parameter Constraint Types

@@ -1,7 +1,6 @@
 import type { ModelDefaultScopeType, PrismaClient } from "@prisma/client";
 
-// @ts-ignore - JSON import
-import * as llmModelsRaw from "./llmModels.json";
+import { llmModels } from "./loadModelCatalog";
 
 interface RegistryEntry {
   id: string;
@@ -10,7 +9,7 @@ interface RegistryEntry {
 }
 
 const REGISTRY = (
-  llmModelsRaw as unknown as { models: Record<string, RegistryEntry> }
+  llmModels as unknown as { models: Record<string, RegistryEntry> }
 ).models;
 
 /** Picks the newest `openai/gpt-X.Y(-suffix)?` chat model. */

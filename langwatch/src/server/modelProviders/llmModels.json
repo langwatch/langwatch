@@ -13331,46 +13331,6 @@
       "supportsImageOutput": false,
       "supportsAudioOutput": false
     },
-    "voyage/voyage-3.5": {
-      "id": "voyage/voyage-3.5",
-      "name": "Voyage AI: Voyage 3.5",
-      "provider": "voyage",
-      "pricing": {
-        "inputCostPerToken": 6e-8,
-        "outputCostPerToken": 0
-      },
-      "contextLength": 32000,
-      "maxCompletionTokens": null,
-      "supportedParameters": [],
-      "defaultParameters": null,
-      "modality": "text->embeddings",
-      "mode": "embedding",
-      "description": "Voyage AI's flagship general-purpose embedding model with strong retrieval quality across domains. Recommended embedding partner where an Anthropic-only setup would otherwise have no embeddings option.",
-      "supportsImageInput": false,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
-    "voyage/voyage-3.5-lite": {
-      "id": "voyage/voyage-3.5-lite",
-      "name": "Voyage AI: Voyage 3.5 Lite",
-      "provider": "voyage",
-      "pricing": {
-        "inputCostPerToken": 2e-8,
-        "outputCostPerToken": 0
-      },
-      "contextLength": 32000,
-      "maxCompletionTokens": null,
-      "supportedParameters": [],
-      "defaultParameters": null,
-      "modality": "text->embeddings",
-      "mode": "embedding",
-      "description": "Voyage AI's smaller, faster embedding model. Lower cost per token at a modest quality tradeoff, useful for high-volume topic-clustering workloads.",
-      "supportsImageInput": false,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
     "openai/text-embedding-3-small": {
       "id": "openai/text-embedding-3-small",
       "name": "OpenAI: Text Embedding 3 Small",
