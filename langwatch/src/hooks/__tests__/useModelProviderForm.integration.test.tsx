@@ -242,7 +242,6 @@ describe("useModelProviderForm()", () => {
       // this is the only enabled provider in the org. Any other
       // scenario requires explicit user opt-in via the toggle.
       const provider = createOpenAIProvider({ enabled: true });
-      const project = { defaultModel: "openai/gpt-4o" };
 
       const { result } = renderHook(() =>
         useModelProviderForm({
@@ -257,7 +256,6 @@ describe("useModelProviderForm()", () => {
 
     it("does not auto-enable when more than one provider is already enabled", () => {
       const provider = createOpenAIProvider({ enabled: true });
-      const project = { defaultModel: "openai/gpt-4o" };
 
       const { result } = renderHook(() =>
         useModelProviderForm({
@@ -272,7 +270,6 @@ describe("useModelProviderForm()", () => {
 
     it("can be toggled manually", () => {
       const provider = createOpenAIProvider({ enabled: true });
-      const project = { defaultModel: "anthropic/claude-sonnet-4" };
 
       const { result } = renderHook(() =>
         useModelProviderForm({
@@ -718,8 +715,6 @@ describe("useModelProviderForm()", () => {
   describe("when enabledProvidersCount is 1", () => {
     it("auto-enables useAsDefaultProvider", () => {
       const provider = createOpenAIProvider({ enabled: false });
-      // Project default model is anthropic, NOT openai -- yet toggle should auto-enable
-      const project = { defaultModel: "anthropic/claude-sonnet-4" };
 
       const { result } = renderHook(() =>
         useModelProviderForm({
@@ -748,7 +743,6 @@ describe("useModelProviderForm()", () => {
         deploymentMapping: null,
         extraHeaders: [],
       };
-      const project = { defaultModel: "openai/gpt-5.2" };
 
       const { result } = renderHook(() =>
         useModelProviderForm({
@@ -765,7 +759,6 @@ describe("useModelProviderForm()", () => {
   describe("when enabledProvidersCount is greater than 1", () => {
     it("does not auto-enable useAsDefaultProvider", () => {
       const provider = createOpenAIProvider({ enabled: false });
-      const project = { defaultModel: "anthropic/claude-sonnet-4" };
 
       const { result } = renderHook(() =>
         useModelProviderForm({
