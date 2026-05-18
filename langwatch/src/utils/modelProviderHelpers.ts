@@ -1,11 +1,5 @@
 import { getProviderModelOptions } from "../server/modelProviders/registry";
-import {
-  DEFAULT_EMBEDDINGS_MODEL,
-  DEFAULT_MODEL,
-  DEFAULT_TOPIC_CLUSTERING_MODEL,
-  KEY_CHECK,
-  MASKED_KEY_PLACEHOLDER,
-} from "./constants";
+import { KEY_CHECK, MASKED_KEY_PLACEHOLDER } from "./constants";
 
 /** Extracts provider key from model string (e.g., "openai/gpt-4" -> "openai") */
 export function getProviderFromModel(model: string): string {
@@ -30,156 +24,6 @@ export function isModelDisabledForProvider({
   if (modelOption) return modelOption.isDisabled;
   const providerKey = getProviderFromModel(model);
   return !(providers?.[providerKey]?.enabled ?? false);
-}
-
-export type EffectiveDefaults = {
-  defaultModel: string;
-  topicClusteringModel: string;
-  embeddingsModel: string;
-};
-
-/**
- * Per-scope default-model carrier. Each scope (project, team, organization)
- * exposes the same three optional fields; resolution walks project → team →
- * org → constant fallback.
- */
-export type ScopeDefaults = {
-  defaultModel?: string | null;
-  topicClusteringModel?: string | null;
-  embeddingsModel?: string | null;
-} | null | undefined;
-
-/** Where each effective default came from. */
-export type EffectiveDefaultSource =
-  | "project"
-  | "team"
-  | "organization"
-  | "constant";
-
-export type EffectiveDefaultsWithSource = {
-  defaultModel: { value: string; source: EffectiveDefaultSource };
-  topicClusteringModel: { value: string; source: EffectiveDefaultSource };
-  embeddingsModel: { value: string; source: EffectiveDefaultSource };
-};
-
-/**
- * Resolves the effective default model for each LangWatch surface, walking
- * project → team → organization → built-in constant. Each field is resolved
- * independently: a project may override `defaultModel` while inheriting
- * `embeddingsModel` from the organization, for example. Callers that don't
- * pass `team` / `organization` get the legacy project-only behaviour.
- */
-export function getEffectiveDefaults(
-  project: ScopeDefaults,
-  team?: ScopeDefaults,
-  organization?: ScopeDefaults,
-): EffectiveDefaults {
-  return {
-    defaultModel:
-      project?.defaultModel ??
-      team?.defaultModel ??
-      organization?.defaultModel ??
-      DEFAULT_MODEL,
-    topicClusteringModel:
-      project?.topicClusteringModel ??
-      team?.topicClusteringModel ??
-      organization?.topicClusteringModel ??
-      DEFAULT_TOPIC_CLUSTERING_MODEL,
-    embeddingsModel:
-      project?.embeddingsModel ??
-      team?.embeddingsModel ??
-      organization?.embeddingsModel ??
-      DEFAULT_EMBEDDINGS_MODEL,
-  };
-}
-
-/**
- * Same resolution as `getEffectiveDefaults` but also reports where each
- * resolved value came from, so the UI can surface "inherited from team
- * platform" hints.
- */
-export function getEffectiveDefaultsWithSource(
-  project: ScopeDefaults,
-  team?: ScopeDefaults,
-  organization?: ScopeDefaults,
-): EffectiveDefaultsWithSource {
-  const resolve = (
-    field: "defaultModel" | "topicClusteringModel" | "embeddingsModel",
-    constant: string,
-  ): { value: string; source: EffectiveDefaultSource } => {
-    if (project?.[field]) return { value: project[field]!, source: "project" };
-    if (team?.[field]) return { value: team[field]!, source: "team" };
-    if (organization?.[field])
-      return { value: organization[field]!, source: "organization" };
-    return { value: constant, source: "constant" };
-  };
-  return {
-    defaultModel: resolve("defaultModel", DEFAULT_MODEL),
-    topicClusteringModel: resolve(
-      "topicClusteringModel",
-      DEFAULT_TOPIC_CLUSTERING_MODEL,
-    ),
-    embeddingsModel: resolve("embeddingsModel", DEFAULT_EMBEDDINGS_MODEL),
-  };
-}
-
-/** Checks if provider is used for ANY effective default (used for delete prevention) */
-export function isProviderEffectiveDefault(
-  providerKey: string,
-  project:
-    | {
-        defaultModel?: string | null;
-        topicClusteringModel?: string | null;
-        embeddingsModel?: string | null;
-      }
-    | null
-    | undefined,
-): boolean {
-  const effectiveDefaults = getEffectiveDefaults(project);
-  return isProviderUsedForDefaultModels(
-    providerKey,
-    effectiveDefaults.defaultModel,
-    effectiveDefaults.topicClusteringModel,
-    effectiveDefaults.embeddingsModel,
-  );
-}
-
-/** Checks if provider is used for the Default Model only (used for badge and toggle logic) */
-export function isProviderDefaultModel(
-  providerKey: string,
-  project:
-    | {
-        defaultModel?: string | null;
-      }
-    | null
-    | undefined,
-): boolean {
-  const effectiveDefault = project?.defaultModel ?? DEFAULT_MODEL;
-  return getProviderFromModel(effectiveDefault) === providerKey;
-}
-
-/** Checks if provider matches any of the given model strings (used in delete dialog) */
-export function isProviderUsedForDefaultModels(
-  providerKey: string,
-  defaultModel: string | null,
-  topicClusteringModel: string | null,
-  embeddingsModel: string | null,
-): boolean {
-  const defaultProvider = defaultModel
-    ? getProviderFromModel(defaultModel)
-    : null;
-  const topicClusteringProvider = topicClusteringModel
-    ? getProviderFromModel(topicClusteringModel)
-    : null;
-  const embeddingsProvider = embeddingsModel
-    ? getProviderFromModel(embeddingsModel)
-    : null;
-
-  return (
-    providerKey === defaultProvider ||
-    providerKey === topicClusteringProvider ||
-    providerKey === embeddingsProvider
-  );
 }
 
 /** Extracts shape from Zod schema for credential keys */
@@ -352,28 +196,15 @@ export function resolveModelForProvider({
 }
 
 /**
- * Determines whether the "Use as Default Provider" toggle should be auto-enabled.
- * Returns true when the provider is already the project's default model provider,
- * or when this is the only enabled provider (first-provider setup).
- *
- * @param params.providerKey - The provider key (e.g., "openai")
- * @param params.project - The project object containing default model info
- * @param params.enabledProvidersCount - Number of currently enabled providers
+ * Determines whether the "Use as Default Provider" toggle should be
+ * auto-enabled when opening the drawer. With the legacy default-model
+ * scalar columns gone, only the "first provider in the project" case
+ * remains: any further provider added needs an explicit opt-in.
  */
 export function shouldAutoEnableAsDefault({
-  providerKey,
-  project,
   enabledProvidersCount,
 }: {
-  providerKey: string;
-  project:
-    | { defaultModel?: string | null }
-    | null
-    | undefined;
   enabledProvidersCount: number;
 }): boolean {
-  return (
-    isProviderDefaultModel(providerKey, project) ||
-    enabledProvidersCount <= 1
-  );
+  return enabledProvidersCount <= 1;
 }

@@ -1,7 +1,6 @@
 import type { ModelDefaultScopeType } from "@prisma/client";
 import { z } from "zod";
 import { customModelUpdateInputSchema } from "../../modelProviders/customModel.schema";
-import { DefaultModelsService } from "../../modelProviders/defaultModels.service";
 import {
   allFeatures,
   featureByKey,
@@ -19,9 +18,8 @@ import { ModelProviderService } from "../../modelProviders/modelProvider.service
 import { resolveModelForFeature } from "../../modelProviders/resolveModelForFeature";
 import { buildSeedPlanForProvider } from "../../modelProviders/seedOnboardingDefaults";
 import {
-  checkProjectPermission,
   checkOrganizationPermission,
-  checkTeamPermission,
+  checkProjectPermission,
   hasOrganizationPermission,
   hasProjectPermission,
   hasTeamPermission,
@@ -211,86 +209,6 @@ export const modelProviderRouter = createTRPCRouter({
         customBaseUrl,
         ctx.prisma,
       );
-    }),
-
-  // ────────────────────────────────────────────────────────────────────────
-  // Hierarchical default models (page-level section, redesigned out of the
-  // create/edit provider drawer). Resolution walks project → team → org →
-  // built-in constant; each scope has its own setter so RBAC is checked at
-  // the scope the caller is writing to.
-  // ────────────────────────────────────────────────────────────────────────
-
-  /**
-   * Returns the effective default models for a project (with the resolved
-   * source scope per field) plus the raw per-scope values so the UI can
-   * render scope-aware selectors and inheritance hints.
-   */
-  getEffectiveDefaultModels: protectedProcedure
-    .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("project:view"))
-    .query(async ({ input, ctx }) => {
-      const service = DefaultModelsService.create(ctx.prisma);
-      return service.getForProject(input.projectId);
-    }),
-
-  setOrganizationDefaultModels: protectedProcedure
-    .input(
-      z.object({
-        organizationId: z.string(),
-        defaultModel: z.string().nullable().optional(),
-        topicClusteringModel: z.string().nullable().optional(),
-        embeddingsModel: z.string().nullable().optional(),
-      }),
-    )
-    .use(checkOrganizationPermission("organization:manage"))
-    .mutation(async ({ input, ctx }) => {
-      const service = DefaultModelsService.create(ctx.prisma);
-      const { organizationId, ...values } = input;
-      return service.setForScope({
-        scopeType: "ORGANIZATION",
-        scopeId: organizationId,
-        values,
-      });
-    }),
-
-  setTeamDefaultModels: protectedProcedure
-    .input(
-      z.object({
-        teamId: z.string(),
-        defaultModel: z.string().nullable().optional(),
-        topicClusteringModel: z.string().nullable().optional(),
-        embeddingsModel: z.string().nullable().optional(),
-      }),
-    )
-    .use(checkTeamPermission("team:manage"))
-    .mutation(async ({ input, ctx }) => {
-      const service = DefaultModelsService.create(ctx.prisma);
-      const { teamId, ...values } = input;
-      return service.setForScope({
-        scopeType: "TEAM",
-        scopeId: teamId,
-        values,
-      });
-    }),
-
-  setProjectDefaultModels: protectedProcedure
-    .input(
-      z.object({
-        projectId: z.string(),
-        defaultModel: z.string().nullable().optional(),
-        topicClusteringModel: z.string().nullable().optional(),
-        embeddingsModel: z.string().nullable().optional(),
-      }),
-    )
-    .use(checkProjectPermission("project:update"))
-    .mutation(async ({ input, ctx }) => {
-      const service = DefaultModelsService.create(ctx.prisma);
-      const { projectId, ...values } = input;
-      return service.setForScope({
-        scopeType: "PROJECT",
-        scopeId: projectId,
-        values,
-      });
     }),
 
   // ────────────────────────────────────────────────────────────────────────

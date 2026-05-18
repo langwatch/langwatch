@@ -209,7 +209,6 @@ export function useModelProviderForm(
   const customModelsHook = useCustomModels({ provider });
   const defaultProviderHook = useDefaultProviderSelection({
     provider,
-    project,
     enabledProvidersCount,
   });
 
@@ -284,7 +283,7 @@ export function useModelProviderForm(
     const nextUseApiGateway = credentialKeysHook.reset(provider);
     extraHeadersHook.reset(provider, nextUseApiGateway);
     customModelsHook.reset(provider);
-    defaultProviderHook.reset(provider, project, enabledProvidersCount);
+    defaultProviderHook.reset(provider, enabledProvidersCount);
     formSubmitHook.reset();
     setName(
       (provider as { name?: string }).name ??

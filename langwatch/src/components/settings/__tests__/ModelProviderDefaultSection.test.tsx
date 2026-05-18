@@ -116,7 +116,6 @@ describe("<DefaultProviderSection/>", () => {
               actions={actions}
               provider={azureProvider}
               enabledProvidersCount={2}
-              project={{ defaultModel: null }}
               providers={{ azure: azureProvider }}
             />
           </Wrapper>,
@@ -157,7 +156,6 @@ describe("<DefaultProviderSection/>", () => {
               actions={actions}
               provider={azureProvider}
               enabledProvidersCount={2}
-              project={{ defaultModel: "openai/gpt-5.2" }}
               providers={{ azure: azureProvider }}
             />
           </Wrapper>,
@@ -188,7 +186,6 @@ describe("<DefaultProviderSection/>", () => {
               actions={actions}
               provider={azureProvider}
               enabledProvidersCount={2}
-              project={{ defaultModel: "azure/gpt-5-mini" }}
               providers={{ azure: azureProvider }}
             />
           </Wrapper>,
@@ -221,7 +218,6 @@ describe("<DefaultProviderSection/>", () => {
               actions={actions}
               provider={azureProvider}
               enabledProvidersCount={2}
-              project={{ defaultModel: "azure/gpt-5-mini" }}
               providers={{ azure: azureProvider }}
             />
           </Wrapper>,
@@ -251,7 +247,6 @@ describe("<DefaultProviderSection/>", () => {
               actions={actions}
               provider={azureProvider}
               enabledProvidersCount={2}
-              project={{ defaultModel: null }}
               providers={{ azure: azureProvider }}
             />
           </Wrapper>,
@@ -277,7 +272,6 @@ describe("<DefaultProviderSection/>", () => {
               actions={actions}
               provider={azureProvider}
               enabledProvidersCount={2}
-              project={{ defaultModel: "openai/gpt-5.2" }}
               providers={{ azure: azureProvider }}
             />
           </Wrapper>,

@@ -3,7 +3,6 @@ import type { ModelDefaultScopeType, PrismaClient } from "@prisma/client";
 import {
   featureByKey,
   type FeatureDescriptor,
-  type ModelRole,
 } from "./featureRegistry";
 import { ModelNotConfiguredError } from "./modelNotConfiguredError";
 
@@ -30,16 +29,6 @@ interface ScopeChain {
   projectId: string;
   teamId: string | null;
   organizationId: string | null;
-  /** Legacy columns kept for one-release read fallback. */
-  projectDefaultModel: string | null;
-  projectTopicClusteringModel: string | null;
-  projectEmbeddingsModel: string | null;
-  teamDefaultModel: string | null;
-  teamTopicClusteringModel: string | null;
-  teamEmbeddingsModel: string | null;
-  organizationDefaultModel: string | null;
-  organizationTopicClusteringModel: string | null;
-  organizationEmbeddingsModel: string | null;
 }
 
 async function loadScopeChain(
@@ -51,24 +40,10 @@ async function loadScopeChain(
     select: {
       id: true,
       teamId: true,
-      defaultModel: true,
-      topicClusteringModel: true,
-      embeddingsModel: true,
       team: {
         select: {
           id: true,
           organizationId: true,
-          defaultModel: true,
-          topicClusteringModel: true,
-          embeddingsModel: true,
-          organization: {
-            select: {
-              id: true,
-              defaultModel: true,
-              topicClusteringModel: true,
-              embeddingsModel: true,
-            },
-          },
         },
       },
     },
@@ -81,18 +56,7 @@ async function loadScopeChain(
   return {
     projectId: project.id,
     teamId: project.team?.id ?? null,
-    organizationId: project.team?.organization?.id ?? null,
-    projectDefaultModel: project.defaultModel ?? null,
-    projectTopicClusteringModel: project.topicClusteringModel ?? null,
-    projectEmbeddingsModel: project.embeddingsModel ?? null,
-    teamDefaultModel: project.team?.defaultModel ?? null,
-    teamTopicClusteringModel: project.team?.topicClusteringModel ?? null,
-    teamEmbeddingsModel: project.team?.embeddingsModel ?? null,
-    organizationDefaultModel: project.team?.organization?.defaultModel ?? null,
-    organizationTopicClusteringModel:
-      project.team?.organization?.topicClusteringModel ?? null,
-    organizationEmbeddingsModel:
-      project.team?.organization?.embeddingsModel ?? null,
+    organizationId: project.team?.organizationId ?? null,
   };
 }
 
@@ -205,38 +169,6 @@ const TIER_ORDER: Array<"project" | "team" | "organization"> = [
   "organization",
 ];
 
-function legacyColumnFor(
-  chain: ScopeChain,
-  role: ModelRole,
-  tier: "project" | "team" | "organization",
-  featureKey: string,
-): string | null {
-  // Map a B2 scalar column to the (role, featureKey) it corresponds
-  // to. Only the columns whose semantic role matches this feature/role
-  // pair contribute to the fallback — we never surface a
-  // topicClusteringModel value when resolving AI search, for example.
-  if (role === "DEFAULT") {
-    if (tier === "project") return chain.projectDefaultModel;
-    if (tier === "team") return chain.teamDefaultModel;
-    return chain.organizationDefaultModel;
-  }
-  if (role === "EMBEDDINGS") {
-    if (tier === "project") return chain.projectEmbeddingsModel;
-    if (tier === "team") return chain.teamEmbeddingsModel;
-    return chain.organizationEmbeddingsModel;
-  }
-  // FAST: the only legacy column we map is topic clustering, and only
-  // for the topic-clustering LLM feature itself. AI search, autocomplete,
-  // etc. never had a dedicated scalar column, so they inherit nothing
-  // from the legacy compat layer.
-  if (role === "FAST" && featureKey === "analytics.topic_clustering_llm") {
-    if (tier === "project") return chain.projectTopicClusteringModel;
-    if (tier === "team") return chain.teamTopicClusteringModel;
-    return chain.organizationTopicClusteringModel;
-  }
-  return null;
-}
-
 /**
  * Walk the scope chain + config attachments to return the model a
  * feature should use. See
@@ -249,13 +181,10 @@ function legacyColumnFor(
  *      featureKey set wins for "feature override", the first that has
  *      the role set wins for "role default". Lower tier always beats
  *      higher tier regardless of recency.
- *   2. Legacy B2 scalar column at project → team → org (compat
- *      fallback; removed in the follow-up PR once writes have drained
- *      off the legacy columns).
- *   3. ModelNotConfiguredError.
+ *   2. ModelNotConfiguredError.
  *
- * There is intentionally no global system fallback. If nothing is
- * configured at any scope (and no legacy column carries a value), AI
+ * There is intentionally no global system fallback and no legacy
+ * scalar-column compat tier. If nothing is configured at any scope, AI
  * features for that role are disabled until the user configures a
  * default. The frontend's tRPC interceptor maps the thrown error to a
  * sticky toast prompting the user to update their defaults.
@@ -308,20 +237,7 @@ export async function resolveModelForFeature(
     }
   }
 
-  // 2. Legacy B2 scalar columns (one-release compat).
-  for (const tier of TIER_ORDER) {
-    const legacy = legacyColumnFor(chain, feature.role, tier, feature.key);
-    if (legacy) {
-      return {
-        model: legacy,
-        source: "role_default",
-        scope: tier,
-        feature,
-      };
-    }
-  }
-
-  // 3. Nothing in the cascade. AI features for this role are disabled
+  // 2. Nothing in the cascade. AI features for this role are disabled
   // until the user configures a default.
   throw new ModelNotConfiguredError(
     feature.key,

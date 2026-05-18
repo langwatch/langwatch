@@ -11,7 +11,6 @@ import {
   DEFAULT_MODEL,
   DEFAULT_TOPIC_CLUSTERING_MODEL,
 } from "../../utils/constants";
-import { isProviderDefaultModel } from "../../utils/modelProviderHelpers";
 import {
   pickFlagshipFromOptions,
   pickLatestEmbeddingFromOptions,
@@ -25,50 +24,31 @@ import { ProviderModelSelector } from "./ProviderModelSelector";
 /**
  * Renders the "Use as default provider" toggle and default model selection fields.
  * When enabled, allows selection of default models for chat, topic clustering, and embeddings.
- * The toggle is disabled if the provider is currently in use or is the only enabled provider.
- * @param state - Form state containing default provider configuration and model selections
- * @param actions - Form actions for updating default provider settings
- * @param provider - The model provider configuration
- * @param enabledProvidersCount - Total number of currently enabled providers
- * @param project - Current project with default model settings
+ * The toggle is disabled only when this is the only enabled provider; the
+ * legacy "already used as default" guard is gone with the legacy
+ * Organization/Team/Project.{defaultModel,...} columns. With those gone, the
+ * "Use as default" toggle writes through to ModelDefaultConfig via the
+ * cascade-aware setRoleAtScope path.
  */
 export const DefaultProviderSection = ({
   state,
   actions,
   provider,
   enabledProvidersCount,
-  project,
   providers,
 }: {
   state: UseModelProviderFormState;
   actions: UseModelProviderFormActions;
   provider: MaybeStoredModelProvider;
   enabledProvidersCount: number;
-  project:
-    | {
-        defaultModel?: string | null;
-        topicClusteringModel?: string | null;
-        embeddingsModel?: string | null;
-      }
-    | null
-    | undefined;
   providers: Record<string, MaybeStoredModelProvider> | undefined;
 }) => {
-  // Determine if toggle should be disabled
-  // Only disable when provider is used for the Default Model (not embeddings or topic clustering)
-  const isUsedForDefaults = isProviderDefaultModel(provider.provider, project);
   const isOnlyEnabledProvider = enabledProvidersCount === 1;
-  const isToggleDisabled = isUsedForDefaults || isOnlyEnabledProvider;
+  const isToggleDisabled = isOnlyEnabledProvider;
 
-  // Generate tooltip message
-  let tooltipMessage = "";
-  if (isUsedForDefaults) {
-    tooltipMessage =
-      "This provider is currently being used for one or more default models and cannot be disabled from default usage.";
-  } else if (isOnlyEnabledProvider) {
-    tooltipMessage =
-      "This is the only enabled provider and must be used as the default.";
-  }
+  const tooltipMessage = isOnlyEnabledProvider
+    ? "This is the only enabled provider and must be used as the default."
+    : "";
 
   // Get provider name for display
   const providerName =
