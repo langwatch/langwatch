@@ -387,9 +387,25 @@ function RoleRow({
   const canExpand = features.length > 0;
   const ChevronIcon = expanded ? ChevronDown : ChevronRight;
 
+  // EMBEDDINGS-specific: when no provider enabled at the picked scope
+  // ships an embedding API (Anthropic-only being the canonical case —
+  // they don't expose embeddings, the docs link to Voyage), the
+  // selector has nothing to offer. Dim the row + tell the user what
+  // would unlock it instead of pretending the field is functional.
+  const unsupportedAtScope = role === "EMBEDDINGS" && modelOptions.length === 0;
+
   return (
-    <Box data-testid={`role-row-${role.toLowerCase()}`} width="full">
-      <HStack gap={2} align="center" paddingY={1}>
+    <Box
+      data-testid={`role-row-${role.toLowerCase()}`}
+      width="full"
+      data-unsupported-at-scope={unsupportedAtScope || undefined}
+    >
+      <HStack
+        gap={2}
+        align="center"
+        paddingY={1}
+        opacity={unsupportedAtScope ? 0.55 : 1}
+      >
         {/* Row reads: [label] ··············· [model selector] ▶
             Label hugs the left, big flex spacer eats the middle, the
             model selector + expand chevron live tight to the right. */}
@@ -411,6 +427,7 @@ function RoleRow({
             options={modelOptions}
             onChange={(m) => onSetOverride(role, m)}
             inheritOption={inheritOption}
+            disabled={unsupportedAtScope}
           />
         </Box>
         {canExpand ? (
@@ -429,6 +446,19 @@ function RoleRow({
           <Box width="24px" flexShrink={0} />
         )}
       </HStack>
+      {unsupportedAtScope && (
+        <Text
+          fontSize="xs"
+          color="fg.muted"
+          paddingLeft={1}
+          paddingBottom={1}
+          data-testid="role-row-embeddings-unsupported-hint"
+        >
+          No provider configured at this scope ships an embedding API.
+          Add an embedding-capable provider (OpenAI, Voyage, Cohere) to
+          unlock topic clustering and semantic search.
+        </Text>
+      )}
       {canExpand && expanded && (
         <VStack
           align="stretch"
