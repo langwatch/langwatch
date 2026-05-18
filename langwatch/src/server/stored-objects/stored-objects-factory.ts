@@ -8,6 +8,7 @@
  *
  * Call once per request — construction is lightweight; drivers are stateless.
  */
+import { env } from "~/env.mjs";
 import { AzureBlobDriver } from "./azure-blob-driver";
 import { LocalFilesystemDriver } from "./local-filesystem-driver";
 import { S3Driver } from "./s3-driver";
@@ -22,13 +23,13 @@ import { StoredObjectsService } from "./stored-objects.service";
  * StorageRegistry treats `azure-blob` URIs as an explicit error then.
  */
 function maybeAzureDriver(): AzureBlobDriver | undefined {
-  const accountName = process.env.AZURE_BLOB_ACCOUNT_NAME;
-  const accountKey = process.env.AZURE_BLOB_ACCOUNT_KEY;
+  const accountName = env.AZURE_BLOB_ACCOUNT_NAME;
+  const accountKey = env.AZURE_BLOB_ACCOUNT_KEY;
   if (!accountName || !accountKey) return undefined;
   return new AzureBlobDriver({
     accountName,
     accountKey,
-    endpointBaseUrl: process.env.AZURE_BLOB_ENDPOINT,
+    endpointBaseUrl: env.AZURE_BLOB_ENDPOINT,
   });
 }
 

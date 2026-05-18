@@ -119,6 +119,12 @@ export function createEnvConfig() {
       // service. Self-hosting operators running multi-pod deployments MUST
       // configure object storage instead — the local-FS path is dev-only.
       LANGWATCH_LOCAL_STORAGE_PATH: z.string().optional(),
+      // Azure Blob Storage — optional alternative to S3 for stored-objects.
+      // Set all three together; AZURE_BLOB_ENDPOINT only needs to be set for
+      // emulator or sovereign-cloud deployments (e.g. Azurite, Azure Gov).
+      AZURE_BLOB_ACCOUNT_NAME: z.string().optional(),
+      AZURE_BLOB_ACCOUNT_KEY: z.string().optional(),
+      AZURE_BLOB_ENDPOINT: z.string().optional(),
       DATASET_STORAGE_LOCAL: z.boolean().optional(),
       CREDENTIALS_SECRET: z.string().optional(),
       AZURE_AD_CLIENT_ID: z.string().optional(),
@@ -259,6 +265,9 @@ export function createEnvConfig() {
       S3_SECRET_ACCESS_KEY: process.env.S3_SECRET_ACCESS_KEY,
       S3_BUCKET_NAME: process.env.S3_BUCKET_NAME,
       LANGWATCH_LOCAL_STORAGE_PATH: process.env.LANGWATCH_LOCAL_STORAGE_PATH,
+      AZURE_BLOB_ACCOUNT_NAME: process.env.AZURE_BLOB_ACCOUNT_NAME,
+      AZURE_BLOB_ACCOUNT_KEY: process.env.AZURE_BLOB_ACCOUNT_KEY,
+      AZURE_BLOB_ENDPOINT: process.env.AZURE_BLOB_ENDPOINT,
       DATASET_STORAGE_LOCAL:
         process.env.DATASET_STORAGE_LOCAL === "1" ||
         process.env.DATASET_STORAGE_LOCAL?.toLowerCase() === "true",
