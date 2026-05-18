@@ -172,16 +172,41 @@ async function handleFileRead(
     return jsonResponse({ status: "not_found" }, 404);
   }
 
-  // Step 1: resolve the owning project from the row id (cross-tenant lookup).
+  // Step 1: per-caller rate limit (AC12). Keyed on the caller's identity
+  // (apiKeyProjectId or userId) so that enumeration attempts are throttled
+  // BEFORE we touch the shared cross-tenant CH client. Using the owner
+  // project as the key would require the cross-tenant lookup first, which
+  // lets an authenticated user fan out id probes against other tenants
+  // before hitting any throttle.
+  const apiKeyProjectId = c.get("apiKeyProjectId");
+  const userId = c.get("userId");
+  const callerKey = apiKeyProjectId ?? userId ?? "unknown";
+  const rl = await rateLimit({
+    key: `files-route:caller:${callerKey}`,
+    windowSeconds: FILES_RATE_LIMIT_WINDOW_SECONDS,
+    max: FILES_RATE_LIMIT_MAX,
+  });
+  if (!rl.allowed) {
+    return new Response(
+      JSON.stringify({ error: "rate_limited" }),
+      {
+        status: 429,
+        headers: {
+          "Content-Type": "application/json",
+          "Retry-After": String(Math.max(1, Math.ceil((rl.resetAt - Date.now()) / 1000))),
+          ...FILES_RESPONSE_BASE_HEADERS,
+        },
+      },
+    );
+  }
+
+  // Step 2: resolve the owning project from the row id (cross-tenant lookup).
   const owner = await resolveStoredObjectOwner({ id });
   if (!owner) {
     return jsonResponse({ status: "not_found" }, 404);
   }
 
-  // Step 2: project-membership gate.
-  const apiKeyProjectId = c.get("apiKeyProjectId");
-  const userId = c.get("userId");
-
+  // Step 3: project-membership gate.
   if (apiKeyProjectId) {
     if (apiKeyProjectId !== owner.projectId) {
       throw new HTTPException(403, { message: "forbidden" });
@@ -199,28 +224,6 @@ async function handleFileRead(
     }
   } else {
     throw new HTTPException(401, { message: "unauthenticated" });
-  }
-
-  // Step 3: per-project rate limit (AC12). Keyed on the owning project so
-  // a tenant burning their quota can't drag down sibling tenants. Cheap
-  // enough to run inside the request path — one Redis INCR + TTL fetch.
-  const rl = await rateLimit({
-    key: `files-route:${owner.projectId}`,
-    windowSeconds: FILES_RATE_LIMIT_WINDOW_SECONDS,
-    max: FILES_RATE_LIMIT_MAX,
-  });
-  if (!rl.allowed) {
-    return new Response(
-      JSON.stringify({ error: "rate_limited" }),
-      {
-        status: 429,
-        headers: {
-          "Content-Type": "application/json",
-          "Retry-After": String(Math.max(1, Math.ceil((rl.resetAt - Date.now()) / 1000))),
-          ...FILES_RESPONSE_BASE_HEADERS,
-        },
-      },
-    );
   }
 
   // Step 4: project-scoped read.

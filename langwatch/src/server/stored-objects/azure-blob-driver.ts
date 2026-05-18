@@ -174,7 +174,7 @@ export class AzureBlobDriver implements StorageDriver {
   constructor(private readonly credentials: AzureBlobCredentials) {}
 
   async get(uri: string): Promise<Readable> {
-    const { accountName, container, blobPath } = parseAzureBlobUri(uri);
+    const { container, blobPath } = parseAzureBlobUri(uri);
     const { endpoint, headers } = this.signedRequest({
       method: "GET",
       container,
@@ -198,15 +198,16 @@ export class AzureBlobDriver implements StorageDriver {
       );
     }
 
-    const arrayBuf = await response.arrayBuffer();
-    return Readable.from(Buffer.from(arrayBuf));
-    // Suppress accountName unused-var warning; keeps the parsed name handy
-    // for callers introspecting the URI in error paths.
-    void accountName;
+    if (!response.body) {
+      throw new Error(`Azure Blob GET returned empty body for ${uri}`);
+    }
+    return Readable.fromWeb(
+      response.body as unknown as import("node:stream/web").ReadableStream<Uint8Array>,
+    );
   }
 
   async put(uri: string, bytes: Buffer, mediaType: string): Promise<void> {
-    const { accountName, container, blobPath } = parseAzureBlobUri(uri);
+    const { container, blobPath } = parseAzureBlobUri(uri);
 
     const { endpoint, headers } = this.signedRequest({
       method: "PUT",
@@ -233,11 +234,10 @@ export class AzureBlobDriver implements StorageDriver {
         `Azure Blob PUT failed for ${uri}: ${response.status} ${response.statusText} ${body}`,
       );
     }
-    void accountName;
   }
 
   async delete(uri: string): Promise<void> {
-    const { accountName, container, blobPath } = parseAzureBlobUri(uri);
+    const { container, blobPath } = parseAzureBlobUri(uri);
 
     const { endpoint, headers } = this.signedRequest({
       method: "DELETE",
@@ -260,11 +260,10 @@ export class AzureBlobDriver implements StorageDriver {
         `Azure Blob DELETE failed for ${uri}: ${response.status} ${response.statusText}`,
       );
     }
-    void accountName;
   }
 
   async exists(uri: string): Promise<boolean> {
-    const { accountName, container, blobPath } = parseAzureBlobUri(uri);
+    const { container, blobPath } = parseAzureBlobUri(uri);
 
     const { endpoint, headers } = this.signedRequest({
       method: "HEAD",
@@ -287,7 +286,6 @@ export class AzureBlobDriver implements StorageDriver {
       );
     }
     return true;
-    void accountName;
   }
 
   private signedRequest({
