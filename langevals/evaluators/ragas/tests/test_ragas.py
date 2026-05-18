@@ -1,4 +1,7 @@
+import asyncio
 import os
+from unittest.mock import patch
+
 import dotenv
 import pytest
 
@@ -105,6 +108,96 @@ def test_faithfulness_should_be_skipped_if_dont_know():
         == "The output seems correctly to be an 'I don't know' statement given the provided contexts. Skipping faithfulness score."
     )
     assert result.status == "skipped"
+
+
+class _StatementGeneratorOutputLike:
+    """Mirrors ragas>=0.3 ragas.metrics._faithfulness.StatementGeneratorOutput:
+    a flat ``statements: list[str]`` (the old SentencesSimplified had
+    ``sentences[].simpler_statements`` instead)."""
+
+    def __init__(self, statements):
+        self.statements = statements
+
+
+class _VerdictLike:
+    def __init__(self, statement, reason, verdict):
+        self.statement = statement
+        self.reason = reason
+        self.verdict = verdict
+
+
+class _NLIStatementOutputLike:
+    def __init__(self, statements):
+        self.statements = statements
+
+
+class _DummyLangchainLLM:
+    model_name = "gpt-4o-mini"
+
+
+class _DummyLLM:
+    """Minimal stand-in for the LangchainLLMWrapper; only ``langchain_llm.model_name``
+    is touched (by capture_cost's teardown) on this code path."""
+
+    langchain_llm = _DummyLangchainLLM()
+
+
+class _FakeFaithfulness:
+    """Stands in for ragas.metrics.Faithfulness so the evaluator's monkey-patch
+    of ``_create_statements`` / ``_create_verdicts`` runs against the ragas>=0.3
+    output shape without any network/LLM call."""
+
+    def __init__(self):
+        self.llm = None
+
+    async def _create_statements(self, row, callbacks):
+        return _StatementGeneratorOutputLike(
+            ["The capital of France is Paris.", "Paris is located in France."]
+        )
+
+    async def _create_verdicts(self, row, statements, callbacks):
+        return _NLIStatementOutputLike(
+            [_VerdictLike("The capital of France is Paris.", "supported by context", 1)]
+        )
+
+    def single_turn_score(self, sample):
+        loop = asyncio.new_event_loop()
+        try:
+            loop.run_until_complete(self._create_statements({}, None))
+            loop.run_until_complete(
+                self._create_verdicts({}, ["The capital of France is Paris."], None)
+            )
+        finally:
+            loop.close()
+        return 0.5
+
+
+def test_faithfulness_supports_ragas_0_3_statement_generator_output():
+    """Regression: ragas>=0.3 ``_create_statements`` returns
+    ``StatementGeneratorOutput`` (flat ``.statements``), not the old
+    ``SentencesSimplified`` (``.sentences[].simpler_statements``). Before the fix
+    this path raised ``'StatementGeneratorOutput' object has no attribute
+    'sentences'`` and the request failed (surfaced as 502/524 after SDK retries)."""
+    with patch(
+        "langevals_ragas.faithfulness.Faithfulness", _FakeFaithfulness
+    ), patch(
+        "langevals_ragas.faithfulness.prepare_llm", return_value=(_DummyLLM(), None)
+    ), patch(
+        "langevals_ragas.faithfulness.check_max_tokens", return_value=None
+    ):
+        evaluator = RagasFaithfulnessEvaluator(
+            settings=RagasFaithfulnessSettings(autodetect_dont_know=False)
+        )
+        result = evaluator.evaluate(
+            RagasFaithfulnessEntry(
+                output="The capital of France is Paris.",
+                contexts=["Paris is the capital of France."],
+            )
+        )
+
+    assert result.status == "processed"
+    assert result.score == 0.5
+    assert result.details and 'The capital of France is Paris.' in result.details
 
 
 def test_response_relevancy():
