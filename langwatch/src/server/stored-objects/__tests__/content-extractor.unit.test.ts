@@ -41,7 +41,6 @@ function makeService(overrides: {
     }),
     getById: vi.fn(),
     cascadeDeleteProject: vi.fn(),
-    cascadeDeleteOwner: vi.fn(),
   } as unknown as StoredObjectsService;
 }
 

@@ -578,52 +578,5 @@ describe("StoredObjectsService (ingest + read path)", () => {
       });
     });
 
-    describe("when cascadeDeleteOwner runs for a specific owner inside a project", () => {
-      /** @scenario "When a project is deleted, cascadeDeleteProject removes both the stored_objects rows and the underlying bytes" */
-      it("deletes only the rows for the specified (ownerKind, ownerId) and leaves the rest intact", async () => {
-        await withTmpStorage(async () => {
-          const proj = `test-so-cascadeowner-${nanoid(6)}`;
-          const service = buildService(proj);
-
-          const ownerA = `run-${nanoid(6)}`;
-          const ownerB = `run-${nanoid(6)}`;
-
-          const targetRow = await service.storeFromBytes({
-            projectId: proj,
-            purpose: "scenario_event",
-            ownerKind: "scenario_run",
-            ownerId: ownerA,
-            mediaType: "text/plain",
-            bytes: makeBytes(`cascade-owner-target-${nanoid(6)}`),
-          });
-          const keepRow = await service.storeFromBytes({
-            projectId: proj,
-            purpose: "scenario_event",
-            ownerKind: "scenario_run",
-            ownerId: ownerB,
-            mediaType: "text/plain",
-            bytes: makeBytes(`cascade-owner-keep-${nanoid(6)}`),
-          });
-
-          await waitForRow(ch, proj, targetRow.id);
-          await waitForRow(ch, proj, keepRow.id);
-
-          await service.cascadeDeleteOwner({
-            projectId: proj,
-            ownerKind: "scenario_run",
-            ownerId: ownerA,
-          });
-
-          // The target row is gone, the unrelated row is preserved.
-          const targetAfter = await service.getById({ projectId: proj, id: targetRow.id });
-          expect(targetAfter).toBeNull();
-          const keepAfter = await service.getById({ projectId: proj, id: keepRow.id });
-          expect(keepAfter).not.toBeNull();
-
-          // Cleanup the kept row so the test is self-contained.
-          await service.cascadeDeleteProject({ projectId: proj });
-        });
-      });
-    });
   });
 });

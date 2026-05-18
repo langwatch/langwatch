@@ -51,7 +51,6 @@ vi.mock("~/server/stored-objects/stored-objects-factory", () => ({
     getById: mockGetById,
     storeFromBytes: vi.fn(),
     cascadeDeleteProject: vi.fn(),
-    cascadeDeleteOwner: vi.fn(),
   })),
 }));
 

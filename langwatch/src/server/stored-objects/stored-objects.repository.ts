@@ -239,18 +239,11 @@ export class StoredObjectsRepository {
    * Uses the scalar-subquery dedup pattern so ReplacingMergeTree-soft-deleted
    * tombstones are filtered out before the cascade tries to delete bytes that
    * may already be gone.
-   *
-   * Optional `ownerKind` / `ownerId` filters narrow the scope to a single
-   * owner — used by `cascadeDeleteOwner` for trace/span deletes.
    */
   async findAllByProject({
     projectId,
-    ownerKind,
-    ownerId,
   }: {
     projectId: string;
-    ownerKind?: string;
-    ownerId?: string;
   }): Promise<Array<{ id: string; storage_uri: string }>> {
     return tracer.withActiveSpan(
       "StoredObjectsRepository.findAllByProject",
@@ -270,20 +263,6 @@ export class StoredObjectsRepository {
           );
         }
 
-        // Build the owner-scope clause if provided. Both predicates are
-        // parameterized so caller-supplied owner ids can't tilt the query.
-        const ownerFilters: string[] = [];
-        const params: Record<string, string> = { projectId };
-        if (ownerKind !== undefined) {
-          ownerFilters.push("AND t.owner_kind = {ownerKind:String}");
-          params.ownerKind = ownerKind;
-        }
-        if (ownerId !== undefined) {
-          ownerFilters.push("AND t.owner_id = {ownerId:String}");
-          params.ownerId = ownerId;
-        }
-        const ownerScope = ownerFilters.join("\n              ");
-
         // Project-scoped enumeration with the standard dedup pattern.
         // We project only id + storage_uri because the cascade does not
         // need the full row; this keeps the scan cheap on wide tables.
@@ -294,7 +273,6 @@ export class StoredObjectsRepository {
               t.storage_uri AS storage_uri
             FROM ${TABLE_NAME} AS t
             WHERE t.project_id = {projectId:String}
-              ${ownerScope}
               AND t.inserted_at = (
                 SELECT max(s.inserted_at)
                 FROM ${TABLE_NAME} AS s
@@ -302,7 +280,7 @@ export class StoredObjectsRepository {
                   AND s.id = t.id
               )
           `,
-          query_params: params,
+          query_params: { projectId },
           format: "JSONEachRow",
         });
 
@@ -330,12 +308,8 @@ export class StoredObjectsRepository {
    */
   async deleteByProject({
     projectId,
-    ownerKind,
-    ownerId,
   }: {
     projectId: string;
-    ownerKind?: string;
-    ownerId?: string;
   }): Promise<void> {
     return tracer.withActiveSpan(
       "StoredObjectsRepository.deleteByProject",
@@ -355,24 +329,12 @@ export class StoredObjectsRepository {
           );
         }
 
-        const filters: string[] = [];
-        const params: Record<string, string> = { projectId };
-        if (ownerKind !== undefined) {
-          filters.push("AND owner_kind = {ownerKind:String}");
-          params.ownerKind = ownerKind;
-        }
-        if (ownerId !== undefined) {
-          filters.push("AND owner_id = {ownerId:String}");
-          params.ownerId = ownerId;
-        }
-        const extraFilters = filters.join(" ");
-
         await client.exec({
           query: `
             ALTER TABLE ${TABLE_NAME}
-            DELETE WHERE project_id = {projectId:String} ${extraFilters}
+            DELETE WHERE project_id = {projectId:String}
           `,
-          query_params: params,
+          query_params: { projectId },
           clickhouse_settings: {
             // Wait until the mutation is at least submitted before we
             // consider the call done; we do NOT wait for finalization

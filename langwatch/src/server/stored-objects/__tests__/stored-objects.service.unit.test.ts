@@ -418,8 +418,8 @@ describe("mintStorageUri (BYOC bucket selection — observed through the inserte
 });
 
 describe("StoredObjectsService surface", () => {
-  /** @scenario "StoredObjectsService exposes storeFromBytes, getById, cascadeDeleteProject, cascadeDeleteOwner" */
-  it("exposes storeFromBytes, getById, cascadeDeleteProject, cascadeDeleteOwner", () => {
+  /** @scenario "StoredObjectsService exposes storeFromBytes, getById, cascadeDeleteProject" */
+  it("exposes storeFromBytes, getById, cascadeDeleteProject", () => {
     const mintStub: MintStorageUri = async ({ projectId, sha256 }) =>
       `file:///tmp/${projectId}/${sha256}`;
     const service = new StoredObjectsService(makeRepository(), makeRegistry(), mintStub);
@@ -427,6 +427,5 @@ describe("StoredObjectsService surface", () => {
     expect(typeof service.storeFromBytes).toBe("function");
     expect(typeof service.getById).toBe("function");
     expect(typeof service.cascadeDeleteProject).toBe("function");
-    expect(typeof service.cascadeDeleteOwner).toBe("function");
   });
 });
