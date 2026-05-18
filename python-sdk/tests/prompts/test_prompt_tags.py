@@ -491,7 +491,7 @@ class TestPromptApiServiceCreateUpdateWithTags:
             service.create(handle="pizza-prompt", parameters={"sdk_write": True})
 
             body_arg = mock_module.sync_detailed.call_args[1]["body"]
-            assert body_arg.to_dict()["parameters"] == {"sdk_write": True}
+            assert body_arg.to_dict()["config"] == {"sdk_write": True}
 
     def test_update_includes_config_in_request_body(self):
         """
@@ -517,7 +517,7 @@ class TestPromptApiServiceCreateUpdateWithTags:
             )
 
             body_arg = mock_module.sync_detailed.call_args[1]["body"]
-            assert body_arg.to_dict()["parameters"] == {"sdk_write": True}
+            assert body_arg.to_dict()["config"] == {"sdk_write": True}
 
 
 # ---------------------------------------------------------------------------

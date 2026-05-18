@@ -302,7 +302,7 @@ class PromptApiService:
                 inputs=api_inputs,
                 outputs=api_outputs,
                 tags=tags if tags is not None else UNSET,
-                parameters=parameters if parameters is not None else UNSET,
+                config=parameters if parameters is not None else UNSET,
             ),
         )
         ok = unwrap_response(
@@ -379,7 +379,7 @@ class PromptApiService:
                 inputs=api_inputs,
                 outputs=api_outputs,
                 tags=tags if tags is not None else UNSET,
-                parameters=parameters if parameters is not None else UNSET,
+                config=parameters if parameters is not None else UNSET,
             ),
         )
 
