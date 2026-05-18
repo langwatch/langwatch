@@ -292,9 +292,9 @@ export class StoredObjectsService {
   }
 
   /**
-   * Cascade-deletes every stored object owned by a project: deletes the
-   * bytes from the storage backend first, then deletes the stored_objects
-   * rows from ClickHouse.
+   * Deletes all stored objects owned by a project: deletes the bytes from
+   * the storage backend first, then deletes the stored_objects rows from
+   * ClickHouse.
    *
    * Bytes-before-rows ordering is intentional. If we deleted rows first and
    * then crashed mid-cascade, the bytes would orphan in S3/disk with no row
@@ -308,9 +308,9 @@ export class StoredObjectsService {
    * operator can sweep up orphans later. The CH delete only runs after
    * all bytes have been attempted.
    */
-  async cascadeDeleteProject({ projectId }: { projectId: string }): Promise<void> {
+  async deleteOwnedBy({ projectId }: { projectId: string }): Promise<void> {
     return tracer.withActiveSpan(
-      "StoredObjectsService.cascadeDeleteProject",
+      "StoredObjectsService.deleteOwnedBy",
       { kind: SpanKind.INTERNAL, attributes: { "tenant.id": projectId } },
       async (span) => {
         const rows = await this.repository.findAllByProject({ projectId });
@@ -330,7 +330,7 @@ export class StoredObjectsService {
             byteDeleteFailures++;
             logger.warn(
               { projectId, id: row.id, storageUri: row.storage_uri, error },
-              "cascadeDeleteProject: failed to delete bytes; row will still be removed",
+              "deleteOwnedBy: failed to delete bytes; row will still be removed",
             );
           }
         }
@@ -340,7 +340,7 @@ export class StoredObjectsService {
         await this.repository.deleteByProject({ projectId });
         logger.info(
           { projectId, rowsCount: rows.length, bytesDeleted, byteDeleteFailures },
-          "cascadeDeleteProject completed",
+          "deleteOwnedBy completed",
         );
       },
     );

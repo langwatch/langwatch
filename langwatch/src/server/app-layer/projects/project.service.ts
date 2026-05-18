@@ -172,11 +172,11 @@ export class ProjectService {
     // cascade failure never blocks the user-facing project deletion — orphan bytes
     // can be swept up later, but a blocked deletion is a worse UX.
     try {
-      await createStoredObjectsService({ projectId: id }).cascadeDeleteProject({ projectId: id });
+      await createStoredObjectsService({ projectId: id }).deleteOwnedBy({ projectId: id });
     } catch (error) {
       logger.warn(
         { projectId: id, error },
-        "cascadeDeleteProject failed during project archive; continuing with archive — orphan bytes may need manual cleanup",
+        "deleteOwnedBy failed during project archive; continuing with archive — orphan bytes may need manual cleanup",
       );
     }
 

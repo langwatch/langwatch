@@ -40,7 +40,7 @@ function makeService(overrides: {
       isDuplicate: false,
     }),
     getById: vi.fn(),
-    cascadeDeleteProject: vi.fn(),
+    deleteOwnedBy: vi.fn(),
   } as unknown as StoredObjectsService;
 }
 

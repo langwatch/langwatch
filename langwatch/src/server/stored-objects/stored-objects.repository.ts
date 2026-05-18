@@ -234,7 +234,7 @@ export class StoredObjectsRepository {
   /**
    * Streams (id, storage_uri) pairs for every live row owned by the project.
    *
-   * Used by `cascadeDeleteProject` to enumerate the bytes that need to be
+   * Used by `deleteOwnedBy` to enumerate the bytes that need to be
    * deleted from the storage backend before the rows themselves are removed.
    * Uses the scalar-subquery dedup pattern so ReplacingMergeTree-soft-deleted
    * tombstones are filtered out before the cascade tries to delete bytes that

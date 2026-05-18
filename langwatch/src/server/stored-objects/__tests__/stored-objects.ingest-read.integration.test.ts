@@ -515,8 +515,8 @@ describe("StoredObjectsService (ingest + read path)", () => {
       });
     });
 
-    describe("when cascadeDeleteProject runs for the owning project", () => {
-      /** @scenario "When a project is deleted, cascadeDeleteProject removes both the stored_objects rows and the underlying bytes" */
+    describe("when deleteOwnedBy runs for the owning project", () => {
+      /** @scenario "When a project is deleted, deleteOwnedBy removes both the stored_objects rows and the underlying bytes" */
       it("deletes both the stored_objects rows AND the underlying storage bytes", async () => {
         await withTmpStorage(async () => {
           // Use a dedicated project id so the cascade doesn't take out rows
@@ -556,7 +556,7 @@ describe("StoredObjectsService (ingest + read path)", () => {
           expect((before2 as { stream?: unknown }).stream).toBeDefined();
 
           // Run the cascade.
-          await service.cascadeDeleteProject({ projectId: cascadeProj });
+          await service.deleteOwnedBy({ projectId: cascadeProj });
 
           // Repository-level: rows for this project are gone (or invisible
           // to SELECT — the ALTER TABLE DELETE mutation is async on disk,
