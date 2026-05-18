@@ -186,9 +186,11 @@ export function DefaultModelsSection({
   // started" affordance. Old accounts that nuked their providers but
   // still have orphan configs DO see the table (with red 'Update
   // needed' badges) so they can rebuild from there.
-  if (noProvidersConfigured && data.configs.length === 0) {
-    return null;
-  }
+  // Hide via display:none rather than return null so the
+  // getDefaultModelsForProject tRPC observer stays mounted and
+  // continues to react to invalidations the moment a provider is
+  // added (no waterfall remount).
+  const isHidden = noProvidersConfigured && data.configs.length === 0;
 
   const openAdd = () => {
     setEditing(undefined);
@@ -205,6 +207,7 @@ export function DefaultModelsSection({
       width="full"
       align="stretch"
       data-testid="default-models-section"
+      display={isHidden ? "none" : "flex"}
     >
       <HStack gap={3} align="center" justify="space-between">
         <VStack align="start" gap={1}>

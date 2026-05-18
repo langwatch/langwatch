@@ -366,17 +366,18 @@ export default function ModelsPage() {
 
         {/* Default Models renders whenever the project has providers
             OR has orphan default-model configs. The section hides
-            itself when BOTH are empty (fresh accounts only) — old
-            accounts that nuked their providers still see the table
-            so they can spot + fix the now-invalid orphan defaults. */}
-        {!isLoading && (
-          <DefaultModelsSection
-            filter={scopeFilter}
-            onFilterChange={setScopeFilter}
-            enabledProviderKeys={enabledProviderKeys}
-            noProvidersConfigured={enabledProviders.length === 0}
-          />
-        )}
+            itself (via display:none) when BOTH are empty (fresh
+            accounts only) — old accounts that nuked their providers
+            still see the table so they can spot + fix the now-invalid
+            orphan defaults. Mounting unconditionally lets the
+            getDefaultModelsForProject tRPC query fire in parallel
+            with getAllForProject above, instead of waterfalling. */}
+        <DefaultModelsSection
+          filter={scopeFilter}
+          onFilterChange={setScopeFilter}
+          enabledProviderKeys={enabledProviderKeys}
+          noProvidersConfigured={!isLoading && enabledProviders.length === 0}
+        />
 
         <Dialog.Root
           open={!!providerToDisable}
