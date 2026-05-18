@@ -9,7 +9,10 @@ import {
 } from "./featureFlagStore.postgres";
 import type { FeatureFlagKey } from "./registry";
 import { resolveFlagDefinition } from "./registry";
-import type { FeatureFlagOptions, FeatureFlagServiceInterface } from "./types";
+import type {
+  FeatureFlagEvaluateOptions,
+  FeatureFlagServiceInterface,
+} from "./types";
 
 /**
  * Main feature flag service.
@@ -58,25 +61,18 @@ export class FeatureFlagService implements FeatureFlagServiceInterface {
   }
 
   /**
-   * Type-checked overload. `flagKey` is constrained to the union of
-   * registered flag keys plus the `es-*-killswitch` family template
-   * literal, so unregistered string literals fail at compile time.
-   * Internally still accepts arbitrary strings via the implementation
-   * signature so the legacy PostHog and memory backends keep working
-   * with flags that pre-date the registry.
+   * `flagKey` is constrained to the union of registered flag keys plus
+   * the `es-*-killswitch` family template literal, so unregistered
+   * string literals fail at compile time. Callers pass everything else
+   * (distinctId, defaultValue, projectId/organizationId for PostHog
+   * targeting, cacheTtlMs for hot-path TTL overrides) via the options
+   * object.
    */
   async isEnabled(
     flagKey: FeatureFlagKey,
-    distinctId: string,
-    defaultValue?: boolean,
-    options?: FeatureFlagOptions,
-  ): Promise<boolean>;
-  async isEnabled(
-    flagKey: string,
-    distinctId: string,
-    defaultValue = false,
-    options?: FeatureFlagOptions,
+    opts: FeatureFlagEvaluateOptions,
   ): Promise<boolean> {
+    const { distinctId, defaultValue = false } = opts;
     const definition = resolveFlagDefinition(flagKey);
 
     const envOverride = checkFlagEnvOverride(flagKey, definition?.legacyEnvVar);
@@ -108,15 +104,19 @@ export class FeatureFlagService implements FeatureFlagServiceInterface {
       const stored = await this.store.get(flagKey);
       if (stored !== null) return stored;
 
-      return await this.legacy.isEnabled(
-        flagKey,
+      return await this.legacy.isEnabled(flagKey, {
+        ...opts,
         distinctId,
-        definition.defaultValue,
-        options,
-      );
+        defaultValue: definition.defaultValue,
+      });
     }
 
-    return this.legacy.isEnabled(flagKey, distinctId, defaultValue, options);
+    // Unregistered keys reach the legacy backend for back-compat with
+    // ad-hoc PostHog flags. The legacy memory/PostHog services widen
+    // the param to `string` in their own implementations, so the
+    // interface-level `FeatureFlagKey` constraint still gates new
+    // callers without blocking runtime back-compat.
+    return this.legacy.isEnabled(flagKey, { ...opts, defaultValue });
   }
 
   private createLegacyService(): FeatureFlagServiceInterface {

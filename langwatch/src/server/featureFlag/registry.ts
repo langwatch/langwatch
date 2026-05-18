@@ -93,6 +93,27 @@ export const FEATURE_FLAGS = [
     family: "Collector",
     legacyEnvVar: "DISABLE_PII_REDACTION",
   },
+  // Per-span token estimation kill switches. Hardcoded raw keys before;
+  // each `record_span` job was a PostHog /flags call for the global key
+  // plus another for the project key (~5k calls/day in dogfood at modest
+  // traffic). Registering them moves the hot path to env + postgres so
+  // the only PostHog traffic is the Ops UI toggle.
+  {
+    key: "token-estimation-killswitch",
+    scope: "SYSTEM",
+    defaultValue: false,
+    description:
+      "Globally disables OTLP span token estimation in the collector. Emergency operator override; enabling skips the model-based token-count fill for spans missing usage metrics.",
+    family: "Collector",
+  },
+  {
+    key: "token-estimation-project-killswitch",
+    scope: "SYSTEM",
+    defaultValue: false,
+    description:
+      "Per-project (distinctId = project id) disable for OTLP span token estimation. Operators can opt a single tenant out before reaching for the global switch.",
+    family: "Collector",
+  },
 
   // ----- PRODUCT -----
   // Hot-ish per-project gate, but only checked on workflow execution
@@ -111,18 +132,6 @@ export const FEATURE_FLAGS = [
     scope: "PRODUCT",
     defaultValue: false,
     description: "Shows the SDK radar banner card on the home page.",
-  },
-  {
-    key: "release_ui_dark_mode_enabled",
-    scope: "PRODUCT",
-    defaultValue: false,
-    description: "Enables the dark-mode toggle in the user profile menu.",
-  },
-  {
-    key: "release_ui_negate_filters_enabled",
-    scope: "PRODUCT",
-    defaultValue: false,
-    description: "Enables negate-filter chips on the messages / traces filters.",
   },
   {
     key: "release_ui_ai_gateway_menu_enabled",

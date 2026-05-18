@@ -81,9 +81,11 @@ describe("isComponentDisabled", () => {
       expect(result).toBe(true);
       expect(ffs.isEnabled).toHaveBeenCalledWith(
         "es-trace-command-recordSpan-killswitch",
-        "tenant-1",
-        false,
-        expect.objectContaining({ cacheTtlMs: expect.any(Number) }),
+        expect.objectContaining({
+          distinctId: "tenant-1",
+          defaultValue: false,
+          cacheTtlMs: expect.any(Number),
+        }),
       );
     });
 
@@ -140,9 +142,11 @@ describe("isComponentDisabled", () => {
 
       expect(ffs.isEnabled).toHaveBeenCalledWith(
         "my-custom-flag",
-        "tenant-1",
-        false,
-        expect.objectContaining({ cacheTtlMs: expect.any(Number) }),
+        expect.objectContaining({
+          distinctId: "tenant-1",
+          defaultValue: false,
+          cacheTtlMs: expect.any(Number),
+        }),
       );
     });
   });

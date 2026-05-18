@@ -81,9 +81,11 @@ export class TenantRateTracker {
     try {
       return await this.featureFlagService.isEnabled(
         ANOMALY_DETECTION_KILL_SWITCH_FLAG,
-        tenantId,
-        false,
-        { cacheTtlMs: KILL_SWITCH_CACHE_TTL_MS },
+        {
+          distinctId: tenantId,
+          defaultValue: false,
+          cacheTtlMs: KILL_SWITCH_CACHE_TTL_MS,
+        },
       );
     } catch {
       return false;
