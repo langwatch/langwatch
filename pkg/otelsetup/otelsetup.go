@@ -8,6 +8,7 @@ package otelsetup
 
 import (
 	"context"
+	"log/slog"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -23,6 +24,23 @@ import (
 
 	"github.com/langwatch/langwatch/pkg/contexts"
 )
+
+// slogErrorHandler is the fallback delegate behind startupErrorHandler.
+// Using a concrete handler — rather than whatever otelapi.GetErrorHandler()
+// returns — is load-bearing: GetErrorHandler() returns the global
+// *ErrDelegator wrapper, which forwards to the latest handler registered
+// via SetErrorHandler. If we captured the delegator and then registered
+// startupErrorHandler globally, dispatching any OTel error would recurse
+// (startupErrorHandler.Handle → delegator → startupErrorHandler.Handle …)
+// until the goroutine stack overflowed and the process exited with code 2.
+type slogErrorHandler struct{}
+
+func (slogErrorHandler) Handle(err error) {
+	if err == nil {
+		return
+	}
+	slog.Warn("otel error", "err", err)
+}
 
 // startupErrorHandler silences OTLP export errors during the first few
 // seconds of startup. The gateway commonly races its OTel exporter
@@ -232,7 +250,7 @@ func New(ctx context.Context, opts Options) (*Provider, error) {
 	// once the healthyExporter wrapper sees a successful export, or after
 	// the 30s grace window elapses (whichever comes first).
 	startupFilter := newStartupErrorHandler(
-		otelapi.GetErrorHandler(),
+		slogErrorHandler{},
 		30*time.Second,
 	)
 	otelapi.SetErrorHandler(startupFilter)
