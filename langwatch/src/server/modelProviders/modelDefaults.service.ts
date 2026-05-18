@@ -7,42 +7,20 @@ import {
   MODEL_ROLES,
   type ModelRole,
 } from "./featureRegistry";
+import {
+  ModelDefaultsRepository,
+  type ModelDefaultsPrisma,
+  type ScopeAttachment,
+} from "./modelDefaults.repository";
+
+export type { ScopeAttachment };
 
 interface Ctx {
-  prisma: PrismaClient | Prisma.TransactionClient;
+  prisma: ModelDefaultsPrisma;
 }
 
-export type ScopeAttachment = {
-  scopeType: ModelDefaultScopeType;
-  scopeId: string;
-};
-
-/**
- * Acquire a transaction-scoped Postgres advisory lock keyed by the
- * (scopeType, scopeId) pair. Serialises concurrent `setRoleAtScope` /
- * `setFeatureAtScope` calls at the same scope so the
- *   findMany → (create | update)
- * pattern can't race three concurrent provider-submit mutations into
- * three separate ModelDefaultConfig rows. The lock is held only for
- * the duration of the surrounding `$transaction`; unrelated scopes
- * (or unrelated orgs) never contend.
- *
- * `pg_advisory_xact_lock(bigint)` takes a 64-bit int; we hash the
- * scope key with Postgres' `hashtextextended` (deterministic, no
- * collisions in practice for the scope-id space) to get one.
- *
- * The bug this prevents: useProviderFormSubmit fans out 3 concurrent
- * mutations (DEFAULT / FAST / EMBEDDINGS) on the same scope. Without
- * the lock, all three see no existing config and each creates a fresh
- * one, leaving 3 separate ModelDefaultConfig rows attached to the
- * same scope. Caught on rchaves's 2026-05-18 dogfood.
- */
-async function lockScope(
-  tx: Pick<Prisma.TransactionClient, "$queryRaw">,
-  scopeType: ModelDefaultScopeType,
-  scopeId: string,
-): Promise<void> {
-  await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`mdc:${scopeType}:${scopeId}`}, 0))`;
+function repoFor(ctx: Ctx): ModelDefaultsRepository {
+  return new ModelDefaultsRepository(ctx.prisma);
 }
 
 /**
@@ -69,6 +47,18 @@ function sanitizeConfig(raw: Record<string, unknown>): Record<string, string> {
   return clean;
 }
 
+function dedupeScopes(scopes: ScopeAttachment[]): ScopeAttachment[] {
+  const seen = new Set<string>();
+  const out: ScopeAttachment[] = [];
+  for (const s of scopes) {
+    const key = `${s.scopeType}::${s.scopeId}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(s);
+  }
+  return out;
+}
+
 /**
  * Create a new ModelDefaultConfig with its scope attachments. Empty
  * configs (no valid keys) are rejected — a config is meaningless
@@ -84,31 +74,18 @@ export async function createConfig(
 ): Promise<{ id: string }> {
   const config = sanitizeConfig(params.config);
   if (Object.keys(config).length === 0) {
-    throw new Error("ModelDefaultConfig must carry at least one role or feature key.");
+    throw new Error(
+      "ModelDefaultConfig must carry at least one role or feature key.",
+    );
   }
   if (params.scopes.length === 0) {
     throw new Error("ModelDefaultConfig must attach to at least one scope.");
   }
-  // Deduplicate scope attachments before insert so a caller passing
-  // the same (type,id) twice doesn't trip the unique index.
-  const seen = new Set<string>();
-  const scopes: ScopeAttachment[] = [];
-  for (const s of params.scopes) {
-    const key = `${s.scopeType}::${s.scopeId}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    scopes.push(s);
-  }
-
-  const created = await ctx.prisma.modelDefaultConfig.create({
-    data: {
-      config,
-      authorId: params.authorId ?? null,
-      scopes: { create: scopes.map((s) => ({ scopeType: s.scopeType, scopeId: s.scopeId })) },
-    },
-    select: { id: true },
+  return repoFor(ctx).create({
+    config,
+    scopes: dedupeScopes(params.scopes),
+    authorId: params.authorId ?? null,
   });
-  return { id: created.id };
 }
 
 /**
@@ -127,6 +104,7 @@ export async function updateConfig(
     authorId?: string | null;
   },
 ): Promise<void> {
+  const repo = repoFor(ctx);
   const data: { config?: Record<string, string>; authorId?: string | null } = {};
   if (params.config !== undefined) {
     const clean = sanitizeConfig(params.config);
@@ -135,82 +113,46 @@ export async function updateConfig(
       // delete because an attached-but-empty config has no effect on
       // resolution but still occupies the same-scope tiebreak slot
       // (newest empty would mask older non-empty at the same scope).
-      await deleteConfig(ctx, params.id);
+      await repo.delete(params.id);
       return;
     }
     data.config = clean;
   }
   if (params.authorId !== undefined) data.authorId = params.authorId;
 
-  if (params.scopes !== undefined) {
-    // Replace-all semantics for scope attachments: empty array → delete
-    // the config (an unattached config can never be hit by the
-    // resolver). Otherwise compute the add/remove diff against the
-    // current set.
-    if (params.scopes.length === 0) {
-      await deleteConfig(ctx, params.id);
-      return;
-    }
-    const desired = new Map<string, ScopeAttachment>();
-    for (const s of params.scopes) {
-      desired.set(`${s.scopeType}::${s.scopeId}`, s);
-    }
-    const current = await ctx.prisma.modelDefaultConfigScope.findMany({
-      where: { configId: params.id },
-      select: { id: true, scopeType: true, scopeId: true },
-    });
-    const currentByKey = new Map(
-      current.map((c) => [`${c.scopeType}::${c.scopeId}`, c]),
-    );
-    const toAdd = [...desired.values()].filter(
-      (s) => !currentByKey.has(`${s.scopeType}::${s.scopeId}`),
-    );
-    const toRemove = current.filter(
-      (c) => !desired.has(`${c.scopeType}::${c.scopeId}`),
-    );
-
-    // Scope mutation needs the multi-statement batch form of
-    // `$transaction`, which only the root Prisma client exposes —
-    // transaction clients themselves do not. Fail loudly if some
-    // future caller passes a tx client into this branch rather than
-    // hiding the crash behind a runtime cast.
-    if (!("$transaction" in ctx.prisma)) {
-      throw new Error(
-        "modelDefaults.updateConfig: scope updates must be called with a root PrismaClient, not a transaction client.",
-      );
-    }
-    const prisma = ctx.prisma as PrismaClient;
-    await prisma.$transaction([
-      prisma.modelDefaultConfig.update({
-        where: { id: params.id },
-        data,
-      }),
-      ...(toAdd.length > 0
-        ? [
-            prisma.modelDefaultConfigScope.createMany({
-              data: toAdd.map((s) => ({
-                configId: params.id,
-                scopeType: s.scopeType,
-                scopeId: s.scopeId,
-              })),
-            }),
-          ]
-        : []),
-      ...(toRemove.length > 0
-        ? [
-            prisma.modelDefaultConfigScope.deleteMany({
-              where: { id: { in: toRemove.map((c) => c.id) } },
-            }),
-          ]
-        : []),
-    ]);
+  if (params.scopes === undefined) {
+    // No scope changes — just bump the JSON / authorId.
+    await repo.updateConfigPayload({ id: params.id, data });
     return;
   }
 
-  // No scope changes — just bump the JSON / authorId.
-  await ctx.prisma.modelDefaultConfig.update({
-    where: { id: params.id },
-    data,
+  // Replace-all semantics for scope attachments: empty array → delete
+  // the config (an unattached config can never be hit by the
+  // resolver). Otherwise compute the add/remove diff against the
+  // current set.
+  if (params.scopes.length === 0) {
+    await repo.delete(params.id);
+    return;
+  }
+  const desired = new Map<string, ScopeAttachment>();
+  for (const s of params.scopes) {
+    desired.set(`${s.scopeType}::${s.scopeId}`, s);
+  }
+  const current = await repo.findScopesForConfig(params.id);
+  const currentByKey = new Map(
+    current.map((c) => [`${c.scopeType}::${c.scopeId}`, c]),
+  );
+  const toAdd = [...desired.values()].filter(
+    (s) => !currentByKey.has(`${s.scopeType}::${s.scopeId}`),
+  );
+  const toRemove = current.filter(
+    (c) => !desired.has(`${c.scopeType}::${c.scopeId}`),
+  );
+  await repo.updateConfigScopes({
+    id: params.id,
+    configPayload: data,
+    toAdd,
+    toRemoveIds: toRemove.map((c) => c.id),
   });
 }
 
@@ -221,7 +163,7 @@ export async function deleteConfig(
   ctx: Ctx,
   configId: string,
 ): Promise<void> {
-  await ctx.prisma.modelDefaultConfig.delete({ where: { id: configId } });
+  await repoFor(ctx).delete(configId);
 }
 
 /**
@@ -294,6 +236,12 @@ export async function setFeatureAtScope(
  *     no-op if no config carries it).
  *  4. Otherwise merge the key into the existing config or create a
  *     fresh one with just this key.
+ *
+ * The bug this guards: useProviderFormSubmit fans out 3 concurrent
+ * mutations (DEFAULT / FAST / EMBEDDINGS) on the same scope. Without
+ * the advisory lock, all three see no existing config and each create
+ * a fresh one, leaving 3 separate ModelDefaultConfig rows attached to
+ * the same scope.
  */
 async function upsertKeyAtScope(
   ctx: Ctx,
@@ -306,30 +254,27 @@ async function upsertKeyAtScope(
   },
 ): Promise<void> {
   await (ctx.prisma as PrismaClient).$transaction(async (tx) => {
-    await lockScope(tx, params.scopeType, params.scopeId);
+    const txRepo = new ModelDefaultsRepository(tx);
+    await txRepo.lockScope(params.scopeType, params.scopeId);
 
-    const attached = await tx.modelDefaultConfigScope.findMany({
-      where: { scopeType: params.scopeType, scopeId: params.scopeId },
-      select: {
-        config: { select: { id: true, config: true, createdAt: true } },
-      },
-    });
-    attached.sort(
-      (a, b) =>
-        (b.config.createdAt?.getTime() ?? 0) -
-        (a.config.createdAt?.getTime() ?? 0),
+    const attached = await txRepo.findConfigsAtScope(
+      params.scopeType,
+      params.scopeId,
     );
-    const target = attached[0]?.config;
+    const target = attached[0];
 
     if (params.model === null) {
       if (!target) return;
       const next = { ...((target.config ?? {}) as Record<string, unknown>) };
       delete next[params.key];
-      await updateConfig({ prisma: tx }, {
-        id: target.id,
-        config: next,
-        authorId: params.authorId,
-      });
+      await updateConfig(
+        { prisma: tx },
+        {
+          id: target.id,
+          config: next,
+          authorId: params.authorId,
+        },
+      );
       return;
     }
 
@@ -338,18 +283,24 @@ async function upsertKeyAtScope(
         ...((target.config ?? {}) as Record<string, unknown>),
         [params.key]: params.model,
       };
-      await updateConfig({ prisma: tx }, {
-        id: target.id,
-        config: next,
-        authorId: params.authorId,
-      });
+      await updateConfig(
+        { prisma: tx },
+        {
+          id: target.id,
+          config: next,
+          authorId: params.authorId,
+        },
+      );
       return;
     }
 
-    await createConfig({ prisma: tx }, {
-      config: { [params.key]: params.model },
-      scopes: [{ scopeType: params.scopeType, scopeId: params.scopeId }],
-      authorId: params.authorId ?? null,
-    });
+    await createConfig(
+      { prisma: tx },
+      {
+        config: { [params.key]: params.model },
+        scopes: [{ scopeType: params.scopeType, scopeId: params.scopeId }],
+        authorId: params.authorId ?? null,
+      },
+    );
   });
 }
