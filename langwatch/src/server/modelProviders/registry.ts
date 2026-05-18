@@ -351,6 +351,16 @@ export const modelProviders = {
     }),
     enabledSince: new Date("2023-01-01"),
   },
+  voyage: {
+    name: "Voyage AI",
+    type: "llm",
+    apiKey: "VOYAGE_API_KEY",
+    endpointKey: undefined,
+    keysSchema: z.object({
+      VOYAGE_API_KEY: z.string().min(1),
+    }),
+    enabledSince: new Date("2026-05-18"),
+  },
   azure_safety: {
     name: "Azure Safety",
     type: "safety",

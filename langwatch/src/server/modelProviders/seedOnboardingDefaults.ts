@@ -156,6 +156,14 @@ export function buildSeedPlanForProvider(
       EMBEDDINGS: pickLatestEmbedding("gemini"),
     };
   }
+  if (provider === "voyage") {
+    // Voyage is embedding-only: Anthropic's recommended embedding
+    // partner. The seed plan populates only EMBEDDINGS so an
+    // anthropic-only org can pair Anthropic for DEFAULT + FAST with
+    // Voyage for EMBEDDINGS without falling through the cascade to
+    // OpenAI as a side effect.
+    return { EMBEDDINGS: pickLatestEmbedding("voyage") };
+  }
   // No special-case for the provider yet — leave the plan empty so
   // onboarding doesn't seed potentially-wrong defaults. The user can
   // still configure manually.
