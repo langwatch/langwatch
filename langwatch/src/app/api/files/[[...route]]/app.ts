@@ -40,6 +40,28 @@ app.onError(handleError);
  *
  * On success, `c.var.userId` (session path) or `c.var.apiKeyProjectId`
  * (API-key path) is set so the handler can apply the right gate.
+ *
+ * CONTRACT — noop-next invocation of authMiddleware
+ * --------------------------------------------------
+ * `authMiddleware` is called with a no-op `next()` because the only useful
+ * work it does here is the side effect of populating `c.var.project` (plus
+ * `c.var.apiKeyProjectId` internally). We do NOT want it to advance to the
+ * route handler — that is `dualAuth`'s job once both auth paths have been
+ * tried.
+ *
+ * Context variables this middleware MUST populate before calling `next()`:
+ *   - API-key path: `c.var.project` (set by authMiddleware) and
+ *     `c.var.apiKeyProjectId` (derived here from project.id)
+ *   - Session path: `c.var.userId` (set here from the session cookie)
+ *
+ * WARNING: if `authMiddleware` is ever changed so that `next` MUST run for
+ * its side effects to take hold (e.g. audit logging written in a
+ * post-`next` callback, telemetry spans flushed via `await next()`, OTel
+ * span finalization), the API-key path of `dualAuth` will silently degrade —
+ * `authMiddleware` will return without error but without populating
+ * `c.var.project`. The runtime assertion below is the early-warning system
+ * for exactly that scenario: it converts a silent degradation into a hard
+ * 500 that surfaces in dev and test rather than rotting undetected in prod.
  */
 const dualAuth: MiddlewareHandler<{ Variables: Variables }> = async (
   c,
@@ -54,6 +76,18 @@ const dualAuth: MiddlewareHandler<{ Variables: Variables }> = async (
       c.set("apiKeyProjectId", project.id);
       return await next();
     }
+    // authMiddleware returned without throwing AND without populating
+    // c.var.project. This violates the contract documented above: a
+    // successful API-key auth MUST set c.var.project as its side effect.
+    // If we reach this point it means authMiddleware now requires `next`
+    // to actually run before it flushes its side effects. Fail loudly
+    // instead of silently falling through to session auth and granting
+    // access under a completely different identity model.
+    throw new HTTPException(500, {
+      message:
+        "dualAuth: authMiddleware returned without populating c.var.project " +
+        "and without throwing an auth error — noop-next contract violated",
+    });
   } catch (err) {
     if (err instanceof HTTPException) {
       const status = err.status as number;
