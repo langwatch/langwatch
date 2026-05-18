@@ -6,6 +6,8 @@ import { resolver, validator as zValidator } from "hono-openapi/zod";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { badRequestSchema } from "~/app/api/shared/schemas";
+import { prisma } from "~/server/db";
+import { resolveModelForFeature } from "~/server/modelProviders/resolveModelForFeature";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createLogger } from "~/utils/logger/server";
 import {
@@ -180,13 +182,31 @@ app.post(
       "Creating evaluator",
     );
 
+    // Resolve the project's DEFAULT and EMBEDDINGS models via the
+    // cascade so the new evaluator's settings render with the right
+    // placeholders. Either may be null if the cascade is empty; the
+    // service falls back to the global constants in that case.
+    const [resolvedDefault, resolvedEmbedding] = await Promise.all([
+      resolveModelForFeature("evaluator.create_default", {
+        prisma,
+        projectId: project.id,
+      }).catch(() => null),
+      resolveModelForFeature("analytics.topic_clustering_embeddings", {
+        prisma,
+        projectId: project.id,
+      }).catch(() => null),
+    ]);
+
     const evaluator = await service.createWithDefaults({
       id: `evaluator_${nanoid()}`,
       projectId: project.id,
       name: data.name,
       type: "evaluator",
       config: data.config as Prisma.InputJsonValue,
-      project,
+      resolved: {
+        defaultModel: resolvedDefault?.model ?? null,
+        embeddingsModel: resolvedEmbedding?.model ?? null,
+      },
     });
 
     const enriched = await service.enrichWithFields(evaluator);
