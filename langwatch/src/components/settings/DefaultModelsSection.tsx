@@ -232,44 +232,30 @@ export function DefaultModelsSection({
         </HStack>
       </HStack>
 
-      {filter.kind === "all" && data.configs.length === 0 ? (
-        // Empty state mirrors the Model Providers list above — no
-        // surrounding bordered card. The callout reads as a single
-        // affordance instead of a boxed message inside a section card.
-        <AllConfigsView
-          configs={data.configs}
-          features={data.features}
-          onEdit={openEdit}
-          onDelete={handleDelete}
-          onAdd={openAdd}
-          enabledProviderKeys={enabledProviderKeys ?? null}
-        />
-      ) : (
-        <Card.Root width="full" overflow="hidden">
-          <Card.Body paddingX={0} paddingY={0}>
-            {filter.kind === "all" ? (
-              <AllConfigsView
-                configs={data.configs}
-                features={data.features}
-                onEdit={openEdit}
-                onDelete={handleDelete}
-                onAdd={openAdd}
-                enabledProviderKeys={enabledProviderKeys ?? null}
-              />
-            ) : (
-              <ResolvedScopeView
-                filter={filter}
-                configs={data.configs}
-                effective={data.effective}
-                featuresByRole={featuresByRole}
-                currentTeamId={team?.id}
-                currentProjectId={project?.id}
-                enabledProviderKeys={enabledProviderKeys ?? null}
-              />
-            )}
-          </Card.Body>
-        </Card.Root>
-      )}
+      <Card.Root width="full" overflow="hidden">
+        <Card.Body paddingX={0} paddingY={0}>
+          {filter.kind === "all" ? (
+            <AllConfigsView
+              configs={data.configs}
+              features={data.features}
+              onEdit={openEdit}
+              onDelete={handleDelete}
+              onAdd={openAdd}
+              enabledProviderKeys={enabledProviderKeys ?? null}
+            />
+          ) : (
+            <ResolvedScopeView
+              filter={filter}
+              configs={data.configs}
+              effective={data.effective}
+              featuresByRole={featuresByRole}
+              currentTeamId={team?.id}
+              currentProjectId={project?.id}
+              enabledProviderKeys={enabledProviderKeys ?? null}
+            />
+          )}
+        </Card.Body>
+      </Card.Root>
 
       <DefaultModelOverrideDrawer
         open={drawerOpen}
@@ -320,7 +306,7 @@ function AllConfigsView({
             </EmptyState.Description>
             <Button
               size="sm"
-              colorPalette="orange"
+              variant="outline"
               onClick={onAdd}
               data-testid="empty-state-add-config"
             >
