@@ -385,6 +385,7 @@ export class StoredObjectsService {
         attributes: {
           "tenant.id": projectId,
           "stored_object.owner_kind": ownerKind,
+          // owner_id is customer-controlled (e.g. scenarioRunId). Acceptable here because tenant_id is also on the span and owner_id is low-entropy by design — operators running shared OTEL backends should be aware that this attribute is searchable across tenants if their backend doesn't enforce tenant-scoped queries.
           "stored_object.owner_id": ownerId,
         },
       },
