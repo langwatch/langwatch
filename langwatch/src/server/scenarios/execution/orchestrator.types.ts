@@ -29,8 +29,12 @@ export interface ScenarioRepository {
 export interface ProjectRepository {
   getProject(projectId: string): Promise<{
     apiKey: string;
-    defaultModel: string | null;
   } | null>;
+}
+
+/** Resolves a project's default model for a given feature key via the cascade. */
+export interface ModelResolver {
+  resolve(featureKey: string, projectId: string): Promise<string>;
 }
 
 /** Creates target adapters */
@@ -73,6 +77,7 @@ export interface OrchestratorDependencies {
   scenarioRepository: ScenarioRepository;
   projectRepository: ProjectRepository;
   modelParamsProvider: ModelParamsProvider;
+  modelResolver: ModelResolver;
   adapterFactory: AdapterFactory;
   tracerFactory: TracerFactory;
   scenarioExecutor: ScenarioExecutor;

@@ -17,6 +17,7 @@ import { normalizeToSnakeCase } from "~/optimization_studio/components/propertie
 import { DEFAULT_MODEL } from "~/utils/constants";
 import { createLogger } from "~/utils/logger/server";
 import { getInputsOutputs } from "../../../optimization_studio/utils/nodeUtils";
+import { resolveModelForFeature } from "../../modelProviders/resolveModelForFeature";
 import { validateWorkflowAgentMappings } from "./validate-workflow-mappings";
 
 const logger = createLogger("langwatch:scenarios:data-prefetcher");
@@ -87,8 +88,16 @@ export interface WorkflowVersionFetcher {
 export interface ProjectFetcher {
   findUnique(projectId: string): Promise<{
     apiKey: string | null;
-    defaultModel: string | null;
   } | null>;
+}
+
+/**
+ * Minimal interface for resolving the DEFAULT model at a project's
+ * cascade. Throws ModelNotConfiguredError when nothing is set; the
+ * prefetcher catches and returns a structured failure to the caller.
+ */
+export interface ModelResolver {
+  resolve(featureKey: string, projectId: string): Promise<string>;
 }
 
 /**
@@ -127,6 +136,7 @@ export interface DataPrefetcherDependencies {
   workflowVersionFetcher: WorkflowVersionFetcher;
   projectFetcher: ProjectFetcher;
   modelParamsProvider: ModelParamsProvider;
+  modelResolver: ModelResolver;
   projectSecretsFetcher: ProjectSecretsFetcher;
 }
 
@@ -217,11 +227,27 @@ export async function prefetchScenarioData(
     };
   }
 
-  // When target is a prompt, use the prompt's configured model for fetching model params
-  const modelForParams =
-    adapterData.type === "prompt" && adapterData.model
-      ? adapterData.model
-      : project.defaultModel;
+  // When target is a prompt, use the prompt's configured model for
+  // fetching model params. Otherwise resolve the project's DEFAULT
+  // model via the cascade. ModelNotConfiguredError bubbles as a
+  // structured failure with the "model not configured" message.
+  let modelForParams: string;
+  if (adapterData.type === "prompt" && adapterData.model) {
+    modelForParams = adapterData.model;
+  } else {
+    try {
+      modelForParams = await deps.modelResolver.resolve(
+        "scenarios.generator",
+        context.projectId,
+      );
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : "No default model configured for this project";
+      return { success: false, error: message };
+    }
+  }
   const modelParamsResult = await deps.modelParamsProvider.prepare(
     context.projectId,
     modelForParams,
@@ -278,7 +304,7 @@ async function fetchScenario(
 }
 
 type FetchProjectResult =
-  | { success: true; data: { apiKey: string; defaultModel: string } }
+  | { success: true; data: { apiKey: string } }
   | { success: false; error: string };
 
 async function fetchProject(
@@ -292,14 +318,7 @@ async function fetchProject(
   if (!project.apiKey) {
     return { success: false, error: `Project ${projectId} missing API key` };
   }
-  // Fall back to DEFAULT_MODEL like the rest of the app does
-  return {
-    success: true,
-    data: {
-      apiKey: project.apiKey,
-      defaultModel: project.defaultModel ?? DEFAULT_MODEL,
-    },
-  };
+  return { success: true, data: { apiKey: project.apiKey } };
 }
 
 /** Failure result propagated from hydrateLlmParameters through the fetch chain */
@@ -782,8 +801,17 @@ export function createDataPrefetcherDependencies(): DataPrefetcherDependencies {
       findUnique: async (projectId) =>
         prisma.project.findUnique({
           where: { id: projectId },
-          select: { apiKey: true, defaultModel: true },
+          select: { apiKey: true },
         }),
+    },
+    modelResolver: {
+      resolve: async (featureKey, projectId) => {
+        const resolved = await resolveModelForFeature(featureKey, {
+          prisma,
+          projectId,
+        });
+        return resolved.model;
+      },
     },
     projectSecretsFetcher: {
       getSecrets: async (projectId) => {

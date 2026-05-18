@@ -1,6 +1,5 @@
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { env } from "../../env.mjs";
-import { DEFAULT_MODEL } from "../../utils/constants";
 import {
   getProjectModelProviders,
   prepareLitellmParams,
@@ -8,8 +7,24 @@ import {
 import { prisma } from "../db";
 import { nlpgoProxyBaseURL } from "../nlpgo/nlpgoFetch";
 import type { MaybeStoredModelProvider } from "./registry";
+import { resolveModelForFeature } from "./resolveModelForFeature";
 
-export const getVercelAIModel = async (projectId: string, model?: string) => {
+/**
+ * Returns a Vercel AI SDK model handle for the given project + feature.
+ *
+ * Resolution: an explicit `model` argument wins. Otherwise the cascade
+ * resolver returns whatever model the given feature key resolves to at
+ * the project's scope chain; without a feature key we default to
+ * `prompt.create_default` since that's the canonical DEFAULT role
+ * surface. If nothing resolves, the resolver throws
+ * `ModelNotConfiguredError` and the surrounding tRPC interceptor maps
+ * it to a sticky toast prompting the user to configure a default.
+ */
+export const getVercelAIModel = async (
+  projectId: string,
+  model?: string,
+  featureKey: string = "prompt.create_default",
+) => {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
   });
@@ -20,10 +35,10 @@ export const getVercelAIModel = async (projectId: string, model?: string) => {
 
   const modelProviders = await getProjectModelProviders(projectId);
 
-  const model_ = resolveModel({
+  const model_ = await resolveModel({
     explicit: model,
-    projectDefault: project.defaultModel,
-    fallback: DEFAULT_MODEL,
+    projectId,
+    featureKey,
     modelProviders,
   });
 
@@ -72,38 +87,43 @@ export const getVercelAIModel = async (projectId: string, model?: string) => {
   return vercelProvider(model_);
 };
 
-function resolveModel({
+async function resolveModel({
   explicit,
-  projectDefault,
-  fallback,
+  projectId,
+  featureKey,
   modelProviders,
 }: {
   explicit: string | undefined;
-  projectDefault: string | null | undefined;
-  fallback: string;
+  projectId: string;
+  featureKey: string;
   modelProviders: Record<string, MaybeStoredModelProvider>;
-}): string {
-  // 1. Explicit model always wins
+}): Promise<string> {
+  // 1. Explicit model always wins.
   if (explicit) return explicit;
 
-  // 2. Project default — only if its provider is configured
-  if (projectDefault) {
-    const providerKey = projectDefault.split("/")[0] ?? "";
-    if (modelProviders[providerKey]?.enabled) return projectDefault;
+  // 2. Cascade-resolved default for the given feature key. Throws
+  //    ModelNotConfiguredError when nothing is set at any scope.
+  try {
+    const resolved = await resolveModelForFeature(featureKey, {
+      prisma,
+      projectId,
+    });
+    const providerKey = resolved.model.split("/")[0] ?? "";
+    if (modelProviders[providerKey]?.enabled) return resolved.model;
+  } catch {
+    // Fall through to the "any enabled provider" rescue below; the
+    // caller's tRPC interceptor handles the empty-cascade case
+    // separately via ModelNotConfiguredError on the route boundary.
   }
 
-  // 3. Hardcoded fallback — only if its provider is configured
-  const fallbackProvider = fallback.split("/")[0] ?? "";
-  if (modelProviders[fallbackProvider]?.enabled) return fallback;
-
-  // 4. Find any enabled provider with a custom model
+  // 3. Find any enabled provider with a usable custom model.
   for (const [key, provider] of Object.entries(modelProviders)) {
     if (provider.enabled && provider.customModels?.length) {
       return `${key}/${provider.customModels[0]?.modelId ?? ""}`;
     }
   }
 
-  // 5. Nothing available — distinguish "none configured" from "all disabled"
+  // 4. Nothing available, distinguish "none configured" from "all disabled".
   if (Object.keys(modelProviders).length > 0) {
     throw new Error(
       "All configured model providers are disabled or have no usable models. Go to Settings → Model Providers to enable one or add a model.",
