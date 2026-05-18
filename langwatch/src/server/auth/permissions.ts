@@ -1,12 +1,13 @@
 import type { PrismaClient } from "@prisma/client";
-import { OrganizationUserRole } from "@prisma/client";
-import { LiteMemberRestrictedError } from "~/server/app-layer/permissions/errors";
 import type { Permission } from "~/server/api/rbac";
-import { resolveProjectPermission } from "~/server/api/rbac";
-import type { Session } from "~/server/auth";
+import { PermissionsService } from "~/server/app-layer/permissions/permissions.service";
 
 /**
  * Asserts that a user holds the given permission on a project.
+ *
+ * Thin wrapper around {@link PermissionsService#requireProjectPermission} that
+ * accepts a caller-supplied Prisma client, keeping backward compatibility with
+ * existing call sites that pass `prisma` as a named parameter.
  *
  * Pure async function — no tRPC dependency. Safe to call from Hono routes,
  * background workers, or any other non-tRPC surface.
@@ -31,24 +32,6 @@ export async function requireProjectPermission({
   permission: Permission;
   prisma: PrismaClient;
 }): Promise<void> {
-  const ctx = {
-    prisma,
-    // Minimal session shape — resolveProjectPermission only accesses user.id.
-    // Other Session fields (expires, sessionId, etc.) are not read by the
-    // permission resolver, so we satisfy the interface with an empty expires.
-    session: { user: { id: userId }, expires: "" } satisfies Session,
-  };
-
-  const { permitted, organizationRole } = await resolveProjectPermission(
-    ctx,
-    projectId,
-    permission,
-  );
-
-  if (!permitted) {
-    if (organizationRole === OrganizationUserRole.EXTERNAL) {
-      throw new LiteMemberRestrictedError(permission.split(":")[0] ?? "unknown");
-    }
-    throw new Error("You do not have permission to access this project resource");
-  }
+  const service = new PermissionsService(prisma);
+  return service.requireProjectPermission({ userId, projectId, permission });
 }
