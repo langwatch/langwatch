@@ -33,12 +33,16 @@ import {
   Heading,
   HStack,
   IconButton,
-  Menu,
   Spinner,
   Table,
   Text,
   VStack,
 } from "@chakra-ui/react";
+// Wrapped Menu uses a Portal under the hood so Menu.Content overlays
+// the page instead of rendering inline inside the <td>, which would
+// push the row's other cells to a wrapped line on open (caught on
+// 2026-05-18 dogfood, Image #118).
+import { Menu } from "../ui/menu";
 import {
   Building2,
   Edit,

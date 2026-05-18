@@ -250,7 +250,7 @@ export function ScopeChipPicker({
   const dropdownVisible = !showQuickPicks || multipleMode;
 
   return (
-    <VStack align="start" width="full" gap={1}>
+    <VStack align="start" width="full" gap={1.5}>
       {label && <SmallLabel>{label}</SmallLabel>}
       {showQuickPicks && quickPicks.length > 0 && (
         <Wrap gap={2} role="group" aria-label="Quick scope">

@@ -230,8 +230,7 @@ export const EditModelProviderForm = ({
           </Box>
           <Field.HelperText>
             Distinguish multiple instances (e.g. "OpenAI – EU prod" vs
-            "OpenAI – Dev"). Shown in the provider list and model
-            selectors.
+            "OpenAI – Dev").
           </Field.HelperText>
         </Field.Root>
 

@@ -128,7 +128,7 @@ export function ProviderScopeSection({
   // state machine. Tight gap between label + chips matches rchaves's
   // 2026-05-18 polish ask.
   return (
-    <VStack align="start" width="full" gap={1}>
+    <VStack align="start" width="full" gap={1.5}>
       <SmallLabel>Scope</SmallLabel>
       <ScopeChipPicker
         value={state.scopes}
