@@ -326,6 +326,14 @@ export const IOViewer = memo(function IOViewer({
   // gray box around the input, why does it exist?". Applies whether
   // we're rendering the input history or the output reply.
   const flushChatCard = format === "pretty" && isChat;
+  // Rendered markdown paints its own typography (headings, paragraphs,
+  // fenced code blocks, etc.) — the outer "bg.subtle + border" container
+  // makes the whole thing read as one giant code block, with the real
+  // fenced code blocks nested inside a near-identical box. Drop the
+  // outer chrome so prose looks like prose and code looks like code.
+  // Source mode (raw markdown text) keeps the box since it IS just text.
+  const flushMarkdown = format === "markdown" && markdownSubmode === "rendered";
+  const flushOuter = flushChatCard || flushMarkdown;
 
   // Track whether the preview box's content actually exceeds its visible
   // height. The "Click to interact" scrim only makes sense when there's
@@ -481,18 +489,18 @@ export const IOViewer = memo(function IOViewer({
                 the outer edge. */}
             <Box
               ref={previewBoxRef}
-              bg={flushChatCard ? "transparent" : "bg.subtle"}
-              borderRadius={flushChatCard ? "0" : "md"}
-              borderWidth={flushChatCard ? "0" : "1px"}
+              bg={flushOuter ? "transparent" : "bg.subtle"}
+              borderRadius={flushOuter ? "0" : "md"}
+              borderWidth={flushOuter ? "0" : "1px"}
               borderColor="border"
-              overflowX={flushChatCard ? "visible" : "auto"}
+              overflowX={flushOuter ? "visible" : "auto"}
               overflowY="visible"
               opacity={1}
               transition="opacity 120ms ease-out"
             >
               <Box
                 padding={
-                  flushChatCard
+                  flushOuter
                     ? 0
                     : format === "markdown" || isVirtualizingChat
                       ? 0
