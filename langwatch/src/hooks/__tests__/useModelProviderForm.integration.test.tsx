@@ -311,7 +311,11 @@ describe("useModelProviderForm()", () => {
   });
 
   describe("useAsDefaultProvider toggle", () => {
-    it("auto-enables when provider is used for default model", () => {
+    it("auto-enables when this is the only enabled provider", () => {
+      // With the legacy project.defaultModel column gone, the only
+      // remaining auto-enable trigger is "first-provider setup": when
+      // this is the only enabled provider in the org. Any other
+      // scenario requires explicit user opt-in via the toggle.
       const provider = createOpenAIProvider({ enabled: true });
       const project = { defaultModel: "openai/gpt-4o" };
 
@@ -320,16 +324,16 @@ describe("useModelProviderForm()", () => {
           provider,
           projectId: "test-project-id",
           project,
-          enabledProvidersCount: 2,
+          enabledProvidersCount: 1,
         }),
       );
 
       expect(result.current[0].useAsDefaultProvider).toBe(true);
     });
 
-    it("does not auto-enable when different provider is default", () => {
+    it("does not auto-enable when more than one provider is already enabled", () => {
       const provider = createOpenAIProvider({ enabled: true });
-      const project = { defaultModel: "anthropic/claude-sonnet-4" };
+      const project = { defaultModel: "openai/gpt-4o" };
 
       const { result } = renderHook(() =>
         useModelProviderForm({
@@ -823,7 +827,12 @@ describe("useModelProviderForm()", () => {
       expect(result.current[0].useAsDefaultProvider).toBe(true);
     });
 
-    it("resolves projectDefaultModel to provider model", () => {
+    it("starts projectDefaultModel as null; selector picks fill it later", () => {
+      // With the legacy default-model columns gone, the form no longer
+      // pre-fills the selector from project.defaultModel. The drawer's
+      // ModelProviderDefaultSection picks a flagship from
+      // modelSelectorOptions when the "Use as default" toggle flips
+      // on. From the hook's perspective the field starts null.
       const provider: MaybeStoredModelProvider = {
         provider: "azure",
         enabled: false,
@@ -834,7 +843,6 @@ describe("useModelProviderForm()", () => {
         deploymentMapping: null,
         extraHeaders: [],
       };
-      // Project default is openai, which does not match azure
       const project = { defaultModel: "openai/gpt-5.2" };
 
       const { result } = renderHook(() =>
@@ -846,42 +854,13 @@ describe("useModelProviderForm()", () => {
         }),
       );
 
-      // Should resolve to first stored model from the azure provider
-      expect(result.current[0].projectDefaultModel).toBe("azure/gpt-4o");
-    });
-
-    it("keeps existing default model when it already matches provider", () => {
-      const provider: MaybeStoredModelProvider = {
-        provider: "azure",
-        enabled: false,
-        customKeys: null,
-        models: ["gpt-4o", "gpt-4-turbo"],
-        embeddingsModels: null,
-        disabledByDefault: true,
-        deploymentMapping: null,
-        extraHeaders: [],
-      };
-      // Project default already starts with azure/
-      const project = { defaultModel: "azure/gpt-4-turbo" };
-
-      const { result } = renderHook(() =>
-        useModelProviderForm({
-          provider,
-          projectId: "test-project-id",
-          project,
-          enabledProvidersCount: 1,
-        }),
-      );
-
-      // Should keep the existing azure model, not override with first stored model
-      expect(result.current[0].projectDefaultModel).toBe("azure/gpt-4-turbo");
+      expect(result.current[0].projectDefaultModel).toBeNull();
     });
   });
 
   describe("when enabledProvidersCount is greater than 1", () => {
     it("does not auto-enable useAsDefaultProvider", () => {
       const provider = createOpenAIProvider({ enabled: false });
-      // Project default model is anthropic, NOT openai
       const project = { defaultModel: "anthropic/claude-sonnet-4" };
 
       const { result } = renderHook(() =>
@@ -894,33 +873,6 @@ describe("useModelProviderForm()", () => {
       );
 
       expect(result.current[0].useAsDefaultProvider).toBe(false);
-    });
-
-    it("does not resolve models to provider", () => {
-      const provider: MaybeStoredModelProvider = {
-        provider: "azure",
-        enabled: false,
-        customKeys: null,
-        models: ["gpt-4o"],
-        embeddingsModels: null,
-        disabledByDefault: true,
-        deploymentMapping: null,
-        extraHeaders: [],
-      };
-      // Project default is openai, which does not match azure
-      const project = { defaultModel: "openai/gpt-5.2" };
-
-      const { result } = renderHook(() =>
-        useModelProviderForm({
-          provider,
-          projectId: "test-project-id",
-          project,
-          enabledProvidersCount: 2,
-        }),
-      );
-
-      // Should stay as-is since enabledProvidersCount > 1
-      expect(result.current[0].projectDefaultModel).toBe("openai/gpt-5.2");
     });
   });
 
