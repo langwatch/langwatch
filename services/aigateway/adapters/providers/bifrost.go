@@ -32,6 +32,11 @@ import (
 type BifrostRouter struct {
 	bf     *bifrost.Bifrost
 	logger *zap.Logger
+	// voyageClient is the single HTTP client reused for every direct
+	// Voyage request so connection pooling actually works. Building a
+	// new http.Client per request would defeat keep-alive and risk
+	// port exhaustion under embedding throughput.
+	voyageClient *http.Client
 }
 
 // BifrostOptions configures the bifrost router.
@@ -54,7 +59,11 @@ func NewBifrostRouter(ctx context.Context, opts BifrostOptions) (*BifrostRouter,
 	if err != nil {
 		return nil, fmt.Errorf("bifrost init: %w", err)
 	}
-	return &BifrostRouter{bf: bf, logger: opts.Logger}, nil
+	return &BifrostRouter{
+		bf:           bf,
+		logger:       opts.Logger,
+		voyageClient: &http.Client{Timeout: 60 * time.Second},
+	}, nil
 }
 
 // Close releases the underlying Bifrost connection pool. Safe to call
@@ -306,8 +315,7 @@ func (r *BifrostRouter) dispatchVoyageDirect(
 	httpReq.Header.Set("Authorization", "Bearer "+cred.APIKey)
 	httpReq.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{Timeout: 60 * time.Second}
-	resp, err := client.Do(httpReq)
+	resp, err := r.voyageClient.Do(httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("voyage direct dispatch: %w", err)
 	}
