@@ -13,7 +13,7 @@ import { LlmConfigRepository } from "./llm-config.repository";
 import {
   getVersionValidator,
   type LatestConfigVersionSchema,
-  parseRuntimeConfig,
+  parseRuntimeParameters,
 } from "./llm-config-version-schema";
 
 /**
@@ -23,7 +23,7 @@ export type LlmConfigVersionDTO = Omit<LatestConfigVersionSchema, "version">;
 
 export type CreateLlmConfigVersionParams = Omit<
   LlmPromptConfigVersion,
-  "id" | "author" | "config" | "createdAt" | "configData" | "name" | "runtimeConfig"
+  "id" | "author" | "config" | "createdAt" | "configData" | "name" | "runtimeParameters"
 > & {
   configData: LatestConfigVersionSchema["configData"];
 };
@@ -177,7 +177,7 @@ export class LlmConfigVersionsRepository {
    */
   async createVersion(params: {
     versionData: Omit<LlmConfigVersionDTO, "author" | "id" | "createdAt"> & {
-      runtimeConfig?: Record<string, unknown>;
+      runtimeParameters?: Record<string, unknown>;
     };
     organizationId: string;
   }): Promise<LlmPromptConfigVersion & { schemaVersion: SchemaVersion }> {
@@ -224,15 +224,15 @@ export class LlmConfigVersionsRepository {
       const nextVersion = (maxVersion._max.version ?? -1) + 1;
 
       // Create the new version
-      const { runtimeConfig, ...restVersionData } = versionData;
+      const { runtimeParameters, ...restVersionData } = versionData;
       const newVersion = await tx.llmPromptConfigVersion.create({
         data: {
           ...restVersionData,
           id: `prompt_version_${nanoid()}`,
           version: nextVersion,
           configData: restVersionData.configData as Prisma.InputJsonValue,
-          runtimeConfig:
-            (runtimeConfig as Prisma.InputJsonValue) ?? {},
+          runtimeParameters:
+            (runtimeParameters as Prisma.InputJsonValue) ?? {},
         },
       });
 
@@ -279,8 +279,8 @@ export class LlmConfigVersionsRepository {
         commitMessage: `Restore from version ${version.version}`,
         schemaVersion: version.schemaVersion as SchemaVersion,
         configData: version.configData as LlmConfigVersionDTO["configData"],
-        runtimeConfig:
-          parseRuntimeConfig(version.runtimeConfig),
+        runtimeParameters:
+          parseRuntimeParameters(version.runtimeParameters),
       },
       organizationId,
     });

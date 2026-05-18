@@ -19,7 +19,7 @@ import type { VersionedPrompt } from "~/server/prompt-config";
 import { PromptConfigProvider } from "../../providers/PromptConfigProvider";
 import { DemonstrationsField } from "../fields/DemonstrationsField";
 import { ModelSelectField } from "../fields/ModelSelectField";
-import { RuntimeConfigField } from "../fields/RuntimeConfigField";
+import { RuntimeParametersField } from "../fields/RuntimeParametersField";
 import { PromptMessagesField } from "../fields/message-history-fields/PromptMessagesField";
 import { PromptHandleInfo } from "./components/PromptHandleInfo";
 import { VersionHistoryButton } from "./components/VersionHistoryButton";
@@ -39,13 +39,13 @@ function InnerPromptConfigForm() {
   const [isSaving, setIsSaving] = useState(false);
   const configId = methods.watch("configId");
   const isDraft = !Boolean(methods.watch("handle"));
-  const hasRuntimeConfigError = Boolean(
-    methods.formState.errors.version?.config,
+  const hasRuntimeParametersError = Boolean(
+    methods.formState.errors.version?.parameters,
   );
   const saveEnabled =
     (methods.formState.isDirty || isDraft) &&
     !isSaving &&
-    !hasRuntimeConfigError;
+    !hasRuntimeParametersError;
 
   /**
    * It is a known limitation of react-hook-form useFieldArray that we cannot
@@ -68,7 +68,7 @@ function InnerPromptConfigForm() {
   const handleSaveClick = useCallback(async () => {
     const isValid = await methods.trigger([
       "version.configData.llm",
-      "version.config",
+      "version.parameters",
     ]);
     if (!isValid) {
       toaster.create({
@@ -141,7 +141,7 @@ function InnerPromptConfigForm() {
             otherNodesFields={{}}
           />
           <FormVariablesSection showMappings={false} title="Variables" />
-          <RuntimeConfigField />
+          <RuntimeParametersField />
           {hasDemonstrations && <DemonstrationsField />}
         </VStack>
         <HStack

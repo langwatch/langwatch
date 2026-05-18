@@ -158,11 +158,11 @@ def test_from_api_response_extracts_runtime_config():
     mock_response.max_tokens = None
     mock_response.messages = []
     mock_response.response_format = None
-    mock_response.config = {"sdk": True}
+    mock_response.parameters = {"sdk": True}
 
     result = PromptData.from_api_response(mock_response)
 
-    assert result.config == {"sdk": True}
+    assert result.parameters == {"sdk": True}
 
 
 def test_from_api_response_defaults_missing_runtime_config_to_empty_dict():
@@ -184,4 +184,4 @@ def test_from_api_response_defaults_missing_runtime_config_to_empty_dict():
 
     result = PromptData.from_api_response(mock_response)
 
-    assert result.config == {}
+    assert result.parameters == {}

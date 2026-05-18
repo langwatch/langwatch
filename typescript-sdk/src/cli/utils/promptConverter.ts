@@ -1,7 +1,7 @@
 import type {
   LocalPromptConfig,
   MaterializedPrompt,
-  RuntimeConfig,
+  RuntimeParameters,
 } from "../types";
 import { type PromptResponse, type UpdatePromptBody } from "@/client-sdk/services/prompts/types";
 import {
@@ -37,7 +37,7 @@ export class PromptConverter {
       maxTokens: prompt.maxTokens,
       inputs: prompt.inputs,
       outputs: prompt.outputs,
-      config: prompt.config ?? {},
+      parameters: prompt.parameters ?? {},
       updatedAt: prompt.updatedAt,
     };
   }
@@ -57,15 +57,15 @@ export class PromptConverter {
       content: string;
     }>;
     response_format?: LocalResponseFormat;
-    config?: RuntimeConfig;
+    parameters?: RuntimeParameters;
   } {
     const result: any = {
       model: prompt.model,
       messages: prompt.messages,
     };
 
-    if (Object.keys(prompt.config ?? {}).length > 0) {
-      result.config = prompt.config;
+    if (Object.keys(prompt.parameters ?? {}).length > 0) {
+      result.parameters = prompt.parameters;
     }
 
     // Add modelParameters if temperature or maxTokens exist. The server is the
@@ -102,14 +102,14 @@ export class PromptConverter {
    */
   static fromLocalToApiFormat(
     config: LocalPromptConfig,
-  ): Omit<UpdatePromptBody, "commitMessage"> & { config?: RuntimeConfig }
+  ): Omit<UpdatePromptBody, "commitMessage"> & { parameters?: RuntimeParameters }
   {
     return {
       model: config.model,
       temperature: config.modelParameters?.temperature,
       maxTokens: config.modelParameters?.max_tokens,
       messages: config.messages,
-      config: config.config ?? {},
+      parameters: config.parameters ?? {},
     };
   }
 

@@ -1,2 +1,2 @@
 -- AlterTable
-ALTER TABLE "LlmPromptConfigVersion" ADD COLUMN "runtimeConfig" JSONB NOT NULL DEFAULT '{}';
+ALTER TABLE "LlmPromptConfigVersion" ADD COLUMN "runtimeParameters" JSONB NOT NULL DEFAULT '{}';

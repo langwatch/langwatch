@@ -1277,7 +1277,7 @@ model LlmPromptConfigVersion {
   configData    Json   @map("config") // The actual config JSON for this version
   schemaVersion String // Schema version for this specific configData
 
-  runtimeConfig Json @default("{}")
+  runtimeParameters Json @default("{}")
 
   createdAt DateTime @default(now()) // Used to determine the latest version
 

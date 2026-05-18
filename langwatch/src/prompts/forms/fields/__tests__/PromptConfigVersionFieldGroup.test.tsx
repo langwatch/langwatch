@@ -58,7 +58,7 @@ const TestWrapper = ({
   const methods = useForm<PromptConfigFormValues>({
     defaultValues: {
       version: {
-        config: {},
+        parameters: {},
         configData: {
           inputs: [],
           outputs: [{ identifier: "output", type: "str" }],
@@ -134,7 +134,7 @@ describe("PromptConfigVersionFieldGroup", () => {
     it("renders existing inputs", () => {
       renderInputsFieldGroup({
         version: {
-          config: {},
+          parameters: {},
           configData: {
             inputs: [
               { identifier: "question", type: "str" },
@@ -154,7 +154,7 @@ describe("PromptConfigVersionFieldGroup", () => {
     it("updates form value when editing input identifier", async () => {
       renderInputsFieldGroup({
         version: {
-          config: {},
+          parameters: {},
           configData: {
             inputs: [{ identifier: "question", type: "str" }],
             outputs: [{ identifier: "output", type: "str" }],
@@ -181,7 +181,7 @@ describe("PromptConfigVersionFieldGroup", () => {
     it("normalizes identifier with spaces to underscores", async () => {
       renderInputsFieldGroup({
         version: {
-          config: {},
+          parameters: {},
           configData: {
             inputs: [{ identifier: "test", type: "str" }],
             outputs: [{ identifier: "output", type: "str" }],
@@ -208,7 +208,7 @@ describe("PromptConfigVersionFieldGroup", () => {
     it("converts identifier to lowercase", async () => {
       renderInputsFieldGroup({
         version: {
-          config: {},
+          parameters: {},
           configData: {
             inputs: [{ identifier: "test", type: "str" }],
             outputs: [{ identifier: "output", type: "str" }],
@@ -236,7 +236,7 @@ describe("PromptConfigVersionFieldGroup", () => {
       const user = userEvent.setup();
       renderInputsFieldGroup({
         version: {
-          config: {},
+          parameters: {},
           configData: {
             inputs: [{ identifier: "input", type: "str" }],
             outputs: [{ identifier: "output", type: "str" }],
@@ -264,7 +264,7 @@ describe("PromptConfigVersionFieldGroup", () => {
       const user = userEvent.setup();
       renderInputsFieldGroup({
         version: {
-          config: {},
+          parameters: {},
           configData: {
             inputs: [
               { identifier: "question", type: "str" },
@@ -319,7 +319,7 @@ describe("PromptConfigVersionFieldGroup", () => {
     it("prevents deleting last output", async () => {
       renderOutputsFieldGroup({
         version: {
-          config: {},
+          parameters: {},
           configData: {
             inputs: [],
             outputs: [{ identifier: "result", type: "str" }],
@@ -348,7 +348,7 @@ describe("PromptConfigVersionFieldGroup", () => {
       const _user = userEvent.setup();
       renderOutputsFieldGroup({
         version: {
-          config: {},
+          parameters: {},
           configData: {
             inputs: [],
             outputs: [

@@ -6,7 +6,7 @@ import { useDebounceCallback } from "usehooks-ts";
 import { Tooltip } from "~/components/ui/tooltip";
 import { type Variable, VariablesSection } from "~/components/variables";
 import { transposeColumnsFirstToRowsFirstWithId } from "~/optimization_studio/utils/datasetUtils";
-import { RuntimeConfigReadonly } from "~/prompts/forms/fields/RuntimeConfigField";
+import { RuntimeParametersReadonly } from "~/prompts/forms/fields/RuntimeParametersField";
 import type { PromptConfigFormValues } from "~/prompts/types";
 import type { LlmConfigInputType } from "~/types";
 import { useDraggableTabsBrowserStore } from "../../../prompt-playground-store/DraggableTabsBrowserStore";
@@ -31,7 +31,7 @@ enum PromptTab {
   Conversation = "conversation",
   Variables = "variables",
   Demonstrations = "demonstrations",
-  Config = "config",
+  Parameters = "parameters",
 }
 
 export type PromptTabbedSectionProps = {
@@ -60,7 +60,7 @@ export function PromptTabbedSection({
   const form = useFormContext<PromptConfigFormValues>();
   const tabId = useTabId();
   const inputs = form.watch("version.configData.inputs") ?? [];
-  const runtimeConfig = form.watch("version.config") ?? {};
+  const runtimeParameters = form.watch("version.parameters") ?? {};
   const demonstrations = form.watch("version.configData.demonstrations");
 
   // Get variable values from persisted store
@@ -179,7 +179,7 @@ export function PromptTabbedSection({
               Demonstrations
             </Tabs.Trigger>
           )}
-          <Tabs.Trigger value={PromptTab.Config}>Config</Tabs.Trigger>
+          <Tabs.Trigger value={PromptTab.Parameters}>Parameters</Tabs.Trigger>
           <Tabs.Context>
             {(tabs) => (
               <>
@@ -285,7 +285,7 @@ export function PromptTabbedSection({
           </Tabs.Content>
         )}
         <Tabs.Content
-          value={PromptTab.Config}
+          value={PromptTab.Parameters}
           flex={1}
           width="full"
           height="full"
@@ -297,7 +297,7 @@ export function PromptTabbedSection({
             margin="0 auto"
             padding={3}
           >
-            <RuntimeConfigReadonly value={runtimeConfig} />
+            <RuntimeParametersReadonly value={runtimeParameters} />
           </Box>
         </Tabs.Content>
       </HStack>

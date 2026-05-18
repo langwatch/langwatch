@@ -31,8 +31,8 @@ import {
   LATEST_SCHEMA_VERSION,
   type LatestConfigVersionSchema,
   parseLlmConfigVersion,
-  parseRuntimeConfig,
-  runtimeConfigsEqual,
+  parseRuntimeParameters,
+  runtimeParametersEqual,
 } from "./repositories/llm-config-version-schema";
 import { mergeAutoDetectedInputs } from "./mergeAutoDetectedInputs";
 import {
@@ -110,7 +110,7 @@ export type VersionedPrompt = {
    * For versions endpoint, these are the tags pointing at the row's version.
    */
   tags: Array<{ name: string; versionId: string }>;
-  config: Record<string, unknown>;
+  parameters: Record<string, unknown>;
 };
 
 /**
@@ -330,7 +330,7 @@ export class PromptService {
 
     const versions = rawVersions.map((v) => ({
       ...parseLlmConfigVersion(v),
-      runtimeConfig: parseRuntimeConfig(v.runtimeConfig),
+      runtimeParameters: parseRuntimeParameters(v.runtimeParameters),
     }));
 
     const versionIds = versions
@@ -404,7 +404,7 @@ export class PromptService {
     promptingTechnique?: z.infer<typeof promptingTechniqueSchema>;
     demonstrations?: LatestConfigVersionSchema["configData"]["demonstrations"];
     commitMessage?: string | null;
-    config?: Record<string, unknown>;
+    parameters?: Record<string, unknown>;
   }): Promise<VersionedPrompt> {
     const organizationId =
       params.organizationId ??
@@ -490,7 +490,7 @@ export class PromptService {
             commitMessage: params.commitMessage ?? "Initial version",
             authorId: params.authorId ?? null,
             version: 1,
-            runtimeConfig: params.config ?? {},
+            runtimeParameters: params.parameters ?? {},
           }
         : undefined,
     });
@@ -563,8 +563,8 @@ export class PromptService {
     );
     const latestVersion = {
       ...parseLlmConfigVersion(latestVersionRaw),
-      runtimeConfig:
-        parseRuntimeConfig(latestVersionRaw.runtimeConfig),
+      runtimeParameters:
+        parseRuntimeParameters(latestVersionRaw.runtimeParameters),
     };
 
     const latestVersionId = latestVersion.id ?? "";
@@ -607,7 +607,7 @@ export class PromptService {
     projectId: string;
     data: {
       commitMessage: string;
-      config?: Record<string, unknown>;
+      parameters?: Record<string, unknown>;
     } & Partial<
       Omit<
         CreateLlmConfigParams &
@@ -625,7 +625,7 @@ export class PromptService {
     >;
   }): Promise<VersionedPrompt> {
     const { idOrHandle, projectId, data } = params;
-    const { handle, scope, commitMessage, config: incomingConfig, ...configDataUpdates } = data;
+    const { handle, scope, commitMessage, parameters: incomingParameters, ...configDataUpdates } = data;
 
     this.versionService.assertNoSystemPromptConflict(configDataUpdates);
 
@@ -668,10 +668,10 @@ export class PromptService {
         );
         const latestVersion = parseLlmConfigVersion(latestVersionRaw);
 
-        const resolvedConfig =
-          incomingConfig !== undefined
-            ? incomingConfig
-            : parseRuntimeConfig(latestVersionRaw.runtimeConfig);
+        const resolvedParameters =
+          incomingParameters !== undefined
+            ? incomingParameters
+            : parseRuntimeParameters(latestVersionRaw.runtimeParameters);
 
         // Create the new version with updated configData
         // Note: Even if only metadata (handle/scope) changed, we create a version
@@ -689,7 +689,7 @@ export class PromptService {
               }) as LatestConfigVersionSchema["configData"],
               schemaVersion: LATEST_SCHEMA_VERSION,
               version: latestVersion.version + 1,
-              runtimeConfig: resolvedConfig,
+              runtimeParameters: resolvedParameters,
             },
           });
 
@@ -702,7 +702,7 @@ export class PromptService {
             ...updatedConfig,
             latestVersion: {
               ...parseLlmConfigVersion(updatedVersion),
-              runtimeConfig: resolvedConfig,
+              runtimeParameters: resolvedParameters,
             },
           } as LlmConfigWithLatestVersion,
           newVersionId
@@ -817,7 +817,7 @@ export class PromptService {
     organizationId: string;
     authorId?: string;
     commitMessage?: string;
-    config?: Record<string, unknown>;
+    parameters?: Record<string, unknown>;
   }): Promise<{
     action: "created" | "updated" | "conflict" | "up_to_date";
     prompt?: VersionedPrompt;
@@ -826,7 +826,7 @@ export class PromptService {
       remoteVersion: number;
       differences: string[];
       remoteConfigData: ConfigData;
-      remoteConfig: Record<string, unknown>;
+      remoteParameters: Record<string, unknown>;
     };
   }> {
     const {
@@ -840,7 +840,7 @@ export class PromptService {
     } = params;
 
     // Must run before comparison/creation so both code paths use the merged inputs.
-    const resolvedConfigData = {
+    const resolvedParametersData = {
       ...localConfigData,
       inputs: mergeAutoDetectedInputs({
         prompt: localConfigData.prompt,
@@ -858,12 +858,12 @@ export class PromptService {
 
     // Case 1: Prompt doesn't exist on server - create new
     if (!existingPrompt) {
-      // Convert snake_case resolvedConfigData to camelCase for createPrompt,
+      // Convert snake_case resolvedParametersData to camelCase for createPrompt,
       // which internally calls transformToDbFormat. Without this conversion,
       // snake_case keys like max_tokens would be invisible to createPrompt's
       // named params (maxTokens), causing data loss.
       const camelCaseData = transformSnakeToCamel(
-        resolvedConfigData as unknown as Record<string, unknown>,
+        resolvedParametersData as unknown as Record<string, unknown>,
       );
 
       const createdPrompt = await this.createPrompt({
@@ -873,7 +873,7 @@ export class PromptService {
         scope: "PROJECT" as PromptScope,
         authorId,
         commitMessage: commitMessage ?? "Synced from local file",
-        config: params.config,
+        parameters: params.parameters,
         ...camelCaseData,
       });
 
@@ -945,16 +945,16 @@ export class PromptService {
     // Case 2: Same version - check content
     if (localVersion === remoteVersion) {
       const comparison = this.repository.compareConfigContent(
-        resolvedConfigData,
+        resolvedParametersData,
         remoteConfigData,
       );
 
-      const runtimeConfigEqual = runtimeConfigsEqual(
-        params.config,
-        existingPrompt.config,
+      const parametersEqual = runtimeParametersEqual(
+        params.parameters,
+        existingPrompt.parameters,
       );
 
-      if (comparison.isEqual && runtimeConfigEqual) {
+      if (comparison.isEqual && parametersEqual) {
         // Content is the same - up to date
         return { action: "up_to_date", prompt: existingPrompt };
       } else {
@@ -965,9 +965,9 @@ export class PromptService {
           data: {
             authorId,
             commitMessage: commitMessage ?? "Updated from local file",
-            ...this.transformToDbFormat(resolvedConfigData),
+            ...this.transformToDbFormat(resolvedParametersData),
             schemaVersion: SchemaVersion.V1_0,
-            config: params.config,
+            parameters: params.parameters,
           },
         });
 
@@ -990,7 +990,7 @@ export class PromptService {
 
       if (localBaseVersion) {
         const baseComparison = this.repository.compareConfigContent(
-          resolvedConfigData,
+          resolvedParametersData,
           localBaseVersion.configData as Record<string, unknown>,
         );
 
@@ -1008,11 +1008,11 @@ export class PromptService {
           remoteVersion,
           differences:
             this.repository.compareConfigContent(
-              resolvedConfigData,
+              resolvedParametersData,
               remoteConfigData,
             ).differences ?? [],
           remoteConfigData,
-          remoteConfig: existingPrompt.config ?? {},
+          remoteParameters: existingPrompt.parameters ?? {},
         },
       };
     }
@@ -1025,11 +1025,11 @@ export class PromptService {
         remoteVersion,
         differences:
           this.repository.compareConfigContent(
-            resolvedConfigData,
+            resolvedParametersData,
             remoteConfigData,
           ).differences ?? [],
         remoteConfigData,
-        remoteConfig: existingPrompt.config ?? {},
+        remoteParameters: existingPrompt.parameters ?? {},
       },
     };
   }
@@ -1130,7 +1130,7 @@ export class PromptService {
       copiedFromPromptId: config.copiedFromPromptId ?? null,
       _count: config._count ?? undefined,
       tags,
-      config: config.latestVersion.runtimeConfig ?? {},
+      parameters: config.latestVersion.runtimeParameters ?? {},
     };
   }
 

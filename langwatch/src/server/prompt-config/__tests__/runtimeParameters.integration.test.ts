@@ -6,7 +6,7 @@ import { projectFactory } from "~/factories/project.factory";
 import { PromptService, type VersionedPrompt } from "../prompt.service";
 import { SEEDED_TAGS } from "~/prompts/constants/tags";
 
-describe("Feature: Prompt runtime config", () => {
+describe("Feature: Prompt runtime parameters", () => {
   let testOrganization: Organization;
   let testTeam: Team;
   let testProject: Project;
@@ -71,10 +71,10 @@ describe("Feature: Prompt runtime config", () => {
 
   async function createPrompt({
     handle,
-    config,
+    parameters,
   }: {
     handle?: string;
-    config?: Record<string, unknown>;
+    parameters?: Record<string, unknown>;
   } = {}): Promise<VersionedPrompt> {
     return service.createPrompt({
       projectId: testProject.id,
@@ -82,39 +82,39 @@ describe("Feature: Prompt runtime config", () => {
       handle: handle ?? `prompt-${nanoid()}`,
       prompt: "You are a helpful assistant",
       model: "openai/gpt-5-mini",
-      config,
+      parameters,
     });
   }
 
-  describe("when creating a prompt with runtime config", () => {
-    /** @scenario Creating a prompt stores the supplied runtime config */
-    it("stores the supplied runtime config", async () => {
-      const config = {
+  describe("when creating a prompt with runtime parameters", () => {
+    /** @scenario Creating a prompt stores the supplied runtime parameters */
+    it("stores the supplied runtime parameters", async () => {
+      const params = {
         search_iterations: 3,
         confidence_threshold: 0.85,
       };
 
-      const prompt = await createPrompt({ config });
+      const prompt = await createPrompt({ parameters: params });
 
-      expect(prompt.config).toEqual(config);
+      expect(prompt.parameters).toEqual(params);
       expect(prompt.version).toBe(1);
     });
   });
 
-  describe("when creating a prompt without runtime config", () => {
-    /** @scenario Creating a prompt without runtime config returns an empty config object */
-    it("returns an empty config object", async () => {
+  describe("when creating a prompt without runtime parameters", () => {
+    /** @scenario Creating a prompt without runtime parameters returns an empty parameters object */
+    it("returns an empty parameters object", async () => {
       const prompt = await createPrompt();
 
-      expect(prompt.config).toEqual({});
+      expect(prompt.parameters).toEqual({});
     });
   });
 
-  describe("when updating only runtime config", () => {
-    /** @scenario Updating only runtime config creates a new prompt version */
+  describe("when updating only runtime parameters", () => {
+    /** @scenario Updating only runtime parameters creates a new prompt version */
     it("creates a new prompt version", async () => {
       const prompt = await createPrompt({
-        config: { search_iterations: 3 },
+        parameters: { search_iterations: 3 },
       });
 
       const updated = await service.updatePrompt({
@@ -122,20 +122,20 @@ describe("Feature: Prompt runtime config", () => {
         projectId: testProject.id,
         data: {
           commitMessage: "Tune search",
-          config: { search_iterations: 5 },
+          parameters: { search_iterations: 5 },
         },
       });
 
       expect(updated.version).toBe(2);
-      expect(updated.config).toEqual({ search_iterations: 5 });
+      expect(updated.parameters).toEqual({ search_iterations: 5 });
     });
   });
 
-  describe("when updating prompt content without runtime config", () => {
-    /** @scenario Updating prompt content without runtime config preserves the previous config */
-    it("preserves the previous config", async () => {
+  describe("when updating prompt content without runtime parameters", () => {
+    /** @scenario Updating prompt content without runtime parameters preserves the previous parameters */
+    it("preserves the previous parameters", async () => {
       const prompt = await createPrompt({
-        config: { confidence_threshold: 0.9 },
+        parameters: { confidence_threshold: 0.9 },
       });
 
       const updated = await service.updatePrompt({
@@ -148,17 +148,17 @@ describe("Feature: Prompt runtime config", () => {
       });
 
       expect(updated.version).toBe(2);
-      expect(updated.config).toEqual({ confidence_threshold: 0.9 });
+      expect(updated.parameters).toEqual({ confidence_threshold: 0.9 });
     });
   });
 
   describe("when fetching prompts by tag and version", () => {
-    /** @scenario Fetching prompts returns the selected version config */
-    it("returns the config for the tagged version", async () => {
+    /** @scenario Fetching prompts returns the selected version parameters */
+    it("returns the parameters for the tagged version", async () => {
       const handle = `tagged-prompt-${nanoid()}`;
       const prompt = await createPrompt({
         handle,
-        config: { environment: "production" },
+        parameters: { environment: "production" },
       });
 
       await service.updatePrompt({
@@ -166,7 +166,7 @@ describe("Feature: Prompt runtime config", () => {
         projectId: testProject.id,
         data: {
           commitMessage: "v2",
-          config: { environment: "staging" },
+          parameters: { environment: "staging" },
         },
       });
 
@@ -185,14 +185,14 @@ describe("Feature: Prompt runtime config", () => {
       });
 
       expect(fetched?.version).toBe(1);
-      expect(fetched?.config).toEqual({ environment: "production" });
+      expect(fetched?.parameters).toEqual({ environment: "production" });
     });
 
-    it("returns the config for a specific version number", async () => {
+    it("returns the parameters for a specific version number", async () => {
       const handle = `versioned-prompt-${nanoid()}`;
       const prompt = await createPrompt({
         handle,
-        config: { environment: "production" },
+        parameters: { environment: "production" },
       });
 
       await service.updatePrompt({
@@ -200,7 +200,7 @@ describe("Feature: Prompt runtime config", () => {
         projectId: testProject.id,
         data: {
           commitMessage: "v2",
-          config: { environment: "staging" },
+          parameters: { environment: "staging" },
         },
       });
 
@@ -212,17 +212,17 @@ describe("Feature: Prompt runtime config", () => {
       });
 
       expect(fetched?.version).toBe(2);
-      expect(fetched?.config).toEqual({ environment: "staging" });
+      expect(fetched?.parameters).toEqual({ environment: "staging" });
     });
   });
 
   describe("when listing prompt versions", () => {
-    /** @scenario Listing prompt versions returns each version config */
-    it("returns each version with its own config", async () => {
+    /** @scenario Listing prompt versions returns each version parameters */
+    it("returns each version with its own parameters", async () => {
       const handle = `multi-version-${nanoid()}`;
       const prompt = await createPrompt({
         handle,
-        config: { schema: "v1" },
+        parameters: { schema: "v1" },
       });
 
       await service.updatePrompt({
@@ -230,7 +230,7 @@ describe("Feature: Prompt runtime config", () => {
         projectId: testProject.id,
         data: {
           commitMessage: "Schema v2",
-          config: { schema: "v2" },
+          parameters: { schema: "v2" },
         },
       });
 
@@ -243,18 +243,18 @@ describe("Feature: Prompt runtime config", () => {
       const v1 = versions.find((v) => v.version === 1);
       const v2 = versions.find((v) => v.version === 2);
 
-      expect(v1?.config).toEqual({ schema: "v1" });
-      expect(v2?.config).toEqual({ schema: "v2" });
+      expect(v1?.parameters).toEqual({ schema: "v1" });
+      expect(v2?.parameters).toEqual({ schema: "v2" });
     });
   });
 
   describe("when restoring a prompt version", () => {
-    /** @scenario Restoring a prompt version carries forward that version config */
-    it("carries forward that version config", async () => {
+    /** @scenario Restoring a prompt version carries forward that version parameters */
+    it("carries forward that version parameters", async () => {
       const handle = `restore-prompt-${nanoid()}`;
       const prompt = await createPrompt({
         handle,
-        config: { restored: true },
+        parameters: { restored: true },
       });
 
       const v1VersionId = prompt.versionId;
@@ -264,7 +264,7 @@ describe("Feature: Prompt runtime config", () => {
         projectId: testProject.id,
         data: {
           commitMessage: "v2",
-          config: { restored: false },
+          parameters: { restored: false },
         },
       });
 
@@ -275,13 +275,13 @@ describe("Feature: Prompt runtime config", () => {
       });
 
       expect(restored.version).toBe(3);
-      expect(restored.config).toEqual({ restored: true });
+      expect(restored.parameters).toEqual({ restored: true });
     });
   });
 
-  describe("when syncing a local prompt with runtime config", () => {
-    /** @scenario Syncing a local prompt includes runtime config in the remote version */
-    it("includes runtime config in the created version", async () => {
+  describe("when syncing a local prompt with runtime parameters", () => {
+    /** @scenario Syncing a local prompt includes runtime parameters in the remote version */
+    it("includes runtime parameters in the created version", async () => {
       const handle = `sync-prompt-${nanoid()}`;
 
       const result = await service.syncPrompt({
@@ -297,17 +297,17 @@ describe("Feature: Prompt runtime config", () => {
           inputs: [{ identifier: "input", type: "str" as const }],
           outputs: [{ identifier: "output", type: "str" as const }],
         },
-        config: { local: true },
+        parameters: { local: true },
       });
 
       expect(result.action).toBe("created");
-      expect(result.prompt!.config).toEqual({ local: true });
+      expect(result.prompt!.parameters).toEqual({ local: true });
     });
   });
 
-  describe("when syncing a local prompt detects config conflicts", () => {
-    /** @scenario Syncing a local prompt detects runtime config conflicts */
-    it("creates a new version when config differs at the same version", async () => {
+  describe("when syncing a local prompt detects parameters conflicts", () => {
+    /** @scenario Syncing a local prompt detects runtime parameters conflicts */
+    it("creates a new version when parameters differ at the same version", async () => {
       const handle = `conflict-prompt-${nanoid()}`;
 
       const localConfigData = {
@@ -325,7 +325,7 @@ describe("Feature: Prompt runtime config", () => {
         projectId: testProject.id,
         organizationId: testOrganization.id,
         localConfigData,
-        config: { remote: true },
+        parameters: { remote: true },
       });
 
       const result = await service.syncPrompt({
@@ -334,17 +334,17 @@ describe("Feature: Prompt runtime config", () => {
         organizationId: testOrganization.id,
         localConfigData,
         localVersion: 1,
-        config: { local: true },
+        parameters: { local: true },
       });
 
       expect(result.action).toBe("updated");
-      expect(result.prompt!.config).toEqual({ local: true });
+      expect(result.prompt!.parameters).toEqual({ local: true });
     });
   });
 
-  describe("when config contains deeply nested values", () => {
+  describe("when parameters contain deeply nested values", () => {
     it("preserves nested structure through create and fetch", async () => {
-      const config = {
+      const params = {
         nested: {
           array: [1, true, { leaf: "value" }],
         },
@@ -356,7 +356,7 @@ describe("Feature: Prompt runtime config", () => {
         },
       };
 
-      const prompt = await createPrompt({ config });
+      const prompt = await createPrompt({ parameters: params });
 
       const fetched = await service.getPromptByIdOrHandle({
         idOrHandle: prompt.id,
@@ -364,7 +364,7 @@ describe("Feature: Prompt runtime config", () => {
         organizationId: testOrganization.id,
       });
 
-      expect(fetched?.config).toEqual(config);
+      expect(fetched?.parameters).toEqual(params);
     });
   });
 });

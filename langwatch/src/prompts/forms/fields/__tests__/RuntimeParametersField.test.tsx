@@ -7,25 +7,25 @@ import userEvent from "@testing-library/user-event";
 import { FormProvider, useForm, useFormContext } from "react-hook-form";
 import { describe, expect, it } from "vitest";
 import type { PromptConfigFormValues } from "~/prompts/types";
-import { RuntimeConfigField } from "../RuntimeConfigField";
+import { RuntimeParametersField } from "../RuntimeParametersField";
 
 function FormValueProbe() {
   const methods = useFormContext<PromptConfigFormValues>();
   return (
-    <output data-testid="config-value">
-      {JSON.stringify(methods.watch("version.config"))}
+    <output data-testid="parameters-value">
+      {JSON.stringify(methods.watch("version.parameters"))}
     </output>
   );
 }
 
-function renderRuntimeConfigField(initialConfig: Record<string, unknown> = {}) {
+function renderRuntimeParametersField(initialParameters: Record<string, unknown> = {}) {
   function Wrapper() {
     const methods = useForm<PromptConfigFormValues>({
       defaultValues: {
         handle: "search-agent",
         scope: "PROJECT",
         version: {
-          config: initialConfig,
+          parameters: initialParameters,
           configData: {
             llm: { model: "openai/gpt-4o" },
             messages: [],
@@ -39,7 +39,7 @@ function renderRuntimeConfigField(initialConfig: Record<string, unknown> = {}) {
     return (
       <ChakraProvider value={defaultSystem}>
         <FormProvider {...methods}>
-          <RuntimeConfigField />
+          <RuntimeParametersField />
           <FormValueProbe />
         </FormProvider>
       </ChakraProvider>
@@ -49,17 +49,17 @@ function renderRuntimeConfigField(initialConfig: Record<string, unknown> = {}) {
   return render(<Wrapper />);
 }
 
-describe("<RuntimeConfigField />", () => {
+describe("<RuntimeParametersField />", () => {
   it("writes valid JSON object values to the form", async () => {
     /**
-     * @scenario Prompt editor saves runtime config from a JSON editor
+     * @scenario Prompt editor saves runtime parameters from a JSON editor
      */
     const user = userEvent.setup();
-    renderRuntimeConfigField();
+    renderRuntimeParametersField();
 
-    await user.click(screen.getByRole("button", { name: /runtime config/i }));
+    await user.click(screen.getByRole("button", { name: /runtime parameters/i }));
     const editor = screen.getByRole("textbox", {
-      name: /runtime config json/i,
+      name: /runtime parameters json/i,
     });
     fireEvent.change(editor, {
       target: {
@@ -67,22 +67,22 @@ describe("<RuntimeConfigField />", () => {
       },
     });
 
-    expect(screen.getByTestId("config-value")).toHaveTextContent(
+    expect(screen.getByTestId("parameters-value")).toHaveTextContent(
       '{"output_schema":{"type":"object"},"enabled":true}',
     );
   });
 
   it("shows a validation error for invalid JSON", async () => {
     /**
-     * @scenario Prompt editor blocks invalid runtime config JSON
+     * @scenario Prompt editor blocks invalid runtime parameters JSON
      */
     const user = userEvent.setup();
-    renderRuntimeConfigField();
+    renderRuntimeParametersField();
 
-    const triggers = screen.getAllByRole("button", { name: /runtime config/i });
+    const triggers = screen.getAllByRole("button", { name: /runtime parameters/i });
     await user.click(triggers[0]!);
     const editor = screen.getByRole("textbox", {
-      name: /runtime config json/i,
+      name: /runtime parameters json/i,
     });
     fireEvent.change(editor, { target: { value: "{invalid" } });
 

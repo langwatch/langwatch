@@ -7,7 +7,7 @@ import {
 } from "~/utils/constants";
 import {
   handleSchema,
-  runtimeConfigSchema,
+  runtimeParametersSchema,
   scopeSchema,
 } from "./field-schemas";
 import { versionMetadataSchema } from "./version-metadata-schema";
@@ -49,7 +49,7 @@ const baseFormSchema = z.object({
   handle: handleSchema.nullable(),
   scope: scopeSchema,
   version: z.object({
-    config: runtimeConfigSchema,
+    parameters: runtimeParametersSchema,
     configData: z.object({
       messages: latestConfigVersionSchema.shape.configData.shape.messages.removeDefault(),
       inputs: latestConfigVersionSchema.shape.configData.shape.inputs.removeDefault(),

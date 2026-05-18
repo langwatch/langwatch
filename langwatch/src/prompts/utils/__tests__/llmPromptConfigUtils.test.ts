@@ -306,7 +306,7 @@ describe("versionedPromptToPromptConfigFormValues", () => {
     updatedAt: new Date(),
     createdAt: new Date(),
     tags: [],
-    config: {},
+    parameters: {},
   });
 
   describe("when prompt handle has no prefix", () => {
@@ -399,17 +399,17 @@ describe("versionedPromptToPromptConfigFormValues", () => {
     });
   });
 
-  describe("when prompt has runtime config", () => {
-    it("maps runtime config onto form values", () => {
+  describe("when prompt has runtime parameters", () => {
+    it("maps runtime parameters onto form values", () => {
       /**
-       * @scenario Prompt form values preserve runtime config during API mapping
+       * @scenario Prompt form values preserve runtime parameters during API mapping
        */
       const prompt = createMockPrompt("test-prompt");
-      prompt.config = { mapped: true };
+      prompt.parameters = { mapped: true };
 
       const result = versionedPromptToPromptConfigFormValues(prompt);
 
-      expect(result.version.config).toEqual({ mapped: true });
+      expect(result.version.parameters).toEqual({ mapped: true });
     });
   });
 });
@@ -441,7 +441,7 @@ describe("versionedPromptToPromptConfigFormValuesWithSystemMessage", () => {
     updatedAt: new Date(),
     createdAt: new Date(),
     tags: [],
-    config: {},
+    parameters: {},
     ...overrides,
   });
 
@@ -786,18 +786,18 @@ describe("formValuesToTriggerSaveVersionParams", () => {
     });
   });
 
-  describe("when form values include runtime config", () => {
-    it("propagates config to the save payload", () => {
+  describe("when form values include runtime parameters", () => {
+    it("propagates parameters to the save payload", () => {
       /**
-       * @scenario Prompt form values preserve runtime config during API mapping
+       * @scenario Prompt form values preserve runtime parameters during API mapping
        */
       const formValues = buildDefaultFormValues({
-        version: { config: { mapped: true } },
+        version: { parameters: { mapped: true } },
       });
 
       const result = formValuesToTriggerSaveVersionParams(formValues);
 
-      expect(result.config).toEqual({ mapped: true });
+      expect(result.parameters).toEqual({ mapped: true });
     });
   });
 });
@@ -839,15 +839,15 @@ describe("formSchema reasoning validation", () => {
   });
 });
 
-describe("formSchema runtime config validation", () => {
-  describe("when config is object JSON", () => {
+describe("formSchema runtime parameters validation", () => {
+  describe("when parameters are object JSON", () => {
     it("accepts nested object values", () => {
       /**
-       * @scenario Runtime config validation accepts object JSON values
+       * @scenario Runtime parameters validation accepts object JSON values
        */
       const values = buildDefaultFormValues({
         version: {
-          config: { nested: { array: [1, true, { leaf: "value" }] } },
+          parameters: { nested: { array: [1, true, { leaf: "value" }] } },
         },
       });
 
@@ -855,14 +855,14 @@ describe("formSchema runtime config validation", () => {
     });
   });
 
-  describe("when config root is not an object", () => {
+  describe("when parameters root is not an object", () => {
     it("rejects non-object values", () => {
       /**
-       * @scenario Runtime config validation rejects non-object root values
+       * @scenario Runtime parameters validation rejects non-object root values
        */
-      for (const config of [null, [1, 2], "value", 1, true]) {
+      for (const params of [null, [1, 2], "value", 1, true]) {
         const values = buildDefaultFormValues({
-          version: { config: config as any },
+          version: { parameters: params as any },
         });
         expect(formSchema.safeParse(values).success).toBe(false);
       }

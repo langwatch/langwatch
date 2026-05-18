@@ -311,15 +311,15 @@ describe("pushPrompts", () => {
     });
   });
 
-  describe("when local config has runtime config", () => {
+  describe("when local config has runtime parameters", () => {
     it("sends config to prompt sync", async () => {
       /**
-       * @scenario TypeScript local prompt files preserve runtime config
+       * @scenario TypeScript local prompt files preserve runtime parameters
        */
       vi.mocked(FileManager.loadLocalPrompt).mockReturnValue({
         model: "openai/gpt-4o",
         messages: [{ role: "system", content: "test" }],
-        config: { cli: true },
+        parameters: { cli: true },
       } as any);
 
       mockSync.mockResolvedValue({
@@ -343,19 +343,19 @@ describe("pushPrompts", () => {
 
       expect(mockSync).toHaveBeenCalledWith(
         expect.objectContaining({
-          config: { cli: true },
+          parameters: { cli: true },
         }),
       );
     });
 
     it("writes remote config when resolving a conflict with remote", async () => {
       /**
-       * @scenario Syncing a local prompt detects runtime config conflicts
+       * @scenario Syncing a local prompt detects runtime parameters conflicts
        */
       vi.mocked(FileManager.loadLocalPrompt).mockReturnValue({
         model: "openai/gpt-4o",
         messages: [{ role: "system", content: "local" }],
-        config: { local: true },
+        parameters: { local: true },
       } as any);
 
       mockSync.mockResolvedValue({
@@ -363,13 +363,13 @@ describe("pushPrompts", () => {
         conflictInfo: {
           localVersion: 1,
           remoteVersion: 1,
-          differences: ["config changed"],
+          differences: ["parameters changed"],
           remoteConfigData: {
             model: "openai/gpt-4o",
             prompt: "remote",
             messages: [],
           },
-          remoteConfig: { remote: true },
+          remoteParameters: { remote: true },
         },
       });
 
@@ -404,7 +404,7 @@ describe("pushPrompts", () => {
 
       const writtenYaml = mockWriteFileSync.mock.calls[0]?.[1] as string;
       expect(yaml.load(writtenYaml)).toMatchObject({
-        config: { remote: true },
+        parameters: { remote: true },
       });
     });
   });

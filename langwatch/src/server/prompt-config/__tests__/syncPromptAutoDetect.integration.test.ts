@@ -37,7 +37,7 @@ describe("PromptService", () => {
         updatedAt: new Date(),
         createdAt: new Date(),
         tags: [],
-        config: {},
+        parameters: {},
         ...overrides,
       };
     }

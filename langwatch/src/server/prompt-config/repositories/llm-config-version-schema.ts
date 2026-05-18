@@ -128,16 +128,16 @@ export function parseLlmConfigVersion(
   return validator.parse(llmConfigVersion);
 }
 
-export type RuntimeConfig = Record<string, unknown>;
+export type RuntimeParameters = Record<string, unknown>;
 
-export function parseRuntimeConfig(value: unknown): RuntimeConfig {
+export function parseRuntimeParameters(value: unknown): RuntimeParameters {
   if (value && typeof value === "object" && !Array.isArray(value)) {
-    return value as RuntimeConfig;
+    return value as RuntimeParameters;
   }
   return {};
 }
 
-export function runtimeConfigsEqual(a: unknown, b: unknown): boolean {
+export function runtimeParametersEqual(a: unknown, b: unknown): boolean {
   const sortKeysDeep = (obj: unknown): unknown => {
     if (Array.isArray(obj)) return obj.map(sortKeysDeep);
     if (obj && typeof obj === "object") {

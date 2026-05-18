@@ -145,7 +145,7 @@ export const pushPrompts = async ({
         const syncResult = await promptsApiService.sync({
           name: promptName,
           configData,
-          config: localConfig.config ?? {},
+          parameters: localConfig.parameters ?? {},
           localVersion: currentVersion,
           commitMessage: `Synced from local file: ${path.basename(filePath)}`,
         });
@@ -169,7 +169,7 @@ export const pushPrompts = async ({
           }
 
           if (conflictResolution === "remote" && syncResult.conflictInfo) {
-            const remoteConfig = {
+            const remotePrompt = {
               model: syncResult.conflictInfo.remoteConfigData.model,
               modelParameters: {
                 temperature:
@@ -184,10 +184,10 @@ export const pushPrompts = async ({
                 },
                 ...(syncResult.conflictInfo.remoteConfigData.messages ?? []),
               ],
-              config: syncResult.conflictInfo.remoteConfig ?? {},
+              parameters: syncResult.conflictInfo.remoteParameters ?? {},
             };
 
-            const yamlContent = yaml.dump(remoteConfig, {
+            const yamlContent = yaml.dump(remotePrompt, {
               lineWidth: -1,
               noRefs: true,
               sortKeys: false,

@@ -144,7 +144,7 @@ const jsonValue: z.ZodType<unknown> = z.lazy(() =>
   ]),
 );
 
-export const runtimeConfigSchema = z
+export const runtimeParametersSchema = z
   .record(z.string(), jsonValue)
   .default({});
 

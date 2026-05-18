@@ -16,7 +16,7 @@ import {
   LATEST_SCHEMA_VERSION,
   type LatestConfigVersionSchema,
   parseLlmConfigVersion,
-  parseRuntimeConfig,
+  parseRuntimeParameters,
 } from "./llm-config-version-schema";
 import {
   type CreateLlmConfigVersionParams,
@@ -60,7 +60,7 @@ export type CreateLlmConfigParams = Omit<
 export interface LlmConfigWithLatestVersion extends LlmPromptConfig {
   latestVersion: LatestConfigVersionSchema & {
     author?: { name: string } | null;
-    runtimeConfig: Record<string, unknown>;
+    runtimeParameters: Record<string, unknown>;
   };
   _count?: {
     copiedPrompts?: number;
@@ -138,8 +138,8 @@ export class LlmConfigRepository {
             ...config,
             latestVersion: {
               ...parseLlmConfigVersion(rawVersion),
-              runtimeConfig:
-                parseRuntimeConfig(rawVersion.runtimeConfig),
+              runtimeParameters:
+                parseRuntimeParameters(rawVersion.runtimeParameters),
             },
           };
         } catch (error) {
@@ -298,8 +298,8 @@ export class LlmConfigRepository {
         ...config,
         latestVersion: {
           ...parseLlmConfigVersion(rawVersion),
-          runtimeConfig:
-            parseRuntimeConfig(rawVersion.runtimeConfig),
+          runtimeParameters:
+            parseRuntimeParameters(rawVersion.runtimeParameters),
         },
       };
     } catch (error) {
@@ -470,7 +470,7 @@ export class LlmConfigRepository {
       "configId" | "projectId"
     > & {
       prompt?: string;
-      runtimeConfig?: Record<string, unknown>;
+      runtimeParameters?: Record<string, unknown>;
     };
   }): Promise<LlmConfigWithLatestVersion> {
     const { configData, versionData } = params;
@@ -547,8 +547,8 @@ export class LlmConfigRepository {
           ...newVersionData,
           version: 1,
           configData: newVersionData.configData as Prisma.InputJsonValue,
-          runtimeConfig:
-            (versionData?.runtimeConfig as Prisma.InputJsonValue) ?? {},
+          runtimeParameters:
+            (versionData?.runtimeParameters as Prisma.InputJsonValue) ?? {},
           id: this.versions.generateVersionId(),
           configId: newConfig.id,
           projectId: newConfig.projectId,
@@ -573,8 +573,8 @@ export class LlmConfigRepository {
         ...updatedConfig,
         latestVersion: {
           ...parseLlmConfigVersion(newVersion),
-          runtimeConfig:
-            parseRuntimeConfig(newVersion.runtimeConfig),
+          runtimeParameters:
+            parseRuntimeParameters(newVersion.runtimeParameters),
         },
       };
     });

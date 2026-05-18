@@ -33,7 +33,7 @@ describe("PromptService", () => {
         configId: "config-1",
         authorId: null,
         commitMessage: "Initial",
-        runtimeConfig: {},
+        runtimeParameters: {},
         configData: {
           prompt: "Original prompt",
           messages: [],
@@ -54,7 +54,7 @@ describe("PromptService", () => {
         configId: "config-1",
         authorId: null,
         commitMessage: "Update",
-        runtimeConfig: {},
+        runtimeParameters: {},
         configData: {
           prompt: "Updated prompt",
           messages: [],
@@ -198,7 +198,7 @@ describe("PromptService", () => {
             },
             schemaVersion: "1.0",
             version: 2,
-            runtimeConfig: {},
+            runtimeParameters: {},
           },
         });
       });

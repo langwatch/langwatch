@@ -9,7 +9,7 @@ import {
   outputsSchema,
   promptingTechniqueSchema,
   responseFormatSchema,
-  runtimeConfigSchema,
+  runtimeParametersSchema,
 } from "~/prompts/schemas";
 import { afterPromptCreated } from "~/../ee/billing/nurturing/hooks/promptCreation";
 import { enforceLicenseLimit } from "~/server/license-enforcement";
@@ -211,7 +211,7 @@ export const promptsRouter = createTRPCRouter({
           responseFormat: responseFormatSchema.optional(),
           demonstrations: nodeDatasetSchema.optional(),
           handle: handleSchema,
-          config: runtimeConfigSchema.optional(),
+          parameters: runtimeParametersSchema.optional(),
         }),
       }),
     )
@@ -273,7 +273,7 @@ export const promptsRouter = createTRPCRouter({
           promptingTechnique: promptingTechniqueSchema.optional(),
           responseFormat: responseFormatSchema.optional(),
           demonstrations: nodeDatasetSchema.optional(),
-          config: runtimeConfigSchema.optional(),
+          parameters: runtimeParametersSchema.optional(),
         }),
       }),
     )

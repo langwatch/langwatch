@@ -11,47 +11,47 @@ import {
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
-import { runtimeConfigSchema } from "~/prompts/schemas/field-schemas";
+import { runtimeParametersSchema } from "~/prompts/schemas/field-schemas";
 import type { PromptConfigFormValues } from "~/prompts/types";
 
-const formatConfig = (value: unknown) => JSON.stringify(value ?? {}, null, 2);
+const formatParameters = (value: unknown) => JSON.stringify(value ?? {}, null, 2);
 
-export function RuntimeConfigField() {
+export function RuntimeParametersField() {
   const methods = useFormContext<PromptConfigFormValues>();
-  const config = useWatch({ control: methods.control, name: "version.config" });
-  const error = methods.formState.errors.version?.config;
+  const parameters = useWatch({ control: methods.control, name: "version.parameters" });
+  const error = methods.formState.errors.version?.parameters;
   const [open, setOpen] = useState(false);
-  const [localValue, setLocalValue] = useState(formatConfig(config));
+  const [localValue, setLocalValue] = useState(formatParameters(parameters));
 
-  const formattedConfig = useMemo(() => formatConfig(config), [config]);
+  const formattedParameters = useMemo(() => formatParameters(parameters), [parameters]);
 
   useEffect(() => {
-    setLocalValue(formattedConfig);
-  }, [formattedConfig]);
+    setLocalValue(formattedParameters);
+  }, [formattedParameters]);
 
   const handleChange = (value: string) => {
     setLocalValue(value);
 
     try {
       const parsed = JSON.parse(value || "{}");
-      const validation = runtimeConfigSchema.safeParse(parsed);
+      const validation = runtimeParametersSchema.safeParse(parsed);
       if (!validation.success) {
-        methods.setError("version.config", {
+        methods.setError("version.parameters", {
           type: "manual",
-          message: "Config must be a JSON object",
+          message: "Parameters must be a JSON object",
         });
         return;
       }
 
-      methods.clearErrors("version.config");
-      methods.setValue("version.config", validation.data, {
+      methods.clearErrors("version.parameters");
+      methods.setValue("version.parameters", validation.data, {
         shouldDirty: true,
         shouldValidate: true,
       });
     } catch {
-      methods.setError("version.config", {
+      methods.setError("version.parameters", {
         type: "manual",
-        message: "Config must be valid JSON",
+        message: "Parameters must be valid JSON",
       });
     }
   };
@@ -63,7 +63,7 @@ export function RuntimeConfigField() {
           <Button variant="ghost" justifyContent="start" paddingX={0}>
             <HStack gap={2}>
               {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-              <Text fontWeight="medium">Runtime Config</Text>
+              <Text fontWeight="medium">Runtime Parameters</Text>
             </HStack>
           </Button>
         </Collapsible.Trigger>
@@ -77,7 +77,7 @@ export function RuntimeConfigField() {
               </Alert.Root>
             )}
             <Textarea
-              aria-label="Runtime Config JSON"
+              aria-label="Runtime Parameters JSON"
               value={localValue}
               onChange={(event) => handleChange(event.target.value)}
               minHeight="160px"
@@ -93,7 +93,7 @@ export function RuntimeConfigField() {
   );
 }
 
-export function RuntimeConfigReadonly({ value }: { value: Record<string, unknown> }) {
+export function RuntimeParametersReadonly({ value }: { value: Record<string, unknown> }) {
   return (
     <Box
       as="pre"
@@ -107,9 +107,9 @@ export function RuntimeConfigReadonly({ value }: { value: Record<string, unknown
       whiteSpace="pre-wrap"
       width="full"
       height="full"
-      data-testid="runtime-config-readonly"
+      data-testid="runtime-parameters-readonly"
     >
-      {formatConfig(value)}
+      {formatParameters(value)}
     </Box>
   );
 }

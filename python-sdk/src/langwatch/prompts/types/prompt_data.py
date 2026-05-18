@@ -1,47 +1,46 @@
-"""
-Core PromptData structure for prompts.
-
-This module contains the PromptData Pydantic model with conversion methods,
-following the TypeScript PromptData interface structure.
-"""
-
-from typing import Any, Dict, Literal, Optional, List, Union
+from typing import Any, Dict, List, Literal, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from langwatch.generated.langwatch_rest_api_client.types import Unset
-from langwatch.generated.langwatch_rest_api_client.models.get_api_prompts_by_id_response_200 import (
+from langwatch.generated.models.get_api_prompts_by_id_response_200 import (
     GetApiPromptsByIdResponse200,
 )
-from langwatch.generated.langwatch_rest_api_client.models.put_api_prompts_by_id_response_200 import (
-    PutApiPromptsByIdResponse200,
-)
-from langwatch.generated.langwatch_rest_api_client.models.post_api_prompts_response_200 import (
+from langwatch.generated.models.post_api_prompts_response_200 import (
     PostApiPromptsResponse200,
 )
+from langwatch.generated.models.put_api_prompts_by_id_response_200 import (
+    PutApiPromptsByIdResponse200,
+)
+from langwatch.generated.types import Unset
 
-from .structures import Message, ResponseFormat
+
+class ResponseFormat(BaseModel):
+    """Response format configuration for structured outputs."""
+
+    type: str
+    json_schema: Optional[Any] = None
+
+
+class Message(BaseModel):
+    """A chat message with role and content."""
+
+    role: Literal["system", "user", "assistant"]
+    content: str
 
 
 class PromptData(BaseModel):
-    """
-    Core data structure for prompts, matching the TypeScript PromptData interface.
-
-    Contains both core functionality fields and optional metadata for identification/tracing.
-    """
-
     model_config = ConfigDict(extra="ignore")
 
     # === Core functionality (required) ===
     model: str = ""
-    messages: List[Message] = []
+    messages: List[Message] = Field(default_factory=list)
 
     # === Optional core fields ===
     prompt: Optional[str] = None
     temperature: Optional[float] = None
     max_tokens: Optional[int] = None
     response_format: Optional[ResponseFormat] = None
-    config: Dict[str, Any] = Field(default_factory=dict)
+    parameters: Dict[str, Any] = Field(default_factory=dict)
 
     # === Optional identification (for tracing) ===
     id: Optional[str] = None
@@ -90,7 +89,7 @@ class PromptData(BaseModel):
             )
 
         raw_version = _unset_to_none(response.version)
-        raw_config = _read_runtime_config(response)
+        raw_parameters = _read_runtime_parameters(response)
 
         return PromptData(
             id=_unset_to_none(response.id),
@@ -101,22 +100,22 @@ class PromptData(BaseModel):
             temperature=_unset_to_none(response.temperature),
             max_tokens=_unset_to_none(response.max_tokens),
             response_format=response_format,
-            config=raw_config,
+            parameters=raw_parameters,
             version=int(raw_version) if raw_version is not None else None,
             version_id=_unset_to_none(response.version_id),
             scope=response.scope.value if response.scope and not isinstance(response.scope, Unset) else None,
         )
 
 
-def _read_runtime_config(response: object) -> Dict[str, Any]:
+def _read_runtime_parameters(response: object) -> Dict[str, Any]:
     additional_properties = getattr(response, "additional_properties", None)
     if isinstance(additional_properties, dict):
-        config = additional_properties.get("config")
+        params = additional_properties.get("parameters")
     else:
-        config = getattr(response, "__dict__", {}).get("config")
+        params = getattr(response, "__dict__", {}).get("parameters")
 
-    if isinstance(config, Unset) or config is None:
+    if isinstance(params, Unset) or params is None:
         return {}
-    if isinstance(config, dict):
-        return config
+    if isinstance(params, dict):
+        return params
     return {}

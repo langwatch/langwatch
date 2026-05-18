@@ -91,7 +91,7 @@ export class PromptVersionService {
       schemaVersion?: SchemaVersion;
       authorId?: string;
       version: number;
-      runtimeConfig?: Record<string, unknown>;
+      runtimeParameters?: Record<string, unknown>;
     };
   }): Promise<LlmPromptConfigVersion> {
     const { data, db } = params;
@@ -111,7 +111,7 @@ export class PromptVersionService {
     return await prisma.llmPromptConfigVersion.create({
       data: {
         ...validatedData,
-        runtimeConfig: (data.runtimeConfig ?? {}) as Prisma.InputJsonValue,
+        runtimeParameters: (data.runtimeParameters ?? {}) as Prisma.InputJsonValue,
       },
     });
   }

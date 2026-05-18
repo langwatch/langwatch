@@ -137,7 +137,7 @@ export function safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(
     handle: llmNode.handle ?? null,
     scope: scope ?? PromptScope.PROJECT,
     version: {
-      config: {},
+      parameters: {},
       configData: {
         inputs,
         outputs,
@@ -538,7 +538,7 @@ export function formValuesToTriggerSaveVersionParams(
     verbosity: llm.verbosity,
     promptingTechnique: formValues.version.configData.promptingTechnique,
     demonstrations: formValues.version.configData.demonstrations,
-    config: formValues.version.config,
+    parameters: formValues.version.parameters,
   };
 }
 
@@ -612,7 +612,7 @@ export function versionedPromptToPromptConfigFormValues(
     handle: isHandleValid ? shortHandle : null,
     scope: prompt.scope,
     version: {
-      config: prompt.config ?? {},
+      parameters: prompt.parameters ?? {},
       configData: {
         prompt: prompt.prompt,
         // The system message should be stored in the prompt field in the DB,

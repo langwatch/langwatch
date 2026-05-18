@@ -13,7 +13,7 @@ import {
   formatApiErrorForOperation,
   formatApiErrorMessage,
 } from "@/client-sdk/services/_shared/format-api-error";
-import type { RuntimeConfig } from "@/cli/types";
+import type { RuntimeParameters } from "@/cli/types";
 
 const syncActionSchema = z.enum([
   "created",
@@ -34,7 +34,7 @@ const syncResultSchema = z.object({
       localVersion: z.number(),
       remoteVersion: z.number(),
       differences: z.array(z.string()),
-      remoteConfigData: z.unknown(),
+      remoteParametersData: z.unknown(),
     })
     .passthrough()
     .optional(),
@@ -55,8 +55,8 @@ export interface SyncResult {
     localVersion: number;
     remoteVersion: number;
     differences: string[];
-    remoteConfigData: ConfigData;
-    remoteConfig?: RuntimeConfig;
+    remoteParametersData: ConfigData;
+    remoteParameters?: RuntimeParameters;
   };
 }
 
@@ -333,7 +333,7 @@ export class PromptsApiService {
         role: "system" | "user" | "assistant";
         content: string;
       }>;
-      config?: RuntimeConfig;
+      parameters?: RuntimeParameters;
     },
   ): Promise<{ created: boolean; prompt: PromptResponse }> {
     const payload = {
@@ -345,7 +345,7 @@ export class PromptsApiService {
       maxTokens: config.modelParameters?.max_tokens,
       inputs: [{ identifier: "input", type: "str" as const }],
       outputs: [{ identifier: "output", type: "str" as const }],
-      config: config.config ?? {},
+      parameters: config.parameters ?? {},
       commitMessage: `Updated via CLI sync`,
       schemaVersion: "1.0" as const,
     };
@@ -374,7 +374,7 @@ export class PromptsApiService {
   async sync(params: {
     name: string;
     configData: ConfigData;
-    config?: RuntimeConfig;
+    parameters?: RuntimeParameters;
     localVersion?: number;
     commitMessage?: string;
   }): Promise<SyncResult> {
@@ -395,7 +395,7 @@ export class PromptsApiService {
           params: { path: { id: params.name } },
           body: {
             configData: params.configData,
-            config: params.config ?? {},
+            parameters: params.parameters ?? {},
             localVersion: params.localVersion,
             commitMessage: params.commitMessage,
           },

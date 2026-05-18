@@ -1832,7 +1832,7 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
           updatedAt: new Date(),
           createdAt: new Date(),
           tags: [],
-          config: {},
+          parameters: {},
         };
 
         // Create loadedPrompts map with our mock prompt

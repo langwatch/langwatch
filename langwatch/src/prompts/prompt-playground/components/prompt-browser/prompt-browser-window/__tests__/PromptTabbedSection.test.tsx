@@ -434,7 +434,7 @@ function FormWrapper({
     defaultValues: {
       ...defaultValues,
       version: {
-        config: {},
+        parameters: {},
         configData: {
           inputs: [],
           demonstrations: { inline: { records: {} } },
@@ -569,7 +569,7 @@ describe("PromptTabbedSection Layout Modes", () => {
 
       await user.click(screen.getByRole("tab", { name: /config/i }));
 
-      expect(screen.getByTestId("runtime-config-readonly")).toHaveTextContent(
+      expect(screen.getByTestId("runtime-parameters-readonly")).toHaveTextContent(
         '"readonly": true',
       );
     });
