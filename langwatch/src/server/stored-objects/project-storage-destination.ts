@@ -65,10 +65,12 @@ export async function resolveProjectStorageDestination(
  * sink — a BYOC tenant's bucket name is a cross-tenant disclosure
  * channel otherwise (security-reviewer, PR-4058 review).
  *
- * Format examples:
- *   s3://customer-private/proj-abc/sha256  →  s3://***/proj-abc/sha256
- *   file:///var/lib/langwatch/objects/...   →  file:///***/...
- *   azure-blob://acct/cont/proj/sha         →  azure-blob://***/***/proj/sha
+ * Format examples (REDACTED stands in for the three-asterisk placeholder we
+ * emit, written out here to avoid the asterisk-slash sequence prematurely
+ * terminating this JSDoc block):
+ *   s3://customer-private/proj-abc/sha256  -> s3://REDACTED/proj-abc/sha256
+ *   file:///var/lib/langwatch/objects/...  -> file:///REDACTED/...
+ *   azure-blob://acct/cont/proj/sha        -> azure-blob://REDACTED/REDACTED/proj/sha
  */
 export function redactStorageUri(uri: string): string {
   try {
