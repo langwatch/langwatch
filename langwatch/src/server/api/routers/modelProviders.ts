@@ -234,6 +234,41 @@ export const modelProviderRouter = createTRPCRouter({
    * filtered) so the drawer's chip picker can be the source of truth
    * without a redundant authz check.
    */
+  /**
+   * Cascade-resolve a single feature key for a project. Wraps
+   * `resolveModelForFeature` for frontend consumers that used to read
+   * `project.defaultModel` / etc directly. Returns null when nothing
+   * is configured at any scope rather than throwing, so the caller can
+   * render a placeholder selector + a "configure a default" hint
+   * without an exception-based control flow.
+   */
+  getResolvedDefault: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        featureKey: z.string(),
+      }),
+    )
+    .use(checkProjectPermission("project:view"))
+    .query(async ({ input, ctx }) => {
+      if (!featureByKey(input.featureKey)) {
+        return null;
+      }
+      try {
+        const resolved = await resolveModelForFeature(input.featureKey, {
+          prisma: ctx.prisma,
+          projectId: input.projectId,
+        });
+        return {
+          model: resolved.model,
+          source: resolved.source,
+          scope: resolved.scope,
+        };
+      } catch {
+        return null;
+      }
+    }),
+
   getDefaultModelsForProject: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .use(checkProjectPermission("project:view"))
