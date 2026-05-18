@@ -219,10 +219,25 @@ export class SimulationRunStateFoldProjection
           throw new ValidationError(`Simulation ${state.ScenarioRunId} failed with invalid message on index ${i}`);
         }
 
+        // Content can be either:
+        //   - a string (legacy SDK output, possibly a Python-repr-stringified array)
+        //   - an array of rich-content parts (the canonical AG-UI/OpenAI shape,
+        //     produced by the stored-objects extractor's rewrite pass)
+        //   - null / undefined / something else (we tolerate by storing "")
+        // We always serialize to a string for the parallel-array CH column.
+        // Array content gets JSON.stringify'd; the renderer's
+        // safeJsonParseOrStringFallback in flattenContent parses it back.
+        let content = "";
+        if (typeof m.content === "string") {
+          content = m.content;
+        } else if (Array.isArray(m.content)) {
+          content = JSON.stringify(m.content);
+        }
+
         return {
           Id: typeof m.id === "string" ? m.id : "",
           Role: typeof m.role === "string" ? m.role : "",
-          Content: typeof m.content === "string" ? m.content : "",
+          Content: content,
           TraceId: typeof m.trace_id === "string" ? m.trace_id : "",
           Rest: buildMessageRestJson(m),
         };

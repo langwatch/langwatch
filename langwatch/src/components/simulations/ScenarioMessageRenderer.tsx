@@ -279,6 +279,45 @@ function flattenMixed(content: unknown[], msg: RawMessage): DisplayItem[] {
       toolResult: (part) => ({ kind: "tool_result" as const, id: `${msg.id}-tr${i}`, result: part.result, traceId: msg.trace_id }),
       imageUrl: (url) => ({ kind: "image" as const, id: `${msg.id}-img${i}`, src: url, traceId: msg.trace_id }),
       bareImage: (src) => ({ kind: "image" as const, id: `${msg.id}-img${i}`, src, traceId: msg.trace_id }),
+      // OpenAI Realtime API audio shape. Two states:
+      // - Pre-extraction: {data, format} (inline base64). Server-side
+      //   extraction normally rewrites this away, but if the renderer
+      //   sees one it builds a data: URI so the <audio> element can
+      //   still play the bytes.
+      // - Post-extraction: {url, format, mimeType} where url is
+      //   /api/files/<storedObjectId>. Build a url-source MediaPart.
+      inputAudio: (part) => {
+        const mimeType =
+          part.mimeType ??
+          (part.format === "wav"
+            ? "audio/wav"
+            : part.format === "mp3"
+              ? "audio/mpeg"
+              : "audio/wav");
+        if (part.url) {
+          return {
+            kind: "media" as const,
+            id: `${msg.id}-audio${i}`,
+            part: {
+              type: "audio" as const,
+              source: { type: "url" as const, value: part.url, mimeType },
+            },
+            traceId: msg.trace_id,
+          };
+        }
+        if (part.data) {
+          return {
+            kind: "media" as const,
+            id: `${msg.id}-audio${i}`,
+            part: {
+              type: "audio" as const,
+              source: { type: "data" as const, value: part.data, mimeType },
+            },
+            traceId: msg.trace_id,
+          };
+        }
+        return undefined;
+      },
     });
     if (result) items.push(result);
   });

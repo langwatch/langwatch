@@ -244,6 +244,68 @@ async function processContentPart({
       return { part: rewrittenPart, ref };
     },
 
+    // OpenAI Realtime API: {type:"input_audio", input_audio:{data:"<base64>", format:"wav"}}.
+    // This is the shape the langwatch python-sdk emits for scenario audio
+    // turns today. Format determines the mime type (wav -> audio/wav, mp3
+    // -> audio/mpeg, etc.); we map a small allowlist and default to
+    // application/octet-stream when the format is missing or unknown.
+    async inputAudio(audioPart) {
+      // Already-externalized: nothing to extract, pass through unchanged.
+      if (!audioPart.data) return noOp;
+
+      const format = audioPart.format?.toLowerCase();
+      const mimeType =
+        format === "wav"
+          ? "audio/wav"
+          : format === "mp3"
+            ? "audio/mpeg"
+            : format === "flac"
+              ? "audio/flac"
+              : format === "ogg"
+                ? "audio/ogg"
+                : format === "webm"
+                  ? "audio/webm"
+                  : "application/octet-stream";
+
+      const bytes = Buffer.from(audioPart.data, "base64");
+      const stored = await service.storeFromBytes({
+        projectId,
+        purpose,
+        ownerKind,
+        ownerId,
+        mediaType: mimeType,
+        bytes,
+      });
+
+      const ref: ExtractedRef = {
+        id: stored.id,
+        isDuplicate: stored.isDuplicate,
+        purpose,
+        ownerKind,
+        ownerId,
+      };
+
+      const original = part as Record<string, unknown>;
+      const originalInputAudio =
+        typeof original.input_audio === "object" && original.input_audio !== null
+          ? (original.input_audio as Record<string, unknown>)
+          : {};
+      // Rewrite to a shape the UI MediaPart already understands: keep the
+      // input_audio key for backward compatibility with consumers that
+      // already look at it, but swap `data` for an externalized `url`.
+      const rewrittenPart = {
+        ...original,
+        input_audio: {
+          ...originalInputAudio,
+          data: undefined,
+          url: `/api/files/${stored.id}`,
+          mimeType,
+        },
+      };
+
+      return { part: rewrittenPart, ref };
+    },
+
     // Bare {image: "data:..."} is rare in production but seen in some
     // older fixtures. Handle the data-URI case symmetrically.
     async bareImage(src) {
@@ -309,18 +371,68 @@ interface ExtractionParams {
  * see `src/server/tracer/types.ts`) covers more variants than any single
  * library schema, including `image_url` with data URIs.
  */
+/**
+ * Coerces a message's `content` field to an array we can walk.
+ *
+ * Some SDK callers (notably the langwatch python-sdk) send `content` as a
+ * stringified Python-repr of a list (`"[{'type': 'input_audio', ...}]"`)
+ * instead of a JSON-encoded array. This isn't strictly valid JSON, but it's
+ * mechanically recoverable: single quotes -> double quotes, then JSON.parse.
+ *
+ * Returns:
+ *  - The array verbatim when content is already an array.
+ *  - A parsed array when content is a string that decodes (JSON or
+ *    Python-repr) to an array of objects.
+ *  - null otherwise (caller should pass through unchanged).
+ */
+function coerceContentToArray(content: unknown): unknown[] | null {
+  if (Array.isArray(content)) return content;
+  if (typeof content !== "string") return null;
+
+  const trimmed = content.trim();
+  if (!trimmed.startsWith("[")) return null;
+
+  // Try strict JSON first.
+  try {
+    const parsed = JSON.parse(trimmed) as unknown;
+    if (Array.isArray(parsed)) return parsed;
+  } catch {
+    // fall through
+  }
+
+  // Python-repr fallback: replace single quotes with double quotes and
+  // Python's None / True / False with their JSON equivalents. This is
+  // narrow on purpose — we're not building a Python parser, just
+  // accepting the specific shape the langwatch python-sdk emits today.
+  const jsonified = trimmed
+    .replace(/'/g, '"')
+    .replace(/\bNone\b/g, "null")
+    .replace(/\bTrue\b/g, "true")
+    .replace(/\bFalse\b/g, "false");
+  try {
+    const parsed = JSON.parse(jsonified) as unknown;
+    if (Array.isArray(parsed)) return parsed;
+  } catch {
+    // give up
+  }
+
+  return null;
+}
+
 async function rewriteMessage(
   rawMessage: Record<string, unknown>,
   params: ExtractionParams,
 ): Promise<{ message: Record<string, unknown>; refs: ExtractedRef[] }> {
-  if (!Array.isArray(rawMessage.content)) {
+  const contentArray = coerceContentToArray(rawMessage.content);
+  if (contentArray === null) {
     return { message: rawMessage, refs: [] };
   }
+  const contentWasStringified = !Array.isArray(rawMessage.content);
 
   const refs: ExtractedRef[] = [];
   const rewrittenParts: unknown[] = [];
   let changed = false;
-  for (const raw of rawMessage.content as unknown[]) {
+  for (const raw of contentArray) {
     const { part: rewritten, ref } = await processContentPart({
       part: raw,
       ...params,

@@ -56,6 +56,13 @@ export type ContentPartVisitor<R> = {
   toolResult(part: { result: unknown }): R;
   imageUrl?(url: string): R;
   bareImage?(src: string): R;
+  // OpenAI Realtime API audio: {type:"input_audio", input_audio:{data, format?}}
+  inputAudio?(part: {
+    data?: string;
+    url?: string;
+    format?: string;
+    mimeType?: string;
+  }): R;
   unknown?(value: unknown): R;
 };
 
@@ -76,6 +83,12 @@ export type AsyncContentPartVisitor<R> = {
   toolResult(part: { result: unknown }): R | Promise<R>;
   imageUrl?(url: string): R | Promise<R>;
   bareImage?(src: string): R | Promise<R>;
+  inputAudio?(part: {
+    data?: string;
+    url?: string;
+    format?: string;
+    mimeType?: string;
+  }): R | Promise<R>;
   unknown?(value: unknown): R | Promise<R>;
 };
 
@@ -125,6 +138,32 @@ export function visitContentPart<R>(
       type: o["type"] as "image" | "audio" | "video" | "document",
       source: o["source"] as ContentSource,
     });
+  }
+
+  // OpenAI Realtime API audio: {type:"input_audio", input_audio:{data, format?}}
+  // After server-side extraction the part has {url, mimeType} instead of
+  // {data} — both shapes flow through this branch so the renderer can play
+  // either an inline base64 turn (pre-extraction) or an externalized
+  // /api/files/<id> reference.
+  if (
+    o["type"] === "input_audio" &&
+    typeof o["input_audio"] === "object" &&
+    o["input_audio"] !== null
+  ) {
+    const ia = o["input_audio"] as Record<string, unknown>;
+    const data = typeof ia["data"] === "string" ? ia["data"] : undefined;
+    const url = typeof ia["url"] === "string" ? ia["url"] : undefined;
+    if (data || url) {
+      return visitor.inputAudio
+        ? visitor.inputAudio({
+            data,
+            url,
+            format: typeof ia["format"] === "string" ? ia["format"] : undefined,
+            mimeType:
+              typeof ia["mimeType"] === "string" ? ia["mimeType"] : undefined,
+          })
+        : visitor.unknown?.(part);
+    }
   }
 
   // binary parts
@@ -221,6 +260,32 @@ export async function visitContentPartAsync<R>(
       type: o["type"] as "image" | "audio" | "video" | "document",
       source: o["source"] as ContentSource,
     });
+  }
+
+  // OpenAI Realtime API audio: {type:"input_audio", input_audio:{data, format?}}
+  // After server-side extraction the part has {url, mimeType} instead of
+  // {data} — both shapes flow through this branch so the renderer can play
+  // either an inline base64 turn (pre-extraction) or an externalized
+  // /api/files/<id> reference.
+  if (
+    o["type"] === "input_audio" &&
+    typeof o["input_audio"] === "object" &&
+    o["input_audio"] !== null
+  ) {
+    const ia = o["input_audio"] as Record<string, unknown>;
+    const data = typeof ia["data"] === "string" ? ia["data"] : undefined;
+    const url = typeof ia["url"] === "string" ? ia["url"] : undefined;
+    if (data || url) {
+      return visitor.inputAudio
+        ? visitor.inputAudio({
+            data,
+            url,
+            format: typeof ia["format"] === "string" ? ia["format"] : undefined,
+            mimeType:
+              typeof ia["mimeType"] === "string" ? ia["mimeType"] : undefined,
+          })
+        : visitor.unknown?.(part);
+    }
   }
 
   // binary parts
