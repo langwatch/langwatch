@@ -29,28 +29,28 @@ Feature: Hierarchical default models across organization, team, and project
   # Scope-aware selection with inheritance
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Setting an org-level default applies to every project in that organization
     Given no team or project default model is set
     When I set the organization's default model to "openai/gpt-5.5"
     Then every project in that organization resolves "openai/gpt-5.5" as its default model
     And the project-level effective default is labelled "inherited from organization"
 
-  @integration
+  @integration @unimplemented
   Scenario: Project-level default overrides the org default for that project only
     Given the organization's default model is "openai/gpt-5.5"
     When I set project "web-app" default model to "anthropic/claude-sonnet-4-6"
     Then project "web-app" resolves "anthropic/claude-sonnet-4-6"
     And every other project in the org still resolves "openai/gpt-5.5"
 
-  @integration
+  @integration @unimplemented
   Scenario: Team default sits between org and project in the resolution order
     Given the organization's default model is "openai/gpt-5.5"
     And team "platform" has its default model set to "openai/gpt-4o"
     And project "web-app" belongs to team "platform" with no project-level override
     Then project "web-app" resolves "openai/gpt-4o"
 
-  @integration
+  @integration @unimplemented
   Scenario: Clearing a scope falls back to the next level up
     Given the organization's default model is "openai/gpt-5.5"
     And project "web-app" had its default model set to "anthropic/claude-sonnet-4-6"
@@ -80,7 +80,7 @@ Feature: Hierarchical default models across organization, team, and project
   # Effective-default surfacing
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: The page shows the effective default and where it comes from
     Given the team default is "openai/gpt-4o" and the project has no override
     When I view the Default Models section for project "web-app"

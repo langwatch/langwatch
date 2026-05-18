@@ -273,6 +273,7 @@ describe("guardProjectId — SCOPED_MODELS (ModelProvider family)", () => {
   });
 
   describe("ModelProvider.create with scopes relation", () => {
+    /** @scenario A nested-create through the scopes relation passes */
     it("does NOT throw — nested-create through the scopes relation carries tenancy", async () => {
       await expect(
         runGuard({
@@ -293,6 +294,7 @@ describe("guardProjectId — SCOPED_MODELS (ModelProvider family)", () => {
   });
 
   describe("ModelProviderScope.findMany without modelProviderId or scope", () => {
+    /** @scenario Join-table bare findMany throws */
     it("THROWS — bare findMany on the join walks every tenant's bindings", async () => {
       await expect(
         runGuard({
@@ -305,6 +307,7 @@ describe("guardProjectId — SCOPED_MODELS (ModelProvider family)", () => {
   });
 
   describe("ModelProviderScope.findMany with modelProviderId", () => {
+    /** @scenario Join-table read with parent FK passes */
     it("does NOT throw — parent FK is the tenancy proof for joins", async () => {
       await expect(
         runGuard({
@@ -317,6 +320,7 @@ describe("guardProjectId — SCOPED_MODELS (ModelProvider family)", () => {
   });
 
   describe("ModelProviderScope.deleteMany without parent FK or scope", () => {
+    /** @scenario Join-table deleteMany requires a parent FK or scope predicate */
     it("THROWS — bare deleteMany would wipe every tenant's bindings", async () => {
       await expect(
         runGuard({

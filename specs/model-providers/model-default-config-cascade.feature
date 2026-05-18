@@ -236,3 +236,14 @@ Feature: Model default config cascade
     # Absence = inherit; lean storage; merge logic stays trivial.
     # The drawer-to-server round-trip + JSON storage shape — bind via
     # the drawer integration test once the inherit-dropdown lands.
+
+  @integration
+  Scenario: Inherit row is a real, selectable option in the model picker
+    Given the model picker is mounted inside the override drawer with an inheritOption present
+    When I open the dropdown and click the "Inherit (from organization)" row
+    Then the picker's onChange fires with the inherit sentinel
+    And the drawer treats the sentinel as "delete this key from the in-progress JSON"
+    # The inherit row is a real list entry so keyboard navigation and
+    # screen readers reach it the same way as any model id. Storing the
+    # sentinel as a delete is what keeps the absence-equals-inherit
+    # contract from leaking into the UI layer.
