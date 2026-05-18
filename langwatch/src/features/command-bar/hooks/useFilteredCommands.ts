@@ -12,7 +12,6 @@ import {
 import { MIN_SEARCH_QUERY_LENGTH, MIN_CATEGORY_MATCH_LENGTH } from "../constants";
 import { getPlanManagementUrl } from "~/hooks/usePlanManagementUrl";
 import { getPageCommands } from "../pageCommands";
-import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import {
   setFeatureFlagOverride,
   useFeatureFlagOverrides,
@@ -38,21 +37,14 @@ export function useFilteredCommands(
   projectId: string | undefined,
   isDevMode: boolean,
 ): FilteredCommands {
-  const { enabled: isTracesV2Enabled } = useFeatureFlag(
-    "release_ui_traces_v2_enabled",
-    { projectId, enabled: !!projectId },
-  );
   const { hasAccess: hasOpsAccess } = useOpsPermission();
 
   const availableNavCommands = useMemo(() => {
-    let commands = hasOpsAccess
+    const commands = hasOpsAccess
       ? navigationCommands
       : navigationCommands.filter((cmd) => !cmd.id.startsWith("nav-ops"));
-    if (!isTracesV2Enabled) {
-      commands = commands.filter((cmd) => cmd.id !== "nav-traces-v2");
-    }
     return commands;
-  }, [hasOpsAccess, isTracesV2Enabled]);
+  }, [hasOpsAccess]);
 
   const filteredNavigation = useMemo(() => {
     if (!query.trim()) return [];

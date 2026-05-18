@@ -1,12 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 
 /**
- * Per-browser opt-in flag for the new Trace Explorer drawer. Sits
- * alongside the server-side `release_ui_traces_v2_enabled` feature
- * flag — both must be on for v2 to actually open. The flag is set
- * the first time the operator clicks "Try the new one" on the v1
- * banner, and cleared when they choose "Go back to old trace
- * visualization" from the v2 drawer's overflow menu.
+ * Per-browser opt-in flag for the new Trace Explorer drawer. Set the
+ * first time the operator clicks "Try the new one" on the v1 banner,
+ * and cleared when they choose "Go back to old trace visualization"
+ * from the v2 drawer's overflow menu.
  *
  * Kept as plain localStorage rather than a server-side preference
  * because (a) we want the choice to stick instantly without a

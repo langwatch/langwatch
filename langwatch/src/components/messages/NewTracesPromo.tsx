@@ -9,29 +9,25 @@ import {
 } from "@chakra-ui/react";
 import posthog from "posthog-js";
 import { useEffect, useState } from "react";
-import { LuArrowRight, LuMessageCircle, LuSparkles, LuX } from "react-icons/lu";
-import { Link } from "~/components/ui/link";
+import { LuArrowRight, LuSparkles, LuX } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
 import { setTracesV2Preferred } from "~/features/traces-v2/hooks/useTracesV2Preference";
-import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 const SNOOZE_DAYS = 7;
 const SNOOZE_MS = SNOOZE_DAYS * 24 * 60 * 60 * 1000;
 // Versioned so prior dismissals from earlier copy/iterations don't keep the
 // banner permanently hidden. Bump when the message materially changes.
-const STORAGE_PREFIX = "langwatch:tracesV2-promo-dismissed:v9:";
+const STORAGE_PREFIX = "langwatch:tracesV2-promo-dismissed:v9:try:";
 
-type PromoMode = "try" | "request";
-
-function storageKey(projectId: string, mode: PromoMode): string {
-  return `${STORAGE_PREFIX}${mode}:${projectId}`;
+function storageKey(projectId: string): string {
+  return `${STORAGE_PREFIX}${projectId}`;
 }
 
-function isSnoozed(projectId: string, mode: PromoMode): boolean {
+function isSnoozed(projectId: string): boolean {
   if (typeof window === "undefined") return false;
   try {
-    const raw = localStorage.getItem(storageKey(projectId, mode));
+    const raw = localStorage.getItem(storageKey(projectId));
     if (!raw) return false;
     const expiresAt = Number(raw);
     if (!Number.isFinite(expiresAt)) return false;
@@ -41,11 +37,11 @@ function isSnoozed(projectId: string, mode: PromoMode): boolean {
   }
 }
 
-function snooze(projectId: string, mode: PromoMode): void {
+function snooze(projectId: string): void {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(
-      storageKey(projectId, mode),
+      storageKey(projectId),
       String(Date.now() + SNOOZE_MS),
     );
   } catch {
@@ -79,17 +75,6 @@ export function resetTracesV2PromoSnooze(): void {
   }
 }
 
-function openCrispChat(): boolean {
-  if (typeof window === "undefined") return false;
-  const crisp = (
-    window as unknown as { $crisp?: { push: (args: unknown[]) => void } }
-  ).$crisp;
-  if (!crisp) return false;
-  crisp.push(["do", "chat:show"]);
-  crisp.push(["do", "chat:toggle"]);
-  return true;
-}
-
 interface NewTracesPromoProps {
   variant?: "full" | "compact";
   /** When set, the CTA deep-links to this trace inside the v2 drawer. */
@@ -106,12 +91,6 @@ export function NewTracesPromo({
   });
   const projectId = project?.id;
   const projectSlug = project?.slug;
-  const { enabled: tracesV2Enabled, isLoading: tracesV2FlagLoading } =
-    useFeatureFlag("release_ui_traces_v2_enabled", {
-      projectId,
-      enabled: !!projectId,
-    });
-  const mode: PromoMode = tracesV2Enabled ? "try" : "request";
   const [dismissed, setDismissed] = useState(false);
   const [hasMounted, setHasMounted] = useState(false);
 
@@ -120,8 +99,8 @@ export function NewTracesPromo({
   }, []);
 
   useEffect(() => {
-    if (projectId) setDismissed(isSnoozed(projectId, mode));
-  }, [projectId, mode]);
+    if (projectId) setDismissed(isSnoozed(projectId));
+  }, [projectId]);
 
   // Re-evaluate dismissed when the operator opts out of v2 from the
   // new drawer (which calls `resetTracesV2PromoSnooze` and dispatches
@@ -129,19 +108,19 @@ export function NewTracesPromo({
   // hidden until the 7-day snooze expired or the page reloaded.
   useEffect(() => {
     const onReset = () => {
-      if (projectId) setDismissed(isSnoozed(projectId, mode));
+      if (projectId) setDismissed(isSnoozed(projectId));
     };
     window.addEventListener("langwatch:traces-v2-promo-reset", onReset);
     return () =>
       window.removeEventListener("langwatch:traces-v2-promo-reset", onReset);
-  }, [projectId, mode]);
+  }, [projectId]);
 
-  if (!hasMounted || !projectSlug || tracesV2FlagLoading || dismissed) {
+  if (!hasMounted || !projectSlug || dismissed) {
     return null;
   }
 
   const handleDismiss = () => {
-    if (projectId) snooze(projectId, mode);
+    if (projectId) snooze(projectId);
     setDismissed(true);
   };
 
@@ -168,7 +147,7 @@ export function NewTracesPromo({
       projectId,
       traceId,
     });
-    if (projectId) snooze(projectId, mode);
+    if (projectId) snooze(projectId);
     // Preserve every non-drawer query param (`span`, filters, time
     // range, …) so the underlying scenario / list view stays put;
     // only swap the drawer.* params.
@@ -181,20 +160,6 @@ export function NewTracesPromo({
     url.searchParams.set("drawer.open", "traceV2Details");
     url.searchParams.set("drawer.traceId", traceId);
     window.location.href = url.toString();
-  };
-
-  const requestAccessMailto = `mailto:support@langwatch.ai?subject=${encodeURIComponent(
-    "Early access to the new Trace Explorer",
-  )}&body=${encodeURIComponent(
-    "Hi! I'd like early access to the new Trace Explorer" +
-      (project?.slug ? ` for project "${project.slug}"` : "") +
-      ".",
-  )}`;
-
-  const handleRequestAccess = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    if (openCrispChat()) {
-      e.preventDefault();
-    }
   };
 
   const isCompact = variant === "compact";
@@ -237,9 +202,7 @@ export function NewTracesPromo({
             letterSpacing="-0.005em"
             truncate
           >
-            {mode === "try"
-              ? "Try the new Trace Explorer"
-              : "A new Trace Explorer is on the way"}
+            Try the new Trace Explorer
           </Text>
           <Box
             paddingX={1.5}
@@ -256,7 +219,7 @@ export function NewTracesPromo({
               textTransform="uppercase"
               lineHeight={1.2}
             >
-              {mode === "try" ? "Beta" : "Coming soon"}
+              Beta
             </Text>
           </Box>
         </HStack>
@@ -272,51 +235,26 @@ export function NewTracesPromo({
               overflow: "hidden",
             }}
           >
-            {mode === "try"
-              ? "A tracing experience you'd introduce to your family. We'd love to hear your feedback — tell us what you love, and what you hate."
-              : "A faster, friendlier tracing experience is in private beta. Want in early? Get in touch and we'll switch it on for you."}
+            A tracing experience you'd introduce to your family. We'd love to hear your feedback, tell us what you love, and what you hate.
           </Text>
         )}
       </VStack>
-      {mode === "try" ? (
-        <Button
-          size={isCompact ? "xs" : "sm"}
-          aria-label="Try the new Trace Explorer"
-          bg="white"
-          color="purple.700"
-          fontWeight="600"
-          paddingX={isCompact ? 3 : 4}
-          boxShadow="0 1px 2px rgba(0, 0, 0, 0.12)"
-          _hover={{ bg: "white/90", transform: "translateY(-1px)" }}
-          _active={{ bg: "white/80", transform: "translateY(0)" }}
-          transition="background-color 0.12s ease, transform 0.12s ease"
-          onClick={handleTryV2}
-        >
-          Try the new one
-          <Icon as={LuArrowRight} boxSize={3.5} marginLeft={1} />
-        </Button>
-      ) : (
-        <Link
-          href={requestAccessMailto}
-          onClick={handleRequestAccess}
-          aria-label="Request early access to the new Trace Explorer"
-        >
-          <Button
-            size={isCompact ? "xs" : "sm"}
-            bg="white"
-            color="purple.700"
-            fontWeight="600"
-            paddingX={isCompact ? 3 : 4}
-            boxShadow="0 1px 2px rgba(0, 0, 0, 0.12)"
-            _hover={{ bg: "white/90", transform: "translateY(-1px)" }}
-            _active={{ bg: "white/80", transform: "translateY(0)" }}
-            transition="background-color 0.12s ease, transform 0.12s ease"
-          >
-            <Icon as={LuMessageCircle} boxSize={3.5} marginRight={1} />
-            Request early access
-          </Button>
-        </Link>
-      )}
+      <Button
+        size={isCompact ? "xs" : "sm"}
+        aria-label="Try the new Trace Explorer"
+        bg="white"
+        color="purple.700"
+        fontWeight="600"
+        paddingX={isCompact ? 3 : 4}
+        boxShadow="0 1px 2px rgba(0, 0, 0, 0.12)"
+        _hover={{ bg: "white/90", transform: "translateY(-1px)" }}
+        _active={{ bg: "white/80", transform: "translateY(0)" }}
+        transition="background-color 0.12s ease, transform 0.12s ease"
+        onClick={handleTryV2}
+      >
+        Try the new one
+        <Icon as={LuArrowRight} boxSize={3.5} marginLeft={1} />
+      </Button>
       <Tooltip
         content={`Hide for ${SNOOZE_DAYS} days`}
         positioning={{ placement: "top" }}

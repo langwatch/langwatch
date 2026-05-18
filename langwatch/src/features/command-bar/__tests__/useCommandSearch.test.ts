@@ -81,39 +81,15 @@ describe("detectEntityId", () => {
       expect(detectIdType("0123456789ABCDEF0123456789ABCDEF")).toBe("trace");
     });
 
-    describe("when traces v2 is disabled (default)", () => {
-      it("includes traceDetails drawerAction", () => {
-        const result = detectEntityId({
-          query: "trace_abc123",
-          projectSlug: PROJECT_SLUG,
-        });
-        expect(result?.drawerAction).toEqual({
-          drawer: "traceDetails",
-          params: { traceId: "trace_abc123" },
-        });
+    it("navigates to v2 /traces with drawer params (no in-place drawerAction)", () => {
+      const result = detectEntityId({
+        query: "trace_abc123",
+        projectSlug: PROJECT_SLUG,
       });
-
-      it("builds v1 /messages path", () => {
-        const result = detectEntityId({
-          query: "trace_abc123",
-          projectSlug: PROJECT_SLUG,
-        });
-        expect(result?.path).toBe("/test-project/messages/trace_abc123");
-      });
-    });
-
-    describe("when traces v2 is enabled", () => {
-      it("navigates to v2 /traces with drawer params (no in-place drawerAction)", () => {
-        const result = detectEntityId({
-          query: "trace_abc123",
-          projectSlug: PROJECT_SLUG,
-          tracesV2Enabled: true,
-        });
-        expect(result?.path).toBe(
-          "/test-project/traces?drawer.open=traceV2Details&drawer.traceId=trace_abc123"
-        );
-        expect(result?.drawerAction).toBeUndefined();
-      });
+      expect(result?.path).toBe(
+        "/test-project/traces?drawer.open=traceV2Details&drawer.traceId=trace_abc123"
+      );
+      expect(result?.drawerAction).toBeUndefined();
     });
   });
 
@@ -130,35 +106,15 @@ describe("detectEntityId", () => {
       expect(detectIdType("0123456789ABCDEF")).toBe("span");
     });
 
-    describe("when traces v2 is disabled (default)", () => {
-      it("builds v1 /messages search path", () => {
-        const result = detectEntityId({
-          query: "span_abc123",
-          projectSlug: PROJECT_SLUG,
-        });
-        expect(result?.path).toBe("/test-project/messages?query=span_abc123");
+    it("builds v2 /traces fragment path with spanId query-language clause", () => {
+      const result = detectEntityId({
+        query: "span_abc123",
+        projectSlug: PROJECT_SLUG,
       });
-
-      it("does not include drawerAction", () => {
-        const result = detectEntityId({
-          query: "span_abc123",
-          projectSlug: PROJECT_SLUG,
-        });
-        expect(result?.drawerAction).toBeUndefined();
-      });
-    });
-
-    describe("when traces v2 is enabled", () => {
-      it("builds v2 /traces fragment path with spanId query-language clause", () => {
-        const result = detectEntityId({
-          query: "span_abc123",
-          projectSlug: PROJECT_SLUG,
-          tracesV2Enabled: true,
-        });
-        expect(result?.path).toBe(
-          "/test-project/traces#all-traces?q=spanId%3Aspan_abc123"
-        );
-      });
+      expect(result?.path).toBe(
+        "/test-project/traces#all-traces?q=spanId%3Aspan_abc123"
+      );
+      expect(result?.drawerAction).toBeUndefined();
     });
   });
 
