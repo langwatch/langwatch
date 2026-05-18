@@ -72,17 +72,23 @@ function pickGemini(
 ): string | undefined {
   const family = variant === "flagship" ? "pro" : "flash";
   const candidates: Candidate[] = [];
+  // Allow-list rather than prefix-match: the catalog ships variants
+  // like `pro-preview-customtools` and `flash-image-preview` whose
+  // names match a permissive `^pro(-|$)` / `^flash(-|$)` regex but
+  // aren't the general-purpose chat model the picker promises.
+  const proSuffixes = new Set(["pro", "pro-preview"]);
+  const flashSuffixes = new Set([
+    "flash",
+    "flash-lite",
+    "flash-preview",
+    "flash-lite-preview",
+  ]);
+  const allowed = family === "pro" ? proSuffixes : flashSuffixes;
   for (const id of modelIds) {
     const m = /^gemini\/gemini-(\d+)\.(\d+)-([a-z-]+)$/.exec(id);
     if (!m) continue;
     const [, major, minor, suffix] = m;
-    // `pro` matches `pro` + `pro-preview`. `flash` matches `flash`,
-    // `flash-lite`, `flash-thinking`, etc. Most-specific family wins.
-    const matchesFamily =
-      family === "pro"
-        ? /^pro(-|$)/.test(suffix!)
-        : /^flash(-|$)/.test(suffix!);
-    if (!matchesFamily) continue;
+    if (!allowed.has(suffix!)) continue;
     candidates.push({ id, major: Number(major), minor: Number(minor) });
   }
   return rankCandidates(candidates);

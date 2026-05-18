@@ -37,55 +37,45 @@ function pickLatestOpenAIChat(suffixFilter: "plain" | "mini"): string | undefine
 
 /**
  * Picks the newest Gemini chat model in the requested family. Gemini
- * ids look like `gemini/gemini-<major>.<minor>-<variant>` where
- * variant may carry trailing tags (e.g. `pro-preview`,
- * `pro-preview-customtools`, `flash-lite`). We sort by version first,
- * then prefer the cleanest variant tag so the canonical model wins
- * over a feature-flavored variant of the same version: `gemini-3.1-pro`
- * beats `gemini-3.1-pro-preview` beats `gemini-3.1-pro-preview-customtools`.
+ * ids look like `gemini/gemini-<major>.<minor>-<variant>`. We sort
+ * numerically on (major, minor) so the latest version wins regardless
+ * of the "-preview" modifier.
  *
- * Variants we care about:
- *   - "pro" (or "pro-preview"): the flagship, used for DEFAULT
- *   - "flash" or "flash-lite": the mini, used for FAST
+ * Allowed variants (exact match, so noisy spin-offs like
+ * `pro-preview-customtools` or `flash-image-preview` don't sneak in):
+ *   - "pro": `pro`, `pro-preview` → DEFAULT
+ *   - "flash": `flash`, `flash-lite`, `flash-preview`,
+ *              `flash-lite-preview` → FAST
+ *
+ * New legit variants (e.g. a future `flash-thinking`) should be added
+ * here explicitly rather than relaxed-matched, otherwise unrelated
+ * skus with the same prefix get seeded as defaults.
  */
 function pickLatestGeminiChat(family: "pro" | "flash"): string | undefined {
-  const candidates: {
-    id: string;
-    major: number;
-    minor: number;
-    suffix: string;
-  }[] = [];
+  const candidates: { id: string; major: number; minor: number }[] = [];
+  const proSuffixes = new Set(["pro", "pro-preview"]);
+  const flashSuffixes = new Set([
+    "flash",
+    "flash-lite",
+    "flash-preview",
+    "flash-lite-preview",
+  ]);
+  const allowed = family === "pro" ? proSuffixes : flashSuffixes;
   for (const model of Object.values(REGISTRY)) {
     if (model.provider !== "gemini" || model.mode !== "chat") continue;
     const m = /^gemini\/gemini-(\d+)\.(\d+)-([a-z-]+)$/.exec(model.id);
     if (!m) continue;
     const [, major, minor, suffix] = m;
-    // "pro" matches "pro", "pro-preview", "pro-preview-customtools".
-    // "flash" matches "flash", "flash-lite", "flash-thinking", etc.
-    // Most-specific family wins: if the caller asks for flash, don't
-    // match pro-flash hybrids.
-    const matchesFamily =
-      family === "pro"
-        ? /^pro(-|$)/.test(suffix!)
-        : /^flash(-|$)/.test(suffix!);
-    if (!matchesFamily) continue;
+    if (!allowed.has(suffix!)) continue;
     candidates.push({
       id: model.id,
       major: Number(major),
       minor: Number(minor),
-      suffix: suffix!,
     });
   }
-  // Version desc, then suffix length asc (canonical "pro" beats
-  // "pro-preview" beats "pro-preview-customtools" at the same version),
-  // then alpha so the sort is deterministic.
-  candidates.sort((a, b) => {
-    if (a.major !== b.major) return b.major - a.major;
-    if (a.minor !== b.minor) return b.minor - a.minor;
-    if (a.suffix.length !== b.suffix.length)
-      return a.suffix.length - b.suffix.length;
-    return a.suffix.localeCompare(b.suffix);
-  });
+  candidates.sort((a, b) =>
+    b.major !== a.major ? b.major - a.major : b.minor - a.minor,
+  );
   return candidates[0]?.id;
 }
 

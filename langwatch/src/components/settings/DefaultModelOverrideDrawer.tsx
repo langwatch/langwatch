@@ -163,21 +163,28 @@ export function DefaultModelOverrideDrawer({
     return m;
   }, [features]);
 
-  // Narrow the model picker to only providers enabled in the cascade
-  // visible to this project. Chat-mode models for DEFAULT/FAST roles;
-  // embedding-mode for EMBEDDINGS. Custom models registered on the
-  // provider (e.g. extra OpenAI deployment names) are folded in so
-  // self-serve admins see what they've added.
-  const projectProviders = api.modelProvider.getAllForProject.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: !!project?.id && open, refetchOnMount: false },
-  );
+  // Narrow the model picker to only providers the user explicitly
+  // configured (one of their scopes has a stored ModelProvider row).
+  // The legacy `getAllForProject` Record merges env-fed defaults
+  // (every registry provider whose API key happens to be present in
+  // the server's process env), which surfaces unrelated providers in
+  // the picker — a user with only Anthropic configured would see
+  // Voyage / Gemini / Perplexity embeddings just because those env
+  // vars are set on the host. `listAllForProjectForFrontend` returns
+  // stored rows only.
+  const projectProviders =
+    api.modelProvider.listAllForProjectForFrontend.useQuery(
+      { projectId: project?.id ?? "" },
+      { enabled: !!project?.id && open, refetchOnMount: false },
+    );
 
   const modelOptionsByRole = useMemo(() => {
-    const providers = projectProviders.data ?? {};
-    const enabledEntries = Object.entries(providers).filter(
-      ([, p]) => p?.enabled === true,
-    );
+    const providers = projectProviders.data?.providers ?? [];
+    const enabledEntries: Array<
+      [string, (typeof providers)[number]]
+    > = providers
+      .filter((p) => p.enabled === true)
+      .map((p) => [p.provider, p]);
     const enabledKeys = new Set(enabledEntries.map(([k]) => k));
     // First-paint fallback: no providers loaded yet → list everything so
     // the dropdown isn't visually broken while the query is in flight.
