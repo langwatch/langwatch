@@ -549,16 +549,16 @@ describe("PromptTabbedSection Layout Modes", () => {
       ).toBeInTheDocument();
     });
 
-    it("shows runtime config as read-only version data", async () => {
+    it("shows runtime parameters as read-only key-value rows", async () => {
       /**
-       * @scenario Prompt playground shows runtime config as read-only version data
+       * @scenario Prompt playground shows runtime parameters as read-only version data
        */
       const user = userEvent.setup();
       renderPromptTabbedSection(
         { layoutMode: "vertical" },
         {
           version: {
-            config: { readonly: true },
+            parameters: { readonly: true },
             configData: {
               inputs: [],
               demonstrations: { inline: { records: {} } },
@@ -567,11 +567,11 @@ describe("PromptTabbedSection Layout Modes", () => {
         },
       );
 
-      await user.click(screen.getByRole("tab", { name: /config/i }));
+      await user.click(screen.getByRole("tab", { name: /parameters/i }));
 
-      expect(screen.getByTestId("runtime-parameters-readonly")).toHaveTextContent(
-        '"readonly": true',
-      );
+      const container = screen.getByTestId("runtime-parameters-readonly");
+      expect(container).toHaveTextContent("readonly");
+      expect(container).toHaveTextContent("true");
     });
   });
 });
