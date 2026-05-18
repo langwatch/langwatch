@@ -1,24 +1,27 @@
 .PHONY: help start sync-all-openapi user-delete-dry-run user-delete es-delete-dry-run es-delete
-.PHONY: dev dev-nlp dev-scenarios dev-test dev-full down logs clean ps quickstart quickstart-help worktree
-.PHONY: dev-up dev-down dev-logs setup-hooks service service-watch
-.PHONY: _dev-deprecation-warning _dev-up-deprecation-warning
+.PHONY: down logs clean ps quickstart quickstart-help worktree
+.PHONY: dev-up dev-down dev-logs setup-hooks service service-watch test-scripts
+.PHONY: _dev-up-deprecation-warning
 
 # Surface every target — boxd-* are pulled in via include below.
 help:
 	@echo "LangWatch dev targets:"
 	@echo ""
 	@echo "  Primary (Docker dev environment):"
-	@echo "    make quickstart                     interactive — asks 'what are you working on?'"
+	@echo "    make quickstart                     interactive preset picker"
+	@echo "    make quickstart all-local           local CH+PG+Redis+app, no NLP (fast iteration default)"
+	@echo "    make quickstart all-local-nlp       all-local + langwatch_nlp + langevals"
+	@echo "    make quickstart dev-storage         local DBs, stored-objects -> dev S3 (runtime-storage-dev)"
+	@echo "    make quickstart dev-infra           everything against shared dev infra (no compose)"
 	@echo "    make quickstart frontend-only       no compose; pure pnpm dev against your .env URLs"
-	@echo "    make quickstart backend-shared      postgres + redis + clickhouse + app, URLs → local"
 	@echo "    make quickstart migration           postgres + clickhouse on host ports (prisma migrate)"
-	@echo "    make quickstart nlp                 backend + langwatch_nlp + langevals"
-	@echo "    make quickstart full-local          everything (--profile full)"
-	@echo "    make quickstart-help                non-interactive mode reference"
+	@echo "    make quickstart full-local          kitchen-sink local (workers + bullboard + ai-server)"
+	@echo "    make quickstart-help                non-interactive preset reference"
 	@echo "    make service svc=<name>             run a Go service (e.g. aigateway)"
 	@echo "    make service-watch svc=<name>       run a Go service with live reload (air)"
 	@echo "    make worktree <issue|name>          create a git worktree for an issue/feature"
 	@echo "    make down                           stop all services"
+	@echo "    make test-scripts                   run bats unit tests under scripts/__tests__/"
 	@echo ""
 	@echo "  Boxd workflows (multi-step orchestration over the boxd CLI):"
 	@echo "    make boxd-help                      full boxd target reference"
@@ -88,6 +91,26 @@ service-watch:
 # (interactive) or `./scripts/dev.sh <preset>` directly. Preset list:
 # all-local, all-local-nlp, dev-storage, dev-infra, frontend-only,
 # migration, full-local.
+
+# Run all *.unit.bats tests under scripts/__tests__/. Wired into CI's
+# `ci-scripts-test` job so shell-script behavior gates merges the same
+# way TypeScript unit tests do. Requires `bats` (`brew install bats-core`
+# locally; installed via apt-get on Ubuntu CI runners).
+#
+# We deliberately glob only *.unit.bats, not all *.bats. The
+# *.integration.bats files (boxd-fork, worktree) exercise scripts that
+# shell out to git / docker / external CLIs against the contributor's
+# real filesystem; running them in CI either flakes or requires fixtures
+# that don't exist in a fresh checkout. Integration coverage for those
+# is owned by their respective workflows, not this target.
+test-scripts:
+	@if ! command -v bats >/dev/null 2>&1; then \
+		echo "ERROR: bats not installed. Install with:" >&2; \
+		echo "  macOS:  brew install bats-core" >&2; \
+		echo "  Linux:  sudo apt-get install -y bats" >&2; \
+		exit 1; \
+	fi
+	bats scripts/__tests__/*.unit.bats
 
 # Stop all services
 down:

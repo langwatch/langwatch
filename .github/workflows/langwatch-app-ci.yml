@@ -404,6 +404,12 @@ jobs:
       - name: Test start-clickhouse-with-storage-policy.sh
         run: bash .github/scripts/__tests__/start-clickhouse-with-storage-policy.test.sh
 
+      - name: Install bats
+        run: sudo apt-get update && sudo apt-get install -y bats
+
+      - name: Run bats tests (scripts/__tests__/*.bats)
+        run: make test-scripts
+
   ci-self-test:
     needs: changes
     if: needs.changes.outputs.relevant == 'true'
