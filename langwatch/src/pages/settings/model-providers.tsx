@@ -6,6 +6,7 @@ import {
   EmptyState,
   Heading,
   HStack,
+  Skeleton,
   Spacer,
   Spinner,
   Table,
@@ -222,7 +223,7 @@ export default function ModelsPage() {
         </HStack>
 
         {isLoading ? (
-          <Spinner />
+          <ProvidersTableSkeleton />
         ) : enabledProviders.length === 0 ? (
           <EmptyState.Root width="full">
             <EmptyState.Content>
@@ -376,14 +377,16 @@ export default function ModelsPage() {
           </Card.Root>
         )}
 
-        {/* Hierarchical default models — section moved out of the
-            provider drawer. Resolves project → team → organization →
-            built-in constant. See specs/model-providers/
-            hierarchical-default-models.feature. */}
-        <DefaultModelsSection
-          filter={scopeFilter}
-          onFilterChange={setScopeFilter}
-        />
+        {/* Default Models section only renders once the project has at
+            least one enabled provider. With zero providers the section
+            below the empty-state would just be confusing — there's
+            nothing to pick a default from. */}
+        {!isLoading && enabledProviders.length > 0 && (
+          <DefaultModelsSection
+            filter={scopeFilter}
+            onFilterChange={setScopeFilter}
+          />
+        )}
 
         <Dialog.Root
           open={!!providerToDisable}
@@ -499,6 +502,49 @@ export function TopicClusteringModel() {
         {hook.isSaving && <Spinner size="sm" marginRight={2} />}
       </HStack>
     </HorizontalFormControl>
+  );
+}
+
+/**
+ * Skeleton render of the providers table — keeps the page from
+ * flashing a bare spinner on first load (or on a refocus refetch that
+ * follows an upstream error). Matches the real table shape (header + 3
+ * rows of provider chip + scope chip + 3-dot menu) so the layout
+ * doesn't jump when the data lands.
+ */
+function ProvidersTableSkeleton() {
+  return (
+    <Card.Root width="full" overflow="hidden" data-testid="providers-table-skeleton">
+      <Card.Body paddingY={0} paddingX={0}>
+        <Table.Root variant="line" size="md" width="full">
+          <Table.Header>
+            <Table.Row>
+              <Table.ColumnHeader>Provider</Table.ColumnHeader>
+              <Table.ColumnHeader>Scope</Table.ColumnHeader>
+              <Table.ColumnHeader />
+            </Table.Row>
+          </Table.Header>
+          <Table.Body>
+            {[0, 1, 2].map((i) => (
+              <Table.Row key={i}>
+                <Table.Cell>
+                  <HStack gap={3} align="center">
+                    <Skeleton width="24px" height="24px" borderRadius="sm" />
+                    <Skeleton width="120px" height="16px" />
+                  </HStack>
+                </Table.Cell>
+                <Table.Cell>
+                  <Skeleton width="80px" height="20px" borderRadius="full" />
+                </Table.Cell>
+                <Table.Cell textAlign="right">
+                  <Skeleton width="24px" height="24px" borderRadius="md" marginLeft="auto" />
+                </Table.Cell>
+              </Table.Row>
+            ))}
+          </Table.Body>
+        </Table.Root>
+      </Card.Body>
+    </Card.Root>
   );
 }
 

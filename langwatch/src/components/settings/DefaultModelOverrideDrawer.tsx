@@ -570,11 +570,12 @@ function buildInheritOption(
     }
     // `feature_override` / `role_default` carry a concrete scope name
     // (organization / team / project). The "system" / env-var fallback
-    // is surfaced via `fromEffective` below, not the cascade endpoint.
-    const scope = fromServer.scope ?? "cascade";
+    // is surfaced via `fromEffective` below.
     return {
       model: fromServer.model,
-      label: `Inherit (from ${scope})`,
+      label: fromServer.scope
+        ? `Inherit (from ${fromServer.scope})`
+        : "Inherit",
     };
   }
   if (fromEffective) {
@@ -584,10 +585,11 @@ function buildInheritOption(
         label: "Inherit (from System)",
       };
     }
-    const scope = fromEffective.scope ?? "cascade";
     return {
       model: fromEffective.model,
-      label: `Inherit (from ${scope})`,
+      label: fromEffective.scope
+        ? `Inherit (from ${fromEffective.scope})`
+        : "Inherit",
     };
   }
   return undefined;

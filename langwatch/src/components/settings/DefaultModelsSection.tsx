@@ -179,7 +179,7 @@ export function DefaultModelsSection({
             Default Models
           </Heading>
           <Text fontSize="sm" color="fg.muted">
-            Define the default models to be used for AI features across the platform.
+            AI features across the platform: prompt creation, evaluations, traces search, topic clustering and more
           </Text>
         </VStack>
         <HStack gap={2}>
@@ -210,28 +210,41 @@ export function DefaultModelsSection({
         </HStack>
       </HStack>
 
-      <Card.Root width="full" overflow="hidden">
-        <Card.Body paddingX={0} paddingY={0}>
-          {filter.kind === "all" ? (
-            <AllConfigsView
-              configs={data.configs}
-              features={data.features}
-              onEdit={openEdit}
-              onDelete={handleDelete}
-              onAdd={openAdd}
-            />
-          ) : (
-            <ResolvedScopeView
-              filter={filter}
-              configs={data.configs}
-              effective={data.effective}
-              featuresByRole={featuresByRole}
-              currentTeamId={team?.id}
-              currentProjectId={project?.id}
-            />
-          )}
-        </Card.Body>
-      </Card.Root>
+      {filter.kind === "all" && data.configs.length === 0 ? (
+        // Empty state mirrors the Model Providers list above — no
+        // surrounding bordered card. The callout reads as a single
+        // affordance instead of a boxed message inside a section card.
+        <AllConfigsView
+          configs={data.configs}
+          features={data.features}
+          onEdit={openEdit}
+          onDelete={handleDelete}
+          onAdd={openAdd}
+        />
+      ) : (
+        <Card.Root width="full" overflow="hidden">
+          <Card.Body paddingX={0} paddingY={0}>
+            {filter.kind === "all" ? (
+              <AllConfigsView
+                configs={data.configs}
+                features={data.features}
+                onEdit={openEdit}
+                onDelete={handleDelete}
+                onAdd={openAdd}
+              />
+            ) : (
+              <ResolvedScopeView
+                filter={filter}
+                configs={data.configs}
+                effective={data.effective}
+                featuresByRole={featuresByRole}
+                currentTeamId={team?.id}
+                currentProjectId={project?.id}
+              />
+            )}
+          </Card.Body>
+        </Card.Root>
+      )}
 
       <DefaultModelOverrideDrawer
         open={drawerOpen}
@@ -276,10 +289,7 @@ function AllConfigsView({
           <VStack textAlign="center" gap={2}>
             <EmptyState.Title>No default models configured</EmptyState.Title>
             <EmptyState.Description>
-              Define a default model to enable AI features across the
-              platform — prompt creation, evaluations, traces search,
-              workflows, scenarios, and analytics all read from this
-              cascade.
+              Define a default model for prompt creation, evaluations, traces search, topic clustering and more.
             </EmptyState.Description>
             <Button
               size="sm"
@@ -287,10 +297,7 @@ function AllConfigsView({
               onClick={onAdd}
               data-testid="empty-state-add-config"
             >
-              <HStack gap={1}>
-                <Plus size={14} />
-                <Text>Add your first config</Text>
-              </HStack>
+              Select default models
             </Button>
           </VStack>
         </EmptyState.Content>
