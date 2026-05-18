@@ -7,6 +7,7 @@
 import { createHash } from "node:crypto";
 import type { Readable } from "node:stream";
 import { SpanKind } from "@opentelemetry/api";
+import { Instance, Ksuid } from "@langwatch/ksuid";
 import { getLangWatchTracer } from "langwatch";
 import {
   getStoredObjectDedupHitCounter,
@@ -30,21 +31,14 @@ const tracer = getLangWatchTracer("langwatch.stored-objects.service");
 const logger = createLogger("langwatch:stored-objects:service");
 
 /**
- * Computes a deterministic UUID v5 from the combination of project_id and sha256.
+ * Derives a deterministic content-addressed id from (projectId, sha256).
  *
- * The `uuid` package is not present in this repo, so we derive the same result
- * manually:
- *  1. Hash `${projectId}:${sha256}` with SHA-1 (20 bytes).
- *  2. Set version bits (nibble at byte[6] high) to 0101 (v5).
- *  3. Set variant bits (byte[8] high two bits) to 10.
- *  4. Format the 16 bytes as a standard UUID string.
- *
- * The remaining 4 bytes of SHA-1 (bytes 16-19) are discarded — this matches
- * the RFC 4122 UUID v5 construction which uses a fixed 128-bit namespace UUID
- * combined with a hash but takes only 16 bytes total.
- *
- * Same inputs ALWAYS produce the same output, so concurrent pods calling this
- * function for the same (projectId, sha256) pair will write the same id.
+ * Uses @langwatch/ksuid with a fixed timestamp (0) and sequence (0) so the
+ * id is purely a function of the input bytes — no randomness, no system clock.
+ * The 8-byte Instance identifier is the first 8 bytes of sha1(projectId:sha256),
+ * making same inputs always produce the same output. Concurrent pods calling
+ * this function for the same (projectId, sha256) pair will write the same id,
+ * collapsing onto one ClickHouse row in the ReplacingMergeTree.
  */
 function deriveStoredObjectId({
   projectId,
@@ -53,26 +47,10 @@ function deriveStoredObjectId({
   projectId: string;
   sha256: string;
 }): string {
-  const hash = createHash("sha1")
-    .update(`${projectId}:${sha256}`)
-    .digest();
-
-  // Mutate the bytes in place per RFC 4122 §4.3 (Name-Based UUIDs / v5):
-  //  - Byte 6 high nibble = 0101 (version = 5)
-  //  - Byte 8 high two bits = 10 (variant = RFC 4122)
-  // No `as number` cast needed — bitwise ops on Uint8Array elements
-  // return numbers; the assignment back into the buffer is well-typed.
-  hash[6] = (hash[6]! & 0x0f) | 0x50;
-  hash[8] = (hash[8]! & 0x3f) | 0x80;
-
-  const hex = hash.toString("hex", 0, 16);
-  return [
-    hex.slice(0, 8),
-    hex.slice(8, 12),
-    hex.slice(12, 16),
-    hex.slice(16, 20),
-    hex.slice(20, 32),
-  ].join("-");
+  const hash = createHash("sha1").update(`${projectId}:${sha256}`).digest();
+  const identifier = hash.subarray(0, 8) as unknown as Uint8Array;
+  const instance = new Instance(Instance.schemes.RANDOM, identifier);
+  return new Ksuid("prod", "so", 0, instance, 0).toString();
 }
 
 /**

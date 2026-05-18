@@ -273,10 +273,8 @@ describe("storeFromBytes", () => {
       const idFromPod2 = deriveStoredObjectId({ projectId: PROJECT_ID, sha256 });
 
       expect(idFromPod1).toBe(idFromPod2);
-      // Must look like a UUID
-      expect(idFromPod1).toMatch(
-        /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
-      );
+      // Must look like a KSUID: resource_<29-char-base62>
+      expect(idFromPod1).toMatch(/^so_[0-9A-Za-z]{29}$/);
     });
   });
 });
