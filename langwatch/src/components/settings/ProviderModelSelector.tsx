@@ -353,13 +353,18 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
           >
             {group.models.map((item) => (
               <Select.Item key={item.value} item={item}>
-                <HStack gap={2} align={item.subtitle ? "flex-start" : "center"}>
-                  {item.icon && (
-                    <Box width={MODEL_ICON_SIZE} minWidth={MODEL_ICON_SIZE}>
-                      {item.icon}
-                    </Box>
-                  )}
-                  <Box>
+                {/* Two-line alias items keep icon + label on the same
+                    HStack so the icon visually anchors to the label
+                    line. The resolved-id subtitle wraps under the
+                    text column, indented past the icon slot so the
+                    column reads cleanly. */}
+                <Box>
+                  <HStack gap={2} align="center">
+                    {item.icon && (
+                      <Box width={MODEL_ICON_SIZE} minWidth={MODEL_ICON_SIZE}>
+                        {item.icon}
+                      </Box>
+                    )}
                     <Box
                       fontSize={size === "sm" ? 12 : 14}
                       fontFamily={item.subtitle ? undefined : "mono"}
@@ -368,18 +373,19 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
                     >
                       {item.label}
                     </Box>
-                    {item.subtitle && (
-                      <Text
-                        fontSize="xs"
-                        color="fg.muted"
-                        fontFamily="mono"
-                        lineClamp={1}
-                      >
-                        {item.subtitle}
-                      </Text>
-                    )}
-                  </Box>
-                </HStack>
+                  </HStack>
+                  {item.subtitle && (
+                    <Text
+                      fontSize="xs"
+                      color="fg.muted"
+                      fontFamily="mono"
+                      lineClamp={1}
+                      paddingLeft={`calc(${MODEL_ICON_SIZE}px + var(--chakra-spacing-2))`}
+                    >
+                      {item.subtitle}
+                    </Text>
+                  )}
+                </Box>
               </Select.Item>
             ))}
           </Select.ItemGroup>

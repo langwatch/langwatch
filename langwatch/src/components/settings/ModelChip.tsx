@@ -42,9 +42,9 @@ export function ModelChip({
   const icon =
     modelProviderIcons[providerKey as keyof typeof modelProviderIcons];
   const iconSlot = size === "sm" ? MODEL_ICON_SIZE_SM : MODEL_ICON_SIZE;
-  // Alias rendering: `openai/latest` shows as "Latest" with the
-  // resolved concrete id on a second line, so the table reads
-  // "Latest → gpt-5.5" instead of an opaque "latest" string.
+  // Alias rendering: `openai/latest` shows as "Latest (gpt-5.5)" with
+  // the resolved concrete id inline in muted text so the table reads
+  // as a single line, parens-disambiguated, instead of a stacked pair.
   const aliasResolved = isLatestAlias(model) ? resolveLatestAlias(model) : null;
   const aliasLabel =
     isLatestAlias(model)
@@ -66,25 +66,20 @@ export function ModelChip({
         </Box>
       )}
       {aliasLabel ? (
-        <Box>
-          <Text
-            fontSize={size === "sm" ? "xs" : "sm"}
-            fontWeight="medium"
-            lineClamp={1}
-          >
+        <Text
+          fontSize={size === "sm" ? "xs" : "sm"}
+          lineClamp={1}
+        >
+          <Text as="span" fontWeight="medium">
             {aliasLabel}
           </Text>
           {aliasResolved && (
-            <Text
-              fontFamily="mono"
-              fontSize={size === "sm" ? "2xs" : "xs"}
-              color="fg.muted"
-              lineClamp={1}
-            >
-              {aliasResolved.split("/").slice(1).join("/")}
+            <Text as="span" color="fg.muted" fontFamily="mono">
+              {" "}
+              ({aliasResolved.split("/").slice(1).join("/")})
             </Text>
           )}
-        </Box>
+        </Text>
       ) : (
         <Text
           fontFamily="mono"
