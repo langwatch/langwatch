@@ -8,7 +8,7 @@
 # at a time.
 #
 # Operators running anything larger than a hobby instance MUST enable
-# app.datasetObjectStorage with S3/MinIO/Azure-compatible storage
+# app.dataplane with S3/MinIO/Azure-compatible storage
 # instead — see charts/langwatch/README.md.
 apiVersion: v1
 kind: PersistentVolumeClaim

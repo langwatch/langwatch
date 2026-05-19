@@ -128,13 +128,6 @@ export function createEnvConfig() {
       // service. Self-hosting operators running multi-pod deployments MUST
       // configure object storage instead — the local-FS path is dev-only.
       LANGWATCH_LOCAL_STORAGE_PATH: z.string().optional(),
-      // Legacy local-filesystem path read by storage.ts:getLocalStoragePath
-      // for dataset uploads (DATASET_STORAGE_LOCAL=true). The newer
-      // stored-objects path uses LANGWATCH_LOCAL_STORAGE_PATH; both are
-      // optional and have separate defaults. Surfaced through the validated
-      // env so the previously-raw process.env access at storage.ts:20
-      // appears in the same config surface.
-      LOCAL_STORAGE_PATH: z.string().optional(),
       // Azure Blob Storage — optional alternative to S3 for stored-objects.
       // Set all three together; AZURE_BLOB_ENDPOINT only needs to be set for
       // emulator or sovereign-cloud deployments (e.g. Azurite, Azure Gov).
@@ -283,7 +276,6 @@ export function createEnvConfig() {
       S3_REGION: process.env.S3_REGION,
       S3_BUCKET_NAME: process.env.S3_BUCKET_NAME,
       LANGWATCH_LOCAL_STORAGE_PATH: process.env.LANGWATCH_LOCAL_STORAGE_PATH,
-      LOCAL_STORAGE_PATH: process.env.LOCAL_STORAGE_PATH,
       AZURE_BLOB_ACCOUNT_NAME: process.env.AZURE_BLOB_ACCOUNT_NAME,
       AZURE_BLOB_ACCOUNT_KEY: process.env.AZURE_BLOB_ACCOUNT_KEY,
       AZURE_BLOB_ENDPOINT: process.env.AZURE_BLOB_ENDPOINT,

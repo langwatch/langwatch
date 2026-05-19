@@ -24103,7 +24103,7 @@ For a deployment with 150 GB/month of trace data, cold storage can save ~$500/ye
 
 ## S3 Dataset Backups
 
-If you're using S3 for dataset storage (`app.datasetObjectStorage.enabled: true`), protect this data with:
+If you're using S3 for dataset storage (`app.dataplane.enabled: true`), protect this data with:
 
 - **S3 Versioning**: Enable versioning on the bucket to recover from accidental deletes
 - **Cross-region replication**: For disaster recovery, replicate to another region
@@ -24236,17 +24236,14 @@ Each SSO provider requires specific variables. See [SSO Configuration](/self-hos
 
 The dataplane S3 bucket is the general file-storage layer for all externalized byte content. Current consumers:
 
-- **Stored objects (scenario media)** — automatic for every applicable scenario event. The `/api/scenario-events` ingest path extracts inline `audio` / `image` / `video` / `document` bytes from incoming events, content-addresses them under `{projectId}/{sha256}`, and rewrites the event payload to reference the stored object by id. The bytes are served back via `GET /api/files/:id`.
-- **Dataset uploads** — enabled via `DATASET_OBJECT_STORAGE_ENABLED`. Persists rows uploaded through the dataset UI. This flag exists for backwards compatibility with deployments that configured datasets separately; both consumers share the same `S3_BUCKET_NAME` bucket.
+- **Stored objects** — externalized byte content (audio, image, video, document) extracted from incoming events and dataset uploads. Bytes are content-addressed under `{projectId}/{sha256}` and served back via `GET /api/files/:id`.
+- **Dataset uploads** — persists rows uploaded through the dataset UI. Shares the same `S3_BUCKET_NAME` bucket.
 
 When `S3_BUCKET_NAME` is set, all consumers use that bucket. When it is not set, stored-objects fall back to the local filesystem at `LANGWATCH_LOCAL_STORAGE_PATH` — fine for single-replica installs, **not** for horizontally-scaled deployments (see warning below).
 
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `S3_BUCKET_NAME` | Dataplane bucket shared by datasets + stored-objects | — |
-| `DATASET_OBJECT_STORAGE_ENABLED` | Enable S3 for dataset uploads (backwards-compat flag; uses the shared `S3_BUCKET_NAME` bucket) | `false` |
-| `DATASET_OBJECT_STORAGE_PROVIDER` | Storage provider (`awsS3`) | `awsS3` |
-| `DATASET_OBJECT_STORAGE_BUCKET` | Bucket name for dataset uploads (defaults to `S3_BUCKET_NAME`) | `langwatch-dataset` |
 | `S3_ENDPOINT` | Custom S3 endpoint (for MinIO, etc.) | — |
 | `S3_ACCESS_KEY_ID` | S3 access key ID | — |
 | `S3_SECRET_ACCESS_KEY` | S3 secret access key | — |
@@ -24258,7 +24255,7 @@ When running on AWS with IRSA (IAM Roles for Service Accounts), you don't need t
 </Note>
 
 <Warning>
-`LANGWATCH_LOCAL_STORAGE_PATH` is **single-replica only**. Multi-pod Kubernetes deployments must NOT rely on it: pods do not share a local filesystem, so a write from pod A is invisible to pod B and bytes vanish on every pod restart. Single-replica self-host installs (small footprints, hobbyist / air-gapped / pre-pilot deployments) can use it safely — the Helm chart refuses to render `localFilesystem.enabled=true` together with `replicaCount > 1` so the misconfiguration can't reach a cluster. Use `S3_BUCKET_NAME` (or the equivalent Helm `app.datasetObjectStorage.enabled` toggle) for any horizontally-scaled deployment.
+`LANGWATCH_LOCAL_STORAGE_PATH` is **single-replica only**. Multi-pod Kubernetes deployments must NOT rely on it: pods do not share a local filesystem, so a write from pod A is invisible to pod B and bytes vanish on every pod restart. Single-replica self-host installs (small footprints, hobbyist / air-gapped / pre-pilot deployments) can use it safely — the Helm chart refuses to render `localFilesystem.enabled=true` together with `replicaCount > 1` so the misconfiguration can't reach a cluster. Use `S3_BUCKET_NAME` (or the equivalent Helm `app.dataplane.enabled` toggle) for any horizontally-scaled deployment.
 </Warning>
 
 ## Email
@@ -24319,8 +24316,8 @@ When using the Helm chart, configuration is set in `values.yaml` rather than env
 | `app.evaluators.google.enabled` | `GOOGLE_EVALUATOR_ENABLED` |
 | `app.evaluators.google.credentials.value` | `GOOGLE_CREDENTIALS_JSON` |
 | `app.telemetry.usage.enabled` | Inverse of `DISABLE_USAGE_STATS` |
-| `app.datasetObjectStorage.enabled` | `DATASET_OBJECT_STORAGE_ENABLED` |
-| `app.datasetObjectStorage.bucket` | `DATASET_OBJECT_STORAGE_BUCKET` |
+| `app.dataplane.enabled` | `USE_S3_STORAGE` |
+| `app.dataplane.bucket` | `S3_BUCKET_NAME` |
 | `postgresql.external.connectionString.value` | `DATABASE_URL` |
 | `redis.external.connectionString.value` | `REDIS_URL` |
 | `workers.enabled` | Inverse of `START_WORKERS` |
@@ -26162,7 +26159,7 @@ The `langwatch/clickhouse-serverless` Docker image is a performance-tweaked Clic
 - ClickHouse cold storage (tiered after TTL)
 - ClickHouse backups (full + incremental)
 - Dataset storage (optional)
-- **Scenario media externalization** — audio/image/video/document bytes extracted from `/api/scenario-events` payloads and served back via `GET /api/files/:id`. The bucket is content-addressed under `{projectId}/{sha256}`. This is the most write-heavy of the four surfaces because it fires on every applicable event, not on opt-in user action.
+- **Stored objects** — externalized byte content (audio/image/video/document) content-addressed under `{projectId}/{sha256}` and served back via `GET /api/files/:id`.
 
 ## Event Sourcing Pipeline
 

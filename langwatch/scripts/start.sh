@@ -44,23 +44,11 @@ if [ -z "$NODE_ENV" ]; then
   RUNTIME_ENV="$RUNTIME_ENV NODE_ENV=production"
 fi
 
-# Dev mode uses `tsx watch` so server-side edits hot-reload without a
-# container restart — the API container previously ran `tsx` once and
-# stayed, making every server-side change require a manual restart.
-# Production keeps the fast-start `tsx src/server.mts` path.
-if [[ "$NODE_ENV" = "development" ]]; then
-  START_APP_COMMAND="pnpm run start:app:dev"
-else
-  START_APP_COMMAND="pnpm run start:app"
-fi
+START_APP_COMMAND="pnpm run start:app"
 
 START_WORKERS_COMMAND=""
 if [[ "$START_WORKERS" = "true" || "$START_WORKERS" = "1" ]]; then
-  if [[ "$NODE_ENV" = "development" ]]; then
-    START_WORKERS_COMMAND="pnpm run start:workers:dev && exit 1"
-  else
-    START_WORKERS_COMMAND="pnpm run start:workers && exit 1"
-  fi
+  START_WORKERS_COMMAND="pnpm run start:workers && exit 1"
 fi
 
 # In development, Vite runs on PORT (default 5560) and proxies /api/* to PORT+1000.

@@ -18,7 +18,7 @@ export class StorageService {
       );
     }
     const storageDir =
-      env.LOCAL_STORAGE_PATH ?? path.resolve(process.cwd(), "storage");
+      process.env.LOCAL_STORAGE_PATH ?? path.resolve(process.cwd(), "storage");
     const fullPath = path.join(storageDir, projectId, key);
     await fs.mkdir(path.dirname(fullPath), { recursive: true });
     return fullPath;

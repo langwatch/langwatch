@@ -121,48 +121,44 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/* Validate dataplane storage configuration for stored-objects.
-     Hard-fail conditions (real misconfigurations):
-       - localFilesystem.enabled AND replicaCount > 1: pods don't share
-         a local filesystem, so multi-pod with local-FS is guaranteed
-         data loss. Refuse to render.
-     Soft conditions (logged but not blocking, see helpers for the
-     diagnostic ConfigMap):
-       - Neither datasetObjectStorage.enabled nor localFilesystem.enabled
-         is set. Scenario events with inline media will write to the
-         container's ephemeral writable layer; operators MUST configure
-         one of the two for any non-toy deployment. The chart still
-         renders so existing single-pod self-host installs keep working
-         on upgrade. */}}
-{{- if .Values.app.storedObjects.localFilesystem.enabled }}
+     dataplane.enabled takes precedence over localFilesystem.enabled when
+     both are set, so multi-replica is fine as long as dataplane is on.
+     Hard-fail: localFilesystem is the active backend AND replicaCount > 1
+     (pods don't share a local filesystem, so multi-pod with local-FS is
+     guaranteed data loss). Operators who explicitly disable both
+     (Neither dataplane.enabled nor localFilesystem.enabled) will fall back
+     to the ephemeral writable container layer — fine for tests, lost on
+     pod restart. */}}
+{{- if and .Values.app.storedObjects.localFilesystem.enabled (not .Values.app.dataplane.enabled) }}
   {{- if gt (int .Values.app.replicaCount) 1 }}
-    {{- $errors = append $errors "app.storedObjects.localFilesystem.enabled requires replicaCount=1 (pods don't share a local filesystem). Use app.datasetObjectStorage.enabled instead for multi-replica deployments." }}
+    {{- $errors = append $errors "app.storedObjects.localFilesystem.enabled requires replicaCount=1 (pods don't share a local filesystem). Enable app.dataplane for multi-replica deployments." }}
   {{- end }}
 {{- end }}
 
 {{/* Validate dataset storage secrets */}}
-{{- if .Values.app.datasetObjectStorage.enabled }}
-  {{- if eq .Values.app.datasetObjectStorage.provider "awsS3" }}
-    {{- if .Values.app.datasetObjectStorage.providers.awsS3.endpoint.secretKeyRef.name }}
-      {{- if empty .Values.app.datasetObjectStorage.providers.awsS3.endpoint.secretKeyRef.key }}
-        {{- $errors = append $errors "app.datasetObjectStorage.providers.awsS3.endpoint.secretKeyRef.name is set but key is empty" }}
+{{- if .Values.app.dataplane.enabled }}
+  {{- if eq .Values.app.dataplane.provider "awsS3" }}
+    {{- if .Values.app.dataplane.providers.awsS3.endpoint.secretKeyRef.name }}
+      {{- if empty .Values.app.dataplane.providers.awsS3.endpoint.secretKeyRef.key }}
+        {{- $errors = append $errors "app.dataplane.providers.awsS3.endpoint.secretKeyRef.name is set but key is empty" }}
       {{- end }}
     {{- end }}
     
-    {{- if .Values.app.datasetObjectStorage.providers.awsS3.accessKeyId.secretKeyRef.name }}
-      {{- if empty .Values.app.datasetObjectStorage.providers.awsS3.accessKeyId.secretKeyRef.key }}
-        {{- $errors = append $errors "app.datasetObjectStorage.providers.awsS3.accessKeyId.secretKeyRef.name is set but key is empty" }}
+    {{- if .Values.app.dataplane.providers.awsS3.accessKeyId.secretKeyRef.name }}
+      {{- if empty .Values.app.dataplane.providers.awsS3.accessKeyId.secretKeyRef.key }}
+        {{- $errors = append $errors "app.dataplane.providers.awsS3.accessKeyId.secretKeyRef.name is set but key is empty" }}
       {{- end }}
     {{- end }}
     
-    {{- if .Values.app.datasetObjectStorage.providers.awsS3.secretAccessKey.secretKeyRef.name }}
-      {{- if empty .Values.app.datasetObjectStorage.providers.awsS3.secretAccessKey.secretKeyRef.key }}
-        {{- $errors = append $errors "app.datasetObjectStorage.providers.awsS3.secretAccessKey.secretKeyRef.name is set but key is empty" }}
+    {{- if .Values.app.dataplane.providers.awsS3.secretAccessKey.secretKeyRef.name }}
+      {{- if empty .Values.app.dataplane.providers.awsS3.secretAccessKey.secretKeyRef.key }}
+        {{- $errors = append $errors "app.dataplane.providers.awsS3.secretAccessKey.secretKeyRef.name is set but key is empty" }}
       {{- end }}
     {{- end }}
     
-    {{- if .Values.app.datasetObjectStorage.providers.awsS3.keySalt.secretKeyRef.name }}
-      {{- if empty .Values.app.datasetObjectStorage.providers.awsS3.keySalt.secretKeyRef.key }}
-        {{- $errors = append $errors "app.datasetObjectStorage.providers.awsS3.keySalt.secretKeyRef.name is set but key is empty" }}
+    {{- if .Values.app.dataplane.providers.awsS3.keySalt.secretKeyRef.name }}
+      {{- if empty .Values.app.dataplane.providers.awsS3.keySalt.secretKeyRef.key }}
+        {{- $errors = append $errors "app.dataplane.providers.awsS3.keySalt.secretKeyRef.name is set but key is empty" }}
       {{- end }}
     {{- end }}
   {{- end }}
@@ -468,10 +464,10 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 # Dataplane Object Storage (shared between datasets and stored-objects;
-# emitted under the legacy `datasetObjectStorage` value key for
+# emitted under the legacy `dataplane` value key for
 # backwards compatibility — bucket carries BOTH dataset uploads and
 # externalized scenario media in this release).
-{{- if .Values.app.datasetObjectStorage.enabled }}
+{{- if .Values.app.dataplane.enabled }}
 - name: USE_S3_STORAGE
   value: "true"
 # Emit S3_BUCKET_NAME — the app/server reads this name across all
@@ -480,12 +476,12 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 # vanilla helm install because nothing read it; emitting it was a
 # silent bug that this fix resolves by aligning on S3_BUCKET_NAME.
 - name: S3_BUCKET_NAME
-  value: {{ .Values.app.datasetObjectStorage.bucket | quote }}
-{{- if eq .Values.app.datasetObjectStorage.provider "awsS3" }}
-{{- include "langwatch.secretOrValue" (dict "envName" "S3_ENDPOINT" "fieldValues" .Values.app.datasetObjectStorage.providers.awsS3.endpoint) }}
-{{- include "langwatch.secretOrValue" (dict "envName" "S3_ACCESS_KEY_ID" "fieldValues" .Values.app.datasetObjectStorage.providers.awsS3.accessKeyId) }}
-{{- include "langwatch.secretOrValue" (dict "envName" "S3_SECRET_ACCESS_KEY" "fieldValues" .Values.app.datasetObjectStorage.providers.awsS3.secretAccessKey) }}
-{{- include "langwatch.secretOrValue" (dict "envName" "S3_KEY_SALT" "fieldValues" .Values.app.datasetObjectStorage.providers.awsS3.keySalt) }}
+  value: {{ .Values.app.dataplane.bucket | quote }}
+{{- if eq .Values.app.dataplane.provider "awsS3" }}
+{{- include "langwatch.secretOrValue" (dict "envName" "S3_ENDPOINT" "fieldValues" .Values.app.dataplane.providers.awsS3.endpoint) }}
+{{- include "langwatch.secretOrValue" (dict "envName" "S3_ACCESS_KEY_ID" "fieldValues" .Values.app.dataplane.providers.awsS3.accessKeyId) }}
+{{- include "langwatch.secretOrValue" (dict "envName" "S3_SECRET_ACCESS_KEY" "fieldValues" .Values.app.dataplane.providers.awsS3.secretAccessKey) }}
+{{- include "langwatch.secretOrValue" (dict "envName" "S3_KEY_SALT" "fieldValues" .Values.app.dataplane.providers.awsS3.keySalt) }}
 {{- end }}
 {{- else if .Values.app.storedObjects.localFilesystem.enabled }}
 # Single-replica local-filesystem fallback for stored-objects. ONLY safe
@@ -494,7 +490,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 # subset of files it personally wrote. The chart enforces the single
 # replica constraint via a validation rule and the PVC is RWO by
 # default. NOT for production. Operators who need multi-replica MUST
-# enable datasetObjectStorage with a real object-storage backend.
+# enable dataplane with a real object-storage backend.
 - name: LANGWATCH_LOCAL_STORAGE_PATH
   value: {{ .Values.app.storedObjects.localFilesystem.path | quote }}
 {{- end }}

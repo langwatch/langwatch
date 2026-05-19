@@ -48,8 +48,8 @@ describe("Helm chart deployment surface for stored-objects", () => {
         /shared between datasets and stored-objects|carries BOTH dataset uploads and\s+# externalized scenario media/,
       );
 
-      // And the single condition (datasetObjectStorage.enabled) governs both.
-      expect(helpers).toContain(".Values.app.datasetObjectStorage.enabled");
+      // And the single condition (dataplane.enabled) governs both.
+      expect(helpers).toContain(".Values.app.dataplane.enabled");
     });
   });
 
@@ -83,7 +83,7 @@ describe("Helm chart deployment surface for stored-objects", () => {
       // but the docstring must still call out the unconfigured-storage
       // scenario so operators reading the chart find the explanation.
       expect(helpers).toMatch(
-        /Neither datasetObjectStorage\.enabled nor localFilesystem\.enabled|ephemeral writable layer|writable container layer/,
+        /Neither dataplane\.enabled nor localFilesystem\.enabled|ephemeral writable layer|writable container layer/,
       );
     });
   });
