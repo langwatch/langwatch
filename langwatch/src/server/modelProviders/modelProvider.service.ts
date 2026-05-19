@@ -282,8 +282,13 @@ export class ModelProviderService {
     // Managed bedrock: env var MANAGED_BEDROCK__<label>__<orgId> sets
     // up cross-account credentials for a specific org. Surface a SYSTEM
     // pseudo-row so the table shows the user where it's coming from.
+    // Skip when bedrock is already represented (saved row OR a standard
+    // env-fed pseudo-row pushed in the loop above).
+    const bedrockAlreadyShown =
+      savedProviderKeys.has("bedrock") ||
+      systemRows.some((r) => r.provider === "bedrock");
     if (
-      !savedProviderKeys.has("bedrock") &&
+      !bedrockAlreadyShown &&
       isManagedProvider(organizationId, "bedrock")
     ) {
       const defaultProvider = this.buildDefaultProvidersFromEnvShape(
