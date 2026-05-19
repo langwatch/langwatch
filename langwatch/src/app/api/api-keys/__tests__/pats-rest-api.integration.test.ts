@@ -110,7 +110,7 @@ describe("Feature: API Keys REST API", () => {
       userId,
       createdByUserId: userId,
       organizationId: testOrganization.id,
-      permissionMode: "restricted",
+      permissionMode: "all",
       bindings: [
         {
           role: TeamUserRole.ADMIN,

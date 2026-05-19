@@ -92,7 +92,7 @@ describe("Feature: Teams REST API", () => {
       userId,
       createdByUserId: userId,
       organizationId: testOrganization.id,
-      permissionMode: "restricted",
+      permissionMode: "all",
       bindings: [
         {
           role: TeamUserRole.ADMIN,
@@ -355,7 +355,7 @@ describe("Feature: Teams REST API", () => {
         userId,
         createdByUserId: userId,
         organizationId: testOrganization.id,
-        permissionMode: "restricted",
+        permissionMode: "all",
         bindings: [
           {
             role: TeamUserRole.VIEWER,

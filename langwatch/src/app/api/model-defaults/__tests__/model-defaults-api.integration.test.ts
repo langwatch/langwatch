@@ -110,7 +110,7 @@ describe("Feature: Model Defaults REST API", () => {
       userId,
       createdByUserId: userId,
       organizationId: testOrganization.id,
-      permissionMode: "restricted",
+      permissionMode: "all",
       bindings: [
         {
           role: TeamUserRole.ADMIN,
