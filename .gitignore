@@ -99,3 +99,4 @@ status
 uuid
 .claude/worktrees/
 .worktrees/
+.gstack/
