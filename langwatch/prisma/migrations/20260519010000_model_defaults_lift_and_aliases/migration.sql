@@ -102,6 +102,11 @@ WHERE (config->>'FAST') ~ '^(openai|anthropic|gemini)/'
 -- walk instead of N.
 --
 -- Rules:
+--   - ALL projects in the org must already carry a PROJECT-scoped
+--     config. If any project is unconfigured, skip the org. Creating
+--     an ORG config for an org with orphan projects would give those
+--     projects a model out of the blue and start spending money on
+--     evals that were silently disabled before.
 --   - Strict majority: provider must appear in > 50% of the org's
 --     PROJECT-scoped configs (ties = no lift).
 --   - Only providers we can alias (openai/anthropic/gemini). Azure /
@@ -142,10 +147,25 @@ org_totals AS (
     FROM project_default_provider
     GROUP BY org_id
 ),
+org_project_counts AS (
+    -- total projects per org (including unconfigured ones)
+    SELECT t."organizationId" AS org_id, COUNT(*) AS project_total
+    FROM "Project" p
+    JOIN "Team" t ON t.id = p."teamId"
+    GROUP BY t."organizationId"
+),
+fully_configured AS (
+    -- orgs where every project carries a PROJECT-scoped config
+    SELECT ot.org_id
+    FROM org_totals ot
+    JOIN org_project_counts opc USING (org_id)
+    WHERE ot.total = opc.project_total
+),
 majority AS (
     SELECT pc.org_id, pc.provider
     FROM provider_counts pc
     JOIN org_totals ot USING (org_id)
+    JOIN fully_configured fc USING (org_id)
     WHERE pc.n * 2 > ot.total
 ),
 qualifying AS (
@@ -194,10 +214,25 @@ org_totals AS (
     FROM project_default_provider
     GROUP BY org_id
 ),
+org_project_counts AS (
+    -- total projects per org (including unconfigured ones)
+    SELECT t."organizationId" AS org_id, COUNT(*) AS project_total
+    FROM "Project" p
+    JOIN "Team" t ON t.id = p."teamId"
+    GROUP BY t."organizationId"
+),
+fully_configured AS (
+    -- orgs where every project carries a PROJECT-scoped config
+    SELECT ot.org_id
+    FROM org_totals ot
+    JOIN org_project_counts opc USING (org_id)
+    WHERE ot.total = opc.project_total
+),
 majority AS (
     SELECT pc.org_id, pc.provider
     FROM provider_counts pc
     JOIN org_totals ot USING (org_id)
+    JOIN fully_configured fc USING (org_id)
     WHERE pc.n * 2 > ot.total
 ),
 qualifying AS (
