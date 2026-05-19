@@ -124,9 +124,6 @@ export class FeatureFlagService implements FeatureFlagServiceInterface {
       this.logger.info("Using PostHog feature flag service for PRODUCT flags");
       return FeatureFlagServicePostHog.create();
     }
-    this.logger.warn(
-      "POSTHOG_KEY not set; PRODUCT flags fall back to postgres/memory only.",
-    );
     return FeatureFlagServiceMemory.create();
   }
 
