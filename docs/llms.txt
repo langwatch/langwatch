@@ -81,12 +81,12 @@ Always navigate to docs links using the .md extension for better readability.
 - [Create a new evaluator](https://langwatch.ai/docs/api-reference/evaluators-config/create-evaluators.md)
 - [Get a specific evaluator by ID or slug](https://langwatch.ai/docs/api-reference/evaluators-config/get-evaluators.md)
 - [Update an existing evaluator](https://langwatch.ai/docs/api-reference/evaluators-config/update-evaluators.md)
-- [Archive](https://langwatch.ai/docs/api-reference/evaluators-config/delete-evaluators.md)
+- [Archive an evaluator](https://langwatch.ai/docs/api-reference/evaluators-config/delete-evaluators.md)
 
 ## Evaluations
 
 - [Overview](https://langwatch.ai/docs/api-reference/evaluations/overview.md): Run and monitor evaluation experiments. Start evaluation runs and poll for progress and results.
-- [Get Runs](https://langwatch.ai/docs/api-reference/evaluations/get-runs.md)
+- [Get evaluation run status](https://langwatch.ai/docs/api-reference/evaluations/get-runs.md)
 - [Create Run](https://langwatch.ai/docs/api-reference/evaluations/action-run.md)
 
 ## Monitors
@@ -121,7 +121,7 @@ Always navigate to docs links using the .md extension for better readability.
 - [Overview](https://langwatch.ai/docs/api-reference/annotations/overview.md): Learn how annotations enhance trace review, labeling, and evaluation workflows for more reliable AI agent testing.
 - [Get annotations](https://langwatch.ai/docs/api-reference/annotations/get-annotation.md)
 - [Get single annotation](https://langwatch.ai/docs/api-reference/annotations/get-single-annotation.md)
-- [Get annotationa for single trace](https://langwatch.ai/docs/api-reference/annotations/get-all-annotations-trace.md)
+- [Get annotations for a trace](https://langwatch.ai/docs/api-reference/annotations/get-all-annotations-trace.md)
 - [Patch single annotation](https://langwatch.ai/docs/api-reference/annotations/patch-annotation.md)
 - [Create annotation for single trace](https://langwatch.ai/docs/api-reference/annotations/create-annotation-trace.md)
 - [Delete single annotation](https://langwatch.ai/docs/api-reference/annotations/delete-annotation.md)
@@ -133,7 +133,7 @@ Always navigate to docs links using the .md extension for better readability.
 - [Create a new scenario](https://langwatch.ai/docs/api-reference/scenarios/create-scenarios.md)
 - [Get a specific scenario by ID](https://langwatch.ai/docs/api-reference/scenarios/get-scenarios.md)
 - [Update an existing scenario](https://langwatch.ai/docs/api-reference/scenarios/update-scenarios.md)
-- [Archive](https://langwatch.ai/docs/api-reference/scenarios/delete-scenarios.md)
+- [Archive a scenario](https://langwatch.ai/docs/api-reference/scenarios/delete-scenarios.md)
 
 ## Scenario Events
 
@@ -157,7 +157,7 @@ Always navigate to docs links using the .md extension for better readability.
 - [Update a suite](https://langwatch.ai/docs/api-reference/suites/update-suites.md)
 - [Duplicate a suite](https://langwatch.ai/docs/api-reference/suites/action-duplicate.md)
 - [Trigger a suite run](https://langwatch.ai/docs/api-reference/suites/action-run.md)
-- [Archive](https://langwatch.ai/docs/api-reference/suites/delete-suites.md)
+- [Archive a suite](https://langwatch.ai/docs/api-reference/suites/delete-suites.md)
 
 ## Agents
 
@@ -175,7 +175,7 @@ Always navigate to docs links using the .md extension for better readability.
 - [Create a new trigger](https://langwatch.ai/docs/api-reference/triggers/create-triggers.md)
 - [Get a trigger by its ID](https://langwatch.ai/docs/api-reference/triggers/get-triggers.md)
 - [Update a trigger](https://langwatch.ai/docs/api-reference/triggers/update-triggers.md)
-- [Delete](https://langwatch.ai/docs/api-reference/triggers/delete-triggers.md)
+- [Delete a trigger](https://langwatch.ai/docs/api-reference/triggers/delete-triggers.md)
 
 ## Workflows
 
@@ -183,7 +183,7 @@ Always navigate to docs links using the .md extension for better readability.
 - [List all non-archived workflows for the project](https://langwatch.ai/docs/api-reference/workflows/list-workflows.md)
 - [Get a workflow by its ID](https://langwatch.ai/docs/api-reference/workflows/get-workflows.md)
 - [Update a workflow's metadata](https://langwatch.ai/docs/api-reference/workflows/update-workflows.md)
-- [Archive](https://langwatch.ai/docs/api-reference/workflows/delete-workflows.md)
+- [Archive a workflow](https://langwatch.ai/docs/api-reference/workflows/delete-workflows.md)
 
 ## Dashboards
 
@@ -191,7 +191,7 @@ Always navigate to docs links using the .md extension for better readability.
 - [List Dashboards](https://langwatch.ai/docs/api-reference/dashboards/list-dashboards.md)
 - [Create a new dashboard](https://langwatch.ai/docs/api-reference/dashboards/create-dashboards.md)
 - [Get a dashboard by its id, including its graphs](https://langwatch.ai/docs/api-reference/dashboards/get-dashboards.md)
-- [Update Reorder](https://langwatch.ai/docs/api-reference/dashboards/update-reorder.md)
+- [Reorder dashboards](https://langwatch.ai/docs/api-reference/dashboards/update-reorder.md)
 - [Rename a dashboard](https://langwatch.ai/docs/api-reference/dashboards/update-dashboards.md)
 - [Delete a dashboard and its graphs](https://langwatch.ai/docs/api-reference/dashboards/delete-dashboards.md)
 

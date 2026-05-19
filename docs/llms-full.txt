@@ -28295,7 +28295,7 @@ openapi: 'DELETE /api/annotations/{id}'
 # FILE: ./api-reference/annotations/get-all-annotations-trace.mdx
 
 ---
-title: 'Get annotationa for single trace'
+title: 'Get annotations for a trace'
 openapi: 'GET /api/annotations/trace/{id}'
 ---
 
@@ -28518,7 +28518,7 @@ openapi: "PATCH /api/dashboards/{id}"
 # FILE: ./api-reference/dashboards/update-reorder.mdx
 
 ---
-title: "Update Reorder"
+title: "Reorder dashboards"
 openapi: "PUT /api/dashboards/reorder"
 ---
 
@@ -28675,7 +28675,7 @@ openapi: "POST /api/evaluations/v3/{slug}/run"
 # FILE: ./api-reference/evaluations/get-runs.mdx
 
 ---
-title: "Get Runs"
+title: "Get evaluation run status"
 openapi: "GET /api/evaluations/v3/runs/{runId}"
 ---
 
@@ -28706,7 +28706,7 @@ openapi: "POST /api/evaluators"
 # FILE: ./api-reference/evaluators-config/delete-evaluators.mdx
 
 ---
-title: "Archive"
+title: "Archive an evaluator"
 openapi: "DELETE /api/evaluators/{id}"
 ---
 
@@ -29961,7 +29961,7 @@ openapi: "POST /api/scenarios"
 # FILE: ./api-reference/scenarios/delete-scenarios.mdx
 
 ---
-title: "Archive"
+title: "Archive a scenario"
 openapi: "DELETE /api/scenarios/{id}"
 ---
 
@@ -30135,7 +30135,7 @@ openapi: "POST /api/suites"
 # FILE: ./api-reference/suites/delete-suites.mdx
 
 ---
-title: "Archive"
+title: "Archive a suite"
 openapi: "DELETE /api/suites/{id}"
 ---
 
@@ -30377,7 +30377,7 @@ openapi: "POST /api/triggers"
 # FILE: ./api-reference/triggers/delete-triggers.mdx
 
 ---
-title: "Delete"
+title: "Delete a trigger"
 openapi: "DELETE /api/triggers/{id}"
 ---
 
@@ -30426,7 +30426,7 @@ openapi: "PATCH /api/triggers/{id}"
 # FILE: ./api-reference/workflows/delete-workflows.mdx
 
 ---
-title: "Archive"
+title: "Archive a workflow"
 openapi: "DELETE /api/workflows/{id}"
 ---
 

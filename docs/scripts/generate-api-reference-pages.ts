@@ -28,7 +28,7 @@ interface EndpointGroup {
   overviewDescription: string;
 }
 
-const METHOD_ORDER = ["get", "post", "put", "patch", "delete"];
+const METHOD_ORDER = ["get", "post", "put", "patch", "delete"] as const;
 
 // Legacy paths that have modern equivalents - skip these
 const SKIP_PATHS = new Set([
