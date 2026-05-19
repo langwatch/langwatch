@@ -242,6 +242,41 @@ vi.mock("~/utils/api", () => ({
           isLoading: false,
         }),
       },
+      listAllForProjectForFrontend: {
+        useQuery: () => ({
+          data: {
+            providers: [
+              {
+                id: "mp-openai",
+                provider: "openai",
+                enabled: true,
+                customKeys: null,
+                customModels: null,
+                customEmbeddingsModels: null,
+                scopes: [{ scopeType: "PROJECT", scopeId: "proj-1" }],
+              },
+            ],
+            modelMetadata: {
+              "openai/gpt-4": {
+                id: "openai/gpt-4",
+                name: "GPT-4",
+                provider: "openai",
+                supportedParameters: ["temperature", "top_p", "max_tokens"],
+                contextLength: 128000,
+                maxCompletionTokens: 8192,
+                defaultParameters: null,
+                supportsImageInput: false,
+                supportsAudioInput: false,
+                pricing: {
+                  inputCostPerToken: 0.00003,
+                  outputCostPerToken: 0.00006,
+                },
+              },
+            },
+          },
+          isLoading: false,
+        }),
+      },
     },
   },
 }));
