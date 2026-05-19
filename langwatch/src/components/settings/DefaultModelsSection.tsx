@@ -56,10 +56,9 @@ import {
 } from "lucide-react";
 import React, { useMemo, useState } from "react";
 
+import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
-
-import { DefaultModelOverrideDrawer } from "./DefaultModelOverrideDrawer";
 import {
   DefaultModelsScopeFilter,
   type ScopeFilter,
@@ -116,8 +115,7 @@ export function DefaultModelsSection({
   const [localFilter, setLocalFilter] = useState<ScopeFilter>({ kind: "all" });
   const filter = controlledFilter ?? localFilter;
   const setFilter = onFilterChange ?? setLocalFilter;
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [editing, setEditing] = useState<ConfigRow | undefined>(undefined);
+  const { openDrawer } = useDrawer();
 
   const utils = api.useContext();
   const deleteMutation =
@@ -193,12 +191,10 @@ export function DefaultModelsSection({
   const isHidden = noProvidersConfigured && data.configs.length === 0;
 
   const openAdd = () => {
-    setEditing(undefined);
-    setDrawerOpen(true);
+    openDrawer("defaultModelOverride", {});
   };
   const openEdit = (c: ConfigRow) => {
-    setEditing(c);
-    setDrawerOpen(true);
+    openDrawer("defaultModelOverride", { editingId: c.id });
   };
 
   return (
@@ -271,17 +267,6 @@ export function DefaultModelsSection({
         </Card.Body>
       </Card.Root>
 
-      <DefaultModelOverrideDrawer
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        editing={editing}
-        available={data.available}
-        features={data.features}
-        effective={data.effective}
-        onSaved={() => {
-          // Query is invalidated inside the drawer — nothing extra here.
-        }}
-      />
     </VStack>
   );
 }

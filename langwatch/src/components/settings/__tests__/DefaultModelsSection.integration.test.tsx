@@ -29,6 +29,20 @@ const mockGetDefaultModels = vi.fn();
 const mockInvalidate = vi.fn();
 const mockSave = vi.fn();
 const mockDelete = vi.fn();
+const mockOpenDrawer = vi.fn();
+const mockCloseDrawer = vi.fn();
+
+vi.mock("~/hooks/useDrawer", () => ({
+  useDrawer: () => ({
+    openDrawer: mockOpenDrawer,
+    closeDrawer: mockCloseDrawer,
+    drawerOpen: () => false,
+    canGoBack: false,
+    goBack: vi.fn(),
+    currentDrawer: undefined,
+  }),
+  useDrawerParams: () => ({}),
+}));
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
@@ -180,6 +194,8 @@ describe("<DefaultModelsSection />", () => {
     mockInvalidate.mockReset();
     mockSave.mockReset();
     mockDelete.mockReset();
+    mockOpenDrawer.mockReset();
+    mockCloseDrawer.mockReset();
   });
   afterEach(() => cleanup());
 
@@ -224,11 +240,12 @@ describe("<DefaultModelsSection />", () => {
     fireEvent.click(
       await screen.findByTestId("config-row-cfg_acme_org-edit"),
     );
-    // Drawer rendered with the role rows for the picked config.
-    expect(
-      await screen.findByTestId("role-row-default"),
-    ).toBeInTheDocument();
-    expect(screen.getByTestId("config-save")).toBeInTheDocument();
+    // Drawer is opened through the URL-driven currentDrawer registry —
+    // the section only fires openDrawer with the row's id, the registry
+    // mounts the actual drawer component above the page.
+    expect(mockOpenDrawer).toHaveBeenCalledWith("defaultModelOverride", {
+      editingId: "cfg_acme_org",
+    });
   });
 
   /** @scenario Deleting a config via the row menu removes the row */
@@ -247,11 +264,8 @@ describe("<DefaultModelsSection />", () => {
   it("opens an empty drawer when +Add config is clicked", async () => {
     renderSection();
     fireEvent.click(screen.getByTestId("add-config-button"));
-    expect(await screen.findByText(/Add config/)).toBeInTheDocument();
-    expect(screen.getByTestId("role-row-default")).toBeInTheDocument();
-    expect(screen.getByTestId("role-row-fast")).toBeInTheDocument();
-    expect(screen.getByTestId("role-row-embeddings")).toBeInTheDocument();
-    // Save disabled while scopes are empty.
-    expect(screen.getByTestId("config-save")).toBeDisabled();
+    // Same URL-routed drawer as Edit — without an editingId so the
+    // drawer initialises in create mode.
+    expect(mockOpenDrawer).toHaveBeenCalledWith("defaultModelOverride", {});
   });
 });
