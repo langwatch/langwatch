@@ -218,6 +218,56 @@ export class ModelProviderService {
   }
 
   /**
+   * Record-shaped, stored-only view of the project's model providers.
+   *
+   * Same data as `listProjectModelProvidersForFrontend` (the canonical
+   * "what has the project actually stored?" path), collapsed by
+   * provider key — every same-provider row across scopes is merged
+   * (enabled if any row is enabled, custom-model lists unioned).
+   *
+   * Use this at every tRPC boundary that historically called
+   * `getProjectModelProviders`: the legacy env-fed merging there
+   * leaked phantom providers (any provider whose API key sat in the
+   * server's process env) into the frontend's model picker. Server-
+   * side fallback paths still call `getProjectModelProviders` directly
+   * when they genuinely need env-key-driven resolution.
+   */
+  async listProjectModelProvidersForFrontendAsRecord(
+    projectId: string,
+    includeKeys = true,
+  ): Promise<Record<string, MaybeStoredModelProvider>> {
+    const masked = await this.listProjectModelProvidersForFrontend(projectId);
+    const out: Record<string, MaybeStoredModelProvider> = {};
+    for (const row of masked) {
+      const next: MaybeStoredModelProvider = includeKeys
+        ? row
+        : { ...row, customKeys: null };
+      const existing = out[row.provider];
+      if (!existing) {
+        out[row.provider] = next;
+        continue;
+      }
+      out[row.provider] = {
+        ...existing,
+        enabled: existing.enabled || next.enabled,
+        customModels: [
+          ...(existing.customModels ?? []),
+          ...(next.customModels ?? []),
+        ].filter((m, idx, arr) =>
+          arr.findIndex((other) => other?.modelId === m?.modelId) === idx,
+        ),
+        customEmbeddingsModels: [
+          ...(existing.customEmbeddingsModels ?? []),
+          ...(next.customEmbeddingsModels ?? []),
+        ].filter((m, idx, arr) =>
+          arr.findIndex((other) => other?.modelId === m?.modelId) === idx,
+        ),
+      };
+    }
+    return out;
+  }
+
+  /**
    * Updates or creates a model provider.
    *
    * Business rules:
