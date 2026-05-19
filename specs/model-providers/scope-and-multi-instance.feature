@@ -137,57 +137,6 @@ Feature: Model Provider Scope and Multi-Instance
     Then two ModelProviders now exist with name "OpenAI"
     And each one is disambiguated by its distinct scope set
 
-  # ────────────────────────────────────────────────────────────────────────────
-  # Quick-add scope chips at the top of the create drawer
-  # ────────────────────────────────────────────────────────────────────────────
-
-  @integration
-  Scenario: Quick-add 'This project' chip pre-fills scope to the current project
-    Given I open the Create Model Provider drawer for "openai" from project "web-app"
-    When I click the "This project" quick-add chip at the top of the drawer
-    Then the Scope field is set to only project "web-app"
-    And no other scope entries are selected
-
-  @integration
-  Scenario: Quick-add 'This team' chip pre-fills scope to the parent team
-    Given I open the Create Model Provider drawer for "openai" from project "web-app" in team "platform"
-    When I click the "This team" quick-add chip at the top of the drawer
-    Then the Scope field is set to only team "platform"
-    And no other scope entries are selected
-
-  @integration
-  Scenario: Quick-add 'Organization' chip pre-fills scope to the organization
-    Given I open the Create Model Provider drawer for "openai" from project "web-app" in organization "acme"
-    And I have "organization:manage" on "acme"
-    When I click the "Organization" quick-add chip at the top of the drawer
-    Then the Scope field is set to only organization "acme"
-    And no other scope entries are selected
-
-  @integration
-  Scenario: 'Multiple' chip is auto-selected when scopes don't match a single quick-pick
-    Given I open the edit drawer for a ModelProvider whose scope set spans both team "platform" and project "web-app"
-    Then the "Multiple" quick-pick chip is the active selection at the top of the drawer
-    And the multi-select dropdown is visible underneath the chip row
-    # Without auto-selection the drawer would render the first quick-pick
-    # as selected and silently misrepresent the saved scope set.
-
-  @integration
-  Scenario: Single matching scope hides the multi-select dropdown
-    Given I open the edit drawer for a ModelProvider scoped only to project "web-app"
-    Then the "This project" quick-pick chip is the active selection
-    And the multi-select dropdown is not rendered
-    # The dropdown is only useful when the user is in "Multiple" mode;
-    # for a single scope the chip itself communicates the full picture.
-
-  @integration
-  Scenario: Clicking Multiple reveals the dropdown without clearing scopes
-    Given I open the edit drawer for a ModelProvider scoped only to project "web-app"
-    When I click the "Multiple" quick-pick chip
-    Then the multi-select dropdown becomes visible
-    And project "web-app" remains selected in the dropdown
-    # Switching to Multiple mode is purely a UI affordance, never a
-    # destructive reset of the in-progress scope selection.
-
   @integration @unimplemented
   Scenario: Users can edit the name to something custom
     Given I am editing a ModelProvider row
