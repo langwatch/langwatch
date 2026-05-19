@@ -353,7 +353,8 @@ function main() {
   const spec: OpenAPISpec = JSON.parse(fs.readFileSync(SPEC_PATH, "utf-8"));
   const docsJson = JSON.parse(fs.readFileSync(DOCS_JSON_PATH, "utf-8"));
 
-  const allNavGroups: Array<{ group: string; pages: string[] }> = [];
+  type NavPage = string | { group: string; pages: string[] };
+  const allNavGroups: Array<{ group: string; pages: NavPage[] }> = [];
   let totalCreated = 0;
   let totalExisting = 0;
 
