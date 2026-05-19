@@ -38,9 +38,6 @@ async function ensureCallerIsOrgMember(
   }
 }
 
-function getApiKeyService(prisma: Parameters<typeof ApiKeyService.create>[0]): ApiKeyService {
-  return ApiKeyService.create(prisma);
-}
 
 const roleBindingSchema = z.object({
   role: z.nativeEnum(TeamUserRole),
@@ -88,7 +85,7 @@ export const apiKeyRouter = createTRPCRouter({
       }),
     )
     .query(async ({ ctx, input }) => {
-      const apiKeyService = getApiKeyService(ctx.prisma);
+      const apiKeyService = ApiKeyService.create(ctx.prisma);
       await ensureCallerIsOrgMember(apiKeyService, ctx.session.user.id, input.organizationId);
       const bindings = await apiKeyService.getUserBindings({
         userId: ctx.session.user.id,
@@ -134,7 +131,7 @@ export const apiKeyRouter = createTRPCRouter({
       }),
     )
     .query(async ({ ctx, input }) => {
-      const apiKeyService = getApiKeyService(ctx.prisma);
+      const apiKeyService = ApiKeyService.create(ctx.prisma);
       await ensureCallerIsOrgMember(apiKeyService, ctx.session.user.id, input.organizationId);
       const callerIsAdmin = await apiKeyService.isOrgAdmin({
         userId: ctx.session.user.id,
@@ -230,7 +227,7 @@ export const apiKeyRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const apiKeyService = getApiKeyService(ctx.prisma);
+      const apiKeyService = ApiKeyService.create(ctx.prisma);
       await ensureCallerIsOrgMember(apiKeyService, ctx.session.user.id, input.organizationId);
       const isService = input.keyType === "service";
 
@@ -309,7 +306,7 @@ export const apiKeyRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const apiKeyService = getApiKeyService(ctx.prisma);
+      const apiKeyService = ApiKeyService.create(ctx.prisma);
       await ensureCallerIsOrgMember(apiKeyService, ctx.session.user.id, input.organizationId);
       const callerIsAdmin = await apiKeyService.isOrgAdmin({
         userId: ctx.session.user.id,
@@ -363,7 +360,7 @@ export const apiKeyRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const apiKeyService = getApiKeyService(ctx.prisma);
+      const apiKeyService = ApiKeyService.create(ctx.prisma);
       await ensureCallerIsOrgMember(apiKeyService, ctx.session.user.id, input.organizationId);
       const callerIsAdmin = await apiKeyService.isOrgAdmin({
         userId: ctx.session.user.id,
@@ -401,7 +398,7 @@ export const apiKeyRouter = createTRPCRouter({
       }),
     )
     .query(async ({ ctx, input }) => {
-      const apiKeyService = getApiKeyService(ctx.prisma);
+      const apiKeyService = ApiKeyService.create(ctx.prisma);
       await ensureCallerIsOrgMember(apiKeyService, ctx.session.user.id, input.organizationId);
       return apiKeyService.getOrgProjects({ organizationId: input.organizationId });
     }),
@@ -414,7 +411,7 @@ export const apiKeyRouter = createTRPCRouter({
       }),
     )
     .query(async ({ ctx, input }) => {
-      const apiKeyService = getApiKeyService(ctx.prisma);
+      const apiKeyService = ApiKeyService.create(ctx.prisma);
       await ensureCallerIsOrgMember(apiKeyService, ctx.session.user.id, input.organizationId);
       return apiKeyService.getOrgTeams({ organizationId: input.organizationId });
     }),
@@ -427,7 +424,7 @@ export const apiKeyRouter = createTRPCRouter({
       }),
     )
     .query(async ({ ctx, input }) => {
-      const apiKeyService = getApiKeyService(ctx.prisma);
+      const apiKeyService = ApiKeyService.create(ctx.prisma);
       await ensureCallerIsOrgMember(apiKeyService, ctx.session.user.id, input.organizationId);
       const callerIsAdmin = await apiKeyService.isOrgAdmin({
         userId: ctx.session.user.id,
