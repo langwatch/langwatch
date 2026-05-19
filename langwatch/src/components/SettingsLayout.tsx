@@ -118,8 +118,8 @@ export default function SettingsLayout({
               "/settings/secrets",
             ]}
           >
-            <MenuLink href="/settings/model-costs">Model Costs</MenuLink>
             <MenuLink href="/settings/model-providers">Model Providers</MenuLink>
+            <MenuLink href="/settings/model-costs">Model Costs</MenuLink>
             {!isLiteMember && (
               <MenuLink href="/settings/secrets">Secrets</MenuLink>
             )}

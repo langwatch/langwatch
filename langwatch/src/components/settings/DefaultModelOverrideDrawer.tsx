@@ -664,6 +664,8 @@ function ScopeSection({
   // scopes. The quick-pick variant is preserved on `ScopeChipPicker`
   // (`showQuickPicks` prop) for future surfaces where the chip-row UX
   // makes sense.
+  // Default label is "Scope" — render it so the picker reads consistent
+  // with the model-provider drawer's scope section.
   return (
     <ScopeChipPicker
       value={scopes}
@@ -672,7 +674,6 @@ function ScopeSection({
       organizationName={available.organization?.name}
       availableTeams={available.teams}
       availableProjects={available.projects}
-      label=""
     />
   );
 }

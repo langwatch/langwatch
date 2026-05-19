@@ -69,79 +69,24 @@ function renderSection({
   return { setScopes };
 }
 
-const quickGroup = () =>
-  within(screen.getByRole("group", { name: /quick scope/i }));
-
-describe("Model provider scope — quick-add chips", () => {
+describe("Model provider scope — dropdown-only picker", () => {
   beforeEach(() => cleanup());
   afterEach(() => cleanup());
 
-
-  /** @scenario Quick-add 'This project' chip pre-fills scope to the current project */
-  it("clicking 'This project' replaces the scope with only that project", () => {
-    const { setScopes } = renderSection();
-    fireEvent.click(quickGroup().getByRole("button", { name: /this project/i }));
-    expect(setScopes).toHaveBeenCalledWith([
-      { scopeType: "PROJECT", scopeId: "proj-web-app" },
-    ]);
-  });
-
-  /** @scenario Quick-add 'This team' chip pre-fills scope to the parent team */
-  it("clicking 'This team' replaces the scope with only that team", () => {
-    const { setScopes } = renderSection();
-    fireEvent.click(quickGroup().getByRole("button", { name: /this team/i }));
-    expect(setScopes).toHaveBeenCalledWith([
-      { scopeType: "TEAM", scopeId: "team-platform" },
-    ]);
-  });
-
-  /** @scenario Quick-add 'Organization' chip pre-fills scope to the organization */
-  it("clicking 'Organization' replaces the scope with only the organization", () => {
-    const { setScopes } = renderSection();
-    fireEvent.click(quickGroup().getByRole("button", { name: /^organization$/i }));
-    expect(setScopes).toHaveBeenCalledWith([
-      { scopeType: "ORGANIZATION", scopeId: "org-acme" },
-    ]);
-  });
-
-  /** @scenario 'Multiple' chip is auto-selected when scopes don't match a single quick-pick */
-  it("auto-selects Multiple when initial scopes don't match a single quick-pick", () => {
-    // Two scopes from different tiers => Multiple should be solid +
-    // dropdown should be visible (combobox role present).
-    renderSection({
-      scopes: [
-        { scopeType: "ORGANIZATION", scopeId: "org-acme" },
-        { scopeType: "PROJECT", scopeId: "proj-web-app" },
-      ],
-    });
-    const multiple = quickGroup().getByRole("button", { name: /multiple/i });
-    expect(multiple).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("combobox")).toBeInTheDocument();
-  });
-
-  /** @scenario Single matching scope hides the multi-select dropdown */
-  it("collapses the dropdown when the active scope is a quick-pick", () => {
-    renderSection({
-      scopes: [{ scopeType: "PROJECT", scopeId: "proj-web-app" }],
-    });
-    const project = quickGroup().getByRole("button", { name: /this project/i });
-    expect(project).toHaveAttribute("aria-pressed", "true");
-    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
-  });
-
-  /** @scenario Clicking Multiple reveals the dropdown without clearing scopes */
-  it("clicking Multiple opens the dropdown while keeping the existing selection", () => {
-    renderSection({
-      scopes: [{ scopeType: "PROJECT", scopeId: "proj-web-app" }],
-    });
-    fireEvent.click(quickGroup().getByRole("button", { name: /multiple/i }));
-    expect(screen.getByRole("combobox")).toBeInTheDocument();
+  it("renders the scope dropdown without quick-pick chips", () => {
+    // The drawer used to render Organization/Team/Project/Multiple
+    // quick-pick chips above the dropdown. They were redundant in
+    // practice — the dropdown already surfaces every reachable scope —
+    // and the quick-pick row was dropped so the picker reads consistent
+    // with the default-models override drawer.
+    renderSection();
     expect(
-      quickGroup().getByRole("button", { name: /this project/i }),
-    ).toHaveAttribute("aria-pressed", "false");
+      screen.queryByRole("group", { name: /quick scope/i }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("combobox")).toBeInTheDocument();
   });
 
-  it("hides chips a user cannot pick (no team / no org context)", () => {
+  it("hides the section a user cannot pick into (no team / no org context)", () => {
     // Personal-account project: no org, no team — section is invisible.
     render(
       <ChakraProvider value={defaultSystem}>
@@ -155,6 +100,6 @@ describe("Model provider scope — quick-add chips", () => {
         />
       </ChakraProvider>,
     );
-    expect(screen.queryByRole("group", { name: /quick scope/i })).toBeNull();
+    expect(screen.queryByRole("combobox")).toBeNull();
   });
 });

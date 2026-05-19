@@ -121,12 +121,13 @@ export function ProviderScopeSection({
 
   if (!hasOrgOrTeam) return null;
 
-  // Quick-pick chips + Multiple chip + collapsible dropdown all live
-  // inside ScopeChipPicker now. The wrapper used to render its own
-  // quick-pick row above the picker; folded into ScopeChipPicker so
-  // both this surface and the default-models drawer share the same
-  // state machine. Tight gap between label + chips matches rchaves's
-  // 2026-05-18 polish ask.
+  // Dropdown-only: the Organization / This team / This project /
+  // Multiple quick-pick chips were redundant in practice and have been
+  // dropped from both the provider drawer and the default-models
+  // override drawer. The dropdown already surfaces every reachable
+  // scope. The chip variant is preserved on `ScopeChipPicker`
+  // (`showQuickPicks` prop) for future surfaces where the chip-row UX
+  // makes sense.
   return (
     <VStack align="start" width="full" gap={1.5}>
       <SmallLabel>Scope</SmallLabel>
@@ -142,7 +143,6 @@ export function ProviderScopeSection({
         availableTeams={availableTeams}
         availableProjects={availableProjects}
         label=""
-        showQuickPicks
         currentOrganizationId={organizationId ?? null}
         currentTeamId={teamId ?? null}
         currentProjectId={projectId ?? null}
