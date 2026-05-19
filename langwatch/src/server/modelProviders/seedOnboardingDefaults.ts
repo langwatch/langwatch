@@ -12,7 +12,9 @@ const REGISTRY = (
   llmModels as unknown as { models: Record<string, RegistryEntry> }
 ).models;
 
-/** Picks the newest `openai/gpt-X.Y(-suffix)?` chat model. */
+/** Picks the newest `openai/gpt-X.Y(-suffix)?` chat model. Exported
+ * so the alias resolver (`{provider}/latest|latest-mini` expansion)
+ * shares the same catalog walk as the onboarding seed. */
 export function pickLatestOpenAIChat(suffixFilter: "plain" | "mini"): string | undefined {
   const candidates: { id: string; major: number; minor: number }[] = [];
   for (const model of Object.values(REGISTRY)) {
@@ -131,29 +133,31 @@ interface ProviderSeedPlan {
 export function buildSeedPlanForProvider(
   provider: string,
 ): ProviderSeedPlan {
+  // openai/anthropic/gemini get the `{provider}/latest` and
+  // `{provider}/latest-mini` aliases so the seed never pins a customer
+  // to a specific model version. The resolver expands them at read
+  // time, so when a newer flagship lands in the catalog every seeded
+  // org picks it up automatically without a config rewrite. Other
+  // providers (azure/bedrock/xai/voyage/etc.) keep their specific-id
+  // seed paths because they don't have alias support yet.
   if (provider === "openai") {
     return {
-      DEFAULT: pickLatestOpenAIChat("plain"),
-      FAST: pickLatestOpenAIChat("mini"),
+      DEFAULT: "openai/latest",
+      FAST: "openai/latest-mini",
       EMBEDDINGS: pickLatestEmbedding("openai"),
     };
   }
   if (provider === "anthropic") {
-    // Anthropic's haiku trails sonnet by a wide enough margin on the
-    // tasks we hit (search, autocomplete, topic clustering) that users
-    // are better served by sonnet across the board. Both roles point
-    // at the latest sonnet; per-feature overrides can still narrow it.
-    const sonnet = pickLatestAnthropicChat("sonnet");
     return {
-      DEFAULT: sonnet,
-      FAST: sonnet,
+      DEFAULT: "anthropic/latest",
+      FAST: "anthropic/latest-mini",
       // Anthropic ships no embeddings model.
     };
   }
   if (provider === "gemini") {
     return {
-      DEFAULT: pickLatestGeminiChat("pro"),
-      FAST: pickLatestGeminiChat("flash"),
+      DEFAULT: "gemini/latest",
+      FAST: "gemini/latest-mini",
       EMBEDDINGS: pickLatestEmbedding("gemini"),
     };
   }

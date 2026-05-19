@@ -2,10 +2,11 @@
  * Unit tests for the per-provider seed plan.
  *
  * Pins the contract every provider obeys when its row is enabled at a
- * fresh scope: roles map to specific catalog entries, missing roles
- * stay absent (cascading up to the parent scope rather than
- * defaulting), and provider-specific quirks (Anthropic FAST = sonnet,
- * Anthropic no embeddings, Voyage embeddings-only) hold.
+ * fresh scope: chat providers seed the `{provider}/latest` +
+ * `{provider}/latest-mini` aliases (resolver expands at read time),
+ * provider-specific quirks (Anthropic no embeddings, Voyage
+ * embeddings-only) hold, missing roles stay absent (cascading up to
+ * the parent rather than defaulting).
  */
 import { describe, expect, it } from "vitest";
 
@@ -13,21 +14,21 @@ import { buildSeedPlanForProvider } from "../seedOnboardingDefaults";
 
 describe("buildSeedPlanForProvider", () => {
   describe("openai", () => {
-    /** @scenario OpenAI seed plan populates all three roles */
-    it("populates DEFAULT (gpt-X.Y plain), FAST (gpt-X.Y-mini), and EMBEDDINGS", () => {
+    /** @scenario OpenAI seed plan uses latest aliases */
+    it("populates DEFAULT (openai/latest), FAST (openai/latest-mini), and EMBEDDINGS (pinned)", () => {
       const plan = buildSeedPlanForProvider("openai");
-      expect(plan.DEFAULT).toMatch(/^openai\/gpt-\d+\.\d+$/);
-      expect(plan.FAST).toMatch(/^openai\/gpt-\d+\.\d+-mini$/);
+      expect(plan.DEFAULT).toBe("openai/latest");
+      expect(plan.FAST).toBe("openai/latest-mini");
       expect(plan.EMBEDDINGS).toMatch(/^openai\/text-embedding-/);
     });
   });
 
   describe("anthropic", () => {
-    /** @scenario Anthropic FAST defaults to sonnet not haiku */
-    it("populates DEFAULT and FAST with the same sonnet model", () => {
+    /** @scenario Anthropic seed plan uses latest aliases */
+    it("populates DEFAULT (anthropic/latest) and FAST (anthropic/latest-mini)", () => {
       const plan = buildSeedPlanForProvider("anthropic");
-      expect(plan.DEFAULT).toMatch(/^anthropic\/claude-sonnet-/);
-      expect(plan.FAST).toBe(plan.DEFAULT);
+      expect(plan.DEFAULT).toBe("anthropic/latest");
+      expect(plan.FAST).toBe("anthropic/latest-mini");
     });
 
     /** @scenario Anthropic seed plan omits EMBEDDINGS */
@@ -38,11 +39,11 @@ describe("buildSeedPlanForProvider", () => {
   });
 
   describe("gemini", () => {
-    /** @scenario Gemini DEFAULT prefers pro (incl. -preview) over flash */
-    it("populates DEFAULT with a pro (incl. preview) and FAST with a flash variant", () => {
+    /** @scenario Gemini seed plan uses latest aliases */
+    it("populates DEFAULT (gemini/latest), FAST (gemini/latest-mini), and EMBEDDINGS (pinned)", () => {
       const plan = buildSeedPlanForProvider("gemini");
-      expect(plan.DEFAULT).toMatch(/^gemini\/gemini-\d+\.\d+-pro/);
-      expect(plan.FAST).toMatch(/^gemini\/gemini-\d+\.\d+-flash/);
+      expect(plan.DEFAULT).toBe("gemini/latest");
+      expect(plan.FAST).toBe("gemini/latest-mini");
       expect(plan.EMBEDDINGS).toMatch(/^gemini\/gemini-embedding-/);
     });
   });
