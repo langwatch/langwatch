@@ -171,9 +171,9 @@ export function DefaultModelOverrideDrawer({
     );
 
   const modelOptionsByRole = useMemo(() => {
-    const providersData = projectProviders.data?.providers;
-    const isLoading = providersData === undefined;
-    const providers = providersData ?? [];
+    const isLoading = projectProviders.isLoading;
+    const hasProviderLoadError = projectProviders.isError;
+    const providers = projectProviders.data?.providers ?? [];
     const enabledEntries: Array<
       [string, (typeof providers)[number]]
     > = providers
@@ -196,14 +196,14 @@ export function DefaultModelOverrideDrawer({
       // Still loading: show the full registry so the dropdown isn't
       // visually broken during first paint. Once data lands we either
       // fall through to the enabled-filter path or — if the project
-      // has zero enabled providers — return an empty list so the
-      // picker doesn't lie about what's available.
+      // has zero enabled providers (or the query errored) — return an
+      // empty list so the picker doesn't lie about what's available.
       if (isLoading) {
         return modelSelectorOptions
           .filter((o) => o.mode === mode)
           .map((o) => o.value);
       }
-      if (enabledEntries.length === 0) return [];
+      if (hasProviderLoadError || enabledEntries.length === 0) return [];
       // Registry chat/embedding models from any enabled provider. This
       // mirrors the ModelProviderDefaultSection logic — the registry is
       // the broad pool; provider toggles narrow it.
@@ -593,18 +593,25 @@ function FeatureRow({
  * organization)" or similar — and the model is rendered at reduced
  * opacity in the trigger + as the first dropdown entry.
  *
- * The `inferred` source (server falls back to "we'd pick the latest
- * from your first provider") is intentionally NOT surfaced. The
- * picker shows the same providers' `/latest` and `/latest-mini`
- * aliases at the top of the list, so a redundant "Suggested from X"
- * chip would just add noise.
+ * For the `inferred` source (server falls back to "we'd pick the
+ * latest from your first provider") the label is a neutral "Inherit"
+ * rather than "Suggested from X" — the picker already surfaces the
+ * provider's `/latest` and `/latest-mini` aliases at the top of the
+ * list, so the per-provider attribution would just add noise. The
+ * inherit entry itself stays so the user can always toggle back from
+ * an explicit override.
  */
 function buildInheritOption(
   fromServer: InheritedEntry,
   fromEffective: Payload["effective"][ModelRoleKey] | null,
 ): { model: string; label: string } | undefined {
   if (fromServer) {
-    if (fromServer.source === "inferred") return undefined;
+    if (fromServer.source === "inferred") {
+      return {
+        model: fromServer.model,
+        label: "Inherit",
+      };
+    }
     // `feature_override` / `role_default` carry a concrete scope name
     // (organization / team / project). The "system" / env-var fallback
     // is surfaced via `fromEffective` below.

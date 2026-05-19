@@ -69,12 +69,18 @@ export function ModelChip({
         <Text
           fontSize={size === "sm" ? "xs" : "sm"}
           lineClamp={1}
+          color={invalid ? "red.600" : undefined}
+          textDecoration={invalid ? "line-through" : undefined}
         >
           <Text as="span" fontWeight="medium">
             {aliasLabel}
           </Text>
           {aliasResolved && (
-            <Text as="span" color="fg.muted" fontFamily="mono">
+            <Text
+              as="span"
+              color={invalid ? undefined : "fg.muted"}
+              fontFamily="mono"
+            >
               {" "}
               ({aliasResolved.split("/").slice(1).join("/")})
             </Text>
