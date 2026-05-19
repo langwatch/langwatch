@@ -60,7 +60,7 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
       "Manage evaluator configurations for your project. Create, update, and organize evaluators used for online evaluations, guardrails, and experiments.",
   },
   {
-    name: "Evaluations",
+    name: "Evaluations v3",
     dirName: "evaluations",
     pathPrefixes: ["/api/evaluations"],
     overviewDescription:
@@ -447,15 +447,17 @@ function main() {
     }
 
     allNavGroups.push({ group: group.name, pages });
-  }
 
-  // Direct Evaluations (from openapi-evals.json, existing pages in evaluators/)
-  const existingEvalPages = findDirectEvalPages();
-  if (existingEvalPages.length > 0) {
-    allNavGroups.push({
-      group: "Direct Evaluations",
-      pages: existingEvalPages,
-    });
+    // Insert Built-in Evaluators right after the Evaluators config group
+    if (group.dirName === "evaluators-config") {
+      const builtInPages = findBuiltInEvaluatorPages();
+      if (builtInPages.length > 0) {
+        allNavGroups.push({
+          group: "Built-in Evaluators",
+          pages: builtInPages,
+        });
+      }
+    }
   }
 
   // Update docs.json navigation
@@ -473,7 +475,7 @@ function main() {
   console.log(`Updated docs.json with ${allNavGroups.length} API groups`);
 }
 
-function findDirectEvalPages(): string[] {
+function findBuiltInEvaluatorPages(): string[] {
   const evalDir = path.join(API_REF_DIR, "evaluators");
   if (!fs.existsSync(evalDir)) return [];
 
