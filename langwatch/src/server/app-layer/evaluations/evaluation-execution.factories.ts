@@ -92,7 +92,17 @@ export async function setupModelEnv(
     ? modelProvider.embeddingsModels
     : modelProvider.models;
 
-  if (modelList && modelList.length > 0 && !modelList.includes(modelName)) {
+  const customModelList = embeddings
+    ? modelProvider.customEmbeddingsModels
+    : modelProvider.customModels;
+  const isCustomModel = customModelList?.some((m) => m.modelId === modelName);
+
+  if (
+    modelList &&
+    modelList.length > 0 &&
+    !modelList.includes(modelName) &&
+    !isCustomModel
+  ) {
     throw new EvaluatorConfigError(
       `Model ${modelName} is not in the ${
         embeddings ? "embedding models" : "models"
