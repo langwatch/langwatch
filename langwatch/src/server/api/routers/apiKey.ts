@@ -39,15 +39,11 @@ async function ensureCallerIsOrgMember(
   }
 }
 
-const apiKeyServiceCache = new WeakMap<PrismaClient, ApiKeyService>();
+let _service: ApiKeyService | undefined;
 
 function getApiKeyService(prisma: PrismaClient): ApiKeyService {
-  let service = apiKeyServiceCache.get(prisma);
-  if (!service) {
-    service = ApiKeyService.create(prisma);
-    apiKeyServiceCache.set(prisma, service);
-  }
-  return service;
+  _service ??= ApiKeyService.create(prisma);
+  return _service;
 }
 
 const roleBindingSchema = z.object({

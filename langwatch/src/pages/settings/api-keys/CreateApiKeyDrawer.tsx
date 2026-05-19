@@ -33,7 +33,7 @@ import {
   deriveBindingRole,
   EXPIRATION_OPTIONS,
   expirationCollection,
-  findBindingAtScope,
+  getUserPermissionsAtScope,
   type PermissionMode,
 } from "./utils";
 
@@ -62,28 +62,6 @@ export type CreateApiKeyInput = {
     scopeId: string;
   }>;
 };
-
-function getUserPermissionsAtScope({
-  myBindings,
-  scopeType,
-  scopeId,
-  organizationId,
-  orgProjects,
-  isServiceKey,
-}: {
-  myBindings: MyBindingsData | undefined;
-  scopeType: string;
-  scopeId: string;
-  organizationId: string;
-  orgProjects: OrgProject[];
-  isServiceKey: boolean;
-}): string[] {
-  if (isServiceKey) return getTeamRolePermissions(TeamUserRole.ADMIN);
-
-  const binding = findBindingAtScope({ bindings: myBindings, scopeType, scopeId, organizationId, orgProjects });
-  if (!binding) return [];
-  return getTeamRolePermissions(binding.role as TeamUserRole);
-}
 
 export function CreateApiKeyDrawer({
   isOpen,
@@ -166,6 +144,7 @@ export function CreateApiKeyDrawer({
         organizationId,
         orgProjects,
         isServiceKey: keyType === "service",
+        getTeamRolePermissions: (role) => getTeamRolePermissions(role as TeamUserRole),
       }),
     [
       myBindings.data,
@@ -214,23 +193,14 @@ export function CreateApiKeyDrawer({
 
     const isServiceKey = keyType === "service";
 
-    const bindings = selectedScopes.length > 0
-      ? selectedScopes.map((s) => ({
-          role: deriveBindingRole({
-            permissionMode, scopeType: s.scopeType, scopeId: s.scopeId,
-            myBindings: myBindings.data, organizationId, orgProjects, isServiceKey,
-          }),
-          scopeType: s.scopeType,
-          scopeId: s.scopeId,
-        }))
-      : [{
-          role: deriveBindingRole({
-            permissionMode, scopeType: "PROJECT", scopeId: currentProjectId ?? "",
-            myBindings: myBindings.data, organizationId, orgProjects, isServiceKey,
-          }),
-          scopeType: "PROJECT",
-          scopeId: currentProjectId ?? "",
-        }];
+    const bindings = selectedScopes.map((s) => ({
+      role: deriveBindingRole({
+        permissionMode, scopeType: s.scopeType, scopeId: s.scopeId,
+        myBindings: myBindings.data, organizationId, orgProjects, isServiceKey,
+      }),
+      scopeType: s.scopeType,
+      scopeId: s.scopeId,
+    }));
 
     const assignedToUserId =
       isAdmin && selectedUserId && selectedUserId !== currentUserId

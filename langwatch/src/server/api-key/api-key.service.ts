@@ -141,6 +141,9 @@ export class ApiKeyService {
       }
     }
 
+    // Intentional: service keys (userId=null) with no explicit bindings
+    // default to org-wide ADMIN. This is the expected behavior for
+    // headless automation keys that need full org access.
     let effectiveBindings = bindings;
     if (!userId && effectiveBindings.length === 0) {
       effectiveBindings = [{

@@ -30,7 +30,14 @@ import {
   PermissionCounter,
   type PermissionSelection,
 } from "./PermissionCategoryList";
-import { deriveBindingRole, findBindingAtScope, type PermissionMode } from "./utils";
+import {
+  bindingsToPermissionMode,
+  bindingsToScopes,
+  bindingsToSelections,
+  deriveBindingRole,
+  findBindingAtScope,
+  type PermissionMode,
+} from "./utils";
 
 type ApiKeyRow = RouterOutputs["apiKey"]["list"][number];
 type MyBindingsData = RouterOutputs["apiKey"]["myBindings"];
@@ -40,73 +47,6 @@ type MyBindings = {
 };
 type OrgProject = { id: string; name: string; teamId: string };
 type OrgTeam = { id: string; name: string };
-
-function bindingsToScopes(
-  roleBindings: Array<{ scopeType: string; scopeId: string }>,
-): ScopeChipPickerEntry[] {
-  return roleBindings.map((rb) => ({
-    scopeType: rb.scopeType as ScopeChipPickerEntry["scopeType"],
-    scopeId: rb.scopeId,
-  }));
-}
-
-function bindingsToPermissionMode(
-  apiKey: ApiKeyRow,
-): "all" | "restricted" {
-  const mode = apiKey.permissionMode as PermissionMode;
-  if (mode === "readonly" || mode === "restricted") return "restricted";
-  if (
-    apiKey.roleBindings.length === 1 &&
-    apiKey.roleBindings[0]!.role === "CUSTOM"
-  ) {
-    return "restricted";
-  }
-  return "all";
-}
-
-function bindingsToSelections(
-  apiKey: ApiKeyRow,
-): Record<string, PermissionSelection> {
-  const mode = apiKey.permissionMode as PermissionMode;
-
-  if (mode === "readonly") {
-    const selections: Record<string, PermissionSelection> = {};
-    for (const cat of PERMISSION_CATEGORIES) {
-      selections[cat.key] = "read";
-    }
-    return selections;
-  }
-
-  const binding = apiKey.roleBindings[0];
-  if (!binding) return {};
-
-  if (binding.role === "CUSTOM" && binding.customRoleId) {
-    const permissions = binding.customRolePermissions;
-    if (Array.isArray(permissions)) {
-      return selectionsFromPermissions(permissions);
-    }
-  }
-
-  if (binding.role === "VIEWER") {
-    const selections: Record<string, PermissionSelection> = {};
-    for (const cat of PERMISSION_CATEGORIES) {
-      selections[cat.key] = "read";
-    }
-    return selections;
-  }
-
-  if (binding.role === "MEMBER") {
-    return selectionsFromPermissions(
-      getTeamRolePermissions(TeamUserRole.MEMBER),
-    );
-  }
-
-  const selections: Record<string, PermissionSelection> = {};
-  for (const cat of PERMISSION_CATEGORIES) {
-    selections[cat.key] = cat.accessLevels.includes("write") ? "write" : "read";
-  }
-  return selections;
-}
 
 export function EditApiKeyDrawer({
   apiKey,
@@ -199,7 +139,11 @@ export function EditApiKeyDrawer({
       setSelectedScopes(bindingsToScopes(apiKey.roleBindings));
 
       if (mode === "restricted") {
-        setCategorySelections(bindingsToSelections(apiKey));
+        setCategorySelections(bindingsToSelections(apiKey, {
+          permissionCategories: PERMISSION_CATEGORIES,
+          selectionsFromPermissions,
+          getTeamRolePermissions: (role) => getTeamRolePermissions(role as TeamUserRole),
+        }) as Record<string, PermissionSelection>);
       } else {
         setCategorySelections({});
       }

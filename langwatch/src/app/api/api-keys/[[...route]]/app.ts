@@ -39,6 +39,9 @@ const createApiKeySchema = z.object({
 }).refine(
   (data) => data.keyType === "service" || (data.bindings && data.bindings.length > 0),
   { message: "bindings are required for personal keys", path: ["bindings"] },
+).refine(
+  (data) => data.keyType === "service" || !data.projectIds || data.projectIds.length === 0,
+  { message: "projectIds is only supported for service keys; use bindings instead", path: ["projectIds"] },
 );
 
 function validationHook(
@@ -121,13 +124,14 @@ export const app = new Hono<{ Variables: Variables }>()
       const service = c.get("apiKeyService") as ApiKeyService;
 
       const isService = body.keyType === "service";
-      const bindings = isService
+      const projectBindings = isService
         ? (body.projectIds ?? []).map((projectId: string) => ({
             role: "ADMIN" as const,
             scopeType: "PROJECT" as const,
             scopeId: projectId,
           }))
-        : (body.bindings ?? []);
+        : [];
+      const bindings = [...(body.bindings ?? []), ...projectBindings];
 
       try {
         const result = await service.create({

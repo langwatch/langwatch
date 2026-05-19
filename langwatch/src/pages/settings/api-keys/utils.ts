@@ -252,3 +252,112 @@ export function scopeLabel({
   const prefix = scopeType === "TEAM" ? "Team" : "Project";
   return scopeName ? `${prefix}: ${scopeName}` : prefix;
 }
+
+export function bindingsToScopes(
+  roleBindings: Array<{ scopeType: string; scopeId: string }>,
+): Array<{ scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }> {
+  return roleBindings.map((rb) => ({
+    scopeType: rb.scopeType as "ORGANIZATION" | "TEAM" | "PROJECT",
+    scopeId: rb.scopeId,
+  }));
+}
+
+export function bindingsToPermissionMode(
+  apiKey: {
+    permissionMode: string;
+    roleBindings: Array<{ role: string }>;
+  },
+): "all" | "restricted" {
+  const mode = apiKey.permissionMode as PermissionMode;
+  if (mode === "readonly" || mode === "restricted") return "restricted";
+  if (
+    apiKey.roleBindings.length === 1 &&
+    apiKey.roleBindings[0]!.role === "CUSTOM"
+  ) {
+    return "restricted";
+  }
+  return "all";
+}
+
+export function bindingsToSelections(
+  apiKey: {
+    permissionMode: string;
+    roleBindings: Array<{
+      role: string;
+      customRoleId: string | null;
+      customRolePermissions: string[] | null;
+    }>;
+  },
+  deps: {
+    permissionCategories: ReadonlyArray<{
+      key: string;
+      accessLevels: readonly string[];
+    }>;
+    selectionsFromPermissions: (perms: string[]) => Record<string, string>;
+    getTeamRolePermissions: (role: string) => string[];
+  },
+): Record<string, string> {
+  const mode = apiKey.permissionMode as PermissionMode;
+
+  if (mode === "readonly") {
+    const selections: Record<string, string> = {};
+    for (const cat of deps.permissionCategories) {
+      selections[cat.key] = "read";
+    }
+    return selections;
+  }
+
+  const binding = apiKey.roleBindings[0];
+  if (!binding) return {};
+
+  if (binding.role === "CUSTOM" && binding.customRoleId) {
+    const permissions = binding.customRolePermissions;
+    if (Array.isArray(permissions)) {
+      return deps.selectionsFromPermissions(permissions);
+    }
+  }
+
+  if (binding.role === "VIEWER") {
+    const selections: Record<string, string> = {};
+    for (const cat of deps.permissionCategories) {
+      selections[cat.key] = "read";
+    }
+    return selections;
+  }
+
+  if (binding.role === "MEMBER") {
+    return deps.selectionsFromPermissions(
+      deps.getTeamRolePermissions("MEMBER"),
+    );
+  }
+
+  const selections: Record<string, string> = {};
+  for (const cat of deps.permissionCategories) {
+    selections[cat.key] = cat.accessLevels.includes("write") ? "write" : "read";
+  }
+  return selections;
+}
+
+export function getUserPermissionsAtScope({
+  myBindings,
+  scopeType,
+  scopeId,
+  organizationId,
+  orgProjects,
+  isServiceKey,
+  getTeamRolePermissions: getRolePerms,
+}: {
+  myBindings: Array<{ scopeType: string; scopeId: string; role: string }> | undefined;
+  scopeType: string;
+  scopeId: string;
+  organizationId: string;
+  orgProjects: Array<{ id: string; teamId: string }>;
+  isServiceKey: boolean;
+  getTeamRolePermissions: (role: string) => string[];
+}): string[] {
+  if (isServiceKey) return getRolePerms("ADMIN");
+
+  const binding = findBindingAtScope({ bindings: myBindings, scopeType, scopeId, organizationId, orgProjects });
+  if (!binding) return [];
+  return getRolePerms(binding.role);
+}
