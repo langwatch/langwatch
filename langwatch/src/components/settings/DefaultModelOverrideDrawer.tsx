@@ -340,7 +340,7 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
       >
         <Drawer.Header>
           <Drawer.Title>
-            {editing ? "Edit config" : "Add config"}
+            {editing ? "Edit default models" : "Add default models"}
           </Drawer.Title>
           <Drawer.CloseTrigger />
         </Drawer.Header>
@@ -634,11 +634,14 @@ function buildInheritOption(
   fromEffective: Payload["effective"][ModelRoleKey] | null,
 ): { model: string; label: string } | undefined {
   if (fromServer) {
+    // Skip the "inferred" source: an inferred value is the server
+    // guessing what the user MIGHT want based on which providers are
+    // enabled, not a real cascade hit. Showing it as a ghost
+    // placeholder under a "Not configured" badge gave the
+    // contradictory read that something was set when nothing was —
+    // the row stays empty until the user explicitly picks a model.
     if (fromServer.source === "inferred") {
-      return {
-        model: fromServer.model,
-        label: "Inherit",
-      };
+      return undefined;
     }
     // `feature_override` / `role_default` carry a concrete scope name
     // (organization / team / project). The "system" / env-var fallback
@@ -651,11 +654,11 @@ function buildInheritOption(
     };
   }
   if (fromEffective) {
+    // Same rationale as the `inferred` skip above: env-var fallback
+    // isn't a configured scope, just a host-level default. The drawer
+    // is for setting explicit policy, so empty stays empty.
     if (fromEffective.source === "system") {
-      return {
-        model: fromEffective.model,
-        label: "Inherit (from System)",
-      };
+      return undefined;
     }
     return {
       model: fromEffective.model,
