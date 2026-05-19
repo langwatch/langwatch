@@ -696,6 +696,288 @@
         "icon": "code",
         "groups": [
           {
+            "group": "Traces",
+            "pages": [
+              "api-reference/traces/overview",
+              "api-reference/traces/search",
+              "api-reference/traces/get-trace",
+              "api-reference/traces/create-public-trace-path",
+              "api-reference/traces/delete-public-trace-path"
+            ]
+          },
+          {
+            "group": "Datasets",
+            "pages": [
+              "api-reference/datasets/overview",
+              "api-reference/datasets/list-dataset",
+              "api-reference/datasets/create-dataset",
+              "api-reference/datasets/create-upload",
+              "api-reference/datasets/get-dataset",
+              "api-reference/datasets/get-records",
+              "api-reference/datasets/update-dataset",
+              "api-reference/datasets/update-records",
+              "api-reference/datasets/post-dataset-entries",
+              "api-reference/datasets/action-records",
+              "api-reference/datasets/action-upload",
+              "api-reference/datasets/delete-dataset",
+              "api-reference/datasets/delete-records"
+            ]
+          },
+          {
+            "group": "Evaluators",
+            "pages": [
+              "api-reference/evaluators-config/overview",
+              "api-reference/evaluators-config/list-evaluators",
+              "api-reference/evaluators-config/create-evaluators",
+              "api-reference/evaluators-config/get-evaluators",
+              "api-reference/evaluators-config/update-evaluators",
+              "api-reference/evaluators-config/delete-evaluators"
+            ]
+          },
+          {
+            "group": "Built-in Evaluators",
+            "pages": [
+              "api-reference/evaluators/overview",
+              {
+                "group": "Expected Answer",
+                "pages": [
+                  "api-reference/evaluators/exact-match-evaluator",
+                  "api-reference/evaluators/llm-answer-match",
+                  "api-reference/evaluators/llm-factual-match",
+                  "api-reference/evaluators/bleu-score",
+                  "api-reference/evaluators/rouge-score",
+                  "api-reference/evaluators/sql-query-equivalence",
+                  "api-reference/evaluators/semantic-similarity-evaluator"
+                ]
+              },
+              {
+                "group": "LLM as Judge",
+                "pages": [
+                  "api-reference/evaluators/llm-as-a-judge-boolean-evaluator",
+                  "api-reference/evaluators/llm-as-a-judge-category-evaluator",
+                  "api-reference/evaluators/llm-as-a-judge-score-evaluator",
+                  "api-reference/evaluators/rubrics-based-scoring",
+                  "api-reference/evaluators/custom-basic-evaluator",
+                  "api-reference/evaluators/summarization-score"
+                ]
+              },
+              {
+                "group": "RAG Quality",
+                "pages": [
+                  "api-reference/evaluators/ragas-answer-correctness",
+                  "api-reference/evaluators/ragas-answer-relevancy",
+                  "api-reference/evaluators/ragas-context-precision",
+                  "api-reference/evaluators/ragas-context-recall",
+                  "api-reference/evaluators/ragas-context-relevancy",
+                  "api-reference/evaluators/ragas-context-utilization",
+                  "api-reference/evaluators/ragas-faithfulness",
+                  "api-reference/evaluators/ragas-faithfulness-1",
+                  "api-reference/evaluators/ragas-response-context-precision",
+                  "api-reference/evaluators/ragas-response-context-recall",
+                  "api-reference/evaluators/ragas-response-relevancy",
+                  "api-reference/evaluators/context-f1",
+                  "api-reference/evaluators/context-precision",
+                  "api-reference/evaluators/context-recall"
+                ]
+              },
+              {
+                "group": "Quality Aspects",
+                "pages": [
+                  "api-reference/evaluators/lingua-language-detection",
+                  "api-reference/evaluators/valid-format-evaluator",
+                  "api-reference/evaluators/off-topic-evaluator",
+                  "api-reference/evaluators/query-resolution"
+                ]
+              },
+              {
+                "group": "Safety",
+                "pages": [
+                  "api-reference/evaluators/azure-content-safety",
+                  "api-reference/evaluators/azure-jailbreak-detection",
+                  "api-reference/evaluators/azure-prompt-shield",
+                  "api-reference/evaluators/openai-moderation",
+                  "api-reference/evaluators/presidio-pii-detection",
+                  "api-reference/evaluators/competitor-blocklist",
+                  "api-reference/evaluators/competitor-allowlist-check",
+                  "api-reference/evaluators/competitor-llm-check"
+                ]
+              }
+            ]
+          },
+          {
+            "group": "Evaluations v3",
+            "pages": [
+              "api-reference/evaluations/overview",
+              "api-reference/evaluations/get-runs",
+              "api-reference/evaluations/action-run"
+            ]
+          },
+          {
+            "group": "Monitors",
+            "pages": [
+              "api-reference/monitors/overview",
+              "api-reference/monitors/list-monitors",
+              "api-reference/monitors/create-monitors",
+              "api-reference/monitors/get-monitors",
+              "api-reference/monitors/update-monitors",
+              "api-reference/monitors/action-toggle",
+              "api-reference/monitors/delete-monitors"
+            ]
+          },
+          {
+            "group": "Prompts",
+            "pages": [
+              "api-reference/prompts/overview",
+              "api-reference/prompts/get-prompts",
+              "api-reference/prompts/list-tags",
+              "api-reference/prompts/create-prompt",
+              "api-reference/prompts/create-tags",
+              "api-reference/prompts/get-prompt",
+              "api-reference/prompts/get-prompt-versions",
+              "api-reference/prompts/update-prompt",
+              "api-reference/prompts/update-tags",
+              "api-reference/prompts/put-update-tags",
+              "api-reference/prompts/action-sync",
+              "api-reference/prompts/action-restore",
+              "api-reference/prompts/delete-prompt",
+              "api-reference/prompts/delete-tags"
+            ]
+          },
+          {
+            "group": "Annotations",
+            "pages": [
+              "api-reference/annotations/overview",
+              "api-reference/annotations/get-annotation",
+              "api-reference/annotations/get-single-annotation",
+              "api-reference/annotations/get-all-annotations-trace",
+              "api-reference/annotations/patch-annotation",
+              "api-reference/annotations/create-annotation-trace",
+              "api-reference/annotations/delete-annotation"
+            ]
+          },
+          {
+            "group": "Scenarios",
+            "pages": [
+              "api-reference/scenarios/overview",
+              "api-reference/scenarios/list-scenarios",
+              "api-reference/scenarios/create-scenarios",
+              "api-reference/scenarios/get-scenarios",
+              "api-reference/scenarios/update-scenarios",
+              "api-reference/scenarios/delete-scenarios"
+            ]
+          },
+          {
+            "group": "Scenario Events",
+            "pages": [
+              "api-reference/scenario-events/overview",
+              "api-reference/scenario-events/create-scenario-events",
+              "api-reference/scenario-events/delete-scenario-events"
+            ]
+          },
+          {
+            "group": "Simulation Runs",
+            "pages": [
+              "api-reference/simulation-runs/overview",
+              "api-reference/simulation-runs/list-simulation-runs",
+              "api-reference/simulation-runs/list-list",
+              "api-reference/simulation-runs/get-simulation-runs"
+            ]
+          },
+          {
+            "group": "Suites",
+            "pages": [
+              "api-reference/suites/overview",
+              "api-reference/suites/list-suites",
+              "api-reference/suites/create-suites",
+              "api-reference/suites/get-suites",
+              "api-reference/suites/update-suites",
+              "api-reference/suites/action-duplicate",
+              "api-reference/suites/action-run",
+              "api-reference/suites/delete-suites"
+            ]
+          },
+          {
+            "group": "Agents",
+            "pages": [
+              "api-reference/agents/overview",
+              "api-reference/agents/list-agents",
+              "api-reference/agents/create-agents",
+              "api-reference/agents/get-agents",
+              "api-reference/agents/update-agents",
+              "api-reference/agents/delete-agents"
+            ]
+          },
+          {
+            "group": "Triggers",
+            "pages": [
+              "api-reference/triggers/overview",
+              "api-reference/triggers/list-triggers",
+              "api-reference/triggers/create-triggers",
+              "api-reference/triggers/get-triggers",
+              "api-reference/triggers/update-triggers",
+              "api-reference/triggers/delete-triggers"
+            ]
+          },
+          {
+            "group": "Workflows",
+            "pages": [
+              "api-reference/workflows/overview",
+              "api-reference/workflows/list-workflows",
+              "api-reference/workflows/get-workflows",
+              "api-reference/workflows/update-workflows",
+              "api-reference/workflows/delete-workflows"
+            ]
+          },
+          {
+            "group": "Dashboards",
+            "pages": [
+              "api-reference/dashboards/overview",
+              "api-reference/dashboards/list-dashboards",
+              "api-reference/dashboards/create-dashboards",
+              "api-reference/dashboards/get-dashboards",
+              "api-reference/dashboards/update-reorder",
+              "api-reference/dashboards/update-dashboards",
+              "api-reference/dashboards/delete-dashboards"
+            ]
+          },
+          {
+            "group": "Graphs",
+            "pages": [
+              "api-reference/graphs/overview",
+              "api-reference/graphs/list-graphs",
+              "api-reference/graphs/create-graphs",
+              "api-reference/graphs/get-graphs",
+              "api-reference/graphs/update-graphs",
+              "api-reference/graphs/delete-graphs"
+            ]
+          },
+          {
+            "group": "Analytics",
+            "pages": [
+              "api-reference/analytics/overview",
+              "api-reference/analytics/create-timeseries"
+            ]
+          },
+          {
+            "group": "Secrets",
+            "pages": [
+              "api-reference/secrets/overview",
+              "api-reference/secrets/list-secrets",
+              "api-reference/secrets/create-secrets",
+              "api-reference/secrets/get-secrets",
+              "api-reference/secrets/update-secrets",
+              "api-reference/secrets/delete-secrets"
+            ]
+          },
+          {
+            "group": "Model Providers",
+            "pages": [
+              "api-reference/model-providers/overview",
+              "api-reference/model-providers/list-model-providers",
+              "api-reference/model-providers/update-model-providers"
+            ]
+          },
+          {
             "group": "Projects",
             "pages": [
               "api-reference/projects/overview",
@@ -727,112 +1009,46 @@
             ]
           },
           {
-            "group": "Traces",
+            "group": "Gateway: Virtual Keys",
             "pages": [
-              "api-reference/traces/overview",
-              "api-reference/traces/get-trace",
-              "api-reference/traces/get-thread-details",
-              "api-reference/traces/search",
-              "api-reference/traces/create-public-trace-path",
-              "api-reference/traces/delete-public-trace-path"
+              "api-reference/gateway-virtual-keys/overview",
+              "api-reference/gateway-virtual-keys/list-virtual-keys",
+              "api-reference/gateway-virtual-keys/create-virtual-key",
+              "api-reference/gateway-virtual-keys/get-virtual-key",
+              "api-reference/gateway-virtual-keys/update-virtual-key",
+              "api-reference/gateway-virtual-keys/revoke-virtual-key",
+              "api-reference/gateway-virtual-keys/rotate-virtual-key-secret"
             ]
           },
           {
-            "group": "Prompts",
+            "group": "Gateway: Provider Bindings",
             "pages": [
-              "api-reference/prompts/overview",
-              "api-reference/prompts/get-prompts",
-              "api-reference/prompts/create-prompt",
-              "api-reference/prompts/get-prompt",
-              "api-reference/prompts/update-prompt",
-              "api-reference/prompts/delete-prompt",
-              "api-reference/prompts/get-prompt-versions",
-              "api-reference/prompts/create-prompt-version"
+              "api-reference/gateway-providers/overview",
+              "api-reference/gateway-providers/list-provider-bindings",
+              "api-reference/gateway-providers/bind-a-model-provider-to-the-gateway",
+              "api-reference/gateway-providers/update-provider-binding",
+              "api-reference/gateway-providers/disable-provider-binding"
             ]
           },
           {
-            "group": "Annotations",
+            "group": "Gateway: Budgets",
             "pages": [
-              "api-reference/annotations/overview",
-              "api-reference/annotations/get-annotation",
-              "api-reference/annotations/get-single-annotation",
-              "api-reference/annotations/delete-annotation",
-              "api-reference/annotations/patch-annotation",
-              "api-reference/annotations/get-all-annotations-trace",
-              "api-reference/annotations/create-annotation-trace"
+              "api-reference/gateway-budgets/overview",
+              "api-reference/gateway-budgets/list-budgets-applicable-to-the-project",
+              "api-reference/gateway-budgets/create-budget",
+              "api-reference/gateway-budgets/update-budget",
+              "api-reference/gateway-budgets/archive-budget"
             ]
           },
           {
-            "group": "Datasets",
+            "group": "Gateway: Cache Rules",
             "pages": [
-              "api-reference/datasets/post-dataset-entries"
-            ]
-          },
-          {
-            "group": "Automations",
-            "pages": [
-              "api-reference/automations/create-slack-automation"
-            ]
-          },
-          {
-            "group": "Scenarios",
-            "pages": [
-              "api-reference/scenarios/overview",
-              "api-reference/scenarios/create-event"
-            ]
-          },
-          {
-            "group": "Evaluators",
-            "pages": [
-              "api-reference/evaluators/overview",
-              "api-reference/evaluators/exact-match-evaluator",
-              "api-reference/evaluators/llm-answer-match",
-              "api-reference/evaluators/bleu-score",
-              "api-reference/evaluators/llm-factual-match",
-              "api-reference/evaluators/rouge-score",
-              "api-reference/evaluators/sql-query-equivalence",
-              "api-reference/evaluators/llm-as-a-judge-boolean-evaluator",
-              "api-reference/evaluators/llm-as-a-judge-category-evaluator",
-              "api-reference/evaluators/llm-as-a-judge-score-evaluator",
-              "api-reference/evaluators/rubrics-based-scoring",
-              "api-reference/evaluators/ragas-answer-correctness",
-              "api-reference/evaluators/ragas-answer-relevancy",
-              "api-reference/evaluators/ragas-context-precision",
-              "api-reference/evaluators/ragas-context-recall",
-              "api-reference/evaluators/ragas-context-relevancy",
-              "api-reference/evaluators/ragas-context-utilization",
-              "api-reference/evaluators/ragas-faithfulness",
-              "api-reference/evaluators/ragas-faithfulness-1",
-              "api-reference/evaluators/ragas-response-context-precision",
-              "api-reference/evaluators/ragas-response-context-recall",
-              "api-reference/evaluators/ragas-response-relevancy",
-              "api-reference/evaluators/context-f1",
-              "api-reference/evaluators/context-precision",
-              "api-reference/evaluators/context-recall",
-              "api-reference/evaluators/azure-content-safety",
-              "api-reference/evaluators/azure-jailbreak-detection",
-              "api-reference/evaluators/azure-prompt-shield",
-              "api-reference/evaluators/openai-moderation",
-              "api-reference/evaluators/presidio-pii-detection",
-              "api-reference/evaluators/custom-basic-evaluator",
-              "api-reference/evaluators/competitor-blocklist",
-              "api-reference/evaluators/competitor-allowlist-check",
-              "api-reference/evaluators/competitor-llm-check",
-              "api-reference/evaluators/off-topic-evaluator",
-              "api-reference/evaluators/query-resolution",
-              "api-reference/evaluators/semantic-similarity-evaluator",
-              "api-reference/evaluators/summarization-score",
-              "api-reference/evaluators/valid-format-evaluator",
-              "api-reference/evaluators/lingua-language-detection"
-            ]
-          },
-          {
-            "group": "Saved Evaluators",
-            "pages": [
-              "api-reference/saved-evaluators/overview",
-              "api-reference/saved-evaluators/get-evaluators",
-              "api-reference/saved-evaluators/get-evaluator",
-              "api-reference/saved-evaluators/create-evaluator"
+              "api-reference/gateway-cache-rules/overview",
+              "api-reference/gateway-cache-rules/list-cache-control-rules",
+              "api-reference/gateway-cache-rules/create-a-cache-rule",
+              "api-reference/gateway-cache-rules/get-a-cache-rule",
+              "api-reference/gateway-cache-rules/update-a-cache-rule",
+              "api-reference/gateway-cache-rules/archive-a-cache-rule"
             ]
           }
         ]
@@ -1080,6 +1296,18 @@
     {
       "source": "/ai-gateway/cli/langwatch-cli",
       "destination": "/integration/cli"
+    },
+    {
+      "source": "/api-reference/saved-evaluators/:path*",
+      "destination": "/api-reference/evaluators-config/overview"
+    },
+    {
+      "source": "/api-reference/automations/:path*",
+      "destination": "/api-reference/triggers/overview"
+    },
+    {
+      "source": "/api-reference/endpoint/:path*",
+      "destination": "/api-reference/introduction"
     }
   ]
 }
