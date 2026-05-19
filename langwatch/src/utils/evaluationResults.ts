@@ -196,6 +196,13 @@ export const getStatusLabel = (
  */
 export interface EvalChipInput {
   name?: string | null;
+  /**
+   * Alias for `name` matching the trace-list `TraceEvalResult` shape
+   * (which mirrors the ClickHouse `EvaluatorName` column). The drawer
+   * header chip passes `name`; the trace list passes a TraceEvalResult
+   * directly. Accept both so neither surface has to remember to remap.
+   */
+  evaluatorName?: string | null;
   evaluatorId?: string | null;
   /** Normalized verdict tokens from any source. */
   status?:
@@ -298,7 +305,8 @@ export function getEvalChipDisplay(input: EvalChipInput): EvalChipDisplay {
   const status = normalizeEvalStatus(input);
   const color = EVALUATION_STATUS_COLORS[status];
   const statusLabel = getStatusLabel(status);
-  const displayName = input.name || input.evaluatorId || "Unknown";
+  const displayName =
+    input.name || input.evaluatorName || input.evaluatorId || "Unknown";
   const scoreText =
     typeof input.score === "number" ? formatEvalScoreText(input.score) : null;
   const noVerdict = status === "skipped" || status === "error";
