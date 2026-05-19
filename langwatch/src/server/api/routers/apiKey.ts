@@ -1,4 +1,3 @@
-import type { PrismaClient } from "@prisma/client";
 import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
@@ -39,15 +38,8 @@ async function ensureCallerIsOrgMember(
   }
 }
 
-const apiKeyServiceCache = new WeakMap<PrismaClient, ApiKeyService>();
-
-function getApiKeyService(prisma: PrismaClient): ApiKeyService {
-  let service = apiKeyServiceCache.get(prisma);
-  if (!service) {
-    service = ApiKeyService.create(prisma);
-    apiKeyServiceCache.set(prisma, service);
-  }
-  return service;
+function getApiKeyService(prisma: Parameters<typeof ApiKeyService.create>[0]): ApiKeyService {
+  return ApiKeyService.create(prisma);
 }
 
 const roleBindingSchema = z.object({
