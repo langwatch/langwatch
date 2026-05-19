@@ -33,6 +33,7 @@ import {
   getProjectModelProviders,
   getProjectModelProvidersForFrontend,
   listProjectModelProvidersForFrontend,
+  listOrgModelProvidersForFrontend,
 } from "./modelProviders.utils";
 import { isManagedProvider } from "../../../../ee/managed-providers/managedBedrockConfig";
 
@@ -89,6 +90,19 @@ export const modelProviderRouter = createTRPCRouter({
     .use(checkProjectPermission("project:view"))
     .query(async ({ input }) => {
       return await listProjectModelProvidersForFrontend(input.projectId);
+    }),
+  /**
+   * Org-wide variant: returns every ModelProvider attached anywhere
+   * inside the organization (org + every team + every project),
+   * including env-fed pseudo-rows. The model-providers settings page
+   * uses this for the "All you can see" view so an admin sees the
+   * providers a sibling project's owner has configured.
+   */
+  listAllForOrganizationForFrontend: protectedProcedure
+    .input(z.object({ organizationId: z.string() }))
+    .use(checkOrganizationPermission("organization:view"))
+    .query(async ({ input }) => {
+      return await listOrgModelProvidersForFrontend(input.organizationId);
     }),
   update: protectedProcedure
     .input(

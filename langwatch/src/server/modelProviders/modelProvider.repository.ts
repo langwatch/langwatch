@@ -109,6 +109,47 @@ export class ModelProviderRepository {
     return results.map((result) => this.withDecryptedKeys(result));
   }
 
+  /**
+   * Every ModelProvider visible anywhere inside the given organization:
+   * rows scoped at the org, at any of its teams, or at any of its
+   * projects. Used by the "All you can see" model-providers page so a
+   * user can see what an admin in a sibling project has configured (the
+   * `findAllAccessibleForProject` view only shows rows whose scope set
+   * intersects the currently-viewed project, which misses rows pinned
+   * to sibling projects in the same org).
+   */
+  async findAllInOrganization(
+    organizationId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<ModelProviderWithScopes[]> {
+    const client = tx ?? this.prisma;
+    const teams = await client.team.findMany({
+      where: { organizationId },
+      select: { id: true, projects: { select: { id: true } } },
+    });
+    const teamIds = teams.map((t) => t.id);
+    const projectIds = teams.flatMap((t) => t.projects.map((p) => p.id));
+    const results = await client.modelProvider.findMany({
+      where: {
+        scopes: {
+          some: {
+            OR: [
+              { scopeType: "ORGANIZATION", scopeId: organizationId },
+              ...(teamIds.length > 0
+                ? [{ scopeType: "TEAM" as const, scopeId: { in: teamIds } }]
+                : []),
+              ...(projectIds.length > 0
+                ? [{ scopeType: "PROJECT" as const, scopeId: { in: projectIds } }]
+                : []),
+            ],
+          },
+        },
+      },
+      include: { scopes: true },
+    });
+    return results.map((result) => this.withDecryptedKeys(result));
+  }
+
   async create(
     data: {
       projectId: string;

@@ -40,13 +40,20 @@ export default function ModelsPage() {
   // collapses multi-instance setups (two "OpenAI" rows at different
   // scopes) into a single entry and silently drops the loser. Use the
   // flat list endpoint instead so the table reflects every row.
-  const listQuery = api.modelProvider.listAllForProjectForFrontend.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: !!project?.id },
-  );
-  const allProvidersList = listQuery.data?.providers ?? [];
-  const isLoading = listQuery.isLoading;
-  const refetch = listQuery.refetch;
+  //
+  // The "All you can see" view fans out across the whole organization
+  // so a user can see providers a sibling project has configured (the
+  // per-project endpoint only returns rows whose scope set intersects
+  // the currently-viewed project, missing PROJECT-scope rows attached
+  // to other projects in the same org).
+  const orgQuery =
+    api.modelProvider.listAllForOrganizationForFrontend.useQuery(
+      { organizationId: organization?.id ?? "" },
+      { enabled: !!organization?.id },
+    );
+  const allProvidersList = orgQuery.data?.providers ?? [];
+  const isLoading = orgQuery.isLoading;
+  const refetch = orgQuery.refetch;
 
   const { openDrawer, drawerOpen: isDrawerOpen } = useDrawer();
   const isProviderDrawerOpen = isDrawerOpen("editModelProvider");
@@ -436,6 +443,7 @@ export default function ModelsPage() {
                     utils.modelProvider.getAllForProject.invalidate(),
                     utils.modelProvider.getAllForProjectForFrontend.invalidate(),
                     utils.modelProvider.listAllForProjectForFrontend.invalidate(),
+                    utils.modelProvider.listAllForOrganizationForFrontend.invalidate(),
                     utils.modelProvider.getResolvedDefault.invalidate(),
                     utils.modelProvider.getDefaultModelsForProject.invalidate(),
                   ]);

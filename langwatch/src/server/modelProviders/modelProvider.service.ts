@@ -20,6 +20,7 @@ import {
   modelProviders,
 } from "./registry";
 import { seedOnboardingDefaultsForProvider } from "./seedOnboardingDefaults";
+import { isManagedProvider } from "../../../ee/managed-providers/managedBedrockConfig";
 
 /**
  * Minimal ctx slice this service uses to authorize scope-level writes.
@@ -234,6 +235,145 @@ export class ModelProviderService {
         return provider_;
       });
     return [...storedRows, ...systemRows];
+  }
+
+  /**
+   * Org-wide variant of `listProjectModelProvidersForFrontend`. Returns
+   * every ModelProvider attached anywhere inside the organization — at
+   * the org itself, any of its teams, or any of its projects. The
+   * settings page renders this when the page-level filter is set to
+   * "All you can see" so a user can see what an admin in a sibling
+   * project has configured.
+   *
+   * Env-fed pseudo-rows (process.env API keys + managed bedrock
+   * keyed by orgId) are included with scopes=[] / isSystem=true so the
+   * "SYSTEM" chip renders correctly. The per-project env check
+   * (enabledSince < project.createdAt) is anchored on the org's
+   * oldest project — if any project in the org is old enough to see
+   * the env-fed provider, all of them do, so the row shows once at
+   * org scope.
+   */
+  async listOrgModelProvidersForFrontend(
+    organizationId: string,
+  ): Promise<MaybeStoredModelProvider[]> {
+    const teams = await this.prisma.team.findMany({
+      where: { organizationId },
+      include: { projects: true },
+    });
+    const projects = teams.flatMap((t) => t.projects);
+    const oldestProject = projects.reduce<Project | null>(
+      (oldest, p) =>
+        !oldest || p.createdAt < oldest.createdAt ? (p as Project) : oldest,
+      null,
+    );
+    const defaultProviders = oldestProject
+      ? this.buildDefaultProviders(oldestProject)
+      : {};
+    const savedProviders =
+      await this.repository.findAllInOrganization(organizationId);
+    const savedProviderKeys = new Set(savedProviders.map((mp) => mp.provider));
+
+    const systemRows: MaybeStoredModelProvider[] = [];
+    for (const [providerKey, provider_] of Object.entries(defaultProviders)) {
+      if (savedProviderKeys.has(providerKey)) continue;
+      if (!provider_.enabled) continue;
+      systemRows.push({ ...provider_, isSystem: true, scopes: [] });
+    }
+    // Managed bedrock: env var MANAGED_BEDROCK__<label>__<orgId> sets
+    // up cross-account credentials for a specific org. Surface a SYSTEM
+    // pseudo-row so the table shows the user where it's coming from.
+    if (
+      !savedProviderKeys.has("bedrock") &&
+      isManagedProvider(organizationId, "bedrock")
+    ) {
+      const defaultProvider = this.buildDefaultProvidersFromEnvShape(
+        "bedrock",
+        oldestProject,
+      );
+      if (defaultProvider) {
+        systemRows.push({ ...defaultProvider, isSystem: true, scopes: [] });
+      }
+    }
+
+    const storedRows = savedProviders
+      .filter((mp) => this.shouldKeepModelProvider(mp, defaultProviders))
+      .map((mp) => {
+        const defaultProvider = defaultProviders[mp.provider];
+        const customModels = toLegacyCompatibleCustomModels(
+          mp.customModels,
+          "chat",
+        );
+        const customEmbeddingsModels = toLegacyCompatibleCustomModels(
+          mp.customEmbeddingsModels,
+          "embedding",
+        );
+        const narrowestScope = this.pickNarrowestScope(mp.scopes);
+        const masked = (mp.customKeys
+          ? Object.fromEntries(
+              Object.entries(
+                mp.customKeys as Record<string, unknown>,
+              ).map(([key, value]) => [
+                key,
+                KEY_CHECK.some((k) => key.includes(k))
+                  ? MASKED_KEY_PLACEHOLDER
+                  : value,
+              ]),
+            )
+          : null) as MaybeStoredModelProvider["customKeys"];
+        const provider_: MaybeStoredModelProvider = {
+          id: mp.id,
+          name: mp.name,
+          provider: mp.provider,
+          enabled: mp.enabled,
+          customKeys: masked,
+          models: defaultProvider?.models ?? null,
+          embeddingsModels: defaultProvider?.embeddingsModels ?? null,
+          customModels: customModels.length > 0 ? customModels : null,
+          customEmbeddingsModels:
+            customEmbeddingsModels.length > 0 ? customEmbeddingsModels : null,
+          deploymentMapping: mp.deploymentMapping,
+          disabledByDefault: defaultProvider?.disabledByDefault,
+          extraHeaders: mp.extraHeaders as
+            | { key: string; value: string }[]
+            | null,
+          scopes: mp.scopes.map((s) => ({
+            scopeType: s.scopeType as "ORGANIZATION" | "TEAM" | "PROJECT",
+            scopeId: s.scopeId,
+          })),
+          scopeType: narrowestScope.scopeType,
+          scopeId: narrowestScope.scopeId,
+        };
+        return provider_;
+      });
+    return [...storedRows, ...systemRows];
+  }
+
+  /**
+   * Build a single default provider row for a specific providerKey.
+   * Used by managed-bedrock pseudo-row synthesis, where the env-fed
+   * gate is satisfied through the managed-providers config rather
+   * than `process.env[apiKey]`.
+   */
+  private buildDefaultProvidersFromEnvShape(
+    providerKey: string,
+    referenceProject: Project | null,
+  ): MaybeStoredModelProvider | null {
+    if (!referenceProject) return null;
+    const registry =
+      modelProviders[providerKey as keyof typeof modelProviders];
+    if (!registry?.enabledSince) return null;
+    return {
+      provider: providerKey,
+      enabled: true,
+      disabledByDefault: false,
+      customKeys: null,
+      models: getProviderModelOptions(providerKey, "chat").map((m) => m.value),
+      embeddingsModels: getProviderModelOptions(providerKey, "embedding").map(
+        (m) => m.value,
+      ),
+      deploymentMapping: null,
+      extraHeaders: [],
+    };
   }
 
   /**
