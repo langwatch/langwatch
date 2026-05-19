@@ -590,22 +590,21 @@ function FeatureRow({
 /**
  * Builds the `inheritOption` payload `ProviderModelSelector` consumes.
  * The label tells the user where the value comes from — "Inherit (from
- * organization)" or "Suggested from openai" for the inferred-fallback
- * case — and the model is rendered at reduced opacity in the trigger +
- * as the first dropdown entry.
+ * organization)" or similar — and the model is rendered at reduced
+ * opacity in the trigger + as the first dropdown entry.
+ *
+ * The `inferred` source (server falls back to "we'd pick the latest
+ * from your first provider") is intentionally NOT surfaced. The
+ * picker shows the same providers' `/latest` and `/latest-mini`
+ * aliases at the top of the list, so a redundant "Suggested from X"
+ * chip would just add noise.
  */
 function buildInheritOption(
   fromServer: InheritedEntry,
   fromEffective: Payload["effective"][ModelRoleKey] | null,
 ): { model: string; label: string } | undefined {
   if (fromServer) {
-    if (fromServer.source === "inferred") {
-      const providerName = fromServer.inferredFromProvider ?? "first provider";
-      return {
-        model: fromServer.model,
-        label: `Suggested from ${providerName}`,
-      };
-    }
+    if (fromServer.source === "inferred") return undefined;
     // `feature_override` / `role_default` carry a concrete scope name
     // (organization / team / project). The "system" / env-var fallback
     // is surfaced via `fromEffective` below.
