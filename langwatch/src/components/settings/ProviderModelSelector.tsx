@@ -9,6 +9,10 @@ import {
 import { Search } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 import { modelProviderIcons } from "../../server/modelProviders/iconsMap";
+import {
+  isLatestAlias,
+  resolveLatestAlias,
+} from "../../server/modelProviders/latestAliases";
 import { titleCase } from "../../utils/stringCasing";
 import {
   MODEL_ICON_SIZE,
@@ -21,6 +25,9 @@ type ModelOption = {
   label: string;
   value: string;
   icon: React.ReactNode;
+  /** Optional second line under the label. Used to surface what an alias
+   *  like `openai/latest` currently resolves to. */
+  subtitle?: string;
 };
 
 type GroupedModelOptions = {
@@ -70,17 +77,34 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
 }) {
   const [modelSearch, setModelSearch] = useState("");
 
-  // Create model options with labels and derive icon from each model's provider
+  // Create model options with labels and derive icon from each model's provider.
+  // Alias entries (`<provider>/latest`, `<provider>/latest-mini`) get a
+  // human-readable label so the picker reads as "Latest" / "Latest smaller"
+  // instead of the raw alias suffix, plus they carry the resolved model id
+  // as a subtitle so the user sees what they'd actually get.
   const selectOptions = useMemo(
     () =>
       options.map((modelValue) => {
         const modelProvider = modelValue.split("/")[0] ?? "";
         const icon =
           modelProviderIcons[modelProvider as keyof typeof modelProviderIcons];
+        if (isLatestAlias(modelValue)) {
+          const suffix = modelValue.split("/")[1] ?? "";
+          const aliasLabel =
+            suffix === "latest" ? "Latest" : "Latest smaller model";
+          const resolved = resolveLatestAlias(modelValue);
+          return {
+            label: aliasLabel,
+            value: modelValue,
+            icon,
+            subtitle: resolved ?? "",
+          };
+        }
         return {
           label: modelValue.split("/").slice(1).join("/"),
           value: modelValue,
           icon,
+          subtitle: "",
         };
       }),
     [options],
@@ -329,18 +353,31 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
           >
             {group.models.map((item) => (
               <Select.Item key={item.value} item={item}>
-                <HStack gap={2}>
+                <HStack gap={2} align={item.subtitle ? "flex-start" : "center"}>
                   {item.icon && (
                     <Box width={MODEL_ICON_SIZE} minWidth={MODEL_ICON_SIZE}>
                       {item.icon}
                     </Box>
                   )}
-                  <Box
-                    fontSize={size === "sm" ? 12 : 14}
-                    fontFamily="mono"
-                    paddingY={size === "sm" ? 0 : "2px"}
-                  >
-                    {item.label}
+                  <Box>
+                    <Box
+                      fontSize={size === "sm" ? 12 : 14}
+                      fontFamily={item.subtitle ? undefined : "mono"}
+                      fontWeight={item.subtitle ? "medium" : undefined}
+                      paddingY={size === "sm" ? 0 : "2px"}
+                    >
+                      {item.label}
+                    </Box>
+                    {item.subtitle && (
+                      <Text
+                        fontSize="xs"
+                        color="fg.muted"
+                        fontFamily="mono"
+                        lineClamp={1}
+                      >
+                        {item.subtitle}
+                      </Text>
+                    )}
                   </Box>
                 </HStack>
               </Select.Item>

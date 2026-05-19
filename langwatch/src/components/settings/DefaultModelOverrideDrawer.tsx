@@ -35,6 +35,7 @@ import { toaster } from "~/components/ui/toaster";
 import { api, type RouterOutputs } from "~/utils/api";
 
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { LATEST_ALIAS_PROVIDERS } from "~/server/modelProviders/latestAliases";
 import { INHERIT_SENTINEL, ProviderModelSelector } from "./ProviderModelSelector";
 import {
   ScopeChipPicker,
@@ -177,6 +178,18 @@ export function DefaultModelOverrideDrawer({
       .filter((p) => p.enabled === true)
       .map((p) => [p.provider, p]);
     const enabledKeys = new Set(enabledEntries.map(([k]) => k));
+    // Build the alias entries for enabled providers that support them.
+    // Aliases sit at the TOP of the chat list (DEFAULT + FAST) so the
+    // user lands on "Latest" / "Latest smaller" without scrolling — the
+    // expectation is that pinning a specific model is the exceptional
+    // case, not the default. EMBEDDINGS doesn't get aliases (the latest
+    // embedding model isn't a moving target the way chat flagships are).
+    const aliasChatOptions: string[] = [];
+    for (const provider of LATEST_ALIAS_PROVIDERS) {
+      if (!enabledKeys.has(provider)) continue;
+      aliasChatOptions.push(`${provider}/latest`);
+      aliasChatOptions.push(`${provider}/latest-mini`);
+    }
     // First-paint fallback: no providers loaded yet → list everything so
     // the dropdown isn't visually broken while the query is in flight.
     const filterByMode = (mode: "chat" | "embedding") => {
@@ -213,9 +226,11 @@ export function DefaultModelOverrideDrawer({
       // Custom entries first so user-added models are easy to spot.
       return Array.from(new Set([...customModels, ...registryModels]));
     };
+    const chatOptions = filterByMode("chat");
     return {
-      DEFAULT: filterByMode("chat"),
-      FAST: filterByMode("chat"),
+      // Aliases at the top of chat lists; concrete models below.
+      DEFAULT: [...aliasChatOptions, ...chatOptions],
+      FAST: [...aliasChatOptions, ...chatOptions],
       EMBEDDINGS: filterByMode("embedding"),
     } satisfies Record<ModelRoleKey, string[]>;
   }, [projectProviders.data]);

@@ -10,6 +10,10 @@ import { AlertTriangle } from "lucide-react";
 import { Tooltip } from "../ui/tooltip";
 import { modelProviderIcons } from "~/server/modelProviders/iconsMap";
 import {
+  isLatestAlias,
+  resolveLatestAlias,
+} from "~/server/modelProviders/latestAliases";
+import {
   MODEL_ICON_SIZE,
   MODEL_ICON_SIZE_SM,
 } from "../llmPromptConfigs/constants";
@@ -38,6 +42,16 @@ export function ModelChip({
   const icon =
     modelProviderIcons[providerKey as keyof typeof modelProviderIcons];
   const iconSlot = size === "sm" ? MODEL_ICON_SIZE_SM : MODEL_ICON_SIZE;
+  // Alias rendering: `openai/latest` shows as "Latest" with the
+  // resolved concrete id on a second line, so the table reads
+  // "Latest → gpt-5.5" instead of an opaque "latest" string.
+  const aliasResolved = isLatestAlias(model) ? resolveLatestAlias(model) : null;
+  const aliasLabel =
+    isLatestAlias(model)
+      ? family === "latest"
+        ? "Latest"
+        : "Latest smaller"
+      : null;
 
   const chip = (
     <HStack
@@ -51,16 +65,38 @@ export function ModelChip({
           {icon}
         </Box>
       )}
-      <Text
-        fontFamily="mono"
-        fontSize={size === "sm" ? "xs" : "sm"}
-        lineClamp={1}
-        wordBreak="break-all"
-        color={invalid ? "red.600" : undefined}
-        textDecoration={invalid ? "line-through" : undefined}
-      >
-        {family || model}
-      </Text>
+      {aliasLabel ? (
+        <Box>
+          <Text
+            fontSize={size === "sm" ? "xs" : "sm"}
+            fontWeight="medium"
+            lineClamp={1}
+          >
+            {aliasLabel}
+          </Text>
+          {aliasResolved && (
+            <Text
+              fontFamily="mono"
+              fontSize={size === "sm" ? "2xs" : "xs"}
+              color="fg.muted"
+              lineClamp={1}
+            >
+              {aliasResolved.split("/").slice(1).join("/")}
+            </Text>
+          )}
+        </Box>
+      ) : (
+        <Text
+          fontFamily="mono"
+          fontSize={size === "sm" ? "xs" : "sm"}
+          lineClamp={1}
+          wordBreak="break-all"
+          color={invalid ? "red.600" : undefined}
+          textDecoration={invalid ? "line-through" : undefined}
+        >
+          {family || model}
+        </Text>
+      )}
       {invalid && (
         <HStack gap={1} color="red.600" flexShrink={0}>
           <AlertTriangle size={size === "sm" ? 12 : 14} aria-hidden />
