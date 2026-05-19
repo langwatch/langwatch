@@ -35,7 +35,10 @@
 -- No down migration: this is a one-way data shape change. To roll back,
 -- restore from a pre-migration export of "ModelDefaultConfig".
 
--- 1a. Lift topic_clustering_llm into FAST when FAST is missing.
+-- 1a. Lift topic_clustering_llm into FAST when FAST is missing, JSON
+--     null, or an empty string. `config ? 'FAST'` alone returns true
+--     for null / empty values, which would silently drop the legacy
+--     key without setting a usable role default.
 UPDATE "ModelDefaultConfig"
 SET config = jsonb_set(
     config,
@@ -43,13 +46,19 @@ SET config = jsonb_set(
     config -> 'analytics.topic_clustering_llm'
 ) - 'analytics.topic_clustering_llm'
 WHERE config ? 'analytics.topic_clustering_llm'
-  AND NOT (config ? 'FAST');
+  AND (
+    NOT (config ? 'FAST')
+    OR jsonb_typeof(config -> 'FAST') <> 'string'
+    OR nullif(config ->> 'FAST', '') IS NULL
+  );
 
--- 1b. Drop topic_clustering_llm when FAST is already set.
+-- 1b. Drop topic_clustering_llm when FAST already holds a usable
+--     (non-null, non-empty) string value.
 UPDATE "ModelDefaultConfig"
 SET config = config - 'analytics.topic_clustering_llm'
 WHERE config ? 'analytics.topic_clustering_llm'
-  AND (config ? 'FAST');
+  AND jsonb_typeof(config -> 'FAST') = 'string'
+  AND nullif(config ->> 'FAST', '') IS NOT NULL;
 
 -- 2a. DEFAULT role: any openai|anthropic|gemini value becomes {provider}/latest.
 UPDATE "ModelDefaultConfig"
