@@ -335,3 +335,45 @@ WHERE s."scopeType" = 'PROJECT'
     WHERE os."scopeType" = 'ORGANIZATION'
       AND os."scopeId" = sub.org_id
   );
+
+-- 5. Single-project org provider lift. Mirror of block 4 on the
+-- ModelProviderScope table: when an org has exactly one project, any
+-- ModelProviderScope rows attached at PROJECT scope are re-pointed to
+-- ORGANIZATION scope. Same safety gate — only single-project orgs, so
+-- no provider can leak into a sibling project that wasn't configured.
+--
+-- A ModelProvider may already have an ORG-scope row for the same org
+-- (someone re-added the provider at org scope after originally pinning
+-- it to the project); the NOT EXISTS guard skips those to avoid
+-- violating the (modelProviderId, scopeType, scopeId) unique index.
+-- The orphaned PROJECT row in that case stays — manual cleanup if the
+-- operator wants it gone.
+--
+-- Idempotent: a row already lifted to ORG no longer matches
+-- scopeType = 'PROJECT', so reruns are no-ops.
+UPDATE "ModelProviderScope" mps
+SET "scopeType" = 'ORGANIZATION'::"ModelProviderScopeType",
+    "scopeId" = sub.org_id
+FROM (
+    SELECT
+        p.id AS project_id,
+        t."organizationId" AS org_id
+    FROM "Project" p
+    JOIN "Team" t ON t.id = p."teamId"
+    WHERE t."organizationId" IN (
+        SELECT t2."organizationId"
+        FROM "Project" p2
+        JOIN "Team" t2 ON t2.id = p2."teamId"
+        GROUP BY t2."organizationId"
+        HAVING COUNT(*) = 1
+    )
+) AS sub
+WHERE mps."scopeType" = 'PROJECT'
+  AND mps."scopeId" = sub.project_id
+  AND NOT EXISTS (
+    SELECT 1
+    FROM "ModelProviderScope" mps2
+    WHERE mps2."modelProviderId" = mps."modelProviderId"
+      AND mps2."scopeType" = 'ORGANIZATION'
+      AND mps2."scopeId" = sub.org_id
+  );
