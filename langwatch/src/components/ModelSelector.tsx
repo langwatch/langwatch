@@ -8,7 +8,7 @@ import {
   Skeleton,
   Text,
 } from "@chakra-ui/react";
-import { Search, Settings } from "lucide-react";
+import { AlertTriangle, Search } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { modelProviderIcons } from "../server/modelProviders/iconsMap";
@@ -23,6 +23,7 @@ import {
 import { InputGroup } from "./ui/input-group";
 import { Link } from "./ui/link";
 import { Select } from "./ui/select";
+import { Tooltip } from "./ui/tooltip";
 import { LuSettings2 } from "react-icons/lu";
 import { NoModelsConfiguredCallout } from "./NoModelsConfiguredCallout";
 
@@ -65,22 +66,49 @@ export const useModelSelectionOptions = (
   mode: "chat" | "embedding" = "chat",
 ) => {
   const { project } = useOrganizationTeamProject();
-  const modelProviders = api.modelProvider.getAllForProject.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: !!project?.id },
-  );
+  // `listAllForProjectForFrontend` returns the providers actually
+  // stored against any scope reachable from this project. The legacy
+  // `getAllForProject` merged env-fed defaults (every registry
+  // provider whose API key is present in the server's process env),
+  // which made unrelated providers like Gemini show up in the picker
+  // for a project that only stored Anthropic/OpenAI.
+  const modelProviders =
+    api.modelProvider.listAllForProjectForFrontend.useQuery(
+      { projectId: project?.id ?? "" },
+      { enabled: !!project?.id },
+    );
 
-  const allModels = getCustomModels(
-    modelProviders.data ?? {},
-    options,
-    mode,
-  );
+  // Adapt the array shape (one row per provider+scope) into the
+  // legacy `Record<provider, config>` shape that getCustomModels +
+  // the custom-model dedup loop below expect. Multiple rows for the
+  // same provider (multi-scope) are merged: the provider counts as
+  // enabled if any row is enabled, customModels lists union.
+  const providersByKey: Record<string, MaybeStoredModelProvider> = {};
+  for (const row of modelProviders.data?.providers ?? []) {
+    const existing = providersByKey[row.provider];
+    if (!existing) {
+      providersByKey[row.provider] = row;
+      continue;
+    }
+    providersByKey[row.provider] = {
+      ...existing,
+      enabled: existing.enabled || row.enabled,
+      customModels: [
+        ...(existing.customModels ?? []),
+        ...(row.customModels ?? []),
+      ],
+      customEmbeddingsModels: [
+        ...(existing.customEmbeddingsModels ?? []),
+        ...(row.customEmbeddingsModels ?? []),
+      ],
+    };
+  }
+
+  const allModels = getCustomModels(providersByKey, options, mode);
 
   // Build a set of custom model IDs for quick lookup
   const customModelIdSet = new Set<string>();
-  for (const [providerKey, config] of Object.entries(
-    modelProviders.data ?? {},
-  )) {
+  for (const [providerKey, config] of Object.entries(providersByKey)) {
     const customList =
       mode === "chat" ? config.customModels : config.customEmbeddingsModels;
     if (customList) {
@@ -207,6 +235,16 @@ export const ModelSelector = React.memo(function ModelSelector({
   // Model might not be in the list if it's a custom model or unknown
   const isUnknown = !selectedItem;
 
+  // Provider gone (deleted or never configured at any reachable
+  // scope) — the value is still persisted on the form but the user
+  // needs to update it before the evaluation can run. Same chip
+  // treatment ModelChip renders in the Default Models table.
+  const providerKey = model.split("/")[0] ?? "";
+  const isProviderMissing =
+    !!model &&
+    !!providerKey &&
+    !groupedByProvider.some((group) => group.provider === providerKey);
+
   const selectValueText = (
     <HStack overflow="hidden" gap={2} align="center">
       {selectedItem?.icon && (
@@ -219,10 +257,32 @@ export const ModelSelector = React.memo(function ModelSelector({
         fontFamily="mono"
         lineClamp={1}
         wordBreak="break-all"
-        color={isUnknown ? "gray.500" : undefined}
+        color={
+          isProviderMissing ? "red.600" : isUnknown ? "gray.500" : undefined
+        }
+        textDecoration={isProviderMissing ? "line-through" : undefined}
       >
         {selectedItem?.label ?? model}
       </Box>
+      {isProviderMissing && (
+        <Tooltip
+          content={`${providerKey} provider isn't enabled here. Re-add the provider or pick a different model to use it.`}
+          positioning={{ placement: "top" }}
+          showArrow
+        >
+          <HStack gap={1} color="red.600" flexShrink={0}>
+            <AlertTriangle size={size === "sm" ? 12 : 14} aria-hidden />
+            <Text
+              fontSize={size === "sm" ? "2xs" : "xs"}
+              fontWeight="medium"
+              textTransform="uppercase"
+              letterSpacing="wide"
+            >
+              Update needed
+            </Text>
+          </HStack>
+        </Tooltip>
+      )}
     </HStack>
   );
 

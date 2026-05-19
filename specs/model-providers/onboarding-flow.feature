@@ -186,21 +186,22 @@ Feature: Onboarding Flow
   # has its own quirks.
 
   @integration
-  Scenario: OpenAI seed plan populates all three roles
+  Scenario: OpenAI seed plan uses latest aliases
     Given OpenAI is the provider being enabled at onboarding
     When the seed plan is computed
-    Then DEFAULT resolves to the latest plain gpt-X.Y
-    And FAST resolves to the latest gpt-X.Y-mini
+    Then DEFAULT is openai/latest
+    And FAST is openai/latest-mini
     And EMBEDDINGS resolves to the latest text-embedding-N
+    # The alias strings expand to the catalog's current flagship /
+    # mini at read time so a newer model release lifts every seeded
+    # org without a config rewrite.
 
   @integration
-  Scenario: Anthropic FAST defaults to sonnet not haiku
+  Scenario: Anthropic seed plan uses latest aliases
     Given Anthropic is the provider being enabled at onboarding
     When the seed plan is computed
-    Then DEFAULT and FAST both resolve to the same latest claude-sonnet
-    # Haiku trails sonnet by a wide enough margin on assistive tasks
-    # that mapping FAST to haiku produces worse output at marginal cost
-    # savings. Sonnet is the price/speed sweet spot across the board.
+    Then DEFAULT is anthropic/latest
+    And FAST is anthropic/latest-mini
 
   @integration
   Scenario: Anthropic seed plan omits EMBEDDINGS
@@ -210,11 +211,11 @@ Feature: Onboarding Flow
          provider that does ship an embedding API
 
   @integration
-  Scenario: Gemini DEFAULT prefers pro (incl. -preview) over flash
+  Scenario: Gemini seed plan uses latest aliases
     Given Gemini is the provider being enabled at onboarding
     When the seed plan is computed
-    Then DEFAULT resolves to a gemini-pro variant (including -preview)
-    And FAST resolves to a gemini-flash variant
+    Then DEFAULT is gemini/latest
+    And FAST is gemini/latest-mini
     And EMBEDDINGS resolves to a gemini-embedding model
 
   @integration

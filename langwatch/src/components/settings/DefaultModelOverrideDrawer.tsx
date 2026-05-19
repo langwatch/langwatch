@@ -35,6 +35,7 @@ import { toaster } from "~/components/ui/toaster";
 import { api, type RouterOutputs } from "~/utils/api";
 
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { LATEST_ALIAS_PROVIDERS } from "~/server/modelProviders/latestAliases";
 import { INHERIT_SENTINEL, ProviderModelSelector } from "./ProviderModelSelector";
 import {
   ScopeChipPicker,
@@ -72,12 +73,6 @@ interface Props {
   /** Effective resolution for the project currently viewed — used as
    *  the "if you don't override" placeholder for each row. */
   effective: Payload["effective"];
-  /** Quick-pick context: the scope ids the caller is currently sitting on
-   *  so the drawer can offer "Organization / This team / This project" chips
-   *  same as the model-provider drawer. */
-  currentOrganizationId?: string | null;
-  currentTeamId?: string | null;
-  currentProjectId?: string | null;
   onSaved: () => void;
 }
 
@@ -88,9 +83,6 @@ export function DefaultModelOverrideDrawer({
   available,
   features,
   effective,
-  currentOrganizationId,
-  currentTeamId,
-  currentProjectId,
   onSaved,
 }: Props) {
   const utils = api.useContext();
@@ -179,6 +171,8 @@ export function DefaultModelOverrideDrawer({
     );
 
   const modelOptionsByRole = useMemo(() => {
+    const isLoading = projectProviders.isLoading;
+    const hasProviderLoadError = projectProviders.isError;
     const providers = projectProviders.data?.providers ?? [];
     const enabledEntries: Array<
       [string, (typeof providers)[number]]
@@ -186,14 +180,30 @@ export function DefaultModelOverrideDrawer({
       .filter((p) => p.enabled === true)
       .map((p) => [p.provider, p]);
     const enabledKeys = new Set(enabledEntries.map(([k]) => k));
-    // First-paint fallback: no providers loaded yet → list everything so
-    // the dropdown isn't visually broken while the query is in flight.
+    // Build the alias entries for enabled providers that support them.
+    // Aliases sit at the TOP of the chat list (DEFAULT + FAST) so the
+    // user lands on "Latest" / "Latest smaller" without scrolling — the
+    // expectation is that pinning a specific model is the exceptional
+    // case, not the default. EMBEDDINGS doesn't get aliases (the latest
+    // embedding model isn't a moving target the way chat flagships are).
+    const aliasChatOptions: string[] = [];
+    for (const provider of LATEST_ALIAS_PROVIDERS) {
+      if (!enabledKeys.has(provider)) continue;
+      aliasChatOptions.push(`${provider}/latest`);
+      aliasChatOptions.push(`${provider}/latest-mini`);
+    }
     const filterByMode = (mode: "chat" | "embedding") => {
-      if (enabledEntries.length === 0) {
+      // Still loading: show the full registry so the dropdown isn't
+      // visually broken during first paint. Once data lands we either
+      // fall through to the enabled-filter path or — if the project
+      // has zero enabled providers (or the query errored) — return an
+      // empty list so the picker doesn't lie about what's available.
+      if (isLoading) {
         return modelSelectorOptions
           .filter((o) => o.mode === mode)
           .map((o) => o.value);
       }
+      if (hasProviderLoadError || enabledEntries.length === 0) return [];
       // Registry chat/embedding models from any enabled provider. This
       // mirrors the ModelProviderDefaultSection logic — the registry is
       // the broad pool; provider toggles narrow it.
@@ -222,9 +232,11 @@ export function DefaultModelOverrideDrawer({
       // Custom entries first so user-added models are easy to spot.
       return Array.from(new Set([...customModels, ...registryModels]));
     };
+    const chatOptions = filterByMode("chat");
     return {
-      DEFAULT: filterByMode("chat"),
-      FAST: filterByMode("chat"),
+      // Aliases at the top of chat lists; concrete models below.
+      DEFAULT: [...aliasChatOptions, ...chatOptions],
+      FAST: [...aliasChatOptions, ...chatOptions],
       EMBEDDINGS: filterByMode("embedding"),
     } satisfies Record<ModelRoleKey, string[]>;
   }, [projectProviders.data]);
@@ -310,9 +322,6 @@ export function DefaultModelOverrideDrawer({
               scopes={scopes}
               onChange={setScopes}
               available={available}
-              currentOrganizationId={currentOrganizationId}
-              currentTeamId={currentTeamId}
-              currentProjectId={currentProjectId}
             />
 
             <VStack align="stretch" gap={2}>
@@ -581,9 +590,16 @@ function FeatureRow({
 /**
  * Builds the `inheritOption` payload `ProviderModelSelector` consumes.
  * The label tells the user where the value comes from — "Inherit (from
- * organization)" or "Suggested from openai" for the inferred-fallback
- * case — and the model is rendered at reduced opacity in the trigger +
- * as the first dropdown entry.
+ * organization)" or similar — and the model is rendered at reduced
+ * opacity in the trigger + as the first dropdown entry.
+ *
+ * For the `inferred` source (server falls back to "we'd pick the
+ * latest from your first provider") the label is a neutral "Inherit"
+ * rather than "Suggested from X" — the picker already surfaces the
+ * provider's `/latest` and `/latest-mini` aliases at the top of the
+ * list, so the per-provider attribution would just add noise. The
+ * inherit entry itself stays so the user can always toggle back from
+ * an explicit override.
  */
 function buildInheritOption(
   fromServer: InheritedEntry,
@@ -591,10 +607,9 @@ function buildInheritOption(
 ): { model: string; label: string } | undefined {
   if (fromServer) {
     if (fromServer.source === "inferred") {
-      const providerName = fromServer.inferredFromProvider ?? "first provider";
       return {
         model: fromServer.model,
-        label: `Suggested from ${providerName}`,
+        label: "Inherit",
       };
     }
     // `feature_override` / `role_default` carry a concrete scope name
@@ -638,22 +653,17 @@ function ScopeSection({
   scopes,
   onChange,
   available,
-  currentOrganizationId,
-  currentTeamId,
-  currentProjectId,
 }: {
   scopes: ScopeChipPickerEntry[];
   onChange: (next: ScopeChipPickerEntry[]) => void;
   available: Payload["available"];
-  currentOrganizationId?: string | null;
-  currentTeamId?: string | null;
-  currentProjectId?: string | null;
 }) {
-  // Quick-picks + Multiple chip + collapsible dropdown all live inside
-  // ScopeChipPicker now — single source of truth. The wrapper used to
-  // render its own quick-pick row above the picker; that duplicated
-  // the same state derivation in two places (and one always lagged the
-  // other by a re-render). See ScopeChipPicker docs for the contract.
+  // Drawer renders only the dropdown — the Organization/Team/Project
+  // quick-pick chips are redundant when scope assignment is effectively
+  // always at org scope, and the dropdown already surfaces all reachable
+  // scopes. The quick-pick variant is preserved on `ScopeChipPicker`
+  // (`showQuickPicks` prop) for future surfaces where the chip-row UX
+  // makes sense.
   return (
     <ScopeChipPicker
       value={scopes}
@@ -663,12 +673,6 @@ function ScopeSection({
       availableTeams={available.teams}
       availableProjects={available.projects}
       label=""
-      showQuickPicks
-      currentOrganizationId={
-        available.organization ? currentOrganizationId ?? null : null
-      }
-      currentTeamId={currentTeamId ?? null}
-      currentProjectId={currentProjectId ?? null}
     />
   );
 }

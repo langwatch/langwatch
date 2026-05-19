@@ -4,6 +4,7 @@ import {
   featureByKey,
   type FeatureDescriptor,
 } from "./featureRegistry";
+import { expandLatestAlias, isLatestAlias } from "./latestAliases";
 import { ModelNotConfiguredError } from "./modelNotConfiguredError";
 
 export type ResolutionSource = "feature_override" | "role_default";
@@ -215,8 +216,17 @@ export async function resolveModelForFeature(
     for (const c of tierConfigs) {
       const value = readKey(c.config, feature.key);
       if (value) {
+        // Aliases like `openai/latest` resolve to the registry flagship
+        // here so downstream consumers (litellm, aigateway, nlp) only
+        // ever see concrete model ids. Non-alias values pass through.
+        // If an alias has no concrete resolution in the current catalog
+        // (e.g. a provider added later but the flagship hasn't shipped
+        // yet), skip this entry and let the cascade continue rather
+        // than leak a virtual id downstream.
+        const expanded = expandLatestAlias(value);
+        if (isLatestAlias(value) && expanded === value) continue;
         return {
-          model: value,
+          model: expanded,
           source: "feature_override",
           scope: tier,
           feature,
@@ -227,8 +237,10 @@ export async function resolveModelForFeature(
     for (const c of tierConfigs) {
       const value = readKey(c.config, feature.role);
       if (value) {
+        const expanded = expandLatestAlias(value);
+        if (isLatestAlias(value) && expanded === value) continue;
         return {
-          model: value,
+          model: expanded,
           source: "role_default",
           scope: tier,
           feature,

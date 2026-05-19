@@ -12,94 +12,6 @@ const REGISTRY = (
   llmModels as unknown as { models: Record<string, RegistryEntry> }
 ).models;
 
-/** Picks the newest `openai/gpt-X.Y(-suffix)?` chat model. */
-function pickLatestOpenAIChat(suffixFilter: "plain" | "mini"): string | undefined {
-  const candidates: { id: string; major: number; minor: number }[] = [];
-  for (const model of Object.values(REGISTRY)) {
-    if (model.provider !== "openai" || model.mode !== "chat") continue;
-    const m = /^openai\/gpt-(\d+)\.(\d+)(-[a-z0-9-]+)?$/.exec(model.id);
-    if (!m) continue;
-    const [, major, minor, suffix] = m;
-    const variant = suffix?.slice(1) ?? "";
-    if (suffixFilter === "plain" && variant) continue;
-    if (suffixFilter === "mini" && variant !== "mini") continue;
-    candidates.push({
-      id: model.id,
-      major: Number(major),
-      minor: Number(minor),
-    });
-  }
-  candidates.sort((a, b) =>
-    b.major !== a.major ? b.major - a.major : b.minor - a.minor,
-  );
-  return candidates[0]?.id;
-}
-
-/**
- * Picks the newest Gemini chat model in the requested family. Gemini
- * ids look like `gemini/gemini-<major>.<minor>-<variant>`. We sort
- * numerically on (major, minor) so the latest version wins regardless
- * of the "-preview" modifier.
- *
- * Allowed variants (exact match, so noisy spin-offs like
- * `pro-preview-customtools` or `flash-image-preview` don't sneak in):
- *   - "pro": `pro`, `pro-preview` → DEFAULT
- *   - "flash": `flash`, `flash-lite`, `flash-preview`,
- *              `flash-lite-preview` → FAST
- *
- * New legit variants (e.g. a future `flash-thinking`) should be added
- * here explicitly rather than relaxed-matched, otherwise unrelated
- * skus with the same prefix get seeded as defaults.
- */
-function pickLatestGeminiChat(family: "pro" | "flash"): string | undefined {
-  const candidates: { id: string; major: number; minor: number }[] = [];
-  const proSuffixes = new Set(["pro", "pro-preview"]);
-  const flashSuffixes = new Set([
-    "flash",
-    "flash-lite",
-    "flash-preview",
-    "flash-lite-preview",
-  ]);
-  const allowed = family === "pro" ? proSuffixes : flashSuffixes;
-  for (const model of Object.values(REGISTRY)) {
-    if (model.provider !== "gemini" || model.mode !== "chat") continue;
-    const m = /^gemini\/gemini-(\d+)\.(\d+)-([a-z-]+)$/.exec(model.id);
-    if (!m) continue;
-    const [, major, minor, suffix] = m;
-    if (!allowed.has(suffix!)) continue;
-    candidates.push({
-      id: model.id,
-      major: Number(major),
-      minor: Number(minor),
-    });
-  }
-  candidates.sort((a, b) =>
-    b.major !== a.major ? b.major - a.major : b.minor - a.minor,
-  );
-  return candidates[0]?.id;
-}
-
-/** Picks the newest `anthropic/claude-<variant>-<major>-<minor>` chat model. */
-function pickLatestAnthropicChat(variant: string): string | undefined {
-  const candidates: { id: string; major: number; minor: number }[] = [];
-  for (const model of Object.values(REGISTRY)) {
-    if (model.provider !== "anthropic" || model.mode !== "chat") continue;
-    const m = new RegExp(
-      `^anthropic\\/claude-${variant}-(\\d+)-(\\d+)$`,
-    ).exec(model.id);
-    if (!m) continue;
-    candidates.push({
-      id: model.id,
-      major: Number(m[1]),
-      minor: Number(m[2]),
-    });
-  }
-  candidates.sort((a, b) =>
-    b.major !== a.major ? b.major - a.major : b.minor - a.minor,
-  );
-  return candidates[0]?.id;
-}
-
 function pickLatestEmbedding(provider: string): string | undefined {
   // Embedding model ids don't follow X.Y. Pick the highest version-like
   // number in the id suffix, or fall back to the first model registered.
@@ -131,29 +43,31 @@ interface ProviderSeedPlan {
 export function buildSeedPlanForProvider(
   provider: string,
 ): ProviderSeedPlan {
+  // openai/anthropic/gemini get the `{provider}/latest` and
+  // `{provider}/latest-mini` aliases so the seed never pins a customer
+  // to a specific model version. The resolver expands them at read
+  // time, so when a newer flagship lands in the catalog every seeded
+  // org picks it up automatically without a config rewrite. Other
+  // providers (azure/bedrock/xai/voyage/etc.) keep their specific-id
+  // seed paths because they don't have alias support yet.
   if (provider === "openai") {
     return {
-      DEFAULT: pickLatestOpenAIChat("plain"),
-      FAST: pickLatestOpenAIChat("mini"),
+      DEFAULT: "openai/latest",
+      FAST: "openai/latest-mini",
       EMBEDDINGS: pickLatestEmbedding("openai"),
     };
   }
   if (provider === "anthropic") {
-    // Anthropic's haiku trails sonnet by a wide enough margin on the
-    // tasks we hit (search, autocomplete, topic clustering) that users
-    // are better served by sonnet across the board. Both roles point
-    // at the latest sonnet; per-feature overrides can still narrow it.
-    const sonnet = pickLatestAnthropicChat("sonnet");
     return {
-      DEFAULT: sonnet,
-      FAST: sonnet,
+      DEFAULT: "anthropic/latest",
+      FAST: "anthropic/latest-mini",
       // Anthropic ships no embeddings model.
     };
   }
   if (provider === "gemini") {
     return {
-      DEFAULT: pickLatestGeminiChat("pro"),
-      FAST: pickLatestGeminiChat("flash"),
+      DEFAULT: "gemini/latest",
+      FAST: "gemini/latest-mini",
       EMBEDDINGS: pickLatestEmbedding("gemini"),
     };
   }
@@ -177,9 +91,8 @@ export function buildSeedPlanForProvider(
  * roles the provider can fulfill. Strictly additive:
  *
  *   - If no config is attached to (scopeType, scopeId), one is created
- *     with the seed plan's roles. Default scope: ORGANIZATION (per
- *     rchaves's directive — onboarding seeds at org level so the
- *     entire organization inherits, not just the first project).
+ *     with the seed plan's roles. Default scope: ORGANIZATION so the
+ *     entire organization inherits, not just the first project.
  *   - If a config is already attached at the same scope, it is left
  *     untouched. We do NOT merge in missing keys, because the user
  *     may have intentionally cleared a key to inherit from a higher

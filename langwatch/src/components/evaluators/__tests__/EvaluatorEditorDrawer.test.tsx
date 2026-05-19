@@ -120,6 +120,11 @@ vi.mock("~/utils/api", () => ({
         })),
       },
     },
+    modelProvider: {
+      getResolvedDefault: {
+        useQuery: vi.fn(() => ({ data: undefined, isLoading: false })),
+      },
+    },
     useContext: vi.fn(() => ({
       evaluators: {
         getAll: { invalidate: vi.fn() },
