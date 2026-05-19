@@ -8,7 +8,7 @@ import {
   Skeleton,
   Text,
 } from "@chakra-ui/react";
-import { AlertTriangle, Search, Settings } from "lucide-react";
+import { AlertTriangle, Search } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { modelProviderIcons } from "../server/modelProviders/iconsMap";
