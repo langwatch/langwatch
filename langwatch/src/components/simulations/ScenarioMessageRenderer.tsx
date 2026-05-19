@@ -3,6 +3,7 @@ import { useMemo, useRef, useEffect } from "react";
 import { Settings } from "react-feather";
 import type { StreamingMessage } from "~/hooks/useSimulationStreamingState";
 import type { ScenarioMessageSnapshotEvent } from "~/server/scenarios/scenario-event.types";
+import { coerceContentToArray } from "~/server/stored-objects/coerce-content-to-array";
 import { visitContentPart } from "~/server/stored-objects/visit-content-part";
 import { TraceMessage } from "../copilot-kit/TraceMessage";
 import { Markdown } from "../Markdown";
@@ -265,14 +266,10 @@ function flattenMessages(
 }
 
 function flattenContent(msg: RawMessage): DisplayItem[] {
-  // Content is already an array of rich content parts — use directly
-  if (Array.isArray(msg.content)) return flattenMixed(msg.content, msg);
+  const coerced = coerceContentToArray(msg.content);
+  if (coerced) return flattenMixed(coerced, msg);
 
   const raw = typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content ?? {});
-
-  // Try parsing string content as JSON array (e.g. serialized rich content)
-  const parsed = safeJsonParseOrStringFallback(raw);
-  if (Array.isArray(parsed)) return flattenMixed(parsed, msg);
 
   if (msg.content && msg.content !== "None") {
     return [{ kind: "text", id: msg.id ?? crypto.randomUUID(), role: msg.role ?? "assistant", content: raw, traceId: msg.trace_id }];

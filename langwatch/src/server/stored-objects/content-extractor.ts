@@ -27,6 +27,7 @@ import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import { createLogger } from "~/utils/logger/server";
 import { binaryInputPartSchema } from "./binary-part";
+import { coerceContentToArray } from "./coerce-content-to-array";
 import { isReadbackSafe } from "./safe-media-types";
 import type { StoredObjectsService } from "./stored-objects.service";
 import { visitContentPartAsync } from "./visit-content-part";
@@ -371,54 +372,6 @@ interface ExtractionParams {
  * see `src/server/tracer/types.ts`) covers more variants than any single
  * library schema, including `image_url` with data URIs.
  */
-/**
- * Coerces a message's `content` field to an array we can walk.
- *
- * Some SDK callers (notably the langwatch python-sdk) send `content` as a
- * stringified Python-repr of a list (`"[{'type': 'input_audio', ...}]"`)
- * instead of a JSON-encoded array. This isn't strictly valid JSON, but it's
- * mechanically recoverable: single quotes -> double quotes, then JSON.parse.
- *
- * Returns:
- *  - The array verbatim when content is already an array.
- *  - A parsed array when content is a string that decodes (JSON or
- *    Python-repr) to an array of objects.
- *  - null otherwise (caller should pass through unchanged).
- */
-function coerceContentToArray(content: unknown): unknown[] | null {
-  if (Array.isArray(content)) return content;
-  if (typeof content !== "string") return null;
-
-  const trimmed = content.trim();
-  if (!trimmed.startsWith("[")) return null;
-
-  // Try strict JSON first.
-  try {
-    const parsed = JSON.parse(trimmed) as unknown;
-    if (Array.isArray(parsed)) return parsed;
-  } catch {
-    // fall through
-  }
-
-  // Python-repr fallback: replace single quotes with double quotes and
-  // Python's None / True / False with their JSON equivalents. This is
-  // narrow on purpose — we're not building a Python parser, just
-  // accepting the specific shape the langwatch python-sdk emits today.
-  const jsonified = trimmed
-    .replace(/'/g, '"')
-    .replace(/\bNone\b/g, "null")
-    .replace(/\bTrue\b/g, "true")
-    .replace(/\bFalse\b/g, "false");
-  try {
-    const parsed = JSON.parse(jsonified) as unknown;
-    if (Array.isArray(parsed)) return parsed;
-  } catch {
-    // give up
-  }
-
-  return null;
-}
-
 async function rewriteMessage(
   rawMessage: Record<string, unknown>,
   params: ExtractionParams,
