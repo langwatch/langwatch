@@ -248,14 +248,7 @@ export const FilterSidebar: React.FC = () => {
 
   if (collapsed) {
     if (showSkeleton) return <CollapsedSidebarSkeleton />;
-    return (
-      <CollapsedSidebar
-        ast={ast}
-        categoricals={categoricals}
-        ranges={ranges}
-        onExpand={toggleSidebar}
-      />
-    );
+    return <CollapsedSidebar onExpand={toggleSidebar} />;
   }
 
   return (
