@@ -66,6 +66,101 @@ const ScopeIcon = ({ scopeType }: { scopeType: ScopeChipPickerScopeType }) => {
 };
 
 /**
+ * Collapses redundant selections after the user picks a new scope.
+ *
+ * Rules (lineage-only, never touches scopes outside the picked one's
+ * branch — so cross-team selections survive):
+ *
+ *   - Picking an ORGANIZATION drops every TEAM and PROJECT that lives
+ *     under it. The org-level row already covers them; keeping both
+ *     would render two chips with one effective grant.
+ *   - Picking a TEAM drops the parent organization AND every PROJECT
+ *     under that team. The narrower team scope is the user's intent.
+ *   - Picking a PROJECT drops the parent organization AND the parent
+ *     team (if either is selected). Same intent narrowing — without
+ *     this an "Org X + Project P" pair silently means "everyone in X
+ *     including P", which is the trip-up the user flagged.
+ *
+ * Pure function so it stays trivially unit-testable. Exported for
+ * tests.
+ */
+export function collapseRedundantScopes(
+  next: ScopeChipPickerEntry[],
+  prev: ScopeChipPickerEntry[],
+  context: {
+    organizationId: string | undefined;
+    availableProjects: Array<{ id: string; teamId?: string }>;
+  },
+): ScopeChipPickerEntry[] {
+  const prevKey = new Set(prev.map((s) => `${s.scopeType}:${s.scopeId}`));
+  const added = next.filter(
+    (s) => !prevKey.has(`${s.scopeType}:${s.scopeId}`),
+  );
+  if (added.length === 0) return next;
+
+  const { organizationId, availableProjects } = context;
+  let cleaned = next;
+  for (const picked of added) {
+    if (picked.scopeType === "ORGANIZATION") {
+      // The picker is single-org-scoped, so every team and project in
+      // `next` belongs to this org by construction. Dropping them
+      // collapses to the single ORG chip.
+      cleaned = cleaned.filter(
+        (s) =>
+          !(
+            (s.scopeType === "TEAM" || s.scopeType === "PROJECT") &&
+            // Defensive guard: only collapse children that belong to
+            // the picked org. With multi-org pickers this gates the
+            // collapse to the lineage.
+            (organizationId === undefined ||
+              picked.scopeId === organizationId)
+          ),
+      );
+    } else if (picked.scopeType === "TEAM") {
+      cleaned = cleaned.filter((s) => {
+        // Parent org goes — team narrows the scope.
+        if (
+          s.scopeType === "ORGANIZATION" &&
+          organizationId !== undefined &&
+          s.scopeId === organizationId
+        ) {
+          return false;
+        }
+        // Projects under this team are redundant once the team is
+        // covered explicitly.
+        if (s.scopeType === "PROJECT") {
+          const proj = availableProjects.find((p) => p.id === s.scopeId);
+          if (proj?.teamId === picked.scopeId) return false;
+        }
+        return true;
+      });
+    } else if (picked.scopeType === "PROJECT") {
+      const parentTeamId = availableProjects.find(
+        (p) => p.id === picked.scopeId,
+      )?.teamId;
+      cleaned = cleaned.filter((s) => {
+        if (
+          s.scopeType === "ORGANIZATION" &&
+          organizationId !== undefined &&
+          s.scopeId === organizationId
+        ) {
+          return false;
+        }
+        if (
+          s.scopeType === "TEAM" &&
+          parentTeamId !== undefined &&
+          s.scopeId === parentTeamId
+        ) {
+          return false;
+        }
+        return true;
+      });
+    }
+  }
+  return cleaned;
+}
+
+/**
  * Controlled chip-based scope picker. Pure presentation: takes the active
  * scope selection and a setter, renders a grouped multi-select over the
  * organization, the teams the caller can reach, and the projects inside
@@ -306,7 +401,17 @@ export function ScopeChipPicker({
           const next = options
             .filter((o) => picked.has(o.value))
             .map((o) => ({ scopeType: o.scopeType, scopeId: o.scopeId }));
-          onChange(next);
+          onChange(
+            collapseRedundantScopes(next, value, {
+              organizationId,
+              availableProjects:
+                availableProjects && availableProjects.length > 0
+                  ? availableProjects
+                  : projectId
+                    ? [{ id: projectId, name: projectName ?? "Project" }]
+                    : [],
+            }),
+          );
         }}
       >
         <Select.Trigger>
