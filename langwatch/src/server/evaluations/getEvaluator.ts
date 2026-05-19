@@ -14,14 +14,14 @@ export const getEvaluatorDefinitions = (evaluator: string) => {
 };
 
 /**
- * Default settings for an evaluator's form rendering. The `model` /
- * `embeddings_model` fields default to the global DEFAULT_MODEL /
- * DEFAULT_EMBEDDINGS_MODEL constants as a UI placeholder; the actual
- * runtime model is the cascade-resolved value, but the form needs
- * SOME initial string to render the picker. Callers can override via
- * `resolvedDefault` / `resolvedEmbedding` from
- * modelProvider.getResolvedDefault when they want the placeholder to
- * mirror the resolver instead of the global constant.
+ * Default settings for an evaluator's form rendering. `model` and
+ * `embeddings_model` fields prefer the cascade-resolved values when
+ * the caller provides them (from `modelProvider.getResolvedDefault`),
+ * because the per-evaluator zod defaults are baked-in literals like
+ * `openai/gpt-5` that don't reflect what this project / team / org
+ * has actually configured. The global DEFAULT_MODEL constants remain
+ * as a last-resort fallback for the case where the cascade has
+ * nothing to say (e.g. server-side callers without project context).
  */
 export const getEvaluatorDefaultSettings = <T extends EvaluatorTypes>(
   evaluator: EvaluatorDefinition<T> | undefined,
@@ -33,7 +33,7 @@ export const getEvaluatorDefaultSettings = <T extends EvaluatorTypes>(
   if (!evaluator) return {};
   return Object.fromEntries(
     Object.entries(evaluator.settings).map(([key, setting]) => {
-      if (key === "model" && evaluator.name.includes("LLM-as-a-Judge")) {
+      if (key === "model") {
         return [key, resolved?.defaultModel ?? DEFAULT_MODEL];
       }
       if (key === "embeddings_model") {

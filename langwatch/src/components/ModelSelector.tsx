@@ -65,22 +65,49 @@ export const useModelSelectionOptions = (
   mode: "chat" | "embedding" = "chat",
 ) => {
   const { project } = useOrganizationTeamProject();
-  const modelProviders = api.modelProvider.getAllForProject.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: !!project?.id },
-  );
+  // `listAllForProjectForFrontend` returns the providers actually
+  // stored against any scope reachable from this project. The legacy
+  // `getAllForProject` merged env-fed defaults (every registry
+  // provider whose API key is present in the server's process env),
+  // which made unrelated providers like Gemini show up in the picker
+  // for a project that only stored Anthropic/OpenAI.
+  const modelProviders =
+    api.modelProvider.listAllForProjectForFrontend.useQuery(
+      { projectId: project?.id ?? "" },
+      { enabled: !!project?.id },
+    );
 
-  const allModels = getCustomModels(
-    modelProviders.data ?? {},
-    options,
-    mode,
-  );
+  // Adapt the array shape (one row per provider+scope) into the
+  // legacy `Record<provider, config>` shape that getCustomModels +
+  // the custom-model dedup loop below expect. Multiple rows for the
+  // same provider (multi-scope) are merged: the provider counts as
+  // enabled if any row is enabled, customModels lists union.
+  const providersByKey: Record<string, MaybeStoredModelProvider> = {};
+  for (const row of modelProviders.data?.providers ?? []) {
+    const existing = providersByKey[row.provider];
+    if (!existing) {
+      providersByKey[row.provider] = row;
+      continue;
+    }
+    providersByKey[row.provider] = {
+      ...existing,
+      enabled: existing.enabled || row.enabled,
+      customModels: [
+        ...(existing.customModels ?? []),
+        ...(row.customModels ?? []),
+      ],
+      customEmbeddingsModels: [
+        ...(existing.customEmbeddingsModels ?? []),
+        ...(row.customEmbeddingsModels ?? []),
+      ],
+    };
+  }
+
+  const allModels = getCustomModels(providersByKey, options, mode);
 
   // Build a set of custom model IDs for quick lookup
   const customModelIdSet = new Set<string>();
-  for (const [providerKey, config] of Object.entries(
-    modelProviders.data ?? {},
-  )) {
+  for (const [providerKey, config] of Object.entries(providersByKey)) {
     const customList =
       mode === "chat" ? config.customModels : config.customEmbeddingsModels;
     if (customList) {

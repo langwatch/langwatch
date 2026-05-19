@@ -85,6 +85,21 @@ export default function CheckConfigForm({
   const { project } = useOrganizationTeamProject();
   const isNameAvailable = api.monitors.isNameAvailable.useMutation();
   const [isNameAlreadyInUse, setIsNameAlreadyInUse] = useState(false);
+  // Cascade-resolved defaults so the form's initial model /
+  // embeddings_model values reflect the project's configured
+  // providers instead of the generic DEFAULT_MODEL fallback.
+  const resolvedDefaultModel = api.modelProvider.getResolvedDefault.useQuery(
+    { projectId: project?.id ?? "", featureKey: "prompt.create_default" },
+    { enabled: !!project?.id },
+  );
+  const resolvedDefaultEmbeddings =
+    api.modelProvider.getResolvedDefault.useQuery(
+      {
+        projectId: project?.id ?? "",
+        featureKey: "analytics.topic_clustering_embeddings",
+      },
+      { enabled: !!project?.id },
+    );
 
   const validateNameUniqueness = async (name: string) => {
     const result = await isNameAvailable.mutateAsync({
@@ -220,10 +235,19 @@ export default function CheckConfigForm({
     };
 
     setDefaultSettings(
-      getEvaluatorDefaultSettings(availableEvaluators[checkType], undefined),
+      getEvaluatorDefaultSettings(availableEvaluators[checkType], {
+        defaultModel: resolvedDefaultModel.data?.model ?? null,
+        embeddingsModel: resolvedDefaultEmbeddings.data?.model ?? null,
+      }),
       "settings",
     );
-  }, [checkType, defaultValues?.checkType, defaultValues?.settings]);
+  }, [
+    checkType,
+    defaultValues?.checkType,
+    defaultValues?.settings,
+    resolvedDefaultModel.data?.model,
+    resolvedDefaultEmbeddings.data?.model,
+  ]);
 
   const accordionIndex = checkType?.startsWith("custom/") ? 0 : undefined;
   const [accordionValue, setAccordionValue] = useState(
