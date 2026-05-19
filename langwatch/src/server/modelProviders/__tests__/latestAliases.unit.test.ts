@@ -12,13 +12,18 @@ vi.mock("../loadModelCatalog", () => ({
         mode: "chat",
       },
       "openai/gpt-5.4": { id: "openai/gpt-5.4", provider: "openai", mode: "chat" },
-      "anthropic/claude-sonnet-4-5": {
-        id: "anthropic/claude-sonnet-4-5",
+      "anthropic/claude-opus-4-5": {
+        id: "anthropic/claude-opus-4-5",
         provider: "anthropic",
         mode: "chat",
       },
-      "anthropic/claude-sonnet-4-3": {
-        id: "anthropic/claude-sonnet-4-3",
+      "anthropic/claude-opus-4-3": {
+        id: "anthropic/claude-opus-4-3",
+        provider: "anthropic",
+        mode: "chat",
+      },
+      "anthropic/claude-sonnet-4-5": {
+        id: "anthropic/claude-sonnet-4-5",
         provider: "anthropic",
         mode: "chat",
       },
@@ -49,8 +54,8 @@ import {
   resolveLatestAlias,
 } from "../latestAliases";
 
-describe("Feature: latest-alias model resolution", () => {
-  describe("isLatestAlias", () => {
+describe("given latest-alias model resolution", () => {
+  describe("when checking isLatestAlias", () => {
     it("recognizes openai/latest", () => {
       expect(isLatestAlias("openai/latest")).toBe(true);
     });
@@ -66,7 +71,7 @@ describe("Feature: latest-alias model resolution", () => {
     });
   });
 
-  describe("parseLatestAlias", () => {
+  describe("when parsing an alias string", () => {
     it("returns provider + suffix parts", () => {
       expect(parseLatestAlias("gemini/latest-mini")).toEqual({
         provider: "gemini",
@@ -78,21 +83,21 @@ describe("Feature: latest-alias model resolution", () => {
     });
   });
 
-  describe("resolveLatestAlias", () => {
+  describe("when resolving an alias to a concrete id", () => {
     it("resolves openai/latest to the newest plain gpt model", () => {
       expect(resolveLatestAlias("openai/latest")).toBe("openai/gpt-5.5");
     });
     it("resolves openai/latest-mini to the newest gpt-X.Y-mini model", () => {
       expect(resolveLatestAlias("openai/latest-mini")).toBe("openai/gpt-5.5-mini");
     });
-    it("resolves anthropic/latest to the newest claude-sonnet model", () => {
+    it("resolves anthropic/latest to the newest claude-opus model", () => {
       expect(resolveLatestAlias("anthropic/latest")).toBe(
-        "anthropic/claude-sonnet-4-5",
+        "anthropic/claude-opus-4-5",
       );
     });
-    it("resolves anthropic/latest-mini to the newest claude-haiku model", () => {
+    it("resolves anthropic/latest-mini to the newest claude-sonnet model (not haiku, parallel to gpt-mini ≠ nano)", () => {
       expect(resolveLatestAlias("anthropic/latest-mini")).toBe(
-        "anthropic/claude-haiku-4-1",
+        "anthropic/claude-sonnet-4-5",
       );
     });
     it("resolves gemini/latest to the newest gemini pro model", () => {
@@ -108,7 +113,7 @@ describe("Feature: latest-alias model resolution", () => {
     });
   });
 
-  describe("expandLatestAlias", () => {
+  describe("when expanding a value that may or may not be an alias", () => {
     it("returns the resolved id for an alias", () => {
       expect(expandLatestAlias("openai/latest")).toBe("openai/gpt-5.5");
     });
@@ -119,8 +124,8 @@ describe("Feature: latest-alias model resolution", () => {
     });
   });
 
-  describe("allLatestAliases", () => {
-    it("enumerates every supported (provider, suffix) pair with resolved value", () => {
+  describe("when enumerating all supported aliases", () => {
+    it("returns every supported (provider, suffix) pair with resolved value", () => {
       const all = allLatestAliases();
       expect(all).toHaveLength(6);
       expect(all.map((e) => e.alias).sort()).toEqual([

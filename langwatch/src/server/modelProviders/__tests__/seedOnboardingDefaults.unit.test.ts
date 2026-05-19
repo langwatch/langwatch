@@ -12,8 +12,8 @@ import { describe, expect, it } from "vitest";
 
 import { buildSeedPlanForProvider } from "../seedOnboardingDefaults";
 
-describe("buildSeedPlanForProvider", () => {
-  describe("openai", () => {
+describe("given buildSeedPlanForProvider", () => {
+  describe("when the provider is openai", () => {
     /** @scenario OpenAI seed plan uses latest aliases */
     it("populates DEFAULT (openai/latest), FAST (openai/latest-mini), and EMBEDDINGS (pinned)", () => {
       const plan = buildSeedPlanForProvider("openai");
@@ -23,7 +23,7 @@ describe("buildSeedPlanForProvider", () => {
     });
   });
 
-  describe("anthropic", () => {
+  describe("when the provider is anthropic", () => {
     /** @scenario Anthropic seed plan uses latest aliases */
     it("populates DEFAULT (anthropic/latest) and FAST (anthropic/latest-mini)", () => {
       const plan = buildSeedPlanForProvider("anthropic");
@@ -38,7 +38,7 @@ describe("buildSeedPlanForProvider", () => {
     });
   });
 
-  describe("gemini", () => {
+  describe("when the provider is gemini", () => {
     /** @scenario Gemini seed plan uses latest aliases */
     it("populates DEFAULT (gemini/latest), FAST (gemini/latest-mini), and EMBEDDINGS (pinned)", () => {
       const plan = buildSeedPlanForProvider("gemini");
@@ -48,7 +48,7 @@ describe("buildSeedPlanForProvider", () => {
     });
   });
 
-  describe("voyage", () => {
+  describe("when the provider is voyage", () => {
     /** @scenario Voyage seed plan populates only EMBEDDINGS */
     it("returns EMBEDDINGS only; DEFAULT and FAST stay absent", () => {
       const plan = buildSeedPlanForProvider("voyage");
@@ -58,7 +58,7 @@ describe("buildSeedPlanForProvider", () => {
     });
   });
 
-  describe("unknown provider", () => {
+  describe("when the provider is not in the catalog", () => {
     it("returns an empty plan rather than guessing", () => {
       expect(buildSeedPlanForProvider("nonexistent")).toEqual({});
     });

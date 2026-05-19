@@ -12,13 +12,19 @@
  *
  * Only providers we know how to "latest"-pick are aliased — openai,
  * anthropic, gemini. Azure/Bedrock customers pin specific deployment
- * names and skipping them was a deliberate ask from rchaves.
+ * names, so they are intentionally excluded.
  */
-import {
-  pickLatestAnthropicChat,
-  pickLatestGeminiChat,
-  pickLatestOpenAIChat,
-} from "./seedOnboardingDefaults";
+import { llmModels } from "./loadModelCatalog";
+
+interface RegistryEntry {
+  id: string;
+  provider: string;
+  mode: "chat" | "embedding";
+}
+
+const REGISTRY = (
+  llmModels as unknown as { models: Record<string, RegistryEntry> }
+).models;
 
 export const LATEST_ALIAS_SUFFIXES = ["latest", "latest-mini"] as const;
 export type LatestAliasSuffix = (typeof LATEST_ALIAS_SUFFIXES)[number];
@@ -50,27 +56,85 @@ export function isLatestAlias(model: string): boolean {
 }
 
 /**
+ * Generic "newest chat model for this provider" picker. Callers supply
+ * a parse function that decides whether a model id is in-scope and
+ * extracts its (major, minor) sort key. The catalog walk, mode/provider
+ * filter, and version sort are shared because all providers follow the
+ * same shape — only the id grammar differs.
+ */
+function pickLatestChat(
+  provider: string,
+  parse: (id: string) => { major: number; minor: number } | null,
+): string | undefined {
+  const candidates: { id: string; major: number; minor: number }[] = [];
+  for (const model of Object.values(REGISTRY)) {
+    if (model.provider !== provider || model.mode !== "chat") continue;
+    const parsed = parse(model.id);
+    if (parsed) candidates.push({ id: model.id, ...parsed });
+  }
+  candidates.sort((a, b) =>
+    b.major !== a.major ? b.major - a.major : b.minor - a.minor,
+  );
+  return candidates[0]?.id;
+}
+
+/**
  * Resolves an alias like `openai/latest-mini` to its concrete current
  * flagship, e.g. `openai/gpt-5.5-mini`. Returns `null` if the input is
  * not an alias OR if the registry has nothing matching the variant.
  *
  * Variants per provider:
  *   - openai     → `gpt-X.Y` (latest), `gpt-X.Y-mini` (latest-mini)
- *   - anthropic  → `claude-sonnet-X-Y` (latest), `claude-haiku-X-Y` (latest-mini)
+ *   - anthropic  → `claude-opus-X-Y` (latest), `claude-sonnet-X-Y` (latest-mini)
  *   - gemini     → `gemini-X.Y-pro` (latest), `gemini-X.Y-flash` (latest-mini)
+ *
+ * Anthropic's `haiku` and OpenAI's `nano` tiers are intentionally
+ * excluded — they're a tier below "fast" and not what users expect
+ * when they pick "latest-mini" as their FAST default.
+ *
+ * Gemini's "pro" / "flash" families admit a curated set of suffixes
+ * (e.g. `pro-preview`, `flash-lite`) so noisy spin-offs like
+ * `flash-image-preview` don't sneak in as defaults.
  */
 export function resolveLatestAlias(model: string): string | null {
   const parts = parseLatestAlias(model);
   if (!parts) return null;
   const { provider, suffix } = parts;
   if (provider === "openai") {
-    return pickLatestOpenAIChat(suffix === "latest" ? "plain" : "mini") ?? null;
+    return (
+      pickLatestChat("openai", (id) => {
+        const m = /^openai\/gpt-(\d+)\.(\d+)(-[a-z0-9-]+)?$/.exec(id);
+        if (!m) return null;
+        const variant = m[3]?.slice(1) ?? "";
+        if (suffix === "latest" && variant) return null;
+        if (suffix === "latest-mini" && variant !== "mini") return null;
+        return { major: Number(m[1]), minor: Number(m[2]) };
+      }) ?? null
+    );
   }
   if (provider === "anthropic") {
-    return pickLatestAnthropicChat(suffix === "latest" ? "sonnet" : "haiku") ?? null;
+    const family = suffix === "latest" ? "opus" : "sonnet";
+    return (
+      pickLatestChat("anthropic", (id) => {
+        const m = new RegExp(`^anthropic\\/claude-${family}-(\\d+)-(\\d+)$`).exec(id);
+        if (!m) return null;
+        return { major: Number(m[1]), minor: Number(m[2]) };
+      }) ?? null
+    );
   }
   if (provider === "gemini") {
-    return pickLatestGeminiChat(suffix === "latest" ? "pro" : "flash") ?? null;
+    const allowed =
+      suffix === "latest"
+        ? new Set(["pro", "pro-preview"])
+        : new Set(["flash", "flash-lite", "flash-preview", "flash-lite-preview"]);
+    return (
+      pickLatestChat("gemini", (id) => {
+        const m = /^gemini\/gemini-(\d+)\.(\d+)-([a-z-]+)$/.exec(id);
+        if (!m) return null;
+        if (!allowed.has(m[3]!)) return null;
+        return { major: Number(m[1]), minor: Number(m[2]) };
+      }) ?? null
+    );
   }
   return null;
 }

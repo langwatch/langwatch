@@ -171,7 +171,9 @@ export function DefaultModelOverrideDrawer({
     );
 
   const modelOptionsByRole = useMemo(() => {
-    const providers = projectProviders.data?.providers ?? [];
+    const providersData = projectProviders.data?.providers;
+    const isLoading = providersData === undefined;
+    const providers = providersData ?? [];
     const enabledEntries: Array<
       [string, (typeof providers)[number]]
     > = providers
@@ -190,14 +192,18 @@ export function DefaultModelOverrideDrawer({
       aliasChatOptions.push(`${provider}/latest`);
       aliasChatOptions.push(`${provider}/latest-mini`);
     }
-    // First-paint fallback: no providers loaded yet → list everything so
-    // the dropdown isn't visually broken while the query is in flight.
     const filterByMode = (mode: "chat" | "embedding") => {
-      if (enabledEntries.length === 0) {
+      // Still loading: show the full registry so the dropdown isn't
+      // visually broken during first paint. Once data lands we either
+      // fall through to the enabled-filter path or — if the project
+      // has zero enabled providers — return an empty list so the
+      // picker doesn't lie about what's available.
+      if (isLoading) {
         return modelSelectorOptions
           .filter((o) => o.mode === mode)
           .map((o) => o.value);
       }
+      if (enabledEntries.length === 0) return [];
       // Registry chat/embedding models from any enabled provider. This
       // mirrors the ModelProviderDefaultSection logic — the registry is
       // the broad pool; provider toggles narrow it.
@@ -647,8 +653,8 @@ function ScopeSection({
   available: Payload["available"];
 }) {
   // Drawer renders only the dropdown — the Organization/Team/Project
-  // quick-pick chips were redundant in practice because rchaves's flow
-  // is always-org-scope, and the dropdown already surfaces all reachable
+  // quick-pick chips are redundant when scope assignment is effectively
+  // always at org scope, and the dropdown already surfaces all reachable
   // scopes. The quick-pick variant is preserved on `ScopeChipPicker`
   // (`showQuickPicks` prop) for future surfaces where the chip-row UX
   // makes sense.
