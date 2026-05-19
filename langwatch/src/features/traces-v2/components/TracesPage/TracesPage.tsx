@@ -27,6 +27,7 @@ import { useUIStore } from "../../stores/uiStore";
 import { analyzeOrGroups } from "~/server/app-layer/traces/query-language/queries";
 import { DensityProvider } from "../DensityProvider";
 import { FilterSidebar } from "../FilterSidebar/FilterSidebar";
+import { SidebarResizeHandle } from "../FilterSidebar/SidebarResizeHandle";
 import { ConnectorLaneWidth } from "../FilterSidebar/OrConnectorOverlay";
 import { FindBar } from "../FindBar";
 import { SearchBar } from "../SearchBar/SearchBar";
@@ -47,6 +48,14 @@ import { useTracesPageTitle } from "./usePageTitle";
 
 const SIDEBAR_WIDTH_EXPANDED = 220;
 const SIDEBAR_WIDTH_COLLAPSED = 40;
+const SIDEBAR_WIDTH_MAX = 640;
+// Threshold at which a drag commits to a collapsed rail instead of an
+// awkward sub-width — matches the trace v2 drawer's collapse-on-drag
+// behaviour. Sits a comfortable distance above the collapsed rail width
+// so a user *trying* to collapse doesn't have to drag pixel-perfect, and
+// a user trying to keep it narrow but readable doesn't accidentally
+// snap to the rail.
+const SIDEBAR_COLLAPSE_THRESHOLD = 80;
 
 const DIMMED_PROPS = {
   opacity: 0.45,
@@ -208,7 +217,10 @@ const FilterAside: React.FC<{
   dimmed?: boolean;
 }> = React.memo(({ dimmed = false }) => {
   const persistedCollapsed = useUIStore((s) => s.sidebarCollapsed);
+  const persistedWidth = useUIStore((s) => s.sidebarWidth);
   const mobileExpandedOverride = useUIStore((s) => s.mobileExpandedOverride);
+  const setSidebarWidth = useUIStore((s) => s.setSidebarWidth);
+  const setSidebarCollapsed = useUIStore((s) => s.setSidebarCollapsed);
   // Below `md` the expanded sidebar steals 240px+ from a 390px-wide
   // viewport, leaving the actual trace table unreadable. Force the
   // collapsed rail on small screens regardless of the persisted preference,
@@ -229,13 +241,26 @@ const FilterAside: React.FC<{
     (s) => analyzeOrGroups(s.ast).groups.length,
   );
 
-  const expandedWidth = SIDEBAR_WIDTH_EXPANDED + orGroupCount * ConnectorLaneWidth;
+  const autoExpandedWidth =
+    SIDEBAR_WIDTH_EXPANDED + orGroupCount * ConnectorLaneWidth;
+  // User-set width wins when present, else the auto-computed default.
+  // The dragged width still respects the auto default as a floor — adding
+  // an OR group should never visually shrink the sidebar below the lane
+  // count the connector overlay needs to draw without squeezing rows.
+  const expandedWidth = persistedWidth
+    ? Math.max(persistedWidth, autoExpandedWidth)
+    : autoExpandedWidth;
+
+  // Don't show the resize handle on mobile (forced-collapsed) or while
+  // the empty-state dim is active — neither surface supports a drag-out.
+  const showResizeHandle = !forceCollapsedSmallScreen && !dimmed;
 
   return (
     <Box
       as="aside"
       role="complementary"
       aria-label="Trace filters"
+      position="relative"
       flexShrink={0}
       // `height="full"` chains the height constraint from the
       // outer tour-target wrapper through the aside into FilterSidebar's
@@ -246,12 +271,26 @@ const FilterAside: React.FC<{
       height="full"
       width={`${collapsed ? SIDEBAR_WIDTH_COLLAPSED : expandedWidth}px`}
       transition="width 0.15s ease"
-      borderRightWidth="1px"
+      borderRightWidth={collapsed ? "1px" : 0}
       borderColor="border"
       overflow="hidden"
       {...(dimmed ? (DIMMED_PROPS as Record<string, unknown>) : {})}
     >
       <FilterSidebar />
+      {showResizeHandle && (
+        <SidebarResizeHandle
+          currentWidth={collapsed ? SIDEBAR_WIDTH_COLLAPSED : expandedWidth}
+          collapseBelow={SIDEBAR_COLLAPSE_THRESHOLD}
+          max={SIDEBAR_WIDTH_MAX}
+          onResize={(width) => {
+            if (collapsed) setSidebarCollapsed(false);
+            setSidebarWidth(width);
+          }}
+          onCollapse={() => {
+            if (!collapsed) setSidebarCollapsed(true);
+          }}
+        />
+      )}
     </Box>
   );
 });
