@@ -110,7 +110,7 @@ export function LLMModelDisplay({
 
   return (
     <Tooltip
-      content={`${providerKey} provider isn't enabled here. This evaluation will fail until you re-add the provider or pick a different model.`}
+      content={`${providerKey} provider isn't enabled here. Re-add the provider or pick a different model to use it.`}
       positioning={{ placement: "top" }}
       showArrow
     >
