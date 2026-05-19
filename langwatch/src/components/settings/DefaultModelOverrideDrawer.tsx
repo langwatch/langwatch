@@ -72,12 +72,6 @@ interface Props {
   /** Effective resolution for the project currently viewed — used as
    *  the "if you don't override" placeholder for each row. */
   effective: Payload["effective"];
-  /** Quick-pick context: the scope ids the caller is currently sitting on
-   *  so the drawer can offer "Organization / This team / This project" chips
-   *  same as the model-provider drawer. */
-  currentOrganizationId?: string | null;
-  currentTeamId?: string | null;
-  currentProjectId?: string | null;
   onSaved: () => void;
 }
 
@@ -88,9 +82,6 @@ export function DefaultModelOverrideDrawer({
   available,
   features,
   effective,
-  currentOrganizationId,
-  currentTeamId,
-  currentProjectId,
   onSaved,
 }: Props) {
   const utils = api.useContext();
@@ -310,9 +301,6 @@ export function DefaultModelOverrideDrawer({
               scopes={scopes}
               onChange={setScopes}
               available={available}
-              currentOrganizationId={currentOrganizationId}
-              currentTeamId={currentTeamId}
-              currentProjectId={currentProjectId}
             />
 
             <VStack align="stretch" gap={2}>
@@ -638,22 +626,17 @@ function ScopeSection({
   scopes,
   onChange,
   available,
-  currentOrganizationId,
-  currentTeamId,
-  currentProjectId,
 }: {
   scopes: ScopeChipPickerEntry[];
   onChange: (next: ScopeChipPickerEntry[]) => void;
   available: Payload["available"];
-  currentOrganizationId?: string | null;
-  currentTeamId?: string | null;
-  currentProjectId?: string | null;
 }) {
-  // Quick-picks + Multiple chip + collapsible dropdown all live inside
-  // ScopeChipPicker now — single source of truth. The wrapper used to
-  // render its own quick-pick row above the picker; that duplicated
-  // the same state derivation in two places (and one always lagged the
-  // other by a re-render). See ScopeChipPicker docs for the contract.
+  // Drawer renders only the dropdown — the Organization/Team/Project
+  // quick-pick chips were redundant in practice because rchaves's flow
+  // is always-org-scope, and the dropdown already surfaces all reachable
+  // scopes. The quick-pick variant is preserved on `ScopeChipPicker`
+  // (`showQuickPicks` prop) for future surfaces where the chip-row UX
+  // makes sense.
   return (
     <ScopeChipPicker
       value={scopes}
@@ -663,12 +646,6 @@ function ScopeSection({
       availableTeams={available.teams}
       availableProjects={available.projects}
       label=""
-      showQuickPicks
-      currentOrganizationId={
-        available.organization ? currentOrganizationId ?? null : null
-      }
-      currentTeamId={currentTeamId ?? null}
-      currentProjectId={currentProjectId ?? null}
     />
   );
 }

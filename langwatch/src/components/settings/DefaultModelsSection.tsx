@@ -278,9 +278,6 @@ export function DefaultModelsSection({
         available={data.available}
         features={data.features}
         effective={data.effective}
-        currentOrganizationId={organization?.id}
-        currentTeamId={team?.id}
-        currentProjectId={project?.id}
         onSaved={() => {
           // Query is invalidated inside the drawer — nothing extra here.
         }}
