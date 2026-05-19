@@ -249,6 +249,7 @@ export class LicenseEnforcementRepository
     const teamIds = teams.map((t) => t.id);
     const bindings = await this.prisma.roleBinding.findMany({
       where: {
+        organizationId,
         scopeType: RoleBindingScopeType.TEAM,
         scopeId: { in: teamIds },
         userId: { in: externalUserIds },

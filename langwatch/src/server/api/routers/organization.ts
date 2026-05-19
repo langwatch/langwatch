@@ -1152,8 +1152,10 @@ export const organizationRouter = createTRPCRouter({
           const currentBinding = await prisma.roleBinding.findFirst({
             where: {
               userId: input.userId,
+              organizationId: team.organizationId,
               scopeType: RoleBindingScopeType.TEAM,
               scopeId: input.teamId,
+              customRoleId: { not: null },
             },
             select: { customRoleId: true },
           });

@@ -222,15 +222,22 @@ export const app = new Hono<{ Variables: Variables }>()
 
       const encryptedValue = encrypt(body.value);
 
-      // API key auth has no user context — use first team member as owner
-      const binding = await prisma.roleBinding.findFirst({
-        where: {
-          scopeType: RoleBindingScopeType.TEAM,
-          scopeId: project.teamId,
-          userId: { not: null },
-        },
-        select: { userId: true },
+      const team = await prisma.team.findUnique({
+        where: { id: project.teamId },
+        select: { organizationId: true },
       });
+
+      const binding = team
+        ? await prisma.roleBinding.findFirst({
+            where: {
+              organizationId: team.organizationId,
+              scopeType: RoleBindingScopeType.TEAM,
+              scopeId: project.teamId,
+              userId: { not: null },
+            },
+            select: { userId: true },
+          })
+        : null;
       const userId = binding?.userId ?? "system";
 
       const secret = await prisma.projectSecret.create({

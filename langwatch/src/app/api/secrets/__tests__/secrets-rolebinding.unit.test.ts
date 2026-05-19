@@ -8,6 +8,9 @@ vi.mock("~/server/db", () => ({
       findFirst: vi.fn().mockResolvedValue(null),
       create: vi.fn(),
     },
+    team: {
+      findUnique: vi.fn(),
+    },
     roleBinding: {
       findFirst: vi.fn(),
     },
@@ -39,6 +42,9 @@ vi.mock("../../middleware", async () => {
         teamId: "team-1",
         name: "Test Project",
       });
+      await next();
+    },
+    requirePermission: () => async (_c: any, next: any) => {
       await next();
     },
     handleError: (err: any, c: any) => {
@@ -75,6 +81,9 @@ describe("secrets API fallback owner lookup", () => {
       createdAt: new Date("2026-01-01"),
       updatedAt: new Date("2026-01-01"),
     });
+    (prisma.team as any).findUnique.mockResolvedValue({
+      organizationId: "org-1",
+    });
   });
 
   describe("when team has only RoleBinding users (no TeamUser rows)", () => {
@@ -97,6 +106,7 @@ describe("secrets API fallback owner lookup", () => {
       expect(res.status).toBe(201);
       expect(prisma.roleBinding.findFirst).toHaveBeenCalledWith({
         where: {
+          organizationId: "org-1",
           scopeType: RoleBindingScopeType.TEAM,
           scopeId: "team-1",
           userId: { not: null },

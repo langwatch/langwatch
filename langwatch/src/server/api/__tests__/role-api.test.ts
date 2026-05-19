@@ -308,7 +308,7 @@ describe("RoleService Tests", () => {
         organizationId: "org-123",
       };
 
-      const mockTeamUser = {
+      const mockBinding = {
         userId: "user-123",
         teamId: "team-123",
       };
@@ -316,7 +316,7 @@ describe("RoleService Tests", () => {
       mockPrisma.customRole.findUnique.mockResolvedValue(mockCustomRole);
       mockPrisma.team.findUnique.mockResolvedValue(mockTeam);
       mockPrisma.team.findUniqueOrThrow.mockResolvedValue(mockTeam);
-      mockPrisma.roleBinding.findFirst.mockResolvedValue(mockTeamUser);
+      mockPrisma.roleBinding.findFirst.mockResolvedValue(mockBinding);
       mockPrisma.roleBinding.deleteMany.mockResolvedValue({ count: 0 });
       mockPrisma.roleBinding.create.mockResolvedValue({});
       mockPrisma.teamUser.update.mockResolvedValue({});
@@ -331,6 +331,7 @@ describe("RoleService Tests", () => {
       expect(mockPrisma.roleBinding.findFirst).toHaveBeenCalledWith({
         where: {
           userId: "user-123",
+          organizationId: "org-123",
           scopeType: RoleBindingScopeType.TEAM,
           scopeId: "team-123",
         },
@@ -408,6 +409,7 @@ describe("RoleService Tests", () => {
       expect(mockPrisma.roleBinding.findFirst).toHaveBeenCalledWith({
         where: {
           userId: "user-123",
+          organizationId: "org-123",
           scopeType: RoleBindingScopeType.TEAM,
           scopeId: "team-123",
         },

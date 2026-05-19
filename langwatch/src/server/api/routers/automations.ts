@@ -53,6 +53,7 @@ export const automationRouter = createTRPCRouter({
         },
         select: {
           teamId: true,
+          team: { select: { organizationId: true } },
         },
       });
 
@@ -62,6 +63,7 @@ export const automationRouter = createTRPCRouter({
 
       const teamBindings = await ctx.prisma.roleBinding.findMany({
         where: {
+          organizationId: project.team.organizationId,
           scopeType: RoleBindingScopeType.TEAM,
           scopeId: project.teamId,
           userId: { not: null },
@@ -91,8 +93,7 @@ export const automationRouter = createTRPCRouter({
         }
       } else if (input.action === TriggerAction.SEND_EMAIL) {
         const teamEmails = teamBindings
-          .filter((b) => b.user !== null)
-          .map((b) => b.user!.email);
+          .flatMap((b) => (b.user ? [b.user.email] : []));
 
         if (input.actionParams.members) {
           input.actionParams.members.map((email: string) => {

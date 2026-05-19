@@ -96,19 +96,11 @@ export class RoleService {
   }
 
   async assignRoleToUser(userId: string, teamId: string, customRoleId: string) {
-    // Business rule: Validate all entities exist and belong together
-    const [customRole, team, binding] = await Promise.all([
+    const [customRole, team] = await Promise.all([
       this.repository.findById(customRoleId),
       this.prisma.team.findUnique({
         where: { id: teamId },
         select: { organizationId: true },
-      }),
-      this.prisma.roleBinding.findFirst({
-        where: {
-          userId,
-          scopeType: RoleBindingScopeType.TEAM,
-          scopeId: teamId,
-        },
       }),
     ]);
 
@@ -123,6 +115,15 @@ export class RoleService {
     if (customRole.organizationId !== team.organizationId) {
       throw new RoleOrganizationMismatchError();
     }
+
+    const binding = await this.prisma.roleBinding.findFirst({
+      where: {
+        userId,
+        organizationId: team.organizationId,
+        scopeType: RoleBindingScopeType.TEAM,
+        scopeId: teamId,
+      },
+    });
 
     if (!binding) {
       throw new UserNotTeamMemberError();

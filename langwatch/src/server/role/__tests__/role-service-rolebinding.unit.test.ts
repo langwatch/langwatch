@@ -70,6 +70,7 @@ describe("RoleService.assignRoleToUser", () => {
       expect(mockPrisma.roleBinding.findFirst).toHaveBeenCalledWith({
         where: {
           userId: "user-rolebinding-only",
+          organizationId: "org-1",
           scopeType: RoleBindingScopeType.TEAM,
           scopeId: "team-1",
         },
