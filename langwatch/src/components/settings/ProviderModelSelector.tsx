@@ -380,7 +380,7 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
                       color="fg.muted"
                       fontFamily="mono"
                       lineClamp={1}
-                      paddingLeft={`calc(${MODEL_ICON_SIZE}px + var(--chakra-spacing-2))`}
+                      paddingLeft={`calc(${MODEL_ICON_SIZE} + var(--chakra-spacing-2))`}
                     >
                       {item.subtitle}
                     </Text>
