@@ -281,8 +281,9 @@ export default function ModelsPage() {
                     provider.provider as keyof typeof modelProvidersRegistry
                   ];
 
+                const isSystem = !!(provider as any).isSystem;
                 return (
-                  <Table.Row key={provider.id ?? provider.provider}>
+                  <Table.Row key={provider.id ?? `system-${provider.provider}`}>
                     <Table.Cell>
                       <HStack gap={3} align="center">
                         <Box width="24px" height="24px">
@@ -299,68 +300,73 @@ export default function ModelsPage() {
                       <ProviderScopeChips
                         scopes={namedScopes}
                         fallbackScopeType={(provider as any).scopeType}
-                        // Env-var-fed defaults arrive with no `id` and no
-                        // scopes; tag them so the chip column reads
-                        // "System" instead of empty.
-                        system={
-                          !(provider as any).id &&
-                          (!namedScopes || namedScopes.length === 0)
-                        }
+                        // Env-var-fed providers carry `isSystem` from
+                        // the service; the chip column reads "System"
+                        // instead of an empty cell.
+                        system={isSystem}
                       />
                     </Table.Cell>
                     <Table.Cell textAlign="right">
-                      <Menu.Root>
-                        <Tooltip
-                          content="You need model provider manage permissions to edit or delete providers."
-                          disabled={hasModelProvidersManagePermission}
-                        >
-                          <Menu.Trigger asChild>
-                            <Button
-                              variant="ghost"
-                              disabled={!hasModelProvidersManagePermission}
+                      {isSystem ? (
+                        // System (env-fed) providers can't be edited
+                        // through the UI — their config lives in the
+                        // server's process env. Hide the menu so the
+                        // row reads as read-only at a glance.
+                        null
+                      ) : (
+                        <Menu.Root>
+                          <Tooltip
+                            content="You need model provider manage permissions to edit or delete providers."
+                            disabled={hasModelProvidersManagePermission}
+                          >
+                            <Menu.Trigger asChild>
+                              <Button
+                                variant="ghost"
+                                disabled={!hasModelProvidersManagePermission}
+                              >
+                                <MoreVertical />
+                              </Button>
+                            </Menu.Trigger>
+                          </Tooltip>
+                          <Menu.Content>
+                            <Menu.Item
+                              value="edit"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                openDrawer("editModelProvider", {
+                                  projectId: project?.id,
+                                  organizationId: organization?.id,
+                                  modelProviderId: provider.id,
+                                  providerKey: provider.provider,
+                                });
+                              }}
                             >
-                              <MoreVertical />
-                            </Button>
-                          </Menu.Trigger>
-                        </Tooltip>
-                        <Menu.Content>
-                          <Menu.Item
-                            value="edit"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              openDrawer("editModelProvider", {
-                                projectId: project?.id,
-                                organizationId: organization?.id,
-                                modelProviderId: provider.id,
-                                providerKey: provider.provider,
-                              });
-                            }}
-                          >
-                            <Box display="flex" alignItems="center" gap={2}>
-                              <Edit size={14} />
-                              Edit Provider
-                            </Box>
-                          </Menu.Item>
-                          <Menu.Item
-                            value="disable"
-                            color="red"
-                            // css={{ color: "var(--chakra-colors-red-600)" }}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setProviderToDisable({
-                                id: provider.id ?? undefined,
-                                provider: provider.provider,
-                                name: providerSpec?.name ?? provider.provider,
-                              });
-                            }}
-                          >
-                            <Box display="flex" alignItems="center" gap={2}>
-                              <Trash2 size={14} />
-                              Delete Provider
-                            </Box>
-                          </Menu.Item>
-                        </Menu.Content>
-                      </Menu.Root>
+                              <Box display="flex" alignItems="center" gap={2}>
+                                <Edit size={14} />
+                                Edit Provider
+                              </Box>
+                            </Menu.Item>
+                            <Menu.Item
+                              value="disable"
+                              color="red"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setProviderToDisable({
+                                  id: provider.id ?? undefined,
+                                  provider: provider.provider,
+                                  name:
+                                    providerSpec?.name ?? provider.provider,
+                                });
+                              }}
+                            >
+                              <Box display="flex" alignItems="center" gap={2}>
+                                <Trash2 size={14} />
+                                Delete Provider
+                              </Box>
+                            </Menu.Item>
+                          </Menu.Content>
+                        </Menu.Root>
+                      )}
                     </Table.Cell>
                   </Table.Row>
                 );

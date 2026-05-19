@@ -164,8 +164,26 @@ export class ModelProviderService {
     const savedProviders = await this.repository.findAllAccessibleForProject(
       projectId,
     );
+    const savedProviderKeys = new Set(savedProviders.map((mp) => mp.provider));
 
-    return savedProviders
+    // Env-fed providers (process.env has the API key) that nobody has
+    // stored a row for. They're real and usable — surface them as
+    // pseudo-rows tagged `isSystem` so the settings table can render a
+    // "SYSTEM" chip and the picker can include them without an edit
+    // affordance. Skip ones that are also stored — the stored row
+    // wins, and we don't want to double-show the same provider.
+    const systemRows: MaybeStoredModelProvider[] = [];
+    for (const [providerKey, provider_] of Object.entries(defaultProviders)) {
+      if (savedProviderKeys.has(providerKey)) continue;
+      if (!provider_.enabled) continue;
+      systemRows.push({
+        ...provider_,
+        isSystem: true,
+        scopes: [],
+      });
+    }
+
+    const storedRows = savedProviders
       .filter((mp) => this.shouldKeepModelProvider(mp, defaultProviders))
       .map((mp) => {
         const defaultProvider = defaultProviders[mp.provider];
@@ -215,6 +233,7 @@ export class ModelProviderService {
         };
         return provider_;
       });
+    return [...storedRows, ...systemRows];
   }
 
   /**

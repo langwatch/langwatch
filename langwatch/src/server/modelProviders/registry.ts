@@ -78,6 +78,13 @@ export type MaybeStoredModelProvider = Omit<
   disabledByDefault?: boolean;
   extraHeaders?: { key: string; value: string }[] | null;
   /**
+   * True for pseudo-rows synthesized from the server's process env
+   * (no `ModelProvider` row exists). The settings table renders these
+   * with a "SYSTEM" scope chip and hides the row's edit affordances,
+   * since they're managed via env vars rather than the UI.
+   */
+  isSystem?: boolean;
+  /**
    * Multi-scope grant set (iter 109). Every persisted MP has at least
    * one entry; registry-seeded placeholders for providers that don't
    * have a row yet omit the field. Consumers that need access-control
