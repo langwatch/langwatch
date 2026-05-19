@@ -257,12 +257,15 @@ test_infra_overlays() {
 test_overlay_stacking() {
   sep; info "Suite: overlay stacking (last -f wins)"
 
-  # size-dev sets 1 replica, then we override to 3 via --set
+  # size-dev sets 1 replica, then we override to 3 via --set. Multi-replica
+  # also disables localFilesystem (validation refuses local-FS + replicas>1
+  # because pods don't share filesystems — operators should use app.dataplane).
   local out
   out=$(tmpl --set autogen.enabled=true \
     -f "${OVERLAYS}/size-dev.yaml" \
     -f "${OVERLAYS}/access-nodeport.yaml" \
-    --set app.replicaCount=3)
+    --set app.replicaCount=3 \
+    --set app.storedObjects.localFilesystem.enabled=false)
   assert_contains "stacking: --set overrides overlay" "$out" "replicas: 3"
 
   # size-dev + access-nodeport, then access-ingress overrides
