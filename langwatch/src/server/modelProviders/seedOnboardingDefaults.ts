@@ -13,7 +13,7 @@ const REGISTRY = (
 ).models;
 
 /** Picks the newest `openai/gpt-X.Y(-suffix)?` chat model. */
-function pickLatestOpenAIChat(suffixFilter: "plain" | "mini"): string | undefined {
+export function pickLatestOpenAIChat(suffixFilter: "plain" | "mini"): string | undefined {
   const candidates: { id: string; major: number; minor: number }[] = [];
   for (const model of Object.values(REGISTRY)) {
     if (model.provider !== "openai" || model.mode !== "chat") continue;
@@ -51,7 +51,7 @@ function pickLatestOpenAIChat(suffixFilter: "plain" | "mini"): string | undefine
  * here explicitly rather than relaxed-matched, otherwise unrelated
  * skus with the same prefix get seeded as defaults.
  */
-function pickLatestGeminiChat(family: "pro" | "flash"): string | undefined {
+export function pickLatestGeminiChat(family: "pro" | "flash"): string | undefined {
   const candidates: { id: string; major: number; minor: number }[] = [];
   const proSuffixes = new Set(["pro", "pro-preview"]);
   const flashSuffixes = new Set([
@@ -80,7 +80,7 @@ function pickLatestGeminiChat(family: "pro" | "flash"): string | undefined {
 }
 
 /** Picks the newest `anthropic/claude-<variant>-<major>-<minor>` chat model. */
-function pickLatestAnthropicChat(variant: string): string | undefined {
+export function pickLatestAnthropicChat(variant: string): string | undefined {
   const candidates: { id: string; major: number; minor: number }[] = [];
   for (const model of Object.values(REGISTRY)) {
     if (model.provider !== "anthropic" || model.mode !== "chat") continue;
