@@ -49,4 +49,5 @@ export const KSUID_RESOURCES = {
   DATASET_RECORD: "dsrecord",
   GROUP: "group",
   ROLE_BINDING: "rolebinding",
+  API_KEY_ROLE: "apikeyrole",
 } as const;

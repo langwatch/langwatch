@@ -58,6 +58,16 @@ export function rolesAtOrBelow(
 
 export type PermissionMode = "all" | "readonly" | "restricted";
 
+export type PermissionLabel = "Read" | "Write";
+
+export function roleToPermissionLabel(role: string): PermissionLabel {
+  return role === "ADMIN" ? "Write" : "Read";
+}
+
+export function permissionLabelToRole(label: PermissionLabel): string {
+  return label === "Write" ? "ADMIN" : "VIEWER";
+}
+
 type BindingInput = {
   id: string;
   role: string;
@@ -126,6 +136,12 @@ export function computeBindings({
   }
 }
 
+function scopeTypeLabel(scopeType: string, count: number): string {
+  if (scopeType === "ORGANIZATION") return "Organization";
+  if (scopeType === "TEAM") return count === 1 ? "Team" : `${count} Teams`;
+  return count === 1 ? "Project" : `${count} Projects`;
+}
+
 /** One-line summary of a role-binding set for table display. */
 export function roleSummary(
   bindings: Array<{
@@ -135,13 +151,104 @@ export function roleSummary(
   }>,
 ): string {
   if (bindings.length === 0) return "No permissions";
-  const first = bindings[0]!;
-  const scope =
-    first.scopeType === "ORGANIZATION"
-      ? "Org-wide"
-      : first.scopeType === "TEAM"
-        ? "Team"
-        : "Project";
-  const suffix = bindings.length > 1 ? ` +${bindings.length - 1} more` : "";
-  return `${first.role} (${scope})${suffix}`;
+
+  const counts: Record<string, number> = {};
+  for (const b of bindings) {
+    counts[b.scopeType] = (counts[b.scopeType] ?? 0) + 1;
+  }
+
+  return Object.entries(counts)
+    .map(([type, count]) => scopeTypeLabel(type, count))
+    .join(", ");
+}
+
+export function permissionsSummary({
+  permissionMode,
+  grantedCount,
+  totalCount,
+}: {
+  permissionMode: string;
+  grantedCount: number;
+  totalCount: number;
+}): string {
+  if (permissionMode === "all") return "All";
+  return `${grantedCount} of ${totalCount} permissions`;
+}
+
+export function findBindingAtScope<
+  T extends { scopeType: string; scopeId: string },
+>({
+  bindings,
+  scopeType,
+  scopeId,
+  organizationId,
+  orgProjects,
+}: {
+  bindings: T[] | undefined;
+  scopeType: string;
+  scopeId: string;
+  organizationId: string;
+  orgProjects: Array<{ id: string; teamId: string }>;
+}): T | undefined {
+  if (!bindings) return undefined;
+
+  const find = (st: string, sid: string) =>
+    bindings.find((b) => b.scopeType === st && b.scopeId === sid);
+
+  return (
+    find(scopeType, scopeId) ??
+    (scopeType === "PROJECT"
+      ? find(
+          "TEAM",
+          orgProjects.find((p) => p.id === scopeId)?.teamId ?? "",
+        )
+      : undefined) ??
+    (scopeType !== "ORGANIZATION"
+      ? find("ORGANIZATION", organizationId)
+      : undefined)
+  );
+}
+
+export function deriveBindingRole({
+  permissionMode,
+  scopeType,
+  scopeId,
+  myBindings,
+  organizationId,
+  orgProjects,
+  isServiceKey,
+}: {
+  permissionMode: string;
+  scopeType: string;
+  scopeId: string;
+  myBindings: Array<{ scopeType: string; scopeId: string; role: string }> | undefined;
+  organizationId: string;
+  orgProjects: Array<{ id: string; teamId: string }>;
+  isServiceKey: boolean;
+}): string {
+  if (permissionMode !== "all") return "CUSTOM";
+  if (isServiceKey) return "ADMIN";
+  if (!myBindings) return "VIEWER";
+
+  const binding = findBindingAtScope({
+    bindings: myBindings,
+    scopeType,
+    scopeId,
+    organizationId,
+    orgProjects,
+  });
+
+  return binding?.role ?? "VIEWER";
+}
+
+export function scopeLabel({
+  scopeType,
+  scopeName,
+}: {
+  scopeType: string;
+  scopeName?: string;
+}): string {
+  if (scopeType === "ORGANIZATION") return "Organization";
+  const prefix = scopeType === "TEAM" ? "Team" : "Project";
+  return scopeName ? `${prefix}: ${scopeName}` : prefix;
 }

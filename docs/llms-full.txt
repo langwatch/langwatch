@@ -429,22 +429,31 @@ Let's get cracking.
 
 <Steps>
   <Step title="Create your LangWatch account">
-    First step: if you haven't already, grab your LangWatch account. Head over to [langwatch.ai](https://app.langwatch.ai), sign up, and get your API key ready.
-
-    <img src="/images/llm-observability/quick-start/setup-full.webp" />
+    Head over to [app.langwatch.ai](https://app.langwatch.ai) and sign up. Create your first organization and project.
   </Step>
 
-  <Step title="Sign in with LangWatch">
-    Open a terminal and run the following command to sign in with LangWatch:
+  <Step title="Get your API key">
+    You have two options:
+
+    **Option A: CLI login (recommended for local development)**
 
     ```bash
     npx langwatch login
     ```
 
-    This will add the `LANGWATCH_API_KEY` to your local `.env` file.
+    This opens your browser to authenticate and adds `LANGWATCH_API_KEY` to your local `.env` file.
+
+    **Option B: Create a key manually**
+
+    Go to [**Settings → API Keys**](https://app.langwatch.ai/settings/api-keys) and create an API key. See the [API Keys guide](/platform/api-keys) for details on personal vs service keys.
+
+    ```bash .env
+    LANGWATCH_API_KEY="sk-lw-..."
+    LANGWATCH_PROJECT_ID="your-project-id"
+    ```
 
     <Note>
-      If you are using a **service API key** (e.g. for CI/CD or multi-project setups), you must also set `LANGWATCH_PROJECT_ID` in your `.env` file so the SDK knows which project to send traces to. You can find the project ID in your project settings.
+      Keys created from **Settings → API Keys** (both personal and service) require `LANGWATCH_PROJECT_ID` so the SDK knows which project to send traces to. You can find the project ID in your project settings or URL.
     </Note>
   </Step>
 
@@ -11013,7 +11022,9 @@ Instead of manually reading docs and writing boilerplate code, just ask your AI 
 <Steps>
 
 <Step title="Get your API key">
-Go to your LangWatch project **Settings** page and copy your API key. The API key is required for observability and prompt tools. Documentation tools work without it.
+Go to [**Settings → API Keys**](https://app.langwatch.ai/settings/api-keys) and create a **personal API key**. This key connects your coding assistant to your LangWatch account for observability, prompts, and analytics tools. Documentation tools work without a key.
+
+See the [API Keys guide](/platform/api-keys#creating-a-personal-api-key) for step-by-step instructions.
 </Step>
 
 <Step title="Configure your MCP">

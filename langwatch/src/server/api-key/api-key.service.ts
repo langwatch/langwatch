@@ -1,6 +1,7 @@
 import type { PrismaClient, ApiKey } from "@prisma/client";
 import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
 import { ApiKeyRepository, type ApiKeyWithBindings } from "./api-key.repository";
+import { RoleRepository, CUSTOM_ROLE_KIND } from "~/server/role/repositories/role.repository";
 import {
   generateApiKeyToken,
   hashSecret,
@@ -15,24 +16,27 @@ import {
 } from "./errors";
 import type { Permission } from "~/server/api/rbac";
 import { checkRoleBindingPermission } from "~/server/rbac/role-binding-resolver";
-import { parseCustomRolePermissions } from "~/server/rbac/custom-role-permissions";
+import { parseCustomRolePermissions, permissionFormatSchema } from "~/server/rbac/custom-role-permissions";
 import { DomainError } from "~/server/app-layer/domain-error";
 import { createLogger } from "~/utils/logger/server";
+import { generate } from "@langwatch/ksuid";
+import { KSUID_RESOURCES } from "~/utils/constants";
 
 const logger = createLogger("langwatch:api-key:service");
 
-type RoleBindingInput = {
-  role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
-  customRoleId?: string | null;
+type RoleBindingBase = {
   scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
   scopeId: string;
 };
 
-/**
- * Scope shape consumed by `checkRoleBindingPermission`. Mirrors the
- * RoleBindingScopeType enum but carries the enclosing `teamId` for project
- * scopes so hierarchy lookups can walk team → org.
- */
+type RoleBindingInput =
+  | (RoleBindingBase & { role: "ADMIN" | "MEMBER" | "VIEWER" })
+  | (RoleBindingBase & { role: "CUSTOM"; customRoleId?: string });
+
+type ResolvedRoleBinding =
+  | (RoleBindingBase & { role: "ADMIN" | "MEMBER" | "VIEWER" })
+  | (RoleBindingBase & { role: "CUSTOM"; customRoleId: string });
+
 type CreatorScope =
   | { type: "org"; id: string }
   | { type: "team"; id: string }
@@ -40,15 +44,29 @@ type CreatorScope =
 
 export class ApiKeyService {
   private readonly repo: ApiKeyRepository;
+  private readonly roleRepo: RoleRepository;
   private readonly prisma: PrismaClient;
 
-  constructor(prisma: PrismaClient) {
+  constructor({
+    prisma,
+    repo,
+    roleRepo,
+  }: {
+    prisma: PrismaClient;
+    repo: ApiKeyRepository;
+    roleRepo: RoleRepository;
+  }) {
     this.prisma = prisma;
-    this.repo = ApiKeyRepository.create(prisma);
+    this.repo = repo;
+    this.roleRepo = roleRepo;
   }
 
   static create(prisma: PrismaClient): ApiKeyService {
-    return new ApiKeyService(prisma);
+    return new ApiKeyService({
+      prisma,
+      repo: ApiKeyRepository.create(prisma),
+      roleRepo: new RoleRepository(prisma),
+    });
   }
 
   /**
@@ -72,6 +90,7 @@ export class ApiKeyService {
     organizationId,
     expiresAt,
     permissionMode,
+    permissions,
     bindings,
   }: {
     name: string;
@@ -81,34 +100,71 @@ export class ApiKeyService {
     organizationId: string;
     expiresAt?: Date | null;
     permissionMode: string;
+    permissions?: string[];
     bindings: RoleBindingInput[];
   }): Promise<{ token: string; apiKey: ApiKey }> {
+    const hasCustomBinding = bindings.some((b) => b.role === TeamUserRole.CUSTOM);
+    const hasPermissions = !!permissions && permissions.length > 0;
+    const isRestricted = permissionMode === "restricted";
+
+    if (isRestricted || hasCustomBinding || hasPermissions) {
+      if (!isRestricted) {
+        throw new ApiKeyScopeViolationError(
+          "CUSTOM permissions require permissionMode 'restricted'",
+        );
+      }
+      if (!hasCustomBinding) {
+        throw new ApiKeyScopeViolationError(
+          "restricted mode requires at least one CUSTOM binding",
+        );
+      }
+      if (!hasPermissions) {
+        throw new ApiKeyScopeViolationError(
+          "CUSTOM bindings require at least one permission",
+        );
+      }
+    }
+
+    if (hasPermissions) {
+      ApiKeyService.assertPermissionFormat(permissions);
+    }
+
+    const sortedPermissions = hasPermissions
+      ? [...permissions].sort()
+      : undefined;
+
     if (userId) {
-      await this.assertOrgMembership({ userId, organizationId });
-      await this.assertBindingsWithinCeiling({
-        ceilingUserId: userId,
-        organizationId,
-        bindings,
-      });
+      await this.ensureCallerIsOrgMember({ userId, organizationId });
     } else if (bindings.length > 0) {
       for (const binding of bindings) {
         await this.resolveAndValidateScope({ binding, organizationId });
       }
     }
 
-    const { token, lookupId, hashedSecret } = generateApiKeyToken();
+    let effectiveBindings = bindings;
+    if (!userId && effectiveBindings.length === 0) {
+      effectiveBindings = [{
+        role: "ADMIN",
+        scopeType: "ORGANIZATION",
+        scopeId: organizationId,
+      }];
+    }
 
-    const effectiveBindings: RoleBindingInput[] =
-      !userId && bindings.length === 0
-        ? [{
-            role: "ADMIN",
-            scopeType: "ORGANIZATION",
-            scopeId: organizationId,
-          }]
-        : bindings;
+    const { token, lookupId, hashedSecret } = generateApiKeyToken();
 
     const apiKey = await this.prisma.$transaction(async (tx) => {
       const txRepo = ApiKeyRepository.create(tx);
+      const txRoleRepo = new RoleRepository(tx);
+
+      if (userId) {
+        await this.assertBindingsWithinCeiling({
+          prisma: tx as unknown as PrismaClient,
+          ceilingUserId: userId,
+          organizationId,
+          bindings,
+          rawPermissions: sortedPermissions,
+        });
+      }
 
       const created = await txRepo.create({
         name,
@@ -121,6 +177,20 @@ export class ApiKeyService {
         organizationId,
         expiresAt,
       });
+
+      if (sortedPermissions) {
+        const customRole = await txRoleRepo.create({
+          name: `apikey:${created.id}`,
+          organizationId,
+          permissions: sortedPermissions,
+          kind: CUSTOM_ROLE_KIND.SYSTEM_API_KEY,
+        });
+        effectiveBindings = effectiveBindings.map((b) =>
+          b.role === TeamUserRole.CUSTOM
+            ? { ...b, customRoleId: customRole.id }
+            : b,
+        );
+      }
 
       if (effectiveBindings.length > 0) {
         await txRepo.createRoleBindings({
@@ -154,6 +224,7 @@ export class ApiKeyService {
     name,
     description,
     permissionMode,
+    permissions,
     bindings,
   }: {
     id: string;
@@ -163,6 +234,7 @@ export class ApiKeyService {
     name?: string;
     description?: string | null;
     permissionMode?: string;
+    permissions?: string[];
     bindings?: RoleBindingInput[];
   }): Promise<ApiKeyWithBindings> {
     const existing = await this.repo.findById({ id });
@@ -171,8 +243,6 @@ export class ApiKeyService {
       throw new ApiKeyNotFoundError(id);
     }
 
-    // Service keys (no userId) can only be managed by admins
-    // Personal keys can be updated by the owner or admins
     if (!callerIsAdmin) {
       if (!existing.userId || existing.userId !== callerUserId) {
         throw new ApiKeyNotOwnedError(id);
@@ -181,20 +251,97 @@ export class ApiKeyService {
 
     if (existing.revokedAt) throw new ApiKeyAlreadyRevokedError(id);
 
-    if (bindings && existing.userId) {
-      await this.assertBindingsWithinCeiling({
-        ceilingUserId: existing.userId,
-        organizationId,
-        bindings,
-      });
-    } else if (bindings && !existing.userId) {
+    const updateHasCustomBinding = bindings?.some((b) => b.role === TeamUserRole.CUSTOM) ?? false;
+    const updateHasPermissions = !!permissions && permissions.length > 0;
+    const updateIsRestricted = permissionMode === "restricted";
+
+    if (updateIsRestricted || updateHasCustomBinding || updateHasPermissions) {
+      if (!updateIsRestricted) {
+        throw new ApiKeyScopeViolationError(
+          "CUSTOM permissions require permissionMode 'restricted'",
+        );
+      }
+      if (!updateHasCustomBinding) {
+        throw new ApiKeyScopeViolationError(
+          "restricted mode requires bindings with at least one CUSTOM role",
+        );
+      }
+      if (!updateHasPermissions) {
+        throw new ApiKeyScopeViolationError(
+          "CUSTOM bindings require at least one permission",
+        );
+      }
+    }
+
+    if (updateHasPermissions) {
+      ApiKeyService.assertPermissionFormat(permissions);
+    }
+
+    const sortedPermissions = updateHasPermissions
+      ? [...permissions].sort()
+      : undefined;
+
+    if (bindings && !existing.userId) {
       for (const binding of bindings) {
         await this.resolveAndValidateScope({ binding, organizationId });
       }
     }
 
+    const oldCustomRoleIds = [
+      ...new Set(
+        existing.roleBindings
+          .map((rb) => rb.customRoleId)
+          .filter((cid): cid is string => cid !== null),
+      ),
+    ];
+
     return this.prisma.$transaction(async (tx) => {
       const txRepo = ApiKeyRepository.create(tx);
+      const txRoleRepo = new RoleRepository(tx);
+
+      if (bindings && existing.userId) {
+        await this.assertBindingsWithinCeiling({
+          prisma: tx as unknown as PrismaClient,
+          ceilingUserId: existing.userId,
+          organizationId,
+          bindings,
+          rawPermissions: sortedPermissions,
+        });
+      }
+
+      let effectiveBindings = bindings;
+
+      if (sortedPermissions && effectiveBindings) {
+        const existingCustomRoleId = existing.roleBindings.find(
+          (rb) => rb.customRoleId !== null,
+        )?.customRoleId;
+
+        const canReuse = existingCustomRoleId
+          ? await txRoleRepo.isExclusiveToApiKey({
+              roleId: existingCustomRoleId,
+              apiKeyId: id,
+            })
+          : false;
+
+        let customRole;
+        if (canReuse && existingCustomRoleId) {
+          customRole = await txRoleRepo.update(existingCustomRoleId, {
+            permissions: sortedPermissions,
+          });
+        } else {
+          customRole = await txRoleRepo.create({
+            name: `apikey:${id}:${generate(KSUID_RESOURCES.API_KEY_ROLE).toString()}`,
+            organizationId,
+            permissions: sortedPermissions,
+            kind: CUSTOM_ROLE_KIND.SYSTEM_API_KEY,
+          });
+        }
+        effectiveBindings = effectiveBindings.map((b) =>
+          b.role === TeamUserRole.CUSTOM
+            ? { ...b, customRoleId: customRole.id }
+            : b,
+        );
+      }
 
       await txRepo.update({
         id,
@@ -203,12 +350,28 @@ export class ApiKeyService {
         permissionMode,
       });
 
-      if (bindings) {
+      if (effectiveBindings) {
         await txRepo.replaceRoleBindings({
           apiKeyId: id,
           organizationId,
-          bindings,
+          bindings: effectiveBindings,
         });
+
+        const newCustomRoleIds = new Set(
+          effectiveBindings
+            .filter((b): b is Extract<RoleBindingInput, { role: "CUSTOM" }> => b.role === "CUSTOM")
+            .map((b) => b.customRoleId)
+            .filter((cid): cid is string => !!cid),
+        );
+        const orphanedRoleIds = oldCustomRoleIds.filter(
+          (roleId) => !newCustomRoleIds.has(roleId),
+        );
+        if (orphanedRoleIds.length > 0) {
+          await txRoleRepo.deleteExclusiveToApiKey({
+            roleIds: orphanedRoleIds,
+            apiKeyId: id,
+          });
+        }
       }
 
       const updated = await txRepo.findById({ id });
@@ -220,17 +383,14 @@ export class ApiKeyService {
   /**
    * Verifies the creator is a member of the org before an API key can be minted.
    */
-  private async assertOrgMembership({
+  async ensureCallerIsOrgMember({
     userId,
     organizationId,
   }: {
     userId: string;
     organizationId: string;
   }): Promise<void> {
-    const orgUser = await this.prisma.organizationUser.findFirst({
-      where: { userId, organizationId },
-      select: { userId: true },
-    });
+    const orgUser = await this.repo.findOrgMembership({ userId, organizationId });
     if (!orgUser) {
       throw new ApiKeyScopeViolationError("Not a member of this organization", {
         meta: { userId, organizationId },
@@ -240,15 +400,21 @@ export class ApiKeyService {
 
   /**
    * Validates every requested binding against the ceiling user's permissions.
+   * Must be called inside a transaction to prevent TOCTOU races where
+   * the user's bindings change between validation and write.
    */
   private async assertBindingsWithinCeiling({
+    prisma,
     ceilingUserId,
     organizationId,
     bindings,
+    rawPermissions,
   }: {
+    prisma: PrismaClient;
     ceilingUserId: string;
     organizationId: string;
     bindings: RoleBindingInput[];
+    rawPermissions?: string[];
   }): Promise<void> {
     for (const binding of bindings) {
       const scope = await this.resolveAndValidateScope({
@@ -257,14 +423,28 @@ export class ApiKeyService {
       });
 
       if (binding.role === TeamUserRole.CUSTOM) {
-        await this.assertCustomRoleWithinCeiling({
-          ceilingUserId,
-          organizationId,
-          scope,
-          customRoleId: binding.customRoleId ?? null,
-        });
+        if (rawPermissions) {
+          await this.assertRawPermissionsWithinCeiling({
+            prisma,
+            ceilingUserId,
+            organizationId,
+            scope,
+            permissions: rawPermissions,
+          });
+        } else if (binding.customRoleId) {
+          await this.assertCustomRoleWithinCeiling({
+            prisma,
+            ceilingUserId,
+            organizationId,
+            scope,
+            customRoleId: binding.customRoleId,
+          });
+        } else {
+          throw new ApiKeyScopeViolationError("CUSTOM role requires a customRoleId");
+        }
       } else {
         await this.assertBuiltinRoleWithinCeiling({
+          prisma,
           ceilingUserId,
           organizationId,
           scope,
@@ -292,9 +472,9 @@ export class ApiKeyService {
     }
 
     if (binding.scopeType === RoleBindingScopeType.TEAM) {
-      const team = await this.prisma.team.findFirst({
-        where: { id: binding.scopeId, organizationId },
-        select: { id: true },
+      const team = await this.repo.findTeamInOrg({
+        teamId: binding.scopeId,
+        organizationId,
       });
       if (!team) {
         throw new ApiKeyScopeViolationError(
@@ -305,9 +485,8 @@ export class ApiKeyService {
       return { type: "team", id: binding.scopeId };
     }
 
-    const project = await this.prisma.project.findUnique({
-      where: { id: binding.scopeId, archivedAt: null },
-      include: { team: { select: { id: true, organizationId: true } } },
+    const project = await this.repo.findProjectWithTeam({
+      projectId: binding.scopeId,
     });
     if (!project) {
       throw new ApiKeyScopeViolationError(
@@ -325,23 +504,19 @@ export class ApiKeyService {
   }
 
   private async assertCustomRoleWithinCeiling({
+    prisma,
     ceilingUserId,
     organizationId,
     scope,
     customRoleId,
   }: {
+    prisma: PrismaClient;
     ceilingUserId: string;
     organizationId: string;
     scope: CreatorScope;
-    customRoleId: string | null;
+    customRoleId: string;
   }): Promise<void> {
-    if (!customRoleId) {
-      throw new ApiKeyScopeViolationError("CUSTOM role requires a customRoleId");
-    }
-    const customRole = await this.prisma.customRole.findUnique({
-      where: { id: customRoleId, organizationId },
-      select: { permissions: true },
-    });
+    const customRole = await this.roleRepo.findByIdInOrg(customRoleId, organizationId);
     if (!customRole) {
       throw new ApiKeyScopeViolationError(
         `Custom role ${customRoleId} not found`,
@@ -368,7 +543,37 @@ export class ApiKeyService {
     }
     for (const perm of perms) {
       const userHas = await checkRoleBindingPermission({
-        prisma: this.prisma,
+        prisma,
+        principal: { type: "user", id: ceilingUserId },
+        organizationId,
+        scope,
+        permission: perm as Permission,
+      });
+      if (!userHas) {
+        throw new ApiKeyScopeViolationError(
+          `Cannot grant permission "${perm}" — exceeds your own access`,
+          { meta: { permission: perm, scope } },
+        );
+      }
+    }
+  }
+
+  private async assertRawPermissionsWithinCeiling({
+    prisma,
+    ceilingUserId,
+    organizationId,
+    scope,
+    permissions,
+  }: {
+    prisma: PrismaClient;
+    ceilingUserId: string;
+    organizationId: string;
+    scope: CreatorScope;
+    permissions: string[];
+  }): Promise<void> {
+    for (const perm of permissions) {
+      const userHas = await checkRoleBindingPermission({
+        prisma,
         principal: { type: "user", id: ceilingUserId },
         organizationId,
         scope,
@@ -384,11 +589,13 @@ export class ApiKeyService {
   }
 
   private async assertBuiltinRoleWithinCeiling({
+    prisma,
     ceilingUserId,
     organizationId,
     scope,
     role,
   }: {
+    prisma: PrismaClient;
     ceilingUserId: string;
     organizationId: string;
     scope: CreatorScope;
@@ -403,7 +610,7 @@ export class ApiKeyService {
           : "project:view";
 
     const userHasPermission = await checkRoleBindingPermission({
-      prisma: this.prisma,
+      prisma,
       principal: { type: "user", id: ceilingUserId },
       organizationId,
       scope,
@@ -415,6 +622,17 @@ export class ApiKeyService {
         `Cannot create API key with ${role} permissions — exceeds your own access at ${scope.type}:${scope.id}`,
         { meta: { role, scope } },
       );
+    }
+  }
+
+  private static assertPermissionFormat(permissions: string[]): void {
+    for (const perm of permissions) {
+      if (!permissionFormatSchema.safeParse(perm).success) {
+        throw new ApiKeyScopeViolationError(
+          `Invalid permission format "${perm}" — must match resource:action (lowercase)`,
+          { meta: { permission: perm } },
+        );
+      }
     }
   }
 
@@ -523,7 +741,30 @@ export class ApiKeyService {
     }
     if (apiKey.revokedAt) throw new ApiKeyAlreadyRevokedError(id);
 
-    return this.repo.revoke({ id });
+    return this.prisma.$transaction(async (tx) => {
+      const txRepo = ApiKeyRepository.create(tx);
+      const txRoleRepo = new RoleRepository(tx);
+
+      const fresh = await txRepo.findById({ id });
+      const customRoleIds = [
+        ...new Set(
+          (fresh?.roleBindings ?? [])
+            .map((rb) => rb.customRoleId)
+            .filter((cid): cid is string => cid !== null),
+        ),
+      ];
+
+      const result = await txRepo.revoke({ id });
+
+      if (customRoleIds.length > 0) {
+        await txRoleRepo.deleteExclusiveToApiKey({
+          roleIds: customRoleIds,
+          apiKeyId: id,
+        });
+      }
+
+      return result;
+    });
   }
 
   /**
@@ -536,14 +777,7 @@ export class ApiKeyService {
     userId: string;
     organizationId: string;
   }): Promise<boolean> {
-    const binding = await this.prisma.roleBinding.findFirst({
-      where: {
-        userId,
-        organizationId,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        role: TeamUserRole.ADMIN,
-      },
-    });
+    const binding = await this.repo.findOrgAdminBinding({ userId, organizationId });
     return !!binding;
   }
 
@@ -552,5 +786,98 @@ export class ApiKeyService {
    */
   async getById({ id }: { id: string }): Promise<ApiKeyWithBindings | null> {
     return this.repo.findById({ id });
+  }
+
+  async getUserBindings({
+    userId,
+    organizationId,
+  }: {
+    userId: string;
+    organizationId: string;
+  }) {
+    return this.repo.findUserBindings({ userId, organizationId });
+  }
+
+  async getOrgProjects({ organizationId }: { organizationId: string }) {
+    return this.repo.findProjectsInOrg({ organizationId });
+  }
+
+  async getOrgTeams({ organizationId }: { organizationId: string }) {
+    return this.repo.findTeamsInOrg({ organizationId });
+  }
+
+  async getOrgMembers({ organizationId }: { organizationId: string }) {
+    return this.repo.findOrgMembers({ organizationId });
+  }
+
+  async enrichBindingsWithNames({
+    bindings,
+  }: {
+    bindings: Array<{
+      id: string;
+      role: string;
+      customRoleId: string | null;
+      scopeType: string;
+      scopeId: string;
+    }>;
+  }) {
+    const orgIds = new Set<string>();
+    const teamIds = new Set<string>();
+    const projectIds = new Set<string>();
+    const customRoleIds = new Set<string>();
+    for (const b of bindings) {
+      if (b.scopeType === "ORGANIZATION") orgIds.add(b.scopeId);
+      else if (b.scopeType === "TEAM") teamIds.add(b.scopeId);
+      else if (b.scopeType === "PROJECT") projectIds.add(b.scopeId);
+      if (b.customRoleId) customRoleIds.add(b.customRoleId);
+    }
+
+    const [orgs, teams, projects, customRoles] = await Promise.all([
+      this.repo.findOrgsByIds([...orgIds]),
+      this.repo.findTeamsByIds([...teamIds]),
+      this.repo.findProjectsByIds([...projectIds]),
+      this.repo.findCustomRolesByIds([...customRoleIds]),
+    ]);
+
+    const orgName = new Map(orgs.map((o) => [o.id, o.name]));
+    const teamName = new Map(teams.map((t) => [t.id, t.name]));
+    const activeProjectIds = new Set(projects.map((p) => p.id));
+    const projectName = new Map(projects.map((p) => [p.id, p.name]));
+    const customRoleName = new Map(customRoles.map((r) => [r.id, r.name]));
+
+    return {
+      orgName,
+      teamName,
+      activeProjectIds,
+      projectName,
+      customRoleName,
+      customRoles,
+    };
+  }
+
+  async enrichApiKeyList({
+    apiKeys,
+  }: {
+    apiKeys: ApiKeyWithBindings[];
+  }) {
+    const customRoleIds = new Set<string>();
+    const userIds = new Set<string>();
+    for (const k of apiKeys) {
+      for (const rb of k.roleBindings) {
+        if (rb.customRoleId) customRoleIds.add(rb.customRoleId);
+      }
+      if (k.userId) userIds.add(k.userId);
+      if (k.createdByUserId) userIds.add(k.createdByUserId);
+    }
+
+    const [customRoles, users] = await Promise.all([
+      this.repo.findCustomRolesByIds([...customRoleIds]),
+      this.repo.findUsersByIds([...userIds]),
+    ]);
+
+    return {
+      customRoles,
+      users,
+    };
   }
 }

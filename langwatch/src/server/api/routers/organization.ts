@@ -3,6 +3,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "@prisma/client";
+import { RoleService } from "~/server/role/role.service";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
@@ -525,6 +526,7 @@ export const organizationRouter = createTRPCRouter({
                 where: {
                   id: { in: customRoleIds },
                   organizationId: input.organizationId,
+                  kind: "custom",
                 },
                 select: { id: true },
               });
@@ -795,7 +797,7 @@ export const organizationRouter = createTRPCRouter({
                   };
                 });
 
-              // Validate custom role IDs belong to this organization
+              // Validate custom role IDs belong to this organization and are user-assignable
               const customRoleIds = teamAssignments
                 .filter((t) => t.customRoleId)
                 .map((t) => t.customRoleId!);
@@ -804,6 +806,7 @@ export const organizationRouter = createTRPCRouter({
                   where: {
                     id: { in: customRoleIds },
                     organizationId: input.organizationId,
+                    kind: "custom",
                   },
                   select: { id: true },
                 });
@@ -1149,22 +1152,16 @@ export const organizationRouter = createTRPCRouter({
             });
           }
 
-          const currentTeamUser = await prisma.teamUser.findUnique({
-            where: {
-              userId_teamId: {
-                userId: input.userId,
-                teamId: input.teamId,
-              },
-            },
-            select: { assignedRoleId: true },
+          const roleService = new RoleService(prisma);
+          const currentBinding = await roleService.getUserCustomRoleBinding({
+            userId: input.userId,
+            organizationId: team.organizationId,
+            teamId: input.teamId,
           });
 
-          const oldPermissions = currentTeamUser?.assignedRoleId
+          const oldPermissions = currentBinding?.customRoleId
             ? await (async () => {
-                const role = await prisma.customRole.findUnique({
-                  where: { id: currentTeamUser.assignedRoleId! },
-                  select: { permissions: true },
-                });
+                const role = await roleService.getRoleByIdOrNull(currentBinding.customRoleId!);
                 return role?.permissions as string[] | undefined;
               })()
             : undefined;

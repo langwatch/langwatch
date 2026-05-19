@@ -137,9 +137,7 @@ export const app = new Hono<{ Variables: Variables }>()
           createdByUserId: callerUserId,
           organizationId: organization.id,
           expiresAt: body.expiresAt,
-          permissionMode: isService
-            ? (bindings.length === 0 ? "all" : "restricted")
-            : "scoped",
+          permissionMode: isService ? "all" : "scoped",
           bindings,
         });
 
