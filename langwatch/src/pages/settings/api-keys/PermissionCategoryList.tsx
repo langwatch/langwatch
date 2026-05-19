@@ -126,6 +126,7 @@ export function PermissionCategoryList({
 }) {
   return (
     <Box
+      width="full"
       borderWidth="1px"
       borderColor="border"
       borderRadius="lg"
