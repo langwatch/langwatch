@@ -33,8 +33,6 @@ import {
   getProjectModelProviders,
   getProjectModelProvidersForFrontend,
   listProjectModelProvidersForFrontend,
-  getModelMetadataForFrontend,
-  mergeCustomModelMetadata,
 } from "./modelProviders.utils";
 import { isManagedProvider } from "../../../../ee/managed-providers/managedBedrockConfig";
 
@@ -49,26 +47,19 @@ export {
 } from "./modelProviders.utils";
 
 export const modelProviderRouter = createTRPCRouter({
-  // Frontend endpoints intentionally route through the
-  // "stored-only" service path (no env-key-based phantom providers).
-  // Server-side fallbacks that need env-key resolution still call
-  // the env-merged `getProjectModelProviders` service method directly
-  // via util imports.
   getAllForProject: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .use(checkProjectPermission("project:view"))
     .query(async ({ input, ctx }) => {
       const { projectId } = input;
+
       const hasSetupPermission = await hasProjectPermission(
         ctx,
         projectId,
         "project:update",
       );
-      const service = ModelProviderService.create(ctx.prisma);
-      return await service.listProjectModelProvidersForFrontendAsRecord(
-        projectId,
-        hasSetupPermission,
-      );
+
+      return await getProjectModelProviders(projectId, hasSetupPermission);
     }),
   getAllForProjectForFrontend: protectedProcedure
     .input(z.object({ projectId: z.string() }))
@@ -80,18 +71,10 @@ export const modelProviderRouter = createTRPCRouter({
         projectId,
         "project:update",
       );
-      const service = ModelProviderService.create(ctx.prisma);
-      const providers =
-        await service.listProjectModelProvidersForFrontendAsRecord(
-          projectId,
-          hasSetupPermission,
-        );
-      const registryMetadata = getModelMetadataForFrontend();
-      const modelMetadata = mergeCustomModelMetadata(
-        registryMetadata,
-        providers,
+      return await getProjectModelProvidersForFrontend(
+        projectId,
+        hasSetupPermission,
       );
-      return { providers, modelMetadata };
     }),
   /**
    * List shape: one entry per stored ModelProvider row, no collapsing
