@@ -448,15 +448,12 @@ function main() {
 
     allNavGroups.push({ group: group.name, pages });
 
-    // Insert Built-in Evaluators right after the Evaluators config group
+    // Insert Built-in Evaluators (categorized) right after the Evaluators config group
     if (group.dirName === "evaluators-config") {
-      const builtInPages = findBuiltInEvaluatorPages();
-      if (builtInPages.length > 0) {
-        allNavGroups.push({
-          group: "Built-in Evaluators",
-          pages: builtInPages,
-        });
-      }
+      allNavGroups.push({
+        group: "Built-in Evaluators",
+        pages: buildBuiltInEvaluatorNav(),
+      });
     }
   }
 
@@ -475,15 +472,75 @@ function main() {
   console.log(`Updated docs.json with ${allNavGroups.length} API groups`);
 }
 
-function findBuiltInEvaluatorPages(): string[] {
-  const evalDir = path.join(API_REF_DIR, "evaluators");
-  if (!fs.existsSync(evalDir)) return [];
+const BUILTIN_EVALUATOR_CATEGORIES: Record<string, string[]> = {
+  "Expected Answer": [
+    "exact-match-evaluator",
+    "llm-answer-match",
+    "llm-factual-match",
+    "bleu-score",
+    "rouge-score",
+    "sql-query-equivalence",
+    "semantic-similarity-evaluator",
+  ],
+  "LLM as Judge": [
+    "llm-as-a-judge-boolean-evaluator",
+    "llm-as-a-judge-category-evaluator",
+    "llm-as-a-judge-score-evaluator",
+    "rubrics-based-scoring",
+    "custom-basic-evaluator",
+    "summarization-score",
+  ],
+  "RAG Quality": [
+    "ragas-answer-correctness",
+    "ragas-answer-relevancy",
+    "ragas-context-precision",
+    "ragas-context-recall",
+    "ragas-context-relevancy",
+    "ragas-context-utilization",
+    "ragas-faithfulness",
+    "ragas-faithfulness-1",
+    "ragas-response-context-precision",
+    "ragas-response-context-recall",
+    "ragas-response-relevancy",
+    "context-f1",
+    "context-precision",
+    "context-recall",
+  ],
+  "Quality Aspects": [
+    "lingua-language-detection",
+    "valid-format-evaluator",
+    "off-topic-evaluator",
+    "query-resolution",
+  ],
+  Safety: [
+    "azure-content-safety",
+    "azure-jailbreak-detection",
+    "azure-prompt-shield",
+    "openai-moderation",
+    "presidio-pii-detection",
+    "competitor-blocklist",
+    "competitor-allowlist-check",
+    "competitor-llm-check",
+  ],
+};
 
-  return fs
-    .readdirSync(evalDir)
-    .filter((f) => f.endsWith(".mdx"))
-    .sort()
-    .map((f) => `api-reference/evaluators/${f.replace(".mdx", "")}`);
+function buildBuiltInEvaluatorNav(): (
+  | string
+  | { group: string; pages: string[] }
+)[] {
+  const p = (name: string) => `api-reference/evaluators/${name}`;
+  const pages: (string | { group: string; pages: string[] })[] = [p("overview")];
+
+  for (const [category, evaluators] of Object.entries(
+    BUILTIN_EVALUATOR_CATEGORIES
+  )) {
+    pages.push({
+      group: category,
+      pages: evaluators.map(p),
+    });
+  }
+
+  return pages;
 }
 
 main();

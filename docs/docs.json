@@ -737,46 +737,71 @@
           {
             "group": "Built-in Evaluators",
             "pages": [
-              "api-reference/evaluators/azure-content-safety",
-              "api-reference/evaluators/azure-jailbreak-detection",
-              "api-reference/evaluators/azure-prompt-shield",
-              "api-reference/evaluators/bleu-score",
-              "api-reference/evaluators/competitor-allowlist-check",
-              "api-reference/evaluators/competitor-blocklist",
-              "api-reference/evaluators/competitor-llm-check",
-              "api-reference/evaluators/context-f1",
-              "api-reference/evaluators/context-precision",
-              "api-reference/evaluators/context-recall",
-              "api-reference/evaluators/custom-basic-evaluator",
-              "api-reference/evaluators/exact-match-evaluator",
-              "api-reference/evaluators/lingua-language-detection",
-              "api-reference/evaluators/llm-answer-match",
-              "api-reference/evaluators/llm-as-a-judge-boolean-evaluator",
-              "api-reference/evaluators/llm-as-a-judge-category-evaluator",
-              "api-reference/evaluators/llm-as-a-judge-score-evaluator",
-              "api-reference/evaluators/llm-factual-match",
-              "api-reference/evaluators/off-topic-evaluator",
-              "api-reference/evaluators/openai-moderation",
               "api-reference/evaluators/overview",
-              "api-reference/evaluators/presidio-pii-detection",
-              "api-reference/evaluators/query-resolution",
-              "api-reference/evaluators/ragas-answer-correctness",
-              "api-reference/evaluators/ragas-answer-relevancy",
-              "api-reference/evaluators/ragas-context-precision",
-              "api-reference/evaluators/ragas-context-recall",
-              "api-reference/evaluators/ragas-context-relevancy",
-              "api-reference/evaluators/ragas-context-utilization",
-              "api-reference/evaluators/ragas-faithfulness-1",
-              "api-reference/evaluators/ragas-faithfulness",
-              "api-reference/evaluators/ragas-response-context-precision",
-              "api-reference/evaluators/ragas-response-context-recall",
-              "api-reference/evaluators/ragas-response-relevancy",
-              "api-reference/evaluators/rouge-score",
-              "api-reference/evaluators/rubrics-based-scoring",
-              "api-reference/evaluators/semantic-similarity-evaluator",
-              "api-reference/evaluators/sql-query-equivalence",
-              "api-reference/evaluators/summarization-score",
-              "api-reference/evaluators/valid-format-evaluator"
+              {
+                "group": "Expected Answer",
+                "pages": [
+                  "api-reference/evaluators/exact-match-evaluator",
+                  "api-reference/evaluators/llm-answer-match",
+                  "api-reference/evaluators/llm-factual-match",
+                  "api-reference/evaluators/bleu-score",
+                  "api-reference/evaluators/rouge-score",
+                  "api-reference/evaluators/sql-query-equivalence",
+                  "api-reference/evaluators/semantic-similarity-evaluator"
+                ]
+              },
+              {
+                "group": "LLM as Judge",
+                "pages": [
+                  "api-reference/evaluators/llm-as-a-judge-boolean-evaluator",
+                  "api-reference/evaluators/llm-as-a-judge-category-evaluator",
+                  "api-reference/evaluators/llm-as-a-judge-score-evaluator",
+                  "api-reference/evaluators/rubrics-based-scoring",
+                  "api-reference/evaluators/custom-basic-evaluator",
+                  "api-reference/evaluators/summarization-score"
+                ]
+              },
+              {
+                "group": "RAG Quality",
+                "pages": [
+                  "api-reference/evaluators/ragas-answer-correctness",
+                  "api-reference/evaluators/ragas-answer-relevancy",
+                  "api-reference/evaluators/ragas-context-precision",
+                  "api-reference/evaluators/ragas-context-recall",
+                  "api-reference/evaluators/ragas-context-relevancy",
+                  "api-reference/evaluators/ragas-context-utilization",
+                  "api-reference/evaluators/ragas-faithfulness",
+                  "api-reference/evaluators/ragas-faithfulness-1",
+                  "api-reference/evaluators/ragas-response-context-precision",
+                  "api-reference/evaluators/ragas-response-context-recall",
+                  "api-reference/evaluators/ragas-response-relevancy",
+                  "api-reference/evaluators/context-f1",
+                  "api-reference/evaluators/context-precision",
+                  "api-reference/evaluators/context-recall"
+                ]
+              },
+              {
+                "group": "Quality Aspects",
+                "pages": [
+                  "api-reference/evaluators/lingua-language-detection",
+                  "api-reference/evaluators/valid-format-evaluator",
+                  "api-reference/evaluators/off-topic-evaluator",
+                  "api-reference/evaluators/query-resolution"
+                ]
+              },
+              {
+                "group": "Safety",
+                "pages": [
+                  "api-reference/evaluators/azure-content-safety",
+                  "api-reference/evaluators/azure-jailbreak-detection",
+                  "api-reference/evaluators/azure-prompt-shield",
+                  "api-reference/evaluators/openai-moderation",
+                  "api-reference/evaluators/presidio-pii-detection",
+                  "api-reference/evaluators/competitor-blocklist",
+                  "api-reference/evaluators/competitor-allowlist-check",
+                  "api-reference/evaluators/competitor-llm-check"
+                ]
+              }
             ]
           },
           {
