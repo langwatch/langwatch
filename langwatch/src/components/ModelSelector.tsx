@@ -8,7 +8,7 @@ import {
   Skeleton,
   Text,
 } from "@chakra-ui/react";
-import { Search, Settings } from "lucide-react";
+import { AlertTriangle, Search, Settings } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { modelProviderIcons } from "../server/modelProviders/iconsMap";
@@ -23,6 +23,7 @@ import {
 import { InputGroup } from "./ui/input-group";
 import { Link } from "./ui/link";
 import { Select } from "./ui/select";
+import { Tooltip } from "./ui/tooltip";
 import { LuSettings2 } from "react-icons/lu";
 import { NoModelsConfiguredCallout } from "./NoModelsConfiguredCallout";
 
@@ -234,6 +235,16 @@ export const ModelSelector = React.memo(function ModelSelector({
   // Model might not be in the list if it's a custom model or unknown
   const isUnknown = !selectedItem;
 
+  // Provider gone (deleted or never configured at any reachable
+  // scope) — the value is still persisted on the form but the user
+  // needs to update it before the evaluation can run. Same chip
+  // treatment ModelChip renders in the Default Models table.
+  const providerKey = model.split("/")[0] ?? "";
+  const isProviderMissing =
+    !!model &&
+    !!providerKey &&
+    !groupedByProvider.some((group) => group.provider === providerKey);
+
   const selectValueText = (
     <HStack overflow="hidden" gap={2} align="center">
       {selectedItem?.icon && (
@@ -246,10 +257,32 @@ export const ModelSelector = React.memo(function ModelSelector({
         fontFamily="mono"
         lineClamp={1}
         wordBreak="break-all"
-        color={isUnknown ? "gray.500" : undefined}
+        color={
+          isProviderMissing ? "red.600" : isUnknown ? "gray.500" : undefined
+        }
+        textDecoration={isProviderMissing ? "line-through" : undefined}
       >
         {selectedItem?.label ?? model}
       </Box>
+      {isProviderMissing && (
+        <Tooltip
+          content={`${providerKey} provider isn't enabled here. This evaluation will fail until you re-add the provider or pick a different model.`}
+          positioning={{ placement: "top" }}
+          showArrow
+        >
+          <HStack gap={1} color="red.600" flexShrink={0}>
+            <AlertTriangle size={size === "sm" ? 12 : 14} aria-hidden />
+            <Text
+              fontSize={size === "sm" ? "2xs" : "xs"}
+              fontWeight="medium"
+              textTransform="uppercase"
+              letterSpacing="wide"
+            >
+              Update needed
+            </Text>
+          </HStack>
+        </Tooltip>
+      )}
     </HStack>
   );
 
