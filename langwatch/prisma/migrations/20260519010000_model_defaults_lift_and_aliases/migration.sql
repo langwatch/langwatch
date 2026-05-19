@@ -278,69 +278,14 @@ WHERE c.id IN (
       ) = 0
 );
 
--- 4. Single-project org lift. When an org has exactly ONE project, the
--- project IS the org. Move the project's entire ModelDefaultConfig
--- (every key, regardless of provider) to ORG scope by re-pointing the
--- existing scope row. Runs after block 3, so any partial ORG config
--- that block 3 created for a single-project org is dropped first — the
--- project's full config (which may carry EMBEDDINGS + per-feature
--- overrides) is the more complete source of truth.
---
--- Skips orgs that have an ORG-scoped config not created by block 3
--- (a human/external script set intent we shouldn't shadow).
-
--- 4a. Drop block-3-created ORG configs for orgs that have exactly one
--- project. The project's config takes over in 4b. Configs created
--- outside this migration (id NOT LIKE 'mdcfg_orglift_%') stay in place.
-DELETE FROM "ModelDefaultConfig" c
-USING "ModelDefaultConfigScope" s,
-      (
-        SELECT t."organizationId" AS org_id
-        FROM "Project" p
-        JOIN "Team" t ON t.id = p."teamId"
-        GROUP BY t."organizationId"
-        HAVING COUNT(*) = 1
-      ) AS single_orgs
-WHERE c.id LIKE 'mdcfg_orglift_%'
-  AND s."configId" = c.id
-  AND s."scopeType" = 'ORGANIZATION'
-  AND s."scopeId" = single_orgs.org_id;
-
--- 4b. Re-point the PROJECT-scope ModelDefaultConfigScope row to
--- ORGANIZATION scope when the project's org has exactly one project
--- and the org doesn't already have a (non-block-3) ORG config. Same
--- ModelDefaultConfig row keeps its keys; only the scope changes.
-UPDATE "ModelDefaultConfigScope" s
-SET "scopeType" = 'ORGANIZATION'::"ModelDefaultScopeType",
-    "scopeId" = sub.org_id
-FROM (
-    SELECT
-        p.id AS project_id,
-        t."organizationId" AS org_id
-    FROM "Project" p
-    JOIN "Team" t ON t.id = p."teamId"
-    WHERE t."organizationId" IN (
-        SELECT t2."organizationId"
-        FROM "Project" p2
-        JOIN "Team" t2 ON t2.id = p2."teamId"
-        GROUP BY t2."organizationId"
-        HAVING COUNT(*) = 1
-    )
-) AS sub
-WHERE s."scopeType" = 'PROJECT'
-  AND s."scopeId" = sub.project_id
-  AND NOT EXISTS (
-    SELECT 1
-    FROM "ModelDefaultConfigScope" os
-    WHERE os."scopeType" = 'ORGANIZATION'
-      AND os."scopeId" = sub.org_id
-  );
-
--- 5. Single-project org provider lift. Mirror of block 4 on the
--- ModelProviderScope table: when an org has exactly one project, any
--- ModelProviderScope rows attached at PROJECT scope are re-pointed to
--- ORGANIZATION scope. Same safety gate — only single-project orgs, so
--- no provider can leak into a sibling project that wasn't configured.
+-- 4. Single-project org provider lift on the ModelProviderScope table.
+-- When an org has exactly ONE project, any ModelProviderScope rows
+-- attached at PROJECT scope are re-pointed to ORGANIZATION scope.
+-- Single-project gate is mandatory here — lifting providers in multi-
+-- project orgs would leak access into sibling projects that weren't
+-- configured. ModelDefaultConfig has its own consolidation in block 3
+-- (majority rule, no single-project gate) since config inheritance
+-- doesn't expose credentials.
 --
 -- A ModelProvider may already have an ORG-scope row for the same org
 -- (someone re-added the provider at org scope after originally pinning
