@@ -231,6 +231,37 @@ export class StoredObjectsService {
   }
 
   /**
+   * Probes for existence without streaming the bytes.
+   *
+   * Returns the same tri-state as the HTTP HEAD route at `/api/files/:id`:
+   *  - `{ status: "available", mediaType }` — row exists and storage has the bytes
+   *  - `{ status: "missing", mediaType }`   — row exists but storage 404s
+   *  - `{ status: "not_found" }`            — no row matches
+   *
+   * Used by the tRPC `storedObjects.headById` probe from the renderer to
+   * distinguish "blob is gone" (graceful missing-badge) from "row never
+   * existed" (404) without round-tripping the body.
+   */
+  async headById({
+    projectId,
+    id,
+  }: {
+    projectId: string;
+    id: string;
+  }): Promise<
+    | { status: "available"; mediaType: string }
+    | { status: "missing"; mediaType: string }
+    | { status: "not_found" }
+  > {
+    const row = await this.repository.findById({ projectId, id });
+    if (!row) return { status: "not_found" };
+    const bytesPresent = await this.registry.exists(row.storage_uri);
+    return bytesPresent
+      ? { status: "available", mediaType: row.media_type }
+      : { status: "missing", mediaType: row.media_type };
+  }
+
+  /**
    * Retrieves a stored object row and a readable stream of its bytes.
    *
    * Returns:
@@ -282,7 +313,12 @@ export class StoredObjectsService {
           }
           storedObjectReadFailureCounter.inc();
           logger.error(
-            { projectId, id, storageUri: row.storage_uri, error },
+            {
+              projectId,
+              id,
+              storageUri: redactStorageUri(row.storage_uri),
+              error,
+            },
             "Failed to GET stored object bytes",
           );
           throw error;
@@ -304,9 +340,11 @@ export class StoredObjectsService {
    * graceful degradation we already handle on the read path.
    *
    * Each individual byte-delete is best-effort: a single storage failure
-   * does not halt the cascade. The error is logged and counted so the
-   * operator can sweep up orphans later. The CH delete only runs after
-   * all bytes have been attempted.
+   * does not halt the cascade. Failed rows are NOT removed from ClickHouse
+   * — they stay behind as retryable tombstones so a follow-up cascade
+   * re-attempts the byte-delete using the same `storage_uri`. Dropping the
+   * row along with a failed byte-delete would lose the address of the
+   * orphaned bytes (Sergio review 2026-05-20).
    */
   async deleteOwnedBy({ projectId }: { projectId: string }): Promise<void> {
     return tracer.withActiveSpan(
@@ -320,26 +358,46 @@ export class StoredObjectsService {
           return;
         }
 
+        const succeededIds: string[] = [];
         let bytesDeleted = 0;
         let byteDeleteFailures = 0;
         for (const row of rows) {
           try {
             await this.registry.delete(row.storage_uri);
             bytesDeleted++;
+            succeededIds.push(row.id);
           } catch (error) {
             byteDeleteFailures++;
             logger.warn(
-              { projectId, id: row.id, storageUri: row.storage_uri, error },
-              "deleteOwnedBy: failed to delete bytes; row will still be removed",
+              {
+                projectId,
+                id: row.id,
+                storageUri: redactStorageUri(row.storage_uri),
+                error,
+              },
+              "deleteOwnedBy: failed to delete bytes; row retained as retryable tombstone",
             );
           }
         }
         span.setAttribute("stored_objects.bytes_deleted", bytesDeleted);
         span.setAttribute("stored_objects.byte_delete_failures", byteDeleteFailures);
+        span.setAttribute("stored_objects.rows_retained_for_retry", byteDeleteFailures);
 
-        await this.repository.deleteByProject({ projectId });
+        // Only remove the rows whose bytes were successfully deleted.
+        // Failed rows stay behind so the next cascade can retry the
+        // byte-delete using the still-present storage_uri.
+        if (succeededIds.length > 0) {
+          await this.repository.deleteByIds({ projectId, ids: succeededIds });
+        }
         logger.info(
-          { projectId, rowsCount: rows.length, bytesDeleted, byteDeleteFailures },
+          {
+            projectId,
+            rowsCount: rows.length,
+            bytesDeleted,
+            byteDeleteFailures,
+            rowsDeleted: succeededIds.length,
+            rowsRetainedForRetry: byteDeleteFailures,
+          },
           "deleteOwnedBy completed",
         );
       },

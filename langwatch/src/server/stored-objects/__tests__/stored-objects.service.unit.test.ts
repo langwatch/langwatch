@@ -83,6 +83,7 @@ function makeRepository(): StoredObjectsRepository {
     findBySha256: vi.fn().mockResolvedValue(null),
     findAllByProject: vi.fn().mockResolvedValue([]),
     deleteByProject: vi.fn().mockResolvedValue(undefined),
+    deleteByIds: vi.fn().mockResolvedValue(undefined),
   } as unknown as StoredObjectsRepository;
 }
 
@@ -347,6 +348,139 @@ describe("getById", () => {
   });
 });
 
+describe("deleteOwnedBy", () => {
+  let repo: StoredObjectsRepository;
+  let registry: StorageRegistry;
+  let service: StoredObjectsService;
+
+  beforeEach(() => {
+    repo = makeRepository();
+    registry = makeRegistry();
+    const mintStub: MintStorageUri = async ({ projectId, sha256 }) =>
+      `file:///tmp/${projectId}/${sha256}`;
+    service = new StoredObjectsService(repo, registry, mintStub);
+  });
+
+  describe("when every byte-delete succeeds", () => {
+    it("deletes every row in one batch", async () => {
+      const rows = [makeRow({ id: "obj-1" }), makeRow({ id: "obj-2" })];
+      vi.mocked(repo.findAllByProject).mockResolvedValue(rows);
+      vi.mocked(registry.delete).mockResolvedValue(undefined);
+
+      await service.deleteOwnedBy({ projectId: PROJECT_ID });
+
+      expect(registry.delete).toHaveBeenCalledTimes(2);
+      expect(repo.deleteByIds).toHaveBeenCalledWith({
+        projectId: PROJECT_ID,
+        ids: ["obj-1", "obj-2"],
+      });
+      // The old whole-project DELETE path must NOT be used — see retention contract.
+      expect(repo.deleteByProject).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when some byte-deletes fail", () => {
+    it("retains the failed rows as retryable tombstones and only deletes the succeeded ones", async () => {
+      const rows = [
+        makeRow({ id: "obj-ok" }),
+        makeRow({ id: "obj-broken" }),
+        makeRow({ id: "obj-also-ok" }),
+      ];
+      vi.mocked(repo.findAllByProject).mockResolvedValue(rows);
+      vi.mocked(registry.delete)
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce(new Error("storage timeout"))
+        .mockResolvedValueOnce(undefined);
+
+      await service.deleteOwnedBy({ projectId: PROJECT_ID });
+
+      // Only the succeeded ids are passed to deleteByIds — the broken row's
+      // id is retained in CH so a future cascade can retry the byte-delete.
+      expect(repo.deleteByIds).toHaveBeenCalledWith({
+        projectId: PROJECT_ID,
+        ids: ["obj-ok", "obj-also-ok"],
+      });
+      // The failed row's id MUST NOT be in the delete list — losing it would
+      // strand the bytes with no row pointing at the storage_uri.
+      const passedIds = vi.mocked(repo.deleteByIds).mock.calls[0]?.[0].ids;
+      expect(passedIds).not.toContain("obj-broken");
+    });
+  });
+
+  describe("when every byte-delete fails", () => {
+    it("does not call deleteByIds at all — every row is retained for retry", async () => {
+      const rows = [makeRow({ id: "obj-a" }), makeRow({ id: "obj-b" })];
+      vi.mocked(repo.findAllByProject).mockResolvedValue(rows);
+      vi.mocked(registry.delete).mockRejectedValue(new Error("backend down"));
+
+      await service.deleteOwnedBy({ projectId: PROJECT_ID });
+
+      expect(repo.deleteByIds).not.toHaveBeenCalled();
+      expect(repo.deleteByProject).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the project has no stored objects", () => {
+    it("returns without touching storage or the repository delete methods", async () => {
+      vi.mocked(repo.findAllByProject).mockResolvedValue([]);
+
+      await service.deleteOwnedBy({ projectId: PROJECT_ID });
+
+      expect(registry.delete).not.toHaveBeenCalled();
+      expect(repo.deleteByIds).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("headById", () => {
+  let repo: StoredObjectsRepository;
+  let registry: StorageRegistry;
+  let service: StoredObjectsService;
+
+  beforeEach(() => {
+    repo = makeRepository();
+    registry = makeRegistry();
+    const mintStub: MintStorageUri = async ({ projectId, sha256 }) =>
+      `file:///tmp/${projectId}/${sha256}`;
+    service = new StoredObjectsService(repo, registry, mintStub);
+  });
+
+  describe("when the row exists and storage has the bytes", () => {
+    it("returns status available with the media type", async () => {
+      const row = makeRow({ id: "obj-1", media_type: "audio/mp3" });
+      vi.mocked(repo.findById).mockResolvedValue(row);
+      vi.mocked(registry.exists).mockResolvedValue(true);
+
+      const result = await service.headById({ projectId: PROJECT_ID, id: "obj-1" });
+
+      expect(result).toEqual({ status: "available", mediaType: "audio/mp3" });
+    });
+  });
+
+  describe("when the row exists but storage reports the blob is gone", () => {
+    it("returns status missing with the media type", async () => {
+      const row = makeRow({ id: "obj-1", media_type: "audio/mp3" });
+      vi.mocked(repo.findById).mockResolvedValue(row);
+      vi.mocked(registry.exists).mockResolvedValue(false);
+
+      const result = await service.headById({ projectId: PROJECT_ID, id: "obj-1" });
+
+      expect(result).toEqual({ status: "missing", mediaType: "audio/mp3" });
+    });
+  });
+
+  describe("when the row does not exist", () => {
+    it("returns status not_found and does not probe storage", async () => {
+      vi.mocked(repo.findById).mockResolvedValue(null);
+
+      const result = await service.headById({ projectId: PROJECT_ID, id: "unknown" });
+
+      expect(result).toEqual({ status: "not_found" });
+      expect(registry.exists).not.toHaveBeenCalled();
+    });
+  });
+});
+
 describe("mintStorageUri (BYOC bucket selection — observed through the inserted row)", () => {
   let repo: StoredObjectsRepository;
   let registry: StorageRegistry;
@@ -424,6 +558,7 @@ describe("StoredObjectsService surface", () => {
 
     expect(typeof service.storeFromBytes).toBe("function");
     expect(typeof service.getById).toBe("function");
+    expect(typeof service.headById).toBe("function");
     expect(typeof service.deleteOwnedBy).toBe("function");
   });
 });

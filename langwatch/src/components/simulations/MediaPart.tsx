@@ -135,14 +135,17 @@ export function MediaPart({ part, projectId }: MediaPartProps) {
     { enabled: probeEnabled && !!storedObjectId && !!projectId },
   );
 
-  // When the probe result arrives, map it to a load status.
+  // When the probe result arrives, map the tri-state to a load status:
+  //   not_found → "missing"   (row was deleted / never existed — placeholder)
+  //   missing   → "missing"   (row exists, blob is gone — feature requires placeholder)
+  //   available → "error"     (server says bytes are there but the <audio>/<img>
+  //                            still failed — transient decode/network issue)
   useEffect(() => {
     if (!probeData) return;
-    if (!probeData.exists) {
-      setStatus("missing");
-    } else {
-      // Row exists but the browser element still errored — transient decode failure.
+    if (probeData.status === "available") {
       setStatus("error");
+    } else {
+      setStatus("missing");
     }
   }, [probeData]);
 

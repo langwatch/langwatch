@@ -347,4 +347,57 @@ export class StoredObjectsRepository {
       },
     );
   }
+
+  /**
+   * Deletes a specific subset of stored-objects rows by id within a project.
+   *
+   * Used by `deleteOwnedBy` to remove ONLY the rows whose underlying byte
+   * deletes succeeded. Rows whose byte-delete failed are intentionally left
+   * behind as retryable tombstones — the operator can re-run the cascade,
+   * and the lingering rows still point at the leaked `storage_uri` so the
+   * GC sweep knows what to chase. Dropping those rows along with the
+   * succeeded ones would lose the address of the orphaned bytes
+   * irrecoverably (Sergio review 2026-05-20).
+   *
+   * Same caveats as `deleteByProject`: callers MUST have already deleted
+   * the underlying bytes for the ids passed here.
+   */
+  async deleteByIds({
+    projectId,
+    ids,
+  }: {
+    projectId: string;
+    ids: string[];
+  }): Promise<void> {
+    if (ids.length === 0) return;
+    return tracer.withActiveSpan(
+      "StoredObjectsRepository.deleteByIds",
+      {
+        kind: SpanKind.CLIENT,
+        attributes: {
+          "db.system": "clickhouse",
+          "db.operation": "DELETE",
+          "tenant.id": projectId,
+          "stored_objects.ids_count": ids.length,
+        },
+      },
+      async () => {
+        const client = await getClickHouseClientForProject(projectId);
+        if (!client) {
+          throw new Error(
+            "ClickHouse is not configured — cannot delete stored objects",
+          );
+        }
+        await client.exec({
+          query: `
+            ALTER TABLE ${TABLE_NAME}
+            DELETE WHERE project_id = {projectId:String}
+              AND id IN ({ids:Array(String)})
+          `,
+          query_params: { projectId, ids },
+          clickhouse_settings: { mutations_sync: "1" },
+        });
+      },
+    );
+  }
 }

@@ -9,15 +9,22 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { checkProjectPermission } from "~/server/api/rbac";
-import { StoredObjectsRepository } from "~/server/stored-objects/stored-objects.repository";
+import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
 
 /**
- * Probes whether a stored object with the given id exists in the given project.
+ * Probes whether a stored object's row AND bytes exist.
  *
- * Returns `{ exists: true, mediaType }` when the row is found, or
- * `{ exists: false }` when no row matches — the caller maps this to the
- * "missing" vs "error" distinction that was previously done with a
- * client-side HEAD fetch to /api/files/:id.
+ * Returns a tri-state matching the `/api/files/:id` HTTP route:
+ *  - `{ status: "available", mediaType }` — row exists and storage has the bytes
+ *  - `{ status: "missing", mediaType }`   — row exists but the blob is gone
+ *    (compensating delete crashed, retention sweep, etc.)
+ *  - `{ status: "not_found" }`            — no row matches
+ *
+ * The renderer maps `"missing"` to the placeholder badge (feature
+ * requirement) and `"not_found"` to a generic error. The pre-fix router
+ * only checked the row, which collapsed the `"missing"` case into
+ * `exists: true` — the renderer then mapped that to "transient decode
+ * error" and dropped the missing badge.
  *
  * Auth: session user must have `scenarios:view` on `projectId`.
  */
@@ -32,13 +39,7 @@ export const storedObjectsRouter = createTRPCRouter({
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ input }) => {
       const { projectId, id } = input;
-      const repository = new StoredObjectsRepository();
-      const row = await repository.findById({ projectId, id });
-
-      if (!row) {
-        return { exists: false } as const;
-      }
-
-      return { exists: true, mediaType: row.media_type } as const;
+      const service = createStoredObjectsService({ projectId });
+      return service.headById({ projectId, id });
     }),
 });

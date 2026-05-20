@@ -17,7 +17,12 @@ import { MediaPart } from "../MediaPart";
 // { data: undefined } so the probe effect does not fire prematurely.
 // ---------------------------------------------------------------------------
 
-const mockHeadByIdData = vi.fn(() => undefined as undefined | { exists: boolean; mediaType?: string });
+type HeadByIdProbeResult =
+  | { status: "available"; mediaType: string }
+  | { status: "missing"; mediaType: string }
+  | { status: "not_found" };
+
+const mockHeadByIdData = vi.fn(() => undefined as undefined | HeadByIdProbeResult);
 
 vi.mock("~/utils/api", () => ({
   api: {
@@ -175,11 +180,10 @@ describe("<MediaPart/>", () => {
     });
   });
 
-  describe("when the tRPC probe returns exists: false (missing)", () => {
+  describe("when the tRPC probe returns status: 'missing' (row exists, blob gone)", () => {
     /** @scenario "Trace timeline shows a missing badge when the byte content is no longer retrievable" */
     it("renders a missing-badge placeholder labeled with the mediaType", async () => {
-      // Prime the mock so the query returns { exists: false } once the probe is enabled.
-      mockHeadByIdData.mockReturnValue({ exists: false });
+      mockHeadByIdData.mockReturnValue({ status: "missing", mediaType: "audio/mp3" });
 
       render(
         <MediaPart
@@ -200,7 +204,7 @@ describe("<MediaPart/>", () => {
       const audio = screen.getByTestId("media-part-audio") as HTMLAudioElement;
       audio.dispatchEvent(new Event("error"));
 
-      // After the error, the tRPC probe result (exists: false) drives the placeholder
+      // After the error, the tRPC probe result drives the placeholder
       await waitFor(() => {
         expect(screen.getByTestId("media-part-missing")).toBeInTheDocument();
       });
@@ -210,11 +214,43 @@ describe("<MediaPart/>", () => {
     });
   });
 
-  describe("when the tRPC probe returns exists: true (storage transient error, not missing)", () => {
+  describe("when the tRPC probe returns status: 'not_found' (row never existed)", () => {
+    it("renders a missing-badge placeholder (same UX as blob-gone)", async () => {
+      // Row never existed (e.g. id was made up / deleted). The renderer
+      // collapses 'not_found' into 'missing' since the user-visible state
+      // is the same: there is nothing to play.
+      mockHeadByIdData.mockReturnValue({ status: "not_found" });
+
+      render(
+        <MediaPart
+          projectId={TEST_PROJECT_ID}
+          part={{
+            type: "audio",
+            source: {
+              type: "url",
+              value: "/api/files/nonexistent-id",
+              mimeType: "audio/mp3",
+            },
+          }}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      const audio = screen.getByTestId("media-part-audio") as HTMLAudioElement;
+      audio.dispatchEvent(new Event("error"));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("media-part-missing")).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("when the tRPC probe returns status: 'available' (storage transient error, not missing)", () => {
     it("renders an error-badge placeholder (distinct from missing)", async () => {
-      // Row exists in ClickHouse but the browser element still errored — transient
-      // decode / storage failure. MediaPart should land on "error", not "missing".
-      mockHeadByIdData.mockReturnValue({ exists: true, mediaType: "audio/mp3" });
+      // Row exists AND storage confirms bytes are present, but the browser
+      // element still errored — transient decode / network failure. MediaPart
+      // should land on "error", not "missing".
+      mockHeadByIdData.mockReturnValue({ status: "available", mediaType: "audio/mp3" });
 
       render(
         <MediaPart

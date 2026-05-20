@@ -221,12 +221,40 @@ Feature: Externalize event byte content to stored_objects
   # ---------------------------------------------------------------
 
   @unit
-  Scenario: StoredObjectsService exposes storeFromBytes, getById, deleteOwnedBy
+  Scenario: StoredObjectsService exposes storeFromBytes, getById, headById, deleteOwnedBy
     Given the StoredObjectsService class
     Then it exposes storeFromBytes
     And it exposes getById
+    And it exposes headById
     And it exposes deleteOwnedBy
     And it depends on StoredObjectsRepository and the storage registry as interfaces
+
+  @unit
+  Scenario: Multi-replica install with dataplane on does NOT create the local-FS PVC, even when localFilesystem.enabled defaults to true
+    Given a helm install with app.replicaCount > 1
+    And app.dataplane.enabled is true
+    And app.storedObjects.localFilesystem.enabled is true by default
+    When the chart is rendered
+    Then no stored-objects PersistentVolumeClaim is created
+    And no stored-objects volume mount is added to the app deployment
+    And the gating goes through the "localFilesystemIsActive" helper (localFilesystem.enabled AND NOT dataplane.enabled)
+
+  @unit
+  Scenario: Cross-tenant owner lookup fans out to every ClickHouse instance
+    Given the shared ClickHouse instance and one private/BYOC ClickHouse instance
+    When a private-CH tenant owns a stored object and /api/files/:id is requested by id only
+    Then resolveStoredObjectOwner finds the row in the private instance
+    And the route does not 404 even though the shared client has no match
+
+  @unit
+  Scenario: headById returns a tri-state distinguishing not_found, missing, and available
+    Given a project with one stored object row whose storage_uri points at storage
+    When the renderer probes a stored-object id whose row does not exist
+    Then the service returns status not_found and does not probe storage
+    When the renderer probes a stored-object id whose row exists but storage reports the blob is gone
+    Then the service returns status missing with the media type
+    When the renderer probes a stored-object id whose row exists and storage confirms the blob
+    Then the service returns status available with the media type
 
   @unit
   Scenario: Route handlers delegate to the service and never touch the repository directly

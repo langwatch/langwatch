@@ -5,6 +5,7 @@
  * remain readable after a deployment swaps the active minting backend.
  */
 import type { Readable } from "node:stream";
+import { redactStorageUri } from "./project-storage-destination";
 import type { StorageDriver } from "./storage-driver";
 import { getUriScheme } from "./uri";
 import type { UriScheme } from "./uri";
@@ -41,7 +42,7 @@ export class StorageRegistry {
     const driver = this.drivers[scheme];
     if (!driver) {
       throw new Error(
-        `Storage scheme "${scheme}" is not configured in this deployment (uri: ${uri})`,
+        `Storage scheme "${scheme}" is not configured in this deployment (uri: ${redactStorageUri(uri)})`,
       );
     }
     return driver;

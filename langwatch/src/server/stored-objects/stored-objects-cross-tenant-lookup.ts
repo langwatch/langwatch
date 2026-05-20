@@ -3,9 +3,9 @@
  *
  * Quarantined from `stored-objects.repository.ts` on purpose: the rest of
  * the repository hits a project-scoped ClickHouse client and filters every
- * query by `project_id`. This module is the documented exception — it
- * uses the *shared* client and intentionally has no project filter,
- * because the caller doesn't yet know which project owns the row.
+ * query by `project_id`. This module is the documented exception — it has
+ * no project filter, because the caller doesn't yet know which project
+ * owns the row.
  *
  * Only the `/api/files/:id` route should reach for these helpers, and
  * only as the very first step of request handling — the moment the
@@ -19,7 +19,7 @@
  */
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import { getSharedClickHouseClient } from "~/server/clickhouse/clickhouseClient";
+import { getAllClickHouseInstances } from "~/server/clickhouse/clickhouseClient";
 
 const tracer = getLangWatchTracer(
   "langwatch.stored-objects.cross-tenant-lookup",
@@ -30,8 +30,15 @@ const TABLE_NAME = "stored_objects";
 /**
  * Resolve the owning project for a stored-object id.
  *
- * Cross-tenant — uses the shared ClickHouse client and has no project
- * filter. Returns null when no row matches.
+ * Cross-tenant — fans out to every configured ClickHouse instance (shared
+ * + every private/BYOC instance) and returns the first matching row.
+ * Returns null when no row matches in any instance.
+ *
+ * Pre-fix this only queried the shared client, which made `/api/files/:id`
+ * return 404 for any object owned by a tenant routed to a private CH
+ * instance (Sergio review 2026-05-20). Stored-object ids are SHA-256
+ * derived from per-tenant salt + content so cross-instance id collisions
+ * are not a practical concern; the first match wins.
  *
  * The caller is responsible for switching to a project-scoped client
  * before reading anything else about the row.
@@ -52,28 +59,41 @@ export async function resolveStoredObjectOwner({
       },
     },
     async (span) => {
-      const client = getSharedClickHouseClient();
-      if (!client) {
+      const instances = await getAllClickHouseInstances();
+      if (instances.length === 0) {
         throw new Error(
           "ClickHouse is not configured — cannot resolve owner project for stored object",
         );
       }
+      span.setAttribute("clickhouse.instances_searched", instances.length);
 
-      const result = await client.query({
-        query: `
-          SELECT project_id
-          FROM ${TABLE_NAME}
-          WHERE id = {id:String}
-          LIMIT 1
-        `,
-        query_params: { id },
-        format: "JSONEachRow",
+      const lookups = instances.map(async ({ client, target }) => {
+        const result = await client.query({
+          query: `
+            SELECT project_id
+            FROM ${TABLE_NAME}
+            WHERE id = {id:String}
+            LIMIT 1
+          `,
+          query_params: { id },
+          format: "JSONEachRow",
+        });
+        const rows = await result.json<{ project_id: string }>();
+        return rows.length > 0
+          ? { projectId: rows[0]!.project_id, target }
+          : null;
       });
 
-      const rows = await result.json<{ project_id: string }>();
-      span.setAttribute("result.found", rows.length > 0);
-      if (rows.length === 0) return null;
-      return { projectId: rows[0]!.project_id };
+      const results = await Promise.all(lookups);
+      const hit = results.find((r): r is NonNullable<typeof r> => r !== null);
+      if (!hit) {
+        span.setAttribute("result.found", false);
+        return null;
+      }
+
+      span.setAttribute("result.found", true);
+      span.setAttribute("result.matched_instance", hit.target);
+      return { projectId: hit.projectId };
     },
   );
 }
