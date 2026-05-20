@@ -17,7 +17,7 @@ import {
   type RoleOption,
   teamRolesOptions,
 } from "../../../components/settings/TeamUserRoleField";
-import { Dialog } from "../../../components/ui/dialog";
+import { ConfirmArchiveDialog } from "../../../components/settings/ConfirmArchiveDialog";
 import { toaster } from "../../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import type { TeamWithProjectsAndMembersAndUsers } from "../../../server/app-layer/organizations/repositories/organization.repository";
@@ -298,47 +298,15 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembersAndUsers }) {
           </Card.Root>
         </VStack>
       </VStack>
-      <Dialog.Root
-        size="lg"
+      <ConfirmArchiveDialog
         open={showArchiveDialog}
-        onOpenChange={({ open }) => {
-          if (!open) setShowArchiveDialog(false);
-        }}
-      >
-        <Dialog.Content bg="bg">
-          <Dialog.Header>
-            <Dialog.Title>Archive Team</Dialog.Title>
-          </Dialog.Header>
-          <Dialog.CloseTrigger />
-          <Dialog.Body paddingBottom={6}>
-            <VStack gap={4} align="start">
-              <Text>
-                Are you sure you want to archive{" "}
-                <Text as="span" fontWeight="semibold">
-                  &quot;{team.name}&quot;
-                </Text>
-                ? This will hide the team and all its projects. Contact LangWatch
-                support to restore it.
-              </Text>
-              <HStack width="full" justify="end" gap={2}>
-                <Button
-                  variant="outline"
-                  onClick={() => setShowArchiveDialog(false)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  colorPalette="red"
-                  onClick={handleArchive}
-                  disabled={archiveTeam.isLoading}
-                >
-                  {archiveTeam.isLoading ? "Archiving..." : "Archive"}
-                </Button>
-              </HStack>
-            </VStack>
-          </Dialog.Body>
-        </Dialog.Content>
-      </Dialog.Root>
+        onClose={() => setShowArchiveDialog(false)}
+        onConfirm={handleArchive}
+        isLoading={archiveTeam.isLoading}
+        entityType="Team"
+        entityName={team.name}
+        description="This will hide the team and all its projects. Contact LangWatch support to restore it."
+      />
     </SettingsLayout>
   );
 }

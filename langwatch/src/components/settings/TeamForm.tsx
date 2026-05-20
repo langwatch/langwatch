@@ -24,14 +24,15 @@ import {
   useWatch,
 } from "react-hook-form";
 import { ProjectAvatar } from "../../components/ProjectAvatar";
-import { Dialog } from "../../components/ui/dialog";
 import { Link } from "../../components/ui/link";
 import { Tooltip } from "../../components/ui/tooltip";
 import { useDrawer } from "../../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { TeamWithProjectsAndMembersAndUsers } from "../../server/app-layer/organizations/repositories/organization.repository";
 import { api } from "../../utils/api";
+import { toaster } from "../ui/toaster";
 import { HorizontalFormControl } from "../HorizontalFormControl";
+import { ConfirmArchiveDialog } from "./ConfirmArchiveDialog";
 import { Select } from "../ui/select";
 import {
   TeamRoleSelect,
@@ -51,6 +52,14 @@ function TeamProjectsList({ team }: { team: TeamWithProjectsAndMembersAndUsers }
       setProjectToArchive(null);
       void queryClient.organization.getAll.invalidate();
       void queryClient.team.getTeamWithMembers.invalidate();
+    },
+    onError: () => {
+      toaster.create({
+        title: "Failed to archive project",
+        type: "error",
+        duration: 5000,
+        meta: { closable: true },
+      });
     },
   });
 
@@ -92,53 +101,21 @@ function TeamProjectsList({ team }: { team: TeamWithProjectsAndMembersAndUsers }
           </Table.Row>
         )}
       </Table.Body>
-      <Dialog.Root
-        size="lg"
+      <ConfirmArchiveDialog
         open={!!projectToArchive}
-        onOpenChange={({ open }) => {
-          if (!open) setProjectToArchive(null);
+        onClose={() => setProjectToArchive(null)}
+        onConfirm={() => {
+          if (!project || !projectToArchive) return;
+          archiveProject.mutate({
+            projectId: project.id,
+            projectToArchiveId: projectToArchive.id,
+          });
         }}
-      >
-        <Dialog.Content bg="bg">
-          <Dialog.Header>
-            <Dialog.Title>Archive Project</Dialog.Title>
-          </Dialog.Header>
-          <Dialog.CloseTrigger />
-          <Dialog.Body paddingBottom={6}>
-            <VStack gap={4} align="start">
-              <Text>
-                Are you sure you want to archive{" "}
-                <Text as="span" fontWeight="semibold">
-                  &quot;{projectToArchive?.name}&quot;
-                </Text>
-                ? This will hide the project and all its data. Contact LangWatch
-                support to restore it.
-              </Text>
-              <HStack width="full" justify="end" gap={2}>
-                <Button
-                  variant="outline"
-                  onClick={() => setProjectToArchive(null)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  colorPalette="red"
-                  onClick={() => {
-                    if (!project || !projectToArchive) return;
-                    archiveProject.mutate({
-                      projectId: project.id,
-                      projectToArchiveId: projectToArchive.id,
-                    });
-                  }}
-                  disabled={archiveProject.isLoading}
-                >
-                  {archiveProject.isLoading ? "Archiving..." : "Archive"}
-                </Button>
-              </HStack>
-            </VStack>
-          </Dialog.Body>
-        </Dialog.Content>
-      </Dialog.Root>
+        isLoading={archiveProject.isLoading}
+        entityType="Project"
+        entityName={projectToArchive?.name ?? ""}
+        description="This will hide the project and all its data. Contact LangWatch support to restore it."
+      />
     </>
   );
 }
