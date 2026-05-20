@@ -5,7 +5,10 @@ import type { MiddlewareHandler } from "hono";
 import { prisma } from "~/server/db";
 import { requireProjectPermission } from "~/server/auth/permissions";
 import { rateLimit } from "~/server/rateLimit";
-import { resolveStoredObjectOwner } from "~/server/stored-objects/stored-objects-cross-tenant-lookup";
+import {
+  resolveStoredObjectOwner,
+  StoredObjectOwnerLookupUnavailableError,
+} from "~/server/stored-objects/stored-objects-cross-tenant-lookup";
 import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
 import { isReadbackSafe } from "~/server/stored-objects/safe-media-types";
 import {
@@ -167,7 +170,7 @@ function streamFileResponse({
  *  401 — no valid credentials.
  *  403 — credentials are valid but the caller has no access to the project.
  *  404 — no row exists (status: not_found) OR storage 404d (status: missing).
- *  429 — per-project rate limit exceeded.
+ *  429 — per-caller rate limit exceeded (keyed before owner resolution).
  *  502 — row exists, storage returned a non-404 error.
  *
  * HEAD /api/files/:id mirrors GET for byte-free probes (used by the UI
@@ -219,7 +222,24 @@ async function handleFileRead(
   }
 
   // Step 2: resolve the owning project from the row id (cross-tenant lookup).
-  const owner = await resolveStoredObjectOwner({ id });
+  //
+  // The lookup fans out across every configured ClickHouse instance with
+  // failure isolation: a transient outage on a private/BYOC instance
+  // throws `StoredObjectOwnerLookupUnavailableError` so this route can
+  // return 502 rather than masking the degraded instance as a 404
+  // (Sergio review 2026-05-20).
+  let owner: { projectId: string } | null;
+  try {
+    owner = await resolveStoredObjectOwner({ id });
+  } catch (err) {
+    if (err instanceof StoredObjectOwnerLookupUnavailableError) {
+      return jsonResponse(
+        { error: "file temporarily unavailable" },
+        502,
+      );
+    }
+    throw err;
+  }
   if (!owner) {
     return jsonResponse({ status: "not_found" }, 404);
   }

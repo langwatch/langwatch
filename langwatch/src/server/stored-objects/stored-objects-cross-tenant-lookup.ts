@@ -28,17 +28,44 @@ const tracer = getLangWatchTracer(
 const TABLE_NAME = "stored_objects";
 
 /**
+ * Thrown when no instance returned a hit AND at least one instance failed.
+ *
+ * Distinct from "all instances returned empty" (→ null = genuine not_found):
+ * here we cannot tell, because some instances couldn't be queried. The route
+ * MUST map this to a transient 502, not a 404 — a 404 in this state would
+ * make `/api/files/:id` silently return "not found" to a caller whose object
+ * actually exists on a temporarily-degraded BYOC instance.
+ */
+export class StoredObjectOwnerLookupUnavailableError extends Error {
+  readonly failedTargets: string[];
+
+  constructor(failedTargets: string[]) {
+    super(
+      `cross-tenant owner lookup degraded: ${failedTargets.length} instance(s) failed (${failedTargets.join(", ")}); no hit on any healthy instance`,
+    );
+    this.name = "StoredObjectOwnerLookupUnavailableError";
+    this.failedTargets = failedTargets;
+  }
+}
+
+/**
  * Resolve the owning project for a stored-object id.
  *
  * Cross-tenant — fans out to every configured ClickHouse instance (shared
  * + every private/BYOC instance) and returns the first matching row.
- * Returns null when no row matches in any instance.
  *
- * Pre-fix this only queried the shared client, which made `/api/files/:id`
- * return 404 for any object owned by a tenant routed to a private CH
- * instance (Sergio review 2026-05-20). Stored-object ids are SHA-256
- * derived from per-tenant salt + content so cross-instance id collisions
- * are not a practical concern; the first match wins.
+ * Failure isolation (Sergio review 2026-05-20): each instance lookup is
+ * isolated with `Promise.allSettled`. If any instance returns a hit, we
+ * return that hit even when other instances rejected — a healthy shared
+ * lookup must not be globally degraded by one outage in an unrelated BYOC
+ * instance. If no hit is found AND at least one instance rejected, we
+ * throw `StoredObjectOwnerLookupUnavailableError` rather than returning
+ * null, so the caller can return a transient 502 instead of falsely
+ * 404'ing an object that may exist on the degraded instance.
+ *
+ * Stored-object ids are SHA-256 derived from per-tenant salt + content so
+ * cross-instance id collisions are not a practical concern; the first
+ * match wins.
  *
  * The caller is responsible for switching to a project-scoped client
  * before reading anything else about the row.
@@ -84,16 +111,37 @@ export async function resolveStoredObjectOwner({
           : null;
       });
 
-      const results = await Promise.all(lookups);
-      const hit = results.find((r): r is NonNullable<typeof r> => r !== null);
-      if (!hit) {
-        span.setAttribute("result.found", false);
-        return null;
+      const settled = await Promise.allSettled(lookups);
+
+      const failedTargets: string[] = [];
+      let hit: { projectId: string; target: string } | null = null;
+      settled.forEach((r, index) => {
+        if (r.status === "fulfilled") {
+          if (r.value !== null && hit === null) {
+            hit = r.value;
+          }
+        } else {
+          failedTargets.push(instances[index]!.target);
+        }
+      });
+
+      span.setAttribute("clickhouse.instances_failed", failedTargets.length);
+
+      if (hit) {
+        const found: { projectId: string; target: string } = hit;
+        span.setAttribute("result.found", true);
+        span.setAttribute("result.matched_instance", found.target);
+        return { projectId: found.projectId };
       }
 
-      span.setAttribute("result.found", true);
-      span.setAttribute("result.matched_instance", hit.target);
-      return { projectId: hit.projectId };
+      if (failedTargets.length > 0) {
+        span.setAttribute("result.found", false);
+        span.setAttribute("result.degraded", true);
+        throw new StoredObjectOwnerLookupUnavailableError(failedTargets);
+      }
+
+      span.setAttribute("result.found", false);
+      return null;
     },
   );
 }

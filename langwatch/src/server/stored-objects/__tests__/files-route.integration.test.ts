@@ -56,7 +56,7 @@ vi.mock("~/server/stored-objects/stored-objects-factory", () => ({
 
 // Rate-limit mock: the default per-test response is "allowed" so all
 // existing tests still exercise the route happy path. The
-// "when the per-project rate limit is exhausted" describe below
+// "when the per-caller rate limit is exhausted" describe below
 // overrides this per-call to simulate the 429 branch directly — that
 // keeps the limiter behavior testable from the route's perspective
 // without spinning Redis fixed-window state up for every test case.
@@ -336,8 +336,8 @@ describe("GET /api/files/:id", () => {
     });
   });
 
-  describe("when the per-project rate limit has been exhausted (AC12)", () => {
-    /** @scenario "GET /api/files/:id honors the standard per-project rate limit" */
+  describe("when the per-caller rate limit has been exhausted (AC12)", () => {
+    /** @scenario "GET /api/files/:id throttles by caller identity before any cross-tenant lookup" */
     it("returns 429 with a Retry-After header and never invokes the underlying service", async () => {
       const fileId = `stored-${nanoid(8)}`;
 

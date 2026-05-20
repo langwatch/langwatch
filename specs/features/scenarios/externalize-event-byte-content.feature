@@ -171,8 +171,14 @@ Feature: Externalize event byte content to stored_objects
     And no bytes are streamed
 
   @integration
-  Scenario: GET /api/files/:id honors the standard per-project rate limit
-    Given the caller has reached the per-project rate limit
+  Scenario: GET /api/files/:id throttles by caller identity before any cross-tenant lookup
+    # The route keys the limiter on the caller's identity (apiKeyProjectId or
+    # userId) rather than the owning project, because owner resolution happens
+    # AFTER the limiter. Using the owner project as the key would let an
+    # authenticated caller fan id probes against other tenants before any
+    # throttle kicked in. Per-project throttling on the owner project is
+    # therefore deliberately NOT implemented here.
+    Given the caller has reached the per-caller rate limit
     When the caller GETs /api/files/:id
     Then the response is 429
 
@@ -245,6 +251,32 @@ Feature: Externalize event byte content to stored_objects
     When a private-CH tenant owns a stored object and /api/files/:id is requested by id only
     Then resolveStoredObjectOwner finds the row in the private instance
     And the route does not 404 even though the shared client has no match
+
+  @unit
+  Scenario: Cross-tenant owner lookup isolates failures across instances
+    # A single BYOC ClickHouse outage must NOT propagate to a healthy
+    # shared lookup — otherwise one customer's degraded CH instance can
+    # globally break /api/files/:id for every other tenant. Each instance
+    # is awaited under Promise.allSettled and the first healthy hit wins
+    # regardless of any sibling rejection.
+    Given the shared ClickHouse instance returns a hit for a stored-object id
+    And one private/BYOC ClickHouse instance is degraded and its query rejects
+    When resolveStoredObjectOwner is invoked
+    Then the healthy shared hit is returned
+    And the rejection from the degraded instance does not fail the lookup
+
+  @unit
+  Scenario: Cross-tenant owner lookup signals transient unavailability when no hit and any instance failed
+    # When no instance returned a hit but at least one rejected, the
+    # lookup cannot prove "not_found" — the object may live on the
+    # degraded instance. The route relies on a typed thrown error
+    # (StoredObjectOwnerLookupUnavailableError) to map this state to a
+    # 502 instead of falsely 404'ing the caller.
+    Given every configured ClickHouse instance returns no hit OR rejects with an error
+    And at least one instance rejects
+    When resolveStoredObjectOwner is invoked
+    Then it throws StoredObjectOwnerLookupUnavailableError
+    And the error carries the list of failed instance targets so the route can log them
 
   @unit
   Scenario: headById returns a tri-state distinguishing not_found, missing, and available
@@ -546,16 +578,27 @@ Feature: Externalize event byte content to stored_objects
     And the default value works under "make quickstart" without further configuration
 
   # ---------------------------------------------------------------
-  # Cloud provider matrix (AC37)
+  # Cloud provider matrix (AC37 — deferred)
   # ---------------------------------------------------------------
+  #
+  # Production minting in this PR only emits s3:// and file:// URIs (see
+  # `defaultMintStorageUri` in stored-objects.service.ts, which dispatches
+  # off resolveProjectStorageDestination's "s3" / "file" kinds). The
+  # `AzureBlobDriver` exists so the registry can still dispatch reads of
+  # any legacy `azure-blob://` URIs persisted before this PR, but no
+  # config path picks Azure as the destination on writes today. Wiring an
+  # "azure" destination into resolveProjectStorageDestination + a
+  # corresponding helm/env surface is a follow-up PR (AC37) — see the
+  # follow-up issue tracked off the PR description. (Sergio review
+  # 2026-05-20.)
 
-  @integration
-  Scenario: Azure Blob Storage is supported as a stored-objects backend via a distinct URI scheme
-    Given an Azure-tenant deployment with Azure Blob configured
-    When the service mints a storage URI for a project
-    Then the URI uses an azure-blob scheme distinct from s3 and file
-    And the storage registry dispatches the URI to an Azure Blob driver
-    And both GET and PUT round-trip the same bytes
+  @unit
+  Scenario: Stored-objects writes do not mint azure-blob URIs in this PR
+    Given a project with no S3 bucket and no Azure config in this PR's destination resolver
+    When the service mints a storage URI
+    Then the URI uses either the s3 or file scheme but never azure-blob
+    And the AzureBlobDriver remains registered only to dispatch reads of any
+        pre-existing azure-blob URIs persisted before this change
 
   # ---------------------------------------------------------------
   # Project-delete cascade (AC38)
@@ -601,7 +644,7 @@ Feature: Externalize event byte content to stored_objects
   #                                                                          -> Scenario: GET /api/files/:id returns 404 with status missing when storage no longer holds the blob
   #                                                                          -> Scenario: GET /api/files/:id returns 502 with a friendly message on transient storage failure
   # AC11 "Auth enforces project ownership via the shared permission check"   -> Scenario: GET /api/files/:id enforces project ownership through the shared permission check
-  # AC12 "Per-project rate limit on the read endpoint"                       -> Scenario: GET /api/files/:id honors the standard per-project rate limit
+  # AC12 "Rate limit on the read endpoint (per-caller, pre-resolution)"      -> Scenario: GET /api/files/:id throttles by caller identity before any cross-tenant lookup
   # AC13 "UI renders new id shape; old inline shape still renders"           -> Scenario: Trace timeline renders the new file id shape as an inline media tag
   #                                                                          -> Scenario: Trace timeline still renders legacy inline base64 file shapes unchanged
   # AC14 "Missing badge placeholder when GET returns status missing"         -> Scenario: Trace timeline shows a missing badge when the byte content is no longer retrievable
@@ -624,6 +667,9 @@ Feature: Externalize event byte content to stored_objects
   #                                                                          -> Scenario: GET /api/files/:id authenticates via API key header when no session cookie is present
   # AC28 "404 not_found is distinct from 404 missing"                        -> Scenario: GET /api/files/:id returns 404 with status not_found when no row exists for the id
   # AC29 "Cross-tenant id->project resolve runs before auth gate"            -> Scenario: GET /api/files/:id resolves the owning project from the row id before applying the membership check
+  #                                                                          -> Scenario: Cross-tenant owner lookup fans out to every ClickHouse instance
+  #                                                                          -> Scenario: Cross-tenant owner lookup isolates failures across instances
+  #                                                                          -> Scenario: Cross-tenant owner lookup signals transient unavailability when no hit and any instance failed
   # AC30 "BYOC: per-project private bucket beats global S3_BUCKET_NAME"      -> Scenario: For a project with a per-project private dataplane bucket, mintStorageUri uses the project bucket, not the global one
   #                                                                          -> Scenario: For a project without per-project storage configured, mintStorageUri falls back to the global S3_BUCKET_NAME
   # AC31 "Persisted storage_uri is authoritative for reads"                  -> Scenario: storage_uri persisted on the stored_objects row is the authoritative bucket address for reads
@@ -633,6 +679,6 @@ Feature: Externalize event byte content to stored_objects
   # AC35 "Helm PVC opt-in for single-replica local-FS"                       -> Scenario: Single-replica helm install can opt into a PVC-backed local-FS storage path
   # AC36 "Self-hosting docs cover scenario media + LANGWATCH_LOCAL_STORAGE_PATH" -> Scenario: Self-hosting docs describe stored-objects (scenario media, datasets, ...) externalization, the LANGWATCH_LOCAL_STORAGE_PATH env, and the shared dataplane bucket
   #                                                                          -> Scenario: .env.example carries LANGWATCH_LOCAL_STORAGE_PATH with a sensible local default
-  # AC37 "Azure Blob support (decision required, separate PR OK)"            -> Scenario: Azure Blob Storage is supported as a stored-objects backend via a distinct URI scheme
+  # AC37 "Azure Blob support — DEFERRED in this PR"                          -> Scenario: Stored-objects writes do not mint azure-blob URIs in this PR
   # AC38 "Project-delete cascade removes rows AND bytes"                     -> Scenario: When a project is deleted, deleteOwnedBy removes both the stored_objects rows and the underlying bytes
   # AC39 "MediaPart playback contract (onLoadedData / non-zero duration)"    -> Scenario: MediaPart audio playback reports a non-zero duration once the browser has decoded the media

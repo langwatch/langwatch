@@ -45,8 +45,8 @@ function newDriver() {
 
 describe("AzureBlobDriver", () => {
   describe("when registered alongside the existing drivers", () => {
-    /** @scenario "Azure Blob Storage is supported as a stored-objects backend via a distinct URI scheme" */
-    it("uses an azure-blob scheme distinct from s3 and file AND round-trips bytes through the registry", async () => {
+    /** @scenario "Stored-objects writes do not mint azure-blob URIs in this PR" */
+    it("uses an azure-blob scheme distinct from s3/file AND the registry round-trips existing azure-blob URIs through the driver", async () => {
       // Import lazily to keep the registry construction local to this test.
       const { StorageRegistry } = await import("../storage-registry");
       const { getUriScheme, mintAzureBlobUri } = await import("../uri");

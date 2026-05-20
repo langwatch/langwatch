@@ -5,9 +5,17 @@
  * `/api/files/:id` route resolves objects owned by tenants routed to a
  * private CH instance. Pre-fix the lookup only queried the shared client,
  * which 404'd for any object owned by a private-CH tenant (Sergio review).
+ *
+ * Also verifies the failure-isolation contract added in the follow-up
+ * Sergio review (2026-05-20): a single failed instance must not block a
+ * healthy hit on another instance, but a no-hit-with-failures result must
+ * surface as a transient error rather than a false null.
  */
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { resolveStoredObjectOwner } from "../stored-objects-cross-tenant-lookup";
+import {
+  resolveStoredObjectOwner,
+  StoredObjectOwnerLookupUnavailableError,
+} from "../stored-objects-cross-tenant-lookup";
 
 const mockGetAllInstances = vi.fn();
 
@@ -30,6 +38,12 @@ function makeMockClient(rows: { project_id: string }[]) {
     query: vi.fn().mockResolvedValue({
       json: vi.fn().mockResolvedValue(rows),
     }),
+  };
+}
+
+function makeFailingClient(error: Error) {
+  return {
+    query: vi.fn().mockRejectedValue(error),
   };
 }
 
@@ -88,6 +102,67 @@ describe("resolveStoredObjectOwner", () => {
       expect(owner).toBeNull();
       expect(sharedClient.query).toHaveBeenCalledTimes(1);
       expect(privateClient.query).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when one instance is degraded", () => {
+    /** @scenario "Cross-tenant owner lookup isolates failures across instances" */
+    it("returns the hit from a healthy instance even when another instance fails", async () => {
+      mockGetAllInstances.mockResolvedValue([
+        {
+          target: "org_byoc_down",
+          client: makeFailingClient(new Error("connection refused")),
+        },
+        {
+          target: "shared",
+          client: makeMockClient([{ project_id: "proj_shared" }]),
+        },
+      ]);
+
+      const owner = await resolveStoredObjectOwner({ id: "obj-x" });
+
+      expect(owner).toEqual({ projectId: "proj_shared" });
+    });
+
+    /** @scenario "Cross-tenant owner lookup signals transient unavailability when no hit and any instance failed" */
+    it("throws StoredObjectOwnerLookupUnavailableError when no instance returned a hit AND any instance failed", async () => {
+      mockGetAllInstances.mockResolvedValue([
+        {
+          target: "shared",
+          client: makeMockClient([]),
+        },
+        {
+          target: "org_byoc_down",
+          client: makeFailingClient(new Error("timeout")),
+        },
+      ]);
+
+      await expect(
+        resolveStoredObjectOwner({ id: "obj-x" }),
+      ).rejects.toBeInstanceOf(StoredObjectOwnerLookupUnavailableError);
+    });
+
+    it("includes the failed targets on the thrown error", async () => {
+      mockGetAllInstances.mockResolvedValue([
+        {
+          target: "shared",
+          client: makeMockClient([]),
+        },
+        {
+          target: "org_byoc_down",
+          client: makeFailingClient(new Error("timeout")),
+        },
+      ]);
+
+      try {
+        await resolveStoredObjectOwner({ id: "obj-x" });
+        throw new Error("expected throw");
+      } catch (err) {
+        expect(err).toBeInstanceOf(StoredObjectOwnerLookupUnavailableError);
+        expect((err as StoredObjectOwnerLookupUnavailableError).failedTargets).toEqual([
+          "org_byoc_down",
+        ]);
+      }
     });
   });
 
