@@ -97,6 +97,17 @@ export const traceSummaryDataSchema = z.object({
    * the next time the projection re-folds.
    */
   traceNameUserOverridden: z.boolean().optional(),
+  /**
+   * True when `traceName` came from the "no real root, fall back to
+   * earliest span" path rather than a span with `parentSpanId === null`.
+   * Customers occasionally emit the first span with a bogus
+   * `parent_span_id` that points to no span in the trace, so no real
+   * root ever exists and the trace would otherwise stay unnamed. The
+   * fallback lets it pick up a sensible name immediately; if a real
+   * root span arrives later the projection prefers it and clears this
+   * flag, since fold updates are incremental.
+   */
+  traceNameFromFallback: z.boolean().optional(),
   /** LangWatch SDK events hoisted from spans during fold projection. */
   events: z
     .array(
