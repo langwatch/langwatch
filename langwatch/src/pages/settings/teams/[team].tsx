@@ -17,7 +17,7 @@ import {
   type RoleOption,
   teamRolesOptions,
 } from "../../../components/settings/TeamUserRoleField";
-import { ConfirmArchiveDialog } from "../../../components/settings/ConfirmArchiveDialog";
+import { ConfirmDialog } from "../../../components/gateway/ConfirmDialog";
 import { toaster } from "../../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import type { TeamWithProjectsAndMembersAndUsers } from "../../../server/app-layer/organizations/repositories/organization.repository";
@@ -298,14 +298,17 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembersAndUsers }) {
           </Card.Root>
         </VStack>
       </VStack>
-      <ConfirmArchiveDialog
+      <ConfirmDialog
         open={showArchiveDialog}
-        onClose={() => setShowArchiveDialog(false)}
+        onOpenChange={(open) => {
+          if (!open) setShowArchiveDialog(false);
+        }}
+        title="Archive Team"
+        message={`Are you sure you want to archive "${team.name}"? This will hide the team and all its projects. Contact LangWatch support to restore it.`}
+        confirmLabel="Archive"
+        tone="danger"
+        loading={archiveTeam.isLoading}
         onConfirm={handleArchive}
-        isLoading={archiveTeam.isLoading}
-        entityType="Team"
-        entityName={team.name}
-        description="This will hide the team and all its projects. Contact LangWatch support to restore it."
       />
     </SettingsLayout>
   );
