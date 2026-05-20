@@ -6,6 +6,13 @@ interface SidebarResizeHandleProps {
   currentWidth: number;
   /** Called with the new width while dragging (continuous). */
   onResize: (width: number) => void;
+  /**
+   * Called once when the drag ends (pointer-up or pointer-cancel).
+   * Lets callers do the heavy work (e.g. localStorage persistence)
+   * once at the end instead of on every `onResize` frame, which
+   * jitters the resize.
+   */
+  onResizeEnd?: () => void;
   /** Min before the drag commits a collapse instead of a resize. */
   collapseBelow: number;
   /** Called once when the drag goes below `collapseBelow`. */
@@ -25,6 +32,7 @@ interface SidebarResizeHandleProps {
 export function SidebarResizeHandle({
   currentWidth,
   onResize,
+  onResizeEnd,
   collapseBelow,
   onCollapse,
   max,
@@ -76,8 +84,9 @@ export function SidebarResizeHandle({
         // (e.g. cancel events fired before pointerdown completed). Safe to
         // ignore — the drag is already over.
       }
+      onResizeEnd?.();
     },
-    [],
+    [onResizeEnd],
   );
 
   return (

@@ -218,6 +218,7 @@ const FilterAside: React.FC<{
   const persistedWidth = useUIStore((s) => s.sidebarWidth);
   const mobileExpandedOverride = useUIStore((s) => s.mobileExpandedOverride);
   const setSidebarWidth = useUIStore((s) => s.setSidebarWidth);
+  const persistSidebarLayout = useUIStore((s) => s.persistSidebarLayout);
   const setSidebarCollapsed = useUIStore((s) => s.setSidebarCollapsed);
   // Below `md` the expanded sidebar steals 240px+ from a 390px-wide
   // viewport, leaving the actual trace table unreadable. Force the
@@ -285,6 +286,7 @@ const FilterAside: React.FC<{
           collapseBelow={SIDEBAR_COLLAPSE_THRESHOLD}
           max={SIDEBAR_WIDTH_MAX}
           onResize={setSidebarWidth}
+          onResizeEnd={persistSidebarLayout}
           onCollapse={() => setSidebarCollapsed(true)}
         />
       )}

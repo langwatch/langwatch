@@ -1,4 +1,4 @@
-import { Box, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
+import { HStack, IconButton, Text, VStack } from "@chakra-ui/react";
 import {
   closestCenter,
   DndContext,

@@ -24,6 +24,13 @@ interface UIState {
   toggleSidebar: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   setSidebarWidth: (width: number | null) => void;
+  /**
+   * Persist the current `sidebarCollapsed` + `sidebarWidth` snapshot to
+   * `localStorage`. Pair with `setSidebarWidth` (which intentionally
+   * stays in-memory only during a drag) — call this once on drag-end
+   * so the user's chosen width survives a reload.
+   */
+  persistSidebarLayout: () => void;
   setSyntaxHelpOpen: (open: boolean) => void;
   setShortcutsHelpOpen: (open: boolean) => void;
   toggleShortcutsHelp: () => void;
@@ -112,8 +119,16 @@ export const useUIStore = create<UIState>((set, get) => ({
   },
 
   setSidebarWidth: (width) => {
+    // Stays in-memory only — `localStorage.setItem` is synchronous and
+    // running it on every pointer-move frame of a drag noticeably
+    // jitters the resize. Persistence happens once at drag-end via
+    // `persistSidebarLayout`, called from the resize handle.
     set({ sidebarWidth: width });
-    persistUI({ sidebarCollapsed: get().sidebarCollapsed, sidebarWidth: width });
+  },
+
+  persistSidebarLayout: () => {
+    const { sidebarCollapsed, sidebarWidth } = get();
+    persistUI({ sidebarCollapsed, sidebarWidth });
   },
 
   setSyntaxHelpOpen: (open) => set({ syntaxHelpOpen: open }),
