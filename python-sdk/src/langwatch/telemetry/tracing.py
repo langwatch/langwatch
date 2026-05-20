@@ -130,10 +130,12 @@ class LangWatchTrace:
             )
             self.metadata["deprecated.trace_id"] = str(trace_id)
 
-        if disable_sending:
-            client = get_instance()
-            if client:
-                client.disable_sending = True
+        # Per-trace flag. Applied to the singleton on __enter__ and restored
+        # on __exit__ so a `disable_sending=True` block cannot poison
+        # subsequent traces (issue #3981 — silent span loss for offline
+        # experiment cells when worker processes are reused across event types).
+        self._disable_sending_request = disable_sending
+        self._prev_disable_sending: Optional[bool] = None
 
         # Use the global tracer provider
         self._tracer_provider = tracer_provider
@@ -186,7 +188,7 @@ class LangWatchTrace:
             metadata=self.metadata,
             expected_output=self._expected_output,
             api_key=self.api_key,
-            disable_sending=self.disable_sending,
+            disable_sending=self._disable_sending_request,
             max_string_length=self.max_string_length,
             tracer_provider=self._tracer_provider,
             span_id=root_span_params.get("span_id", None),
@@ -250,6 +252,34 @@ class LangWatchTrace:
                 self._trace_id = context.trace_id
             return self.root_span
 
+    def _apply_disable_sending(self) -> None:
+        """Snapshot the client's disable_sending flag and apply this trace's
+        request. Paired with `_restore_disable_sending` in `_cleanup`.
+        """
+        client = get_instance()
+        if client is None:
+            return
+        self._prev_disable_sending = client.disable_sending
+        if self._disable_sending_request and not client.disable_sending:
+            client.disable_sending = True
+
+    def _restore_disable_sending(self) -> None:
+        """Restore the client's disable_sending flag to the value captured
+        on enter. Prevents one trace's `disable_sending=True` from poisoning
+        subsequent traces on a reused worker (issue #3981).
+        """
+        if self._prev_disable_sending is None:
+            return
+        client = get_instance()
+        if client is None:
+            self._prev_disable_sending = None
+            return
+        try:
+            if client.disable_sending != self._prev_disable_sending:
+                client.disable_sending = self._prev_disable_sending
+        finally:
+            self._prev_disable_sending = None
+
     def _cleanup(
         self,
         exc_type: Optional[type],
@@ -270,6 +300,8 @@ class LangWatchTrace:
             if self._context_token is not None:
                 langwatch.telemetry.context._reset_current_trace(self._context_token)
                 self._context_token = None
+
+            self._restore_disable_sending()
 
             self._cleaned_up = True
 
@@ -580,6 +612,7 @@ class LangWatchTrace:
     def __enter__(self) -> "LangWatchTrace":
         """Makes the trace usable as a context manager."""
         self._reset()
+        self._apply_disable_sending()
 
         # Store the old token and set the new one
         self._context_token = langwatch.telemetry.context._set_current_trace(self)
@@ -608,6 +641,7 @@ class LangWatchTrace:
     async def __aenter__(self) -> "LangWatchTrace":
         """Makes the trace usable as an async context manager."""
         self._reset()
+        self._apply_disable_sending()
 
         # Store the old token and set the new one
         self._context_token = langwatch.telemetry.context._set_current_trace(self)
