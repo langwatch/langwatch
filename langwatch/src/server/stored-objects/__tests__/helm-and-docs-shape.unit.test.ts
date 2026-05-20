@@ -59,17 +59,46 @@ describe("Helm chart deployment surface for stored-objects", () => {
       const pvc = readRepoFile("charts/langwatch/templates/app/stored-objects-pvc.yaml");
       const helpers = readRepoFile("charts/langwatch/templates/_helpers.tpl");
 
-      // PVC template is gated on the localFilesystem.enabled toggle
-      expect(pvc).toContain(".Values.app.storedObjects.localFilesystem.enabled");
+      // PVC template is gated on the "local-FS is the active backend" helper
+      // (renders only when localFilesystem.enabled AND NOT dataplane.enabled).
+      expect(pvc).toContain("langwatch.storedObjects.localFilesystemIsActive");
       expect(pvc).toContain("kind: PersistentVolumeClaim");
 
       // ReadWriteOnce forces single-pod consumption
       expect(pvc).toContain("ReadWriteOnce");
 
+      // The helper itself is the single source of truth for the active-backend
+      // condition: localFilesystem.enabled AND NOT dataplane.enabled.
+      expect(helpers).toContain(".Values.app.storedObjects.localFilesystem.enabled");
+      expect(helpers).toContain("not .Values.app.dataplane.enabled");
+
       // The validation block rejects localFilesystem + replicaCount > 1
       expect(helpers).toMatch(
         /localFilesystem\.enabled requires replicaCount=1|requires replicaCount=1/,
       );
+    });
+  });
+
+  describe("when dataplane is enabled alongside localFilesystem default-on", () => {
+    /** @scenario "Multi-replica install with dataplane on does NOT create the local-FS PVC, even when localFilesystem.enabled defaults to true" */
+    it("PVC and volume mount only render when dataplane is OFF", () => {
+      const pvc = readRepoFile("charts/langwatch/templates/app/stored-objects-pvc.yaml");
+      const deployment = readRepoFile(
+        "charts/langwatch/templates/app/deployment.yaml",
+      );
+
+      // Both the PVC and the volume mount must go through the
+      // "localFilesystemIsActive" helper so multi-replica + dataplane.enabled
+      // does NOT mount a single-attach RWO PVC into multiple pods.
+      expect(pvc).toContain("langwatch.storedObjects.localFilesystemIsActive");
+      expect(deployment).toContain("langwatch.storedObjects.localFilesystemIsActive");
+
+      // Anti-regression: neither template gates only on the raw enabled toggle
+      // (the bug Sergio caught — dataplane=true + localFS=true would still mount).
+      const rawToggleRefsInPvc = (
+        pvc.match(/\.Values\.app\.storedObjects\.localFilesystem\.enabled/g) || []
+      ).length;
+      expect(rawToggleRefsInPvc).toBe(0);
     });
   });
 

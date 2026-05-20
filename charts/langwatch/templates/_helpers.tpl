@@ -561,6 +561,31 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 {{- end -}}
 
+{{/*
+  Returns "true" when the local-filesystem driver is the ACTIVE stored-objects
+  backend (and therefore needs the PVC + volume mount), or empty string when
+  it isn't and the PVC must NOT render.
+
+  "Active" means `app.storedObjects.localFilesystem.enabled` is true AND
+  `app.dataplane.enabled` is false. When dataplane is enabled, S3/Azure is the
+  active backend even if localFilesystem.enabled is still true (the value can
+  be on by default — that's intentional for single-replica fallbacks — but
+  must NOT cause the chart to mount an RWO PVC into multiple replicas).
+
+  Used by:
+    - templates/app/stored-objects-pvc.yaml (gates PVC creation)
+    - templates/app/deployment.yaml         (gates volume + mount)
+
+  Without this helper, `--set app.replicaCount=2 --set app.dataplane.enabled=true`
+  would still create the RWO PVC and mount it into multiple replicas — only
+  one would attach, the others crash-loop (Sergio review 2026-05-20).
+*/}}
+{{- define "langwatch.storedObjects.localFilesystemIsActive" -}}
+{{- if and .Values.app.storedObjects.localFilesystem.enabled (not .Values.app.dataplane.enabled) -}}
+true
+{{- end -}}
+{{- end -}}
+
 {{/* ClickHouse: Cluster name for the app (only when replicas > 1 or external.cluster set) */}}
 {{- define "langwatch.clickhouse.clusterName" -}}
   {{- if .Values.clickhouse.chartManaged -}}

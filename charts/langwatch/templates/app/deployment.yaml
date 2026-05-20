@@ -271,10 +271,11 @@ spec:
               mountPath: /tmp
             - name: next-dir
               mountPath: /app/langwatch/.next
-            {{- if .Values.app.storedObjects.localFilesystem.enabled }}
-            # Stored-objects local-FS opt-in. Single-replica only (the chart
-            # refuses to render when replicaCount > 1). PVC-backed so bytes
-            # survive pod restarts; without this they'd land on the
+            {{- if eq (include "langwatch.storedObjects.localFilesystemIsActive" .) "true" }}
+            # Stored-objects local-FS mount — renders ONLY when local-FS is
+            # the active backend (dataplane disabled). Single-replica only
+            # (the chart refuses to render when replicaCount > 1). PVC-backed
+            # so bytes survive pod restarts; without this they'd land on the
             # container's ephemeral writable layer and disappear on every
             # rollout.
             - name: stored-objects-data
@@ -289,7 +290,7 @@ spec:
           emptyDir: {}
         - name: next-dir
           emptyDir: {}
-        {{- if .Values.app.storedObjects.localFilesystem.enabled }}
+        {{- if eq (include "langwatch.storedObjects.localFilesystemIsActive" .) "true" }}
         - name: stored-objects-data
           persistentVolumeClaim:
             claimName: {{ .Release.Name }}-stored-objects
