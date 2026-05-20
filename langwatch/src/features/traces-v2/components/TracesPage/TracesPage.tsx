@@ -47,14 +47,12 @@ import {
 import { useTracesPageTitle } from "./usePageTitle";
 
 const SIDEBAR_WIDTH_EXPANDED = 220;
-const SIDEBAR_WIDTH_COLLAPSED = 40;
 const SIDEBAR_WIDTH_MAX = 640;
-// Threshold at which a drag commits to a collapsed rail instead of an
-// awkward sub-width — matches the trace v2 drawer's collapse-on-drag
-// behaviour. Sits a comfortable distance above the collapsed rail width
-// so a user *trying* to collapse doesn't have to drag pixel-perfect, and
-// a user trying to keep it narrow but readable doesn't accidentally
-// snap to the rail.
+// Threshold at which an inward drag commits to a full collapse instead
+// of an awkward sub-width. Sits a comfortable distance above the
+// minimum readable width so a user *trying* to collapse doesn't have
+// to drag pixel-perfect, and a user trying to keep the sidebar narrow
+// but readable doesn't accidentally snap it away.
 const SIDEBAR_COLLAPSE_THRESHOLD = 80;
 
 const DIMMED_PROPS = {
@@ -241,6 +239,12 @@ const FilterAside: React.FC<{
     (s) => analyzeOrGroups(s.ast).groups.length,
   );
 
+  // When the operator collapses the sidebar we drop the aside from the
+  // DOM entirely — no narrow rail, no icon strip. The "expand" affordance
+  // lives in the table footer (see `Pagination`) so the page is one
+  // continuous slab while collapsed, with one button to bring it back.
+  if (collapsed) return null;
+
   const autoExpandedWidth =
     SIDEBAR_WIDTH_EXPANDED + orGroupCount * ConnectorLaneWidth;
   // User-set width wins when present, else the auto-computed default.
@@ -269,26 +273,19 @@ const FilterAside: React.FC<{
       // ~1700px, which the parent then clipped — facets past the
       // viewport were invisible *and* unscrollable.
       height="full"
-      width={`${collapsed ? SIDEBAR_WIDTH_COLLAPSED : expandedWidth}px`}
+      width={`${expandedWidth}px`}
       transition="width 0.15s ease"
-      borderRightWidth={collapsed ? "1px" : 0}
-      borderColor="border"
       overflow="hidden"
       {...(dimmed ? (DIMMED_PROPS as Record<string, unknown>) : {})}
     >
       <FilterSidebar />
       {showResizeHandle && (
         <SidebarResizeHandle
-          currentWidth={collapsed ? SIDEBAR_WIDTH_COLLAPSED : expandedWidth}
+          currentWidth={expandedWidth}
           collapseBelow={SIDEBAR_COLLAPSE_THRESHOLD}
           max={SIDEBAR_WIDTH_MAX}
-          onResize={(width) => {
-            if (collapsed) setSidebarCollapsed(false);
-            setSidebarWidth(width);
-          }}
-          onCollapse={() => {
-            if (!collapsed) setSidebarCollapsed(true);
-          }}
+          onResize={setSidebarWidth}
+          onCollapse={() => setSidebarCollapsed(true)}
         />
       )}
     </Box>

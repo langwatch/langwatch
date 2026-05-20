@@ -36,8 +36,6 @@ import {
   getRangeValue,
 } from "~/server/app-layer/traces/query-language/queries";
 import { useUIStore } from "../../stores/uiStore";
-import { CollapsedSidebar } from "./CollapsedSidebar";
-import { CollapsedSidebarSkeleton } from "./CollapsedSidebarSkeleton";
 import { getFacetGroupId } from "./constants";
 import { FacetGroupHeader } from "./FacetGroupHeader";
 import { FilterSidebarSkeleton } from "./FilterSidebarSkeleton";
@@ -58,7 +56,10 @@ const groupIdFromSortableId = (id: string): string =>
 const DRAG_ACTIVATION_DISTANCE_PX = 5;
 
 export const FilterSidebar: React.FC = () => {
-  const collapsed = useUIStore((s) => s.sidebarCollapsed);
+  // The collapsed-state branch lives one level up: when collapsed,
+  // `FilterAside` returns `null` and the page renders no sidebar DOM at
+  // all (the expand affordance sits on the table footer's pagination
+  // row). So this component is only ever mounted in the expanded path.
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
 
   const {
@@ -245,11 +246,6 @@ export const FilterSidebar: React.FC = () => {
   // blank rail if the synthesis is ever short-circuited.
   const showSkeleton =
     facetsLoading && descriptors.length === 0 && categoricals.length === 0;
-
-  if (collapsed) {
-    if (showSkeleton) return <CollapsedSidebarSkeleton />;
-    return <CollapsedSidebar onExpand={toggleSidebar} />;
-  }
 
   return (
     <VStack
