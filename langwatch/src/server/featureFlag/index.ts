@@ -25,6 +25,18 @@ export type {
   FeatureFlagServiceInterface,
 } from "./types";
 export {
+  evaluateRules,
+  featureFlagRuleSchema,
+  featureFlagRulesSchema,
+  parseRules,
+} from "./rules";
+export type {
+  FeatureFlagRule,
+  FeatureFlagRuleMatch,
+  FeatureFlagRules,
+  RuleEvaluationContext,
+} from "./rules";
+export {
   FRONTEND_FEATURE_FLAGS,
   type FrontendFeatureFlag,
 } from "./frontendFeatureFlags";

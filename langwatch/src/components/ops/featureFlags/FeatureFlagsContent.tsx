@@ -17,7 +17,9 @@ import { Tooltip } from "~/components/ui/tooltip";
 import { toaster } from "~/components/ui/toaster";
 import { useOpsPermission } from "~/hooks/useOpsPermission";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
+import type { FeatureFlagRules } from "~/server/featureFlag";
 import { api } from "~/utils/api";
+import { FeatureFlagRulesDialog } from "./FeatureFlagRulesDialog";
 
 interface FlagRow {
   key: string;
@@ -26,6 +28,7 @@ interface FlagRow {
   description: string;
   family: string | null;
   storedValue: boolean | null;
+  rules: FeatureFlagRules;
   envOverride: boolean | null;
   effective: boolean;
   lastEditedBy: string | null;
@@ -214,6 +217,7 @@ function ScopeSection({
               <Table.ColumnHeader>Flag</Table.ColumnHeader>
               <Table.ColumnHeader>Effective</Table.ColumnHeader>
               <Table.ColumnHeader>Source</Table.ColumnHeader>
+              <Table.ColumnHeader>Targeting</Table.ColumnHeader>
               <Table.ColumnHeader>Default</Table.ColumnHeader>
               <Table.ColumnHeader>Last edit</Table.ColumnHeader>
             </Table.Row>
@@ -253,13 +257,17 @@ function FlagRowView({
   pending: boolean;
 }) {
   const [optimistic, setOptimistic] = useState<boolean | null>(null);
+  const [rulesDialogOpen, setRulesDialogOpen] = useState(false);
   const envLocked = row.envOverride !== null;
   const effective = optimistic ?? row.effective;
+  const ruleCount = row.rules.length;
   const source = envLocked
     ? "env override"
-    : row.storedValue !== null
-      ? "postgres"
-      : "registry default";
+    : ruleCount > 0
+      ? "postgres + rules"
+      : row.storedValue !== null
+        ? "postgres"
+        : "registry default";
 
   const onChange = async (next: boolean) => {
     setOptimistic(next);
@@ -316,6 +324,39 @@ function FlagRowView({
       </Table.Cell>
       <Table.Cell>
         <Text fontSize="xs">{source}</Text>
+      </Table.Cell>
+      <Table.Cell>
+        <HStack gap={2}>
+          <Text fontSize="xs" color={ruleCount > 0 ? "fg" : "fg.muted"}>
+            {ruleCount === 0
+              ? "no rules"
+              : ruleCount === 1
+                ? "1 rule"
+                : `${ruleCount} rules`}
+          </Text>
+          {canManage && !envLocked && (
+            <Button
+              type="button"
+              variant="plain"
+              size="xs"
+              fontSize="xs"
+              color="blue.500"
+              textDecoration="underline"
+              paddingX={0}
+              height="auto"
+              minWidth="auto"
+              onClick={() => setRulesDialogOpen(true)}
+            >
+              {ruleCount === 0 ? "add" : "edit"}
+            </Button>
+          )}
+        </HStack>
+        <FeatureFlagRulesDialog
+          open={rulesDialogOpen}
+          onOpenChange={setRulesDialogOpen}
+          flagKey={row.key}
+          initialRules={row.rules}
+        />
       </Table.Cell>
       <Table.Cell>
         <Text fontSize="xs">{row.defaultValue ? "on" : "off"}</Text>

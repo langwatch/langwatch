@@ -2,6 +2,12 @@ import { prisma } from "../db";
 import { createLogger } from "~/utils/logger/server";
 import { KILL_SWITCH_CACHE_TTL_MS } from "./constants";
 import { TtlCache } from "../utils/ttlCache";
+import {
+  evaluateRules,
+  parseRules,
+  type FeatureFlagRules,
+  type RuleEvaluationContext,
+} from "./rules";
 
 /**
  * Postgres-backed flag value store with a thin Redis/in-memory cache.
@@ -18,63 +24,82 @@ import { TtlCache } from "../utils/ttlCache";
  * minute per flag, orders of magnitude below the PostHog cost the
  * SYSTEM scope is replacing.
  *
- * "Not set" is a distinct state from "set to false": registry defaults
- * apply only when there is no row. We cache the tri-state explicitly so
- * a cache hit for an absent row doesn't shadow a registry default with
- * `false`.
+ * The cached value is the row itself ({ enabled, rules }), not a
+ * pre-evaluated boolean. Targeting-rule evaluation happens per call
+ * against the caller's `{ projectId, organizationId }` context, so a
+ * single cache entry serves every tenant — no per-context cache key
+ * fan-out (which is what drove the 2026-05 PostHog spike). "Not set"
+ * stays a distinct state (null row) so a cache hit for an absent row
+ * doesn't shadow a registry default with `false`.
  */
-type CachedValue = { enabled: boolean | null };
+type CachedRow = { enabled: boolean; rules: FeatureFlagRules } | null;
+type CacheSlot = { row: CachedRow };
 
-const CACHE_PREFIX = "feature_flag_store:";
-// Local in-process TTL: kept much shorter than the Redis TTL so a
-// killed flag still propagates within seconds, but long enough that
-// per-event reactor calls collapse to a Map lookup on the hot path.
+const CACHE_PREFIX = "feature_flag_store:v2:";
 const LOCAL_TTL_MS = 5_000;
-// Hard cap on the in-process map size so dynamically-named keys
-// (e.g. arbitrary unregistered flag lookups) can't grow memory
-// indefinitely. Expired entries are pruned lazily on writes; when
-// the cap is still exceeded after pruning, the oldest insertions
-// (Map iteration is insertion-ordered) are evicted to fit.
 const LOCAL_MAX_KEYS = 5_000;
 
 export class FeatureFlagStorePostgres {
   private readonly logger = createLogger("langwatch:feature-flag-store");
-  private readonly cache = new TtlCache<CachedValue>(
+  private readonly cache = new TtlCache<CacheSlot>(
     KILL_SWITCH_CACHE_TTL_MS,
     CACHE_PREFIX,
   );
   // Per-pod in-process cache. Sits in front of Redis so the trace-
   // processing reactor (called per event) does not generate a Redis GET
-  // per event. Map + timestamp is plenty; no LRU bound because the key
-  // space is bounded by the registry size.
-  private readonly local = new Map<string, { value: boolean | null; expiresAt: number }>();
+  // per event.
+  private readonly local = new Map<
+    string,
+    { row: CachedRow; expiresAt: number }
+  >();
 
   /**
-   * Read the operator-set value for `key`. Returns `null` when no row
-   * exists in postgres (caller should fall through to the registry
-   * default).
+   * Resolve `key` against the calling context. Returns `null` when no
+   * postgres row exists (caller should fall through to the registry
+   * default or PostHog). When a row exists, targeting rules are
+   * evaluated first; the row-level `enabled` is the fallback if no
+   * rule matches.
    */
-  async get(key: string): Promise<boolean | null> {
+  async get(
+    key: string,
+    ctx: RuleEvaluationContext = {},
+  ): Promise<boolean | null> {
+    const row = await this.getRow(key);
+    if (row === null) return null;
+    const ruleHit = evaluateRules(row.rules, ctx);
+    return ruleHit ?? row.enabled;
+  }
+
+  /**
+   * Bypass rule evaluation and return the raw row (or null when
+   * absent). Used by the Ops UI to render the row-level toggle and
+   * the rules editor against the same cache. Same TTLs as `get`.
+   */
+  async getRow(
+    key: string,
+  ): Promise<{ enabled: boolean; rules: FeatureFlagRules } | null> {
     const localHit = this.local.get(key);
     const now = Date.now();
     if (localHit) {
-      if (localHit.expiresAt > now) return localHit.value;
+      if (localHit.expiresAt > now) return localHit.row;
       this.local.delete(key);
     }
     const cached = await this.cache.get(key);
     if (cached !== undefined) {
-      this.writeLocal(key, cached.enabled, now);
-      return cached.enabled;
+      this.writeLocal(key, cached.row, now);
+      return cached.row;
     }
     try {
-      const row = await prisma.featureFlag.findUnique({
+      const dbRow = await prisma.featureFlag.findUnique({
         where: { key },
-        select: { enabled: true },
+        select: { enabled: true, rules: true },
       });
-      const value = row?.enabled ?? null;
-      await this.cache.set(key, { enabled: value });
-      this.writeLocal(key, value, now);
-      return value;
+      const row: CachedRow = dbRow
+        ? { enabled: dbRow.enabled, rules: parseRules(dbRow.rules) }
+        : null;
+      await this.cache.set(key, { row });
+      this.writeLocal(key, row, now);
+      return row;
     } catch (error) {
       this.logger.warn(
         { key, error: error instanceof Error ? error.message : error },
@@ -84,11 +109,9 @@ export class FeatureFlagStorePostgres {
     }
   }
 
-  private writeLocal(key: string, value: boolean | null, now: number): void {
-    this.local.set(key, { value, expiresAt: now + LOCAL_TTL_MS });
+  private writeLocal(key: string, row: CachedRow, now: number): void {
+    this.local.set(key, { row, expiresAt: now + LOCAL_TTL_MS });
     if (this.local.size <= LOCAL_MAX_KEYS) return;
-    // Cap exceeded: first prune expired entries; if still over cap,
-    // drop oldest insertions until we're back under.
     for (const [k, v] of this.local) {
       if (v.expiresAt <= now) this.local.delete(k);
     }
@@ -103,11 +126,8 @@ export class FeatureFlagStorePostgres {
   }
 
   /**
-   * Operator write: invalidates the per-pod cache entry immediately so
-   * subsequent reads on this pod see the new value. Other pods catch up
-   * within `KILL_SWITCH_CACHE_TTL_MS` via natural TTL expiry. No pub/sub
-   * channel by design (kept the Redis load minimal; the 60 s lag is
-   * acceptable for kill switches and operator UI ops).
+   * Operator write of the row-level enabled value (the rule-fallback
+   * default). Existing rules are preserved on update.
    */
   async set(
     key: string,
@@ -119,18 +139,36 @@ export class FeatureFlagStorePostgres {
       create: { key, enabled, lastEditedBy },
       update: { enabled, lastEditedBy },
     });
-    await this.cache.delete(key);
-    this.local.delete(key);
+    await this.invalidate(key);
+  }
+
+  /**
+   * Operator write of the targeting rules for a flag. Creates a row
+   * with rule-only semantics (no row-level true) when one doesn't
+   * already exist so an org-scoped enable doesn't accidentally flip
+   * the flag on cluster-wide.
+   */
+  async setRules(
+    key: string,
+    rules: FeatureFlagRules,
+    lastEditedBy: string | null,
+  ): Promise<void> {
+    await prisma.featureFlag.upsert({
+      where: { key },
+      create: {
+        key,
+        enabled: false,
+        rules: rules as unknown as object,
+        lastEditedBy,
+      },
+      update: { rules: rules as unknown as object, lastEditedBy },
+    });
+    await this.invalidate(key);
   }
 
   async clear(key: string, lastEditedBy: string | null): Promise<void> {
-    // `deleteMany` is idempotent (no-op when the row is absent) and
-    // bubbles real DB errors up to the caller, unlike the previous
-    // `.delete(...).catch(() => undefined)` which silently swallowed
-    // write failures and made the Ops UI report success on failure.
     await prisma.featureFlag.deleteMany({ where: { key } });
-    await this.cache.delete(key);
-    this.local.delete(key);
+    await this.invalidate(key);
     this.logger.debug({ key, lastEditedBy }, "feature flag cleared");
   }
 
@@ -140,13 +178,30 @@ export class FeatureFlagStorePostgres {
    * orphaned rows from removed flags and clean them up.
    */
   async listAll(): Promise<
-    Array<{ key: string; enabled: boolean; lastEditedBy: string | null; updatedAt: Date }>
+    Array<{
+      key: string;
+      enabled: boolean;
+      rules: FeatureFlagRules;
+      lastEditedBy: string | null;
+      updatedAt: Date;
+    }>
   > {
     const rows = await prisma.featureFlag.findMany({
-      select: { key: true, enabled: true, lastEditedBy: true, updatedAt: true },
+      select: {
+        key: true,
+        enabled: true,
+        rules: true,
+        lastEditedBy: true,
+        updatedAt: true,
+      },
       orderBy: { key: "asc" },
     });
-    return rows;
+    return rows.map((r) => ({ ...r, rules: parseRules(r.rules) }));
+  }
+
+  private async invalidate(key: string): Promise<void> {
+    await this.cache.delete(key);
+    this.local.delete(key);
   }
 }
 

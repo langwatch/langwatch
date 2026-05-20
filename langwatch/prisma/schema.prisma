@@ -1886,6 +1886,14 @@ model GatewayCacheRule {
 model FeatureFlag {
     key          String   @id
     enabled      Boolean
+    // Optional list of targeting rules evaluated before the `enabled`
+    // fallback. Each rule is `{ match: { projectId?, organizationId? },
+    // enabled: boolean }` — first match wins. Shape lives in
+    // `src/server/featureFlag/rules.ts` so it can grow over time
+    // (percentage rollouts, email-domain matches, etc.) without a
+    // migration. Storing as JSON keeps the surface flexible while
+    // postgres handles the row-level cache invalidation.
+    rules        Json?
     // Last operator to flip the value. Free-form string (user id), no FK
     // because the same table serves SaaS and self-hosted installs where
     // the User table is not guaranteed to share lifecycle with this row.

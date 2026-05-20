@@ -82,6 +82,7 @@ Feature: Internal feature flag system for system-level kill switches
     Scenario: PRODUCT flag with PostHog reachable consults PostHog for user targeting
       Given the registry has a PRODUCT-scoped UI flag
       And PostHog is configured and reachable
+      And the postgres flag store has no row or rule matching the calling context
       When the flag is checked for a known user
       Then PostHog evaluates the flag using the user's properties
       And the postgres store is not used as the source of truth for that result
@@ -99,6 +100,39 @@ Feature: Internal feature flag system for system-level kill switches
       And the per-flag env override forces the flag enabled
       When the flag is checked
       Then the flag resolves enabled
+
+  Rule: Postgres targeting rules win over PostHog
+
+    Scenario: org-scoped postgres rule enables a PRODUCT flag without touching PostHog
+      Given the postgres flag store has a row for the PRODUCT flag with
+            a targeting rule matching the calling organization and enabled true
+      And PostHog would return disabled for this flag and user
+      When the flag is checked with that organization in context
+      Then the flag resolves enabled from the postgres rule
+      And no PostHog call is attempted
+
+    Scenario: project-scoped postgres rule overrides the row-level default
+      Given the postgres flag store has a row for the PRODUCT flag with
+            a row-level enabled value of false
+      And the row carries a targeting rule that matches the calling project
+            with enabled true
+      When the flag is checked with that project in context
+      Then the flag resolves enabled from the targeting rule
+
+    Scenario: rule order wins on the first match
+      Given the postgres flag store has a row whose first rule matches the
+            calling organization with enabled true
+      And the row's second rule matches the same organization with enabled false
+      When the flag is checked with that organization in context
+      Then the flag resolves enabled because the first matching rule wins
+
+    Scenario: rules that do not match fall through to the row-level enabled value
+      Given the postgres flag store has a row whose only rule matches a
+            different organization than the calling one
+      And the row-level enabled value is false
+      When the flag is checked
+      Then the flag resolves disabled from the row-level enabled value
+      And PostHog is not consulted because the postgres row was present
 
   Rule: Operators manage flags from the Ops Feature Flags page
 

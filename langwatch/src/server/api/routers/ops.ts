@@ -20,6 +20,7 @@ import {
   resolveFlagDefinition,
 } from "~/server/featureFlag";
 import { checkFlagEnvOverride } from "~/server/featureFlag/envOverride";
+import { featureFlagRulesSchema } from "~/server/featureFlag/rules";
 
 const opsViewPermission = checkOpsPermission({ permission: "ops:view" });
 
@@ -681,6 +682,7 @@ export const opsRouter = createTRPCRouter({
           description: def.description,
           family: def.family ?? null,
           storedValue: row?.enabled ?? null,
+          rules: row?.rules ?? [],
           envOverride: envOverride ?? null,
           effective,
           lastEditedBy: row?.lastEditedBy ?? null,
@@ -714,6 +716,7 @@ export const opsRouter = createTRPCRouter({
             : `Pipeline ${desc.pipelineName} ${desc.componentType} ${desc.componentName}.`,
           family: def?.family ?? null,
           storedValue: row?.enabled ?? null,
+          rules: row?.rules ?? [],
           envOverride: envOverride ?? null,
           effective,
           lastEditedBy: row?.lastEditedBy ?? null,
@@ -744,6 +747,7 @@ export const opsRouter = createTRPCRouter({
             description: def?.description ?? "Orphaned postgres flag row (no longer registered).",
             family: def?.family ?? null,
             storedValue: s.enabled,
+            rules: s.rules,
             envOverride: envOverride ?? null,
             effective,
             lastEditedBy: s.lastEditedBy,
@@ -794,6 +798,35 @@ export const opsRouter = createTRPCRouter({
       await getFeatureFlagStore().set(
         input.key,
         input.enabled,
+        ctx.session.user.id,
+      );
+      return { ok: true };
+    }),
+
+  setFeatureFlagRules: protectedProcedure
+    .use(opsManagePermission)
+    .input(
+      z.object({
+        key: z.string().min(1).max(200),
+        rules: featureFlagRulesSchema.max(50),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const isExplicitKey = listFeatureFlags().some(
+        (f) => f.key === input.key,
+      );
+      const isLiveKillSwitch = getKillSwitchDescriptors().some(
+        (d) => d.key === input.key,
+      );
+      if (!isExplicitKey && !isLiveKillSwitch) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Unknown feature flag key: ${input.key}`,
+        });
+      }
+      await getFeatureFlagStore().setRules(
+        input.key,
+        input.rules,
         ctx.session.user.id,
       );
       return { ok: true };
