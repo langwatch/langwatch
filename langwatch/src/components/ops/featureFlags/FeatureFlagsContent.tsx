@@ -364,8 +364,16 @@ function FlagRowView({
             <Switch
               checked={effective || partialEnabled}
               disabled={!canManage || envLocked || pending}
-              colorPalette={partialEnabled ? "yellow" : "blue"}
               onCheckedChange={(details) => void onChange(details.checked)}
+              css={
+                partialEnabled
+                  ? {
+                      "& [data-part='control'][data-state='checked']": {
+                        background: "yellow.500",
+                      },
+                    }
+                  : undefined
+              }
             />
             {canManage && !envLocked && (
               <Tooltip
@@ -397,7 +405,7 @@ function FlagRowView({
             )}
           </HStack>
           {targetingLabel && (
-            <Text fontSize="xs" color="yellow.700">
+            <Text fontSize="xs" color="fg.muted">
               {targetingLabel}
             </Text>
           )}
