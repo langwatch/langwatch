@@ -48,12 +48,12 @@ import { useTracesPageTitle } from "./usePageTitle";
 
 const SIDEBAR_WIDTH_EXPANDED = 220;
 const SIDEBAR_WIDTH_MAX = 640;
-// Threshold at which an inward drag commits to a full collapse instead
-// of an awkward sub-width. Sits a comfortable distance above the
-// minimum readable width so a user *trying* to collapse doesn't have
-// to drag pixel-perfect, and a user trying to keep the sidebar narrow
-// but readable doesn't accidentally snap it away.
-const SIDEBAR_COLLAPSE_THRESHOLD = 80;
+// Minimum width the operator can drag the sidebar to before we accept
+// it as "intended to keep visible." Below this, an inward drag commits
+// a full collapse instead of an awkward sliver. Kept low (40px) so a
+// short accidental drag doesn't snap the sidebar shut — operators who
+// actually want it gone have to drag clearly into the trace table.
+const SIDEBAR_COLLAPSE_THRESHOLD = 40;
 
 const DIMMED_PROPS = {
   opacity: 0.45,
