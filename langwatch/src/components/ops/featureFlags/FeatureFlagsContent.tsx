@@ -5,19 +5,23 @@ import {
   Center,
   HStack,
   Heading,
+  IconButton,
   Spinner,
   Stack,
   Table,
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { Settings2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Switch } from "~/components/ui/switch";
 import { Tooltip } from "~/components/ui/tooltip";
 import { toaster } from "~/components/ui/toaster";
 import { useOpsPermission } from "~/hooks/useOpsPermission";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
+import type { FeatureFlagRules } from "~/server/featureFlag";
 import { api } from "~/utils/api";
+import { FeatureFlagRulesDialog } from "./FeatureFlagRulesDialog";
 
 interface FlagRow {
   key: string;
@@ -26,6 +30,7 @@ interface FlagRow {
   description: string;
   family: string | null;
   storedValue: boolean | null;
+  rules: FeatureFlagRules;
   envOverride: boolean | null;
   effective: boolean;
   lastEditedBy: string | null;
@@ -253,13 +258,70 @@ function FlagRowView({
   pending: boolean;
 }) {
   const [optimistic, setOptimistic] = useState<boolean | null>(null);
+  const [rulesDialogOpen, setRulesDialogOpen] = useState(false);
   const envLocked = row.envOverride !== null;
   const effective = optimistic ?? row.effective;
+  const ruleCount = row.rules.length;
   const source = envLocked
     ? "env override"
-    : row.storedValue !== null
-      ? "postgres"
-      : "registry default";
+    : ruleCount > 0
+      ? "postgres + rules"
+      : row.storedValue !== null
+        ? "postgres"
+        : "registry default";
+
+  // Walk rules honoring first-match-wins, so a disabled rule earlier in
+  // the list correctly shadows a later enabled rule for the same scope.
+  // An empty-match rule matches every context, so once one is seen, no
+  // later rule can ever fire and we stop.
+  let everyoneViaRule: boolean | null = null;
+  const orgDecisions = new Map<string, boolean>();
+  const projectDecisions = new Map<string, boolean>();
+  for (const r of row.rules) {
+    const isEveryone = !r.match.organizationId && !r.match.projectId;
+    if (isEveryone) {
+      everyoneViaRule = r.enabled;
+      break;
+    }
+    if (r.match.organizationId && !orgDecisions.has(r.match.organizationId)) {
+      orgDecisions.set(r.match.organizationId, r.enabled);
+    }
+    if (r.match.projectId && !projectDecisions.has(r.match.projectId)) {
+      projectDecisions.set(r.match.projectId, r.enabled);
+    }
+  }
+  const enabledOrgIds = new Set(
+    Array.from(orgDecisions.entries())
+      .filter(([, v]) => v)
+      .map(([k]) => k),
+  );
+  const enabledProjectIds = new Set(
+    Array.from(projectDecisions.entries())
+      .filter(([, v]) => v)
+      .map(([k]) => k),
+  );
+  const enabledEveryoneViaRule = everyoneViaRule === true;
+  const partialEnabled =
+    !effective &&
+    (enabledEveryoneViaRule ||
+      enabledOrgIds.size > 0 ||
+      enabledProjectIds.size > 0);
+  const targetingSummary = enabledEveryoneViaRule
+    ? "Enabled for everyone via rule"
+    : [
+        enabledOrgIds.size > 0 &&
+          `${enabledOrgIds.size} organization${enabledOrgIds.size === 1 ? "" : "s"}`,
+        enabledProjectIds.size > 0 &&
+          `${enabledProjectIds.size} project${enabledProjectIds.size === 1 ? "" : "s"}`,
+      ]
+        .filter(Boolean)
+        .join(", ");
+  const targetingLabel =
+    !effective && targetingSummary
+      ? enabledEveryoneViaRule
+        ? targetingSummary
+        : `Enabled for ${targetingSummary}`
+      : null;
 
   const onChange = async (next: boolean) => {
     setOptimistic(next);
@@ -297,22 +359,63 @@ function FlagRowView({
         </VStack>
       </Table.Cell>
       <Table.Cell>
-        <HStack gap={3}>
-          <Switch
-            checked={effective}
-            disabled={!canManage || envLocked || pending}
-            onCheckedChange={(details) => void onChange(details.checked)}
-          />
-          {envLocked && (
-            <Tooltip
-              content={`Locked by env override (${row.envOverride ? "1" : "0"}). The toggle is disabled because the env var wins over postgres.`}
-            >
-              <Badge colorPalette="orange" size="sm" variant="subtle">
-                env override
-              </Badge>
-            </Tooltip>
+        <VStack align="start" gap={1}>
+          <HStack gap={2}>
+            <Switch
+              checked={effective || partialEnabled}
+              disabled={!canManage || envLocked || pending}
+              onCheckedChange={(details) => void onChange(details.checked)}
+              css={
+                partialEnabled
+                  ? {
+                      "& [data-part='control'][data-state='checked']": {
+                        background: "green.500",
+                      },
+                    }
+                  : undefined
+              }
+            />
+            {canManage && !envLocked && (
+              <Tooltip
+                content={
+                  ruleCount === 0
+                    ? "Specific targeting"
+                    : `Specific targeting (${ruleCount} rule${ruleCount === 1 ? "" : "s"})`
+                }
+              >
+                <IconButton
+                  aria-label="Specific targeting"
+                  size="xs"
+                  variant="ghost"
+                  onClick={() => setRulesDialogOpen(true)}
+                  color="gray.500"
+                >
+                  <Settings2 size={14} />
+                </IconButton>
+              </Tooltip>
+            )}
+            {envLocked && (
+              <Tooltip
+                content={`Locked by env override (${row.envOverride ? "1" : "0"}). The toggle is disabled because the env var wins over postgres.`}
+              >
+                <Badge colorPalette="orange" size="sm" variant="subtle">
+                  env override
+                </Badge>
+              </Tooltip>
+            )}
+          </HStack>
+          {targetingLabel && (
+            <Text fontSize="xs" color="fg.muted">
+              {targetingLabel}
+            </Text>
           )}
-        </HStack>
+        </VStack>
+        <FeatureFlagRulesDialog
+          open={rulesDialogOpen}
+          onOpenChange={setRulesDialogOpen}
+          flagKey={row.key}
+          initialRules={row.rules}
+        />
       </Table.Cell>
       <Table.Cell>
         <Text fontSize="xs">{source}</Text>

@@ -87,21 +87,27 @@ export class FeatureFlagService implements FeatureFlagServiceInterface {
       return true;
     }
 
+    const storeCtx = {
+      projectId: opts.projectId,
+      organizationId: opts.organizationId,
+    };
+
     if (definition?.scope === "SYSTEM") {
-      const stored = await this.store.get(flagKey);
+      const stored = await this.store.get(flagKey, storeCtx);
       if (stored !== null) return stored;
       return definition.defaultValue;
     }
 
     if (definition?.scope === "PRODUCT") {
-      // Operator override via /ops/feature-flags wins. Both legacy
-      // backends (PostHog and memory) catch their own failures and
-      // return the registry default, so a try/catch around legacy
-      // never falls through to postgres on its own. Checking the
-      // store first keeps the Ops UI usable for self-hosted installs
-      // and during PostHog outages without losing PostHog's user
-      // targeting on flags that have no DB override.
-      const stored = await this.store.get(flagKey);
+      // Operator override via /ops/feature-flags wins. The store
+      // evaluates per-org/per-project targeting rules first; if any
+      // rule matches the calling context we use that result and never
+      // touch PostHog. With no rule match and no row, fall through to
+      // the legacy backend (PostHog when configured, memory otherwise).
+      // Both legacy backends catch their own failures and return the
+      // registry default, so checking the store first is also what
+      // keeps the Ops UI usable during PostHog outages or quota caps.
+      const stored = await this.store.get(flagKey, storeCtx);
       if (stored !== null) return stored;
 
       return await this.legacy.isEnabled(flagKey, {

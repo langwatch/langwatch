@@ -25,6 +25,11 @@ import {
 } from "vitest";
 import { FeatureFlagService } from "../featureFlag.service";
 import type { FeatureFlagStorePostgres } from "../featureFlagStore.postgres";
+import {
+  evaluateRules,
+  type FeatureFlagRules,
+  type RuleEvaluationContext,
+} from "../rules";
 import type { FeatureFlagServiceInterface } from "../types";
 
 const SYSTEM_FLAG = "ops_es_causality_loop_guard_disabled";
@@ -33,12 +38,26 @@ const PRODUCT_FLAG = "release_nlp_go_engine_enabled";
 const UNREGISTERED_FLAG = "experiment_some_adhoc_posthog_flag";
 
 class InMemoryStore {
-  private values = new Map<string, boolean>();
-  async get(key: string): Promise<boolean | null> {
-    return this.values.has(key) ? this.values.get(key)! : null;
+  private values = new Map<
+    string,
+    { enabled: boolean; rules: FeatureFlagRules }
+  >();
+  async get(
+    key: string,
+    ctx: RuleEvaluationContext = {},
+  ): Promise<boolean | null> {
+    const row = this.values.get(key);
+    if (!row) return null;
+    const ruleHit = evaluateRules(row.rules, ctx);
+    return ruleHit ?? row.enabled;
   }
   async set(key: string, enabled: boolean): Promise<void> {
-    this.values.set(key, enabled);
+    const existing = this.values.get(key);
+    this.values.set(key, { enabled, rules: existing?.rules ?? [] });
+  }
+  async setRules(key: string, rules: FeatureFlagRules): Promise<void> {
+    const existing = this.values.get(key);
+    this.values.set(key, { enabled: existing?.enabled ?? false, rules });
   }
   async clear(key: string): Promise<void> {
     this.values.delete(key);
@@ -175,6 +194,58 @@ describe("FeatureFlagService", () => {
           true,
         );
         const enabled = await service.isEnabled(PRODUCT_FLAG, { distinctId: "user-1", defaultValue: true });
+        expect(enabled).toBe(false);
+        expect(legacy.isEnabled).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the store row carries an org-scoped targeting rule", () => {
+      it("uses the rule for the matching org and skips PostHog", async () => {
+        const { service, store, legacy } = buildService();
+        await store.setRules(PRODUCT_FLAG, [
+          { match: { organizationId: "org_lw" }, enabled: true },
+        ]);
+        const enabled = await service.isEnabled(PRODUCT_FLAG, {
+          distinctId: "user-1",
+          organizationId: "org_lw",
+          defaultValue: false,
+        });
+        expect(enabled).toBe(true);
+        expect(legacy.isEnabled).not.toHaveBeenCalled();
+      });
+
+      it("uses the row-level default for a non-matching org without consulting PostHog", async () => {
+        // The store creates a row with row-level enabled=false when only
+        // rules are written, so the row counts as an explicit operator
+        // override and stops the PostHog fallthrough. To target an
+        // allowlist while still letting PostHog drive everyone else,
+        // operators must leave the row absent — that's by design.
+        const { service, store, legacy } = buildService();
+        await store.setRules(PRODUCT_FLAG, [
+          { match: { organizationId: "org_lw" }, enabled: true },
+        ]);
+        const enabled = await service.isEnabled(PRODUCT_FLAG, {
+          distinctId: "user-1",
+          organizationId: "org_other",
+          defaultValue: false,
+        });
+        expect(enabled).toBe(false);
+        expect(legacy.isEnabled).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the row carries both a row-level default and a non-matching rule", () => {
+      it("uses the row-level default (PostHog is not consulted because the row exists)", async () => {
+        const { service, store, legacy } = buildService();
+        await store.set(PRODUCT_FLAG, false);
+        await store.setRules(PRODUCT_FLAG, [
+          { match: { organizationId: "org_other" }, enabled: true },
+        ]);
+        const enabled = await service.isEnabled(PRODUCT_FLAG, {
+          distinctId: "user-1",
+          organizationId: "org_self",
+          defaultValue: true,
+        });
         expect(enabled).toBe(false);
         expect(legacy.isEnabled).not.toHaveBeenCalled();
       });
