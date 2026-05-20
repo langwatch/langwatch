@@ -15,14 +15,20 @@ import { z } from "zod";
  * `percentageRollout`, etc., without a schema migration.
  */
 
+const KNOWN_MATCH_KEYS = ["projectId", "organizationId"] as const;
+type KnownMatchKey = (typeof KNOWN_MATCH_KEYS)[number];
+
 const featureFlagRuleMatchSchema = z
   .object({
     projectId: z.string().optional(),
     organizationId: z.string().optional(),
   })
-  // Future-proof: ignore extra fields rather than reject so a newer
-  // writer can ship a rule shape the running reader doesn't know yet,
-  // and old rows keep deserializing after we extend the schema.
+  // Future-proof: keep unknown fields on the parsed object rather than
+  // rejecting them, so a newer writer can ship a rule shape the running
+  // reader doesn't know yet and old rows keep deserializing after we
+  // extend the schema. The matcher itself fails closed on unknown keys
+  // (see matchesContext) so an unrecognized condition never silently
+  // matches every context.
   .passthrough();
 
 export const featureFlagRuleSchema = z.object({
@@ -72,6 +78,13 @@ function matchesContext(
   match: FeatureFlagRuleMatch,
   ctx: RuleEvaluationContext,
 ): boolean {
+  // Fail closed on unknown match keys: a newer writer might have added
+  // a condition (e.g. percentageRollout) that this reader doesn't
+  // understand. Treating it as "no constraint" would silently turn
+  // that rule into a global match for every context.
+  for (const key of Object.keys(match)) {
+    if (!KNOWN_MATCH_KEYS.includes(key as KnownMatchKey)) return false;
+  }
   // Every specified field must match the context. An entirely empty
   // match acts as a default-rule and matches every context.
   if (match.projectId !== undefined && match.projectId !== ctx.projectId) {

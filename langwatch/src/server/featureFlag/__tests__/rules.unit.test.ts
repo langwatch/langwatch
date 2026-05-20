@@ -65,6 +65,27 @@ describe("evaluateRules", () => {
       ).toBe(true);
     });
   });
+
+  describe("when a rule carries an unknown match key (forward-compat)", () => {
+    it("fails closed so a newer writer's condition doesn't silently match everyone", () => {
+      // A future writer ships { match: { percentageRollout: 10 }, enabled: true }.
+      // An older reader doesn't know about percentageRollout — without
+      // the fail-closed guard this would degenerate to an empty match
+      // and turn into a global on-switch.
+      const rules: FeatureFlagRules = [
+        {
+          match: { percentageRollout: 10 } as unknown as FeatureFlagRules[number]["match"],
+          enabled: true,
+        },
+      ];
+      expect(
+        evaluateRules(rules, {
+          projectId: "proj_a",
+          organizationId: "org_a",
+        }),
+      ).toBeNull();
+    });
+  });
 });
 
 describe("parseRules", () => {

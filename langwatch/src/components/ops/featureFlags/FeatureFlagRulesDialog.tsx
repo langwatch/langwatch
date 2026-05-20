@@ -10,7 +10,7 @@ import {
   createListCollection,
 } from "@chakra-ui/react";
 import { Plus, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   DialogActionTrigger,
   DialogBody,
@@ -71,11 +71,12 @@ function rulesToUI(rules: FeatureFlagRules): UIRule[] {
 
 function uiToRules(rules: UIRule[]): FeatureFlagRules {
   return rules.map((r) => {
+    const scopeId = r.scopeId.trim();
     if (r.scopeKind === "ORGANIZATION") {
-      return { match: { organizationId: r.scopeId }, enabled: r.enabled };
+      return { match: { organizationId: scopeId }, enabled: r.enabled };
     }
     if (r.scopeKind === "PROJECT") {
-      return { match: { projectId: r.scopeId }, enabled: r.enabled };
+      return { match: { projectId: scopeId }, enabled: r.enabled };
     }
     return { match: {}, enabled: r.enabled };
   });
@@ -108,11 +109,16 @@ export function FeatureFlagRulesDialog({
     },
   });
 
-  // Re-seed the draft whenever the dialog is reopened or the upstream
-  // rules change, so a "Cancel" + reopen always starts from the saved
-  // server state and doesn't leak unsaved edits between sessions.
+  // Re-seed the draft only when the dialog transitions from closed to
+  // open, so a "Cancel" + reopen always starts from the saved server
+  // state and doesn't leak unsaved edits between sessions. We don't
+  // reset on every initialRules identity change, because a background
+  // refetch while the user is mid-edit would otherwise wipe their work.
+  const wasOpenRef = useRef(false);
   useEffect(() => {
-    if (open) setDraft(rulesToUI(initialRules));
+    const justOpened = open && !wasOpenRef.current;
+    if (justOpened) setDraft(rulesToUI(initialRules));
+    wasOpenRef.current = open;
   }, [open, initialRules]);
 
   const updateRule = (index: number, patch: Partial<UIRule>) => {
