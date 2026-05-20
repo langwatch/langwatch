@@ -17,7 +17,7 @@ describe("Feature: Dataset REST API", () => {
   let testProjectId: string;
   let testOrganization: Organization;
   let testTeam: Team;
-  let testProject: Project;
+  let testProject: any;
   let mockGetActivePlan: ReturnType<typeof vi.fn>;
   let mockNotifyPlanLimitReached: ReturnType<typeof vi.fn>;
   let helpers: {

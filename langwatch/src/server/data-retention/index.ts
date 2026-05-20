@@ -3,3 +3,8 @@ export type { RetentionPolicy, RetentionCategory } from "./retentionPolicy.schem
 export { resolveRetentionDays } from "./resolveRetentionDays";
 export { RetentionPolicyCache } from "./retentionPolicyCache";
 export type { RetentionPolicyResolver } from "./retentionPolicyResolver";
+export { PinnedTraceService } from "./pinning/pinnedTrace.service";
+export { PinnedTraceRepository } from "./pinning/pinnedTrace.repository";
+export { RetroactiveUpdateService } from "./retroactive/retroactiveUpdate.service";
+export { StorageMeterService } from "./metering/storageMeter.service";
+export { OrphanSweepService } from "./orphan-sweep/orphanSweep.service";

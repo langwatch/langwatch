@@ -28,7 +28,7 @@ describe("Feature: REST API resource limit enforcement parity", () => {
   let testProjectId: string;
   let testOrganization: Organization;
   let testTeam: Team;
-  let testProject: Project;
+  let testProject: any;
 
   const authHeaders = (apiKey: string) => ({
     "X-Auth-Token": apiKey,

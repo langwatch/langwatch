@@ -542,3 +542,38 @@ export async function withMetrics<T>({
     throw error;
   }
 }
+
+// --- Data Retention Metrics ---
+
+register.removeSingleMetric("data_retention_lag_seconds");
+export const dataRetentionLagSeconds = new Gauge({
+  name: "data_retention_lag_seconds",
+  help: "Seconds between expected cutoff and actual oldest data for tenants with active retention",
+  labelNames: ["tenant_id", "table"] as const,
+});
+
+register.removeSingleMetric("data_retention_mutation_progress_ratio");
+export const dataRetentionMutationProgressRatio = new Gauge({
+  name: "data_retention_mutation_progress_ratio",
+  help: "Ratio of parts_done / total_parts for active retention mutations",
+  labelNames: ["tenant_id", "table"] as const,
+});
+
+register.removeSingleMetric("data_retention_orphans_swept_total");
+export const dataRetentionOrphansSsweptTotal = new Counter({
+  name: "data_retention_orphans_swept_total",
+  help: "Count of PG orphan records cleaned up by retention sweep",
+  labelNames: ["model"] as const,
+});
+
+export function setRetentionLag(tenantId: string, table: string, lagSeconds: number): void {
+  dataRetentionLagSeconds.set({ tenant_id: tenantId, table }, lagSeconds);
+}
+
+export function setMutationProgress(tenantId: string, table: string, ratio: number): void {
+  dataRetentionMutationProgressRatio.set({ tenant_id: tenantId, table }, ratio);
+}
+
+export function incrementOrphansSswept(model: string, count: number): void {
+  dataRetentionOrphansSsweptTotal.inc({ model }, count);
+}

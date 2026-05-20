@@ -17,7 +17,7 @@ describe("Feature: Suites REST API", () => {
   let testProjectId: string;
   let testOrganization: Organization;
   let testTeam: Team;
-  let testProject: Project;
+  let testProject: any;
   let helpers: {
     api: {
       get: (path: string) => Response | Promise<Response>;

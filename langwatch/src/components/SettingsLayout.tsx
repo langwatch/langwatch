@@ -161,8 +161,9 @@ export default function SettingsLayout({
 
           <NavSection
             label="Features"
-            paths={["/settings/annotation-scores", "/settings/topic-clustering"]}
+            paths={["/settings/annotation-scores", "/settings/topic-clustering", "/settings/data-retention"]}
           >
+            <MenuLink href="/settings/data-retention">Data Retention</MenuLink>
             <MenuLink href="/settings/annotation-scores">Annotation Scores</MenuLink>
             {!isLiteMember && project?.slug && (
               <MenuLink href={`/${project.slug}/automations`}>Automations</MenuLink>

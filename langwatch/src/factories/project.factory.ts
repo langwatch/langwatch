@@ -7,9 +7,12 @@ import {
 import { Factory } from "fishery";
 import { nanoid } from "nanoid";
 
-export const projectFactory = Factory.define<
-  Omit<Project, "retentionPolicy"> & { retentionPolicy: any }
->(({ sequence }) => ({
+export type ProjectFactoryOutput = Omit<Project, "retentionPolicy"> & {
+  retentionPolicy: null;
+};
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const projectFactory = Factory.define<any>(({ sequence }) => ({
   id: nanoid(),
   name: `Test Project ${sequence}`,
   slug: `test-project-${sequence}`,
@@ -37,5 +40,5 @@ export const projectFactory = Factory.define<
   presenceEnabled: false,
   personalFeatures: {},
   costCenterId: null,
-  retentionPolicy: undefined as any,
+  retentionPolicy: null,
 }));

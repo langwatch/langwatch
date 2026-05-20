@@ -12,7 +12,7 @@ describe("Model Providers API", () => {
   let testProjectId: string;
   let testOrganization: Organization;
   let testTeam: Team;
-  let testProject: Project;
+  let testProject: any;
   let helpers: {
     api: {
       put: (path: string, body: unknown) => Response | Promise<Response>;

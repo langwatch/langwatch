@@ -11,9 +11,9 @@ export interface FindByTraceIdOptions {
 }
 
 export interface TraceSummaryRepository {
-  upsert(data: TraceSummaryData, tenantId: string): Promise<void>;
+  upsert(data: TraceSummaryData, tenantId: string, retentionDays?: number): Promise<void>;
   upsertBatch?(
-    entries: Array<{ data: TraceSummaryData; tenantId: string }>,
+    entries: Array<{ data: TraceSummaryData; tenantId: string; retentionDays?: number }>,
   ): Promise<void>;
   findByTraceId(
     tenantId: string,

@@ -32,6 +32,7 @@ export class App {
   readonly nurturing?: AppDependencies["nurturing"];
   readonly usageLimits: AppDependencies["usageLimits"];
   readonly ops?: OpsDependencies;
+  readonly retentionPolicyCache: AppDependencies["retentionPolicyCache"];
 
   /** Keeps EventSourcing infrastructure safe from the greedy garbage men */
   private readonly _eventSourcing?: EventSourcing;
@@ -68,6 +69,7 @@ export class App {
     this.simulations = { ...deps.simulations, ...deps.commands.simulations };
     this.suiteRuns = { ...deps.suiteRuns, ...deps.commands.suiteRuns };
     this.ops = deps.ops;
+    this.retentionPolicyCache = deps.retentionPolicyCache;
     this._eventSourcing = deps._eventSourcing;
     this._gracefulCloseables = deps._gracefulCloseables ?? [];
   }

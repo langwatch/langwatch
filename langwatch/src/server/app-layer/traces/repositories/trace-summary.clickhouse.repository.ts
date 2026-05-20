@@ -26,6 +26,8 @@ interface ClickHouseSummaryRecord extends TraceSummaryFieldsBase {
   Attributes: Record<string, string>;
   HasAnnotation: number | null;
   LastEventOccurredAt: number;
+  _retention_days: number;
+  _size_bytes: number;
 }
 
 export class TraceSummaryClickHouseRepository
@@ -33,7 +35,7 @@ export class TraceSummaryClickHouseRepository
 {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
-  async upsert(data: TraceSummaryData, tenantId: string): Promise<void> {
+  async upsert(data: TraceSummaryData, tenantId: string, retentionDays = 0): Promise<void> {
     EventUtils.validateTenantId(
       { tenantId },
       "TraceSummaryClickHouseRepository.upsert",
@@ -52,6 +54,7 @@ export class TraceSummaryClickHouseRepository
         tenantId,
         projectionId,
         TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
+        retentionDays,
       );
 
       await client.insert({
@@ -72,7 +75,7 @@ export class TraceSummaryClickHouseRepository
   }
 
   async upsertBatch(
-    entries: Array<{ data: TraceSummaryData; tenantId: string }>,
+    entries: Array<{ data: TraceSummaryData; tenantId: string; retentionDays?: number }>,
   ): Promise<void> {
     if (entries.length === 0) return;
 
@@ -83,7 +86,7 @@ export class TraceSummaryClickHouseRepository
 
     try {
       const client = await this.resolveClient(tenantId);
-      const records = entries.map(({ data, tenantId: tid }) => {
+      const records = entries.map(({ data, tenantId: tid, retentionDays: rd }) => {
         const projectionId =
           IdUtils.generateDeterministicTraceSummaryIdFromData(
             tid,
@@ -95,6 +98,7 @@ export class TraceSummaryClickHouseRepository
           tid,
           projectionId,
           TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
+          rd,
         );
       });
 
@@ -306,6 +310,7 @@ export class TraceSummaryClickHouseRepository
     tenantId: string,
     projectionId: string,
     version: string,
+    retentionDays = 0,
   ): ClickHouseSummaryWriteRecord {
     return {
       ProjectionId: projectionId,
@@ -359,6 +364,16 @@ export class TraceSummaryClickHouseRepository
       AnnotationIds: data.annotationIds,
       HasAnnotation: data.annotationIds.length > 0 ? 1 : 0,
       TraceName: data.traceName,
+      _retention_days: retentionDays,
+      _size_bytes: estimateTraceSummarySizeBytes(data),
     };
   }
+}
+
+function estimateTraceSummarySizeBytes(data: TraceSummaryData): number {
+  let size = 128;
+  size += (data.computedInput?.length ?? 0) + (data.computedOutput?.length ?? 0);
+  size += (data.errorMessage?.length ?? 0);
+  size += JSON.stringify(data.attributes).length;
+  return size;
 }
