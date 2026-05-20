@@ -1,4 +1,4 @@
-import { Box, HStack, Text } from "@chakra-ui/react";
+import { Badge, Box, HStack, Text } from "@chakra-ui/react";
 import { useLayoutEffect, useRef, useState } from "react";
 import type {
   TraceEvalResult,
@@ -79,27 +79,14 @@ export const EvaluationsCell = {
 } as const satisfies CellDef<TraceListItem>;
 
 function MoreEvalsPill({ count }: { count: number }) {
+  // Matches the model column's `ExtraModelsBadge` — same outline badge,
+  // bare `+N` text. The previous filled pill with the trailing "more"
+  // word read as a louder, separately-coloured surface that didn't
+  // sit beside the eval chips cleanly.
   return (
-    <HStack
-      gap={1}
-      paddingX={2}
-      paddingY={0.5}
-      borderRadius="md"
-      borderWidth="1px"
-      borderColor="border.muted"
-      bg="bg.subtle"
-      flexShrink={0}
-    >
-      <Text
-        textStyle="2xs"
-        fontWeight="medium"
-        color="fg.muted"
-        whiteSpace="nowrap"
-        lineHeight="1.2"
-      >
-        +{count} more
-      </Text>
-    </HStack>
+    <Badge size="xs" variant="outline" flexShrink={0}>
+      +{count}
+    </Badge>
   );
 }
 

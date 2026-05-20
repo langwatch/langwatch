@@ -1,7 +1,8 @@
-import { Box, HStack, IconButton, Tabs } from "@chakra-ui/react";
+import { Box, HStack, IconButton, Tabs, Text } from "@chakra-ui/react";
 import { PanelLeftOpen } from "lucide-react";
 import type React from "react";
 import { startTransition, useMemo, useRef, useState } from "react";
+import { Kbd } from "~/components/ops/shared/Kbd";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useErrorCount } from "../../hooks/useErrorCount";
 import { useOverflowVisibility } from "../../hooks/useOverflowVisibility";
@@ -102,7 +103,12 @@ export const LensTabs: React.FC = () => {
       <HStack gap={0} flex="1" minWidth={0}>
         {sidebarCollapsed && (
           <Tooltip
-            content="Show filters sidebar"
+            content={
+              <HStack gap={1.5}>
+                <Text>Show filters sidebar</Text>
+                <Kbd>{"["}</Kbd>
+              </HStack>
+            }
             positioning={{ placement: "bottom" }}
           >
             <IconButton
