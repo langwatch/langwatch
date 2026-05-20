@@ -12,11 +12,12 @@ const LEGACY_LIVE_UPDATES_BOOL_KEY =
  *
  * - `live`: SSE on, table auto-refreshes as updates arrive (the historic
  *   "enabled" behaviour).
- * - `ask`: SSE on so we know when new rows exist, but the table does NOT
- *   auto-refresh. Instead a "(N new)" badge surfaces in the toolbar and
- *   the user opts in by clicking it. Avoids the list jumping under the
- *   cursor while the operator is reading a row.
- * - `paused`: SSE off entirely — no updates, no badge, no polling.
+ * - `ask`: SSE on so the `(N new)` pill knows when new rows exist, but
+ *   the table does NOT auto-refresh. The user opts in by clicking the
+ *   pill — avoids the list jumping under the cursor mid-read. Reuses
+ *   the same floating pill the scrolled-list overlay shows in live
+ *   mode, so there is one and only one "new rows available" affordance.
+ * - `paused`: SSE off entirely — no updates, no pill, no polling.
  */
 export type LiveUpdatesMode = "live" | "ask" | "paused";
 
@@ -82,20 +83,11 @@ interface SseStatusState {
   setLiveUpdatesMode: (mode: LiveUpdatesMode) => void;
   /** Cycle live → ask → paused → live. */
   toggleLiveUpdates: () => void;
-
-  /**
-   * Trace IDs seen by SSE while in `ask` mode that the user hasn't
-   * acknowledged yet. The toolbar badge shows the size; flushing
-   * invalidates the list and clears the buffer.
-   */
-  pendingTraceIds: Set<string>;
-  recordPendingTraceIds: (ids: string[]) => void;
-  clearPendingTraceIds: () => void;
 }
 
 const initialMode = readLiveUpdatesMode();
 
-export const useSseStatusStore = create<SseStatusState>((set, get) => ({
+export const useSseStatusStore = create<SseStatusState>((set) => ({
   sseConnectionState: initialMode === "paused" ? "disconnected" : "connecting",
   setSseConnectionState: (state) => set({ sseConnectionState: state }),
   lastEventAt: 0,
@@ -110,38 +102,17 @@ export const useSseStatusStore = create<SseStatusState>((set, get) => ({
       liveUpdatesMode: mode,
       liveUpdatesEnabled: mode !== "paused",
       sseConnectionState: mode === "paused" ? "disconnected" : "connecting",
-      // Switching out of `ask` mode drops the buffered acks — they're
-      // about to be flushed by the live refetch, or they're irrelevant
-      // because the user is now ignoring updates entirely.
-      ...(mode !== "ask" ? { pendingTraceIds: new Set<string>() } : {}),
     });
   },
   toggleLiveUpdates: () => {
-    const next = nextMode(get().liveUpdatesMode);
-    persistLiveUpdatesMode(next);
-    set({
-      liveUpdatesMode: next,
-      liveUpdatesEnabled: next !== "paused",
-      sseConnectionState: next === "paused" ? "disconnected" : "connecting",
-      ...(next !== "ask" ? { pendingTraceIds: new Set<string>() } : {}),
-    });
-  },
-
-  pendingTraceIds: new Set<string>(),
-  recordPendingTraceIds: (ids) => {
-    if (ids.length === 0) return;
     set((state) => {
-      // Cap the buffer so a runaway producer can't grow it unboundedly.
-      // The UI only renders `size` as a count anyway, so dropping the
-      // tail past 9999 has no visible effect besides bounded memory.
-      const merged = new Set(state.pendingTraceIds);
-      for (const id of ids) {
-        if (merged.size >= 9999) break;
-        merged.add(id);
-      }
-      return { pendingTraceIds: merged };
+      const next = nextMode(state.liveUpdatesMode);
+      persistLiveUpdatesMode(next);
+      return {
+        liveUpdatesMode: next,
+        liveUpdatesEnabled: next !== "paused",
+        sseConnectionState: next === "paused" ? "disconnected" : "connecting",
+      };
     });
   },
-  clearPendingTraceIds: () =>
-    set({ pendingTraceIds: new Set<string>() }),
 }));

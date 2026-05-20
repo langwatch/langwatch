@@ -45,10 +45,6 @@ export function useTraceFreshness() {
     };
   }, []);
 
-  const recordPendingTraceIds = useSseStatusStore(
-    (s) => s.recordPendingTraceIds,
-  );
-
   const onTraceSummaryUpdated = useCallback(
     (traceIds: string[]) => {
       const mode = useSseStatusStore.getState().liveUpdatesMode;
@@ -60,16 +56,14 @@ export function useTraceFreshness() {
       // the icon would look like a stealth refresh.
       if (mode === "live") pulse();
 
-      if (mode === "ask") {
-        // Buffer instead of refetching: surface "(N new)" in the toolbar
-        // and let the user opt in by clicking. The list query stays on
-        // its current snapshot until they do, so reading a row doesn't
-        // get yanked by an auto-refresh.
-        recordPendingTraceIds(traceIds);
-      } else {
-        // Table-level invalidation — TQ only refetches mounted queries
+      // Refresh the new-count query in BOTH live and ask modes so the
+      // floating "(N new)" pill stays in sync. In `ask` we deliberately
+      // skip the list refetch so the table doesn't jump under the
+      // cursor — the operator clicks the pill to commit the merge,
+      // which calls `acknowledge()` and pulls the new rows.
+      void trpcUtils.tracesV2.newCount.invalidate();
+      if (mode === "live") {
         void trpcUtils.tracesV2.list.invalidate();
-        void trpcUtils.tracesV2.newCount.invalidate();
       }
       // Discover (facets) is heavy. Coalesce into a 30s window so a steady
       // trace stream doesn't keep it permanently refetching. Skipped in
@@ -107,7 +101,7 @@ export function useTraceFreshness() {
         });
       }
     },
-    [trpcUtils, requestFastPoll, pulse, project?.id, recordPendingTraceIds],
+    [trpcUtils, requestFastPoll, pulse, project?.id],
   );
 
   const onSpanStored = useCallback(

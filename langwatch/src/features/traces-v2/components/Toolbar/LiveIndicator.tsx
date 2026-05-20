@@ -1,9 +1,8 @@
-import { Box, Button, Flex, IconButton } from "@chakra-ui/react";
+import { Box, Flex, IconButton } from "@chakra-ui/react";
 import { RefreshCw, Wifi, WifiOff } from "lucide-react";
 import type React from "react";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { ConnectionState } from "~/hooks/useSSESubscription";
-import { useFlushPendingTraces } from "../../hooks/useFlushPendingTraces";
 import { useTraceListRefresh } from "../../hooks/useTraceListRefresh";
 import { useRefreshUIStore } from "../../stores/refreshUIStore";
 import {
@@ -36,21 +35,20 @@ export const LiveIndicator: React.FC = () => {
   const lastEventAt = useSseStatusStore((s) => s.lastEventAt);
   const liveUpdatesMode = useSseStatusStore((s) => s.liveUpdatesMode);
   const toggleLiveUpdates = useSseStatusStore((s) => s.toggleLiveUpdates);
-  const pendingCount = useSseStatusStore((s) => s.pendingTraceIds.size);
   const isRefreshing = useRefreshUIStore((s) => s.isRefreshing);
   const refresh = useTraceListRefresh();
-  const flushPending = useFlushPendingTraces();
 
   // In `ask` mode the dot is solid blue: SSE is on (so we know new rows
   // exist) but the user is in charge of when to pull them in. In `live`
   // mode the dot reflects the SSE connection state — green pulse when
   // connected. `paused` reuses the connection style (which goes red /
-  // disconnected by definition).
+  // disconnected by definition). The "N new" affordance reuses the
+  // existing floating pill (`NewTracesScrollUpIndicator`) — there is
+  // exactly one "new rows available" surface across both modes.
   const dotStyle =
     liveUpdatesMode === "ask"
       ? { dotColor: "blue.solid", pulse: false }
       : SSE_STATE_STYLE[sseState];
-  const isConnected = sseState === "connected" || liveUpdatesMode === "ask";
 
   return (
     <Flex align="center" gap={1}>
@@ -60,7 +58,6 @@ export const LiveIndicator: React.FC = () => {
           nextMode: nextLabel(liveUpdatesMode),
           sseState,
           lastEventAt,
-          pendingCount,
         })}
         positioning={{ placement: "bottom" }}
       >
@@ -90,23 +87,6 @@ export const LiveIndicator: React.FC = () => {
         </Flex>
       </Tooltip>
 
-      {liveUpdatesMode === "ask" && pendingCount > 0 && (
-        <Tooltip
-          content="Click to load the buffered updates"
-          positioning={{ placement: "bottom" }}
-        >
-          <Button
-            size="2xs"
-            variant="ghost"
-            colorPalette="blue"
-            onClick={flushPending}
-            aria-label={`Load ${pendingCount} buffered trace updates`}
-          >
-            ({formatPendingCount(pendingCount)} new)
-          </Button>
-        </Tooltip>
-      )}
-
       <Tooltip
         content={isRefreshing ? "Refreshing…" : "Refresh traces"}
         positioning={{ placement: "bottom" }}
@@ -126,12 +106,6 @@ export const LiveIndicator: React.FC = () => {
   );
 };
 
-/** Cap the visible count so a runaway buffer doesn't break the layout. */
-function formatPendingCount(count: number): string {
-  if (count >= 1000) return "999+";
-  return String(count);
-}
-
 function nextLabel(mode: LiveUpdatesMode): LiveUpdatesMode {
   if (mode === "live") return "ask";
   if (mode === "ask") return "paused";
@@ -143,22 +117,18 @@ function describeMode({
   nextMode,
   sseState,
   lastEventAt,
-  pendingCount,
 }: {
   mode: LiveUpdatesMode;
   nextMode: LiveUpdatesMode;
   sseState: ConnectionState;
   lastEventAt: number | null;
-  pendingCount: number;
 }): string {
   const cycle = `Click to switch to "${nextMode}".`;
   switch (mode) {
     case "live":
       return `${describeSseState(sseState, lastEventAt)}. ${cycle}`;
     case "ask":
-      return pendingCount > 0
-        ? `${pendingCount} update${pendingCount === 1 ? "" : "s"} buffered. ${cycle}`
-        : `Live updates buffered (waiting for click to apply). ${cycle}`;
+      return `Live updates buffered — the floating "N new" pill appears when fresh rows arrive. ${cycle}`;
     case "paused":
       return `Live updates paused. ${cycle}`;
   }

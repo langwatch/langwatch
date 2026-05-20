@@ -119,35 +119,5 @@ describe("sseStatusStore", () => {
       );
     });
 
-    it("drops the pending buffer when leaving ask mode", async () => {
-      const { useSseStatusStore } = await loadStoreWith({ mode: "ask" });
-      useSseStatusStore.getState().recordPendingTraceIds(["a", "b", "c"]);
-      expect(useSseStatusStore.getState().pendingTraceIds.size).toBe(3);
-      useSseStatusStore.getState().setLiveUpdatesMode("live");
-      expect(useSseStatusStore.getState().pendingTraceIds.size).toBe(0);
-    });
-  });
-
-  describe("when recording pending trace IDs in ask mode", () => {
-    it("dedups across multiple batches so the count is unique IDs, not events", async () => {
-      const { useSseStatusStore } = await loadStoreWith({ mode: "ask" });
-      useSseStatusStore.getState().recordPendingTraceIds(["a", "b"]);
-      useSseStatusStore.getState().recordPendingTraceIds(["b", "c"]);
-      expect(useSseStatusStore.getState().pendingTraceIds.size).toBe(3);
-    });
-
-    it("no-ops on an empty batch", async () => {
-      const { useSseStatusStore } = await loadStoreWith({ mode: "ask" });
-      const before = useSseStatusStore.getState().pendingTraceIds;
-      useSseStatusStore.getState().recordPendingTraceIds([]);
-      expect(useSseStatusStore.getState().pendingTraceIds).toBe(before);
-    });
-
-    it("clearPendingTraceIds resets the buffer to empty", async () => {
-      const { useSseStatusStore } = await loadStoreWith({ mode: "ask" });
-      useSseStatusStore.getState().recordPendingTraceIds(["a", "b"]);
-      useSseStatusStore.getState().clearPendingTraceIds();
-      expect(useSseStatusStore.getState().pendingTraceIds.size).toBe(0);
-    });
   });
 });
