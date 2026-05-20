@@ -74,6 +74,33 @@ export function evaluateRules(
   return null;
 }
 
+/**
+ * Compute the "default context" effective value for the Ops listing
+ * UI — what a feature-flag check would resolve to for a caller with no
+ * project/organization context. This mirrors the resolver chain so the
+ * table can't contradict runtime behavior: env override beats any
+ * empty-match rule, which beats the row-level toggle, which beats the
+ * registry default. Per-target rules (org/project) don't fire here
+ * because the listing has no specific tenant context.
+ */
+export function resolveEffectiveForListing({
+  envOverride,
+  rules,
+  rowEnabled,
+  registryDefault,
+}: {
+  envOverride: boolean | null;
+  rules: FeatureFlagRules;
+  rowEnabled: boolean | null;
+  registryDefault: boolean;
+}): boolean {
+  if (envOverride !== null) return envOverride;
+  const ruleHit = evaluateRules(rules, {});
+  if (ruleHit !== null) return ruleHit;
+  if (rowEnabled !== null) return rowEnabled;
+  return registryDefault;
+}
+
 function matchesContext(
   match: FeatureFlagRuleMatch,
   ctx: RuleEvaluationContext,

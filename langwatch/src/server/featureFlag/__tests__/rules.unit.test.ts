@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   evaluateRules,
   parseRules,
+  resolveEffectiveForListing,
   type FeatureFlagRules,
 } from "../rules";
 
@@ -114,6 +115,68 @@ describe("parseRules", () => {
       expect(parsed).toHaveLength(1);
       expect(parsed[0]?.enabled).toBe(true);
       expect(parsed[0]?.match.organizationId).toBe("org_a");
+    });
+  });
+});
+
+describe("resolveEffectiveForListing", () => {
+  describe("when an env override is set", () => {
+    it("wins over rules, row default, and registry default", () => {
+      expect(
+        resolveEffectiveForListing({
+          envOverride: false,
+          rules: [{ match: {}, enabled: true }],
+          rowEnabled: true,
+          registryDefault: true,
+        }),
+      ).toBe(false);
+    });
+  });
+
+  describe("when an empty-match rule disables the flag", () => {
+    it("returns false even when the row toggle is on (regression: ops UI must not contradict the resolver)", () => {
+      // Resolver semantics: an empty-match rule matches every context
+      // and wins via first-match. Before this helper existed, the Ops
+      // table read `row.enabled` directly and showed "on" while the
+      // resolver returned false for every caller.
+      expect(
+        resolveEffectiveForListing({
+          envOverride: null,
+          rules: [{ match: {}, enabled: false }],
+          rowEnabled: true,
+          registryDefault: true,
+        }),
+      ).toBe(false);
+    });
+  });
+
+  describe("when only per-target rules are present", () => {
+    it("falls through to the row toggle because the listing has no context", () => {
+      // Per-org/per-project rules don't match the empty default context
+      // so the listing falls through to the row-level toggle, then to
+      // the registry default. The targeting UI surfaces those rules
+      // separately.
+      expect(
+        resolveEffectiveForListing({
+          envOverride: null,
+          rules: [{ match: { organizationId: "org_a" }, enabled: true }],
+          rowEnabled: false,
+          registryDefault: true,
+        }),
+      ).toBe(false);
+    });
+  });
+
+  describe("when nothing else applies", () => {
+    it("returns the registry default", () => {
+      expect(
+        resolveEffectiveForListing({
+          envOverride: null,
+          rules: [],
+          rowEnabled: null,
+          registryDefault: true,
+        }),
+      ).toBe(true);
     });
   });
 });

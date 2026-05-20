@@ -20,7 +20,10 @@ import {
   resolveFlagDefinition,
 } from "~/server/featureFlag";
 import { checkFlagEnvOverride } from "~/server/featureFlag/envOverride";
-import { featureFlagRulesSchema } from "~/server/featureFlag/rules";
+import {
+  featureFlagRulesSchema,
+  resolveEffectiveForListing,
+} from "~/server/featureFlag/rules";
 
 const opsViewPermission = checkOpsPermission({ permission: "ops:view" });
 
@@ -673,8 +676,12 @@ export const opsRouter = createTRPCRouter({
       const explicitRows = explicit.map((def) => {
         const row = stored.find((s) => s.key === def.key);
         const envOverride = checkFlagEnvOverride(def.key, def.legacyEnvVar);
-        const effective =
-          envOverride ?? row?.enabled ?? def.defaultValue;
+        const effective = resolveEffectiveForListing({
+          envOverride: envOverride ?? null,
+          rules: row?.rules ?? [],
+          rowEnabled: row?.enabled ?? null,
+          registryDefault: def.defaultValue,
+        });
         return {
           key: def.key,
           scope: def.scope,
@@ -705,8 +712,12 @@ export const opsRouter = createTRPCRouter({
         const row = stored.find((s) => s.key === desc.key);
         const def = resolveFlagDefinition(desc.key);
         const envOverride = checkFlagEnvOverride(desc.key, def?.legacyEnvVar);
-        const effective =
-          envOverride ?? row?.enabled ?? def?.defaultValue ?? false;
+        const effective = resolveEffectiveForListing({
+          envOverride: envOverride ?? null,
+          rules: row?.rules ?? [],
+          rowEnabled: row?.enabled ?? null,
+          registryDefault: def?.defaultValue ?? false,
+        });
         return {
           key: desc.key,
           scope: def?.scope ?? "SYSTEM",
@@ -738,8 +749,12 @@ export const opsRouter = createTRPCRouter({
             s.key,
             def?.legacyEnvVar,
           );
-          const effective =
-            envOverride ?? s.enabled ?? def?.defaultValue ?? false;
+          const effective = resolveEffectiveForListing({
+            envOverride: envOverride ?? null,
+            rules: s.rules,
+            rowEnabled: s.enabled,
+            registryDefault: def?.defaultValue ?? false,
+          });
           return {
             key: s.key,
             scope: def?.scope ?? "SYSTEM",

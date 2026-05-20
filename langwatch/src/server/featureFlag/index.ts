@@ -29,6 +29,7 @@ export {
   featureFlagRuleSchema,
   featureFlagRulesSchema,
   parseRules,
+  resolveEffectiveForListing,
 } from "./rules";
 export type {
   FeatureFlagRule,
