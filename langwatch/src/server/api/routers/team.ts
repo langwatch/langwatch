@@ -144,7 +144,9 @@ export const teamRouter = createTRPCRouter({
               assignedRole: true,
             },
           },
-          projects: true,
+          projects: {
+            where: { archivedAt: null },
+          },
         },
       });
 

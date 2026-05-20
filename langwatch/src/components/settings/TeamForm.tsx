@@ -15,7 +15,7 @@ import {
 } from "@chakra-ui/react";
 import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
 import { HelpCircle, Plus, Trash2 } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   Controller,
   type SubmitHandler,
@@ -24,6 +24,7 @@ import {
   useWatch,
 } from "react-hook-form";
 import { ProjectAvatar } from "../../components/ProjectAvatar";
+import { Dialog } from "../../components/ui/dialog";
 import { Link } from "../../components/ui/link";
 import { Tooltip } from "../../components/ui/tooltip";
 import { useDrawer } from "../../hooks/useDrawer";
@@ -41,49 +42,104 @@ import {
 function TeamProjectsList({ team }: { team: TeamWithProjectsAndMembersAndUsers }) {
   const queryClient = api.useContext();
   const { project, hasPermission } = useOrganizationTeamProject();
+  const [projectToArchive, setProjectToArchive] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
   const archiveProject = api.project.archiveById.useMutation({
     onSuccess: () => {
+      setProjectToArchive(null);
       void queryClient.organization.getAll.invalidate();
+      void queryClient.team.getTeamWithMembers.invalidate();
     },
   });
 
   return (
-    <Table.Body>
-      {team.projects.map((teamProject) => (
-        <Table.Row key={teamProject.id}>
-          <Table.Cell>
-            <HStack gap={2}>
-              <ProjectAvatar name={teamProject.name} />
-              <Link href={`/${teamProject.slug}`}>{teamProject.name}</Link>
-            </HStack>
-          </Table.Cell>
-          <Table.Cell textAlign="right">
-            {teamProject.id !== project?.id && hasPermission("project:delete") && (
-              <Button
-                variant="ghost"
-                color="red.fg"
-                size="sm"
-                onClick={() => {
-                  if (!project) return;
-                  if (confirm("Are you sure you want to archive this project? Contact LangWatch support to restore it.")) {
-                    archiveProject.mutate({ projectId: project.id, projectToArchiveId: teamProject.id });
+    <>
+      <Table.Body>
+        {team.projects.map((teamProject) => (
+          <Table.Row key={teamProject.id}>
+            <Table.Cell>
+              <HStack gap={2}>
+                <ProjectAvatar name={teamProject.name} />
+                <Link href={`/${teamProject.slug}`}>{teamProject.name}</Link>
+              </HStack>
+            </Table.Cell>
+            <Table.Cell textAlign="right">
+              {teamProject.id !== project?.id && hasPermission("project:delete") && (
+                <Button
+                  variant="ghost"
+                  color="red.fg"
+                  size="sm"
+                  onClick={() =>
+                    setProjectToArchive({
+                      id: teamProject.id,
+                      name: teamProject.name,
+                    })
                   }
-                }}
-              >
-                <Trash2 size={16} />
-              </Button>
-            )}
-          </Table.Cell>
-        </Table.Row>
-      ))}
-      {team.projects.length === 0 && (
-        <Table.Row>
-          <Table.Cell colSpan={2}>
-            <Text>No projects on this team</Text>
-          </Table.Cell>
-        </Table.Row>
-      )}
-    </Table.Body>
+                >
+                  <Trash2 size={16} />
+                </Button>
+              )}
+            </Table.Cell>
+          </Table.Row>
+        ))}
+        {team.projects.length === 0 && (
+          <Table.Row>
+            <Table.Cell colSpan={2}>
+              <Text>No projects on this team</Text>
+            </Table.Cell>
+          </Table.Row>
+        )}
+      </Table.Body>
+      <Dialog.Root
+        size="lg"
+        open={!!projectToArchive}
+        onOpenChange={({ open }) => {
+          if (!open) setProjectToArchive(null);
+        }}
+      >
+        <Dialog.Content bg="bg">
+          <Dialog.Header>
+            <Dialog.Title>Archive Project</Dialog.Title>
+          </Dialog.Header>
+          <Dialog.CloseTrigger />
+          <Dialog.Body paddingBottom={6}>
+            <VStack gap={4} align="start">
+              <Text>
+                Are you sure you want to archive{" "}
+                <Text as="span" fontWeight="semibold">
+                  &quot;{projectToArchive?.name}&quot;
+                </Text>
+                ? This will hide the project and all its data. Contact LangWatch
+                support to restore it.
+              </Text>
+              <HStack width="full" justify="end" gap={2}>
+                <Button
+                  variant="outline"
+                  onClick={() => setProjectToArchive(null)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  colorPalette="red"
+                  onClick={() => {
+                    if (!project || !projectToArchive) return;
+                    archiveProject.mutate({
+                      projectId: project.id,
+                      projectToArchiveId: projectToArchive.id,
+                    });
+                  }}
+                  disabled={archiveProject.isLoading}
+                >
+                  {archiveProject.isLoading ? "Archiving..." : "Archive"}
+                </Button>
+              </HStack>
+            </VStack>
+          </Dialog.Body>
+        </Dialog.Content>
+      </Dialog.Root>
+    </>
   );
 }
 
