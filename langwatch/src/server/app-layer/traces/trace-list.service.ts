@@ -9,6 +9,7 @@ import type {
   FacetTable,
   RangeFacetDef,
 } from "./facet-registry";
+import { deriveTraceStatus } from "./derive-trace-status";
 import { FACET_REGISTRY, TABLE_TIME_COLUMNS } from "./facet-registry";
 import type {
   BatchedFacetResult,
@@ -888,11 +889,7 @@ export class TraceListService {
 }
 
 function mapToTraceListItem(row: TraceSummaryData): TraceListItem {
-  const status: "ok" | "error" | "warning" = row.containsErrorStatus
-    ? "error"
-    : row.containsOKStatus
-      ? "ok"
-      : "warning";
+  const status = deriveTraceStatus(row);
 
   const totalTokens =
     (row.totalPromptTokenCount ?? 0) + (row.totalCompletionTokenCount ?? 0);

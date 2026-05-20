@@ -6,6 +6,7 @@ import {
   generateTraceQueryFromPrompt,
 } from "~/server/app-layer/traces/ai-query";
 import { ValidationError } from "~/server/app-layer/domain-error";
+import { deriveTraceStatus } from "~/server/app-layer/traces/derive-trace-status";
 import { TraceNotFoundError } from "~/server/app-layer/traces/errors";
 import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to-clickhouse";
 import type { SpanSummaryRow } from "~/server/app-layer/traces/repositories/span-storage.repository";
@@ -87,9 +88,7 @@ function mapTraceSummaryToHeader(summary: TraceSummaryData): TraceHeader {
     (summary.totalPromptTokenCount ?? 0) +
     (summary.totalCompletionTokenCount ?? 0);
 
-  let status: TraceHeader["status"] = "ok";
-  if (summary.containsErrorStatus) status = "error";
-  else if (!summary.containsOKStatus) status = "warning";
+  const status = deriveTraceStatus(summary);
 
   return {
     traceId: summary.traceId,
