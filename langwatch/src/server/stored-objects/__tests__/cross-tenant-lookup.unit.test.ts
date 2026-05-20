@@ -61,6 +61,7 @@ describe("resolveStoredObjectOwner", () => {
   });
 
   describe("when a private-CH tenant owns the row", () => {
+    /** @scenario "Cross-tenant owner lookup fans out to every ClickHouse instance" */
     it("finds the row in the private instance even though shared has no match", async () => {
       mockGetAllInstances.mockResolvedValue([
         { target: "shared", client: makeMockClient([]) },

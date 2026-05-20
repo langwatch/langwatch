@@ -446,6 +446,7 @@ describe("headById", () => {
   });
 
   describe("when the row exists and storage has the bytes", () => {
+    /** @scenario "headById returns a tri-state distinguishing not_found, missing, and available" */
     it("returns status available with the media type", async () => {
       const row = makeRow({ id: "obj-1", media_type: "audio/mp3" });
       vi.mocked(repo.findById).mockResolvedValue(row);
@@ -550,7 +551,7 @@ describe("mintStorageUri (BYOC bucket selection — observed through the inserte
 });
 
 describe("StoredObjectsService surface", () => {
-  /** @scenario "StoredObjectsService exposes storeFromBytes, getById, deleteOwnedBy" */
+  /** @scenario "StoredObjectsService exposes storeFromBytes, getById, headById, deleteOwnedBy" */
   it("exposes storeFromBytes, getById, deleteOwnedBy", () => {
     const mintStub: MintStorageUri = async ({ projectId, sha256 }) =>
       `file:///tmp/${projectId}/${sha256}`;
