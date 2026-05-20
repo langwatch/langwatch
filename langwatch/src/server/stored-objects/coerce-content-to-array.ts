@@ -55,6 +55,27 @@ export function coerceContentToArray(content: unknown): unknown[] | null {
  * JSON-encode their content directly; do not lean on this function as
  * an excuse to keep emitting Python repr.
  */
+/**
+ * If ``input`` at ``offset`` begins with a Python ``\xHH`` byte escape,
+ * return its JSON ``\u00HH`` equivalent and the number of source chars
+ * consumed (always 4). Returns ``null`` otherwise.
+ *
+ * JSON.parse rejects ``\xHH`` outright; without this translation the
+ * recovery path returns null on any Python repr that contains a control
+ * byte (rare in chat content but well within spec).
+ */
+function readPythonHexEscape(
+  input: string,
+  offset: number,
+): { json: string; consumed: number } | null {
+  if (input[offset] !== "\\" || input[offset + 1] !== "x") return null;
+  const h1 = input[offset + 2];
+  const h2 = input[offset + 3];
+  if (h1 === undefined || h2 === undefined) return null;
+  if (!/[0-9a-fA-F]/.test(h1) || !/[0-9a-fA-F]/.test(h2)) return null;
+  return { json: `\\u00${h1}${h2}`, consumed: 4 };
+}
+
 function pythonReprToJsonish(input: string): string {
   let out = "";
   let i = 0;
@@ -125,6 +146,12 @@ function pythonReprToJsonish(input: string): string {
           i += 2;
           continue;
         }
+        const hex = readPythonHexEscape(input, i);
+        if (hex !== null) {
+          out += hex.json;
+          i += hex.consumed;
+          continue;
+        }
         if (next !== undefined) {
           // Pass through other escapes verbatim (\n, \t, \\, \uXXXX
           // all share semantics between Python and JSON).
@@ -156,6 +183,12 @@ function pythonReprToJsonish(input: string): string {
 
     // state === "double"
     if (c === "\\") {
+      const hex = readPythonHexEscape(input, i);
+      if (hex !== null) {
+        out += hex.json;
+        i += hex.consumed;
+        continue;
+      }
       const next = input[i + 1];
       if (next !== undefined) {
         out += c + next;
