@@ -49,7 +49,16 @@ const SCOPE_COLLECTION = createListCollection<{ value: ScopeKind; label: string 
   ],
 });
 
+const DEFAULT_NEW_RULE: UIRule = {
+  scopeKind: "ORGANIZATION",
+  scopeId: "",
+  enabled: true,
+};
+
 function rulesToUI(rules: FeatureFlagRules): UIRule[] {
+  // Empty input → seed the dialog with one org-scoped rule so operators
+  // see the shape they're about to fill in instead of an empty pane.
+  if (rules.length === 0) return [DEFAULT_NEW_RULE];
   return rules.map((r) => {
     if (r.match.organizationId) {
       return {

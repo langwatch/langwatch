@@ -217,7 +217,6 @@ function ScopeSection({
               <Table.ColumnHeader>Flag</Table.ColumnHeader>
               <Table.ColumnHeader>Effective</Table.ColumnHeader>
               <Table.ColumnHeader>Source</Table.ColumnHeader>
-              <Table.ColumnHeader>Targeting</Table.ColumnHeader>
               <Table.ColumnHeader>Default</Table.ColumnHeader>
               <Table.ColumnHeader>Last edit</Table.ColumnHeader>
             </Table.Row>
@@ -305,35 +304,23 @@ function FlagRowView({
         </VStack>
       </Table.Cell>
       <Table.Cell>
-        <HStack gap={3}>
-          <Switch
-            checked={effective}
-            disabled={!canManage || envLocked || pending}
-            onCheckedChange={(details) => void onChange(details.checked)}
-          />
-          {envLocked && (
-            <Tooltip
-              content={`Locked by env override (${row.envOverride ? "1" : "0"}). The toggle is disabled because the env var wins over postgres.`}
-            >
-              <Badge colorPalette="orange" size="sm" variant="subtle">
-                env override
-              </Badge>
-            </Tooltip>
-          )}
-        </HStack>
-      </Table.Cell>
-      <Table.Cell>
-        <Text fontSize="xs">{source}</Text>
-      </Table.Cell>
-      <Table.Cell>
-        <HStack gap={2}>
-          <Text fontSize="xs" color={ruleCount > 0 ? "fg" : "fg.muted"}>
-            {ruleCount === 0
-              ? "no rules"
-              : ruleCount === 1
-                ? "1 rule"
-                : `${ruleCount} rules`}
-          </Text>
+        <VStack align="start" gap={1}>
+          <HStack gap={3}>
+            <Switch
+              checked={effective}
+              disabled={!canManage || envLocked || pending}
+              onCheckedChange={(details) => void onChange(details.checked)}
+            />
+            {envLocked && (
+              <Tooltip
+                content={`Locked by env override (${row.envOverride ? "1" : "0"}). The toggle is disabled because the env var wins over postgres.`}
+              >
+                <Badge colorPalette="orange" size="sm" variant="subtle">
+                  env override
+                </Badge>
+              </Tooltip>
+            )}
+          </HStack>
           {canManage && !envLocked && (
             <Button
               type="button"
@@ -347,16 +334,21 @@ function FlagRowView({
               minWidth="auto"
               onClick={() => setRulesDialogOpen(true)}
             >
-              {ruleCount === 0 ? "add" : "edit"}
+              {ruleCount === 0
+                ? "Specific targeting"
+                : `Specific targeting (${ruleCount})`}
             </Button>
           )}
-        </HStack>
+        </VStack>
         <FeatureFlagRulesDialog
           open={rulesDialogOpen}
           onOpenChange={setRulesDialogOpen}
           flagKey={row.key}
           initialRules={row.rules}
         />
+      </Table.Cell>
+      <Table.Cell>
+        <Text fontSize="xs">{source}</Text>
       </Table.Cell>
       <Table.Cell>
         <Text fontSize="xs">{row.defaultValue ? "on" : "off"}</Text>
