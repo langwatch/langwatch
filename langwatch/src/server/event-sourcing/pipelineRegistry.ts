@@ -192,6 +192,7 @@ export interface PipelineRegistryDeps {
   gatewayBudgetSync?: GatewayBudgetSyncReactorDeps;
   governanceKpisSync?: GovernanceKpisSyncReactorDeps;
   governanceOcsfEventsSync?: GovernanceOcsfEventsSyncReactorDeps;
+  retentionPolicyResolver?: import("../data-retention/retentionPolicyResolver").RetentionPolicyResolver;
 }
 
 /**

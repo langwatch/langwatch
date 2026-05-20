@@ -9,7 +9,7 @@ import type { NormalizedSpan } from "../schemas/spans";
 /**
  * Maps a pipeline NormalizedSpan to the app-layer SpanInsertData.
  */
-function toAppLayer(span: NormalizedSpan): SpanInsertData {
+function toAppLayer(span: NormalizedSpan, retentionDays: number): SpanInsertData {
   return {
     id: span.id,
     tenantId: span.tenantId,
@@ -45,6 +45,7 @@ function toAppLayer(span: NormalizedSpan): SpanInsertData {
     droppedAttributesCount: span.droppedAttributesCount,
     droppedEventsCount: span.droppedEventsCount,
     droppedLinksCount: span.droppedLinksCount,
+    retentionDays,
   };
 }
 
@@ -99,20 +100,22 @@ export class SpanAppendStore implements AppendStore<NormalizedSpan> {
 
   async append(
     record: NormalizedSpan,
-    _context: ProjectionStoreContext,
+    context: ProjectionStoreContext,
   ): Promise<void> {
     const transformed = await applyGovernanceStrip(record, this.stripService);
-    await this.repo.insertSpan(toAppLayer(transformed));
+    const retentionDays = context.retentionPolicy?.traces ?? 0;
+    await this.repo.insertSpan(toAppLayer(transformed, retentionDays));
   }
 
   async bulkAppend(
     records: NormalizedSpan[],
-    _context: ProjectionStoreContext,
+    context: ProjectionStoreContext,
   ): Promise<void> {
     if (records.length === 0) return;
     const transformed = await Promise.all(
       records.map((r) => applyGovernanceStrip(r, this.stripService)),
     );
-    await this.repo.insertSpans(transformed.map(toAppLayer));
+    const retentionDays = context.retentionPolicy?.traces ?? 0;
+    await this.repo.insertSpans(transformed.map((r) => toAppLayer(r, retentionDays)));
   }
 }

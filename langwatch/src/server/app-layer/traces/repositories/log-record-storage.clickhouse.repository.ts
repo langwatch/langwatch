@@ -10,12 +10,21 @@ const logger = createLogger(
   "langwatch:app-layer:traces:log-record-storage-repository",
 );
 
+function estimateLogRecordSizeBytes(record: NormalizedLogRecord): number {
+  let size = 64;
+  size += record.body?.length ?? 0;
+  size += JSON.stringify(record.attributes).length;
+  size += JSON.stringify(record.resourceAttributes).length;
+  size += record.severityText?.length ?? 0;
+  return size;
+}
+
 export class LogRecordStorageClickHouseRepository
   implements LogRecordStorageRepository
 {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
-  async insertLogRecord(record: NormalizedLogRecord): Promise<void> {
+  async insertLogRecord(record: NormalizedLogRecord, retentionDays = 0): Promise<void> {
     EventUtils.validateTenantId(
       { tenantId: record.tenantId },
       "LogRecordStorageClickHouseRepository.insertLogRecord",
@@ -42,6 +51,8 @@ export class LogRecordStorageClickHouseRepository
             ScopeVersion: record.scopeVersion,
             CreatedAt: now,
             UpdatedAt: now,
+            _retention_days: retentionDays,
+            _size_bytes: estimateLogRecordSizeBytes(record),
           },
         ],
         format: "JSONEachRow",

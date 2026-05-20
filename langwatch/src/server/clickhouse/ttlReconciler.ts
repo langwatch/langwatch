@@ -2,6 +2,7 @@ import { createClient } from "@clickhouse/client";
 
 import { createLogger } from "../../utils/logger/server";
 import { parseConnectionUrl } from "./goose";
+import { RETENTION_MANAGED_TABLES } from "../data-retention/retentionPolicy.schema";
 
 const logger = createLogger("langwatch:clickhouse:ttl-reconciler");
 
@@ -12,6 +13,10 @@ export interface TableTTLEntry {
   ttlColumnExpression?: string;
   envVar: string;
   hardcodedDefault: number;
+  /** Immutable business-timestamp column for retention TTL (may differ from cold-storage anchor). */
+  retentionTTLColumn?: string;
+  /** Override for the retention TTL column expression (e.g. for UInt64 epoch ms). */
+  retentionTTLColumnExpression?: string;
 }
 
 /**
@@ -34,12 +39,14 @@ export const TABLE_TTL_CONFIG: readonly TableTTLEntry[] = [
   {
     table: "dspy_steps",
     ttlColumn: "CreatedAt",
+    retentionTTLColumn: "CreatedAt",
     envVar: "CLICKHOUSE_COLD_STORAGE_DSPY_STEPS_TTL_DAYS",
     hardcodedDefault: 49,
   },
   {
     table: "evaluation_runs",
     ttlColumn: "UpdatedAt",
+    retentionTTLColumn: "ScheduledAt",
     envVar: "CLICKHOUSE_COLD_STORAGE_EVALUATION_RUNS_TTL_DAYS",
     hardcodedDefault: 49,
   },
@@ -47,48 +54,64 @@ export const TABLE_TTL_CONFIG: readonly TableTTLEntry[] = [
     table: "event_log",
     ttlColumn: "EventOccurredAt",
     ttlColumnExpression: "toDateTime(EventOccurredAt / 1000)",
+    retentionTTLColumn: "EventOccurredAt",
+    retentionTTLColumnExpression: "toDateTime(EventOccurredAt / 1000)",
     envVar: "CLICKHOUSE_COLD_STORAGE_EVENT_LOG_TTL_DAYS",
     hardcodedDefault: 49,
   },
   {
     table: "experiment_run_items",
     ttlColumn: "OccurredAt",
+    retentionTTLColumn: "OccurredAt",
     envVar: "CLICKHOUSE_COLD_STORAGE_EXPERIMENT_RUN_ITEMS_TTL_DAYS",
     hardcodedDefault: 49,
   },
   {
     table: "experiment_runs",
     ttlColumn: "StartedAt",
+    retentionTTLColumn: "StartedAt",
     envVar: "CLICKHOUSE_COLD_STORAGE_EXPERIMENT_RUNS_TTL_DAYS",
     hardcodedDefault: 49,
   },
   {
     table: "simulation_runs",
     ttlColumn: "StartedAt",
+    retentionTTLColumn: "StartedAt",
     envVar: "CLICKHOUSE_COLD_STORAGE_SIMULATION_RUNS_TTL_DAYS",
     hardcodedDefault: 49,
   },
   {
     table: "stored_log_records",
     ttlColumn: "TimeUnixMs",
+    retentionTTLColumn: "TimeUnixMs",
     envVar: "CLICKHOUSE_COLD_STORAGE_LOG_RECORDS_TTL_DAYS",
+    hardcodedDefault: 49,
+  },
+  {
+    table: "suite_runs",
+    ttlColumn: "StartedAt",
+    retentionTTLColumn: "StartedAt",
+    envVar: "CLICKHOUSE_COLD_STORAGE_SUITE_RUNS_TTL_DAYS",
     hardcodedDefault: 49,
   },
   {
     table: "stored_metric_records",
     ttlColumn: "TimeUnixMs",
+    retentionTTLColumn: "TimeUnixMs",
     envVar: "CLICKHOUSE_COLD_STORAGE_METRIC_RECORDS_TTL_DAYS",
     hardcodedDefault: 49,
   },
   {
     table: "stored_spans",
     ttlColumn: "EndTime",
+    retentionTTLColumn: "StartTime",
     envVar: "CLICKHOUSE_COLD_STORAGE_SPANS_TTL_DAYS",
     hardcodedDefault: 49,
   },
   {
     table: "trace_summaries",
     ttlColumn: "OccurredAt",
+    retentionTTLColumn: "OccurredAt",
     envVar: "CLICKHOUSE_COLD_STORAGE_TRACE_SUMMARIES_TTL_DAYS",
     hardcodedDefault: 49,
   },
@@ -184,6 +207,18 @@ export function buildDesiredTTLExpression({
   return `${colExpr} + INTERVAL ${days} DAY TO VOLUME 'cold'`;
 }
 
+export function buildRetentionTTLExpression(config: TableTTLEntry): string | null {
+  if (!config.retentionTTLColumn) return null;
+  const colExpr =
+    config.retentionTTLColumnExpression ??
+    `toDateTime(${config.retentionTTLColumn})`;
+  return `IF(_retention_days > 0, ${colExpr} + toIntervalDay(_retention_days), toDateTime('2106-01-01')) DELETE`;
+}
+
+export function hasRetentionTTL(engineFull: string): boolean {
+  return engineFull.includes("_retention_days") && engineFull.includes("DELETE");
+}
+
 interface ReconcileOptions {
   connectionUrl?: string;
   database?: string;
@@ -260,15 +295,36 @@ export async function reconcileTTL(
       }
 
       // TTL volume routing (`TO VOLUME 'cold'`) only works on tables using the
-      // tiered storage policy. Tables on 'default' policy don't have a cold volume.
+      // tiered storage policy. Tables on 'default' policy don't have a cold volume,
+      // but they CAN still have retention DELETE TTL.
       if (tableInfo.storage_policy !== TIERED_STORAGE_POLICY) {
-        if (options.verbose) {
-          logger.info(
-            { table: tableConfig.table, policy: tableInfo.storage_policy },
-            `Table uses '${tableInfo.storage_policy}' policy (not '${TIERED_STORAGE_POLICY}'), skipping TTL`,
-          );
+        const retentionTTLExpr = buildRetentionTTLExpression(tableConfig);
+        if (
+          retentionTTLExpr &&
+          RETENTION_MANAGED_TABLES.includes(tableConfig.table) &&
+          !hasRetentionTTL(tableInfo.engine_full)
+        ) {
+          const onCluster = config.clusterName
+            ? ` ON CLUSTER \`${config.clusterName}\``
+            : "";
+          const alterQuery = `ALTER TABLE \`${config.database}\`.\`${tableConfig.table}\`${onCluster} MODIFY TTL ${retentionTTLExpr} SETTINGS materialize_ttl_after_modify = 0`;
+          if (options.verbose) {
+            logger.info(
+              { table: tableConfig.table },
+              "Applying retention-only TTL (no cold storage)",
+            );
+          }
+          await client.command({ query: alterQuery });
+          updatedCount++;
+        } else {
+          if (options.verbose) {
+            logger.info(
+              { table: tableConfig.table, policy: tableInfo.storage_policy },
+              `Table uses '${tableInfo.storage_policy}' policy (not '${TIERED_STORAGE_POLICY}'), skipping cold-storage TTL`,
+            );
+          }
+          skippedCount++;
         }
-        skippedCount++;
         continue;
       }
 
@@ -288,18 +344,37 @@ export async function reconcileTTL(
         continue;
       }
 
-      const ttlExpr = buildDesiredTTLExpression({
+      const coldTTLExpr = buildDesiredTTLExpression({
         config: tableConfig,
         days: desiredDays,
       });
+
+      const retentionTTLExpr = buildRetentionTTLExpression(tableConfig);
+      const needsRetention =
+        retentionTTLExpr &&
+        RETENTION_MANAGED_TABLES.includes(tableConfig.table) &&
+        !hasRetentionTTL(engineFull);
+
+      const ttlClauses = [
+        coldTTLExpr,
+        needsRetention ? retentionTTLExpr : null,
+      ]
+        .filter(Boolean)
+        .join(",\n  ");
+
       const onCluster = config.clusterName
         ? ` ON CLUSTER \`${config.clusterName}\``
         : "";
-      const alterQuery = `ALTER TABLE \`${config.database}\`.\`${tableConfig.table}\`${onCluster} MODIFY TTL ${ttlExpr} SETTINGS materialize_ttl_after_modify = 0`;
+      const alterQuery = `ALTER TABLE \`${config.database}\`.\`${tableConfig.table}\`${onCluster} MODIFY TTL ${ttlClauses} SETTINGS materialize_ttl_after_modify = 0`;
 
       if (options.verbose) {
         logger.info(
-          { table: tableConfig.table, from: currentDays, to: desiredDays },
+          {
+            table: tableConfig.table,
+            from: currentDays,
+            to: desiredDays,
+            retentionTTL: needsRetention,
+          },
           "Updating TTL",
         );
       }

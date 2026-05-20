@@ -33,6 +33,7 @@ import type { OpsMetricsCollector } from "./ops/metrics-collector";
 import type { UsageService } from "./usage/usage.service";
 import type { ExperimentService } from "../experiments/experiment.service";
 import type { TriggerService } from "./triggers/trigger.service";
+import type { RetentionPolicyCache } from "../data-retention/retentionPolicyCache";
 
 export interface OpsDependencies {
   queues: QueueService;
@@ -86,6 +87,7 @@ export interface AppDependencies {
   notifications: NotificationService;
   nurturing?: NurturingService;
   usageLimits: UsageLimitService;
+  retentionPolicyCache: RetentionPolicyCache;
   commands: AppCommands;
   ops?: OpsDependencies;
 

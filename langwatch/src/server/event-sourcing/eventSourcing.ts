@@ -49,6 +49,7 @@ export interface EventSourcingOptions {
   enabled?: boolean; // defaults to true
   isSaas?: boolean; // defaults to false
   processRole?: ProcessRole;
+  retentionPolicyResolver?: import("../data-retention/retentionPolicyResolver").RetentionPolicyResolver;
 }
 
 /**
@@ -104,12 +105,14 @@ export class EventSourcing {
   private readonly _clickhouse?: ClickHouseClientResolver | null;
   private readonly _redis?: IORedis | Cluster | null;
   private readonly _processRole?: ProcessRole;
+  private readonly _retentionPolicyResolver?: import("../data-retention/retentionPolicyResolver").RetentionPolicyResolver;
 
   constructor(options: EventSourcingOptions = {}) {
     this._enabled = options.enabled ?? true;
     this._clickhouse = options.clickhouse;
     this._redis = options.redis;
     this._processRole = options.processRole;
+    this._retentionPolicyResolver = options.retentionPolicyResolver;
 
     // Create projection registry and register SaaS-only projections
     this.projectionRegistry = new ProjectionRegistry<Event>();
@@ -296,6 +299,7 @@ export class EventSourcing {
           replayMarkerChecker: this._redis
             ? new RedisReplayMarkerChecker(this._redis)
             : undefined,
+          retentionPolicyResolver: this._retentionPolicyResolver,
         });
 
         // Get command dispatchers

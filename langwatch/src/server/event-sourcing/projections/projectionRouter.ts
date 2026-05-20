@@ -34,6 +34,7 @@ import type { MapProjectionDefinition } from "./mapProjection.types";
 import { MapProjectionExecutor } from "./mapProjectionExecutor";
 import type { ProjectionStoreContext } from "./projectionStoreContext";
 import type { ReplayMarkerChecker } from "./replayMarkerCheck";
+import type { RetentionPolicyResolver } from "../../data-retention/retentionPolicyResolver";
 
 /**
  * Default cap on how many same-aggregate fold events are coalesced into one
@@ -74,6 +75,7 @@ export class ProjectionRouter<
     private readonly featureFlagService?: FeatureFlagServiceInterface,
     private readonly processRole?: ProcessRole,
     private readonly replayMarkerChecker?: ReplayMarkerChecker,
+    private readonly retentionPolicyResolver?: RetentionPolicyResolver,
   ) {}
 
   registerFoldProjection(projection: FoldProjectionDefinition<any, EventType>): void {
@@ -317,9 +319,11 @@ export class ProjectionRouter<
         name,
         handler: {
           handle: async (event: EventType) => {
+            const retentionPolicy = await this.resolveRetention(event.tenantId);
             const context: ProjectionStoreContext = {
               aggregateId: String(event.aggregateId),
               tenantId: event.tenantId,
+              retentionPolicy,
             };
             const record = await withMetrics({
               fn: () => this.mapExecutor.execute(mapProj, event, context),
@@ -558,9 +562,11 @@ export class ProjectionRouter<
           }
 
           try {
+            const retentionPolicy = await this.resolveRetention(event.tenantId);
             const storeContext: ProjectionStoreContext = {
               aggregateId: String(event.aggregateId),
               tenantId: event.tenantId,
+              retentionPolicy,
             };
             const record = await withMetrics({
               fn: () => this.mapExecutor.execute(mapProj, event, storeContext),
@@ -634,10 +640,12 @@ export class ProjectionRouter<
         }
 
         const key = fold.key ? fold.key(event) : undefined;
+        const retentionPolicy = await this.resolveRetention(event.tenantId);
         const storeContext: ProjectionStoreContext = {
           aggregateId: String(event.aggregateId),
           tenantId: event.tenantId,
           key,
+          retentionPolicy,
         };
 
         const foldState = await withMetrics({
@@ -926,5 +934,10 @@ export class ProjectionRouter<
   private isReactorExcluded(reactor: ReactorDefinition<EventType>): boolean {
     if (!reactor.options?.runIn || !this.processRole) return false;
     return !reactor.options.runIn.includes(this.processRole);
+  }
+
+  private async resolveRetention(tenantId: unknown): Promise<import("../../data-retention/retentionPolicy.schema").RetentionPolicy | null> {
+    if (!this.retentionPolicyResolver) return null;
+    return this.retentionPolicyResolver.resolve(String(tenantId));
   }
 }

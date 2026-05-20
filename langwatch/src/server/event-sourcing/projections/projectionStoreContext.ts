@@ -1,4 +1,5 @@
 import type { TenantId } from "../domain/tenantId";
+import type { RetentionPolicy } from "../../data-retention/retentionPolicy.schema";
 
 /**
  * Context passed to projection stores for both fold and map projections.
@@ -13,4 +14,7 @@ export interface ProjectionStoreContext {
 
   /** Custom projection key. Defaults to aggregateId when not set. */
   key?: string;
+
+  /** Resolved retention policy for the tenant. Absent = indefinite (0). */
+  retentionPolicy?: RetentionPolicy | null;
 }

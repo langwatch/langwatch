@@ -8,8 +8,9 @@ export class LogRecordAppendStore implements AppendStore<NormalizedLogRecord> {
 
   async append(
     record: NormalizedLogRecord,
-    _context: ProjectionStoreContext,
+    context: ProjectionStoreContext,
   ): Promise<void> {
-    await this.repo.insertLogRecord(record);
+    const retentionDays = context.retentionPolicy?.traces ?? 0;
+    await this.repo.insertLogRecord(record, retentionDays);
   }
 }

@@ -1,4 +1,5 @@
 import {
+  Prisma,
   PIIRedactionLevel,
   type Project,
   ProjectSensitiveDataVisibilityLevel,
@@ -6,7 +7,9 @@ import {
 import { Factory } from "fishery";
 import { nanoid } from "nanoid";
 
-export const projectFactory = Factory.define<Project>(({ sequence }) => ({
+export const projectFactory = Factory.define<
+  Omit<Project, "retentionPolicy"> & { retentionPolicy: any }
+>(({ sequence }) => ({
   id: nanoid(),
   name: `Test Project ${sequence}`,
   slug: `test-project-${sequence}`,
@@ -34,4 +37,5 @@ export const projectFactory = Factory.define<Project>(({ sequence }) => ({
   presenceEnabled: false,
   personalFeatures: {},
   costCenterId: null,
+  retentionPolicy: undefined as any,
 }));

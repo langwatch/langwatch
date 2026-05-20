@@ -10,8 +10,9 @@ export class MetricRecordAppendStore
 
   async append(
     record: NormalizedMetricRecord,
-    _context: ProjectionStoreContext,
+    context: ProjectionStoreContext,
   ): Promise<void> {
-    await this.repo.insertMetricRecord(record);
+    const retentionDays = context.retentionPolicy?.traces ?? 0;
+    await this.repo.insertMetricRecord(record, retentionDays);
   }
 }

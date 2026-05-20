@@ -10,12 +10,20 @@ const logger = createLogger(
   "langwatch:app-layer:traces:metric-record-storage-repository",
 );
 
+function estimateMetricRecordSizeBytes(record: NormalizedMetricRecord): number {
+  let size = 64;
+  size += record.metricName.length;
+  size += JSON.stringify(record.attributes).length;
+  size += JSON.stringify(record.resourceAttributes).length;
+  return size;
+}
+
 export class MetricRecordStorageClickHouseRepository
   implements MetricRecordStorageRepository
 {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
-  async insertMetricRecord(record: NormalizedMetricRecord): Promise<void> {
+  async insertMetricRecord(record: NormalizedMetricRecord, retentionDays = 0): Promise<void> {
     EventUtils.validateTenantId(
       { tenantId: record.tenantId },
       "MetricRecordStorageClickHouseRepository.insertMetricRecord",
@@ -41,6 +49,8 @@ export class MetricRecordStorageClickHouseRepository
             ResourceAttributes: record.resourceAttributes,
             CreatedAt: now,
             UpdatedAt: now,
+            _retention_days: retentionDays,
+            _size_bytes: estimateMetricRecordSizeBytes(record),
           },
         ],
         format: "JSONEachRow",

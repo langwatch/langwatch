@@ -41,13 +41,20 @@ export class RepositoryFoldStore<TData>
       data: state,
     };
 
-    await this.repo.storeProjection(projection, { tenantId: context.tenantId });
+    await this.repo.storeProjection(projection, {
+      tenantId: context.tenantId,
+      metadata: context.retentionPolicy
+        ? { retentionPolicy: context.retentionPolicy }
+        : undefined,
+    });
   }
 
   async storeBatch(
     entries: Array<{ state: TData; context: ProjectionStoreContext }>,
   ): Promise<void> {
     if (entries.length === 0) return;
+
+    const firstContext = entries[0]!.context;
 
     // Use native batch insert if the repository supports it
     if (this.repo.storeProjectionBatch) {
@@ -59,7 +66,10 @@ export class RepositoryFoldStore<TData>
         data: entry.state,
       }));
       await this.repo.storeProjectionBatch(projections, {
-        tenantId: entries[0]!.context.tenantId,
+        tenantId: firstContext.tenantId,
+        metadata: firstContext.retentionPolicy
+          ? { retentionPolicy: firstContext.retentionPolicy }
+          : undefined,
       });
       return;
     }

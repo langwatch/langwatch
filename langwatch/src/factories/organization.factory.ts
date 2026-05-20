@@ -1,10 +1,11 @@
-import { PricingModel, type Organization } from "@prisma/client";
+import { Prisma, PricingModel, type Organization } from "@prisma/client";
 import { Factory } from "fishery";
 import { nanoid } from "nanoid";
 
 export const organizationFactory = Factory.define<
   Omit<Organization, "stripeCustomerId" | "currency"> & {
     signupData: any;
+    defaultRetentionPolicy: any;
   }
 >(({ sequence }) => ({
   id: nanoid(),
@@ -35,4 +36,5 @@ export const organizationFactory = Factory.define<
   licenseExpiresAt: null,
   licenseLastValidatedAt: null,
   presenceEnabled: false,
+  defaultRetentionPolicy: null,
 }));

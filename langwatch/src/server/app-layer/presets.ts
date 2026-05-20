@@ -115,6 +115,7 @@ import { SimulationRunStateRepositoryClickHouse, SimulationRunStateRepositoryMem
 import { ExperimentRunStateRepositoryClickHouse, ExperimentRunStateRepositoryMemory } from "../event-sourcing/pipelines/experiment-run-processing/repositories";
 import { createExperimentRunItemAppendStore } from "../event-sourcing/pipelines/experiment-run-processing/projections/experimentRunResultStorage.store";
 import type { PipelineRepositories } from "../event-sourcing/pipelineRegistry";
+import { RetentionPolicyCache } from "../data-retention/retentionPolicyCache";
 
 /**
  * Late-bound handle for the scenario execution reactor.
@@ -333,12 +334,15 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
       })
     : undefined;
 
+  const retentionPolicyCache = new RetentionPolicyCache(prisma);
+
   const es = new EventSourcing({
     clickhouse: clickhouseEnabled ? resolveClickHouseClient : void 0,
     redis,
     enabled: true,
     isSaas: config.isSaas,
     processRole: config.processRole,
+    retentionPolicyResolver: retentionPolicyCache,
   });
 
   // Construct repositories at the composition root — ClickHouse-or-Memory decisions live here.
@@ -547,6 +551,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     notifications,
     nurturing,
     usageLimits,
+    retentionPolicyCache,
     commands,
     ops,
     _eventSourcing: es,
@@ -684,6 +689,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       } as AppCommands["billing"],
       scenarioExecutionHandle: { reactor: { name: "scenarioExecution", options: { runIn: ["worker"] }, handle: async () => {} }, setPool: () => {} },
     },
+    retentionPolicyCache: new RetentionPolicyCache(testPrisma),
     ...overrides,
   });
 }

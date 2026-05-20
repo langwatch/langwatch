@@ -12,6 +12,7 @@ import type { CommandHandlerOptions } from "../services/commands/commandDispatch
 import type { EventSourcingService } from "../services/eventSourcingService";
 import type { JobRegistryEntry } from "../services/queues/queueManager";
 import type { ReplayMarkerChecker } from "../projections/replayMarkerCheck";
+import type { RetentionPolicyResolver } from "../../data-retention/retentionPolicyResolver";
 import type { EventStore } from "../stores/eventStore.types";
 
 /**
@@ -57,6 +58,7 @@ export interface EventSourcingPipelineDefinition<
   globalRegistry?: ProjectionRegistry<Event>;
   processRole?: ProcessRole;
   replayMarkerChecker?: ReplayMarkerChecker;
+  retentionPolicyResolver?: RetentionPolicyResolver;
 }
 
 export interface RegisteredPipeline<

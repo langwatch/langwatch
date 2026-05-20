@@ -107,6 +107,7 @@ model User {
   ingestionSourcesCreated IngestionSource[]        @relation("IngestionSourceCreatedBy")
   anomalyRulesCreated     AnomalyRule[]            @relation("AnomalyRuleCreatedBy")
   userIngestionBindings   UserIngestionBinding[]
+  pinnedTraces            PinnedTrace[]
 }
 
 model VerificationToken {
@@ -280,6 +281,7 @@ model Organization {
   aiToolEntries          AiToolEntry[]
   ingestionTemplates     IngestionTemplate[]
   userIngestionBindings  UserIngestionBinding[]
+  defaultRetentionPolicy Json?
 
   @@index([ssoProvider])
 }
@@ -409,6 +411,8 @@ model Project {
   gatewayGuardrails        GatewayGuardrail[]                  @relation("ProjectGatewayGuardrails")
   gatewayChangeEvents      GatewayChangeEvent[]
   userIngestionBindings    UserIngestionBinding[]
+  retentionPolicy          Json?
+  pinnedTraces             PinnedTrace[]
 
   // Denormalised mirror of parent Team's personal flag for fast
   // lookup at trace ingest time without a Team join. Always equals
@@ -1090,6 +1094,20 @@ model PublicShare {
 
   @@unique([projectId, resourceType, resourceId])
   @@index([userId])
+}
+
+model PinnedTrace {
+    id        String   @id @default(nanoid())
+    projectId String
+    project   Project  @relation(fields: [projectId], references: [id])
+    traceId   String
+    userId    String?
+    user      User?    @relation(fields: [userId], references: [id])
+    reason    String?
+    createdAt DateTime @default(now())
+
+    @@unique([projectId, traceId])
+    @@index([projectId])
 }
 
 enum CustomLLMModelCostScopeType {
