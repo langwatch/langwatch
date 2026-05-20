@@ -5,12 +5,14 @@ import {
   Center,
   HStack,
   Heading,
+  IconButton,
   Spinner,
   Stack,
   Table,
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { Settings } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Switch } from "~/components/ui/switch";
 import { Tooltip } from "~/components/ui/tooltip";
@@ -304,42 +306,41 @@ function FlagRowView({
         </VStack>
       </Table.Cell>
       <Table.Cell>
-        <VStack align="start" gap={1}>
-          <HStack gap={3}>
-            <Switch
-              checked={effective}
-              disabled={!canManage || envLocked || pending}
-              onCheckedChange={(details) => void onChange(details.checked)}
-            />
-            {envLocked && (
-              <Tooltip
-                content={`Locked by env override (${row.envOverride ? "1" : "0"}). The toggle is disabled because the env var wins over postgres.`}
-              >
-                <Badge colorPalette="orange" size="sm" variant="subtle">
-                  env override
-                </Badge>
-              </Tooltip>
-            )}
-          </HStack>
+        <HStack gap={2}>
+          <Switch
+            checked={effective}
+            disabled={!canManage || envLocked || pending}
+            onCheckedChange={(details) => void onChange(details.checked)}
+          />
           {canManage && !envLocked && (
-            <Button
-              type="button"
-              variant="plain"
-              size="xs"
-              fontSize="xs"
-              color="blue.500"
-              textDecoration="underline"
-              paddingX={0}
-              height="auto"
-              minWidth="auto"
-              onClick={() => setRulesDialogOpen(true)}
+            <Tooltip
+              content={
+                ruleCount === 0
+                  ? "Specific targeting"
+                  : `Specific targeting (${ruleCount} rule${ruleCount === 1 ? "" : "s"})`
+              }
             >
-              {ruleCount === 0
-                ? "Specific targeting"
-                : `Specific targeting (${ruleCount})`}
-            </Button>
+              <IconButton
+                aria-label="Specific targeting"
+                size="xs"
+                variant="ghost"
+                onClick={() => setRulesDialogOpen(true)}
+                colorPalette={ruleCount > 0 ? "blue" : "gray"}
+              >
+                <Settings size={14} />
+              </IconButton>
+            </Tooltip>
           )}
-        </VStack>
+          {envLocked && (
+            <Tooltip
+              content={`Locked by env override (${row.envOverride ? "1" : "0"}). The toggle is disabled because the env var wins over postgres.`}
+            >
+              <Badge colorPalette="orange" size="sm" variant="subtle">
+                env override
+              </Badge>
+            </Tooltip>
+          )}
+        </HStack>
         <FeatureFlagRulesDialog
           open={rulesDialogOpen}
           onOpenChange={setRulesDialogOpen}

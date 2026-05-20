@@ -230,7 +230,11 @@ export function FeatureFlagRulesDialog({
               Cancel
             </Button>
           </DialogActionTrigger>
-          <Button onClick={handleSave} loading={setRules.isPending}>
+          <Button
+            onClick={handleSave}
+            loading={setRules.isPending}
+            colorPalette="blue"
+          >
             Save rules
           </Button>
         </DialogFooter>
