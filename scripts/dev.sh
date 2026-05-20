@@ -6,7 +6,7 @@
 #   scripts/dev.sh all-local      # local CH+PG+Redis+app, no NLP
 #   scripts/dev.sh all-local-nlp  # all-local + langwatch_nlp + langevals
 #   scripts/dev.sh dev-storage    # local CH+PG+Redis, stored-objects -> dev S3
-#   scripts/dev.sh dev-infra      # everything against shared dev infra (no compose)
+#   scripts/dev.sh dev-infra      # local redis + workers + app, everything else against shared dev
 #   scripts/dev.sh frontend-only  # no compose, pure pnpm dev against .env URLs
 #   scripts/dev.sh migration      # postgres + clickhouse on host ports for prisma migrate
 #   scripts/dev.sh full-local     # all-local-nlp + workers + bullboard + ai-server
@@ -27,31 +27,41 @@ LangWatch dev environment
 
 Presets — pass as the first arg or pick interactively:
 
-  all-local       Local postgres + redis + clickhouse + app. No NLP.
-                  Stored-objects fall back to local-FS. Fast iteration default.
+  all-local       Local postgres + redis + clickhouse + app + workers.
+                  No NLP. Stored-objects fall back to local-FS. Fast iteration
+                  default.
 
   all-local-nlp   all-local + langwatch_nlp + langevals containers.
 
-  dev-storage     Local CH + PG + Redis. Stored-objects route to the dev S3
-                  bucket runtime-storage-dev in lw-dev (eu-central-1). Real
-                  AWS S3 driver under test without polluting shared dev tables.
-                  Requires fresh AWS SSO credentials in langwatch/.env — run
-                  `bash langwatch/scripts/refresh-dev-s3-env.sh` first if
-                  S3_SESSION_TOKEN is missing or stale.
+  dev-storage     Local CH + PG + Redis + workers. Stored-objects route to the
+                  dev S3 bucket runtime-storage-dev in lw-dev (eu-central-1).
+                  Real AWS S3 driver under test without polluting shared dev
+                  tables. Requires fresh AWS SSO credentials in langwatch/.env
+                  — run `bash langwatch/scripts/refresh-dev-s3-env.sh` first
+                  if S3_SESSION_TOKEN is missing or stale.
 
-  dev-infra       Everything against shared dev infrastructure (dev CH,
-                  dev PG, dev Redis, dev S3, dev NLP). No compose. Most
-                  faithful e2e. WARNING: other developers see your data.
+  dev-infra       Local app + local Redis + local workers container.
+                  Postgres, ClickHouse, NLP, and S3 stay remote (shared dev
+                  infrastructure). Redis and the `workers` compose service
+                  are brought up so BullMQ jobs / GroupQueue streams stay
+                  isolated to this operator and background processing
+                  matches production's container layout. App still runs via
+                  `pnpm dev` on the host for hot-reload. Most faithful e2e
+                  short of running prod. WARNING: other developers see your
+                  data in dev CH / dev PG.
 
   frontend-only   No compose. Pure `pnpm dev` against the URLs in your
-                  langwatch/.env. UI / design / static iteration.
+                  langwatch/.env. UI / design / static iteration. Workers
+                  still run in-process via `pnpm dev`; set
+                  START_WORKERS=false on the command line if you want pure
+                  Vite with no background processing.
 
   migration       postgres + clickhouse on HOST ports (5432 / 8123). Run
                   `pnpm prisma migrate dev` and `pnpm clickhouse:migrate`
-                  from your host shell.
+                  from your host shell. No app, no workers.
 
-  full-local      Kitchen-sink local: all-local-nlp + workers + bullboard +
-                  ai-server. Slowest boot.
+  full-local      Kitchen-sink local: all-local-nlp + dedicated workers
+                  container + bullboard + ai-server. Slowest boot.
 
 URL-override model: each preset writes `langwatch/.env.dev-up` listing only
 the URLs whose services start locally. compose loads this overlay AFTER
@@ -264,8 +274,8 @@ run_all_local() {
   . "$(dirname "$0")/lib/sanitize-dev-env.sh"
   sanitize_localhost_dev_env
   write_overrides all-local
-  echo "Starting: postgres + redis + clickhouse + app (preset=all-local)"
-  $COMPOSE up
+  echo "Starting: postgres + redis + clickhouse + app + workers (preset=all-local)"
+  $COMPOSE --profile workers up
 }
 
 run_all_local_nlp() {
@@ -275,8 +285,10 @@ run_all_local_nlp() {
   . "$(dirname "$0")/lib/sanitize-dev-env.sh"
   sanitize_localhost_dev_env
   write_overrides all-local-nlp
-  echo "Starting: backend + langwatch_nlp + langevals (preset=all-local-nlp)"
-  $COMPOSE --profile nlp up
+  echo "Starting: backend + workers + langwatch_nlp + langevals (preset=all-local-nlp)"
+  # `nlp` profile starts NLP/langevals; `workers` profile starts the worker
+  # container. Both profiles must be passed — compose unions them.
+  $COMPOSE --profile nlp --profile workers up
 }
 
 run_dev_storage() {
@@ -286,22 +298,29 @@ run_dev_storage() {
   . "$(dirname "$0")/lib/sanitize-dev-env.sh"
   sanitize_localhost_dev_env
   write_overrides dev-storage
-  echo "Starting: postgres + redis + clickhouse + app (preset=dev-storage)"
+  echo "Starting: postgres + redis + clickhouse + app + workers (preset=dev-storage)"
   echo "  Stored-objects route to s3://runtime-storage-dev/ via SSO credentials in langwatch/.env"
-  $COMPOSE up
+  $COMPOSE --profile workers up
 }
 
 run_dev_infra() {
-  # No compose — everything in shared dev. We still warn loudly so the
-  # operator knows what they're about to write into.
+  # Local app + local Redis + local workers compose + remote everything else.
+  # Redis runs locally so BullMQ queues / GroupQueue streams / the fold cache
+  # stay isolated to this operator (using shared dev Redis would collide with
+  # other developers' jobs). The `workers` compose service runs alongside so
+  # background jobs match production layout instead of relying on the host
+  # `pnpm dev` in-process worker. DB / CH / NLP / S3 all stay remote per the
+  # operator's .env. Warn loudly first — operators routinely write into
+  # shared dev tables when running this.
   cat <<'EOF'
 
 ╔════════════════════════════════════════════════════════════╗
 ║              dev-infra preset                              ║
 ╠════════════════════════════════════════════════════════════╣
-║  This routes EVERY service against shared dev              ║
-║  infrastructure. Other developers will see your data       ║
-║  in dev CH and dev Postgres. Test scenarios you run will   ║
+║  Local app + local Redis + local workers. Postgres,        ║
+║  ClickHouse, NLP, and S3 route against shared dev          ║
+║  infrastructure. Other developers will see your data in    ║
+║  dev CH and dev Postgres. Test scenarios you run will      ║
 ║  appear in dev observability boards.                       ║
 ║                                                            ║
 ║  Use a recognizable identifier in scenario/test names so   ║
@@ -315,10 +334,23 @@ EOF
     *) exit 1 ;;
   esac
   check_dev_s3_credentials
+  ensure_prepared
   write_overrides dev-infra
-  echo ""
-  echo "preset=dev-infra. No compose started; run 'pnpm dev' from langwatch/ to start the app."
-  echo "URLs come from langwatch/.env which must be pointed at shared dev."
+  echo "Starting: redis + workers compose services (preset=dev-infra)"
+  echo "  App runs via 'pnpm dev' from langwatch/ on the host for hot-reload."
+  echo "  Workers run in the compose 'workers' container (not in-process)."
+  echo "  DB / ClickHouse / NLP / S3 come from langwatch/.env (shared dev)."
+  $COMPOSE --profile workers up -d redis workers
+  cat <<'EOF'
+
+Redis is running detached on localhost:6379.
+Workers compose container is running detached. Next:
+
+  cd langwatch
+  pnpm dev
+
+Stop redis + workers with: scripts/dev.sh down
+EOF
 }
 
 run_frontend_only() {
@@ -443,13 +475,13 @@ cat <<'EOF'
 
 Pick a preset:
 
-  1) all-local       Local CH + PG + Redis + app. No NLP. Fast iteration.
+  1) all-local       Local CH + PG + Redis + app + workers. No NLP. Fast iteration.
   2) all-local-nlp   all-local + langwatch_nlp + langevals.
-  3) dev-storage     Local DBs, stored-objects -> runtime-storage-dev (real AWS S3).
-  4) dev-infra       Shared dev infra everywhere. Most faithful e2e.
+  3) dev-storage     Local DBs + workers, stored-objects -> runtime-storage-dev (real AWS S3).
+  4) dev-infra       Local app + Redis + workers, shared dev infra for PG/CH/NLP/S3. Most faithful e2e.
   5) frontend-only   No compose. UI / design / static iteration.
-  6) migration       postgres + clickhouse on host ports for prisma migrate.
-  7) full-local      Kitchen-sink local: all-local-nlp + workers + bullboard + ai-server.
+  6) migration       postgres + clickhouse on host ports for prisma migrate (no app, no workers).
+  7) full-local      Kitchen-sink local: all-local-nlp + dedicated workers container + bullboard + ai-server.
 
   d) down            stop all services
   l) logs            tail compose logs
