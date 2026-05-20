@@ -22,6 +22,11 @@ secrets:
 # --- overlays/size-prod.yaml ---
 app:
   replicaCount: 2
+  # Multi-pod: local-FS is unsafe (pods don't share filesystems). Use S3/GCS/Azure
+  # via app.dataplane (see overlays/cold-storage-s3.yaml).
+  storedObjects:
+    localFilesystem:
+      enabled: false
   resources:
     requests: { cpu: 500m, memory: 2Gi }
     limits:   { cpu: 2, memory: 4Gi }

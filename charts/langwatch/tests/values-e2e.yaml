@@ -34,6 +34,12 @@ gateway:
 # ── services that require private images — set to 0 replicas ─────────────────
 app:
   replicaCount: 0
+  # No app pod = no PVC consumer. WaitForFirstConsumer leaves the PVC
+  # unbound and helm --wait times out. Disable the local-FS PVC in e2e —
+  # the infra tier is what's being validated here.
+  storedObjects:
+    localFilesystem:
+      enabled: false
   features:
     skipEnvValidation: true
 

@@ -113,7 +113,27 @@ export function createEnvConfig() {
       S3_ENDPOINT: z.string().optional(),
       S3_ACCESS_KEY_ID: z.string().optional(),
       S3_SECRET_ACCESS_KEY: z.string().optional(),
+      // Optional STS session token. Required for temporary credentials
+      // (SSO local dev, STS:AssumeRole, etc.). For long-lived IAM-user
+      // keys this stays unset.
+      S3_SESSION_TOKEN: z.string().optional(),
+      // AWS region for the S3 client. The legacy default "auto" is the
+      // R2 / MinIO convention; real AWS S3 needs a real region
+      // (eu-central-1, us-east-1, etc.) or SigV4 fails with
+      // SignatureDoesNotMatch.
+      S3_REGION: z.string().optional(),
       S3_BUCKET_NAME: z.string().optional(),
+      // Root path used by the stored-objects LocalFilesystemDriver when S3 is
+      // not configured. Defaults to /var/lib/langwatch/objects inside the
+      // service. Self-hosting operators running multi-pod deployments MUST
+      // configure object storage instead — the local-FS path is dev-only.
+      LANGWATCH_LOCAL_STORAGE_PATH: z.string().optional(),
+      // Azure Blob Storage — optional alternative to S3 for stored-objects.
+      // Set all three together; AZURE_BLOB_ENDPOINT only needs to be set for
+      // emulator or sovereign-cloud deployments (e.g. Azurite, Azure Gov).
+      AZURE_BLOB_ACCOUNT_NAME: z.string().optional(),
+      AZURE_BLOB_ACCOUNT_KEY: z.string().optional(),
+      AZURE_BLOB_ENDPOINT: z.string().optional(),
       DATASET_STORAGE_LOCAL: z.boolean().optional(),
       CREDENTIALS_SECRET: z.string().optional(),
       AZURE_AD_CLIENT_ID: z.string().optional(),
@@ -252,7 +272,13 @@ export function createEnvConfig() {
       S3_ENDPOINT: process.env.S3_ENDPOINT,
       S3_ACCESS_KEY_ID: process.env.S3_ACCESS_KEY_ID,
       S3_SECRET_ACCESS_KEY: process.env.S3_SECRET_ACCESS_KEY,
+      S3_SESSION_TOKEN: process.env.S3_SESSION_TOKEN,
+      S3_REGION: process.env.S3_REGION,
       S3_BUCKET_NAME: process.env.S3_BUCKET_NAME,
+      LANGWATCH_LOCAL_STORAGE_PATH: process.env.LANGWATCH_LOCAL_STORAGE_PATH,
+      AZURE_BLOB_ACCOUNT_NAME: process.env.AZURE_BLOB_ACCOUNT_NAME,
+      AZURE_BLOB_ACCOUNT_KEY: process.env.AZURE_BLOB_ACCOUNT_KEY,
+      AZURE_BLOB_ENDPOINT: process.env.AZURE_BLOB_ENDPOINT,
       DATASET_STORAGE_LOCAL:
         process.env.DATASET_STORAGE_LOCAL === "1" ||
         process.env.DATASET_STORAGE_LOCAL?.toLowerCase() === "true",

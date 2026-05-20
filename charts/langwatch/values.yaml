@@ -237,11 +237,11 @@ app:
 
   # Dataset storage configuration
   # Controls how LangWatch stores and manages training datasets
-  ## @extra app.datasetObjectStorage Object storage configuration for datasets.
-  ## @param app.datasetObjectStorage.enabled [default: false] Enable dataset object storage.
-  ## @param app.datasetObjectStorage.provider [string, default: awsS3] Object storage provider.
-  ## @param app.datasetObjectStorage.bucket [string, default: langwatch-dataset] Bucket name for datasets.
-  datasetObjectStorage:
+  ## @extra app.dataplane Object storage configuration for datasets.
+  ## @param app.dataplane.enabled [default: false] Enable dataset object storage.
+  ## @param app.dataplane.provider [string, default: awsS3] Object storage provider.
+  ## @param app.dataplane.bucket [string, default: langwatch-dataset] Bucket name for datasets.
+  dataplane:
     enabled: false
     # Storage provider to use. Options: awsS3 (default)
     # When set to 'awsS3', enables AWS S3 native integration
@@ -251,28 +251,46 @@ app:
     # Provider-specific configurations
     providers:
       # AWS S3 configuration for dataset storage
-      ## @extra app.datasetObjectStorage.providers.awsS3 AWS S3 provider configuration.
-      ## @param app.datasetObjectStorage.providers.awsS3.endpoint.value [string] Custom S3 endpoint.
-      ## @param app.datasetObjectStorage.providers.awsS3.accessKeyId.value [string] S3 access key ID.
-      ## @param app.datasetObjectStorage.providers.awsS3.secretAccessKey.value [string] S3 secret access key.
-      ## @param app.datasetObjectStorage.providers.awsS3.keySalt.value [string] Optional key salt.
+      ## @extra app.dataplane.providers.awsS3 AWS S3 provider configuration.
+      ## @param app.dataplane.providers.awsS3.endpoint.value [string] Custom S3 endpoint.
+      ## @param app.dataplane.providers.awsS3.accessKeyId.value [string] S3 access key ID.
+      ## @param app.dataplane.providers.awsS3.secretAccessKey.value [string] S3 secret access key.
+      ## @param app.dataplane.providers.awsS3.keySalt.value [string] Optional key salt.
       awsS3:
         endpoint:
           value: ""
-          ## @param app.datasetObjectStorage.providers.awsS3.endpoint.secretKeyRef [object] Secret ref for custom S3 endpoint.
+          ## @param app.dataplane.providers.awsS3.endpoint.secretKeyRef [object] Secret ref for custom S3 endpoint.
           secretKeyRef: { name: "", key: "" }
         accessKeyId:
           value: ""
-          ## @param app.datasetObjectStorage.providers.awsS3.accessKeyId.secretKeyRef [object] Secret ref for S3 access key ID.
+          ## @param app.dataplane.providers.awsS3.accessKeyId.secretKeyRef [object] Secret ref for S3 access key ID.
           secretKeyRef: { name: "", key: "" }
         secretAccessKey:
           value: ""
-          ## @param app.datasetObjectStorage.providers.awsS3.secretAccessKey.secretKeyRef [object] Secret ref for S3 secret access key.
+          ## @param app.dataplane.providers.awsS3.secretAccessKey.secretKeyRef [object] Secret ref for S3 secret access key.
           secretKeyRef: { name: "", key: "" }
         keySalt:
           value: ""
-          ## @param app.datasetObjectStorage.providers.awsS3.keySalt.secretKeyRef [object] Secret ref for optional key salt.
+          ## @param app.dataplane.providers.awsS3.keySalt.secretKeyRef [object] Secret ref for optional key salt.
           secretKeyRef: { name: "", key: "" }
+
+  # Stored Objects - externalized byte content (audio, image, PDF, document).
+  # By default, uses a local-filesystem PVC so the chart works plug-and-play
+  # for single-replica installs. Operators running horizontally-scaled
+  # deployments must enable app.dataplane above (S3/GCS/Azure) — pods don't
+  # share a local filesystem. The chart refuses to render with
+  # replicaCount > 1 while localFilesystem.enabled=true.
+  ## @extra app.storedObjects Stored-objects configuration.
+  ## @param app.storedObjects.localFilesystem.enabled [default: true] Use a local-FS path for stored-objects bytes. Disable when using app.dataplane (S3) instead.
+  ## @param app.storedObjects.localFilesystem.path [string, default: /var/lib/langwatch/objects] Mount point that the LocalFilesystemDriver writes under.
+  ## @param app.storedObjects.localFilesystem.size [string, default: 10Gi] PVC size for the stored-objects volume.
+  ## @param app.storedObjects.localFilesystem.storageClassName [string] PVC storageClassName (cluster default if empty).
+  storedObjects:
+    localFilesystem:
+      enabled: true
+      path: /var/lib/langwatch/objects
+      size: 10Gi
+      storageClassName: ""
 
   # Email notification configuration
   # Enables sending alerts and notifications via email

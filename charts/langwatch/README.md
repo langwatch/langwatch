@@ -219,19 +219,19 @@ npx @bitnami/readme-generator-for-helm --readme ./README.md --values values.yaml
 | `app.evaluators.google.enabled`                                         | Enable Google evaluator.                                                                  | `false`                 |
 | `app.evaluators.google.credentials.value`                               | Google credentials JSON (base64 or inline).                                               | `""`                    |
 | `app.evaluators.google.credentials.secretKeyRef`                        | Secret ref for Google credentials JSON.                                                   | `{}`                    |
-| `app.datasetObjectStorage`                                              | Object storage configuration for datasets.                                                |                         |
-| `app.datasetObjectStorage.enabled`                                      | Enable dataset object storage.                                                            | `false`                 |
-| `app.datasetObjectStorage.provider`                                     | Object storage provider.                                                                  | `awsS3`                 |
-| `app.datasetObjectStorage.bucket`                                       | Bucket name for datasets.                                                                 | `langwatch-dataset`     |
-| `app.datasetObjectStorage.providers.awsS3`                              | AWS S3 provider configuration.                                                            |                         |
-| `app.datasetObjectStorage.providers.awsS3.endpoint.value`               | Custom S3 endpoint.                                                                       | `""`                    |
-| `app.datasetObjectStorage.providers.awsS3.accessKeyId.value`            | S3 access key ID.                                                                         | `""`                    |
-| `app.datasetObjectStorage.providers.awsS3.secretAccessKey.value`        | S3 secret access key.                                                                     | `""`                    |
-| `app.datasetObjectStorage.providers.awsS3.keySalt.value`                | Optional key salt.                                                                        | `""`                    |
-| `app.datasetObjectStorage.providers.awsS3.endpoint.secretKeyRef`        | Secret ref for custom S3 endpoint.                                                        | `{}`                    |
-| `app.datasetObjectStorage.providers.awsS3.accessKeyId.secretKeyRef`     | Secret ref for S3 access key ID.                                                          | `{}`                    |
-| `app.datasetObjectStorage.providers.awsS3.secretAccessKey.secretKeyRef` | Secret ref for S3 secret access key.                                                      | `{}`                    |
-| `app.datasetObjectStorage.providers.awsS3.keySalt.secretKeyRef`         | Secret ref for optional key salt.                                                         | `{}`                    |
+| `app.dataplane`                                              | Object storage configuration for datasets.                                                |                         |
+| `app.dataplane.enabled`                                      | Enable dataset object storage.                                                            | `false`                 |
+| `app.dataplane.provider`                                     | Object storage provider.                                                                  | `awsS3`                 |
+| `app.dataplane.bucket`                                       | Bucket name for datasets.                                                                 | `langwatch-dataset`     |
+| `app.dataplane.providers.awsS3`                              | AWS S3 provider configuration.                                                            |                         |
+| `app.dataplane.providers.awsS3.endpoint.value`               | Custom S3 endpoint.                                                                       | `""`                    |
+| `app.dataplane.providers.awsS3.accessKeyId.value`            | S3 access key ID.                                                                         | `""`                    |
+| `app.dataplane.providers.awsS3.secretAccessKey.value`        | S3 secret access key.                                                                     | `""`                    |
+| `app.dataplane.providers.awsS3.keySalt.value`                | Optional key salt.                                                                        | `""`                    |
+| `app.dataplane.providers.awsS3.endpoint.secretKeyRef`        | Secret ref for custom S3 endpoint.                                                        | `{}`                    |
+| `app.dataplane.providers.awsS3.accessKeyId.secretKeyRef`     | Secret ref for S3 access key ID.                                                          | `{}`                    |
+| `app.dataplane.providers.awsS3.secretAccessKey.secretKeyRef` | Secret ref for S3 secret access key.                                                      | `{}`                    |
+| `app.dataplane.providers.awsS3.keySalt.secretKeyRef`         | Secret ref for optional key salt.                                                         | `{}`                    |
 | `app.email`                                                             | Email provider configuration.                                                             |                         |
 | `app.email.enabled`                                                     | Enable email notifications.                                                               | `false`                 |
 | `app.email.defaultFrom`                                                 | Default "from" address.                                                                   | `""`                    |

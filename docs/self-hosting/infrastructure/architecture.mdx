@@ -151,6 +151,7 @@ The `langwatch/clickhouse-serverless` Docker image is a performance-tweaked Clic
 - ClickHouse cold storage (tiered after TTL)
 - ClickHouse backups (full + incremental)
 - Dataset storage (optional)
+- **Stored objects** — externalized byte content (audio/image/video/document) content-addressed under `{projectId}/{sha256}` and served back via `GET /api/files/:id`.
 
 ## Event Sourcing Pipeline
 

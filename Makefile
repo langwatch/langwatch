@@ -1,24 +1,28 @@
 .PHONY: help start sync-all-openapi user-delete-dry-run user-delete es-delete-dry-run es-delete
-.PHONY: dev dev-nlp dev-scenarios dev-test dev-full down logs clean ps quickstart quickstart-help worktree
-.PHONY: dev-up dev-down dev-logs setup-hooks service service-watch
-.PHONY: _dev-deprecation-warning _dev-up-deprecation-warning
+.PHONY: down logs clean ps quickstart quickstart-help worktree refresh-dev-s3
+.PHONY: dev-up dev-down dev-logs setup-hooks service service-watch test-scripts
+.PHONY: _dev-up-deprecation-warning
 
 # Surface every target — boxd-* are pulled in via include below.
 help:
 	@echo "LangWatch dev targets:"
 	@echo ""
 	@echo "  Primary (Docker dev environment):"
-	@echo "    make quickstart                     interactive — asks 'what are you working on?'"
+	@echo "    make quickstart                     interactive preset picker"
+	@echo "    make quickstart all-local           local CH+PG+Redis+app, no NLP (fast iteration default)"
+	@echo "    make quickstart all-local-nlp       all-local + langwatch_nlp + langevals"
+	@echo "    make quickstart dev-storage         local DBs, stored-objects -> dev S3 (runtime-storage-dev)"
+	@echo "    make refresh-dev-s3                 rotate AWS SSO creds in .env (run before dev-storage)"
+	@echo "    make quickstart dev-infra           everything against shared dev infra (no compose)"
 	@echo "    make quickstart frontend-only       no compose; pure pnpm dev against your .env URLs"
-	@echo "    make quickstart backend-shared      postgres + redis + clickhouse + app, URLs → local"
 	@echo "    make quickstart migration           postgres + clickhouse on host ports (prisma migrate)"
-	@echo "    make quickstart nlp                 backend + langwatch_nlp + langevals"
-	@echo "    make quickstart full-local          everything (--profile full)"
-	@echo "    make quickstart-help                non-interactive mode reference"
+	@echo "    make quickstart full-local          kitchen-sink local (workers + bullboard + ai-server)"
+	@echo "    make quickstart-help                non-interactive preset reference"
 	@echo "    make service svc=<name>             run a Go service (e.g. aigateway)"
 	@echo "    make service-watch svc=<name>       run a Go service with live reload (air)"
 	@echo "    make worktree <issue|name>          create a git worktree for an issue/feature"
 	@echo "    make down                           stop all services"
+	@echo "    make test-scripts                   run bats unit tests under scripts/__tests__/"
 	@echo ""
 	@echo "  Boxd workflows (multi-step orchestration over the boxd CLI):"
 	@echo "    make boxd-help                      full boxd target reference"
@@ -28,9 +32,10 @@ help:
 	@echo "    make boxd-fork-issue ISSUE=<n>      fork + worktree + tmux+claude in VM"
 	@echo "    make boxd-connect-{pr,branch,issue} <ARG>=<v>   attach to the in-VM session"
 	@echo ""
-	@echo "  Deprecated (use 'make quickstart' — kept for one release):"
-	@echo "    make dev / dev-nlp / dev-scenarios / dev-test / dev-full"
-	@echo "    make dev-up / dev-down / dev-logs"
+	@echo "  Per-worktree isolated stacks (for AI agents / parallel work):"
+	@echo "    make dev-up [PROFILE=full]            start isolated containers"
+	@echo "    make dev-down                          stop isolated containers"
+	@echo "    make dev-logs                          tail isolated logs"
 	@echo ""
 	@echo "  See: dev/docs/adr/004-docker-dev-environment.md, dev/docs/boxd-makefile.md"
 
@@ -83,27 +88,38 @@ service-watch:
 			--build.include_ext "go" \
 			--build.exclude_dir "tmp,vendor,node_modules"
 
-# Deprecation warning for dev* targets — kept for one release. (#3860 AC#9)
-# Each maps onto the equivalent quickstart mode so the URL-override behavior
-# is consistent regardless of which alias the user invoked.
-_dev-deprecation-warning:
-	@printf '\033[33m[deprecated] make %s → make quickstart (or ./scripts/dev.sh <mode>)\033[0m\n' "$(MAKECMDGOALS)" >&2
-	@printf 'See: dev/docs/adr/004-docker-dev-environment.md\n' >&2
+# The dev* shim targets were removed in #4053. Use `make quickstart`
+# (interactive) or `./scripts/dev.sh <preset>` directly. Preset list:
+# all-local, all-local-nlp, dev-storage, dev-infra, frontend-only,
+# migration, full-local.
 
-dev: _dev-deprecation-warning
-	@./scripts/dev.sh backend-shared
+# Refresh AWS SSO credentials in langwatch/.env so `make quickstart
+# dev-storage` can talk to runtime-storage-dev. SSO temporary tokens
+# expire ~hourly; this rotates the three S3_*_KEY/TOKEN lines in
+# langwatch/.env, leaving S3_BUCKET_NAME/S3_ENDPOINT/S3_REGION alone.
+refresh-dev-s3:
+	@bash langwatch/scripts/refresh-dev-s3-env.sh
 
-dev-nlp: _dev-deprecation-warning
-	@./scripts/dev.sh nlp
-
-dev-scenarios: _dev-deprecation-warning
-	@./scripts/dev.sh full-local
-
-dev-test: _dev-deprecation-warning
-	@./scripts/dev.sh full-local
-
-dev-full: _dev-deprecation-warning
-	@./scripts/dev.sh full-local
+# Run all *.unit.bats tests under scripts/__tests__/. Dev-only — these
+# tests cover shell behavior of `dev.sh` / `write-dev-overrides.sh` /
+# `worktree.sh` / `boxd-fork.sh`. CI does NOT run them; the launchers
+# are local dev tools, not part of the shipped product. If you're
+# editing one of those scripts, run `make test-scripts` to verify.
+#
+# Requires `bats` (`brew install bats-core` on macOS,
+# `sudo apt-get install -y bats` on Linux).
+#
+# Globs only *.unit.bats — the *.integration.bats files shell out to
+# git / docker / external CLIs against the real filesystem and need
+# fixtures.
+test-scripts:
+	@if ! command -v bats >/dev/null 2>&1; then \
+		echo "ERROR: bats not installed. Install with:" >&2; \
+		echo "  macOS:  brew install bats-core" >&2; \
+		echo "  Linux:  sudo apt-get install -y bats" >&2; \
+		exit 1; \
+	fi
+	bats scripts/__tests__/*.unit.bats
 
 # Stop all services
 down:

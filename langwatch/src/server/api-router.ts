@@ -19,6 +19,7 @@ import { app as monitorsApp } from "../app/api/monitors/[[...route]]/app";
 import { app as apiKeysApp } from "../app/api/api-keys/[[...route]]/app";
 import { app as projectsApp } from "../app/api/projects/[[...route]]/app";
 import { app as promptsApp } from "../app/api/prompts/[[...route]]/app";
+import { app as filesApp } from "../app/api/files/[[...route]]/app";
 import { app as scenarioEventsApp } from "../app/api/scenario-events/[[...route]]/app";
 import { app as scenariosApp } from "../app/api/scenarios/[[...route]]/app";
 import { app as secretsApp } from "../app/api/secrets/[[...route]]/app";
@@ -78,6 +79,7 @@ export function createApiRouter() {
   api.route("/", dashboardsApp);
   api.route("/", datasetApp);
   api.route("/", evaluatorsApp);
+  api.route("/", filesApp);
   api.route("/", exportTracesApp);
   api.route("/", gatewayPlatformApp);
   api.route("/", graphsApp);
