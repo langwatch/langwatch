@@ -64,7 +64,9 @@ export const dataRetentionRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       await ctx.prisma.project.update({
         where: { id: input.projectId },
-        data: { retentionPolicy: input.retentionPolicy },
+        data: {
+          retentionPolicy: input.retentionPolicy ?? Prisma.JsonNull,
+        },
       });
 
       getApp().retentionPolicyCache.invalidate(input.projectId);
@@ -81,7 +83,10 @@ export const dataRetentionRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       await ctx.prisma.organization.update({
         where: { id: input.organizationId },
-        data: { defaultRetentionPolicy: input.defaultRetentionPolicy },
+        data: {
+          defaultRetentionPolicy:
+            input.defaultRetentionPolicy ?? Prisma.JsonNull,
+        },
       });
     }),
 

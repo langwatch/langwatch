@@ -41,6 +41,8 @@ interface ClickHouseEvaluationRunRecord {
   CostId: string | null;
   LastProcessedEventId: string;
   LastEventOccurredAt: number;
+  _retention_days: number;
+  _size_bytes: number;
 }
 
 type ClickHouseEvaluationRunWriteRecord = WithDateWrites<
@@ -53,7 +55,7 @@ export class EvaluationRunClickHouseRepository
 {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
-  async upsert(data: EvaluationRunData, tenantId: string): Promise<void> {
+  async upsert(data: EvaluationRunData, tenantId: string, retentionDays = 0): Promise<void> {
     EventUtils.validateTenantId(
       { tenantId },
       "EvaluationRunClickHouseRepository.upsert",
@@ -74,6 +76,7 @@ export class EvaluationRunClickHouseRepository
         tenantId,
         projectionId,
         EVALUATION_PROJECTION_VERSIONS.STATE,
+        retentionDays,
       );
 
       await client.insert({
@@ -95,7 +98,7 @@ export class EvaluationRunClickHouseRepository
   }
 
   async upsertBatch(
-    entries: Array<{ data: EvaluationRunData; tenantId: string }>,
+    entries: Array<{ data: EvaluationRunData; tenantId: string; retentionDays?: number }>,
   ): Promise<void> {
     if (entries.length === 0) return;
 
@@ -106,7 +109,7 @@ export class EvaluationRunClickHouseRepository
 
     try {
       const client = await this.resolveClient(tenantId);
-      const records = entries.map(({ data, tenantId: tid }) => {
+      const records = entries.map(({ data, tenantId: tid, retentionDays: rd }) => {
         const projectionId = data.scheduledAt
           ? IdUtils.generateDeterministicEvaluationRunId(
               tid,
@@ -119,6 +122,7 @@ export class EvaluationRunClickHouseRepository
           tid,
           projectionId,
           EVALUATION_PROJECTION_VERSIONS.STATE,
+          rd,
         );
       });
 
@@ -468,6 +472,7 @@ export class EvaluationRunClickHouseRepository
     tenantId: string,
     projectionId: string,
     version: string,
+    retentionDays = 0,
   ): ClickHouseEvaluationRunWriteRecord {
     return {
       ProjectionId: projectionId,
@@ -496,6 +501,15 @@ export class EvaluationRunClickHouseRepository
       CompletedAt: data.completedAt != null ? new Date(data.completedAt) : null,
       CostId: data.costId ?? null,
       LastProcessedEventId: projectionId,
+      _retention_days: retentionDays,
+      _size_bytes: estimateEvaluationRunSizeBytes(data),
     };
   }
+}
+
+function estimateEvaluationRunSizeBytes(data: EvaluationRunData): number {
+  let size = 128;
+  size += (data.details?.length ?? 0) + (data.error?.length ?? 0) + (data.errorDetails?.length ?? 0);
+  size += data.inputs ? JSON.stringify(data.inputs).length : 0;
+  return size;
 }

@@ -35,6 +35,8 @@ interface ClickHouseRecord {
   CreatedAt: number;
   InsertedAt: number;
   UpdatedAt: number;
+  _retention_days: number;
+  _size_bytes: number;
 }
 
 type ClickHouseWriteRecord = WithDateWrites<
@@ -117,6 +119,8 @@ export class DspyStepClickHouseRepository implements DspyStepRepository {
       CreatedAt: new Date(data.createdAt),
       InsertedAt: new Date(data.insertedAt),
       UpdatedAt: new Date(data.updatedAt),
+      _retention_days: 0,
+      _size_bytes: JSON.stringify(data.optimizerParameters).length + JSON.stringify(data.predictors).length + JSON.stringify(data.examples).length + JSON.stringify(data.llmCalls).length + 128,
     };
 
     const client = await this.resolveClient(data.tenantId);
@@ -171,6 +175,8 @@ export class DspyStepClickHouseRepository implements DspyStepRepository {
         CreatedAt: new Date(existing?.createdAt ?? data.createdAt),
         InsertedAt: new Date(existing?.insertedAt ?? data.insertedAt),
         UpdatedAt: new Date(data.updatedAt),
+        _retention_days: 0,
+        _size_bytes: JSON.stringify(data.optimizerParameters).length + JSON.stringify(mergedExamples).length + JSON.stringify(mergedLlmCalls).length + 128,
       };
 
       const client = await this.resolveClient(data.tenantId);

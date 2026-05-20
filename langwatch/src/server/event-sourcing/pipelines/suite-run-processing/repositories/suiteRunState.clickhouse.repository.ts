@@ -47,6 +47,8 @@ interface ClickHouseSuiteRunRecord {
   StartedAt: number | null;
   FinishedAt: number | null;
   LastEventOccurredAt: number;
+  _retention_days: number;
+  _size_bytes: number;
 }
 
 type ClickHouseSuiteRunWriteRecord = WithDateWrites<
@@ -113,6 +115,8 @@ export class SuiteRunStateRepositoryClickHouse<
       StartedAt: new Date(data.StartedAt ?? data.CreatedAt),
       FinishedAt: data.FinishedAt != null ? new Date(data.FinishedAt) : null,
       LastEventOccurredAt: data.LastEventOccurredAt ? new Date(data.LastEventOccurredAt) : new Date(0),
+      _retention_days: 0,
+      _size_bytes: 64,
     };
   }
 
@@ -229,6 +233,9 @@ export class SuiteRunStateRepositoryClickHouse<
         projection.version,
       );
 
+      const retentionPolicy = context.metadata?.retentionPolicy as { scenarios?: number | null } | undefined;
+      projectionRecord._retention_days = retentionPolicy?.scenarios ?? 0;
+
       await client.insert({
         table: TABLE_NAME,
         values: [projectionRecord],
@@ -279,14 +286,18 @@ export class SuiteRunStateRepositoryClickHouse<
     }
 
     try {
-      const records = projections.map((projection) =>
-        this.mapProjectionDataToClickHouseRecord(
+      const retentionPolicy = context.metadata?.retentionPolicy as { scenarios?: number | null } | undefined;
+      const retentionDays = retentionPolicy?.scenarios ?? 0;
+      const records = projections.map((projection) => {
+        const record = this.mapProjectionDataToClickHouseRecord(
           projection.data as SuiteRunStateData,
           String(context.tenantId),
           projection.id,
           projection.version,
-        ),
-      );
+        );
+        record._retention_days = retentionDays;
+        return record;
+      });
 
       const client = await this.resolveClient(context.tenantId);
       await client.insert({

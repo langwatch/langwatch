@@ -32,10 +32,17 @@ export function createExperimentRunItemAppendStore(
         return;
       }
 
+      const retentionDays = context.retentionPolicy?.experiments ?? 0;
+      const recordWithRetention = {
+        ...record,
+        _retention_days: retentionDays,
+        _size_bytes: JSON.stringify(record).length,
+      };
+
       const client = await resolveClient(context.tenantId);
       await client.insert({
         table: TABLE_NAME,
-        values: [record],
+        values: [recordWithRetention],
         format: "JSONEachRow",
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
       });

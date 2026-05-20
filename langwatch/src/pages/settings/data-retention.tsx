@@ -6,7 +6,6 @@ import {
   Heading,
   HStack,
   Input,
-  Spacer,
   Spinner,
   Text,
   VStack,
@@ -14,7 +13,6 @@ import {
 import { useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { HorizontalFormControl } from "~/components/HorizontalFormControl";
-import { ProjectSelector } from "~/components/DashboardLayout";
 import SettingsLayout from "~/components/SettingsLayout";
 import { Dialog } from "~/components/ui/dialog";
 import { toaster } from "~/components/ui/toaster";
@@ -196,13 +194,9 @@ function DataRetentionForm({
 
   return (
     <VStack gap={6} width="full" align="start" paddingX={6} paddingY={4}>
-      <HStack width="full" marginTop={2}>
-        <Heading as="h2" fontSize="xl">
-          Data Retention
-        </Heading>
-        <Spacer />
-        <ProjectSelector />
-      </HStack>
+      <Heading as="h2" fontSize="xl" marginTop={2}>
+        Data Retention
+      </Heading>
 
       <Card.Root width="full">
         <Card.Header>
@@ -394,35 +388,32 @@ function DataRetentionForm({
           }
         }}
       >
-        <Dialog.Backdrop />
-        <Dialog.Positioner>
-          <Dialog.Content>
-            <Dialog.Header>
-              <Dialog.Title>Confirm Retention Contraction</Dialog.Title>
-            </Dialog.Header>
-            <Dialog.Body>
-              <Text>
-                Reducing retention to {pendingRetroactive?.days} days will make
-                existing data older than {pendingRetroactive?.days} days eligible
-                for deletion. This cannot be undone.
-              </Text>
-            </Dialog.Body>
-            <Dialog.Footer>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setShowConfirmDialog(false);
-                  setPendingRetroactive(null);
-                }}
-              >
-                Cancel
-              </Button>
-              <Button colorPalette="red" onClick={confirmRetroactive}>
-                Confirm
-              </Button>
-            </Dialog.Footer>
-          </Dialog.Content>
-        </Dialog.Positioner>
+        <Dialog.Content>
+          <Dialog.Header>
+            <Dialog.Title>Confirm Retention Contraction</Dialog.Title>
+          </Dialog.Header>
+          <Dialog.Body>
+            <Text>
+              Reducing retention to {pendingRetroactive?.days} days will make
+              existing data older than {pendingRetroactive?.days} days eligible
+              for deletion. This cannot be undone.
+            </Text>
+          </Dialog.Body>
+          <Dialog.Footer>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowConfirmDialog(false);
+                setPendingRetroactive(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button colorPalette="red" onClick={confirmRetroactive}>
+              Confirm
+            </Button>
+          </Dialog.Footer>
+        </Dialog.Content>
       </Dialog.Root>
     </VStack>
   );

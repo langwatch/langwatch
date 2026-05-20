@@ -19,7 +19,8 @@ export class EvaluationRunStore
     const stateWithId = state.evaluationId
       ? state
       : { ...state, evaluationId: String(context.aggregateId) };
-    await this.repo.upsert(stateWithId, String(context.tenantId));
+    const retentionDays = context.retentionPolicy?.traces ?? 0;
+    await this.repo.upsert(stateWithId, String(context.tenantId), retentionDays);
   }
 
   async storeBatch(
@@ -32,14 +33,15 @@ export class EvaluationRunStore
         ? state
         : { ...state, evaluationId: String(context.aggregateId) },
       tenantId: String(context.tenantId),
+      retentionDays: context.retentionPolicy?.traces ?? 0,
     }));
 
     if (this.repo.upsertBatch) {
       await this.repo.upsertBatch(batchEntries);
     } else {
       await Promise.all(
-        batchEntries.map(({ data, tenantId }) =>
-          this.repo.upsert(data, tenantId),
+        batchEntries.map(({ data, tenantId, retentionDays }) =>
+          this.repo.upsert(data, tenantId, retentionDays),
         ),
       );
     }

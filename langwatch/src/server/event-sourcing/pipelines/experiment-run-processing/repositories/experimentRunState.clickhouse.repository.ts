@@ -53,6 +53,8 @@ interface ClickHouseExperimentRunRecord {
   PassedCount: number;
   GradedCount: number;
   LastEventOccurredAt: number;
+  _retention_days: number;
+  _size_bytes: number;
 }
 
 type ClickHouseExperimentRunWriteRecord = WithDateWrites<
@@ -133,6 +135,8 @@ export class ExperimentRunStateRepositoryClickHouse<
       PassedCount: data.PassedCount,
       GradedCount: data.GradedCount,
       LastEventOccurredAt: data.LastEventOccurredAt ? new Date(data.LastEventOccurredAt) : new Date(0),
+      _retention_days: 0,
+      _size_bytes: 64 + (data.Targets?.length ?? 0),
     };
   }
 
@@ -262,6 +266,9 @@ export class ExperimentRunStateRepositoryClickHouse<
         runId,
       );
 
+      const retentionPolicy = context.metadata?.retentionPolicy as { experiments?: number | null } | undefined;
+      projectionRecord._retention_days = retentionPolicy?.experiments ?? 0;
+
       await client.insert({
         table: TABLE_NAME,
         values: [projectionRecord],
@@ -312,9 +319,11 @@ export class ExperimentRunStateRepositoryClickHouse<
     }
 
     try {
+      const retentionPolicy = context.metadata?.retentionPolicy as { experiments?: number | null } | undefined;
+      const retentionDays = retentionPolicy?.experiments ?? 0;
       const records = projections.map((projection) => {
         const { runId } = parseExperimentRunKey(String(projection.aggregateId));
-        return this.mapProjectionDataToClickHouseRecord(
+        const record = this.mapProjectionDataToClickHouseRecord(
           projection.data as ExperimentRunStateData,
           String(context.tenantId),
           projection.id,
@@ -322,6 +331,8 @@ export class ExperimentRunStateRepositoryClickHouse<
           projection.id,
           runId,
         );
+        record._retention_days = retentionDays;
+        return record;
       });
 
       const client = await this.resolveClient(context.tenantId);
