@@ -28,16 +28,27 @@ describe("formatPreview", () => {
 
   describe("given multiline prose", () => {
     describe("when newlines: glyph", () => {
-      it("renders ↵ between non-empty lines", () => {
+      it("renders ↵ between non-empty lines", () => {
         const result = formatPreview("line one\nline two\nline three", {
           maxChars: 80,
         });
-        expect(result.text).toBe("line one ↵ line two ↵ line three");
+        expect(result.text).toBe("line one ↵ line two ↵ line three");
       });
 
       it("collapses runs of blank lines to a single ↵", () => {
         const result = formatPreview("first\n\n\nsecond", { maxChars: 80 });
-        expect(result.text).toBe("first ↵ second");
+        expect(result.text).toBe("first ↵ second");
+      });
+
+      it("glues the ↵ to the preceding word with a non-breaking space", () => {
+        // Without an NBSP before the glyph, CSS word-wrap could break
+        // between the word and the glyph — and the wrapped line would
+        // then *start* with ↵, which read as "this line begins with a
+        // newline marker" rather than "the previous line ended here."
+        // Regression for the 2026-05-20 customer report.
+        const result = formatPreview("alpha\nbeta", { maxChars: 80 });
+        const NBSP = " ";
+        expect(result.text).toBe(`alpha${NBSP}↵ beta`);
       });
     });
 
@@ -67,14 +78,14 @@ describe("formatPreview", () => {
       const input = "```python\nimport time\nfrom typing import Callable\n```";
       const result = formatPreview(input, { maxChars: 80 });
       expect(result.hadCode).toBe(true);
-      expect(result.text).toBe("import time ↵ from typing import Callable");
+      expect(result.text).toBe("import time ↵ from typing import Callable");
     });
 
     it("keeps the body when no language is specified", () => {
       const input = "```\nfoo\nbar\n```";
       const result = formatPreview(input, { maxChars: 80 });
       expect(result.hadCode).toBe(true);
-      expect(result.text).toBe("foo ↵ bar");
+      expect(result.text).toBe("foo ↵ bar");
     });
 
     it("does not strip inline backticks (only fenced blocks)", () => {
@@ -300,7 +311,7 @@ describe("formatPreview", () => {
         question: "```python\nimport time\nimport os\n```",
       });
       const result = formatPreview(input, { maxChars: 80 });
-      expect(result.text).toBe("import time ↵ import os");
+      expect(result.text).toBe("import time ↵ import os");
       expect(result.hadCode).toBe(true);
     });
   });

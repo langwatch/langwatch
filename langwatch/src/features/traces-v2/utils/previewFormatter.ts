@@ -400,12 +400,15 @@ function stripMarkdownNoise(text: string): NoiseStripResult {
 function applyNewlineTreatment(text: string, mode: NewlineTreatment): string {
   if (mode === "preserve") return text;
   if (mode === "space") return text.replace(/\s+/g, " ");
-  // glyph: collapse runs of newline-containing whitespace to " ↵ ", and
-  // collapse pure spaces/tabs runs to a single space. This way a normal
-  // paragraph with line wrap renders as "first line ↵ second line" rather
-  // than the misleading "first linesecond line" the nowrap default produces.
+  // glyph: collapse runs of newline-containing whitespace to "↵" surrounded
+  // by a non-breaking space on the LEFT and a regular space on the RIGHT.
+  // Using a regular space on both sides let the CSS line-wrap break BEFORE
+  // the glyph, which read as "line two starts with ↵" — visually wrong.
+  // Gluing the glyph to the preceding word keeps it where the line break
+  // actually happened. The trailing space stays breakable so the next word
+  // can flow onto a new line cleanly.
   return text
     .replace(/[ \t]+/g, " ")
-    .replace(/\s*\n+\s*/g, ` ${NEWLINE_GLYPH} `)
+    .replace(/\s*\n+\s*/g, ` ${NEWLINE_GLYPH} `)
     .trim();
 }
