@@ -234,9 +234,9 @@ services:
   # =============================================================================
   # WORKERS (profile: workers)
   # =============================================================================
-  # Started by quickstart presets: all-local, all-local-nlp, dev-storage, full-local.
-  # Skipped by: dev-infra and frontend-only (which use `pnpm dev` on the host —
-  # that script bakes in START_WORKERS=true so workers run in-process there).
+  # Started by quickstart presets: all-local, all-local-nlp, dev-storage, dev-infra, full-local.
+  # Skipped by: frontend-only (which uses `pnpm dev` on the host with
+  # START_WORKERS=true so workers run in-process there).
   # migration is a short-lived host-port stack for prisma/clickhouse migrate;
   # it never runs the app, so no workers.
 
