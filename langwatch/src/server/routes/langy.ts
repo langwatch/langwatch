@@ -9,6 +9,8 @@
  */
 import {
   convertToModelMessages,
+  createUIMessageStream,
+  createUIMessageStreamResponse,
   stepCountIs,
   streamText,
   tool,
@@ -1207,65 +1209,96 @@ app.post("/langy/chat", async (c) => {
     projectMemory,
     mode: prefs.mode,
   });
-  const modelMessages = await convertToModelMessages(messages);
 
-  const result = streamText({
-    model,
-    system: systemPrompt,
-    messages: modelMessages,
-    tools,
-    stopWhen: stepCountIs(LANGY_TOOL_CALLS_PER_MESSAGE),
-    maxRetries: 2,
-    experimental_telemetry: {
-      isEnabled: true,
-      functionId: "langy.chat",
-      metadata: {
-        "langwatch.project_id": projectId,
-        "langwatch.user_id": session.user.id,
-        "langy.conversation_id": conversation.id,
-      },
-    },
-    onError: (error) => {
-      logger.error({ error }, "error in langy chat stream");
-    },
-    onFinish: async ({ text, response }) => {
+  const agentUrl = process.env.OPENCODE_AGENT_URL;
+  if (!agentUrl) {
+    logger.error("OPENCODE_AGENT_URL is not configured");
+    return c.json({ error: "Agent not configured" }, { status: 503 });
+  }
+
+  const lastUserMessage = messages[messages.length - 1];
+  const userText =
+    typeof lastUserMessage?.content === "string"
+      ? lastUserMessage.content
+      : Array.isArray(lastUserMessage?.content)
+        ? lastUserMessage.content
+            .filter((p: { type: string }) => p.type === "text")
+            .map((p: { text: string }) => p.text)
+            .join("")
+        : "";
+
+  const fullPrompt = `${systemPrompt}\n\nUser: ${userText}`;
+
+  const agentResponse = await fetch(`${agentUrl}/run`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ prompt: fullPrompt }),
+    signal: AbortSignal.timeout(120_000),
+  });
+
+  if (!agentResponse.ok) {
+    logger.error({ status: agentResponse.status }, "opencode agent request failed");
+    return c.json({ error: "Agent request failed" }, { status: 502 });
+  }
+
+  const textId = crypto.randomUUID();
+  let fullText = "";
+
+  const stream = createUIMessageStream({
+    execute: async (writer) => {
+      writer.write({ type: "text-start", id: textId });
+
+      const reader = agentResponse.body!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const event = JSON.parse(line) as {
+              type: string;
+              part?: { text?: string };
+            };
+            if (event.type === "text" && event.part?.text) {
+              fullText += event.part.text;
+              writer.write({ type: "text-delta", delta: event.part.text, id: textId });
+            }
+          } catch {}
+        }
+      }
+
+      writer.write({ type: "text-end", id: textId });
+
       try {
-        const assistantMessages = response.messages.filter(
-          (m) => m.role === "assistant" || m.role === "tool",
-        );
-        // Return type is annotated as `unknown[]` because the AI SDK content
-        // union (text/file/image/tool-call/…) doesn't unify with the literal
-        // text-shape we synthesise from string content. persistAssistantMessage
-        // takes `parts: unknown`, so we lose nothing by widening here.
-        const parts = assistantMessages.flatMap((m): unknown[] => {
-          if (typeof m.content === "string") {
-            return m.content
-              ? [{ type: "text", text: m.content, role: m.role }]
-              : [];
-          }
-          if (Array.isArray(m.content)) {
-            return m.content.map((c) => ({ ...c, role: m.role }));
-          }
-          return [];
-        });
         await persistAssistantMessage({
           conversationId: conversation.id,
           projectId,
-          parts,
-          text,
-          model: LANGY_FALLBACK_MODEL,
+          parts: [{ type: "text", text: fullText, role: "assistant" }],
+          text: fullText,
+          model: "opencode",
         });
       } catch (error) {
         logger.error({ error }, "failed to persist langy assistant message");
       }
     },
+    onError: (error) => {
+      logger.error({ error }, "error in opencode agent stream");
+      return "An error occurred while processing your request.";
+    },
   });
 
-  const response = result.toUIMessageStreamResponse();
-  const headers = new Headers(response.headers);
+  const streamResponse = createUIMessageStreamResponse({ stream });
+  const headers = new Headers(streamResponse.headers);
   headers.set("x-langy-conversation-id", conversation.id);
-  return new Response(response.body, {
-    status: response.status,
+  return new Response(streamResponse.body, {
+    status: streamResponse.status,
     headers,
   });
 });
