@@ -270,20 +270,37 @@ function FlagRowView({
         ? "postgres"
         : "registry default";
 
-  const enabledRules = row.rules.filter((r) => r.enabled);
+  // Walk rules honoring first-match-wins, so a disabled rule earlier in
+  // the list correctly shadows a later enabled rule for the same scope.
+  // An empty-match rule matches every context, so once one is seen, no
+  // later rule can ever fire and we stop.
+  let everyoneViaRule: boolean | null = null;
+  const orgDecisions = new Map<string, boolean>();
+  const projectDecisions = new Map<string, boolean>();
+  for (const r of row.rules) {
+    const isEveryone = !r.match.organizationId && !r.match.projectId;
+    if (isEveryone) {
+      everyoneViaRule = r.enabled;
+      break;
+    }
+    if (r.match.organizationId && !orgDecisions.has(r.match.organizationId)) {
+      orgDecisions.set(r.match.organizationId, r.enabled);
+    }
+    if (r.match.projectId && !projectDecisions.has(r.match.projectId)) {
+      projectDecisions.set(r.match.projectId, r.enabled);
+    }
+  }
   const enabledOrgIds = new Set(
-    enabledRules
-      .filter((r) => r.match.organizationId)
-      .map((r) => r.match.organizationId!),
+    Array.from(orgDecisions.entries())
+      .filter(([, v]) => v)
+      .map(([k]) => k),
   );
   const enabledProjectIds = new Set(
-    enabledRules
-      .filter((r) => r.match.projectId)
-      .map((r) => r.match.projectId!),
+    Array.from(projectDecisions.entries())
+      .filter(([, v]) => v)
+      .map(([k]) => k),
   );
-  const enabledEveryoneViaRule = enabledRules.some(
-    (r) => !r.match.organizationId && !r.match.projectId,
-  );
+  const enabledEveryoneViaRule = everyoneViaRule === true;
   const partialEnabled =
     !effective &&
     (enabledEveryoneViaRule ||
