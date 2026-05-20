@@ -124,8 +124,15 @@ function RegistryRowComponent<TRow>({
     () => visibleCells.findIndex((c) => c.column.id === "evaluations"),
     [visibleCells],
   );
+  // `rowSpan=2` spans the immediately-following row only. If another
+  // addon (e.g. error-detail) is registered before io-preview, the
+  // claim would land on that row instead and the eval cell would punch
+  // through the wrong section of the table. Gating on "io-preview is
+  // the first rendered addon" keeps the geometry trustworthy for any
+  // saved lens addon order, even ones the built-in lenses don't use
+  // today.
   const ioPreviewWillRender = useMemo(
-    () => renderedAddons.some((a) => a.id === "io-preview"),
+    () => renderedAddons[0]?.id === "io-preview",
     [renderedAddons],
   );
   const evalsRowSpansIntoIOPreview =

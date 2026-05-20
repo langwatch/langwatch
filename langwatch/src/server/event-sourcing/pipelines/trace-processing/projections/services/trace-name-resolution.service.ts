@@ -13,6 +13,14 @@ interface ResolvedTraceName {
    * arriving real root may supersede the current name.
    */
   traceNameFromFallback: boolean;
+  /**
+   * Whether `rootSpanType` / `rootSpanStartTimeMs` were claimed via
+   * the fallback path. Tracked separately from
+   * `traceNameFromFallback` so a user rename can disown the name's
+   * fallback provenance without locking in a non-root span as the
+   * canonical root metadata.
+   */
+  rootMetadataFromFallback: boolean;
 }
 
 /**
@@ -45,6 +53,14 @@ interface ResolvedTraceName {
  *      `parent_span_id` — without this, the trace would never get a
  *      name at all because no span ever satisfies
  *      `parentSpanId === null`.
+ *   5. Name and root-metadata provenance diverge after a user rename:
+ *      `traceNameFromFallback` clears (the user-supplied name is no
+ *      longer "fallback-sourced"), but `rootMetadataFromFallback`
+ *      stays true so a real root arriving later can still upgrade the
+ *      canonical metadata. Without this split, a rename in step 2
+ *      would freeze `rootSpanStartTimeMs` to the fallback span and
+ *      block the metadata upgrade on later real roots that started
+ *      after the fallback span.
  */
 export class TraceNameResolutionService {
   resolveFromSpan({
@@ -54,12 +70,15 @@ export class TraceNameResolutionService {
     state: TraceSummaryData;
     span: NormalizedSpan;
   }): ResolvedTraceName {
-    const fromFallback = state.traceNameFromFallback ?? false;
+    const nameFromFallback = state.traceNameFromFallback ?? false;
+    const metadataFromFallback =
+      state.rootMetadataFromFallback ?? nameFromFallback;
     const unchanged: ResolvedTraceName = {
       traceName: state.traceName,
       rootSpanType: state.rootSpanType,
       rootSpanStartTimeMs: state.rootSpanStartTimeMs,
-      traceNameFromFallback: fromFallback,
+      traceNameFromFallback: nameFromFallback,
+      rootMetadataFromFallback: metadataFromFallback,
     };
 
     const isRootSpan = span.parentSpanId === null;
@@ -76,24 +95,27 @@ export class TraceNameResolutionService {
       const upgradesEmptyNamedRoot =
         haveCanonicalRoot && state.traceName === "" && span.name !== "";
 
-      // A real root always wins over a fallback name from an earlier
-      // non-root span. Force a take-over when the current name is from
-      // the fallback path even if we already had a fallback "canonical
-      // root" recorded.
+      // A real root always wins over fallback metadata. The metadata
+      // takeover is gated on `metadataFromFallback`, NOT
+      // `nameFromFallback` — a user rename clears the name flag but
+      // leaves the metadata still fallback-sourced, and we still want
+      // a real root's metadata to land in that case.
       if (
-        fromFallback ||
+        metadataFromFallback ||
         !haveCanonicalRoot ||
         isEarlierNamedRoot ||
         upgradesEmptyNamedRoot
       ) {
+        // The name only takes over when the *name* itself was still
+        // fallback-sourced (or empty). A user-supplied name survives a
+        // metadata upgrade — the user's intent overrides the discovery.
+        const nameTakesOver = nameFromFallback || state.traceName === "";
         return {
-          traceName:
-            fromFallback || state.traceName === ""
-              ? span.name
-              : state.traceName,
+          traceName: nameTakesOver ? span.name : state.traceName,
           rootSpanType: spanType || null,
           rootSpanStartTimeMs: spanStartMs,
           traceNameFromFallback: false,
+          rootMetadataFromFallback: false,
         };
       }
 
@@ -103,7 +125,8 @@ export class TraceNameResolutionService {
     // Non-root span. Only the fallback path can update from here, and
     // only if (a) we've never had a real root, and (b) this is now the
     // earliest-starting span we've seen.
-    const haveRealRoot = !fromFallback && state.rootSpanStartTimeMs !== undefined;
+    const haveRealRoot =
+      !metadataFromFallback && state.rootSpanStartTimeMs !== undefined;
     if (haveRealRoot) return unchanged;
     // A user-overridden name is final; don't let the fallback path
     // overwrite it even when no real root exists. The user explicitly
@@ -130,6 +153,7 @@ export class TraceNameResolutionService {
       rootSpanType: spanType || null,
       rootSpanStartTimeMs: spanStartMs,
       traceNameFromFallback: true,
+      rootMetadataFromFallback: true,
     };
   }
 }

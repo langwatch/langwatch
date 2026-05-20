@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import { createTenantId } from "~/server/event-sourcing";
 import {
@@ -493,6 +494,61 @@ describe("applySpanToSummary() trace name extraction", () => {
       expect(state.traceName).toBe("Operator-picked label");
       expect(state.traceNameUserOverridden).toBe(true);
       expect(state.traceNameFromFallback).toBe(false);
+    });
+
+    /** @scenario Real root metadata upgrades after a user rename clears the name fallback flag */
+    it("still lets a real root upgrade rootSpanStartTimeMs/Type even after a user rename disowned the fallback name", () => {
+      const projection = makeProjection();
+      let state = createInitState();
+
+      // 1) Fallback span claims rootSpanStartTimeMs + rootSpanType
+      //    along with the trace name. Both fallback flags latch true.
+      const fallbackSpan = createTestSpan({
+        id: "child-1",
+        spanId: "child-1",
+        parentSpanId: "phantom",
+        name: "TentativeName",
+        startTimeUnixMs: 1000,
+        spanAttributes: { [ATTR_KEYS.SPAN_TYPE]: "agent" },
+      });
+      state = applySpanToSummary({ state, span: fallbackSpan });
+      expect(state.traceNameFromFallback).toBe(true);
+      expect(state.rootMetadataFromFallback).toBe(true);
+      expect(state.rootSpanStartTimeMs).toBe(1000);
+      expect(state.rootSpanType).toBe("agent");
+
+      // 2) User renames. The name flag clears (the name is no longer
+      //    fallback-sourced) but the metadata flag stays — the root
+      //    metadata is still a stand-in.
+      state = projection.apply(
+        state,
+        makeTraceNameChangedEvent({ newName: "Operator-picked label" }),
+      );
+      expect(state.traceNameFromFallback).toBe(false);
+      expect(state.rootMetadataFromFallback).toBe(true);
+      expect(state.traceName).toBe("Operator-picked label");
+
+      // 3) Real root arrives later in time than the fallback span.
+      //    Pre-fix, the metadata stayed pinned to the fallback span
+      //    because the only "is this still fallback?" signal had been
+      //    cleared by the rename. Now: the metadata upgrades to the
+      //    real root, the user's name survives.
+      const realRoot = createTestSpan({
+        id: "root-1",
+        spanId: "root-1",
+        parentSpanId: null,
+        name: "RealRootName",
+        startTimeUnixMs: 2000,
+        spanAttributes: { [ATTR_KEYS.SPAN_TYPE]: "workflow" },
+      });
+      state = applySpanToSummary({ state, span: realRoot });
+
+      expect(state.traceName).toBe("Operator-picked label");
+      expect(state.traceNameUserOverridden).toBe(true);
+      expect(state.traceNameFromFallback).toBe(false);
+      expect(state.rootMetadataFromFallback).toBe(false);
+      expect(state.rootSpanStartTimeMs).toBe(2000);
+      expect(state.rootSpanType).toBe("workflow");
     });
   });
 });

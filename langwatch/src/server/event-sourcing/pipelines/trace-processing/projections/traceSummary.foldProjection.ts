@@ -133,6 +133,7 @@ export function applySpanToSummary({
     rootSpanType,
     rootSpanStartTimeMs,
     traceNameFromFallback,
+    rootMetadataFromFallback,
   } = traceNameResolutionService.resolveFromSpan({ state, span });
 
   const spanType = String(span.spanAttributes[ATTR_KEYS.SPAN_TYPE] ?? "");
@@ -152,6 +153,7 @@ export function applySpanToSummary({
     models,
     traceName,
     traceNameFromFallback,
+    rootMetadataFromFallback,
     rootSpanStartTimeMs,
     ...tokens,
     ...status,
@@ -245,6 +247,7 @@ export class TraceSummaryFoldProjection
       rootSpanStartTimeMs: undefined,
       traceNameUserOverridden: false,
       traceNameFromFallback: false,
+      rootMetadataFromFallback: false,
       attributes: {},
       events: [],
       scenarioRoleCosts: {},

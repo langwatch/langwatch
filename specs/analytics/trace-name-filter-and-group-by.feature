@@ -84,6 +84,16 @@ Feature: Trace Name Filter and Group-By
     And the canonical root start time equals T1
     And the fold projection still marks the name as a fallback
 
+  @unit
+  Scenario: Real root metadata upgrades after a user rename clears the name fallback flag
+    Given a fallback span first claimed both the trace name and the root metadata (startTimeMs + spanType)
+    And the user then renamed the trace through a TraceNameChanged event
+    When a real root span arrives later in time than the fallback span
+    Then the user-supplied trace name is preserved
+    And rootSpanStartTimeMs is reassigned to the real root's start time
+    And rootSpanType is reassigned to the real root's span type
+    And both fallback flags resolve to false
+
   # ---------------------------------------------------------------------------
   # Filter: trace name appears as a filter dimension
   #

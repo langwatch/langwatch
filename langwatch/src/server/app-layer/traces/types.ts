@@ -106,8 +106,24 @@ export const traceSummaryDataSchema = z.object({
    * fallback lets it pick up a sensible name immediately; if a real
    * root span arrives later the projection prefers it and clears this
    * flag, since fold updates are incremental.
+   *
+   * Cleared by a user rename (TraceNameChanged event) — the rename is
+   * itself a higher-precedence source of the name, so the "is this
+   * still fallback-sourced?" question is meaningfully no.
+   * `rootMetadataFromFallback` continues to track the metadata
+   * provenance independently in that case.
    */
   traceNameFromFallback: z.boolean().optional(),
+  /**
+   * True when `rootSpanStartTimeMs` / `rootSpanType` were claimed via
+   * the fallback path (a non-root span used as a stand-in because no
+   * real root has arrived yet). Pairs with `traceNameFromFallback` but
+   * outlives a user rename — a user-supplied name disowns the fallback
+   * for *naming purposes* but the metadata itself is still a stand-in,
+   * so a real root arriving later must still be allowed to take it
+   * over.
+   */
+  rootMetadataFromFallback: z.boolean().optional(),
   /** LangWatch SDK events hoisted from spans during fold projection. */
   events: z
     .array(
