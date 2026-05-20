@@ -457,11 +457,38 @@ describe("getEvalChipDisplay", () => {
     });
 
     it("falls back to evaluatorId when name missing", () => {
-      
-        
+
+
       expect(getEvalChipDisplay({ evaluatorId: "azure_safety" }).displayName).toBe(
         "azure_safety",
       );
+    });
+
+    it("accepts the trace-list shape (evaluatorName) as an alias for name", () => {
+      // The trace-list `TraceEvalResult` uses `evaluatorName` (matches the
+      // ClickHouse column) while the drawer header chip passes `name`.
+      // Both shapes need to resolve to the same displayName — otherwise the
+      // trace-list EVALS column falls back to the monitor's KSUID and
+      // operators see `monitor_xxxx…` instead of the real evaluator name.
+      // Regression for the customer report on the v2 trace list.
+      expect(
+        getEvalChipDisplay({
+          evaluatorName: "User frustration by input",
+          evaluatorId: "monitor_ZAnGKUxsvjLf6PnAFzvws",
+        }).displayName,
+      ).toBe("User frustration by input");
+    });
+
+    it("prefers `name` over `evaluatorName` when both are present", () => {
+      // `name` wins so callers can explicitly override the persisted name
+      // without us having to chase down every adapter.
+      expect(
+        getEvalChipDisplay({
+          name: "Safety",
+          evaluatorName: "azure/content_safety",
+          evaluatorId: "monitor_x",
+        }).displayName,
+      ).toBe("Safety");
     });
   });
 

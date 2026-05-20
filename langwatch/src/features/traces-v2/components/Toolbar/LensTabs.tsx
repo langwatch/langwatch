@@ -1,8 +1,12 @@
-import { Box, HStack, Tabs } from "@chakra-ui/react";
+import { Box, HStack, IconButton, Tabs, Text } from "@chakra-ui/react";
+import { PanelLeftOpen } from "lucide-react";
 import type React from "react";
 import { startTransition, useMemo, useRef, useState } from "react";
+import { Kbd } from "~/components/ops/shared/Kbd";
+import { Tooltip } from "~/components/ui/tooltip";
 import { useErrorCount } from "../../hooks/useErrorCount";
 import { useOverflowVisibility } from "../../hooks/useOverflowVisibility";
+import { useUIStore } from "../../stores/uiStore";
 import { useViewStore } from "../../stores/viewStore";
 import { OverflowMenu } from "../shared/OverflowMenu";
 import { CreateLensButton } from "./CreateLensButton";
@@ -36,6 +40,9 @@ export const LensTabs: React.FC = () => {
     // `LensTab`.
     attribute: "data-value",
   });
+
+  const sidebarCollapsed = useUIStore((s) => s.sidebarCollapsed);
+  const toggleSidebar = useUIStore((s) => s.toggleSidebar);
 
   const activeLens = allLenses.find((l) => l.id === activeLensId);
   const activeLensIsDraft = isDraft(activeLensId);
@@ -94,6 +101,29 @@ export const LensTabs: React.FC = () => {
   return (
     <>
       <HStack gap={0} flex="1" minWidth={0}>
+        {sidebarCollapsed && (
+          <Tooltip
+            content={
+              <HStack gap={1.5}>
+                <Text>Show filters sidebar</Text>
+                <Kbd>{"["}</Kbd>
+              </HStack>
+            }
+            positioning={{ placement: "bottom" }}
+          >
+            <IconButton
+              aria-label="Show filters sidebar"
+              variant="ghost"
+              size="2xs"
+              color="fg.subtle"
+              onClick={toggleSidebar}
+              marginRight={1}
+              flexShrink={0}
+            >
+              <PanelLeftOpen size={14} />
+            </IconButton>
+          </Tooltip>
+        )}
         <Tabs.Root
           value={activeLensId}
           onValueChange={(e) => handleLensChange(e.value)}

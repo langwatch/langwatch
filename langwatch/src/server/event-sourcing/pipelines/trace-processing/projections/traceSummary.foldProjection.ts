@@ -128,8 +128,13 @@ export function applySpanToSummary({
 
   // Precedence rules for traceName / rootSpanType / rootSpanStartTimeMs
   // live in TraceNameResolutionService — see that file for the full set.
-  const { traceName, rootSpanType, rootSpanStartTimeMs } =
-    traceNameResolutionService.resolveFromSpan({ state, span });
+  const {
+    traceName,
+    rootSpanType,
+    rootSpanStartTimeMs,
+    traceNameFromFallback,
+    rootMetadataFromFallback,
+  } = traceNameResolutionService.resolveFromSpan({ state, span });
 
   const spanType = String(span.spanAttributes[ATTR_KEYS.SPAN_TYPE] ?? "");
   const containsAi = state.containsAi || AI_SPAN_TYPES.has(spanType);
@@ -147,6 +152,8 @@ export function applySpanToSummary({
     totalDurationMs: timing.totalDurationMs,
     models,
     traceName,
+    traceNameFromFallback,
+    rootMetadataFromFallback,
     rootSpanStartTimeMs,
     ...tokens,
     ...status,
@@ -239,6 +246,8 @@ export class TraceSummaryFoldProjection
       traceName: "",
       rootSpanStartTimeMs: undefined,
       traceNameUserOverridden: false,
+      traceNameFromFallback: false,
+      rootMetadataFromFallback: false,
       attributes: {},
       events: [],
       scenarioRoleCosts: {},
@@ -437,6 +446,10 @@ export class TraceSummaryFoldProjection
       // the new name happens to coincide with the discovered root span
       // name — intent matters more than the value.
       traceNameUserOverridden: true,
+      // A user-supplied name is the highest-precedence source; whatever
+      // came before is no longer a "fallback" guess that should be
+      // displaced by a later real-root span.
+      traceNameFromFallback: false,
     };
   }
 }

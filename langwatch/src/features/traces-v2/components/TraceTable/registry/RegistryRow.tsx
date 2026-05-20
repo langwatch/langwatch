@@ -108,6 +108,39 @@ function RegistryRowComponent<TRow>({
   // overall height matches the real data layout (the IO-preview addon
   // is the common-case addon and dominates the row's height).
   const hasAddons = isLoading || renderedAddons.length > 0;
+
+  // The evals column tends to grow tall when many evaluators ran (chips
+  // wrap to multiple lines), while the IO preview addon directly below
+  // wastes the bottom-right corner with empty space under the same
+  // column. Letting evals `rowSpan=2` over the addon row absorbs that
+  // dead area: the table gets shorter and the chips have more vertical
+  // room. We only do this when an IO preview addon actually renders
+  // below — the only addon today that always reserves a sibling row
+  // and is the dominant height-contributor. Other addons (error-detail,
+  // expanded-peek) don't visually compete with the evals column for
+  // the same screen real estate, so leaving them on the original
+  // single-row addon layout keeps their borders / styling intact.
+  const evalsCellIdx = useMemo(
+    () => visibleCells.findIndex((c) => c.column.id === "evaluations"),
+    [visibleCells],
+  );
+  // `rowSpan=2` spans the immediately-following row only. If another
+  // addon (e.g. error-detail) is registered before io-preview, the
+  // claim would land on that row instead and the eval cell would punch
+  // through the wrong section of the table. Gating on "io-preview is
+  // the first rendered addon" keeps the geometry trustworthy for any
+  // saved lens addon order, even ones the built-in lenses don't use
+  // today.
+  const ioPreviewWillRender = useMemo(
+    () => renderedAddons[0]?.id === "io-preview",
+    [renderedAddons],
+  );
+  const evalsRowSpansIntoIOPreview =
+    !isLoading && evalsCellIdx >= 0 && ioPreviewWillRender;
+  const rowSpanClaimedIndices = useMemo(
+    () => (evalsRowSpansIntoIOPreview ? [evalsCellIdx] : []),
+    [evalsRowSpansIntoIOPreview, evalsCellIdx],
+  );
   const skeletonRowIdx = dataIndex ?? 0;
 
   const handleRowClick = () => {
@@ -134,11 +167,19 @@ function RegistryRowComponent<TRow>({
     >
       {visibleCells.map((cell, i) => {
         const isSelectCell = cell.column.id === SELECT_COLUMN_ID;
+        const isEvalsRowSpanCell =
+          evalsRowSpansIntoIOPreview && i === evalsCellIdx;
         const meta = cell.column.columnDef.meta as ColumnMeta | undefined;
         return (
           <Td
             key={cell.id}
             bg={hoverScope === "unified" ? style.bg : undefined}
+            // When this cell rowSpans into the IO preview row below, it
+            // needs to paint the bottom border that the IO preview row
+            // would otherwise own on this column slot — the addon row
+            // never gets a chance to render a TD here.
+            rowSpan={isEvalsRowSpanCell ? 2 : undefined}
+            verticalAlign={isEvalsRowSpanCell ? "top" : undefined}
             // Borders go on each TD instead of the Tr because the table
             // runs under `border-collapse: separate` — under that mode
             // browsers ignore TR-level borders, only TD borders render.
@@ -148,14 +189,21 @@ function RegistryRowComponent<TRow>({
             // belong to the same row group visually, so a divider
             // between them reads as the group being broken in two. The
             // addon's own bottom border closes the group against the
-            // next trace.
+            // next trace. Exception: a rowspan cell owns its bottom
+            // border because no addon TD will paint one beneath it.
             //
             // Top border only paints when this row leads a consecutive
             // error run, so the red bracket closes the run on both
             // sides instead of being open on top.
-            borderBottomWidth={hasAddons ? undefined : "1px"}
+            borderBottomWidth={
+              isEvalsRowSpanCell ? "1px" : hasAddons ? undefined : "1px"
+            }
             borderBottomColor={
-              hasAddons ? undefined : style.bottomSeparatorColor
+              isEvalsRowSpanCell
+                ? style.bottomSeparatorColor
+                : hasAddons
+                  ? undefined
+                  : style.bottomSeparatorColor
             }
             borderTopWidth={isFirstOfErrorRun ? "1px" : undefined}
             borderTopColor={
@@ -207,6 +255,7 @@ function RegistryRowComponent<TRow>({
                 isSelected,
                 isFocused,
                 actions,
+                enabledAddonIds: addons,
               })
             )}
           </Td>
@@ -246,6 +295,14 @@ function RegistryRowComponent<TRow>({
           isSelected,
           tanstackRow,
           actions,
+          // Only the IO preview addon participates in the rowspan
+          // dance — every other addon row is a stylistically distinct
+          // visual block (error detail, expanded peek) that doesn't
+          // share its row with rowspan-claimed main-row cells. Passing
+          // an empty list keeps those addons on their existing
+          // single-TD layout.
+          rowSpanClaimedIndices:
+            addon.id === "io-preview" ? rowSpanClaimedIndices : [],
         })}
       </React.Fragment>
     ))

@@ -57,17 +57,35 @@ export function useTraceNewCount(): TraceNewCountResult {
     setIntervalMs(FAST_MS);
   }, [fastPollRequestedAt]);
 
-  // Reset to fast polling when tab becomes visible again, and surface
-  // any traces that arrived while we were away by invalidating the list.
+  // Reset to fast polling when tab becomes visible again. What we
+  // refetch depends on the operator's live-updates mode:
+  //
+  //   live   — full refresh: list + discover + newCount, so the table
+  //            reflects whatever arrived while we were away.
+  //   ask    — newCount only; the user explicitly opted *out* of
+  //            silent list merges, so we just update the (N new) pill
+  //            and let them click it to commit.
+  //   paused — do nothing; "no updates, no pill, no polling" per the
+  //            store's contract.
+  const trpcUtils = api.useContext();
   const prevVisibleRef = useRef(isVisible);
   useEffect(() => {
     if (isVisible && !prevVisibleRef.current) {
-      consecutiveZerosRef.current = 0;
-      setIntervalMs(FAST_MS);
-      refresh();
+      const mode = useSseStatusStore.getState().liveUpdatesMode;
+      if (mode !== "paused") {
+        consecutiveZerosRef.current = 0;
+        setIntervalMs(FAST_MS);
+      }
+      if (mode === "live") {
+        refresh();
+      } else if (mode === "ask") {
+        void trpcUtils.tracesV2.newCount.invalidate();
+      }
     }
     prevVisibleRef.current = isVisible;
-  }, [isVisible, refresh]);
+  }, [isVisible, refresh, trpcUtils]);
+
+  const liveUpdatesMode = useSseStatusStore((s) => s.liveUpdatesMode);
 
   const query = api.tracesV2.newCount.useQuery(
     {
@@ -81,7 +99,11 @@ export function useTraceNewCount(): TraceNewCountResult {
       query: queryText || undefined,
     },
     {
-      enabled: !!project?.id,
+      // Honour the store contract: paused = "no updates, no pill, no
+      // polling". Stops the query from firing at all so a paused
+      // operator can leave the tab without burning quota on count
+      // pings they explicitly turned off.
+      enabled: !!project?.id && liveUpdatesMode !== "paused",
       staleTime: 0,
       refetchInterval: isVisible && !sseConnected ? intervalMs : false,
       onSuccess: (data) => {

@@ -27,6 +27,7 @@ import { useUIStore } from "../../stores/uiStore";
 import { analyzeOrGroups } from "~/server/app-layer/traces/query-language/queries";
 import { DensityProvider } from "../DensityProvider";
 import { FilterSidebar } from "../FilterSidebar/FilterSidebar";
+import { SidebarResizeHandle } from "../FilterSidebar/SidebarResizeHandle";
 import { ConnectorLaneWidth } from "../FilterSidebar/OrConnectorOverlay";
 import { FindBar } from "../FindBar";
 import { SearchBar } from "../SearchBar/SearchBar";
@@ -46,7 +47,13 @@ import {
 import { useTracesPageTitle } from "./usePageTitle";
 
 const SIDEBAR_WIDTH_EXPANDED = 220;
-const SIDEBAR_WIDTH_COLLAPSED = 40;
+const SIDEBAR_WIDTH_MAX = 640;
+// Minimum width the operator can drag the sidebar to before we accept
+// it as "intended to keep visible." Below this, an inward drag commits
+// a full collapse instead of an awkward sliver. Kept low (40px) so a
+// short accidental drag doesn't snap the sidebar shut — operators who
+// actually want it gone have to drag clearly into the trace table.
+const SIDEBAR_COLLAPSE_THRESHOLD = 40;
 
 const DIMMED_PROPS = {
   opacity: 0.45,
@@ -208,7 +215,11 @@ const FilterAside: React.FC<{
   dimmed?: boolean;
 }> = React.memo(({ dimmed = false }) => {
   const persistedCollapsed = useUIStore((s) => s.sidebarCollapsed);
+  const persistedWidth = useUIStore((s) => s.sidebarWidth);
   const mobileExpandedOverride = useUIStore((s) => s.mobileExpandedOverride);
+  const setSidebarWidth = useUIStore((s) => s.setSidebarWidth);
+  const persistSidebarLayout = useUIStore((s) => s.persistSidebarLayout);
+  const setSidebarCollapsed = useUIStore((s) => s.setSidebarCollapsed);
   // Below `md` the expanded sidebar steals 240px+ from a 390px-wide
   // viewport, leaving the actual trace table unreadable. Force the
   // collapsed rail on small screens regardless of the persisted preference,
@@ -229,13 +240,32 @@ const FilterAside: React.FC<{
     (s) => analyzeOrGroups(s.ast).groups.length,
   );
 
-  const expandedWidth = SIDEBAR_WIDTH_EXPANDED + orGroupCount * ConnectorLaneWidth;
+  // When the operator collapses the sidebar we drop the aside from the
+  // DOM entirely — no narrow rail, no icon strip. The "expand" affordance
+  // lives in the table footer (see `Pagination`) so the page is one
+  // continuous slab while collapsed, with one button to bring it back.
+  if (collapsed) return null;
+
+  const autoExpandedWidth =
+    SIDEBAR_WIDTH_EXPANDED + orGroupCount * ConnectorLaneWidth;
+  // User-set width wins when present, else the auto-computed default.
+  // The dragged width still respects the auto default as a floor — adding
+  // an OR group should never visually shrink the sidebar below the lane
+  // count the connector overlay needs to draw without squeezing rows.
+  const expandedWidth = persistedWidth
+    ? Math.max(persistedWidth, autoExpandedWidth)
+    : autoExpandedWidth;
+
+  // Don't show the resize handle on mobile (forced-collapsed) or while
+  // the empty-state dim is active — neither surface supports a drag-out.
+  const showResizeHandle = !forceCollapsedSmallScreen && !dimmed;
 
   return (
     <Box
       as="aside"
       role="complementary"
       aria-label="Trace filters"
+      position="relative"
       flexShrink={0}
       // `height="full"` chains the height constraint from the
       // outer tour-target wrapper through the aside into FilterSidebar's
@@ -244,14 +274,22 @@ const FilterAside: React.FC<{
       // ~1700px, which the parent then clipped — facets past the
       // viewport were invisible *and* unscrollable.
       height="full"
-      width={`${collapsed ? SIDEBAR_WIDTH_COLLAPSED : expandedWidth}px`}
+      width={`${expandedWidth}px`}
       transition="width 0.15s ease"
-      borderRightWidth="1px"
-      borderColor="border"
       overflow="hidden"
       {...(dimmed ? (DIMMED_PROPS as Record<string, unknown>) : {})}
     >
       <FilterSidebar />
+      {showResizeHandle && (
+        <SidebarResizeHandle
+          currentWidth={expandedWidth}
+          collapseBelow={SIDEBAR_COLLAPSE_THRESHOLD}
+          max={SIDEBAR_WIDTH_MAX}
+          onResize={setSidebarWidth}
+          onResizeEnd={persistSidebarLayout}
+          onCollapse={() => setSidebarCollapsed(true)}
+        />
+      )}
     </Box>
   );
 });

@@ -3,6 +3,7 @@ import { ChevronUp } from "lucide-react";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { useTraceNewCount } from "../../hooks/useTraceNewCount";
+import { useSseStatusStore } from "../../stores/sseStatusStore";
 
 const SCROLL_THRESHOLD_PX = 80;
 
@@ -27,6 +28,7 @@ export const NewTracesScrollUpIndicator: React.FC<
   NewTracesScrollUpIndicatorProps
 > = ({ scrollRef }) => {
   const { count, acknowledge } = useTraceNewCount();
+  const liveUpdatesMode = useSseStatusStore((s) => s.liveUpdatesMode);
   const [isScrolled, setIsScrolled] = useState(false);
 
   useEffect(() => {
@@ -38,14 +40,25 @@ export const NewTracesScrollUpIndicator: React.FC<
     return () => el.removeEventListener("scroll", update);
   }, [scrollRef]);
 
-  if (count === 0 || !isScrolled) return null;
+  // Live mode: only show when the user is scrolled away from the top —
+  // otherwise auto-refresh has already brought the new rows into view.
+  // Ask mode: the table is deliberately frozen on the snapshot the user
+  // was reading, so the pill needs to surface regardless of scroll
+  // position. Without this, an operator at the top in ask mode would
+  // never see that new rows are available.
+  const visible =
+    count > 0 && (isScrolled || liveUpdatesMode === "ask");
+  if (!visible) return null;
 
   const handleClick = () => {
     scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
     acknowledge();
   };
 
-  const ariaLabel = `${count} new trace${count === 1 ? "" : "s"} above — scroll up`;
+  const ariaLabel =
+    liveUpdatesMode === "ask"
+      ? `${count} new trace${count === 1 ? "" : "s"} buffered — click to load`
+      : `${count} new trace${count === 1 ? "" : "s"} above — scroll up`;
 
   return (
     <Box

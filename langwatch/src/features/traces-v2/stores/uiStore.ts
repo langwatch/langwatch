@@ -9,6 +9,10 @@ import { create } from "zustand";
  */
 interface UIState {
   sidebarCollapsed: boolean;
+  // User-set sidebar width in px. `null` means "use the auto-computed
+  // default" (220px base + per-OR-group lanes). When the user drags the
+  // resize handle, this becomes a number and overrides the default.
+  sidebarWidth: number | null;
   // Transient override used only on mobile (< md). The persisted
   // `sidebarCollapsed` is the user's desktop preference; on a narrow
   // viewport we force-collapse regardless, but the user can opt back
@@ -19,13 +23,21 @@ interface UIState {
 
   toggleSidebar: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
+  setSidebarWidth: (width: number | null) => void;
+  /**
+   * Persist the current `sidebarCollapsed` + `sidebarWidth` snapshot to
+   * `localStorage`. Pair with `setSidebarWidth` (which intentionally
+   * stays in-memory only during a drag) — call this once on drag-end
+   * so the user's chosen width survives a reload.
+   */
+  persistSidebarLayout: () => void;
   setSyntaxHelpOpen: (open: boolean) => void;
   setShortcutsHelpOpen: (open: boolean) => void;
   toggleShortcutsHelp: () => void;
 }
 
 const STORAGE_KEY = "langwatch:traces-v2:ui";
-type Persisted = Pick<UIState, "sidebarCollapsed">;
+type Persisted = Pick<UIState, "sidebarCollapsed" | "sidebarWidth">;
 
 const DEFAULT_PERSISTED: Persisted = {
   // Default to open — the filter sidebar is the primary discovery surface
@@ -34,6 +46,7 @@ const DEFAULT_PERSISTED: Persisted = {
   // who prefer the slim view can still collapse it, and that choice
   // persists.
   sidebarCollapsed: false,
+  sidebarWidth: null,
 };
 
 function loadPersistedUI(): Persisted {
@@ -50,6 +63,10 @@ function loadPersistedUI(): Persisted {
         typeof parsed.sidebarCollapsed === "boolean"
           ? parsed.sidebarCollapsed
           : DEFAULT_PERSISTED.sidebarCollapsed,
+      sidebarWidth:
+        typeof parsed.sidebarWidth === "number" && parsed.sidebarWidth > 0
+          ? parsed.sidebarWidth
+          : DEFAULT_PERSISTED.sidebarWidth,
     };
   } catch {
     return DEFAULT_PERSISTED;
@@ -77,6 +94,7 @@ function isBelowMdViewport(): boolean {
 
 export const useUIStore = create<UIState>((set, get) => ({
   sidebarCollapsed: initial.sidebarCollapsed,
+  sidebarWidth: initial.sidebarWidth,
   mobileExpandedOverride: false,
   syntaxHelpOpen: false,
   shortcutsHelpOpen: false,
@@ -92,12 +110,25 @@ export const useUIStore = create<UIState>((set, get) => ({
     }
     const next = !get().sidebarCollapsed;
     set({ sidebarCollapsed: next });
-    persistUI({ sidebarCollapsed: next });
+    persistUI({ sidebarCollapsed: next, sidebarWidth: get().sidebarWidth });
   },
 
   setSidebarCollapsed: (collapsed) => {
     set({ sidebarCollapsed: collapsed });
-    persistUI({ sidebarCollapsed: collapsed });
+    persistUI({ sidebarCollapsed: collapsed, sidebarWidth: get().sidebarWidth });
+  },
+
+  setSidebarWidth: (width) => {
+    // Stays in-memory only — `localStorage.setItem` is synchronous and
+    // running it on every pointer-move frame of a drag noticeably
+    // jitters the resize. Persistence happens once at drag-end via
+    // `persistSidebarLayout`, called from the resize handle.
+    set({ sidebarWidth: width });
+  },
+
+  persistSidebarLayout: () => {
+    const { sidebarCollapsed, sidebarWidth } = get();
+    persistUI({ sidebarCollapsed, sidebarWidth });
   },
 
   setSyntaxHelpOpen: (open) => set({ syntaxHelpOpen: open }),

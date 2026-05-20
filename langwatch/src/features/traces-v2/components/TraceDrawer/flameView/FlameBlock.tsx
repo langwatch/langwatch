@@ -134,7 +134,6 @@ export function FlameBlock({
       ? `${formatPercent(pctOfTrace)} of trace`
       : null,
     span.model ? `Model: ${span.model}` : null,
-    node.isOrphaned ? "⚠ Parent not in trace" : null,
   ].filter(Boolean);
 
   // Visual hierarchy: selected > focused > hovered > ancestor/child > rest.
@@ -182,7 +181,6 @@ export function FlameBlock({
         }}
         borderWidth={borderWidth}
         borderColor={borderColor}
-        borderStyle={node.isOrphaned ? "dashed" : "solid"}
         borderRadius="sm"
         cursor="pointer"
         pointerEvents="auto"

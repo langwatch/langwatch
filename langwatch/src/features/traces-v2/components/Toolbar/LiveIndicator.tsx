@@ -5,7 +5,10 @@ import { Tooltip } from "~/components/ui/tooltip";
 import type { ConnectionState } from "~/hooks/useSSESubscription";
 import { useTraceListRefresh } from "../../hooks/useTraceListRefresh";
 import { useRefreshUIStore } from "../../stores/refreshUIStore";
-import { useSseStatusStore } from "../../stores/sseStatusStore";
+import {
+  useSseStatusStore,
+  type LiveUpdatesMode,
+} from "../../stores/sseStatusStore";
 
 const SSE_STATE_STYLE: Record<
   ConnectionState,
@@ -30,22 +33,32 @@ const REFRESH_SPIN_KEYFRAMES = {
 export const LiveIndicator: React.FC = () => {
   const sseState = useSseStatusStore((s) => s.sseConnectionState);
   const lastEventAt = useSseStatusStore((s) => s.lastEventAt);
-  const liveUpdatesEnabled = useSseStatusStore((s) => s.liveUpdatesEnabled);
+  const liveUpdatesMode = useSseStatusStore((s) => s.liveUpdatesMode);
   const toggleLiveUpdates = useSseStatusStore((s) => s.toggleLiveUpdates);
   const isRefreshing = useRefreshUIStore((s) => s.isRefreshing);
   const refresh = useTraceListRefresh();
 
-  const { dotColor, pulse } = SSE_STATE_STYLE[sseState];
-  const isConnected = sseState === "connected";
+  // In `ask` mode the dot is solid blue: SSE is on (so we know new rows
+  // exist) but the user is in charge of when to pull them in. In `live`
+  // mode the dot reflects the SSE connection state — green pulse when
+  // connected. `paused` reuses the connection style (which goes red /
+  // disconnected by definition). The "N new" affordance reuses the
+  // existing floating pill (`NewTracesScrollUpIndicator`) — there is
+  // exactly one "new rows available" surface across both modes.
+  const dotStyle =
+    liveUpdatesMode === "ask"
+      ? { dotColor: "blue.solid", pulse: false }
+      : SSE_STATE_STYLE[sseState];
 
   return (
     <Flex align="center" gap={1}>
       <Tooltip
-        content={
-          liveUpdatesEnabled
-            ? `${describeSseState(sseState, lastEventAt)}. Click to pause.`
-            : "Live updates paused. Click to resume."
-        }
+        content={describeMode({
+          mode: liveUpdatesMode,
+          nextMode: nextLabel(liveUpdatesMode),
+          sseState,
+          lastEventAt,
+        })}
         positioning={{ placement: "bottom" }}
       >
         <Flex
@@ -54,20 +67,22 @@ export const LiveIndicator: React.FC = () => {
           gap={1}
           paddingX={1}
           cursor="pointer"
-          color={liveUpdatesEnabled ? "fg" : "fg.subtle"}
+          color={liveUpdatesMode === "paused" ? "fg.subtle" : "fg"}
           onClick={toggleLiveUpdates}
-          aria-label={
-            liveUpdatesEnabled ? "Pause live updates" : "Resume live updates"
-          }
-          aria-pressed={liveUpdatesEnabled}
+          aria-label={`Live updates mode: ${liveUpdatesMode}. Click to switch to ${nextLabel(liveUpdatesMode)}.`}
+          aria-pressed={liveUpdatesMode !== "paused"}
         >
-          {isConnected ? <Wifi size={12} /> : <WifiOff size={12} />}
+          {liveUpdatesMode === "paused" ? (
+            <WifiOff size={12} />
+          ) : (
+            <Wifi size={12} />
+          )}
           <Box
             width="6px"
             height="6px"
             borderRadius="full"
-            bg={dotColor}
-            animation={pulse ? "pulse 2s infinite" : undefined}
+            bg={dotStyle.dotColor}
+            animation={dotStyle.pulse ? "pulse 2s infinite" : undefined}
           />
         </Flex>
       </Tooltip>
@@ -90,6 +105,34 @@ export const LiveIndicator: React.FC = () => {
     </Flex>
   );
 };
+
+function nextLabel(mode: LiveUpdatesMode): LiveUpdatesMode {
+  if (mode === "live") return "ask";
+  if (mode === "ask") return "paused";
+  return "live";
+}
+
+function describeMode({
+  mode,
+  nextMode,
+  sseState,
+  lastEventAt,
+}: {
+  mode: LiveUpdatesMode;
+  nextMode: LiveUpdatesMode;
+  sseState: ConnectionState;
+  lastEventAt: number | null;
+}): string {
+  const cycle = `Click to switch to "${nextMode}".`;
+  switch (mode) {
+    case "live":
+      return `${describeSseState(sseState, lastEventAt)}. ${cycle}`;
+    case "ask":
+      return `Live updates buffered — the floating "N new" pill appears when fresh rows arrive. ${cycle}`;
+    case "paused":
+      return `Live updates paused. ${cycle}`;
+  }
+}
 
 function describeSseState(
   state: ConnectionState,

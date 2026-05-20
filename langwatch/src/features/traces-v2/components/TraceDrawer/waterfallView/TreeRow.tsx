@@ -3,7 +3,6 @@ import {
   LuChevronDown,
   LuChevronRight,
   LuTriangleAlert,
-  LuUnlink,
 } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { LangwatchSignalBucket } from "~/server/api/routers/tracesV2.schemas";
@@ -52,7 +51,7 @@ export function TreeRow({
   onHoverStart: () => void;
   onHoverEnd: () => void;
 }) {
-  const { span, depth, isOrphaned } = node;
+  const { span, depth } = node;
   const isError = span.status === "error";
   const color =
     (SPAN_TYPE_COLORS[span.type ?? "span"] as string) ?? "gray.solid";
@@ -124,11 +123,6 @@ export function TreeRow({
           <TipCell label="Parent" value={span.parentSpanId.slice(0, 16)} mono />
         )}
       </Box>
-      {isOrphaned && (
-        <Text textStyle="2xs" color="orange.fg" marginTop={1.5}>
-          ⚠ Parent not in trace
-        </Text>
-      )}
     </Box>
   );
 
@@ -219,18 +213,6 @@ export function TreeRow({
           >
             <Icon as={TypeIcon} boxSize={3} />
           </Flex>
-
-          {/* Orphaned indicator */}
-          {isOrphaned && (
-            <Tooltip
-              content="Parent not in trace"
-              positioning={{ placement: "top" }}
-            >
-              <Flex flexShrink={0} marginRight={1}>
-                <Icon as={LuUnlink} boxSize={3} color="yellow.fg" />
-              </Flex>
-            </Tooltip>
-          )}
 
           {/* Span name + metadata */}
           <Flex
