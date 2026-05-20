@@ -225,12 +225,19 @@ export async function checkRoleBindingPermission({
           }
         }
       }
-      if (perms.length > 0 && hasPermissionWithHierarchy(perms, permission)) {
-        return true;
+      if (perms.length > 0) {
+        if (hasPermissionWithHierarchy(perms, permission)) {
+          return true;
+        }
+        // Non-empty custom role is authoritative — skip VIEWER baseline.
+        // See also resolveBindingPermission() in rbac.ts which must stay
+        // in sync with this logic.
+        continue;
       }
       // Empty/missing/malformed custom role — fall through to the built-in
-      // CUSTOM permission set below, which grants the same `*:view`
-      // permissions as a VIEWER binding.
+      // CUSTOM permission set below (VIEWER-equivalent baseline). This
+      // preserves backward compatibility for legacy CUSTOM bindings that
+      // were created before fine-grained permissions existed.
     }
 
     // Org-scoped bindings: ADMIN grants everything; MEMBER grants org-level permissions only

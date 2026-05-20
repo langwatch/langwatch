@@ -207,6 +207,54 @@ describe("checkRoleBindingPermission()", () => {
 
       expect(result).toBe(false);
     });
+
+    it("denies view permissions in CUSTOM baseline when custom role has explicit permissions", async () => {
+      const prisma = makePrisma({
+        directBindings: [
+          {
+            role: TeamUserRole.CUSTOM,
+            customRoleId: "cr1",
+            scopeType: RoleBindingScopeType.TEAM,
+            scopeId: TEAM_ID,
+          },
+        ],
+        customRolePermissions: ["traces:view"],
+      });
+
+      const result = await checkRoleBindingPermission({
+        prisma,
+        userId: USER_ID,
+        organizationId: ORG_ID,
+        scope: teamScope,
+        permission: "secrets:view",
+      });
+
+      expect(result).toBe(false);
+    });
+
+    it("grants VIEWER baseline when custom role has empty permissions", async () => {
+      const prisma = makePrisma({
+        directBindings: [
+          {
+            role: TeamUserRole.CUSTOM,
+            customRoleId: "cr1",
+            scopeType: RoleBindingScopeType.TEAM,
+            scopeId: TEAM_ID,
+          },
+        ],
+        customRolePermissions: [],
+      });
+
+      const result = await checkRoleBindingPermission({
+        prisma,
+        userId: USER_ID,
+        organizationId: ORG_ID,
+        scope: teamScope,
+        permission: "analytics:view",
+      });
+
+      expect(result).toBe(true);
+    });
   });
 
   describe("when user has no access", () => {

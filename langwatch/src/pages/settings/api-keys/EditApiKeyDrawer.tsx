@@ -155,12 +155,15 @@ export function EditApiKeyDrawer({
     if (mode === "restricted" && Object.values(categorySelections).every((v) => !v || v === "none")) {
       const allSelected: Record<string, PermissionSelection> = {};
       for (const cat of PERMISSION_CATEGORIES) {
+        const canRead = cat.readPermissions.every((p) =>
+          hasPermissionWithHierarchy(userPermissions, p),
+        );
         const canWrite =
           cat.accessLevels.includes("write") &&
           cat.writePermissions.every((p) =>
             hasPermissionWithHierarchy(userPermissions, p),
           );
-        allSelected[cat.key] = canWrite ? "write" : "read";
+        allSelected[cat.key] = canWrite ? "write" : canRead ? "read" : "none";
       }
       setCategorySelections(allSelected);
     }
