@@ -9,7 +9,10 @@ import type {
   FacetTable,
   RangeFacetDef,
 } from "./facet-registry";
-import { deriveTraceStatus } from "./derive-trace-status";
+import {
+  deriveTraceStatus,
+  TRACE_STATUS_CLICKHOUSE_EXPRESSION,
+} from "./derive-trace-status";
 import { FACET_REGISTRY, TABLE_TIME_COLUMNS } from "./facet-registry";
 import type {
   BatchedFacetResult,
@@ -261,8 +264,7 @@ const SORT_COLUMN_MAP: Record<string, TraceListSort["column"]> = {
 
 const FACET_EXPRESSIONS: Record<string, string> = {
   origin: "Attributes['langwatch.origin']",
-  status:
-    "if(ContainsErrorStatus = 1, 'error', if(ContainsOKStatus = 1, 'ok', 'warning'))",
+  status: TRACE_STATUS_CLICKHOUSE_EXPRESSION,
   service: "Attributes['service.name']",
 };
 
