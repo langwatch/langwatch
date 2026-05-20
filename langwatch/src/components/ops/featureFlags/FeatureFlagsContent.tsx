@@ -369,7 +369,7 @@ function FlagRowView({
                 partialEnabled
                   ? {
                       "& [data-part='control'][data-state='checked']": {
-                        background: "yellow.500",
+                        background: "green.500",
                       },
                     }
                   : undefined
