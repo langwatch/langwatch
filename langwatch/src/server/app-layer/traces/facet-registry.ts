@@ -1,3 +1,4 @@
+import { TRACE_STATUS_CLICKHOUSE_EXPRESSION } from "./derive-trace-status";
 import {
   EVALUATOR_FACET,
   EVENT_ATTRIBUTE_KEYS_FACET,
@@ -80,8 +81,7 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
     label: "Status",
     group: "trace",
     table: "trace_summaries",
-    expression:
-      "if(ContainsErrorStatus = 1, 'error', if(ContainsOKStatus = 1, 'ok', 'warning'))",
+    expression: TRACE_STATUS_CLICKHOUSE_EXPRESSION,
   },
   {
     key: "origin",
