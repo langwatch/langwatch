@@ -75,4 +75,44 @@ describe("coerceContentToArray", () => {
       expect(coerceContentToArray("[not parseable at all")).toBeNull();
     });
   });
+
+  describe("when Python repr contains apostrophes inside string literals", () => {
+    // Real bug from prod (scenariorun_3Dzjm2lT7Rcc4oj9r390XO8bdoL). Python's
+    // repr switches the outer string delimiter to double quotes whenever a
+    // text contains an apostrophe — but the rest of the structure still
+    // uses single quotes for dict keys and string values. A naive
+    // single-to-double sweep flips `i'm` into `i"m` and breaks JSON.parse.
+    it("preserves apostrophes when text part is wrapped in double quotes", () => {
+      const repr =
+        "[{'type': 'text', 'text': \"[shouting] you charged me [angry] i'm at a noisy cafe\"}]";
+      expect(coerceContentToArray(repr)).toEqual([
+        {
+          type: "text",
+          text: "[shouting] you charged me [angry] i'm at a noisy cafe",
+        },
+      ]);
+    });
+
+    it("handles mixed parts: text with apostrophe + input_audio with base64", () => {
+      const repr =
+        "[{'type': 'text', 'text': \"i'm at a cafe\"}, {'type': 'input_audio', 'input_audio': {'data': 'UklGRg==', 'format': 'wav'}}]";
+      expect(coerceContentToArray(repr)).toEqual([
+        { type: "text", text: "i'm at a cafe" },
+        {
+          type: "input_audio",
+          input_audio: { data: "UklGRg==", format: "wav" },
+        },
+      ]);
+    });
+
+    it("handles double quotes nested inside python single-quoted strings", () => {
+      // Python repr will escape: 'he said "hi"' stays single-quoted with
+      // escaped doubles. JSON needs the inner quotes escaped under double
+      // quotes as well.
+      const repr = "[{'type': 'text', 'text': 'he said \"hi\" loudly'}]";
+      expect(coerceContentToArray(repr)).toEqual([
+        { type: "text", text: 'he said "hi" loudly' },
+      ]);
+    });
+  });
 });
