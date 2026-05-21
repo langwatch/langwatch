@@ -1,0 +1,10 @@
+# Smoke-test for issue #3754 — DO NOT MERGE.
+# Expect .github/workflows/deployment-impact-check.yml to FAIL the PR
+# because the PR description omits the ## Deployment Impact section.
+# (This file touches `charts/**`, which is one of the watched paths.)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: smoke-test-no-op
+data:
+  noop: "true"
