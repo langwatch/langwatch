@@ -8,12 +8,18 @@ language: TypeScript
 rule:
   pattern: $F.watch()
   inside:
-    kind: function_declaration
+    any:
+      - kind: arrow_function
+      - kind: function_expression
+      - kind: function_declaration
     has:
       kind: formal_parameters
       has:
-        kind: required_parameter
-        pattern: $F
+        any:
+          - kind: required_parameter
+            pattern: $F
+          - kind: identifier
+            pattern: $F
 files:
   - "langwatch/src/components/**/*.tsx"
 ignores:

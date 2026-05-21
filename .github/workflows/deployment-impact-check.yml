@@ -37,10 +37,10 @@ jobs:
             exit 1
           fi
 
-          # Heading presence (case-insensitive, allow either Deployment Impact
-          # or Operator/Deployment impact).
-          if ! echo "$PR_BODY" | grep -qiE '^##+[[:space:]]*(deployment[[:space:]]+impact|operator[[:space:]]*/?[[:space:]]*deployment[[:space:]]+impact)' ; then
-            echo "::error::No '## Deployment Impact' heading found in PR description. This PR touches deployment surface (charts/services/ADRs/best-practices docs/env.example/self-hosting) — add the section."
+          # Heading presence — strict H2 (`## `). Loosen to `##+` if H3 turns
+          # out to be common in template usage.
+          if ! printf '%s\n' "$PR_BODY" | grep -qiE '^##[[:space:]]+(deployment[[:space:]]+impact|operator[[:space:]]*/?[[:space:]]*deployment[[:space:]]+impact)' ; then
+            echo "::error::No '## Deployment Impact' heading found in PR description. This PR touches deployment surface (charts/services/ADRs/best-practices docs/env.example/self-hosting) — add the section as a top-level H2 (`## Deployment Impact`)."
             exit 1
           fi
 

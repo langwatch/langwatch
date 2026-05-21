@@ -7,6 +7,10 @@
 
 rules:
   # ── PII in logger calls ────────────────────────────────────────────────
+  # Pattern enumeration: literal email/userId/etc. keys, spread of User-named
+  # variables, shorthand property where the value-name suggests a user object.
+  # Doesn't catch `logger.info("msg", user)` — that needs taint-mode (deferred
+  # to a follow-up if AC6 shows the shape mismatters).
   - id: pii-in-logger-call
     message: >
       Logger call references PII fields (email, phone, name, ip, userId,
@@ -28,6 +32,7 @@ rules:
         - "**/__fixtures__/**"
     patterns:
       - pattern-either:
+          # Literal PII keys
           - pattern: logger.$LEVEL($..., { ..., email: $E, ... }, $...)
           - pattern: logger.$LEVEL($..., { ..., phone: $P, ... }, $...)
           - pattern: logger.$LEVEL($..., { ..., userId: $U, ... }, $...)
@@ -37,23 +42,21 @@ rules:
           - pattern: console.$LEVEL($..., { ..., userId: $U, ... }, $...)
           - pattern: console.$LEVEL($..., { ..., apiKey: $K, ... }, $...)
           - pattern: console.$LEVEL($..., { ..., token: $T, ... }, $...)
+          # Spread of a user/session/account object
+          - pattern: logger.$LEVEL($..., { ...$USER, $... }, $...)
+          - pattern: console.$LEVEL($..., { ...$USER, $... }, $...)
+          # Shorthand property with a user-shaped name
+          - pattern: logger.$LEVEL($..., { user: $U, $... }, $...)
+          - pattern: logger.$LEVEL($..., { session: $S, $... }, $...)
+          - pattern: logger.$LEVEL($..., { account: $A, $... }, $...)
+          - pattern: logger.$LEVEL($..., { user }, $...)
+          - pattern: logger.$LEVEL($..., { session }, $...)
+          - pattern: logger.$LEVEL($..., { account }, $...)
 
   # ── PII regex literals outside fixtures ────────────────────────────────
-  - id: pii-literal-ssn
-    message: >
-      String literal matches US SSN shape (NNN-NN-NNNN). PII literals
-      should not appear in production code — use a fixture under
-      `**/__fixtures__/**` if this is a test value.
-    severity: WARNING
-    languages: [typescript, javascript, python]
-    paths:
-      exclude:
-        - "**/__fixtures__/**"
-        - "**/*.test.*"
-        - "**/*.spec.*"
-        - "**/migrations/**"
-    pattern-regex: '"\d{3}-\d{2}-\d{4}"'
-
+  # SSN dropped: 3-2-4-digit regex false-positives on dates (`2026-05-21`),
+  # version strings, etc. The investigation didn't cite an SSN leak; bring
+  # the rule back when one exists.
   - id: pii-literal-api-key
     message: >
       String literal matches API key prefix (`sk_live_`, `pk_live_`,
@@ -70,19 +73,20 @@ rules:
     pattern-regex: '"(sk_live_|pk_live_|xai-|sk-proj-|sk-ant-)[A-Za-z0-9_-]{16,}"'
 
   # ── ClickHouse migrations: unqualified table names only ────────────────
+  # Anchored to SQL DDL keywords to avoid matching `langwatch.io`,
+  # comment tokens, etc.
   - id: clickhouse-no-qualified-table
     message: >
       ClickHouse migrations must use unqualified table names — they run
       against the connected database. `${CLICKHOUSE_DATABASE}.<table>`
-      or `langwatch.<table>` breaks BYOC deployments where the database
-      name differs.
+      or `langwatch.<table>` in a DDL context breaks BYOC deployments
+      where the database name differs.
     severity: WARNING
     languages: [generic]
     paths:
       include:
-        - "**/clickhouse/migrations/**/*.sql"
-        - "**/clickhouse/migrations/**/*.ts"
-        - "**/clickhouse/migrations/**/*.go"
+        - "langwatch/src/server/clickhouse/migrations/**/*.sql"
+        - "langwatch/src/server/clickhouse/migrations/**/*.ts"
     pattern-either:
       - pattern-regex: '\$\{CLICKHOUSE_DATABASE\}\.\w+'
-      - pattern-regex: '\blangwatch\.[a-z_]+\b'
+      - pattern-regex: '\b(FROM|JOIN|INTO|UPDATE|TABLE|VIEW|EXISTS|DROP)[[:space:]]+langwatch\.[a-z_]+'

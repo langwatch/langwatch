@@ -12,8 +12,8 @@ CodeRabbit auto-loads everything in this directory via `reviews.tools.ast-grep.r
 | `no-explicit-any.yml` | `: any`, `as any` in `langwatch/src/**`. |
 | `no-inline-dynamic-import.yml` | Inline `import(...)` in `.ts`/`.tsx` outside `routes.tsx` / `pages/**`. |
 | `no-form-watch-in-child.yml` | `$form.watch()` inside a child component receiving `form` as prop. |
-| `no-export-star-shim.yml` | `export * from "..."` outside `index.ts`/`index.tsx` barrels. |
-| `no-localhost-fallback.yml` | `?? "http://localhost..."` and equivalents. |
+| `no-export-star-shim.yml` | `export * from "..."` unless the preceding line is `// @barrel`. |
+| `no-localhost-fallback.yml` | `?? "http://localhost..."`, plus template-literal variants with embedded `${...}`. |
 
 All rules `severity: warning` for sprint 1 (phased rollout — promote to
 `error` per-rule once baseline is verifiably clean).

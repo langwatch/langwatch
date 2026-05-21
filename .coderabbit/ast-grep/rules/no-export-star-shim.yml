@@ -2,14 +2,17 @@ id: no-export-star-shim
 message: >
   `export * from "..."` is a re-export shim. Backwards-compat shims rot —
   update consumers to import from the new location instead. If this is a
-  legitimate barrel file with multiple exports, list each one explicitly.
+  legitimate barrel, add `// @barrel` on the line above the first
+  `export *` to opt out.
 severity: warning
 language: TypeScript
 rule:
   pattern: export * from $MOD
+  not:
+    precedes:
+      kind: comment
+      regex: '@barrel'
+      stopBy: end
 files:
   - "langwatch/src/**/*.ts"
   - "langwatch/src/**/*.tsx"
-ignores:
-  - "**/index.ts"
-  - "**/index.tsx"
