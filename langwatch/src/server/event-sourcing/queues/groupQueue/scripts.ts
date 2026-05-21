@@ -177,7 +177,7 @@ local nowMs        = tonumber(ARGV[2])
 local activeTtlSec = tonumber(ARGV[3])
 -- Tenant soft-cap (post-2026-05-11 incident follow-up). When > 0, the
 -- scheduler refuses to dispatch a group whose tenant already has >=
--- tenantCap groups in flight. Defaults to 100 in TS (see
+-- tenantCap groups in flight. Defaults to 50 in TS (see
 -- DEFAULT_TENANT_CAP); operators can set LANGWATCH_DISPATCH_TENANT_CAP=0
 -- as an explicit kill switch, or to a higher integer to retune.
 -- The tenantId is derived from groupId prefix (segment before first '/').
@@ -198,7 +198,7 @@ local pageSize = 200
 -- zset. This is the explicit cost of the cap: more work per poll, in
 -- exchange for cross-tenant fairness.
 local scanBudget = 1000
-if tenantCap > 0 then scanBudget = 50000 end
+if tenantCap > 0 then scanBudget = 10000 end
 local offset = 0
 
 while offset < scanBudget do
@@ -339,7 +339,7 @@ if pageSize < 30 then pageSize = 30 end
 local scanBudget = pageSize * 5
 -- See DISPATCH_LUA: widen scan budget when the tenant cap is on so a
 -- head full of one over-cap tenant cannot starve other tenants.
-if tenantCap > 0 then scanBudget = pageSize * 250 end
+if tenantCap > 0 then scanBudget = pageSize * 50 end
 local offset = 0
 
 while offset < scanBudget and dispatched < maxJobs do
@@ -732,7 +732,7 @@ export interface DispatchResult {
  *     disable entirely (incident kill-switch), or set a different
  *     positive integer to retune.
  */
-export const DEFAULT_TENANT_CAP = 100;
+export const DEFAULT_TENANT_CAP = 50;
 
 /**
  * Read the tenant soft-cap from the environment.
@@ -742,7 +742,7 @@ export const DEFAULT_TENANT_CAP = 100;
  * re-importing the frozen env module.
  *
  * Semantics:
- *   - env unset / empty / non-numeric / negative → DEFAULT_TENANT_CAP (100)
+ *   - env unset / empty / non-numeric / negative → DEFAULT_TENANT_CAP (50)
  *   - env = "0" → 0 (explicit kill switch — disable cap entirely)
  *   - env = positive integer → that integer
  */
