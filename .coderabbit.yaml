@@ -106,6 +106,13 @@ reviews:
     # export * from re-export shims) live in .coderabbit/ast-grep/rules/.
     # ClickHouse fully-qualified table names live in .semgrep/langwatch.yml.
     # path_instructions only carries the judgment calls.
+    #
+    # NOTE: each layering/convention rule below is in its own path_instructions
+    # block. Smoke testing (#4166) showed that bundling 4 unrelated FAIL
+    # conditions under one block caused CR to surface only 1 of them. Smaller
+    # focused blocks fire reliably.
+
+    # tRPC Zod gating — every router/procedure path.
     - path: "langwatch/src/**/*.{ts,tsx}"
       instructions: |
         Flag ONLY on newly added or modified lines.
@@ -114,17 +121,41 @@ reviews:
         `.input(z.object({...}))` or equivalent Zod schema — including
         procedures with no input (use `z.void()` or `z.object({})`).
 
-        FAIL when service-layer code (`langwatch/src/server/**`,
-        `langwatch/src/services/**`) imports from `~/components` or
-        `langwatch/src/components/**`. The server must not depend on UI.
+    # Service→UI layering guard. Glob scoped to the layers that must NOT
+    # import from UI. Smoke PR caught the violation as part of a generic
+    # comment, not surfaced under this rule — narrowing the glob makes CR
+    # consult this block only on those files, raising firing reliability.
+    - path: "langwatch/src/{server,services}/**/*.{ts,tsx}"
+      instructions: |
+        Flag ONLY on newly added or modified lines.
 
-        FAIL when a new React component is declared as a class component.
-        Use function components + hooks.
+        FAIL when this file imports from `~/components`, `~/components/...`,
+        or any `langwatch/src/components/**` path. Server-layer code and
+        service-layer code must not depend on UI components. The dependency
+        direction is UI → services → server, never the reverse.
+
+    # Class component ban — restrict to component-bearing surface to keep
+    # this from getting noisy on non-component files.
+    - path: "langwatch/src/**/*.tsx"
+      instructions: |
+        Flag ONLY on newly added or modified lines.
+
+        FAIL when a new React component is declared as a class component
+        (`class X extends React.Component`, `class X extends Component`).
+        Use function components + hooks instead.
+
+    # Localhost-fallback judgment fallback (the ast-grep rule covers the
+    # syntactic shapes; this catches creative variations the syntactic
+    # rule misses).
+    - path: "langwatch/src/**/*.{ts,tsx}"
+      instructions: |
+        Flag ONLY on newly added or modified lines.
 
         FAIL when code adds a default fallback URL of the form
-        `?? "http://localhost..."` or `?? "https://..."`. Required env vars
-        must be validated through the Zod env schema and consumed without
-        fallbacks.
+        `?? "http://localhost..."` or `?? "https://..."` (including
+        template-literal variants like `?? \`http://localhost:${...}\``).
+        Required env vars must be validated through the Zod env schema and
+        consumed without fallbacks.
 
     - path: "langwatch/package.json"
       instructions: |
