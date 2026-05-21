@@ -1,6 +1,15 @@
 import { createEnv } from "@t3-oss/env-core";
 import { z } from "zod";
 
+/**
+ * The placeholder value `.env.example` ships for AI Gateway secrets.
+ * Detected by `assertNoSentinelSecrets` to hard-fail first-run setup
+ * when the user has copied `.env.example` to `.env` without generating
+ * real secrets. See `langwatch/src/__tests__/env-create.unit.test.ts`
+ * for the guard's contract.
+ */
+export const SENTINEL_VALUE = "GENERATE_ME_WITH_openssl_rand_hex_32";
+
 /** @param {import('zod').ZodTypeAny} schema */
 const optionalIfBuildTime = (schema) => {
   return process.env.BUILD_TIME ? schema.optional() : schema;
@@ -407,10 +416,52 @@ export function createEnvConfig() {
         "IS_SAAS=true requires BLOCK_LOCAL_HTTP_CALLS=true to keep SSRF protections enabled",
       );
     }
+    assertNoSentinelSecrets(process.env);
     assertGatewaySecretsAllOrNone(process.env);
   }
 
   return _env;
+}
+
+/**
+ * Guard that hard-fails at boot when any of the three AI Gateway secrets
+ * equals the placeholder sentinel shipped in `.env.example`. The sentinel
+ * (`GENERATE_ME_WITH_openssl_rand_hex_32`) is 37 chars — it passes both
+ * Zod `min(32)` and `assertGatewaySecretsAllOrNone` (all three are "present"),
+ * so without this guard the server boots cleanly and the failure only surfaces
+ * at the first gateway request. Called before `assertGatewaySecretsAllOrNone`
+ * so the more-specific error fires first.
+ *
+ * @param {Record<string, unknown>} env
+ */
+export function assertNoSentinelSecrets(env) {
+  const gwSecrets = {
+    LW_VIRTUAL_KEY_PEPPER: env.LW_VIRTUAL_KEY_PEPPER,
+    LW_GATEWAY_INTERNAL_SECRET: env.LW_GATEWAY_INTERNAL_SECRET,
+    LW_GATEWAY_JWT_SECRET: env.LW_GATEWAY_JWT_SECRET,
+  };
+  const sentinelKeys = Object.entries(gwSecrets)
+    .filter(([, v]) => v === SENTINEL_VALUE)
+    .map(([k]) => k);
+  if (sentinelKeys.length > 0) {
+    const banner = [
+      "",
+      "========================================================================",
+      "AI Gateway secrets still contain the .env.example sentinel value.",
+      `  Keys with placeholder: ${sentinelKeys.join(", ")}`,
+      "  These were copied verbatim from .env.example and have not been",
+      "  replaced with real secrets. Generate each value with:",
+      "    openssl rand -hex 32",
+      "  Then set the generated value in your .env file.",
+      "========================================================================",
+      "",
+    ].join("\n");
+    // eslint-disable-next-line no-console
+    console.error(banner);
+    throw new Error(
+      `AI Gateway secrets contain .env.example sentinel (keys: ${sentinelKeys.join(", ")}). Generate real values with: openssl rand -hex 32`,
+    );
+  }
 }
 
 /**
