@@ -171,7 +171,7 @@ export function FeatureFlagRulesDialog({
       onOpenChange={(details) => onOpenChange(details.open)}
       size="lg"
     >
-      <DialogContent backdropProps={{ bg: "whiteAlpha.600" }}>
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>Targeting rules</DialogTitle>
         </DialogHeader>

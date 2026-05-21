@@ -8,8 +8,20 @@ interface DialogContentProps extends ChakraDialog.ContentProps {
   portalled?: boolean;
   portalRef?: React.RefObject<HTMLElement>;
   backdrop?: boolean;
-  /** Props merged onto the default backdrop (e.g. stronger blur). */
-  backdropProps?: ChakraDialog.BackdropProps;
+  /**
+   * Props merged onto the default backdrop (e.g. stronger blur).
+   *
+   * Note: `bg` / `background` / `backgroundColor` are intentionally
+   * stripped. The backdrop must stay transparent so only the blur is
+   * visible. Chakra's default backdrop ships with `blackAlpha.500`
+   * which is the dark grey overlay we never want. If you think you
+   * need a coloured backdrop, you don't — change the dialog surface
+   * instead.
+   */
+  backdropProps?: Omit<
+    ChakraDialog.BackdropProps,
+    "bg" | "background" | "backgroundColor"
+  >;
   /** Props passed to the positioner (e.g. style for --layer-index). */
   positionerProps?: ChakraDialog.PositionerProps;
   /**
@@ -48,12 +60,24 @@ export const DialogContent = React.forwardRef<
     children
   );
 
+  // Strip background overrides defensively at runtime in addition to the
+  // type-level Omit, in case a caller widens the type with `as any`.
+  const safeBackdropProps = stripBackdropBg(backdropProps);
+
   return (
     <Portal disabled={!portalled} container={portalRef}>
       {backdrop && (
         <ChakraDialog.Backdrop
           backdropFilter="blur(8px)"
-          {...backdropProps}
+          {...safeBackdropProps}
+          bg="transparent"
+          // Stable DOM signal that the wrapper's transparency contract is
+          // active. Tests assert on this attribute because Chakra resolves
+          // the `bg` prop through a CSS class which jsdom cannot compute,
+          // so checking computed/inline styles is unreliable. If anyone
+          // removes the `bg="transparent"` line above, this attribute
+          // should be removed too — the test then fails.
+          data-lw-transparent-backdrop="true"
         />
       )}
       <ChakraDialog.Positioner {...positionerProps}>
@@ -102,11 +126,32 @@ export const DialogRoot = function DialogRoot(props: DialogRootProps) {
   );
 };
 
-export const DialogBackdrop = function DialogBackdrop(
-  props: ChakraDialog.BackdropProps,
-) {
-  return <ChakraDialog.Backdrop {...props} />;
-};
+function stripBackdropBg(
+  props: DialogContentProps["backdropProps"] | undefined,
+): DialogContentProps["backdropProps"] | undefined {
+  if (!props) return props;
+  const { bg, background, backgroundColor, style, ...rest } =
+    props as ChakraDialog.BackdropProps;
+  const safeStyle = style
+    ? { ...style, background: "transparent", backgroundColor: "transparent" }
+    : undefined;
+  if (
+    process.env.NODE_ENV !== "production" &&
+    (bg !== undefined ||
+      background !== undefined ||
+      backgroundColor !== undefined ||
+      style?.background !== undefined ||
+      style?.backgroundColor !== undefined)
+  ) {
+    console.warn(
+      "[Dialog] backdropProps.bg/background/backgroundColor is ignored — the backdrop is always transparent so the page behind stays visible. Adjust Dialog.Content surface instead.",
+    );
+  }
+  return {
+    ...rest,
+    ...(safeStyle ? { style: safeStyle } : {}),
+  } as DialogContentProps["backdropProps"];
+}
 
 export const DialogFooter = ChakraDialog.Footer;
 export const DialogHeader = ChakraDialog.Header;
@@ -123,7 +168,10 @@ export const Dialog = {
   Footer: DialogFooter,
   Header: DialogHeader,
   Body: DialogBody,
-  Backdrop: DialogBackdrop,
+  // `Backdrop` is intentionally NOT exported. `Dialog.Content` already
+  // renders the one allowed backdrop (transparent + blur). Mounting a
+  // second one stacks two overlays and reintroduces the dark grey fill
+  // we explicitly do not want.
   Title: DialogTitle,
   Description: DialogDescription,
   Trigger: DialogTrigger,
