@@ -1,32 +1,26 @@
 /**
- * Integration test for issue #3900 — Phase 1 fix.
+ * Integration test for issue #3900 / #3981 — analytics JOIN regression.
  *
- * Bug: Offline-experiment evaluation results produced by the orchestrator are
- * written to `evaluation_runs` (via reportEvaluation → EvaluationRunFoldProjection
- * → upsert) but the corresponding `trace_summaries` row is never written for
- * offline-cell trace IDs. Because the analytics read path JOINs (INNER) from
- * `trace_summaries` to `evaluation_runs` on (TenantId, TraceId), any evaluation
- * row whose TraceId has no matching trace_summary is silently dropped. The
- * Custom Graphs chart therefore shows an empty plot for offline experiments.
+ * The analytics read path INNER JOINs from `trace_summaries` to
+ * `evaluation_runs` on `(TenantId, TraceId)`. An evaluation row whose TraceId
+ * has no matching trace_summary is silently dropped, leaving Custom Graphs
+ * empty.
  *
- * Fix (Phase 1 / #3900): The orchestrator now dispatches a synthetic recordSpan
- * via `getApp().traces.recordSpan(...)` immediately after every `target_result`
- * event for an offline-experiment cell. This guarantees a `trace_summaries` row
- * exists for the cell's traceId, regardless of what langwatch_nlp's OTLP send
- * did or did not do at runtime.
+ * Originally tripped by #3981: the SDK silently dropped OTel spans for
+ * offline-experiment cells (singleton `disable_sending` flag leaked across
+ * reused nlp worker processes). The root cause is fixed in the python-sdk,
+ * but the analytics-layer JOIN is the load-bearing read path either way —
+ * if it ever breaks, offline experiments go invisible again.
  *
  * Test strategy:
- * - Seed `evaluation_runs` rows for synthetic offline-cell trace IDs.
- * - ALSO seed `trace_summaries` rows for those trace IDs — simulating what the
- *   orchestrator's new `recordSpan` dispatch creates at runtime via the
- *   trace processing pipeline.
+ * - Seed both `evaluation_runs` AND `trace_summaries` for synthetic
+ *   offline-cell trace IDs (the runtime state the SDK fix guarantees).
  * - Execute the real `buildTimeseriesQuery` for `evaluations.evaluation_score`
  *   and `evaluations.evaluation_pass_rate` against the test ClickHouse.
- * - Assert that the result contains at least one non-null / non-zero metric
- *   bucket — this proves the analytics JOIN succeeds once trace_summaries rows
- *   are present.
+ * - Assert non-null / non-zero metric buckets — proves the JOIN works.
  *
  * @see https://github.com/langwatch/langwatch/issues/3900
+ * @see https://github.com/langwatch/langwatch/issues/3981
  */
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -44,8 +38,8 @@ const TENANT_ID = "test-offline-exp-3900-fixed";
 
 /**
  * Synthetic trace IDs that the offline-experiment orchestrator generates per
- * cell. With the Phase 1 fix, the orchestrator dispatches a recordSpan for
- * each, which writes a matching trace_summaries row.
+ * cell. The SDK fix in #3981 ensures the matching trace_summaries row is
+ * actually written by the OTel export path.
  */
 const OFFLINE_TRACE_ID_0 = `${TENANT_ID}-offline-cell-trace-0`;
 const OFFLINE_TRACE_ID_1 = `${TENANT_ID}-offline-cell-trace-1`;
@@ -76,18 +70,19 @@ describe("offline-experiment evaluations on Custom Graphs", () => {
       ch = wrapWithDefaultSettings(rawClient);
 
       /**
-       * Simulate the fixed runtime state:
+       * Simulate the runtime end-state:
        *
-       * The orchestrator generates a synthetic traceId per cell, calls
-       * reportEvaluation (writes evaluation_runs), and NOW ALSO dispatches a
-       * synthetic recordSpan via getApp().traces.recordSpan() — which ultimately
-       * writes a trace_summaries row. We simulate the end-result of that
-       * pipeline by inserting into both tables directly, as the full BullMQ
-       * pipeline is not available in this integration test environment.
+       * The orchestrator generates a traceId per cell, calls reportEvaluation
+       * (writes evaluation_runs), and langwatch_nlp exports OTel spans for the
+       * cell (writes trace_summaries via the trace-processing pipeline). We
+       * simulate the end-result of both pipelines by inserting into both
+       * tables directly, since the full BullMQ trace pipeline is not
+       * available in this integration test environment.
        */
 
-      // Seed trace_summaries — this is what the orchestrator's new recordSpan
-      // dispatch creates at runtime via the trace processing pipeline.
+      // Seed trace_summaries — represents what the OTel export pipeline
+      // writes at runtime for offline-experiment cells (now reliably, after
+      // the #3981 SDK fix removed the singleton disable_sending leak).
       const now = new Date("2025-06-01T10:00:00Z");
       await ch.insert({
         table: "trace_summaries",
@@ -259,21 +254,20 @@ describe("offline-experiment evaluations on Custom Graphs", () => {
     }
   });
 
-  describe("given the orchestrator dispatches a recordSpan for each offline-experiment cell", () => {
+  describe("given trace_summaries rows exist for each offline-experiment cell traceId", () => {
     describe("when the analytics layer queries evaluation_score for the experiment's evaluator", () => {
       /**
        * @scenario Offline experiment writes joinable evaluation_runs rows for boolean and numeric evaluators
        */
       it("renders non-empty evaluation_score buckets for the offline-experiment evaluator", async () => {
-        // With the Phase 1 fix, the orchestrator dispatches a synthetic
-        // recordSpan immediately after each target_result event. This creates a
-        // trace_summaries row for the cell's traceId via the trace processing
-        // pipeline. The analytics INNER JOIN trace_summaries → evaluation_runs
-        // on (TenantId, TraceId) therefore matches, and the metric is non-null.
+        // With the #3981 SDK fix, offline-experiment cell spans now reach
+        // `trace_summaries` reliably via the normal OTel export pipeline.
+        // The analytics INNER JOIN trace_summaries → evaluation_runs on
+        // (TenantId, TraceId) therefore matches, and the metric is non-null.
         //
-        // This test seeds both trace_summaries (simulating the recordSpan write)
-        // and evaluation_runs (seeded as before), then asserts the analytics
-        // query returns a non-zero value.
+        // This test seeds both trace_summaries (simulating the OTel export
+        // pipeline writing the cell's span) and evaluation_runs, then asserts
+        // the analytics query returns a non-zero value.
         resetParamCounter();
         const { sql, params } = buildTimeseriesQuery({
           ...baseInput,
