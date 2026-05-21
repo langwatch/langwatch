@@ -214,34 +214,6 @@ vi.mock("~/utils/api", () => ({
           isLoading: false,
         }),
       },
-      // listAllForProjectForFrontend (introduced in #4120) returns providers
-      // as an array, distinct from the legacy getAllForProjectForFrontend
-      // record shape. ModelSelector iterates this with `for (const row of providers)`.
-      listAllForProjectForFrontend: {
-        useQuery: () => ({
-          data: {
-            providers: [{ provider: "openai", enabled: true, customModels: [] }],
-            modelMetadata: {
-              "openai/gpt-4": {
-                id: "openai/gpt-4",
-                name: "GPT-4",
-                provider: "openai",
-                supportedParameters: ["temperature", "top_p", "max_tokens"],
-                contextLength: 128000,
-                maxCompletionTokens: 8192,
-                defaultParameters: null,
-                supportsImageInput: false,
-                supportsAudioInput: false,
-                pricing: {
-                  inputCostPerToken: 0.00003,
-                  outputCostPerToken: 0.00006,
-                },
-              },
-            },
-          },
-          isLoading: false,
-        }),
-      },
       listAllForProjectForFrontend: {
         useQuery: () => ({
           data: {
