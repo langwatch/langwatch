@@ -40,7 +40,7 @@ Feature: Deploy Prompt Dialog
 
   # --- Layout ---
 
-  @integration @manual
+  @integration @manual @unimplemented
   Scenario: Version Select inputs stay within the modal width
     Given I am on the prompt detail page for "pizza-prompt"
     And "pizza-prompt" has versions whose commit messages are long enough to overflow a 180px-wide trigger
