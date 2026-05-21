@@ -1,8 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createEnv } from "@t3-oss/env-core";
-import { z } from "zod";
 
-import { assertGatewaySecretsAllOrNone, createEnvConfig } from "../env-create.mjs";
+import { assertGatewaySecretsAllOrNone, createEnvConfig, gatewaySecretsSchema } from "../env-create.mjs";
 
 // Regression for iter-110: gateway secrets set partially (e.g. only
 // LW_VIRTUAL_KEY_PEPPER, missing the two HMAC/JWT secrets) let the server
@@ -109,21 +108,21 @@ describe("createEnvConfig — client-safe guard", () => {
   });
 });
 
-// Regression for issue #3903 Friction #2 (redesign): the new sentinel value
+// Regression for issue #3903 Friction #2: the .env.example sentinel value
 // "REPLACE_ME" is only 10 chars — deliberately shorter than min(32) — so Zod
-// itself rejects it at boot without a bespoke assertNoSentinelSecrets guard.
-// This test exercises the Zod schema layer directly (bypassing SKIP_ENV_VALIDATION
-// and createEnvConfig memoization which are vitest-env artefacts) to prove the
-// min(32) constraint is wired to the three gateway secret keys.
+// itself rejects it at boot without a bespoke length-equality guard.
+// This test exercises the REAL gatewaySecretsSchema exported from env-create.mjs
+// (not an inline copy), so a mutation of min(32) → min(1) in production will
+// cause this test to fail because "REPLACE_ME" (10 chars) would pass min(1).
 //
 // Note: @t3-oss/env-core logs issues to console.error but the thrown error
 // message is the fixed string "Invalid environment variables" — the field names
 // appear in the logged issues, not in the thrown string. "REPLACE_ME" itself is
-// not surfaced in the Zod output (only the path + minimum constraint are logged).
-// This is an accepted trade-off: the user sees which keys are invalid and the
-// min(32) constraint, and the .env.example comment instructs them to run
-// `openssl rand -hex 32`.
-describe("createEnvConfig with .env.example sentinels", () => {
+// not surfaced in the Zod output (only the path + minimum constraint are logged) —
+// this is asserted as a security contract below. The user sees which keys are
+// invalid and the min(32) constraint, and the .env.example comment instructs
+// them to run `openssl rand -hex 32`.
+describe("gatewaySecretsSchema", () => {
   describe("given LW_GATEWAY_* equal the .env.example REPLACE_ME sentinel", () => {
     let errorSpy: ReturnType<typeof vi.spyOn>;
 
@@ -136,17 +135,17 @@ describe("createEnvConfig with .env.example sentinels", () => {
     });
 
     it("throws a Zod min(32) error naming the sentinel value", () => {
-      // Call createEnv directly with skipValidation=false to bypass the
-      // SKIP_ENV_VALIDATION=1 test-env flag and the createEnvConfig memoization.
-      // The schema mirrors the three keys in env-create.mjs.
+      // Call createEnv with the real gatewaySecretsSchema imported from env-create.mjs.
+      // This exercises the actual min(32) constraint — NOT an inline copy — so a
+      // mutation of min(32) → min(1) in env-create.mjs will cause this test to fail.
       expect(() =>
         createEnv({
           clientPrefix: "VITE_PUBLIC_",
           client: {},
           server: {
-            LW_VIRTUAL_KEY_PEPPER: z.string().min(32).optional(),
-            LW_GATEWAY_INTERNAL_SECRET: z.string().min(32).optional(),
-            LW_GATEWAY_JWT_SECRET: z.string().min(32).optional(),
+            LW_VIRTUAL_KEY_PEPPER: gatewaySecretsSchema.LW_VIRTUAL_KEY_PEPPER,
+            LW_GATEWAY_INTERNAL_SECRET: gatewaySecretsSchema.LW_GATEWAY_INTERNAL_SECRET,
+            LW_GATEWAY_JWT_SECRET: gatewaySecretsSchema.LW_GATEWAY_JWT_SECRET,
           },
           runtimeEnv: {
             LW_VIRTUAL_KEY_PEPPER: "REPLACE_ME",
@@ -167,6 +166,10 @@ describe("createEnvConfig with .env.example sentinels", () => {
       expect(logged).toMatch(/LW_GATEWAY_JWT_SECRET/);
       // "32" appears as the minimum constraint value in the logged issues
       expect(logged).toMatch(/32/);
+      // Security contract: Zod must NOT leak the placeholder value into the
+      // logged issues. If a future Zod/t3-env release starts echoing the
+      // received value, this assertion will fail — that's the trip-wire.
+      expect(logged).not.toMatch(/REPLACE_ME/);
     });
   });
 });
