@@ -837,11 +837,15 @@ EOF
 }
 
 # boxd_preview_down BRANCH — destroy the preview VM non-interactively.
-# The target-level guard (_boxd_require) already validated BRANCH; this
-# function validates shape before touching any remote shell.
+# Validates branch shape before slugging to a VM name; an invalid branch can
+# otherwise slug to a *different* valid VM name and destroy the wrong one.
 boxd_preview_down() {
   local branch="${1-}"
   [ -n "$branch" ] || { echo "usage: make boxd-preview-down BRANCH=<name>" >&2; return 1; }
+  if ! git check-ref-format --branch "$branch" >/dev/null 2>&1; then
+    echo "ERROR: '$branch' is not a valid git branch name." >&2
+    return 1
+  fi
 
   local vm
   vm=$(boxd_preview_vm_name "$branch") || return 1
@@ -861,9 +865,14 @@ boxd_preview_down() {
 
 # boxd_preview_status BRANCH — print VM status, in-VM git branch + HEAD sha,
 # and docker compose ps output. Informational; never modifies state.
+# Still validates branch shape so a typo doesn't report on the wrong VM.
 boxd_preview_status() {
   local branch="${1-}"
   [ -n "$branch" ] || { echo "usage: make boxd-preview-status BRANCH=<name>" >&2; return 1; }
+  if ! git check-ref-format --branch "$branch" >/dev/null 2>&1; then
+    echo "ERROR: '$branch' is not a valid git branch name." >&2
+    return 1
+  fi
 
   local vm
   vm=$(boxd_preview_vm_name "$branch") || return 1

@@ -462,6 +462,12 @@ EOF
   [[ "$output" == *"usage:"* ]]
 }
 
+@test "boxd_preview_down: rejects invalid git branch name" {
+  run boxd_preview_down "feat/foo bar"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"not a valid git branch name"* ]]
+}
+
 # ---------------------------------------------------------------------------
 # boxd_preview_status — arg validation
 # ---------------------------------------------------------------------------
@@ -470,6 +476,12 @@ EOF
   run boxd_preview_status ""
   [ "$status" -ne 0 ]
   [[ "$output" == *"usage:"* ]]
+}
+
+@test "boxd_preview_status: rejects invalid git branch name" {
+  run boxd_preview_status "feat/foo bar"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"not a valid git branch name"* ]]
 }
 
 # ---------------------------------------------------------------------------
