@@ -42,18 +42,31 @@ export default function ModelsPage() {
   // flat list endpoint instead so the table reflects every row.
   //
   // The "All you can see" view fans out across the whole organization
-  // so a user can see providers a sibling project has configured (the
-  // per-project endpoint only returns rows whose scope set intersects
-  // the currently-viewed project, missing PROJECT-scope rows attached
-  // to other projects in the same org).
+  // so an admin sees providers a sibling project has configured. Members
+  // without `organization:view` (project-only members) fall back to the
+  // per-project endpoint, which they always have permission to read.
+  const canViewOrg = hasPermission("organization:view");
   const orgQuery =
     api.modelProvider.listAllForOrganizationForFrontend.useQuery(
       { organizationId: organization?.id ?? "" },
-      { enabled: !!organization?.id },
+      {
+        enabled: !!organization?.id && canViewOrg,
+        retry: false,
+        refetchOnWindowFocus: false,
+      },
     );
-  const allProvidersList = orgQuery.data?.providers ?? [];
-  const isLoading = orgQuery.isLoading;
-  const refetch = orgQuery.refetch;
+  const projectQuery = api.modelProvider.listAllForProjectForFrontend.useQuery(
+    { projectId: project?.id ?? "" },
+    {
+      enabled: !!project?.id && !canViewOrg,
+      retry: false,
+      refetchOnWindowFocus: false,
+    },
+  );
+  const activeQuery = canViewOrg ? orgQuery : projectQuery;
+  const allProvidersList = activeQuery.data?.providers ?? [];
+  const isLoading = activeQuery.isLoading;
+  const refetch = activeQuery.refetch;
 
   const { openDrawer, drawerOpen: isDrawerOpen } = useDrawer();
   const isProviderDrawerOpen = isDrawerOpen("editModelProvider");

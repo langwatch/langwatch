@@ -301,13 +301,14 @@ export const DashboardLayout = ({
 
   const { data: session } = useRequiredSession({ required: !publicPage });
 
-  const { isLoading, organization, organizations, team, project, organizationRole } =
+  const { isLoading, organization, organizations, team, project, organizationRole, hasPermission } =
     useOrganizationTeamProject();
   const { isLiteMember } = useLiteMemberGuard();
   const usage = api.limits.getUsage.useQuery(
     { organizationId: organization?.id ?? "" },
     {
-      enabled: !!organization,
+      enabled: !!organization && hasPermission("organization:view"),
+      retry: false,
       refetchOnWindowFocus: false,
       refetchOnMount: false,
     },
