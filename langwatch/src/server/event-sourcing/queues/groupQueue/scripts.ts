@@ -177,7 +177,7 @@ local nowMs        = tonumber(ARGV[2])
 local activeTtlSec = tonumber(ARGV[3])
 -- Tenant soft-cap (post-2026-05-11 incident follow-up). When > 0, the
 -- scheduler refuses to dispatch a group whose tenant already has >=
--- tenantCap groups in flight. Defaults to 100 in TS (see
+-- tenantCap groups in flight. Defaults to 50 in TS (see
 -- DEFAULT_TENANT_CAP); operators can set LANGWATCH_DISPATCH_TENANT_CAP=0
 -- as an explicit kill switch, or to a higher integer to retune.
 -- The tenantId is derived from groupId prefix (segment before first '/').
@@ -732,7 +732,7 @@ export interface DispatchResult {
  *     disable entirely (incident kill-switch), or set a different
  *     positive integer to retune.
  */
-export const DEFAULT_TENANT_CAP = 100;
+export const DEFAULT_TENANT_CAP = 50;
 
 /**
  * Read the tenant soft-cap from the environment.
@@ -742,7 +742,7 @@ export const DEFAULT_TENANT_CAP = 100;
  * re-importing the frozen env module.
  *
  * Semantics:
- *   - env unset / empty / non-numeric / negative → DEFAULT_TENANT_CAP (100)
+ *   - env unset / empty / non-numeric / negative → DEFAULT_TENANT_CAP (50)
  *   - env = "0" → 0 (explicit kill switch — disable cap entirely)
  *   - env = positive integer → that integer
  */
