@@ -173,6 +173,36 @@ LangWatch enforces tenant isolation at the application level:
 - API tokens are scoped to a specific project
 - Cross-tenant data access is prevented at the query layer
 
+## Supply Chain
+
+LangWatch container images and CLI packages are published with verifiable supply-chain attestations so operators can confirm an artifact was built by LangWatch CI from a specific source commit.
+
+### Container images (Docker Hub)
+
+Every release of `langwatch/langwatch`, `langwatch/langwatch_nlp`, `langwatch/langevals`, and `langwatch/ai-gateway` is signed with [Sigstore](https://www.sigstore.dev/) cosign using keyless OIDC, and a CycloneDX SBOM is attached as a cosign attestation.
+
+Verify a signature with [cosign](https://github.com/sigstore/cosign):
+
+```bash
+cosign verify langwatch/langwatch:<tag> \
+  --certificate-identity-regexp '^https://github\.com/langwatch/langwatch/' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+```
+
+Inspect the attached SBOM:
+
+```bash
+cosign download attestation langwatch/langwatch:<tag> \
+  | jq -r '.payload | @base64d | fromjson | .predicate' \
+  > langwatch.cdx.json
+```
+
+The same `*.cdx.json` files are also attached to each `langwatch@vX.Y.Z` [GitHub release](https://github.com/langwatch/langwatch/releases).
+
+### npm CLI
+
+The `langwatch` npm package is published with [npm provenance attestations](https://docs.npmjs.com/generating-provenance-statements) via GitHub Actions OIDC, also backed by Sigstore. The provenance link is visible on the [package page](https://www.npmjs.com/package/langwatch) and can be verified with `npm audit signatures`.
+
 ## Production Hardening Checklist
 
 - [ ] `autogen.enabled: false` — use manually created secrets
@@ -188,3 +218,4 @@ LangWatch enforces tenant isolation at the application level:
 - [ ] Pod security contexts verified (non-root, read-only filesystem)
 - [ ] Ingress rate limiting configured
 - [ ] Audit logs enabled (Enterprise)
+- [ ] Image signatures verified at pull time (admission controller or `cosign verify` in CI)

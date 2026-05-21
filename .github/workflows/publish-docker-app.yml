@@ -186,6 +186,71 @@ jobs:
             done
           done
 
+  sign-and-attest:
+    runs-on: ubuntu-latest
+    needs: [extract-version, create-manifest]
+    permissions:
+      contents: write # upload SBOMs to GitHub release assets
+      id-token: write # keyless OIDC signing via Sigstore
+    env:
+      COSIGN_YES: "true"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Install syft
+        uses: anchore/sbom-action/download-syft@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Sign manifests and attach CycloneDX SBOMs
+        env:
+          HASH: ${{ needs.extract-version.outputs.short_hash }}
+        run: |
+          set -euo pipefail
+          mkdir -p sboms
+          for IMAGE in langwatch langwatch_nlp langevals ai-gateway; do
+            REF="langwatch/${IMAGE}:${HASH}"
+            DIGEST=$(docker buildx imagetools inspect "${REF}" --format '{{ json . }}' | jq -r '.manifest.digest')
+            if [ -z "${DIGEST}" ] || [ "${DIGEST}" = "null" ]; then
+              echo "::error::Could not resolve digest for ${REF}"
+              exit 1
+            fi
+            DIGEST_REF="langwatch/${IMAGE}@${DIGEST}"
+            echo "Signing ${DIGEST_REF}"
+            cosign sign "${DIGEST_REF}"
+
+            SBOM_FILE="sboms/${IMAGE}.cdx.json"
+            echo "Generating CycloneDX SBOM for ${DIGEST_REF}"
+            syft "registry:${DIGEST_REF}" -o cyclonedx-json="${SBOM_FILE}"
+
+            echo "Attesting SBOM for ${DIGEST_REF}"
+            cosign attest --predicate "${SBOM_FILE}" --type cyclonedx "${DIGEST_REF}"
+          done
+
+      - name: Upload SBOMs as workflow artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sboms-${{ needs.extract-version.outputs.short_hash }}
+          path: sboms/*.cdx.json
+          retention-days: 90
+
+      - name: Attach SBOMs to GitHub release
+        if: needs.extract-version.outputs.is_release == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          gh release upload "${RELEASE_TAG}" sboms/*.cdx.json --clobber --repo "${GITHUB_REPOSITORY}"
+
   notify:
     runs-on: ubuntu-latest
     needs: [extract-version, create-manifest]
