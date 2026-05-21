@@ -198,7 +198,7 @@ local pageSize = 200
 -- zset. This is the explicit cost of the cap: more work per poll, in
 -- exchange for cross-tenant fairness.
 local scanBudget = 1000
-if tenantCap > 0 then scanBudget = 50000 end
+if tenantCap > 0 then scanBudget = 10000 end
 local offset = 0
 
 while offset < scanBudget do
@@ -339,7 +339,7 @@ if pageSize < 30 then pageSize = 30 end
 local scanBudget = pageSize * 5
 -- See DISPATCH_LUA: widen scan budget when the tenant cap is on so a
 -- head full of one over-cap tenant cannot starve other tenants.
-if tenantCap > 0 then scanBudget = pageSize * 250 end
+if tenantCap > 0 then scanBudget = pageSize * 50 end
 local offset = 0
 
 while offset < scanBudget and dispatched < maxJobs do
