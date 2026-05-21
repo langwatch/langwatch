@@ -13,15 +13,20 @@
 #   make boxd-connect-pr PR=1234           # SSH + tmux attach to the matching VM
 #   make boxd-connect-branch BRANCH=feat/foo
 #   make boxd-connect-issue ISSUE=123
+#   make boxd-preview BRANCH=feat/foo      # ephemeral PR-preview VM (fork langwatch-golden-v2)
+#   make boxd-preview-down BRANCH=feat/foo # destroy the preview VM
+#   make boxd-preview-status BRANCH=feat/foo # print VM status + stack state
 #
 # Naming: forks live at langwatch-<branch-slug> or langwatch-issue<N>.
 # tmux session inside the VM matches as claude-<branch-slug> / claude-issue<N>.
+# Preview VMs live at preview-<branch-slug> (no namespace prefix — team shared golden).
 #
 # See dev/docs/boxd-makefile.md for the full reference + threat model.
 
 .PHONY: boxd-help boxd-golden boxd-golden-reset \
         boxd-fork-pr boxd-fork-branch boxd-fork-issue \
         boxd-connect-pr boxd-connect-branch boxd-connect-issue \
+        boxd-preview boxd-preview-down boxd-preview-status \
         seed-golden _boxd-fork-impl _boxd-require
 
 BOXD_FORK_LIB := scripts/boxd-fork.sh
@@ -55,12 +60,20 @@ boxd-help:
 	@echo "  boxd-connect-branch BRANCH=<name>"
 	@echo "  boxd-connect-issue ISSUE=<n>"
 	@echo ""
+	@echo "PR preview (ephemeral, team golden langwatch-golden-v2):"
+	@echo "  boxd-preview BRANCH=<name>           fork team golden, checkout branch, start compose full"
+	@echo "  boxd-preview-down BRANCH=<name>      destroy the preview VM"
+	@echo "  boxd-preview-status BRANCH=<name>    print VM status, git HEAD, docker compose ps"
+	@echo "  (override the source golden with LW_PREVIEW_GOLDEN_SOURCE=<name>)"
+	@echo ""
 	@echo "Naming: langwatch-<branch-slug> | langwatch-issue<N>; tmux: claude-<...>"
+	@echo "Preview: preview-<branch-slug> (no namespace prefix)"
 	@echo ""
 	@echo "Customizable env vars:"
 	@echo "  CLAUDE_CREDS=/path/to/credentials.json   override the source credentials"
 	@echo "  BOXD_FORK_YES=1                          confirm destructive ops"
 	@echo "  BOXD_NAMESPACE=<name>                    override golden namespace (default: gh user → whoami)"
+	@echo "  LW_PREVIEW_GOLDEN_SOURCE=<name>          override the team golden for preview VMs (default: langwatch-golden-v2)"
 
 # ---------------------------------------------------------------------------
 # Argument guards
@@ -127,3 +140,32 @@ boxd-connect-branch:
 boxd-connect-issue:
 	$(call _boxd_require,ISSUE,$(ISSUE))
 	@bash -c '$(BOXD_RUN_PREFIX) boxd_connect issue "$(ISSUE)"'
+
+# ---------------------------------------------------------------------------
+# PR preview — ephemeral per-branch VMs
+#
+# Forks the team golden (langwatch-golden-v2 by default) rather than the
+# per-user namespaced golden. Override with LW_PREVIEW_GOLDEN_SOURCE=<name>.
+# VM naming: preview-<branch-slug> (no namespace prefix).
+# ---------------------------------------------------------------------------
+
+# boxd-preview BRANCH=<name>
+# Fork the team golden into preview-<branch-slug>, check out the branch,
+# start compose.dev.yml --profile full, and print the URL.
+boxd-preview:
+	$(call _boxd_require,BRANCH,$(BRANCH))
+	@echo "→ boxd-preview BRANCH=$(BRANCH)"
+	@LW_PREVIEW_GOLDEN_SOURCE="$(LW_PREVIEW_GOLDEN_SOURCE)" bash -c '$(BOXD_RUN_PREFIX) boxd_preview_up "$(BRANCH)"'
+
+# boxd-preview-down BRANCH=<name>
+# Destroy the preview VM non-interactively.
+boxd-preview-down:
+	$(call _boxd_require,BRANCH,$(BRANCH))
+	@echo "→ boxd-preview-down BRANCH=$(BRANCH)"
+	@bash -c '$(BOXD_RUN_PREFIX) boxd_preview_down "$(BRANCH)"'
+
+# boxd-preview-status BRANCH=<name>
+# Print VM status, current git branch + HEAD sha, and docker compose ps.
+boxd-preview-status:
+	$(call _boxd_require,BRANCH,$(BRANCH))
+	@bash -c '$(BOXD_RUN_PREFIX) boxd_preview_status "$(BRANCH)"'
