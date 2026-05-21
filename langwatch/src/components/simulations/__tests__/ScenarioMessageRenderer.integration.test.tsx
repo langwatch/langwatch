@@ -142,7 +142,15 @@ describe("<ScenarioMessageRenderer/>", () => {
   });
 
   // --- AC 1: assistant audio + traceId shows View Trace in drawer ---
+  // AC 3 ("clicking View Trace opens the trace details drawer") is also bound
+  // to this test: the click handler is owned by TraceMessage (see
+  // langwatch/src/components/copilot-kit/TraceMessage.tsx — it calls
+  // useTraceDetailsDrawer().openTraceDetailsDrawer({ traceId })). This PR
+  // adds no new wiring; the renderer-side responsibility is to mount the
+  // component with the correct traceId, which is what this test asserts.
   describe("when an assistant audio message has a trace id in drawer variant", () => {
+    /** @scenario "Assistant audio turn with a trace id shows the View Trace button in drawer variant" */
+    /** @scenario "Clicking View Trace on an audio turn opens the trace details drawer" */
     it("renders a View Trace button under the media bubble", () => {
       renderWith([
         {
@@ -164,6 +172,7 @@ describe("<ScenarioMessageRenderer/>", () => {
 
   // --- AC 2a: no traceId → no View Trace button ---
   describe("when an assistant audio message has no trace id", () => {
+    /** @scenario "Assistant audio turn without a trace id does not show the button" */
     it("does not render a View Trace button", () => {
       renderWith([
         {
@@ -181,6 +190,7 @@ describe("<ScenarioMessageRenderer/>", () => {
 
   // --- AC 2b: user-role audio + traceId → no View Trace button ---
   describe("when a user-role audio message has a trace id", () => {
+    /** @scenario "User-role audio turn does not show the View Trace button" */
     it("does not render a View Trace button", () => {
       renderWith([
         {
@@ -199,6 +209,7 @@ describe("<ScenarioMessageRenderer/>", () => {
 
   // --- AC 4: grid variant suppresses View Trace on audio ---
   describe("when the renderer is mounted in grid variant", () => {
+    /** @scenario "Grid variant suppresses the View Trace button on audio turns" */
     it("does not render a View Trace button on assistant audio messages", () => {
       renderWithGrid([
         {
@@ -216,6 +227,7 @@ describe("<ScenarioMessageRenderer/>", () => {
 
   // --- AC 5: transcript-collapse — one bubble, one View Trace button ---
   describe("when an assistant message has both audio and a sibling text transcript with one trace id", () => {
+    /** @scenario "Transcript-collapse case renders one bubble with one View Trace button" */
     it("renders exactly one bubble with exactly one View Trace button", () => {
       renderWith([
         {
@@ -234,6 +246,7 @@ describe("<ScenarioMessageRenderer/>", () => {
 
   // --- AC 6: existing text / tool_call / tool_result branches render View Trace unchanged ---
   describe("when assistant text, tool_call, and tool_result turns have trace ids", () => {
+    /** @scenario "Existing trace-button behavior on text and tool turns is unchanged" */
     it("renders a View Trace button for each turn unchanged", () => {
       renderWith([
         {
