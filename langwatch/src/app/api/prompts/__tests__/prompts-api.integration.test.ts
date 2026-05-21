@@ -10,7 +10,7 @@ import {
   llmPromptConfigFactory,
   llmPromptConfigVersionFactory,
 } from "~/factories/llm-config.factory";
-import { buildProjectCreateData } from "~/factories/project.factory";
+import { projectFactory } from "~/factories/project.factory";
 import { prisma } from "~/server/db";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
@@ -81,7 +81,7 @@ describe("Prompts API", () => {
     // Create test project in the database with the proper team
     testProject = await prisma.project.create({
       data: {
-        ...buildProjectCreateData({ slug: nanoid() }),
+        ...projectFactory.build({ slug: nanoid() }),
         teamId: testTeam.id,
         personalFeatures: {},
       },

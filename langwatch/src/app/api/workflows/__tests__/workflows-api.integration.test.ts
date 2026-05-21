@@ -1,7 +1,7 @@
 import type { Organization, Project, Team, Workflow } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { buildProjectCreateData } from "~/factories/project.factory";
+import { projectFactory } from "~/factories/project.factory";
 import { prisma } from "~/server/db";
 import { app } from "../[[...route]]/app";
 
@@ -36,7 +36,7 @@ describe("Workflows REST API", () => {
 
     testProject = await prisma.project.create({
       data: {
-        ...buildProjectCreateData({ slug: nanoid() }),
+        ...projectFactory.build({ slug: nanoid() }),
         teamId: testTeam.id,
         personalFeatures: {},
       },

@@ -1,7 +1,7 @@
 import type { Organization, Project, Team } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { buildProjectCreateData } from "~/factories/project.factory";
+import { projectFactory } from "~/factories/project.factory";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import {
@@ -65,7 +65,7 @@ describe("Feature: REST API resource limit enforcement parity", () => {
 
     testProject = await prisma.project.create({
       data: {
-        ...buildProjectCreateData({ slug: nanoid() }),
+        ...projectFactory.build({ slug: nanoid() }),
         teamId: testTeam.id,
         personalFeatures: {},
       },

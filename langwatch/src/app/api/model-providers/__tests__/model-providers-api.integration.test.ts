@@ -1,7 +1,7 @@
 import type { Organization, Project, Team } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { buildProjectCreateData } from "~/factories/project.factory";
+import { projectFactory } from "~/factories/project.factory";
 import { prisma } from "~/server/db";
 import { MASKED_KEY_PLACEHOLDER } from "~/utils/constants";
 import { ModelProviderRepository } from "~/server/modelProviders/modelProvider.repository";
@@ -43,7 +43,7 @@ describe("Model Providers API", () => {
 
     testProject = await prisma.project.create({
       data: {
-        ...buildProjectCreateData({ slug: nanoid() }),
+        ...projectFactory.build({ slug: nanoid() }),
         teamId: testTeam.id,
         personalFeatures: {},
       },

@@ -11,7 +11,7 @@ import {
   llmPromptConfigFactory,
   llmPromptConfigVersionFactory,
 } from "~/factories/llm-config.factory";
-import { buildProjectCreateData } from "~/factories/project.factory";
+import { projectFactory } from "~/factories/project.factory";
 import { prisma } from "~/server/db";
 import { app } from "../[[...route]]/app";
 
@@ -74,7 +74,7 @@ describe("Prompt Tags REST API (/api/prompts/tags)", () => {
 
     testProject = await prisma.project.create({
       data: {
-        ...buildProjectCreateData({ slug: `test-project-${slug}` }),
+        ...projectFactory.build({ slug: `test-project-${slug}` }),
         teamId: testTeam.id,
         personalFeatures: {},
       },

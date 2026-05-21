@@ -2,7 +2,7 @@ import type { Organization, Project, Team } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";
-import { buildProjectCreateData } from "~/factories/project.factory";
+import { projectFactory } from "~/factories/project.factory";
 import { PromptService } from "../prompt.service";
 import { SEEDED_TAGS } from "~/prompts/constants/tags";
 
@@ -32,7 +32,7 @@ describe("Feature: Prompt version tags", () => {
 
     testProject = await prisma.project.create({
       data: {
-        ...buildProjectCreateData({ slug: nanoid() }),
+        ...projectFactory.build({ slug: nanoid() }),
         teamId: testTeam.id,
         personalFeatures: {},
       },
@@ -40,7 +40,7 @@ describe("Feature: Prompt version tags", () => {
 
     otherProject = await prisma.project.create({
       data: {
-        ...buildProjectCreateData({ slug: nanoid() }),
+        ...projectFactory.build({ slug: nanoid() }),
         teamId: testTeam.id,
         personalFeatures: {},
       },

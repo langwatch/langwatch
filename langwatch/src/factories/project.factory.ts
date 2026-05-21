@@ -6,7 +6,13 @@ import {
 import { Factory } from "fishery";
 import { nanoid } from "nanoid";
 
-export const projectFactory = Factory.define<Project>(({ sequence }) => ({
+// Omit Json? fields — Prisma's output type (JsonValue | null) is structurally
+// incompatible with its input type (InputJsonValue | NullableJsonNullValueInput).
+// Excluding them lets the factory output be spread directly into prisma.*.create()
+// while Prisma applies the column default (NULL).
+export const projectFactory = Factory.define<
+  Omit<Project, "retentionPolicy" | "personalFeatures">
+>(({ sequence }) => ({
   id: nanoid(),
   name: `Test Project ${sequence}`,
   slug: `test-project-${sequence}`,
@@ -32,12 +38,5 @@ export const projectFactory = Factory.define<Project>(({ sequence }) => ({
   isPersonal: false,
   ownerUserId: null,
   presenceEnabled: false,
-  personalFeatures: {},
   costCenterId: null,
-  retentionPolicy: null,
 }));
-
-export function buildProjectCreateData(overrides?: Partial<Project>) {
-  const { retentionPolicy: _, ...data } = projectFactory.build(overrides);
-  return data;
-}

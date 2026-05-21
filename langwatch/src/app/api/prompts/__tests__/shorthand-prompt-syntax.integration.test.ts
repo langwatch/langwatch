@@ -1,7 +1,7 @@
 import type { Organization, Project, Team } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { buildProjectCreateData } from "~/factories/project.factory";
+import { projectFactory } from "~/factories/project.factory";
 import { prisma } from "~/server/db";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
@@ -58,7 +58,7 @@ describe("Feature: Shorthand prompt tag syntax (REST API)", () => {
     });
 
     testProject = await prisma.project.create({
-      data: { ...buildProjectCreateData({ slug: nanoid() }), teamId: testTeam.id },
+      data: { ...projectFactory.build({ slug: nanoid() }), teamId: testTeam.id },
     });
 
     testApiKey = testProject.apiKey;
