@@ -201,6 +201,9 @@ local scanBudget = 1000
 if tenantCap > 0 then scanBudget = 10000 end
 local offset = 0
 
+-- Cache tenant cap lookups within this EVAL to avoid redundant GETs.
+local tenantCapCache = {}
+
 while offset < scanBudget do
   local groups = redis.call("ZRANGEBYSCORE", readyKey, "-inf", nowMs, "LIMIT", offset, pageSize)
   if #groups == 0 then return nil end
@@ -215,8 +218,13 @@ while offset < scanBudget do
         if slashPos and slashPos > 1 then
           local tenantId = string.sub(groupId, 1, slashPos - 1)
           tenantCountKey = keyPrefix .. "tenant_active:" .. tenantId
-          local n = tonumber(redis.call("GET", tenantCountKey)) or 0
-          if n >= tenantCap then tenantOverCap = true end
+          local cached = tenantCapCache[tenantId]
+          if cached == nil then
+            local n = tonumber(redis.call("GET", tenantCountKey)) or 0
+            cached = n >= tenantCap
+            tenantCapCache[tenantId] = cached
+          end
+          if cached then tenantOverCap = true end
         end
       end
 
@@ -342,6 +350,11 @@ local scanBudget = pageSize * 5
 if tenantCap > 0 then scanBudget = pageSize * 50 end
 local offset = 0
 
+-- Cache tenant cap lookups within this EVAL to avoid redundant GETs.
+-- When 1,800 groups belong to one over-cap tenant, this turns 1,800
+-- GET calls into 1 GET + 1,799 table lookups.
+local tenantCapCache = {}
+
 while offset < scanBudget and dispatched < maxJobs do
   local groups = redis.call("ZRANGEBYSCORE", readyKey, "-inf", nowMs, "LIMIT", offset, pageSize)
   if #groups == 0 then break end
@@ -358,8 +371,13 @@ while offset < scanBudget and dispatched < maxJobs do
         if slashPos and slashPos > 1 then
           local tenantId = string.sub(groupId, 1, slashPos - 1)
           tenantCountKey = keyPrefix .. "tenant_active:" .. tenantId
-          local n = tonumber(redis.call("GET", tenantCountKey)) or 0
-          if n >= tenantCap then tenantOverCap = true end
+          local cached = tenantCapCache[tenantId]
+          if cached == nil then
+            local n = tonumber(redis.call("GET", tenantCountKey)) or 0
+            cached = n >= tenantCap
+            tenantCapCache[tenantId] = cached
+          end
+          if cached then tenantOverCap = true end
         end
       end
 
@@ -423,6 +441,11 @@ while offset < scanBudget and dispatched < maxJobs do
             if tenantCap > 0 and tenantCountKey then
               redis.call("INCR", tenantCountKey)
               redis.call("EXPIRE", tenantCountKey, activeTtlSec)
+              -- Invalidate cache — count changed, may now be at cap
+              local slashPos2 = string.find(groupId, "/", 1, true)
+              if slashPos2 then
+                tenantCapCache[string.sub(groupId, 1, slashPos2 - 1)] = nil
+              end
             end
 
             local dataKey = keyPrefix .. "group:" .. groupId .. ":data"
