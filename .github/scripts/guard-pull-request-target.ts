@@ -1,0 +1,133 @@
+#!/usr/bin/env node
+import { readdirSync, readFileSync } from "node:fs";
+import { relative, resolve } from "node:path";
+
+const defaultRepoRoot = ".";
+const guardWorkflow = ".github/workflows/workflow-security-guard.yml";
+
+const unsafeHeadRefPatterns = [
+  "github.event.pull_request.head.sha",
+  "github.event.pull_request.head.ref",
+  "github.head_ref",
+];
+
+const safeGatePatterns = [
+  /github\.event\.label\.name\s*==\s*['"]approved-ci['"]/,
+  /github\.event\.pull_request\.head\.repo\.full_name\s*==\s*github\.repository/,
+  /github\.event\.pull_request\.head\.repo\.fork\s*==\s*false/,
+];
+
+type JobBlock = {
+  name: string;
+  startLine: number;
+  lines: string[];
+};
+
+const workflowFiles = (repoRoot: string): string[] => {
+  const workflowDir = resolve(repoRoot, ".github/workflows");
+  return readdirSync(workflowDir)
+    .filter((file) => file.endsWith(".yml") || file.endsWith(".yaml"))
+    .sort()
+    .map((file) => resolve(workflowDir, file));
+};
+
+const jobBlocks = (lines: string[]): JobBlock[] => {
+  const jobsStart = lines.findIndex((line) => /^jobs:\s*$/.test(line));
+  if (jobsStart === -1) {
+    return [];
+  }
+
+  const jobs: JobBlock[] = [];
+  let current: JobBlock | undefined;
+
+  for (let index = jobsStart + 1; index < lines.length; index++) {
+    const line = lines[index] ?? "";
+    if (line && !line.startsWith(" ")) {
+      break;
+    }
+
+    const match = /^  ([A-Za-z0-9_-]+):\s*$/.exec(line);
+    if (match?.[1]) {
+      if (current) {
+        jobs.push(current);
+      }
+      current = { name: match[1], startLine: index + 1, lines: [line] };
+      continue;
+    }
+
+    current?.lines.push(line);
+  }
+
+  if (current) {
+    jobs.push(current);
+  }
+
+  return jobs;
+};
+
+const usesPullRequestTarget = (lines: string[]): boolean =>
+  lines.some((line) => /^\s*pull_request_target:\s*$/.test(line));
+
+const hasUnsafeCheckout = (jobText: string): boolean =>
+  jobText.includes("actions/checkout") &&
+  unsafeHeadRefPatterns.some((pattern) => jobText.includes(pattern));
+
+const hasSafeGate = (jobText: string): boolean =>
+  safeGatePatterns.some((pattern) => pattern.test(jobText));
+
+const validateGuardWorkflow = (repoRoot: string, errors: string[]): void => {
+  const path = resolve(repoRoot, guardWorkflow);
+  const text = readFileSync(path, "utf8");
+  const requiredSnippets = [
+    "pull_request:",
+    '".github/workflows/*.yml"',
+    '".github/workflows/*.yaml"',
+    ".github/scripts/guard-pull-request-target.ts",
+  ];
+
+  for (const snippet of requiredSnippets) {
+    if (!text.includes(snippet)) {
+      errors.push(`${guardWorkflow}: missing required guard trigger \`${snippet}\``);
+    }
+  }
+};
+
+const displayPath = (repoRoot: string, path: string): string =>
+  relative(resolve(repoRoot), path) || path;
+
+const main = (): number => {
+  const repoRoot = process.argv[2] ?? defaultRepoRoot;
+  const errors: string[] = [];
+
+  validateGuardWorkflow(repoRoot, errors);
+
+  for (const path of workflowFiles(repoRoot)) {
+    const lines = readFileSync(path, "utf8").split(/\r?\n/);
+    if (!usesPullRequestTarget(lines)) {
+      continue;
+    }
+
+    for (const job of jobBlocks(lines)) {
+      const jobText = job.lines.join("\n");
+      if (hasUnsafeCheckout(jobText) && !hasSafeGate(jobText)) {
+        errors.push(
+          `${displayPath(repoRoot, path)}:${job.startLine}: job \`${job.name}\` checks out PR-head code ` +
+            "from pull_request_target without an `approved-ci` or same-repo gate",
+        );
+      }
+    }
+  }
+
+  if (errors.length > 0) {
+    console.error("Unsafe pull_request_target workflow pattern found:");
+    for (const error of errors) {
+      console.error(`- ${error}`);
+    }
+    return 1;
+  }
+
+  console.log("pull_request_target workflow guard passed");
+  return 0;
+};
+
+process.exitCode = main();
