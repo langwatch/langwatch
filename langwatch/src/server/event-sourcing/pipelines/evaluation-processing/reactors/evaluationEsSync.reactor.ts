@@ -31,6 +31,13 @@ export function createEvaluationEsSyncReactor(
 ): ReactorDefinition<EvaluationProcessingEvent, EvaluationRunData> {
   return {
     name: "evaluationEsSync",
+    options: {
+      // ES writes fully disabled since LangWatch 3.0 (ClickHouse is the sole
+      // data store). Without this flag the reactor still goes through the full
+      // STAGE → DISPATCH → COMPLETE lifecycle (~25 Redis commands per
+      // evaluation run) only to execute an empty handler.
+      disabled: true,
+    },
 
     async handle(
       _event: EvaluationProcessingEvent,
