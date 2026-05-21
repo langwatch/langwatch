@@ -41,5 +41,12 @@ export class DataRetentionPolicyService {
       organizationId,
       defaultRetentionPolicy,
     });
+
+    const projectIds = await this.repository.findProjectIdsByOrganization({
+      organizationId,
+    });
+    for (const id of projectIds) {
+      this.retentionPolicyCache.invalidate(id);
+    }
   }
 }

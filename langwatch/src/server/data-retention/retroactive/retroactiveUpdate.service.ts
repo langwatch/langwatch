@@ -1,12 +1,11 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
-import { createLogger } from "~/utils/logger/server";
 import {
   RETENTION_TABLE_CATEGORY_MAP,
   type RetentionCategory,
 } from "../retentionPolicy.schema";
 
-const logger = createLogger("langwatch:data-retention:retroactive");
+const esc = (s: string) => s.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
 
 interface MutationProgress {
   mutationId: string;
@@ -55,9 +54,10 @@ export class RetroactiveUpdateService {
       );
     }
 
+    const escapedProjectId = esc(projectId);
     for (const table of tables) {
       await client.command({
-        query: `ALTER TABLE ${table} UPDATE _retention_days = ${newRetentionDays} WHERE TenantId = '${projectId}' AND _retention_days != ${newRetentionDays} AND _retention_days != 0`,
+        query: `ALTER TABLE ${table} UPDATE _retention_days = ${newRetentionDays} WHERE TenantId = '${escapedProjectId}' AND _retention_days != ${newRetentionDays} AND _retention_days != 0`,
       });
     }
 
@@ -82,7 +82,7 @@ export class RetroactiveUpdateService {
           formatDateTime(create_time, '%Y-%m-%dT%H:%i:%S') AS createTime
         FROM system.mutations
         WHERE command LIKE '%_retention_days%'
-          AND command LIKE '%${projectId}%'
+          AND command LIKE '%${esc(projectId)}%'
           AND is_done = 0
         ORDER BY create_time DESC
       `,
@@ -118,7 +118,7 @@ export class RetroactiveUpdateService {
 
     const client = await this.resolveClickHouseClient(projectId);
     await client.command({
-      query: `KILL MUTATION WHERE mutation_id = '${mutationId.replace(/'/g, "\\'")}'`,
+      query: `KILL MUTATION WHERE mutation_id = '${esc(mutationId)}'`,
     });
   }
 
@@ -143,7 +143,7 @@ export class RetroactiveUpdateService {
         FROM system.mutations
         WHERE table IN (${tableList})
           AND command LIKE '%_retention_days%'
-          AND command LIKE '%${projectId}%'
+          AND command LIKE '%${esc(projectId)}%'
           AND is_done = 0
       `,
       format: "JSONEachRow",

@@ -3,7 +3,6 @@ import type { PinnedTrace } from "@prisma/client";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { createLogger } from "~/utils/logger/server";
 import type { RetentionPolicyCache } from "../retentionPolicyCache";
-import { RETENTION_TABLE_CATEGORY_MAP } from "../retentionPolicy.schema";
 import type { PinnedTraceRepository } from "./pinnedTrace.repository";
 
 const logger = createLogger("langwatch:data-retention:pinning");
@@ -174,12 +173,14 @@ export class PinnedTraceService {
       return;
     }
 
-    const traceIdList = traceIds.map((id) => `'${id.replace(/'/g, "\\'")}'`).join(",");
+    const esc = (s: string) => s.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+    const traceIdList = traceIds.map((id) => `'${esc(id)}'`).join(",");
+    const escapedProjectId = esc(projectId);
 
     for (const table of TRACE_TABLES) {
       try {
         await client.command({
-          query: `ALTER TABLE ${table} UPDATE _retention_days = ${retentionDays} WHERE TenantId = '${projectId}' AND TraceId IN (${traceIdList}) AND _retention_days != ${retentionDays}`,
+          query: `ALTER TABLE ${table} UPDATE _retention_days = ${retentionDays} WHERE TenantId = '${escapedProjectId}' AND TraceId IN (${traceIdList}) AND _retention_days != ${retentionDays}`,
         });
       } catch (error) {
         logger.error(

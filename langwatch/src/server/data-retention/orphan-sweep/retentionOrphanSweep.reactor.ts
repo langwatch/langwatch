@@ -8,7 +8,6 @@ import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:data-retention:orphan-reactor");
 
-const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 const SWEEP_DEDUP_TTL_MS = 60 * 60 * 1000;
 
 interface RetentionOrphanSweepReactorDeps {

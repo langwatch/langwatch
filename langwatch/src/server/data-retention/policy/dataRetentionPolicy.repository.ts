@@ -64,4 +64,16 @@ export class DataRetentionPolicyRepository {
       },
     });
   }
+
+  async findProjectIdsByOrganization({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<string[]> {
+    const projects = await this.prisma.project.findMany({
+      where: { team: { organizationId } },
+      select: { id: true },
+    });
+    return projects.map((p) => p.id);
+  }
 }
