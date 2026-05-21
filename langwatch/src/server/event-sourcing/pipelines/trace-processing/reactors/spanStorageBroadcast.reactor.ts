@@ -29,7 +29,7 @@ export function createSpanStorageBroadcastReactor(
       disabled: deps.hasRedis === false,
       makeJobId: (payload) =>
         `span-stored:${payload.event.tenantId}:${payload.event.aggregateId}`,
-      ttl: 1000,
+      ttl: 15_000, // Debounce — notification only, frontend refetches
     },
 
     async handle(event: TraceProcessingEvent): Promise<void> {

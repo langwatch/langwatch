@@ -40,7 +40,7 @@ export function createOriginGateReactor(
     options: {
       makeJobId: (payload) =>
         `origin-gate:${payload.event.tenantId}:${payload.event.aggregateId}`,
-      ttl: 5_000,    // 5s dedup — debounce the initial span burst
+      ttl: 15_000,   // 15s dedup — debounce multi-span trace bursts
       delay: 5_000,  // 5s delay — settle before checking origin
     },
 
