@@ -15,6 +15,7 @@ import {
   OrganizationNotFoundError,
 } from "./errors";
 import { LimitExceededError } from "../license-enforcement/errors";
+import { RoleService } from "../role/role.service";
 import { nanoid } from "nanoid";
 import type { JsonArray } from "@prisma/client/runtime/library";
 
@@ -149,7 +150,8 @@ export class InviteService {
   constructor(
     private readonly prisma: PrismaClient | Prisma.TransactionClient,
     private readonly licenseRepo: ILicenseEnforcementRepository,
-    private readonly planProvider: PlanProvider
+    private readonly planProvider: PlanProvider,
+    private readonly roleService?: RoleService,
   ) {}
 
   /**
@@ -171,7 +173,8 @@ export class InviteService {
     const provider: PlanProvider = options?.planProvider ?? {
       getActivePlan: (params) => getApp().planProvider.getActivePlan(params),
     };
-    return new InviteService(prisma, licenseRepo, provider);
+    const roleService = new RoleService(prisma);
+    return new InviteService(prisma, licenseRepo, provider, roleService);
   }
 
   /**
@@ -600,6 +603,31 @@ export class InviteService {
         teamId,
         role: ORGANIZATION_TO_TEAM_ROLE_MAP[invite.role],
       }));
+    }
+
+    if (this.roleService) {
+      const customRoleIds = teamMembershipData
+        .filter((m) => m.role === TeamUserRole.CUSTOM && m.customRoleId)
+        .map((m) => m.customRoleId!);
+      if (customRoleIds.length > 0) {
+        const validRoles = await this.roleService.filterAssignableRoleIds({
+          roleIds: customRoleIds,
+          organizationId: invite.organizationId,
+        });
+        const validIds = new Set(validRoles);
+        const invalidAssignments = teamMembershipData.filter(
+          (m) => m.customRoleId && !validIds.has(m.customRoleId),
+        );
+        if (invalidAssignments.length > 0) {
+          logger.warn(
+            { inviteId: invite.id, invalidAssignments },
+            "dropping team assignments with invalid/non-assignable custom roles at invite accept",
+          );
+        }
+        teamMembershipData = teamMembershipData.filter(
+          (m) => !m.customRoleId || validIds.has(m.customRoleId),
+        );
+      }
     }
 
     for (const member of teamMembershipData) {

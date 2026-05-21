@@ -676,6 +676,10 @@ async function checkPermissionFromBindings({
 /**
  * Checks whether a single binding grants the requested permission,
  * respecting EXTERNAL user restrictions and custom role permission lists.
+ *
+ * See also checkRoleBindingPermission() in role-binding-resolver.ts which
+ * implements parallel CUSTOM-role logic for API key resolution and must
+ * stay in sync with the non-empty/empty fallthrough semantics here.
  */
 async function resolveBindingPermission(
   binding: { role: TeamUserRole; customRoleId: string | null },

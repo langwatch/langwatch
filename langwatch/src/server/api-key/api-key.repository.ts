@@ -4,6 +4,7 @@ import type {
   PrismaClient,
   RoleBinding,
 } from "@prisma/client";
+import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
 
 export type ApiKeyWithBindings = ApiKey & {
   roleBindings: RoleBinding[];
@@ -208,6 +209,151 @@ export class ApiKeyRepository {
         scopeId: b.scopeId,
       })),
     });
+  }
+
+  async findOrgMembership({
+    userId,
+    organizationId,
+  }: {
+    userId: string;
+    organizationId: string;
+  }): Promise<{ userId: string } | null> {
+    return this.prisma.organizationUser.findFirst({
+      where: { userId, organizationId },
+      select: { userId: true },
+    });
+  }
+
+  async findTeamInOrg({
+    teamId,
+    organizationId,
+  }: {
+    teamId: string;
+    organizationId: string;
+  }): Promise<{ id: string } | null> {
+    return this.prisma.team.findFirst({
+      where: { id: teamId, organizationId },
+      select: { id: true },
+    });
+  }
+
+  async findProjectWithTeam({
+    projectId,
+  }: {
+    projectId: string;
+  }): Promise<{
+    id: string;
+    team: { id: string; organizationId: string };
+  } | null> {
+    return this.prisma.project.findUnique({
+      where: { id: projectId, archivedAt: null },
+      include: { team: { select: { id: true, organizationId: true } } },
+    });
+  }
+
+  async findOrgAdminBinding({
+    userId,
+    organizationId,
+  }: {
+    userId: string;
+    organizationId: string;
+  }): Promise<{ userId: string | null } | null> {
+    return this.prisma.roleBinding.findFirst({
+      where: {
+        userId,
+        organizationId,
+        scopeType: RoleBindingScopeType.ORGANIZATION,
+        role: TeamUserRole.ADMIN,
+      },
+      select: { userId: true },
+    });
+  }
+
+  async findUserBindings({
+    userId,
+    organizationId,
+  }: {
+    userId: string;
+    organizationId: string;
+  }) {
+    return this.prisma.roleBinding.findMany({
+      where: { userId, organizationId },
+      select: {
+        id: true,
+        role: true,
+        customRoleId: true,
+        scopeType: true,
+        scopeId: true,
+      },
+    });
+  }
+
+  async findOrgsByIds(ids: string[]) {
+    if (ids.length === 0) return [];
+    return this.prisma.organization.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, name: true },
+    });
+  }
+
+  async findTeamsByIds(ids: string[]) {
+    if (ids.length === 0) return [];
+    return this.prisma.team.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, name: true },
+    });
+  }
+
+  async findProjectsByIds(ids: string[]) {
+    if (ids.length === 0) return [];
+    return this.prisma.project.findMany({
+      where: { id: { in: ids }, archivedAt: null },
+      select: { id: true, name: true },
+    });
+  }
+
+  async findCustomRolesByIds(ids: string[]) {
+    if (ids.length === 0) return [];
+    return this.prisma.customRole.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, name: true, permissions: true },
+    });
+  }
+
+  async findUsersByIds(ids: string[]) {
+    if (ids.length === 0) return [];
+    return this.prisma.user.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, name: true, email: true },
+    });
+  }
+
+  async findProjectsInOrg({ organizationId }: { organizationId: string }) {
+    return this.prisma.project.findMany({
+      where: { team: { organizationId }, archivedAt: null },
+      select: { id: true, name: true, teamId: true },
+      orderBy: { name: "asc" },
+    });
+  }
+
+  async findTeamsInOrg({ organizationId }: { organizationId: string }) {
+    return this.prisma.team.findMany({
+      where: { organizationId },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    });
+  }
+
+  async findOrgMembers({ organizationId }: { organizationId: string }) {
+    const orgUsers = await this.prisma.organizationUser.findMany({
+      where: { organizationId },
+      include: { user: { select: { id: true, name: true, email: true } } },
+    });
+    return orgUsers.map((ou) => ({
+      id: ou.user.id,
+      name: ou.user.name,
+      email: ou.user.email,
+    }));
   }
 
   /**

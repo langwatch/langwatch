@@ -1171,6 +1171,7 @@ model CustomRole {
     name           String
     description    String?
     permissions    Json // Array of Permission strings
+    kind           String       @default("custom") // "custom" = user-created, "system_api_key" = generated for API keys
     createdAt      DateTime     @default(now())
     updatedAt      DateTime     @default(now()) @updatedAt
     assignedUsers      TeamUser[]

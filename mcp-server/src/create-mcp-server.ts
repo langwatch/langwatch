@@ -1796,4 +1796,154 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       };
     }
   );
+
+  // --- Platform Project Tools ---
+  // These tools manage projects on the LangWatch platform via the REST API.
+  // They require an API key with org-level permissions.
+
+  server.tool(
+    "platform_list_projects",
+    "List all projects in your LangWatch organization. Requires an org-level API key.",
+    {
+      page: z.number().int().positive().optional().describe("Page number (default: 1)"),
+      limit: z.number().int().positive().max(1000).optional().describe("Results per page (default: 100)"),
+    },
+    withToolLogging("platform_list_projects", async (params) => {
+      requireApiKey();
+      const { handleListProjects } = await import("./tools/list-projects.js");
+      return {
+        content: [{ type: "text", text: await handleListProjects(params) }],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_get_project",
+    "Get details of a specific project by its ID.",
+    {
+      id: z.string().describe("The project ID"),
+    },
+    withToolLogging("platform_get_project", async (params) => {
+      requireApiKey();
+      const { handleGetProject } = await import("./tools/get-project.js");
+      return {
+        content: [{ type: "text", text: await handleGetProject(params) }],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_create_project",
+    `Create a new project in your LangWatch organization. Returns a one-time service API key for the project.
+
+You must provide either teamId (to add the project to an existing team) or newTeamName (to create a new team for the project).`,
+    {
+      name: z.string().describe("Project name"),
+      language: z.string().describe('Programming language (e.g. "python", "typescript")'),
+      framework: z.string().describe('Framework (e.g. "openai", "langchain", "custom")'),
+      teamId: z.string().optional().describe("ID of an existing team to add the project to"),
+      newTeamName: z.string().optional().describe("Name for a new team to create for this project"),
+    },
+    withToolLogging("platform_create_project", async (params) => {
+      requireApiKey();
+      const { handleCreateProject } = await import("./tools/create-project.js");
+      return {
+        content: [{ type: "text", text: await handleCreateProject(params) }],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_update_project",
+    "Update an existing project's name, language, framework, or PII redaction level.",
+    {
+      id: z.string().describe("The project ID to update"),
+      name: z.string().optional().describe("New project name"),
+      language: z.string().optional().describe("New programming language"),
+      framework: z.string().optional().describe("New framework"),
+      piiRedactionLevel: z.enum(["STRICT", "ESSENTIAL", "DISABLED"]).optional().describe("PII redaction level"),
+    },
+    withToolLogging("platform_update_project", async (params) => {
+      requireApiKey();
+      const { handleUpdateProject } = await import("./tools/update-project.js");
+      return {
+        content: [{ type: "text", text: await handleUpdateProject(params) }],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_archive_project",
+    "Archive (soft-delete) a project. The project can be restored later if needed.",
+    {
+      id: z.string().describe("The project ID to archive"),
+    },
+    withToolLogging("platform_archive_project", async (params) => {
+      requireApiKey();
+      const { handleArchiveProject } = await import("./tools/archive-project.js");
+      return {
+        content: [{ type: "text", text: await handleArchiveProject(params) }],
+      };
+    })
+  );
+
+  // --- Platform API Key Tools (require org-level API key) ---
+  // These tools manage API keys on the LangWatch platform via the REST API.
+
+  server.tool(
+    "platform_list_api_keys",
+    "List all API keys in your LangWatch organization. Shows key metadata, status (active/revoked/expired), and role bindings. API key tokens are never returned.",
+    {},
+    withToolLogging("platform_list_api_keys", async () => {
+      requireApiKey();
+      const { handleListApiKeys } = await import("./tools/list-api-keys.js");
+      return {
+        content: [{ type: "text", text: await handleListApiKeys() }],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_create_api_key",
+    `Create a new API key. Two types available:
+
+- **personal**: Tied to a user, requires explicit role bindings (e.g. ADMIN on PROJECT:proj_123).
+- **service**: Not tied to a user. Use projectIds for project-scoped service keys, or omit for org-wide access.
+
+The token is returned once and cannot be retrieved again.`,
+    {
+      keyType: z.enum(["personal", "service"]).describe("Key type: 'personal' (user-tied) or 'service' (headless)"),
+      name: z.string().describe("Key name (max 100 chars)"),
+      description: z.string().optional().describe("Key description (max 500 chars)"),
+      expiresAt: z.string().optional().describe("Expiration date (ISO string)"),
+      bindings: z.array(z.object({
+        role: z.enum(["ADMIN", "MEMBER", "VIEWER"]).describe("Role"),
+        scopeType: z.enum(["ORGANIZATION", "TEAM", "PROJECT"]).describe("Scope type"),
+        scopeId: z.string().describe("Scope ID (org, team, or project ID)"),
+      })).optional().describe("Role bindings (required for personal keys)"),
+      projectIds: z.array(z.string()).optional().describe("Project IDs for service keys (creates ADMIN bindings per project)"),
+    },
+    withToolLogging("platform_create_api_key", async (params) => {
+      requireApiKey();
+      const { handleCreateApiKey } = await import("./tools/create-api-key.js");
+      return {
+        content: [{ type: "text", text: await handleCreateApiKey(params) }],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_revoke_api_key",
+    "Revoke an API key. Once revoked, the key can no longer be used for authentication.",
+    {
+      id: z.string().describe("The API key ID to revoke"),
+    },
+    withToolLogging("platform_revoke_api_key", async (params) => {
+      requireApiKey();
+      const { handleRevokeApiKey } = await import("./tools/revoke-api-key.js");
+      return {
+        content: [{ type: "text", text: await handleRevokeApiKey(params) }],
+      };
+    })
+  );
 }

@@ -224,3 +224,43 @@ Feature: Scenario tests for skills quality assurance
     And the agent uses `langwatch trace search` or `langwatch trace get` to inspect specific traces
     And the agent provides a summary of performance trends
     And the agent does NOT use any MCP tools
+
+  # ──────────────────────────────────────────────────
+  # Projects & API Keys CLI + MCP
+  # ──────────────────────────────────────────────────
+
+  @platform @projects @integration @unimplemented
+  Scenario: Projects skill lists and creates projects via the CLI
+    Given an empty temporary directory (no codebase)
+    And LANGWATCH_API_KEY is set with org-level permissions
+    When the agent receives "list my projects and create a new one called 'Test Project' with python/langchain"
+    Then the agent runs `langwatch projects list` via the Bash tool
+    And the agent runs `langwatch projects create` with --name, --language, --framework, and --new-team-name flags
+    And the agent receives a one-time service API key in the create output
+    And the agent does NOT use any MCP tools
+
+  @platform @api-keys @integration @unimplemented
+  Scenario: API keys skill lists and creates API keys via the CLI
+    Given an empty temporary directory (no codebase)
+    And LANGWATCH_API_KEY is set with org-level permissions
+    When the agent receives "list my API keys and create a new service key for CI"
+    Then the agent runs `langwatch api-keys list` via the Bash tool
+    And the agent runs `langwatch api-keys create` with a --name flag
+    And the agent receives a one-time token in the create output
+    And the agent does NOT use any MCP tools
+
+  @platform @mcp @projects @integration @unimplemented
+  Scenario: MCP project tools work from an AI coding assistant
+    Given the MCP server is configured with an org-level API key
+    When the agent calls platform_list_projects
+    Then the response contains project data with id, name, slug, language, and framework
+    When the agent calls platform_create_project with name, language, framework, and newTeamName
+    Then the response includes a one-time service API key with a save warning
+
+  @platform @mcp @api-keys @integration @unimplemented
+  Scenario: MCP API key tools work from an AI coding assistant
+    Given the MCP server is configured with an org-level API key
+    When the agent calls platform_list_api_keys
+    Then the response contains API key data with id, name, status, and role bindings
+    When the agent calls platform_create_api_key with keyType "service" and name "CI Key"
+    Then the response includes a one-time token with a save warning

@@ -1,7 +1,5 @@
 import {
-  Box,
   Button,
-  createListCollection,
   Heading,
   HStack,
   Input,
@@ -10,13 +8,34 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Drawer } from "../../../components/ui/drawer";
-import { Select } from "../../../components/ui/select";
+import {
+  ScopeChipPicker,
+  type ScopeChipPickerEntry,
+} from "../../../components/settings/ScopeChipPicker";
 import type { RouterOutputs } from "../../../utils/api";
 import {
-  ROLE_LABELS,
-  STANDARD_ROLES,
+  PERMISSION_CATEGORIES,
+  computePermissionsFromSelections,
+  selectionsFromPermissions,
+} from "../../../server/api-key/permission-categories";
+import {
+  getTeamRolePermissions,
+  hasPermissionWithHierarchy,
+} from "../../../server/api/rbac";
+import { TeamUserRole } from "@prisma/client";
+import {
+  PermissionCategoryList,
+  PermissionCounter,
+  type PermissionSelection,
+} from "./PermissionCategoryList";
+import {
+  bindingsToPermissionMode,
+  bindingsToScopes,
+  bindingsToSelections,
+  deriveBindingRole,
+  findBindingAtScope,
   type PermissionMode,
 } from "./utils";
 
@@ -26,13 +45,19 @@ type MyBindings = {
   data: MyBindingsData | undefined;
   isLoading: boolean;
 };
-type OrgProject = { id: string; name: string };
+type OrgProject = { id: string; name: string; teamId: string };
+type OrgTeam = { id: string; name: string };
 
 export function EditApiKeyDrawer({
   apiKey,
   isUpdating,
   myBindings,
   orgProjects,
+  orgTeams,
+  organizationId,
+  organizationName,
+  currentTeamId,
+  currentProjectId,
   onClose,
   onSave,
 }: {
@@ -40,15 +65,22 @@ export function EditApiKeyDrawer({
   isUpdating: boolean;
   myBindings: MyBindings;
   orgProjects: OrgProject[];
+  orgTeams: OrgTeam[];
+  organizationId: string;
+  organizationName: string | undefined;
+  currentTeamId?: string;
+  currentProjectId?: string;
   onClose: () => void;
   onSave: (input: {
     apiKeyId: string;
     name?: string;
     description?: string | null;
     permissionMode?: PermissionMode;
+    scopeType?: string;
+    scopeId?: string;
+    permissions?: string[];
     bindings?: Array<{
       role: string;
-      customRoleId: string | null | undefined;
       scopeType: string;
       scopeId: string;
     }>;
@@ -56,60 +88,104 @@ export function EditApiKeyDrawer({
 }) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [permissionMode, setPermissionMode] = useState<PermissionMode>("all");
-  const [projectRoles, setProjectRoles] = useState<Record<string, string>>({});
+  const [selectedScopes, setSelectedScopes] = useState<ScopeChipPickerEntry[]>(
+    [],
+  );
+  const [permissionMode, setPermissionMode] = useState<"all" | "restricted">(
+    "all",
+  );
+  const [categorySelections, setCategorySelections] = useState<
+    Record<string, PermissionSelection>
+  >({});
+
+  const isServiceKey = apiKey ? !apiKey.userId : false;
+
+  const primaryScope = selectedScopes[0] ?? {
+    scopeType: "PROJECT" as const,
+    scopeId: currentProjectId ?? "",
+  };
+
+  const userPermissions = useMemo(() => {
+    if (isServiceKey) return getTeamRolePermissions(TeamUserRole.ADMIN);
+    if (!myBindings.data) return [];
+
+    const binding = findBindingAtScope({
+      bindings: myBindings.data,
+      scopeType: primaryScope.scopeType,
+      scopeId: primaryScope.scopeId,
+      organizationId,
+      orgProjects,
+    });
+
+    if (!binding) return [];
+    return getTeamRolePermissions(binding.role as TeamUserRole);
+  }, [
+    myBindings.data,
+    primaryScope.scopeType,
+    primaryScope.scopeId,
+    organizationId,
+    orgProjects,
+    isServiceKey,
+  ]);
 
   useEffect(() => {
     if (apiKey) {
       setName(apiKey.name);
       setDescription(apiKey.description ?? "");
-      setPermissionMode((apiKey.permissionMode as PermissionMode) ?? "all");
 
-      // Pre-populate project roles from existing bindings
-      const roles: Record<string, string> = {};
-      for (const rb of apiKey.roleBindings) {
-        if (rb.scopeType === "PROJECT") {
-          roles[rb.scopeId] = rb.role;
-        }
+      const mode = bindingsToPermissionMode(apiKey);
+      setPermissionMode(mode);
+
+      setSelectedScopes(bindingsToScopes(apiKey.roleBindings));
+
+      if (mode === "restricted") {
+        setCategorySelections(bindingsToSelections(apiKey, {
+          permissionCategories: PERMISSION_CATEGORIES,
+          selectionsFromPermissions,
+          getTeamRolePermissions: (role) => getTeamRolePermissions(role as TeamUserRole),
+        }) as Record<string, PermissionSelection>);
+      } else {
+        setCategorySelections({});
       }
-      setProjectRoles(roles);
     }
-  }, [apiKey]);
+  }, [apiKey, organizationId, currentTeamId, currentProjectId]);
 
-  const buildBindings = () => {
-    if (!myBindings.data) return [];
-
-    if (permissionMode === "all") {
-      return myBindings.data.map((b) => ({
-        role: b.role,
-        customRoleId: b.customRoleId,
-        scopeType: b.scopeType,
-        scopeId: b.scopeId,
-      }));
+  const handlePermissionModeChange = (mode: "all" | "restricted") => {
+    setPermissionMode(mode);
+    if (mode === "restricted" && Object.values(categorySelections).every((v) => !v || v === "none")) {
+      const allSelected: Record<string, PermissionSelection> = {};
+      for (const cat of PERMISSION_CATEGORIES) {
+        const canRead = cat.readPermissions.every((p) =>
+          hasPermissionWithHierarchy(userPermissions, p),
+        );
+        const canWrite =
+          cat.accessLevels.includes("write") &&
+          cat.writePermissions.every((p) =>
+            hasPermissionWithHierarchy(userPermissions, p),
+          );
+        allSelected[cat.key] = canWrite ? "write" : canRead ? "read" : "none";
+      }
+      setCategorySelections(allSelected);
     }
-
-    if (permissionMode === "readonly") {
-      return myBindings.data.map((b) => ({
-        role: "VIEWER" as const,
-        customRoleId: null,
-        scopeType: b.scopeType,
-        scopeId: b.scopeId,
-      }));
-    }
-
-    // Restricted: per-project roles
-    return orgProjects
-      .filter((p) => (projectRoles[p.id] ?? "NONE") !== "NONE")
-      .map((p) => ({
-        role: projectRoles[p.id] ?? "VIEWER",
-        customRoleId: null,
-        scopeType: "PROJECT" as const,
-        scopeId: p.id,
-      }));
   };
 
   const handleSave = () => {
     if (!apiKey) return;
+
+    const permissions =
+      permissionMode === "restricted"
+        ? computePermissionsFromSelections(categorySelections)
+        : undefined;
+
+    const bindings = selectedScopes.map((s) => ({
+      role: deriveBindingRole({
+        permissionMode, scopeType: s.scopeType, scopeId: s.scopeId,
+        myBindings: myBindings.data, organizationId, orgProjects, isServiceKey,
+      }),
+      scopeType: s.scopeType,
+      scopeId: s.scopeId,
+    }));
+
     onSave({
       apiKeyId: apiKey.id,
       name: name !== apiKey.name ? name : undefined,
@@ -118,9 +194,18 @@ export function EditApiKeyDrawer({
           ? description || null
           : undefined,
       permissionMode,
-      bindings: buildBindings(),
+      scopeType: primaryScope.scopeType,
+      scopeId: primaryScope.scopeId,
+      permissions,
+      bindings,
     });
   };
+
+  const hasAnySelection =
+    permissionMode === "all" ||
+    Object.values(categorySelections).some((v) => v !== "none");
+
+  const canSave = name.trim() && !isUpdating && hasAnySelection;
 
   return (
     <Drawer.Root
@@ -166,16 +251,40 @@ export function EditApiKeyDrawer({
               />
             </VStack>
 
+            {/* Scope */}
+            <VStack gap={1.5} align="start" width="full">
+              <Text fontWeight="600" fontSize="sm">
+                Scope
+              </Text>
+              <ScopeChipPicker
+                value={selectedScopes}
+                onChange={(next) => {
+                  setSelectedScopes(next);
+                  setCategorySelections({});
+                }}
+                organizationId={organizationId}
+                organizationName={organizationName}
+                availableTeams={orgTeams}
+                availableProjects={orgProjects}
+                label=""
+                showQuickPicks
+                currentOrganizationId={organizationId}
+                currentTeamId={currentTeamId}
+                currentProjectId={currentProjectId}
+              />
+            </VStack>
+
             {/* Permissions */}
             <VStack gap={2} align="start" width="full">
               <Text fontWeight="600" fontSize="sm">
                 Permissions
               </Text>
+              <HStack justify="space-between" width="full">
               <SegmentGroup.Root
                 size="sm"
                 value={permissionMode}
                 onValueChange={(e) =>
-                  setPermissionMode(e.value as PermissionMode)
+                  handlePermissionModeChange(e.value as "all" | "restricted")
                 }
               >
                 <SegmentGroup.Indicator />
@@ -187,91 +296,20 @@ export function EditApiKeyDrawer({
                   <SegmentGroup.ItemText>Restricted</SegmentGroup.ItemText>
                   <SegmentGroup.ItemHiddenInput />
                 </SegmentGroup.Item>
-                <SegmentGroup.Item value="readonly">
-                  <SegmentGroup.ItemText>Read only</SegmentGroup.ItemText>
-                  <SegmentGroup.ItemHiddenInput />
-                </SegmentGroup.Item>
               </SegmentGroup.Root>
+              {permissionMode === "restricted" && (
+                <PermissionCounter
+                  count={Object.values(categorySelections).filter((v) => v && v !== "none").length}
+                />
+              )}
+              </HStack>
 
               {permissionMode === "restricted" && (
-                <Box
-                  width="full"
-                  padding={3}
-                  borderWidth="1px"
-                  borderColor="border"
-                  borderRadius="md"
-                  background="bg.subtle"
-                >
-                  <Text fontSize="sm" marginBottom={2}>
-                    Set a role for each project:
-                  </Text>
-                  <VStack align="stretch" gap={2}>
-                    {orgProjects.map((project) => {
-                      const effectiveRole = projectRoles[project.id] ?? "NONE";
-                      const roleOptions = createListCollection({
-                        items: [
-                          ...STANDARD_ROLES.map((r) => ({
-                            label: ROLE_LABELS[r] ?? r,
-                            value: r,
-                          })),
-                          { label: "None", value: "NONE" },
-                        ],
-                      });
-
-                      return (
-                        <HStack
-                          key={project.id}
-                          gap={3}
-                          fontSize="sm"
-                          width="full"
-                          align="center"
-                        >
-                          <Text
-                            color="fg"
-                            flex="1"
-                            fontWeight="500"
-                            lineHeight="32px"
-                          >
-                            {project.name}
-                          </Text>
-                          <Select.Root
-                            collection={roleOptions}
-                            size="sm"
-                            value={[effectiveRole]}
-                            onValueChange={(details) => {
-                              const val = details.value[0];
-                              if (val) {
-                                setProjectRoles((prev) => ({
-                                  ...prev,
-                                  [project.id]: val,
-                                }));
-                              }
-                            }}
-                            width="140px"
-                          >
-                            <Select.Trigger
-                              width="140px"
-                              aria-label={`Role for ${project.name}`}
-                            >
-                              <Select.ValueText />
-                            </Select.Trigger>
-                            <Select.Content>
-                              {roleOptions.items.map((opt) => (
-                                <Select.Item key={opt.value} item={opt}>
-                                  {opt.label}
-                                </Select.Item>
-                              ))}
-                            </Select.Content>
-                          </Select.Root>
-                        </HStack>
-                      );
-                    })}
-                  </VStack>
-                  <Text fontSize="xs" color="fg.muted" marginTop={3}>
-                    Your access acts as a ceiling. If your role is later
-                    reduced, the key loses those permissions automatically.
-                  </Text>
-                </Box>
+                <PermissionCategoryList
+                  selections={categorySelections}
+                  userPermissions={userPermissions}
+                  onChange={setCategorySelections}
+                />
               )}
             </VStack>
           </VStack>
@@ -284,7 +322,7 @@ export function EditApiKeyDrawer({
             <Button
               colorPalette="blue"
               onClick={handleSave}
-              disabled={isUpdating || !name.trim()}
+              disabled={!canSave}
             >
               Save
             </Button>

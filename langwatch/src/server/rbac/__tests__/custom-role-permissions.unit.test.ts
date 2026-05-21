@@ -88,11 +88,19 @@ describe("parseCustomRolePermissions", () => {
       ).toThrow(MalformedCustomRolePermissionsError);
     });
 
-    it("throws for strings with uppercase characters", () => {
+    it("accepts camelCase resource names", () => {
+      const result = parseCustomRolePermissions({
+        customRoleId,
+        permissions: ["auditLog:view", "virtualKeys:manage"],
+      });
+      expect(result).toEqual(["auditLog:view", "virtualKeys:manage"]);
+    });
+
+    it("throws for uppercase action names", () => {
       expect(() =>
         parseCustomRolePermissions({
           customRoleId,
-          permissions: ["Traces:View"],
+          permissions: ["traces:View"],
         }),
       ).toThrow(MalformedCustomRolePermissionsError);
     });

@@ -20,6 +20,7 @@ import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamPr
 import { useSession } from "~/utils/auth-client";
 import { api, type RouterOutputs } from "../../../utils/api";
 import { formatTimeAgo } from "../../../utils/formatTimeAgo";
+import { ProviderScopeChips } from "../../../components/settings/ProviderScopeChips";
 import { CreateApiKeyDrawer, type CreateApiKeyInput } from "./CreateApiKeyDrawer";
 import { EditApiKeyDrawer } from "./EditApiKeyDrawer";
 import { RevokeConfirmDialog } from "./RevokeConfirmDialog";
@@ -62,12 +63,13 @@ export function ApiKeysSection({
   const session = useSession();
   const currentUserId = session.data?.user?.id ?? "";
   const publicEnv = usePublicEnv();
-  const { project } = useOrganizationTeamProject();
+  const { project, team, organization } = useOrganizationTeamProject();
   const endpoint = publicEnv.data?.BASE_HOST ?? "https://app.langwatch.ai";
 
   const apiKeys = api.apiKey.list.useQuery({ organizationId });
   const myBindings = api.apiKey.myBindings.useQuery({ organizationId });
   const orgProjects = api.apiKey.orgProjects.useQuery({ organizationId });
+  const orgTeams = api.apiKey.orgTeams.useQuery({ organizationId });
   const orgMembers = api.apiKey.orgMembers.useQuery({ organizationId });
   const isAdmin = (orgMembers.data?.length ?? 0) > 0;
   const createMutation = api.apiKey.create.useMutation();
@@ -89,9 +91,9 @@ export function ApiKeysSection({
   const handleCreate = (input: CreateApiKeyInput): void => {
     if (input.permissionMode === "restricted" && input.bindings.length === 0) {
       toaster.create({
-        title: "No projects selected",
+        title: "No scopes selected",
         description:
-          "Select at least one project for a restricted key.",
+          "Select at least one scope for a restricted key.",
         type: "error",
         duration: 5000,
         meta: { closable: true },
@@ -121,6 +123,7 @@ export function ApiKeysSection({
         permissionMode: input.permissionMode,
         keyType: input.keyType,
         assignedToUserId: input.assignedToUserId,
+        permissions: input.permissions,
         bindings: input.bindings as Parameters<typeof createMutation.mutate>[0]["bindings"],
       },
       {
@@ -147,9 +150,9 @@ export function ApiKeysSection({
     name?: string;
     description?: string | null;
     permissionMode?: "all" | "readonly" | "restricted";
+    permissions?: string[];
     bindings?: Array<{
       role: string;
-      customRoleId: string | null | undefined;
       scopeType: string;
       scopeId: string;
     }>;
@@ -161,6 +164,7 @@ export function ApiKeysSection({
         name: input.name,
         description: input.description,
         permissionMode: input.permissionMode,
+        permissions: input.permissions,
         bindings: input.bindings as Parameters<typeof updateMutation.mutate>[0]["bindings"],
       },
       {
@@ -224,17 +228,24 @@ export function ApiKeysSection({
     return "Active";
   };
 
-  const getPermissionBadge = (mode: string) => {
-    switch (mode) {
-      case "all":
-        return <Badge size="sm" colorPalette="blue">All</Badge>;
-      case "readonly":
-        return <Badge size="sm" colorPalette="gray">Read only</Badge>;
-      case "restricted":
-        return <Badge size="sm" colorPalette="orange">Restricted</Badge>;
-      default:
-        return <Badge size="sm">{mode}</Badge>;
+  const getPermissionBadge = (apiKeyRow: ApiKeyRow) => {
+    if (apiKeyRow.permissionMode === "all") {
+      return <Badge size="sm" colorPalette="green">All</Badge>;
     }
+    return <Badge size="sm" colorPalette="orange">Restricted</Badge>;
+  };
+
+  const getScopeBadge = (apiKeyRow: ApiKeyRow) => {
+    return (
+      <ProviderScopeChips
+        size="xs"
+        scopes={apiKeyRow.roleBindings.map((rb) => ({
+          scopeType: rb.scopeType as "ORGANIZATION" | "TEAM" | "PROJECT",
+          scopeId: rb.scopeId,
+          name: rb.scopeName ?? undefined,
+        }))}
+      />
+    );
   };
 
   return (
@@ -262,7 +273,8 @@ export function ApiKeysSection({
                   <Table.ColumnHeader>Secret Key</Table.ColumnHeader>
                   <Table.ColumnHeader>Created</Table.ColumnHeader>
                   <Table.ColumnHeader>Last Used</Table.ColumnHeader>
-                  <Table.ColumnHeader>Created By</Table.ColumnHeader>
+                  <Table.ColumnHeader>Type</Table.ColumnHeader>
+                  <Table.ColumnHeader>Scope</Table.ColumnHeader>
                   <Table.ColumnHeader>Permissions</Table.ColumnHeader>
                   <Table.ColumnHeader width="100px"></Table.ColumnHeader>
                 </Table.Row>
@@ -282,7 +294,7 @@ export function ApiKeysSection({
                     </Table.Cell>
                     <Table.Cell>
                       <Text fontSize="xs" fontFamily="monospace" color="fg.muted">
-                        sk-...{projectApiKey.slice(-4)}
+                        sk-…{projectApiKey.slice(-4)}
                       </Text>
                     </Table.Cell>
                     <Table.Cell>
@@ -292,10 +304,13 @@ export function ApiKeysSection({
                       <Text fontSize="sm" color="fg.muted">—</Text>
                     </Table.Cell>
                     <Table.Cell>
-                      <Text fontSize="sm" color="fg.muted">—</Text>
+                      <Badge size="sm" colorPalette="purple">Service</Badge>
                     </Table.Cell>
                     <Table.Cell>
                       <Badge size="sm" colorPalette="teal">Project</Badge>
+                    </Table.Cell>
+                    <Table.Cell>
+                      <Badge size="sm" colorPalette="green">All</Badge>
                     </Table.Cell>
                     <Table.Cell>
                       <ProjectKeyActions apiKey={projectApiKey} />
@@ -330,7 +345,7 @@ export function ApiKeysSection({
                     </Table.Cell>
                     <Table.Cell>
                       <Text fontSize="xs" fontFamily="monospace" color="fg.muted">
-                        sk-...{apiKey.lookupIdSuffix}
+                        sk-lw-{apiKey.lookupIdPrefix}…
                       </Text>
                     </Table.Cell>
                     <Table.Cell>
@@ -357,15 +372,18 @@ export function ApiKeysSection({
                     </Table.Cell>
                     <Table.Cell>
                       {apiKey.userId ? (
-                        <Text fontSize="sm">
-                          {apiKey.createdByUserName ?? apiKey.userName ?? "—"}
-                        </Text>
+                        <Badge size="sm" variant="outline">
+                          {apiKey.userEmail ?? apiKey.userName ?? "—"}
+                        </Badge>
                       ) : (
                         <Badge size="sm" colorPalette="purple">Service</Badge>
                       )}
                     </Table.Cell>
                     <Table.Cell>
-                      {getPermissionBadge(apiKey.permissionMode)}
+                      {getScopeBadge(apiKey)}
+                    </Table.Cell>
+                    <Table.Cell>
+                      {getPermissionBadge(apiKey)}
                     </Table.Cell>
                     <Table.Cell>
                       {/* Owner or admin can edit/revoke; service keys (no userId) require admin */}
@@ -396,7 +414,7 @@ export function ApiKeysSection({
 
                 {activeKeys.length === 0 && !projectApiKey && (
                   <Table.Row>
-                    <Table.Cell colSpan={8}>
+                    <Table.Cell colSpan={9}>
                       <Text color="fg.muted" textAlign="center" paddingY={4}>
                         No API keys. Create one to get started.
                       </Text>
@@ -414,7 +432,11 @@ export function ApiKeysSection({
         isCreating={createMutation.isLoading}
         myBindings={myBindings}
         orgProjects={orgProjects.data ?? []}
+        orgTeams={orgTeams.data ?? []}
         organizationId={organizationId}
+        organizationName={organization?.name}
+        currentTeamId={team?.id}
+        currentProjectId={project?.id}
         onClose={onCreateClose}
         onCreate={handleCreate}
       />
@@ -424,6 +446,11 @@ export function ApiKeysSection({
         isUpdating={updateMutation.isLoading}
         myBindings={myBindings}
         orgProjects={orgProjects.data ?? []}
+        orgTeams={orgTeams.data ?? []}
+        organizationId={organizationId}
+        organizationName={organization?.name}
+        currentTeamId={team?.id}
+        currentProjectId={project?.id}
         onClose={() => setApiKeyToEdit(null)}
         onSave={handleUpdate}
       />
