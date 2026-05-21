@@ -1,0 +1,22 @@
+id: no-explicit-any
+message: >
+  Avoid `any` — prefer `unknown` + narrowing, or a real type. See
+  langwatch CLAUDE.md and #3754 AC3.
+severity: warning
+language: TypeScript
+rule:
+  any:
+    - kind: any_type
+    - pattern: $X as any
+    - pattern: $X as any[]
+files:
+  - "langwatch/src/**/*.ts"
+  - "langwatch/src/**/*.tsx"
+ignores:
+  - "**/*.d.ts"
+  - "**/__tests__/**"
+  - "**/*.test.ts"
+  - "**/*.test.tsx"
+  - "**/*.spec.ts"
+  - "**/*.spec.tsx"
+  - "**/__fixtures__/**"

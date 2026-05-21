@@ -1,0 +1,21 @@
+id: no-form-watch-in-child
+message: >
+  Child components receiving `form` as prop must not call `form.watch()` —
+  it re-renders the whole form tree on every keystroke. Use
+  `useWatch({ control, name })` instead.
+severity: warning
+language: TypeScript
+rule:
+  pattern: $F.watch()
+  inside:
+    kind: function_declaration
+    has:
+      kind: formal_parameters
+      has:
+        kind: required_parameter
+        pattern: $F
+files:
+  - "langwatch/src/components/**/*.tsx"
+ignores:
+  - "**/*.test.tsx"
+  - "**/*.spec.tsx"

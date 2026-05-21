@@ -1,0 +1,75 @@
+name: deployment-impact-check
+
+# Fails when a PR touches deployment surface without addressing operator
+# impact in the PR description. CodeRabbit's path_instructions cannot see
+# PR descriptions, so this rule lives in a GH Action instead. See #3754
+# Investigation Flip 3.
+#
+# Once this workflow has run once and we have its check name, add it to
+# branch protection on main as a required check (tracked as AC1b in #3754).
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+    paths:
+      - "charts/**"
+      - "services/**"
+      - "dev/docs/adr/**"
+      - "dev/docs/best_practices/**"
+      - "langwatch/.env.example"
+      - "docs/self-hosting/**"
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify deployment-impact section in PR description
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          # Body presence
+          if [ -z "$PR_BODY" ]; then
+            echo "::error::PR description is empty. Add a ## Deployment Impact section addressing env vars, helm values, default helm install behavior, and BYOC dataplane impact."
+            exit 1
+          fi
+
+          # Heading presence (case-insensitive, allow either Deployment Impact
+          # or Operator/Deployment impact).
+          if ! echo "$PR_BODY" | grep -qiE '^##+[[:space:]]*(deployment[[:space:]]+impact|operator[[:space:]]*/?[[:space:]]*deployment[[:space:]]+impact)' ; then
+            echo "::error::No '## Deployment Impact' heading found in PR description. This PR touches deployment surface (charts/services/ADRs/best-practices docs/env.example/self-hosting) — add the section."
+            exit 1
+          fi
+
+          # Content presence — the section must say *something*. We measure by
+          # extracting from the heading to the next H2 (or EOF) and requiring
+          # at least 80 non-whitespace chars beyond the heading. Cheap proxy
+          # for "actually filled in, not placeholder."
+          SECTION=$(printf '%s\n' "$PR_BODY" | awk '
+            BEGIN { capturing=0 }
+            /^##+[[:space:]]*[Dd]eployment[[:space:]]+[Ii]mpact/ { capturing=1; next }
+            /^##+[[:space:]]*[Oo]perator/ { if ($0 ~ /[Dd]eployment/) { capturing=1; next } }
+            capturing && /^##+[[:space:]]/ { exit }
+            capturing { print }
+          ')
+          LEN=$(printf '%s' "$SECTION" | tr -d '[:space:]' | wc -c | tr -d ' ')
+          if [ "${LEN:-0}" -lt 80 ]; then
+            echo "::error::'## Deployment Impact' section is too short (${LEN} non-whitespace chars). It must address: env vars added/changed, helm values added/changed, default behavior on vanilla 'helm install' with no overrides, and BYOC dataplane impact."
+            exit 1
+          fi
+
+          # Discourage obvious placeholder text.
+          if printf '%s' "$SECTION" | grep -qiE '\b(TBD|TODO|FIXME|placeholder|N/?A)\b'; then
+            # Allow N/A if the author explicitly justifies — look for at least
+            # one sentence of justification after the marker.
+            JUST=$(printf '%s' "$SECTION" | grep -iE '(TBD|TODO|FIXME|placeholder|N/?A)' | head -1)
+            if ! printf '%s\n' "$SECTION" | grep -qiE 'no operator impact|no deployment impact|repo metadata only|docs[- ]only'; then
+              echo "::error::'## Deployment Impact' contains a placeholder ('$JUST') without justification. Either fill it in, or explain why no impact applies (e.g., 'no deployment impact — repo metadata only')."
+              exit 1
+            fi
+          fi
+
+          echo "Deployment Impact section present and filled in (${LEN} chars). OK."
