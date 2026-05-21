@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { filterProvidersByScope } from "../filterProvidersByScope";
+import {
+  filterProvidersByScope,
+  type ScopeHierarchy,
+} from "../filterProvidersByScope";
 
 type FixtureProvider = {
   provider: string;
@@ -11,19 +14,29 @@ const orgOnly: FixtureProvider = {
   scopes: [{ scopeType: "ORGANIZATION", scopeId: "org-1" }],
 };
 
-const teamOnly: FixtureProvider = {
+const teamOne: FixtureProvider = {
   provider: "anthropic",
   scopes: [{ scopeType: "TEAM", scopeId: "team-1" }],
 };
 
-const projectOnly: FixtureProvider = {
+const teamTwo: FixtureProvider = {
+  provider: "gemini",
+  scopes: [{ scopeType: "TEAM", scopeId: "team-2" }],
+};
+
+const projectOne: FixtureProvider = {
   provider: "azure",
   scopes: [{ scopeType: "PROJECT", scopeId: "proj-1" }],
 };
 
 const projectTwo: FixtureProvider = {
-  provider: "openai",
+  provider: "cohere",
   scopes: [{ scopeType: "PROJECT", scopeId: "proj-2" }],
+};
+
+const projectThree: FixtureProvider = {
+  provider: "groq",
+  scopes: [{ scopeType: "PROJECT", scopeId: "proj-3" }],
 };
 
 const orgAndProject: FixtureProvider = {
@@ -34,45 +47,126 @@ const orgAndProject: FixtureProvider = {
   ],
 };
 
+// proj-1 + proj-2 live in team-1; proj-3 lives in team-2.
+const hierarchy: ScopeHierarchy = {
+  organization: { id: "org-1" },
+  teams: [{ id: "team-1" }, { id: "team-2" }],
+  projects: [
+    { id: "proj-1", teamId: "team-1" },
+    { id: "proj-2", teamId: "team-1" },
+    { id: "proj-3", teamId: "team-2" },
+  ],
+};
+
+const ctx = (
+  overrides: Partial<{
+    currentTeamId: string;
+    currentProjectId: string;
+  }> = {},
+) => ({ hierarchy, ...overrides });
+
+const ALL = [
+  orgOnly,
+  teamOne,
+  teamTwo,
+  projectOne,
+  projectTwo,
+  projectThree,
+  orgAndProject,
+];
+
 describe("filterProvidersByScope()", () => {
   /** @scenario The default view shows every provider I have access to across scopes */
   it("returns every provider unchanged when filter is 'all'", () => {
-    const all = [orgOnly, teamOnly, projectOnly, projectTwo, orgAndProject];
-    expect(filterProvidersByScope(all, "all", "proj-1")).toEqual(all);
+    expect(filterProvidersByScope(ALL, { kind: "all" }, ctx())).toEqual(ALL);
   });
 
-  /** @scenario Filtering by "Organization" hides team- and project-only rows */
-  it("keeps only providers attached at the organization scope", () => {
-    const all = [orgOnly, teamOnly, projectOnly, projectTwo, orgAndProject];
-    const result = filterProvidersByScope(all, "organization", "proj-1");
+  /** @scenario Picking the organization keeps every row in that org's tree */
+  it("keeps everything inside the picked organization (org row + every team + every project)", () => {
+    const result = filterProvidersByScope(
+      ALL,
+      { kind: "specific", scopeType: "ORGANIZATION", scopeId: "org-1" },
+      ctx(),
+    );
+    expect(result).toEqual(ALL);
+  });
+
+  /** @scenario Picking a team keeps org rows, the team itself, and its projects */
+  it("keeps org/team/own-projects when picking a team; hides sibling teams and their projects", () => {
+    const result = filterProvidersByScope(
+      ALL,
+      { kind: "specific", scopeType: "TEAM", scopeId: "team-1" },
+      ctx(),
+    );
     expect(result).toContain(orgOnly);
     expect(result).toContain(orgAndProject);
-    expect(result).not.toContain(teamOnly);
-    expect(result).not.toContain(projectOnly);
-    expect(result).not.toContain(projectTwo);
+    expect(result).toContain(teamOne);
+    expect(result).toContain(projectOne);
+    expect(result).toContain(projectTwo);
+    expect(result).not.toContain(teamTwo);
+    expect(result).not.toContain(projectThree);
   });
 
-  /** @scenario Filtering by "This project" hides everything not attached to the current project */
-  it("keeps only providers attached to the current project (org/team rows are hidden)", () => {
-    const all = [orgOnly, teamOnly, projectOnly, projectTwo, orgAndProject];
-    const result = filterProvidersByScope(all, "project", "proj-1");
-    expect(result).toContain(projectOnly);
-    expect(result).toContain(orgAndProject); // also attached to proj-1
-    expect(result).not.toContain(orgOnly);
-    expect(result).not.toContain(teamOnly);
+  /** @scenario Picking a project keeps org rows, the project's parent team, and the project itself */
+  it("keeps org/parent-team/this-project when picking a project; hides siblings", () => {
+    const result = filterProvidersByScope(
+      ALL,
+      { kind: "specific", scopeType: "PROJECT", scopeId: "proj-1" },
+      ctx(),
+    );
+    expect(result).toContain(orgOnly);
+    expect(result).toContain(orgAndProject);
+    expect(result).toContain(teamOne);
+    expect(result).toContain(projectOne);
+    expect(result).not.toContain(teamTwo);
     expect(result).not.toContain(projectTwo);
+    expect(result).not.toContain(projectThree);
   });
 
-  it("project filter with no projectId returns nothing", () => {
-    const all = [orgOnly, projectOnly];
-    expect(filterProvidersByScope(all, "project", undefined)).toEqual([]);
+  it("team-current resolves against the current team id", () => {
+    const result = filterProvidersByScope(
+      ALL,
+      { kind: "team-current" },
+      ctx({ currentTeamId: "team-2" }),
+    );
+    expect(result).toContain(orgOnly);
+    expect(result).toContain(teamTwo);
+    expect(result).toContain(projectThree);
+    expect(result).not.toContain(teamOne);
+    expect(result).not.toContain(projectOne);
+  });
+
+  it("project-current resolves against the current project id", () => {
+    const result = filterProvidersByScope(
+      ALL,
+      { kind: "project-current" },
+      ctx({ currentProjectId: "proj-3" }),
+    );
+    expect(result).toContain(orgOnly);
+    expect(result).toContain(teamTwo);
+    expect(result).toContain(projectThree);
+    expect(result).not.toContain(teamOne);
+    expect(result).not.toContain(projectOne);
   });
 
   it("treats providers with no scopes as scope-less (only visible under 'all')", () => {
     const noScopes = { provider: "openai", scopes: [] };
-    const all = [noScopes];
-    expect(filterProvidersByScope(all, "all", "proj-1")).toEqual(all);
-    expect(filterProvidersByScope(all, "organization", "proj-1")).toEqual([]);
-    expect(filterProvidersByScope(all, "project", "proj-1")).toEqual([]);
+    expect(filterProvidersByScope([noScopes], { kind: "all" }, ctx())).toEqual([
+      noScopes,
+    ]);
+    expect(
+      filterProvidersByScope(
+        [noScopes],
+        { kind: "specific", scopeType: "ORGANIZATION", scopeId: "org-1" },
+        ctx(),
+      ),
+    ).toEqual([]);
+    expect(
+      filterProvidersByScope(
+        [noScopes],
+        { kind: "specific", scopeType: "PROJECT", scopeId: "proj-1" },
+        ctx(),
+      ),
+    ).toEqual([]);
   });
 });

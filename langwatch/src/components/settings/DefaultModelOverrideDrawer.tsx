@@ -34,6 +34,7 @@ import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
 import { api, type RouterOutputs } from "~/utils/api";
 
+import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { LATEST_ALIAS_PROVIDERS } from "~/server/modelProviders/latestAliases";
 import { INHERIT_SENTINEL, ProviderModelSelector } from "./ProviderModelSelector";
@@ -64,30 +65,57 @@ const ROLE_BLURB: Record<ModelRoleKey, string> = {
 };
 
 interface Props {
-  open: boolean;
-  onClose: () => void;
-  /** Undefined = create; defined = edit an existing config. */
-  editing?: ConfigRow;
-  available: Payload["available"];
-  features: FeatureProjection[];
-  /** Effective resolution for the project currently viewed — used as
-   *  the "if you don't override" placeholder for each row. */
-  effective: Payload["effective"];
-  onSaved: () => void;
+  /** Config id when editing an existing policy; absent = create. The
+   *  drawer fetches the full ConfigRow + available / features / effective
+   *  payloads from the same getDefaultModelsForProject query
+   *  DefaultModelsSection already consumes (tRPC dedupes the second
+   *  caller). Kept as a single serializable prop so the drawer fits
+   *  the URL-driven `currentDrawer` pattern used everywhere else. */
+  editingId?: string;
 }
 
-export function DefaultModelOverrideDrawer({
-  open,
-  onClose,
-  editing,
-  available,
-  features,
-  effective,
-  onSaved,
-}: Props) {
+export function DefaultModelOverrideDrawer({ editingId }: Props) {
   const utils = api.useContext();
   const saveMutation = api.modelProvider.saveDefaultModelsConfig.useMutation();
   const { project } = useOrganizationTeamProject();
+  const { closeDrawer } = useDrawer();
+
+  // Pulls the same Payload DefaultModelsSection consumes — tRPC
+  // de-duplicates the query so the parent page render doesn't pay an
+  // extra round-trip. The drawer used to receive these as props from
+  // the page, but URL-routed drawers can't accept non-serializable
+  // payloads.
+  const dataQuery = api.modelProvider.getDefaultModelsForProject.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project?.id },
+  );
+  const editing = editingId
+    ? dataQuery.data?.configs.find((c) => c.id === editingId)
+    : undefined;
+  const available = dataQuery.data?.available ?? {
+    organization: null,
+    teams: [],
+    projects: [],
+  };
+  const features: FeatureProjection[] = dataQuery.data?.features ?? [];
+  const effective: Payload["effective"] =
+    dataQuery.data?.effective ??
+    ({
+      DEFAULT: null,
+      FAST: null,
+      EMBEDDINGS: null,
+    } as Payload["effective"]);
+
+  // Treat the drawer as always-open while mounted — the registry only
+  // renders it when `drawer.open === "defaultModelOverride"`. closeDrawer
+  // pops the URL param and unmounts.
+  const open = true;
+  const onClose = closeDrawer;
+  const onSaved = () => {
+    // No-op: the save mutation invalidates both queries on success.
+    // Kept as a name to preserve the previous prop-driven contract for
+    // future callers that might want to react to a successful save.
+  };
 
   // Ask the server what the cascade would resolve for each role +
   // feature key if the picked scopes had nothing set. The drawer uses
@@ -312,7 +340,7 @@ export function DefaultModelOverrideDrawer({
       >
         <Drawer.Header>
           <Drawer.Title>
-            {editing ? "Edit config" : "Add config"}
+            {editing ? "Edit default models" : "Add default models"}
           </Drawer.Title>
           <Drawer.CloseTrigger />
         </Drawer.Header>
@@ -606,11 +634,14 @@ function buildInheritOption(
   fromEffective: Payload["effective"][ModelRoleKey] | null,
 ): { model: string; label: string } | undefined {
   if (fromServer) {
+    // Skip the "inferred" source: an inferred value is the server
+    // guessing what the user MIGHT want based on which providers are
+    // enabled, not a real cascade hit. Showing it as a ghost
+    // placeholder under a "Not configured" badge gave the
+    // contradictory read that something was set when nothing was —
+    // the row stays empty until the user explicitly picks a model.
     if (fromServer.source === "inferred") {
-      return {
-        model: fromServer.model,
-        label: "Inherit",
-      };
+      return undefined;
     }
     // `feature_override` / `role_default` carry a concrete scope name
     // (organization / team / project). The "system" / env-var fallback
@@ -623,11 +654,11 @@ function buildInheritOption(
     };
   }
   if (fromEffective) {
+    // Same rationale as the `inferred` skip above: env-var fallback
+    // isn't a configured scope, just a host-level default. The drawer
+    // is for setting explicit policy, so empty stays empty.
     if (fromEffective.source === "system") {
-      return {
-        model: fromEffective.model,
-        label: "Inherit (from System)",
-      };
+      return undefined;
     }
     return {
       model: fromEffective.model,
@@ -664,6 +695,8 @@ function ScopeSection({
   // scopes. The quick-pick variant is preserved on `ScopeChipPicker`
   // (`showQuickPicks` prop) for future surfaces where the chip-row UX
   // makes sense.
+  // Default label is "Scope" — render it so the picker reads consistent
+  // with the model-provider drawer's scope section.
   return (
     <ScopeChipPicker
       value={scopes}
@@ -672,7 +705,6 @@ function ScopeSection({
       organizationName={available.organization?.name}
       availableTeams={available.teams}
       availableProjects={available.projects}
-      label=""
     />
   );
 }

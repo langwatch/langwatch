@@ -27,10 +27,10 @@ vi.mock("../../hooks/useOrganizationTeamProject", () => ({
   }),
 }));
 
-// tRPC's getAllForProject query returns an empty providers map to
-// simulate a freshly created project with zero configured providers.
-// listAllForProjectForFrontend (introduced in #4120) is also called by
-// ModelSelector; mock it as an empty providers array.
+// tRPC queries return an empty providers list to simulate a freshly
+// created project with zero configured providers. Stubs both the
+// legacy `getAllForProject` and the stored-only
+// `listAllForProjectForFrontend` that ModelSelector reads.
 vi.mock("../../utils/api", () => ({
   api: {
     modelProvider: {
@@ -38,7 +38,10 @@ vi.mock("../../utils/api", () => ({
         useQuery: () => ({ data: {}, isLoading: false }),
       },
       listAllForProjectForFrontend: {
-        useQuery: () => ({ data: { providers: [] }, isLoading: false }),
+        useQuery: () => ({
+          data: { providers: [], modelMetadata: {} },
+          isLoading: false,
+        }),
       },
     },
   },

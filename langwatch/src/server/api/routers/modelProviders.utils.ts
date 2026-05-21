@@ -158,6 +158,28 @@ export const getProjectModelProvidersForFrontend = async (
 // "OpenAI — Project override" side by side. The Record-by-provider-key
 // `getProjectModelProvidersForFrontend` collapses those duplicates and
 // is not safe to use here.
+export const listOrgModelProvidersForFrontend = async (
+  organizationId: string,
+) => {
+  const service = ModelProviderService.create(prisma);
+  const providers =
+    await service.listOrgModelProvidersForFrontend(organizationId);
+
+  const registryMetadata = getModelMetadataForFrontend();
+  const providersAsRecord = Object.fromEntries(
+    providers.map((p) => [p.id ?? `system-${p.provider}`, p]),
+  );
+  const modelMetadata = mergeCustomModelMetadata(
+    registryMetadata,
+    providersAsRecord,
+  );
+
+  return {
+    providers,
+    modelMetadata,
+  };
+};
+
 export const listProjectModelProvidersForFrontend = async (
   projectId: string,
 ) => {

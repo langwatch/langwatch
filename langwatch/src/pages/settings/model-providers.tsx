@@ -29,7 +29,10 @@ import { Tooltip } from "../../components/ui/tooltip";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { modelProviderIcons } from "../../server/modelProviders/iconsMap";
 import { modelProviders as modelProvidersRegistry } from "../../server/modelProviders/registry";
-import { filterProvidersByScope } from "../../utils/filterProvidersByScope";
+import {
+  filterProvidersByScope,
+  type ScopeHierarchy,
+} from "../../utils/filterProvidersByScope";
 
 export default function ModelsPage() {
   const { project, organization, team, hasPermission } =
@@ -40,13 +43,33 @@ export default function ModelsPage() {
   // collapses multi-instance setups (two "OpenAI" rows at different
   // scopes) into a single entry and silently drops the loser. Use the
   // flat list endpoint instead so the table reflects every row.
-  const listQuery = api.modelProvider.listAllForProjectForFrontend.useQuery(
+  //
+  // The "All you can see" view fans out across the whole organization
+  // so an admin sees providers a sibling project has configured. Members
+  // without `organization:view` (project-only members) fall back to the
+  // per-project endpoint, which they always have permission to read.
+  const canViewOrg = hasPermission("organization:view");
+  const orgQuery =
+    api.modelProvider.listAllForOrganizationForFrontend.useQuery(
+      { organizationId: organization?.id ?? "" },
+      {
+        enabled: !!organization?.id && canViewOrg,
+        retry: false,
+        refetchOnWindowFocus: false,
+      },
+    );
+  const projectQuery = api.modelProvider.listAllForProjectForFrontend.useQuery(
     { projectId: project?.id ?? "" },
-    { enabled: !!project?.id },
+    {
+      enabled: !!project?.id && !canViewOrg,
+      retry: false,
+      refetchOnWindowFocus: false,
+    },
   );
-  const allProvidersList = listQuery.data?.providers ?? [];
-  const isLoading = listQuery.isLoading;
-  const refetch = listQuery.refetch;
+  const activeQuery = canViewOrg ? orgQuery : projectQuery;
+  const allProvidersList = activeQuery.data?.providers ?? [];
+  const isLoading = activeQuery.isLoading;
+  const refetch = activeQuery.refetch;
 
   const { openDrawer, drawerOpen: isDrawerOpen } = useDrawer();
   const isProviderDrawerOpen = isDrawerOpen("editModelProvider");
@@ -100,13 +123,32 @@ export default function ModelsPage() {
     [allEnabledProviders],
   );
 
+  // Hierarchy describing the org tree the page is rendering. Drives
+  // inclusive scope filtering (parents up, children down) for both the
+  // Model Providers and Default Models tables.
+  const hierarchy: ScopeHierarchy = useMemo(
+    () => ({
+      organization: organization ? { id: organization.id } : null,
+      teams: filterAvailable.teams.map((t) => ({ id: t.id })),
+      projects: filterAvailable.projects.map((p) => ({
+        id: p.id,
+        teamId: p.teamId,
+      })),
+    }),
+    [organization, filterAvailable],
+  );
+
   // Client-side filter for the scope dropdown at the top of the page.
   // The list query returns every provider the caller can see; this just
   // narrows the visible rows. See specs/model-providers/scope-filter.feature.
   const enabledProviders = useMemo(
     () =>
-      filterProvidersByScope(allEnabledProviders, scopeFilter, project?.id),
-    [allEnabledProviders, scopeFilter, project?.id],
+      filterProvidersByScope(allEnabledProviders, scopeFilter, {
+        hierarchy,
+        currentTeamId: team?.id,
+        currentProjectId: project?.id,
+      }),
+    [allEnabledProviders, scopeFilter, hierarchy, team?.id, project?.id],
   );
 
   // Every registry provider is always addable — iter 109 allows multiple
@@ -390,6 +432,7 @@ export default function ModelsPage() {
           onFilterChange={setScopeFilter}
           enabledProviderKeys={enabledProviderKeys}
           noProvidersConfigured={!isLoading && enabledProviders.length === 0}
+          hierarchy={hierarchy}
         />
 
         <Dialog.Root
@@ -436,6 +479,7 @@ export default function ModelsPage() {
                     utils.modelProvider.getAllForProject.invalidate(),
                     utils.modelProvider.getAllForProjectForFrontend.invalidate(),
                     utils.modelProvider.listAllForProjectForFrontend.invalidate(),
+                    utils.modelProvider.listAllForOrganizationForFrontend.invalidate(),
                     utils.modelProvider.getResolvedDefault.invalidate(),
                     utils.modelProvider.getDefaultModelsForProject.invalidate(),
                   ]);

@@ -1,19 +1,27 @@
 /**
- * Client-side scope filter for the model-providers settings page. The list
- * query returns every provider the caller can see across org/team/project;
- * this util just narrows the visible rows based on the active filter at
- * the top of the page. See specs/model-providers/scope-filter.feature.
+ * Client-side scope filter for the model-providers settings page and the
+ * Default Models section. Both surfaces render rows that attach to one
+ * or more scopes (ORGANIZATION / TEAM / PROJECT); this util narrows the
+ * visible rows to the scopes reachable from the active filter.
  *
- * Accepts either the legacy 3-state string filter ("all" / "organization"
- * / "project") or the structured `ScopeFilter` shared with the default-
- * models surface — the page picks one filter dropdown and threads its
- * value to both tables on the page.
+ * Filter semantics are INCLUSIVE — picking a scope shows everything in
+ * its cascade tier, both up (parents the row inherits from) and down
+ * (children that resolve through it). Concretely:
+ *
+ *   - "All you can see": every row visible to the caller.
+ *   - "Organization X": every row in X's tree (org row + every team
+ *     row + every project row inside the org).
+ *   - "Team Y": org rows (parent), team Y, and project rows whose
+ *     parent team is Y. Other teams and their projects are hidden.
+ *   - "Project Z": org rows, the team containing Z, and project Z
+ *     itself. Sibling projects and other teams are hidden.
+ *
+ * The user can hit ctrl+F if they need a more specific search; this
+ * filter just hides rows that don't belong to the current branch of the
+ * org tree.
  */
 
 export type ScopeFilter =
-  | "all"
-  | "organization"
-  | "project"
   | { kind: "all" }
   | { kind: "team-current" }
   | { kind: "project-current" }
@@ -21,55 +29,116 @@ export type ScopeFilter =
       kind: "specific";
       scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
       scopeId: string;
+      name?: string;
     };
 
-type ProviderWithScopes = {
-  scopes?: Array<{ scopeType: string; scopeId: string }>;
+export type ScopeHierarchy = {
+  organization?: { id: string } | null;
+  teams?: Array<{ id: string }>;
+  projects?: Array<{ id: string; teamId?: string | null }>;
 };
+
+export type FilterContext = {
+  hierarchy: ScopeHierarchy;
+  currentTeamId?: string | null;
+  currentProjectId?: string | null;
+};
+
+type ResolvedFilter =
+  | { kind: "all" }
+  | {
+      kind: "specific";
+      scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+      scopeId: string;
+    };
+
+type Scope = { scopeType: string; scopeId: string };
+
+type ProviderWithScopes = {
+  scopes?: Array<Scope>;
+};
+
+export function resolveScopeFilter(
+  filter: ScopeFilter,
+  ctx: Pick<FilterContext, "currentTeamId" | "currentProjectId">,
+): ResolvedFilter {
+  if (filter.kind === "all") return { kind: "all" };
+  if (filter.kind === "team-current") {
+    return ctx.currentTeamId
+      ? { kind: "specific", scopeType: "TEAM", scopeId: ctx.currentTeamId }
+      : { kind: "all" };
+  }
+  if (filter.kind === "project-current") {
+    return ctx.currentProjectId
+      ? { kind: "specific", scopeType: "PROJECT", scopeId: ctx.currentProjectId }
+      : { kind: "all" };
+  }
+  return {
+    kind: "specific",
+    scopeType: filter.scopeType,
+    scopeId: filter.scopeId,
+  };
+}
+
+/**
+ * Predicate for "does this scope sit on the same branch of the org tree
+ * as the active filter?". Used by both the providers table and the
+ * default-models table so they filter consistently.
+ */
+export function isScopeInFilter(
+  scope: Scope,
+  filter: ResolvedFilter,
+  hierarchy: ScopeHierarchy,
+): boolean {
+  if (filter.kind === "all") return true;
+
+  const teamOfProject = (projectId: string): string | null => {
+    const p = hierarchy.projects?.find((x) => x.id === projectId);
+    return p?.teamId ?? null;
+  };
+
+  if (filter.scopeType === "ORGANIZATION") {
+    if (scope.scopeType === "ORGANIZATION") {
+      return scope.scopeId === filter.scopeId;
+    }
+    // TEAM and PROJECT scopes inside a single-org context are always in
+    // the org's tree; the page only loads one org at a time.
+    return true;
+  }
+
+  if (filter.scopeType === "TEAM") {
+    if (scope.scopeType === "ORGANIZATION") return true;
+    if (scope.scopeType === "TEAM") return scope.scopeId === filter.scopeId;
+    if (scope.scopeType === "PROJECT") {
+      return teamOfProject(scope.scopeId) === filter.scopeId;
+    }
+    return false;
+  }
+
+  if (filter.scopeType === "PROJECT") {
+    if (scope.scopeType === "ORGANIZATION") return true;
+    if (scope.scopeType === "TEAM") {
+      const parentTeam = teamOfProject(filter.scopeId);
+      return parentTeam !== null && scope.scopeId === parentTeam;
+    }
+    if (scope.scopeType === "PROJECT") {
+      return scope.scopeId === filter.scopeId;
+    }
+    return false;
+  }
+
+  return false;
+}
 
 export function filterProvidersByScope<T extends ProviderWithScopes>(
   providers: T[],
   filter: ScopeFilter,
-  projectId: string | undefined,
+  ctx: FilterContext,
 ): T[] {
-  // Normalise legacy string form into the structured filter so we
-  // have a single match-on-kind branch below.
-  const f: Exclude<ScopeFilter, string> =
-    typeof filter === "string"
-      ? filter === "all"
-        ? { kind: "all" }
-        : filter === "organization"
-        ? { kind: "specific", scopeType: "ORGANIZATION", scopeId: "" }
-        : { kind: "project-current" }
-      : filter;
-
-  if (f.kind === "all") return providers;
-  return providers.filter((provider) => {
-    const scopes = provider.scopes ?? [];
-    if (f.kind === "specific") {
-      if (f.scopeType === "ORGANIZATION") {
-        // "organization" filter matches any provider bound at the org tier,
-        // regardless of which org id was picked (legacy behaviour).
-        if (f.scopeId === "") {
-          return scopes.some((s) => s.scopeType === "ORGANIZATION");
-        }
-        return scopes.some(
-          (s) => s.scopeType === "ORGANIZATION" && s.scopeId === f.scopeId,
-        );
-      }
-      return scopes.some(
-        (s) => s.scopeType === f.scopeType && s.scopeId === f.scopeId,
-      );
-    }
-    if (f.kind === "project-current") {
-      if (!projectId) return false;
-      return scopes.some(
-        (s) => s.scopeType === "PROJECT" && s.scopeId === projectId,
-      );
-    }
-    // team-current — providers don't expose a notion of "current team"
-    // separate from the org/project, so fall through to "show all rows
-    // the caller can see" rather than blank the table.
-    return true;
+  const resolved = resolveScopeFilter(filter, ctx);
+  if (resolved.kind === "all") return providers;
+  return providers.filter((p) => {
+    const scopes = p.scopes ?? [];
+    return scopes.some((s) => isScopeInFilter(s, resolved, ctx.hierarchy));
   });
 }

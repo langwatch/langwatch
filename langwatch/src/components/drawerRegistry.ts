@@ -52,6 +52,7 @@ import { PromptListDrawer } from "./prompts/PromptListDrawer";
 import { SeriesFiltersDrawer } from "./SeriesFilterDrawer";
 import { ScenarioFormDrawerFromUrl } from "./scenarios/ScenarioFormDrawer";
 import { CreateTeamDrawer } from "./settings/CreateTeamDrawer";
+import { DefaultModelOverrideDrawer } from "./settings/DefaultModelOverrideDrawer";
 import { LLMModelCostDrawer } from "./settings/LLMModelCostDrawer";
 import { ScenarioRunDetailDrawer } from "./simulations/ScenarioRunDetailDrawer";
 import { SuiteFormDrawer } from "./suites/SuiteFormDrawer";
@@ -81,6 +82,7 @@ export const drawers = {
   batchEvaluation: BatchEvaluationDrawer,
   automation: AutomationDrawer,
   editModelProvider: EditModelProviderDrawer,
+  defaultModelOverride: DefaultModelOverrideDrawer,
   addOrEditAnnotationScore: AddOrEditAnnotationScoreDrawer,
   addAnnotationQueue: AddAnnotationQueueDrawer,
   addDatasetRecord: AddDatasetRecordDrawerV2,

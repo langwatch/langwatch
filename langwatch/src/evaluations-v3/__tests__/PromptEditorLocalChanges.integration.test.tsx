@@ -214,13 +214,20 @@ vi.mock("~/utils/api", () => ({
           isLoading: false,
         }),
       },
-      // listAllForProjectForFrontend (introduced in #4120) returns providers
-      // as an array, distinct from the legacy getAllForProjectForFrontend
-      // record shape. ModelSelector iterates this with `for (const row of providers)`.
       listAllForProjectForFrontend: {
         useQuery: () => ({
           data: {
-            providers: [{ provider: "openai", enabled: true, customModels: [] }],
+            providers: [
+              {
+                id: "mp-openai",
+                provider: "openai",
+                enabled: true,
+                customKeys: null,
+                customModels: null,
+                customEmbeddingsModels: null,
+                scopes: [{ scopeType: "PROJECT", scopeId: "proj-1" }],
+              },
+            ],
             modelMetadata: {
               "openai/gpt-4": {
                 id: "openai/gpt-4",

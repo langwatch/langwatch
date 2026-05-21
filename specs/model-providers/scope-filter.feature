@@ -1,7 +1,7 @@
 Feature: Model providers scope filter
   As a user managing model providers across an organization
   I want to filter the providers list by the scope they're attached to
-  So that I can see what's set at the org, team, or current project, instead of being limited to one view
+  So that I can focus on one branch of the org tree without losing the parent / child rows that resolve through it
 
   Background:
     Given I am logged in
@@ -20,26 +20,32 @@ Feature: Model providers scope filter
     And each row shows scope chips for the scope(s) the provider belongs to
 
   # ============================================================================
-  # Scope filters
+  # Scope filters — inclusive cascade
   # ============================================================================
+  # The filter is inclusive: picking a scope keeps everything on the same
+  # branch of the org tree (parents up, children down), and hides the other
+  # branches. If a user needs to find one specific row they can still ctrl+F.
 
   @integration
-  Scenario: Filtering by "Organization" hides team- and project-only rows
-    When I change the scope filter to "Organization"
-    Then the list shows only providers attached at the organization scope
-    And providers attached only to a team or a project are hidden
-
-  @integration @unimplemented
-  Scenario: Filtering by a specific team hides org and other-team rows
-    When I change the scope filter to team "platform"
-    Then the list shows only providers attached to team "platform"
-    And providers attached at the organization or to a different team are hidden
+  Scenario: Picking the organization keeps every row in that org's tree
+    When I change the scope filter to the organization
+    Then the list keeps every provider in the org, including team- and project-scoped rows
 
   @integration
-  Scenario: Filtering by "This project" hides everything not attached to the current project
-    When I change the scope filter to "This project"
-    Then the list shows only providers attached to the current project
-    And inherited org/team providers are hidden from the list
+  Scenario: Picking a team keeps org rows, the team itself, and its projects
+    When I change the scope filter to a team
+    Then the list keeps providers attached to the organization (parent)
+    And the list keeps providers attached to the picked team
+    And the list keeps providers attached to projects whose parent team is the picked team
+    And providers on sibling teams or projects in other teams are hidden
+
+  @integration
+  Scenario: Picking a project keeps org rows, the project's parent team, and the project itself
+    When I change the scope filter to a project
+    Then the list keeps providers attached to the organization (grand-parent)
+    And the list keeps providers attached to the picked project's parent team
+    And the list keeps providers attached to the picked project
+    And providers on sibling projects or unrelated teams are hidden
 
   # ============================================================================
   # Empty states
@@ -48,6 +54,6 @@ Feature: Model providers scope filter
   @integration @unimplemented
   Scenario: An empty filter result shows a helpful empty state
     Given the current project has no project-only providers
-    When I change the scope filter to "This project"
+    When I change the scope filter to the current project
     Then the empty state says no providers are attached at that scope
     And the empty state links back to "All you can see"

@@ -53,14 +53,15 @@ export type UsageIndicatorProps = {
 };
 
 export const UsageIndicator = ({ showLabel = true }: UsageIndicatorProps) => {
-  const { organization } = useOrganizationTeamProject();
+  const { organization, hasPermission } = useOrganizationTeamProject();
   const publicEnv = usePublicEnv();
   const isSaaS = publicEnv.data?.IS_SAAS;
 
   const usage = api.limits.getUsage.useQuery(
     { organizationId: organization?.id ?? "" },
     {
-      enabled: !!organization,
+      enabled: !!organization && hasPermission("organization:view"),
+      retry: false,
       refetchOnWindowFocus: false,
       refetchOnMount: false,
     },
