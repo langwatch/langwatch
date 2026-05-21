@@ -1744,9 +1744,9 @@ describe("GroupStagingScripts", () => {
         const d2 = await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
         const d3 = await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
 
-        await scripts.complete({ groupId: "g1", stagedJobId: d1!.stagedJobId });
-        await scripts.complete({ groupId: "g2", stagedJobId: d2!.stagedJobId });
-        await scripts.complete({ groupId: "g3", stagedJobId: d3!.stagedJobId });
+        await scripts.complete({ groupId: d1!.groupId, stagedJobId: d1!.stagedJobId });
+        await scripts.complete({ groupId: d2!.groupId, stagedJobId: d2!.stagedJobId });
+        await scripts.complete({ groupId: d3!.groupId, stagedJobId: d3!.stagedJobId });
 
         expect(await inspectTotalPending()).toBe(0);
       });
@@ -1961,7 +1961,7 @@ describe("GroupStagingScripts", () => {
         await scripts.stage(makeJob({ stagedJobId: "j1", groupId: "g-recon-retry", dispatchAfterMs: 100 }));
         expect(await inspectTotalPending()).toBe(1);
 
-        const d1 = await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
+        await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
 
         await scripts.retryRestage({
           groupId: "g-recon-retry",
