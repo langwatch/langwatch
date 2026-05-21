@@ -8,8 +8,9 @@ language: TypeScript
 rule:
   any:
     - pattern: $X ?? "http://localhost$REST"
-    - pattern: $X ?? `http://localhost$REST`
     - pattern: $X ?? "https://localhost$REST"
+    - pattern: $X ?? `http://localhost$$$REST`
+    - pattern: $X ?? `https://localhost$$$REST`
 files:
   - "langwatch/src/**/*.ts"
   - "langwatch/src/**/*.tsx"
