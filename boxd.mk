@@ -155,7 +155,7 @@ boxd-connect-issue:
 boxd-preview:
 	$(call _boxd_require,BRANCH,$(BRANCH))
 	@echo "→ boxd-preview BRANCH=$(BRANCH)"
-	@bash -c 'LW_PREVIEW_GOLDEN_SOURCE=$(LW_PREVIEW_GOLDEN_SOURCE) $(BOXD_RUN_PREFIX) boxd_preview_up "$(BRANCH)"'
+	@LW_PREVIEW_GOLDEN_SOURCE="$(LW_PREVIEW_GOLDEN_SOURCE)" bash -c '$(BOXD_RUN_PREFIX) boxd_preview_up "$(BRANCH)"'
 
 # boxd-preview-down BRANCH=<name>
 # Destroy the preview VM non-interactively.

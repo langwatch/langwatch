@@ -754,7 +754,7 @@ EOF
 # ---------------------------------------------------------------------------
 
 # LW_PREVIEW_GOLDEN_SOURCE — team golden that preview VMs are forked from.
-# Overridable so Drew can swap to a personal lw-preview source without
+# Overridable so the user can swap to a personal lw-preview source without
 # touching the Makefile.
 LW_PREVIEW_GOLDEN_SOURCE="${LW_PREVIEW_GOLDEN_SOURCE:-langwatch-golden-v2}"
 
