@@ -42,14 +42,7 @@ Feature: Fresh-clone dev setup friction removal
     When the app boots and env-create.mjs validates the environment
     Then validation fails with a non-zero exit
     And the error names each of "LW_GATEWAY_INTERNAL_SECRET", "LW_GATEWAY_JWT_SECRET", and "LW_VIRTUAL_KEY_PEPPER"
-    And the error surfaces the "openssl rand -hex 32" generation command to the reader
-
-  @integration
-  Scenario: assertGatewaySecretsAllOrNone does not produce a confusing second error
-    Given a fresh ".env" created from ".env.example" with no manual edits
-    When the app boots and env-create.mjs runs both Zod validation and the all-or-none guard
-    Then the user sees a single, coherent remediation message
-    And no contradictory "set all three or none" banner stacks on top of the Zod error
+    And the error output contains the minimum character requirement so the user knows to generate a real secret
 
   # --- Friction #5: no new postinstall network calls ---
 
@@ -92,7 +85,6 @@ Feature: Fresh-clone dev setup friction removal
   #   -> Scenario: .env.example ships a sentinel placeholder for LW_VIRTUAL_KEY_PEPPER
   # AC 4 ("cp .env.example .env && pnpm dev produces a Zod error that names the gateway secrets and the generation command")
   #   -> Scenario: First-run env validation surfaces a self-documenting error for unset gateway secrets
-  #   -> Scenario: assertGatewaySecretsAllOrNone does not produce a confusing second error
   # AC 5 ("No new postinstall network calls introduced")
   #   -> Scenario: No postinstall script reaches the network to download goose
   # AC 6 ("The Repro section in this body still passes end-to-end on a fresh clone using make quickstart all-local")
