@@ -123,19 +123,27 @@ function stripBackdropBg(
   props: DialogContentProps["backdropProps"] | undefined,
 ): DialogContentProps["backdropProps"] | undefined {
   if (!props) return props;
-  const { bg, background, backgroundColor, ...rest } =
+  const { bg, background, backgroundColor, style, ...rest } =
     props as ChakraDialog.BackdropProps;
+  const safeStyle = style
+    ? { ...style, background: "transparent", backgroundColor: "transparent" }
+    : undefined;
   if (
     process.env.NODE_ENV !== "production" &&
     (bg !== undefined ||
       background !== undefined ||
-      backgroundColor !== undefined)
+      backgroundColor !== undefined ||
+      style?.background !== undefined ||
+      style?.backgroundColor !== undefined)
   ) {
     console.warn(
       "[Dialog] backdropProps.bg/background/backgroundColor is ignored — the backdrop is always transparent so the page behind stays visible. Adjust Dialog.Content surface instead.",
     );
   }
-  return rest as DialogContentProps["backdropProps"];
+  return {
+    ...rest,
+    ...(safeStyle ? { style: safeStyle } : {}),
+  } as DialogContentProps["backdropProps"];
 }
 
 export const DialogFooter = ChakraDialog.Footer;

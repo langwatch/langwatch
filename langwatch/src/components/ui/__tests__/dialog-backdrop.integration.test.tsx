@@ -84,6 +84,25 @@ describe("Dialog backdrop", () => {
     });
   });
 
+  describe("when a caller tries to set a dark background via inline style", () => {
+    it("forces style.background and style.backgroundColor to transparent and warns", () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      renderOpenDialog({
+        backdropProps: {
+          style: { backgroundColor: "black" },
+        } as unknown as Parameters<typeof Dialog.Content>[0]["backdropProps"],
+      });
+      const backdrop = getBackdrop();
+      expect(backdrop.style.backgroundColor).toBe("transparent");
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining(
+          "backdropProps.bg/background/backgroundColor is ignored",
+        ),
+      );
+      warn.mockRestore();
+    });
+  });
+
   describe("when consumers reach for the Dialog namespace", () => {
     /** @scenario Dialog.Backdrop is not exposed as a public sub-component */
     it("does not expose a Backdrop sub-component", () => {
