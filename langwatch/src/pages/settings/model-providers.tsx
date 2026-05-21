@@ -29,7 +29,10 @@ import { Tooltip } from "../../components/ui/tooltip";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { modelProviderIcons } from "../../server/modelProviders/iconsMap";
 import { modelProviders as modelProvidersRegistry } from "../../server/modelProviders/registry";
-import { filterProvidersByScope } from "../../utils/filterProvidersByScope";
+import {
+  filterProvidersByScope,
+  type ScopeHierarchy,
+} from "../../utils/filterProvidersByScope";
 
 export default function ModelsPage() {
   const { project, organization, team, hasPermission } =
@@ -120,13 +123,32 @@ export default function ModelsPage() {
     [allEnabledProviders],
   );
 
+  // Hierarchy describing the org tree the page is rendering. Drives
+  // inclusive scope filtering (parents up, children down) for both the
+  // Model Providers and Default Models tables.
+  const hierarchy: ScopeHierarchy = useMemo(
+    () => ({
+      organization: organization ? { id: organization.id } : null,
+      teams: filterAvailable.teams.map((t) => ({ id: t.id })),
+      projects: filterAvailable.projects.map((p) => ({
+        id: p.id,
+        teamId: p.teamId,
+      })),
+    }),
+    [organization, filterAvailable],
+  );
+
   // Client-side filter for the scope dropdown at the top of the page.
   // The list query returns every provider the caller can see; this just
   // narrows the visible rows. See specs/model-providers/scope-filter.feature.
   const enabledProviders = useMemo(
     () =>
-      filterProvidersByScope(allEnabledProviders, scopeFilter, project?.id),
-    [allEnabledProviders, scopeFilter, project?.id],
+      filterProvidersByScope(allEnabledProviders, scopeFilter, {
+        hierarchy,
+        currentTeamId: team?.id,
+        currentProjectId: project?.id,
+      }),
+    [allEnabledProviders, scopeFilter, hierarchy, team?.id, project?.id],
   );
 
   // Every registry provider is always addable — iter 109 allows multiple
@@ -410,6 +432,7 @@ export default function ModelsPage() {
           onFilterChange={setScopeFilter}
           enabledProviderKeys={enabledProviderKeys}
           noProvidersConfigured={!isLoading && enabledProviders.length === 0}
+          hierarchy={hierarchy}
         />
 
         <Dialog.Root

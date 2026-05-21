@@ -1,23 +1,16 @@
 /**
  * Default Models settings page section — table view of every
- * ModelDefaultConfig the caller can see, plus a scope filter so an
- * admin can narrow to a single team / project and see the resolved
- * cascade.
+ * ModelDefaultConfig the caller can see. One row per policy, with
+ * scope chips on the left and the role-level models in the matching
+ * columns.
  *
- * Two render modes driven by `DefaultModelsScopeFilter`:
- *   - "All you can see" (default): one row per config policy. Each
- *     row shows the scopes the config is attached to + the model
- *     cells for whichever role / feature keys the policy actually
- *     overrides. Inherited cells stay empty so the page reads as a
- *     diff against the cascade.
- *   - Specific scope (this team / this project / "More Scopes ▸"
- *     submenu pick): one resolved row showing the final model the
- *     cascade hands out for each role, with feature overrides shown
- *     indented underneath. Mirrors what a feature actually reads at
- *     runtime — handy for "why is THIS project resolving Claude?".
+ * The page-level scope filter narrows the rows inclusively (parents +
+ * children of the picked scope). Same predicate the Model Providers
+ * table above uses, so both tables reveal/hide the same branch of the
+ * org tree when the filter changes.
  *
- * "+ Add config" opens `DefaultModelOverrideDrawer`. Each rule row
- * carries an Edit button that opens the same drawer pre-filled.
+ * "+ Add config" opens `DefaultModelOverrideDrawer`. Each row carries
+ * an Edit button that opens the same drawer pre-filled.
  *
  * See specs/model-providers/role-based-default-models.feature for the
  * behavioural contract and specs/model-providers/model-default-config-cascade.feature
@@ -65,6 +58,11 @@ import {
 } from "./DefaultModelsScopeFilter";
 import { ModelChip } from "./ModelChip";
 import { toaster } from "~/components/ui/toaster";
+import {
+  isScopeInFilter,
+  resolveScopeFilter,
+  type ScopeHierarchy,
+} from "~/utils/filterProvidersByScope";
 
 type Payload = RouterOutputs["modelProvider"]["getDefaultModelsForProject"];
 type ConfigRow = Payload["configs"][number];
@@ -96,6 +94,10 @@ interface DefaultModelsSectionProps {
    *  that nuked their providers keep seeing the orphan-config table so
    *  they can fix it. */
   noProvidersConfigured?: boolean;
+  /** Org graph used to resolve inclusive scope filtering (parents +
+   *  children of the picked scope). When omitted, falls back to the
+   *  org returned from the tRPC payload — fine for standalone mounts. */
+  hierarchy?: ScopeHierarchy;
 }
 
 export function DefaultModelsSection({
@@ -103,6 +105,7 @@ export function DefaultModelsSection({
   onFilterChange,
   enabledProviderKeys,
   noProvidersConfigured = false,
+  hierarchy,
 }: DefaultModelsSectionProps = {}) {
   const { project, team, organization } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
@@ -144,17 +147,38 @@ export function DefaultModelsSection({
     }
   };
 
-  const featuresByRole = useMemo(() => {
-    const m: Record<ModelRoleKey, Payload["features"]> = {
-      DEFAULT: [],
-      FAST: [],
-      EMBEDDINGS: [],
+  const effectiveHierarchy: ScopeHierarchy = useMemo(() => {
+    if (hierarchy) return hierarchy;
+    const available = dataQuery.data?.available;
+    return {
+      organization: available?.organization
+        ? { id: available.organization.id }
+        : null,
+      teams: (available?.teams ?? []).map((t) => ({ id: t.id })),
+      projects: (available?.projects ?? []).map((p) => ({
+        id: p.id,
+        teamId: p.teamId ?? null,
+      })),
     };
-    for (const f of dataQuery.data?.features ?? []) {
-      m[f.role as ModelRoleKey]?.push(f);
-    }
-    return m;
-  }, [dataQuery.data?.features]);
+  }, [hierarchy, dataQuery.data?.available]);
+
+  const visibleConfigs = useMemo(() => {
+    const all = dataQuery.data?.configs ?? [];
+    const resolved = resolveScopeFilter(filter, {
+      currentTeamId: team?.id ?? null,
+      currentProjectId: project?.id ?? null,
+    });
+    if (resolved.kind === "all") return all;
+    return all.filter((c) =>
+      c.scopes.some((s) =>
+        isScopeInFilter(
+          { scopeType: s.type, scopeId: s.id },
+          resolved,
+          effectiveHierarchy,
+        ),
+      ),
+    );
+  }, [dataQuery.data?.configs, filter, team?.id, project?.id, effectiveHierarchy]);
 
   if (dataQuery.isLoading || !dataQuery.data) {
     return (
@@ -244,26 +268,15 @@ export function DefaultModelsSection({
 
       <Card.Root width="full" overflow="hidden">
         <Card.Body paddingX={0} paddingY={0}>
-          {filter.kind === "all" ? (
-            <AllConfigsView
-              configs={data.configs}
-              features={data.features}
-              onEdit={openEdit}
-              onDelete={handleDelete}
-              onAdd={openAdd}
-              enabledProviderKeys={enabledProviderKeys ?? null}
-            />
-          ) : (
-            <ResolvedScopeView
-              filter={filter}
-              configs={data.configs}
-              effective={data.effective}
-              featuresByRole={featuresByRole}
-              currentTeamId={team?.id}
-              currentProjectId={project?.id}
-              enabledProviderKeys={enabledProviderKeys ?? null}
-            />
-          )}
+          <AllConfigsView
+            configs={visibleConfigs}
+            allConfigs={data.configs}
+            features={data.features}
+            onEdit={openEdit}
+            onDelete={handleDelete}
+            onAdd={openAdd}
+            enabledProviderKeys={enabledProviderKeys ?? null}
+          />
         </Card.Body>
       </Card.Root>
 
@@ -275,6 +288,7 @@ export function DefaultModelsSection({
 
 function AllConfigsView({
   configs,
+  allConfigs,
   features,
   onEdit,
   onDelete,
@@ -282,6 +296,11 @@ function AllConfigsView({
   enabledProviderKeys,
 }: {
   configs: ConfigRow[];
+  /** Full cascade input. `configs` is filter-narrowed for display, but
+   *  cells still walk the full set when resolving inherited models so
+   *  the visible row reflects what code on that scope would actually
+   *  see at runtime. */
+  allConfigs: ConfigRow[];
   features: Payload["features"];
   onEdit: (c: ConfigRow) => void;
   onDelete: (c: ConfigRow) => void;
@@ -343,7 +362,7 @@ function AllConfigsView({
                   role={role}
                   config={c.config as Record<string, string>}
                   features={features}
-                  configs={configs}
+                  configs={allConfigs}
                   anchorScope={mostSpecificScope(c.scopes)}
                   onEdit={() => onEdit(c)}
                   enabledProviderKeys={enabledProviderKeys}
@@ -544,157 +563,11 @@ function mostSpecificScope(
   return null;
 }
 
-// ─── Resolved-at-scope view ────────────────────────────────────────
-
-function ResolvedScopeView({
-  filter,
-  configs,
-  effective,
-  featuresByRole,
-  currentTeamId,
-  currentProjectId,
-  enabledProviderKeys,
-}: {
-  filter: ScopeFilter;
-  configs: ConfigRow[];
-  effective: Payload["effective"];
-  featuresByRole: Record<ModelRoleKey, Payload["features"]>;
-  currentTeamId?: string | null;
-  currentProjectId?: string | null;
-  enabledProviderKeys: Set<string> | null;
-}) {
-  const isInvalid = (model: string) =>
-    !!enabledProviderKeys &&
-    !enabledProviderKeys.has(model.split("/")[0] ?? "");
-  // For "this team" / "this project" / "specific scope" we render the
-  // cascade-resolved view. For the project the user is currently in
-  // the server already pre-computed `effective`. For other scopes we
-  // do a client-side walk over the visible configs — the same CSS-
-  // cascade rules the server runs.
-  const targetScope = useMemo(() => {
-    if (filter.kind === "team-current") {
-      return currentTeamId
-        ? { type: "TEAM" as const, id: currentTeamId }
-        : null;
-    }
-    if (filter.kind === "project-current") {
-      return currentProjectId
-        ? { type: "PROJECT" as const, id: currentProjectId }
-        : null;
-    }
-    if (filter.kind === "specific") {
-      return { type: filter.scopeType, id: filter.scopeId };
-    }
-    return null;
-  }, [filter, currentTeamId, currentProjectId]);
-
-  if (!targetScope) {
-    return (
-      <Box padding={6}>
-        <Text fontSize="sm" color="fg.muted">
-          Pick a scope to see its resolved defaults.
-        </Text>
-      </Box>
-    );
-  }
-
-  const isProjectCurrent =
-    filter.kind === "project-current" && currentProjectId === targetScope.id;
-
-  return (
-    <VStack align="stretch" padding={4} gap={3}>
-      {ROLES.map((role) => {
-        // Use server-side `effective` when the target is the user's
-        // own project; otherwise fall back to the client cascade walk.
-        const resolved = isProjectCurrent
-          ? effective[role]
-          : resolveAtScope(role, configs, targetScope.type, targetScope.id);
-        // Only surface a feature row when its resolved model actually
-        // overrides the role default at this scope — if the cascade
-        // picks the same model for the feature as for the role, the
-        // feature is implicitly inheriting and there's nothing to show.
-        // Skip noisy "Topic clustering | gpt-x" lines that just echo
-        // the FAST default sitting above them.
-        const featureOverrides = featuresByRole[role]
-          .map((f) => {
-            const fr = isProjectCurrent
-              ? null
-              : resolveAtScope(f.key, configs, targetScope.type, targetScope.id);
-            if (!fr) return null;
-            if (resolved && fr.model === resolved.model) return null;
-            return { feature: f, resolved: fr };
-          })
-          .filter(Boolean) as Array<{
-          feature: Payload["features"][number];
-          resolved: NonNullable<Payload["effective"][ModelRoleKey]>;
-        }>;
-        return (
-          <Box key={role} data-testid={`resolved-row-${role.toLowerCase()}`}>
-            <HStack gap={3} align="center">
-              <Box width="120px" flexShrink={0}>
-                <Text fontWeight="medium">{ROLE_LABEL[role]}</Text>
-              </Box>
-              {resolved ? (
-                <HStack gap={2}>
-                  <ModelChip
-                    model={resolved.model}
-                    invalid={isInvalid(resolved.model)}
-                  />
-                  <Text fontSize="xs" color="fg.muted">
-                    from {resolved.scope}
-                  </Text>
-                </HStack>
-              ) : (
-                <Badge colorPalette="orange">not configured</Badge>
-              )}
-            </HStack>
-            {featureOverrides.length > 0 && (
-              <VStack
-                align="stretch"
-                gap={1}
-                paddingLeft={6}
-                paddingTop={2}
-                paddingBottom={1}
-              >
-                {featureOverrides.map(({ feature, resolved }) => (
-                  <HStack
-                    key={feature.key}
-                    gap={3}
-                    align="center"
-                    data-testid={`resolved-row-${role.toLowerCase()}-feature-${feature.key}`}
-                  >
-                    <Box width="160px" flexShrink={0}>
-                      <Text fontSize="xs">{feature.displayName}</Text>
-                    </Box>
-                    <ModelChip
-                      model={resolved.model}
-                      size="sm"
-                      invalid={isInvalid(resolved.model)}
-                    />
-                    <Text fontSize="xs" color="fg.muted">
-                      from {resolved.scope}
-                    </Text>
-                  </HStack>
-                ))}
-              </VStack>
-            )}
-          </Box>
-        );
-      })}
-    </VStack>
-  );
-}
-
 /**
- * Client-side cascading walk for a single key at a given scope. The
- * server is the source of truth (it serves `effective` for the current
- * project) — this fallback only fires when the user picks "this team"
- * or "more scopes ▸ <other team/project>" since the server only
- * computes effective for the project being viewed.
- *
- * Walks PROJECT → TEAM → ORG, within each tier sorting configs by
- * createdAt DESC and taking the first that has the key. Returns null
- * if no config in the visible set carries the key.
+ * Cascading walk for a single key at a given scope. Walks
+ * PROJECT → TEAM → ORG from the anchor scope, within each tier sorting
+ * configs by createdAt DESC and taking the first that has the key.
+ * Returns null if no config in the visible set carries the key.
  */
 function resolveAtScope(
   key: string,
