@@ -62,7 +62,17 @@ Feature: Fresh-clone dev setup friction removal
 
   # --- Friction #6: fresh-clone end-to-end against current Makefile ---
 
-  @e2e
+  @e2e @unimplemented
+  # HARNESS_GAP: Requires a fresh clone (no node_modules, no .env) on a host
+  # with Docker free of port collisions on :5432/:6379/:8123. This worktree
+  # cannot self-test the "fresh clone" precondition. Run manually before
+  # closing #3903:
+  #   git clone git@github.com:langwatch/langwatch.git /tmp/lw-ac6 && cd /tmp/lw-ac6
+  #   cp langwatch/.env.example langwatch/.env
+  #   # generate three real secrets per the inline `openssl rand -hex 32` hints
+  #   make quickstart all-local
+  #   # expect: stack starts, no ERR_PNPM_LOCKFILE_CONFIG_MISMATCH,
+  #   # no cryptic Zod min(32) error, app reachable on the documented URL.
   Scenario: Fresh clone reaches a green app via make quickstart all-local in one cycle
     Given a fresh clone of the repository at HEAD
     And the host has Docker, Node, and pnpm installed
