@@ -71,6 +71,13 @@ export const DialogContent = React.forwardRef<
           backdropFilter="blur(8px)"
           {...safeBackdropProps}
           bg="transparent"
+          // Stable DOM signal that the wrapper's transparency contract is
+          // active. Tests assert on this attribute because Chakra resolves
+          // the `bg` prop through a CSS class which jsdom cannot compute,
+          // so checking computed/inline styles is unreliable. If anyone
+          // removes the `bg="transparent"` line above, this attribute
+          // should be removed too — the test then fails.
+          data-lw-transparent-backdrop="true"
         />
       )}
       <ChakraDialog.Positioner {...positionerProps}>

@@ -49,7 +49,7 @@
 						"paths": {
 							"@chakra-ui/react": {
 								"importNames": ["Dialog", "Drawer", "Modal"],
-								"message": "Import Dialog/Drawer from ~/components/ui/dialog or ~/components/ui/drawer instead. The wrappers force a transparent backdrop (no dark grey overlay), wire focus/scroll defaults, and add an inline error boundary. Raw Chakra primitives reintroduce the dark backdrop we explicitly do not want."
+								"message": "Import Dialog or Drawer from ~/components/ui/dialog and ~/components/ui/drawer instead. Modal-style flows also use the Dialog wrapper (see AICreateModal, RunScenarioModal, etc.) — there is no Modal wrapper. The wrappers force a transparent backdrop (no dark grey overlay), wire focus/scroll defaults, and add an inline error boundary. Raw Chakra primitives reintroduce the dark backdrop we explicitly do not want."
 							}
 						}
 					}

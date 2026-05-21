@@ -44,19 +44,22 @@ describe("Dialog backdrop", () => {
 
   describe("when a dialog opens", () => {
     /** @scenario Dialog backdrop renders with blur and no dark fill */
-    it("renders a backdrop and does not inject a dark inline fill", () => {
+    it("renders a backdrop with the wrapper's transparency marker", () => {
       renderOpenDialog();
       const backdrop = getBackdrop();
 
-      // Chakra resolves the `bg` prop through its recipe to a CSS class
-      // rather than an inline style, so we can't read the colour value
-      // from jsdom. What we CAN assert is that the wrapper does not put a
-      // dark colour as an inline style on the backdrop element, since
-      // Chakra's default (blackAlpha.500) only renders through the class.
-      // Visual confirmation lives in pr-screenshots from QA.
-      const inlineBg =
-        backdrop.style.background || backdrop.style.backgroundColor;
-      expect(inlineBg).not.toMatch(/blackalpha|rgba\(0,\s*0,\s*0,/i);
+      // The wrapper marks the backdrop with this data-attribute exactly
+      // when the `bg="transparent"` hard-override is in place (see
+      // src/components/ui/dialog.tsx). It is the only stable signal jsdom
+      // can observe — Chakra resolves the `bg` prop through a CSS class
+      // which jsdom cannot compute, so any inline-style assertion passes
+      // vacuously even when a class-driven dark backdrop comes back. If
+      // anyone removes the transparency override, this attribute is
+      // removed alongside it and the test fails. The visual contract
+      // itself is verified in the browser-QA pr-screenshots.
+      expect(backdrop.getAttribute("data-lw-transparent-backdrop")).toBe(
+        "true",
+      );
     });
   });
 
