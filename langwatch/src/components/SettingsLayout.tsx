@@ -201,6 +201,12 @@ export default function SettingsLayout({
               <MenuLink href="/ops/dejaview" includePath="/ops/dejaview">
                 Deja View
               </MenuLink>
+              <MenuLink
+                href="/ops/feature-flags"
+                includePath="/ops/feature-flags"
+              >
+                Feature Flags
+              </MenuLink>
             </NavSection>
           )}
 
@@ -229,12 +235,6 @@ export default function SettingsLayout({
                 includePath="/ops/backoffice/subscriptions"
               >
                 Subscriptions
-              </MenuLink>
-              <MenuLink
-                href="/ops/backoffice/organization-features"
-                includePath="/ops/backoffice/organization-features"
-              >
-                Organization Features
               </MenuLink>
             </NavSection>
           )}

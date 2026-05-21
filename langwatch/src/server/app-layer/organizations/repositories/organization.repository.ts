@@ -10,7 +10,6 @@ import type {
   TeamUserRole,
   User,
 } from "@prisma/client";
-import type { OrganizationFeatureName } from "../organization.service";
 
 export type TeamWithProjects = Team & {
   projects: Project[];
@@ -22,15 +21,9 @@ export type TeamWithProjectsAndMembers = TeamWithProjects & {
   })[];
 };
 
-export type OrganizationFeature = {
-  feature: string;
-  trialEndDate: Date | null;
-};
-
 export type FullyLoadedOrganization = Organization & {
   members: OrganizationUser[];
   teams: TeamWithProjectsAndMembers[];
-  features: OrganizationFeature[];
 };
 
 export type TeamMemberWithUser = TeamUser & {
@@ -59,12 +52,6 @@ export type OrganizationMemberWithUser = OrganizationUser & {
 export type OrganizationWithMembersAndTheirTeams = Organization & {
   members: OrganizationMemberWithUser[];
 };
-
-export interface OrganizationFeatureRow {
-  feature: string;
-  organizationId: string;
-  trialEndDate: Date | null;
-}
 
 /**
  * Organization with admin members and their users, used for notification delivery.
@@ -234,10 +221,6 @@ export interface OrganizationRepository {
     teamId: string;
   }): Promise<OrganizationUserRole | null>;
   getProjectIds(organizationId: string): Promise<string[]>;
-  getFeature(
-    organizationId: string,
-    feature: OrganizationFeatureName,
-  ): Promise<OrganizationFeatureRow | null>;
   findWithAdmins(
     organizationId: string,
   ): Promise<OrganizationWithAdmins | null>;
@@ -326,13 +309,6 @@ export class NullOrganizationRepository implements OrganizationRepository {
 
   async getProjectIds(_organizationId: string): Promise<string[]> {
     return [];
-  }
-
-  async getFeature(
-    _organizationId: string,
-    _feature: OrganizationFeatureName,
-  ): Promise<OrganizationFeatureRow | null> {
-    return null;
   }
 
   async findWithAdmins(

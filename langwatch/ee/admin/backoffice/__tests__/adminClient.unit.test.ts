@@ -85,15 +85,15 @@ describe("adminClient", () => {
 
   describe("when calling create", () => {
     it("sends data inside params", async () => {
-      await adminClient.create("organizationFeature", {
-        feature: "CUSTOM_EMBEDDINGS",
+      await adminClient.create("subscription", {
         organizationId: "org_1",
+        plan: "GROWTH",
       });
       expect(JSON.parse(fetchMock.mock.calls[0]![1].body as string)).toEqual({
-        resource: "organizationFeature",
+        resource: "subscription",
         method: "create",
         params: {
-          data: { feature: "CUSTOM_EMBEDDINGS", organizationId: "org_1" },
+          data: { organizationId: "org_1", plan: "GROWTH" },
         },
       });
     });

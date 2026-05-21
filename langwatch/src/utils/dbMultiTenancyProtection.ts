@@ -12,7 +12,6 @@ const EXEMPT_MODELS = [
   "OrganizationInvite",
   "Project",
   "Subscription",
-  "OrganizationFeature",
   "AuditLog",
   /**
    * Because prompts can be accessed at either the project or org level
