@@ -1,19 +1,18 @@
-id: no-explicit-any-ts
+id: no-explicit-any-tsx
 message: >
   Avoid `any` — prefer `unknown` + narrowing, or a real type. See
   langwatch CLAUDE.md and #3754 AC3. (Biome also flags this via
   `suspicious.noExplicitAny` — this rule is the deterministic fallback
   for cases Biome misses.)
 severity: warning
-language: TypeScript
+language: Tsx
 rule:
   kind: predefined_type
   regex: '^any$'
 files:
-  - "langwatch/src/**/*.ts"
+  - "langwatch/src/**/*.tsx"
 ignores:
-  - "**/*.d.ts"
   - "**/__tests__/**"
-  - "**/*.test.ts"
-  - "**/*.spec.ts"
+  - "**/*.test.tsx"
+  - "**/*.spec.tsx"
   - "**/__fixtures__/**"

@@ -4,7 +4,7 @@ message: >
   it re-renders the whole form tree on every keystroke. Use
   `useWatch({ control, name })` instead.
 severity: warning
-language: TypeScript
+language: Tsx
 rule:
   pattern: $F.watch()
   inside:

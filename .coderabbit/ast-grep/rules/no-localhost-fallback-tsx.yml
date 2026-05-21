@@ -1,10 +1,10 @@
-id: no-localhost-fallback-ts
+id: no-localhost-fallback-tsx
 message: >
   Don't fall back to a localhost URL via `??`. Required env vars must be
   validated through the Zod env schema and consumed without fallbacks —
   silent fallbacks mask missing configuration in production.
 severity: warning
-language: TypeScript
+language: Tsx
 rule:
   any:
     - pattern: $X ?? "http://localhost$REST"
@@ -12,7 +12,7 @@ rule:
     - pattern: $X ?? `http://localhost$$$REST`
     - pattern: $X ?? `https://localhost$$$REST`
 files:
-  - "langwatch/src/**/*.ts"
+  - "langwatch/src/**/*.tsx"
 ignores:
-  - "**/*.test.ts"
-  - "**/*.spec.ts"
+  - "**/*.test.tsx"
+  - "**/*.spec.tsx"

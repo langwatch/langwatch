@@ -1,11 +1,11 @@
-id: no-export-star-shim-ts
+id: no-export-star-shim-tsx
 message: >
   `export * from "..."` is a re-export shim. Backwards-compat shims rot —
   update consumers to import from the new location instead. If this is a
   legitimate barrel, add `// @barrel` on the line above the first
   `export *` to opt out.
 severity: warning
-language: TypeScript
+language: Tsx
 rule:
   all:
     - kind: export_statement
@@ -15,4 +15,4 @@ rule:
           kind: comment
           regex: '@barrel'
 files:
-  - "langwatch/src/**/*.ts"
+  - "langwatch/src/**/*.tsx"
