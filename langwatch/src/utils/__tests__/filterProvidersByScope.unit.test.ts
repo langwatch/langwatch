@@ -91,7 +91,7 @@ describe("filterProvidersByScope()", () => {
     expect(result).toEqual(ALL);
   });
 
-  /** @scenario Picking a team keeps org rows (parent) + the team itself + its projects (children) */
+  /** @scenario Picking a team keeps org rows, the team itself, and its projects */
   it("keeps org/team/own-projects when picking a team; hides sibling teams and their projects", () => {
     const result = filterProvidersByScope(
       ALL,
@@ -107,7 +107,7 @@ describe("filterProvidersByScope()", () => {
     expect(result).not.toContain(projectThree);
   });
 
-  /** @scenario Picking a project keeps org + the project's parent team + the project itself */
+  /** @scenario Picking a project keeps org rows, the project's parent team, and the project itself */
   it("keeps org/parent-team/this-project when picking a project; hides siblings", () => {
     const result = filterProvidersByScope(
       ALL,

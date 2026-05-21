@@ -428,13 +428,17 @@ describe("RBAC Integration Tests", () => {
         expect(result).toBe(true);
       });
 
-      it("does NOT grant organization:manage (org-admin-only perm)", async () => {
+      it("grants organization:manage (OrgUser.role=ADMIN is authoritative for org perms)", async () => {
+        // Without honoring OrgUser.role=ADMIN for org-scope perms,
+        // an admin promoted via the Members UI but never seeded with
+        // an ORG-scope RoleBinding silently loses every org-scope
+        // read — UI says "Admin", API returns 401.
         const result = await hasOrganizationPermission(
           { prisma: mockPrisma, session: mockSession },
           "org-123",
           "organization:manage" as Permission,
         );
-        expect(result).toBe(false);
+        expect(result).toBe(true);
       });
     });
 
