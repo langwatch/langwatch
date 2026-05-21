@@ -1,8 +1,8 @@
 """
 Regression test for #3981 — offline-experiment cell traces silently lost on OTLP path.
 
-Root cause: `langwatch.trace(disable_sending=True)` flips `Client._disable_sending`
-on the singleton classvar. When the trace block exits, the flag is NEVER restored.
+Root cause: `langwatch.trace(disable_sending=True)` flipped `Client._disable_sending`
+on the singleton classvar without restoring it.
 
 In `langwatch_nlp` the runtime reuses worker processes across event types:
 - `execute_evaluation` and `execute_optimization` explicitly set
@@ -16,8 +16,11 @@ even though the caller never opted into disabling.
 
 PR #3979 papered over the symptom by synthesizing a stand-in `recordSpan` from
 the orchestrator. This test exercises the SDK-level bug directly, so the fix
-must restore the flag (or scope it per-trace) rather than mask it downstream.
+must scope the flag per-trace lifetime — and remain correct under overlapping
+concurrent traces, not just sequential reuse.
 """
+
+import threading
 
 import langwatch
 from langwatch.client import Client
@@ -137,3 +140,82 @@ class TestDisableSendingSingletonPoisoning:
             )
 
         assert client.disable_sending is False
+
+    def test_user_set_disable_sending_baseline_is_preserved(self):
+        """
+        If the user explicitly set `client.disable_sending = True` outside of
+        any trace block, a `disable_sending=True` trace must NOT flip the
+        baseline back to False on exit.
+        """
+        langwatch.setup(**_make_setup())
+
+        client = get_instance()
+        assert client is not None
+        client.disable_sending = True
+        assert client.disable_sending is True
+
+        with langwatch.trace(name="inside-user-disabled", disable_sending=True):
+            assert client.disable_sending is True
+
+        assert client.disable_sending is True, (
+            "User-set baseline of `disable_sending=True` must survive a "
+            "trace block exit — only the refcount-acquired delta should be "
+            "released, not the user's intent."
+        )
+
+        client.disable_sending = False
+
+    def test_overlapping_concurrent_traces_do_not_corrupt_flag(self):
+        """
+        CodeRabbit critique: simple snapshot/restore is unsafe under
+        overlapping concurrent traces. Two threads start a
+        `disable_sending=True` trace each; while both are active the flag
+        must stay True; only when the last one exits does it return to the
+        baseline. A non-refcounted implementation can leak `True` to the
+        baseline or flip back to `False` too early.
+        """
+        langwatch.setup(**_make_setup())
+        client = get_instance()
+        assert client is not None
+
+        observations = []
+        gate_outer_entered = threading.Event()
+        gate_inner_done = threading.Event()
+        gate_release_outer = threading.Event()
+
+        def outer():
+            with langwatch.trace(name="outer-disabled", disable_sending=True):
+                gate_outer_entered.set()
+                gate_release_outer.wait(timeout=5)
+                observations.append(("outer.exit", client.disable_sending))
+
+        def inner():
+            gate_outer_entered.wait(timeout=5)
+            with langwatch.trace(name="inner-disabled", disable_sending=True):
+                observations.append(("inner.inside", client.disable_sending))
+            gate_inner_done.set()
+
+        t_outer = threading.Thread(target=outer)
+        t_inner = threading.Thread(target=inner)
+        t_outer.start()
+        t_inner.start()
+
+        gate_inner_done.wait(timeout=5)
+        # Inner has fully exited its `with` block; outer is still holding
+        # the disable refcount. Flag must remain True.
+        t_inner.join(timeout=5)
+        assert client.disable_sending is True, (
+            "After inner trace exits but outer still holds the disable "
+            "refcount, flag must remain True. Single-slot snapshot/restore "
+            "(pre-refcount fix) would have already flipped it to False here."
+        )
+
+        gate_release_outer.set()
+        t_outer.join(timeout=5)
+
+        assert client.disable_sending is False, (
+            "After ALL disable-requesting traces have exited, flag must "
+            "return to baseline (False)."
+        )
+        assert ("inner.inside", True) in observations
+        assert ("outer.exit", True) in observations

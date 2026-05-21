@@ -130,12 +130,13 @@ class LangWatchTrace:
             )
             self.metadata["deprecated.trace_id"] = str(trace_id)
 
-        # Per-trace flag. Applied to the singleton on __enter__ and restored
-        # on __exit__ so a `disable_sending=True` block cannot poison
-        # subsequent traces (issue #3981 — silent span loss for offline
-        # experiment cells when worker processes are reused across event types).
+        # Per-trace request. Refcounted on the client during __enter__ and
+        # released during _cleanup so a `disable_sending=True` block cannot
+        # poison subsequent traces (issue #3981 — silent span loss for offline
+        # experiment cells when worker processes are reused across event
+        # types) AND remains correct under overlapping concurrent traces.
         self._disable_sending_request = disable_sending
-        self._prev_disable_sending: Optional[bool] = None
+        self._disable_sending_acquired = False
 
         # Use the global tracer provider
         self._tracer_provider = tracer_provider
@@ -253,32 +254,34 @@ class LangWatchTrace:
             return self.root_span
 
     def _apply_disable_sending(self) -> None:
-        """Snapshot the client's disable_sending flag and apply this trace's
-        request. Paired with `_restore_disable_sending` in `_cleanup`.
+        """Acquire a refcount on the client's disable_sending gate if this
+        trace requested it. Idempotent: the matching `_release_disable_sending`
+        in `_cleanup` will only release if we actually acquired.
         """
-        client = get_instance()
-        if client is None:
+        if not self._disable_sending_request or self._disable_sending_acquired:
             return
-        self._prev_disable_sending = client.disable_sending
-        if self._disable_sending_request and not client.disable_sending:
-            client.disable_sending = True
+        client = get_instance()
+        if client is None or not hasattr(client, "acquire_disable_sending"):
+            return
+        client.acquire_disable_sending()
+        self._disable_sending_acquired = True
 
-    def _restore_disable_sending(self) -> None:
-        """Restore the client's disable_sending flag to the value captured
-        on enter. Prevents one trace's `disable_sending=True` from poisoning
-        subsequent traces on a reused worker (issue #3981).
+    def _release_disable_sending(self) -> None:
+        """Release the refcount acquired by `_apply_disable_sending`, if any.
+
+        Concurrency-safe (issue #3981): the refcount on the client means an
+        overlapping default-sending trace cannot flip the flag back on while
+        another trace still holds the disable refcount, and a `disable_sending`
+        block restores the user-set baseline only when the last holder exits.
         """
-        if self._prev_disable_sending is None:
+        if not self._disable_sending_acquired:
             return
         client = get_instance()
-        if client is None:
-            self._prev_disable_sending = None
-            return
         try:
-            if client.disable_sending != self._prev_disable_sending:
-                client.disable_sending = self._prev_disable_sending
+            if client is not None and hasattr(client, "release_disable_sending"):
+                client.release_disable_sending()
         finally:
-            self._prev_disable_sending = None
+            self._disable_sending_acquired = False
 
     def _cleanup(
         self,
@@ -301,7 +304,7 @@ class LangWatchTrace:
                 langwatch.telemetry.context._reset_current_trace(self._context_token)
                 self._context_token = None
 
-            self._restore_disable_sending()
+            self._release_disable_sending()
 
             self._cleaned_up = True
 
