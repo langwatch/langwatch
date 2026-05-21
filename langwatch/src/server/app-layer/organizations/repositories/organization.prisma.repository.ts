@@ -19,7 +19,6 @@ import {
 } from "~/utils/memberRoleConstraints";
 import { isCustomRole } from "../../../api/enterprise";
 import { LITE_MEMBER_VIEWER_ONLY_ERROR } from "../compute-effective-team-role-updates";
-import type { OrganizationFeatureName } from "../organization.service";
 import type {
   AuditLogFilters,
   CreateAndAssignInput,
@@ -27,7 +26,6 @@ import type {
   DeleteMemberInput,
   EnrichedAuditLog,
   FullyLoadedOrganization,
-  OrganizationFeatureRow,
   OrganizationForBilling,
   OrganizationMemberWithUser,
   OrganizationRepository,
@@ -97,17 +95,6 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
       select: { id: true },
     });
     return projects.map((p) => p.id);
-  }
-
-  async getFeature(
-    organizationId: string,
-    feature: OrganizationFeatureName,
-  ): Promise<OrganizationFeatureRow | null> {
-    return this.prisma.organizationFeature.findUnique({
-      where: {
-        feature_organizationId: { feature, organizationId },
-      },
-    });
   }
 
   async findWithAdmins(
@@ -324,7 +311,6 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
             userId,
           },
         },
-        features: true,
         teams: {
           where: {
             archivedAt: null,

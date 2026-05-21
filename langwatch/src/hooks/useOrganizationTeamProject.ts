@@ -324,24 +324,12 @@ export const useOrganizationTeamProject = (
       hasOrgPermission: () => false,
       hasAnyPermission: () => false,
       isPublicRoute,
-      isOrganizationFeatureEnabled: () => false,
       isDemo,
       organizationRole: undefined,
     };
   }
 
   const organizationRole = organization?.members?.[0]?.role;
-
-  const isOrganizationFeatureEnabled = (feature: string): boolean => {
-    if (!organization?.features) return false;
-    const trialFeature = organization.features.find(
-      (f) => f.feature === feature,
-    );
-    if (!trialFeature) return false;
-
-    if (!trialFeature.trialEndDate) return true;
-    return new Date(trialFeature.trialEndDate) > new Date();
-  };
 
   // ============================================================================
   // NEW RBAC SYSTEM - Preferred API going forward
@@ -446,7 +434,6 @@ export const useOrganizationTeamProject = (
     hasAnyPermission,
     isPublicRoute,
     modelProviders: modelProviders.data,
-    isOrganizationFeatureEnabled,
     isDemo,
     organizationRole,
   };

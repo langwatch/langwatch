@@ -42,7 +42,7 @@ export const MainMenu = React.memo(function MainMenu({
   isCompact = false,
 }: MainMenuProps) {
   const router = useRouter();
-  const { project, hasPermission, isPublicRoute } =
+  const { organization, project, hasPermission, isPublicRoute } =
     useOrganizationTeamProject();
   const [isHovered, setIsHovered] = useState(false);
 
@@ -57,7 +57,11 @@ export const MainMenu = React.memo(function MainMenu({
   // is driven by PostHog release conditions.
   const { enabled: gatewayMenuEnabled } = useFeatureFlag(
     "release_ui_ai_gateway_menu_enabled",
-    { projectId: project?.id, enabled: !!project },
+    {
+      projectId: project?.id,
+      organizationId: organization?.id,
+      enabled: !!project,
+    },
   );
 
   // In compact mode, show expanded view on hover

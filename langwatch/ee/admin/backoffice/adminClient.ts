@@ -13,8 +13,7 @@ export type ResourceName =
   | "user"
   | "organization"
   | "project"
-  | "subscription"
-  | "organizationFeature";
+  | "subscription";
 
 export type SortOrder = "ASC" | "DESC";
 

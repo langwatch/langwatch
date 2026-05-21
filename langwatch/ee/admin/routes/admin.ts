@@ -47,8 +47,6 @@ const ALLOWED_RESOURCES = new Set([
   "project",
   "subscription",
   "subscriptions",
-  "organizationFeature",
-  "organizationFeatures",
 ]);
 
 // ---------- POST|DELETE /api/admin/impersonate ----------
@@ -153,8 +151,6 @@ app.post("/admin/:resource", async (c) => {
   }
 
   if (body.resource === "organizations") body.resource = "organization";
-  if (body.resource === "organizationFeatures")
-    body.resource = "organizationFeature";
   if (body.resource === "subscriptions") body.resource = "subscription";
   if (body.resource === "teams") body.resource = "team";
 
@@ -304,50 +300,6 @@ app.post("/admin/:resource", async (c) => {
       body as GetOneRequest,
       prisma.project,
       { select: PROJECT_SAFE_SELECT },
-    );
-    return c.json(result);
-  }
-
-  if (body.resource === "organizationFeature" && body.method === "getList") {
-    const query = body.params?.filter?.query;
-    if (body.params?.filter?.query) delete body.params.filter.query;
-
-    const result = await getListHandler<Prisma.OrganizationFeatureFindManyArgs>(
-      body as GetListRequest,
-      prisma.organizationFeature,
-      {
-        ...(query
-          ? {
-              where: {
-                OR: [
-                  { id: { contains: query, mode: "insensitive" } },
-                  { feature: { contains: query, mode: "insensitive" } },
-                  {
-                    organization: {
-                      OR: [
-                        { id: { contains: query, mode: "insensitive" } },
-                        {
-                          name: { contains: query, mode: "insensitive" },
-                        },
-                        {
-                          slug: { contains: query, mode: "insensitive" },
-                        },
-                      ],
-                    },
-                  },
-                ],
-              },
-            }
-          : {}),
-        // Include the organization so the Backoffice table can render names
-        // instead of raw IDs. Admin-only endpoint, so exposing name/slug is
-        // fine.
-        include: {
-          organization: {
-            select: { id: true, name: true, slug: true },
-          },
-        },
-      },
     );
     return c.json(result);
   }

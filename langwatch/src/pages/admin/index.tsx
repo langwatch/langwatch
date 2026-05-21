@@ -22,8 +22,6 @@ const RESOURCE_REDIRECTS: Record<string, string> = {
   projects: "projects",
   subscription: "subscriptions",
   subscriptions: "subscriptions",
-  organizationfeature: "organization-features",
-  organizationfeatures: "organization-features",
 };
 
 export default function AdminRedirect() {
