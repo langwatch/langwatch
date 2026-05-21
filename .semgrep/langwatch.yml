@@ -1,0 +1,88 @@
+# Semgrep rules — semantic patterns CodeRabbit's path_instructions can't
+# express deterministically. Loaded via reviews.tools.semgrep.config_file
+# in /.coderabbit.yaml.
+#
+# Highest-value rule per #3754 Investigation #6: PII-in-logger
+# (only 3 audit hits — easy to baseline-clear, high signal).
+
+rules:
+  # ── PII in logger calls ────────────────────────────────────────────────
+  - id: pii-in-logger-call
+    message: >
+      Logger call references PII fields (email, phone, name, ip, userId,
+      apiKey, token, etc.) without redaction. Wrap with `redact(...)` or
+      `hashEmail(...)`, or pass the minimal non-identifying fields needed
+      for debugging. See #3754 AC2.
+    severity: WARNING
+    languages: [typescript, javascript]
+    paths:
+      include:
+        - "langwatch/src/**/*.ts"
+        - "langwatch/src/**/*.tsx"
+      exclude:
+        - "**/__tests__/**"
+        - "**/*.test.ts"
+        - "**/*.test.tsx"
+        - "**/*.spec.ts"
+        - "**/*.spec.tsx"
+        - "**/__fixtures__/**"
+    patterns:
+      - pattern-either:
+          - pattern: logger.$LEVEL($..., { ..., email: $E, ... }, $...)
+          - pattern: logger.$LEVEL($..., { ..., phone: $P, ... }, $...)
+          - pattern: logger.$LEVEL($..., { ..., userId: $U, ... }, $...)
+          - pattern: logger.$LEVEL($..., { ..., apiKey: $K, ... }, $...)
+          - pattern: logger.$LEVEL($..., { ..., token: $T, ... }, $...)
+          - pattern: console.$LEVEL($..., { ..., email: $E, ... }, $...)
+          - pattern: console.$LEVEL($..., { ..., userId: $U, ... }, $...)
+          - pattern: console.$LEVEL($..., { ..., apiKey: $K, ... }, $...)
+          - pattern: console.$LEVEL($..., { ..., token: $T, ... }, $...)
+
+  # ── PII regex literals outside fixtures ────────────────────────────────
+  - id: pii-literal-ssn
+    message: >
+      String literal matches US SSN shape (NNN-NN-NNNN). PII literals
+      should not appear in production code — use a fixture under
+      `**/__fixtures__/**` if this is a test value.
+    severity: WARNING
+    languages: [typescript, javascript, python]
+    paths:
+      exclude:
+        - "**/__fixtures__/**"
+        - "**/*.test.*"
+        - "**/*.spec.*"
+        - "**/migrations/**"
+    pattern-regex: '"\d{3}-\d{2}-\d{4}"'
+
+  - id: pii-literal-api-key
+    message: >
+      String literal matches API key prefix (`sk_live_`, `pk_live_`,
+      `xai-`, `sk-`, `lw_`). Use env-var indirection — never check live
+      keys into source. Gitleaks should also catch this; this rule
+      catches near-misses that gitleaks lets through.
+    severity: ERROR
+    languages: [typescript, javascript, python]
+    paths:
+      exclude:
+        - "**/__fixtures__/**"
+        - "**/*.test.*"
+        - "**/*.spec.*"
+    pattern-regex: '"(sk_live_|pk_live_|xai-|sk-proj-|sk-ant-)[A-Za-z0-9_-]{16,}"'
+
+  # ── ClickHouse migrations: unqualified table names only ────────────────
+  - id: clickhouse-no-qualified-table
+    message: >
+      ClickHouse migrations must use unqualified table names — they run
+      against the connected database. `${CLICKHOUSE_DATABASE}.<table>`
+      or `langwatch.<table>` breaks BYOC deployments where the database
+      name differs.
+    severity: WARNING
+    languages: [generic]
+    paths:
+      include:
+        - "**/clickhouse/migrations/**/*.sql"
+        - "**/clickhouse/migrations/**/*.ts"
+        - "**/clickhouse/migrations/**/*.go"
+    pattern-either:
+      - pattern-regex: '\$\{CLICKHOUSE_DATABASE\}\.\w+'
+      - pattern-regex: '\blangwatch\.[a-z_]+\b'

@@ -1,0 +1,20 @@
+id: no-inline-dynamic-import
+message: >
+  Avoid inline `import(...)` for what should be a static import. Use
+  top-level `import` / `import type` instead. Dynamic `import()` inside
+  a function for intentional lazy-loading is fine — annotate the diff
+  if not obvious.
+severity: warning
+language: TypeScript
+rule:
+  pattern: import($MOD)
+files:
+  - "langwatch/src/**/*.ts"
+  - "langwatch/src/**/*.tsx"
+ignores:
+  - "**/routes.tsx"
+  - "**/pages/**"
+  - "**/*.test.ts"
+  - "**/*.test.tsx"
+  - "**/*.spec.ts"
+  - "**/*.spec.tsx"
