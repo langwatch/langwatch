@@ -740,3 +740,157 @@ EOF
 
   exec "$BOXD_BIN" connect "$vm" --command "tmux attach -t '$tmux'"
 }
+
+# ---------------------------------------------------------------------------
+# Preview lifecycle — ephemeral per-branch PR-preview VMs
+#
+# Naming convention: preview-<slug(branch)>
+# Source golden:     $LW_PREVIEW_GOLDEN_SOURCE (default: langwatch-golden-v2)
+#
+# Three entry points driven by boxd.mk targets:
+#   boxd_preview_up   BRANCH — fork golden, checkout branch, start compose full
+#   boxd_preview_down BRANCH — destroy the preview VM non-interactively
+#   boxd_preview_status BRANCH — print VM status, git HEAD, docker compose ps
+# ---------------------------------------------------------------------------
+
+# LW_PREVIEW_GOLDEN_SOURCE — team golden that preview VMs are forked from.
+# Overridable so Drew can swap to a personal lw-preview source without
+# touching the Makefile.
+LW_PREVIEW_GOLDEN_SOURCE="${LW_PREVIEW_GOLDEN_SOURCE:-langwatch-golden-v2}"
+
+# boxd_preview_vm_name BRANCH — return the VM name for a preview fork.
+# Pattern: preview-<slug(branch)>
+boxd_preview_vm_name() {
+  local branch="${1-}"
+  [ -n "$branch" ] || { echo "boxd_preview_vm_name: BRANCH is required" >&2; return 1; }
+  printf 'preview-%s' "$(boxd_slug "$branch")"
+}
+
+# boxd_preview_up BRANCH — fork the team golden, check out the branch inside
+# the VM, then start the full compose stack (compose.dev.yml --profile full).
+# Prints the VM URL on success.
+#
+# Does not upload Claude creds or .env files — preview VMs are read-only
+# stack snapshots, not development environments.
+boxd_preview_up() {
+  local branch="${1-}"
+  [ -n "$branch" ] || { echo "usage: make boxd-preview BRANCH=<name>" >&2; return 1; }
+  if ! git check-ref-format --branch "$branch" >/dev/null 2>&1; then
+    echo "ERROR: '$branch' is not a valid git branch name." >&2
+    return 1
+  fi
+
+  local vm golden q_branch q_origin_branch
+  vm=$(boxd_preview_vm_name "$branch") || return 1
+  golden="${LW_PREVIEW_GOLDEN_SOURCE}"
+
+  printf 'Creating preview VM: %s (source=%s, branch=%s)\n' "$vm" "$golden" "$branch" >&2
+
+  if boxd_vm_exists "$vm"; then
+    cat <<EOF >&2
+ERROR: VM '$vm' already exists. Destroy it first:
+  make boxd-preview-down BRANCH=$branch
+Or check its status:
+  make boxd-preview-status BRANCH=$branch
+EOF
+    return 1
+  fi
+
+  if ! "$BOXD_BIN" fork "$golden" --name="$vm" >/dev/null; then
+    cat <<EOF >&2
+ERROR: 'boxd fork $golden --name=$vm' failed.
+       Is '$golden' the correct team golden name? Override with:
+         LW_PREVIEW_GOLDEN_SOURCE=<name> make boxd-preview BRANCH=$branch
+EOF
+    return 1
+  fi
+
+  # Check out the branch inside the VM. Wraps in bash -c so set -o pipefail
+  # works (boxd exec runs /bin/sh / dash by default).
+  q_branch=$(_boxd_shell_quote "$branch")
+  q_origin_branch=$(_boxd_shell_quote "origin/$branch")
+  if ! "$BOXD_BIN" exec "$vm" -- bash -c "
+    set -euo pipefail
+    cd langwatch
+    git fetch origin
+    git checkout $q_branch 2>/dev/null \
+      || git checkout -b $q_branch $q_origin_branch 2>/dev/null \
+      || git checkout $q_origin_branch
+    git pull --ff-only origin $q_branch 2>/dev/null || true
+  "; then
+    echo "ERROR: failed to check out '$branch' inside $vm." >&2
+    return 1
+  fi
+
+  # Start the full compose stack detached.
+  if ! "$BOXD_BIN" exec "$vm" -- bash -c "
+    set -euo pipefail
+    cd langwatch
+    docker compose -f compose.dev.yml --profile full up -d --build
+  "; then
+    echo "ERROR: 'docker compose up' failed inside $vm." >&2
+    return 1
+  fi
+
+  printf 'Done.\n' >&2
+  printf 'Preview URL: https://%s.boxd.sh\n' "$vm"
+}
+
+# boxd_preview_down BRANCH — destroy the preview VM non-interactively.
+# The target-level guard (_boxd_require) already validated BRANCH; this
+# function validates shape before touching any remote shell.
+boxd_preview_down() {
+  local branch="${1-}"
+  [ -n "$branch" ] || { echo "usage: make boxd-preview-down BRANCH=<name>" >&2; return 1; }
+
+  local vm
+  vm=$(boxd_preview_vm_name "$branch") || return 1
+
+  if ! boxd_vm_exists "$vm"; then
+    printf 'INFO: VM %s does not exist — nothing to destroy.\n' "$vm" >&2
+    return 0
+  fi
+
+  printf 'Destroying preview VM: %s\n' "$vm" >&2
+  if ! "$BOXD_BIN" destroy "$vm" -y >/dev/null 2>&1; then
+    echo "ERROR: 'boxd destroy $vm -y' failed." >&2
+    return 1
+  fi
+  printf 'Destroyed %s.\n' "$vm" >&2
+}
+
+# boxd_preview_status BRANCH — print VM status, in-VM git branch + HEAD sha,
+# and docker compose ps output. Informational; never modifies state.
+boxd_preview_status() {
+  local branch="${1-}"
+  [ -n "$branch" ] || { echo "usage: make boxd-preview-status BRANCH=<name>" >&2; return 1; }
+
+  local vm
+  vm=$(boxd_preview_vm_name "$branch") || return 1
+
+  printf '==> VM: %s\n' "$vm"
+  local status
+  status=$(boxd_vm_status "$vm")
+  printf '    status:  %s\n' "${status:-unknown}"
+
+  if ! boxd_vm_exists "$vm"; then
+    printf '    (VM does not exist)\n' >&2
+    return 0
+  fi
+
+  boxd_wake_if_suspended "$vm"
+
+  local git_info
+  git_info=$("$BOXD_BIN" exec "$vm" -- bash -c "
+    cd langwatch 2>/dev/null || exit 0
+    printf 'branch: %s\n' \"\$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)\"
+    printf 'sha:    %s\n' \"\$(git rev-parse HEAD 2>/dev/null || echo unknown)\"
+  " 2>/dev/null || echo "(could not read git state)")
+  printf '%s\n' "$git_info" | sed 's/^/    /'
+
+  printf '==> docker compose ps:\n'
+  "$BOXD_BIN" exec "$vm" -- bash -c "
+    cd langwatch 2>/dev/null || exit 0
+    docker compose -f compose.dev.yml --profile full ps 2>/dev/null || echo '(compose not running)'
+  " 2>/dev/null | sed 's/^/    /' || true
+}

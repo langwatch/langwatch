@@ -387,3 +387,119 @@ EOF
     }
   ' "$SCRIPT_DIR/boxd-fork.sh"
 }
+
+# ---------------------------------------------------------------------------
+# boxd_preview_vm_name
+# ---------------------------------------------------------------------------
+
+@test "boxd_preview_vm_name: returns preview-<slug(branch)>" {
+  result=$(boxd_preview_vm_name "feat/dark-mode")
+  [ "$result" = "preview-feat-dark-mode" ]
+}
+
+@test "boxd_preview_vm_name: slugifies branch with special chars" {
+  result=$(boxd_preview_vm_name "fix/User's Bug #42!")
+  [[ "$result" == preview-* ]]
+  [[ "$result" =~ ^preview-[a-z0-9-]+$ ]]
+}
+
+@test "boxd_preview_vm_name: truncates slug to 40 chars after prefix" {
+  result=$(boxd_preview_vm_name "feat/this-is-an-extremely-long-branch-name-that-should-get-truncated")
+  # prefix is "preview-" (8 chars) + up to 40 chars slug = up to 48 total
+  [ "${#result}" -le 48 ]
+  [[ "$result" == preview-* ]]
+}
+
+@test "boxd_preview_vm_name: empty branch errors" {
+  run boxd_preview_vm_name ""
+  [ "$status" -ne 0 ]
+}
+
+# ---------------------------------------------------------------------------
+# LW_PREVIEW_GOLDEN_SOURCE default
+# ---------------------------------------------------------------------------
+
+@test "LW_PREVIEW_GOLDEN_SOURCE defaults to langwatch-golden-v2" {
+  run bash -c '
+    source "'"$SCRIPT_DIR"'/boxd-fork.sh"
+    printf "%s" "$LW_PREVIEW_GOLDEN_SOURCE"
+  '
+  [ "$status" -eq 0 ]
+  [ "$output" = "langwatch-golden-v2" ]
+}
+
+@test "LW_PREVIEW_GOLDEN_SOURCE env override is respected" {
+  result=$(LW_PREVIEW_GOLDEN_SOURCE="my-custom-golden" bash -c '
+    source "'"$SCRIPT_DIR"'/boxd-fork.sh"
+    printf "%s" "$LW_PREVIEW_GOLDEN_SOURCE"
+  ')
+  [ "$result" = "my-custom-golden" ]
+}
+
+# ---------------------------------------------------------------------------
+# boxd_preview_up — arg validation (no real boxd calls made)
+# ---------------------------------------------------------------------------
+
+@test "boxd_preview_up: rejects invalid git branch name" {
+  run boxd_preview_up "feat/foo bar"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"not a valid git branch name"* ]]
+}
+
+@test "boxd_preview_up: rejects empty branch" {
+  run boxd_preview_up ""
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"usage:"* ]]
+}
+
+# ---------------------------------------------------------------------------
+# boxd_preview_down — arg validation
+# ---------------------------------------------------------------------------
+
+@test "boxd_preview_down: rejects empty branch" {
+  run boxd_preview_down ""
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"usage:"* ]]
+}
+
+# ---------------------------------------------------------------------------
+# boxd_preview_status — arg validation
+# ---------------------------------------------------------------------------
+
+@test "boxd_preview_status: rejects empty branch" {
+  run boxd_preview_status ""
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"usage:"* ]]
+}
+
+# ---------------------------------------------------------------------------
+# Preview: pipefail inside boxd exec recipe uses bash -c (regression guard)
+# ---------------------------------------------------------------------------
+
+@test "boxd-fork.sh: preview helpers' boxd-exec recipes wrap pipefail in bash -c" {
+  # Same lint applied to the main script — scan preview_ functions too.
+  awk '
+    {
+      lines[NR] = $0
+      if ($0 ~ /set -[a-zA-Z]*o[a-zA-Z]* pipefail/) pipefail_lines[NR] = 1
+    }
+    END {
+      bad = 0
+      for (n in pipefail_lines) {
+        found_exec = 0; ok = 0
+        for (i = n; i >= n - 20 && i > 0; i--) {
+          if (lines[i] ~ /\$BOXD_BIN" exec /) {
+            found_exec = 1
+            if (lines[i] ~ /bash -c/) ok = 1
+            break
+          }
+        }
+        if (found_exec && !ok) {
+          print "BAD line " n ": pipefail in boxd-exec recipe without bash -c"
+          bad = 1
+        }
+      }
+      exit bad
+    }
+  ' "$SCRIPT_DIR/boxd-fork.sh"
+}
