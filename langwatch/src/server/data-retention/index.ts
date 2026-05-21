@@ -8,3 +8,6 @@ export { PinnedTraceRepository } from "./pinning/pinnedTrace.repository";
 export { RetroactiveUpdateService } from "./retroactive/retroactiveUpdate.service";
 export { StorageMeterService } from "./metering/storageMeter.service";
 export { OrphanSweepService } from "./orphan-sweep/orphanSweep.service";
+export { OrphanSweepRepository } from "./orphan-sweep/orphanSweep.repository";
+export { DataRetentionPolicyService } from "./policy/dataRetentionPolicy.service";
+export { DataRetentionPolicyRepository } from "./policy/dataRetentionPolicy.repository";

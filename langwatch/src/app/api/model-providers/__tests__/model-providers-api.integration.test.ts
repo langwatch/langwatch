@@ -1,7 +1,7 @@
 import type { Organization, Project, Team } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { projectFactory } from "~/factories/project.factory";
+import { buildProjectCreateData } from "~/factories/project.factory";
 import { prisma } from "~/server/db";
 import { MASKED_KEY_PLACEHOLDER } from "~/utils/constants";
 import { ModelProviderRepository } from "~/server/modelProviders/modelProvider.repository";
@@ -12,7 +12,7 @@ describe("Model Providers API", () => {
   let testProjectId: string;
   let testOrganization: Organization;
   let testTeam: Team;
-  let testProject: any;
+  let testProject: Project;
   let helpers: {
     api: {
       put: (path: string, body: unknown) => Response | Promise<Response>;
@@ -41,12 +41,9 @@ describe("Model Providers API", () => {
       },
     });
 
-    testProject = projectFactory.build({
-      slug: nanoid(),
-    });
     testProject = await prisma.project.create({
       data: {
-        ...testProject,
+        ...buildProjectCreateData({ slug: nanoid() }),
         teamId: testTeam.id,
         personalFeatures: {},
       },

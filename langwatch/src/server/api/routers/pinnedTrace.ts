@@ -1,23 +1,7 @@
-import type { PrismaClient } from "@prisma/client";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { checkProjectPermission } from "../rbac";
-import { PinnedTraceService } from "~/server/data-retention/pinning/pinnedTrace.service";
-import { PinnedTraceRepository } from "~/server/data-retention/pinning/pinnedTrace.repository";
 import { getApp } from "~/server/app-layer/app";
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
-
-function buildService(prisma: PrismaClient): PinnedTraceService {
-  return new PinnedTraceService(
-    new PinnedTraceRepository(prisma),
-    async (tenantId) => {
-      const client = await getClickHouseClientForProject(tenantId);
-      if (!client) throw new Error(`ClickHouse not available for ${tenantId}`);
-      return client;
-    },
-    getApp().retentionPolicyCache,
-  );
-}
 
 export const pinnedTraceRouter = createTRPCRouter({
   pin: protectedProcedure
@@ -30,7 +14,7 @@ export const pinnedTraceRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("project:update"))
     .mutation(async ({ input, ctx }) => {
-      return buildService(ctx.prisma).pin({
+      return getApp().dataRetention.pinning.pin({
         projectId: input.projectId,
         traceId: input.traceId,
         userId: ctx.session.user.id,
@@ -46,8 +30,8 @@ export const pinnedTraceRouter = createTRPCRouter({
       }),
     )
     .use(checkProjectPermission("project:update"))
-    .mutation(async ({ input, ctx }) => {
-      await buildService(ctx.prisma).unpin({
+    .mutation(async ({ input }) => {
+      await getApp().dataRetention.pinning.unpin({
         projectId: input.projectId,
         traceId: input.traceId,
       });
@@ -61,9 +45,8 @@ export const pinnedTraceRouter = createTRPCRouter({
       }),
     )
     .use(checkProjectPermission("traces:view"))
-    .query(async ({ input, ctx }) => {
-      const repo = new PinnedTraceRepository(ctx.prisma);
-      return repo.findByProjectAndTrace({
+    .query(async ({ input }) => {
+      return getApp().dataRetention.pinning.getPin({
         projectId: input.projectId,
         traceId: input.traceId,
       });
@@ -76,8 +59,9 @@ export const pinnedTraceRouter = createTRPCRouter({
       }),
     )
     .use(checkProjectPermission("traces:view"))
-    .query(async ({ input, ctx }) => {
-      const repo = new PinnedTraceRepository(ctx.prisma);
-      return repo.findAllByProject({ projectId: input.projectId });
+    .query(async ({ input }) => {
+      return getApp().dataRetention.pinning.listByProject({
+        projectId: input.projectId,
+      });
     }),
 });

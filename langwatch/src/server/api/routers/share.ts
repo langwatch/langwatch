@@ -8,10 +8,7 @@ import {
 } from "~/server/api/trpc";
 
 import { prisma } from "~/server/db";
-import { PinnedTraceService } from "~/server/data-retention/pinning/pinnedTrace.service";
-import { PinnedTraceRepository } from "~/server/data-retention/pinning/pinnedTrace.repository";
 import { getApp } from "~/server/app-layer/app";
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { createLogger } from "~/utils/logger/server";
 
 import {
@@ -174,16 +171,7 @@ export const createShare = async ({
 
   if (resourceType === "TRACE") {
     try {
-      const pinService = new PinnedTraceService(
-        new PinnedTraceRepository(prisma),
-        async (tenantId) => {
-          const client = await getClickHouseClientForProject(tenantId);
-          if (!client) throw new Error(`ClickHouse not available for ${tenantId}`);
-          return client;
-        },
-        getApp().retentionPolicyCache,
-      );
-      await pinService.autoPin({ projectId, traceId: resourceId });
+      await getApp().dataRetention.pinning.autoPin({ projectId, traceId: resourceId });
     } catch (error) {
       logger.error({ projectId, traceId: resourceId, error }, "Failed to auto-pin trace on share");
     }
@@ -211,16 +199,7 @@ export const unshareItem = async ({
 
   if (resourceType === "TRACE") {
     try {
-      const pinService = new PinnedTraceService(
-        new PinnedTraceRepository(prisma),
-        async (tenantId) => {
-          const client = await getClickHouseClientForProject(tenantId);
-          if (!client) throw new Error(`ClickHouse not available for ${tenantId}`);
-          return client;
-        },
-        getApp().retentionPolicyCache,
-      );
-      await pinService.autoUnpin({ projectId, traceId: resourceId });
+      await getApp().dataRetention.pinning.autoUnpin({ projectId, traceId: resourceId });
     } catch (error) {
       logger.error({ projectId, traceId: resourceId, error }, "Failed to auto-unpin trace on unshare");
     }

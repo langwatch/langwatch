@@ -5,6 +5,7 @@ import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
 import { getLangWatchTracer } from "langwatch";
 import type { ProcessRole } from "~/server/app-layer/config";
+import type { RetentionPolicyResolver } from "~/server/data-retention/retentionPolicyResolver";
 import { makeQueueName } from "~/server/background/queues/makeQueueName";
 import { createLogger } from "~/utils/logger/server";
 import { DisabledPipeline } from "./disabledPipeline";
@@ -49,7 +50,7 @@ export interface EventSourcingOptions {
   enabled?: boolean; // defaults to true
   isSaas?: boolean; // defaults to false
   processRole?: ProcessRole;
-  retentionPolicyResolver?: import("../data-retention/retentionPolicyResolver").RetentionPolicyResolver;
+  retentionPolicyResolver?: RetentionPolicyResolver;
 }
 
 /**
@@ -105,7 +106,7 @@ export class EventSourcing {
   private readonly _clickhouse?: ClickHouseClientResolver | null;
   private readonly _redis?: IORedis | Cluster | null;
   private readonly _processRole?: ProcessRole;
-  private readonly _retentionPolicyResolver?: import("../data-retention/retentionPolicyResolver").RetentionPolicyResolver;
+  private readonly _retentionPolicyResolver?: RetentionPolicyResolver;
 
   constructor(options: EventSourcingOptions = {}) {
     this._enabled = options.enabled ?? true;

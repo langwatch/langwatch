@@ -1,7 +1,7 @@
 import type { Organization, Project, Team } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { projectFactory } from "~/factories/project.factory";
+import { buildProjectCreateData } from "~/factories/project.factory";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import {
@@ -19,7 +19,7 @@ describe("Feature: Dataset File Upload REST API", () => {
   let testProjectId: string;
   let testOrganization: Organization;
   let testTeam: Team;
-  let testProject: any;
+  let testProject: Project;
   let mockGetActivePlan: ReturnType<typeof vi.fn>;
 
   beforeEach(async () => {
@@ -50,10 +50,9 @@ describe("Feature: Dataset File Upload REST API", () => {
       },
     });
 
-    testProject = projectFactory.build({ slug: nanoid() });
     testProject = await prisma.project.create({
       data: {
-        ...testProject,
+        ...buildProjectCreateData({ slug: nanoid() }),
         teamId: testTeam.id,
         personalFeatures: {},
       },

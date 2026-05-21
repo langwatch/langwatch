@@ -116,6 +116,15 @@ import { ExperimentRunStateRepositoryClickHouse, ExperimentRunStateRepositoryMem
 import { createExperimentRunItemAppendStore } from "../event-sourcing/pipelines/experiment-run-processing/projections/experimentRunResultStorage.store";
 import type { PipelineRepositories } from "../event-sourcing/pipelineRegistry";
 import { RetentionPolicyCache } from "../data-retention/retentionPolicyCache";
+import { DataRetentionPolicyRepository } from "../data-retention/policy/dataRetentionPolicy.repository";
+import { DataRetentionPolicyService } from "../data-retention/policy/dataRetentionPolicy.service";
+import { PinnedTraceRepository } from "../data-retention/pinning/pinnedTrace.repository";
+import { PinnedTraceService } from "../data-retention/pinning/pinnedTrace.service";
+import { RetroactiveUpdateService } from "../data-retention/retroactive/retroactiveUpdate.service";
+import { StorageMeterService } from "../data-retention/metering/storageMeter.service";
+import { OrphanSweepRepository } from "../data-retention/orphan-sweep/orphanSweep.repository";
+import { OrphanSweepService } from "../data-retention/orphan-sweep/orphanSweep.service";
+import type { DataRetentionDependencies } from "./dependencies";
 
 /**
  * Late-bound handle for the scenario execution reactor.
@@ -336,6 +345,37 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
 
   const retentionPolicyCache = new RetentionPolicyCache(prisma);
 
+  const dataRetentionPolicyRepo = new DataRetentionPolicyRepository(prisma);
+  const dataRetentionPolicyService = new DataRetentionPolicyService(
+    dataRetentionPolicyRepo,
+    retentionPolicyCache,
+  );
+  const pinnedTraceRepo = new PinnedTraceRepository(prisma);
+  const pinnedTraceService = new PinnedTraceService(
+    pinnedTraceRepo,
+    clickhouseEnabled ? resolveClickHouseClient : null,
+    retentionPolicyCache,
+  );
+  const retroactiveUpdateService = new RetroactiveUpdateService(
+    clickhouseEnabled ? resolveClickHouseClient : null,
+  );
+  const storageMeterService = new StorageMeterService(
+    clickhouseEnabled ? resolveClickHouseClient : null,
+  );
+  const orphanSweepRepo = new OrphanSweepRepository(prisma);
+  const orphanSweepService = new OrphanSweepService(
+    orphanSweepRepo,
+    clickhouseEnabled ? resolveClickHouseClient : null,
+  );
+
+  const dataRetention: DataRetentionDependencies = {
+    policy: dataRetentionPolicyService,
+    pinning: pinnedTraceService,
+    retroactive: retroactiveUpdateService,
+    metering: storageMeterService,
+    orphanSweep: orphanSweepService,
+  };
+
   const es = new EventSourcing({
     clickhouse: clickhouseEnabled ? resolveClickHouseClient : void 0,
     redis,
@@ -552,6 +592,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     nurturing,
     usageLimits,
     retentionPolicyCache,
+    dataRetention,
     commands,
     ops,
     _eventSourcing: es,
@@ -690,6 +731,13 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       scenarioExecutionHandle: { reactor: { name: "scenarioExecution", options: { runIn: ["worker"] }, handle: async () => {} }, setPool: () => {} },
     },
     retentionPolicyCache: new RetentionPolicyCache(testPrisma),
+    dataRetention: {
+      policy: new DataRetentionPolicyService(new DataRetentionPolicyRepository(testPrisma), new RetentionPolicyCache(testPrisma)),
+      pinning: new PinnedTraceService(new PinnedTraceRepository(testPrisma), null, new RetentionPolicyCache(testPrisma)),
+      retroactive: new RetroactiveUpdateService(null),
+      metering: new StorageMeterService(null),
+      orphanSweep: new OrphanSweepService(new OrphanSweepRepository(testPrisma), null),
+    },
     ...overrides,
   });
 }

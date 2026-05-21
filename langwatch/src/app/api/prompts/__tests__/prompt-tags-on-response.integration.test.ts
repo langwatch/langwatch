@@ -12,7 +12,7 @@ import {
   llmPromptConfigFactory,
   llmPromptConfigVersionFactory,
 } from "~/factories/llm-config.factory";
-import { projectFactory } from "~/factories/project.factory";
+import { buildProjectCreateData } from "~/factories/project.factory";
 import { prisma } from "~/server/db";
 import { app } from "../[[...route]]/app";
 
@@ -54,7 +54,7 @@ describe("Prompt tags appear in prompt responses", () => {
 
     testProject = await prisma.project.create({
       data: {
-        ...projectFactory.build({ slug: `test-project-${slug}` }),
+        ...buildProjectCreateData({ slug: `test-project-${slug}` }),
         teamId: testTeam.id,
         personalFeatures: {},
       },

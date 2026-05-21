@@ -1,12 +1,9 @@
-import { Prisma, PricingModel, type Organization } from "@prisma/client";
+import { PricingModel, type Organization } from "@prisma/client";
 import { Factory } from "fishery";
 import { nanoid } from "nanoid";
 
 export const organizationFactory = Factory.define<
-  Omit<Organization, "stripeCustomerId" | "currency"> & {
-    signupData: any;
-    defaultRetentionPolicy: any;
-  }
+  Omit<Organization, "stripeCustomerId" | "currency" | "signupData" | "defaultRetentionPolicy">
 >(({ sequence }) => ({
   id: nanoid(),
   name: `Test Organization ${sequence}`,
@@ -17,7 +14,6 @@ export const organizationFactory = Factory.define<
   usageSpendingMaxLimit: null,
   maxSessionDurationDays: 0,
   governanceLogContentMode: "full",
-  signupData: null,
   signedDPA: false,
   elasticsearchNodeUrl: null,
   elasticsearchApiKey: null,
@@ -36,5 +32,4 @@ export const organizationFactory = Factory.define<
   licenseExpiresAt: null,
   licenseLastValidatedAt: null,
   presenceEnabled: false,
-  defaultRetentionPolicy: null,
 }));

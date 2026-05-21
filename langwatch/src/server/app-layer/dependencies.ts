@@ -34,6 +34,19 @@ import type { UsageService } from "./usage/usage.service";
 import type { ExperimentService } from "../experiments/experiment.service";
 import type { TriggerService } from "./triggers/trigger.service";
 import type { RetentionPolicyCache } from "../data-retention/retentionPolicyCache";
+import type { DataRetentionPolicyService } from "../data-retention/policy/dataRetentionPolicy.service";
+import type { PinnedTraceService } from "../data-retention/pinning/pinnedTrace.service";
+import type { RetroactiveUpdateService } from "../data-retention/retroactive/retroactiveUpdate.service";
+import type { StorageMeterService } from "../data-retention/metering/storageMeter.service";
+import type { OrphanSweepService } from "../data-retention/orphan-sweep/orphanSweep.service";
+
+export interface DataRetentionDependencies {
+  policy: DataRetentionPolicyService;
+  pinning: PinnedTraceService;
+  retroactive: RetroactiveUpdateService;
+  metering: StorageMeterService;
+  orphanSweep: OrphanSweepService;
+}
 
 export interface OpsDependencies {
   queues: QueueService;
@@ -88,6 +101,7 @@ export interface AppDependencies {
   nurturing?: NurturingService;
   usageLimits: UsageLimitService;
   retentionPolicyCache: RetentionPolicyCache;
+  dataRetention: DataRetentionDependencies;
   commands: AppCommands;
   ops?: OpsDependencies;
 

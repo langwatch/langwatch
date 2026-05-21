@@ -8,6 +8,8 @@ import type { EvaluationCostRecorder } from "../app-layer/evaluations/evaluation
 import type { OrganizationService } from "../app-layer/organizations/organization.service";
 
 import type { TraceSummaryData } from "../app-layer/traces/types";
+import type { RetentionPolicyResolver } from "../data-retention/retentionPolicyResolver";
+import { getClickHouseClientForProject } from "../clickhouse/clickhouseClient";
 import type { BroadcastService } from "../app-layer/broadcast/broadcast.service";
 import type { FoldProjectionStore } from "./projections/foldProjection.types";
 import type { EvaluationExecutionService } from "../app-layer/evaluations/evaluation-execution.service";
@@ -192,7 +194,7 @@ export interface PipelineRegistryDeps {
   gatewayBudgetSync?: GatewayBudgetSyncReactorDeps;
   governanceKpisSync?: GovernanceKpisSyncReactorDeps;
   governanceOcsfEventsSync?: GovernanceOcsfEventsSyncReactorDeps;
-  retentionPolicyResolver?: import("../data-retention/retentionPolicyResolver").RetentionPolicyResolver;
+  retentionPolicyResolver?: RetentionPolicyResolver;
 }
 
 /**
@@ -651,7 +653,6 @@ export class PipelineRegistry {
     // Create the experimentId lookup function using the experiment run ClickHouse repository
     const lookupExperimentId = async (tenantId: string, runId: string): Promise<string | null> => {
       try {
-        const { getClickHouseClientForProject } = await import("../clickhouse/clickhouseClient");
         const client = await getClickHouseClientForProject(tenantId);
         if (!client) return null;
 

@@ -1,7 +1,7 @@
 import type { Organization, Project, Team } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { projectFactory } from "~/factories/project.factory";
+import { buildProjectCreateData } from "~/factories/project.factory";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import {
@@ -28,7 +28,7 @@ describe("Feature: REST API resource limit enforcement parity", () => {
   let testProjectId: string;
   let testOrganization: Organization;
   let testTeam: Team;
-  let testProject: any;
+  let testProject: Project;
 
   const authHeaders = (apiKey: string) => ({
     "X-Auth-Token": apiKey,
@@ -63,10 +63,9 @@ describe("Feature: REST API resource limit enforcement parity", () => {
       },
     });
 
-    testProject = projectFactory.build({ slug: nanoid() });
     testProject = await prisma.project.create({
       data: {
-        ...testProject,
+        ...buildProjectCreateData({ slug: nanoid() }),
         teamId: testTeam.id,
         personalFeatures: {},
       },

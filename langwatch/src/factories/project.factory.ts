@@ -1,5 +1,4 @@
 import {
-  Prisma,
   PIIRedactionLevel,
   type Project,
   ProjectSensitiveDataVisibilityLevel,
@@ -7,12 +6,7 @@ import {
 import { Factory } from "fishery";
 import { nanoid } from "nanoid";
 
-export type ProjectFactoryOutput = Omit<Project, "retentionPolicy"> & {
-  retentionPolicy: null;
-};
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const projectFactory = Factory.define<any>(({ sequence }) => ({
+export const projectFactory = Factory.define<Project>(({ sequence }) => ({
   id: nanoid(),
   name: `Test Project ${sequence}`,
   slug: `test-project-${sequence}`,
@@ -42,3 +36,8 @@ export const projectFactory = Factory.define<any>(({ sequence }) => ({
   costCenterId: null,
   retentionPolicy: null,
 }));
+
+export function buildProjectCreateData(overrides?: Partial<Project>) {
+  const { retentionPolicy: _, ...data } = projectFactory.build(overrides);
+  return data;
+}

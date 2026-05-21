@@ -1,7 +1,7 @@
 import type { Organization, Project, Team, Workflow } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { projectFactory } from "~/factories/project.factory";
+import { buildProjectCreateData } from "~/factories/project.factory";
 import { prisma } from "~/server/db";
 import { app } from "../[[...route]]/app";
 
@@ -10,7 +10,7 @@ describe("Workflows REST API", () => {
   let testProjectId: string;
   let testOrganization: Organization;
   let testTeam: Team;
-  let testProject: any;
+  let testProject: Project;
   let helpers: {
     api: {
       get: (path: string) => Response | Promise<Response>;
@@ -34,12 +34,9 @@ describe("Workflows REST API", () => {
       },
     });
 
-    testProject = projectFactory.build({
-      slug: nanoid(),
-    });
     testProject = await prisma.project.create({
       data: {
-        ...testProject,
+        ...buildProjectCreateData({ slug: nanoid() }),
         teamId: testTeam.id,
         personalFeatures: {},
       },
