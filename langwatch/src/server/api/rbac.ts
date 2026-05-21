@@ -861,20 +861,6 @@ export async function hasOrganizationPermission(
     return permission === "organization:view";
   }
 
-  // OrganizationUser.role=ADMIN is authoritative for org-scope
-  // permissions: an admin promoted via the Members UI (which writes
-  // OrganizationUser.role but doesn't seed an ORG-scope RoleBinding)
-  // would otherwise silently lose every org-scope read, even though
-  // the UI still presents them as "Admin". For non-org perms (gateway,
-  // audit, etc.) fall through to the RoleBinding + TeamUser fallback
-  // below so the existing legacy paths still resolve.
-  if (
-    orgMember.role === OrganizationUserRole.ADMIN &&
-    organizationRoleHasPermission(orgMember.role, permission)
-  ) {
-    return true;
-  }
-
   // Primary path: resolve via ORGANIZATION-scoped RoleBindings.
   const permittedByBindings = await checkPermissionFromBindings({
     prisma: ctx.prisma,
