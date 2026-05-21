@@ -93,7 +93,7 @@ export const AutomateButton: React.FC = () => {
                 <Icon boxSize={3.5}>
                   <ArrowUpRight />
                 </Icon>
-                Open original trace view
+                Set up automations (original view)
               </Button>
             </NextLink>
           </VStack>

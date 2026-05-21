@@ -18,6 +18,7 @@ import {
 import { resetTracesV2PromoSnooze } from "~/components/messages/NewTracesPromo";
 import { Menu } from "~/components/ui/menu";
 import { useDrawer } from "~/hooks/useDrawer";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useConversationTurns } from "../../../hooks/useConversationTurns";
 import { setTracesV2Preferred } from "../../../hooks/useTracesV2Preference";
 
@@ -52,6 +53,7 @@ export function TraceOverflowMenu({
   onTogglePinned,
 }: TraceOverflowMenuProps) {
   const { openDrawer } = useDrawer();
+  const { project } = useOrganizationTeamProject();
 
   const conversationTurns = useConversationTurns(conversationId);
   const conversationTraceIds =
@@ -82,22 +84,18 @@ export function TraceOverflowMenu({
       surface: "drawer_overflow_menu",
       traceId,
     });
-    // Hard-nav for symmetry with the v1→v2 opt-in (and the same
-    // reasoning — soft-swap races against Chakra's unmount-fired
-    // onOpenChange). Preserve non-drawer params (`span`, etc.).
-    if (typeof window !== "undefined") {
-      const url = new URL(window.location.href);
-      const drawerKeys: string[] = [];
-      url.searchParams.forEach((_, key) => {
-        if (key.startsWith("drawer.")) drawerKeys.push(key);
-      });
-      for (const key of drawerKeys) url.searchParams.delete(key);
-      url.searchParams.set("drawer.open", "traceDetails");
-      url.searchParams.set("drawer.traceId", traceId);
-      url.searchParams.set("drawer.selectedTab", "traceDetails");
-      window.location.href = url.toString();
+    // Hard-nav to /messages where the v1 traceDetails drawer is
+    // registered. Previously this rewrote params on the current URL
+    // (/traces), but the v2 hydrator ignores traceDetails — so the
+    // drawer never opened.
+    if (typeof window !== "undefined" && project?.slug) {
+      const params = new URLSearchParams();
+      params.set("drawer.open", "traceDetails");
+      params.set("drawer.traceId", traceId);
+      params.set("drawer.selectedTab", "traceDetails");
+      window.location.href = `/${project.slug}/messages?${params.toString()}`;
     }
-  }, [traceId]);
+  }, [traceId, project?.slug]);
 
   return (
     <Menu.Root positioning={{ placement: "bottom-end" }}>
