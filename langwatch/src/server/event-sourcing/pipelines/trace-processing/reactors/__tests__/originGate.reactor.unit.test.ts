@@ -111,7 +111,7 @@ describe("originGate reactor", () => {
       const reactor = createOriginGateReactor(deps);
 
       expect(reactor.options?.delay).toBe(5_000);
-      expect(reactor.options?.ttl).toBe(5_000);
+      expect(reactor.options?.ttl).toBe(15_000);
     });
 
     it("generates dedup key from tenant and trace", () => {
