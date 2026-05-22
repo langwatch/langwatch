@@ -84,7 +84,9 @@ type JobType =
   | "usage_stats"
   | "usage_reporting"
   | "event_sourcing"
-  | "scenario";
+  | "scenario"
+  | "langy_bootstrap"
+  | "langy_retention";
 
 type JobStatus = "processing" | "completed" | "failed";
 

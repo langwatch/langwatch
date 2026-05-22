@@ -160,7 +160,11 @@ export default function SettingsLayout({
 
           <NavSection
             label="Features"
-            paths={["/settings/annotation-scores", "/settings/topic-clustering"]}
+            paths={[
+              "/settings/annotation-scores",
+              "/settings/topic-clustering",
+              "/settings/langy-memory",
+            ]}
           >
             <MenuLink href="/settings/annotation-scores">Annotation Scores</MenuLink>
             {!isLiteMember && project?.slug && (
@@ -169,6 +173,7 @@ export default function SettingsLayout({
             {!isLiteMember && (
               <MenuLink href="/settings/topic-clustering">Topic Clustering</MenuLink>
             )}
+            <MenuLink href="/settings/langy-memory">Langy memory</MenuLink>
           </NavSection>
 
           {!isLiteMember && (

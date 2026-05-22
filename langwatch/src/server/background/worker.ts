@@ -47,6 +47,11 @@ import { SCENARIO_WORKER } from "../scenarios/scenario.constants";
 import { getScenarioExecutionHandle } from "../app-layer/presets";
 import { monitoredQueues } from "./queues";
 import { startUsageStatsWorker } from "./workers/usageStatsWorker";
+import { startLangyBootstrapWorker } from "./workers/langyBootstrapWorker";
+import {
+  startLangyRetentionWorker,
+} from "./workers/langyRetentionWorker";
+import { scheduleLangyRetention } from "./queues/langyRetentionQueue";
 
 const logger = createLogger("langwatch:workers");
 
@@ -160,6 +165,9 @@ export const start = async (
     );
     const topicClusteringWorker = startTopicClusteringWorker();
     const usageStatsWorker = startUsageStatsWorker();
+    const langyBootstrapWorker = startLangyBootstrapWorker();
+    const langyRetentionWorker = startLangyRetentionWorker();
+    void scheduleLangyRetention().catch(() => undefined);
     const metricsServer = startMetricsServer();
 
     // Register all closeables for graceful shutdown
@@ -167,6 +175,8 @@ export const start = async (
     registerCloseable("evaluations", evaluationsWorker);
     registerCloseable("topicClustering", topicClusteringWorker);
     registerCloseable("usageStats", usageStatsWorker);
+    registerCloseable("langyBootstrap", langyBootstrapWorker);
+    registerCloseable("langyRetention", langyRetentionWorker);
     registerCloseable("scenario", scenarioProcessor);
     registerCloseable("metricsServer", {
       close: () =>

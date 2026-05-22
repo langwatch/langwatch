@@ -39,6 +39,12 @@ import { trackEvent } from "../utils/tracking";
 import { GlobalTraceV2DrawerMount } from "../features/traces-v2/components/GlobalTraceV2DrawerMount";
 import { AnnouncementBanner } from "./AnnouncementBanner";
 import { CurrentDrawer } from "./CurrentDrawer";
+import { LangyProvider, useLangy } from "./langy/LangyContext";
+import {
+  LangyDrawer,
+  LANGY_DOCKED_OFFSET,
+  LANGY_TRANSITION,
+} from "./langy/LangySidebar";
 import { FullLogo } from "./icons/FullLogo";
 import { LogoIcon } from "./icons/LogoIcon";
 import { LoadingScreen } from "./LoadingScreen";
@@ -365,13 +371,14 @@ export const DashboardLayout = ({
   // avatar-menu entry so it stays off the other surfaces' chrome.
   const showPresenceMenuItem = router.pathname.startsWith("/[project]/traces");
 
+  const isProjectRoute =
+    router.pathname === "/[project]" ||
+    router.pathname.startsWith("/[project]/");
+  const showLangy = !publicPage && userIsPartOfTeam && isProjectRoute;
+
   return (
-    <Box
-      width="full"
-      minHeight="100vh"
-      background="bg.page"
-      overflowX={["auto", "auto", "hidden"]}
-    >
+    <LangyProvider>
+      <LangyShiftedRoot showLangy={showLangy}>
       <Head>
         <title>
           LangWatch{project ? ` - ${project.name}` : ""}
@@ -820,10 +827,48 @@ export const DashboardLayout = ({
           Toast lives in the toaster portal that's already at the app
           root; nothing else to mount here. See
           specs/model-providers/missing-model-popup.feature. */}
-    </Box>
+    </LangyShiftedRoot>
+    </LangyProvider>
   );
 };
 
+function LangyShiftedRoot({
+  showLangy,
+  children,
+}: {
+  showLangy: boolean;
+  children: React.ReactNode;
+}) {
+  const { isOpen } = useLangy();
+  const shifted = showLangy && isOpen;
+  return (
+    <>
+      <Box
+        width="full"
+        minHeight="100vh"
+        background="bg.page"
+        overflowX={["auto", "auto", "hidden"]}
+        paddingRight={shifted ? `${LANGY_DOCKED_OFFSET}px` : 0}
+        transition={`padding-right ${LANGY_TRANSITION}`}
+      >
+        {children}
+      </Box>
+      {showLangy && <LangyDrawerConnected />}
+    </>
+  );
+}
+
+function LangyDrawerConnected() {
+  const { isOpen, setIsOpen, proposalHandlers, experimentSlug } = useLangy();
+  return (
+    <LangyDrawer
+      isOpen={isOpen}
+      onOpenChange={setIsOpen}
+      proposalHandlers={proposalHandlers}
+      experimentSlug={experimentSlug}
+    />
+  );
+}
 
 function GlobalUpgradeModal() {
   const { isOpen, variant, close } = useUpgradeModalStore();
