@@ -624,9 +624,11 @@ local activeKey    = keyPrefix .. "group:" .. groupId .. ":active"
 redis.call("SADD", blockedKey, groupId)
 
 -- 2. Re-stage the failed job with a new ID
-redis.call("ZADD", groupJobsKey, score, newStagedJobId)
+local inserted = redis.call("ZADD", groupJobsKey, score, newStagedJobId)
 redis.call("HSET", groupDataKey, newStagedJobId, jobDataJson)
-redis.call("INCR", totalPendingKey)
+if inserted == 1 then
+  redis.call("INCR", totalPendingKey)
+end
 
 -- 3. Remove from ready set — blocked groups should not be scanned by dispatch.
 --    UNBLOCK_LUA re-adds the group when it is unblocked.
@@ -697,9 +699,11 @@ end
 -- 2. Re-stage job with future score (backoff delay)
 local groupJobsKey = keyPrefix .. "group:" .. groupId .. ":jobs"
 local groupDataKey = keyPrefix .. "group:" .. groupId .. ":data"
-redis.call("ZADD", groupJobsKey, dispatchAfterMs, newStagedJobId)
+local inserted = redis.call("ZADD", groupJobsKey, dispatchAfterMs, newStagedJobId)
 redis.call("HSET", groupDataKey, newStagedJobId, jobDataJson)
-redis.call("INCR", totalPendingKey)
+if inserted == 1 then
+  redis.call("INCR", totalPendingKey)
+end
 
 -- 3. Update ready set score = future dispatch time so the group becomes
 --    eligible exactly when the backoff window expires.
