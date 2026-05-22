@@ -1805,19 +1805,22 @@ describe("GroupStagingScripts", () => {
         });
         expect(first.map((r) => r.groupId)).toContain("proj_noisy/g1");
         expect(first.map((r) => r.groupId)).toContain("proj_noisy/g2");
+        expect(first.map((r) => r.groupId)).toContain("proj_quiet/g1");
 
-        // restageAndBlock frees g1's slot (counter 2→1), but g2 is still
-        // active so proj_noisy stays at cap (1 active, cap=2 → under cap?).
-        // No — we need tenant to remain AT cap after restage. With cap=2,
-        // first batch dispatches g1+g2 (counter=2). Restage g1 drops to 1.
-        // That's under cap=2, so g3 would dispatch. Set cap back to 1 so
-        // the remaining active g2 (counter=1) keeps tenant at cap.
+        // restageAndBlock frees g1's slot (counter 2→1). g2 still active
+        // so proj_noisy counter = 1. Complete proj_quiet/g1 so it frees
+        // its slot (counter 0). Now lower cap to 1: proj_noisy (counter=1)
+        // is at cap, proj_quiet (counter=0) is under cap.
         await scripts.restageAndBlock({
           groupId: "proj_noisy/g1",
           newStagedJobId: "j1-retry",
           score: 5000,
           jobDataJson: first.find((r) => r.groupId === "proj_noisy/g1")!.jobDataJson,
           errorMessage: "test",
+        });
+        await scripts.complete({
+          groupId: "proj_quiet/g1",
+          stagedJobId: first.find((r) => r.groupId === "proj_quiet/g1")!.stagedJobId,
         });
         process.env[TENANT_CAP_ENV] = "1";
 
