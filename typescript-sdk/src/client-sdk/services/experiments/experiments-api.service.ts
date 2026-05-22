@@ -284,7 +284,7 @@ export class ExperimentsApiService {
       operation: `get run results for "${runId}"`,
     });
     if (body === null) {
-      throw this.handleApiError(`get run results for "${runId}"`, {
+      this.handleApiError(`get run results for "${runId}"`, {
         response: { status: 404 },
         data: { error: `Run not found: ${runId}` },
       });
