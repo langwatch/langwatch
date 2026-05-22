@@ -33,7 +33,9 @@ const workflowFiles = (repoRoot: string): string[] => {
 };
 
 export const jobBlocks = (lines: string[]): JobBlock[] => {
-  const jobsStart = lines.findIndex((line) => /^jobs:\s*$/.test(line));
+  const jobsStart = lines.findIndex((line) =>
+    /^jobs:\s*(?:#.*)?$/.test(line),
+  );
   if (jobsStart === -1) {
     return [];
   }
@@ -47,7 +49,7 @@ export const jobBlocks = (lines: string[]): JobBlock[] => {
       break;
     }
 
-    const match = /^  ([A-Za-z0-9_-]+):\s*$/.exec(line);
+    const match = /^  ["']?([A-Za-z0-9_-]+)["']?:\s*(?:#.*)?$/.exec(line);
     if (match?.[1]) {
       if (current) {
         jobs.push(current);

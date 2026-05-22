@@ -52,4 +52,15 @@ describe("pull_request_target workflow guard", () => {
     );
     assert.equal(hasSafeGate(gatedJob), true);
   });
+
+  it("extracts commented jobs keys", () => {
+    const [job] = jobBlocks([
+      "jobs: # workflow jobs",
+      "  'build': # comment after job key",
+      "    runs-on: ubuntu-latest",
+    ]);
+
+    assert.ok(job);
+    assert.equal(job.name, "build");
+  });
 });
