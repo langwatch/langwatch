@@ -6,7 +6,7 @@ on:
       - ".github/workflows/*.yml"
       - ".github/workflows/*.yaml"
       - ".github/actions/**"
-      - ".github/scripts/guard-pull-request-target.ts"
+      - ".github/scripts/guard-pull-request-target*.ts"
   push:
     branches:
       - main
@@ -14,7 +14,7 @@ on:
       - ".github/workflows/*.yml"
       - ".github/workflows/*.yaml"
       - ".github/actions/**"
-      - ".github/scripts/guard-pull-request-target.ts"
+      - ".github/scripts/guard-pull-request-target*.ts"
   workflow_dispatch:
 
 permissions:
@@ -61,6 +61,10 @@ jobs:
         if: github.event_name == 'pull_request'
         run: node --experimental-strip-types "${{ steps.guard-script.outputs.path }}" pr
 
+      - name: Check guard tests on PR
+        if: github.event_name == 'pull_request'
+        run: node --test --experimental-strip-types pr/.github/scripts/guard-pull-request-target.test.ts
+
       - name: Checkout repository
         if: github.event_name != 'pull_request'
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -70,3 +74,7 @@ jobs:
       - name: Check privileged workflow gates
         if: github.event_name != 'pull_request'
         run: node --experimental-strip-types .github/scripts/guard-pull-request-target.ts
+
+      - name: Check guard tests
+        if: github.event_name != 'pull_request'
+        run: node --test --experimental-strip-types .github/scripts/guard-pull-request-target.test.ts

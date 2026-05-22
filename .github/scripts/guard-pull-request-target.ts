@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { readdirSync, readFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 
 const defaultRepoRoot = ".";
 const guardWorkflow = ".github/workflows/workflow-security-guard.yml";
@@ -31,7 +32,7 @@ const workflowFiles = (repoRoot: string): string[] => {
     .map((file) => resolve(workflowDir, file));
 };
 
-const jobBlocks = (lines: string[]): JobBlock[] => {
+export const jobBlocks = (lines: string[]): JobBlock[] => {
   const jobsStart = lines.findIndex((line) => /^jobs:\s*$/.test(line));
   if (jobsStart === -1) {
     return [];
@@ -65,15 +66,58 @@ const jobBlocks = (lines: string[]): JobBlock[] => {
   return jobs;
 };
 
-const usesPullRequestTarget = (lines: string[]): boolean =>
-  lines.some((line) => /^\s*pull_request_target:\s*$/.test(line));
+const stripYamlComment = (line: string): string => {
+  const trimmed = line.trim();
+  if (trimmed.startsWith("#")) {
+    return "";
+  }
+
+  return trimmed.replace(/\s+#.*$/, "").trim();
+};
+
+export const usesPullRequestTarget = (lines: string[]): boolean =>
+  lines.some((line) =>
+    /(^|[{,\s])pull_request_target\s*:/.test(stripYamlComment(line)),
+  );
 
 const hasUnsafeCheckout = (jobText: string): boolean =>
   jobText.includes("actions/checkout") &&
   unsafeHeadRefPatterns.some((pattern) => jobText.includes(pattern));
 
-const hasSafeGate = (jobText: string): boolean =>
-  safeGatePatterns.some((pattern) => pattern.test(jobText));
+export const jobIfExpression = (job: JobBlock): string | undefined => {
+  const ifStart = job.lines.findIndex((line) => /^    if:\s*/.test(line));
+  if (ifStart === -1) {
+    return undefined;
+  }
+
+  const firstLine = job.lines[ifStart] ?? "";
+  const firstValue = stripYamlComment(firstLine.replace(/^    if:\s*/, ""));
+  const ifLines =
+    /^(?:[>|][+-]?)?$/.test(firstValue) || firstValue === ""
+      ? []
+      : [firstValue];
+
+  for (let index = ifStart + 1; index < job.lines.length; index++) {
+    const line = job.lines[index] ?? "";
+    if (/^    \S/.test(line)) {
+      break;
+    }
+
+    const value = stripYamlComment(line);
+    if (value) {
+      ifLines.push(value);
+    }
+  }
+
+  return ifLines.join("\n");
+};
+
+export const hasSafeGate = (job: JobBlock): boolean => {
+  const ifExpression = jobIfExpression(job);
+  return ifExpression !== undefined
+    ? safeGatePatterns.some((pattern) => pattern.test(ifExpression))
+    : false;
+};
 
 const validateGuardWorkflow = (repoRoot: string, errors: string[]): void => {
   const path = resolve(repoRoot, guardWorkflow);
@@ -109,7 +153,7 @@ const main = (): number => {
 
     for (const job of jobBlocks(lines)) {
       const jobText = job.lines.join("\n");
-      if (hasUnsafeCheckout(jobText) && !hasSafeGate(jobText)) {
+      if (hasUnsafeCheckout(jobText) && !hasSafeGate(job)) {
         errors.push(
           `${displayPath(repoRoot, path)}:${job.startLine}: job \`${job.name}\` checks out PR-head code ` +
             "from pull_request_target without an `approved-ci` or same-repo gate",
@@ -130,4 +174,10 @@ const main = (): number => {
   return 0;
 };
 
-process.exitCode = main();
+const isEntrypoint = (): boolean =>
+  process.argv[1] !== undefined &&
+  import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
+
+if (isEntrypoint()) {
+  process.exitCode = main();
+}
