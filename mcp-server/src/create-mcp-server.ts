@@ -10,6 +10,7 @@ import {
 import { handleExperimentResults } from "./tools/get-experiment-results.js";
 import { handleExperimentListRuns } from "./tools/list-experiment-runs.js";
 import { handleExperimentList } from "./tools/list-experiments.js";
+import { handleRunExperiment, handleExperimentStatus } from "./tools/run-experiment.js";
 
 const modelSchema = z
   .string()
@@ -1554,7 +1555,6 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     },
     withToolLogging("platform_run_experiment", async (params) => {
       requireApiKey();
-      const { handleRunExperiment } = await import("./tools/run-experiment.js");
       return {
         content: [{ type: "text", text: await handleRunExperiment(params) }],
       };
@@ -1569,7 +1569,6 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     },
     withToolLogging("platform_experiment_status", async (params) => {
       requireApiKey();
-      const { handleExperimentStatus } = await import("./tools/run-experiment.js");
       return {
         content: [{ type: "text", text: await handleExperimentStatus(params) }],
       };
