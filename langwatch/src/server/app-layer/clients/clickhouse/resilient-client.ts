@@ -16,12 +16,36 @@ const TRANSIENT_NETWORK_CODES = new Set([
   "ETIMEDOUT",
 ]);
 
+/**
+ * ClickHouse server error fragments that indicate a transient condition.
+ * Mirrors `classifyClickHouseError` in event-sourcing/services/errorHandling.ts
+ * so the inline insert retry loop catches the same cluster-recovery cases
+ * (ZK reconnect, replica shutdown, KILL during graceful shutdown) as the
+ * outer group-queue retry layer.
+ */
+const TRANSIENT_MESSAGE_FRAGMENTS = [
+  "MEMORY_LIMIT_EXCEEDED",
+  "QUERY_WAS_CANCELLED",
+  "Query was cancelled",
+  "TABLE_IS_READ_ONLY",
+  "Table is in readonly mode",
+  "KEEPER_EXCEPTION",
+  "Coordination::Exception",
+  "Session expired",
+  "Connection loss",
+  "CANNOT_READ_ALL_DATA",
+  "Write buffer has been canceled",
+  "NETWORK_ERROR",
+] as const;
+
 function isTransientError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
 
   const message = error.message;
-  if (message.includes("MEMORY_LIMIT_EXCEEDED")) return true;
   if (/timeout/i.test(message)) return true;
+  for (const fragment of TRANSIENT_MESSAGE_FRAGMENTS) {
+    if (message.includes(fragment)) return true;
+  }
 
   const code = (error as NodeJS.ErrnoException).code;
   if (code && TRANSIENT_NETWORK_CODES.has(code)) return true;
