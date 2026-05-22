@@ -1733,6 +1733,7 @@ describe("GroupStagingScripts", () => {
     });
 
     describe("when the happy path completes normally", () => {
+      /** @scenario Counter tracks jobs in :jobs ZSETs through happy path */
       it("total-pending returns to 0 after stage → dispatch → complete", async () => {
         await scripts.stage(makeJob({ stagedJobId: "j1", groupId: "g1", dispatchAfterMs: 100 }));
         await scripts.stage(makeJob({ stagedJobId: "j2", groupId: "g2", dispatchAfterMs: 100 }));
@@ -1753,6 +1754,7 @@ describe("GroupStagingScripts", () => {
     });
 
     describe("when active key expires before COMPLETE", () => {
+      /** @scenario Counter stays accurate when activeKey expires before COMPLETE */
       it("counter stays accurate — DECR happened at dispatch, not complete", async () => {
         await scripts.stage(makeJob({ stagedJobId: "j1", groupId: "g-leak", dispatchAfterMs: 100 }));
         expect(await inspectTotalPending()).toBe(1);
@@ -1776,6 +1778,7 @@ describe("GroupStagingScripts", () => {
     });
 
     describe("when a job is retried via retryRestage", () => {
+      /** @scenario Counter tracks retry restage as a new pending job */
       it("total-pending returns to 0 after stage → dispatch → retryRestage → dispatch → complete", async () => {
         await scripts.stage(makeJob({ stagedJobId: "j1", groupId: "g-retry", dispatchAfterMs: 100 }));
         expect(await inspectTotalPending()).toBe(1);
@@ -1810,6 +1813,7 @@ describe("GroupStagingScripts", () => {
     });
 
     describe("when a job exhausts retries via restageAndBlock", () => {
+      /** @scenario Counter tracks restage-and-block as a new pending job */
       it("total-pending returns to 0 after stage → dispatch → restageAndBlock → unblock → dispatch → complete", async () => {
         await scripts.stage(makeJob({ stagedJobId: "j1", groupId: "g-block", dispatchAfterMs: 100 }));
         expect(await inspectTotalPending()).toBe(1);
@@ -1934,6 +1938,7 @@ describe("GroupStagingScripts", () => {
     });
 
     describe("counter reconciliation invariant", () => {
+      /** @scenario Counter equals sum of all :jobs ZSET cardinalities */
       it("total-pending equals sum of ZCARD(:jobs) across all groups", async () => {
         await scripts.stage(makeJob({ stagedJobId: "a1", groupId: "g-recon-a", dispatchAfterMs: 100 }));
         await scripts.stage(makeJob({ stagedJobId: "a2", groupId: "g-recon-a", dispatchAfterMs: 200 }));
