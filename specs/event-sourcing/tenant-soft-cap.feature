@@ -82,3 +82,29 @@ Feature: Per-tenant soft cap on in-flight dispatch
     Given the env var "LANGWATCH_DISPATCH_TENANT_CAP" is set to "0"
     When a full dispatch then completion lifecycle runs for any tenant
     Then no tenant counter keys are ever created in Redis
+
+  # DISPATCH_BATCH_LUA parity — the batch path shares the same cap logic
+  # but iterates multiple groups per EVAL. These scenarios guard against
+  # the batch branch drifting from the single-dispatch path above.
+
+  @integration @tenant-cap @batch @fairness
+  Scenario: DISPATCH_BATCH skips over-cap groups and dispatches under-cap groups in one call
+    Given a tenant "proj_noisy" with cap=1 and 5 groups on the ready zset
+    And a tenant "proj_quiet" with 1 group later in the zset
+    When DISPATCH_BATCH_LUA is invoked with maxJobs=10
+    Then "proj_noisy" dispatches exactly 1 group (hitting cap)
+    And "proj_quiet" dispatches its group in the same batch
+
+  @integration @tenant-cap @batch @blocked
+  Scenario: Over-cap tenant with a blocked group does not affect other tenants
+    Given a tenant "proj_noisy" at cap with a blocked group from a prior retry
+    And a tenant "proj_quiet" with dispatchable groups
+    When DISPATCH_BATCH_LUA is invoked
+    Then "proj_noisy"'s blocked group is not dispatched
+    And "proj_quiet"'s groups dispatch normally
+
+  @integration @tenant-cap @batch @cleanup
+  Scenario: Drift cleanup runs for under-cap tenants in batch dispatch
+    Given a tenant "proj_acme" with a zombie group (empty jobs zset) on the ready zset
+    When DISPATCH_BATCH_LUA is invoked
+    Then the zombie group is removed from the ready zset

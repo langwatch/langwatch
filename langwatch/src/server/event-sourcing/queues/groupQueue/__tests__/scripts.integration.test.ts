@@ -1714,6 +1714,8 @@ describe("GroupStagingScripts", () => {
       expect(results[0]!.stagedJobId).toBe("j1");
     });
 
+    // Parity with specs/event-sourcing/tenant-soft-cap.feature
+    // @integration @tenant-cap @batch scenarios
     describe("when tenant cap interacts with dispatchBatch", () => {
       const TENANT_CAP_ENV = "LANGWATCH_DISPATCH_TENANT_CAP";
       let originalEnv: string | undefined;
@@ -1730,6 +1732,7 @@ describe("GroupStagingScripts", () => {
         }
       });
 
+      /** @scenario DISPATCH_BATCH skips over-cap groups and dispatches under-cap groups in one call */
       it("over-cap tenant groups are skipped, under-cap tenant groups dispatch", async () => {
         process.env[TENANT_CAP_ENV] = "1";
 
@@ -1762,6 +1765,7 @@ describe("GroupStagingScripts", () => {
         expect(dispatched).toHaveLength(2);
       });
 
+      /** @scenario Over-cap tenant with a blocked group does not affect other tenants */
       it("over-cap tenant blocked group is skipped without SISMEMBER affecting dispatch", async () => {
         process.env[TENANT_CAP_ENV] = "1";
 
@@ -1812,6 +1816,7 @@ describe("GroupStagingScripts", () => {
         expect(second.map((r) => r.groupId)).not.toContain("proj_noisy/g2");
       });
 
+      /** @scenario Drift cleanup runs for under-cap tenants in batch dispatch */
       it("drift cleanup still runs for under-cap tenants with empty job ZSETs", async () => {
         process.env[TENANT_CAP_ENV] = "10";
 
