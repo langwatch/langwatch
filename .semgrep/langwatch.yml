@@ -90,3 +90,60 @@ rules:
     pattern-either:
       - pattern-regex: '\$\{CLICKHOUSE_DATABASE\}\.\w+'
       - pattern-regex: '\b(FROM|JOIN|INTO|UPDATE|TABLE|VIEW|EXISTS|DROP)[[:space:]]+langwatch\.[a-z_]+'
+
+  # ── ClickHouse runtime queries must filter by TenantId ─────────────────
+  # Surfaced as a follow-up by CR on PR #4170: every ClickHouse query MUST
+  # include `WHERE TenantId = {tenantId:String}` to keep tenants isolated.
+  # Migrations (DDL) are exempt — they don't filter by tenant. This rule
+  # targets query files only, where a missing TenantId predicate is a
+  # cross-tenant leak.
+  - id: clickhouse-require-tenant-id
+    message: >
+      ClickHouse query missing `WHERE TenantId = {tenantId:String}`
+      predicate. Every runtime query must filter by TenantId to keep
+      tenants isolated. See
+      `dev/docs/best_practices/clickhouse-queries.md` § Tenant scoping.
+    severity: ERROR
+    languages: [typescript, javascript]
+    paths:
+      include:
+        - "langwatch/src/server/clickhouse/**/*.ts"
+        - "langwatch/src/server/repositories/**/clickhouse*.ts"
+      exclude:
+        - "**/migrations/**"
+        - "**/__tests__/**"
+        - "**/*.test.ts"
+        - "**/*.spec.ts"
+    patterns:
+      - pattern-either:
+          - pattern: clickhouse.query({ query: $Q, ... })
+          - pattern: clickhouse.exec({ query: $Q, ... })
+          - pattern: clickhouseClient.query({ query: $Q, ... })
+      - pattern-not-regex: 'TenantId\s*=\s*\{tenantId'
+
+  # ── ClickHouse dedup anti-pattern: ORDER BY … LIMIT 1 + heavy cols ─────
+  # Anti-pattern 1 from clickhouse-queries.md. Reading heavy columns while
+  # sorting all unmerged versions of a row saturates ClickHouse.
+  - id: clickhouse-no-version-order-limit
+    message: >
+      ClickHouse query selects heavy columns AND uses
+      `ORDER BY <Version|UpdatedAt> DESC LIMIT 1` to pick the latest
+      version. This loads every unmerged version of every matching row
+      into memory before sorting. Use the IN-tuple dedup pattern
+      (lightweight key columns inner subquery + heavy columns in the
+      outer select). See
+      `dev/docs/best_practices/clickhouse-queries.md` § Anti-Pattern 1.
+    severity: WARNING
+    languages: [generic]
+    paths:
+      include:
+        - "langwatch/src/server/clickhouse/**/*.ts"
+        - "langwatch/src/server/clickhouse/**/*.sql"
+      exclude:
+        - "**/migrations/**"
+        - "**/__tests__/**"
+        - "**/*.test.ts"
+        - "**/*.spec.ts"
+    patterns:
+      - pattern-regex: '(Messages|ComputedInput|Inputs|Details|SpanAttributes|RoleCosts|Metadata)\b'
+      - pattern-regex: 'ORDER\s+BY\s+\w*(Version|UpdatedAt)\s+DESC\s+LIMIT\s+1'

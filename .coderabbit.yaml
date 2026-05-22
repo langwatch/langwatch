@@ -189,6 +189,129 @@ reviews:
         `IRREVERSIBLE:` explaining why (data-destructive, schema-only, etc.).
         FAIL when neither is present.
 
+    # ── House-style rules sourced from dev/docs/best_practices/ ────────────
+    # Cite the source doc in your comment so authors can read the rationale.
+
+    # react.md: hooks must not return JSX. Hooks return state + callbacks;
+    # the consumer renders. JSX-returning hooks couple rendering to logic
+    # and hide the component tree.
+    - path: "langwatch/src/**/hooks/**/*.{ts,tsx}"
+      instructions: |
+        Flag ONLY on newly added or modified lines.
+
+        FAIL when a hook function (name starts with `use`) returns JSX.
+        Hooks return state and callbacks; consumers render. Cite
+        `dev/docs/best_practices/react.md` § Hooks.
+
+    # react.md: hook files should be .ts, not .tsx. A .tsx hook file means
+    # the hook returns JSX — same anti-pattern as above.
+    - path: "langwatch/src/**/hooks/**/use*.tsx"
+      instructions: |
+        FAIL: hook files must be `.ts`, not `.tsx`. A `.tsx` hook file is
+        a smell — the JSX belongs in the consumer component. Move the JSX
+        out and rename to `.ts`. See `dev/docs/best_practices/react.md`.
+
+    # typescript.md: exhaustive switches need a `never` check in default.
+    - path: "langwatch/src/**/*.{ts,tsx}"
+      instructions: |
+        Flag ONLY on newly added or modified lines.
+
+        FAIL when a NEW `switch` over a discriminated-union or enum type
+        lacks an exhaustiveness check in the `default:` case. The check
+        must assign the scrutinee to a `never`-typed variable
+        (`const _exhaustive: never = x;` or `assertNever(x);`). Without it,
+        adding a new variant later silently falls through. See
+        `dev/docs/best_practices/typescript.md` § Exhaustive switches.
+
+    # typescript.md: named params for 2+ args on exported functions.
+    - path: "langwatch/src/**/*.{ts,tsx}"
+      instructions: |
+        Flag ONLY on newly added or modified lines.
+
+        FAIL when a NEW exported function takes 2+ positional parameters
+        of the same primitive type (string, string, string) or where the
+        call site is non-obvious (`(scenarioId, target, setId)`). Use
+        object-destructuring instead: `({ scenarioId, target, setId })`.
+        Two-parameter functions where the types differ obviously
+        (e.g., `(id: string, options: { ... })`) are fine. See
+        `dev/docs/best_practices/typescript.md` § Named parameters.
+
+    # soft-delete-vs-archive.md: archivedAt, not deletedAt.
+    - path: "langwatch/{prisma/schema.prisma,src/server/**/*.{ts,tsx}}"
+      instructions: |
+        Flag ONLY on newly added or modified lines.
+
+        FAIL when a NEW Prisma model field, repository method, or service
+        method introduces `deletedAt` for soft-delete semantics. The
+        house pattern is `archivedAt DateTime?` with a `findAll` that
+        filters `archivedAt IS NULL` by default, plus
+        `find*IncludingArchived` variants for the cases that need them.
+        Existing `deletedAt` fields are out of scope here (migration is
+        tracked in #1889). See
+        `dev/docs/best_practices/soft-delete-vs-archive.md`.
+
+    # ksuids.md: user-facing IDs use KSUIDs at the service/repository layer.
+    - path: "langwatch/src/server/{repositories,services}/**/*.ts"
+      instructions: |
+        Flag ONLY on newly added or modified lines.
+
+        FAIL when a NEW repository or service `create` method writes a
+        user-facing entity (one that shows up in URLs, API responses,
+        exports, or webhooks) using a Prisma default id
+        (`@default(nanoid())`, `@default(cuid())`, `@default(uuid())`)
+        instead of generating a prefixed KSUID via
+        `generate(KSUID_RESOURCES.X).toString()`. Internal join tables
+        (`*Scope`, `*Link`) may keep Prisma defaults. See
+        `dev/docs/best_practices/ksuids.md`.
+
+    # clickhouse-queries.md anti-pattern 1: ORDER BY <version> DESC LIMIT 1.
+    - path: "langwatch/src/server/clickhouse/**/*.{ts,sql}"
+      instructions: |
+        Flag ONLY on newly added or modified lines.
+
+        FAIL when a NEW ClickHouse query selects heavy columns (Messages,
+        ComputedInput, Inputs, Details, SpanAttributes, RoleCosts,
+        Metadata) AND uses one of these anti-patterns:
+
+          (a) `ORDER BY <Version|UpdatedAt> DESC LIMIT 1` to pick the
+              latest version. Use the IN-tuple dedup pattern instead.
+          (b) `LIMIT 1 BY <key>` over heavy columns. Move the dedup into
+              a lightweight inner subquery (key columns only) and select
+              heavy columns in the outer query.
+
+        Cite `dev/docs/best_practices/clickhouse-queries.md` § Deduplication.
+
+    # design/guidelines.md §6: form Save button disables only on isPending,
+    # never on !form.formState.isValid. Pre-disabling is silent and
+    # frustrating; validation errors must surface inline or via toast.
+    - path: "langwatch/src/**/*.tsx"
+      instructions: |
+        Flag ONLY on newly added or modified lines.
+
+        FAIL when a NEW submit button uses `disabled={!form.formState.isValid}`,
+        `disabled={!isValid}`, `disabled={!formState.isValid}`, or any
+        variant that disables the button based on validity state.
+        Submit buttons disable ONLY while a request is in flight
+        (`disabled={mutation.isPending}` is the canonical shape).
+        Validation errors must surface inline (Field.ErrorText) or via
+        toast in the submit handler. See
+        `dev/docs/design/guidelines.md` § 6 and ADR-018.
+
+    # design/guidelines.md §3: prefer Drawer wrapper, not raw Chakra Modal.
+    # Biome's noRestrictedImports already bans @chakra-ui/react Dialog/Drawer/
+    # Modal — this catches the path_instructions side (new code introducing
+    # modal-style flows that should use Dialog wrapper).
+    - path: "langwatch/src/**/*.tsx"
+      instructions: |
+        Flag ONLY on newly added or modified lines.
+
+        FAIL when NEW resource creation, editing, or selection flows are
+        wired through a Dialog-style modal instead of a Drawer (e.g.,
+        adding a new "Create X" form behind a centered modal). Drawers
+        maintain context by keeping the underlying page visible.
+        Confirmation prompts (delete, discard) and simple alerts may
+        stay as Dialogs. See `dev/docs/design/guidelines.md` § 3.
+
     # ── AC7: SOLID / Clean Code / KISS / YAGNI / Boy Scout ─────────────────
     # Principle-level checks. Each FAIL is one specific, observable failure
     # mode — not vibes-based "this looks SOLID-y" judgement. All flag only
@@ -303,6 +426,11 @@ chat:
 
 knowledge_base:
   # Capture house-style markers deterministically. Cheap, single-line addition.
+  # Includes best_practices (TypeScript, React, ClickHouse, KSUIDs, repository
+  # pattern, soft-delete, etc.), design system (Chakra wrappers, drawer
+  # preference, form submit-then-surface), and ADRs (RBAC, event sourcing,
+  # logging, repository-service layering, form validation, etc.) so CR can
+  # cite the source in its review comments.
   code_guidelines:
     enabled: true
     filePatterns:
@@ -310,6 +438,9 @@ knowledge_base:
       - "**/CLAUDE.md"
       - "AGENTS.md"
       - "dev/docs/best_practices/**/*.md"
+      - "dev/docs/design/**/*.md"
+      - "dev/docs/adr/**/*.md"
+      - "docs/adr/**/*.md"
   # Off per #3754 non-goals.
   learnings:
     scope: local
