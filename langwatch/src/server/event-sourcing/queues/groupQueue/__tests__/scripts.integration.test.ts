@@ -1713,6 +1713,140 @@ describe("GroupStagingScripts", () => {
       expect(results).toHaveLength(1);
       expect(results[0]!.stagedJobId).toBe("j1");
     });
+
+    describe("when tenant cap interacts with dispatchBatch", () => {
+      const TENANT_CAP_ENV = "LANGWATCH_DISPATCH_TENANT_CAP";
+      let originalEnv: string | undefined;
+
+      beforeEach(() => {
+        originalEnv = process.env[TENANT_CAP_ENV];
+      });
+
+      afterEach(() => {
+        if (originalEnv === undefined) {
+          delete process.env[TENANT_CAP_ENV];
+        } else {
+          process.env[TENANT_CAP_ENV] = originalEnv;
+        }
+      });
+
+      it("over-cap tenant groups are skipped, under-cap tenant groups dispatch", async () => {
+        process.env[TENANT_CAP_ENV] = "1";
+
+        for (let i = 0; i < 5; i++) {
+          await scripts.stage(
+            makeJob({
+              stagedJobId: `noisy-j${i}`,
+              groupId: `proj_noisy/g${i}`,
+              dispatchAfterMs: 1000,
+            }),
+          );
+        }
+        await scripts.stage(
+          makeJob({
+            stagedJobId: "quiet-j1",
+            groupId: "proj_quiet/g1",
+            dispatchAfterMs: 1001,
+          }),
+        );
+
+        const results = await scripts.dispatchBatch({
+          nowMs: 2000,
+          activeTtlSec: 60,
+          maxJobs: 10,
+        });
+
+        const dispatched = results.map((r) => r.groupId);
+        expect(dispatched).toContain("proj_noisy/g0");
+        expect(dispatched).toContain("proj_quiet/g1");
+        expect(dispatched).toHaveLength(2);
+      });
+
+      it("over-cap tenant blocked group is skipped without SISMEMBER affecting dispatch", async () => {
+        process.env[TENANT_CAP_ENV] = "1";
+
+        await scripts.stage(
+          makeJob({
+            stagedJobId: "j1",
+            groupId: "proj_noisy/g1",
+            dispatchAfterMs: 1000,
+          }),
+        );
+        await scripts.stage(
+          makeJob({
+            stagedJobId: "j2",
+            groupId: "proj_noisy/g2",
+            dispatchAfterMs: 1000,
+          }),
+        );
+        await scripts.stage(
+          makeJob({
+            stagedJobId: "quiet-j1",
+            groupId: "proj_quiet/g1",
+            dispatchAfterMs: 1001,
+          }),
+        );
+
+        const first = await scripts.dispatchBatch({
+          nowMs: 2000,
+          activeTtlSec: 60,
+          maxJobs: 10,
+        });
+        expect(first.map((r) => r.groupId)).toContain("proj_noisy/g1");
+
+        await scripts.restageAndBlock({
+          groupId: "proj_noisy/g1",
+          newStagedJobId: "j1-retry",
+          score: 3000,
+          jobDataJson: first.find((r) => r.groupId === "proj_noisy/g1")!.jobDataJson,
+          errorMessage: "test",
+        });
+
+        const second = await scripts.dispatchBatch({
+          nowMs: 4000,
+          activeTtlSec: 60,
+          maxJobs: 10,
+        });
+
+        expect(second.map((r) => r.groupId)).not.toContain("proj_noisy/g1");
+        expect(second.map((r) => r.groupId)).not.toContain("proj_noisy/g2");
+      });
+
+      it("drift cleanup still runs for under-cap tenants with empty job ZSETs", async () => {
+        process.env[TENANT_CAP_ENV] = "10";
+
+        await scripts.stage(
+          makeJob({
+            stagedJobId: "j1",
+            groupId: "proj_acme/g1",
+            dispatchAfterMs: 1000,
+          }),
+        );
+
+        const batch1 = await scripts.dispatchBatch({
+          nowMs: 2000,
+          activeTtlSec: 60,
+          maxJobs: 10,
+        });
+        expect(batch1).toHaveLength(1);
+
+        await scripts.complete({
+          groupId: "proj_acme/g1",
+          stagedJobId: batch1[0]!.stagedJobId,
+        });
+
+        const readyBefore = await redis.zcard(`${keyPrefix()}ready`);
+
+        await scripts.dispatchBatch({
+          nowMs: 3000,
+          activeTtlSec: 60,
+          maxJobs: 10,
+        });
+
+        const readyAfter = await redis.zcard(`${keyPrefix()}ready`);
+        expect(readyAfter).toBeLessThanOrEqual(readyBefore);
+      });
+    });
   });
   });
 
