@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.29.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.28.0...typescript-sdk@v0.29.0) (2026-05-22)
+
+
+### Features
+
+* **api-keys:** scope-based permissions with fine-grained categories + docs ([#4117](https://github.com/langwatch/langwatch/issues/4117)) ([3dca0f6](https://github.com/langwatch/langwatch/commit/3dca0f685f8df8333d22117581510b0f6e13442d))
+* **experiments:** list + per-row results across SDK / CLI / MCP, plus evaluations-v3 → experiments rename ([#3893](https://github.com/langwatch/langwatch/issues/3893)) ([895cda8](https://github.com/langwatch/langwatch/commit/895cda80565c0c69da64affde501c5f159ce283f))
+* **model-providers:** role-based default models + missing-model popup + multi-instance providers ([#4073](https://github.com/langwatch/langwatch/issues/4073)) ([a5364e6](https://github.com/langwatch/langwatch/commit/a5364e685488866bce4175cdb79b2a46c79f7c83))
+
+
+### Bug Fixes
+
+* **deps:** upgrade langsmith sdk security floors ([2e18927](https://github.com/langwatch/langwatch/commit/2e18927c0c1c1fdec24c2bba17e5f094e56a9deb))
+* **deps:** upgrade LangSmith SDK security floors ([#4041](https://github.com/langwatch/langwatch/issues/4041)) ([2e18927](https://github.com/langwatch/langwatch/commit/2e18927c0c1c1fdec24c2bba17e5f094e56a9deb))
+* **prompts:** lossless structured-output and parameter sync between platform and local yaml ([#4068](https://github.com/langwatch/langwatch/issues/4068)) ([c3c5941](https://github.com/langwatch/langwatch/commit/c3c59417c916e4aaaba453723cb9f527834efbb8))
+
+
+### Miscellaneous
+
+* **ci:** bump all Node-20 actions to Node-24 ([#4050](https://github.com/langwatch/langwatch/issues/4050)) ([df3b0a1](https://github.com/langwatch/langwatch/commit/df3b0a1f76744e94741c9240c4489390434b7231))
+* **security:** add dependency age gates ([#3523](https://github.com/langwatch/langwatch/issues/3523)) ([78f5b20](https://github.com/langwatch/langwatch/commit/78f5b2059228748d19fb4bf74118c9bee6c474f9))
+
 ## [0.28.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.27.0...typescript-sdk@v0.28.0) (2026-05-13)
 
 
