@@ -7,7 +7,7 @@
 set -eo pipefail
 
 printf 'building mcp server... '
-start=$(node -e 'console.log(Date.now())')
+start=$(node -e 'console.log(Date.now())' 2>/dev/null)
 
 if ! output=$(pnpm --silent --filter @langwatch/mcp-server run build 2>&1); then
   printf 'FAILED\n'

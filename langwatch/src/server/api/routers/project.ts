@@ -28,6 +28,7 @@ import {
 } from "../../license-enforcement";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { generateApiKey } from "../../utils/apiKeyGenerator";
+import { enqueueLangyBootstrap } from "../../background/queues/langyBootstrapQueue";
 import {
   checkOrganizationPermission,
   checkProjectPermission,
@@ -221,6 +222,10 @@ export const projectRouter = createTRPCRouter({
           capturedOutputVisibility:
             ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
         },
+      });
+
+      void enqueueLangyBootstrap(project.id).catch((error) => {
+        captureException(error);
       });
 
       return { success: true, projectSlug: project.slug };
