@@ -168,9 +168,10 @@ return newStagedCount
 `;
 
 const DISPATCH_LUA = `
-local readyKey     = KEYS[1]
-local blockedKey   = KEYS[2]
-local pausedJobKey = KEYS[3]
+local readyKey         = KEYS[1]
+local blockedKey       = KEYS[2]
+local pausedJobKey     = KEYS[3]
+local totalPendingKey  = KEYS[4]
 
 local keyPrefix    = ARGV[1]
 local nowMs        = tonumber(ARGV[2])
@@ -278,6 +279,7 @@ while offset < scanBudget do
 
           if not paused then
             redis.call("ZREM", jobsKey, stagedJobId)
+            redis.call("DECR", totalPendingKey)
             redis.call("SET", activeKey, stagedJobId, "EX", activeTtlSec)
 
             -- Mark group as actively-processing in ready zset (future score suppresses redispatch).
@@ -321,9 +323,10 @@ return nil
 `;
 
 const DISPATCH_BATCH_LUA = `
-local readyKey     = KEYS[1]
-local blockedKey   = KEYS[2]
-local pausedJobKey = KEYS[3]
+local readyKey         = KEYS[1]
+local blockedKey       = KEYS[2]
+local pausedJobKey     = KEYS[3]
+local totalPendingKey  = KEYS[4]
 
 local keyPrefix      = ARGV[1]
 local nowMs          = tonumber(ARGV[2])
@@ -433,6 +436,7 @@ while offset < scanBudget and dispatched < maxJobs do
 
           if not paused then
             redis.call("ZREM", jobsKey, stagedJobId)
+            redis.call("DECR", totalPendingKey)
             redis.call("SET", activeKey, stagedJobId, "EX", activeTtlSec)
 
             -- Mark group as actively-processing in ready zset (future score suppresses redispatch).
@@ -491,7 +495,6 @@ local readyKey        = KEYS[3]
 local signalKey       = KEYS[4]
 local statsKey        = KEYS[5]
 local errorKey        = KEYS[6]
-local totalPendingKey = KEYS[7]
 
 local groupId      = ARGV[1]
 local stagedJobId  = ARGV[2]
@@ -550,9 +553,6 @@ if jobName and jobName ~= "" then
   redis.call("INCR", statsKey .. ":" .. jobName)
 end
 
--- Decrement total pending counter
-redis.call("DECR", totalPendingKey)
-
 -- Clear any leftover error from previous failures now that the job succeeded
 redis.call("DEL", errorKey)
 
@@ -598,9 +598,10 @@ return 0
 `;
 
 const RESTAGE_AND_BLOCK_LUA = `
-local blockedKey = KEYS[1]
-local readyKey   = KEYS[2]
-local statsKey   = KEYS[3]
+local blockedKey      = KEYS[1]
+local readyKey        = KEYS[2]
+local statsKey        = KEYS[3]
+local totalPendingKey = KEYS[4]
 
 local keyPrefix             = ARGV[1]
 local groupId               = ARGV[2]
@@ -625,6 +626,7 @@ redis.call("SADD", blockedKey, groupId)
 -- 2. Re-stage the failed job with a new ID
 redis.call("ZADD", groupJobsKey, score, newStagedJobId)
 redis.call("HSET", groupDataKey, newStagedJobId, jobDataJson)
+redis.call("INCR", totalPendingKey)
 
 -- 3. Remove from ready set — blocked groups should not be scanned by dispatch.
 --    UNBLOCK_LUA re-adds the group when it is unblocked.
@@ -671,7 +673,8 @@ return 1
 `;
 
 const RETRY_RESTAGE_LUA = `
-local activeKey = KEYS[1]
+local activeKey       = KEYS[1]
+local totalPendingKey = KEYS[2]
 
 local keyPrefix             = ARGV[1]
 local groupId               = ARGV[2]
@@ -696,6 +699,7 @@ local groupJobsKey = keyPrefix .. "group:" .. groupId .. ":jobs"
 local groupDataKey = keyPrefix .. "group:" .. groupId .. ":data"
 redis.call("ZADD", groupJobsKey, dispatchAfterMs, newStagedJobId)
 redis.call("HSET", groupDataKey, newStagedJobId, jobDataJson)
+redis.call("INCR", totalPendingKey)
 
 -- 3. Update ready set score = future dispatch time so the group becomes
 --    eligible exactly when the backoff window expires.
@@ -918,6 +922,7 @@ export class GroupStagingScripts {
     const readyKey = `${this.keyPrefix}ready`;
     const blockedKey = `${this.keyPrefix}blocked`;
     const pausedJobKey = `${this.keyPrefix}paused-jobs`;
+    const totalPendingKey = `${this.keyPrefix}stats:total-pending`;
 
     // Tenant soft-cap (post-2026-05-11 follow-up). 0 = disabled.
     // Env var lets operators flip on per-environment without redeploy.
@@ -925,10 +930,11 @@ export class GroupStagingScripts {
 
     const result = await this.redis.eval(
       DISPATCH_LUA,
-      3,
+      4,
       readyKey,
       blockedKey,
       pausedJobKey,
+      totalPendingKey,
       this.keyPrefix,
       String(nowMs),
       String(activeTtlSec),
@@ -963,15 +969,17 @@ export class GroupStagingScripts {
     const readyKey = `${this.keyPrefix}ready`;
     const blockedKey = `${this.keyPrefix}blocked`;
     const pausedJobKey = `${this.keyPrefix}paused-jobs`;
+    const totalPendingKey = `${this.keyPrefix}stats:total-pending`;
 
     const tenantCap = readTenantCap();
 
     const result = await this.redis.eval(
       DISPATCH_BATCH_LUA,
-      3,
+      4,
       readyKey,
       blockedKey,
       pausedJobKey,
+      totalPendingKey,
       this.keyPrefix,
       String(nowMs),
       String(activeTtlSec),
@@ -1016,18 +1024,16 @@ export class GroupStagingScripts {
     const signalKey = `${this.keyPrefix}signal`;
     const statsKey = `${this.keyPrefix}stats:completed`;
     const errorKey = `${this.keyPrefix}group:${groupId}:error`;
-    const totalPendingKey = `${this.keyPrefix}stats:total-pending`;
 
     const result = await this.redis.eval(
       COMPLETE_LUA,
-      7,
+      6,
       activeKey,
       jobsKey,
       readyKey,
       signalKey,
       statsKey,
       errorKey,
-      totalPendingKey,
       groupId,
       stagedJobId,
       jobName ?? "",
@@ -1091,13 +1097,15 @@ export class GroupStagingScripts {
     const blockedKey = `${this.keyPrefix}blocked`;
     const readyKey = `${this.keyPrefix}ready`;
     const statsKey = `${this.keyPrefix}stats:failed`;
+    const totalPendingKey = `${this.keyPrefix}stats:total-pending`;
 
     await this.redis.eval(
       RESTAGE_AND_BLOCK_LUA,
-      3,
+      4,
       blockedKey,
       readyKey,
       statsKey,
+      totalPendingKey,
       this.keyPrefix,
       groupId,
       newStagedJobId,
@@ -1136,13 +1144,15 @@ export class GroupStagingScripts {
     backoffMs: number;
   }): Promise<boolean> {
     const activeKey = `${this.keyPrefix}group:${groupId}:active`;
+    const totalPendingKey = `${this.keyPrefix}stats:total-pending`;
     // TTL = backoff + 2s buffer so the key expires just after the job becomes eligible
     const retryTtlSec = Math.ceil(backoffMs / 1000) + 2;
 
     const result = await this.redis.eval(
       RETRY_RESTAGE_LUA,
-      1,
+      2,
       activeKey,
+      totalPendingKey,
       this.keyPrefix,
       groupId,
       stagedJobId,
