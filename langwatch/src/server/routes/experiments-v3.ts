@@ -58,6 +58,15 @@ export const app = new Hono().basePath("/api/experiments");
 app.use(tracerMiddleware({ name: "experiments-v3" }));
 app.use(loggerMiddleware());
 
+// Backward-compat aliases: redirect old /api/evaluations/v3/... paths to new /api/experiments/...
+// Python SDK still calls the old routes until it is updated in a follow-up.
+export const legacyAliasApp = new Hono().basePath("/api/evaluations/v3");
+legacyAliasApp.all("/*", (c) => {
+  const url = new URL(c.req.url);
+  url.pathname = url.pathname.replace(/^\/api\/evaluations\/v3/, "/api/experiments");
+  return app.fetch(new Request(url.toString(), c.req.raw));
+});
+
 // ── helpers ──────────────────────────────────────────────────────────
 
 const tokenResolver = TokenResolver.create(prisma);

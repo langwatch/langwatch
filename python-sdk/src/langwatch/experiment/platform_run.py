@@ -329,7 +329,7 @@ def _start_run(slug: str, endpoint: str, api_key: str) -> dict:
     """Start an experiment run."""
     with httpx.Client(timeout=60) as client:
         response = client.post(
-            f"{endpoint}/api/experiments/{slug}/run",
+            f"{endpoint}/api/evaluations/v3/{slug}/run",
             headers=build_auth_headers(api_key),
         )
 
@@ -351,7 +351,7 @@ def _get_run_status(run_id: str, endpoint: str, api_key: str) -> dict:
     """Get the status of a run."""
     with httpx.Client(timeout=60) as client:
         response = client.get(
-            f"{endpoint}/api/experiments/runs/{run_id}",
+            f"{endpoint}/api/evaluations/v3/runs/{run_id}",
             headers=build_auth_headers(api_key),
         )
 

@@ -279,7 +279,7 @@ class Experiment:
         api_key = langwatch.get_api_key() or ""
 
         url = (
-            f"{endpoint}/api/experiments/runs/"
+            f"{endpoint}/api/evaluations/v3/runs/"
             f"{urllib.parse.quote(self.run_id)}/results"
             f"?experimentSlug={urllib.parse.quote(self.experiment_slug)}"
         )
