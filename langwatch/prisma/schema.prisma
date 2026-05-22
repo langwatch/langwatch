@@ -2726,3 +2726,85 @@ model FeatureFlag {
     createdAt    DateTime @default(now())
     updatedAt    DateTime @default(now()) @updatedAt
 }
+
+// ============================================================================
+// Langy assistant — see specs/assistant/memory-design.md §3
+// ============================================================================
+
+model LangyConversation {
+    id          String    @id @default(cuid())
+    projectId   String
+    userId      String
+    title       String?
+    isShared    Boolean   @default(false)
+    sharedAt    DateTime?
+    sharedById  String?
+    createdAt   DateTime  @default(now())
+    updatedAt   DateTime  @updatedAt
+    deletedAt   DateTime?
+
+    messages    LangyMessage[]
+
+    @@index([projectId, userId, updatedAt])
+    @@index([projectId, isShared, updatedAt])
+    @@index([deletedAt])
+}
+
+model LangyMessage {
+    id             String   @id @default(cuid())
+    conversationId String
+    projectId      String
+    role           String
+    parts          Json
+    tokenCount     Int?
+    createdAt      DateTime @default(now())
+
+    conversation   LangyConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+    @@index([conversationId, createdAt])
+    @@index([projectId])
+}
+
+model LangyProjectMemory {
+    id             String   @id @default(cuid())
+    projectId      String   @unique
+    content        String   @db.Text
+    contentSummary String?  @db.Text
+    contentVersion Int      @default(1)
+    generatedAt    DateTime @default(now())
+    refreshedAt    DateTime @default(now())
+    lastEditorId   String?
+
+    history        LangyProjectMemoryHistory[]
+
+    @@index([projectId])
+}
+
+model LangyProjectMemoryHistory {
+    id              String   @id @default(cuid())
+    projectMemoryId String
+    projectId       String
+    contentVersion  Int
+    content         String   @db.Text
+    changedById     String?
+    changeReason    String?
+    changedAt       DateTime @default(now())
+
+    projectMemory   LangyProjectMemory @relation(fields: [projectMemoryId], references: [id], onDelete: Cascade)
+
+    @@index([projectMemoryId, changedAt])
+    @@index([projectId])
+}
+
+model LangyUserPreferences {
+    id                       String   @id @default(cuid())
+    userId                   String
+    projectId                String
+    mode                     String   @default("non_expert")
+    dismissedSuggestionKinds String[] @default([])
+    createdAt                DateTime @default(now())
+    updatedAt                DateTime @updatedAt
+
+    @@unique([userId, projectId])
+    @@index([projectId])
+}
