@@ -18,6 +18,7 @@ export interface ExperimentResultsOptions {
   evaluator?: string;
   format?: string;
   limit?: string;
+  experiment?: string;
 }
 
 const DEFAULT_LIMIT = 20;
@@ -79,6 +80,7 @@ export const experimentResultsCommand = async ({
     return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_LIMIT;
   })();
   const evaluatorFilter = options.evaluator?.trim();
+  const experimentSlug = options.experiment?.trim();
 
   const service = new ExperimentsApiService();
   const spinner = ora(`Fetching results for run "${runId}"...`).start();
@@ -86,6 +88,7 @@ export const experimentResultsCommand = async ({
   try {
     const results: ExperimentRunResultsResponse = await service.getRunResults({
       runId,
+      experimentSlug,
     });
     spinner.succeed(
       `Loaded results for ${chalk.cyan(runId)} (${results.dataset.length} rows, ${results.evaluations.length} evaluations)`,

@@ -507,6 +507,7 @@ experimentCmd
   .option("--evaluator <name>", "Show only this evaluator's column")
   .option("-f, --format <format>", "Output format: table (default) or json", "table")
   .option("--limit <n>", "Maximum rows to print in table mode (default 20)", "20")
+  .option("--experiment <slug>", "Experiment slug — required for runs older than 24h")
   .action(
     async (
       runId: string,
@@ -515,6 +516,7 @@ experimentCmd
         evaluator?: string;
         format?: string;
         limit?: string;
+        experiment?: string;
       },
     ) => {
       await experimentResultsCommand({ runId, options });

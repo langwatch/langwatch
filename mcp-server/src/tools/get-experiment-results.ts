@@ -69,6 +69,7 @@ const isFailedRow = ({
 
 export async function handleExperimentResults(params: {
   runId: string;
+  experimentSlug?: string;
   filter?: "all" | "failed";
   evaluator?: string;
   limit?: number;
@@ -80,11 +81,15 @@ export async function handleExperimentResults(params: {
       ? Math.min(params.limit, DEFAULT_ROW_CAP)
       : DEFAULT_ROW_CAP;
 
+  const search = new URLSearchParams();
+  if (params.experimentSlug) search.set("experimentSlug", params.experimentSlug);
+  const qs = search.toString() ? `?${search.toString()}` : "";
+
   let results: EvaluationRunResults | null;
   try {
     results = (await makeRequest(
       "GET",
-      `/api/experiments/runs/${encodeURIComponent(params.runId)}/results`,
+      `/api/experiments/runs/${encodeURIComponent(params.runId)}/results${qs}`,
     )) as EvaluationRunResults;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

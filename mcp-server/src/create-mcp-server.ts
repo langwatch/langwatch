@@ -1631,6 +1631,12 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       runId: z
         .string()
         .describe("The run ID returned from platform_run_experiment"),
+      experimentSlug: z
+        .string()
+        .optional()
+        .describe(
+          "Experiment slug — required when fetching results for runs older than 24h (Redis state may have expired). Use platform_experiment_list_runs to find the slug.",
+        ),
       filter: z
         .enum(["all", "failed"])
         .optional()

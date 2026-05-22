@@ -274,13 +274,18 @@ export class ExperimentsApiService {
    */
   async getRunResults({
     runId,
+    experimentSlug,
   }: {
     runId: string;
+    experimentSlug?: string;
   }): Promise<ExperimentRunResultsResponse> {
+    const search = new URLSearchParams();
+    if (experimentSlug) search.set("experimentSlug", experimentSlug);
+    const qs = search.toString() ? `?${search.toString()}` : "";
     const body = await this.getUndeclaredEndpoint<
       ExperimentRunResultsResponse | null
     >({
-      path: `/api/experiments/runs/${encodeURIComponent(runId)}/results`,
+      path: `/api/experiments/runs/${encodeURIComponent(runId)}/results${qs}`,
       operation: `get run results for "${runId}"`,
     });
     if (body === null) {
