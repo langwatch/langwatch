@@ -27,6 +27,7 @@ import {
   targetConfigSchema,
 } from "../types";
 import type { LocalEvaluatorConfig } from "../types";
+import { EvaluatorEditorDrawer } from "~/components/evaluators/EvaluatorEditorDrawer";
 
 // ============================================================================
 // Mocks for EvaluatorEditorDrawer
@@ -246,10 +247,6 @@ describe("<EvaluatorEditorDrawer />", () => {
 
   describe("when initialLocalConfig is provided", () => {
     it("initializes form with local config values instead of DB data", async () => {
-      const { EvaluatorEditorDrawer } = await import(
-        "~/components/evaluators/EvaluatorEditorDrawer"
-      );
-
       const localConfig: LocalEvaluatorConfig = {
         name: "Modified Evaluator Name",
         settings: { maxScore: 0.5 },
@@ -279,9 +276,6 @@ describe("<EvaluatorEditorDrawer />", () => {
   describe("when form changes are made", () => {
     it("calls onLocalConfigChange with updated values", async () => {
       const user = userEvent.setup({ delay: null });
-      const { EvaluatorEditorDrawer } = await import(
-        "~/components/evaluators/EvaluatorEditorDrawer"
-      );
 
       const mockOnLocalConfigChange = vi.fn();
 
@@ -339,9 +333,6 @@ describe("<EvaluatorEditorDrawer />", () => {
   describe("when save succeeds", () => {
     it("calls onLocalConfigChange with undefined to clear local config", async () => {
       const user = userEvent.setup({ delay: null });
-      const { EvaluatorEditorDrawer } = await import(
-        "~/components/evaluators/EvaluatorEditorDrawer"
-      );
 
       const mockOnLocalConfigChange = vi.fn();
       const localConfig: LocalEvaluatorConfig = {
@@ -389,10 +380,6 @@ describe("<EvaluatorEditorDrawer />", () => {
 
   describe("when onLocalConfigChange is provided", () => {
     it("renders the Apply button", async () => {
-      const { EvaluatorEditorDrawer } = await import(
-        "~/components/evaluators/EvaluatorEditorDrawer"
-      );
-
       render(
         <EvaluatorEditorDrawer
           open={true}
@@ -414,9 +401,6 @@ describe("<EvaluatorEditorDrawer />", () => {
 
     it("does NOT show save confirmation when closing with unsaved changes", async () => {
       const user = userEvent.setup({ delay: null });
-      const { EvaluatorEditorDrawer } = await import(
-        "~/components/evaluators/EvaluatorEditorDrawer"
-      );
 
       vi.spyOn(window, "confirm").mockImplementation(() => true);
 
@@ -454,10 +438,6 @@ describe("<EvaluatorEditorDrawer />", () => {
 
   describe("when onLocalConfigChange is NOT provided", () => {
     it("does NOT render the Apply button", async () => {
-      const { EvaluatorEditorDrawer } = await import(
-        "~/components/evaluators/EvaluatorEditorDrawer"
-      );
-
       render(
         <EvaluatorEditorDrawer
           open={true}
