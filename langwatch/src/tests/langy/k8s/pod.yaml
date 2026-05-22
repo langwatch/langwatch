@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: opencode-agent
+  labels:
+    app: opencode-agent
+spec:
+  containers:
+  - name: agent
+    image: opencode-agent:v4
+    imagePullPolicy: Never
+    ports:
+    - containerPort: 8080
+    env:
+    - name: OPENAI_API_KEY
+      valueFrom:
+        secretKeyRef:
+          name: agent-secrets
+          key: GATEWAY_API_KEY
+    - name: OPENAI_BASE_URL
+      # Replace with your WSL host IP: run `ip route show default | awk '{print $3}'` in WSL
+      value: "http://<WSL_HOST_IP>:5563/v1"
+    - name: LANGWATCH_API_KEY
+      valueFrom:
+        secretKeyRef:
+          name: agent-secrets
+          key: LANGWATCH_API_KEY
+    - name: LANGWATCH_ENDPOINT
+      value: "http://<WSL_HOST_IP>:5560"
+  restartPolicy: Never
