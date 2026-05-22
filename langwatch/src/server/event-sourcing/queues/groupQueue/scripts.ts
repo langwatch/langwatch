@@ -381,12 +381,13 @@ while offset < scanBudget and dispatched < maxJobs do
         end
       end
 
-      local activeKey = keyPrefix .. "group:" .. groupId .. ":active"
-      -- Defensive activeKey check — covers legacy state during migration
-      -- and the small race between ZADD ready and ZADD active.
-      local activeJob = redis.call("GET", activeKey)
+      if not tenantOverCap then
+        local activeKey = keyPrefix .. "group:" .. groupId .. ":active"
+        -- Defensive activeKey check — covers legacy state during migration
+        -- and the small race between ZADD ready and ZADD active.
+        local activeJob = redis.call("GET", activeKey)
 
-      if (not activeJob) and (not tenantOverCap) then
+        if not activeJob then
         local jobsKey = keyPrefix .. "group:" .. groupId .. ":jobs"
         local jobResults = redis.call("ZRANGEBYSCORE", jobsKey, "-inf", nowMs, "WITHSCORES", "LIMIT", 0, 1)
 
@@ -471,6 +472,7 @@ while offset < scanBudget and dispatched < maxJobs do
             end
           end
         end
+      end
       end
     end
   end
