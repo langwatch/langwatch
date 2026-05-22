@@ -15,7 +15,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Tooltip } from "../../../components/ui/tooltip";
 import { FormatMoney } from "../../../optimization_studio/components/FormatMoney";
 import type { AppRouter } from "../../../server/api/root";
-import type { ExperimentRun } from "../../../server/evaluations-v3/services/types";
+import type { ExperimentRun } from "../../../server/experiments-v3/services/types";
 import { formatMilliseconds } from "../../../utils/formatMilliseconds";
 import { formatMoney } from "../../../utils/formatMoney";
 import { HoverableBigText } from "../../HoverableBigText";

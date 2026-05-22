@@ -5,7 +5,7 @@ import { useShallow } from "zustand/react/shallow";
 
 import { PromptEditorDrawer } from "~/components/prompts/PromptEditorDrawer";
 import type { FieldMapping } from "~/components/variables";
-import type { LocalPromptConfig } from "~/evaluations-v3/types";
+import type { LocalPromptConfig } from "~/experiments-v3/types";
 import { nodeDataToLocalPromptConfig } from "~/prompts/utils/llmPromptConfigUtils";
 import { useSmartSetNode } from "../../hooks/useSmartSetNode";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";

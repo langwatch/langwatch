@@ -1,6 +1,6 @@
 import type { ProjectService } from "~/server/app-layer/projects/project.service";
 import { createLogger } from "../../../../../utils/logger/server";
-import type { BatchEvaluationRepository } from "../../../../evaluations-v3/repositories/batchEvaluation.repository";
+import type { BatchEvaluationRepository } from "../../../../experiments-v3/repositories/batchEvaluation.repository";
 import type { ReactorContext, ReactorDefinition } from "../../../reactors/reactor.types";
 import type { ExperimentRunStateData } from "../projections/experimentRunState.foldProjection";
 import type { ExperimentRunProcessingEvent } from "../schemas/events";

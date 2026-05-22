@@ -1,5 +1,5 @@
 import { useCallback, useRef } from "react";
-import { createEvaluatorEditorCallbacks } from "~/evaluations-v3/utils/evaluatorEditorCallbacks";
+import { createEvaluatorEditorCallbacks } from "~/experiments-v3/utils/evaluatorEditorCallbacks";
 import { setFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
 import type { Component, Field } from "../types/dsl";
 import type { NodeWithOptionalPosition } from "~/types";

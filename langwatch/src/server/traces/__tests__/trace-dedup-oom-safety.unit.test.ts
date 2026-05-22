@@ -318,7 +318,7 @@ describe("trace dedup OOM safety", () => {
       __dirname,
       "..",
       "..",
-      "evaluations-v3",
+      "experiments-v3",
       "services",
       "clickhouse-experiment-run.service.ts",
     );

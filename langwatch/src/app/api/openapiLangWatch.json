@@ -3961,7 +3961,7 @@
         }
       }
     },
-    "/api/evaluations/v3/runs/{runId}": {
+    "/api/experiments/runs/{runId}": {
       "get": {
         "description": "Get the current status of an evaluation run for polling. Returns progress while running, and summary when completed.",
         "operationId": "getEvaluationsV3RunStatus",
@@ -3976,7 +3976,7 @@
             "in": "path",
             "name": "runId",
             "required": true,
-            "description": "The run ID returned from POST /api/evaluations/v3/{slug}/run"
+            "description": "The run ID returned from POST /api/experiments/{slug}/run"
           }
         ],
         "responses": {
@@ -4096,7 +4096,7 @@
         }
       }
     },
-    "/api/evaluations/v3/{slug}/run": {
+    "/api/experiments/{slug}/run": {
       "post": {
         "description": "Start execution of a saved Evaluations V3 experiment by slug. Returns immediately with a runId for polling, or streams SSE events if Accept: text/event-stream header is provided.",
         "operationId": "postEvaluationsV3Run",

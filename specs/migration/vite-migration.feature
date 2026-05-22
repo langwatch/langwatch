@@ -147,7 +147,7 @@ Feature: Next.js to Vite Migration
 
   Scenario: Streaming evaluation responses work
     Given I am authenticated
-    When I trigger an evaluation execution via /api/evaluations/v3/execute
+    When I trigger an evaluation execution via /api/experiments/execute
     Then I receive a streaming response
     And evaluation progress events arrive in order
 

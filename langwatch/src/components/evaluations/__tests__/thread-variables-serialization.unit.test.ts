@@ -2,7 +2,7 @@
  * @vitest-environment node
  *
  * Unit tests for thread variable serialization/deserialization.
- * Feature: specs/features/evaluations-v3/thread-variables-in-trace-evaluator.feature
+ * Feature: specs/features/experiments-v3/thread-variables-in-trace-evaluator.feature
  *
  * Tests the real serializeMappingsToMappingState and deserializeMappingStateToUI
  * functions from the shared mappingSerialization module.

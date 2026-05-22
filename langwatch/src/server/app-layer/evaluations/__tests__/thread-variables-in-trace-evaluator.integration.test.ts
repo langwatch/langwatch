@@ -2,7 +2,7 @@
  * @vitest-environment node
  *
  * Integration tests for thread variables in trace-level evaluator input mapping.
- * Feature: specs/features/evaluations-v3/thread-variables-in-trace-evaluator.feature
+ * Feature: specs/features/experiments-v3/thread-variables-in-trace-evaluator.feature
  *
  * Tests the backend resolution of mixed trace + thread source mappings.
  * All I/O deps are injected via constructor — zero vi.mock calls.

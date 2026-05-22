@@ -21,8 +21,8 @@ import {
   type FieldMapping,
   FormVariablesSection,
 } from "~/components/variables";
-import { useEvaluationMappings } from "~/evaluations-v3/hooks/useEvaluationMappings";
-import type { LocalPromptConfig } from "~/evaluations-v3/types";
+import { useEvaluationMappings } from "~/experiments-v3/hooks/useEvaluationMappings";
+import type { LocalPromptConfig } from "~/experiments-v3/types";
 import {
   getComplexProps,
   getFlowCallbacks,

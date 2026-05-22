@@ -53,7 +53,7 @@ import {
   type EvaluationRESTResult,
   evaluationInputSchema,
 } from "~/server/evaluations/types";
-import { mapEsTargetsToTargets } from "~/server/evaluations-v3/services/mappers";
+import { mapEsTargetsToTargets } from "~/server/experiments-v3/services/mappers";
 import type {
   ESBatchEvaluation,
   ESBatchEvaluationRESTParams,

@@ -25,7 +25,7 @@ import {
   type AvailableSource,
   type FieldMapping as UIFieldMapping,
 } from "~/components/variables";
-import type { LocalEvaluatorConfig } from "~/evaluations-v3/types";
+import type { LocalEvaluatorConfig } from "~/experiments-v3/types";
 import {
   getComplexProps,
   getDrawerStack,
