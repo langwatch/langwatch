@@ -172,6 +172,7 @@ export default function SettingsLayout({
               "/settings/topic-clustering",
               "/settings/data-retention",
               "/settings/data-privacy",
+              "/settings/langy-memory",
             ]}
           >
             <MenuLink href="/settings/data-retention">Data Retention</MenuLink>
@@ -189,6 +190,7 @@ export default function SettingsLayout({
                 Topic Clustering
               </MenuLink>
             )}
+            <MenuLink href="/settings/langy-memory">Langy memory</MenuLink>
           </NavSection>
 
           {!isLiteMember && (

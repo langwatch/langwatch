@@ -7,7 +7,7 @@
 set -eo pipefail
 
 printf 'building mcp server... '
-start=$(node -e 'console.log(Date.now())')
+start=$(node -e 'console.log(Date.now())' 2>/dev/null)
 
 # Self-heal a half-linked mcp-server/node_modules. An interrupted prep run
 # (Ctrl-C, OOM, the compose-v5 crash) can leave the `.bin/tsup` symlink in

@@ -27,6 +27,7 @@ import {
   LimitExceededError,
 } from "../../license-enforcement";
 import { generateApiKey } from "../../utils/apiKeyGenerator";
+import { enqueueLangyBootstrap } from "../../background/queues/langyBootstrapQueue";
 import {
   checkOrganizationPermission,
   checkProjectPermission,
@@ -209,6 +210,10 @@ export const projectRouter = createTRPCRouter({
           teamId: teamId,
           apiKey: generateApiKey(),
         },
+      });
+
+      void enqueueLangyBootstrap(project.id).catch((error) => {
+        captureException(error);
       });
 
       return { success: true, projectSlug: project.slug };
