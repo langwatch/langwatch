@@ -179,7 +179,7 @@ LangWatch container images and CLI packages are published with verifiable supply
 
 ### Container images (Docker Hub)
 
-Every release of `langwatch/langwatch`, `langwatch/langwatch_nlp`, `langwatch/langevals`, and `langwatch/ai-gateway` is signed with [Sigstore](https://www.sigstore.dev/) cosign using keyless OIDC, and a CycloneDX SBOM is attached as a cosign attestation.
+Every release of `langwatch/langwatch`, `langwatch/langwatch_nlp`, `langwatch/langevals`, and `langwatch/ai-gateway` is signed with [Sigstore](https://www.sigstore.dev/) cosign using keyless OIDC. Both the multi-arch index manifest and each per-platform manifest (linux/amd64, linux/arm64) are signed by digest. A CycloneDX SBOM is generated per platform and attached as a cosign attestation against the matching platform manifest digest, so the SBOM you verify always corresponds to the architecture you actually pulled.
 
 Verify a signature with [cosign](https://github.com/sigstore/cosign):
 
@@ -189,15 +189,17 @@ cosign verify langwatch/langwatch:<tag> \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
 
-Inspect the attached SBOM:
+Inspect the attached SBOM for the platform you pulled (cosign resolves the right per-platform manifest digest automatically when you pass a tag):
 
 ```bash
-cosign download attestation langwatch/langwatch:<tag> \
+cosign download attestation \
+  --predicate-type https://cyclonedx.org/bom \
+  langwatch/langwatch:<tag> \
   | jq -r '.payload | @base64d | fromjson | .predicate' \
   > langwatch.cdx.json
 ```
 
-The same `*.cdx.json` files are also attached to each `langwatch@vX.Y.Z` [GitHub release](https://github.com/langwatch/langwatch/releases).
+The per-platform `*.cdx.json` files (e.g. `langwatch-linux-amd64.cdx.json`, `langwatch-linux-arm64.cdx.json`) are also attached to each `langwatch@vX.Y.Z` [GitHub release](https://github.com/langwatch/langwatch/releases).
 
 ### npm CLI
 

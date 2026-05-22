@@ -210,7 +210,7 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Sign manifests and attach CycloneDX SBOMs
+      - name: Sign manifests and attach per-platform CycloneDX SBOMs
         env:
           HASH: ${{ needs.extract-version.outputs.short_hash }}
         run: |
@@ -218,21 +218,40 @@ jobs:
           mkdir -p sboms
           for IMAGE in langwatch langwatch_nlp langevals ai-gateway; do
             REF="langwatch/${IMAGE}:${HASH}"
-            DIGEST=$(docker buildx imagetools inspect "${REF}" --format '{{ json . }}' | jq -r '.manifest.digest')
-            if [ -z "${DIGEST}" ] || [ "${DIGEST}" = "null" ]; then
-              echo "::error::Could not resolve digest for ${REF}"
+            INSPECT=$(docker buildx imagetools inspect "${REF}" --format '{{ json . }}')
+
+            INDEX_DIGEST=$(echo "${INSPECT}" | jq -r '.manifest.digest')
+            if [ -z "${INDEX_DIGEST}" ] || [ "${INDEX_DIGEST}" = "null" ]; then
+              echo "::error::Could not resolve index digest for ${REF}"
               exit 1
             fi
-            DIGEST_REF="langwatch/${IMAGE}@${DIGEST}"
-            echo "Signing ${DIGEST_REF}"
-            cosign sign "${DIGEST_REF}"
+            echo "Signing multi-arch index langwatch/${IMAGE}@${INDEX_DIGEST}"
+            cosign sign "langwatch/${IMAGE}@${INDEX_DIGEST}"
 
-            SBOM_FILE="sboms/${IMAGE}.cdx.json"
-            echo "Generating CycloneDX SBOM for ${DIGEST_REF}"
-            syft "registry:${DIGEST_REF}" -o cyclonedx-json="${SBOM_FILE}"
+            PLATFORMS_JSON=$(echo "${INSPECT}" | jq -c '[.manifest.manifests[] | select(.platform.os != "unknown") | {digest: .digest, os: .platform.os, arch: .platform.architecture}]')
+            COUNT=$(echo "${PLATFORMS_JSON}" | jq 'length')
+            if [ "${COUNT}" -eq 0 ]; then
+              echo "::error::No platform manifests found in index for ${REF}"
+              exit 1
+            fi
 
-            echo "Attesting SBOM for ${DIGEST_REF}"
-            cosign attest --predicate "${SBOM_FILE}" --type cyclonedx "${DIGEST_REF}"
+            for i in $(seq 0 $((COUNT - 1))); do
+              ENTRY=$(echo "${PLATFORMS_JSON}" | jq -c ".[$i]")
+              PDIGEST=$(echo "${ENTRY}" | jq -r '.digest')
+              POS=$(echo "${ENTRY}" | jq -r '.os')
+              PARCH=$(echo "${ENTRY}" | jq -r '.arch')
+              PDREF="langwatch/${IMAGE}@${PDIGEST}"
+              SBOM_FILE="sboms/${IMAGE}-${POS}-${PARCH}.cdx.json"
+
+              echo "Generating CycloneDX SBOM for ${PDREF} (${POS}/${PARCH})"
+              syft "registry:${PDREF}" -o cyclonedx-json="${SBOM_FILE}"
+
+              echo "Signing platform manifest ${PDREF}"
+              cosign sign "${PDREF}"
+
+              echo "Attesting SBOM for ${PDREF}"
+              cosign attest --predicate "${SBOM_FILE}" --type cyclonedx "${PDREF}"
+            done
           done
 
       - name: Upload SBOMs as workflow artifact
@@ -253,7 +272,7 @@ jobs:
 
   notify:
     runs-on: ubuntu-latest
-    needs: [extract-version, create-manifest]
+    needs: [extract-version, create-manifest, sign-and-attest]
     if: needs.extract-version.outputs.is_release == 'true'
 
     steps:
