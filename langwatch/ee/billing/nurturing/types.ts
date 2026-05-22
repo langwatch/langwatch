@@ -71,6 +71,9 @@ export interface CioPersonTraits {
   // Billing
   plan: string;
   has_subscription: boolean;
+
+  // Admin labeling
+  is_admin: boolean;
 }
 
 // ---------------------------------------------------------------------------

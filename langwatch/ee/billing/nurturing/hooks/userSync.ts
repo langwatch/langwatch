@@ -1,4 +1,5 @@
 import { getApp } from "../../../../src/server/app-layer/app";
+import { isAdmin } from "../../../admin/isAdmin";
 import { prisma } from "../../../../src/server/db";
 import { captureException } from "../../../../src/utils/posthogErrorCapture";
 import type { CioPersonTraits, CioOrgTraits } from "../types";
@@ -107,6 +108,7 @@ async function performFullSync({ userId }: { userId: string }): Promise<void> {
     has_subscription: !!activeSubscription,
     createdAt: user.createdAt.toISOString(),
     last_active_at: new Date().toISOString(),
+    is_admin: isAdmin({ email: user.email }),
   };
 
   const orgTraits: Partial<CioOrgTraits> = {

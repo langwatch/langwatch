@@ -227,11 +227,13 @@ export const promptsRouter = createTRPCRouter({
         authorId,
       });
 
-      afterPromptCreated({
-        prisma: ctx.prisma,
-        projectId: input.projectId,
-        userId: authorId,
-      });
+      if (!ctx.session.user.impersonator) {
+        afterPromptCreated({
+          prisma: ctx.prisma,
+          projectId: input.projectId,
+          userId: authorId,
+        });
+      }
 
       return result;
     }),
@@ -542,11 +544,13 @@ export const promptsRouter = createTRPCRouter({
         data: { copiedFromPromptId: sourcePrompt.id },
       });
 
-      afterPromptCreated({
-        prisma: ctx.prisma,
-        projectId: input.projectId,
-        userId: authorId,
-      });
+      if (!ctx.session.user.impersonator) {
+        afterPromptCreated({
+          prisma: ctx.prisma,
+          projectId: input.projectId,
+          userId: authorId,
+        });
+      }
 
       return { ...copiedPrompt, copiedFromPromptId: sourcePrompt.id };
     }),
