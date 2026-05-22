@@ -53,6 +53,11 @@ import { scheduleAnomalyDetection } from "./queues/anomalyDetectionQueue";
 import { startOrphanSweepChainWorker } from "./workers/orphanSweepChainWorker";
 import { startIngestionPullerWorker } from "@ee/governance/services/pullers/pullerWorker";
 import { scheduleIngestionPullers } from "./queues/ingestionPullerQueue";
+import { startLangyBootstrapWorker } from "./workers/langyBootstrapWorker";
+import {
+  startLangyRetentionWorker,
+} from "./workers/langyRetentionWorker";
+import { scheduleLangyRetention } from "./queues/langyRetentionQueue";
 
 const logger = createLogger("langwatch:workers");
 
@@ -175,6 +180,9 @@ export const start = async (
     const orphanSweepChainWorker = startOrphanSweepChainWorker();
     const ingestionPullerWorker = startIngestionPullerWorker();
     void scheduleIngestionPullers();
+    const langyBootstrapWorker = startLangyBootstrapWorker();
+    const langyRetentionWorker = startLangyRetentionWorker();
+    void scheduleLangyRetention().catch(() => undefined);
     const metricsServer = startMetricsServer();
 
     // Register all closeables for graceful shutdown
@@ -189,6 +197,8 @@ export const start = async (
     if (ingestionPullerWorker) {
       registerCloseable("ingestionPuller", ingestionPullerWorker);
     }
+    registerCloseable("langyBootstrap", langyBootstrapWorker);
+    registerCloseable("langyRetention", langyRetentionWorker);
     registerCloseable("scenario", scenarioProcessor);
     registerCloseable("metricsServer", {
       close: () =>

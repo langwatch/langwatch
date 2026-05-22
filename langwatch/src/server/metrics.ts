@@ -86,7 +86,9 @@ type JobType =
   | "event_sourcing"
   | "scenario"
   | "anomaly_detection"
-  | "orphan_sweep_chain";
+  | "orphan_sweep_chain"
+  | "langy_bootstrap"
+  | "langy_retention";
 
 type JobStatus = "processing" | "completed" | "failed";
 

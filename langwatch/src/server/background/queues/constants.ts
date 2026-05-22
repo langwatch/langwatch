@@ -75,3 +75,15 @@ export const ORPHAN_SWEEP_CHAIN_QUEUE = {
   JOB: "orphan_sweep_chain",
 } as const;
 
+/** Langy bootstrap queue - generates project memory at project creation. */
+export const LANGY_BOOTSTRAP_QUEUE = {
+  NAME: makeQueueName("langy_bootstrap"),
+  JOB: "langy_bootstrap",
+} as const;
+
+/** Langy retention queue - daily hard-delete sweep of soft-deleted convos. */
+export const LANGY_RETENTION_QUEUE = {
+  NAME: makeQueueName("langy_retention"),
+  JOB: "langy_retention",
+} as const;
+
