@@ -21,6 +21,7 @@ const safeGatePatterns = [
 type JobBlock = {
   name: string;
   startLine: number;
+  indent: number;
   lines: string[];
 };
 
@@ -42,6 +43,7 @@ export const jobBlocks = (lines: string[]): JobBlock[] => {
 
   const jobs: JobBlock[] = [];
   let current: JobBlock | undefined;
+  let jobIndent: number | undefined;
 
   for (let index = jobsStart + 1; index < lines.length; index++) {
     const line = lines[index] ?? "";
@@ -49,12 +51,18 @@ export const jobBlocks = (lines: string[]): JobBlock[] => {
       break;
     }
 
-    const match = /^  ["']?([A-Za-z0-9_-]+)["']?:\s*(?:#.*)?$/.exec(line);
-    if (match?.[1]) {
+    const match = /^(\s+)["']?([A-Za-z0-9_-]+)["']?:\s*(?:#.*)?$/.exec(line);
+    const indent = match?.[1]?.length;
+    if (
+      match?.[2] &&
+      indent !== undefined &&
+      (jobIndent === undefined || indent === jobIndent)
+    ) {
+      jobIndent ??= indent;
       if (current) {
         jobs.push(current);
       }
-      current = { name: match[1], startLine: index + 1, lines: [line] };
+      current = { name: match[2], startLine: index + 1, indent, lines: [line] };
       continue;
     }
 
@@ -87,13 +95,29 @@ const hasUnsafeCheckout = (jobText: string): boolean =>
   unsafeHeadRefPatterns.some((pattern) => jobText.includes(pattern));
 
 export const jobIfExpression = (job: JobBlock): string | undefined => {
-  const ifStart = job.lines.findIndex((line) => /^    if:\s*/.test(line));
+  const fieldPattern = new RegExp(
+    `^(\\s{${job.indent + 1},})([A-Za-z0-9_-]+):\\s*`,
+  );
+  const fieldIndent = job.lines.reduce<number | undefined>((minimum, line) => {
+    const match = fieldPattern.exec(line);
+    const indent = match?.[1]?.length;
+    return indent === undefined || (minimum !== undefined && minimum <= indent)
+      ? minimum
+      : indent;
+  }, undefined);
+  if (fieldIndent === undefined) {
+    return undefined;
+  }
+
+  const ifPattern = new RegExp(`^\\s{${fieldIndent}}if:\\s*`);
+  const fieldBoundaryPattern = new RegExp(`^\\s{${fieldIndent}}\\S`);
+  const ifStart = job.lines.findIndex((line) => ifPattern.test(line));
   if (ifStart === -1) {
     return undefined;
   }
 
   const firstLine = job.lines[ifStart] ?? "";
-  const firstValue = stripYamlComment(firstLine.replace(/^    if:\s*/, ""));
+  const firstValue = stripYamlComment(firstLine.replace(ifPattern, ""));
   const ifLines =
     /^(?:[>|][+-]?)?$/.test(firstValue) || firstValue === ""
       ? []
@@ -101,7 +125,7 @@ export const jobIfExpression = (job: JobBlock): string | undefined => {
 
   for (let index = ifStart + 1; index < job.lines.length; index++) {
     const line = job.lines[index] ?? "";
-    if (/^    \S/.test(line)) {
+    if (fieldBoundaryPattern.test(line)) {
       break;
     }
 

@@ -53,14 +53,23 @@ describe("pull_request_target workflow guard", () => {
     assert.equal(hasSafeGate(gatedJob), true);
   });
 
-  it("extracts commented jobs keys", () => {
-    const [job] = jobBlocks([
+  it("extracts commented and wider-indented jobs keys", () => {
+    const [commentedJob] = jobBlocks([
       "jobs: # workflow jobs",
       "  'build': # comment after job key",
       "    runs-on: ubuntu-latest",
     ]);
+    const [indentedJob] = jobBlocks([
+      "jobs:",
+      "    build: # indented job key",
+      "      if: github.event.label.name == 'approved-ci'",
+      "      runs-on: ubuntu-latest",
+    ]);
 
-    assert.ok(job);
-    assert.equal(job.name, "build");
+    assert.ok(commentedJob);
+    assert.equal(commentedJob.name, "build");
+    assert.ok(indentedJob);
+    assert.equal(indentedJob.name, "build");
+    assert.equal(hasSafeGate(indentedJob), true);
   });
 });
