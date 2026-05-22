@@ -1805,6 +1805,13 @@ describe("GroupStagingScripts", () => {
           jobDataJson: first.find((r) => r.groupId === "proj_noisy/g1")!.jobDataJson,
           errorMessage: "test",
         });
+        await scripts.stage(
+          makeJob({
+            stagedJobId: "quiet-j2",
+            groupId: "proj_quiet/g2",
+            dispatchAfterMs: 3001,
+          }),
+        );
 
         const second = await scripts.dispatchBatch({
           nowMs: 4000,
@@ -1814,6 +1821,7 @@ describe("GroupStagingScripts", () => {
 
         expect(second.map((r) => r.groupId)).not.toContain("proj_noisy/g1");
         expect(second.map((r) => r.groupId)).not.toContain("proj_noisy/g2");
+        expect(second.map((r) => r.groupId)).toContain("proj_quiet/g2");
       });
 
       /** @scenario Drift cleanup runs for under-cap tenants in batch dispatch */
@@ -1840,7 +1848,9 @@ describe("GroupStagingScripts", () => {
           stagedJobId: batch1[0]!.stagedJobId,
         });
 
-        const readyBefore = await redis.zcard(`${keyPrefix()}ready`);
+        await redis.zadd(`${keyPrefix()}ready`, 2500, "proj_acme/g-zombie");
+        const readyBefore = await inspectReadySet();
+        expect(readyBefore).toContain("proj_acme/g-zombie");
 
         await scripts.dispatchBatch({
           nowMs: 3000,
@@ -1848,8 +1858,8 @@ describe("GroupStagingScripts", () => {
           maxJobs: 10,
         });
 
-        const readyAfter = await redis.zcard(`${keyPrefix()}ready`);
-        expect(readyAfter).toBeLessThanOrEqual(readyBefore);
+        const readyAfter = await inspectReadySet();
+        expect(readyAfter).not.toContain("proj_acme/g-zombie");
       });
     });
   });
