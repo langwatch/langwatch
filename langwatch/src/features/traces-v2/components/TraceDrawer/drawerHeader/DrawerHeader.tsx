@@ -2,8 +2,10 @@ import {
   Box,
   Button,
   Circle,
+  HoverCard,
   HStack,
   Icon,
+  Portal,
   Text,
   VStack,
 } from "@chakra-ui/react";
@@ -39,6 +41,9 @@ import { useTraceRefresh } from "../../../hooks/useTraceRefresh";
 import { useTraceResources } from "../../../hooks/useTraceResources";
 import { useDrawerStore } from "../../../stores/drawerStore";
 import { useFilterStore } from "../../../stores/filterStore";
+import { useFocusSectionStore } from "../../../stores/focusSectionStore";
+import { rankedErrorSpans } from "../../../utils/errorSpans";
+import { ExceptionsContent } from "../ExceptionsContent";
 import type { PinnedAttribute } from "../../../stores/pinnedAttributesStore";
 import {
   abbreviateModel,
@@ -175,10 +180,13 @@ function TraceIdChip({ traceId }: { traceId: string }) {
 }
 
 /**
- * Trace status indicator. For error traces, the chip is clickable —
- * jumps to the first span with an error so the user can investigate
- * without having to scan the waterfall manually. OK traces render the
- * dot non-interactively (just the help tooltip).
+ * Trace status indicator. On error traces the chip is an interactive
+ * popover: hovering opens an inline preview of the Exceptions section
+ * (same trace-level message + same per-span pill row, sourced from
+ * the same `rankedErrorSpans` helper), and clicking the chip itself
+ * jumps the operator to the Summary tab's Exceptions accordion with
+ * a brief blue pulse so the eye lands. OK traces render the dot
+ * non-interactively (just the help tooltip).
  */
 function StatusChip({
   trace,
@@ -189,60 +197,121 @@ function StatusChip({
 }) {
   const selectSpan = useDrawerStore((s) => s.selectSpan);
   const setActiveTab = useDrawerStore((s) => s.setActiveTab);
+  const setViewMode = useDrawerStore((s) => s.setViewMode);
+  const requestFocus = useFocusSectionStore((s) => s.request);
   const spanTree = useSpanTree();
-  const firstErrorSpanId = useMemo(() => {
-    const spans = spanTree.data ?? [];
-    if (spans.length === 0) return null;
-    const errors = spans.filter((s) => s.status === "error");
-    if (errors.length === 0) return null;
-    errors.sort((a, b) => a.startTimeMs - b.startTimeMs);
-    return errors[0]!.spanId;
-  }, [spanTree.data]);
+  const errorSpans = useMemo(
+    () => rankedErrorSpans(spanTree.data ?? []),
+    [spanTree.data],
+  );
 
   const isError = trace.status === "error";
-  const canJump = isError && firstErrorSpanId != null;
-  const tooltipContent = isError
-    ? canJump
-      ? "Jump to the first span with an error"
-      : "At least one span on this trace recorded an error"
-    : trace.status === "ok"
-      ? "No errors recorded on any span in this trace"
-      : `Trace status: ${trace.status}`;
+  const hasErrorContent = isError && (!!trace.error || errorSpans.length > 0);
 
-  const handleClick = () => {
-    if (!canJump) return;
-    selectSpan(firstErrorSpanId);
+  const focusExceptions = useCallback(() => {
+    setViewMode("trace");
     setActiveTab("summary");
-  };
+    requestFocus({ traceId: trace.traceId, section: "exceptions" });
+  }, [requestFocus, setActiveTab, setViewMode, trace.traceId]);
+
+  const jumpToSpan = useCallback(
+    (spanId: string) => {
+      setViewMode("trace");
+      setActiveTab("summary");
+      selectSpan(spanId);
+    },
+    [selectSpan, setActiveTab, setViewMode],
+  );
+
+  // OK / non-error rendering keeps the existing static-tooltip recipe —
+  // there's nothing to preview, no jump to make.
+  if (!isError) {
+    const tooltipContent =
+      trace.status === "ok"
+        ? "No errors recorded on any span in this trace"
+        : `Trace status: ${trace.status}`;
+    return (
+      <Tooltip content={tooltipContent} positioning={{ placement: "bottom" }}>
+        <HStack gap={1} flexShrink={0} cursor="help">
+          <Circle size="8px" bg={statusColor} flexShrink={0} />
+        </HStack>
+      </Tooltip>
+    );
+  }
+
+  const chipBody = (
+    <HStack
+      as="button"
+      gap={1}
+      flexShrink={0}
+      cursor="pointer"
+      onClick={focusExceptions}
+      aria-label="Show exception details for this trace"
+      paddingX={1}
+      paddingY={0.5}
+      borderRadius="md"
+      _hover={{ bg: "red.fg/10" }}
+      transition="background 0.15s ease"
+    >
+      <Circle size="8px" bg={statusColor} flexShrink={0} />
+      <Text
+        textStyle="xs"
+        fontWeight="medium"
+        color={statusColor}
+        textTransform="capitalize"
+      >
+        {trace.status}
+      </Text>
+    </HStack>
+  );
+
+  // No content to preview — degrade to the plain clickable chip.
+  // Click still focuses the (empty) Exceptions section so the
+  // operator at least lands on the right tab.
+  if (!hasErrorContent) return chipBody;
 
   return (
-    <Tooltip content={tooltipContent} positioning={{ placement: "bottom" }}>
-      <HStack
-        as={canJump ? "button" : "div"}
-        gap={1}
-        flexShrink={0}
-        cursor={canJump ? "pointer" : "help"}
-        onClick={canJump ? handleClick : undefined}
-        aria-label={canJump ? "Jump to first error span" : undefined}
-        paddingX={canJump ? 1 : 0}
-        paddingY={canJump ? 0.5 : 0}
-        borderRadius={canJump ? "md" : undefined}
-        _hover={canJump ? { bg: "red.fg/10" } : undefined}
-        transition="background 0.15s ease"
-      >
-        <Circle size="8px" bg={statusColor} flexShrink={0} />
-        {trace.status !== "ok" && (
-          <Text
-            textStyle="xs"
-            fontWeight="medium"
-            color={statusColor}
-            textTransform="capitalize"
+    <HoverCard.Root
+      openDelay={150}
+      closeDelay={120}
+      positioning={{ placement: "bottom-start", gutter: 6 }}
+    >
+      <HoverCard.Trigger asChild>{chipBody}</HoverCard.Trigger>
+      <Portal>
+        <HoverCard.Positioner>
+          <HoverCard.Content
+            minWidth="280px"
+            maxWidth="420px"
+            padding={3}
+            borderRadius="lg"
+            background="bg.panel"
+            boxShadow="lg"
           >
-            {trace.status}
-          </Text>
-        )}
-      </HStack>
-    </Tooltip>
+            <ExceptionsContent
+              error={trace.error}
+              errorSpans={errorSpans}
+              onSelectSpan={jumpToSpan}
+              density="compact"
+            />
+            {/* Anchor row: nudges the operator that the popover is a
+                preview of the full Exceptions section, and clicking
+                the chip itself opens it. Matches the deep-link style
+                used on the eval header chips. */}
+            <HStack
+              gap={1}
+              paddingTop={2}
+              marginTop={2}
+              borderTopWidth="1px"
+              borderTopColor="border.muted"
+            >
+              <Text textStyle="2xs" color="fg.muted">
+                Click the chip to open the Exceptions section
+              </Text>
+            </HStack>
+          </HoverCard.Content>
+        </HoverCard.Positioner>
+      </Portal>
+    </HoverCard.Root>
   );
 }
 

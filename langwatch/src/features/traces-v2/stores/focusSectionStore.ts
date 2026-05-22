@@ -7,7 +7,7 @@ import { create } from "zustand";
  * triggering a no-op at runtime when `TraceSummaryAccordions` fails to
  * find a matching `data-section` element.
  */
-const FOCUS_SECTIONS = ["evals", "events"] as const;
+const FOCUS_SECTIONS = ["evals", "events", "exceptions"] as const;
 export type FocusSection = (typeof FOCUS_SECTIONS)[number];
 
 interface PendingFocus {

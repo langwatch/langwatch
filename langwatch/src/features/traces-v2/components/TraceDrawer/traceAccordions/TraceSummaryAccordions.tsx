@@ -1,6 +1,5 @@
-import { Box, Button, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { useEffect, useMemo, useRef } from "react";
-import { LuCircleX } from "react-icons/lu";
 import { useFocusSectionStore } from "../../../stores/focusSectionStore";
 import type {
   SpanTreeNode,
@@ -8,15 +7,20 @@ import type {
 } from "~/server/api/routers/tracesV2.schemas";
 import { useTraceEvaluations } from "../../../hooks/useTraceEvaluations";
 import { useTraceResources } from "../../../hooks/useTraceResources";
+import { rankedErrorSpans } from "../../../utils/errorSpans";
 import { AttributeTable } from "../AttributeTable";
 import { EvalsList } from "../evalCards";
+import { ExceptionsContent } from "../ExceptionsContent";
 import { IOViewer } from "../IOViewer";
 import { ScopeBlock } from "../ScopeChip";
 import { AccordionShell, Section } from "./AccordionShell";
 import { EmptyEventsState, EmptyHint } from "./EmptyStates";
 import { EventCard } from "./EventCard";
 import { useAutoOpenSections } from "./sectionPresence";
+import { SectionFocusGlow } from "./SectionFocusGlow";
 import { countFlatLeaves } from "./utils";
+
+const SECTION_GLOW_DURATION_MS = 1500;
 
 export function TraceSummaryAccordions({
   trace,
@@ -59,30 +63,15 @@ export function TraceSummaryAccordions({
     [richEvals, spans],
   );
 
-  // Spans flagged with status=error, sorted deepest-first so the most
+  // Spans flagged with status=error, deepest-first so the most
   // specific failure (the leaf that actually threw) leads the pill row.
-  // The trace's `error` summary covers the *what*; these pills cover the
-  // *where* — clicking one jumps to the span's details. If span data
-  // hasn't loaded yet we fall back to the summary-only layout.
-  const errorSpans = useMemo(() => {
-    if (!hasError || spans.length === 0) return [];
-    const byId = new Map(spans.map((s) => [s.spanId, s]));
-    const depthOf = (spanId: string): number => {
-      let depth = 0;
-      let cur: SpanTreeNode | undefined = byId.get(spanId);
-      while (cur?.parentSpanId) {
-        const parent = byId.get(cur.parentSpanId);
-        if (!parent) break;
-        depth += 1;
-        cur = parent;
-      }
-      return depth;
-    };
-    return spans
-      .filter((s) => s.status === "error")
-      .map((s) => ({ span: s, depth: depthOf(s.spanId) }))
-      .sort((a, b) => b.depth - a.depth);
-  }, [spans, hasError]);
+  // Same ranking is reused by the StatusChip's interactive tooltip so
+  // the operator sees the same span order whether they're scanning
+  // the popover or the expanded accordion.
+  const errorSpans = useMemo(
+    () => (hasError ? rankedErrorSpans(spans) : []),
+    [spans, hasError],
+  );
 
   const sections = useMemo(() => {
     const list: Array<
@@ -134,15 +123,35 @@ export function TraceSummaryAccordions({
     // Wait one frame so the accordion has actually expanded before we
     // measure + scroll. Two rAFs because the first only flushes the
     // open-state setState; layout commits on the second.
+    const glowSection = pendingFocus.section;
+    const root = containerRef.current;
+    const fadeTimer = window.setTimeout(() => {
+      root
+        ?.querySelector<HTMLElement>(`[data-section="${glowSection}"]`)
+        ?.removeAttribute("data-section-focus");
+    }, SECTION_GLOW_DURATION_MS);
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        const el = containerRef.current?.querySelector<HTMLElement>(
-          `[data-section="${pendingFocus.section}"]`,
+        const el = root?.querySelector<HTMLElement>(
+          `[data-section="${glowSection}"]`,
         );
         el?.scrollIntoView({ behavior: "smooth", block: "start" });
+        // Set the focus attribute AFTER the scroll so the keyframe's
+        // initial transparent frame doesn't elapse mid-scroll — the
+        // operator sees the pulse on the section already in view.
+        // Clear-then-set so re-clicking the same chip restarts the
+        // animation instead of getting swallowed by the running one.
+        if (el) {
+          el.removeAttribute("data-section-focus");
+          // Force a style flush so the re-applied attribute restarts
+          // the keyframe even when the previous run was still in-flight.
+          void el.offsetWidth;
+          el.setAttribute("data-section-focus", "1");
+        }
       });
     });
     clearFocus();
+    return () => window.clearTimeout(fadeTimer);
   }, [
     pendingFocus,
     trace.traceId,
@@ -158,6 +167,7 @@ export function TraceSummaryAccordions({
           attribution row at the top of the summary panel. It's now
           pinned to the right of the SpanTabBar so it stays visible
           when the user scrolls the summary content. */}
+      <SectionFocusGlow />
       <AccordionShell value={openSections} onValueChange={setOpenSections}>
         {sections.map((id, idx) => {
           const isFirst = idx === 0;
@@ -254,59 +264,11 @@ export function TraceSummaryAccordions({
                 isFirst={isFirst}
                 open={isOpen}
               >
-                <VStack align="stretch" gap={2}>
-                  <HStack
-                    gap={2}
-                    paddingX={3}
-                    paddingY={2}
-                    borderRadius="sm"
-                    bg="red.subtle"
-                    align="flex-start"
-                  >
-                    <Icon
-                      as={LuCircleX}
-                      boxSize={4}
-                      color="red.fg"
-                      flexShrink={0}
-                      marginTop={0.5}
-                    />
-                    <Text textStyle="xs" color="red.fg" whiteSpace="pre-wrap">
-                      {trace.error}
-                    </Text>
-                  </HStack>
-                  {/* Pills for spans flagged with status=error, deepest
-                      first. The summary up top tells you *what* broke;
-                      these tell you *where* — click to jump to the span
-                      and see the per-span exception payload. */}
-                  {errorSpans.length > 0 && (
-                    <HStack gap={1.5} flexWrap="wrap" align="center">
-                      <Text
-                        textStyle="2xs"
-                        color="fg.muted"
-                        textTransform="uppercase"
-                        letterSpacing="0.04em"
-                      >
-                        Spans with errors
-                      </Text>
-                      {errorSpans.map(({ span }) => (
-                        <Button
-                          key={span.spanId}
-                          size="2xs"
-                          variant="outline"
-                          colorPalette="red"
-                          onClick={() => onSelectSpan?.(span.spanId)}
-                          paddingX={2}
-                          height="22px"
-                          fontWeight="medium"
-                        >
-                          <Text truncate maxWidth="220px">
-                            {span.name}
-                          </Text>
-                        </Button>
-                      ))}
-                    </HStack>
-                  )}
-                </VStack>
+                <ExceptionsContent
+                  error={trace.error}
+                  errorSpans={errorSpans}
+                  onSelectSpan={onSelectSpan}
+                />
               </Section>
             );
           }
