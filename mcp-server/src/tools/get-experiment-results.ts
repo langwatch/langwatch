@@ -113,7 +113,7 @@ export async function handleExperimentResults(params: {
     throw error;
   }
 
-  if (!results || results.timestamps.finishedAt == null) {
+  if (!results || (results.timestamps.finishedAt == null && results.timestamps.stoppedAt == null)) {
     return [
       `# Evaluation Results: ${params.runId}`,
       "",

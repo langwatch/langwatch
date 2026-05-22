@@ -155,7 +155,7 @@ export class ExperimentsFacade {
 
       if (status.status === "completed") {
         console.log(); // Newline after progress
-        const summary = status.summary!;
+        const summary = status.summary ?? {};
         return this.buildResult(runId, "completed", summary, runUrl ?? "");
       }
 

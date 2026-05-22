@@ -145,7 +145,7 @@ export const statusCommand = async (options?: { format?: string }): Promise<void
   console.log(chalk.gray("    langwatch annotation list   langwatch model-provider list"));
   console.log();
   console.log(chalk.gray("  Execution:"));
-  console.log(chalk.gray("    langwatch evaluation run <slug> [--wait]"));
+  console.log(chalk.gray("    langwatch experiment run <slug> [--wait]"));
   console.log(chalk.gray("    langwatch suite run <id> [--wait]"));
   console.log(chalk.gray("    langwatch scenario run <id> --target <type>:<ref>"));
   console.log(chalk.gray("    langwatch agent run <id> --input <json>"));
