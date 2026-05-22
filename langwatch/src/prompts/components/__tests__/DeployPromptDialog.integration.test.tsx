@@ -105,7 +105,11 @@ vi.mock("~/components/ui/select", () => {
     "aria-label"?: string;
     [key: string]: unknown;
   }) => (
-    <div data-testid="select-root">
+    <div
+      data-testid="select-root"
+      data-flex={rest["flex"] as string | undefined}
+      data-max-width={rest["maxWidth"] as string | undefined}
+    >
       <select
         aria-label={rest["aria-label"] as string}
         value={value[0] ?? ""}
@@ -726,6 +730,40 @@ describe.skip("Feature: Deploy Prompt Dialog", () => {
         expect(
           screen.getByRole("button", { name: /delete tag production/i }),
         ).toBeInTheDocument();
+      });
+    });
+
+    describe("Scenario: Version Select inputs stay within the modal width", () => {
+      /** @scenario Version Select inputs stay within the modal width */
+      it("renders version Select with flex layout props that prevent modal overflow", async () => {
+        const longCommitMessage = "a".repeat(220);
+        setupQueries({
+          versions: [
+            { version: 1, versionId: "v1-id", commitMessage: "Short message" },
+            {
+              version: 2,
+              versionId: "v2-id",
+              commitMessage: longCommitMessage,
+            },
+          ],
+        });
+
+        const { container } = renderDialog();
+
+        await waitFor(() => {
+          expect(screen.getByLabelText("Production version")).toBeInTheDocument();
+        });
+
+        // Each Select.Root rendered for a tag row must carry the anti-overflow
+        // flex props that clamp the trigger to the row width.
+        const selectRoots = container.querySelectorAll(
+          '[data-testid="select-root"]',
+        );
+        expect(selectRoots.length).toBeGreaterThan(0);
+        selectRoots.forEach((root) => {
+          expect(root).toHaveAttribute("data-flex", "1");
+          expect(root).toHaveAttribute("data-max-width", "280px");
+        });
       });
     });
   });

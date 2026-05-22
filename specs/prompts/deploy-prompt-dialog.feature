@@ -40,12 +40,10 @@ Feature: Deploy Prompt Dialog
 
   # --- Layout ---
 
-  @integration @manual @unimplemented
+  @integration
   Scenario: Version Select inputs stay within the modal width
     Given I am on the prompt detail page for "pizza-prompt"
     And "pizza-prompt" has versions whose commit messages are long enough to overflow a 180px-wide trigger
     When I click the "Deploy" button
     Then each environment tag row (production, staging, any custom) renders within the modal's content boundary
     And the version Select trigger truncates long commit messages instead of pushing the row past the modal edge
-    # Asserted visually (jsdom does not compute layout). Proof: screenshot
-    # attached to PR for #4006 showing the Selects clamped to the row width.
