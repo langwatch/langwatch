@@ -1767,7 +1767,7 @@ describe("GroupStagingScripts", () => {
 
       /** @scenario Over-cap tenant with a blocked group does not affect other tenants */
       it("over-cap tenant blocked group is skipped without SISMEMBER affecting dispatch", async () => {
-        process.env[TENANT_CAP_ENV] = "1";
+        process.env[TENANT_CAP_ENV] = "2";
 
         await scripts.stage(
           makeJob({
@@ -1785,6 +1785,13 @@ describe("GroupStagingScripts", () => {
         );
         await scripts.stage(
           makeJob({
+            stagedJobId: "j3",
+            groupId: "proj_noisy/g3",
+            dispatchAfterMs: 1000,
+          }),
+        );
+        await scripts.stage(
+          makeJob({
             stagedJobId: "quiet-j1",
             groupId: "proj_quiet/g1",
             dispatchAfterMs: 1001,
@@ -1797,14 +1804,23 @@ describe("GroupStagingScripts", () => {
           maxJobs: 10,
         });
         expect(first.map((r) => r.groupId)).toContain("proj_noisy/g1");
+        expect(first.map((r) => r.groupId)).toContain("proj_noisy/g2");
 
+        // restageAndBlock frees g1's slot (counter 2→1), but g2 is still
+        // active so proj_noisy stays at cap (1 active, cap=2 → under cap?).
+        // No — we need tenant to remain AT cap after restage. With cap=2,
+        // first batch dispatches g1+g2 (counter=2). Restage g1 drops to 1.
+        // That's under cap=2, so g3 would dispatch. Set cap back to 1 so
+        // the remaining active g2 (counter=1) keeps tenant at cap.
         await scripts.restageAndBlock({
           groupId: "proj_noisy/g1",
           newStagedJobId: "j1-retry",
-          score: 3000,
+          score: 5000,
           jobDataJson: first.find((r) => r.groupId === "proj_noisy/g1")!.jobDataJson,
           errorMessage: "test",
         });
+        process.env[TENANT_CAP_ENV] = "1";
+
         await scripts.stage(
           makeJob({
             stagedJobId: "quiet-j2",
@@ -1820,7 +1836,7 @@ describe("GroupStagingScripts", () => {
         });
 
         expect(second.map((r) => r.groupId)).not.toContain("proj_noisy/g1");
-        expect(second.map((r) => r.groupId)).not.toContain("proj_noisy/g2");
+        expect(second.map((r) => r.groupId)).not.toContain("proj_noisy/g3");
         expect(second.map((r) => r.groupId)).toContain("proj_quiet/g2");
       });
 
