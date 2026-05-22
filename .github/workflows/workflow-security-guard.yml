@@ -40,6 +40,18 @@ jobs:
           path: base
           persist-credentials: false
 
+      # The base branch has no guard script during the initial rollout.
+      # After merge, future workflow PRs use the trusted base copy.
+      - name: Resolve guard script path
+        if: github.event_name == 'pull_request'
+        id: guard-script
+        run: |
+          if [ -f base/.github/scripts/guard-pull-request-target.ts ]; then
+            echo "path=base/.github/scripts/guard-pull-request-target.ts" >> "$GITHUB_OUTPUT"
+          else
+            echo "path=pr/.github/scripts/guard-pull-request-target.ts" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Setup Node
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
@@ -47,7 +59,7 @@ jobs:
 
       - name: Check privileged workflow gates on PR
         if: github.event_name == 'pull_request'
-        run: node --experimental-strip-types base/.github/scripts/guard-pull-request-target.ts pr
+        run: node --experimental-strip-types "${{ steps.guard-script.outputs.path }}" pr
 
       - name: Checkout repository
         if: github.event_name != 'pull_request'
