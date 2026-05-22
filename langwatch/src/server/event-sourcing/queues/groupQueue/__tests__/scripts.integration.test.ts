@@ -1805,6 +1805,7 @@ describe("GroupStagingScripts", () => {
         });
         expect(first.map((r) => r.groupId)).toContain("proj_noisy/g1");
         expect(first.map((r) => r.groupId)).toContain("proj_noisy/g2");
+        expect(first.map((r) => r.groupId)).not.toContain("proj_noisy/g3");
         expect(first.map((r) => r.groupId)).toContain("proj_quiet/g1");
 
         // restageAndBlock frees g1's slot (counter 2→1). g2 still active
