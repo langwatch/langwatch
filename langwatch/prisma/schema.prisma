@@ -379,9 +379,6 @@ model Project {
   annotations              Annotation[]
   modelProviders           ModelProvider[]
   projectSecrets           ProjectSecret[]
-  defaultModel             String?
-  topicClusteringModel     String?
-  embeddingsModel          String?
   TriggerSent              TriggerSent[]
   annotationScores         AnnotationScore[]
   publicShares             PublicShare[]
