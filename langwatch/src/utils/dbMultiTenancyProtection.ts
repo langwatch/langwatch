@@ -90,15 +90,6 @@ const EXEMPT_MODELS = [
    * that keeps system-scoped kill switches off PostHog.
    */
   "FeatureFlag",
-  "ModelProvider",
-  /**
-   * ModelProviderScope (iter 109) is the N:M join table between a
-   * ModelProvider row and its (scopeType, scopeId) entries. It has no
-   * projectId column — access is always gated through the parent MP
-   * (repository replaces the scope set inside a transaction keyed on
-   * `modelProviderId`). Same rationale as VirtualKeyProviderCredential.
-   */
-  "ModelProviderScope",
   /**
    * RoutingPolicy (iter governance-platform) is org-scoped:
    * (organizationId, scope, scopeId, name) is the natural key. Scope
@@ -442,7 +433,7 @@ const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
   }
 
   // Gateway auth resolver: findByHashedSecret is the hot-path lookup
-  // that converts an opaque `lw_vk_live_*` bearer token into a
+  // that converts an opaque `vk-lw-*` bearer token into a
   // VirtualKey row. The hashedSecret itself is a cryptographic
   // identifier unique across the platform (HMAC-SHA256 with a
   // per-deployment pepper), so projectId/organizationId cannot be
