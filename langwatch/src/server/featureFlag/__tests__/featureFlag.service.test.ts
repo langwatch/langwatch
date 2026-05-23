@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { FeatureFlagService } from "../featureFlag.service";
+import type { FeatureFlagStorePostgres } from "../featureFlagStore.postgres";
+import type { FeatureFlagServiceInterface } from "../types";
 
 vi.mock("../featureFlagService.posthog", () => ({
   FeatureFlagServicePostHog: {
@@ -17,14 +19,24 @@ vi.mock("../featureFlagService.memory", () => ({
   },
 }));
 
+// Store stub. Registry-aware paths are exercised in the resolver
+// suite; here we just need an inert dependency so the constructor
+// doesn't reach into the real Prisma client.
+function buildNoopStore(): FeatureFlagStorePostgres {
+  return {
+    get: vi.fn().mockResolvedValue(null),
+    set: vi.fn().mockResolvedValue(undefined),
+    clear: vi.fn().mockResolvedValue(undefined),
+    listAll: vi.fn().mockResolvedValue([]),
+  } as unknown as FeatureFlagStorePostgres;
+}
+
+function buildLegacy(returnValue: boolean): FeatureFlagServiceInterface {
+  return { isEnabled: vi.fn().mockResolvedValue(returnValue) };
+}
+
 describe("FeatureFlagService", () => {
   describe("isEnabled()", () => {
-    let service: FeatureFlagService;
-
-    beforeEach(() => {
-      service = FeatureFlagService.create();
-    });
-
     describe("when no env override is set", () => {
       const originalEnvValue = process.env.RELEASE_UI_SIMULATIONS_MENU_ENABLED;
 
@@ -40,49 +52,63 @@ describe("FeatureFlagService", () => {
         }
       });
 
-      it("delegates to underlying service", async () => {
-        const mockService = { isEnabled: vi.fn().mockResolvedValue(true) };
-        vi.spyOn(service as any, "service", "get").mockReturnValue(mockService);
+      it("delegates unregistered flags to the legacy service", async () => {
+        const legacy = buildLegacy(true);
+        const service = new FeatureFlagService({
+          legacy,
+          store: buildNoopStore(),
+        });
 
-        const result = await service.isEnabled("some-flag", "user-1", false);
+        const result = await service.isEnabled("some-flag" as never, {
+          distinctId: "user-1",
+          defaultValue: false,
+        });
 
         expect(result).toBe(true);
-        expect(mockService.isEnabled).toHaveBeenCalledWith(
-          "some-flag",
-          "user-1",
-          false,
-          undefined,
-        );
+        expect(legacy.isEnabled).toHaveBeenCalledWith("some-flag", {
+          distinctId: "user-1",
+          defaultValue: false,
+        });
       });
 
-      it("passes projectId to underlying service", async () => {
-        const mockService = { isEnabled: vi.fn().mockResolvedValue(true) };
-        vi.spyOn(service as any, "service", "get").mockReturnValue(mockService);
+      it("forwards projectId to the legacy service", async () => {
+        const legacy = buildLegacy(true);
+        const service = new FeatureFlagService({
+          legacy,
+          store: buildNoopStore(),
+        });
 
-        const options = { projectId: "proj-123" };
-        await service.isEnabled("some-flag", "user-1", true, options);
+        await service.isEnabled("some-flag" as never, {
+          distinctId: "user-1",
+          defaultValue: true,
+          projectId: "proj-123",
+        });
 
-        expect(mockService.isEnabled).toHaveBeenCalledWith(
-          "some-flag",
-          "user-1",
-          true,
-          options,
-        );
+        expect(legacy.isEnabled).toHaveBeenCalledWith("some-flag", {
+          distinctId: "user-1",
+          defaultValue: true,
+          projectId: "proj-123",
+        });
       });
 
-      it("passes organizationId to underlying service", async () => {
-        const mockService = { isEnabled: vi.fn().mockResolvedValue(true) };
-        vi.spyOn(service as any, "service", "get").mockReturnValue(mockService);
+      it("forwards organizationId to the legacy service", async () => {
+        const legacy = buildLegacy(true);
+        const service = new FeatureFlagService({
+          legacy,
+          store: buildNoopStore(),
+        });
 
-        const options = { organizationId: "org-456" };
-        await service.isEnabled("some-flag", "user-1", false, options);
+        await service.isEnabled("some-flag" as never, {
+          distinctId: "user-1",
+          defaultValue: false,
+          organizationId: "org-456",
+        });
 
-        expect(mockService.isEnabled).toHaveBeenCalledWith(
-          "some-flag",
-          "user-1",
-          false,
-          options,
-        );
+        expect(legacy.isEnabled).toHaveBeenCalledWith("some-flag", {
+          distinctId: "user-1",
+          defaultValue: false,
+          organizationId: "org-456",
+        });
       });
     });
 
@@ -103,9 +129,8 @@ describe("FeatureFlagService", () => {
           const service = FeatureFlagService.create();
 
           const result = await service.isEnabled(
-            "release_ui_simulations_menu_enabled",
-            "user-123",
-            false,
+            "release_ui_simulations_menu_enabled" as never,
+            { distinctId: "user-123", defaultValue: false },
           );
 
           expect(result).toBe(true);
@@ -118,9 +143,8 @@ describe("FeatureFlagService", () => {
           const service = FeatureFlagService.create();
 
           const result = await service.isEnabled(
-            "release_ui_simulations_menu_enabled",
-            "user-123",
-            true,
+            "release_ui_simulations_menu_enabled" as never,
+            { distinctId: "user-123", defaultValue: true },
           );
 
           expect(result).toBe(false);
@@ -139,58 +163,72 @@ describe("FeatureFlagService", () => {
         process.env = originalEnv;
       });
 
-      it("forces matching flag on regardless of underlying service", async () => {
+      it("forces matching flag on regardless of legacy service", async () => {
         process.env.FEATURE_FLAG_FORCE_ENABLE = "some_flag,other_flag";
-        const service = FeatureFlagService.create();
-        const mockSub = { isEnabled: vi.fn().mockResolvedValue(false) };
-        vi.spyOn(service as any, "service", "get").mockReturnValue(mockSub);
+        const legacy = buildLegacy(false);
+        const service = new FeatureFlagService({
+          legacy,
+          store: buildNoopStore(),
+        });
 
-        const result = await service.isEnabled("some_flag", "user-1", false);
+        const result = await service.isEnabled("some_flag" as never, {
+          distinctId: "user-1",
+          defaultValue: false,
+        });
 
         expect(result).toBe(true);
-        expect(mockSub.isEnabled).not.toHaveBeenCalled();
+        expect(legacy.isEnabled).not.toHaveBeenCalled();
       });
 
-      it("does not force flags that are not in the list", async () => {
+      it("does not force flags outside the list", async () => {
         process.env.FEATURE_FLAG_FORCE_ENABLE = "only_this_flag";
-        const service = FeatureFlagService.create();
-        const mockSub = { isEnabled: vi.fn().mockResolvedValue(false) };
-        vi.spyOn(service as any, "service", "get").mockReturnValue(mockSub);
+        const legacy = buildLegacy(false);
+        const service = new FeatureFlagService({
+          legacy,
+          store: buildNoopStore(),
+        });
 
-        const result = await service.isEnabled("different_flag", "u", false);
+        const result = await service.isEnabled("different_flag" as never, {
+          distinctId: "u",
+          defaultValue: false,
+        });
 
         expect(result).toBe(false);
-        expect(mockSub.isEnabled).toHaveBeenCalled();
+        expect(legacy.isEnabled).toHaveBeenCalled();
       });
 
       it("trims whitespace in the comma-separated list", async () => {
         process.env.FEATURE_FLAG_FORCE_ENABLE = "  spaced_flag  , other ";
-        const service = FeatureFlagService.create();
-        const mockSub = { isEnabled: vi.fn().mockResolvedValue(false) };
-        vi.spyOn(service as any, "service", "get").mockReturnValue(mockSub);
+        const legacy = buildLegacy(false);
+        const service = new FeatureFlagService({
+          legacy,
+          store: buildNoopStore(),
+        });
 
-        const result = await service.isEnabled("spaced_flag", "u", false);
+        const result = await service.isEnabled("spaced_flag" as never, {
+          distinctId: "u",
+          defaultValue: false,
+        });
 
         expect(result).toBe(true);
       });
 
-      it("runs at the top level so dev memory sub-service is bypassed", async () => {
+      it("runs at the top level so the legacy service is bypassed", async () => {
         process.env.FEATURE_FLAG_FORCE_ENABLE = "release_ui_ai_gateway_menu_enabled";
         delete process.env.POSTHOG_KEY;
-        const service = FeatureFlagService.create();
-        const mockMemorySub = { isEnabled: vi.fn().mockResolvedValue(false) };
-        vi.spyOn(service as any, "service", "get").mockReturnValue(
-          mockMemorySub,
-        );
+        const legacy = buildLegacy(false);
+        const service = new FeatureFlagService({
+          legacy,
+          store: buildNoopStore(),
+        });
 
         const result = await service.isEnabled(
           "release_ui_ai_gateway_menu_enabled",
-          "u",
-          false,
+          { distinctId: "u", defaultValue: false },
         );
 
         expect(result).toBe(true);
-        expect(mockMemorySub.isEnabled).not.toHaveBeenCalled();
+        expect(legacy.isEnabled).not.toHaveBeenCalled();
       });
 
       it("per-flag envOverride takes precedence over FEATURE_FLAG_FORCE_ENABLE", async () => {
@@ -199,9 +237,8 @@ describe("FeatureFlagService", () => {
         const service = FeatureFlagService.create();
 
         const result = await service.isEnabled(
-          "release_ui_simulations_menu_enabled",
-          "u",
-          true,
+          "release_ui_simulations_menu_enabled" as never,
+          { distinctId: "u", defaultValue: true },
         );
 
         expect(result).toBe(false);

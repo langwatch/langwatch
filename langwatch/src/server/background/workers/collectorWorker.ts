@@ -53,6 +53,7 @@ import {
 } from "./collector/metrics";
 import { cleanupPIIs } from "./collector/piiCheck";
 import { addInputAndOutputForRAGs } from "./collector/rag";
+import { featureFlagService } from "../../featureFlag";
 
 const logger = createLogger("langwatch:workers:collectorWorker");
 const tracer = trace.getTracer("langwatch:collector");
@@ -448,10 +449,11 @@ const processCollectorJob_ = async (
       .toReversed(),
   };
 
-  if (
-    !process.env.DISABLE_PII_REDACTION &&
-    project.piiRedactionLevel !== "DISABLED"
-  ) {
+  const piiRedactionDisabled = await featureFlagService.isEnabled(
+    "ops_pii_redaction_disabled",
+    { distinctId: project.id, defaultValue: false },
+  );
+  if (!piiRedactionDisabled && project.piiRedactionLevel !== "DISABLED") {
     const piiEnforced = env.NODE_ENV === "production";
     await withSpan("cleanupPIIs", () =>
       cleanupPIIs(trace, esSpans, {

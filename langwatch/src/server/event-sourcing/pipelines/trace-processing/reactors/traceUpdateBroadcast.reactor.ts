@@ -31,7 +31,7 @@ export function createTraceUpdateBroadcastReactor(
       disabled: deps.hasRedis === false,
       makeJobId: (payload) =>
         `trace-update:${payload.event.tenantId}:${payload.event.aggregateId}`,
-      ttl: 1000, // Debounce broadcasts slightly
+      ttl: 30_000, // Debounce broadcasts — frontend already debounces duplicate events
     },
 
     async handle(

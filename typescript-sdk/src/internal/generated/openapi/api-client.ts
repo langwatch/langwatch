@@ -787,7 +787,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/evaluations/v3/{slug}/run": {
+    "/api/experiments/{slug}/run": {
         parameters: {
             query?: never;
             header?: never;
@@ -804,7 +804,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/evaluations/v3/runs/{runId}": {
+    "/api/experiments/runs/{runId}": {
         parameters: {
             query?: never;
             header?: never;
@@ -4060,7 +4060,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description The run ID returned from POST /api/evaluations/v3/{slug}/run */
+                /** @description The run ID returned from POST /api/experiments/{slug}/run */
                 runId: string;
             };
             cookie?: never;

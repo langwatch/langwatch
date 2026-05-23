@@ -95,8 +95,6 @@ export function enrichTeamWithRoleBindings<
   return { ...team, members: newMembers };
 }
 
-export type OrganizationFeatureName = "billable_events_usage";
-
 /**
  * Organization-level queries and mutations delegated from the tRPC router.
  * License checks remain in the router layer (they require request-scoped user context).
@@ -127,18 +125,6 @@ export class OrganizationService {
 
   async getProjectIds(organizationId: string): Promise<string[]> {
     return this.repo.getProjectIds(organizationId);
-  }
-
-  async isFeatureEnabled(
-    organizationId: string,
-    feature: OrganizationFeatureName,
-  ): Promise<boolean> {
-    const row = await this.repo.getFeature(organizationId, feature);
-    if (!row) return false;
-    if (row.trialEndDate && new Date(row.trialEndDate) <= new Date()) {
-      return false;
-    }
-    return true;
   }
 
   async findWithAdmins(

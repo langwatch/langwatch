@@ -10,12 +10,8 @@ import {
 } from "@chakra-ui/react";
 import { type ReactNode, useState } from "react";
 import { LuCircleAlert, LuCircleSlash, LuQuote } from "react-icons/lu";
-import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import {
-  AZURE_SAFETY_NOT_CONFIGURED_MESSAGE,
-  AZURE_SAFETY_PROVIDER_KEY,
-} from "~/server/app-layer/evaluations/azure-safety-env";
+import { AZURE_SAFETY_NOT_CONFIGURED_MESSAGE } from "~/server/app-layer/evaluations/azure-safety-env";
 import { formatCost, formatDuration } from "../../../utils/formatters";
 import { RunHistorySparkline } from "./RunHistorySparkline";
 import { type EvalEntry, formatInputValue, isNoVerdict, STATUS } from "./utils";
@@ -30,7 +26,6 @@ export function EvalCard({
   const { name, score, scoreType, status } = eval_;
   const tone = STATUS[status] ?? STATUS.warning;
   const noVerdict = isNoVerdict(status);
-  const { openDrawer } = useDrawer();
   const { project, organization } = useOrganizationTeamProject();
 
   let scoreLabel = "";
@@ -162,13 +157,12 @@ export function EvalCard({
               textStyle="lg"
               fontWeight="bold"
               color={tone.color}
-              fontFamily="mono"
               lineHeight={1}
             >
               {scoreLabel}
             </Text>
             {scoreSubLabel && (
-              <Text textStyle="2xs" color="fg.subtle" fontFamily="mono">
+              <Text textStyle="2xs" color="fg.subtle">
                 {scoreSubLabel}
               </Text>
             )}
@@ -231,22 +225,16 @@ export function EvalCard({
                 primaryStatusText === AZURE_SAFETY_NOT_CONFIGURED_MESSAGE ? (
                   <>
                     Azure Safety provider not configured. Configure it in{" "}
-                    <chakra.button
-                      type="button"
+                    <chakra.a
+                      href="/settings/model-providers"
+                      target="_blank"
+                      rel="noopener noreferrer"
                       color="blue.fg"
                       textDecoration="underline"
-                      onClick={() => {
-                        if (!project?.id) return;
-                        openDrawer("editModelProvider", {
-                          projectId: project.id,
-                          organizationId: organization?.id,
-                          providerKey: AZURE_SAFETY_PROVIDER_KEY,
-                          modelProviderId: "new",
-                        });
-                      }}
+                      onClick={(e) => e.stopPropagation()}
                     >
                       Settings → Model Providers
-                    </chakra.button>{" "}
+                    </chakra.a>{" "}
                     to run this evaluator.
                   </>
                 ) : (
@@ -324,7 +312,6 @@ function EvalCardFooter({
               align="center"
               textStyle="2xs"
               color="blue.fg"
-              fontFamily="mono"
               cursor="pointer"
               onClick={() => eval_.spanId && onSelectSpan?.(eval_.spanId)}
               _hover={{ textDecoration: "underline" }}
@@ -334,7 +321,7 @@ function EvalCardFooter({
           </HStack>
         )}
         {meta.map((m, i) => (
-          <Text key={i} textStyle="2xs" fontFamily="mono">
+          <Text key={i} textStyle="2xs">
             {m}
           </Text>
         ))}
@@ -368,7 +355,6 @@ function EvalCardFooter({
             <DetailRow label="Label">
               <Text
                 textStyle="xs"
-                fontFamily="mono"
                 color="fg"
                 fontWeight="medium"
               >
@@ -391,7 +377,6 @@ function EvalCardFooter({
               <Text
                 textStyle="xs"
                 color={tone.fg}
-                fontFamily="mono"
                 whiteSpace="pre-wrap"
                 wordBreak="break-word"
               >
@@ -406,7 +391,6 @@ function EvalCardFooter({
                   <HStack align="flex-start" gap={2} minWidth={0}>
                     <Text
                       textStyle="2xs"
-                      fontFamily="mono"
                       color="fg.subtle"
                       flexShrink={0}
                       minWidth="80px"
@@ -415,7 +399,6 @@ function EvalCardFooter({
                     </Text>
                     <Text
                       textStyle="2xs"
-                      fontFamily="mono"
                       color="fg"
                       wordBreak="break-all"
                     >
@@ -427,7 +410,6 @@ function EvalCardFooter({
                   <HStack align="flex-start" gap={2} minWidth={0}>
                     <Text
                       textStyle="2xs"
-                      fontFamily="mono"
                       color="fg.subtle"
                       flexShrink={0}
                       minWidth="80px"
@@ -436,7 +418,6 @@ function EvalCardFooter({
                     </Text>
                     <Text
                       textStyle="2xs"
-                      fontFamily="mono"
                       color="fg"
                       wordBreak="break-all"
                     >
@@ -452,7 +433,6 @@ function EvalCardFooter({
               <Box
                 as="pre"
                 textStyle="2xs"
-                fontFamily="mono"
                 color="fg.muted"
                 whiteSpace="pre-wrap"
                 wordBreak="break-word"
@@ -475,7 +455,6 @@ function EvalCardFooter({
                   <HStack key={key} align="flex-start" gap={2} minWidth={0}>
                     <Text
                       textStyle="2xs"
-                      fontFamily="mono"
                       color="fg.subtle"
                       flexShrink={0}
                       minWidth="80px"
@@ -485,7 +464,6 @@ function EvalCardFooter({
                     <Box
                       as="pre"
                       textStyle="2xs"
-                      fontFamily="mono"
                       color="fg"
                       whiteSpace="pre-wrap"
                       wordBreak="break-word"

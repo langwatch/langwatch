@@ -69,7 +69,7 @@ Feature: Model Provider Scope and Multi-Instance
     And I have only "project:manage" on "web-app"
     Then the Scope field is pre-filled with project "web-app"
 
-  @integration @unimplemented
+  @integration
   Scenario: Save a provider with multiple scopes
     Given I open the Create Model Provider drawer for "openai"
     When I set the name to "OpenAI Production"
@@ -127,7 +127,7 @@ Feature: Model Provider Scope and Multi-Instance
   # check. Users disambiguate duplicates through the scope chips on the
   # list page and the scope-grouped header in model selectors.
 
-  @integration @unimplemented
+  @integration
   Scenario: Create a second OpenAI row under a different scope
     Given the org "acme" already has a ModelProvider named "OpenAI" scoped to project "web-app"
     When I open the Create Model Provider drawer and select provider "openai"

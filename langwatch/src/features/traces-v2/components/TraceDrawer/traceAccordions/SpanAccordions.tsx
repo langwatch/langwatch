@@ -7,7 +7,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import { LuCircleX } from "react-icons/lu";
 import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
 import { useSpanDetail } from "../../../hooks/useSpanDetail";
@@ -15,10 +15,13 @@ import { useTraceResources } from "../../../hooks/useTraceResources";
 import { AttributeTable } from "../AttributeTable";
 import { IOViewer } from "../IOViewer";
 import { hasPromptMetadata, PromptAccordion } from "../PromptAccordion";
-import { ScopeBlock, ScopeChip } from "../ScopeChip";
+import { ScopeBlock } from "../ScopeChip";
 import { AccordionShell, Section } from "./AccordionShell";
 import { EmptyEventsState, EmptyHint } from "./EmptyStates";
+import { EventCard } from "./EventCard";
 import { useAutoOpenSections } from "./sectionPresence";
+import { SectionFocusGlow } from "./SectionFocusGlow";
+import { useSectionFocusGlow } from "./useSectionFocusGlow";
 import { countFlatLeaves } from "./utils";
 
 export function SpanAccordions({
@@ -43,6 +46,9 @@ export function SpanAccordions({
     !!detail?.params && Object.keys(detail.params).length > 0;
   const hasAttributes = hasSpanAttrs || hasResourceAttrs;
   const hasScope = !!spanScope?.name;
+  // Prompt section only when there's actual prompt metadata. The no-prompt
+  // case is covered by the "Open in Playground" affordance on the IOViewer
+  // header — no value in rendering an empty Prompt accordion next to it.
   const hasPrompt = !!detail && hasPromptMetadata(detail.params);
   const hasError = span.status === "error" || !!detail?.error;
   const hasEvents = !!detail?.events && detail.events.length > 0;
@@ -71,8 +77,17 @@ export function SpanAccordions({
     events: hasEvents,
   });
 
+  const containerRef = useRef<HTMLDivElement>(null);
+  const { glow, handleGlowDone } = useSectionFocusGlow({
+    traceId,
+    sections,
+    openSections,
+    setOpenSections,
+    containerRef,
+  });
+
   return (
-    <Box>
+    <Box ref={containerRef}>
       {/* Span-switch loading banner — makes it explicit that the panel
         below is still resolving, instead of letting the user stare at
         an empty accordion stack and wonder if anything's happening. */}
@@ -86,7 +101,7 @@ export function SpanAccordions({
           borderColor="border.muted"
         >
           <Spinner size="xs" color="blue.fg" />
-          <Text textStyle="xs" color="fg.muted" fontFamily="mono" truncate>
+          <Text textStyle="xs" color="fg.muted" truncate>
             Loading span{" "}
             <Text as="span" color="fg">
               {span.name}
@@ -95,16 +110,21 @@ export function SpanAccordions({
           </Text>
         </HStack>
       )}
-      {hasScope && (
-        <Box
-          paddingX={4}
-          paddingY={2}
-          borderBottomWidth="1px"
-          borderColor="border.muted"
-        >
-          <ScopeChip scope={spanScope} />
-        </Box>
-      )}
+      {/*
+        The instrumentation-scope chip lives in the SpanTabBar's
+        rightSlot now — rendering it here too duplicated it directly
+        below the tab row, which read as visual noise on every span
+        detail. The tab-bar chip already covers the same trace-level
+        attribution; nothing else to add here.
+      */}
+      {glow ? (
+        <SectionFocusGlow
+          key={glow.nonce}
+          target={glow.target}
+          nonce={glow.nonce}
+          onDone={handleGlowDone}
+        />
+      ) : null}
       {detailQuery.isLoading ? (
         <VStack align="stretch" gap={2} padding={4}>
           <Skeleton height="32px" borderRadius="md" />
@@ -124,7 +144,6 @@ export function SpanAccordions({
                   title="Input and Output"
                   empty={!detailQuery.isLoading && !hasIO}
                   isFirst={isFirst}
-                stackIndex={idx}
                   open={isOpen}
                 >
                   {detailQuery.isLoading ? (
@@ -136,6 +155,8 @@ export function SpanAccordions({
                           label="Input"
                           content={detail.input}
                           mode="input"
+                          spanId={detail.spanId}
+                          spanType={detail.type}
                         />
                       )}
                       {detail?.output && (
@@ -143,6 +164,8 @@ export function SpanAccordions({
                           label="Output"
                           content={detail.output}
                           mode="output"
+                          spanId={detail.spanId}
+                          spanType={detail.type}
                         />
                       )}
                     </VStack>
@@ -159,7 +182,6 @@ export function SpanAccordions({
                   value="prompt"
                   title="Prompt"
                   isFirst={isFirst}
-                stackIndex={idx}
                   open={isOpen}
                 >
                   {detail && <PromptAccordion span={detail} />}
@@ -183,7 +205,6 @@ export function SpanAccordions({
                     !detailQuery.isLoading
                   }
                   isFirst={isFirst}
-                stackIndex={idx}
                   open={isOpen}
                 >
                   {hasAttributes ? (
@@ -215,7 +236,6 @@ export function SpanAccordions({
                   value="scope"
                   title="Instrumentation Scope"
                   isFirst={isFirst}
-                stackIndex={idx}
                   open={isOpen}
                 >
                   <ScopeBlock scope={spanScope} />
@@ -229,7 +249,6 @@ export function SpanAccordions({
                   value="exceptions"
                   title="Exceptions"
                   isFirst={isFirst}
-                stackIndex={idx}
                   open={isOpen}
                 >
                   {detail?.error ? (
@@ -252,7 +271,6 @@ export function SpanAccordions({
                         <Text
                           textStyle="xs"
                           color="red.fg"
-                          fontFamily="mono"
                           whiteSpace="pre-wrap"
                           fontWeight="semibold"
                         >
@@ -266,7 +284,6 @@ export function SpanAccordions({
                           borderWidth="1px"
                           borderColor="border"
                           padding={2}
-                          fontFamily="mono"
                           textStyle="xs"
                           color="fg.muted"
                           whiteSpace="pre-wrap"
@@ -294,24 +311,18 @@ export function SpanAccordions({
                 count={hasEvents ? detail!.events.length : undefined}
                 empty={!detailQuery.isLoading && !hasEvents}
                 isFirst={isFirst}
-                stackIndex={idx}
                 open={isOpen}
               >
                 {hasEvents ? (
-                  <VStack align="stretch" gap={1}>
-                    {detail!.events.map((evt) => (
-                      <HStack key={`${evt.timestampMs}-${evt.name}`} gap={3}>
-                        <Text textStyle="xs" fontWeight="medium">
-                          {evt.name}
-                        </Text>
-                        <Text
-                          textStyle="xs"
-                          color="fg.subtle"
-                          fontFamily="mono"
-                        >
-                          +{Math.round(evt.timestampMs - span.startTimeMs)}ms
-                        </Text>
-                      </HStack>
+                  <VStack align="stretch" gap={2}>
+                    {detail!.events.map((evt, i) => (
+                      <EventCard
+                        key={`${evt.timestampMs}-${evt.name}-${i}`}
+                        name={evt.name}
+                        timestampMs={evt.timestampMs}
+                        anchorMs={span.startTimeMs}
+                        attributes={evt.attributes}
+                      />
                     ))}
                   </VStack>
                 ) : (

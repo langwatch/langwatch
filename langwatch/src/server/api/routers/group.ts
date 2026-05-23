@@ -9,6 +9,7 @@ import {
 import { checkOrganizationPermission } from "../rbac";
 import { PrismaRoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.prisma.repository";
 import { RoleBindingService } from "~/server/role-bindings/role-binding.service";
+import { RoleService } from "~/server/role/role.service";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { slugify } from "~/utils/slugify";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -221,6 +222,17 @@ export const groupRouter = createTRPCRouter({
             scopeId: b.scopeId,
           });
         }
+
+        const customRoleIds = input.bindings
+          .filter((b) => b.role === TeamUserRole.CUSTOM && b.customRoleId)
+          .map((b) => b.customRoleId!);
+        if (customRoleIds.length > 0) {
+          const roleService = new RoleService(ctx.prisma);
+          await roleService.validateRolesAssignable({
+            roleIds: customRoleIds,
+            organizationId: input.organizationId,
+          });
+        }
       }
 
       return ctx.prisma.$transaction(async (tx) => {
@@ -282,6 +294,14 @@ export const groupRouter = createTRPCRouter({
         scopeType: input.scopeType,
         scopeId: input.scopeId,
       });
+
+      if (input.role === TeamUserRole.CUSTOM && input.customRoleId) {
+        const roleService = new RoleService(ctx.prisma);
+        await roleService.validateRolesAssignable({
+          roleIds: [input.customRoleId],
+          organizationId: input.organizationId,
+        });
+      }
 
       return ctx.prisma.roleBinding.create({
         data: {
@@ -544,7 +564,8 @@ export const groupRouter = createTRPCRouter({
       }
 
       const repo = new PrismaRoleBindingRepository(ctx.prisma);
-      const service = new RoleBindingService(ctx.prisma, repo);
+      const roleService = new RoleService(ctx.prisma);
+      const service = new RoleBindingService(ctx.prisma, repo, roleService);
       return service.applyGroupEdits({
         organizationId: input.organizationId,
         groupId: input.groupId,

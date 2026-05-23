@@ -8,13 +8,27 @@ import { UserTurnBubble } from "./UserTurnBubble";
 export function TurnView({
   turn,
   collapseTools = false,
+  onCollapse,
 }: {
   turn: ConversationTurn;
   collapseTools?: boolean;
+  /**
+   * When provided, the turn's inner header renders a chevron button
+   * that calls this back. Used by the threaded layout so the
+   * collapse affordance sits inline with the role chip instead of
+   * duplicating it in an outer row.
+   */
+  onCollapse?: () => void;
 }) {
   const isScenario = useIsScenarioRole();
   if (turn.kind === "system") {
-    return <SystemTurnView role={turn.role} blocks={turn.blocks} />;
+    return (
+      <SystemTurnView
+        role={turn.role}
+        blocks={turn.blocks}
+        onCollapse={onCollapse}
+      />
+    );
   }
   // In scenario mode the source role's `displayRole` is flipped, so a
   // `user` turn renders with the assistant card and an `assistant` turn
@@ -28,6 +42,7 @@ export function TurnView({
         toolCalls={turn.toolCalls}
         visuals={visuals}
         collapseTools={collapseTools}
+        onCollapse={onCollapse}
       />
     );
   }
@@ -37,6 +52,7 @@ export function TurnView({
       toolCalls={turn.toolCalls}
       visuals={visuals}
       collapseTools={collapseTools}
+      onCollapse={onCollapse}
     />
   );
 }

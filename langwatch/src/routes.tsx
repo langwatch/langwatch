@@ -499,6 +499,10 @@ const routes: RouteObject[] = [
   { path: "/ops", ...page(() => import("./pages/ops/index")) },
   { path: "/ops/queues", ...page(() => import("./pages/ops/queues")) },
   { path: "/ops/dejaview", ...page(() => import("./pages/ops/dejaview")) },
+  {
+    path: "/ops/feature-flags",
+    ...page(() => import("./pages/ops/feature-flags")),
+  },
   { path: "/ops/foundry", ...page(() => import("./pages/ops/foundry")) },
   {
     path: "/ops/projections",
@@ -527,10 +531,6 @@ const routes: RouteObject[] = [
   {
     path: "/ops/backoffice/subscriptions",
     ...page(() => import("./pages/ops/backoffice/subscriptions")),
-  },
-  {
-    path: "/ops/backoffice/organization-features",
-    ...page(() => import("./pages/ops/backoffice/organization-features")),
   },
 
   // @project redirect — Next.js parallel route that redirects /@project/path to /:project/path

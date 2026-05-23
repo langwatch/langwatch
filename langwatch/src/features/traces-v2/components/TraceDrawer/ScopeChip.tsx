@@ -45,7 +45,6 @@ export function ScopeChip({ scope }: ScopeChipProps) {
         <Text
           textStyle="2xs"
           color="fg.subtle"
-          fontFamily="mono"
           truncate
           maxWidth="320px"
         >
@@ -62,7 +61,7 @@ function TooltipRow({ label, value }: { label: string; value: string }) {
       <Text textStyle="xs" color="fg.muted">
         {label}
       </Text>
-      <Text textStyle="xs" fontFamily="mono" color="fg">
+      <Text textStyle="xs" color="fg">
         {value}
       </Text>
     </HStack>
@@ -90,11 +89,11 @@ export function ScopeBlock({ scope }: { scope: InstrumentationScope | null }) {
       <HStack gap={2}>
         <Icon as={LuPackage} boxSize={3.5} color="fg.muted" />
         <VStack align="stretch" gap={0} flex={1} minWidth={0}>
-          <Text textStyle="xs" fontFamily="mono" color="fg" truncate>
+          <Text textStyle="xs" color="fg" truncate>
             {scope.name}
           </Text>
           {scope.version && (
-            <Text textStyle="2xs" fontFamily="mono" color="fg.subtle">
+            <Text textStyle="2xs" color="fg.subtle">
               v{scope.version}
             </Text>
           )}

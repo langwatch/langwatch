@@ -1,27 +1,24 @@
-import { Box, CodeBlock, VStack } from "@chakra-ui/react";
-import { motion } from "motion/react";
-import { useEffect } from "react";
+import { Box, CodeBlock, Flex } from "@chakra-ui/react";
+import { useRef } from "react";
 import { useColorMode } from "~/components/ui/color-mode";
 import { Drawer } from "~/components/ui/drawer";
 import { IsolatedErrorBoundary } from "~/components/ui/IsolatedErrorBoundary";
-import { Tooltip } from "~/components/ui/tooltip";
-import { useDrawerStore } from "../../stores/drawerStore";
-import { parseTracePromptIds } from "../../utils/promptAttributes";
-import { BelowFoldIndicator } from "./BelowFoldIndicator";
-import { ConversationContext } from "./ConversationContext";
+import {
+  DRAWER_DEFAULT_WIDTH_PX,
+  DRAWER_MIN_WIDTH_PX,
+  useDrawerStore,
+} from "../../stores/drawerStore";
 import { ConversationView } from "./conversationView";
 import { DrawerHeader } from "./drawerHeader";
 import { KeyboardShortcutsHelp } from "./KeyboardShortcutsHelp";
-import { LlmPanel } from "./LlmPanel";
 import { useShikiAdapter } from "./markdownView/shikiAdapter";
-import { PromptsPanel } from "./PromptsPanel";
-import { SpanTabBar } from "./SpanTabBar";
+import { PaneLayout } from "./panes/PaneLayout";
+import { ResizeRail } from "./panes/ResizeRail";
+import { usePaneLayout } from "./panes/usePaneLayout";
 import { ScenarioRoleProvider } from "./scenarioRoles";
 import { TraceDrawerEmptyState } from "./TraceDrawerEmptyState";
 import { TraceDrawerSkeleton } from "./TraceDrawerSkeleton";
-import { TraceAccordions } from "./traceAccordions";
 import { useTraceDrawerScaffold } from "./useTraceDrawerScaffold";
-import { VizPlaceholder } from "./VizPlaceholder";
 
 export interface TraceV2DrawerShellProps {
   open?: boolean;
@@ -59,35 +56,27 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
     goBackInTraceHistory,
     handleClose,
     drawerContentRef,
-    drawerBodyRef,
-    scrollContentRef,
   } = useTraceDrawerScaffold();
 
   const viewMode = useDrawerStore((s) => s.viewMode);
-  const vizTab = useDrawerStore((s) => s.vizTab);
-  const activeTab = useDrawerStore((s) => s.activeTab);
-  const selectedSpanId = useDrawerStore((s) => s.selectedSpanId);
-  const isMaximized = useDrawerStore((s) => s.isMaximized);
+  const widthPx = useDrawerStore((s) => s.widthPx);
   const shortcutsOpen = useDrawerStore((s) => s.shortcutsOpen);
   const pinned = useDrawerStore((s) => s.pinned);
-
-  const setVizTab = useDrawerStore((s) => s.setVizTab);
-  const selectSpan = useDrawerStore((s) => s.selectSpan);
-  const clearSpan = useDrawerStore((s) => s.clearSpan);
-  const toggleMaximized = useDrawerStore((s) => s.toggleMaximized);
   const setShortcutsOpen = useDrawerStore((s) => s.setShortcutsOpen);
 
-  // Reset every drawer scroll container when the user crosses a layout
-  // boundary — switching the top-level mode (Trace ↔ Conversation) or the
-  // active span/summary tab. Without this, the browser carries the previous
-  // scrollTop into a totally different DOM (conversation has no viz chrome,
-  // summary has the input element), landing the operator halfway down or
-  // jumping mid-element. `overflowAnchor: "none"` only stops *automatic*
-  // anchoring; it doesn't actively reset to 0. We do that here.
-  useEffect(() => {
-    drawerBodyRef.current?.scrollTo({ top: 0 });
-    scrollContentRef.current?.scrollTo({ top: 0 });
-  }, [viewMode, activeTab, drawerBodyRef, scrollContentRef]);
+  // `open` is hardcoded `true` because the parent (`TracesPage`'s
+  // `<TraceDrawerMount>`) only mounts this shell while the drawer
+  // store holds a `traceId`. Click → store update → mount lands in
+  // the same render; close → store clear → unmount. Wiring `open` to
+  // anything reactive would just add a one-frame "open after the URL
+  // resolves" beat on top of an already-instant mount.
+
+  // Watch the actual rendered drawer body so the layout decision
+  // reflects whatever pixel width the operator dragged the drawer to —
+  // not the abstract widthPx state (which may be `null` when at the
+  // default 45%).
+  const paneContainerRef = useRef<HTMLDivElement>(null);
+  const layout = usePaneLayout(paneContainerRef);
 
   // Error state: trace not found, network failure, or no selection. The
   // dedicated empty-state component differentiates 404 vs load-failed and
@@ -116,11 +105,35 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
     );
   }
 
+  // The drawer width is driven by the operator's drag (persisted in
+  // drawerStore.widthPx). Until they drag, we use a flat
+  // `DRAWER_DEFAULT_WIDTH_PX` (920) instead of the previous 45% rule
+  // — a deterministic first-paint width that doesn't visibly shift
+  // when the user later drags and the persisted px replaces the %.
+  // Below the `md` breakpoint (~768px) the drawer goes full viewport
+  // so the chrome stays usable on phones. We also cap any
+  // persisted/default width against the current viewport so a width
+  // remembered on a wide monitor never overflows a narrower window.
+  const viewportWidth =
+    typeof window !== "undefined" ? window.innerWidth : Infinity;
+  const isCompactViewport = viewportWidth < 768;
+  const effectiveWidthPx = Math.min(
+    widthPx ?? DRAWER_DEFAULT_WIDTH_PX,
+    viewportWidth,
+  );
+  const contentWidthStyle = isCompactViewport
+    ? undefined
+    : {
+        width: `${effectiveWidthPx}px`,
+        maxWidth: `${effectiveWidthPx}px`,
+        minWidth: `${DRAWER_MIN_WIDTH_PX}px`,
+      };
+
   return (
     <Drawer.Root
       open={true}
       placement="end"
-      size={isMaximized ? "full" : "lg"}
+      size="lg"
       // When unpinned, the drawer behaves as a standard modal — clicking
       // outside or pressing Esc dismisses it. When pinned (default), it
       // stays put so the operator can interact with the underlying page;
@@ -131,196 +144,124 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
       onOpenChange={() => handleClose()}
     >
       <CodeBlock.AdapterProvider value={shikiAdapter}>
-        <Drawer.Content bg="bg"
+        <Drawer.Content
+          // Transparent at the Content level so the header section
+          // below can run its own translucent + backdrop-blur fill
+          // (page content behind the drawer reads through blurred,
+          // consistent with the rest of the site's translucent
+          // chrome — see BelowFoldIndicator, sequence overlays).
+          // The lower pane container has its own `bg.surface` white,
+          // so only the header area is translucent — everything
+          // below stays solid white.
+          bg="transparent"
           ref={drawerContentRef}
           paddingX={0}
-          // Maximized state used to expand to a full 100vw, leaving no gap on
-          // the left to click outside / peek at what's underneath. Capping at
-          // `calc(100vw - 80px)` keeps the page edge visible and clickable
-          // while still giving the drawer effectively all the horizontal
-          // room it needs for waterfall views.
-          maxWidth={isMaximized ? "calc(100vw - 10px)" : "45%"}
-          transition="max-width 0.2s ease"
+          // When `contentWidthStyle` is set (non-compact viewports) the
+          // inline style below owns width/maxWidth. The fallback here
+          // only matters on compact viewports (<md), where we want
+          // the drawer full-bleed — the operator can't drag on a
+          // phone-sized window anyway.
+          maxWidth={contentWidthStyle ? undefined : "100vw"}
+          width={contentWidthStyle ? undefined : "100vw"}
+          // The ResizeRail renders the visible pill in a 10px gutter
+          // *outside* the drawer's left edge. Allow horizontal overflow
+          // so that bit isn't clipped; the body itself still clips its
+          // own scroll content.
+          overflow="visible"
           // Anchor for the empty-state onboarding tour: a global
           // CSS rule keyed off `body[data-traces-tour-stage]`
           // applies a soft blue glow to this element during
           // `drawerOverview` so the user knows where the tour copy
           // is pointing. No-op outside the onboarding journey.
           data-tour-target="drawer"
+          style={contentWidthStyle}
         >
-          <ResizeEdgeGrip
-            onDoubleClick={toggleMaximized}
-            isMaximized={isMaximized}
-          />
+          <ResizeRail />
           <Drawer.Body
-            ref={drawerBodyRef}
             paddingY={0}
             paddingX={0}
-            overflowY="auto"
-            // The drawer body is also a scroll container alongside the inner
-            // panel scroller. Without this, the browser's scroll-anchoring
-            // grabs whatever element it finds when the panel's chrome (viz +
-            // conversation context) is conditionally hidden on the LLM tab,
-            // and slams scrollTop to the bottom of the new layout.
-            style={{ overflowAnchor: "none" }}
+            // The drawer body NEVER scrolls — every section inside is
+            // its own pane with its own scroll viewport. This is the
+            // headline behaviour change in the DevTools-inspired
+            // redesign: no more single drawer scroller chasing
+            // sections up and down.
+            overflow="hidden"
+            // Clip the inner panel backgrounds (bg.surface in light
+            // mode) to the drawer's rounded chrome. Without this the
+            // white pane fills extend past the bottom-left corner of
+            // the drawer since Drawer.Content runs with overflow:visible
+            // (to let the ResizeRail pill escape the chrome).
+            borderRadius="lg"
+            display="flex"
+            flexDirection="column"
+            minHeight={0}
           >
-            <VStack align="stretch" gap={0} height="full">
-              {isLoading || !trace ? (
-                <TraceDrawerSkeleton onClose={handleClose} />
-              ) : (
-                <>
-                  <Box onDoubleClick={toggleMaximized}>
-                    <IsolatedErrorBoundary
-                      scope="Couldn't render this trace's header"
-                      resetKeys={[trace.traceId]}
-                    >
-                      <DrawerHeader trace={trace} onClose={handleClose} />
-                    </IsolatedErrorBoundary>
-                  </Box>
-                  <Box borderBottomWidth="1px" borderColor="border" />
-                </>
-              )}
-
-              {isLoading ? null : trace ? (
-                <ScenarioRoleProvider
-                  isScenario={
-                    !!(
-                      trace.scenarioRunId ?? trace.attributes["scenario.run_id"]
-                    )
-                  }
+            {isLoading || !trace ? (
+              <TraceDrawerSkeleton onClose={handleClose} />
+            ) : (
+              <>
+                <Box
+                  flexShrink={0}
+                  // Translucent fill + backdrop blur so the page behind
+                  // the drawer reads through (same recipe used elsewhere
+                  // for chrome — BelowFoldIndicator, sequence overlays,
+                  // onboarding panels). The lower pane container keeps
+                  // its solid `bg.surface` white, so only the header
+                  // strip is translucent.
+                  bg="bg.panel/70"
+                  backdropFilter="blur(20px) saturate(150%)"
                 >
-                  {/* Single persistent body wrapper — no key change → no
-                    remount → heavy children stay mounted, viz state
-                    survives. A short opacity dip on fetch reads as
-                    "loading new content" without choreography. */}
-                  <motion.div
-                    ref={scrollContentRef}
-                    animate={{ opacity: headerQuery.isFetching ? 0.55 : 1 }}
-                    transition={{ duration: 0.12, ease: "easeOut" }}
-                    style={{
-                      flex: 1,
-                      overflow: "auto",
-                      // Tab switches conditionally remove the viz/conversation
-                      // chrome above the panel. Without this, the browser's
-                      // CSS scroll-anchoring picks an element that's about to
-                      // be unmounted and compensates by jumping scrollTop —
-                      // landing the user at the bottom of the new tab.
-                      overflowAnchor: "none",
-                      position: "relative",
-                      display: "flex",
-                      flexDirection: "column",
-                      minHeight: 0,
-                    }}
+                  <IsolatedErrorBoundary
+                    scope="Couldn't render this trace's header"
+                    resetKeys={[trace.traceId]}
+                  >
+                    <DrawerHeader trace={trace} onClose={handleClose} />
+                  </IsolatedErrorBoundary>
+                </Box>
+                <Box borderBottomWidth="1px" borderColor="border" />
+                <Flex
+                  ref={paneContainerRef}
+                  flex={1}
+                  minHeight={0}
+                  minWidth={0}
+                  direction="column"
+                  bg={{ base: "bg.surface", _dark: "bg.panel" }}
+                  opacity={headerQuery.isFetching ? 0.55 : 1}
+                  transition="opacity 120ms ease-out"
+                >
+                  <ScenarioRoleProvider
+                    isScenario={
+                      !!(
+                        trace.scenarioRunId ??
+                        trace.attributes["scenario.run_id"]
+                      )
+                    }
                   >
                     {viewMode === "conversation" && trace.conversationId ? (
                       <IsolatedErrorBoundary
                         scope="Couldn't render conversation view"
                         resetKeys={[trace.conversationId, trace.traceId]}
                       >
-                        <ConversationView
-                          conversationId={trace.conversationId}
-                          currentTraceId={trace.traceId}
-                        />
+                        <Box flex={1} minHeight={0} overflow="auto">
+                          <ConversationView
+                            conversationId={trace.conversationId}
+                            currentTraceId={trace.traceId}
+                          />
+                        </Box>
                       </IsolatedErrorBoundary>
                     ) : (
-                      <VStack align="stretch" gap={0}>
-                        {trace.conversationId && (
-                          <Box
-                            data-section-label="Conversation context"
-                            bg="bg.subtle"
-                            borderTopWidth="1px"
-                            borderBottomWidth="1px"
-                            borderColor="border.muted"
-                            paddingY={5}
-                          >
-                            <IsolatedErrorBoundary
-                              scope="Couldn't render conversation context"
-                              resetKeys={[trace.conversationId, trace.traceId]}
-                            >
-                              <ConversationContext
-                                conversationId={trace.conversationId}
-                                traceId={trace.traceId}
-                              />
-                            </IsolatedErrorBoundary>
-                          </Box>
-                        )}
-
-                        <Box data-section-label="Visualisation">
-                          <IsolatedErrorBoundary
-                            scope="Couldn't render visualisation"
-                            resetKeys={[trace.traceId, vizTab]}
-                          >
-                            <VizPlaceholder
-                              vizTab={vizTab}
-                              onVizTabChange={setVizTab}
-                              trace={trace}
-                              spans={spanTree}
-                              isLoading={spanTreeQuery.isLoading}
-                              selectedSpanId={selectedSpanId}
-                              onSelectSpan={selectSpan}
-                              onClearSpan={clearSpan}
-                            />
-                          </IsolatedErrorBoundary>
-                        </Box>
-
-                        <Box borderBottomWidth="1px" borderColor="border" />
-
-                        <Box position="sticky" top={0} zIndex={2} bg="bg.panel">
-                          <IsolatedErrorBoundary
-                            scope="Couldn't render span tabs"
-                            resetKeys={[trace.traceId]}
-                          >
-                            <SpanTabBar
-                              spanTree={spanTree}
-                              promptCount={
-                                parseTracePromptIds(trace.attributes).length
-                              }
-                            />
-                          </IsolatedErrorBoundary>
-                        </Box>
-
-                        {/* `minHeight: 100vh` reserves room for the active
-                          panel so a tab swap can't briefly collapse the
-                          body — `overflowAnchor: none` is set on the
-                          scrollers but a sudden height drop would still
-                          let the browser snap scrollTop. */}
-                        <Box minHeight="100vh">
-                          <IsolatedErrorBoundary
-                            scope={`Couldn't render the ${activeTab} tab`}
-                            resetKeys={[
-                              trace.traceId,
-                              activeTab,
-                              selectedSpanId,
-                            ]}
-                          >
-                            {activeTab === "llm" ? (
-                              <LlmPanel trace={trace} spans={spanTree} />
-                            ) : activeTab === "prompts" ? (
-                              <PromptsPanel
-                                trace={trace}
-                                spans={spanTree}
-                                onSelectSpan={selectSpan}
-                              />
-                            ) : (
-                              <TraceAccordions
-                                trace={trace}
-                                spans={spanTree}
-                                selectedSpan={selectedSpan}
-                                activeTab={activeTab}
-                                onSelectSpan={selectSpan}
-                              />
-                            )}
-                          </IsolatedErrorBoundary>
-                        </Box>
-                      </VStack>
+                      <PaneLayout
+                        trace={trace}
+                        spans={spanTree}
+                        selectedSpan={selectedSpan}
+                        spansLoading={spanTreeQuery.isLoading}
+                        layout={layout}
+                      />
                     )}
-                  </motion.div>
-                  {(activeTab === "summary" || activeTab === "span") && (
-                    <BelowFoldIndicator scrollRef={scrollContentRef} />
-                  )}
-                </ScenarioRoleProvider>
-              ) : null}
-            </VStack>
+                  </ScenarioRoleProvider>
+                </Flex>
+              </>
+            )}
           </Drawer.Body>
         </Drawer.Content>
       </CodeBlock.AdapterProvider>
@@ -329,80 +270,5 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
         onClose={() => setShortcutsOpen(false)}
       />
     </Drawer.Root>
-  );
-}
-
-function ResizeEdgeGrip({
-  onDoubleClick,
-  isMaximized,
-}: {
-  onDoubleClick: () => void;
-  isMaximized: boolean;
-}) {
-  // When the drawer is maximized, the only direction it can resize toward is
-  // west (shrinking). When restored, the only direction is east (expanding).
-  // The OS cursor reflects that — `w-resize` for the maximized state and
-  // `e-resize` for the restored state. Double-click on the bar still toggles
-  // between the two.
-  const cursor = isMaximized ? "w-resize" : "e-resize";
-  return (
-    <Tooltip
-      content="Double-click to expand · click again to restore"
-      positioning={{ placement: "right" }}
-      openDelay={500}
-    >
-      <Box
-        position="absolute"
-        top={0}
-        bottom={0}
-        left={0}
-        width="6px"
-        cursor={cursor}
-        zIndex={2}
-        onDoubleClick={onDoubleClick}
-        _hover={{ "& > [data-edge-grip]": { opacity: 1 } }}
-        aria-label="Drag edge to resize, double-click to toggle"
-        // Doubles as the anchor point for the empty-state
-        // onboarding hero during drawer-tour stages — the hero
-        // queries `[data-edge-grip="true"]` and pins its right
-        // boundary to this element's left edge so it never slides
-        // under the drawer regardless of drawer width.
-        data-edge-grip="true"
-      >
-        <Box
-          data-edge-grip
-          position="absolute"
-          top="50%"
-          left="2px"
-          width="2px"
-          height="32px"
-          borderRadius="full"
-          // When maximized the grip is the operator's only visible affordance
-          // for restoring the drawer — pure white at full opacity makes it
-          // pop against the page underneath, and a periodic east-bounce hints
-          // that you can drag/double-click here to restore. When restored,
-          // it falls back to the subtle muted state.
-          bg={isMaximized ? "white" : "border.emphasized"}
-          boxShadow={
-            isMaximized ? "0 0 8px rgba(255, 255, 255, 0.6)" : undefined
-          }
-          opacity={isMaximized ? 0.95 : 0.35}
-          transition="opacity 120ms ease, background 120ms ease"
-          pointerEvents="none"
-          css={
-            isMaximized
-              ? {
-                  animation: "tracesV2EdgeGripBounce 1.6s ease-in-out infinite",
-                  "@keyframes tracesV2EdgeGripBounce": {
-                    "0%, 100%": { transform: "translate(0, -50%)" },
-                    "40%": { transform: "translate(6px, -50%)" },
-                    "60%": { transform: "translate(6px, -50%)" },
-                  },
-                }
-              : { transform: "translateY(-50%)" }
-          }
-        />
-      </Box>
-    </Tooltip>
   );
 }

@@ -83,8 +83,15 @@ class RagasFaithfulnessEvaluator(
         async def _create_statements(self, row: dict, callbacks):
             nonlocal ragas_statements
             statements = await _original_create_statements(row, callbacks)
-            for components in statements.sentences:
-                ragas_statements += components.simpler_statements
+            # ragas >= 0.3 returns StatementGeneratorOutput with a flat
+            # `.statements: list[str]`. ragas <= 0.2 returned SentencesSimplified
+            # with `.sentences[].simpler_statements`. Support both so this works
+            # on the deployed pin and older local pins alike.
+            if hasattr(statements, "statements"):
+                ragas_statements += statements.statements
+            else:
+                for components in statements.sentences:
+                    ragas_statements += components.simpler_statements
             return statements
 
         scorer._create_statements = _create_statements.__get__(scorer)

@@ -1,12 +1,4 @@
-import {
-  Box,
-  Button,
-  HStack,
-  Separator,
-  Spacer,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { HStack, IconButton, Text, VStack } from "@chakra-ui/react";
 import {
   closestCenter,
   DndContext,
@@ -27,6 +19,7 @@ import type React from "react";
 import { useCallback, useMemo, useRef } from "react";
 import { Kbd } from "~/components/ops/shared/Kbd";
 import { IsolatedErrorBoundary } from "~/components/ui/IsolatedErrorBoundary";
+import { Tooltip } from "~/components/ui/tooltip";
 import {
   FIELD_NAMES,
   SEARCH_FIELDS,
@@ -36,8 +29,6 @@ import {
   getRangeValue,
 } from "~/server/app-layer/traces/query-language/queries";
 import { useUIStore } from "../../stores/uiStore";
-import { CollapsedSidebar } from "./CollapsedSidebar";
-import { CollapsedSidebarSkeleton } from "./CollapsedSidebarSkeleton";
 import { getFacetGroupId } from "./constants";
 import { FacetGroupHeader } from "./FacetGroupHeader";
 import { FilterSidebarSkeleton } from "./FilterSidebarSkeleton";
@@ -58,7 +49,10 @@ const groupIdFromSortableId = (id: string): string =>
 const DRAG_ACTIVATION_DISTANCE_PX = 5;
 
 export const FilterSidebar: React.FC = () => {
-  const collapsed = useUIStore((s) => s.sidebarCollapsed);
+  // The collapsed-state branch lives one level up: when collapsed,
+  // `FilterAside` returns `null` and the page renders no sidebar DOM at
+  // all (the expand affordance sits on the table footer's pagination
+  // row). So this component is only ever mounted in the expanded path.
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
 
   const {
@@ -246,18 +240,6 @@ export const FilterSidebar: React.FC = () => {
   const showSkeleton =
     facetsLoading && descriptors.length === 0 && categoricals.length === 0;
 
-  if (collapsed) {
-    if (showSkeleton) return <CollapsedSidebarSkeleton />;
-    return (
-      <CollapsedSidebar
-        ast={ast}
-        categoricals={categoricals}
-        ranges={ranges}
-        onExpand={toggleSidebar}
-      />
-    );
-  }
-
   return (
     <VStack
       height="full"
@@ -271,6 +253,35 @@ export const FilterSidebar: React.FC = () => {
         groups={orAnalysis.groups}
         containerRef={scrollAreaRef}
       />
+      {/* Top-right collapse button. Sits absolutely so the icon lines
+          up vertically with the first group header (TRACE) on the
+          right edge — the mirror image of the expand button that
+          appears just before the "All" lens tab once collapsed, so
+          the close/open affordance lives at roughly the same eye
+          line in both states. */}
+      <Tooltip
+        positioning={{ placement: "bottom" }}
+        content={
+          <HStack gap={1.5}>
+            <Text>Hide filters sidebar</Text>
+            <Kbd>{"["}</Kbd>
+          </HStack>
+        }
+      >
+        <IconButton
+          aria-label="Hide filters sidebar"
+          size="2xs"
+          variant="ghost"
+          color="fg.subtle"
+          onClick={toggleSidebar}
+          position="absolute"
+          top="6px"
+          right="6px"
+          zIndex={2}
+        >
+          <PanelLeftClose size={14} />
+        </IconButton>
+      </Tooltip>
       <div
         ref={scrollAreaRef}
         style={{
@@ -319,21 +330,6 @@ export const FilterSidebar: React.FC = () => {
         )}
       </div>
 
-      <Separator />
-      <HStack paddingX={3} paddingY={1.5}>
-        <Spacer />
-        <Button
-          aria-label="Collapse sidebar"
-          size="2xs"
-          variant="ghost"
-          color="fg.subtle"
-          onClick={toggleSidebar}
-        >
-          <PanelLeftClose size={12} />
-          <Text textStyle="2xs">Collapse</Text>
-          <Kbd>{"["}</Kbd>
-        </Button>
-      </HStack>
     </VStack>
   );
 };

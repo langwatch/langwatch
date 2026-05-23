@@ -24,6 +24,10 @@ export function usePromptByHandle(handle: string | null | undefined) {
   return {
     ...lookup,
     latestVersion: lookup.data?.version ?? null,
+    // Friendly human-readable handle (e.g. "pizza-prompt") when the SDK
+    // emitted the opaque slug-id form (`prompt_xxx`). Null when the prompt
+    // never had a handle or the lookup hasn't resolved yet.
+    resolvedHandle: lookup.data?.handle ?? null,
     missing: !!handle && lookup.isError,
   };
 }

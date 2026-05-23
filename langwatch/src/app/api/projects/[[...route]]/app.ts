@@ -170,7 +170,7 @@ export const app = new Hono<{ Variables: Variables }>()
         userId: null,
         createdByUserId: userId,
         organizationId: organization.id,
-        permissionMode: "restricted",
+        permissionMode: "all",
         bindings: [
           {
             role: "ADMIN",

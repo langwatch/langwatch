@@ -388,6 +388,7 @@ export function ScenarioRunDetailDrawer({
                       messages={scenarioState.messages ?? []}
                       streamingMessages={streamingMessages}
                       variant="drawer"
+                      projectId={project?.id ?? ""}
                     />
                   </Box>
                 </Box>

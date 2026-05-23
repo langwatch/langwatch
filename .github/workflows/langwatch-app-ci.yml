@@ -123,7 +123,7 @@ jobs:
         run: bash ../.github/scripts/notify-slack-test-failure.sh test-unit
 
       - name: Upload unit test coverage to Codecov
-        if: always()
+        if: always() && hashFiles('langwatch/coverage/lcov.info') != ''
         uses: codecov/codecov-action@1af58845a975a7985b0beb0cbe6fbbb71a41dbad # v5
         with:
           files: langwatch/coverage/lcov.info
@@ -245,7 +245,7 @@ jobs:
         run: bash ../.github/scripts/notify-slack-test-failure.sh test-integration
 
       - name: Upload integration test coverage to Codecov
-        if: always()
+        if: always() && hashFiles('langwatch/coverage/lcov.info') != ''
         uses: codecov/codecov-action@1af58845a975a7985b0beb0cbe6fbbb71a41dbad # v5
         with:
           files: langwatch/coverage/lcov.info

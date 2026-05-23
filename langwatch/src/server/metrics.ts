@@ -447,6 +447,74 @@ export const incrementEsFoldCacheRedisError = (
 ) => esFoldCacheRedisErrorTotal.labels(projectionName, operation).inc();
 
 // ============================================================================
+// Stored Objects Metrics
+// ============================================================================
+
+// Counter: total storeFromBytes calls (dedup hit + miss combined)
+register.removeSingleMetric("stored_object_extract_total");
+const storedObjectExtractTotal = new Counter({
+  name: "stored_object_extract_total",
+  help: "Total number of storeFromBytes calls, whether hit or miss",
+  labelNames: ["purpose"] as const,
+});
+
+export const getStoredObjectExtractCounter = (purpose: string) =>
+  storedObjectExtractTotal.labels(purpose);
+
+// Counter: deduplication hits (content already present for this project)
+register.removeSingleMetric("stored_object_dedup_hit_total");
+const storedObjectDedupHitTotal = new Counter({
+  name: "stored_object_dedup_hit_total",
+  help: "Total storeFromBytes calls where content was already present (dedup hit)",
+  labelNames: ["purpose"] as const,
+});
+
+export const getStoredObjectDedupHitCounter = (purpose: string) =>
+  storedObjectDedupHitTotal.labels(purpose);
+
+// Counter: PUT failures (storage backend rejected the write)
+register.removeSingleMetric("stored_object_write_failures_total");
+const storedObjectWriteFailuresTotal = new Counter({
+  name: "stored_object_write_failures_total",
+  help: "Total storeFromBytes calls where the storage put rejected the write",
+  labelNames: ["purpose"] as const,
+});
+
+export const getStoredObjectWriteFailureCounter = (purpose: string) =>
+  storedObjectWriteFailuresTotal.labels(purpose);
+
+// Counter: GET failures (storage backend rejected the read)
+register.removeSingleMetric("stored_object_read_failures_total");
+const storedObjectReadFailuresTotal = new Counter({
+  name: "stored_object_read_failures_total",
+  help: "Total getById calls where the storage get rejected the read",
+});
+
+export const storedObjectReadFailureCounter = storedObjectReadFailuresTotal;
+
+// Histogram: payload size observed on each storeFromBytes call
+register.removeSingleMetric("stored_object_size_bytes");
+const storedObjectSizeBytesHistogram = new Histogram({
+  name: "stored_object_size_bytes",
+  help: "Size of stored object payloads in bytes",
+  labelNames: ["purpose"] as const,
+  buckets: [
+    128,      // 0.125 KB
+    1024,     // 1 KB
+    4096,     // 4 KB
+    16384,    // 16 KB
+    65536,    // 64 KB
+    262144,   // 256 KB
+    1048576,  // 1 MB
+    4194304,  // 4 MB
+    16777216, // 16 MB
+  ],
+});
+
+export const getStoredObjectSizeBytesHistogram = (purpose: string) =>
+  storedObjectSizeBytesHistogram.labels(purpose);
+
+// ============================================================================
 // withMetrics utility
 // ============================================================================
 

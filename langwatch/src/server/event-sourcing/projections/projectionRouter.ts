@@ -227,7 +227,7 @@ export class ProjectionRouter<
     const projectionDefs: Record<string, {
       name: string;
       groupKeyFn?: (event: EventType) => string;
-      options?: { killSwitch?: { customKey?: string } };
+      options?: { killSwitch?: KillSwitchOptions };
     }> = {};
 
     for (const [name, fold] of this.foldProjections) {

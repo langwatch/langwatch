@@ -512,8 +512,12 @@ export const PromptTextAreaWithVariables = ({
                 (invalidVariables.length > 0 ? 9 : 2.5) - (borderless ? 2 : 0)
               }
               right={2}
-              gap={1}
+              gap={1.5}
+              data-testid="add-context-buttons"
             >
+              {/* Two separate normal buttons; each carries its own solid
+                  background so message text behind never bleeds through the
+                  labels (see AddLogicButton / AddVariableButton). */}
               <AddLogicButton
                 ref={logicMenu.addButtonRef}
                 onClick={logicMenu.handleAddLogicClick}

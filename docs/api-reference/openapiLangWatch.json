@@ -27193,6 +27193,281 @@
         ],
         "description": "Archive (soft-delete) a workflow"
       }
+    },
+    "/api/teams": {
+      "get": {
+        "operationId": "listTeams",
+        "summary": "List teams",
+        "description": "List all non-archived teams for the organization (paginated). Requires an admin API key with team:view permission.",
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list of teams",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Team"
+                      }
+                    },
+                    "pagination": {
+                      "$ref": "#/components/schemas/Pagination"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing API key token"
+          },
+          "403": {
+            "description": "Insufficient permissions for this operation"
+          }
+        }
+      },
+      "post": {
+        "operationId": "createTeam",
+        "summary": "Create a team",
+        "description": "Create a new team in the organization. Requires team:create permission.",
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255,
+                    "description": "Team name"
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Team created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Team"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing API key token"
+          },
+          "403": {
+            "description": "Insufficient permissions for this operation"
+          },
+          "422": {
+            "description": "Validation error (missing or invalid name)"
+          }
+        }
+      }
+    },
+    "/api/teams/{id}": {
+      "get": {
+        "operationId": "getTeam",
+        "summary": "Get team",
+        "description": "Get a team by its ID. Returns 404 if the team does not exist or belongs to a different organization. Requires team:view permission.",
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Team ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Team details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Team"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing API key token"
+          },
+          "403": {
+            "description": "Insufficient permissions for this operation"
+          },
+          "404": {
+            "description": "Team not found or belongs to another organization"
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateTeam",
+        "summary": "Update team",
+        "description": "Update a team's fields. Requires team:update permission.",
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Team ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255,
+                    "description": "New team name"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated team",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Team"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing API key token"
+          },
+          "403": {
+            "description": "Insufficient permissions for this operation"
+          },
+          "404": {
+            "description": "Team not found"
+          },
+          "422": {
+            "description": "Validation error (invalid name)"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "archiveTeam",
+        "summary": "Archive team",
+        "description": "Archive a team (soft-delete). Sets archivedAt timestamp. The team will no longer appear in list or get operations. Requires team:delete permission.",
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Team ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Archived team",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "archivedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing API key token"
+          },
+          "403": {
+            "description": "Insufficient permissions for this operation"
+          },
+          "404": {
+            "description": "Team not found"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -27600,6 +27875,43 @@
             }
           }
         }
+      },
+      "Team": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Team ID (prefixed with team_)"
+          },
+          "name": {
+            "type": "string",
+            "description": "Team name"
+          },
+          "slug": {
+            "type": "string",
+            "description": "URL-friendly team identifier"
+          },
+          "organizationId": {
+            "type": "string",
+            "description": "ID of the owning organization"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "organizationId",
+          "createdAt",
+          "updatedAt"
+        ]
       }
     },
     "securitySchemes": {

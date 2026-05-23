@@ -65,7 +65,51 @@ export interface WorkflowExecutor {
     inputs: Record<string, string>,
     versionId?: string,
     causalityDepth?: number,
+    parentTrace?: { traceId: string; parentSpanId: string },
   ): Promise<{ result: SingleEvaluationResult; status: string }>;
+}
+
+const TRACE_ID_HEX = /^[0-9a-fA-F]{32}$/;
+const SPAN_ID_HEX = /^[0-9a-fA-F]{16}$/;
+
+/**
+ * Extract the W3C `traceparent` context for the eval workflow from the
+ * parent trace. nlpgo needs both pieces (32-hex trace_id + 16-hex root
+ * span_id) so its emitted spans land as children of the parent trace
+ * in Studio's waterfall rather than as a separate orphan trace.
+ *
+ * Returns `undefined` when the parent trace doesn't have OTel-standard
+ * IDs (legacy `trace_<nanoid>` shape, missing root span) — in that
+ * case nlpgo falls back to body-supplied req.TraceID and emits without
+ * a parent linkage. Callers should NOT default-emit a synthesized
+ * parent: a synth parent_span_id would render under a non-existent
+ * span in the waterfall, which is worse UX than a separate trace.
+ */
+export function extractParentTraceForNlpgo(
+  trace: Trace | undefined,
+): { traceId: string; parentSpanId: string } | undefined {
+  if (!trace?.trace_id || !TRACE_ID_HEX.test(trace.trace_id)) return undefined;
+
+  // Broken / multi-source instrumentation can leave a trace with more
+  // than one parent-less span. `find()` would then pick whichever span
+  // happened to be ingested first — non-deterministic across re-runs.
+  // Sort by started_at (earliest is the true root in any sane trace)
+  // with span_id as the tie-breaker to keep two consecutive eval runs
+  // pinned to the same parent_span_id.
+  const rootCandidates = (trace.spans ?? []).filter((s) => !s.parent_id);
+  if (rootCandidates.length === 0) return undefined;
+  rootCandidates.sort((a, b) => {
+    const aStart = a.timestamps?.started_at ?? Number.MAX_SAFE_INTEGER;
+    const bStart = b.timestamps?.started_at ?? Number.MAX_SAFE_INTEGER;
+    if (aStart !== bStart) return aStart - bStart;
+    return (a.span_id ?? "").localeCompare(b.span_id ?? "");
+  });
+  const rootSpan = rootCandidates[0];
+  if (!rootSpan?.span_id || !SPAN_ID_HEX.test(rootSpan.span_id)) return undefined;
+  return {
+    traceId: trace.trace_id.toLowerCase(),
+    parentSpanId: rootSpan.span_id.toLowerCase(),
+  };
 }
 
 /**
@@ -467,12 +511,19 @@ export class EvaluationExecutionService {
       ...data,
     };
 
+    // W3C trace context: link the eval workflow's spans to the parent
+    // trace's root span so Studio's waterfall renders them as a child
+    // sub-tree (not a separate orphan trace, which is the 2026-05-14
+    // bug rchaves caught in prod).
+    const parentTrace = extractParentTraceForNlpgo(trace);
+
     const response = await this.deps.workflowExecutor.runEvaluationWorkflow(
       resolvedWorkflowId,
       projectId,
       requestBody as Record<string, string>,
       undefined,
       parentCausalityDepth,
+      parentTrace,
     );
 
     if (response.status !== "success") {

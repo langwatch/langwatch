@@ -1,19 +1,24 @@
-import { Box, Button, HStack, Icon, Text, VStack } from "@chakra-ui/react";
-import { useMemo } from "react";
-import { LuCircleX } from "react-icons/lu";
+import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { useMemo, useRef } from "react";
+import { useFocusSectionStore } from "../../../stores/focusSectionStore";
 import type {
   SpanTreeNode,
   TraceHeader,
 } from "~/server/api/routers/tracesV2.schemas";
 import { useTraceEvaluations } from "../../../hooks/useTraceEvaluations";
 import { useTraceResources } from "../../../hooks/useTraceResources";
+import { rankedErrorSpans } from "../../../utils/errorSpans";
 import { AttributeTable } from "../AttributeTable";
 import { EvalsList } from "../evalCards";
+import { ExceptionsContent } from "../ExceptionsContent";
 import { IOViewer } from "../IOViewer";
-import { ScopeBlock, ScopeChip } from "../ScopeChip";
+import { ScopeBlock } from "../ScopeChip";
 import { AccordionShell, Section } from "./AccordionShell";
 import { EmptyEventsState, EmptyHint } from "./EmptyStates";
+import { EventCard } from "./EventCard";
 import { useAutoOpenSections } from "./sectionPresence";
+import { SectionFocusGlow } from "./SectionFocusGlow";
+import { useSectionFocusGlow } from "./useSectionFocusGlow";
 import { countFlatLeaves } from "./utils";
 
 export function TraceSummaryAccordions({
@@ -38,7 +43,6 @@ export function TraceSummaryAccordions({
   const hasTraceAttributes = Object.keys(traceAttributes).length > 0;
   const hasAttributes = hasTraceAttributes || hasResourceAttributes;
   const hasScope = !!resources.scope?.name;
-  const hasError = trace.status === "error" && !!trace.error;
 
   const {
     rich: richEvals,
@@ -56,6 +60,23 @@ export function TraceSummaryAccordions({
       })),
     [richEvals, spans],
   );
+
+  // Spans flagged with status=error, deepest-first so the most
+  // specific failure (the leaf that actually threw) leads the pill row.
+  // Same ranking is reused by the StatusChip's interactive tooltip so
+  // the operator sees the same span order whether they're scanning
+  // the popover or the expanded accordion.
+  const errorSpans = useMemo(
+    () => (trace.status === "error" ? rankedErrorSpans(spans) : []),
+    [spans, trace.status],
+  );
+  // Surface the Exceptions section whenever an error trace has either
+  // a trace-level error string or at least one errored span. The latter
+  // matters for traces that only have span-level failures (no rolled
+  // up trace.error), where the header chip would otherwise list pills
+  // that lead to a section gate that never opens.
+  const hasError =
+    trace.status === "error" && (!!trace.error || errorSpans.length > 0);
 
   const sections = useMemo(() => {
     const list: Array<
@@ -89,18 +110,33 @@ export function TraceSummaryAccordions({
     events: hasEventsContent,
   });
 
+  // Observe focus-section signals from external surfaces (header chips,
+  // overflow menus, …). When a request matches this trace, ensure the
+  // requested section is in `openSections` and scroll it into view.
+  const containerRef = useRef<HTMLDivElement>(null);
+  const requestFocus = useFocusSectionStore((s) => s.request);
+  const { glow, handleGlowDone } = useSectionFocusGlow({
+    traceId: trace.traceId,
+    sections,
+    openSections,
+    setOpenSections,
+    containerRef,
+  });
+
   return (
-    <Box>
-      {hasScope && (
-        <Box
-          paddingX={4}
-          paddingY={2}
-          borderBottomWidth="1px"
-          borderColor="border.muted"
-        >
-          <ScopeChip scope={resources.scope} />
-        </Box>
-      )}
+    <Box ref={containerRef}>
+      {/* The instrumentation scope used to render here as a small
+          attribution row at the top of the summary panel. It's now
+          pinned to the right of the SpanTabBar so it stays visible
+          when the user scrolls the summary content. */}
+      {glow ? (
+        <SectionFocusGlow
+          key={glow.nonce}
+          target={glow.target}
+          nonce={glow.nonce}
+          onDone={handleGlowDone}
+        />
+      ) : null}
       <AccordionShell value={openSections} onValueChange={setOpenSections}>
         {sections.map((id, idx) => {
           const isFirst = idx === 0;
@@ -113,7 +149,6 @@ export function TraceSummaryAccordions({
                 title="Input and Output"
                 empty={!hasIO}
                 isFirst={isFirst}
-                stackIndex={idx}
                 open={isOpen}
               >
                 {hasIO ? (
@@ -156,7 +191,6 @@ export function TraceSummaryAccordions({
                 count={attrCount}
                 empty={!hasAttributes && !resources.isLoading}
                 isFirst={isFirst}
-                stackIndex={idx}
                 open={isOpen}
               >
                 {hasAttributes ? (
@@ -184,7 +218,6 @@ export function TraceSummaryAccordions({
                 value="scope"
                 title="Instrumentation Scope"
                 isFirst={isFirst}
-                stackIndex={idx}
                 open={isOpen}
               >
                 <ScopeBlock scope={resources.scope} />
@@ -198,33 +231,19 @@ export function TraceSummaryAccordions({
                 value="exceptions"
                 title="Exceptions"
                 isFirst={isFirst}
-                stackIndex={idx}
                 open={isOpen}
               >
-                <HStack
-                  gap={2}
-                  paddingX={3}
-                  paddingY={2}
-                  borderRadius="sm"
-                  bg="red.subtle"
-                  align="flex-start"
-                >
-                  <Icon
-                    as={LuCircleX}
-                    boxSize={4}
-                    color="red.fg"
-                    flexShrink={0}
-                    marginTop={0.5}
-                  />
-                  <Text
-                    textStyle="xs"
-                    color="red.fg"
-                    fontFamily="mono"
-                    whiteSpace="pre-wrap"
-                  >
-                    {trace.error}
-                  </Text>
-                </HStack>
+                <ExceptionsContent
+                  error={trace.error}
+                  errorSpans={errorSpans}
+                  onSelectSpan={onSelectSpan}
+                  onFocusSection={() =>
+                    requestFocus({
+                      traceId: trace.traceId,
+                      section: "exceptions",
+                    })
+                  }
+                />
               </Section>
             );
           }
@@ -243,7 +262,6 @@ export function TraceSummaryAccordions({
                   pendingCount === 0
                 }
                 isFirst={isFirst}
-                stackIndex={idx}
                 open={isOpen}
               >
                 {evalsLoading ? (
@@ -274,35 +292,20 @@ export function TraceSummaryAccordions({
               count={traceEvents.length > 0 ? traceEvents.length : undefined}
               empty={traceEvents.length === 0}
               isFirst={isFirst}
-                stackIndex={idx}
               open={isOpen}
             >
               {traceEvents.length > 0 ? (
-                <VStack align="stretch" gap={1}>
+                <VStack align="stretch" gap={2}>
                   {traceEvents.map((evt, i) => (
-                    <HStack key={`${evt.spanId}-${evt.timestamp}-${i}`} gap={3}>
-                      <Text textStyle="xs" fontWeight="medium">
-                        {evt.name}
-                      </Text>
-                      <Text textStyle="xs" color="fg.subtle" fontFamily="mono">
-                        +
-                        {Math.max(
-                          0,
-                          Math.round(evt.timestamp - trace.timestamp),
-                        )}
-                        ms
-                      </Text>
-                      {onSelectSpan && evt.spanId && (
-                        <Button
-                          size="xs"
-                          variant="ghost"
-                          marginLeft="auto"
-                          onClick={() => onSelectSpan(evt.spanId)}
-                        >
-                          View span
-                        </Button>
-                      )}
-                    </HStack>
+                    <EventCard
+                      key={`${evt.spanId}-${evt.timestamp}-${i}`}
+                      name={evt.name}
+                      timestampMs={evt.timestamp}
+                      anchorMs={trace.timestamp}
+                      attributes={evt.attributes}
+                      spanId={evt.spanId}
+                      onSelectSpan={onSelectSpan}
+                    />
                   ))}
                 </VStack>
               ) : (

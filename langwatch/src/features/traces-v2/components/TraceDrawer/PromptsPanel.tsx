@@ -18,8 +18,10 @@ import {
   LuSparkles,
   LuTriangleAlert,
 } from "react-icons/lu";
+import { Link } from "~/components/ui/link";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useDrawer } from "~/hooks/useDrawer";
+import { useGoToSpanInPlaygroundTabUrlBuilder } from "~/prompts/prompt-playground/hooks/useLoadSpanIntoPromptPlayground";
 import type {
   SpanDetail,
   SpanTreeNode,
@@ -88,6 +90,14 @@ function aggregatePromptUsage(
       for (const [k, v] of Object.entries(ref.variables)) {
         usage.variables[k] = v;
       }
+    }
+    // Propagate draft=true forward. The flag lives on Prompt.compile
+    // but the first span we see for a given prompt may be the
+    // sibling PromptApiService.get which doesn't carry it — without
+    // this merge the usage.ref.draft would be locked to the get
+    // span's `false` and the "unsaved edits" chip never renders.
+    if (ref.draft && !usage.ref.draft) {
+      usage.ref = { ...usage.ref, draft: true };
     }
   }
 
@@ -275,7 +285,7 @@ function SelectedVsLastUsedCallout({
             <Text textStyle="2xs" color="fg.muted">
               The pin resolved to a different concrete prompt than what was
               recorded as last used. Common when a tag like{" "}
-              <Text as="span" fontFamily="mono">
+              <Text as="span">
                 production
               </Text>{" "}
               moves between deploys.
@@ -412,7 +422,6 @@ function PromptIdentityRow({
       </Text>
       <Text
         textStyle="sm"
-        fontFamily="mono"
         color="fg"
         truncate
         flex={1}
@@ -449,6 +458,14 @@ function PromptUsageCard({
   const variableEntries = Object.entries(variables).sort(([a], [b]) =>
     a.localeCompare(b),
   );
+  const { buildUrl } = useGoToSpanInPlaygroundTabUrlBuilder();
+  // Prefer the first emitting span (Prompt.compile / PromptApiService.get)
+  // — the server-side playground loader walks descendants/siblings to
+  // find the actual llm call for it.
+  const playgroundSpanId = spanIds[0] ?? null;
+  const playgroundHref = playgroundSpanId
+    ? (buildUrl(playgroundSpanId)?.toString() ?? "")
+    : "";
 
   return (
     <VStack align="stretch" gap={3} paddingX={4} paddingY={4}>
@@ -457,7 +474,6 @@ function PromptUsageCard({
           <Text
             textStyle="sm"
             fontWeight="bold"
-            fontFamily="mono"
             truncate
             minWidth={0}
           >
@@ -473,16 +489,37 @@ function PromptUsageCard({
               {ref.tag}
             </Badge>
           )}
+          {ref.draft && (
+            // Executed config diverged from the saved version (user
+            // edited inline without saving). Amber chip so operators
+            // know "Open prompt" lands on the base version, not the
+            // diverged messages in the trace. Mirrors the same chip
+            // in PromptAccordion.tsx — kept in sync for parity across
+            // the two prompt-surfacing components in the drawer.
+            <Badge size="sm" variant="subtle" colorPalette="orange">
+              unsaved edits
+            </Badge>
+          )}
         </HStack>
-        <Button
-          size="xs"
-          variant="ghost"
-          gap={1}
-          onClick={() => onOpenPromptEditor(ref.handle)}
-        >
-          <Icon as={LuExternalLink} boxSize={3} />
-          Open prompt
-        </Button>
+        <HStack gap={1}>
+          <Button
+            size="xs"
+            variant="ghost"
+            gap={1}
+            onClick={() => onOpenPromptEditor(ref.handle)}
+          >
+            <Icon as={LuExternalLink} boxSize={3} />
+            Open prompt
+          </Button>
+          {playgroundHref && (
+            <Link href={playgroundHref} isExternal variant="plain">
+              <Button size="xs" variant="ghost" gap={1}>
+                <Icon as={LuExternalLink} boxSize={3} />
+                Open in Playground
+              </Button>
+            </Link>
+          )}
+        </HStack>
       </HStack>
 
       {/* Variables */}
@@ -519,7 +556,6 @@ function PromptUsageCard({
                   width="120px"
                   flexShrink={0}
                   textStyle="xs"
-                  fontFamily="mono"
                   color="fg.muted"
                 >
                   {key}
@@ -527,7 +563,6 @@ function PromptUsageCard({
                 <Text
                   flex={1}
                   textStyle="xs"
-                  fontFamily="mono"
                   color="fg"
                   truncate
                   minWidth={0}
@@ -553,7 +588,7 @@ function PromptUsageCard({
             Spans
           </Text>
           {spanIds.length > 0 && (
-            <Text textStyle="2xs" color="fg.muted" fontFamily="mono">
+            <Text textStyle="2xs" color="fg.muted">
               {spanIds.length}
             </Text>
           )}
@@ -627,7 +662,6 @@ function SpanRow({
     >
       <Text
         textStyle="xs"
-        fontFamily="mono"
         color="fg"
         truncate
         flex={1}
@@ -636,7 +670,7 @@ function SpanRow({
         {span?.name ?? spanId}
       </Text>
       {span?.model && (
-        <Text textStyle="2xs" color="fg.subtle" fontFamily="mono">
+        <Text textStyle="2xs" color="fg.subtle">
           {abbreviateModel(span.model)}
         </Text>
       )}

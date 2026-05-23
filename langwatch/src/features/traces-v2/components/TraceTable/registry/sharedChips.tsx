@@ -7,50 +7,94 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type React from "react";
+import type { IconType } from "react-icons";
+import { LuCircleSlash, LuCircleAlert } from "react-icons/lu";
+import {
+  getEvalChipDisplay,
+  type EvalChipDisplay,
+} from "~/utils/evaluationResults";
 import type { TraceEvalResult, TraceListEvent } from "../../../types/trace";
 
-const EVAL_CHIP_COLORS: Record<string, string> = {
-  processed_pass: "green.solid",
-  processed_fail: "red.solid",
-  processed_neutral: "blue.solid",
-  error: "red.solid",
-  skipped: "yellow.solid",
-  in_progress: "blue.solid",
-  scheduled: "gray.solid",
-};
+/**
+ * Re-exported for callers that already imported from this module — the
+ * canonical formatter now lives in `evaluationResults.ts` so the trace
+ * table, the drawer header and any future surface format scores
+ * identically.
+ */
+export function formatEvalScore(ev: TraceEvalResult): string | null {
+  return getEvalChipDisplay(ev).scoreText;
+}
 
 export function evalChipColor(ev: TraceEvalResult): string {
-  if (ev.status === "processed") {
-    if (ev.passed === true) return EVAL_CHIP_COLORS.processed_pass!;
-    if (ev.passed === false) return EVAL_CHIP_COLORS.processed_fail!;
-    return EVAL_CHIP_COLORS.processed_neutral!;
-  }
-  return EVAL_CHIP_COLORS[ev.status] ?? "gray.solid";
+  return getEvalChipDisplay(ev).color;
 }
 
-export function formatEvalScore(ev: TraceEvalResult): string | null {
-  if (ev.score == null) return null;
-  if (ev.score <= 1) return ev.score.toFixed(2);
-  return ev.score.toFixed(1);
+/**
+ * Render the trailing verdict slot. Skipped / error get a tinted-bg
+ * badge with a leading icon so they don't look like a real score; pure
+ * boolean verdicts get colored "Pass" / "Fail" text; numeric scores stay
+ * as muted-foreground numerals.
+ */
+function VerdictSlot({ display }: { display: EvalChipDisplay }) {
+  if (display.status === "skipped") return <NoVerdictBadge label="SKIPPED" icon={LuCircleSlash} />;
+  if (display.status === "error") return <NoVerdictBadge label="ERROR" icon={LuCircleAlert} />;
+  if (display.scoreText) {
+    return (
+      <Text
+        textStyle="2xs"
+        fontWeight="semibold"
+        color="fg.muted"
+        whiteSpace="nowrap"
+        lineHeight="1.2"
+      >
+        {display.scoreText}
+      </Text>
+    );
+  }
+  if (display.passLabel) {
+    return (
+      <Text
+        textStyle="2xs"
+        fontWeight="semibold"
+        color={display.passLabel.color}
+        whiteSpace="nowrap"
+        lineHeight="1.2"
+      >
+        {display.passLabel.text}
+      </Text>
+    );
+  }
+  return null;
 }
 
-function getStatusLabel(ev: TraceEvalResult): string {
-  if (ev.status === "processed") {
-    if (ev.passed === true) return "Passed";
-    if (ev.passed === false) return "Failed";
-    return "Processed";
-  }
-  if (ev.status === "in_progress") return "Running";
-  if (ev.status === "scheduled") return "Pending";
-  if (ev.status === "error") return "Error";
-  if (ev.status === "skipped") return "Skipped";
-  return ev.status;
+function NoVerdictBadge({ label, icon: Icon }: { label: string; icon: IconType }) {
+  return (
+    <HStack
+      gap={1}
+      paddingX={1.5}
+      paddingY={0}
+      borderRadius="sm"
+      borderWidth="1px"
+      borderColor="border.muted"
+      bg="bg.muted"
+      flexShrink={0}
+    >
+      <Icon size={10} />
+      <Text
+        textStyle="2xs"
+        fontWeight="bold"
+        color="fg.muted"
+        letterSpacing="0.04em"
+        lineHeight="1.2"
+      >
+        {label}
+      </Text>
+    </HStack>
+  );
 }
 
 export const EvalChip: React.FC<{ eval_: TraceEvalResult }> = ({ eval_ }) => {
-  const color = evalChipColor(eval_);
-  const scoreText = formatEvalScore(eval_);
-  const displayName = eval_.evaluatorName ?? eval_.evaluatorId;
+  const display = getEvalChipDisplay(eval_);
 
   return (
     <HoverCard.Root
@@ -71,7 +115,10 @@ export const EvalChip: React.FC<{ eval_: TraceEvalResult }> = ({ eval_ }) => {
           flexShrink={0}
           onClick={(e: React.MouseEvent) => e.stopPropagation()}
         >
-          <Circle size="8px" bg={color} flexShrink={0} />
+          {/* Dot always renders so every chip lines up regardless of
+              whether the trailing slot is a score, a Pass/Fail label,
+              or a no-verdict badge. */}
+          <Circle size="10px" bg={display.color} flexShrink={0} />
           <Text
             textStyle="2xs"
             fontWeight="medium"
@@ -80,30 +127,9 @@ export const EvalChip: React.FC<{ eval_: TraceEvalResult }> = ({ eval_ }) => {
             maxWidth="80px"
             lineHeight="1.2"
           >
-            {displayName}
+            {display.displayName}
           </Text>
-          {scoreText && (
-            <Text
-              textStyle="2xs"
-              fontWeight="semibold"
-              color="fg.muted"
-              whiteSpace="nowrap"
-              lineHeight="1.2"
-            >
-              {scoreText}
-            </Text>
-          )}
-          {eval_.passed != null && eval_.score == null && (
-            <Text
-              textStyle="2xs"
-              fontWeight="semibold"
-              color={eval_.passed ? "green.fg" : "red.fg"}
-              whiteSpace="nowrap"
-              lineHeight="1.2"
-            >
-              {eval_.passed ? "Pass" : "Fail"}
-            </Text>
-          )}
+          <VerdictSlot display={display} />
         </HStack>
       </HoverCard.Trigger>
       <Portal>
@@ -119,18 +145,18 @@ export const EvalChip: React.FC<{ eval_: TraceEvalResult }> = ({ eval_ }) => {
           >
             <VStack align="stretch" gap={1.5}>
               <HStack gap={2}>
-                <Circle size="8px" bg={color} flexShrink={0} />
+                <Circle size="8px" bg={display.color} flexShrink={0} />
                 <Text textStyle="xs" fontWeight="semibold" color="fg" truncate>
-                  {displayName}
+                  {display.displayName}
                 </Text>
               </HStack>
-              {scoreText && (
+              {display.scoreText && (
                 <HStack justify="space-between" gap={3}>
                   <Text textStyle="2xs" color="fg.muted">
                     Score
                   </Text>
                   <Text textStyle="2xs" fontWeight="semibold" color="fg">
-                    {scoreText}
+                    {display.scoreText}
                   </Text>
                 </HStack>
               )}
@@ -144,7 +170,7 @@ export const EvalChip: React.FC<{ eval_: TraceEvalResult }> = ({ eval_ }) => {
                   </Text>
                 </HStack>
               )}
-              {eval_.passed != null && (
+              {display.passLabel && (
                 <HStack justify="space-between" gap={3}>
                   <Text textStyle="2xs" color="fg.muted">
                     Result
@@ -152,9 +178,9 @@ export const EvalChip: React.FC<{ eval_: TraceEvalResult }> = ({ eval_ }) => {
                   <Text
                     textStyle="2xs"
                     fontWeight="semibold"
-                    color={eval_.passed ? "green.fg" : "red.fg"}
+                    color={display.passLabel.color}
                   >
-                    {eval_.passed ? "Passed" : "Failed"}
+                    {display.statusLabel}
                   </Text>
                 </HStack>
               )}
@@ -162,8 +188,12 @@ export const EvalChip: React.FC<{ eval_: TraceEvalResult }> = ({ eval_ }) => {
                 <Text textStyle="2xs" color="fg.muted">
                   Status
                 </Text>
-                <Text textStyle="2xs" fontWeight="semibold" color={color}>
-                  {getStatusLabel(eval_)}
+                <Text
+                  textStyle="2xs"
+                  fontWeight="semibold"
+                  color={display.color}
+                >
+                  {display.statusLabel}
                 </Text>
               </HStack>
             </VStack>

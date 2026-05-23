@@ -176,3 +176,55 @@ Feature: Onboarding Flow
     When the API key is being validated
     Then the "Save" button shows a loading indicator
     And the button is disabled during validation
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # Provider seed plan
+  # ────────────────────────────────────────────────────────────────────────────
+  # buildSeedPlanForProvider runs at onboarding time when the user
+  # enables a provider for the first time; the returned plan becomes
+  # the ModelDefaultConfig JSON that lands at org scope. Each provider
+  # has its own quirks.
+
+  @integration
+  Scenario: OpenAI seed plan uses latest aliases
+    Given OpenAI is the provider being enabled at onboarding
+    When the seed plan is computed
+    Then DEFAULT is openai/latest
+    And FAST is openai/latest-mini
+    And EMBEDDINGS resolves to the latest text-embedding-N
+    # The alias strings expand to the catalog's current flagship /
+    # mini at read time so a newer model release lifts every seeded
+    # org without a config rewrite.
+
+  @integration
+  Scenario: Anthropic seed plan uses latest aliases
+    Given Anthropic is the provider being enabled at onboarding
+    When the seed plan is computed
+    Then DEFAULT is anthropic/latest
+    And FAST is anthropic/latest-mini
+
+  @integration
+  Scenario: Anthropic seed plan omits EMBEDDINGS
+    Given Anthropic is the provider being enabled at onboarding
+    When the seed plan is computed
+    Then EMBEDDINGS stays absent so the cascade walks up to a sibling
+         provider that does ship an embedding API
+
+  @integration
+  Scenario: Gemini seed plan uses latest aliases
+    Given Gemini is the provider being enabled at onboarding
+    When the seed plan is computed
+    Then DEFAULT is gemini/latest
+    And FAST is gemini/latest-mini
+    And EMBEDDINGS resolves to a gemini-embedding model
+
+  @integration
+  Scenario: Voyage seed plan populates only EMBEDDINGS
+    Given Voyage is the provider being enabled at onboarding
+    When the seed plan is computed
+    Then EMBEDDINGS resolves to voyage-3.5
+    And DEFAULT stays absent
+    And FAST stays absent
+    # Voyage is embedding-only. The cascade walks up for DEFAULT and
+    # FAST so an Anthropic+Voyage org has Anthropic chat + Voyage
+    # embeddings without falling through to OpenAI.

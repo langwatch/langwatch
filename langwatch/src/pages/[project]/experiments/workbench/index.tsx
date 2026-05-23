@@ -3,8 +3,8 @@ import { useRouter } from "~/utils/compat/next-router";
 import { useEffect, useRef } from "react";
 
 import { DashboardLayout } from "~/components/DashboardLayout";
-import { createInitialState } from "~/evaluations-v3/types";
-import { extractPersistedState } from "~/evaluations-v3/types/persistence";
+import { createInitialState } from "~/experiments-v3/types";
+import { extractPersistedState } from "~/experiments-v3/types/persistence";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 

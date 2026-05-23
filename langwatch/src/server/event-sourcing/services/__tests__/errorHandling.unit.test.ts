@@ -361,6 +361,31 @@ describe("classifyClickHouseError", () => {
       const err = Object.assign(new Error("memory"), { code: "241" });
       expect(classifyClickHouseError(err)).toBe(ErrorCategory.RECOVERABLE);
     });
+
+    it("returns RECOVERABLE for code 394 (QUERY_WAS_CANCELLED)", () => {
+      const err = Object.assign(new Error("cancelled"), { code: "394" });
+      expect(classifyClickHouseError(err)).toBe(ErrorCategory.RECOVERABLE);
+    });
+
+    it("returns RECOVERABLE for code 242 (TABLE_IS_READ_ONLY)", () => {
+      const err = Object.assign(new Error("readonly"), { code: "242" });
+      expect(classifyClickHouseError(err)).toBe(ErrorCategory.RECOVERABLE);
+    });
+
+    it("returns RECOVERABLE for code 999 (KEEPER_EXCEPTION)", () => {
+      const err = Object.assign(new Error("zk"), { code: "999" });
+      expect(classifyClickHouseError(err)).toBe(ErrorCategory.RECOVERABLE);
+    });
+
+    it("returns RECOVERABLE for code 236 (ABORTED)", () => {
+      const err = Object.assign(new Error("aborted"), { code: "236" });
+      expect(classifyClickHouseError(err)).toBe(ErrorCategory.RECOVERABLE);
+    });
+
+    it("returns RECOVERABLE for code 33 (CANNOT_READ_ALL_DATA)", () => {
+      const err = Object.assign(new Error("truncated"), { code: "33" });
+      expect(classifyClickHouseError(err)).toBe(ErrorCategory.RECOVERABLE);
+    });
   });
 
   describe("when error message matches transient patterns", () => {
@@ -374,6 +399,46 @@ describe("classifyClickHouseError", () => {
 
     it("returns RECOVERABLE for connection timeout", () => {
       expect(classifyClickHouseError(new Error("connect ETIMEDOUT"))).toBe(ErrorCategory.RECOVERABLE);
+    });
+
+    it("returns RECOVERABLE for MEMORY_LIMIT_EXCEEDED message-only (no `code` field)", () => {
+      expect(
+        classifyClickHouseError(
+          new Error("Code: 241. DB::Exception: Memory limit (for query) exceeded: would use 3.5 GiB. (MEMORY_LIMIT_EXCEEDED)"),
+        ),
+      ).toBe(ErrorCategory.RECOVERABLE);
+    });
+
+    it("returns RECOVERABLE for 'Query was cancelled' message (CH replica graceful shutdown)", () => {
+      expect(
+        classifyClickHouseError(
+          new Error("Code: 394. DB::Exception: Query was cancelled. (QUERY_WAS_CANCELLED)"),
+        ),
+      ).toBe(ErrorCategory.RECOVERABLE);
+    });
+
+    it("returns RECOVERABLE for 'Table is in readonly mode' message (ZK session lost)", () => {
+      expect(
+        classifyClickHouseError(
+          new Error("Code: 242. DB::Exception: Table is in readonly mode (replica path: /clickhouse/tables/...)"),
+        ),
+      ).toBe(ErrorCategory.RECOVERABLE);
+    });
+
+    it("returns RECOVERABLE for Coordination::Exception (KEEPER_EXCEPTION)", () => {
+      expect(
+        classifyClickHouseError(
+          new Error("Code: 999. Coordination::Exception: Session expired. (KEEPER_EXCEPTION)"),
+        ),
+      ).toBe(ErrorCategory.RECOVERABLE);
+    });
+
+    it("returns RECOVERABLE for 'Connection loss' message (Keeper coordinator dropped)", () => {
+      expect(
+        classifyClickHouseError(
+          new Error("Code: 999. Coordination::Exception: Coordination error: Connection loss."),
+        ),
+      ).toBe(ErrorCategory.RECOVERABLE);
     });
   });
 

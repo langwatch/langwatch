@@ -80,6 +80,42 @@ export const WaterfallView = memo(function WaterfallView({
     [rootDuration],
   );
 
+  // Drop interior markers when the timeline panel is narrow enough
+  // that adjacent labels would collide. Always keep the first + last
+  // so the trace's bounds stay readable; the rest are decimated by an
+  // integer stride so the remaining marks stay evenly spaced. The
+  // ResizeObserver fires on every drag so the count tracks the user's
+  // resize in real time.
+  const timelinePanelRef = useRef<HTMLDivElement>(null);
+  const [timelinePanelWidth, setTimelinePanelWidth] = useState(0);
+  useEffect(() => {
+    const el = timelinePanelRef.current;
+    if (!el) return;
+    const measure = () => setTimelinePanelWidth(el.clientWidth);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+  const visibleTimeMarkers = useMemo(() => {
+    if (timeMarkers.length <= 2) return timeMarkers;
+    // Reserve ~60px per label so neighbours don't touch even at the
+    // longest "00.0s" duration string. Always show first + last.
+    const PER_LABEL_PX = 60;
+    const maxLabels = Math.max(
+      2,
+      Math.floor(timelinePanelWidth / PER_LABEL_PX),
+    );
+    if (timeMarkers.length <= maxLabels) return timeMarkers;
+    const last = timeMarkers.length - 1;
+    const interiorBudget = Math.max(0, maxLabels - 2);
+    if (interiorBudget === 0) return [timeMarkers[0]!, timeMarkers[last]!];
+    const interior = timeMarkers.slice(1, -1);
+    const stride = Math.ceil(interior.length / interiorBudget);
+    const picked = interior.filter((_, i) => i % stride === 0);
+    return [timeMarkers[0]!, ...picked, timeMarkers[last]!];
+  }, [timeMarkers, timelinePanelWidth]);
+
   // Detect multi-root (forest)
   const rootCount = useMemo(() => tree.length, [tree]);
 
@@ -107,19 +143,60 @@ export const WaterfallView = memo(function WaterfallView({
     });
   }, []);
 
-  const handleExpandAll = useCallback(() => {
-    setCollapsedIds(new Set());
-  }, []);
-
-  const handleCollapseAll = useCallback(() => {
-    const parentIds = new Set<string>();
-    for (const span of filteredSpans) {
-      if (filteredSpans.some((s) => s.parentSpanId === span.spanId)) {
-        parentIds.add(span.spanId);
+  // Parent spans keyed by depth — drives the Expand More / Collapse
+  // More step-through. Built from the same tree the rows render from
+  // so the depths line up with what the user sees.
+  const parentsByDepth = useMemo(() => {
+    const map = new Map<number, string[]>();
+    const walk = (nodes: typeof tree) => {
+      for (const node of nodes) {
+        if (node.children.length > 0) {
+          const list = map.get(node.depth) ?? [];
+          list.push(node.span.spanId);
+          map.set(node.depth, list);
+          walk(node.children);
+        }
       }
-    }
-    setCollapsedIds(parentIds);
-  }, [filteredSpans]);
+    };
+    walk(tree);
+    return map;
+  }, [tree]);
+
+  const handleCollapseMore = useCallback(() => {
+    // Collapse the deepest currently-expanded layer first, then the
+    // next layer up on subsequent clicks. Each click peels one level
+    // off the tree until only the root remains visible.
+    setCollapsedIds((prev) => {
+      const depths = [...parentsByDepth.keys()].sort((a, b) => b - a);
+      for (const d of depths) {
+        const parentsAtDepth = parentsByDepth.get(d) ?? [];
+        const stillExpanded = parentsAtDepth.filter((id) => !prev.has(id));
+        if (stillExpanded.length === 0) continue;
+        const next = new Set(prev);
+        for (const id of stillExpanded) next.add(id);
+        return next;
+      }
+      return prev;
+    });
+  }, [parentsByDepth]);
+
+  const handleExpandMore = useCallback(() => {
+    // Inverse of `handleCollapseMore` — reveal the shallowest collapsed
+    // layer per click, working back down toward the leaves.
+    setCollapsedIds((prev) => {
+      if (prev.size === 0) return prev;
+      const depths = [...parentsByDepth.keys()].sort((a, b) => a - b);
+      for (const d of depths) {
+        const parentsAtDepth = parentsByDepth.get(d) ?? [];
+        const collapsedAtDepth = parentsAtDepth.filter((id) => prev.has(id));
+        if (collapsedAtDepth.length === 0) continue;
+        const next = new Set(prev);
+        for (const id of collapsedAtDepth) next.delete(id);
+        return next;
+      }
+      return prev;
+    });
+  }, [parentsByDepth]);
 
   const handleSelectSpan = useCallback(
     (spanId: string) => {
@@ -297,14 +374,14 @@ export const WaterfallView = memo(function WaterfallView({
               </Tooltip>
             )}
             <ToolbarIconButton
-              tooltip="Expand all"
+              tooltip="Expand one level"
               icon={LuChevronsUpDown}
-              onClick={handleExpandAll}
+              onClick={handleExpandMore}
             />
             <ToolbarIconButton
-              tooltip="Collapse all"
+              tooltip="Collapse one level"
               icon={LuChevronsDownUp}
-              onClick={handleCollapseAll}
+              onClick={handleCollapseMore}
             />
           </HStack>
         </Flex>
@@ -427,61 +504,81 @@ export const WaterfallView = memo(function WaterfallView({
           bottom={0}
           left="2px"
           width="1px"
-          bg="border.subtle"
-          opacity={0.6}
+          // Light mode: lean on the darker `border.emphasized` token so
+          // the divider doesn't vanish against the white-ish surface.
+          // Dark mode: drop to the regular `border` token (and a lower
+          // opacity) — `border.emphasized` reads brighter than the
+          // panel separators around it, which looked off-key in the
+          // dark theme.
+          bg={{ base: "border.emphasized", _dark: "border" }}
+          opacity={0.5}
           transition="all 0.15s ease"
         />
       </Box>
 
       {/* Timeline panel */}
       <Flex
+        ref={timelinePanelRef}
         direction="column"
         flex={1}
         minWidth={0}
         height="full"
         overflow="hidden"
       >
-        {/* Time axis header */}
+        {/* Time axis header — time markers share the same right inset as
+            the bars below so labels and bars align vertically. */}
         <Flex
           align="center"
           position="relative"
           height="24px"
           flexShrink={0}
-          paddingX={2}
           borderBottomWidth="1px"
           borderColor="border.subtle"
           bg="bg.subtle/30"
         >
-          {timeMarkers.map((ms, idx) => {
-            const pct = rootDuration > 0 ? (ms / rootDuration) * 100 : 0;
-            const isLast = idx === timeMarkers.length - 1;
-            const isFirst = idx === 0;
-            return (
-              <Text
-                key={idx}
-                textStyle="xs"
-                color="fg.subtle"
-                position="absolute"
-                left={`${pct}%`}
-                transform={
-                  isLast
-                    ? "translateX(-100%)"
-                    : isFirst
-                      ? undefined
-                      : "translateX(-50%)"
-                }
-                whiteSpace="nowrap"
-                userSelect="none"
-                lineHeight={1}
-              >
-                {formatDuration(ms)}
-              </Text>
-            );
-          })}
+          <Box
+            position="absolute"
+            top={0}
+            bottom={0}
+            left={2}
+            right={4}
+          >
+            {visibleTimeMarkers.map((ms, idx) => {
+              const pct = rootDuration > 0 ? (ms / rootDuration) * 100 : 0;
+              const isLast = idx === visibleTimeMarkers.length - 1;
+              const isFirst = idx === 0;
+              return (
+                <Text
+                  key={idx}
+                  textStyle="xs"
+                  color="fg.subtle"
+                  position="absolute"
+                  top="50%"
+                  left={`${pct}%`}
+                  transform={
+                    isLast
+                      ? "translate(-100%, -50%)"
+                      : isFirst
+                        ? "translateY(-50%)"
+                        : "translate(-50%, -50%)"
+                  }
+                  whiteSpace="nowrap"
+                  userSelect="none"
+                  lineHeight={1}
+                >
+                  {formatDuration(ms)}
+                </Text>
+              );
+            })}
+          </Box>
         </Flex>
 
         {/* Timeline rows — driven by the tree's scroll position via transform.
-            No native scrollbar here; wheel events delegate to the tree. */}
+            No native scrollbar here; wheel events delegate to the tree.
+            Right inset is applied per-bar (in TimelineBar) rather than
+            on this container so the row's hover / selection background
+            still extends edge-to-edge while only the bars + time
+            labels stay clear of the pane edge. */}
         <Box
           flex={1}
           overflow="hidden"
@@ -495,9 +592,18 @@ export const WaterfallView = memo(function WaterfallView({
             width="full"
             style={{ willChange: "transform" }}
           >
-            {/* Vertical grid lines */}
-            <Box position="absolute" inset={0} pointerEvents="none" zIndex={0}>
-              {timeMarkers.map((ms, idx) => {
+            {/* Vertical grid lines — inset to match the bars and time
+                marker labels so the alignment grid is consistent. */}
+            <Box
+              position="absolute"
+              top={0}
+              bottom={0}
+              left={2}
+              right={4}
+              pointerEvents="none"
+              zIndex={0}
+            >
+              {visibleTimeMarkers.map((ms, idx) => {
                 const pct = rootDuration > 0 ? (ms / rootDuration) * 100 : 0;
                 return (
                   <Box

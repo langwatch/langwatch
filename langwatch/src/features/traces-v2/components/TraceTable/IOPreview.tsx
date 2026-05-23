@@ -6,7 +6,6 @@ import { useDensityStore } from "../../stores/densityStore";
 import { formatPreview } from "../../utils/previewFormatter";
 import { tryParseChat } from "./chatContent";
 
-const VERTICAL_BAR = "\u2506";
 const COMFORTABLE_LABEL_WIDTH = "60px";
 
 interface IOPreviewProps {
@@ -28,6 +27,42 @@ export const IOPreview: React.FC<IOPreviewProps> = ({ input, output }) => {
  * isChat/isTool flags that drive the role icon. Both are cheap (each does
  * one JSON.parse attempt on the same input).
  */
+/**
+ * Render line breaks for the 2-line clamped preview cell.
+ *
+ * Trade-offs we're navigating:
+ *  - We want the `↵` glyph as an explicit "there was a break here"
+ *    marker, so wrapped text doesn't look like one continuous string.
+ *  - CSS `-webkit-line-clamp` can truncate anywhere — including right
+ *    after a glyph, which then renders as the ugly "…↵..." or pure
+ *    "↵..." (an empty line whose only content is the glyph followed
+ *    by the clamp ellipsis). Operator complaint, with screenshots.
+ *
+ * Strategy:
+ *  - Strip trailing whitespace/blank lines so the text never ends on
+ *    a break.
+ *  - Collapse runs of blank lines to a single break (no more "↵\n↵\n"
+ *    that renders as an empty middle line whose only character is the
+ *    glyph).
+ *  - Put the glyph at the START of every continuation line, not at
+ *    the END of the previous one. That way the clamp ellipsis lands
+ *    on real text content (or replaces it mid-word with "…"), never
+ *    on the glyph itself. Reads as "↳ continuation" rather than
+ *    "ends with ↵...".
+ */
+function withGlyphBreaks(text: string): string {
+  // 1. Normalise: trim trailing whitespace/newlines so we never end
+  //    on a hard break.
+  const trimmed = text.replace(/\s+$/u, "");
+  // 2. Split on newline runs (one or more), so consecutive blanks
+  //    collapse to a single break point.
+  const lines = trimmed.split(/\n+/);
+  if (lines.length <= 1) return trimmed;
+  // 3. Re-join with `\n↵ ` — leading-glyph style. The first line
+  //    has no prefix; every subsequent line is "↵ <content>".
+  return lines.join("\n↵ ");
+}
+
 function buildRow(raw: string | null): {
   text: string;
   isChat: boolean;
@@ -35,9 +70,13 @@ function buildRow(raw: string | null): {
 } {
   if (raw === null) return { text: "", isChat: false, isTool: false };
   const parsed = tryParseChat(raw);
-  const formatted = formatPreview(raw, { maxChars: 80 });
+  // Preserve newlines AND surface the `↵` glyph at the break point —
+  // operator preference: the glyph makes the soft-break explicit while
+  // the real `\n` lets CSS (whiteSpace="pre-line") actually wrap the
+  // next chunk to a new line.
+  const formatted = formatPreview(raw, { maxChars: 200, newlines: "preserve" });
   return {
-    text: formatted.text,
+    text: withGlyphBreaks(formatted.text),
     isChat: parsed.isChat,
     isTool: parsed.isTool,
   };
@@ -77,15 +116,21 @@ const CompactRow: React.FC<CompactRowProps> = ({
   direction,
 }) => {
   const isInput = direction === "input";
-  const accent = isInput ? "blue.fg" : "green.fg";
+  // Vivid palette in light mode — `*.solid` matches the saturated tone
+  // the filter sidebar uses for the origin dots, so the table accents
+  // and the sidebar legend feel like the same palette. Dark mode keeps
+  // `*.fg` because against the dark canvas the solid step over-pops.
+  const accent = isInput
+    ? { base: "blue.500", _dark: "blue.fg" }
+    : { base: "green.solid", _dark: "green.fg" };
   const textColor = isInput ? "fg.muted" : "fg.subtle";
 
   return (
-    <HStack gap={1} width="full" overflow="hidden" align="baseline">
-      <Text textStyle="2xs" color="fg.subtle/30" flexShrink={0} lineHeight="1">
-        {VERTICAL_BAR}
-      </Text>
-      <Flex align="center" gap={1} flexShrink={0}>
+    <HStack gap={1} width="full" overflow="hidden" align="flex-start">
+      {/* Removed the dashed vertical bar that used to sit before the
+          arrow icon — it read as visual noise and didn't add an
+          alignment cue the row tint isn't already providing. */}
+      <Flex align="center" gap={1} flexShrink={0} paddingTop="2px">
         <Icon boxSize="10px" color={accent}>
           {isInput ? <ArrowUp /> : <ArrowDown />}
         </Icon>
@@ -96,7 +141,12 @@ const CompactRow: React.FC<CompactRowProps> = ({
         color={textColor}
         fontStyle="italic"
         fontWeight="400"
-        truncate
+        // Preserve real newlines coming through formatPreview (the row
+        // text used to inline-render `↵` glyphs — now wraps onto a real
+        // second line). Cap at 2 lines so the preview stays compact in
+        // the table.
+        whiteSpace="pre-line"
+        lineClamp={2}
         flex={1}
         minWidth={0}
       >
@@ -108,7 +158,7 @@ const CompactRow: React.FC<CompactRowProps> = ({
 
 const RoleIcon: React.FC<{
   row: { isChat: boolean; isTool: boolean };
-  color: string;
+  color: string | { base: string; _dark: string };
   direction: "input" | "output";
 }> = ({ row, color, direction }) => {
   if (direction === "input") {
@@ -136,21 +186,25 @@ const RoleIcon: React.FC<{
 };
 
 const ComfortableIOPreview: React.FC<IOPreviewProps> = ({ input, output }) => (
-  <VStack align="stretch" gap={2}>
+  <VStack align="stretch" gap={2} fontFamily="mono">
     {input !== null && (
       <ComfortableRow
         label="Input"
-        labelColor="blue.fg"
+        labelColor={{ base: "blue.500", _dark: "blue.fg" }}
         textColor="fg.muted"
-        text={formatPreview(input, { maxChars: 200 }).text}
+        text={withGlyphBreaks(
+          formatPreview(input, { maxChars: 200, newlines: "preserve" }).text,
+        )}
       />
     )}
     {output !== null && (
       <ComfortableRow
         label="Output"
-        labelColor="green.fg"
+        labelColor={{ base: "green.solid", _dark: "green.fg" }}
         textColor="fg"
-        text={formatPreview(output, { maxChars: 200 }).text}
+        text={withGlyphBreaks(
+          formatPreview(output, { maxChars: 200, newlines: "preserve" }).text,
+        )}
       />
     )}
   </VStack>
@@ -158,11 +212,11 @@ const ComfortableIOPreview: React.FC<IOPreviewProps> = ({ input, output }) => (
 
 const ComfortableRow: React.FC<{
   label: string;
-  labelColor: string;
+  labelColor: string | { base: string; _dark: string };
   textColor: string;
   text: string;
 }> = ({ label, labelColor, textColor, text }) => (
-  <HStack align="baseline" gap={2}>
+  <HStack align="flex-start" gap={2}>
     <Text
       textStyle="sm"
       fontWeight="600"
@@ -172,7 +226,14 @@ const ComfortableRow: React.FC<{
     >
       {label}
     </Text>
-    <Text textStyle="sm" color={textColor} truncate flex={1} minWidth={0}>
+    <Text
+      textStyle="sm"
+      color={textColor}
+      whiteSpace="pre-line"
+      lineClamp={2}
+      flex={1}
+      minWidth={0}
+    >
       {text}
     </Text>
   </HStack>

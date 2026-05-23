@@ -1,4 +1,4 @@
-import { Box, Flex, Icon } from "@chakra-ui/react";
+import { Box, chakra, Flex, Icon } from "@chakra-ui/react";
 import { Search } from "lucide-react";
 import { AnimatePresence } from "motion/react";
 import type React from "react";
@@ -91,6 +91,15 @@ export const SearchBar: React.FC = () => {
   const [editorMounted, setEditorMounted] = useState(false);
   const [editorHasContent, setEditorHasContent] = useState(false);
   const [aiMode, setAiMode] = useState(false);
+  const [suggestionOpen, setSuggestionOpen] = useState(false);
+  const [cursorAnchorX, setCursorAnchorX] = useState(0);
+  const [editorFocused, setEditorFocused] = useState(false);
+  // When the user fires ⌘+⏎ on a typed query, we punt the text into AI
+  // mode AND ask the composer to submit immediately. Tracked separately
+  // from `aiMode` because the same flag would otherwise re-fire on every
+  // subsequent AI-mode entry (e.g. clicking the Ask AI button to start
+  // fresh would auto-submit the now-applied filter as a prompt).
+  const [aiAutoSubmitSeed, setAiAutoSubmitSeed] = useState<string | null>(null);
   // Anchor info for the click-a-chip-to-edit-value popover. Lifted to
   // SearchBar so the popover can portal into document.body and share
   // the same instance whether the click came from PlaceholderEditor or
@@ -185,6 +194,27 @@ export const SearchBar: React.FC = () => {
   }, [askAiNeedsProviderPrimer]);
   useGlobalAiShortcut(handleAiShortcut);
 
+  // ⌘+⏎ / Ctrl+⏎ from inside the editor: punt the typed text into AI
+  // mode and auto-submit it. Lets the operator triage "is this filter
+  // syntax or free text I want the AI to interpret?" without taking
+  // their hands off the keyboard.
+  const handleEditorAiShortcut = useCallback(
+    (currentText: string) => {
+      if (askAiNeedsProviderPrimer) return;
+      const trimmed = currentText.trim();
+      // Empty input still opens the composer (parity with the button),
+      // it just doesn't auto-submit a blank prompt.
+      setAiAutoSubmitSeed(trimmed.length > 0 ? trimmed : null);
+      setAiMode(true);
+    },
+    [askAiNeedsProviderPrimer],
+  );
+
+  const handleAiBarClose = useCallback(() => {
+    setAiMode(false);
+    setAiAutoSubmitSeed(null);
+  }, []);
+
   // Reuse the discover payload that already powers the facets sidebar — its
   // `topValues` is exactly the autocomplete pool for `model:`, `service:`,
   // etc. No extra fetch, and the resolver is called inline by the editor's
@@ -226,20 +256,21 @@ export const SearchBar: React.FC = () => {
           <FloatingAiBar
             key="ai-bar"
             rect={floatRect}
-            onClose={() => setAiMode(false)}
-            // If the URL query is still exactly what the last AI run
-            // produced (same project, no facet/free-text edits since),
-            // re-show the natural-language prompt — the user likely
-            // wants to refine *what they asked*, not edit the generated
-            // syntax. Otherwise fall back to the current query so a
-            // mid-typed expression isn't wiped on AI-mode entry.
+            onClose={handleAiBarClose}
+            // If the ⌘+⏎ shortcut seeded a specific prompt, that wins
+            // outright (and the composer auto-submits below). Otherwise
+            // fall through to the same "re-show last natural-language
+            // prompt vs current query" logic the Ask AI button uses.
             initialPrompt={
-              lastAiTranslation &&
-              lastAiTranslation.projectId === project?.id &&
-              lastAiTranslation.query === queryText
-                ? lastAiTranslation.prompt
-                : queryText
+              aiAutoSubmitSeed !== null
+                ? aiAutoSubmitSeed
+                : lastAiTranslation &&
+                    lastAiTranslation.projectId === project?.id &&
+                    lastAiTranslation.query === queryText
+                  ? lastAiTranslation.prompt
+                  : queryText
             }
+            autoSubmit={aiAutoSubmitSeed !== null}
           />
         )}
       </AnimatePresence>
@@ -275,6 +306,10 @@ export const SearchBar: React.FC = () => {
                 onHasContentChange={setEditorHasContent}
                 valueResolver={valueResolver}
                 onTokenClick={setTokenAnchor}
+                onAiShortcut={handleEditorAiShortcut}
+                onSuggestionOpenChange={setSuggestionOpen}
+                onCursorAnchorChange={setCursorAnchorX}
+                onFocusChange={setEditorFocused}
               />
             ) : (
               <PlaceholderEditor
@@ -284,6 +319,12 @@ export const SearchBar: React.FC = () => {
                 onTokenClick={setTokenAnchor}
               />
             )}
+            {hasContent &&
+              editorFocused &&
+              !suggestionOpen &&
+              !askAiNeedsProviderPrimer && (
+                <SearchSubmitHint anchorX={cursorAnchorX} />
+              )}
           </Box>
 
           <StatusBadge status={status} />
@@ -302,3 +343,37 @@ export const SearchBar: React.FC = () => {
     </Box>
   );
 };
+
+const IS_MAC =
+  typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
+const MOD_KEY_SYMBOL = IS_MAC ? "⌘" : "Ctrl";
+
+/**
+ * Plain one-liner hint that floats just after the typed content.
+ * Pure UTF-8 text — no Kbd chips, no clickable fragments. The whole
+ * thing reads as a single faint hint and never competes with the
+ * input for attention.
+ */
+const SearchSubmitHint: React.FC<{ anchorX: number }> = ({ anchorX }) => (
+  <chakra.span
+    position="absolute"
+    // Bigger gap (24px) so the hint doesn't crowd the last typed glyph.
+    left={`${anchorX + 24}px`}
+    // Pixel-nudge up (~1px from geometric center) — the hint text and
+    // the editor text use different font stacks, and Chakra's exact
+    // 50% transform leaves the hint baseline sitting visibly below
+    // the editor's typing line on light mode.
+    top="calc(50% - 1px)"
+    transform="translateY(-50%)"
+    color={{ base: "gray.400", _dark: "gray.500" }}
+    fontSize="xs"
+    fontWeight="normal"
+    whiteSpace="nowrap"
+    overflow="hidden"
+    textOverflow="ellipsis"
+    pointerEvents="none"
+    userSelect="none"
+  >
+    {`Press ${MOD_KEY_SYMBOL} + Enter to Ask AI`}
+  </chakra.span>
+);

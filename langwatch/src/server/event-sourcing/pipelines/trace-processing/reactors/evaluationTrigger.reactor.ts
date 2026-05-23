@@ -12,6 +12,10 @@ import { isSpanReceivedEvent, type TraceProcessingEvent } from "../schemas/event
 import { defineOriginGuardedTraceReactor } from "./_originGuardedReactor";
 import { SYNTHETIC_SPAN_NAMES } from "~/server/tracer/constants";
 import { DEFERRED_CHECK_DELAY_MS } from "./originGate.reactor";
+import { featureFlagService } from "../../../../featureFlag";
+
+const CAUSALITY_LOOP_GUARD_DISABLED_FLAG =
+  "ops_es_causality_loop_guard_disabled";
 
 const logger = createLogger(
   "langwatch:trace-processing:evaluation-trigger-reactor",
@@ -63,12 +67,16 @@ export function createEvaluationTriggerReactor(
       // attribute is the nlpgo-side BaggageAttributeProcessor (stamps
       // every span at OnStart from a single baggage entry on context).
       //
-      // Kill-switch: LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD=1 bypasses
-      // the check (emergency rollback without redeploy). Captured in
-      // env-create.mjs for schema discoverability; read via process.env
-      // here so tests can mutate it between cases.
-      const guardDisabled =
-        process.env.LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD === "1";
+      // Kill-switch: SYSTEM flag `ops_es_causality_loop_guard_disabled`
+      // bypasses the check (emergency rollback without redeploy).
+      // Resolved through featureFlagService so operators can flip it
+      // from the Ops UI without restarting pods; the legacy
+      // `LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD=1` env var still works
+      // via the standard env-override path (uppercased flag key).
+      const guardDisabled = await featureFlagService.isEnabled(
+        CAUSALITY_LOOP_GUARD_DISABLED_FLAG,
+        { distinctId: tenantId, defaultValue: false },
+      );
 
       if (!guardDisabled && isSpanReceivedEvent(event)) {
         const reason = detectCausalityLoop({
@@ -85,7 +93,7 @@ export function createEvaluationTriggerReactor(
       } else if (guardDisabled) {
         logger.warn(
           { tenantId, observedTraceId: traceId },
-          "LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD=1 — loop guard bypassed",
+          "ops_es_causality_loop_guard_disabled is on, loop guard bypassed",
         );
       }
 

@@ -3,14 +3,8 @@ import type {
   NodeDataset,
 } from "~/optimization_studio/types/dsl";
 import type { NodeWithOptionalPosition } from "../../../../../../../types";
-import { DEFAULT_MODEL } from "../../../../../../../utils/constants";
 
-type LlmSignatureNode = Omit<
-  NodeWithOptionalPosition<LlmPromptConfigComponent>,
-  "data"
-> & {
-  data: Omit<LlmPromptConfigComponent, "configId">;
-};
+type LlmSignatureNode = NodeWithOptionalPosition<LlmPromptConfigComponent>;
 
 const DEFAULT_SIGNATURE_NODE_PROPERTIES = (
   model: string,
@@ -87,17 +81,21 @@ const DEFAULT_SIGNATURE_NODE_PROPERTIES = (
 });
 
 /**
- * Simple factory for creating LLM Signature Nodes
+ * Simple factory for creating LLM Signature Nodes.
+ *
+ * Caller supplies the resolved default model (post-system-tier removal
+ * the cascade can return nothing, in which case an empty string is the
+ * correct hand-off — the LLM-node UI surfaces the missing default at
+ * the first run via the MissingModelToast interceptor instead of
+ * masking the gap with a constant).
  */
 export class LlmSignatureNodeFactory {
   static build(
     overrides?: Partial<LlmSignatureNode>,
-    project?: { defaultModel?: string | null },
+    defaultModel?: string,
   ): LlmSignatureNode {
     return {
-      ...DEFAULT_SIGNATURE_NODE_PROPERTIES(
-        project?.defaultModel ?? DEFAULT_MODEL,
-      ),
+      ...DEFAULT_SIGNATURE_NODE_PROPERTIES(defaultModel ?? ""),
       ...overrides,
     };
   }

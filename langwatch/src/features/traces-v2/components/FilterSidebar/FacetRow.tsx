@@ -188,7 +188,6 @@ export const FacetRow = memo(function FacetRow({
             paddingX={1}
             flexShrink={0}
             textTransform="lowercase"
-            fontFamily="mono"
             fontWeight="500"
           >
             {typeTag}
@@ -209,7 +208,6 @@ export const FacetRow = memo(function FacetRow({
           <Text
             textStyle="xs"
             color="fg.subtle"
-            fontFamily="mono"
             mr={2}
             fontWeight={isActive ? "600" : "400"}
             flexShrink={0}

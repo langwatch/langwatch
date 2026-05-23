@@ -134,12 +134,14 @@ export function PinnedMetricPill({
             flexShrink={0}
           />
         </Box>
+        {/* Mixed-case + no letter-spacing so pinned-attribute labels
+            (e.g. "User", "Conversation") read at the same rhythm as
+            the neutral Chip labels above ("Duration", "Origin"). The
+            previous uppercase + tracked-out treatment made auto-pins
+            stand out as a separate visual language for no reason. */}
         <Text
           textStyle="2xs"
           color={fg}
-          fontFamily="mono"
-          textTransform="uppercase"
-          letterSpacing="0.04em"
           fontWeight="medium"
           truncate
           flexShrink={0}
@@ -167,7 +169,6 @@ export function PinnedMetricPill({
           <Text
             textStyle="xs"
             color={value == null ? "fg.subtle" : "fg"}
-            fontFamily="mono"
             fontWeight="medium"
             truncate
             minWidth={0}

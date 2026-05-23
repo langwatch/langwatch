@@ -72,6 +72,7 @@ import { personalSessionsRouter } from "@ee/governance/routers/personalSessions"
 import { sessionPolicyRouter } from "@ee/governance/routers/sessionPolicy";
 import { workflowRouter } from "./routers/workflows";
 import { opsRouter } from "./routers/ops";
+import { storedObjectsRouter } from "./routers/stored-objects.router";
 
 const coreRouters = {
   agents: agentsRouter,
@@ -128,6 +129,7 @@ const coreRouters = {
   apiKey: apiKeyRouter,
   group: groupRouter,
   ops: opsRouter,
+  storedObjects: storedObjectsRouter,
   virtualKeys: virtualKeysRouter,
   personalVirtualKeys: personalVirtualKeysRouter,
   personalWorkspaceFeatures: personalWorkspaceFeaturesRouter,

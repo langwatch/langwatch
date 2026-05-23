@@ -93,7 +93,7 @@ export const BulkActionBar: React.FC<BulkActionBarProps> = ({
         </Button>
 
         <Tooltip
-          content="Disabled — add to dataset requires explicit row selection."
+          content="Disabled. Add to dataset requires explicit row selection."
           disabled={!isAllMatchingMode}
           showArrow
         >

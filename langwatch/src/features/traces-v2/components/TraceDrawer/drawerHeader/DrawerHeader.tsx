@@ -2,18 +2,19 @@ import {
   Box,
   Button,
   Circle,
+  HoverCard,
   HStack,
   Icon,
+  Portal,
   Text,
   VStack,
 } from "@chakra-ui/react";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import {
   LuArrowLeft,
+  LuCopy,
   LuMaximize2,
   LuMinimize2,
-  LuPin,
-  LuPinOff,
   LuRefreshCw,
   LuX,
 } from "react-icons/lu";
@@ -24,6 +25,7 @@ import {
   MenuItem,
   MenuRoot,
 } from "~/components/ui/menu";
+import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
 import { TracePresenceAvatars } from "~/features/presence/components/TracePresenceAvatars";
 import { useDejaViewLink } from "~/hooks/useDejaViewLink";
@@ -33,17 +35,22 @@ import type { TraceHeader } from "~/server/api/routers/tracesV2.schemas";
 import { useConversationContext } from "../../../hooks/useConversationContext";
 import { usePinnedAttributes } from "../../../hooks/usePinnedAttributes";
 import { useTraceDrawerNavigation } from "../../../hooks/useTraceDrawerNavigation";
+import { useSpanTree } from "../../../hooks/useSpanTree";
 import { useTraceHeader } from "../../../hooks/useTraceHeader";
 import { useTraceRefresh } from "../../../hooks/useTraceRefresh";
 import { useTraceResources } from "../../../hooks/useTraceResources";
 import { useDrawerStore } from "../../../stores/drawerStore";
 import { useFilterStore } from "../../../stores/filterStore";
+import { useFocusSectionStore } from "../../../stores/focusSectionStore";
+import { rankedErrorSpans } from "../../../utils/errorSpans";
+import { ExceptionsContent } from "../ExceptionsContent";
 import type { PinnedAttribute } from "../../../stores/pinnedAttributesStore";
 import {
   abbreviateModel,
+  formatAbsoluteTime,
   formatCost,
   formatDuration,
-  formatRelativeTime,
+  formatRelativeTimeAgo,
   formatTokens,
   SPAN_TYPE_COLORS,
   STATUS_COLORS,
@@ -53,6 +60,7 @@ import { splitChipsForOverflow } from "../ChipBar";
 import { ModeSwitch } from "../ModeSwitch";
 import { RawJsonDialog } from "../RawJsonDialog";
 import { useTraceHeaderChipDefs } from "../TraceHeaderChips";
+import { EditableTraceName } from "./EditableTraceName";
 import { MetricPill } from "./MetricPill";
 import {
   type CategorizedPin,
@@ -73,6 +81,253 @@ interface DrawerHeaderProps {
   trace: TraceHeader;
   /** Parent's drawer-close handler (URL teardown). */
   onClose: () => void;
+}
+
+/**
+ * Inline trace ID chip — collapsed to the first 5 chars by default so
+ * it doesn't compete with the trace name, expands to the full ID on
+ * hover, and reveals a copy icon at the trailing edge. Power-users can
+ * still hit `Y` (overflow-menu shortcut) to copy without hovering;
+ * this is for the case where they want to read the ID without leaving
+ * the header.
+ */
+/**
+ * Trace ID chip rendered with the same Chip component the metric pills
+ * use (Duration / Spans / Cost / …) so the drawer header reads as one
+ * consistent strip rather than the trace ID floating with its own
+ * styling. 8 chars short by default — git's short-SHA convention, long
+ * enough to be uniquely scannable but still fits beside the trace name.
+ * On hover the short id swaps to the full id and a copy icon appears;
+ * clicking anywhere on the chip copies to the clipboard.
+ */
+function TraceIdChip({ traceId }: { traceId: string }) {
+  const short = traceId.slice(0, 8);
+  const handleCopy = async () => {
+    // navigator.clipboard requires a secure context (https or localhost).
+    // Surface a friendly hint when it fails so users running LangWatch on
+    // a plain-http internal domain understand what went wrong instead of
+    // seeing a silent no-op.
+    try {
+      if (
+        typeof navigator !== "undefined" &&
+        navigator.clipboard?.writeText
+      ) {
+        await navigator.clipboard.writeText(traceId);
+        toaster.create({
+          title: "Trace ID copied",
+          // Show the full id so the operator can verify what landed on
+          // their clipboard at a glance. The chip shows a short id by
+          // design (git-SHA convention) but the toast has the real
+          // estate — operator report: the previous "<8 chars>…" felt
+          // truncated for no benefit.
+          description: traceId,
+          type: "success",
+          duration: 2500,
+        });
+        return;
+      }
+      throw new Error("clipboard unavailable");
+    } catch {
+      toaster.create({
+        title: "Couldn't copy trace ID",
+        description:
+          "Clipboard access is restricted. This can happen on non-HTTPS domains. Copy the ID manually from the URL.",
+        type: "error",
+        duration: 6000,
+      });
+    }
+  };
+  const value = (
+    <Box
+      display="inline-flex"
+      alignItems="center"
+      gap={1}
+      fontFamily="mono"
+      // Hover affordances: swap short text for full id, reveal the copy
+      // icon. CSS-only so we don't need a React state per row of header.
+      css={{
+        "& [data-hover-only]": { display: "none" },
+        ".chip-root:hover & [data-hover-only]": { display: "inline-flex" },
+        ".chip-root:hover & [data-collapsed]": { display: "none" },
+        ".chip-root:hover & [data-expanded]": { display: "inline" },
+      }}
+    >
+      <Text as="span" data-collapsed textStyle="xs" color="fg" fontWeight="medium">
+        {short}
+      </Text>
+      <Text
+        as="span"
+        data-expanded
+        textStyle="xs"
+        color="fg"
+        fontWeight="medium"
+        display="none"
+      >
+        {traceId}
+      </Text>
+      <Icon as={LuCopy} boxSize={3} color="fg.muted" data-hover-only />
+    </Box>
+  );
+  return (
+    <Chip
+      value={value}
+      tone="neutral"
+      onClick={() => void handleCopy()}
+      tooltip="Hover to see full ID, click to copy"
+      ariaLabel={`Copy trace ID ${traceId}`}
+    />
+  );
+}
+
+/**
+ * Trace status indicator. On error traces the chip is an interactive
+ * popover: hovering opens an inline preview of the Exceptions section
+ * (same trace-level message + same per-span pill row, sourced from
+ * the same `rankedErrorSpans` helper), and clicking the chip itself
+ * jumps the operator to the Summary tab's Exceptions accordion with
+ * a brief blue pulse so the eye lands. OK traces render the dot
+ * non-interactively (just the help tooltip).
+ */
+function StatusChip({
+  trace,
+  statusColor,
+}: {
+  trace: TraceHeader;
+  statusColor: string;
+}) {
+  const selectSpan = useDrawerStore((s) => s.selectSpan);
+  const setActiveTab = useDrawerStore((s) => s.setActiveTab);
+  const setViewMode = useDrawerStore((s) => s.setViewMode);
+  const requestFocus = useFocusSectionStore((s) => s.request);
+  const spanTree = useSpanTree();
+  const errorSpans = useMemo(
+    () => rankedErrorSpans(spanTree.data ?? []),
+    [spanTree.data],
+  );
+
+  const isError = trace.status === "error";
+  const hasErrorContent = isError && (!!trace.error || errorSpans.length > 0);
+
+  const focusExceptions = useCallback(() => {
+    setViewMode("trace");
+    setActiveTab("summary");
+    requestFocus({ traceId: trace.traceId, section: "exceptions" });
+  }, [requestFocus, setActiveTab, setViewMode, trace.traceId]);
+
+  // Same focus request without the activeTab override, so a span pill
+  // inside the popover can flip to the span tab (via `selectSpan`)
+  // without our callback then yanking the operator back to summary.
+  // The pulse lands on whichever accordion stack is mounted next —
+  // `SpanAccordions` for span tab, `TraceSummaryAccordions` for
+  // summary — since both observe the same focus store.
+  const focusExceptionsKeepTab = useCallback(() => {
+    requestFocus({ traceId: trace.traceId, section: "exceptions" });
+  }, [requestFocus, trace.traceId]);
+
+  const jumpToSpan = useCallback(
+    (spanId: string) => {
+      // Land on the span detail tab — `selectSpan` flips activeTab to
+      // "span" internally, so we just ensure trace mode here. The
+      // accordion-side focus-glow observer on SpanAccordions will catch
+      // the follow-up `requestFocus({section: "exceptions"})` fired by
+      // ExceptionsContent and pulse the span's own Exceptions section.
+      setViewMode("trace");
+      selectSpan(spanId);
+    },
+    [selectSpan, setViewMode],
+  );
+
+  // OK / non-error rendering keeps the existing static-tooltip recipe —
+  // there's nothing to preview, no jump to make.
+  if (!isError) {
+    const tooltipContent =
+      trace.status === "ok"
+        ? "No errors recorded on any span in this trace"
+        : `Trace status: ${trace.status}`;
+    return (
+      <Tooltip content={tooltipContent} positioning={{ placement: "bottom" }}>
+        <HStack gap={1} flexShrink={0} cursor="help">
+          <Circle size="8px" bg={statusColor} flexShrink={0} />
+        </HStack>
+      </Tooltip>
+    );
+  }
+
+  const chipBody = (
+    <HStack
+      as="button"
+      gap={1}
+      flexShrink={0}
+      cursor="pointer"
+      onClick={focusExceptions}
+      aria-label="Show exception details for this trace"
+      paddingX={1}
+      paddingY={0.5}
+      borderRadius="md"
+      _hover={{ bg: "red.fg/10" }}
+      transition="background 0.15s ease"
+    >
+      <Circle size="8px" bg={statusColor} flexShrink={0} />
+      <Text
+        textStyle="xs"
+        fontWeight="medium"
+        color={statusColor}
+        textTransform="capitalize"
+      >
+        {trace.status}
+      </Text>
+    </HStack>
+  );
+
+  // No content to preview — degrade to the plain clickable chip.
+  // Click still focuses the (empty) Exceptions section so the
+  // operator at least lands on the right tab.
+  if (!hasErrorContent) return chipBody;
+
+  return (
+    <HoverCard.Root
+      openDelay={150}
+      closeDelay={120}
+      positioning={{ placement: "bottom-start", gutter: 6 }}
+    >
+      <HoverCard.Trigger asChild>{chipBody}</HoverCard.Trigger>
+      <Portal>
+        <HoverCard.Positioner>
+          <HoverCard.Content
+            minWidth="280px"
+            maxWidth="420px"
+            padding={3}
+            borderRadius="lg"
+            background="bg.panel"
+            boxShadow="lg"
+          >
+            <ExceptionsContent
+              error={trace.error}
+              errorSpans={errorSpans}
+              onSelectSpan={jumpToSpan}
+              onFocusSection={focusExceptionsKeepTab}
+              density="compact"
+            />
+            {/* Anchor row: nudges the operator that the popover is a
+                preview of the full Exceptions section, and clicking
+                the chip itself opens it. Matches the deep-link style
+                used on the eval header chips. */}
+            <HStack
+              gap={1}
+              paddingTop={2}
+              marginTop={2}
+              borderTopWidth="1px"
+              borderTopColor="border.muted"
+            >
+              <Text textStyle="2xs" color="fg.muted">
+                Click the chip to open the Exceptions section
+              </Text>
+            </HStack>
+          </HoverCard.Content>
+        </HoverCard.Positioner>
+      </Portal>
+    </HoverCard.Root>
+  );
 }
 
 /**
@@ -184,6 +439,20 @@ export const DrawerHeader = memo(function DrawerHeader({
   const setActiveTab = useDrawerStore((s) => s.setActiveTab);
   const selectSpan = useDrawerStore((s) => s.selectSpan);
   const toggleMaximized = useDrawerStore((s) => s.toggleMaximized);
+  const toggleSnapMaximize = useDrawerStore((s) => s.toggleSnapMaximize);
+  // The Maximize / Restore icon drives the same width snap that
+  // double-clicking the edge grip uses — `widthPx` is the actual size
+  // signal, while the boolean `isMaximized` is kept in sync for
+  // components that read it to swap the icon label. The SSR / no-window
+  // branch falls through to `toggleMaximized()` so the button still
+  // does *something* visible during hydration.
+  const handleMaximizeClick = () => {
+    if (typeof window === "undefined") {
+      toggleMaximized();
+      return;
+    }
+    toggleSnapMaximize(window.innerWidth);
+  };
   const setShortcutsOpen = useDrawerStore((s) => s.setShortcutsOpen);
 
   const { canGoBack, goBack, goBackTo, backStackDepth, backStack } =
@@ -206,6 +475,10 @@ export const DrawerHeader = memo(function DrawerHeader({
   const cacheCreationTokens = readNumberAttribute(
     trace.attributes,
     "gen_ai.usage.cache_creation.input_tokens",
+  );
+  const reasoningTokens = readNumberAttribute(
+    trace.attributes,
+    "gen_ai.usage.reasoning_tokens",
   );
 
   // If we have concrete input AND output token numbers to display, trust them
@@ -448,10 +721,13 @@ export const DrawerHeader = memo(function DrawerHeader({
     onSelectSpan: selectSpan,
     onOpenPromptsTab: () => setActiveTab("prompts"),
   });
-  // Source chips: cap inline at 6 — anything beyond rolls into the "+N more"
-  // popover so the strip stays scannable for traces with many capabilities.
+  // Source chips: cap inline at 10 so multi-evaluator traces don't hide
+  // their second & third verdicts in the overflow popover by default —
+  // eval status is the highest-signal data on the strip, not something
+  // to bury after a half-dozen capabilities. Anything beyond 10 still
+  // rolls into "+N more" so the row stays scannable.
   const { primary: primaryChips, overflowChip: chipsOverflow } =
-    splitChipsForOverflow(chipDefs, 6);
+    splitChipsForOverflow(chipDefs, 10);
   // Pins: auto-pins (identity/run/tag) always inline, custom pins capped at
   // 3 inline with the rest in a "+N pinned" popover. Anyone can pin
   // arbitrary attributes, so this keeps the row from running away.
@@ -461,10 +737,12 @@ export const DrawerHeader = memo(function DrawerHeader({
 
   return (
     <VStack align="stretch" gap={2} paddingX={4} paddingTop={3}>
-      {/* Row 1: Title (back button + type badge + name + status) on the
-          left, presence + actions on the right — collapsed from two rows so
-          the trace name sits at the very top instead of after a near-empty
-          peer/actions strip. */}
+      {/* Row 1: Trace ID chip + title + status on the left, actions
+          on the right. The Trace ID chip leads the row (replacing the
+          previous LLM root-span-type badge — that badge was almost
+          always "span" or "llm" and added noise instead of signal).
+          The chip itself shows only the id (no "Trace ID" label),
+          with hover-to-expand + click-to-copy. */}
       <HStack justify="space-between" align="center" gap={2.5} minWidth={0}>
         <HStack gap={2.5} minWidth={0} flex={1} flexWrap="wrap" align="center">
           {canGoBack && (
@@ -474,7 +752,7 @@ export const DrawerHeader = memo(function DrawerHeader({
                   <HStack gap={1}>
                     <Text>
                       {backStackDepth > 1
-                        ? `Back (${backStackDepth} traces) — right-click for full history`
+                        ? `Back (${backStackDepth} traces). Right-click for full history`
                         : "Back to previous trace"}
                     </Text>
                     <Kbd>B</Kbd>
@@ -513,7 +791,6 @@ export const DrawerHeader = memo(function DrawerHeader({
                         </Text>
                         <Text
                           textStyle="xs"
-                          fontFamily="mono"
                           flex={1}
                           truncate
                         >
@@ -533,50 +810,13 @@ export const DrawerHeader = memo(function DrawerHeader({
               </MenuContent>
             </MenuRoot>
           )}
-          {trace.rootSpanType && (
-            <Text
-              textStyle="2xs"
-              fontWeight="semibold"
-              color={
-                (SPAN_TYPE_COLORS[trace.rootSpanType] as string) ?? "gray.solid"
-              }
-              paddingX={1.5}
-              paddingY={0.5}
-              borderRadius="sm"
-              borderWidth="1px"
-              borderColor={
-                (SPAN_TYPE_COLORS[trace.rootSpanType] as string) ?? "gray.solid"
-              }
-              letterSpacing="0.04em"
-              flexShrink={0}
-            >
-              {trace.rootSpanType.toUpperCase()}
-            </Text>
-          )}
-          <Text
-            fontWeight="semibold"
-            textStyle="md"
-            truncate
-            fontFamily="mono"
-            letterSpacing="-0.005em"
-            minWidth={0}
-            color={titleIsFallback ? "fg.muted" : undefined}
-          >
-            {titleText}
-          </Text>
-          <HStack gap={1} flexShrink={0}>
-            <Circle size="8px" bg={statusColor} flexShrink={0} />
-            {trace.status !== "ok" && (
-              <Text
-                textStyle="xs"
-                fontWeight="medium"
-                color={statusColor}
-                textTransform="capitalize"
-              >
-                {trace.status}
-              </Text>
-            )}
-          </HStack>
+          <TraceIdChip traceId={trace.traceId} />
+          <EditableTraceName
+            traceId={trace.traceId}
+            titleText={titleText}
+            titleIsFallback={titleIsFallback}
+          />
+          <StatusChip trace={trace} statusColor={statusColor} />
           {conversationContext.total > 1 && (
             <ThreadProgressIndicator
               position={conversationContext.position}
@@ -595,7 +835,15 @@ export const DrawerHeader = memo(function DrawerHeader({
           )}
         </HStack>
 
-        <HStack gap={1} flexShrink={0}>
+        {/* Negative marginRight cancels the header's paddingX so the
+            close button sits flush with the drawer edge, matching the
+            online-evaluations / add-to-dataset drawers (their
+            DrawerCloseTrigger uses absolute positioning at the edge).
+            marginTop matches what the other drawers do — their close
+            button sits ~8px from the top of the drawer chrome, the
+            VStack's paddingTop={3} (12px) puts ours too low without
+            this offset. */}
+        <HStack gap={1} flexShrink={0} marginRight={-2} marginTop={-2}>
           <Tooltip
             content={
               <HStack gap={1}>
@@ -631,29 +879,6 @@ export const DrawerHeader = memo(function DrawerHeader({
           </Tooltip>
           <Tooltip
             content={
-              pinned
-                ? "Pinned — clicks outside don't close. Click to unpin."
-                : "Unpinned — click outside to close. Click to pin."
-            }
-            positioning={{ placement: "bottom" }}
-          >
-            <Button
-              size="xs"
-              variant="ghost"
-              onClick={togglePinned}
-              aria-label={
-                pinned
-                  ? "Unpin drawer (click outside closes)"
-                  : "Pin drawer (click outside ignored)"
-              }
-              aria-pressed={pinned}
-              color={pinned ? "blue.fg" : "fg.muted"}
-            >
-              <Icon as={pinned ? LuPin : LuPinOff} boxSize={3.5} />
-            </Button>
-          </Tooltip>
-          <Tooltip
-            content={
               <HStack gap={1}>
                 <Text>{isMaximized ? "Restore" : "Maximize"}</Text>
                 <Kbd>M</Kbd>
@@ -664,7 +889,7 @@ export const DrawerHeader = memo(function DrawerHeader({
             <Button
               size="xs"
               variant="ghost"
-              onClick={toggleMaximized}
+              onClick={handleMaximizeClick}
               aria-label={isMaximized ? "Restore drawer" : "Maximize drawer"}
             >
               <Icon
@@ -681,6 +906,8 @@ export const DrawerHeader = memo(function DrawerHeader({
             dejaViewHref={dejaView.href ?? null}
             onOpenRawJson={() => setRawOpen(true)}
             onShowShortcuts={() => setShortcutsOpen(true)}
+            pinned={pinned}
+            onTogglePinned={togglePinned}
           />
           <Box
             width="1px"
@@ -698,18 +925,27 @@ export const DrawerHeader = memo(function DrawerHeader({
             }
             positioning={{ placement: "bottom" }}
           >
+            {/* Plain ghost Button — the standard Chakra `CloseButton`
+                (IconButton wrapper) intermittently swallowed the click
+                under our Drawer.Root setup: the URL stripped fine but
+                the drawer didn't unmount, leaving the operator stuck.
+                A bare Button calling `onClose` directly is the same
+                pattern this drawer used pre-revamp and behaves
+                reliably across Chakra's Drawer focus management. */}
             <Button
               size="xs"
               variant="ghost"
               onClick={onClose}
               aria-label="Close drawer"
-              paddingX={3}
+              paddingX={1.5}
+              paddingY={1.5}
+              height="auto"
               minWidth="auto"
               color="fg.muted"
               _hover={{ bg: "bg.muted", color: "fg" }}
               _active={{ bg: "bg.emphasized" }}
             >
-              <Icon as={LuX} boxSize={5} strokeWidth={2.25} />
+              <Icon as={LuX} boxSize={4} strokeWidth={2.25} />
             </Button>
           </Tooltip>
         </HStack>
@@ -784,18 +1020,26 @@ export const DrawerHeader = memo(function DrawerHeader({
                   label="Output"
                   value={trace.outputTokens?.toLocaleString() ?? "—"}
                 />
-                {cacheReadTokens != null && (
-                  <TooltipRow
-                    label="Cache read"
-                    value={cacheReadTokens.toLocaleString()}
-                  />
-                )}
+                {/* Cached + reasoning tokens are always surfaced — both
+                    are material to cost and behaviour these days
+                    (provider cache hits flatten cost; reasoning tokens
+                    are billed but invisible in input/output). Missing
+                    values render as `—` rather than 0 so the reader can
+                    tell "we don't know" apart from "definitely zero". */}
+                <TooltipRow
+                  label="Cache read"
+                  value={cacheReadTokens?.toLocaleString() ?? "—"}
+                />
                 {cacheCreationTokens != null && (
                   <TooltipRow
                     label="Cache write"
                     value={cacheCreationTokens.toLocaleString()}
                   />
                 )}
+                <TooltipRow
+                  label="Reasoning"
+                  value={reasoningTokens?.toLocaleString() ?? "—"}
+                />
                 <Box height="1px" bg="border" marginY={1} />
                 <TooltipRow
                   label="Total"
@@ -828,8 +1072,9 @@ export const DrawerHeader = memo(function DrawerHeader({
 
         {/* Section 2: Source / tools chips (service, origin, scenario, sdk,
             prompts, annotations). Capped at 6 inline; surplus rolls into
-            the standard "+N more" popover. */}
-        {(primaryChips.length > 0 || chipsOverflow) && <PinDivider />}
+            the standard "+N more" popover. No PinDivider before this
+            section — the chip borders give enough visual grouping on
+            their own, the extra rule just read as a stray line. */}
         {primaryChips.map((c) => (
           <Chip key={c.id} {...c} />
         ))}
@@ -877,9 +1122,33 @@ export const DrawerHeader = memo(function DrawerHeader({
                 max={5}
                 size="2xs"
               />
-              <Text textStyle="xs" color="fg.subtle">
-                {formatRelativeTime(trace.timestamp)}
-              </Text>
+              <Tooltip
+                content={
+                  <VStack align="start" gap={0.5}>
+                    <Text textStyle="xs">
+                      First span recorded{" "}
+                      {formatRelativeTimeAgo(trace.timestamp)}
+                    </Text>
+                    <Text textStyle="xs" color="fg.muted">
+                      {formatAbsoluteTime(trace.timestamp)}
+                    </Text>
+                  </VStack>
+                }
+                positioning={{ placement: "bottom-end" }}
+                openDelay={400}
+                closeDelay={150}
+                interactive
+              >
+                <Text textStyle="xs" color="fg.subtle" cursor="help">
+                  {/* Compact "16d ago" — keeps the unit attached to the
+                      number for tight surfaces while still carrying the
+                      natural-language "ago" hint. The tooltip resolves
+                      the absolute UTC timestamp and is interactive so
+                      the user can hover over it and select / copy the
+                      date without it disappearing. */}
+                  {formatRelativeTimeAgo(trace.timestamp)}
+                </Text>
+              </Tooltip>
             </HStack>
           }
         />

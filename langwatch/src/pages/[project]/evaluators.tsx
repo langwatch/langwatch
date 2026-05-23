@@ -16,7 +16,7 @@ import { DashboardLayout } from "~/components/DashboardLayout";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { toaster } from "~/components/ui/toaster";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
-import { createEvaluatorEditorCallbacks } from "~/evaluations-v3/utils/evaluatorEditorCallbacks";
+import { createEvaluatorEditorCallbacks } from "~/experiments-v3/utils/evaluatorEditorCallbacks";
 import { setFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";

@@ -19,7 +19,7 @@ export const ErrorTextCell = {
         <Icon boxSize="14px" color="red.solid" flexShrink={0} marginTop="2px">
           <AlertTriangle />
         </Icon>
-        <Text textStyle="sm" color="red.fg" lineClamp={2} fontFamily="mono">
+        <Text textStyle="sm" color="red.fg" lineClamp={2}>
           {row.error}
         </Text>
       </HStack>

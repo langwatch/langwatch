@@ -47,17 +47,28 @@ export function useTraceFreshness() {
 
   const onTraceSummaryUpdated = useCallback(
     (traceIds: string[]) => {
+      const mode = useSseStatusStore.getState().liveUpdatesMode;
+
       // Spin the refresh icon for every update event — invalidations that
       // resolve from cache wouldn't otherwise flip isFetching long enough
-      // for the user to notice anything happened.
-      pulse();
+      // for the user to notice anything happened. Skipped in `ask` mode
+      // because the operator hasn't asked to see anything yet — flashing
+      // the icon would look like a stealth refresh.
+      if (mode === "live") pulse();
 
-      // Table-level invalidation — TQ only refetches mounted queries
-      void trpcUtils.tracesV2.list.invalidate();
+      // Refresh the new-count query in BOTH live and ask modes so the
+      // floating "(N new)" pill stays in sync. In `ask` we deliberately
+      // skip the list refetch so the table doesn't jump under the
+      // cursor — the operator clicks the pill to commit the merge,
+      // which calls `acknowledge()` and pulls the new rows.
       void trpcUtils.tracesV2.newCount.invalidate();
+      if (mode === "live") {
+        void trpcUtils.tracesV2.list.invalidate();
+      }
       // Discover (facets) is heavy. Coalesce into a 30s window so a steady
-      // trace stream doesn't keep it permanently refetching.
-      if (!discoverInvalidateTimer.current) {
+      // trace stream doesn't keep it permanently refetching. Skipped in
+      // `ask` mode for the same reason — wait for the user to ask.
+      if (mode === "live" && !discoverInvalidateTimer.current) {
         discoverInvalidateTimer.current = setTimeout(() => {
           discoverInvalidateTimer.current = null;
           void trpcUtils.tracesV2.discover.invalidate();
@@ -70,6 +81,9 @@ export function useTraceFreshness() {
       // Targeted drawer invalidation. Project-scoped explicitly so the
       // partial-input filter matches the project queries are keyed under,
       // not just every header/spanTree/evals query in the cache.
+      // The drawer is what the user explicitly opened, so even in `ask`
+      // mode we still keep its contents fresh — `ask` only suppresses
+      // the implicit list refetch.
       const { traceId: openTraceId } = useDrawerStore.getState();
       const projectId = project?.id;
       if (openTraceId && projectId && traceIds.includes(openTraceId)) {
@@ -108,9 +122,16 @@ export function useTraceFreshness() {
     [trpcUtils, project?.id],
   );
 
+  // Honour the operator's "live updates" preference — when disabled,
+  // skip subscribing and force the connection state to disconnected so
+  // the toolbar indicator reads correctly.
+  const liveUpdatesEnabled = useSseStatusStore(
+    (s) => s.liveUpdatesEnabled,
+  );
+
   const { connectionState, lastEventAt } = useTraceUpdateListener({
     projectId: project?.id ?? "",
-    enabled: !!project?.id,
+    enabled: !!project?.id && liveUpdatesEnabled,
     onTraceSummaryUpdated,
     onSpanStored,
     debounceMs: 2000,
@@ -118,8 +139,10 @@ export function useTraceFreshness() {
   });
 
   useEffect(() => {
-    setSseConnectionState(connectionState);
-  }, [connectionState, setSseConnectionState]);
+    setSseConnectionState(
+      liveUpdatesEnabled ? connectionState : "disconnected",
+    );
+  }, [connectionState, liveUpdatesEnabled, setSseConnectionState]);
 
   useEffect(() => {
     if (lastEventAt > 0) {

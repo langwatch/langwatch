@@ -32,7 +32,6 @@ function createTestDeps(overrides?: Partial<OrchestratorDependencies>): Orchestr
 
   const defaultProject = {
     apiKey: "test-api-key",
-    defaultModel: "openai/gpt-4o-mini",
   };
 
   const defaultParams: LiteLLMParams = {
@@ -48,6 +47,9 @@ function createTestDeps(overrides?: Partial<OrchestratorDependencies>): Orchestr
     },
     projectRepository: {
       getProject: async () => defaultProject,
+    },
+    modelResolver: {
+      resolve: async () => "openai/gpt-4o-mini",
     },
     modelParamsProvider: {
       prepare: async () => ({ success: true as const, params: defaultParams }),
@@ -141,8 +143,12 @@ describe("ScenarioExecutionOrchestrator", () => {
       describe("when executing", () => {
         it("returns failure with clear error message", async () => {
           const deps = createTestDeps({
-            projectRepository: {
-              getProject: async () => ({ apiKey: "test-api-key", defaultModel: null }),
+            modelResolver: {
+              resolve: async () => {
+                throw new Error(
+                  "No model configured for prompt.create_default",
+                );
+              },
             },
           });
           const orchestrator = new ScenarioExecutionOrchestrator(deps);

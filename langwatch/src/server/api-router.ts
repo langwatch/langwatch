@@ -10,26 +10,30 @@ import { app as copilotKitApp } from "../app/api/copilotkit/[[...route]]/app";
 import { app as dashboardsApp } from "../app/api/dashboards/[[...route]]/app";
 import { app as datasetApp } from "../app/api/dataset/[[...route]]/app";
 import { app as evaluatorsApp } from "../app/api/evaluators/[[...route]]/app";
+import { app as experimentsApp } from "../app/api/experiments/[[...route]]/app";
 import { app as exportTracesApp } from "../app/api/export/traces/[[...route]]/app";
 import { app as gatewayPlatformApp } from "../app/api/gateway-platform/[[...route]]/app";
 import { app as governanceApp } from "../app/api/governance/[[...route]]/app";
 import { app as graphsApp } from "../app/api/graphs/[[...route]]/app";
+import { app as modelDefaultsApp } from "../app/api/model-defaults/[[...route]]/app";
 import { app as modelProvidersApp } from "../app/api/model-providers/[[...route]]/app";
 import { app as monitorsApp } from "../app/api/monitors/[[...route]]/app";
 import { app as apiKeysApp } from "../app/api/api-keys/[[...route]]/app";
 import { app as projectsApp } from "../app/api/projects/[[...route]]/app";
 import { app as promptsApp } from "../app/api/prompts/[[...route]]/app";
+import { app as filesApp } from "../app/api/files/[[...route]]/app";
 import { app as scenarioEventsApp } from "../app/api/scenario-events/[[...route]]/app";
 import { app as scenariosApp } from "../app/api/scenarios/[[...route]]/app";
 import { app as secretsApp } from "../app/api/secrets/[[...route]]/app";
 import { app as simulationRunsApp } from "../app/api/simulation-runs/[[...route]]/app";
 import { app as suitesApp } from "../app/api/suites/[[...route]]/app";
+import { app as teamsApp } from "../app/api/teams/[[...route]]/app";
 import { app as tracesApp } from "../app/api/traces/[[...route]]/app";
 import { app as triggersApp } from "../app/api/triggers/[[...route]]/app";
 import { app as workflowsCrudApp } from "../app/api/workflows/[[...route]]/app";
 
 import { app as datasetGenerateApp } from "./routes/dataset-generate";
-import { app as evaluationsV3App } from "./routes/evaluations-v3";
+import { app as experimentsV3App, legacyAliasApp as experimentsV3LegacyAliasApp } from "./routes/experiments-v3";
 import { app as gatewayInternalApp } from "./routes/gateway-internal";
 import { app as healthChecksApp } from "./routes/health-checks";
 import { app as otelApp } from "./routes/otel";
@@ -79,10 +83,13 @@ export function createApiRouter() {
   api.route("/", dashboardsApp);
   api.route("/", datasetApp);
   api.route("/", evaluatorsApp);
+  api.route("/", experimentsApp);
+  api.route("/", filesApp);
   api.route("/", exportTracesApp);
   api.route("/", gatewayPlatformApp);
   api.route("/", governanceApp);
   api.route("/", graphsApp);
+  api.route("/", modelDefaultsApp);
   api.route("/", modelProvidersApp);
   api.route("/", monitorsApp);
   api.route("/", apiKeysApp);
@@ -93,11 +100,13 @@ export function createApiRouter() {
   api.route("/", secretsApp);
   api.route("/", simulationRunsApp);
   api.route("/", suitesApp);
+  api.route("/", teamsApp);
   api.route("/", tracesApp);
   api.route("/", triggersApp);
   api.route("/", workflowsCrudApp);      // CRUD — complements workflowsApp (code-completion, post_event)
 
-  api.route("/", evaluationsV3App);
+  api.route("/", experimentsV3App);
+  api.route("/", experimentsV3LegacyAliasApp);  // /api/evaluations/v3/... → /api/experiments/...
   api.route("/", gatewayInternalApp);
   api.route("/", otelApp);
   api.route("/", playgroundApp);

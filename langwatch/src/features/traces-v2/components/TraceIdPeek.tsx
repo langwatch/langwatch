@@ -11,9 +11,8 @@ import {
 } from "@chakra-ui/react";
 import { Eye } from "lucide-react";
 import type React from "react";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { useDrawer } from "~/hooks/useDrawer";
-import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import {
@@ -24,61 +23,49 @@ import {
   STATUS_COLORS,
 } from "../utils/formatters";
 
-interface TraceIdPeekProps {
+interface TracePreviewHoverCardProps {
   traceId: string;
+  children: ReactNode;
+  /**
+   * Defaults to "bottom-start" — sits below the trigger and aligns to
+   * its leading edge. Override when the trigger is on the far right of
+   * a row and a bottom-end placement reads better.
+   */
+  placement?:
+    | "top"
+    | "top-start"
+    | "top-end"
+    | "bottom"
+    | "bottom-start"
+    | "bottom-end";
 }
 
 /**
- * Reusable hover-peek for trace IDs. Renders a small icon that, on hover,
- * shows a compact trace summary popover. On click, opens the trace drawer.
- *
- * Drop this next to any trace ID display across the platform.
+ * Hover wrapper that surfaces a compact v2 trace summary popover on any
+ * trigger you put inside it. Use it to add a hover-peek to any element
+ * already mounted next to a trace — buttons, links, badges — without
+ * needing a standalone trigger like the eye icon.
  */
-export const TraceIdPeek: React.FC<TraceIdPeekProps> = ({ traceId }) => {
-  const { enabled } = useFeatureFlag("release_ui_traces_v2_enabled");
-  const { openDrawer } = useDrawer();
+export const TracePreviewHoverCard: React.FC<TracePreviewHoverCardProps> = ({
+  traceId,
+  children,
+  placement = "bottom-start",
+}) => {
   const [hasHovered, setHasHovered] = useState(false);
   const [open, setOpen] = useState(false);
-
-  if (!enabled) return null;
-
-  const handleOpenDrawer = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setOpen(false);
-    openDrawer("traceV2Details", { traceId });
-  };
 
   return (
     <HoverCard.Root
       open={open}
       openDelay={400}
       closeDelay={200}
-      positioning={{ placement: "bottom-start" }}
+      positioning={{ placement }}
       onOpenChange={({ open: nextOpen }) => {
         setOpen(nextOpen);
         if (nextOpen) setHasHovered(true);
       }}
     >
-      <HoverCard.Trigger asChild>
-        <Box
-          as="button"
-          onClick={handleOpenDrawer}
-          display="inline-flex"
-          alignItems="center"
-          justifyContent="center"
-          flexShrink={0}
-          width="16px"
-          height="16px"
-          borderRadius="sm"
-          color="fg.subtle/40"
-          _hover={{ color: "fg.muted" }}
-          transition="color 0.1s"
-        >
-          <Icon boxSize="11px">
-            <Eye />
-          </Icon>
-        </Box>
-      </HoverCard.Trigger>
+      <HoverCard.Trigger asChild>{children}</HoverCard.Trigger>
       <Portal>
         <HoverCard.Positioner>
           <HoverCard.Content
@@ -93,6 +80,51 @@ export const TraceIdPeek: React.FC<TraceIdPeekProps> = ({ traceId }) => {
         </HoverCard.Positioner>
       </Portal>
     </HoverCard.Root>
+  );
+};
+
+interface TraceIdPeekProps {
+  traceId: string;
+}
+
+/**
+ * Standalone eye-icon trigger that opens the trace drawer on click and
+ * shows the same hover-peek popover as `<TracePreviewHoverCard>`.
+ *
+ * Used in dense table rows where there's no other natural "go to
+ * trace" affordance to attach the popover to. For surfaces that
+ * already have a button or link you can wrap, prefer
+ * `<TracePreviewHoverCard>` directly so the eye doesn't crowd the row.
+ */
+export const TraceIdPeek: React.FC<TraceIdPeekProps> = ({ traceId }) => {
+  const { openDrawer } = useDrawer();
+
+  const handleOpenDrawer = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    openDrawer("traceV2Details", { traceId });
+  };
+
+  return (
+    <TracePreviewHoverCard traceId={traceId}>
+      <Box
+        as="button"
+        onClick={handleOpenDrawer}
+        display="inline-flex"
+        alignItems="center"
+        justifyContent="center"
+        flexShrink={0}
+        width="16px"
+        height="16px"
+        borderRadius="sm"
+        color="fg.subtle/40"
+        _hover={{ color: "fg.muted" }}
+        transition="color 0.1s"
+      >
+        <Icon boxSize="11px">
+          <Eye />
+        </Icon>
+      </Box>
+    </TracePreviewHoverCard>
   );
 };
 
@@ -171,7 +203,6 @@ function PeekPopoverContent({ traceId }: { traceId: string }) {
               <Text
                 textStyle="xs"
                 color="fg"
-                fontFamily="mono"
                 lineClamp={2}
                 whiteSpace="pre-wrap"
                 wordBreak="break-word"
@@ -193,7 +224,6 @@ function PeekPopoverContent({ traceId }: { traceId: string }) {
               <Text
                 textStyle="xs"
                 color="fg"
-                fontFamily="mono"
                 lineClamp={2}
                 whiteSpace="pre-wrap"
                 wordBreak="break-word"
@@ -220,7 +250,7 @@ function PeekPopoverContent({ traceId }: { traceId: string }) {
 
       {/* Footer */}
       <HStack padding={2} paddingX={3} justify="space-between">
-        <Text textStyle="2xs" color="fg.subtle" fontFamily="mono">
+        <Text textStyle="2xs" color="fg.subtle">
           {traceId.slice(0, 16)}...
         </Text>
         <Text textStyle="2xs" color="fg.subtle">
@@ -237,7 +267,7 @@ function PopoverMetric({ label, value }: { label: string; value: string }) {
       <Text textStyle="2xs" color="fg.subtle">
         {label}:
       </Text>
-      <Text textStyle="2xs" color="fg" fontFamily="mono" fontWeight="medium">
+      <Text textStyle="2xs" color="fg" fontWeight="medium">
         {value}
       </Text>
     </HStack>

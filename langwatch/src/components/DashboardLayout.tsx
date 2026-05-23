@@ -36,6 +36,7 @@ import { useUpgradeModalStore } from "../stores/upgradeModalStore";
 import { api } from "../utils/api";
 import { findCurrentRoute, projectRoutes, type Route } from "../utils/routes";
 import { trackEvent } from "../utils/tracking";
+import { GlobalTraceV2DrawerMount } from "../features/traces-v2/components/GlobalTraceV2DrawerMount";
 import { AnnouncementBanner } from "./AnnouncementBanner";
 import { AdminViewingAsBanner } from "./governance/AdminViewingAsBanner";
 import { CurrentDrawer } from "./CurrentDrawer";
@@ -48,6 +49,7 @@ import { ProjectAvatar } from "./ProjectAvatar";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 import { useWorkspaceData } from "./useWorkspaceData";
 import { SavedViewsBar } from "./messages/SavedViewsBar";
+import { PresenceMenuItem } from "./sidebar/PresenceMenuItem";
 import { SdkRadarBanner } from "./SdkRadarBanner";
 import { UpgradeModal } from "./UpgradeModal";
 import { Link } from "./ui/link";
@@ -371,7 +373,7 @@ export const DashboardLayout = ({
   const { data: session } = useRequiredSession({ required: !publicPage });
 
   const bypassProjectGating = personalScope || orgScope;
-  const { isLoading, organization, organizations, team, project, organizationRole } =
+  const { isLoading, organization, organizations, team, project, organizationRole, hasPermission } =
     useOrganizationTeamProject({
       redirectToOnboarding: !bypassProjectGating,
       redirectToProjectOnboarding: !bypassProjectGating,
@@ -380,7 +382,8 @@ export const DashboardLayout = ({
   const usage = api.limits.getUsage.useQuery(
     { organizationId: organization?.id ?? "" },
     {
-      enabled: !!organization,
+      enabled: !!organization && hasPermission("organization:view"),
+      retry: false,
       refetchOnWindowFocus: false,
       refetchOnMount: false,
     },
@@ -523,6 +526,10 @@ export const DashboardLayout = ({
     router.pathname.startsWith("/[project]/messages") ||
     router.pathname.startsWith("/[project]/analytics");
   const showSavedViews = isTracesOrAnalyticsPage;
+  // The presence toggle is meaningful only on the traces v2 lens
+  // (multiplayer cursors + section presence are wired there). Gate the
+  // avatar-menu entry so it stays off the other surfaces' chrome.
+  const showPresenceMenuItem = router.pathname.startsWith("/[project]/traces");
 
   return (
     <Box
@@ -756,6 +763,7 @@ export const DashboardLayout = ({
                     <Menu.Item value="settings" asChild>
                       <Link href="/settings">Settings</Link>
                     </Menu.Item>
+                    {showPresenceMenuItem && <PresenceMenuItem />}
                     <Menu.Item value="logout" asChild>
                       <a href="/api/auth/logout">Logout</a>
                     </Menu.Item>
@@ -972,6 +980,11 @@ export const DashboardLayout = ({
               )}
 
             <CurrentDrawer />
+            {/* v2 trace drawer is mounted globally so cross-page opens
+                (e.g. clicking "Try the new one" from a /simulations
+                drawer) actually render the shell. Self-skips on
+                /[project]/traces where TracesPage already mounts it. */}
+            <GlobalTraceV2DrawerMount />
 
             {userIsPartOfTeam ? (
               <ErrorBoundary FallbackComponent={PageErrorFallback} resetKeys={[router.pathname]}>
@@ -1017,6 +1030,12 @@ export const DashboardLayout = ({
         </Box>
       </HStack>
       <GlobalUpgradeModal />
+      {/* No MissingModelModal mount — the global tRPC / QueryCache
+          interceptors emit a sticky orange toast via
+          `showMissingModelToast` (deduped per (featureKey, role)).
+          Toast lives in the toaster portal that's already at the app
+          root; nothing else to mount here. See
+          specs/model-providers/missing-model-popup.feature. */}
     </Box>
   );
 };

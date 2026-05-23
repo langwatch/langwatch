@@ -209,7 +209,6 @@ export function TraceDrawerEmptyState({
         <Text
           textStyle="2xs"
           color="fg.subtle"
-          fontFamily="mono"
           maxWidth="360px"
           truncate
           paddingTop={1}

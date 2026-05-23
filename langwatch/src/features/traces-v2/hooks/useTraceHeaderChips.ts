@@ -4,8 +4,11 @@ import {
   type ScenarioChipData,
   useScenarioChipData,
 } from "../components/TraceDrawer/ScenarioChip";
+import { useDrawerStore } from "../stores/drawerStore";
 import { useFilterStore } from "../stores/filterStore";
+import { useFocusSectionStore } from "../stores/focusSectionStore";
 import { parseSdkInfo, type SdkInfo } from "../utils/sdkInfo";
+import { type RichEval, useTraceEvaluations } from "./useTraceEvaluations";
 import { usePromptByHandle } from "./usePromptByHandle";
 
 export interface SdkInfoLike {
@@ -55,6 +58,11 @@ export type TraceHeaderChipData =
       state: PromptChipState;
       driftFromSelection: boolean;
       outOfDate: boolean;
+    }
+  | {
+      kind: "eval";
+      eval: RichEval;
+      onClick: () => void;
     };
 
 interface UseTraceHeaderChipsOptions {
@@ -100,7 +108,18 @@ export function useTraceHeaderChips(
   });
 
   const lastUsedHandle = trace.lastUsedPromptId;
-  const { latestVersion, missing } = usePromptByHandle(lastUsedHandle);
+  const { latestVersion, missing, resolvedHandle: lastUsedResolvedHandle } =
+    usePromptByHandle(lastUsedHandle);
+  // SDKs sometimes emit the opaque slug-id (`prompt_xxx`) instead of the
+  // human handle (`pizza-prompt`). When the live prompt config resolves a
+  // friendlier handle, prefer it in the chip — fall back to the raw id so
+  // we still surface *something* while the lookup is in flight or for
+  // unmanaged prompts.
+  const lastUsedDisplayHandle = lastUsedResolvedHandle ?? lastUsedHandle;
+  const { resolvedHandle: selectedResolvedHandle } = usePromptByHandle(
+    trace.selectedPromptId,
+  );
+  const selectedDisplayId = selectedResolvedHandle ?? trace.selectedPromptId;
   const lastUsedState: PromptChipState = { latestVersion, missing };
 
   const driftFromSelection =
@@ -142,7 +161,7 @@ export function useTraceHeaderChips(
   if (trace.selectedPromptId && driftFromSelection) {
     chips.push({
       kind: "promptSelected",
-      selectedId: trace.selectedPromptId,
+      selectedId: selectedDisplayId ?? trace.selectedPromptId,
       spanId: trace.selectedPromptSpanId,
     });
   }
@@ -150,12 +169,32 @@ export function useTraceHeaderChips(
   if (trace.lastUsedPromptId) {
     chips.push({
       kind: "promptLastUsed",
-      handle: trace.lastUsedPromptId,
+      handle: lastUsedDisplayHandle ?? trace.lastUsedPromptId,
       versionNumber: trace.lastUsedPromptVersionNumber,
       spanId: trace.lastUsedPromptSpanId,
       state: lastUsedState,
       driftFromSelection,
       outOfDate: isOutOfDate,
+    });
+  }
+
+  // One chip per evaluation result. Click jumps to the trace Summary
+  // Evals accordion and scrolls it into view — operators previously had
+  // to expand the drawer past the metadata strip to see any eval
+  // signal, even on heavily-evaluated traces.
+  const { rich: evals } = useTraceEvaluations();
+  const setViewMode = useDrawerStore((s) => s.setViewMode);
+  const setActiveTab = useDrawerStore((s) => s.setActiveTab);
+  const requestFocus = useFocusSectionStore((s) => s.request);
+  for (const ev of evals) {
+    chips.push({
+      kind: "eval",
+      eval: ev,
+      onClick: () => {
+        setViewMode("trace");
+        setActiveTab("summary");
+        requestFocus({ traceId: trace.traceId, section: "evals" });
+      },
     });
   }
 

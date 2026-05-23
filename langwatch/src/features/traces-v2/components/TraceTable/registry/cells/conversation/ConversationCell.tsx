@@ -62,7 +62,6 @@ export const ConversationCell: CellDef<ConversationGroup> = {
           textStyle="xs"
           fontWeight="500"
           color="blue.fg"
-          fontFamily="mono"
           flexShrink={0}
           marginTop="2px"
         >
@@ -91,7 +90,6 @@ const ConversationSummaryChips: React.FC<{ group: ConversationGroup }> = ({
     flexShrink={0}
     textStyle="2xs"
     color="fg.subtle"
-    fontFamily="mono"
     marginTop="2px"
   >
     {group.errorCount > 0 && (

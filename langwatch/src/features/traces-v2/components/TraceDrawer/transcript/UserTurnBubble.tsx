@@ -3,6 +3,8 @@ import { LuUser } from "react-icons/lu";
 import { RenderedMarkdown } from "../markdownView";
 import type { DisplayRoleVisuals } from "../scenarioRoles";
 import { BlockStack } from "./BlockStack";
+import { getRolePalette } from "./RoleChip";
+import { TurnCollapseChevron } from "./TurnCollapseChevron";
 import { asMarkdownBody } from "./parsing";
 import type { ChatMessage, ContentBlock } from "./types";
 
@@ -19,6 +21,7 @@ export function UserTurnBubble({
   toolCalls,
   visuals,
   collapseTools = false,
+  onCollapse,
 }: {
   blocks: ContentBlock[];
   toolCalls: NonNullable<ChatMessage["tool_calls"]>;
@@ -29,10 +32,15 @@ export function UserTurnBubble({
    */
   visuals?: DisplayRoleVisuals;
   collapseTools?: boolean;
+  onCollapse?: () => void;
 }) {
   const HeaderIcon = visuals?.Icon ?? LuUser;
   const headerLabel = visuals?.bubbleLabel ?? "User";
   const onlyText = blocks.length > 0 && blocks.every((b) => b.kind === "text");
+  // The user-side bubble is always rendered for `displayRole=user` —
+  // sourced from `ROLE_PALETTES.user` so every surface that paints
+  // "the user side" lands on the same blue.
+  const palette = getRolePalette("user");
 
   // Pure-prose user message → classic chat bubble layout.
   if (onlyText) {
@@ -57,22 +65,28 @@ export function UserTurnBubble({
               width="16px"
               height="16px"
               borderRadius="full"
-              bg="blue.muted"
+              bg={palette.muted}
               align="center"
               justify="center"
               flexShrink={0}
             >
-              <Icon as={HeaderIcon} boxSize="10px" color="blue.fg" />
+              <Icon as={HeaderIcon} boxSize="10px" color={palette.fg} />
             </Flex>
             <Text
               textStyle="2xs"
-              color="blue.fg"
+              color={palette.fg}
               fontWeight="600"
               textTransform="uppercase"
               letterSpacing="0.06em"
             >
               {headerLabel}
             </Text>
+            {onCollapse && (
+              <>
+                <Box flex={1} />
+                <TurnCollapseChevron onClick={onCollapse} />
+              </>
+            )}
           </HStack>
           <Box color="fg" textStyle="xs" lineHeight="1.6">
             {text ? (
@@ -97,29 +111,35 @@ export function UserTurnBubble({
       marginBottom={4}
       paddingLeft={4}
       borderLeftWidth="2px"
-      borderLeftColor="blue.muted"
+      borderLeftColor={palette.muted}
     >
       <HStack gap={1.5} marginBottom={1.5}>
         <Flex
           width="16px"
           height="16px"
           borderRadius="full"
-          bg="blue.muted"
+          bg={palette.muted}
           align="center"
           justify="center"
           flexShrink={0}
         >
-          <Icon as={HeaderIcon} boxSize="10px" color="blue.fg" />
+          <Icon as={HeaderIcon} boxSize="10px" color={palette.fg} />
         </Flex>
         <Text
           textStyle="2xs"
-          color="blue.fg"
+          color={palette.fg}
           fontWeight="600"
           textTransform="uppercase"
           letterSpacing="0.06em"
         >
           {headerLabel}
         </Text>
+        {onCollapse && (
+          <>
+            <Box flex={1} />
+            <TurnCollapseChevron onClick={onCollapse} />
+          </>
+        )}
       </HStack>
       <BlockStack
         blocks={blocks}

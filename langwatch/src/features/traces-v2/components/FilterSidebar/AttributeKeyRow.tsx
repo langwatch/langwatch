@@ -71,7 +71,6 @@ export const AttributeKeyRow = memo(function AttributeKeyRow({
             </Icon>
             <Text
               textStyle="xs"
-              fontFamily="mono"
               fontWeight={activeCount > 0 ? "500" : "400"}
               truncate
               flex={1}
@@ -94,7 +93,6 @@ export const AttributeKeyRow = memo(function AttributeKeyRow({
             <Text
               textStyle="xs"
               color="fg.subtle"
-              fontFamily="mono"
               flexShrink={0}
             >
               {formatCount(count)}

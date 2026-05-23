@@ -5,6 +5,7 @@ import {
   Anvil,
   Eye,
   Film,
+  Flag,
   Gauge,
   History,
   KeyRound,
@@ -25,7 +26,6 @@ import { projectRoutes } from "../utils/routes";
 import { useTableView } from "./messages/HeaderButtons";
 import { CollapsibleMenuGroup } from "./sidebar/CollapsibleMenuGroup";
 import { SideMenuLink } from "./sidebar/SideMenuLink";
-import { PresenceToggle } from "./sidebar/PresenceToggle";
 import { SupportMenu } from "./sidebar/SupportMenu";
 import { ThemeToggle } from "./sidebar/ThemeToggle";
 import { UsageIndicator } from "./sidebar/UsageIndicator";
@@ -42,14 +42,9 @@ export const MainMenu = React.memo(function MainMenu({
   isCompact = false,
 }: MainMenuProps) {
   const router = useRouter();
-  const { project, hasPermission, isPublicRoute } =
+  const { organization, project, hasPermission, isPublicRoute } =
     useOrganizationTeamProject();
   const [isHovered, setIsHovered] = useState(false);
-
-  const { enabled: tracesV2Enabled } = useFeatureFlag(
-    "release_ui_traces_v2_enabled",
-    { projectId: project?.id, enabled: !!project },
-  );
 
   const pendingItemsCount = api.annotation.getPendingItemsCount.useQuery(
     { projectId: project?.id ?? "" },
@@ -62,7 +57,11 @@ export const MainMenu = React.memo(function MainMenu({
   // is driven by PostHog release conditions.
   const { enabled: gatewayMenuEnabled } = useFeatureFlag(
     "release_ui_ai_gateway_menu_enabled",
-    { projectId: project?.id, enabled: !!project },
+    {
+      projectId: project?.id,
+      organizationId: organization?.id,
+      enabled: !!project,
+    },
   );
 
   // Governance section is gated on:
@@ -173,18 +172,16 @@ export const MainMenu = React.memo(function MainMenu({
               isActive={router.pathname.includes("/messages")}
               showLabel={showExpanded}
             />
-            {tracesV2Enabled && (
-              <PageMenuLink
-                path={projectRoutes.traces_v2.path}
-                icon={featureIcons.traces_v2.icon}
-                label={projectRoutes.traces_v2.title}
-                project={project}
-                isActive={router.pathname.includes("/traces")}
-                showLabel={showExpanded}
-                beta="Trace Explorer is in beta — expect rough edges. Share feedback or report issues on Slack, or open one at https://github.com/langwatch/langwatch/issues/new/choose."
-                betaLabel="Beta"
-              />
-            )}
+            <PageMenuLink
+              path={projectRoutes.traces_v2.path}
+              icon={featureIcons.traces_v2.icon}
+              label={projectRoutes.traces_v2.title}
+              project={project}
+              isActive={router.pathname.includes("/traces")}
+              showLabel={showExpanded}
+              beta="Trace Explorer is in beta. Expect rough edges; share feedback or report issues on Slack, or open one at https://github.com/langwatch/langwatch/issues/new/choose."
+              betaLabel="Beta"
+            />
 
             <Text
               fontSize="11px"
@@ -446,7 +443,6 @@ export const MainMenu = React.memo(function MainMenu({
               />
             )}
             <SupportMenu showLabel={showExpanded} />
-            <PresenceToggle showLabel={showExpanded} />
             <ThemeToggle showLabel={showExpanded} />
           </VStack>
         </VStack>
@@ -546,6 +542,13 @@ const OpsSection = ({ showExpanded }: { showExpanded: boolean }) => {
         label="Deja View"
         href="/ops/dejaview"
         isActive={router.pathname.startsWith("/ops/dejaview")}
+        showLabel={showExpanded}
+      />
+      <SideMenuLink
+        icon={Flag}
+        label="Feature Flags"
+        href="/ops/feature-flags"
+        isActive={router.pathname.startsWith("/ops/feature-flags")}
         showLabel={showExpanded}
       />
       {isAdminUser && (

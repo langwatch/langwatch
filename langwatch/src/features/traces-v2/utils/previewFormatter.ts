@@ -48,6 +48,15 @@ const UNWRAP_KEY_ALLOWLIST = new Set([
 interface ChatMessageLike {
   role?: string;
   content?: unknown;
+  /**
+   * Genkit / AI SDK / Mastra emit a `parts` array (sibling of `content`),
+   * where each part is `{ type: "text" | "blob" | "reasoning" | ..., content? | text? }`.
+   * The backend's `extractMessageContentText` handles this shape; without
+   * the matching support here, the new traces explorer renders these
+   * payloads as raw JSON. Reported on 2026-05-14 by rchaves with a real
+   * G'nger product-classification trace.
+   */
+  parts?: unknown;
   tool_calls?: Array<{ function?: { name?: string } }>;
 }
 
@@ -185,12 +194,75 @@ function unwrapChatArray(arr: unknown[]): UnwrapResult | null {
         role: normaliseRole(m.role),
       };
     }
+    // Try `content` first (OpenAI / Anthropic), then `parts` (Genkit /
+    // AI SDK / Mastra). Either may carry the readable payload, and
+    // some integrations populate both — content wins when present.
     const content = extractMessageContent(m.content);
     if (content) {
       return { text: content, role: normaliseRole(m.role) };
     }
+    if (Array.isArray(m.parts)) {
+      const fromParts = extractMessagePartsText(m.parts);
+      if (fromParts) {
+        return { text: fromParts, role: normaliseRole(m.role) };
+      }
+    }
   }
   return null;
+}
+
+/**
+ * Pull text out of a `parts` array. Each part is typically one of:
+ *   - `{ type: "text", content: "..." }`  ← Genkit / Mastra
+ *   - `{ type: "text", text: "..." }`     ← Anthropic style
+ *   - `{ type: "blob" | "image" | "reasoning" | ... }` ← skip; non-text
+ *   - `{ content: "..." }` / `{ text: "..." }` ← typeless wrapper
+ *   - plain string                            ← rare; pass through
+ *
+ * Skips non-text parts so a multi-modal message (image + text)
+ * surfaces just the text in a one-line preview. Non-text parts that
+ * *are* the whole content (e.g. an image-only message) intentionally
+ * yield no preview — fall-through to JSON.stringify keeps the wrapper
+ * visible rather than rendering "(blob)" placeholders that the caller
+ * couldn't distinguish from a real text "(blob)".
+ */
+// Typed `parts` entries we treat as user-meaningful prose. `text` covers
+// Anthropic / Genkit / Mastra and AI SDK v4. `reasoning` is AI SDK v5
+// where the model's chain-of-thought lands in a sibling part with its
+// own `.text` string — same wire shape, different `type`. Skipping it
+// would re-introduce the wrapper-JSON failure mode this PR is fixing,
+// just for the next payload generation.
+const RENDERABLE_PART_TYPES = new Set(["text", "reasoning"]);
+
+function extractMessagePartsText(parts: unknown[]): string | null {
+  const texts: string[] = [];
+  for (const part of parts) {
+    if (typeof part === "string") {
+      texts.push(part);
+      continue;
+    }
+    if (!part || typeof part !== "object") continue;
+    const p = part as { type?: unknown; text?: unknown; content?: unknown };
+
+    // Typed part: only renderable types contribute to the preview.
+    if (typeof p.type === "string") {
+      if (!RENDERABLE_PART_TYPES.has(p.type)) continue;
+      if (typeof p.text === "string") {
+        texts.push(p.text);
+      } else if (typeof p.content === "string") {
+        texts.push(p.content);
+      }
+      continue;
+    }
+
+    // Typeless part: accept text or content directly.
+    if (typeof p.text === "string") {
+      texts.push(p.text);
+    } else if (typeof p.content === "string") {
+      texts.push(p.content);
+    }
+  }
+  return texts.length > 0 ? texts.join(" ") : null;
 }
 
 /**
@@ -328,12 +400,15 @@ function stripMarkdownNoise(text: string): NoiseStripResult {
 function applyNewlineTreatment(text: string, mode: NewlineTreatment): string {
   if (mode === "preserve") return text;
   if (mode === "space") return text.replace(/\s+/g, " ");
-  // glyph: collapse runs of newline-containing whitespace to " ↵ ", and
-  // collapse pure spaces/tabs runs to a single space. This way a normal
-  // paragraph with line wrap renders as "first line ↵ second line" rather
-  // than the misleading "first linesecond line" the nowrap default produces.
+  // glyph: collapse runs of newline-containing whitespace to "↵" surrounded
+  // by a non-breaking space on the LEFT and a regular space on the RIGHT.
+  // Using a regular space on both sides let the CSS line-wrap break BEFORE
+  // the glyph, which read as "line two starts with ↵" — visually wrong.
+  // Gluing the glyph to the preceding word keeps it where the line break
+  // actually happened. The trailing space stays breakable so the next word
+  // can flow onto a new line cleanly.
   return text
     .replace(/[ \t]+/g, " ")
-    .replace(/\s*\n+\s*/g, ` ${NEWLINE_GLYPH} `)
+    .replace(/\s*\n+\s*/g, ` ${NEWLINE_GLYPH} `)
     .trim();
 }

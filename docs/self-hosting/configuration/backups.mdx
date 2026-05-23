@@ -171,7 +171,7 @@ For a deployment with 150 GB/month of trace data, cold storage can save ~$500/ye
 
 ## S3 Dataset Backups
 
-If you're using S3 for dataset storage (`app.datasetObjectStorage.enabled: true`), protect this data with:
+If you're using S3 for dataset storage (`app.dataplane.enabled: true`), protect this data with:
 
 - **S3 Versioning**: Enable versioning on the bucket to recover from accidental deletes
 - **Cross-region replication**: For disaster recovery, replicate to another region

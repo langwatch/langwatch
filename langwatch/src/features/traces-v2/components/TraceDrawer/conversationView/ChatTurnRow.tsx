@@ -86,7 +86,7 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
       {showGap && (
         <Flex align="center" gap={2}>
           <Box height="1px" flex={1} bg="border.muted" />
-          <Text textStyle="2xs" color="fg.subtle" fontFamily="mono">
+          <Text textStyle="2xs" color="fg.subtle">
             {formatGap(gapSecs)}
           </Text>
           <Box height="1px" flex={1} bg="border.muted" />
@@ -181,7 +181,7 @@ const TurnSeparator: React.FC<{
   const isError = turn.status === "error";
 
   const Sep = () => (
-    <Text textStyle="2xs" color="fg.subtle" fontFamily="mono">
+    <Text textStyle="2xs" color="fg.subtle">
       ·
     </Text>
   );
@@ -226,19 +226,19 @@ const TurnSeparator: React.FC<{
         {model && (
           <>
             <Sep />
-            <Text textStyle="2xs" color="fg.muted" fontFamily="mono">
+            <Text textStyle="2xs" color="fg.muted">
               {model}
             </Text>
           </>
         )}
         <Sep />
-        <Text textStyle="2xs" color="fg.subtle" fontFamily="mono">
+        <Text textStyle="2xs" color="fg.subtle">
           {formatDuration(turn.durationMs)}
         </Text>
         {turn.ttft != null && turn.ttft > 0 && (
           <>
             <Sep />
-            <Text textStyle="2xs" color="fg.subtle" fontFamily="mono">
+            <Text textStyle="2xs" color="fg.subtle">
               ttft {formatDuration(turn.ttft)}
             </Text>
           </>
@@ -246,7 +246,7 @@ const TurnSeparator: React.FC<{
         {hasTokens && (
           <>
             <Sep />
-            <Text textStyle="2xs" color="fg.subtle" fontFamily="mono">
+            <Text textStyle="2xs" color="fg.subtle">
               {turn.inputTokens != null && turn.outputTokens != null
                 ? `${formatTokens(turn.inputTokens)}→${formatTokens(turn.outputTokens)}`
                 : `${formatTokens(turn.totalTokens)} tok`}
@@ -257,7 +257,7 @@ const TurnSeparator: React.FC<{
         {hasCost && (
           <>
             <Sep />
-            <Text textStyle="2xs" color="fg.subtle" fontFamily="mono">
+            <Text textStyle="2xs" color="fg.subtle">
               {formatCost(turn.totalCost)}
             </Text>
           </>

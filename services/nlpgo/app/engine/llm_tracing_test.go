@@ -25,7 +25,7 @@ func TestStartLLMSpan_NameAndReservedAttrs(t *testing.T) {
 	rec := withRecorder(t)
 
 	tracer := otelapi.Tracer(tracerName)
-	parentCtx, parent := tracer.Start(context.Background(), componentSpanName)
+	parentCtx, parent := tracer.Start(context.Background(), "test-parent")
 	defer parent.End()
 
 	messages := []app.ChatMessage{
@@ -90,7 +90,7 @@ func TestEndLLMSpan_ErrorPathDoesNotStampOutput(t *testing.T) {
 	rec := withRecorder(t)
 
 	tracer := otelapi.Tracer(tracerName)
-	parentCtx, parent := tracer.Start(context.Background(), componentSpanName)
+	parentCtx, parent := tracer.Start(context.Background(), "test-parent")
 	defer parent.End()
 
 	_, llmSpan := startLLMSpan(parentCtx, "gpt-5-mini", "openai", []app.ChatMessage{
@@ -120,7 +120,7 @@ func TestEndLLMSpan_NilResponseNilErrorIsTreatedAsError(t *testing.T) {
 	rec := withRecorder(t)
 
 	tracer := otelapi.Tracer(tracerName)
-	parentCtx, parent := tracer.Start(context.Background(), componentSpanName)
+	parentCtx, parent := tracer.Start(context.Background(), "test-parent")
 	defer parent.End()
 
 	_, llmSpan := startLLMSpan(parentCtx, "gpt-5-mini", "openai", []app.ChatMessage{

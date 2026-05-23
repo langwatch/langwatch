@@ -195,7 +195,9 @@ export const teamRouter = createTRPCRouter({
               assignedRole: true,
             },
           },
-          projects: true,
+          projects: {
+            where: { archivedAt: null },
+          },
         },
       });
 
@@ -274,9 +276,9 @@ export const teamRouter = createTRPCRouter({
           }
           const customRole = await prisma.customRole.findUnique({
             where: { id: member.customRoleId },
-            select: { organizationId: true },
+            select: { organizationId: true, kind: true },
           });
-          if (!customRole) {
+          if (!customRole || customRole.kind !== "custom") {
             throw new TRPCError({ code: "NOT_FOUND", message: `Custom role ${member.customRoleId} not found` });
           }
           if (customRole.organizationId !== organizationId) {
@@ -428,14 +430,15 @@ export const teamRouter = createTRPCRouter({
             : (member.role as TeamUserRole);
 
           if (memberIsCustomRole) {
-            // Verify the custom role belongs to the same organization
+            // Verify the custom role belongs to the same organization and is user-assignable
             const customRole = await tx.customRole.findUnique({
               where: { id: member.customRoleId! },
-              select: { organizationId: true },
+              select: { organizationId: true, kind: true },
             });
 
             if (
               !customRole ||
+              customRole.kind !== "custom" ||
               customRole.organizationId !== team.organizationId
             ) {
               throw new TRPCError({

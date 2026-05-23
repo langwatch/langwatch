@@ -37,6 +37,29 @@ export class ExperimentRepository {
     });
   }
 
+  async findPage(
+    input: { projectId: string; skip: number; take: number },
+    options?: { tx?: Prisma.TransactionClient },
+  ): Promise<Experiment[]> {
+    const client = options?.tx ?? this.prisma;
+    return await client.experiment.findMany({
+      where: { projectId: input.projectId },
+      orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+      skip: input.skip,
+      take: input.take,
+    });
+  }
+
+  async countByProject(
+    input: { projectId: string },
+    options?: { tx?: Prisma.TransactionClient },
+  ): Promise<number> {
+    const client = options?.tx ?? this.prisma;
+    return await client.experiment.count({
+      where: { projectId: input.projectId },
+    });
+  }
+
   /**
    * Finds slugs matching a prefix, used by slug deduplication.
    * Returns only slug strings for efficient in-memory filtering.

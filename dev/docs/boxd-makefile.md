@@ -27,6 +27,10 @@ make boxd-fork-issue ISSUE=123       # fork + worktree branch + tmux+claude in V
 make boxd-connect-pr PR=1234         # SSH + tmux attach to the matching VM
 make boxd-connect-branch BRANCH=feat/foo
 make boxd-connect-issue ISSUE=123
+# PR previews — ephemeral, forked from the team golden (langwatch-golden-v2):
+make boxd-preview BRANCH=feat/foo           # fork team golden, start compose full, print URL
+make boxd-preview-down BRANCH=feat/foo      # destroy the preview VM
+make boxd-preview-status BRANCH=feat/foo    # VM status + git HEAD + docker compose ps
 ```
 
 ## Naming
@@ -36,6 +40,7 @@ make boxd-connect-issue ISSUE=123
 | `fork-pr PR=N` | `langwatch-<slug(branch)>` | `claude-<slug(branch)>` |
 | `fork-branch BRANCH=X` | `langwatch-<slug(X)>` | `claude-<slug(X)>` |
 | `fork-issue ISSUE=N` | `langwatch-issue<N>` (literal) | `claude-issue<N>` |
+| `preview BRANCH=X` | `preview-<slug(X)>` | (none — compose, not claude) |
 
 Slug rules: lowercase, replace `/` and non-`[a-z0-9-]` with `-`, collapse `-`, trim, max 40 chars (truncate, no word-boundary cut).
 
@@ -63,6 +68,7 @@ Collision: `boxd-fork-branch BRANCH=issue42/foo` produces `langwatch-issue42-foo
 | `CLAUDE_CREDS` | `~/.claude/.credentials.json` | Path to the file `boxd cp`-ed into the fork |
 | `BOXD_FORK_YES` | unset | Set to `1` to skip the destructive-confirm on `boxd-golden-reset` |
 | `BOXD_NAMESPACE` | `gh api user --jq .login` (fallback `whoami`) | Override the per-user prefix on the golden VM name (`<namespace>--langwatch-golden`). Useful for shared/team-owned goldens. |
+| `LW_PREVIEW_GOLDEN_SOURCE` | `langwatch-golden-v2` | Team golden that preview VMs fork from. Override when using a personal or alternative base. |
 | `BOXD_RESUME_TIMEOUT_SECS` | `30` | Max seconds to wait for a VM to reach `running` after `boxd resume` |
 | `BOXD_BIN` | `boxd` | Override the `boxd` binary (used by tests) |
 | `GH_BIN` | `gh` | Override the `gh` binary (used by tests) |
@@ -84,6 +90,34 @@ Recommended cadence: rebuild **weekly**, or after any of:
 ## Seed step
 
 `boxd-golden` calls a `seed-golden` hook target. The default `seed-golden` is a no-op that prints a hint. Override it locally (in a `Makefile.local` you `include` from `Makefile`) to seed users / projects / sample traces. Implementation of a shared seed script is out of scope for this Makefile — see `make quickstart` work.
+
+## PR preview lifecycle
+
+Preview targets complement `boxd-fork-*` with an **ephemeral, shareable** workflow:
+
+1. **Fork** the team golden (`langwatch-golden-v2`) into `preview-<branch-slug>` — no per-user namespace prefix.
+2. **Checkout** the branch inside the VM (`git fetch origin && git checkout <branch>`).
+3. **Start** `docker compose -f compose.dev.yml --profile full up -d --build` — runs the full stack detached.
+4. **Print** the URL: `https://preview-<branch-slug>.boxd.sh`.
+
+Preview VMs do not receive `.env` uploads or Claude credentials — they are read-only stack snapshots for review/demo, not development environments.
+
+```bash
+# Spin up
+make boxd-preview BRANCH=feat/my-feature
+# => https://preview-feat-my-feature.boxd.sh
+
+# Check what's running
+make boxd-preview-status BRANCH=feat/my-feature
+
+# Tear down when done
+make boxd-preview-down BRANCH=feat/my-feature
+```
+
+The golden source is overridable:
+```bash
+LW_PREVIEW_GOLDEN_SOURCE=lw-preview make boxd-preview BRANCH=feat/my-feature
+```
 
 ## Troubleshooting
 

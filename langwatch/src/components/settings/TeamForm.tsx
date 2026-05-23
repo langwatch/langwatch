@@ -15,7 +15,7 @@ import {
 } from "@chakra-ui/react";
 import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
 import { HelpCircle, Plus, Trash2 } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   Controller,
   type SubmitHandler,
@@ -23,6 +23,7 @@ import {
   useFieldArray,
   useWatch,
 } from "react-hook-form";
+import { ConfirmDialog } from "../../components/gateway/ConfirmDialog";
 import { ProjectAvatar } from "../../components/ProjectAvatar";
 import { Link } from "../../components/ui/link";
 import { Tooltip } from "../../components/ui/tooltip";
@@ -30,6 +31,7 @@ import { useDrawer } from "../../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { TeamWithProjectsAndMembersAndUsers } from "../../server/app-layer/organizations/repositories/organization.repository";
 import { api } from "../../utils/api";
+import { toaster } from "../ui/toaster";
 import { HorizontalFormControl } from "../HorizontalFormControl";
 import { Select } from "../ui/select";
 import {
@@ -38,14 +40,14 @@ import {
   teamRolesOptions,
 } from "./TeamUserRoleField";
 
-function TeamProjectsList({ team }: { team: TeamWithProjectsAndMembersAndUsers }) {
-  const queryClient = api.useContext();
+function TeamProjectsBody({
+  team,
+  onArchiveClick,
+}: {
+  team: TeamWithProjectsAndMembersAndUsers;
+  onArchiveClick: (project: { id: string; name: string }) => void;
+}) {
   const { project, hasPermission } = useOrganizationTeamProject();
-  const archiveProject = api.project.archiveById.useMutation({
-    onSuccess: () => {
-      void queryClient.organization.getAll.invalidate();
-    },
-  });
 
   return (
     <Table.Body>
@@ -63,12 +65,12 @@ function TeamProjectsList({ team }: { team: TeamWithProjectsAndMembersAndUsers }
                 variant="ghost"
                 color="red.fg"
                 size="sm"
-                onClick={() => {
-                  if (!project) return;
-                  if (confirm("Are you sure you want to archive this project? Contact LangWatch support to restore it.")) {
-                    archiveProject.mutate({ projectId: project.id, projectToArchiveId: teamProject.id });
-                  }
-                }}
+                onClick={() =>
+                  onArchiveClick({
+                    id: teamProject.id,
+                    name: teamProject.name,
+                  })
+                }
               >
                 <Trash2 size={16} />
               </Button>
@@ -117,6 +119,28 @@ export const TeamForm = ({
 
   const { hasOrgPermission } = useOrganizationTeamProject();
   const canManageOrganization = hasOrgPermission("organization:manage");
+
+  const queryClient = api.useContext();
+  const { project } = useOrganizationTeamProject();
+  const [projectToArchive, setProjectToArchive] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+  const archiveProject = api.project.archiveById.useMutation({
+    onSuccess: () => {
+      setProjectToArchive(null);
+      void queryClient.organization.getAll.invalidate();
+      void queryClient.team.getTeamWithMembers.invalidate();
+    },
+    onError: () => {
+      toaster.create({
+        title: "Failed to archive project",
+        type: "error",
+        duration: 5000,
+        meta: { closable: true },
+      });
+    },
+  });
 
   const users = api.organization.getAllOrganizationMembers.useQuery({
     organizationId: organizationId,
@@ -353,10 +377,31 @@ export const TeamForm = ({
                       <Table.ColumnHeader width="60px"></Table.ColumnHeader>
                     </Table.Row>
                   </Table.Header>
-                  <TeamProjectsList team={team} />
+                  <TeamProjectsBody
+                    team={team}
+                    onArchiveClick={setProjectToArchive}
+                  />
                 </Table.Root>
               </Card.Body>
             </Card.Root>
+            <ConfirmDialog
+              open={!!projectToArchive}
+              onOpenChange={(open) => {
+                if (!open) setProjectToArchive(null);
+              }}
+              title="Archive Project"
+              message={`Are you sure you want to archive "${projectToArchive?.name ?? ""}"? This will hide the project and all its data. Contact LangWatch support to restore it.`}
+              confirmLabel="Archive"
+              tone="danger"
+              loading={archiveProject.isLoading}
+              onConfirm={() => {
+                if (!project || !projectToArchive) return;
+                archiveProject.mutate({
+                  projectId: project.id,
+                  projectToArchiveId: projectToArchive.id,
+                });
+              }}
+            />
           </>
         )}
       </VStack>

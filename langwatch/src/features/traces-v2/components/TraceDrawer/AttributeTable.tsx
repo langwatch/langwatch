@@ -1,5 +1,5 @@
 import { Box, Button, HStack, Icon, Input, Text } from "@chakra-ui/react";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { LuCheck, LuCopy, LuPin, LuPinOff } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -11,6 +11,136 @@ import { SegmentedToggle } from "./SegmentedToggle";
 
 const EM_DASH = "\u2014";
 const COPY_FEEDBACK_MS = 1500;
+
+const LABEL_WIDTH_STORAGE_KEY = "langwatch:traces-v2:attribute-label-width";
+const LABEL_WIDTH_MIN = 120;
+const LABEL_WIDTH_MAX = 480;
+const LABEL_WIDTH_DEFAULT = 200;
+
+function clampLabelWidth(value: number): number {
+  if (!Number.isFinite(value)) return LABEL_WIDTH_DEFAULT;
+  return Math.min(LABEL_WIDTH_MAX, Math.max(LABEL_WIDTH_MIN, Math.round(value)));
+}
+
+/**
+ * Persisted width of the attribute-name column. Operators told us the
+ * truncated `langwatch.prompt.variab\u2026` lines on prompt-heavy traces were
+ * unreadable; the column is now dragable per-device so they can size it
+ * to whatever fits their attribute namespace.
+ */
+function useLabelColumnWidth() {
+  const [width, setWidth] = useState<number>(() => {
+    if (typeof window === "undefined") return LABEL_WIDTH_DEFAULT;
+    const raw = window.localStorage.getItem(LABEL_WIDTH_STORAGE_KEY);
+    const parsed = raw ? Number.parseInt(raw, 10) : NaN;
+    return Number.isFinite(parsed)
+      ? clampLabelWidth(parsed)
+      : LABEL_WIDTH_DEFAULT;
+  });
+
+  const setAndPersist = useCallback((next: number) => {
+    const clamped = clampLabelWidth(next);
+    setWidth(clamped);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(LABEL_WIDTH_STORAGE_KEY, String(clamped));
+    }
+  }, []);
+
+  const applyDelta = useCallback((deltaPx: number) => {
+    setWidth((prev) => {
+      const clamped = clampLabelWidth(prev + deltaPx);
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(LABEL_WIDTH_STORAGE_KEY, String(clamped));
+      }
+      return clamped;
+    });
+  }, []);
+
+  return [width, setAndPersist, applyDelta] as const;
+}
+
+/**
+ * 4px-wide drag handle that sits flush with the right border of the
+ * label cell. Idle state shows the existing 1px border; on hover/drag
+ * the bar turns blue, mirroring the resize affordance of the drawer's
+ * pane separator (`PaneLayout`). State is tracked via a
+ * `data-resize-handle-state` attribute so styling matches the rest of
+ * the v2 surface without a custom theme.
+ */
+/**
+ * Per-row 4px resize handle that sits flush with the right border of
+ * the label cell. Idle state is invisible; hover/drag lights up the
+ * blue stripe. Resize state lives on the shared `useLabelColumnWidth`
+ * hook so dragging any row's handle resizes the whole column in
+ * lockstep — visually scoped to the row the operator grabbed, but
+ * functionally global.
+ */
+function LabelResizeHandle({
+  onResize,
+}: {
+  onResize: (deltaPx: number) => void;
+}) {
+  const [state, setState] = useState<"idle" | "hover" | "drag">("idle");
+  const startXRef = useRef<number | null>(null);
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    startXRef.current = e.clientX;
+    setState("drag");
+    (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (state !== "drag" || startXRef.current === null) return;
+    const delta = e.clientX - startXRef.current;
+    startXRef.current = e.clientX;
+    onResize(delta);
+  };
+
+  const handlePointerEnd = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (state === "drag") {
+      startXRef.current = null;
+      (e.currentTarget as HTMLDivElement).releasePointerCapture(e.pointerId);
+      setState("idle");
+    }
+  };
+
+  return (
+    <Box
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize attribute name column"
+      data-resize-handle-state={state}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerEnd}
+      onPointerCancel={handlePointerEnd}
+      onPointerEnter={() => {
+        if (state === "idle") setState("hover");
+      }}
+      onPointerLeave={() => {
+        if (state === "hover") setState("idle");
+      }}
+      width="4px"
+      flexShrink={0}
+      cursor="col-resize"
+      alignSelf="stretch"
+      position="relative"
+      marginRight="-1px"
+      _before={{
+        content: '""',
+        position: "absolute",
+        top: 0,
+        bottom: 0,
+        left: "1px",
+        right: "1px",
+        transition: "background 100ms ease",
+        background: state === "idle" ? "transparent" : "blue.solid",
+      }}
+    />
+  );
+}
 
 interface AttributeTableProps {
   attributes: Record<string, unknown>;
@@ -180,6 +310,8 @@ function FlatRow({
   pinned,
   isLast,
   onTogglePin,
+  labelWidth,
+  onLabelResize,
 }: {
   attrKey: string;
   value: unknown;
@@ -187,6 +319,8 @@ function FlatRow({
   pinned: boolean;
   isLast: boolean;
   onTogglePin: () => void;
+  labelWidth: number;
+  onLabelResize: (deltaPx: number) => void;
 }) {
   const display = formatValue(value);
   return (
@@ -205,28 +339,33 @@ function FlatRow({
         attrKey={attrKey}
         onToggle={onTogglePin}
       />
-      <Text
-        width="200px"
-        flexShrink={0}
-        textStyle="xs"
-        fontFamily="mono"
-        color={pinned ? "fg" : "fg.muted"}
-        fontWeight={pinned ? "semibold" : "normal"}
-        truncate
-        paddingX={3}
-        paddingY={1.5}
-        bg="bg.subtle"
-        borderRightWidth="1px"
-        borderColor="border.muted"
-        transition="color 0.12s ease, font-weight 0.12s ease"
-        css={{
-          // Strengthen the key column when the row is hovered so the
-          // attribute name reads as the focus, not just a tint change.
-          ".attr-row:hover &": { color: "fg", fontWeight: "semibold" },
-        }}
+      <Tooltip
+        content={attrKey}
+        openDelay={250}
+        positioning={{ placement: "top-start" }}
       >
-        {attrKey}
-      </Text>
+        <Text
+          width={`${labelWidth}px`}
+          flexShrink={0}
+          textStyle="xs"
+          fontFamily="mono"
+          color={pinned ? "fg" : "fg.muted"}
+          fontWeight={pinned ? "semibold" : "normal"}
+          truncate
+          paddingX={3}
+          paddingY={1.5}
+          bg="bg.subtle"
+          transition="color 0.12s ease, font-weight 0.12s ease"
+          css={{
+            // Strengthen the key column when the row is hovered so the
+            // attribute name reads as the focus, not just a tint change.
+            ".attr-row:hover &": { color: "fg", fontWeight: "semibold" },
+          }}
+        >
+          {attrKey}
+        </Text>
+      </Tooltip>
+      <LabelResizeHandle onResize={onLabelResize} />
       {/* Pretty-print column. Heuristic format detection picks chat / json
           / text / leaf; non-leaf values render a `📋 format` pill that
           opens a popover with the prettified payload + an override row.
@@ -257,11 +396,15 @@ function AttrSection({
   attributes,
   viewMode,
   source,
+  labelWidth,
+  onLabelResize,
 }: {
   title: string;
   attributes: Record<string, unknown>;
   viewMode: AttrViewMode;
   source: PinnedAttributeSource;
+  labelWidth: number;
+  onLabelResize: (deltaPx: number) => void;
 }) {
   const { project } = useOrganizationTeamProject();
   const { pins, isPinned, togglePin } = usePinnedAttributes(project?.id);
@@ -299,11 +442,14 @@ function AttrSection({
         </Text>
       )}
       {viewMode === "flat" ? (
+        // `position: relative` anchors the absolute-positioned column
+        // resize handle inside this card so the line spans the table's
+        // full height regardless of how many rows render.
         <Box
           borderRadius="md"
           borderWidth="1px"
           borderColor="border"
-          overflow="hidden"
+            overflow="hidden"
           bg="bg.panel"
         >
           {sortedEntries.map(([key, val], i) => (
@@ -315,6 +461,8 @@ function AttrSection({
               pinned={isPinned(source, key)}
               isLast={i === sortedEntries.length - 1}
               onTogglePin={() => togglePin({ source, key })}
+              labelWidth={labelWidth}
+              onLabelResize={onLabelResize}
             />
           ))}
         </Box>
@@ -345,6 +493,8 @@ export function AttributeTable({
 }: AttributeTableProps) {
   const [viewMode, setViewMode] = useState<AttrViewMode>("flat");
   const [searchTerm, setSearchTerm] = useState("");
+  const [labelWidth, , applyLabelDelta] = useLabelColumnWidth();
+  const handleLabelResize = applyLabelDelta;
 
   const flatAttrs = useMemo(() => flattenAttributes(attributes), [attributes]);
   const flatResAttrs = useMemo(
@@ -406,6 +556,8 @@ export function AttributeTable({
         attributes={filterAttrs}
         viewMode={viewMode}
         source="attribute"
+        labelWidth={labelWidth}
+        onLabelResize={handleLabelResize}
       />
       {filterResAttrs && (
         <AttrSection
@@ -413,6 +565,8 @@ export function AttributeTable({
           attributes={filterResAttrs}
           viewMode={viewMode}
           source="resource"
+          labelWidth={labelWidth}
+          onLabelResize={handleLabelResize}
         />
       )}
     </Box>

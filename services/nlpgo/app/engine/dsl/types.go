@@ -258,6 +258,28 @@ type Component struct {
 
 	// Evaluator-specific
 	Evaluator *string `json:"evaluator,omitempty"`
+
+	// Signature/Prompt-specific — forwarded from the TS signatureComponentSchema
+	// (langwatch/src/optimization_studio/types/dsl.ts:414) so the engine can
+	// stamp the PromptApiService.get + Prompt.compile span identity attrs.
+	// PromptDraft is true when the executed config diverges from the saved
+	// version (user edited inline without persisting); base configId / handle /
+	// versionMetadata stay populated so the trace-UI can still surface
+	// "Open in Prompts" with "(unsaved edits)" appended.
+	PromptConfigID  *string                 `json:"configId,omitempty"`
+	PromptHandle    *string                 `json:"handle,omitempty"`
+	VersionMetadata *PromptVersionMetadata  `json:"versionMetadata,omitempty"`
+	PromptDraft     *bool                   `json:"promptDraft,omitempty"`
+}
+
+// PromptVersionMetadata mirrors signatureComponentSchema.versionMetadata
+// (langwatch/src/optimization_studio/types/dsl.ts:417-422). Kept as a
+// nested struct rather than three flat fields so the JSON round-trip
+// matches the TS wire format byte-for-byte.
+type PromptVersionMetadata struct {
+	VersionID        string `json:"versionId"`
+	VersionNumber    int    `json:"versionNumber"`
+	VersionCreatedAt string `json:"versionCreatedAt"`
 }
 
 // Node is a workflow graph node. Type discriminates the union; Data

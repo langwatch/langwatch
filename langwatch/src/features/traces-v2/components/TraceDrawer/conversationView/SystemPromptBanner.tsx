@@ -67,7 +67,6 @@ export const SystemPromptBanner: React.FC<{ text: string }> = ({ text }) => {
       >
         <Text
           textStyle="xs"
-          fontFamily="mono"
           color="fg.muted"
           whiteSpace="pre-wrap"
           lineHeight="1.6"

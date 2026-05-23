@@ -96,8 +96,12 @@ describe("getVercelAIModel", () => {
       });
     });
 
-    describe("when openai provider is enabled", () => {
-      it("falls back to DEFAULT_MODEL", async () => {
+    describe("when openai provider is enabled but has no usable models", () => {
+      it("throws because no global default fallback exists", async () => {
+        // With the no-global-fallback contract, "openai is enabled but
+        // has no custom models and no ModelDefaultConfig entry" is the
+        // canonical 'AI features are disabled for this project'
+        // surface. The legacy DEFAULT_MODEL constant no longer rescues.
         mockGetProjectModelProviders.mockResolvedValue({
           openai: {
             provider: "openai",
@@ -107,9 +111,9 @@ describe("getVercelAIModel", () => {
           },
         });
 
-        const result = await getVercelAIModel("project-123");
-
-        expect(result).toBeDefined();
+        await expect(getVercelAIModel("project-123")).rejects.toThrow(
+          /All configured model providers are disabled or have no usable models/,
+        );
       });
     });
 

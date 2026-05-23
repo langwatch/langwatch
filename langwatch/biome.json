@@ -1,5 +1,5 @@
 {
-	"$schema": "https://biomejs.dev/schemas/2.3.8/schema.json",
+	"$schema": "https://biomejs.dev/schemas/2.4.14/schema.json",
 	"vcs": {
 		"enabled": true,
 		"clientKind": "git",
@@ -24,6 +24,7 @@
 				"useOptionalChain": "error"
 			},
 			"correctness": {
+				"noNextAsyncClientComponent": "warn",
 				"noPrecisionLoss": "error",
 				"noUnusedVariables": "warn"
 			},
@@ -31,7 +32,6 @@
 				"noFloatingPromises": "error",
 				"noForIn": "error",
 				"noMisusedPromises": "error",
-				"noNextAsyncClientComponent": "warn",
 				"noSyncScripts": "error"
 			},
 			"performance": {
@@ -43,7 +43,17 @@
 				"noHeadElement": "warn",
 				"noInferrableTypes": "error",
 				"noNamespace": "error",
-				"noRestrictedImports": "error",
+				"noRestrictedImports": {
+					"level": "error",
+					"options": {
+						"paths": {
+							"@chakra-ui/react": {
+								"importNames": ["Dialog", "Drawer", "Modal"],
+								"message": "Import Dialog or Drawer from ~/components/ui/dialog and ~/components/ui/drawer instead. Modal-style flows also use the Dialog wrapper (see AICreateModal, RunScenarioModal, etc.) — there is no Modal wrapper. The wrappers force a transparent backdrop (no dark grey overlay), wire focus/scroll defaults, and add an inline error boundary. Raw Chakra primitives reintroduce the dark backdrop we explicitly do not want."
+							}
+						}
+					}
+				},
 				"useArrayLiterals": "error",
 				"useAsConstAssertion": "error",
 				"useConsistentArrayType": "off",
@@ -128,6 +138,19 @@
 				"rules": {
 					"suspicious": {
 						"noEmptyBlockStatements": "off"
+					}
+				}
+			}
+		},
+		{
+			"includes": [
+				"src/components/ui/dialog.tsx",
+				"src/components/ui/drawer.tsx"
+			],
+			"linter": {
+				"rules": {
+					"style": {
+						"noRestrictedImports": "off"
 					}
 				}
 			}

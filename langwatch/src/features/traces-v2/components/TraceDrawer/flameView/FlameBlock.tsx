@@ -65,6 +65,15 @@ export function FlameBlock({
 
   const color =
     (SPAN_TYPE_COLORS[span.type ?? "span"] as string) ?? "gray.solid";
+  // `gray.solid` is too low-saturation for the white-on-fill recipe
+  // every other palette uses — at 85% alpha on a white canvas the
+  // result is a pale grey that white text dissolves into (operator
+  // report: "can't read the letters" on Scenario Turn / module /
+  // execute_event_loop_cycle bars). Dark mode is fine because the
+  // canvas is already dark. So flip text to `fg` only for grey
+  // palettes in light mode; everything else stays the saturated
+  // white-on-colour treatment.
+  const isLowContrastPalette = color === "gray.solid";
   const depthAlpha = Math.max(
     DEPTH_FADE_FLOOR,
     1 - depth * DEPTH_FADE_STEP,
@@ -91,6 +100,19 @@ export function FlameBlock({
             ? depthAlpha * 0.3
             : depthAlpha) * 100,
   );
+  // Light mode runs on a much stronger floor: alpha-tinted `.solid`
+  // tokens against a white surface produce pale fills that white text
+  // disappears into. Pin every state to a "saturated, readable" floor
+  // and let the hover/select/dim states still nudge the alpha around
+  // without ever landing in unreadable-text territory. White text is
+  // legible against this whole band.
+  const lightBgAlphaPct = isEmphasized
+    ? 100
+    : isDimmed
+      ? 55
+      : isAncestor || isDirectChild
+        ? 95
+        : 85;
   const isZeroDuration = spanDur === 0;
 
   const parentDurMs = node.parent
@@ -112,7 +134,6 @@ export function FlameBlock({
       ? `${formatPercent(pctOfTrace)} of trace`
       : null,
     span.model ? `Model: ${span.model}` : null,
-    node.isOrphaned ? "⚠ Parent not in trace" : null,
   ].filter(Boolean);
 
   // Visual hierarchy: selected > focused > hovered > ancestor/child > rest.
@@ -154,10 +175,12 @@ export function FlameBlock({
         width={`${widthPct}%`}
         minWidth={`${MIN_BLOCK_PX}px`}
         height={`${ROW_HEIGHT}px`}
-        bg={`${color}/${bgAlphaPct}`}
+        bg={{
+          base: `${color}/${lightBgAlphaPct}`,
+          _dark: `${color}/${bgAlphaPct}`,
+        }}
         borderWidth={borderWidth}
         borderColor={borderColor}
-        borderStyle={node.isOrphaned ? "dashed" : "solid"}
         borderRadius="sm"
         cursor="pointer"
         pointerEvents="auto"
@@ -180,21 +203,24 @@ export function FlameBlock({
       >
         <Text
           textStyle="xs"
-          // In dark mode the saturated block bg is dark enough to read
-          // white text against; in light mode the same blocks render as
-          // pastel tints and white-on-pastel becomes invisible. Flip to
-          // a near-black foreground in light mode and drop the dark
-          // text-shadow that exists to lift white off colour — it
-          // becomes a fuzzy halo under dark text.
-          color={isEmphasized ? "white" : "white/90"}
-          _light={{
-            color: isEmphasized ? "gray.900" : "gray.800",
-            textShadow: "0 1px 0 rgba(255,255,255,0.45)",
-          }}
+          // White text in both modes for the saturated palettes
+          // (blue/green/purple/teal/orange/pink/cyan) — `lightBgAlphaPct`
+          // keeps the fill saturated enough that white reads cleanly.
+          // Grey-palette spans (span/module) get `fg` in light mode
+          // instead because grey.solid at 85% alpha is too pale for
+          // white text — dark mode stays white because the canvas
+          // already pushes the fill into a dark band.
+          color={isLowContrastPalette ? { base: "fg", _dark: "white" } : "white"}
           truncate
           lineHeight={1}
-          userSelect="none"
-          textShadow="0 1px 1px rgba(0,0,0,0.35)"
+          // Dark drop-shadow lifts white text off the saturated fills.
+          // On the grey-palette light-mode path we render dark text
+          // instead, where this same shadow would double-print the
+          // glyphs into bold-ish noise — drop it on that branch.
+          textShadow={{
+            base: isLowContrastPalette ? "none" : "0 1px 1px rgba(0,0,0,0.45)",
+            _dark: "0 1px 1px rgba(0,0,0,0.45)",
+          }}
         >
           <BlockLabel
             name={span.name}

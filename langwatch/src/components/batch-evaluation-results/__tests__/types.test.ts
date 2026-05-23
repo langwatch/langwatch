@@ -2,7 +2,7 @@
  * Tests for batch evaluation data transformer
  */
 import { describe, expect, it } from "vitest";
-import type { ExperimentRunWithItems } from "~/server/evaluations-v3/services/types";
+import type { ExperimentRunWithItems } from "~/server/experiments-v3/services/types";
 import { transformBatchEvaluationData } from "../types";
 
 // Helper to create base timestamps

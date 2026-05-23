@@ -4,6 +4,7 @@ import {
   googleDLPClearPII,
   type PIICheckOptions,
 } from "~/server/background/workers/collector/piiCheck";
+import { featureFlagService } from "~/server/featureFlag";
 import { createLogger } from "~/utils/logger/server";
 import {
   DEFAULT_PII_REDACTION_LEVEL,
@@ -144,7 +145,7 @@ export class OtlpSpanPiiRedactionService {
     resource: OtlpResource | null,
     piiRedactionLevel: PIIRedactionLevel,
   ): Promise<void> {
-    const options = this.buildOptions(piiRedactionLevel);
+    const options = await this.buildOptions(piiRedactionLevel);
     if (!options) return;
 
     const entries: StringEntry[] = [];
@@ -241,7 +242,7 @@ export class OtlpSpanPiiRedactionService {
     },
     piiRedactionLevel: PIIRedactionLevel,
   ): Promise<void> {
-    const options = this.buildOptions(piiRedactionLevel);
+    const options = await this.buildOptions(piiRedactionLevel);
     if (!options) return;
 
     const batch = this.createRedactionBatch();
@@ -267,7 +268,7 @@ export class OtlpSpanPiiRedactionService {
     },
     piiRedactionLevel: PIIRedactionLevel,
   ): Promise<void> {
-    const options = this.buildOptions(piiRedactionLevel);
+    const options = await this.buildOptions(piiRedactionLevel);
     if (!options) return;
 
     const batch = this.createRedactionBatch();
@@ -282,10 +283,14 @@ export class OtlpSpanPiiRedactionService {
    * should be skipped (disabled, no langevals in dev, etc). Throws when
    * langevals is required but unset in production.
    */
-  private buildOptions(
+  private async buildOptions(
     piiRedactionLevel: PIIRedactionLevel,
-  ): PIICheckOptions | null {
-    if (process.env.DISABLE_PII_REDACTION) return null;
+  ): Promise<PIICheckOptions | null> {
+    const disabled = await featureFlagService.isEnabled(
+      "ops_pii_redaction_disabled",
+      { distinctId: "span-pii-service", defaultValue: false },
+    );
+    if (disabled) return null;
     if (piiRedactionLevel === "DISABLED") return null;
 
     const piiEnforced = this.deps.isProduction;

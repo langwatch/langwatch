@@ -22,6 +22,7 @@ import type {
   AnnotationAddedEvent,
   AnnotationRemovedEvent,
   AnnotationsBulkSyncedEvent,
+  TraceNameChangedEvent,
 } from "../schemas/events";
 import {
   spanReceivedEventSchema,
@@ -32,6 +33,7 @@ import {
   annotationAddedEventSchema,
   annotationRemovedEventSchema,
   annotationsBulkSyncedEventSchema,
+  traceNameChangedEventSchema,
 } from "../schemas/events";
 import type { NormalizedSpan } from "../schemas/spans";
 import {
@@ -43,6 +45,7 @@ import {
   TraceIOAccumulationService,
   ScenarioRoleCostService,
   TracePromptAccumulationService,
+  TraceNameResolutionService,
   accumulateEvents,
   shouldOverrideOutput,
   extractIOFromLogRecord,
@@ -74,6 +77,7 @@ const traceIOAccumulationService = new TraceIOAccumulationService(
 );
 const scenarioRoleCostService = new ScenarioRoleCostService(spanCostService);
 const tracePromptAccumulationService = new TracePromptAccumulationService();
+const traceNameResolutionService = new TraceNameResolutionService();
 
 // ─── Main composition ───────────────────────────────────────────────
 
@@ -86,7 +90,13 @@ export function applySpanToSummary({
   span: NormalizedSpan;
 }): TraceSummaryData {
   if (SYNTHETIC_SPAN_NAMES.has(span.name)) {
-    return state;
+    // Synthetic spans (e.g. `langwatch.track_event`) must not contribute to
+    // timing/cost/I-O — they don't represent real execution. But the
+    // `/api/track_event` endpoint stuffs the user-tracked event payload
+    // into `span.events`, so we still need to hoist those onto the trace
+    // summary; otherwise the event vanishes between the span and the
+    // trace-level events list.
+    return { ...state, events: accumulateEvents({ state, span }) };
   }
 
   const timing = spanTimingService.accumulateTiming({ state, span });
@@ -116,32 +126,17 @@ export function applySpanToSummary({
     span,
   });
 
-  // Pick the canonical root span. Precedence:
-  //   1. Named roots win over empty-named roots ("" = not set yet)
-  //   2. Among multiple named roots, earliest startTimeUnixMs wins
-  // After checkpoint reload, rootSpanStartTimeMs is undefined so the first
-  // root we see post-reload wins on tie. `traceName`, `rootSpanType`, and
-  // `rootSpanStartTimeMs` move together — they all describe the same span.
-  const isRootSpan = span.parentSpanId === null;
-  const spanStartMs = span.startTimeUnixMs;
+  // Precedence rules for traceName / rootSpanType / rootSpanStartTimeMs
+  // live in TraceNameResolutionService — see that file for the full set.
+  const {
+    traceName,
+    rootSpanType,
+    rootSpanStartTimeMs,
+    traceNameFromFallback,
+    rootMetadataFromFallback,
+  } = traceNameResolutionService.resolveFromSpan({ state, span });
+
   const spanType = String(span.spanAttributes[ATTR_KEYS.SPAN_TYPE] ?? "");
-
-  let traceName = state.traceName;
-  let rootSpanType = state.rootSpanType;
-  let rootSpanStartTimeMs = state.rootSpanStartTimeMs;
-  if (isRootSpan) {
-    const haveNamedRoot = traceName !== "";
-    const isEarlierNamedRoot =
-      span.name !== "" &&
-      rootSpanStartTimeMs !== undefined &&
-      spanStartMs < rootSpanStartTimeMs;
-    if (!haveNamedRoot || isEarlierNamedRoot) {
-      traceName = span.name;
-      rootSpanType = spanType || null;
-      rootSpanStartTimeMs = spanStartMs;
-    }
-  }
-
   const containsAi = state.containsAi || AI_SPAN_TYPES.has(spanType);
 
   const events = accumulateEvents({ state, span });
@@ -157,6 +152,8 @@ export function applySpanToSummary({
     totalDurationMs: timing.totalDurationMs,
     models,
     traceName,
+    traceNameFromFallback,
+    rootMetadataFromFallback,
     rootSpanStartTimeMs,
     ...tokens,
     ...status,
@@ -185,6 +182,7 @@ const traceSummaryEvents = [
   annotationAddedEventSchema,
   annotationRemovedEventSchema,
   annotationsBulkSyncedEventSchema,
+  traceNameChangedEventSchema,
 ] as const;
 
 /**
@@ -247,6 +245,9 @@ export class TraceSummaryFoldProjection
       annotationIds: [],
       traceName: "",
       rootSpanStartTimeMs: undefined,
+      traceNameUserOverridden: false,
+      traceNameFromFallback: false,
+      rootMetadataFromFallback: false,
       attributes: {},
       events: [],
       scenarioRoleCosts: {},
@@ -430,5 +431,25 @@ export class TraceSummaryFoldProjection
   ): TraceSummaryData {
     const merged = [...new Set([...(state.annotationIds ?? []), ...event.data.annotationIds])];
     return { ...state, annotationIds: merged };
+  }
+
+  handleTraceTraceNameChanged(
+    event: TraceNameChangedEvent,
+    state: TraceSummaryData,
+  ): TraceSummaryData {
+    return {
+      ...state,
+      traceId: state.traceId || event.data.traceId,
+      traceName: event.data.newName,
+      // Latch the override so any later root-span arrival doesn't
+      // silently revert the user's edit. The latch persists even if
+      // the new name happens to coincide with the discovered root span
+      // name — intent matters more than the value.
+      traceNameUserOverridden: true,
+      // A user-supplied name is the highest-precedence source; whatever
+      // came before is no longer a "fallback" guess that should be
+      // displaced by a later real-root span.
+      traceNameFromFallback: false,
+    };
   }
 }

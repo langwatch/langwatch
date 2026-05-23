@@ -182,7 +182,6 @@ export function BlockStack({
             key={`r-${i}`}
             as="pre"
             textStyle="2xs"
-            fontFamily="mono"
             color="fg.muted"
             whiteSpace="pre-wrap"
             wordBreak="break-word"

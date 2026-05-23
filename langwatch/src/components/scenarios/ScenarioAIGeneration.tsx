@@ -16,6 +16,7 @@ import { useCallback, useState } from "react";
 import type { UseFormReturn } from "react-hook-form";
 import { useModelProvidersSettings } from "../../hooks/useModelProvidersSettings";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { api } from "../../utils/api";
 import { createLogger } from "../../utils/logger";
 import { toaster } from "../ui/toaster";
 import type { ScenarioFormData } from "./ScenarioForm";
@@ -127,10 +128,16 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
     projectId: project?.id,
   });
 
+  // Cascade-resolved model for scenario generation.
+  const resolvedDefault = api.modelProvider.getResolvedDefault.useQuery(
+    { projectId: project?.id ?? "", featureKey: "scenarios.generator" },
+    { enabled: !!project?.id },
+  );
+
   const defaultModelState = getDefaultModelState({
     hasEnabledProviders,
     providers,
-    defaultModel: project?.defaultModel,
+    defaultModel: resolvedDefault.data?.model,
   });
 
   const isDefaultModelDisabled = !defaultModelState.ok;

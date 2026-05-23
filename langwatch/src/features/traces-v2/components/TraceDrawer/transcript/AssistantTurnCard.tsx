@@ -3,6 +3,8 @@ import { useMemo, useState } from "react";
 import { LuBot } from "react-icons/lu";
 import type { DisplayRoleVisuals } from "../scenarioRoles";
 import { BlockStack } from "./BlockStack";
+import { getRolePalette } from "./RoleChip";
+import { TurnCollapseChevron } from "./TurnCollapseChevron";
 import type { ChatMessage, ContentBlock } from "./types";
 
 export function AssistantTurnCard({
@@ -10,6 +12,7 @@ export function AssistantTurnCard({
   toolCalls,
   visuals,
   collapseTools = false,
+  onCollapse,
 }: {
   blocks: ContentBlock[];
   toolCalls: NonNullable<ChatMessage["tool_calls"]>;
@@ -20,6 +23,7 @@ export function AssistantTurnCard({
    */
   visuals?: DisplayRoleVisuals;
   collapseTools?: boolean;
+  onCollapse?: () => void;
 }) {
   // Operations = thinking + tool_use + tool_result (every block that isn't
   // user-facing output text). The header chip lets the user collapse them
@@ -51,12 +55,18 @@ export function AssistantTurnCard({
   );
   const visibleToolCalls = opsHidden && hasOutputText ? [] : toolCalls;
 
+  // Assistant-side bubble: always sourced from `ROLE_PALETTES.assistant`
+  // (purple). This is the canonical "assistant side" colour; thread
+  // layout reads the same palette via `getRolePalette("assistant")`,
+  // so a scenario simulator (displayRole=assistant) renders purple
+  // here AND in the thread chip.
+  const palette = getRolePalette("assistant");
   return (
     <Box
       mb="4"
       pl="4"
       borderStartWidth="2px"
-      borderStartColor="purple.muted"
+      borderStartColor={palette.muted}
       bg="bg.panel"
       py="3"
       pr="3"
@@ -69,16 +79,16 @@ export function AssistantTurnCard({
           w="4"
           h="4"
           borderRadius="full"
-          bg="purple.muted"
+          bg={palette.muted}
           align="center"
           justify="center"
           flexShrink={0}
         >
-          <Icon as={visuals?.Icon ?? LuBot} boxSize={2.5} color="purple.fg" />
+          <Icon as={visuals?.Icon ?? LuBot} boxSize={2.5} color={palette.fg} />
         </Flex>
         <Text
           textStyle="2xs"
-          color="purple.fg"
+          color={palette.fg}
           fontWeight="600"
           textTransform="uppercase"
           letterSpacing="0.06em"
@@ -102,6 +112,16 @@ export function AssistantTurnCard({
                 ? `Show ${operationCount} ${operationCount === 1 ? "step" : "steps"}`
                 : `Hide ${operationCount === 1 ? "step" : "steps"}`}
             </chakra.button>
+          </>
+        )}
+        {onCollapse && (
+          <>
+            {/* If the steps toggle wasn't rendered, push the chevron
+                to the right edge with our own spacer. */}
+            {!(!collapseTools && operationCount > 0 && hasOutputText) && (
+              <Box flex="1" />
+            )}
+            <TurnCollapseChevron onClick={onCollapse} />
           </>
         )}
       </HStack>

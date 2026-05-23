@@ -73,6 +73,9 @@ import type {
   CopilotRuntimeChatCompletionResponse,
 } from "@copilotkit/runtime";
 import { beforeEach, describe, expect, it } from "vitest";
+import { studioBackendPostEvent } from "../../workflows/post_event/post-event";
+import { addEnvs } from "~/optimization_studio/server/addEnvs";
+import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
 import { PromptStudioAdapter } from "./service-adapter";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -187,6 +190,339 @@ describe("PromptStudioAdapter", () => {
     generateOtelTraceIdMock.mockImplementation(() => {
       callCount++;
       return `trace-mock-${callCount}`;
+    });
+  });
+
+  // 2026-05-16 prompt-playground regression — the saved-prompt template
+  // carries `{{input}}` placeholders by default; the live chat turn must
+  // (a) bind to the `input` variable so those placeholders resolve, and
+  // (b) be ABSORBED by the template's user-message slot rather than
+  // duplicated as a separate live turn. Trace evidence from rchaves
+  // showed `{{input}}` rendering to empty AND the live turn appended
+  // alongside it.
+  describe("when the saved-prompt template references {{input}}", () => {
+    /** Build a fresh formValues blob matching what PromptPlaygroundChat
+     * forwards via `additionalParams.model`. */
+    function buildAdditionalParams({
+      messages: templateMessages,
+      variables,
+    }: {
+      messages: { role: string; content: string }[];
+      variables?: { identifier: string; value: string }[];
+    }): string {
+      return JSON.stringify({
+        formValues: {
+          version: {
+            configData: {
+              llm: { model: "openai/gpt-5-mini" },
+              messages: templateMessages,
+              inputs: [{ identifier: "input", type: "str" }],
+              outputs: [{ identifier: "output", type: "str" }],
+            },
+          },
+        },
+        variables: variables ?? [],
+      });
+    }
+
+    function buildRequestWithChat({
+      additionalParams,
+      chatMessages,
+      eventSource,
+    }: {
+      additionalParams: string;
+      chatMessages: { role: string; content: string }[];
+      eventSource: MockEventSource;
+    }): RequestForProcess {
+      return {
+        eventSource,
+        messages: chatMessages as any,
+        actions: [],
+        threadId: "thread-test-input-binding",
+        forwardedParameters: {
+          model: additionalParams,
+        } as CopilotRuntimeChatCompletionRequest["forwardedParameters"],
+      } as RequestForProcess;
+    }
+
+    function lastPostedEvent(): any {
+      const mocked = vi.mocked(studioBackendPostEvent);
+      expect(mocked, "studioBackendPostEvent must have been called").toHaveBeenCalled();
+      // The component_state_change consumer is async; we only need the
+      // envelope shape that was passed in. The `!` propagates the
+      // toHaveBeenCalled guarantee past TS's noUncheckedIndexedAccess.
+      const firstCall = mocked.mock.calls[0]!;
+      return (firstCall[0] as any).message;
+    }
+
+    beforeEach(() => {
+      vi.mocked(studioBackendPostEvent).mockReset();
+      vi.mocked(studioBackendPostEvent).mockResolvedValue(undefined as any);
+      vi.mocked(addEnvs).mockImplementation(async (event: any) => event);
+      vi.mocked(loadDatasets).mockImplementation(async (event: any) => event);
+    });
+
+    it("binds the latest live user-message content to inputs.input", async () => {
+      const { eventSource } = createMockEventSource();
+      await runProcess(
+        adapter,
+        buildRequestWithChat({
+          additionalParams: buildAdditionalParams({
+            messages: [
+              { role: "system", content: "Reply using {{input}} verbatim" },
+              { role: "user", content: "{{input}}" },
+            ],
+          }),
+          chatMessages: [{ role: "user", content: "test7" }],
+          eventSource,
+        }),
+      );
+
+      const envelope = lastPostedEvent();
+      expect(envelope.payload.inputs.input).toBe("test7");
+    });
+
+    it("absorbs the live user-message into the template slot (no duplicate turn)", async () => {
+      const { eventSource } = createMockEventSource();
+      await runProcess(
+        adapter,
+        buildRequestWithChat({
+          additionalParams: buildAdditionalParams({
+            messages: [
+              { role: "system", content: "system" },
+              { role: "user", content: "{{input}}" },
+            ],
+          }),
+          chatMessages: [{ role: "user", content: "test7" }],
+          eventSource,
+        }),
+      );
+
+      const envelope = lastPostedEvent();
+      const sent: { role: string; content: string }[] = envelope.payload.inputs.messages;
+      // Exactly one user turn — the template's `{{input}}` slot, NOT a
+      // duplicated live "test7" turn. Server-side render will resolve
+      // the placeholder against inputs.input.
+      const userTurns = sent.filter((m) => m.role === "user");
+      expect(userTurns).toHaveLength(1);
+      expect(userTurns[0]!.content).toBe("{{input}}");
+    });
+
+    it("keeps prior assistant + user turns when the template absorbs only the latest live turn", async () => {
+      const { eventSource } = createMockEventSource();
+      await runProcess(
+        adapter,
+        buildRequestWithChat({
+          additionalParams: buildAdditionalParams({
+            messages: [
+              { role: "system", content: "system" },
+              { role: "user", content: "{{input}}" },
+            ],
+          }),
+          chatMessages: [
+            { role: "user", content: "older question" },
+            { role: "assistant", content: "older reply" },
+            { role: "user", content: "test7" },
+          ],
+          eventSource,
+        }),
+      );
+
+      const envelope = lastPostedEvent();
+      const sent: { role: string; content: string }[] = envelope.payload.inputs.messages;
+      // Prior live history (older question + older reply) FIRST, then
+      // the template's `{{input}}` slot which renders to the latest
+      // "test7" turn at the END. Pre-2026-05-17 the order was inverted
+      // — `{{input}}` shipped at index 0 and the live history trailed
+      // behind, so the LLM read the latest user input as if it came
+      // BEFORE every prior turn. The screenshot from rchaves caught
+      // this: 'huh?' (latest) landed at messages[1] right after the
+      // system prompt, with 'how big is mars?' (older) following.
+      expect(sent.map((m) => m.content)).toEqual([
+        "older question",
+        "older reply",
+        "{{input}}",
+      ]);
+      expect(envelope.payload.inputs.input).toBe("test7");
+    });
+
+    // 2026-05-17 prod regression — caught after #4098 merged.
+    // rchaves: "huh?" was the LATEST user message in the playground,
+    // but the trace shows it injected at messages[1] right after the
+    // system slot, with the actual conversation history ("how big is
+    // mars?", assistant reply, "thanks bro!", assistant reply)
+    // following it. This test replays the exact multi-turn shape that
+    // surfaced the bug.
+    it("places the latest user turn at the END of the messages array, not after the system slot", async () => {
+      const { eventSource } = createMockEventSource();
+      await runProcess(
+        adapter,
+        buildRequestWithChat({
+          additionalParams: buildAdditionalParams({
+            messages: [
+              { role: "system", content: "Welcome" },
+              { role: "user", content: "{{input}}" },
+            ],
+          }),
+          chatMessages: [
+            { role: "user", content: "how big is mars?" },
+            { role: "assistant", content: "Mars is 6,779 km in diameter." },
+            { role: "user", content: "thanks bro!" },
+            { role: "assistant", content: "You're welcome." },
+            { role: "user", content: "huh?" },
+          ],
+          eventSource,
+        }),
+      );
+
+      const envelope = lastPostedEvent();
+      const sent: { role: string; content: string }[] = envelope.payload.inputs.messages;
+      // Chronological history (everything BEFORE the latest user turn)
+      // + template's `{{input}}` slot at the end, which the downstream
+      // render will resolve to "huh?".
+      expect(sent.map((m) => ({ role: m.role, content: m.content }))).toEqual([
+        { role: "user", content: "how big is mars?" },
+        { role: "assistant", content: "Mars is 6,779 km in diameter." },
+        { role: "user", content: "thanks bro!" },
+        { role: "assistant", content: "You're welcome." },
+        { role: "user", content: "{{input}}" },
+      ]);
+      expect(envelope.payload.inputs.input).toBe("huh?");
+    });
+
+    it("absorbs the live turn when the template references {{input}} only in the system message", async () => {
+      // 2026-05-17 dogfood (rchaves on a 'Messages mode' prompt): the
+      // template's USER message is plain text ('answer it') and only
+      // the SYSTEM contains `{{input}}`. The live chat must still be
+      // absorbed (bound to inputs.input) and NOT also appended as a
+      // duplicate user turn — Python parity is "absorb when {{input}}
+      // is ANYWHERE in the template", not "only when a user template
+      // contains it".
+      const { eventSource } = createMockEventSource();
+      await runProcess(
+        adapter,
+        buildRequestWithChat({
+          additionalParams: buildAdditionalParams({
+            messages: [
+              { role: "system", content: "Reply about {{input}}" },
+              { role: "user", content: "answer it" },
+            ],
+          }),
+          chatMessages: [{ role: "user", content: "how much is 2+3" }],
+          eventSource,
+        }),
+      );
+
+      const envelope = lastPostedEvent();
+      const sent: { role: string; content: string }[] = envelope.payload.inputs.messages;
+      // ONE user turn — the template's explicit "answer it". The
+      // live "how much is 2+3" is absorbed into inputs.input, not
+      // appended as a second user turn.
+      const userTurns = sent.filter((m) => m.role === "user");
+      expect(userTurns).toEqual([{ role: "user", content: "answer it" }]);
+      // The live chat is the value for {{input}} resolution.
+      expect(envelope.payload.inputs.input).toBe("how much is 2+3");
+    });
+
+    it("appends the live turn normally when the template doesn't reference {{input}} anywhere", async () => {
+      // Negative-direction guard for the absorb heuristic. When NO
+      // template message (system or user) references `{{input}}`,
+      // the live chat turn must still appear as its own user
+      // message — otherwise users in 'Messages mode' with no
+      // placeholder would have their chat silently dropped.
+      const { eventSource } = createMockEventSource();
+      await runProcess(
+        adapter,
+        buildRequestWithChat({
+          additionalParams: buildAdditionalParams({
+            messages: [
+              { role: "system", content: "Be terse" },
+              { role: "user", content: "answer it" },
+            ],
+          }),
+          chatMessages: [{ role: "user", content: "how much is 2+3" }],
+          eventSource,
+        }),
+      );
+
+      const envelope = lastPostedEvent();
+      const sent: { role: string; content: string }[] = envelope.payload.inputs.messages;
+      expect(sent).toEqual([
+        { role: "user", content: "answer it" },
+        { role: "user", content: "how much is 2+3" },
+      ]);
+      // No `{{input}}` placeholder anywhere → no need to bind, but
+      // bind still happens via the falsy-input fallback (kept for
+      // back-compat with prompts that consume `input` indirectly).
+      expect(envelope.payload.inputs.input).toBe("how much is 2+3");
+    });
+
+    it("does not override an explicit `input` value from the Variables panel", async () => {
+      const { eventSource } = createMockEventSource();
+      await runProcess(
+        adapter,
+        buildRequestWithChat({
+          additionalParams: buildAdditionalParams({
+            messages: [
+              { role: "system", content: "system" },
+              { role: "user", content: "{{input}}" },
+            ],
+            variables: [{ identifier: "input", value: "explicit-value" }],
+          }),
+          chatMessages: [{ role: "user", content: "test7" }],
+          eventSource,
+        }),
+      );
+
+      const envelope = lastPostedEvent();
+      expect(envelope.payload.inputs.input).toBe("explicit-value");
+    });
+
+    // 2026-05-17 prod regression: PromptStudioAdapter shipped to prod
+    // skipping the bind because variablesDict.input was DEFINED but
+    // empty-string. The saved-prompt template declares `input` in
+    // configData.inputs, so the Variables tab UI always emits a row
+    // `{identifier:"input", value:""}` even when the user typed nothing
+    // — strict `=== undefined` missed that and left `{{input}}` empty
+    // (then the absorb step dropped the live "test7" turn for good
+    // measure, so the LLM only saw the system message and rambled
+    // about playground variables). The earlier 5 unit tests passed
+    // because they either omitted `input` from variables entirely or
+    // supplied an explicit non-empty value — neither matches the
+    // real-form "declared with empty default" shape that ships from
+    // the UI. Falsy-check now treats missing OR empty as "panel not
+    // set" so the live turn correctly fills the placeholder.
+    it("binds the live user message when Variables panel has `input` declared with empty-string default", async () => {
+      const { eventSource } = createMockEventSource();
+      await runProcess(
+        adapter,
+        buildRequestWithChat({
+          additionalParams: buildAdditionalParams({
+            messages: [
+              { role: "system", content: "Reply using {{input}} verbatim" },
+              { role: "user", content: "{{input}}" },
+            ],
+            // This is the EXACT shape PromptPlaygroundChat ships from
+            // the UI when the user hasn't typed into the Variables tab:
+            // the row exists (because configData.inputs declares it),
+            // but its `value` is the empty string. Pre-fix
+            // `variablesDict.input === undefined` was false → bind
+            // skipped → `{{input}}` resolved to ""  → "test7" lost
+            // entirely (absorb dropped the live turn for the template
+            // slot that then rendered to empty).
+            variables: [{ identifier: "input", value: "" }],
+          }),
+          chatMessages: [{ role: "user", content: "test7" }],
+          eventSource,
+        }),
+      );
+
+      const envelope = lastPostedEvent();
+      // CORE ASSERTION — bind happened despite the declared-but-empty
+      // panel row. This is the field nlpgo reads to interpolate the
+      // template's `{{input}}` placeholders against, both in the
+      // system and the user-message slot.
+      expect(envelope.payload.inputs.input).toBe("test7");
     });
   });
 

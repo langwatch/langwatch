@@ -15,6 +15,7 @@ import currentSpec from "../app/api/openapiLangWatch.json";
 import { app as llmConfigsApp } from "../app/api/prompts/[[...route]]/app";
 import { app as scenarioEventsApp } from "../app/api/scenario-events/[[...route]]/app";
 import { app as scenariosApp } from "../app/api/scenarios/[[...route]]/app";
+import { app as modelDefaultsApp } from "../app/api/model-defaults/[[...route]]/app";
 import { app as modelProvidersApp } from "../app/api/model-providers/[[...route]]/app";
 import { app as tracesApp } from "../app/api/traces/[[...route]]/app";
 import { app as triggersApp } from "../app/api/triggers/[[...route]]/app";
@@ -67,6 +68,8 @@ export default async function execute() {
   const scenarioEventsSpec = await generateSpecs(scenarioEventsApp);
   console.log("Building monitors spec...");
   const monitorsSpec = await generateSpecs(monitorsApp);
+  console.log("Building model defaults spec...");
+  const modelDefaultsSpec = await generateSpecs(modelDefaultsApp);
   console.log("Building model providers spec...");
   const modelProvidersSpec = await generateSpecs(modelProvidersApp);
   console.log("Building secrets spec...");
@@ -97,6 +100,7 @@ export default async function execute() {
       governanceSpec,
       graphsSpec,
       llmConfigsSpec,
+      modelDefaultsSpec,
       modelProvidersSpec,
       monitorsSpec,
       scenarioEventsSpec,

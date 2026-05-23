@@ -257,13 +257,20 @@ export class EvaluatorService {
 
   /**
    * Creates a new evaluator, populating missing settings with defaults
-   * from the evaluator definition and project configuration.
+   * from the evaluator definition. The `resolved` argument carries the
+   * cascade-resolved DEFAULT + EMBEDDINGS models from the resolver
+   * (via the modelProvider.getResolvedDefault tRPC query at the route
+   * boundary); when absent, the global DEFAULT_MODEL +
+   * DEFAULT_EMBEDDINGS_MODEL constants are used as UI placeholders.
    */
   async createWithDefaults({
-    project,
+    resolved,
     ...input
   }: Parameters<EvaluatorRepository["create"]>[0] & {
-    project: { defaultModel?: string | null; embeddingsModel?: string | null };
+    resolved?: {
+      defaultModel?: string | null;
+      embeddingsModel?: string | null;
+    };
   }) {
     const config = input.config as Record<string, unknown> | null;
     const evaluatorType = config?.evaluatorType as string | undefined;
@@ -271,7 +278,7 @@ export class EvaluatorService {
     if (evaluatorType && config) {
       const defaults = getEvaluatorDefaultSettings(
         getEvaluatorDefinitions(evaluatorType),
-        project,
+        resolved,
       );
       const userSettings = (config.settings ?? {}) as Record<string, unknown>;
       config.settings = { ...defaults, ...userSettings };

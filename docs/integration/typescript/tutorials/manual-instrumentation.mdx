@@ -339,6 +339,7 @@ import { FilterableBatchSpanProcessor, LangWatchExporter } from "langwatch";
 const processor = new FilterableBatchSpanProcessor(
   new LangWatchExporter({
     apiKey: "your-api-key",
+    projectId: "your-project-id", // Required for service API keys
   }),
   [
     { attribute: "http.url", value: "/health" },

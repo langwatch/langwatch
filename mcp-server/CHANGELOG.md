@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.9.0](https://github.com/langwatch/langwatch/compare/mcp-server@v0.8.0...mcp-server@v0.9.0) (2026-05-22)
+
+
+### Features
+
+* **api-keys:** scope-based permissions with fine-grained categories + docs ([#4117](https://github.com/langwatch/langwatch/issues/4117)) ([3dca0f6](https://github.com/langwatch/langwatch/commit/3dca0f685f8df8333d22117581510b0f6e13442d))
+* **dev-env:** boxd Makefile + quickstart rework ([#3891](https://github.com/langwatch/langwatch/issues/3891) + [#3860](https://github.com/langwatch/langwatch/issues/3860)) ([#3901](https://github.com/langwatch/langwatch/issues/3901)) ([06e294e](https://github.com/langwatch/langwatch/commit/06e294e590b733c19147a027c432a9b68080a276))
+* **experiments:** list + per-row results across SDK / CLI / MCP, plus evaluations-v3 → experiments rename ([#3893](https://github.com/langwatch/langwatch/issues/3893)) ([895cda8](https://github.com/langwatch/langwatch/commit/895cda80565c0c69da64affde501c5f159ce283f))
+
+
+### Bug Fixes
+
+* **deps:** upgrade langsmith sdk security floors ([2e18927](https://github.com/langwatch/langwatch/commit/2e18927c0c1c1fdec24c2bba17e5f094e56a9deb))
+* **deps:** upgrade LangSmith SDK security floors ([#4041](https://github.com/langwatch/langwatch/issues/4041)) ([2e18927](https://github.com/langwatch/langwatch/commit/2e18927c0c1c1fdec24c2bba17e5f094e56a9deb))
+
+
+### Miscellaneous
+
+* relicense langwatch from BSL 1.1 to Apache 2.0 (+ ee/ for enterprise modules) ([#4085](https://github.com/langwatch/langwatch/issues/4085)) ([23b9dcd](https://github.com/langwatch/langwatch/commit/23b9dcd051806e0d2162b377a7e1b4c3fecb3ed5))
+* **security:** add dependency age gates ([#3523](https://github.com/langwatch/langwatch/issues/3523)) ([78f5b20](https://github.com/langwatch/langwatch/commit/78f5b2059228748d19fb4bf74118c9bee6c474f9))
+
 ## [0.8.0](https://github.com/langwatch/langwatch/compare/mcp-server@v0.7.0...mcp-server@v0.8.0) (2026-05-13)
 
 

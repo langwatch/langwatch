@@ -25,7 +25,7 @@ import { useMemo } from "react";
 import { Tooltip } from "~/components/ui/tooltip";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { getColorForString } from "~/utils/rotatingColors";
-import { getRunDisplayName } from "./getRunDisplayName";
+import { getRunDisplayName, RunDisplayName } from "./getRunDisplayName";
 import { INTERRUPTED_THRESHOLD_MS, isRunFinished } from "./isRunFinished";
 
 /**
@@ -378,7 +378,7 @@ export function BatchRunsSidebar({
                       positioning={{ placement: "top" }}
                       openDelay={500}
                     >
-                      <HStack gap={1}>
+                      <HStack gap={1} flex={1} minWidth={0} width="100%">
                         {/* Small color indicator square */}
                         <Box
                           width="10px"
@@ -393,8 +393,13 @@ export function BatchRunsSidebar({
                           lineClamp={1}
                           wordBreak="break-all"
                           flex={1}
+                          minWidth={0}
                         >
-                          {runName}
+                          <RunDisplayName
+                            commitMessage={run.workflowVersion?.commitMessage}
+                            runId={run.runId}
+                            index={chronologicalIndex}
+                          />
                         </Text>
                       </HStack>
                     </Tooltip>

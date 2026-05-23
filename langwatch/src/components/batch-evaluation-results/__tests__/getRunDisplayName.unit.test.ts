@@ -49,24 +49,30 @@ describe("getRunDisplayName()", () => {
   });
 
   describe("when runId is provided", () => {
-    it("includes the runId in the fallback name", () => {
+    /** @scenario A run without a commit message shows index then a middle-dot separator */
+    it("joins the index and runId with a gray middle-dot separator, no parentheses", () => {
       const result = getRunDisplayName({
         commitMessage: undefined,
-        runId: "abc123",
-        index: 0,
+        runId: "snobbish-otter-1f2a3b",
+        index: 9,
       });
-      expect(result).toBe("Run #1 (abc123)");
+      expect(result).toBe("Run #10 · snobbish-otter-1f2a3b");
+      expect(result).not.toContain("(");
+      expect(result).not.toContain(")");
     });
 
-    it("truncates long runId values", () => {
+    /** @scenario The run id uses the available width instead of an early hard truncation */
+    it("keeps the full runId without pre-truncating to eight characters", () => {
       const result = getRunDisplayName({
         commitMessage: undefined,
         runId: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
         index: 0,
       });
-      expect(result).toBe("Run #1 (a1b2c3d4…)");
+      expect(result).toBe("Run #1 · a1b2c3d4-e5f6-7890-abcd-ef1234567890");
+      expect(result).not.toContain("…");
     });
 
+    /** @scenario A run with a commit message still shows the commit message */
     it("still prefers commitMessage over runId", () => {
       const result = getRunDisplayName({
         commitMessage: "Add retry logic",

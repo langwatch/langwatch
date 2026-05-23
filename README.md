@@ -162,16 +162,9 @@ Please read our [Contribution Guidelines](https://github.com/langwatch/langwatch
 
 ## ✍️ License — open-core split
 
-LangWatch is **open-core**. The repo ships under two licenses, mapped 1:1 to the directory split:
+LangWatch is Apache 2.0, except for the enterprise modules (SCIM, audit logs, license and billing management, etc.) which live under `langwatch/ee/` and need a commercial license for production use. The SDKs (`typescript-sdk`, `python-sdk`, `mcp-server`) are MIT.
 
-| Tier | Where it lives | License | What it covers |
-|---|---|---|---|
-| **Apache 2.0 floor** | `langwatch/src/`, `services/aigateway/`, `python-sdk/`, `typescript-sdk/`, `langwatch_nlp/`, `langwatch_server/`, `charts/gateway/`, `docs/` | Apache 2.0 | The platform, AI Gateway data plane, Personal IDE keys + CLI device-flow login, AI Tools Portal at `/me`, routing policies, single ingestion source (`otel_generic`) at 30-day retention, RBAC catalog with the 5 default roles, PII redaction, integration SDKs |
-| **Enterprise extension** | `langwatch/ee/` (governance services / routers / reactors under `langwatch/ee/governance/`) | Enterprise | Multi-source governance ingestion (Workato / S3 / Copilot Studio / OpenAI + Anthropic compliance APIs), anomaly rules + dispatch, OCSF/SIEM export, multi-class retention (`one_year` / `seven_years`), custom roles via `CustomRolePermissions`, SCIM provisioning, post-GA tamper-evidence |
-
-The split is enforced at three layers — see [Open-core licensing](https://docs.langwatch.ai/ai-governance/overview#open-core-licensing) for the layered enforcement (UI gating + tRPC middleware + service-layer defense-in-depth + CLI 402 envelope) and [Self-hosting compliance](https://docs.langwatch.ai/self-hosting/compliance) for what each tier underwrites against SOC 2 / ISO 27001 / GDPR / HIPAA / EU AI Act.
-
-License files at the repo root: [`LICENSE`](/LICENSE) (Apache 2.0, applies to the floor) and [`LICENSE-EE`](/LICENSE-EE) (Enterprise terms, applies to `langwatch/ee/`). The legacy [`LICENSE.md`](/LICENSE.md) is preserved for backwards compatibility while consumers transition.
+See [`LICENSE.md`](/LICENSE.md), [`NOTICE`](/NOTICE), and [`langwatch/ee/LICENSE.md`](/langwatch/ee/LICENSE.md) for the full text and the per-folder breakdown.
 
 ## 👮‍♀️ Security + Compliance
 

@@ -11,8 +11,9 @@ import {
   hasOrganizationPermission,
 } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { permissionFormatSchema } from "../../rbac/custom-role-permissions";
 
-const permissionSchema = z.string().regex(/^[a-z]+:[a-z]+$/);
+const permissionSchema = permissionFormatSchema;
 
 export const roleRouter = createTRPCRouter({
   getAll: protectedProcedure

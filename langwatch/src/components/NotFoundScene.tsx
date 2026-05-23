@@ -242,7 +242,7 @@ export function NotFoundScene() {
     <Center
       ref={containerRef}
       width="100%"
-      height="100%"
+      height="100dvh"
       minHeight="400px"
       overflow="hidden"
       position="relative"

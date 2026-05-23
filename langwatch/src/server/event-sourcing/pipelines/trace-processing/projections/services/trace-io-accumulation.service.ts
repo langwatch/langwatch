@@ -148,18 +148,24 @@ export class TraceIOAccumulationService {
       inputResult &&
       (isRoot || computedInput === null || currentInputIsFallback)
     ) {
-      const raw = inputResult.raw;
-      computedInput = typeof raw === "string" ? raw : JSON.stringify(raw);
+      // Use the EXTRACTED text — extractRichIOFromSpan already runs
+      // messagesToText / extractTextFromPlainJson to pull the clean
+      // human-readable string out of common wrappers (e.g. unwrap
+      // `{"output":"Hey there"}` → `"Hey there"`). Discarding that and
+      // re-stringifying `raw` is what caused the 2026-05-14 prod UX
+      // regression where trace summaries showed the wrapper JSON
+      // instead of the actual text.
+      computedInput = preferText(inputResult.text, inputResult.raw);
       inputIsFallback = false;
     } else if (!inputResult && computedInput === null) {
-      // Semantic heuristics didn't find anything. Fall back to a stringified
-      // payload so ComputedInput is non-null when the span has real data,
+      // Semantic heuristics didn't find anything. Fall back to the
+      // service's `text` (best-effort stringification of the wrapper)
+      // so ComputedInput is non-null when the span has real data,
       // but ONLY if no prior span already contributed a semantic match.
       const inputFallback =
         this.traceIOExtractionService.extractFallbackIOFromSpan(span, "input");
       if (inputFallback) {
-        const raw = inputFallback.raw;
-        computedInput = typeof raw === "string" ? raw : JSON.stringify(raw);
+        computedInput = preferText(inputFallback.text, inputFallback.raw);
         inputIsFallback = true;
       }
     }
@@ -183,8 +189,10 @@ export class TraceIOAccumulationService {
           currentEndTime: outputSpanEndTimeMs,
         });
       if (shouldOverride) {
-        const raw = outputResult.raw;
-        computedOutput = typeof raw === "string" ? raw : JSON.stringify(raw);
+        // Use the extracted text (unwrapped from common JSON wrappers
+        // like `{"output":"..."}`), not the raw payload. See input
+        // branch above for the full rationale.
+        computedOutput = preferText(outputResult.text, outputResult.raw);
         outputFromRootSpan = isRoot;
         outputSpanEndTimeMs = span.endTimeUnixMs;
         outputSource = isExplicit
@@ -204,8 +212,7 @@ export class TraceIOAccumulationService {
           "output",
         );
       if (outputFallback) {
-        const raw = outputFallback.raw;
-        computedOutput = typeof raw === "string" ? raw : JSON.stringify(raw);
+        computedOutput = preferText(outputFallback.text, outputFallback.raw);
         outputSpanEndTimeMs = span.endTimeUnixMs;
         outputIsFallback = true;
       }
@@ -222,4 +229,27 @@ export class TraceIOAccumulationService {
       outputIsFallback,
     };
   }
+}
+
+/**
+ * Prefer the extracted human-readable text over the raw payload.
+ * The IO extraction service runs messagesToText / extractTextFromPlainJson
+ * to unwrap common payload shapes (e.g. `{"output":"Hey"}` → `"Hey"`,
+ * gen_ai messages → joined content text). When that succeeds, use it
+ * for the trace summary. Fall back to stringifying the raw payload
+ * only when extraction returned no text — keeps NON-null guarantee
+ * for spans that have data but unknown shape.
+ *
+ * Exported via the existing accumulation surface — tests cover this
+ * via the fold projection, not directly.
+ */
+function preferText(text: string | null | undefined, raw: unknown): string {
+  if (typeof text === "string" && text.length > 0) return text;
+  if (typeof raw === "string") return raw;
+  // JSON.stringify(undefined) returns the literal value `undefined`,
+  // not the string "undefined". Guard explicitly so a future caller
+  // that hands us `undefined` doesn't silently corrupt the trace
+  // summary with a non-string value cast to string.
+  if (raw === undefined) return "";
+  return JSON.stringify(raw);
 }

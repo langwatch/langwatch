@@ -3,8 +3,6 @@ import { useRouter } from "~/utils/compat/next-router";
 import qs from "qs";
 import { X } from "react-feather";
 import { type FilterParam, useFilterParams } from "../../hooks/useFilterParams";
-import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { useFeatureFlag } from "../../hooks/useFeatureFlag";
 import { filterOutEmptyFilters } from "../../server/analytics/utils";
 import type { FilterField } from "../../server/filters/types";
 import { Tooltip } from "../ui/tooltip";
@@ -149,16 +147,7 @@ export function FilterToggleButton({
   negateFiltersToggled?: boolean;
   setNegateFilters?: (negateFilters: boolean) => void;
 }) {
-  const { project, organization } = useOrganizationTeamProject();
   const { filterCount, hasAnyFilters } = getFilterCount(filters);
-
-  const { enabled: hasNegateFilters } = useFeatureFlag(
-    "release_ui_negate_filters_enabled",
-    {
-      projectId: project?.id,
-      organizationId: organization?.id,
-    },
-  );
 
   return (
     <HStack gap={2}>
@@ -194,7 +183,7 @@ export function FilterToggleButton({
           )}
         </HStack>
       </Button>
-      {hasNegateFilters && setNegateFilters && (
+      {setNegateFilters && (
         <Tooltip content="Negate filters" positioning={{ gutter: 0 }}>
           <Button
             variant="plain"

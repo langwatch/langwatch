@@ -16,7 +16,7 @@ import {
   type WizardState,
   workbenchStateSchema,
 } from "../../../components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
-import { persistedEvaluationsV3StateSchema } from "../../../evaluations-v3/types/persistence";
+import { persistedEvaluationsV3StateSchema } from "../../../experiments-v3/types/persistence";
 import {
   type Entry,
   type Evaluator,
@@ -34,8 +34,8 @@ import {
 } from "../../elasticsearch";
 import { getApp } from "../../app-layer/app";
 import { DspyStepNotFoundError } from "../../app-layer/dspy-steps/errors";
-import { ExperimentRunService } from "../../evaluations-v3/services/experiment-run.service";
-import { getVersionMap } from "../../evaluations-v3/services/getVersionMap";
+import { ExperimentRunService } from "../../experiments-v3/services/experiment-run.service";
+import { getVersionMap } from "../../experiments-v3/services/getVersionMap";
 import type {
   DSPyRunsSummary,
   DSPyStep,

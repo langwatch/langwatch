@@ -177,7 +177,7 @@ local nowMs        = tonumber(ARGV[2])
 local activeTtlSec = tonumber(ARGV[3])
 -- Tenant soft-cap (post-2026-05-11 incident follow-up). When > 0, the
 -- scheduler refuses to dispatch a group whose tenant already has >=
--- tenantCap groups in flight. Defaults to 100 in TS (see
+-- tenantCap groups in flight. Defaults to 50 in TS (see
 -- DEFAULT_TENANT_CAP); operators can set LANGWATCH_DISPATCH_TENANT_CAP=0
 -- as an explicit kill switch, or to a higher integer to retune.
 -- The tenantId is derived from groupId prefix (segment before first '/').
@@ -198,8 +198,11 @@ local pageSize = 200
 -- zset. This is the explicit cost of the cap: more work per poll, in
 -- exchange for cross-tenant fairness.
 local scanBudget = 1000
-if tenantCap > 0 then scanBudget = 50000 end
+if tenantCap > 0 then scanBudget = 10000 end
 local offset = 0
+
+-- Cache tenant cap lookups within this EVAL to avoid redundant GETs.
+local tenantCapCache = {}
 
 while offset < scanBudget do
   local groups = redis.call("ZRANGEBYSCORE", readyKey, "-inf", nowMs, "LIMIT", offset, pageSize)
@@ -215,8 +218,13 @@ while offset < scanBudget do
         if slashPos and slashPos > 1 then
           local tenantId = string.sub(groupId, 1, slashPos - 1)
           tenantCountKey = keyPrefix .. "tenant_active:" .. tenantId
-          local n = tonumber(redis.call("GET", tenantCountKey)) or 0
-          if n >= tenantCap then tenantOverCap = true end
+          local cached = tenantCapCache[tenantId]
+          if cached == nil then
+            local n = tonumber(redis.call("GET", tenantCountKey)) or 0
+            cached = n >= tenantCap
+            tenantCapCache[tenantId] = cached
+          end
+          if cached then tenantOverCap = true end
         end
       end
 
@@ -339,8 +347,13 @@ if pageSize < 30 then pageSize = 30 end
 local scanBudget = pageSize * 5
 -- See DISPATCH_LUA: widen scan budget when the tenant cap is on so a
 -- head full of one over-cap tenant cannot starve other tenants.
-if tenantCap > 0 then scanBudget = pageSize * 250 end
+if tenantCap > 0 then scanBudget = pageSize * 50 end
 local offset = 0
+
+-- Cache tenant cap lookups within this EVAL to avoid redundant GETs.
+-- When 1,800 groups belong to one over-cap tenant, this turns 1,800
+-- GET calls into 1 GET + 1,799 table lookups.
+local tenantCapCache = {}
 
 while offset < scanBudget and dispatched < maxJobs do
   local groups = redis.call("ZRANGEBYSCORE", readyKey, "-inf", nowMs, "LIMIT", offset, pageSize)
@@ -358,17 +371,23 @@ while offset < scanBudget and dispatched < maxJobs do
         if slashPos and slashPos > 1 then
           local tenantId = string.sub(groupId, 1, slashPos - 1)
           tenantCountKey = keyPrefix .. "tenant_active:" .. tenantId
-          local n = tonumber(redis.call("GET", tenantCountKey)) or 0
-          if n >= tenantCap then tenantOverCap = true end
+          local cached = tenantCapCache[tenantId]
+          if cached == nil then
+            local n = tonumber(redis.call("GET", tenantCountKey)) or 0
+            cached = n >= tenantCap
+            tenantCapCache[tenantId] = cached
+          end
+          if cached then tenantOverCap = true end
         end
       end
 
-      local activeKey = keyPrefix .. "group:" .. groupId .. ":active"
-      -- Defensive activeKey check — covers legacy state during migration
-      -- and the small race between ZADD ready and ZADD active.
-      local activeJob = redis.call("GET", activeKey)
+      if not tenantOverCap then
+        local activeKey = keyPrefix .. "group:" .. groupId .. ":active"
+        -- Defensive activeKey check — covers legacy state during migration
+        -- and the small race between ZADD ready and ZADD active.
+        local activeJob = redis.call("GET", activeKey)
 
-      if (not activeJob) and (not tenantOverCap) then
+        if not activeJob then
         local jobsKey = keyPrefix .. "group:" .. groupId .. ":jobs"
         local jobResults = redis.call("ZRANGEBYSCORE", jobsKey, "-inf", nowMs, "WITHSCORES", "LIMIT", 0, 1)
 
@@ -423,6 +442,11 @@ while offset < scanBudget and dispatched < maxJobs do
             if tenantCap > 0 and tenantCountKey then
               redis.call("INCR", tenantCountKey)
               redis.call("EXPIRE", tenantCountKey, activeTtlSec)
+              -- Invalidate cache — count changed, may now be at cap
+              local slashPos2 = string.find(groupId, "/", 1, true)
+              if slashPos2 then
+                tenantCapCache[string.sub(groupId, 1, slashPos2 - 1)] = nil
+              end
             end
 
             local dataKey = keyPrefix .. "group:" .. groupId .. ":data"
@@ -448,6 +472,7 @@ while offset < scanBudget and dispatched < maxJobs do
             end
           end
         end
+      end
       end
     end
   end
@@ -732,7 +757,7 @@ export interface DispatchResult {
  *     disable entirely (incident kill-switch), or set a different
  *     positive integer to retune.
  */
-export const DEFAULT_TENANT_CAP = 100;
+export const DEFAULT_TENANT_CAP = 50;
 
 /**
  * Read the tenant soft-cap from the environment.
@@ -742,7 +767,7 @@ export const DEFAULT_TENANT_CAP = 100;
  * re-importing the frozen env module.
  *
  * Semantics:
- *   - env unset / empty / non-numeric / negative → DEFAULT_TENANT_CAP (100)
+ *   - env unset / empty / non-numeric / negative → DEFAULT_TENANT_CAP (50)
  *   - env = "0" → 0 (explicit kill switch — disable cap entirely)
  *   - env = positive integer → that integer
  */

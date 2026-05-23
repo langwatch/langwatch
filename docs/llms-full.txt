@@ -504,19 +504,32 @@ Let's get cracking.
 
 <Steps>
   <Step title="Create your LangWatch account">
-    First step: if you haven't already, grab your LangWatch account. Head over to [langwatch.ai](https://app.langwatch.ai), sign up, and get your API key ready.
-
-    <img src="/images/llm-observability/quick-start/setup-full.webp" />
+    Head over to [app.langwatch.ai](https://app.langwatch.ai) and sign up. Create your first organization and project.
   </Step>
 
-  <Step title="Sign in with LangWatch">
-    Open a terminal and run the following command to sign in with LangWatch:
+  <Step title="Get your API key">
+    You have two options:
+
+    **Option A: CLI login (recommended for local development)**
 
     ```bash
     npx langwatch login
     ```
 
-    This will add the `LANGWATCH_API_KEY` to your local `.env` file.
+    This opens your browser to authenticate and adds `LANGWATCH_API_KEY` to your local `.env` file.
+
+    **Option B: Create a key manually**
+
+    Go to [**Settings → API Keys**](https://app.langwatch.ai/settings/api-keys) and create an API key. See the [API Keys guide](/platform/api-keys) for details on personal vs service keys.
+
+    ```bash .env
+    LANGWATCH_API_KEY="sk-lw-..."
+    LANGWATCH_PROJECT_ID="your-project-id"
+    ```
+
+    <Note>
+      Keys created from **Settings → API Keys** (both personal and service) require `LANGWATCH_PROJECT_ID` so the SDK knows which project to send traces to. You can find the project ID in your project settings or URL.
+    </Note>
   </Step>
 
   <Step title="Let LangWatch MCP do the rest for you (Optional)">
@@ -568,6 +581,7 @@ from langwatch.instrumentors import OpenAIInstrumentor
 
 langwatch.setup(
     api_key=os.getenv("LANGWATCH_API_KEY"), # Your LangWatch API key
+    project_id=os.getenv("LANGWATCH_PROJECT_ID"), # Required for service API keys
     instrumentors=[OpenAIInstrumentor()] # Add the instrumentor for your LLM
 )
 ```
@@ -591,6 +605,7 @@ export function register() {
     serviceName: 'your-app-name', // Give your service a clear name
     traceExporter: new LangWatchExporter({
       apiKey: process.env.LANGWATCH_API_KEY, // Your LangWatch API key
+      projectId: process.env.LANGWATCH_PROJECT_ID, // Required for service API keys
     })
   });
 }
@@ -4832,7 +4847,7 @@ from langwatch.types import RAGChunk
 from langwatch.attributes import AttributeKey # For semantic attribute keys
 import asyncio # Assuming async operation
 
-langwatch.setup()
+langwatch.setup()  # Reads LANGWATCH_API_KEY and LANGWATCH_PROJECT_ID from environment
 
 async def rag_retrieval_manual(query: str):
     # Use async with for the span, instead of a decorator
@@ -7840,6 +7855,7 @@ import { FilterableBatchSpanProcessor, LangWatchExporter } from "langwatch";
 const processor = new FilterableBatchSpanProcessor(
   new LangWatchExporter({
     apiKey: "your-api-key",
+    projectId: "your-project-id", // Required for service API keys
   }),
   [
     { attribute: "http.url", value: "/health" },
@@ -10134,6 +10150,7 @@ This guide shows you how to set up OpenTelemetry instrumentation in any language
 ## Prerequisites
 
 - Obtain your `LANGWATCH_API_KEY` from the [LangWatch dashboard](https://app.langwatch.ai/)
+- If using a **service API key**, also obtain your `LANGWATCH_PROJECT_ID` from your project settings
 - Install the OpenTelemetry SDK for your programming language
 
 ## LangWatch OTEL API Endpoint
@@ -10336,7 +10353,12 @@ Set these environment variables for authentication:
 
 ```bash
 export LANGWATCH_API_KEY="your-api-key-here"
+export LANGWATCH_PROJECT_ID="your-project-id-here"  # Required for service API keys
 ```
+
+<Note>
+  `LANGWATCH_PROJECT_ID` is required when using a **service API key** (e.g. for CI/CD or multi-project setups). Project API keys obtained from the project settings page already have the project context built in.
+</Note>
 
 ## Verification
 
@@ -11080,7 +11102,9 @@ Instead of manually reading docs and writing boilerplate code, just ask your AI 
 <Steps>
 
 <Step title="Get your API key">
-Go to your LangWatch project **Settings** page and copy your API key. The API key is required for observability and prompt tools. Documentation tools work without it.
+Go to [**Settings → API Keys**](https://app.langwatch.ai/settings/api-keys) and create a **personal API key**. This key connects your coding assistant to your LangWatch account for observability, prompts, and analytics tools. Documentation tools work without a key.
+
+See the [API Keys guide](/platform/api-keys#creating-a-personal-api-key) for step-by-step instructions.
 </Step>
 
 <Step title="Configure your MCP">
@@ -11452,7 +11476,7 @@ The LangWatch MCP is so powerful that it can help AI agents automatically instru
 
 ## MCP Tools Reference
 
-The MCP server provides 10 tools organized into three categories. Your AI assistant automatically chooses the right tools based on your request.
+The MCP server provides tools organized into categories. Your AI assistant automatically chooses the right tools based on your request.
 
 ### Documentation
 
@@ -11478,6 +11502,23 @@ The MCP server provides 10 tools organized into three categories. Your AI assist
 | `get_prompt` | Get a prompt with messages, model config, and version history |
 | `create_prompt` | Create a new prompt with messages and model configuration |
 | `update_prompt` | Update a prompt or create a new version |
+
+### Organization Management (requires org-level API key)
+
+| Tool | Description |
+|------|-------------|
+| `platform_list_projects` | List all projects in the organization |
+| `platform_get_project` | Get project details by ID |
+| `platform_create_project` | Create a new project (returns a one-time service API key) |
+| `platform_update_project` | Update a project's name, language, framework, or PII settings |
+| `platform_archive_project` | Archive a project (soft-delete) |
+| `platform_list_api_keys` | List all API keys in the organization |
+| `platform_create_api_key` | Create a personal or service API key |
+| `platform_revoke_api_key` | Revoke an API key |
+
+<Info>
+Organization management tools require an API key with org-level permissions. If the configured key lacks organization permissions, these tools will return a clear error message.
+</Info>
 
 ### Tool Details
 
@@ -13650,6 +13691,10 @@ const langwatch = new LangWatch();
 ```
 
 
+
+<Note>
+  If you are using a **service API key** (e.g. for CI/CD or multi-project setups), you must also set the `LANGWATCH_PROJECT_ID` environment variable (or pass `project_id`/`projectId` to the SDK) so the SDK knows which project to access. You can find the project ID in your project settings.
+</Note>
 
 ## List Datasets
 
@@ -18488,7 +18533,12 @@ Be sure to login or create an account on the link that will be displayed, then p
 
 ```bash
 export LANGWATCH_API_KEY=your_api_key
+export LANGWATCH_PROJECT_ID=your_project_id  # Required for service API keys
 ```
+
+<Note>
+  `LANGWATCH_PROJECT_ID` is required when using a **service API key** (e.g. for CI/CD or multi-project setups). Project API keys obtained via `langwatch.login()` or from the project settings page already have the project context built in.
+</Note>
 
 
 
@@ -24341,7 +24391,7 @@ For a deployment with 150 GB/month of trace data, cold storage can save ~$500/ye
 
 ## S3 Dataset Backups
 
-If you're using S3 for dataset storage (`app.datasetObjectStorage.enabled: true`), protect this data with:
+If you're using S3 for dataset storage (`app.dataplane.enabled: true`), protect this data with:
 
 - **S3 Versioning**: Enable versioning on the bucket to recover from accidental deletes
 - **Cross-region replication**: For disaster recovery, replicate to another region
@@ -24472,19 +24522,29 @@ Each SSO provider requires specific variables. See [SSO Configuration](/self-hos
 
 ## Object Storage (S3)
 
+The dataplane S3 bucket is the general file-storage layer for all externalized byte content. Current consumers:
+
+- **Stored objects** — externalized byte content (audio, image, video, document) extracted from incoming events and dataset uploads. Bytes are content-addressed under `{projectId}/{sha256}` and served back via `GET /api/files/:id`.
+- **Dataset uploads** — persists rows uploaded through the dataset UI. Shares the same `S3_BUCKET_NAME` bucket.
+
+When `S3_BUCKET_NAME` is set, all consumers use that bucket. When it is not set, stored-objects fall back to the local filesystem at `LANGWATCH_LOCAL_STORAGE_PATH` — fine for single-replica installs, **not** for horizontally-scaled deployments (see warning below).
+
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `DATASET_OBJECT_STORAGE_ENABLED` | Enable S3 for dataset storage | `false` |
-| `DATASET_OBJECT_STORAGE_PROVIDER` | Storage provider (`awsS3`) | `awsS3` |
-| `DATASET_OBJECT_STORAGE_BUCKET` | S3 bucket name | `langwatch-dataset` |
-| `S3_ENDPOINT` | Custom S3 endpoint (for MinIO, etc.) |, |
-| `S3_ACCESS_KEY_ID` | S3 access key ID |, |
-| `S3_SECRET_ACCESS_KEY` | S3 secret access key |, |
-| `S3_KEY_SALT` | Optional key salt for S3 object keys |, |
+| `S3_BUCKET_NAME` | Dataplane bucket shared by datasets + stored-objects | — |
+| `S3_ENDPOINT` | Custom S3 endpoint (for MinIO, etc.) | — |
+| `S3_ACCESS_KEY_ID` | S3 access key ID | — |
+| `S3_SECRET_ACCESS_KEY` | S3 secret access key | — |
+| `S3_KEY_SALT` | Optional key salt for S3 object keys | — |
+| `LANGWATCH_LOCAL_STORAGE_PATH` | Filesystem root used for stored-objects when no S3 is configured | `/var/lib/langwatch/objects` |
 
 <Note>
 When running on AWS with IRSA (IAM Roles for Service Accounts), you don't need to set S3 access keys. The pod's service account will assume the IAM role automatically.
 </Note>
+
+<Warning>
+`LANGWATCH_LOCAL_STORAGE_PATH` is **single-replica only**. Multi-pod Kubernetes deployments must NOT rely on it: pods do not share a local filesystem, so a write from pod A is invisible to pod B and bytes vanish on every pod restart. Single-replica self-host installs (small footprints, hobbyist / air-gapped / pre-pilot deployments) can use it safely — the Helm chart refuses to render `localFilesystem.enabled=true` together with `replicaCount > 1` so the misconfiguration can't reach a cluster. Use `S3_BUCKET_NAME` (or the equivalent Helm `app.dataplane.enabled` toggle) for any horizontally-scaled deployment.
+</Warning>
 
 ## Email
 
@@ -24544,8 +24604,8 @@ When using the Helm chart, configuration is set in `values.yaml` rather than env
 | `app.evaluators.google.enabled` | `GOOGLE_EVALUATOR_ENABLED` |
 | `app.evaluators.google.credentials.value` | `GOOGLE_CREDENTIALS_JSON` |
 | `app.telemetry.usage.enabled` | Inverse of `DISABLE_USAGE_STATS` |
-| `app.datasetObjectStorage.enabled` | `DATASET_OBJECT_STORAGE_ENABLED` |
-| `app.datasetObjectStorage.bucket` | `DATASET_OBJECT_STORAGE_BUCKET` |
+| `app.dataplane.enabled` | `USE_S3_STORAGE` |
+| `app.dataplane.bucket` | `S3_BUCKET_NAME` |
 | `postgresql.external.connectionString.value` | `DATABASE_URL` |
 | `redis.external.connectionString.value` | `REDIS_URL` |
 | `workers.enabled` | Inverse of `START_WORKERS` |
@@ -26387,6 +26447,7 @@ The `langwatch/clickhouse-serverless` Docker image is a performance-tweaked Clic
 - ClickHouse cold storage (tiered after TTL)
 - ClickHouse backups (full + incremental)
 - Dataset storage (optional)
+- **Stored objects** — externalized byte content (audio/image/video/document) content-addressed under `{projectId}/{sha256}` and served back via `GET /api/files/:id`.
 
 ## Event Sourcing Pipeline
 
@@ -27227,7 +27288,8 @@ graph LR
     Workers -->|"NLP"| NLP["LangWatch NLP"]
     App -->|"queries"| CH
     App -->|"control plane"| PG["PostgreSQL"]
-    CH -->|"cold storage"| S3["S3"]
+    App -->|"externalized byte content<br/>(scenario media, datasets, …)"| S3["S3"]
+    CH -->|"cold storage"| S3
 ```
 
 See [Architecture & Infrastructure](/self-hosting/infrastructure/architecture) for a detailed breakdown of networking, scaling, and storage tiers, and [AI Gateway → Self-hosting](/ai-gateway/self-hosting/helm) for the gateway sub-chart setup if you want to terminate LLM traffic on your own perimeter.
@@ -27503,6 +27565,38 @@ LangWatch enforces tenant isolation at the application level:
 - API tokens are scoped to a specific project
 - Cross-tenant data access is prevented at the query layer
 
+## Supply Chain
+
+LangWatch container images and CLI packages are published with verifiable supply-chain attestations so operators can confirm an artifact was built by LangWatch CI from a specific source commit.
+
+### Container images (Docker Hub)
+
+Every release of `langwatch/langwatch`, `langwatch/langwatch_nlp`, `langwatch/langevals`, and `langwatch/ai-gateway` is signed with [Sigstore](https://www.sigstore.dev/) cosign using keyless OIDC. Both the multi-arch index manifest and each per-platform manifest (linux/amd64, linux/arm64) are signed by digest. A CycloneDX SBOM is generated per platform and attached as a cosign attestation against the matching platform manifest digest, so the SBOM you verify always corresponds to the architecture you actually pulled.
+
+Verify a signature with [cosign](https://github.com/sigstore/cosign):
+
+```bash
+cosign verify langwatch/langwatch:<tag> \
+  --certificate-identity-regexp '^https://github\.com/langwatch/langwatch/' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+```
+
+Inspect the attached SBOM for the platform you pulled (cosign resolves the right per-platform manifest digest automatically when you pass a tag):
+
+```bash
+cosign download attestation \
+  --predicate-type https://cyclonedx.org/bom \
+  langwatch/langwatch:<tag> \
+  | jq -r '.payload | @base64d | fromjson | .predicate' \
+  > langwatch.cdx.json
+```
+
+The per-platform `*.cdx.json` files (e.g. `langwatch-linux-amd64.cdx.json`, `langwatch-linux-arm64.cdx.json`) are also attached to each `langwatch@vX.Y.Z` [GitHub release](https://github.com/langwatch/langwatch/releases).
+
+### npm CLI
+
+The `langwatch` npm package is published with [npm provenance attestations](https://docs.npmjs.com/generating-provenance-statements) via GitHub Actions OIDC, also backed by Sigstore. The provenance link is visible on the [package page](https://www.npmjs.com/package/langwatch) and can be verified with `npm audit signatures`.
+
 ## Production Hardening Checklist
 
 - [ ] `autogen.enabled: false`, use manually created secrets
@@ -27518,6 +27612,7 @@ LangWatch enforces tenant isolation at the application level:
 - [ ] Pod security contexts verified (non-root, read-only filesystem)
 - [ ] Ingress rate limiting configured
 - [ ] Audit logs enabled (Enterprise)
+- [ ] Image signatures verified at pull time (admission controller or `cosign verify` in CI)
 
 ---
 
@@ -28431,6 +28526,86 @@ The hybrid setup requires coordination with our team to configure the secure con
 
 ---
 
+# FILE: ./api-reference/agents/create-agents.mdx
+
+---
+title: "Create a new agent"
+openapi: "POST /api/agents"
+---
+
+---
+
+# FILE: ./api-reference/agents/delete-agents.mdx
+
+---
+title: "Archive an agent"
+openapi: "DELETE /api/agents/{id}"
+---
+
+---
+
+# FILE: ./api-reference/agents/get-agents.mdx
+
+---
+title: "Get an agent by its id"
+openapi: "GET /api/agents/{id}"
+---
+
+---
+
+# FILE: ./api-reference/agents/list-agents.mdx
+
+---
+title: "List all non-archived agents for the project"
+openapi: "GET /api/agents"
+---
+
+---
+
+# FILE: ./api-reference/agents/overview.mdx
+
+---
+title: "Overview"
+description: "Manage AI agent configurations. Create, update, and organize agents that are tracked and evaluated in LangWatch."
+---
+
+## Intro
+
+Manage AI agent configurations. Create, update, and organize agents that are tracked and evaluated in LangWatch.
+
+---
+
+# FILE: ./api-reference/agents/update-agents.mdx
+
+---
+title: "Update an agent by its id"
+openapi: "PATCH /api/agents/{id}"
+---
+
+---
+
+# FILE: ./api-reference/analytics/create-timeseries.mdx
+
+---
+title: "Create Timeseries"
+openapi: "POST /api/analytics/timeseries"
+---
+
+---
+
+# FILE: ./api-reference/analytics/overview.mdx
+
+---
+title: "Overview"
+description: "Query analytics timeseries data with metrics, aggregations, and filters."
+---
+
+## Intro
+
+Query analytics timeseries data with metrics, aggregations, and filters.
+
+---
+
 # FILE: ./api-reference/annotations/create-annotation-trace.mdx
 
 ---
@@ -28453,7 +28628,7 @@ openapi: 'DELETE /api/annotations/{id}'
 # FILE: ./api-reference/annotations/get-all-annotations-trace.mdx
 
 ---
-title: 'Get annotationa for single trace'
+title: 'Get annotations for a trace'
 openapi: 'GET /api/annotations/trace/{id}'
 ---
 
@@ -28615,11 +28790,190 @@ openapi: 'POST /api/trigger/slack'
 
 ---
 
+# FILE: ./api-reference/dashboards/create-dashboards.mdx
+
+---
+title: "Create a new dashboard"
+openapi: "POST /api/dashboards"
+---
+
+---
+
+# FILE: ./api-reference/dashboards/delete-dashboards.mdx
+
+---
+title: "Delete a dashboard and its graphs"
+openapi: "DELETE /api/dashboards/{id}"
+---
+
+---
+
+# FILE: ./api-reference/dashboards/get-dashboards.mdx
+
+---
+title: "Get a dashboard by its id, including its graphs"
+openapi: "GET /api/dashboards/{id}"
+---
+
+---
+
+# FILE: ./api-reference/dashboards/list-dashboards.mdx
+
+---
+title: "List Dashboards"
+openapi: "GET /api/dashboards"
+---
+
+---
+
+# FILE: ./api-reference/dashboards/overview.mdx
+
+---
+title: "Overview"
+description: "Manage custom analytics dashboards. Create, reorder, and organize dashboards with custom graphs."
+---
+
+## Intro
+
+Manage custom analytics dashboards. Create, reorder, and organize dashboards with custom graphs.
+
+---
+
+# FILE: ./api-reference/dashboards/update-dashboards.mdx
+
+---
+title: "Rename a dashboard"
+openapi: "PATCH /api/dashboards/{id}"
+---
+
+---
+
+# FILE: ./api-reference/dashboards/update-reorder.mdx
+
+---
+title: "Reorder dashboards"
+openapi: "PUT /api/dashboards/reorder"
+---
+
+---
+
+# FILE: ./api-reference/datasets/action-records.mdx
+
+---
+title: "Create records in a dataset in batch"
+openapi: "POST /api/dataset/{slugOrId}/records"
+---
+
+---
+
+# FILE: ./api-reference/datasets/action-upload.mdx
+
+---
+title: "Upload a file"
+openapi: "POST /api/dataset/{slugOrId}/upload"
+---
+
+---
+
+# FILE: ./api-reference/datasets/create-dataset.mdx
+
+---
+title: "Create a new dataset"
+openapi: "POST /api/dataset"
+---
+
+---
+
+# FILE: ./api-reference/datasets/create-upload.mdx
+
+---
+title: "Create a new dataset from an uploaded file"
+openapi: "POST /api/dataset/upload"
+---
+
+---
+
+# FILE: ./api-reference/datasets/delete-dataset.mdx
+
+---
+title: "Archive a dataset"
+openapi: "DELETE /api/dataset/{slugOrId}"
+---
+
+---
+
+# FILE: ./api-reference/datasets/delete-records.mdx
+
+---
+title: "Delete records from a dataset by IDs"
+openapi: "DELETE /api/dataset/{slugOrId}/records"
+---
+
+---
+
+# FILE: ./api-reference/datasets/get-dataset.mdx
+
+---
+title: "Get a dataset by its slug or id"
+openapi: "GET /api/dataset/{slugOrId}"
+---
+
+---
+
+# FILE: ./api-reference/datasets/get-records.mdx
+
+---
+title: "List records for a dataset"
+openapi: "GET /api/dataset/{slugOrId}/records"
+---
+
+---
+
+# FILE: ./api-reference/datasets/list-dataset.mdx
+
+---
+title: "List all non-archived datasets for the project"
+openapi: "GET /api/dataset"
+---
+
+---
+
+# FILE: ./api-reference/datasets/overview.mdx
+
+---
+title: "Overview"
+description: "Manage datasets for evaluations, experiments, and fine-tuning. Create, update, upload, and manage records programmatically."
+---
+
+## Intro
+
+Manage datasets for evaluations, experiments, and fine-tuning. Create, update, upload, and manage records programmatically.
+
+---
+
 # FILE: ./api-reference/datasets/post-dataset-entries.mdx
 
 ---
 title: 'Add dataset entries programmatically using the LangWatch API to build evaluation sets for LLM testing and agent validation.'
 openapi: 'POST /api/dataset/{slug}/entries'
+---
+
+---
+
+# FILE: ./api-reference/datasets/update-dataset.mdx
+
+---
+title: "Update a dataset by its slug or id"
+openapi: "PATCH /api/dataset/{slugOrId}"
+---
+
+---
+
+# FILE: ./api-reference/datasets/update-records.mdx
+
+---
+title: "Update or create a record in a dataset"
+openapi: "PATCH /api/dataset/{slugOrId}/records/{recordId}"
 ---
 
 ---
@@ -28638,6 +28992,95 @@ openapi: 'POST /plants'
 ---
 title: 'Delete Plant'
 openapi: 'DELETE /plants/{id}'
+---
+
+---
+
+# FILE: ./api-reference/evaluations/action-run.mdx
+
+---
+title: "Create Run"
+openapi: "POST /api/evaluations/v3/{slug}/run"
+---
+
+---
+
+# FILE: ./api-reference/evaluations/get-runs.mdx
+
+---
+title: "Get evaluation run status"
+openapi: "GET /api/evaluations/v3/runs/{runId}"
+---
+
+---
+
+# FILE: ./api-reference/evaluations/overview.mdx
+
+---
+title: "Overview"
+description: "Run and monitor evaluation experiments. Start evaluation runs and poll for progress and results."
+---
+
+## Intro
+
+Run and monitor evaluation experiments. Start evaluation runs and poll for progress and results.
+
+---
+
+# FILE: ./api-reference/evaluators-config/create-evaluators.mdx
+
+---
+title: "Create a new evaluator"
+openapi: "POST /api/evaluators"
+---
+
+---
+
+# FILE: ./api-reference/evaluators-config/delete-evaluators.mdx
+
+---
+title: "Archive an evaluator"
+openapi: "DELETE /api/evaluators/{id}"
+---
+
+---
+
+# FILE: ./api-reference/evaluators-config/get-evaluators.mdx
+
+---
+title: "Get a specific evaluator by ID or slug"
+openapi: "GET /api/evaluators/{idOrSlug}"
+---
+
+---
+
+# FILE: ./api-reference/evaluators-config/list-evaluators.mdx
+
+---
+title: "Get all evaluators for a project"
+openapi: "GET /api/evaluators"
+---
+
+---
+
+# FILE: ./api-reference/evaluators-config/overview.mdx
+
+---
+title: "Overview"
+description: "Manage evaluator configurations for your project. Create, update, and organize evaluators used for online evaluations, guardrails, and experiments."
+---
+
+## Intro
+
+Manage evaluator configurations for your project. Create, update, and organize evaluators used for online evaluations, guardrails, and experiments.
+
+---
+
+# FILE: ./api-reference/evaluators-config/update-evaluators.mdx
+
+---
+title: "Update an existing evaluator"
+openapi: "PUT /api/evaluators/{id}"
 ---
 
 ---
@@ -29121,6 +29564,385 @@ openapi: post /langevals/valid_format/evaluate
 ---
 ---
 
+# FILE: ./api-reference/gateway-budgets/archive-budget.mdx
+
+---
+title: "Archive budget"
+openapi: "DELETE /api/gateway/v1/budgets/{id}"
+---
+
+---
+
+# FILE: ./api-reference/gateway-budgets/create-budget.mdx
+
+---
+title: "Create budget"
+openapi: "POST /api/gateway/v1/budgets"
+---
+
+---
+
+# FILE: ./api-reference/gateway-budgets/list-budgets-applicable-to-the-project.mdx
+
+---
+title: "List budgets applicable to the project"
+openapi: "GET /api/gateway/v1/budgets"
+---
+
+---
+
+# FILE: ./api-reference/gateway-budgets/overview.mdx
+
+---
+title: "Overview"
+description: "Manage spending budgets for the AI Gateway. Set cost limits per project, team, or virtual key with configurable time windows."
+---
+
+## Intro
+
+Manage spending budgets for the AI Gateway. Set cost limits per project, team, or virtual key with configurable time windows.
+
+---
+
+# FILE: ./api-reference/gateway-budgets/update-budget.mdx
+
+---
+title: "Update budget"
+openapi: "PATCH /api/gateway/v1/budgets/{id}"
+---
+
+---
+
+# FILE: ./api-reference/gateway-cache-rules/archive-a-cache-rule.mdx
+
+---
+title: "Archive a cache rule"
+openapi: "DELETE /api/gateway/v1/cache-rules/{id}"
+---
+
+---
+
+# FILE: ./api-reference/gateway-cache-rules/create-a-cache-rule.mdx
+
+---
+title: "Create a cache rule"
+openapi: "POST /api/gateway/v1/cache-rules"
+---
+
+---
+
+# FILE: ./api-reference/gateway-cache-rules/get-a-cache-rule.mdx
+
+---
+title: "Get a cache rule"
+openapi: "GET /api/gateway/v1/cache-rules/{id}"
+---
+
+---
+
+# FILE: ./api-reference/gateway-cache-rules/list-cache-control-rules.mdx
+
+---
+title: "List cache-control rules"
+openapi: "GET /api/gateway/v1/cache-rules"
+---
+
+---
+
+# FILE: ./api-reference/gateway-cache-rules/overview.mdx
+
+---
+title: "Overview"
+description: "Manage cache-control rules for the AI Gateway. Configure semantic caching to reduce latency and costs for repeated queries."
+---
+
+## Intro
+
+Manage cache-control rules for the AI Gateway. Configure semantic caching to reduce latency and costs for repeated queries.
+
+---
+
+# FILE: ./api-reference/gateway-cache-rules/update-a-cache-rule.mdx
+
+---
+title: "Update a cache rule"
+openapi: "PATCH /api/gateway/v1/cache-rules/{id}"
+---
+
+---
+
+# FILE: ./api-reference/gateway-providers/bind-a-model-provider-to-the-gateway.mdx
+
+---
+title: "Bind a model provider to the gateway"
+openapi: "POST /api/gateway/v1/providers"
+---
+
+---
+
+# FILE: ./api-reference/gateway-providers/disable-provider-binding.mdx
+
+---
+title: "Disable provider binding"
+openapi: "DELETE /api/gateway/v1/providers/{id}"
+---
+
+---
+
+# FILE: ./api-reference/gateway-providers/list-provider-bindings.mdx
+
+---
+title: "List provider bindings"
+openapi: "GET /api/gateway/v1/providers"
+---
+
+---
+
+# FILE: ./api-reference/gateway-providers/overview.mdx
+
+---
+title: "Overview"
+description: "Manage provider credential bindings for the AI Gateway. Bind model providers (OpenAI, Anthropic, etc.) to enable routing through the gateway."
+---
+
+## Intro
+
+Manage provider credential bindings for the AI Gateway. Bind model providers (OpenAI, Anthropic, etc.) to enable routing through the gateway.
+
+---
+
+# FILE: ./api-reference/gateway-providers/update-provider-binding.mdx
+
+---
+title: "Update provider binding"
+openapi: "PATCH /api/gateway/v1/providers/{id}"
+---
+
+---
+
+# FILE: ./api-reference/gateway-virtual-keys/create-virtual-key.mdx
+
+---
+title: "Create virtual key"
+openapi: "POST /api/gateway/v1/virtual-keys"
+---
+
+---
+
+# FILE: ./api-reference/gateway-virtual-keys/get-virtual-key.mdx
+
+---
+title: "Get virtual key"
+openapi: "GET /api/gateway/v1/virtual-keys/{id}"
+---
+
+---
+
+# FILE: ./api-reference/gateway-virtual-keys/list-virtual-keys.mdx
+
+---
+title: "List virtual keys"
+openapi: "GET /api/gateway/v1/virtual-keys"
+---
+
+---
+
+# FILE: ./api-reference/gateway-virtual-keys/overview.mdx
+
+---
+title: "Overview"
+description: "Manage virtual keys for the AI Gateway. Virtual keys abstract provider credentials and enable usage tracking, rate limiting, and access control."
+---
+
+## Intro
+
+Manage virtual keys for the AI Gateway. Virtual keys abstract provider credentials and enable usage tracking, rate limiting, and access control.
+
+---
+
+# FILE: ./api-reference/gateway-virtual-keys/revoke-virtual-key.mdx
+
+---
+title: "Revoke virtual key"
+openapi: "POST /api/gateway/v1/virtual-keys/{id}/revoke"
+---
+
+---
+
+# FILE: ./api-reference/gateway-virtual-keys/rotate-virtual-key-secret.mdx
+
+---
+title: "Rotate virtual key secret"
+openapi: "POST /api/gateway/v1/virtual-keys/{id}/rotate"
+---
+
+---
+
+# FILE: ./api-reference/gateway-virtual-keys/update-virtual-key.mdx
+
+---
+title: "Update virtual key"
+openapi: "PATCH /api/gateway/v1/virtual-keys/{id}"
+---
+
+---
+
+# FILE: ./api-reference/graphs/create-graphs.mdx
+
+---
+title: "Create a custom graph on a dashboard"
+openapi: "POST /api/graphs"
+---
+
+---
+
+# FILE: ./api-reference/graphs/delete-graphs.mdx
+
+---
+title: "Delete a custom graph"
+openapi: "DELETE /api/graphs/{id}"
+---
+
+---
+
+# FILE: ./api-reference/graphs/get-graphs.mdx
+
+---
+title: "Get a custom graph by its ID"
+openapi: "GET /api/graphs/{id}"
+---
+
+---
+
+# FILE: ./api-reference/graphs/list-graphs.mdx
+
+---
+title: "List Graphs"
+openapi: "GET /api/graphs"
+---
+
+---
+
+# FILE: ./api-reference/graphs/overview.mdx
+
+---
+title: "Overview"
+description: "Manage custom analytics graphs within dashboards. Create, update, and configure graph visualizations."
+---
+
+## Intro
+
+Manage custom analytics graphs within dashboards. Create, update, and configure graph visualizations.
+
+---
+
+# FILE: ./api-reference/graphs/update-graphs.mdx
+
+---
+title: "Update Graphs"
+openapi: "PATCH /api/graphs/{id}"
+---
+
+---
+
+# FILE: ./api-reference/model-providers/list-model-providers.mdx
+
+---
+title: "List Model Providers"
+openapi: "GET /api/model-providers"
+---
+
+---
+
+# FILE: ./api-reference/model-providers/overview.mdx
+
+---
+title: "Overview"
+description: "Manage model provider configurations (API keys for OpenAI, Anthropic, etc.) used across the platform."
+---
+
+## Intro
+
+Manage model provider configurations (API keys for OpenAI, Anthropic, etc.) used across the platform.
+
+---
+
+# FILE: ./api-reference/model-providers/update-model-providers.mdx
+
+---
+title: "Create or update a model provider"
+openapi: "PUT /api/model-providers/{provider}"
+---
+
+---
+
+# FILE: ./api-reference/monitors/action-toggle.mdx
+
+---
+title: "Enable or disable a monitor"
+openapi: "POST /api/monitors/{id}/toggle"
+---
+
+---
+
+# FILE: ./api-reference/monitors/create-monitors.mdx
+
+---
+title: "Create a new online evaluation monitor"
+openapi: "POST /api/monitors"
+---
+
+---
+
+# FILE: ./api-reference/monitors/delete-monitors.mdx
+
+---
+title: "Delete a monitor"
+openapi: "DELETE /api/monitors/{id}"
+---
+
+---
+
+# FILE: ./api-reference/monitors/get-monitors.mdx
+
+---
+title: "Get a monitor by its ID"
+openapi: "GET /api/monitors/{id}"
+---
+
+---
+
+# FILE: ./api-reference/monitors/list-monitors.mdx
+
+---
+title: "List Monitors"
+openapi: "GET /api/monitors"
+---
+
+---
+
+# FILE: ./api-reference/monitors/overview.mdx
+
+---
+title: "Overview"
+description: "Manage online evaluation monitors that automatically evaluate traces as they arrive. Create, update, enable/disable, and delete monitors."
+---
+
+## Intro
+
+Manage online evaluation monitors that automatically evaluate traces as they arrive. Create, update, enable/disable, and delete monitors.
+
+---
+
+# FILE: ./api-reference/monitors/update-monitors.mdx
+
+---
+title: "Update a monitor"
+openapi: "PATCH /api/monitors/{id}"
+---
+
+---
+
 # FILE: ./api-reference/projects/archive-project.mdx
 
 ---
@@ -29217,6 +30039,24 @@ openapi: "PATCH /api/projects/{id}"
 
 ---
 
+# FILE: ./api-reference/prompts/action-restore.mdx
+
+---
+title: "Restore a prompt to a previous version"
+openapi: "POST /api/prompts/{id}/versions/{versionId}/restore"
+---
+
+---
+
+# FILE: ./api-reference/prompts/action-sync.mdx
+
+---
+title: "Sync/upsert a prompt with local content"
+openapi: "POST /api/prompts/{id}/sync"
+---
+
+---
+
 # FILE: ./api-reference/prompts/create-prompt-version.mdx
 
 ---
@@ -29235,11 +30075,29 @@ openapi: "POST /api/prompts"
 
 ---
 
+# FILE: ./api-reference/prompts/create-tags.mdx
+
+---
+title: "Create Tags"
+openapi: "POST /api/prompts/tags"
+---
+
+---
+
 # FILE: ./api-reference/prompts/delete-prompt.mdx
 
 ---
 title: "Delete prompt"
 openapi: "DELETE /api/prompts/{id}"
+---
+
+---
+
+# FILE: ./api-reference/prompts/delete-tags.mdx
+
+---
+title: "Delete Tags"
+openapi: "DELETE /api/prompts/tags/{tag}"
 ---
 
 ---
@@ -29267,6 +30125,15 @@ openapi: "GET /api/prompts/{id}"
 ---
 title: "Get prompts"
 openapi: "GET /api/prompts"
+---
+
+---
+
+# FILE: ./api-reference/prompts/list-tags.mdx
+
+---
+title: "List Tags"
+openapi: "GET /api/prompts/tags"
 ---
 
 ---
@@ -29305,11 +30172,29 @@ To make a call to the Prompts API, you will need to pass through your LangWatch 
 
 ---
 
+# FILE: ./api-reference/prompts/put-update-tags.mdx
+
+---
+title: "Rename a prompt tag definition"
+openapi: "PUT /api/prompts/tags/{tag}"
+---
+
+---
+
 # FILE: ./api-reference/prompts/update-prompt.mdx
 
 ---
 title: "Update prompt"
 openapi: "PUT /api/prompts/{id}"
+---
+
+---
+
+# FILE: ./api-reference/prompts/update-tags.mdx
+
+---
+title: "Assign a tag"
+openapi: "PUT /api/prompts/{id}/tags/{tag}"
 ---
 
 ---
@@ -29366,17 +30251,29 @@ To make a call to the Saved Evaluators API, you will need to pass through your L
 
 ---
 
-# FILE: ./api-reference/scenarios/create-event.mdx
+# FILE: ./api-reference/scenario-events/create-scenario-events.mdx
 
 ---
-openapi: post /api/scenario-events
----
+title: "Create a new scenario event"
+openapi: "POST /api/scenario-events"
 ---
 
-# FILE: ./api-reference/scenarios/overview.mdx
+---
+
+# FILE: ./api-reference/scenario-events/delete-scenario-events.mdx
 
 ---
-title: Overview
+title: "Delete all events"
+openapi: "DELETE /api/scenario-events"
+---
+
+---
+
+# FILE: ./api-reference/scenario-events/overview.mdx
+
+---
+title: "Overview"
+description: "Create and manage scenario execution events to power the Simulations visualizer."
 ---
 
 # Scenario Event Schema
@@ -29389,7 +30286,7 @@ The Simulations visualizer is powered by a single endpoint that receives events 
 
 The request body should be a JSON object representing one of the event types described below. These events allow LangWatch to reconstruct the entire history of your simulation sets, batches, and individual scenario runs.
 
-For a detailed look at the request and response models, see the [Create Event endpoint reference](/api-reference/scenarios/create-event).
+For a detailed look at the request and response models, see the [Create Event endpoint reference](/api-reference/scenario-events/create-scenario-events).
 
 ## Common Properties
 
@@ -29432,6 +30329,343 @@ This event marks the end of a scenario run and includes the final results.
     -   `reasoning`: The explanation for the verdict.
     -   `metCriteria`: A list of criteria that were satisfied.
     -   `unmetCriteria`: A list of criteria that were not met.
+
+---
+
+# FILE: ./api-reference/scenarios/create-scenarios.mdx
+
+---
+title: "Create a new scenario"
+openapi: "POST /api/scenarios"
+---
+
+---
+
+# FILE: ./api-reference/scenarios/delete-scenarios.mdx
+
+---
+title: "Archive a scenario"
+openapi: "DELETE /api/scenarios/{id}"
+---
+
+---
+
+# FILE: ./api-reference/scenarios/get-scenarios.mdx
+
+---
+title: "Get a specific scenario by ID"
+openapi: "GET /api/scenarios/{id}"
+---
+
+---
+
+# FILE: ./api-reference/scenarios/list-scenarios.mdx
+
+---
+title: "Get all scenarios for a project"
+openapi: "GET /api/scenarios"
+---
+
+---
+
+# FILE: ./api-reference/scenarios/overview.mdx
+
+---
+title: "Overview"
+description: "Manage test scenarios for agent simulations. Create, update, and organize scenarios that define test cases for your AI agents."
+---
+
+## Intro
+
+Manage test scenarios for agent simulations. Create, update, and organize scenarios that define test cases for your AI agents.
+
+---
+
+# FILE: ./api-reference/scenarios/update-scenarios.mdx
+
+---
+title: "Update an existing scenario"
+openapi: "PUT /api/scenarios/{id}"
+---
+
+---
+
+# FILE: ./api-reference/secrets/create-secrets.mdx
+
+---
+title: "Create a new project secret"
+openapi: "POST /api/secrets"
+---
+
+---
+
+# FILE: ./api-reference/secrets/delete-secrets.mdx
+
+---
+title: "Delete a secret"
+openapi: "DELETE /api/secrets/{id}"
+---
+
+---
+
+# FILE: ./api-reference/secrets/get-secrets.mdx
+
+---
+title: "Get a secret by its ID"
+openapi: "GET /api/secrets/{id}"
+---
+
+---
+
+# FILE: ./api-reference/secrets/list-secrets.mdx
+
+---
+title: "List all secrets for the project"
+openapi: "GET /api/secrets"
+---
+
+---
+
+# FILE: ./api-reference/secrets/overview.mdx
+
+---
+title: "Overview"
+description: "Manage project secrets used for external integrations. Values are encrypted at rest and never returned in API responses."
+---
+
+## Intro
+
+Manage project secrets used for external integrations. Values are encrypted at rest and never returned in API responses.
+
+---
+
+# FILE: ./api-reference/secrets/update-secrets.mdx
+
+---
+title: "Update a secret's value"
+openapi: "PUT /api/secrets/{id}"
+---
+
+---
+
+# FILE: ./api-reference/simulation-runs/get-simulation-runs.mdx
+
+---
+title: "Get a single simulation run by its ID"
+openapi: "GET /api/simulation-runs/{scenarioRunId}"
+---
+
+---
+
+# FILE: ./api-reference/simulation-runs/list-list.mdx
+
+---
+title: "List batch summaries for a scenario set"
+openapi: "GET /api/simulation-runs/batches/list"
+---
+
+---
+
+# FILE: ./api-reference/simulation-runs/list-simulation-runs.mdx
+
+---
+title: "List Simulation Runs"
+openapi: "GET /api/simulation-runs"
+---
+
+---
+
+# FILE: ./api-reference/simulation-runs/overview.mdx
+
+---
+title: "Overview"
+description: "Query simulation run results. List runs, get batch summaries, and retrieve individual run details."
+---
+
+## Intro
+
+Query simulation run results. List runs, get batch summaries, and retrieve individual run details.
+
+---
+
+# FILE: ./api-reference/suites/action-duplicate.mdx
+
+---
+title: "Duplicate a suite"
+openapi: "POST /api/suites/{id}/duplicate"
+---
+
+---
+
+# FILE: ./api-reference/suites/action-run.mdx
+
+---
+title: "Trigger a suite run"
+openapi: "POST /api/suites/{id}/run"
+---
+
+---
+
+# FILE: ./api-reference/suites/create-suites.mdx
+
+---
+title: "Create a new suite"
+openapi: "POST /api/suites"
+---
+
+---
+
+# FILE: ./api-reference/suites/delete-suites.mdx
+
+---
+title: "Archive a suite"
+openapi: "DELETE /api/suites/{id}"
+---
+
+---
+
+# FILE: ./api-reference/suites/get-suites.mdx
+
+---
+title: "Get a suite"
+openapi: "GET /api/suites/{id}"
+---
+
+---
+
+# FILE: ./api-reference/suites/list-suites.mdx
+
+---
+title: "List all non-archived suites"
+openapi: "GET /api/suites"
+---
+
+---
+
+# FILE: ./api-reference/suites/overview.mdx
+
+---
+title: "Overview"
+description: "Manage test suites (run plans) that group scenarios for batch execution. Create, update, duplicate, and trigger suite runs."
+---
+
+## Intro
+
+Manage test suites (run plans) that group scenarios for batch execution. Create, update, duplicate, and trigger suite runs.
+
+---
+
+# FILE: ./api-reference/suites/update-suites.mdx
+
+---
+title: "Update a suite"
+openapi: "PATCH /api/suites/{id}"
+---
+
+---
+
+# FILE: ./api-reference/teams/archive-team.mdx
+
+---
+title: "Archive team"
+openapi: "DELETE /api/teams/{id}"
+---
+
+---
+
+# FILE: ./api-reference/teams/create-team.mdx
+
+---
+title: "Create team"
+openapi: "POST /api/teams"
+---
+
+---
+
+# FILE: ./api-reference/teams/get-team.mdx
+
+---
+title: "Get team"
+openapi: "GET /api/teams/{id}"
+---
+
+---
+
+# FILE: ./api-reference/teams/list-teams.mdx
+
+---
+title: "List teams"
+openapi: "GET /api/teams"
+---
+
+---
+
+# FILE: ./api-reference/teams/overview.mdx
+
+---
+title: 'Overview'
+description: 'Create, list, update, and archive LangWatch teams programmatically. Designed for automated provisioning and cleanup of team structures.'
+---
+
+## Intro
+
+The Teams API lets you manage LangWatch teams via REST. Teams are organizational units that group projects and members together.
+
+This API is designed for service-to-service automation (e.g. provisioning team structures for new departments, cleaning up orphaned teams from test runs), not for end-user access.
+
+## Authentication
+
+The Teams API requires an **organization-level API key** with `team:manage` permission (created in Settings > API Keys). Pass it as a Bearer token:
+
+```
+Authorization: Bearer sk-lw-<id>_<secret>
+```
+
+Project API keys (`X-Auth-Token`) cannot be used here — they lack organization context.
+
+## Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/teams` | List all teams in the organization |
+| `POST` | `/api/teams` | Create a new team |
+| `GET` | `/api/teams/{id}` | Get team details |
+| `PATCH` | `/api/teams/{id}` | Update a team |
+| `DELETE` | `/api/teams/{id}` | Archive a team (soft-delete) |
+
+## Soft Delete
+
+`DELETE` does not permanently remove a team. It sets an `archivedAt` timestamp, making the team invisible to list and get operations. Archived teams can still be referenced in historical data (e.g. past project associations).
+
+## Typical Flow
+
+1. Create an admin API key in Settings > API Keys with `team:manage` permission
+2. Call `POST /api/teams` with a team name
+3. Use the returned team `id` when creating projects via the Projects API
+
+```bash
+# Create team
+curl -X POST https://app.langwatch.ai/api/teams \
+  -H "Authorization: Bearer sk-lw-..." \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Engineering"}'
+
+# Use team ID to create a project
+curl -X POST https://app.langwatch.ai/api/projects \
+  -H "Authorization: Bearer sk-lw-..." \
+  -H "Content-Type: application/json" \
+  -d '{"name": "My Project", "teamId": "<team_id>", "language": "python", "framework": "langchain"}'
+```
+
+---
+
+# FILE: ./api-reference/teams/update-team.mdx
+
+---
+title: "Update team"
+openapi: "PATCH /api/teams/{id}"
+---
+
 ---
 
 # FILE: ./api-reference/traces/create-public-trace-path.mdx
@@ -29510,6 +30744,113 @@ The older `/api/trace/search` and `/api/trace/{id}` endpoints still work but are
 ---
 title: 'Search traces'
 openapi: 'POST /api/traces/search'
+---
+
+---
+
+# FILE: ./api-reference/triggers/create-triggers.mdx
+
+---
+title: "Create a new trigger"
+openapi: "POST /api/triggers"
+---
+
+---
+
+# FILE: ./api-reference/triggers/delete-triggers.mdx
+
+---
+title: "Delete a trigger"
+openapi: "DELETE /api/triggers/{id}"
+---
+
+---
+
+# FILE: ./api-reference/triggers/get-triggers.mdx
+
+---
+title: "Get a trigger by its ID"
+openapi: "GET /api/triggers/{id}"
+---
+
+---
+
+# FILE: ./api-reference/triggers/list-triggers.mdx
+
+---
+title: "List all active triggers"
+openapi: "GET /api/triggers"
+---
+
+---
+
+# FILE: ./api-reference/triggers/overview.mdx
+
+---
+title: "Overview"
+description: "Manage automation triggers that fire actions based on trace events. Create Slack notifications, webhooks, and other automated responses."
+---
+
+## Intro
+
+Manage automation triggers that fire actions based on trace events. Create Slack notifications, webhooks, and other automated responses.
+
+---
+
+# FILE: ./api-reference/triggers/update-triggers.mdx
+
+---
+title: "Update a trigger"
+openapi: "PATCH /api/triggers/{id}"
+---
+
+---
+
+# FILE: ./api-reference/workflows/delete-workflows.mdx
+
+---
+title: "Archive a workflow"
+openapi: "DELETE /api/workflows/{id}"
+---
+
+---
+
+# FILE: ./api-reference/workflows/get-workflows.mdx
+
+---
+title: "Get a workflow by its ID"
+openapi: "GET /api/workflows/{id}"
+---
+
+---
+
+# FILE: ./api-reference/workflows/list-workflows.mdx
+
+---
+title: "List all non-archived workflows for the project"
+openapi: "GET /api/workflows"
+---
+
+---
+
+# FILE: ./api-reference/workflows/overview.mdx
+
+---
+title: "Overview"
+description: "Manage Optimization Studio workflows. List, update, and archive workflows used for prompt optimization and agent design."
+---
+
+## Intro
+
+Manage Optimization Studio workflows. List, update, and archive workflows used for prompt optimization and agent design.
+
+---
+
+# FILE: ./api-reference/workflows/update-workflows.mdx
+
+---
+title: "Update a workflow's metadata"
+openapi: "PATCH /api/workflows/{id}"
 ---
 
 ---

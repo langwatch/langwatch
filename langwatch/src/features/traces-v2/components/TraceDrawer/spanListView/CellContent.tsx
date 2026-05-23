@@ -22,7 +22,6 @@ export function CellContent({
         <HStack gap={1.5} minWidth={0} flex={1}>
           <Text
             textStyle="xs"
-            fontFamily="mono"
             truncate
             title={data.span.name}
             color="fg"
@@ -38,7 +37,7 @@ export function CellContent({
       return <SpanTypeBadge type={data.span.type ?? "span"} />;
     case "duration":
       return (
-        <Text textStyle="xs" fontFamily="mono" color="fg.muted">
+        <Text textStyle="xs" color="fg.muted">
           {data.duration === 0 ? "<1ms" : formatDuration(data.duration)}
         </Text>
       );
@@ -67,7 +66,7 @@ export function CellContent({
     }
     case "start":
       return (
-        <Text textStyle="xs" fontFamily="mono" color="fg.subtle">
+        <Text textStyle="xs" color="fg.subtle">
           {formatOffset(data.startOffset)}
         </Text>
       );
@@ -103,11 +102,9 @@ export function FooterCell({
           <Text
             textStyle="xs"
             fontWeight="semibold"
-            fontFamily="mono"
             color="fg.muted"
           >
             {totals.duration === 0 ? "<1ms" : formatDuration(totals.duration)}
-            {!isFiltered && "*"}
           </Text>
         </Tooltip>
       );

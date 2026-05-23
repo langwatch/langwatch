@@ -1,41 +1,43 @@
+import {
+  EVALUATION_STATUS_COLORS,
+  EVALUATION_STATUS_TONES,
+} from "~/utils/evaluationResults";
 import type { EvalSummary } from "../../../types/trace";
 
+/**
+ * Per-status tag rendering for the Evals accordion cards. Sourced from
+ * the shared evaluation-results maps so dot / tag colours can't drift
+ * out of step with the trace-list `EvalChip`, the v2 drawer header
+ * chip, or the v3 EvaluatorChip — three surfaces that all need to
+ * agree on "this verdict reads as X".
+ */
+function buildStatusTone(
+  parsed: keyof typeof EVALUATION_STATUS_COLORS,
+  label: string,
+) {
+  return {
+    color: EVALUATION_STATUS_COLORS[parsed],
+    fg: EVALUATION_STATUS_TONES[parsed].fg,
+    bg: EVALUATION_STATUS_TONES[parsed].bg,
+    label,
+  } as const;
+}
+
 export const STATUS = {
-  pass: {
-    color: "green.solid",
-    fg: "green.fg",
-    bg: "green.subtle",
-    label: "PASS",
-  },
-  warning: {
-    color: "yellow.solid",
-    fg: "yellow.fg",
-    bg: "yellow.subtle",
-    label: "WARN",
-  },
-  fail: {
-    color: "red.solid",
-    fg: "red.fg",
-    bg: "red.subtle",
-    label: "FAIL",
-  },
+  pass: buildStatusTone("passed", "PASS"),
+  // "Warning" is a legacy trace-summary status with no v3 equivalent;
+  // it reads as a not-quite-pass, so route it through the `failed` tone
+  // so the chip still turns red rather than picking up a bespoke yellow.
+  warning: buildStatusTone("failed", "WARN"),
+  fail: buildStatusTone("failed", "FAIL"),
   // Evaluator wasn't run — provider not configured, preconditions failed,
-  // etc. This is a setup state, not a verdict; rendering a 0.00/1.00 score
-  // alongside it (the old behavior) lied about what happened.
-  skipped: {
-    color: "fg.subtle",
-    fg: "fg.muted",
-    bg: "bg.muted",
-    label: "SKIPPED",
-  },
-  // Evaluator crashed. Distinct from a FAIL verdict — there is no score
-  // because the evaluator never produced one.
-  error: {
-    color: "orange.solid",
-    fg: "orange.fg",
-    bg: "orange.subtle",
-    label: "ERROR",
-  },
+  // etc. This is a setup state, not a verdict; gray-on-gray keeps it from
+  // competing for attention next to real pass/fail rows.
+  skipped: buildStatusTone("skipped", "SKIPPED"),
+  // Evaluator crashed. Distinct from a FAIL verdict — uses the deeper
+  // red.700 from the shared map so "the evaluator broke" reads as a
+  // separate failure mode from "the evaluator ran and said no".
+  error: buildStatusTone("error", "ERROR"),
 } as const;
 
 /**

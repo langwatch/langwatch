@@ -1,5 +1,6 @@
-import { Box, Text } from "@chakra-ui/react";
+import { Box, Flex, Text } from "@chakra-ui/react";
 import { RenderedMarkdown } from "../markdownView";
+import { TurnCollapseChevron } from "./TurnCollapseChevron";
 import { asMarkdownBody } from "./parsing";
 import { RoleChip } from "./RoleChip";
 import type { ContentBlock } from "./types";
@@ -7,9 +8,11 @@ import type { ContentBlock } from "./types";
 export function SystemTurnView({
   role,
   blocks,
+  onCollapse,
 }: {
   role: "system" | "developer";
   blocks: ContentBlock[];
+  onCollapse?: () => void;
 }) {
   const text = blocks
     .filter(
@@ -19,8 +22,11 @@ export function SystemTurnView({
     .join("\n");
   return (
     <Box marginBottom={3}>
-      <RoleChip role={role} />
-      <Box paddingLeft={4} textStyle="xs" color="fg.muted">
+      <Flex align="center" justify="space-between" gap={2}>
+        <RoleChip role={role} />
+        {onCollapse && <TurnCollapseChevron onClick={onCollapse} />}
+      </Flex>
+      <Box textStyle="xs" color="fg.muted">
         {text ? (
           <RenderedMarkdown
             markdown={asMarkdownBody(text)}

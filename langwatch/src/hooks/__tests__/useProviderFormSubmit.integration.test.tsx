@@ -24,11 +24,15 @@ const {
   mockUpdateProjectDefaultModelsMutateAsync,
   mockToasterCreate,
   mockInvalidate,
+  mockSetRoleAssignmentMutateAsync,
+  mockDefaultModelsInvalidate,
 } = vi.hoisted(() => ({
   mockUpdateMutateAsync: vi.fn().mockResolvedValue({}),
   mockUpdateProjectDefaultModelsMutateAsync: vi.fn().mockResolvedValue({}),
   mockToasterCreate: vi.fn(),
   mockInvalidate: vi.fn(),
+  mockSetRoleAssignmentMutateAsync: vi.fn().mockResolvedValue({ ok: true }),
+  mockDefaultModelsInvalidate: vi.fn(),
 }));
 
 vi.mock("../../utils/api", () => ({
@@ -39,11 +43,25 @@ vi.mock("../../utils/api", () => ({
           invalidate: mockInvalidate,
         },
       },
+      modelProvider: {
+        getAllForProject: { invalidate: vi.fn() },
+        getAllForProjectForFrontend: { invalidate: vi.fn() },
+        listAllForProjectForFrontend: { invalidate: vi.fn() },
+        getResolvedDefault: { invalidate: vi.fn() },
+        getDefaultModelsForProject: {
+          invalidate: mockDefaultModelsInvalidate,
+        },
+      },
     }),
     modelProvider: {
       update: {
         useMutation: () => ({
           mutateAsync: mockUpdateMutateAsync,
+        }),
+      },
+      setRoleAssignmentForScope: {
+        useMutation: () => ({
+          mutateAsync: mockSetRoleAssignmentMutateAsync,
         }),
       },
     },
@@ -187,7 +205,13 @@ describe("useProviderFormSubmit()", () => {
     });
 
     describe("when all models start with azure/ (no mismatch)", () => {
-      it("calls updateProjectDefaultModels mutation with the selected models", async () => {
+      /** @scenario Default models live in a section below the providers list, not in the drawer */
+      it("no longer writes project defaults from the provider drawer", async () => {
+        // Project default models are now owned by the page-level
+        // DefaultModelsSection (see specs/model-providers/
+        // hierarchical-default-models.feature). The drawer's submit path
+        // must NOT write to project.defaultModel so it can't silently
+        // pin an inherited org/team default onto the project.
         const snapshot = buildSnapshot({
           projectDefaultModel: "azure/gpt-5-mini",
           projectTopicClusteringModel: "azure/gpt-5-mini",
@@ -199,14 +223,7 @@ describe("useProviderFormSubmit()", () => {
           await result.current.submit();
         });
 
-        expect(mockUpdateProjectDefaultModelsMutateAsync).toHaveBeenCalledWith(
-          expect.objectContaining({
-            projectId: "proj-1",
-            defaultModel: "azure/gpt-5-mini",
-            topicClusteringModel: "azure/gpt-5-mini",
-            embeddingsModel: "azure/text-embedding-3-small",
-          }),
-        );
+        expect(mockUpdateProjectDefaultModelsMutateAsync).not.toHaveBeenCalled();
       });
     });
   });
@@ -230,6 +247,100 @@ describe("useProviderFormSubmit()", () => {
           (call) => call[0]?.type === "error",
         );
         expect(errorToasts).toHaveLength(0);
+      });
+
+      /** @scenario Toggling "Set as default" off does not write any ModelDefault row */
+      it("does not call setRoleAssignmentForScope (the seed remains the only writer)", async () => {
+        const snapshot = buildSnapshot({
+          useAsDefaultProvider: false,
+          projectDefaultModel: "azure/gpt-5-mini",
+          projectTopicClusteringModel: "azure/gpt-5-mini",
+          projectEmbeddingsModel: null,
+          scopes: [{ scopeType: "ORGANIZATION", scopeId: "org-1" }],
+        });
+        const { result } = renderSubmitHook({ snapshot });
+
+        await act(async () => {
+          await result.current.submit();
+        });
+
+        expect(mockSetRoleAssignmentMutateAsync).not.toHaveBeenCalled();
+      });
+
+      it("still invalidates getDefaultModelsForProject so the section refetches the auto-seeded row", async () => {
+        // First-provider create runs seedOnboardingDefaultsForProvider
+        // server-side regardless of the "use as default provider" checkbox.
+        // The Default Models card on the settings page binds to
+        // getDefaultModelsForProject, so it MUST be invalidated even when
+        // the user didn't opt into the user-pick replay — otherwise the
+        // section reads stale "no configs" until window-focus refetch.
+        const snapshot = buildSnapshot({
+          useAsDefaultProvider: false,
+          projectDefaultModel: null,
+          projectTopicClusteringModel: null,
+          projectEmbeddingsModel: null,
+          scopes: [{ scopeType: "PROJECT", scopeId: "proj-1" }],
+        });
+        const { result } = renderSubmitHook({ snapshot });
+
+        await act(async () => {
+          await result.current.submit();
+        });
+
+        expect(mockDefaultModelsInvalidate).toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given useAsDefaultProvider is true and the picks land on same-provider models", () => {
+    /** @scenario The user's onboarding pick wins over the additive seed */
+    it("upserts a ModelDefault row per role per scope using the user's picks", async () => {
+      const snapshot = buildSnapshot({
+        useAsDefaultProvider: true,
+        // All picks belong to the azure provider being submitted so the
+        // mismatch guard accepts the submit.
+        projectDefaultModel: "azure/gpt-5-mini",
+        projectTopicClusteringModel: "azure/gpt-5-mini",
+        projectEmbeddingsModel: "azure/text-embedding-3-small",
+        scopes: [
+          { scopeType: "ORGANIZATION", scopeId: "org-1" },
+          { scopeType: "PROJECT", scopeId: "proj-1" },
+        ],
+      });
+      const { result } = renderSubmitHook({ snapshot });
+
+      await act(async () => {
+        await result.current.submit();
+      });
+
+      // 2 scopes × 3 roles = 6 upserts. Each carries the user's picked
+      // model (not the registry flagship that the additive seed would
+      // have written).
+      expect(mockSetRoleAssignmentMutateAsync).toHaveBeenCalledTimes(6);
+      // Spot-check the per-scope-per-role payloads.
+      expect(mockSetRoleAssignmentMutateAsync).toHaveBeenCalledWith({
+        scopeType: "ORGANIZATION",
+        scopeId: "org-1",
+        role: "DEFAULT",
+        model: "azure/gpt-5-mini",
+      });
+      expect(mockSetRoleAssignmentMutateAsync).toHaveBeenCalledWith({
+        scopeType: "ORGANIZATION",
+        scopeId: "org-1",
+        role: "FAST",
+        model: "azure/gpt-5-mini",
+      });
+      expect(mockSetRoleAssignmentMutateAsync).toHaveBeenCalledWith({
+        scopeType: "ORGANIZATION",
+        scopeId: "org-1",
+        role: "EMBEDDINGS",
+        model: "azure/text-embedding-3-small",
+      });
+      expect(mockSetRoleAssignmentMutateAsync).toHaveBeenCalledWith({
+        scopeType: "PROJECT",
+        scopeId: "proj-1",
+        role: "DEFAULT",
+        model: "azure/gpt-5-mini",
       });
     });
   });

@@ -6,9 +6,24 @@ import { checkOpsPermission } from "~/server/api/rbac";
 import { getApp } from "~/server/app-layer/app";
 import { DASHBOARD_EVENT } from "~/server/app-layer/ops/metrics-collector";
 import type { DashboardData } from "~/server/app-layer/ops/types";
-import { getProjectionMetadata, getReactorMetadata } from "~/server/event-sourcing/pipelineRegistry";
+import {
+  getKillSwitchDescriptors,
+  getProjectionMetadata,
+  getReactorMetadata,
+} from "~/server/event-sourcing/pipelineRegistry";
 import { AnomalyStateStore } from "~/server/observability/anomalyState";
 import { connection } from "~/server/redis";
+import {
+  getFeatureFlagStore,
+  listFeatureFlagFamilies,
+  listFeatureFlags,
+  resolveFlagDefinition,
+} from "~/server/featureFlag";
+import { checkFlagEnvOverride } from "~/server/featureFlag/envOverride";
+import {
+  featureFlagRulesSchema,
+  resolveEffectiveForListing,
+} from "~/server/featureFlag/rules";
 
 const opsViewPermission = checkOpsPermission({ permission: "ops:view" });
 
@@ -634,5 +649,209 @@ export const opsRouter = createTRPCRouter({
       const store = new AnomalyStateStore(connection);
       await store.clear(input.tenantId, input.kind);
       return { dismissed: true };
+    }),
+
+  /**
+   * Lists every registered feature flag plus any orphaned postgres
+   * rows. Operators use this to see the source of truth for each flag
+   * (registry default vs postgres override vs env override) before
+   * flipping anything.
+   *
+   * Read-only: no PostHog calls happen on this path either, so opening
+   * the page does not cost a flag call.
+   */
+  listFeatureFlags: protectedProcedure
+    .use(opsViewPermission)
+    .query(async () => {
+      const store = getFeatureFlagStore();
+      const stored = await store.listAll();
+      const explicit = listFeatureFlags();
+      const families = listFeatureFlagFamilies();
+      const explicitKeys = new Set(explicit.map((e) => e.key));
+
+      const explicitRows = explicit.map((def) => {
+        const row = stored.find((s) => s.key === def.key);
+        const envOverride = checkFlagEnvOverride(def.key, def.legacyEnvVar);
+        const effective = resolveEffectiveForListing({
+          envOverride: envOverride ?? null,
+          rules: row?.rules ?? [],
+          rowEnabled: row?.enabled ?? null,
+          registryDefault: def.defaultValue,
+        });
+        return {
+          key: def.key,
+          scope: def.scope,
+          defaultValue: def.defaultValue,
+          description: def.description,
+          family: def.family ?? null,
+          storedValue: row?.enabled ?? null,
+          rules: row?.rules ?? [],
+          envOverride: envOverride ?? null,
+          effective,
+          lastEditedBy: row?.lastEditedBy ?? null,
+          updatedAt: row?.updatedAt ?? null,
+        };
+      });
+
+      // Pre-seed every generated kill-switch key from the live pipeline
+      // graph. Operators see the full set of toggleable es-* switches
+      // even before anyone has flipped them in postgres, which was the
+      // whole point of moving them off PostHog: discoverability.
+      const generatedKillSwitches = getKillSwitchDescriptors();
+
+      // Merge: combine generated descriptors with any postgres rows
+      // that don't have an explicit registry entry. Postgres value wins
+      // the row but the descriptor provides the metadata.
+      const familyKeysSeen = new Set<string>();
+      const familyRows = generatedKillSwitches.map((desc) => {
+        familyKeysSeen.add(desc.key);
+        const row = stored.find((s) => s.key === desc.key);
+        const def = resolveFlagDefinition(desc.key);
+        const envOverride = checkFlagEnvOverride(desc.key, def?.legacyEnvVar);
+        const effective = resolveEffectiveForListing({
+          envOverride: envOverride ?? null,
+          rules: row?.rules ?? [],
+          rowEnabled: row?.enabled ?? null,
+          registryDefault: def?.defaultValue ?? false,
+        });
+        return {
+          key: desc.key,
+          scope: def?.scope ?? "SYSTEM",
+          defaultValue: def?.defaultValue ?? false,
+          description: def?.description
+            ? `${def.description} (${desc.pipelineName}: ${desc.componentType} ${desc.componentName})`
+            : `Pipeline ${desc.pipelineName} ${desc.componentType} ${desc.componentName}.`,
+          family: def?.family ?? null,
+          storedValue: row?.enabled ?? null,
+          rules: row?.rules ?? [],
+          envOverride: envOverride ?? null,
+          effective,
+          lastEditedBy: row?.lastEditedBy ?? null,
+          updatedAt: row?.updatedAt ?? null,
+        };
+      });
+
+      // Stored postgres rows that match neither an explicit registry
+      // entry nor a generated descriptor. Either orphans from removed
+      // pipeline components or rows for keys we no longer recognize;
+      // surface them so operators can clean up.
+      const orphanRows = stored
+        .filter(
+          (s) => !explicitKeys.has(s.key) && !familyKeysSeen.has(s.key),
+        )
+        .map((s) => {
+          const def = resolveFlagDefinition(s.key);
+          const envOverride = checkFlagEnvOverride(
+            s.key,
+            def?.legacyEnvVar,
+          );
+          const effective = resolveEffectiveForListing({
+            envOverride: envOverride ?? null,
+            rules: s.rules,
+            rowEnabled: s.enabled,
+            registryDefault: def?.defaultValue ?? false,
+          });
+          return {
+            key: s.key,
+            scope: def?.scope ?? "SYSTEM",
+            defaultValue: def?.defaultValue ?? false,
+            description: def?.description ?? "Orphaned postgres flag row (no longer registered).",
+            family: def?.family ?? null,
+            storedValue: s.enabled,
+            rules: s.rules,
+            envOverride: envOverride ?? null,
+            effective,
+            lastEditedBy: s.lastEditedBy,
+            updatedAt: s.updatedAt,
+          };
+        });
+
+      return {
+        flags: [...explicitRows, ...familyRows, ...orphanRows],
+        families: families.map((f) => ({
+          family: f.family,
+          keyPrefix: f.keyPrefix,
+          scope: f.scope,
+          defaultValue: f.defaultValue,
+          description: f.description,
+        })),
+      };
+    }),
+
+  setFeatureFlag: protectedProcedure
+    .use(opsManagePermission)
+    .input(
+      z.object({
+        key: z.string().min(1).max(200),
+        enabled: z.boolean(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Restrict writes to keys the system actively knows about:
+      // explicit registry entries or kill-switch descriptors currently
+      // advertised by the live pipeline graph. Family-prefix matching
+      // alone is too permissive — `es-foo-bar-killswitch` passes
+      // `resolveFlagDefinition` even with no pipeline component on the
+      // other end, so a typo would create an orphan row that never
+      // affects anything.
+      const isExplicitKey = listFeatureFlags().some(
+        (f) => f.key === input.key,
+      );
+      const isLiveKillSwitch = getKillSwitchDescriptors().some(
+        (d) => d.key === input.key,
+      );
+      if (!isExplicitKey && !isLiveKillSwitch) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Unknown feature flag key: ${input.key}`,
+        });
+      }
+      await getFeatureFlagStore().set(
+        input.key,
+        input.enabled,
+        ctx.session.user.id,
+      );
+      return { ok: true };
+    }),
+
+  setFeatureFlagRules: protectedProcedure
+    .use(opsManagePermission)
+    .input(
+      z.object({
+        key: z.string().min(1).max(200),
+        rules: featureFlagRulesSchema.max(50),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const isExplicitKey = listFeatureFlags().some(
+        (f) => f.key === input.key,
+      );
+      const isLiveKillSwitch = getKillSwitchDescriptors().some(
+        (d) => d.key === input.key,
+      );
+      if (!isExplicitKey && !isLiveKillSwitch) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Unknown feature flag key: ${input.key}`,
+        });
+      }
+      await getFeatureFlagStore().setRules(
+        input.key,
+        input.rules,
+        ctx.session.user.id,
+      );
+      return { ok: true };
+    }),
+
+  clearFeatureFlag: protectedProcedure
+    .use(opsManagePermission)
+    .input(z.object({ key: z.string().min(1).max(200) }))
+    .mutation(async ({ ctx, input }) => {
+      // Deliberately permissive: listFeatureFlags surfaces orphan rows
+      // (DB keys that no longer match the registry or pipeline graph)
+      // so operators can delete them. Validating the key here would
+      // break that cleanup path.
+      await getFeatureFlagStore().clear(input.key, ctx.session.user.id);
+      return { ok: true };
     }),
 });

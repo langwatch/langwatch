@@ -1,6 +1,7 @@
 import atexit
 import os
 import logging
+import threading
 from typing import List, Optional, Sequence, ClassVar
 
 from langwatch.__version__ import __version__
@@ -43,6 +44,19 @@ class Client(LangWatchClientProtocol):
     _base_attributes: ClassVar[BaseAttributes] = {}
     _instrumentors: ClassVar[Sequence[BaseInstrumentor]] = ()
     _disable_sending: ClassVar[bool] = False
+    # Refcount of currently-active traces that requested disable_sending=True.
+    # While >0, sending stays disabled even if the underlying user-set flag is
+    # False — this prevents one trace's disable_sending=True from poisoning
+    # subsequent traces (issue #3981) while also remaining correct under
+    # overlapping concurrent traces. The user-set flag (set via the
+    # `client.disable_sending` setter directly) is preserved separately.
+    _disable_sending_refcount: ClassVar[int] = 0
+    _disable_sending_lock: ClassVar[threading.Lock] = threading.Lock()
+    # Snapshot of the user-set disable_sending value at the moment the first
+    # disable_sending=True trace acquired the refcount. Restored when the
+    # last trace releases. Lets a user who set `client.disable_sending = True`
+    # explicitly keep that value across trace boundaries.
+    _disable_sending_user_baseline: ClassVar[bool] = False
     _flush_on_exit: ClassVar[bool] = True
     _span_exclude_rules: ClassVar[List[SpanProcessingExcludeRule]] = []  # type: ignore[misc]
     _ignore_global_tracer_provider_override_warning: ClassVar[bool] = False
@@ -361,6 +375,8 @@ class Client(LangWatchClientProtocol):
         cls._base_attributes = {}
         cls._instrumentors = ()
         cls._disable_sending = False
+        cls._disable_sending_refcount = 0
+        cls._disable_sending_user_baseline = False
         cls._flush_on_exit = True
         cls._span_exclude_rules = []
         cls._ignore_global_tracer_provider_override_warning = False
@@ -473,6 +489,44 @@ class Client(LangWatchClientProtocol):
             Client._tracer_provider.force_flush()
 
         Client._disable_sending = value
+
+    def acquire_disable_sending(self) -> None:
+        """Refcount-based gate used by `langwatch.trace(disable_sending=True)`.
+
+        Each call increments the refcount and forces sending disabled. Pairs
+        with `release_disable_sending`. Concurrency-safe (issue #3981): an
+        overlapping default-sending trace will not flip the flag back on
+        while another trace still holds the disable refcount.
+        """
+        with Client._disable_sending_lock:
+            if Client._disable_sending_refcount == 0:
+                Client._disable_sending_user_baseline = Client._disable_sending
+            Client._disable_sending_refcount += 1
+            if not Client._disable_sending:
+                # Bypass the public setter's force_flush — we want to start
+                # dropping spans immediately, not flush pending traffic that
+                # was queued under the prior baseline.
+                Client._disable_sending = True
+
+    def release_disable_sending(self) -> None:
+        """Pair with `acquire_disable_sending`. Decrement the refcount; when
+        it returns to zero, restore the user-set baseline value.
+        """
+        with Client._disable_sending_lock:
+            if Client._disable_sending_refcount == 0:
+                # Already released — defensive no-op; an unbalanced release
+                # should not corrupt the baseline.
+                return
+            Client._disable_sending_refcount -= 1
+            if Client._disable_sending_refcount == 0:
+                baseline = Client._disable_sending_user_baseline
+                if Client._disable_sending != baseline:
+                    if (
+                        Client._tracer_provider
+                        and not Client._skip_open_telemetry_setup
+                    ):
+                        Client._tracer_provider.force_flush()
+                    Client._disable_sending = baseline
 
     def __shutdown_tracer_provider(self) -> None:
         """Shuts down the current tracer provider, including flushing."""

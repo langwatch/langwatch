@@ -1,0 +1,299 @@
+/**
+ * @vitest-environment jsdom
+ */
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import type { DatasetReference, TargetConfig } from "../../../types";
+import { TargetVariablesPanel } from "../../TargetSection/TargetVariablesPanel";
+
+// Mock components with complex dependencies
+vi.mock("~/optimization_studio/components/code/CodeEditorModal", () => ({
+  CodeEditor: () => null,
+}));
+
+vi.mock("~/optimization_studio/components/nodes/Nodes", () => ({
+  TypeLabel: ({ type }: { type: string }) => <span>{type}</span>,
+}));
+
+// Mock name hooks to avoid tRPC queries
+vi.mock("../../../hooks/useTargetName", () => ({
+  useTargetName: () => "Web Search",
+}));
+
+// Resolver returns a friendly name for the chained prompt target, and falls
+// back to the raw id when no entity/name is known.
+vi.mock("../../../hooks/useResolveTargetName", () => ({
+  useResolveTargetName:
+    () => (t: { id: string; promptId?: string }) =>
+      t.promptId === "prompt-cat" ? "category_classifier" : t.id,
+}));
+
+const mockDatasets: DatasetReference[] = [
+  {
+    id: "dataset-1",
+    name: "Test Dataset",
+    type: "inline",
+    columns: [
+      { id: "col-1", name: "input_text", type: "string" },
+      { id: "col-2", name: "expected_output", type: "string" },
+    ],
+  },
+];
+
+const ACTIVE_DATASET_ID = "dataset-1";
+
+const mockTarget: TargetConfig = {
+  id: "target-1",
+  type: "prompt",
+  inputs: [
+    { identifier: "question", type: "str" },
+    { identifier: "context", type: "str" },
+  ],
+  outputs: [{ identifier: "answer", type: "str" }],
+  // Per-dataset mappings: datasetId -> inputField -> FieldMapping
+  mappings: {
+    [ACTIVE_DATASET_ID]: {
+      question: {
+        type: "source",
+        source: "dataset",
+        sourceId: "dataset-1",
+        sourceField: "input_text",
+      },
+    },
+  },
+  // localPromptConfig is needed to determine which fields are actually used
+  localPromptConfig: {
+    llm: { model: "gpt-4" },
+    messages: [
+      {
+        role: "user",
+        content: "Answer this: {{question}} with context: {{context}}",
+      },
+    ],
+    inputs: [
+      { identifier: "question", type: "str" },
+      { identifier: "context", type: "str" },
+    ],
+    outputs: [{ identifier: "answer", type: "str" }],
+  },
+};
+
+const mockOtherTarget: TargetConfig = {
+  id: "target-2",
+  type: "prompt",
+  inputs: [{ identifier: "query", type: "str" }],
+  outputs: [{ identifier: "search_results", type: "str" }],
+  mappings: {},
+};
+
+const renderComponent = (
+  props: Partial<Parameters<typeof TargetVariablesPanel>[0]> = {},
+) => {
+  const defaultProps = {
+    target: mockTarget,
+    activeDatasetId: ACTIVE_DATASET_ID,
+    datasets: mockDatasets,
+    otherTargets: [],
+    onInputsChange: vi.fn(),
+    onMappingChange: vi.fn(),
+  };
+
+  return render(
+    <ChakraProvider value={defaultSystem}>
+      <TargetVariablesPanel {...defaultProps} {...props} />
+    </ChakraProvider>,
+  );
+};
+
+describe("TargetVariablesPanel", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  describe("rendering", () => {
+    it("displays Input Variables title", () => {
+      renderComponent();
+      expect(screen.getByText("Input Variables")).toBeInTheDocument();
+    });
+
+    it("shows target input variables", () => {
+      renderComponent();
+      expect(screen.getByText("question")).toBeInTheDocument();
+      expect(screen.getByText("context")).toBeInTheDocument();
+    });
+
+    it("shows mapped variable as a tag", () => {
+      renderComponent();
+      // The mapped field should show as a closable tag with the friendly
+      // source name and field name
+      expect(screen.getByTestId("source-mapping-tag")).toBeInTheDocument();
+      expect(screen.getByText("Test Dataset.input_text")).toBeInTheDocument();
+    });
+
+    it("shows helper text", () => {
+      renderComponent();
+      expect(
+        screen.getByText(/Connect each input variable to a data source/i),
+      ).toBeInTheDocument();
+    });
+  });
+
+  describe("missing mappings warning", () => {
+    it("shows warning when inputs are not mapped", () => {
+      renderComponent();
+      // context is not mapped - shows validation error
+      const warning = screen.getByTestId("missing-mappings-error");
+      expect(warning).toBeInTheDocument();
+      // The warning text should contain "context"
+      expect(warning.textContent).toContain("context");
+    });
+
+    it("does not show warning when all inputs are mapped", () => {
+      const fullyMappedTarget: TargetConfig = {
+        ...mockTarget,
+        // Per-dataset mappings
+        mappings: {
+          [ACTIVE_DATASET_ID]: {
+            question: {
+              type: "source",
+              source: "dataset",
+              sourceId: "dataset-1",
+              sourceField: "input_text",
+            },
+            context: {
+              type: "source",
+              source: "dataset",
+              sourceId: "dataset-1",
+              sourceField: "expected_output",
+            },
+          },
+        },
+      };
+
+      renderComponent({ target: fullyMappedTarget });
+      expect(
+        screen.queryByTestId("missing-mappings-error"),
+      ).not.toBeInTheDocument();
+    });
+
+    it("hides warning in readOnly mode", () => {
+      renderComponent({ readOnly: true });
+      expect(
+        screen.queryByTestId("missing-mappings-error"),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("available sources", () => {
+    it("includes datasets as mapping sources", async () => {
+      const user = userEvent.setup();
+      renderComponent();
+
+      // Find the mapping input for "context" (the unmapped one)
+      const inputs = screen.getAllByRole("textbox");
+      // Click on an empty mapping input to open dropdown
+      const emptyInput = inputs.find(
+        (input) => !(input as HTMLInputElement).value,
+      );
+      if (emptyInput) {
+        await user.click(emptyInput);
+
+        await waitFor(() => {
+          expect(screen.getByText("Test Dataset")).toBeInTheDocument();
+        });
+      }
+    });
+
+    it("includes other targets as mapping sources", async () => {
+      const user = userEvent.setup();
+      renderComponent({ otherTargets: [mockOtherTarget] });
+
+      // Click on an empty mapping input
+      const inputs = screen.getAllByRole("textbox");
+      const emptyInput = inputs.find(
+        (input) => !(input as HTMLInputElement).value,
+      );
+      if (emptyInput) {
+        await user.click(emptyInput);
+
+        await waitFor(() => {
+          // Falls back to target.id when the target has no resolvable entity
+          expect(screen.getByText("target-2")).toBeInTheDocument();
+          expect(screen.getByText("search_results")).toBeInTheDocument();
+        });
+      }
+    });
+
+    /** @scenario Chaining one target into another shows the upstream target name */
+    it("labels an upstream prompt target source with its resolved name", async () => {
+      const user = userEvent.setup();
+      const upstream: TargetConfig = {
+        ...mockOtherTarget,
+        id: "target_1778838627724",
+        promptId: "prompt-cat",
+      };
+      renderComponent({ otherTargets: [upstream] });
+
+      const inputs = screen.getAllByRole("textbox");
+      const emptyInput = inputs.find(
+        (input) => !(input as HTMLInputElement).value,
+      );
+      expect(emptyInput).toBeDefined();
+      await user.click(emptyInput!);
+
+      await waitFor(() => {
+        expect(screen.getByText("category_classifier")).toBeInTheDocument();
+      });
+      expect(
+        screen.queryByText("target_1778838627724"),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("callbacks", () => {
+    it("calls onMappingChange when mapping is selected", async () => {
+      const user = userEvent.setup();
+      const onMappingChange = vi.fn();
+      renderComponent({ onMappingChange });
+
+      // Find the inputs - with the new Tag UI, the mapped variable (question) shows
+      // a tag + empty input, while unmapped variable (context) shows just empty input
+      // We need to click the input that doesn't have a tag next to it
+      const inputs = screen.getAllByRole("textbox");
+
+      // The second input should be for "context" (unmapped variable)
+      const contextInput = inputs[1];
+      expect(contextInput).toBeDefined();
+
+      await user.click(contextInput!);
+
+      await waitFor(() => {
+        expect(screen.getByText("expected_output")).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByText("expected_output"));
+
+      // The callback should be called with the field name and mapping
+      // onMappingChange(inputField, mapping | undefined)
+      expect(onMappingChange).toHaveBeenCalledWith(
+        "context",
+        expect.objectContaining({
+          type: "source",
+          sourceId: "dataset-1",
+          sourceField: "expected_output",
+        }),
+      );
+    });
+  });
+
+  describe("readOnly mode", () => {
+    it("hides helper text in readOnly mode", () => {
+      renderComponent({ readOnly: true });
+      expect(
+        screen.queryByText(/Connect each input variable to a data source/i),
+      ).not.toBeInTheDocument();
+    });
+  });
+});

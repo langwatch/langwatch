@@ -1,28 +1,22 @@
-import { Box, Button, HStack, Tabs } from "@chakra-ui/react";
-import { MoreVertical } from "lucide-react";
+import { Box, HStack, IconButton, Tabs, Text } from "@chakra-ui/react";
+import { PanelLeftOpen } from "lucide-react";
 import type React from "react";
-import {
-  startTransition,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-import {
-  MenuContent,
-  MenuItem,
-  MenuRoot,
-  MenuTrigger,
-} from "../../../../components/ui/menu";
+import { startTransition, useMemo, useRef, useState } from "react";
+import { Kbd } from "~/components/ops/shared/Kbd";
+import { Tooltip } from "~/components/ui/tooltip";
 import { useErrorCount } from "../../hooks/useErrorCount";
-import type { LensConfig } from "../../stores/viewStore";
+import { useOverflowVisibility } from "../../hooks/useOverflowVisibility";
+import { useUIStore } from "../../stores/uiStore";
 import { useViewStore } from "../../stores/viewStore";
+import { OverflowMenu } from "../shared/OverflowMenu";
 import { CreateLensButton } from "./CreateLensButton";
 import { LensTab } from "./LensTab";
 import { UnsavedLensDialog } from "./UnsavedLensDialog";
 
 const ERRORS_LENS_ID = "errors";
+// Headroom reserved on the right edge of the scroller for the inline
+// "+" button + the overflow "⋮" trigger sitting just outside it.
+const LENS_OVERFLOW_RESERVE_PX = 56;
 
 export const LensTabs: React.FC = () => {
   const activeLensId = useViewStore((s) => s.activeLensId);
@@ -35,14 +29,28 @@ export const LensTabs: React.FC = () => {
 
   const [pendingLensId, setPendingLensId] = useState<string | null>(null);
   const scrollerRef = useRef<HTMLDivElement>(null);
-  const hiddenIds = useHiddenLensTabs(scrollerRef, allLenses, activeLensId);
+  const lensIds = useMemo(() => allLenses.map((l) => l.id), [allLenses]);
+  const hiddenIds = useOverflowVisibility({
+    scrollerRef,
+    items: lensIds,
+    activeId: activeLensId,
+    reservePx: LENS_OVERFLOW_RESERVE_PX,
+    // Chakra's `Tabs.Trigger` already emits `data-value` on each tab,
+    // so we reuse it instead of duplicating the attribute on every
+    // `LensTab`.
+    attribute: "data-value",
+  });
+
+  const sidebarCollapsed = useUIStore((s) => s.sidebarCollapsed);
+  const toggleSidebar = useUIStore((s) => s.toggleSidebar);
 
   const activeLens = allLenses.find((l) => l.id === activeLensId);
   const activeLensIsDraft = isDraft(activeLensId);
-  // Preserve `allLenses` order in the overflow menu — `Set.has` lookup keeps
-  // the filter cheap.
-  const hiddenLenses = useMemo(
-    () => allLenses.filter((l) => hiddenIds.has(l.id)),
+  const overflowItems = useMemo(
+    () =>
+      allLenses
+        .filter((l) => hiddenIds.has(l.id))
+        .map((l) => ({ id: l.id, label: l.name })),
     [allLenses, hiddenIds],
   );
 
@@ -93,6 +101,29 @@ export const LensTabs: React.FC = () => {
   return (
     <>
       <HStack gap={0} flex="1" minWidth={0}>
+        {sidebarCollapsed && (
+          <Tooltip
+            content={
+              <HStack gap={1.5}>
+                <Text>Show filters sidebar</Text>
+                <Kbd>{"["}</Kbd>
+              </HStack>
+            }
+            positioning={{ placement: "bottom" }}
+          >
+            <IconButton
+              aria-label="Show filters sidebar"
+              variant="ghost"
+              size="2xs"
+              color="fg.subtle"
+              onClick={toggleSidebar}
+              marginRight={1}
+              flexShrink={0}
+            >
+              <PanelLeftOpen size={14} />
+            </IconButton>
+          </Tooltip>
+        )}
         <Tabs.Root
           value={activeLensId}
           onValueChange={(e) => handleLensChange(e.value)}
@@ -131,9 +162,10 @@ export const LensTabs: React.FC = () => {
           </Box>
         </Tabs.Root>
         <OverflowMenu
-          hiddenLenses={hiddenLenses}
-          activeLensId={activeLensId}
+          items={overflowItems}
+          activeId={activeLensId}
           onSelect={handleOverflowSelect}
+          ariaLabel={`Show ${overflowItems.length} more lenses`}
         />
       </HStack>
 
@@ -148,137 +180,3 @@ export const LensTabs: React.FC = () => {
   );
 };
 
-// Reserve enough headroom in the scroller for the inline `+` button plus the
-// overflow `⋮` trigger that lives just outside the scroller. If a tab's right
-// edge would land past `containerRight - OVERFLOW_RESERVE_PX`, we drop the
-// whole tab into the overflow menu instead of letting it clip.
-const OVERFLOW_RESERVE_PX = 56;
-
-/**
- * First-fit overflow: measure each tab's right edge against the scroller,
- * and once one would clip, drop it (and every subsequent tab) into the
- * overflow menu. Two-phase to avoid thrashing — when the lens list changes
- * or the container resizes we reset to "all visible", let layout settle,
- * then pick a fresh cutoff in `useLayoutEffect`. We never *un*-hide based
- * on settled state, so we converge in a single measurement pass per
- * input change.
- */
-function useHiddenLensTabs(
-  scrollerRef: React.RefObject<HTMLDivElement | null>,
-  allLenses: LensConfig[],
-  activeLensId: string,
-): Set<string> {
-  const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
-  const [measureSeq, setMeasureSeq] = useState(0);
-
-  // Reset on lens list change or active-lens change (the active tab is
-  // force-visible, so re-measure when it moves).
-  useEffect(() => {
-    setHiddenIds(EMPTY_SET);
-    setMeasureSeq((s) => s + 1);
-  }, [allLenses, activeLensId]);
-
-  // Reset on container resize so a wider toolbar can re-show tabs.
-  useEffect(() => {
-    const root = scrollerRef.current;
-    if (!root) return;
-    const ro = new ResizeObserver(() => {
-      setHiddenIds(EMPTY_SET);
-      setMeasureSeq((s) => s + 1);
-    });
-    ro.observe(root);
-    return () => ro.disconnect();
-  }, [scrollerRef]);
-
-  // Measurement pass — only runs while every tab is on-screen, i.e. right
-  // after a reset. Once we've assigned a cutoff we exit early so subsequent
-  // re-renders don't bounce.
-  useLayoutEffect(() => {
-    if (hiddenIds.size > 0) return;
-    const root = scrollerRef.current;
-    if (!root) return;
-
-    const tabs = Array.from(root.querySelectorAll<HTMLElement>("[data-value]"));
-    if (tabs.length === 0) return;
-
-    const containerRect = root.getBoundingClientRect();
-    const limit = containerRect.right - OVERFLOW_RESERVE_PX;
-
-    const next = new Set<string>();
-    const visibleIds: string[] = [];
-    let cutoff = false;
-    for (const tab of tabs) {
-      const id = tab.getAttribute("data-value");
-      if (!id) continue;
-      if (cutoff) {
-        next.add(id);
-        continue;
-      }
-      const rect = tab.getBoundingClientRect();
-      if (rect.right > limit) {
-        next.add(id);
-        cutoff = true;
-      } else {
-        visibleIds.push(id);
-      }
-    }
-
-    // Active tab must always be visible — otherwise the Tabs underline
-    // points at a `display: none` element and the user can't see what
-    // they just selected. Swap with the last visible tab to make room.
-    if (next.has(activeLensId) && visibleIds.length > 0) {
-      const sacrifice = visibleIds[visibleIds.length - 1]!;
-      next.delete(activeLensId);
-      next.add(sacrifice);
-    }
-
-    if (next.size > 0) setHiddenIds(next);
-  }, [measureSeq, hiddenIds, allLenses, scrollerRef, activeLensId]);
-
-  return hiddenIds;
-}
-
-const EMPTY_SET: Set<string> = new Set();
-
-interface OverflowMenuProps {
-  hiddenLenses: LensConfig[];
-  activeLensId: string;
-  onSelect: (id: string) => void;
-}
-
-const OverflowMenu: React.FC<OverflowMenuProps> = ({
-  hiddenLenses,
-  activeLensId,
-  onSelect,
-}) => {
-  if (hiddenLenses.length === 0) return null;
-  return (
-    <MenuRoot>
-      <MenuTrigger asChild>
-        <Button
-          size="xs"
-          variant="ghost"
-          paddingX={0.5}
-          minWidth="auto"
-          height="22px"
-          color="fg.muted"
-          aria-label={`Show ${hiddenLenses.length} more lenses`}
-        >
-          <MoreVertical size={14} />
-        </Button>
-      </MenuTrigger>
-      <MenuContent minWidth="180px">
-        {hiddenLenses.map((lens) => (
-          <MenuItem
-            key={lens.id}
-            value={lens.id}
-            onClick={() => onSelect(lens.id)}
-            fontWeight={lens.id === activeLensId ? "semibold" : undefined}
-          >
-            {lens.name}
-          </MenuItem>
-        ))}
-      </MenuContent>
-    </MenuRoot>
-  );
-};

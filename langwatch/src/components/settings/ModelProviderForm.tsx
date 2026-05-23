@@ -19,7 +19,9 @@ import { parseZodFieldErrors, type ZodErrorStructure } from "../../utils/zod";
 import { Switch } from "../ui/switch";
 import { CredentialsSection } from "./ModelProviderCredentialsSection";
 import { CustomModelInputSection } from "./ModelProviderCustomModelInput";
-import { DefaultProviderSection } from "./ModelProviderDefaultSection";
+// DefaultProviderSection has been moved out of this drawer to a page-level
+// section on the model-providers settings page (DefaultModelsSection). See
+// specs/model-providers/hierarchical-default-models.feature.
 import { ExtraHeadersSection } from "./ModelProviderExtraHeadersSection";
 import { ProviderScopeSection } from "./ModelProviderScopeSection";
 
@@ -61,25 +63,25 @@ export const EditModelProviderForm = ({
 
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
-  // Get provider - first try by ID, then fallback to provider key.
-  // The `modelProviderId === "new"` sentinel forces a blank form even
-  // when the same providerKey is already configured — that's the
-  // multi-instance flow (iter 109): a user can have multiple OpenAI
-  // rows at different scopes, and the "Add Model Provider" menu routes
-  // through this path.
+  // Find the row this form is editing. Three inputs to the lookup:
+  //   - `modelProviderId === "new"` → always blank, never pre-fill from
+  //     an existing row. The Add Model Provider menu sets this so the
+  //     user can stand up a second instance of an already-configured
+  //     provider type without colliding with the first.
+  //   - `modelProviderId === "<cuid>"` → edit that specific row. With
+  //     multi-instance enabled the providers Record dedupes by provider
+  //     string and may not contain this row, so we don't fall back on
+  //     `providers[providerKey]` if the id lookup misses (that fallback
+  //     used to silently swap the user's intended row for whichever
+  //     same-type row happened to win the dedupe).
+  //   - `modelProviderId` undefined → no specific target, fresh blank
+  //     (deep-link from evaluator selector or similar).
   const provider: MaybeStoredModelProvider = useMemo(() => {
-    const isExplicitNew = modelProviderId === "new";
-    if (providers && !isExplicitNew) {
-      // First try to find by ID
-      if (modelProviderId) {
-        const existing = Object.values(providers).find(
-          (p) => p.id === modelProviderId,
-        );
-        if (existing) return existing;
-      }
-      // Fallback: find by provider key
-      const byKey = providers[providerKey];
-      if (byKey) return byKey;
+    if (providers && modelProviderId && modelProviderId !== "new") {
+      const existing = Object.values(providers).find(
+        (p) => p.id === modelProviderId,
+      );
+      if (existing) return existing;
     }
     return {
       provider: providerKey,
@@ -106,7 +108,6 @@ export const EditModelProviderForm = ({
   const [state, actions] = useModelProviderForm({
     provider,
     projectId,
-    project,
     enabledProvidersCount,
     isUsingEnvVars,
     teamId: team?.id,
@@ -228,8 +229,7 @@ export const EditModelProviderForm = ({
           </Box>
           <Field.HelperText>
             Distinguish multiple instances (e.g. "OpenAI – EU prod" vs
-            "OpenAI – Dev"). Shown in the provider list and model
-            selectors.
+            "OpenAI – Dev").
           </Field.HelperText>
         </Field.Root>
 
@@ -245,18 +245,6 @@ export const EditModelProviderForm = ({
             </Switch>
           </Field.Root>
         )}
-
-        <CredentialsSection
-          state={state}
-          actions={actions}
-          provider={provider}
-          fieldErrors={fieldErrors}
-          setFieldErrors={setFieldErrors}
-          projectId={projectId}
-          organizationId={organizationId}
-          apiKeyValidationError={apiKeyValidationError}
-          onApiKeyValidationClear={clearApiKeyError}
-        />
 
         <ProviderScopeSection
           state={state}
@@ -282,6 +270,18 @@ export const EditModelProviderForm = ({
           }
         />
 
+        <CredentialsSection
+          state={state}
+          actions={actions}
+          provider={provider}
+          fieldErrors={fieldErrors}
+          setFieldErrors={setFieldErrors}
+          projectId={projectId}
+          organizationId={organizationId}
+          apiKeyValidationError={apiKeyValidationError}
+          onApiKeyValidationClear={clearApiKeyError}
+        />
+
         <ExtraHeadersSection
           state={state}
           actions={actions}
@@ -289,22 +289,11 @@ export const EditModelProviderForm = ({
         />
 
         {isLlmProvider && (
-          <>
-            <CustomModelInputSection
-              state={state}
-              actions={actions}
-              provider={provider}
-            />
-
-            <DefaultProviderSection
-              state={state}
-              actions={actions}
-              provider={provider}
-              enabledProvidersCount={enabledProvidersCount}
-              project={project}
-              providers={providers}
-            />
-          </>
+          <CustomModelInputSection
+            state={state}
+            actions={actions}
+            provider={provider}
+          />
         )}
 
         <HStack width="full" justify="end">

@@ -13,7 +13,7 @@ import numeral from "numeral";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { TraceIdPeek } from "~/features/traces-v2/components/TraceIdPeek";
 import { useDrawer } from "~/hooks/useDrawer";
-import type { ExperimentRunWithItems } from "../../../server/evaluations-v3/services/types";
+import type { ExperimentRunWithItems } from "../../../server/experiments-v3/services/types";
 import { formatMilliseconds } from "../../../utils/formatMilliseconds";
 import { formatMoney } from "../../../utils/formatMoney";
 import { ExternalImage, getImageUrl } from "../../ExternalImage";

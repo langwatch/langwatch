@@ -480,9 +480,11 @@ describe("OtlpSpanTokenEstimationService", () => {
         expect(deps.tokenizer.countTokens).not.toHaveBeenCalled();
         expect(featureFlagService.isEnabled).toHaveBeenCalledWith(
           "token-estimation-killswitch",
-          "global",
-          false,
-          expect.objectContaining({ cacheTtlMs: expect.any(Number) }),
+          expect.objectContaining({
+            distinctId: "global",
+            defaultValue: false,
+            cacheTtlMs: expect.any(Number),
+          }),
         );
       });
     });
@@ -526,9 +528,9 @@ describe("OtlpSpanTokenEstimationService", () => {
         expect(deps.tokenizer.countTokens).not.toHaveBeenCalled();
         expect(featureFlagService.isEnabled).toHaveBeenCalledWith(
           "token-estimation-project-killswitch",
-          "project-456",
-          false,
           expect.objectContaining({
+            distinctId: "project-456",
+            defaultValue: false,
             projectId: "project-456",
             cacheTtlMs: expect.any(Number),
           }),

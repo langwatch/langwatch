@@ -127,6 +127,7 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     // Traces
     "traces:view",
     "traces:create",
+    "traces:update",
     "traces:share",
     // Annotations
     "annotations:view",
@@ -198,6 +199,7 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     // Traces
     "traces:view",
     "traces:create",
+    "traces:update",
     "traces:share",
     // Annotations
     "annotations:view",
@@ -730,6 +732,10 @@ async function checkPermissionFromBindings({
 /**
  * Checks whether a single binding grants the requested permission,
  * respecting EXTERNAL user restrictions and custom role permission lists.
+ *
+ * See also checkRoleBindingPermission() in role-binding-resolver.ts which
+ * implements parallel CUSTOM-role logic for API key resolution and must
+ * stay in sync with the non-empty/empty fallthrough semantics here.
  */
 async function resolveBindingPermission(
   binding: { role: TeamUserRole; customRoleId: string | null },
@@ -971,6 +977,232 @@ export async function hasOrganizationPermission(
     if (permitted) return true;
   }
   return false;
+}
+
+/**
+ * Batched team + project permission check used by surfaces that need to
+ * test the SAME permission across many scopes inside one organization
+ * (e.g. the model-defaults settings page enumerating every team +
+ * project the caller can read/write). One scoped permission check costs
+ * ~3-5 queries (team/project lookup, organizationUser, groupMembership,
+ * roleBinding, optional customRole). N team + M project checks ran in a
+ * Promise.all fan-out, that's hundreds of queries per page load on large
+ * orgs.
+ *
+ * This helper does the four lookups ONCE — groupMembership, roleBinding
+ * (with scopeId IN the union of all team/project/org ids), customRole
+ * (for any binding referencing one), and legacy teamUser — then
+ * resolves each id in-memory against the same rules
+ * `checkPermissionFromBindings` applies.
+ *
+ * Project resolution still needs to know the project's team so a
+ * team-scoped binding inherits to its projects. Callers pass the
+ * project→teamId map alongside the project ids.
+ */
+export async function batchScopePermissions(
+  ctx: { prisma: PrismaClient; session: Session | null },
+  args: {
+    organizationId: string;
+    teamIds: string[];
+    projectIds: string[];
+    projectTeamId: Record<string, string>;
+    permission: Permission;
+  },
+): Promise<{ teams: Map<string, boolean>; projects: Map<string, boolean> }> {
+  const teamsMap = new Map<string, boolean>();
+  const projectsMap = new Map<string, boolean>();
+  if (!ctx.session?.user) {
+    args.teamIds.forEach((id) => teamsMap.set(id, false));
+    args.projectIds.forEach((id) => projectsMap.set(id, false));
+    return { teams: teamsMap, projects: projectsMap };
+  }
+  const userId = ctx.session.user.id;
+
+  const orgMember = await ctx.prisma.organizationUser?.findFirst({
+    where: { userId, organizationId: args.organizationId },
+    select: { role: true },
+  });
+  const organizationRole: OrganizationUserRole | null =
+    orgMember?.role ?? null;
+  if (!orgMember) {
+    args.teamIds.forEach((id) => teamsMap.set(id, false));
+    args.projectIds.forEach((id) => projectsMap.set(id, false));
+    return { teams: teamsMap, projects: projectsMap };
+  }
+
+  const groupMemberships = await ctx.prisma.groupMembership.findMany({
+    where: { userId, group: { organizationId: args.organizationId } },
+    select: { groupId: true },
+  });
+  const groupIds = groupMemberships.map((m) => m.groupId);
+
+  const scopeIds = [
+    args.organizationId,
+    ...args.teamIds,
+    ...args.projectIds,
+  ];
+  const bindings =
+    scopeIds.length > 0
+      ? await ctx.prisma.roleBinding.findMany({
+          where: {
+            organizationId: args.organizationId,
+            scopeId: { in: scopeIds },
+            OR: [
+              { userId },
+              ...(groupIds.length > 0 ? [{ groupId: { in: groupIds } }] : []),
+            ],
+          },
+          select: {
+            role: true,
+            customRoleId: true,
+            scopeType: true,
+            scopeId: true,
+          },
+        })
+      : [];
+
+  const customRoleIds = Array.from(
+    new Set(
+      bindings
+        .map((b) => b.customRoleId)
+        .filter((id): id is string => !!id),
+    ),
+  );
+  const customRoles =
+    customRoleIds.length > 0
+      ? await ctx.prisma.customRole.findMany({
+          where: { id: { in: customRoleIds } },
+          select: { id: true, permissions: true },
+        })
+      : [];
+  const customRoleById = new Map(customRoles.map((c) => [c.id, c]));
+
+  const evaluateBinding = (binding: {
+    role: TeamUserRole;
+    customRoleId: string | null;
+    scopeType: RoleBindingScopeType;
+  }): boolean => {
+    if (binding.customRoleId) {
+      const custom = customRoleById.get(binding.customRoleId);
+      if (custom) {
+        const perms = Array.isArray(custom.permissions)
+          ? (custom.permissions as string[])
+          : [];
+        if (perms.length > 0) {
+          return hasPermissionWithHierarchy(perms, args.permission);
+        }
+      }
+    }
+    if (binding.scopeType === RoleBindingScopeType.ORGANIZATION) {
+      if (binding.role === TeamUserRole.CUSTOM) return false;
+      if (organizationRole === OrganizationUserRole.EXTERNAL) return false;
+      if (binding.role === TeamUserRole.ADMIN) return true;
+      return organizationRoleHasPermission(
+        OrganizationUserRole.MEMBER,
+        args.permission,
+      );
+    }
+    if (organizationRole === OrganizationUserRole.EXTERNAL) {
+      return hasPermissionWithHierarchy(
+        EXTERNAL_MEMBER_PERMISSIONS,
+        args.permission,
+      );
+    }
+    return teamRoleHasPermission(binding.role, args.permission);
+  };
+
+  const bindingsByScope = new Map<string, typeof bindings>();
+  for (const b of bindings) {
+    const key = `${b.scopeType}::${b.scopeId}`;
+    const list = bindingsByScope.get(key) ?? [];
+    list.push(b);
+    bindingsByScope.set(key, list);
+  }
+  const orgBindings =
+    bindingsByScope.get(
+      `${RoleBindingScopeType.ORGANIZATION}::${args.organizationId}`,
+    ) ?? [];
+  const orgGrants = orgBindings.some(evaluateBinding);
+
+  // Legacy fallback: a user with no RoleBindings at all (binding count
+  // is zero across the org for them) falls back to TeamUser. We mirror
+  // that fallback per-scope here so this batch path keeps parity with
+  // the per-call helpers.
+  const needsLegacyFallback = bindings.length === 0;
+  const legacyTeamUser = needsLegacyFallback
+    ? await ctx.prisma.teamUser.findMany({
+        where: {
+          userId,
+          team: { organizationId: args.organizationId },
+        },
+        select: { teamId: true, role: true, assignedRoleId: true },
+      })
+    : [];
+  const legacyByTeam = new Map(legacyTeamUser.map((t) => [t.teamId, t]));
+
+  for (const teamId of args.teamIds) {
+    if (orgGrants) {
+      teamsMap.set(teamId, true);
+      continue;
+    }
+    const teamBindings =
+      bindingsByScope.get(`${RoleBindingScopeType.TEAM}::${teamId}`) ?? [];
+    if (teamBindings.some(evaluateBinding)) {
+      teamsMap.set(teamId, true);
+      continue;
+    }
+    if (needsLegacyFallback) {
+      const legacy = legacyByTeam.get(teamId);
+      if (legacy) {
+        const permitted = evaluateBinding({
+          role: legacy.role,
+          customRoleId: legacy.assignedRoleId ?? null,
+          scopeType: RoleBindingScopeType.TEAM,
+        });
+        teamsMap.set(teamId, permitted);
+        continue;
+      }
+    }
+    teamsMap.set(teamId, false);
+  }
+
+  for (const projectId of args.projectIds) {
+    if (orgGrants) {
+      projectsMap.set(projectId, true);
+      continue;
+    }
+    const projectBindings =
+      bindingsByScope.get(`${RoleBindingScopeType.PROJECT}::${projectId}`) ??
+      [];
+    if (projectBindings.some(evaluateBinding)) {
+      projectsMap.set(projectId, true);
+      continue;
+    }
+    const teamId = args.projectTeamId[projectId];
+    if (teamId) {
+      const teamBindings =
+        bindingsByScope.get(`${RoleBindingScopeType.TEAM}::${teamId}`) ?? [];
+      if (teamBindings.some(evaluateBinding)) {
+        projectsMap.set(projectId, true);
+        continue;
+      }
+      if (needsLegacyFallback) {
+        const legacy = legacyByTeam.get(teamId);
+        if (legacy) {
+          const permitted = evaluateBinding({
+            role: legacy.role,
+            customRoleId: legacy.assignedRoleId ?? null,
+            scopeType: RoleBindingScopeType.TEAM,
+          });
+          projectsMap.set(projectId, permitted);
+          continue;
+        }
+      }
+    }
+    projectsMap.set(projectId, false);
+  }
+
+  return { teams: teamsMap, projects: projectsMap };
 }
 
 // ============================================================================

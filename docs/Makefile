@@ -17,6 +17,12 @@ generate-openapi-evals:
 	@npx tsx scripts/generate-openapi-evals.ts
 	@echo "✅ Evaluators OpenAPI spec generated successfully"
 
+.PHONY: generate-api-reference
+generate-api-reference:
+	@echo "Generating API reference pages from OpenAPI spec..."
+	@npx tsx scripts/generate-api-reference-pages.ts
+	@echo "✅ API reference pages generated and docs.json updated"
+
 .PHONY: view-docs
 preview:
 	@echo "Viewing docs..."

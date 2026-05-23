@@ -5,10 +5,22 @@ import {
   generateTraceAction,
   generateTraceQueryFromPrompt,
 } from "~/server/app-layer/traces/ai-query";
+import { ValidationError } from "~/server/app-layer/domain-error";
+import { deriveTraceStatus } from "~/server/app-layer/traces/derive-trace-status";
 import { TraceNotFoundError } from "~/server/app-layer/traces/errors";
 import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to-clickhouse";
 import type { SpanSummaryRow } from "~/server/app-layer/traces/repositories/span-storage.repository";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import { changeTraceNameInputSchema } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
+import {
+  TRACE_NAME_MAX_LENGTH,
+  TRACE_NAME_MIN_LENGTH,
+} from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
+import {
+  findPromptReferenceInAncestors,
+  flattenParamsToPromptAttributes,
+  type PromptLookupSpan,
+} from "~/server/traces/findPromptReferenceInAncestors";
 import type { Span, SpanInputOutput } from "~/server/tracer/types";
 import { checkProjectPermission } from "../rbac";
 import type {
@@ -76,9 +88,7 @@ function mapTraceSummaryToHeader(summary: TraceSummaryData): TraceHeader {
     (summary.totalPromptTokenCount ?? 0) +
     (summary.totalCompletionTokenCount ?? 0);
 
-  let status: TraceHeader["status"] = "ok";
-  if (summary.containsErrorStatus) status = "error";
-  else if (!summary.containsOKStatus) status = "warning";
+  const status = deriveTraceStatus(summary);
 
   return {
     traceId: summary.traceId,
@@ -204,6 +214,83 @@ function mapSpanToDetail(
       attributes: e.attributes,
     })),
   };
+}
+
+const PROMPT_ATTR_KEYS = [
+  "langwatch.prompt.id",
+  "langwatch.prompt.handle",
+  "langwatch.prompt.version.number",
+  "langwatch.prompt.variables",
+] as const;
+
+function hasOwnPromptAttrs(
+  params: Record<string, unknown> | null,
+): boolean {
+  if (!params) return false;
+  const flat = flattenParamsToPromptAttributes(params);
+  return PROMPT_ATTR_KEYS.some((k) => flat[k] !== undefined);
+}
+
+/**
+ * Resolves the closest preceding `langwatch.prompt.*` reference for an llm
+ * span by walking the trace's ancestor / sibling chain — same heuristic
+ * `getSpanForPromptStudio` uses on the legacy path. Returns the llm span's
+ * params merged with the resolved prompt attributes (in nested-object form
+ * matching the rest of `params`), or null when nothing was found so the
+ * caller can skip the assignment.
+ */
+async function enrichLlmSpanWithAncestorPrompt({
+  tenantId,
+  traceId,
+  targetSpanId,
+  occurredAtMs,
+  currentParams,
+}: {
+  tenantId: string;
+  traceId: string;
+  targetSpanId: string;
+  occurredAtMs?: number;
+  currentParams: Record<string, unknown> | null;
+}): Promise<Record<string, unknown> | null> {
+  const app = getApp();
+  const allSpans = await app.traces.spans.getSpansByTraceId({
+    tenantId,
+    traceId,
+    occurredAtMs,
+  });
+
+  const lookupSpans: PromptLookupSpan[] = allSpans.map((s) => ({
+    spanId: s.span_id,
+    parentSpanId: s.parent_id ?? null,
+    startTime: s.timestamps.started_at,
+    attributes: flattenParamsToPromptAttributes(
+      s.params as Record<string, unknown> | null,
+    ),
+  }));
+
+  const ref = findPromptReferenceInAncestors({
+    targetSpanId,
+    spans: lookupSpans,
+  });
+  if (!ref?.promptHandle) return null;
+
+  const promptNode: Record<string, unknown> = {
+    id: ref.promptHandle,
+  };
+  if (ref.promptVersionNumber != null) {
+    promptNode.version = { number: ref.promptVersionNumber };
+  }
+  if (ref.promptVariables) {
+    promptNode.variables = ref.promptVariables;
+  }
+
+  const next: Record<string, unknown> = { ...(currentParams ?? {}) };
+  const langwatch =
+    next.langwatch && typeof next.langwatch === "object"
+      ? (next.langwatch as Record<string, unknown>)
+      : {};
+  next.langwatch = { ...langwatch, prompt: promptNode };
+  return next;
 }
 
 // ---------------------------------------------------------------------------
@@ -468,6 +555,53 @@ export const tracesV2Router = createTRPCRouter({
       return mapTraceSummaryToHeader(summary);
     }),
 
+  /**
+   * Lets a user rename a trace. Trim happens in the procedure so the event
+   * always carries a canonical form, then the schema check rejects empty /
+   * over-long names — when those rejections fire we surface them as a
+   * `ValidationError` (DomainError), so the client receives the rich
+   * `domainError` payload via tRPC's error formatter alongside the safe
+   * user-facing message. The command pipeline still re-validates via Zod
+   * as a defence-in-depth check (replays from a poisoned event store).
+   */
+  changeName: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        traceId: z.string(),
+        newName: z.string(),
+      }),
+    )
+    .use(checkProjectPermission("traces:update"))
+    .mutation(async ({ input, ctx }) => {
+      const trimmed = input.newName.trim();
+      const parsed = changeTraceNameInputSchema.safeParse({ newName: trimmed });
+      if (!parsed.success) {
+        throw new ValidationError(
+          `Trace name must be between ${TRACE_NAME_MIN_LENGTH} and ${TRACE_NAME_MAX_LENGTH} characters after trimming`,
+          {
+            meta: {
+              field: "newName",
+              minLength: TRACE_NAME_MIN_LENGTH,
+              maxLength: TRACE_NAME_MAX_LENGTH,
+              receivedLength: trimmed.length,
+              fieldErrors: parsed.error.flatten().fieldErrors,
+            },
+          },
+        );
+      }
+
+      await getApp().traces.changeTraceName({
+        tenantId: input.projectId,
+        traceId: input.traceId,
+        newName: parsed.data.newName,
+        changedByUserId: ctx.session.user.id,
+        occurredAt: Date.now(),
+      });
+
+      return { traceId: input.traceId, newName: parsed.data.newName };
+    }),
+
   spansPaginated: protectedProcedure
     .input(
       z.object({
@@ -664,7 +798,7 @@ export const tracesV2Router = createTRPCRouter({
         throw new TraceNotFoundError(input.spanId);
       }
 
-      return mapSpanToDetail(
+      const detail = mapSpanToDetail(
         span,
         rawEvents.map((e) => ({
           name: e.event_type,
@@ -678,6 +812,30 @@ export const tracesV2Router = createTRPCRouter({
           ]),
         })),
       );
+
+      // SDK pattern: `Prompt.compile` / `PromptApiService.get` siblings
+      // carry `langwatch.prompt.*` while the actual `llm` span next door
+      // does not. Walk ancestors/siblings here so the v2 drawer's prompt
+      // accordion lights up on the llm span too (matches legacy
+      // SpanDetails). One extra trace-scoped read, only when the llm
+      // span has no own prompt attrs.
+      if (
+        detail.type === "llm" &&
+        !hasOwnPromptAttrs(detail.params as Record<string, unknown> | null)
+      ) {
+        const enriched = await enrichLlmSpanWithAncestorPrompt({
+          tenantId: input.projectId,
+          traceId: input.traceId,
+          targetSpanId: input.spanId,
+          occurredAtMs: hint.occurredAtMs,
+          currentParams: detail.params as Record<string, unknown> | null,
+        });
+        if (enriched) {
+          detail.params = enriched;
+        }
+      }
+
+      return detail;
     }),
 
   /**

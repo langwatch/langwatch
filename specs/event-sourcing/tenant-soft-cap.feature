@@ -14,7 +14,7 @@ Feature: Per-tenant soft cap on in-flight dispatch
   # cluster capacity; the scheduler scans past its over-cap groups and
   # serves the rest of the fleet.
   #
-  # Ships ON by default (LANGWATCH_DISPATCH_TENANT_CAP unset → 100).
+  # Ships ON by default (LANGWATCH_DISPATCH_TENANT_CAP unset → 50).
   # Operators set =0 as an explicit kill switch, or =N to retune.
   # Sized at ≈ GLOBAL_QUEUE_CONCURRENCY so a tenant tops out at one
   # pod's worth of slots — strong protection on multi-pod clusters,
@@ -24,10 +24,10 @@ Feature: Per-tenant soft cap on in-flight dispatch
     Given the GroupQueue is running with Lua scripts deployed
 
   @unit @tenant-cap @env
-  Scenario: Tenant cap defaults to 100 when env var is unset
+  Scenario: Tenant cap defaults to 50 when env var is unset
     Given the env var "LANGWATCH_DISPATCH_TENANT_CAP" is not set
     When readTenantCap() is invoked
-    Then it returns 100
+    Then it returns 50
 
   @unit @tenant-cap @env
   Scenario: Explicit env=0 disables the tenant cap entirely (kill switch)

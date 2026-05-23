@@ -1,4 +1,7 @@
-import { describe, it, expect } from "vitest";
+/**
+ * @vitest-environment jsdom
+ */
+import { describe, it, expect, afterEach } from "vitest";
 import { detectEntityId } from "../useCommandSearch";
 
 /**
@@ -7,6 +10,10 @@ import { detectEntityId } from "../useCommandSearch";
  */
 describe("detectEntityId", () => {
   const PROJECT_SLUG = "test-project";
+
+  afterEach(() => {
+    window.localStorage.removeItem("langwatch:traces-v2-preferred");
+  });
 
   /**
    * Helper to extract the type from detectEntityId result.
@@ -81,39 +88,27 @@ describe("detectEntityId", () => {
       expect(detectIdType("0123456789ABCDEF0123456789ABCDEF")).toBe("trace");
     });
 
-    describe("when traces v2 is disabled (default)", () => {
-      it("includes traceDetails drawerAction", () => {
-        const result = detectEntityId({
-          query: "trace_abc123",
-          projectSlug: PROJECT_SLUG,
-        });
-        expect(result?.drawerAction).toEqual({
-          drawer: "traceDetails",
-          params: { traceId: "trace_abc123" },
-        });
+    it("navigates to v1 /messages when v2 preference is off", () => {
+      const result = detectEntityId({
+        query: "trace_abc123",
+        projectSlug: PROJECT_SLUG,
       });
-
-      it("builds v1 /messages path", () => {
-        const result = detectEntityId({
-          query: "trace_abc123",
-          projectSlug: PROJECT_SLUG,
-        });
-        expect(result?.path).toBe("/test-project/messages/trace_abc123");
-      });
+      expect(result?.path).toBe(
+        "/test-project/messages?drawer.open=traceDetails&drawer.traceId=trace_abc123"
+      );
+      expect(result?.drawerAction).toBeUndefined();
     });
 
-    describe("when traces v2 is enabled", () => {
-      it("navigates to v2 /traces with drawer params (no in-place drawerAction)", () => {
-        const result = detectEntityId({
-          query: "trace_abc123",
-          projectSlug: PROJECT_SLUG,
-          tracesV2Enabled: true,
-        });
-        expect(result?.path).toBe(
-          "/test-project/traces?drawer.open=traceV2Details&drawer.traceId=trace_abc123"
-        );
-        expect(result?.drawerAction).toBeUndefined();
+    it("navigates to v2 /traces when v2 preference is on", () => {
+      window.localStorage.setItem("langwatch:traces-v2-preferred", "1");
+      const result = detectEntityId({
+        query: "trace_abc123",
+        projectSlug: PROJECT_SLUG,
       });
+      expect(result?.path).toBe(
+        "/test-project/traces?drawer.open=traceV2Details&drawer.traceId=trace_abc123"
+      );
+      expect(result?.drawerAction).toBeUndefined();
     });
   });
 
@@ -130,35 +125,15 @@ describe("detectEntityId", () => {
       expect(detectIdType("0123456789ABCDEF")).toBe("span");
     });
 
-    describe("when traces v2 is disabled (default)", () => {
-      it("builds v1 /messages search path", () => {
-        const result = detectEntityId({
-          query: "span_abc123",
-          projectSlug: PROJECT_SLUG,
-        });
-        expect(result?.path).toBe("/test-project/messages?query=span_abc123");
+    it("builds v2 /traces fragment path with spanId query-language clause", () => {
+      const result = detectEntityId({
+        query: "span_abc123",
+        projectSlug: PROJECT_SLUG,
       });
-
-      it("does not include drawerAction", () => {
-        const result = detectEntityId({
-          query: "span_abc123",
-          projectSlug: PROJECT_SLUG,
-        });
-        expect(result?.drawerAction).toBeUndefined();
-      });
-    });
-
-    describe("when traces v2 is enabled", () => {
-      it("builds v2 /traces fragment path with spanId query-language clause", () => {
-        const result = detectEntityId({
-          query: "span_abc123",
-          projectSlug: PROJECT_SLUG,
-          tracesV2Enabled: true,
-        });
-        expect(result?.path).toBe(
-          "/test-project/traces#all-traces?q=spanId%3Aspan_abc123"
-        );
-      });
+      expect(result?.path).toBe(
+        "/test-project/traces#all-traces?q=spanId%3Aspan_abc123"
+      );
+      expect(result?.drawerAction).toBeUndefined();
     });
   });
 

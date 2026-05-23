@@ -65,6 +65,21 @@ export type ChatRichContent =
       toolName?: string;
       toolCallId?: string;
       result?: any;
+    }
+  /**
+   * AG-UI binary content part. Used for audio/image/video/file attachments.
+   * Mutually-exclusive payload: exactly one of `data` (inline base64), `url`
+   * (already-externalized reference), or `id` (stored_objects id) is present.
+   * After ingest-side extraction (stored-objects pipeline), inline `data` is
+   * rewritten to `id` + `url` pointing at /api/files/{id}.
+   */
+  | {
+      type: "binary";
+      mimeType: string;
+      data?: string;
+      url?: string;
+      id?: string;
+      filename?: string;
     };
 
 export interface TypedValueChatMessages {

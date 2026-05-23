@@ -20,6 +20,8 @@ import {
   type MaybeStoredModelProvider,
   modelProviders,
 } from "./registry";
+import { seedOnboardingDefaultsForProvider } from "./seedOnboardingDefaults";
+import { isManagedProvider } from "../../../ee/managed-providers/managedBedrockConfig";
 
 /**
  * Minimal ctx slice this service uses to authorize scope-level writes.
@@ -143,6 +145,244 @@ export class ModelProviderService {
   }
 
   /**
+   * List shape of every ModelProvider accessible to a project — one
+   * entry per stored row, no collapsing by provider key. The page-level
+   * Model Providers table needs this so it can render multi-instance
+   * setups (e.g. "OpenAI — Org" + "OpenAI — Project override") as two
+   * rows; the `Record<provider, …>` shape returned by
+   * `getProjectModelProvidersForFrontend` silently drops the loser.
+   *
+   * API keys are masked.
+   */
+  async listProjectModelProvidersForFrontend(
+    projectId: string,
+  ): Promise<MaybeStoredModelProvider[]> {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+    });
+    if (!project) throw new Error("Project not found");
+
+    const defaultProviders = this.buildDefaultProviders(project);
+    const savedProviders = await this.repository.findAllAccessibleForProject(
+      projectId,
+    );
+    const savedProviderKeys = new Set(savedProviders.map((mp) => mp.provider));
+
+    // Env-fed providers (process.env has the API key) that nobody has
+    // stored a row for. They're real and usable — surface them as
+    // pseudo-rows tagged `isSystem` so the settings table can render a
+    // "SYSTEM" chip and the picker can include them without an edit
+    // affordance. Skip ones that are also stored — the stored row
+    // wins, and we don't want to double-show the same provider.
+    const systemRows: MaybeStoredModelProvider[] = [];
+    for (const [providerKey, provider_] of Object.entries(defaultProviders)) {
+      if (savedProviderKeys.has(providerKey)) continue;
+      if (!provider_.enabled) continue;
+      systemRows.push({
+        ...provider_,
+        isSystem: true,
+        scopes: [],
+      });
+    }
+
+    const storedRows = savedProviders
+      .filter((mp) => this.shouldKeepModelProvider(mp, defaultProviders))
+      .map((mp) => {
+        const defaultProvider = defaultProviders[mp.provider];
+        const customModels = toLegacyCompatibleCustomModels(
+          mp.customModels,
+          "chat",
+        );
+        const customEmbeddingsModels = toLegacyCompatibleCustomModels(
+          mp.customEmbeddingsModels,
+          "embedding",
+        );
+        const narrowestScope = this.pickNarrowestScope(mp.scopes);
+        const masked = (mp.customKeys
+          ? Object.fromEntries(
+              Object.entries(
+                mp.customKeys as Record<string, unknown>,
+              ).map(([key, value]) => [
+                key,
+                KEY_CHECK.some((k) => key.includes(k))
+                  ? MASKED_KEY_PLACEHOLDER
+                  : value,
+              ]),
+            )
+          : null) as MaybeStoredModelProvider["customKeys"];
+        const provider_: MaybeStoredModelProvider = {
+          id: mp.id,
+          name: mp.name,
+          provider: mp.provider,
+          enabled: mp.enabled,
+          customKeys: masked,
+          models: defaultProvider?.models ?? null,
+          embeddingsModels: defaultProvider?.embeddingsModels ?? null,
+          customModels: customModels.length > 0 ? customModels : null,
+          customEmbeddingsModels:
+            customEmbeddingsModels.length > 0 ? customEmbeddingsModels : null,
+          deploymentMapping: mp.deploymentMapping,
+          disabledByDefault: defaultProvider?.disabledByDefault,
+          extraHeaders: mp.extraHeaders as
+            | { key: string; value: string }[]
+            | null,
+          scopes: mp.scopes.map((s) => ({
+            scopeType: s.scopeType as "ORGANIZATION" | "TEAM" | "PROJECT",
+            scopeId: s.scopeId,
+          })),
+          scopeType: narrowestScope.scopeType,
+          scopeId: narrowestScope.scopeId,
+        };
+        return provider_;
+      });
+    return [...storedRows, ...systemRows];
+  }
+
+  /**
+   * Org-wide variant of `listProjectModelProvidersForFrontend`. Returns
+   * every ModelProvider attached anywhere inside the organization — at
+   * the org itself, any of its teams, or any of its projects. The
+   * settings page renders this when the page-level filter is set to
+   * "All you can see" so a user can see what an admin in a sibling
+   * project has configured.
+   *
+   * Env-fed pseudo-rows (process.env API keys + managed bedrock
+   * keyed by orgId) are included with scopes=[] / isSystem=true so the
+   * "SYSTEM" chip renders correctly. The per-project env check
+   * (enabledSince < project.createdAt) is anchored on the org's
+   * oldest project — if any project in the org is old enough to see
+   * the env-fed provider, all of them do, so the row shows once at
+   * org scope.
+   */
+  async listOrgModelProvidersForFrontend(
+    organizationId: string,
+  ): Promise<MaybeStoredModelProvider[]> {
+    const teams = await this.prisma.team.findMany({
+      where: { organizationId },
+      include: { projects: true },
+    });
+    const projects = teams.flatMap((t) => t.projects);
+    const oldestProject = projects.reduce<Project | null>(
+      (oldest, p) =>
+        !oldest || p.createdAt < oldest.createdAt ? (p as Project) : oldest,
+      null,
+    );
+    const defaultProviders = oldestProject
+      ? this.buildDefaultProviders(oldestProject)
+      : {};
+    const savedProviders =
+      await this.repository.findAllInOrganization(organizationId);
+    const savedProviderKeys = new Set(savedProviders.map((mp) => mp.provider));
+
+    const systemRows: MaybeStoredModelProvider[] = [];
+    for (const [providerKey, provider_] of Object.entries(defaultProviders)) {
+      if (savedProviderKeys.has(providerKey)) continue;
+      if (!provider_.enabled) continue;
+      systemRows.push({ ...provider_, isSystem: true, scopes: [] });
+    }
+    // Managed bedrock: env var MANAGED_BEDROCK__<label>__<orgId> sets
+    // up cross-account credentials for a specific org. Surface a SYSTEM
+    // pseudo-row so the table shows the user where it's coming from.
+    // Skip when bedrock is already represented (saved row OR a standard
+    // env-fed pseudo-row pushed in the loop above).
+    const bedrockAlreadyShown =
+      savedProviderKeys.has("bedrock") ||
+      systemRows.some((r) => r.provider === "bedrock");
+    if (
+      !bedrockAlreadyShown &&
+      isManagedProvider(organizationId, "bedrock")
+    ) {
+      const defaultProvider = this.buildDefaultProvidersFromEnvShape(
+        "bedrock",
+        oldestProject,
+      );
+      if (defaultProvider) {
+        systemRows.push({ ...defaultProvider, isSystem: true, scopes: [] });
+      }
+    }
+
+    const storedRows = savedProviders
+      .filter((mp) => this.shouldKeepModelProvider(mp, defaultProviders))
+      .map((mp) => {
+        const defaultProvider = defaultProviders[mp.provider];
+        const customModels = toLegacyCompatibleCustomModels(
+          mp.customModels,
+          "chat",
+        );
+        const customEmbeddingsModels = toLegacyCompatibleCustomModels(
+          mp.customEmbeddingsModels,
+          "embedding",
+        );
+        const narrowestScope = this.pickNarrowestScope(mp.scopes);
+        const masked = (mp.customKeys
+          ? Object.fromEntries(
+              Object.entries(
+                mp.customKeys as Record<string, unknown>,
+              ).map(([key, value]) => [
+                key,
+                KEY_CHECK.some((k) => key.includes(k))
+                  ? MASKED_KEY_PLACEHOLDER
+                  : value,
+              ]),
+            )
+          : null) as MaybeStoredModelProvider["customKeys"];
+        const provider_: MaybeStoredModelProvider = {
+          id: mp.id,
+          name: mp.name,
+          provider: mp.provider,
+          enabled: mp.enabled,
+          customKeys: masked,
+          models: defaultProvider?.models ?? null,
+          embeddingsModels: defaultProvider?.embeddingsModels ?? null,
+          customModels: customModels.length > 0 ? customModels : null,
+          customEmbeddingsModels:
+            customEmbeddingsModels.length > 0 ? customEmbeddingsModels : null,
+          deploymentMapping: mp.deploymentMapping,
+          disabledByDefault: defaultProvider?.disabledByDefault,
+          extraHeaders: mp.extraHeaders as
+            | { key: string; value: string }[]
+            | null,
+          scopes: mp.scopes.map((s) => ({
+            scopeType: s.scopeType as "ORGANIZATION" | "TEAM" | "PROJECT",
+            scopeId: s.scopeId,
+          })),
+          scopeType: narrowestScope.scopeType,
+          scopeId: narrowestScope.scopeId,
+        };
+        return provider_;
+      });
+    return [...storedRows, ...systemRows];
+  }
+
+  /**
+   * Build a single default provider row for a specific providerKey.
+   * Used by managed-bedrock pseudo-row synthesis, where the env-fed
+   * gate is satisfied through the managed-providers config rather
+   * than `process.env[apiKey]`.
+   */
+  private buildDefaultProvidersFromEnvShape(
+    providerKey: string,
+    referenceProject: Project | null,
+  ): MaybeStoredModelProvider | null {
+    if (!referenceProject) return null;
+    const registry =
+      modelProviders[providerKey as keyof typeof modelProviders];
+    if (!registry?.enabledSince) return null;
+    return {
+      provider: providerKey,
+      enabled: true,
+      disabledByDefault: false,
+      customKeys: null,
+      models: getProviderModelOptions(providerKey, "chat").map((m) => m.value),
+      embeddingsModels: getProviderModelOptions(providerKey, "embedding").map(
+        (m) => m.value,
+      ),
+      deploymentMapping: null,
+      extraHeaders: [],
+    };
+  }
+
+  /**
    * Updates or creates a model provider.
    *
    * Business rules:
@@ -189,12 +429,11 @@ export class ModelProviderService {
       customKeys,
     );
 
-    // Find existing provider
-    const existingProvider = await this.findExistingProvider(
-      id,
-      provider,
-      projectId,
-    );
+    // Find existing provider. Absent `id` means an explicit create — we
+    // intentionally do NOT auto-match by (provider, projectId) here,
+    // since that would clobber an existing row at a different scope when
+    // a user adds a second instance of the same provider type.
+    const existingProvider = await this.findExistingProvider(id, projectId);
 
     // Resolve input scope set. Callers may pass `scopes: [...]` directly,
     // or a single-scope pair via the legacy `scopeType`/`scopeId` fields.
@@ -249,18 +488,62 @@ export class ModelProviderService {
           customKeysProvided,
           tx,
         );
+
+        // Onboarding seed: writes one role-level ModelDefault row per
+        // role the provider can fulfill (DEFAULT / FAST / EMBEDDINGS),
+        // at every scope the new credential is bound to. Strictly
+        // additive — `seedOnboardingDefaultsForProvider` skips any
+        // (scope, role) pair that already has a row, so enabling a
+        // second provider later can't silently replace a user's
+        // configured choice. Without this wiring the seed function is
+        // dead code; the bug surfaces as a fresh org showing
+        // "not configured" on every role despite having a provider
+        // enabled. See
+        // specs/model-providers/model-resolver-and-registry.feature.
+        const targetScopes: ScopeInput[] = scopes ?? [
+          { scopeType: "PROJECT", scopeId: projectId },
+        ];
+        for (const scope of targetScopes) {
+          await seedOnboardingDefaultsForProvider({
+            prisma: tx as unknown as PrismaClient,
+            provider,
+            scopeType: scope.scopeType,
+            scopeId: scope.scopeId,
+          });
+        }
       }
 
-      // Update project default model if provided
-      if (defaultModel !== undefined) {
-        await tx.project.update({
-          where: { id: projectId },
-          data: { defaultModel },
-        });
-      }
+      // The legacy `defaultModel` parameter is accepted in the input
+      // shape for backwards compatibility but no longer writes anywhere.
+      // Default-model writes go through `setRoleAtScope` against
+      // ModelDefaultConfig (see useProviderFormSubmit).
+      void defaultModel;
 
       return result;
     });
+  }
+
+  /**
+   * Upsert-by-provider-key path for the REST endpoint
+   * `PUT /api/model-providers/:provider`. The REST contract identifies a
+   * row by provider string within a project (legacy single-instance shape);
+   * if a project-scoped row exists for that provider we update it,
+   * otherwise we create one. The tRPC `update` procedure goes through the
+   * id-based path and never lands here, so the multi-instance create flow
+   * from the UI is unaffected.
+   */
+  async upsertByProviderKey(
+    input: UpdateModelProviderInput,
+    ctx?: AuthzContext,
+  ) {
+    const existing = await this.repository.findByProvider(
+      input.provider,
+      input.projectId,
+    );
+    return await this.updateModelProvider(
+      { ...input, id: existing?.id },
+      ctx,
+    );
   }
 
   /**
@@ -628,15 +911,22 @@ export class ModelProviderService {
     return { validatedKeys, customKeysProvided };
   }
 
+  /**
+   * Look up the existing row a write targets. When the caller supplies an
+   * `id`, that's an explicit edit. When `id` is absent, this is an explicit
+   * create: returning `null` here lets `updateModelProvider` go straight to
+   * `createNew` instead of falling through to a scope-blind
+   * `findByProvider` match that silently clobbers the first existing row
+   * of the same provider type (the multi-instance override bug). The
+   * REST upsert-by-provider-key entrypoint uses
+   * `upsertByProviderKey` below, not this code path.
+   */
   private async findExistingProvider(
     id: string | undefined,
-    provider: string,
     projectId: string,
   ) {
-    if (id) {
-      return await this.repository.findById(id, projectId);
-    }
-    return await this.repository.findByProvider(provider, projectId);
+    if (!id) return null;
+    return await this.repository.findById(id, projectId);
   }
 
   private async updateExisting(

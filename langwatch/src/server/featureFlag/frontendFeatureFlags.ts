@@ -51,8 +51,6 @@
  */
 export const FRONTEND_FEATURE_FLAGS = [
   "release_ui_sdk_radar_banner_card_enabled",
-  "release_ui_dark_mode_enabled",
-  "release_ui_negate_filters_enabled",
   "release_ui_ai_gateway_menu_enabled",
   // Governance preview — gates the personal-keys / admin oversight /
   // RoutingPolicy / IngestionSource UI surfaces on this long-lived

@@ -1,4 +1,5 @@
 import { AlertType, TriggerAction } from "@prisma/client";
+import { RoleService } from "~/server/role/role.service";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
@@ -53,6 +54,7 @@ export const automationRouter = createTRPCRouter({
         },
         select: {
           teamId: true,
+          team: { select: { organizationId: true } },
         },
       });
 
@@ -60,13 +62,10 @@ export const automationRouter = createTRPCRouter({
         throw new Error(`Project with id ${input.projectId} not found`);
       }
 
-      const teamMembers = await ctx.prisma.teamUser.findMany({
-        where: {
-          teamId: project.teamId,
-        },
-        include: {
-          user: true,
-        },
+      const roleService = new RoleService(ctx.prisma);
+      const teamBindings = await roleService.getTeamMembersWithUsers({
+        organizationId: project.team.organizationId,
+        teamId: project.teamId,
       });
 
       if (input.action === TriggerAction.ADD_TO_ANNOTATION_QUEUE) {
@@ -88,7 +87,8 @@ export const automationRouter = createTRPCRouter({
           });
         }
       } else if (input.action === TriggerAction.SEND_EMAIL) {
-        const teamEmails = teamMembers.map((user) => user.user.email);
+        const teamEmails = teamBindings
+          .flatMap((b) => (b.user ? [b.user.email] : []));
 
         if (input.actionParams.members) {
           input.actionParams.members.map((email: string) => {

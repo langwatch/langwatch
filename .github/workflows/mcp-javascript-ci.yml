@@ -31,6 +31,7 @@ jobs:
             relevant:
               - 'mcp-server/**'
               - '.github/workflows/mcp-javascript-ci.yml'
+              - '.github/actions/setup-pnpm-node/**'
               - '.github/.release-please-manifest.json'
 
   typecheck:
@@ -38,8 +39,7 @@ jobs:
     if: >
       needs.changes.outputs.relevant == 'true'
       && (github.event_name != 'pull_request_target'
-          || (github.event.label.name == 'approved-ci'
-              && github.event.pull_request.user.login == 'dependabot[bot]'))
+          || github.event.label.name == 'approved-ci')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -61,8 +61,7 @@ jobs:
     if: >
       needs.changes.outputs.relevant == 'true'
       && (github.event_name != 'pull_request_target'
-          || (github.event.label.name == 'approved-ci'
-              && github.event.pull_request.user.login == 'dependabot[bot]'))
+          || github.event.label.name == 'approved-ci')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

@@ -119,8 +119,8 @@ export default function SettingsLayout({
               "/settings/secrets",
             ]}
           >
-            <MenuLink href="/settings/model-costs">Model Costs</MenuLink>
             <MenuLink href="/settings/model-providers">Model Providers</MenuLink>
+            <MenuLink href="/settings/model-costs">Model Costs</MenuLink>
             {!isLiteMember && (
               <MenuLink href="/settings/secrets">Secrets</MenuLink>
             )}
@@ -202,6 +202,12 @@ export default function SettingsLayout({
               <MenuLink href="/ops/dejaview" includePath="/ops/dejaview">
                 Deja View
               </MenuLink>
+              <MenuLink
+                href="/ops/feature-flags"
+                includePath="/ops/feature-flags"
+              >
+                Feature Flags
+              </MenuLink>
             </NavSection>
           )}
 
@@ -230,12 +236,6 @@ export default function SettingsLayout({
                 includePath="/ops/backoffice/subscriptions"
               >
                 Subscriptions
-              </MenuLink>
-              <MenuLink
-                href="/ops/backoffice/organization-features"
-                includePath="/ops/backoffice/organization-features"
-              >
-                Organization Features
               </MenuLink>
             </NavSection>
           )}

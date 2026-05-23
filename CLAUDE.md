@@ -18,21 +18,23 @@ If no feature file exists for your task, create one before writing code.
 `make quickstart` is the single entry point. It asks what you're working on and starts only the services you need, overriding only the URLs whose services are local. Your `langwatch/.env` is the source of truth for everything else.
 
 ```bash
-make quickstart                        # Interactive launcher (asks "what are you working on?")
+make quickstart                        # Interactive preset picker
+make quickstart all-local              # Local CH + PG + Redis + app, no NLP (fast iteration default)
+make quickstart all-local-nlp          # all-local + langwatch_nlp + langevals
+make quickstart dev-storage            # Local DBs, stored-objects -> dev S3 (runtime-storage-dev)
+make quickstart dev-infra              # Everything against shared dev infra (no compose)
 make quickstart frontend-only          # No compose, fastest — UI / design work
-make quickstart backend-shared         # postgres + redis + clickhouse + app, URLs → local
 make quickstart migration              # postgres + clickhouse on host ports for prisma migrate
-make quickstart nlp                    # backend + langwatch_nlp + langevals
-make quickstart full-local             # everything (--profile full)
-make quickstart-help                   # Non-interactive mode reference
+make quickstart full-local             # Kitchen-sink local: all-local-nlp + workers + bullboard + ai-server
+make quickstart-help                   # Non-interactive preset reference
 make down                              # Stop all services
 make service svc=aigateway             # Start the Go AI Gateway data plane on :5563
 make help                              # Full target list including boxd workflows
 ```
 
-The mode-picker writes `langwatch/.env.dev-up` listing only the URLs to override; everything else comes from your `langwatch/.env`. So if your `.env` has `LANGWATCH_NLP_SERVICE=https://nlp.langwatch.ai`, that's what `backend-shared` mode will use — only `nlp` / `full-local` modes override it to point at a local container.
+The preset-picker writes `langwatch/.env.dev-up` listing only the URLs to override; everything else comes from your `langwatch/.env`. **Credentials never go in the overlay** — only non-rotating infrastructure shape (bucket / endpoint / region / connection-host). For `dev-storage`, refresh AWS SSO credentials in `.env` first via `bash langwatch/scripts/refresh-dev-s3-env.sh` (the launcher hard-fails without S3_SESSION_TOKEN).
 
-`make dev`, `make dev-nlp`, `make dev-scenarios`, `make dev-test`, `make dev-full`, `make dev-up`, `make dev-down`, and `make dev-logs` still work for one release with a deprecation warning — they're thin shims onto the new modes.
+The legacy `make dev` / `make dev-nlp` / `make dev-scenarios` / `make dev-test` / `make dev-full` aliases were removed in #4053. Use the preset names directly. `make dev-up` / `make dev-down` / `make dev-logs` still exist for per-worktree isolated stacks (the `dev-up.sh` use case — separate from `quickstart`).
 
 Stateful services (`langwatch-db-data`, `langwatch-clickhouse-data`, `langwatch-redis-data`) share data across worktrees: sign up once, persist across worktree switches. Only one worktree can have postgres or clickhouse `up` at a time — `quickstart` detects collisions and points at the other compose project. Redis is a singleton on host `:6379`.
 

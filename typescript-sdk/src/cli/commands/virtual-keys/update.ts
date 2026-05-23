@@ -1,5 +1,6 @@
 import chalk from "chalk";
 import ora from "ora";
+import type * as NodeFs from "node:fs";
 import { VirtualKeysApiService } from "@/client-sdk/services/virtual-keys/virtual-keys-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
@@ -26,7 +27,7 @@ function parseConfig(options: UpdateVirtualKeyOptions): Record<string, unknown> 
     // Lazy-require so the import stays local to the --config-file path
     // (the CLI is an entrypoint shared with scripts that may not need fs).
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { readFileSync } = require("node:fs") as typeof import("node:fs");
+    const { readFileSync } = require("node:fs") as typeof NodeFs;
     const raw = readFileSync(options.configFile, "utf8");
     try {
       return JSON.parse(raw) as Record<string, unknown>;

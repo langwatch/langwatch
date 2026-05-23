@@ -3,6 +3,8 @@ packages:
   - "packages/*"
   - "../mcp-server"
 
+minimumReleaseAge: 10080
+
 overrides:
   pino: ^10.3.0
   pino-pretty: ^13.0.0
@@ -44,6 +46,9 @@ overrides:
   # Security: protobufjs code execution, DoS, code injection (CVE-2026-44289/44290/44291/44293)
   "protobufjs@<7.5.6": "7.5.6"
   "protobufjs@>=8.0.0 <8.0.2": "8.0.2"
+  # Security: OpenTelemetry Prometheus exporter crash via malformed HTTP (CVE-2026-44902)
+  "@opentelemetry/exporter-prometheus@<0.217.0": "0.217.0"
+  "@opentelemetry/sdk-node@<0.217.0": "0.217.0"
 
 packageExtensions:
   bullmq-otel:

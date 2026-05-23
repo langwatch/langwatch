@@ -19,6 +19,10 @@ resolution-markers = [
     "python_full_version < '3.11' and platform_machine == 's390x' and sys_platform != 'darwin'",
 ]
 
+[options]
+exclude-newer = "2026-04-19T17:07:22.760709Z"
+exclude-newer-span = "P7D"
+
 [[package]]
 name = "accelerate"
 version = "1.10.0"

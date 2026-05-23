@@ -72,8 +72,14 @@ export function useProviderFormSubmit({
 }): UseProviderFormSubmitReturn {
   const utils = api.useContext();
   const updateMutation = api.modelProvider.update.useMutation();
-  const updateProjectDefaultModelsMutation =
-    api.project.updateProjectDefaultModels.useMutation();
+  // B3 redesign: the user's onboarding picks for the three role models
+  // need to win over the additive seed (which fills in the registry
+  // flagship). After the provider create lands, we replay those picks
+  // through `setRoleAssignmentForScope` at every scope the provider
+  // covers so the new ModelDefault table reflects what the user chose
+  // rather than what the seed defaulted to.
+  const setRoleAssignmentMutation =
+    api.modelProvider.setRoleAssignmentForScope.useMutation();
 
   const [isSaving, setIsSaving] = useState(false);
   const [errors, setErrors] = useState<{ customKeysRoot?: string }>({});
@@ -164,9 +170,9 @@ export function useProviderFormSubmit({
 
       // Block save when "use as default provider" is enabled but the
       // selected default model belongs to a different provider — otherwise
-      // updateProjectDefaultModels would silently persist a contradiction
-      // (this provider becomes the default while the model still points
-      // elsewhere). See #3785.
+      // the setRoleAssignmentForScope replay below would silently persist
+      // a contradiction (this provider becomes the default while the
+      // model still points elsewhere). See #3785.
       if (useAsDefaultProvider) {
         const prefix = `${provider.provider}/`;
         const mismatched: string[] = [];
@@ -257,17 +263,118 @@ export function useProviderFormSubmit({
         scopeId,
       });
 
-      // Update project default models if useAsDefaultProvider is enabled
-      if (useAsDefaultProvider && projectId) {
-        await updateProjectDefaultModelsMutation.mutateAsync({
-          projectId,
-          defaultModel: projectDefaultModel ?? undefined,
-          topicClusteringModel: projectTopicClusteringModel ?? undefined,
-          embeddingsModel: projectEmbeddingsModel ?? undefined,
-        });
+      // Project default models are no longer written from the provider
+      // drawer — the redesigned DefaultModelsSection on the model-providers
+      // settings page owns hierarchical default-model writes per scope.
+      // See specs/model-providers/hierarchical-default-models.feature.
 
-        void utils.organization.getAll.invalidate();
+      // Replay the onboarding picks into ModelDefault. Mario's additive
+      // seed in `updateModelProvider` already wrote the registry flagship
+      // for each role at every scope this provider covers, but the user
+      // explicitly picked a Default / Topic-clustering / Embeddings
+      // model on this drawer — those picks need to win. We call
+      // `setRoleAssignmentForScope` (upsert semantics) per scope per
+      // role with the user's value. The Fast role is reused for the
+      // legacy "topic clustering" field (the feature registry binds
+      // `analytics.topic_clustering_llm` to FAST). See
+      // specs/model-providers/role-based-default-models.feature.
+      if (useAsDefaultProvider) {
+        const targetScopes = scopes && scopes.length > 0
+          ? scopes
+          : scopeType && scopeId
+            ? [{ scopeType, scopeId }]
+            : [];
+        type RoleWrite = {
+          label: string;
+          promise: Promise<unknown>;
+        };
+        const writes: RoleWrite[] = [];
+        for (const s of targetScopes) {
+          if (projectDefaultModel) {
+            writes.push({
+              label: `Default at ${s.scopeType.toLowerCase()}`,
+              promise: setRoleAssignmentMutation.mutateAsync({
+                scopeType: s.scopeType,
+                scopeId: s.scopeId,
+                role: "DEFAULT",
+                model: projectDefaultModel,
+              }),
+            });
+          }
+          if (projectTopicClusteringModel) {
+            writes.push({
+              label: `Fast at ${s.scopeType.toLowerCase()}`,
+              promise: setRoleAssignmentMutation.mutateAsync({
+                scopeType: s.scopeType,
+                scopeId: s.scopeId,
+                role: "FAST",
+                model: projectTopicClusteringModel,
+              }),
+            });
+          }
+          if (projectEmbeddingsModel) {
+            writes.push({
+              label: `Embeddings at ${s.scopeType.toLowerCase()}`,
+              promise: setRoleAssignmentMutation.mutateAsync({
+                scopeType: s.scopeType,
+                scopeId: s.scopeId,
+                role: "EMBEDDINGS",
+                model: projectEmbeddingsModel,
+              }),
+            });
+          }
+        }
+        // Best-effort: a single failed scope (e.g. RBAC blocks an org
+        // write for a non-admin) shouldn't kill the whole submit — the
+        // provider row is already created. But silent allSettled would
+        // also hide ALL three role writes failing, leaving the user
+        // with a "Model Provider Updated" success toast and an empty
+        // cascade. Capture rejections and surface them as a warning.
+        const results = await Promise.allSettled(writes.map((w) => w.promise));
+        const failed = results
+          .map((r, i) => ({ r, label: writes[i]!.label }))
+          .filter((x): x is { r: PromiseRejectedResult; label: string } =>
+            x.r.status === "rejected",
+          );
+        if (failed.length > 0) {
+          const reasons = failed
+            .map(
+              (f) =>
+                `${f.label}: ${
+                  f.r.reason instanceof Error
+                    ? f.r.reason.message
+                    : String(f.r.reason)
+                }`,
+            )
+            .join("; ");
+          toaster.create({
+            title:
+              failed.length === writes.length
+                ? "Default model assignments failed"
+                : "Some default model assignments failed",
+            description: reasons,
+            type: "warning",
+            duration: 8000,
+            meta: { closable: true },
+          });
+        }
       }
+
+      // Invalidate every cached provider/resolved-default query so the
+      // prompts page, evaluation wizard, and any other surface that
+      // gates UI on "are there enabled providers?" picks up the new
+      // state without needing a window-focus refetch. getDefaultModelsForProject
+      // is in this unconditional list because the server's first-provider
+      // auto-seed (seedOnboardingDefaultsForProvider) runs regardless of
+      // the "use as default provider" checkbox — so the DefaultModelsSection
+      // card needs to refetch even when the user didn't opt into the replay.
+      await Promise.all([
+        utils.modelProvider.getAllForProject.invalidate(),
+        utils.modelProvider.getAllForProjectForFrontend.invalidate(),
+        utils.modelProvider.listAllForProjectForFrontend.invalidate(),
+        utils.modelProvider.getResolvedDefault.invalidate(),
+        utils.modelProvider.getDefaultModelsForProject.invalidate(),
+      ]);
 
       toaster.create({
         title: "Model Provider Updated",
@@ -293,7 +400,7 @@ export function useProviderFormSubmit({
     onSuccess,
     onError,
     updateMutation,
-    updateProjectDefaultModelsMutation,
+    setRoleAssignmentMutation,
     utils,
   ]);
 

@@ -31,8 +31,18 @@ import {
 import { ValidationError } from "~/server/event-sourcing/services/errorHandling";
 
 function buildMessageRestJson(messageFields: Record<string, unknown>): string {
+  // When `content` is an array, preserve it in Rest so the renderer can route
+  // each part through <MediaPart>. Flat-string content goes to the top-level
+  // Content column and is omitted here. The AG-UI `parts` field (alternative
+  // location for content parts on ChatMessage) is already preserved via the
+  // ...restFields spread below; only `content` needs the special-case to
+  // bypass the flat-string column.
   const { id, role, content, trace_id, ...restFields } = messageFields;
-  return Object.keys(restFields).length > 0 ? JSON.stringify(restFields) : "";
+  const rest: Record<string, unknown> = { ...restFields };
+  if (Array.isArray(content)) {
+    rest.content = content;
+  }
+  return Object.keys(rest).length > 0 ? JSON.stringify(rest) : "";
 }
 
 /**
@@ -209,10 +219,25 @@ export class SimulationRunStateFoldProjection
           throw new ValidationError(`Simulation ${state.ScenarioRunId} failed with invalid message on index ${i}`);
         }
 
+        // Content can be either:
+        //   - a string (legacy SDK output, possibly a Python-repr-stringified array)
+        //   - an array of rich-content parts (the canonical AG-UI/OpenAI shape,
+        //     produced by the stored-objects extractor's rewrite pass)
+        //   - null / undefined / something else (we tolerate by storing "")
+        // We always serialize to a string for the parallel-array CH column.
+        // Array content gets JSON.stringify'd; the renderer's
+        // safeJsonParseOrStringFallback in flattenContent parses it back.
+        let content = "";
+        if (typeof m.content === "string") {
+          content = m.content;
+        } else if (Array.isArray(m.content)) {
+          content = JSON.stringify(m.content);
+        }
+
         return {
           Id: typeof m.id === "string" ? m.id : "",
           Role: typeof m.role === "string" ? m.role : "",
-          Content: typeof m.content === "string" ? m.content : "",
+          Content: content,
           TraceId: typeof m.trace_id === "string" ? m.trace_id : "",
           Rest: buildMessageRestJson(m),
         };

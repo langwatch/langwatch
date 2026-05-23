@@ -1,5 +1,4 @@
 import {
-  Box,
   Button,
   createListCollection,
   Heading,
@@ -14,13 +13,27 @@ import { useSession } from "~/utils/auth-client";
 import { useEffect, useMemo, useState } from "react";
 import { Drawer } from "../../../components/ui/drawer";
 import { Select } from "../../../components/ui/select";
+import {
+  ScopeChipPicker,
+  type ScopeChipPickerEntry,
+} from "../../../components/settings/ScopeChipPicker";
 import type { RouterOutputs } from "../../../utils/api";
 import { api } from "../../../utils/api";
 import {
+  computePermissionsFromSelections,
+} from "../../../server/api-key/permission-categories";
+import { getTeamRolePermissions } from "../../../server/api/rbac";
+import { TeamUserRole } from "@prisma/client";
+import {
+  PermissionCategoryList,
+  PermissionCounter,
+  type PermissionSelection,
+} from "./PermissionCategoryList";
+import {
+  deriveBindingRole,
   EXPIRATION_OPTIONS,
   expirationCollection,
-  ROLE_LABELS,
-  STANDARD_ROLES,
+  getUserPermissionsAtScope,
   type PermissionMode,
 } from "./utils";
 
@@ -30,7 +43,8 @@ type MyBindings = {
   isLoading: boolean;
 };
 
-type OrgProject = { id: string; name: string };
+type OrgProject = { id: string; name: string; teamId: string };
+type OrgTeam = { id: string; name: string };
 
 export type CreateApiKeyInput = {
   name: string;
@@ -39,9 +53,11 @@ export type CreateApiKeyInput = {
   permissionMode: PermissionMode;
   keyType: "personal" | "service";
   assignedToUserId?: string;
+  scopeType: string;
+  scopeId: string;
+  permissions?: string[];
   bindings: Array<{
     role: string;
-    customRoleId: string | null | undefined;
     scopeType: string;
     scopeId: string;
   }>;
@@ -52,7 +68,11 @@ export function CreateApiKeyDrawer({
   isCreating,
   myBindings,
   orgProjects,
+  orgTeams,
   organizationId,
+  organizationName,
+  currentTeamId,
+  currentProjectId,
   onClose,
   onCreate,
 }: {
@@ -60,7 +80,11 @@ export function CreateApiKeyDrawer({
   isCreating: boolean;
   myBindings: MyBindings;
   orgProjects: OrgProject[];
+  orgTeams: OrgTeam[];
   organizationId: string;
+  organizationName: string | undefined;
+  currentTeamId?: string;
+  currentProjectId?: string;
   onClose: () => void;
   onCreate: (input: CreateApiKeyInput) => void;
 }) {
@@ -71,12 +95,18 @@ export function CreateApiKeyDrawer({
   const [description, setDescription] = useState("");
   const [expirationPreset, setExpirationPreset] = useState("");
   const [customDate, setCustomDate] = useState("");
-  const [permissionMode, setPermissionMode] = useState<PermissionMode>("all");
-  const [projectRoles, setProjectRoles] = useState<Record<string, string>>({});
+  const [selectedScopes, setSelectedScopes] = useState<ScopeChipPickerEntry[]>(
+    [],
+  );
+  const [permissionMode, setPermissionMode] = useState<"all" | "restricted">(
+    "all",
+  );
+  const [categorySelections, setCategorySelections] = useState<
+    Record<string, PermissionSelection>
+  >({});
   const [keyType, setKeyType] = useState<"personal" | "service">("personal");
   const [selectedUserId, setSelectedUserId] = useState("");
 
-  // Fetch org members for the user picker (admin only)
   const orgMembers = api.apiKey.orgMembers.useQuery(
     { organizationId },
     { enabled: isOpen },
@@ -100,13 +130,44 @@ export function CreateApiKeyDrawer({
     return createListCollection({ items });
   }, [orgMembers.data]);
 
+  const primaryScope = selectedScopes[0] ?? {
+    scopeType: "PROJECT" as const,
+    scopeId: currentProjectId ?? "",
+  };
+
+  const userPermissions = useMemo(
+    () =>
+      getUserPermissionsAtScope({
+        myBindings: myBindings.data,
+        scopeType: primaryScope.scopeType,
+        scopeId: primaryScope.scopeId,
+        organizationId,
+        orgProjects,
+        isServiceKey: keyType === "service",
+        getTeamRolePermissions: (role) => getTeamRolePermissions(role as TeamUserRole),
+      }),
+    [
+      myBindings.data,
+      primaryScope.scopeType,
+      primaryScope.scopeId,
+      organizationId,
+      orgProjects,
+      keyType,
+    ],
+  );
+
   const resetForm = () => {
     setName("");
     setDescription("");
     setExpirationPreset("");
     setCustomDate("");
+    setSelectedScopes(
+      currentProjectId
+        ? [{ scopeType: "PROJECT", scopeId: currentProjectId }]
+        : [],
+    );
     setPermissionMode("all");
-    setProjectRoles({});
+    setCategorySelections({});
     setKeyType("personal");
     setSelectedUserId(currentUserId);
   };
@@ -116,52 +177,6 @@ export function CreateApiKeyDrawer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, currentUserId]);
 
-  /** Build the bindings array from the current permission mode and project role selections. */
-  const buildBindings = () => {
-    if (!myBindings.data) return [];
-
-    if (keyType === "service") {
-      if (permissionMode === "all") return [];
-      // Restricted service keys: ADMIN on each selected project
-      return orgProjects
-        .filter((p) => (projectRoles[p.id] ?? "NONE") !== "NONE")
-        .map((p) => ({
-          role: "ADMIN" as const,
-          customRoleId: null,
-          scopeType: "PROJECT" as const,
-          scopeId: p.id,
-        }));
-    }
-
-    if (permissionMode === "all") {
-      return myBindings.data.map((b) => ({
-        role: b.role,
-        customRoleId: b.customRoleId,
-        scopeType: b.scopeType,
-        scopeId: b.scopeId,
-      }));
-    }
-
-    if (permissionMode === "readonly") {
-      return myBindings.data.map((b) => ({
-        role: "VIEWER" as const,
-        customRoleId: null,
-        scopeType: b.scopeType,
-        scopeId: b.scopeId,
-      }));
-    }
-
-    // Restricted: use per-project role selections (skip "NONE")
-    return orgProjects
-      .filter((p) => (projectRoles[p.id] ?? "NONE") !== "NONE")
-      .map((p) => ({
-        role: projectRoles[p.id] ?? "VIEWER",
-        customRoleId: null,
-        scopeType: "PROJECT" as const,
-        scopeId: p.id,
-      }));
-  };
-
   const handleCreate = () => {
     let expiresAt: Date | undefined;
     if (expirationPreset === "custom" && customDate) {
@@ -170,12 +185,28 @@ export function CreateApiKeyDrawer({
       const days = parseInt(expirationPreset, 10);
       expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
     }
-    const bindings = buildBindings();
-    // Only pass assignedToUserId when admin selected a different user
+
+    const permissions =
+      permissionMode === "restricted"
+        ? computePermissionsFromSelections(categorySelections)
+        : undefined;
+
+    const isServiceKey = keyType === "service";
+
+    const bindings = selectedScopes.map((s) => ({
+      role: deriveBindingRole({
+        permissionMode, scopeType: s.scopeType, scopeId: s.scopeId,
+        myBindings: myBindings.data, organizationId, orgProjects, isServiceKey,
+      }),
+      scopeType: s.scopeType,
+      scopeId: s.scopeId,
+    }));
+
     const assignedToUserId =
       isAdmin && selectedUserId && selectedUserId !== currentUserId
         ? selectedUserId
         : undefined;
+
     onCreate({
       name,
       description,
@@ -183,13 +214,19 @@ export function CreateApiKeyDrawer({
       permissionMode,
       keyType,
       assignedToUserId,
+      scopeType: primaryScope.scopeType,
+      scopeId: primaryScope.scopeId,
+      permissions,
       bindings,
     });
-    // resetForm is triggered by useEffect on isOpen change (via parent's onClose)
-    // — not here, so form input is preserved if the mutation fails
   };
 
-  const canCreate = name.trim() && !isCreating && !myBindings.isLoading;
+  const hasAnySelection =
+    permissionMode === "all" ||
+    Object.values(categorySelections).some((v) => v !== "none");
+
+  const canCreate = name.trim() && !isCreating && !myBindings.isLoading && hasAnySelection
+    && (selectedScopes.length > 0 || !!currentProjectId);
 
   return (
     <Drawer.Root
@@ -299,17 +336,43 @@ export function CreateApiKeyDrawer({
               />
             </VStack>
 
+            {/* Scope */}
+            <VStack gap={1.5} align="start" width="full">
+              <Text fontWeight="600" fontSize="sm">
+                Scope
+              </Text>
+              <ScopeChipPicker
+                value={selectedScopes}
+                onChange={(next) => {
+                  setSelectedScopes(next);
+                  setCategorySelections({});
+                }}
+                organizationId={organizationId}
+                organizationName={organizationName}
+                availableTeams={orgTeams}
+                availableProjects={orgProjects}
+                label=""
+                showQuickPicks
+                currentOrganizationId={organizationId}
+                currentTeamId={currentTeamId}
+                currentProjectId={currentProjectId}
+              />
+            </VStack>
+
             {/* Permissions */}
             <VStack gap={2} align="start" width="full">
               <Text fontWeight="600" fontSize="sm">
                 Permissions
               </Text>
+              <HStack justify="space-between" width="full">
               <SegmentGroup.Root
                 size="sm"
                 value={permissionMode}
-                onValueChange={(e) =>
-                  setPermissionMode(e.value as PermissionMode)
-                }
+                onValueChange={(e) => {
+                  const mode = e.value as "all" | "restricted";
+                  setPermissionMode(mode);
+                  if (mode === "all") setCategorySelections({});
+                }}
               >
                 <SegmentGroup.Indicator />
                 <SegmentGroup.Item value="all">
@@ -320,151 +383,26 @@ export function CreateApiKeyDrawer({
                   <SegmentGroup.ItemText>Restricted</SegmentGroup.ItemText>
                   <SegmentGroup.ItemHiddenInput />
                 </SegmentGroup.Item>
-                {keyType !== "service" && (
-                  <SegmentGroup.Item value="readonly">
-                    <SegmentGroup.ItemText>Read only</SegmentGroup.ItemText>
-                    <SegmentGroup.ItemHiddenInput />
-                  </SegmentGroup.Item>
-                )}
               </SegmentGroup.Root>
+              {permissionMode === "restricted" && (
+                <PermissionCounter
+                  count={Object.values(categorySelections).filter((v) => v && v !== "none").length}
+                />
+              )}
+              </HStack>
+
+              {permissionMode === "all" && (
+                <Text fontSize="xs" color="fg.muted">
+                  Full access within the selected scope, bounded by your role.
+                </Text>
+              )}
 
               {permissionMode === "restricted" && (
-                <Box
-                  width="full"
-                  padding={3}
-                  borderWidth="1px"
-                  borderColor="border"
-                  borderRadius="md"
-                  background="bg.subtle"
-                >
-                  <Text fontSize="sm" marginBottom={2}>
-                    {keyType === "service"
-                      ? "Select projects this key can access (admin on each):"
-                      : "Set a role for each project:"}
-                  </Text>
-                  {orgProjects.length === 0 ? (
-                    <Text fontSize="xs" color="fg.muted">
-                      No projects found in this organization.
-                    </Text>
-                  ) : (
-                    <VStack align="stretch" gap={2}>
-                      {orgProjects.map((project) => {
-                        const effectiveRole = projectRoles[project.id] ?? "NONE";
-
-                        if (keyType === "service") {
-                          const isSelected = effectiveRole !== "NONE";
-                          return (
-                            <HStack
-                              key={project.id}
-                              gap={3}
-                              fontSize="sm"
-                              width="full"
-                              align="center"
-                              cursor="pointer"
-                              onClick={() =>
-                                setProjectRoles((prev) => ({
-                                  ...prev,
-                                  [project.id]: isSelected ? "NONE" : "ADMIN",
-                                }))
-                              }
-                            >
-                              <Box
-                                width="16px"
-                                height="16px"
-                                borderWidth="1px"
-                                borderColor={isSelected ? "blue.500" : "border"}
-                                borderRadius="sm"
-                                background={isSelected ? "blue.500" : "transparent"}
-                                display="flex"
-                                alignItems="center"
-                                justifyContent="center"
-                                flexShrink={0}
-                              >
-                                {isSelected && (
-                                  <Text color="white" fontSize="xs" lineHeight="1">
-                                    ✓
-                                  </Text>
-                                )}
-                              </Box>
-                              <Text
-                                color="fg"
-                                flex="1"
-                                fontWeight="500"
-                                lineHeight="32px"
-                              >
-                                {project.name}
-                              </Text>
-                            </HStack>
-                          );
-                        }
-
-                        const roleOptions = createListCollection({
-                          items: [
-                            ...STANDARD_ROLES.map((r) => ({
-                              label: ROLE_LABELS[r] ?? r,
-                              value: r,
-                            })),
-                            { label: "None", value: "NONE" },
-                          ],
-                        });
-
-                        return (
-                          <HStack
-                            key={project.id}
-                            gap={3}
-                            fontSize="sm"
-                            width="full"
-                            align="center"
-                          >
-                            <Text
-                              color="fg"
-                              flex="1"
-                              fontWeight="500"
-                              lineHeight="32px"
-                            >
-                              {project.name}
-                            </Text>
-                            <Select.Root
-                              collection={roleOptions}
-                              size="sm"
-                              value={[effectiveRole]}
-                              onValueChange={(details) => {
-                                const val = details.value[0];
-                                if (val) {
-                                  setProjectRoles((prev) => ({
-                                    ...prev,
-                                    [project.id]: val,
-                                  }));
-                                }
-                              }}
-                              width="140px"
-                            >
-                              <Select.Trigger
-                                width="140px"
-                                aria-label={`Role for ${project.name}`}
-                              >
-                                <Select.ValueText />
-                              </Select.Trigger>
-                              <Select.Content>
-                                {roleOptions.items.map((opt) => (
-                                  <Select.Item key={opt.value} item={opt}>
-                                    {opt.label}
-                                  </Select.Item>
-                                ))}
-                              </Select.Content>
-                            </Select.Root>
-                          </HStack>
-                        );
-                      })}
-                    </VStack>
-                  )}
-                  {keyType !== "service" && (
-                    <Text fontSize="xs" color="fg.muted" marginTop={3}>
-                      Your access acts as a ceiling. If your role is later
-                      reduced, the key loses those permissions automatically.
-                    </Text>
-                  )}
-                </Box>
+                <PermissionCategoryList
+                  selections={categorySelections}
+                  userPermissions={userPermissions}
+                  onChange={setCategorySelections}
+                />
               )}
             </VStack>
 

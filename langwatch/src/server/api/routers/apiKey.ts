@@ -1,5 +1,4 @@
 import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
-import type { PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
@@ -7,11 +6,8 @@ import { DomainError } from "~/server/app-layer/domain-error";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { auditLog } from "~/server/auditLog";
 import { skipPermissionCheck } from "../rbac";
+import { permissionFormatSchema } from "~/server/rbac/custom-role-permissions";
 
-/**
- * Maps an API key domain error to a tRPCError. Re-throws anything
- * that isn't a handled DomainError.
- */
 function mapApiKeyDomainError(error: unknown): never {
   if (DomainError.isHandled(error)) {
     switch (error.kind) {
@@ -30,34 +26,52 @@ function mapApiKeyDomainError(error: unknown): never {
   throw error;
 }
 
-async function assertOrgMembership({
-  prisma,
-  userId,
-  organizationId,
-}: {
-  prisma: PrismaClient;
-  userId: string;
-  organizationId: string;
-}): Promise<void> {
-  const membership = await prisma.organizationUser.findFirst({
-    where: { userId, organizationId },
-    select: { userId: true },
-  });
-  if (!membership) {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: "Not a member of this organization",
-    });
+async function ensureCallerIsOrgMember(
+  service: ApiKeyService,
+  userId: string,
+  organizationId: string,
+): Promise<void> {
+  try {
+    await service.ensureCallerIsOrgMember({ userId, organizationId });
+  } catch (error) {
+    mapApiKeyDomainError(error);
   }
 }
 
+
 const roleBindingSchema = z.object({
   role: z.nativeEnum(TeamUserRole),
-  customRoleId: z.string().nullish(),
   scopeType: z.nativeEnum(RoleBindingScopeType),
   scopeId: z.string(),
 });
 
+function refineRestrictedPermissions(
+  data: {
+    permissionMode?: string;
+    permissions?: string[];
+    bindings?: Array<{ role: string }>;
+  },
+  ctx: z.RefinementCtx,
+) {
+  const isRestricted = data.permissionMode === "restricted";
+  const hasCustomBinding = data.bindings?.some((b) => b.role === "CUSTOM") ?? false;
+  const hasPermissions = !!data.permissions && data.permissions.length > 0;
+
+  if (isRestricted || hasCustomBinding || hasPermissions) {
+    if (!isRestricted) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "CUSTOM permissions require permissionMode 'restricted'", path: ["permissionMode"] });
+    }
+    if (!hasCustomBinding) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "restricted mode requires at least one CUSTOM binding", path: ["bindings"] });
+    }
+    if (!hasPermissions) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "restricted mode requires at least one permission", path: ["permissions"] });
+    }
+  }
+}
+
+// RBAC is intentionally bypassed via skipPermissionCheck on all endpoints.
+// Authorization is handled at the service layer: ensureCallerIsOrgMember + isOrgAdmin.
 export const apiKeyRouter = createTRPCRouter({
   /**
    * Returns the caller's own RoleBindings within the given organization.
@@ -71,84 +85,39 @@ export const apiKeyRouter = createTRPCRouter({
       }),
     )
     .query(async ({ ctx, input }) => {
-      await assertOrgMembership({
-        prisma: ctx.prisma,
+      const apiKeyService = ApiKeyService.create(ctx.prisma);
+      await ensureCallerIsOrgMember(apiKeyService, ctx.session.user.id, input.organizationId);
+      const bindings = await apiKeyService.getUserBindings({
         userId: ctx.session.user.id,
         organizationId: input.organizationId,
       });
 
-      const bindings = await ctx.prisma.roleBinding.findMany({
-        where: {
-          userId: ctx.session.user.id,
-          organizationId: input.organizationId,
-        },
-        select: {
-          id: true,
-          role: true,
-          customRoleId: true,
-          scopeType: true,
-          scopeId: true,
-        },
-      });
+      const {
+        orgName,
+        teamName,
+        activeProjectIds,
+        projectName,
+        customRoleName,
+      } = await apiKeyService.enrichBindingsWithNames({ bindings });
 
-      const orgIds = new Set<string>();
-      const teamIds = new Set<string>();
-      const projectIds = new Set<string>();
-      const customRoleIds = new Set<string>();
-      for (const b of bindings) {
-        if (b.scopeType === RoleBindingScopeType.ORGANIZATION)
-          orgIds.add(b.scopeId);
-        else if (b.scopeType === RoleBindingScopeType.TEAM)
-          teamIds.add(b.scopeId);
-        else if (b.scopeType === RoleBindingScopeType.PROJECT)
-          projectIds.add(b.scopeId);
-        if (b.customRoleId) customRoleIds.add(b.customRoleId);
-      }
-
-      const [orgs, teams, projects, customRoles] = await Promise.all([
-        orgIds.size
-          ? ctx.prisma.organization.findMany({
-              where: { id: { in: [...orgIds] } },
-              select: { id: true, name: true },
-            })
-          : Promise.resolve([]),
-        teamIds.size
-          ? ctx.prisma.team.findMany({
-              where: { id: { in: [...teamIds] } },
-              select: { id: true, name: true },
-            })
-          : Promise.resolve([]),
-        projectIds.size
-          ? ctx.prisma.project.findMany({
-              where: { id: { in: [...projectIds] } },
-              select: { id: true, name: true },
-            })
-          : Promise.resolve([]),
-        customRoleIds.size
-          ? ctx.prisma.customRole.findMany({
-              where: { id: { in: [...customRoleIds] } },
-              select: { id: true, name: true },
-            })
-          : Promise.resolve([]),
-      ]);
-
-      const orgName = new Map(orgs.map((o) => [o.id, o.name]));
-      const teamName = new Map(teams.map((t) => [t.id, t.name]));
-      const projectName = new Map(projects.map((p) => [p.id, p.name]));
-      const customRoleName = new Map(customRoles.map((r) => [r.id, r.name]));
-
-      return bindings.map((b) => ({
-        ...b,
-        scopeName:
-          b.scopeType === RoleBindingScopeType.ORGANIZATION
-            ? orgName.get(b.scopeId) ?? null
-            : b.scopeType === RoleBindingScopeType.TEAM
-              ? teamName.get(b.scopeId) ?? null
-              : projectName.get(b.scopeId) ?? null,
-        customRoleName: b.customRoleId
-          ? customRoleName.get(b.customRoleId) ?? null
-          : null,
-      }));
+      return bindings
+        .filter(
+          (b) =>
+            b.scopeType !== RoleBindingScopeType.PROJECT ||
+            activeProjectIds.has(b.scopeId),
+        )
+        .map((b) => ({
+          ...b,
+          scopeName:
+            b.scopeType === RoleBindingScopeType.ORGANIZATION
+              ? orgName.get(b.scopeId) ?? null
+              : b.scopeType === RoleBindingScopeType.TEAM
+                ? teamName.get(b.scopeId) ?? null
+                : projectName.get(b.scopeId) ?? null,
+          customRoleName: b.customRoleId
+            ? customRoleName.get(b.customRoleId) ?? null
+            : null,
+        }));
     }),
 
   /**
@@ -162,13 +131,8 @@ export const apiKeyRouter = createTRPCRouter({
       }),
     )
     .query(async ({ ctx, input }) => {
-      await assertOrgMembership({
-        prisma: ctx.prisma,
-        userId: ctx.session.user.id,
-        organizationId: input.organizationId,
-      });
-
       const apiKeyService = ApiKeyService.create(ctx.prisma);
+      await ensureCallerIsOrgMember(apiKeyService, ctx.session.user.id, input.organizationId);
       const callerIsAdmin = await apiKeyService.isOrgAdmin({
         userId: ctx.session.user.id,
         organizationId: input.organizationId,
@@ -181,75 +145,38 @@ export const apiKeyRouter = createTRPCRouter({
             organizationId: input.organizationId,
           });
 
-      // Resolve scope names and user names for display
       const allBindings = apiKeys.flatMap((k) => k.roleBindings);
-      const orgIds = new Set<string>();
-      const teamIds = new Set<string>();
-      const projectIds = new Set<string>();
-      const customRoleIds = new Set<string>();
-      const userIds = new Set<string>();
+      const { orgName, teamName, projectName, customRoleName, customRoles } =
+        await apiKeyService.enrichBindingsWithNames({
+          bindings: allBindings.map((rb) => ({
+            id: rb.id,
+            role: rb.role,
+            customRoleId: rb.customRoleId,
+            scopeType: rb.scopeType,
+            scopeId: rb.scopeId,
+          })),
+        });
 
-      for (const b of allBindings) {
-        if (b.scopeType === RoleBindingScopeType.ORGANIZATION)
-          orgIds.add(b.scopeId);
-        else if (b.scopeType === RoleBindingScopeType.TEAM)
-          teamIds.add(b.scopeId);
-        else if (b.scopeType === RoleBindingScopeType.PROJECT)
-          projectIds.add(b.scopeId);
-        if (b.customRoleId) customRoleIds.add(b.customRoleId);
-      }
-      for (const k of apiKeys) {
-        if (k.userId) userIds.add(k.userId);
-        if (k.createdByUserId) userIds.add(k.createdByUserId);
-      }
+      const customRolePermissions = new Map(
+        customRoles.map((r) => [
+          r.id,
+          Array.isArray(r.permissions) ? (r.permissions as string[]) : [],
+        ]),
+      );
 
-      const [orgs, teams, projects, customRoles, users] = await Promise.all([
-        orgIds.size
-          ? ctx.prisma.organization.findMany({
-              where: { id: { in: [...orgIds] } },
-              select: { id: true, name: true },
-            })
-          : Promise.resolve([]),
-        teamIds.size
-          ? ctx.prisma.team.findMany({
-              where: { id: { in: [...teamIds] } },
-              select: { id: true, name: true },
-            })
-          : Promise.resolve([]),
-        projectIds.size
-          ? ctx.prisma.project.findMany({
-              where: { id: { in: [...projectIds] } },
-              select: { id: true, name: true },
-            })
-          : Promise.resolve([]),
-        customRoleIds.size
-          ? ctx.prisma.customRole.findMany({
-              where: { id: { in: [...customRoleIds] } },
-              select: { id: true, name: true },
-            })
-          : Promise.resolve([]),
-        userIds.size
-          ? ctx.prisma.user.findMany({
-              where: { id: { in: [...userIds] } },
-              select: { id: true, name: true, email: true },
-            })
-          : Promise.resolve([]),
-      ]);
-
-      const orgName = new Map(orgs.map((o) => [o.id, o.name]));
-      const teamName = new Map(teams.map((t) => [t.id, t.name]));
-      const projectName = new Map(projects.map((p) => [p.id, p.name]));
-      const customRoleName = new Map(customRoles.map((r) => [r.id, r.name]));
+      const { users } = await apiKeyService.enrichApiKeyList({ apiKeys });
       const userName = new Map(users.map((u) => [u.id, u.name ?? u.email]));
+      const userEmail = new Map(users.map((u) => [u.id, u.email]));
 
       return apiKeys.map((apiKey) => ({
         id: apiKey.id,
-        lookupIdSuffix: apiKey.lookupId.slice(-4),
+        lookupIdPrefix: apiKey.lookupId.slice(0, 5),
         name: apiKey.name,
         description: apiKey.description,
         permissionMode: apiKey.permissionMode,
         userId: apiKey.userId,
         userName: apiKey.userId ? (userName.get(apiKey.userId) ?? null) : null,
+        userEmail: apiKey.userId ? (userEmail.get(apiKey.userId) ?? null) : null,
         createdByUserId: apiKey.createdByUserId,
         createdByUserName: apiKey.createdByUserId
           ? userName.get(apiKey.createdByUserId) ?? null
@@ -264,6 +191,9 @@ export const apiKeyRouter = createTRPCRouter({
           customRoleId: rb.customRoleId,
           customRoleName: rb.customRoleId
             ? customRoleName.get(rb.customRoleId) ?? null
+            : null,
+          customRolePermissions: rb.customRoleId
+            ? customRolePermissions.get(rb.customRoleId) ?? null
             : null,
           scopeType: rb.scopeType,
           scopeId: rb.scopeId,
@@ -287,8 +217,9 @@ export const apiKeyRouter = createTRPCRouter({
         permissionMode: z.enum(["all", "readonly", "restricted"]).default("all"),
         keyType: z.enum(["personal", "service"]).default("personal"),
         assignedToUserId: z.string().optional(),
+        permissions: z.array(permissionFormatSchema).optional(),
         bindings: z.array(roleBindingSchema).max(20),
-      }),
+      }).superRefine(refineRestrictedPermissions),
     )
     .use(
       skipPermissionCheck({
@@ -296,13 +227,8 @@ export const apiKeyRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      await assertOrgMembership({
-        prisma: ctx.prisma,
-        userId: ctx.session.user.id,
-        organizationId: input.organizationId,
-      });
-
       const apiKeyService = ApiKeyService.create(ctx.prisma);
+      await ensureCallerIsOrgMember(apiKeyService, ctx.session.user.id, input.organizationId);
       const isService = input.keyType === "service";
 
       // Service keys and assigning to another user both require admin
@@ -332,6 +258,7 @@ export const apiKeyRouter = createTRPCRouter({
           organizationId: input.organizationId,
           expiresAt: input.expiresAt,
           permissionMode: input.permissionMode,
+          permissions: input.permissions,
           bindings: input.bindings,
         });
 
@@ -369,8 +296,9 @@ export const apiKeyRouter = createTRPCRouter({
         name: z.string().min(1).max(100).optional(),
         description: z.string().max(500).nullish(),
         permissionMode: z.enum(["all", "readonly", "restricted"]).optional(),
+        permissions: z.array(permissionFormatSchema).optional(),
         bindings: z.array(roleBindingSchema).min(1).max(20).optional(),
-      }),
+      }).superRefine(refineRestrictedPermissions),
     )
     .use(
       skipPermissionCheck({
@@ -378,13 +306,8 @@ export const apiKeyRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      await assertOrgMembership({
-        prisma: ctx.prisma,
-        userId: ctx.session.user.id,
-        organizationId: input.organizationId,
-      });
-
       const apiKeyService = ApiKeyService.create(ctx.prisma);
+      await ensureCallerIsOrgMember(apiKeyService, ctx.session.user.id, input.organizationId);
       const callerIsAdmin = await apiKeyService.isOrgAdmin({
         userId: ctx.session.user.id,
         organizationId: input.organizationId,
@@ -399,6 +322,7 @@ export const apiKeyRouter = createTRPCRouter({
           name: input.name,
           description: input.description,
           permissionMode: input.permissionMode,
+          permissions: input.permissions,
           bindings: input.bindings,
         });
 
@@ -436,13 +360,8 @@ export const apiKeyRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      await assertOrgMembership({
-        prisma: ctx.prisma,
-        userId: ctx.session.user.id,
-        organizationId: input.organizationId,
-      });
-
       const apiKeyService = ApiKeyService.create(ctx.prisma);
+      await ensureCallerIsOrgMember(apiKeyService, ctx.session.user.id, input.organizationId);
       const callerIsAdmin = await apiKeyService.isOrgAdmin({
         userId: ctx.session.user.id,
         organizationId: input.organizationId,
@@ -479,25 +398,24 @@ export const apiKeyRouter = createTRPCRouter({
       }),
     )
     .query(async ({ ctx, input }) => {
-      await assertOrgMembership({
-        prisma: ctx.prisma,
-        userId: ctx.session.user.id,
-        organizationId: input.organizationId,
-      });
-
-      return ctx.prisma.project.findMany({
-        where: {
-          team: { organizationId: input.organizationId },
-          archivedAt: null,
-        },
-        select: { id: true, name: true },
-        orderBy: { name: "asc" },
-      });
+      const apiKeyService = ApiKeyService.create(ctx.prisma);
+      await ensureCallerIsOrgMember(apiKeyService, ctx.session.user.id, input.organizationId);
+      return apiKeyService.getOrgProjects({ organizationId: input.organizationId });
     }),
 
-  /**
-   * Returns org members for the admin user picker (admin only).
-   */
+  orgTeams: protectedProcedure
+    .input(z.object({ organizationId: z.string() }))
+    .use(
+      skipPermissionCheck({
+        allow: { organizationId: "listing org teams for scope picker" },
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      const apiKeyService = ApiKeyService.create(ctx.prisma);
+      await ensureCallerIsOrgMember(apiKeyService, ctx.session.user.id, input.organizationId);
+      return apiKeyService.getOrgTeams({ organizationId: input.organizationId });
+    }),
+
   orgMembers: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
     .use(
@@ -506,29 +424,14 @@ export const apiKeyRouter = createTRPCRouter({
       }),
     )
     .query(async ({ ctx, input }) => {
-      await assertOrgMembership({
-        prisma: ctx.prisma,
-        userId: ctx.session.user.id,
-        organizationId: input.organizationId,
-      });
-
       const apiKeyService = ApiKeyService.create(ctx.prisma);
+      await ensureCallerIsOrgMember(apiKeyService, ctx.session.user.id, input.organizationId);
       const callerIsAdmin = await apiKeyService.isOrgAdmin({
         userId: ctx.session.user.id,
         organizationId: input.organizationId,
       });
       if (!callerIsAdmin) return [];
 
-      const orgUsers = await ctx.prisma.organizationUser.findMany({
-        where: { organizationId: input.organizationId },
-        include: {
-          user: { select: { id: true, name: true, email: true } },
-        },
-      });
-      return orgUsers.map((ou) => ({
-        id: ou.user.id,
-        name: ou.user.name,
-        email: ou.user.email,
-      }));
+      return apiKeyService.getOrgMembers({ organizationId: input.organizationId });
     }),
 });

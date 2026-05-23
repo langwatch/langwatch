@@ -19,10 +19,14 @@ vi.mock("~/server/rbac/role-binding-resolver", () => ({
 }));
 
 // Mock the custom role permissions module
-vi.mock("~/server/rbac/custom-role-permissions", () => ({
-  parseCustomRolePermissions: vi.fn().mockReturnValue(["project:view"]),
-  MalformedCustomRolePermissionsError: class extends Error {},
-}));
+vi.mock("~/server/rbac/custom-role-permissions", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("~/server/rbac/custom-role-permissions")>();
+  return {
+    ...actual,
+    parseCustomRolePermissions: vi.fn().mockReturnValue(["project:view"]),
+    MalformedCustomRolePermissionsError: class extends Error {},
+  };
+});
 
 // Mock the logger
 vi.mock("~/utils/logger/server", () => ({
@@ -61,6 +65,21 @@ function createMockPrisma() {
       createMany: vi.fn().mockResolvedValue({ count: 1 }),
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
+    customRole: {
+      create: vi.fn().mockResolvedValue({
+        id: "cr_1",
+        name: "API Key: Test",
+        permissions: ["traces:view"],
+      }),
+      update: vi.fn().mockResolvedValue({
+        id: "cr_1",
+        name: "API Key: Test",
+        permissions: ["traces:view"],
+      }),
+      findUnique: vi.fn(),
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+      findFirst: vi.fn(),
+    },
   };
 
   return {
@@ -78,6 +97,9 @@ function createMockPrisma() {
       findFirst: vi.fn(),
       createMany: vi.fn(),
       deleteMany: vi.fn(),
+    },
+    customRole: {
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
     _mockTx: mockTx,
   } as any;
@@ -206,6 +228,36 @@ describe("ApiKeyService", () => {
     });
   });
 
+  describe("create() ceiling validation ordering", () => {
+    describe("when ceiling check rejects permissions", () => {
+      it("does not create a CustomRole", async () => {
+        const { checkRoleBindingPermission } = await import("~/server/rbac/role-binding-resolver");
+        (checkRoleBindingPermission as ReturnType<typeof vi.fn>).mockResolvedValue(false);
+
+        await expect(
+          service.create({
+            name: "Forbidden Key",
+            userId: "user_1",
+            organizationId: "org_1",
+            permissionMode: "restricted",
+            permissions: ["secrets:manage"],
+            bindings: [
+              {
+                role: "CUSTOM" as const,
+                scopeType: "ORGANIZATION" as const,
+                scopeId: "org_1",
+              },
+            ],
+          }),
+        ).rejects.toThrow("exceeds your own access");
+
+        expect(prisma._mockTx.customRole.create).not.toHaveBeenCalled();
+
+        (checkRoleBindingPermission as ReturnType<typeof vi.fn>).mockResolvedValue(true);
+      });
+    });
+  });
+
   describe("update()", () => {
     const existingKey = {
       id: "ak_1",
@@ -329,7 +381,7 @@ describe("ApiKeyService", () => {
     describe("when owner revokes their own key", () => {
       it("sets revokedAt", async () => {
         prisma.apiKey.findUnique.mockResolvedValue(existingKey);
-        prisma.apiKey.update.mockResolvedValue({
+        prisma._mockTx.apiKey.update.mockResolvedValue({
           ...existingKey,
           revokedAt: new Date(),
         });
@@ -341,7 +393,7 @@ describe("ApiKeyService", () => {
           organizationId: "org_1",
         });
 
-        expect(prisma.apiKey.update).toHaveBeenCalledWith(
+        expect(prisma._mockTx.apiKey.update).toHaveBeenCalledWith(
           expect.objectContaining({
             where: { id: "ak_1" },
             data: expect.objectContaining({ revokedAt: expect.any(Date) }),
@@ -371,7 +423,7 @@ describe("ApiKeyService", () => {
           ...existingKey,
           userId: null,
         });
-        prisma.apiKey.update.mockResolvedValue({
+        prisma._mockTx.apiKey.update.mockResolvedValue({
           ...existingKey,
           userId: null,
           revokedAt: new Date(),
@@ -384,7 +436,7 @@ describe("ApiKeyService", () => {
           organizationId: "org_1",
         });
 
-        expect(prisma.apiKey.update).toHaveBeenCalled();
+        expect(prisma._mockTx.apiKey.update).toHaveBeenCalled();
       });
     });
 
@@ -421,6 +473,97 @@ describe("ApiKeyService", () => {
             organizationId: "org_1",
           }),
         ).rejects.toThrow();
+      });
+    });
+
+    describe("when revoking a key with an API-key-owned CustomRole", () => {
+      it("deletes only roles with the API Key: naming prefix", async () => {
+        const keyWithCustomRole = {
+          ...existingKey,
+          roleBindings: [
+            { id: "rb_1", customRoleId: "cr_1", role: "CUSTOM", scopeType: "ORGANIZATION", scopeId: "org_1" },
+          ],
+        };
+        prisma.apiKey.findUnique.mockResolvedValue(keyWithCustomRole);
+        prisma._mockTx.apiKey.findUnique.mockResolvedValue(keyWithCustomRole);
+        prisma._mockTx.apiKey.update.mockResolvedValue({
+          ...existingKey,
+          revokedAt: new Date(),
+        });
+
+        await service.revoke({
+          id: "ak_1",
+          callerUserId: "user_1",
+          callerIsAdmin: false,
+          organizationId: "org_1",
+        });
+
+        expect(prisma._mockTx.customRole.deleteMany).toHaveBeenCalledWith({
+          where: {
+            id: { in: ["cr_1"] },
+            roleBindings: { every: { apiKeyId: "ak_1" } },
+            assignedUsers: { none: {} },
+          },
+        });
+      });
+    });
+
+    describe("when revoking a key with multiple bindings sharing one CustomRole", () => {
+      it("deduplicates and deletes the CustomRole once", async () => {
+        const keyWithSharedRole = {
+          ...existingKey,
+          roleBindings: [
+            { id: "rb_1", customRoleId: "cr_1", role: "CUSTOM", scopeType: "PROJECT", scopeId: "p_1" },
+            { id: "rb_2", customRoleId: "cr_1", role: "CUSTOM", scopeType: "PROJECT", scopeId: "p_2" },
+          ],
+        };
+        prisma.apiKey.findUnique.mockResolvedValue(keyWithSharedRole);
+        prisma._mockTx.apiKey.findUnique.mockResolvedValue(keyWithSharedRole);
+        prisma._mockTx.apiKey.update.mockResolvedValue({
+          ...existingKey,
+          revokedAt: new Date(),
+        });
+
+        await service.revoke({
+          id: "ak_1",
+          callerUserId: "user_1",
+          callerIsAdmin: false,
+          organizationId: "org_1",
+        });
+
+        expect(prisma._mockTx.customRole.deleteMany).toHaveBeenCalledWith({
+          where: {
+            id: { in: ["cr_1"] },
+            roleBindings: { every: { apiKeyId: "ak_1" } },
+            assignedUsers: { none: {} },
+          },
+        });
+      });
+    });
+
+    describe("when revoking a key with no CustomRole (ADMIN bindings)", () => {
+      it("does not call customRole.deleteMany", async () => {
+        const keyWithAdminOnly = {
+          ...existingKey,
+          roleBindings: [
+            { id: "rb_1", customRoleId: null, role: "ADMIN", scopeType: "ORGANIZATION", scopeId: "org_1" },
+          ],
+        };
+        prisma.apiKey.findUnique.mockResolvedValue(keyWithAdminOnly);
+        prisma._mockTx.apiKey.findUnique.mockResolvedValue(keyWithAdminOnly);
+        prisma._mockTx.apiKey.update.mockResolvedValue({
+          ...existingKey,
+          revokedAt: new Date(),
+        });
+
+        await service.revoke({
+          id: "ak_1",
+          callerUserId: "user_1",
+          callerIsAdmin: false,
+          organizationId: "org_1",
+        });
+
+        expect(prisma._mockTx.customRole.deleteMany).not.toHaveBeenCalled();
       });
     });
   });

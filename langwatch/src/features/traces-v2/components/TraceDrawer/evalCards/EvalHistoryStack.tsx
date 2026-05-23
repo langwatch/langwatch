@@ -102,7 +102,7 @@ function EvalHistoryRow({
         {status.label}
       </Text>
       {scoreLabel !== null && (
-        <Text textStyle="xs" fontFamily="mono" color="fg" flexShrink={0}>
+        <Text textStyle="xs" color="fg" flexShrink={0}>
           {scoreLabel}
         </Text>
       )}
@@ -110,7 +110,6 @@ function EvalHistoryRow({
         <Text
           textStyle="2xs"
           color="fg.subtle"
-          fontFamily="mono"
           flexShrink={0}
         >
           {time}
@@ -125,7 +124,7 @@ function EvalHistoryRow({
                   <Text textStyle="2xs" color="fg.muted">
                     name
                   </Text>
-                  <Text textStyle="2xs" fontFamily="mono" color="fg">
+                  <Text textStyle="2xs" color="fg">
                     {entry.spanName}
                   </Text>
                 </HStack>
@@ -133,7 +132,7 @@ function EvalHistoryRow({
                   <Text textStyle="2xs" color="fg.muted">
                     id
                   </Text>
-                  <Text textStyle="2xs" fontFamily="mono" color="fg">
+                  <Text textStyle="2xs" color="fg">
                     {entry.spanId}
                   </Text>
                 </HStack>
@@ -144,7 +143,7 @@ function EvalHistoryRow({
                 )}
               </VStack>
             ) : (
-              <Text textStyle="2xs" fontFamily="mono">
+              <Text textStyle="2xs">
                 {entry.spanId}
               </Text>
             )
@@ -165,7 +164,6 @@ function EvalHistoryRow({
             {entry.spanName && (
               <Text
                 textStyle="2xs"
-                fontFamily="mono"
                 color="inherit"
                 truncate
                 maxWidth="160px"
@@ -175,7 +173,6 @@ function EvalHistoryRow({
             )}
             <Text
               textStyle="2xs"
-              fontFamily="mono"
               color="fg.subtle"
               flexShrink={0}
             >

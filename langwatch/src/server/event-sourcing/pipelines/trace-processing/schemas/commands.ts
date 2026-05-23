@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { TRACE_NAME_MAX_LENGTH, TRACE_NAME_MIN_LENGTH } from "./constants";
 import { instrumentationScopeSchema, resourceSchema, spanSchema } from "./otlp";
 
 export const piiRedactionLevelSchema = z.enum(["STRICT", "ESSENTIAL", "DISABLED"]);
@@ -85,4 +86,19 @@ export const resolveOriginCommandDataSchema = z.object({
 export type ResolveOriginCommandData = z.infer<
   typeof resolveOriginCommandDataSchema
 >;
+
+/**
+ * Strict input shape for the user-facing rename API. The trim is applied
+ * upstream (in the app-layer service) before this schema runs, so this
+ * rejects pure-whitespace and over-long names without an extra transform
+ * step that defineCommand's `z.ZodObject<z.ZodRawShape>` constraint
+ * doesn't accept. Anything that fails this Zod check should bubble up
+ * as a `ValidationError` (DomainError) rather than reaching the command
+ * pipeline.
+ */
+export const changeTraceNameInputSchema = z.object({
+  newName: z.string().min(TRACE_NAME_MIN_LENGTH).max(TRACE_NAME_MAX_LENGTH),
+});
+
+export type ChangeTraceNameInput = z.infer<typeof changeTraceNameInputSchema>;
 

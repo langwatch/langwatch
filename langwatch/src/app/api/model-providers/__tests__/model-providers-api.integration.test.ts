@@ -221,35 +221,39 @@ describe("Model Providers API", () => {
       });
     });
 
-    describe("when setting defaultModel without provider prefix", () => {
-      it("stores defaultModel with provider prefix prepended", async () => {
+    // The legacy `defaultModel` write path on the REST API is gone
+    // along with the Project.defaultModel scalar column. Defaults now
+    // live in ModelDefaultConfig and are mutated through the tRPC
+    // model-provider router (createConfig / updateConfig /
+    // setRoleAtScope / setFeatureAtScope).
+
+    describe("when the project has no defaults yet", () => {
+      it("seeds a ModelDefaultConfig row on first-provider create", async () => {
+        // No provider rows on this project yet — the next PUT below
+        // is the "first provider" event. ModelProviderService.createNew
+        // runs seedOnboardingDefaultsForProvider, which should land a
+        // ModelDefaultConfig row at PROJECT scope.
+        const before = await prisma.modelDefaultConfig.count({
+          where: {
+            scopes: { some: { scopeType: "PROJECT", scopeId: testProjectId } },
+          },
+        });
+
         const res = await helpers.api.put("/api/model-providers/openai", {
           enabled: true,
-          defaultModel: "gpt-4o",
+          customKeys: { OPENAI_API_KEY: "sk-seed-default-test" },
         });
+        // 200 happy path or 400 when CREDENTIALS_SECRET is unset (same
+        // env-skip the other PUT tests in this file accept). The seed
+        // only runs when the create lands, so we early-exit on 400.
+        if (res.status !== 200) return;
 
-        expect(res.status).toBe(200);
-
-        const project = await prisma.project.findUnique({
-          where: { id: testProjectId },
+        const after = await prisma.modelDefaultConfig.count({
+          where: {
+            scopes: { some: { scopeType: "PROJECT", scopeId: testProjectId } },
+          },
         });
-        expect(project?.defaultModel).toBe("openai/gpt-4o");
-      });
-    });
-
-    describe("when setting defaultModel with provider prefix already", () => {
-      it("stores defaultModel as-is without double-prefixing", async () => {
-        const res = await helpers.api.put("/api/model-providers/openai", {
-          enabled: true,
-          defaultModel: "openai/gpt-4o",
-        });
-
-        expect(res.status).toBe(200);
-
-        const project = await prisma.project.findUnique({
-          where: { id: testProjectId },
-        });
-        expect(project?.defaultModel).toBe("openai/gpt-4o");
+        expect(after).toBeGreaterThan(before);
       });
     });
 

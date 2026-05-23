@@ -42,8 +42,7 @@ jobs:
     if: >
       needs.changes.outputs.relevant == 'true'
       && (github.event_name != 'pull_request_target'
-          || (github.event.label.name == 'approved-ci'
-              && github.event.pull_request.user.login == 'dependabot[bot]'))
+          || github.event.label.name == 'approved-ci')
     runs-on: ubuntu-latest
     # Run lint, typecheck, tests, and build for TypeScript SDK
     defaults:
@@ -82,8 +81,7 @@ jobs:
     if: >
       needs.changes.outputs.relevant == 'true'
       && (github.event_name != 'pull_request_target'
-          || (github.event.label.name == 'approved-ci'
-              && github.event.pull_request.user.login == 'dependabot[bot]'))
+          || github.event.label.name == 'approved-ci')
     runs-on: ubuntu-latest
 
     env:

@@ -24,7 +24,11 @@ interface ToneStyle {
 const TONE_STYLES: Record<ChipTone, ToneStyle> = {
   neutral: {
     bg: "bg.subtle",
-    border: "border.muted",
+    // Slightly more present than `border.muted` (which is nearly
+    // invisible against the now-translucent drawer header). Matches
+    // the perceived weight of the tinted-tone borders (purple/blue
+    // `/30`) so neutral and toned chips read as one strip.
+    border: "border",
     fg: "fg.muted",
     hoverBg: "bg.muted",
   },
@@ -136,15 +140,12 @@ export const Chip = forwardRef<HTMLDivElement, ChipProps>(function Chip(
       minWidth={0}
       className="chip-root"
     >
-      {dot && <Circle size="6px" bg={dot} flexShrink={0} />}
+      {dot && <Circle size="8px" bg={dot} flexShrink={0} />}
       {icon && <Icon as={icon} boxSize={3} color={style.fg} flexShrink={0} />}
       {label && (
         <Text
           textStyle="2xs"
           color={style.fg}
-          fontFamily="mono"
-          textTransform="uppercase"
-          letterSpacing="0.04em"
           fontWeight="medium"
           flexShrink={0}
         >

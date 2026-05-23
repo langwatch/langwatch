@@ -58,6 +58,31 @@ langwatch prompt create <name>
 
 Edit the generated `.prompt.yaml` file to match the original prompt content.
 
+**Model:** keep the generated `model` on a current model (the latest OpenAI
+generation is `openai/gpt-5.5`). Never downgrade a new prompt to a legacy
+model like `gpt-4o-mini`.
+
+**Temperature:** the gpt-5 family rejects a custom `temperature` — do not add
+`modelParameters.temperature` for those models. `create` omits it on purpose.
+
+**Structured outputs:** if the prompt must return strict JSON, add a
+`response_format` block instead of asking for JSON in prose:
+
+```yaml
+response_format:
+  name: product_category
+  schema:
+    type: object
+    properties:
+      category: { type: string }
+      reasoning: { type: string }
+    required: [category, reasoning]
+    additionalProperties: false
+```
+
+`response_format` round-trips losslessly through `sync`/`pull`. See
+`langwatch docs prompt-management/cli` for the full format.
+
 ## Step 4: Update Application Code
 
 Replace every hardcoded prompt string with a call to `langwatch.prompts.get()`.
@@ -118,3 +143,6 @@ Run `langwatch prompt list` to confirm everything synced, or open the Prompts se
 - Do NOT add a hardcoded fallback string in a try/catch — that silently defeats versioning
 - Do NOT manually edit `prompts.json` — use the CLI
 - Do NOT skip `langwatch prompt sync` after creating prompts
+- Prefer the current flagship (`openai/gpt-5.5`) — pick an older model like `gpt-4o-mini` only when intentionally optimizing for cost or latency
+- Do NOT set `modelParameters.temperature` on a gpt-5-family model — it will be rejected
+- Do NOT ask for JSON in the prompt text when output must be structured — use a `response_format` block

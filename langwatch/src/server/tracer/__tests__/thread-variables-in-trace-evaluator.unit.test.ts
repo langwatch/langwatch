@@ -2,7 +2,7 @@
  * @vitest-environment node
  *
  * Unit tests for thread variables available in trace-level evaluator input mapping.
- * Feature: specs/features/evaluations-v3/thread-variables-in-trace-evaluator.feature
+ * Feature: specs/features/experiments-v3/thread-variables-in-trace-evaluator.feature
  */
 import { describe, expect, it } from "vitest";
 import {

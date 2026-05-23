@@ -5,6 +5,7 @@ import type { AppendStore } from "../../projections/mapProjection.types";
 import type { ReactorDefinition } from "../../reactors/reactor.types";
 import { AddAnnotationCommand, BulkSyncAnnotationsCommand, RemoveAnnotationCommand } from "./commands/annotationCommands";
 import { AssignTopicCommand } from "./commands/assignTopicCommand";
+import { ChangeTraceNameCommand } from "./commands/changeTraceNameCommand";
 import { RecordLogCommand } from "./commands/recordLogCommand";
 import { RecordMetricCommand } from "./commands/recordMetricCommand";
 import { RecordSpanCommand } from "./commands/recordSpanCommand";
@@ -112,5 +113,6 @@ export function createTraceProcessingPipeline(deps: TraceProcessingPipelineDeps)
     .withCommand("addAnnotation", AddAnnotationCommand)
     .withCommand("removeAnnotation", RemoveAnnotationCommand)
     .withCommand("bulkSyncAnnotations", BulkSyncAnnotationsCommand)
+    .withCommand("changeTraceName", ChangeTraceNameCommand)
     .build();
 }

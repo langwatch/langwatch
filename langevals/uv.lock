@@ -13,6 +13,10 @@ resolution-markers = [
     "python_full_version < '3.12' and sys_platform != 'emscripten' and sys_platform != 'win32'",
 ]
 
+[options]
+exclude-newer = "2026-04-19T17:07:22.760704Z"
+exclude-newer-span = "P7D"
+
 [manifest]
 members = [
     "langevals",

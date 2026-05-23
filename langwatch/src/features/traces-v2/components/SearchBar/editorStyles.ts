@@ -115,7 +115,12 @@ export const editorStyles: SystemStyleObject = {
     borderTop: "1px solid",
     borderBottom: "1px solid",
     borderRight: "1px solid",
-    borderLeft: "1px solid",
+    // Intentionally NO borderLeft — the left half of the chip
+    // (`.filter-token`) paints its own right edge is omitted by design,
+    // and `marginLeft: -1px` here visually butts the two halves
+    // together. Adding a left border draws a faint inner divider that
+    // becomes obvious on hover when both halves take on the red.muted
+    // tint, looking like a misaligned middle stripe.
     borderColor: "blue.solid",
     borderTopRightRadius: "8px",
     borderBottomRightRadius: "8px",
@@ -165,5 +170,18 @@ export const editorStyles: SystemStyleObject = {
     background: "red.muted",
     borderColor: "red.muted",
     color: "red.fg",
+  },
+  // Back-propagate hover from the X button onto the left half of the chip
+  // so the whole pill reads "about to delete" — without this the variant
+  // tint (green for numeric, purple for scenario, etc.) stayed on the
+  // left half while only the X button turned red, which made the hover
+  // state look broken.
+  "& .filter-token:has(+ .filter-token-delete:hover)": {
+    background: "red.subtle",
+    borderColor: "red.muted",
+  },
+  "& .filter-token:has(+ .filter-token-delete:active)": {
+    background: "red.muted",
+    borderColor: "red.muted",
   },
 };

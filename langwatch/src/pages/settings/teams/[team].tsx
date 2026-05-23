@@ -17,6 +17,7 @@ import {
   type RoleOption,
   teamRolesOptions,
 } from "../../../components/settings/TeamUserRoleField";
+import { ConfirmDialog } from "../../../components/gateway/ConfirmDialog";
 import { toaster } from "../../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import type { TeamWithProjectsAndMembersAndUsers } from "../../../server/app-layer/organizations/repositories/organization.repository";
@@ -239,12 +240,14 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembersAndUsers }) {
     void handleSubmit(onSubmit)();
   }, [formWatch, handleSubmit, onSubmit]);
 
+  const [showArchiveDialog, setShowArchiveDialog] = useState(false);
+
   const handleArchive = () => {
-    if (!confirm(`Archive "${team.name}"? This will hide the team and all its projects. Contact LangWatch support to restore it.`)) return;
     archiveTeam.mutate(
       { teamId: team.id },
       {
         onSuccess: () => {
+          setShowArchiveDialog(false);
           void router.push("/settings/teams");
         },
         onError: () => {
@@ -285,7 +288,7 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembersAndUsers }) {
                   colorPalette="red"
                   variant="outline"
                   size="sm"
-                  onClick={handleArchive}
+                  onClick={() => setShowArchiveDialog(true)}
                   disabled={archiveTeam.isLoading}
                 >
                   Archive team
@@ -295,6 +298,18 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembersAndUsers }) {
           </Card.Root>
         </VStack>
       </VStack>
+      <ConfirmDialog
+        open={showArchiveDialog}
+        onOpenChange={(open) => {
+          if (!open) setShowArchiveDialog(false);
+        }}
+        title="Archive Team"
+        message={`Are you sure you want to archive "${team.name}"? This will hide the team and all its projects. Contact LangWatch support to restore it.`}
+        confirmLabel="Archive"
+        tone="danger"
+        loading={archiveTeam.isLoading}
+        onConfirm={handleArchive}
+      />
     </SettingsLayout>
   );
 }

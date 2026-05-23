@@ -2,7 +2,7 @@ import { PromptScope } from "@prisma/client";
 import type { Node } from "@xyflow/react";
 import type { DeepPartial } from "react-hook-form";
 
-import type { LocalPromptConfig } from "~/evaluations-v3/types";
+import type { LocalPromptConfig } from "~/experiments-v3/types";
 import type {
   Component,
   LlmConfigParameter,
@@ -676,6 +676,7 @@ export function versionedPromptToOptimizationStudioNodeData(
     | "localPromptConfig"
     | "promptId"
     | "promptVersionId"
+    | "promptDraft"
   >
 > {
   return {

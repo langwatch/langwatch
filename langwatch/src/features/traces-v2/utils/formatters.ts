@@ -12,8 +12,37 @@ export function formatRelativeTime(timestamp: number): string {
   return `${Math.floor(diffMs / MS_PER_DAY)}d`;
 }
 
+/**
+ * Compact relative-time formatter with an explicit "ago" suffix for
+ * drawer-header / detail surfaces. No space between the number and
+ * unit (`10m ago`, `16d ago`) so it stays tight at small sizes, but
+ * keeps the natural-language hint that the table-cell
+ * `formatRelativeTime` drops.
+ */
+export function formatRelativeTimeAgo(timestamp: number): string {
+  const diffMs = Date.now() - timestamp;
+  if (diffMs < MS_PER_MINUTE) return "just now";
+  if (diffMs < MS_PER_HOUR) {
+    return `${Math.floor(diffMs / MS_PER_MINUTE)}m ago`;
+  }
+  if (diffMs < MS_PER_DAY) {
+    return `${Math.floor(diffMs / MS_PER_HOUR)}h ago`;
+  }
+  return `${Math.floor(diffMs / MS_PER_DAY)}d ago`;
+}
+
 export function formatAbsoluteTime(timestamp: number): string {
-  return new Date(timestamp).toLocaleString();
+  // Render in UTC and tag the suffix so engineers reading a trace can
+  // line up timestamps against their server logs without doing the TZ
+  // math in their heads. The previous `toLocaleString()` form rendered
+  // in the viewer's local time without saying so, which was ambiguous.
+  const d = new Date(timestamp);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(
+    d.getUTCDate(),
+  )} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(
+    d.getUTCSeconds(),
+  )} UTC`;
 }
 
 export function formatDuration(ms: number): string {
@@ -34,12 +63,6 @@ export function formatTokens(tokens: number): string {
   return `${tokens}`;
 }
 
-const PROVIDER_ABBREVIATIONS: Readonly<Record<string, string>> = {
-  openai: "oai",
-  anthropic: "ant",
-  google: "ggl",
-};
-
 const MODEL_ABBREVIATIONS: ReadonlyArray<readonly [from: string, to: string]> =
   [
     ["gpt-4o-mini", "4o-mini"],
@@ -56,12 +79,11 @@ export function abbreviateModel(model: string): string {
   if (slash < 0) return model;
   const provider = model.slice(0, slash);
   const name = model.slice(slash + 1);
-  const shortProvider = PROVIDER_ABBREVIATIONS[provider] ?? provider;
   let shortName = name;
   for (const [from, to] of MODEL_ABBREVIATIONS) {
     shortName = shortName.replace(from, to);
   }
-  return `${shortProvider}/${shortName}`;
+  return `${provider}/${shortName}`;
 }
 
 export function formatWallClock(startMs: number, endMs: number): string {
@@ -103,6 +125,24 @@ export const STATUS_COLORS: Readonly<Record<string, Tokens["colors"]>> = {
   error: "red.solid",
   warning: "yellow.solid",
   ok: "green.solid",
+};
+
+/**
+ * Origin palette — kept in sync with `~/utils/originColors.ts` so the
+ * filter sidebar dots, the Origin table cell, and any chip rendering
+ * the trace's origin agree on what colour each origin gets. Picking
+ * deterministic mappings (instead of hashing the string) avoids the
+ * "evaluation just landed on orange today" surprise that prompted
+ * this change.
+ */
+export const ORIGIN_COLORS: Readonly<Record<string, Tokens["colors"]>> = {
+  application: "blue.solid",
+  evaluation: "green.solid",
+  simulation: "pink.solid",
+  workflow: "cyan.solid",
+  playground: "teal.solid",
+  gateway: "purple.solid",
+  sample: "gray.solid",
 };
 
 /**

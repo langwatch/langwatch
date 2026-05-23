@@ -51,8 +51,13 @@ Get started in just a few minutes by installing the SDK and instrumenting your a
 
   ```bash
   export LANGWATCH_API_KEY="your-langwatch-api-key"
+  export LANGWATCH_PROJECT_ID="your-project-id"  # Required for service API keys
   export OPENAI_API_KEY="your-openai-api-key"
   ```
+
+  <Note>
+    `LANGWATCH_PROJECT_ID` is required when using a **service API key** (e.g. for CI/CD or multi-project setups). Project API keys obtained from the project settings page already have the project context built in.
+  </Note>
 
   <Check>
   You can verify your API key is set by running `echo $LANGWATCH_API_KEY`
@@ -323,7 +328,8 @@ The SDK respects these environment variables for configuration:
 
 | Variable | Description |
 | --- | --- |
-| `LANGWATCH_API_KEY` | **Required.** Your LangWatch project API key. |
+| `LANGWATCH_API_KEY` | **Required.** Your LangWatch API key. |
+| `LANGWATCH_PROJECT_ID` | Your LangWatch project ID. **Required** when using a service API key. |
 | `LANGWATCH_ENDPOINT` | The LangWatch collector endpoint. Defaults to `https://app.langwatch.ai`. |
 
 ## Filtering Spans

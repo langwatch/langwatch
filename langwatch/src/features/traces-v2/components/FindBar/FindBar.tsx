@@ -87,7 +87,6 @@ export function FindBar() {
             flex={1}
             borderColor="transparent"
             _focus={{ borderColor: "transparent", boxShadow: "none" }}
-            fontFamily="mono"
             textStyle="xs"
             aria-label="Find query"
           />

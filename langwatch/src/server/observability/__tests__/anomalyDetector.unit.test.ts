@@ -224,8 +224,9 @@ describe("AnomalyDetector.tick", () => {
       const featureFlagService = {
         isEnabled: vi
           .fn()
-          .mockImplementation(async (_flag: string, distinctId: string) =>
-            distinctId === "proj_killed",
+          .mockImplementation(
+            async (_flag: string, opts: { distinctId: string }) =>
+              opts.distinctId === "proj_killed",
           ),
       };
 

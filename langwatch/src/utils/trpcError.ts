@@ -124,3 +124,109 @@ export function extractLimitExceededInfo(
     max: typeof cause.max === "number" ? cause.max : 0,
   };
 }
+
+// --- Missing-model (ModelNotConfiguredError) dedup ---
+const handledMissingModelErrors = new WeakSet<Error>();
+
+export function markAsHandledByMissingModelHandler(error: Error): void {
+  handledMissingModelErrors.add(error);
+}
+
+export function isHandledByMissingModelHandler(error: unknown): boolean {
+  return error instanceof Error && handledMissingModelErrors.has(error);
+}
+
+export interface MissingModelExtracted {
+  featureKey: string;
+  featureDisplayName: string;
+  role: "DEFAULT" | "FAST" | "EMBEDDINGS";
+  projectId?: string;
+}
+
+/**
+ * Extracts the typed payload from a tRPC error whose cause is
+ * `MODEL_NOT_CONFIGURED`. The wire shape is set by the server-side
+ * `ModelNotConfiguredError` (see
+ * `specs/model-providers/model-resolver-and-registry.feature`).
+ */
+export function extractMissingModelInfo(
+  error: unknown,
+): MissingModelExtracted | null {
+  if (!(error instanceof TRPCClientError)) return null;
+  // Server wraps the typed error as a BAD_REQUEST TRPCError with
+  // cause.code === "MODEL_NOT_CONFIGURED". The interceptor keys off the
+  // cause string, not the HTTP/TRPC code, so REST and tRPC surfaces both
+  // funnel into the same modal.
+  const cause = error.data?.cause as
+    | {
+        code?: string;
+        featureKey?: string;
+        featureDisplayName?: string;
+        role?: string;
+        projectId?: string;
+      }
+    | undefined;
+
+  if (cause?.code !== "MODEL_NOT_CONFIGURED") return null;
+  if (!cause.featureKey || !cause.role) return null;
+
+  const role = cause.role as MissingModelExtracted["role"];
+  if (role !== "DEFAULT" && role !== "FAST" && role !== "EMBEDDINGS") {
+    return null;
+  }
+
+  return {
+    featureKey: cause.featureKey,
+    featureDisplayName: cause.featureDisplayName ?? cause.featureKey,
+    role,
+    projectId: cause.projectId,
+  };
+}
+
+/**
+ * Wire-side discriminator a server route attaches when a downstream
+ * AI call fails for a non-MODEL_NOT_CONFIGURED reason (provider 5xx,
+ * 401 on a stale key, malformed custom model id, etc). The frontend
+ * lifts it into a softer toast that nudges the user to double-check
+ * their model provider configuration — most of these failures trace
+ * back to a misset key or wrong model id at the provider layer, and
+ * surfacing that hint up front saves a debug round-trip.
+ */
+export const AI_CALL_FAILED_CAUSE = "AI_CALL_FAILED" as const;
+
+export interface AiCallFailedExtracted {
+  featureKey: string;
+  featureDisplayName: string;
+  role: "DEFAULT" | "FAST" | "EMBEDDINGS";
+  /** Best-effort short message from the provider/SDK. */
+  errorMessage?: string;
+}
+
+export function extractAiCallFailedInfo(
+  error: unknown,
+): AiCallFailedExtracted | null {
+  if (!(error instanceof TRPCClientError)) return null;
+  const cause = error.data?.cause as
+    | {
+        code?: string;
+        featureKey?: string;
+        featureDisplayName?: string;
+        role?: string;
+        errorMessage?: string;
+      }
+    | undefined;
+
+  if (cause?.code !== AI_CALL_FAILED_CAUSE) return null;
+  if (!cause.featureKey || !cause.role) return null;
+  const role = cause.role as AiCallFailedExtracted["role"];
+  if (role !== "DEFAULT" && role !== "FAST" && role !== "EMBEDDINGS") {
+    return null;
+  }
+
+  return {
+    featureKey: cause.featureKey,
+    featureDisplayName: cause.featureDisplayName ?? cause.featureKey,
+    role,
+    errorMessage: cause.errorMessage,
+  };
+}

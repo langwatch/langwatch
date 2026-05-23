@@ -35,7 +35,7 @@ Before you start, make sure you have:
 
 - **Node.js** 18+ installed
 - A **LangWatch account** (sign up at [app.langwatch.ai](https://app.langwatch.ai))
-- Your **LangWatch API key** from the dashboard
+- Your **LangWatch API key** from [Settings → API Keys](https://app.langwatch.ai/settings/api-keys) (see [API Keys guide](/platform/api-keys))
 - An **OpenAI API key** (for the LLM example)
 
 ## Quick Start (5 minutes)
@@ -65,8 +65,13 @@ The `@ai-sdk/openai` and `ai` packages are only required for the example in this
 
 ```bash
 export LANGWATCH_API_KEY=your_langwatch_api_key_here
+export LANGWATCH_PROJECT_ID=your_project_id_here  # Required for service API keys
 export OPENAI_API_KEY=your_openai_api_key_here
 ```
+
+<Note>
+  `LANGWATCH_PROJECT_ID` is required when using a **service API key** (e.g. for CI/CD or multi-project setups). Project API keys obtained via `npx langwatch login` or from the project settings page already have the project context built in.
+</Note>
 
 ### Step 3: Your First LLM Trace
 
@@ -257,6 +262,7 @@ const handle = setupObservability({
   // Optional: Custom API key (defaults to LANGWATCH_API_KEY env var)
   langwatch: {
     apiKey: process.env.LANGWATCH_API_KEY,
+    projectId: process.env.LANGWATCH_PROJECT_ID, // Required for service API keys
   },
 
   // Optional: Global attributes for all traces
@@ -369,6 +375,7 @@ If you don't call `shutdown()`, some traces may be lost when your application te
 1. **Set up environment**:
 ```bash
 export LANGWATCH_API_KEY=your_key
+export LANGWATCH_PROJECT_ID=your_project_id  # Required for service API keys
 export NODE_ENV=development
 ```
 

@@ -17,6 +17,7 @@ import type {
   StudioServerEvent,
 } from "~/optimization_studio/types/events";
 import type { runtimeInputsSchema } from "~/prompts/schemas";
+import { versionMetadataToNodeFormat } from "~/prompts/schemas/version-metadata-schema";
 import type { PromptConfigFormValues } from "~/prompts/types";
 import { buildLLMConfig } from "~/server/prompt-config/llmConfigBuilder";
 import type { ChatMessage } from "~/server/tracer/types";
@@ -27,6 +28,11 @@ import { studioBackendPostEvent } from "../../workflows/post_event/post-event";
 import { extractStreamableOutput, type OutputConfig } from "./output-formatter";
 
 const logger = createLogger("PromptStudioAdapter");
+
+// Matches a `{{ input }}` Liquid placeholder (whitespace tolerated).
+// Used to detect whether a saved-prompt template message will absorb
+// the live chat turn or needs it appended separately.
+const TEMPLATE_INPUT_PLACEHOLDER_RE = /\{\{\s*input\s*\}\}/;
 
 type PromptStudioAdapterParams = {
   projectId: string;
@@ -96,7 +102,64 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
       const formMsgs = (formValues.version.configData.messages ?? []).filter(
         (m) => m.role !== "system",
       );
-      const messagesHistory = [...formMsgs, ...messages]
+
+      // 2026-05-16 prompt-playground regression: the saved-prompt
+      // template carries `{{input}}` placeholders by default
+      // (llm-config.repository.ts:872), but PromptStudioAdapter never
+      // bound the live chat turn to the `input` variable — so
+      // `{{input}}` rendered to empty and the live user message was
+      // appended as a SEPARATE turn next to the template turn. Old
+      // langwatch_nlp's playground path treated the latest live user
+      // message as the `input` value; the new live turn was only
+      // appended when the template did NOT already reference
+      // `{{input}}`. Reproducing that heuristic here keeps the wire
+      // shape (`inputs.input` + `inputs.messages`) consistent with
+      // what nlpgo's buildMessages expects and what the saved prompt
+      // template assumes.
+      const lastLiveUserMsg = [...messages]
+        .reverse()
+        .find((m: any) => m.role === "user");
+      // Broaden the absorb-check to ANY template message (system +
+      // user templates), not just user-role templates. Old
+      // langwatch_nlp's playground heuristic was 'append the live
+      // turn only if `{{input}}` is not in the template' — i.e.
+      // ANYWHERE in the template. The 2026-05-17 follow-up to #4087
+      // (rchaves dogfood) hit the gap: switching the prompt editor to
+      // 'Messages' mode with `{{input}}` ONLY in the system message
+      // and a user template like 'answer it' caused the live chat
+      // input to be duplicated as a second user turn, because the
+      // narrower 'templateUserMsgs only' check returned false.
+      const allTemplateMsgs = formValues.version.configData.messages ?? [];
+      const templateReferencesInput = allTemplateMsgs.some((m) =>
+        TEMPLATE_INPUT_PLACEHOLDER_RE.test(m.content ?? ""),
+      );
+      // Drop the latest live user turn from the history when ANY
+      // template message (system or user) will absorb it through
+      // `{{input}}` (otherwise the user sees the same content twice
+      // — once via `{{input}}` rendering, once live). Earlier copilot
+      // turns (assistant replies + prior user turns) still belong in
+      // the history.
+      const liveMessagesForHistory =
+        templateReferencesInput && lastLiveUserMsg
+          ? messages.filter((m: any) => m !== lastLiveUserMsg)
+          : messages;
+      // Order matters: when the template absorbs the latest live
+      // turn via `{{input}}`, the template's `{{input}}`-bearing
+      // user slot must land at the END of the messages array so
+      // it represents the LATEST turn. Putting formMsgs first
+      // shipped `{{input}}` at index 1 right after system, with the
+      // actual conversation history pushed behind it — the LLM then
+      // saw the latest user turn as if it came BEFORE every prior
+      // turn (prod regression: a long history ended up trailing the
+      // most recent question). When the template does NOT reference
+      // `{{input}}`, formMsgs is preamble/scaffolding (e.g. a fixed
+      // `user("answer it")` role-instruction in 'Messages mode') and
+      // stays at the front — the live history then appends as normal.
+      const messagesHistory = (
+        templateReferencesInput && lastLiveUserMsg
+          ? [...liveMessagesForHistory, ...formMsgs]
+          : [...formMsgs, ...liveMessagesForHistory]
+      )
         .map((message: any) => ({
           role: message.role,
           content: message.content,
@@ -121,6 +184,30 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
         },
         {} as Record<string, unknown>,
       );
+      // Bind the latest live user message's content to the `input`
+      // variable so saved-prompt `{{input}}` placeholders (in system
+      // OR template user messages) resolve to what the user actually
+      // typed. An explicit non-empty value from the Variables panel
+      // always wins — typing-then-overriding is the user's choice.
+      //
+      // Falsy-check (not `=== undefined`): the saved-prompt template
+      // declares `input` as a variable in its `inputs` list, so the
+      // form's variablesDict ALWAYS carries an `input` key even when
+      // the user hasn't typed anything into the Variables panel — its
+      // default is empty-string. A strict-undefined check missed that
+      // case and left `input` empty, causing `{{input}}` to render to
+      // "" AND the live "test7" turn to be dropped by the absorb step
+      // below — exactly the 2026-05-17 prod regression. Treating
+      // missing/empty as "panel not set" preserves the user's intent:
+      // typing an explicit non-empty value still wins; not typing
+      // anything correctly falls back to the chat message.
+      const lastLiveUserContent =
+        lastLiveUserMsg && typeof (lastLiveUserMsg as any).content === "string"
+          ? ((lastLiveUserMsg as any).content as string)
+          : undefined;
+      if (lastLiveUserContent !== undefined && !variablesDict.input) {
+        variablesDict.input = lastLiveUserContent;
+      }
 
       // Build execute_flow event (inputs must be a dict)
       const rawEvent: StudioClientEvent = {
@@ -320,14 +407,24 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
 
   /**
    * Builds node data configuration for LLM prompt component from form values.
-   * Converts form configuration into component parameters including LLM settings, instructions, and messages.
+   * Converts form configuration into component parameters including LLM
+   * settings, instructions, and messages.
+   *
+   * Prompt-span parity: when the form originates from a saved prompt
+   * (configId / handle / versionMetadata present on the form values),
+   * those fields ride along on the dispatched node so nlpgo's engine
+   * emits the PromptApiService.get + Prompt.compile span pair with the
+   * full identity — the trace drawer's "Open in Prompts" deep-link
+   * resolves cleanly back to the playground at the resume target.
+   * Fresh ad-hoc prompts (no configId on the form) omit those fields,
+   * matching the python-sdk "Create new prompt" path.
+   *
    * @param params - Form values and message history to convert
-   * @returns LLM prompt component configuration without configId
    */
   private buildNodeData(params: {
     formValues: PromptConfigFormValues;
     messagesHistory: ChatMessage[];
-  }): Omit<LlmPromptConfigComponent, "configId"> {
+  }): LlmPromptConfigComponent {
     const { formValues, messagesHistory } = params;
 
     // Extract system prompt from messages array
@@ -338,6 +435,16 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
     return {
       name: "LLM Node",
       description: "LLM calling node",
+      // Pass-through identity fields so nlpgo can stamp the prompt
+      // spans. Each is conditional on presence: ad-hoc playground sends
+      // omit the keys, mirroring the python-sdk omission convention.
+      // versionMetadata uses the canonical form→node converter
+      // (versionCreatedAt is a Date in form state, ISO string on the wire).
+      ...(formValues.configId !== undefined && { configId: formValues.configId }),
+      ...(formValues.handle !== undefined && { handle: formValues.handle }),
+      ...(formValues.versionMetadata !== undefined && {
+        versionMetadata: versionMetadataToNodeFormat(formValues.versionMetadata),
+      }),
       parameters: [
         {
           identifier: "llm",

@@ -166,6 +166,13 @@ interface UseFilterEditorParams {
     currentValue: string;
     location: { start: number; end: number };
   }) => void;
+  /**
+   * Fired when the user presses ⌘+⏎ / Ctrl+⏎ while typing. The caller is
+   * expected to enter AI mode with the captured text auto-submitted, so
+   * a typed free-text query becomes an Ask-AI invocation in one keystroke
+   * instead of requiring a separate click on the Ask AI button.
+   */
+  onAiShortcut?: (currentText: string) => void;
 }
 
 interface FilterEditorApi {
@@ -179,6 +186,16 @@ interface FilterEditorApi {
    * the active token, not back at column 0.
    */
   cursorAnchorX: number;
+  /**
+   * Pixel offset to the right edge of the rendered document content.
+   * Independent of the cursor — drives the inline "Press ⏎ to search,
+   * ⌘+⏎ to Ask AI" hint so the hint stays pinned to the end of the
+   * typed text even when the caret is mid-line or `⌘+A` selected
+   * everything.
+   */
+  endAnchorX: number;
+  /** Whether the editor currently holds focus. */
+  isFocused: boolean;
 }
 
 export function useFilterEditor({
@@ -187,11 +204,21 @@ export function useFilterEditor({
   onHasContentChange,
   valueResolver,
   onTokenClick,
+  onAiShortcut,
 }: UseFilterEditorParams): FilterEditorApi {
   const [suggestion, setSuggestion] =
     useState<SuggestionUIState>(CLOSED_SUGGESTION);
   const [dropdownDismissed, setDropdownDismissed] = useState(false);
   const [cursorAnchorX, setCursorAnchorX] = useState(0);
+  // Independent anchor that tracks the *end of the rendered content*,
+  // not the cursor — drives the inline submit hint so a ⌘+A or
+  // mid-text caret placement doesn't drag the hint on top of the
+  // user's text. Always updated (regardless of dropdown state).
+  const [endAnchorX, setEndAnchorX] = useState(0);
+  // TipTap's `editor.isFocused` doesn't trigger React renders. Mirror
+  // focus/blur into state so the SearchBar can hide chrome (inline
+  // submit hint, …) when the editor isn't actively engaged.
+  const [isFocused, setIsFocused] = useState(false);
 
   const editorRef = useRef<Editor | null>(null);
   const isProgrammaticRef = useRef(false);
@@ -201,6 +228,7 @@ export function useFilterEditor({
   const suggestionRef = useLatestRef(suggestion);
   const dismissedRef = useLatestRef(dropdownDismissed);
   const valueResolverRef = useLatestRef(valueResolver);
+  const onAiShortcutRef = useLatestRef(onAiShortcut);
   // Tracks last reported hasContent so we only fire onHasContentChange when
   // it actually flips (not on every keystroke that keeps the state).
   const lastHasContentRef = useRef<boolean>(queryText.length > 0);
@@ -267,6 +295,23 @@ export function useFilterEditor({
         } catch {
           // coordsAtPos can throw if the doc isn't yet mounted; ignore.
         }
+      }
+
+      // End-of-content anchor for the inline submit hint. Independent
+      // of the cursor — a ⌘+A or click-back-to-middle puts the caret
+      // anywhere, but the hint should stay pinned right after whatever
+      // the user has typed. Measure the rightmost edge of the document
+      // by asking PM for coords at the document's *end* position
+      // (PARAGRAPH_OFFSET + text length).
+      try {
+        const view = editor.view;
+        const editorRect = view.dom.getBoundingClientRect();
+        const endPos = PARAGRAPH_OFFSET + text.length;
+        const coords = view.coordsAtPos(endPos);
+        const next = Math.round(coords.left - editorRect.left);
+        setEndAnchorX((prev) => (prev === next ? prev : next));
+      } catch {
+        // coordsAtPos throws on cold mount; the next refresh will recover.
       }
 
       // Escape is sticky for the session — `dismissedRef` only clears on
@@ -355,9 +400,11 @@ export function useFilterEditor({
       refreshSuggestion(ed);
     },
     onFocus: ({ editor: ed }) => {
+      setIsFocused(true);
       refreshSuggestion(ed);
     },
     onBlur: ({ editor: ed }) => {
+      setIsFocused(false);
       applyQueryTextRef.current(ed.getText().trim());
       setSuggestion(CLOSED_SUGGESTION);
       setDropdownDismissed(false);
@@ -389,6 +436,21 @@ export function useFilterEditor({
       handleKeyDown: (view, event) => {
         const text = view.state.doc.textContent;
         const cursorPos = view.state.selection.from - PARAGRAPH_OFFSET;
+
+        // ⌘+⏎ / Ctrl+⏎ → punt the current text into Ask AI. We intercept
+        // before any of the autocomplete or submit logic runs so a held
+        // modifier always wins, even mid-autocomplete. Without content
+        // the shortcut still opens AI mode but with an empty seed (same
+        // as clicking the Ask AI button).
+        if (
+          event.key === "Enter" &&
+          (event.metaKey || event.ctrlKey) &&
+          onAiShortcutRef.current
+        ) {
+          event.preventDefault();
+          onAiShortcutRef.current(text);
+          return true;
+        }
 
         // `@` is a virtual trigger: it never enters the document. We anchor
         // the autocomplete to the cursor position and let subsequent typing
@@ -644,5 +706,7 @@ export function useFilterEditor({
     acceptSuggestion,
     reset,
     cursorAnchorX,
+    endAnchorX,
+    isFocused,
   };
 }

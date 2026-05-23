@@ -1,7 +1,7 @@
 /**
  * Shared utility for formatting target outputs for display.
  *
- * This function is used by both evaluations-v3 table and batch results table
+ * This function is used by both experiments-v3 table and batch results table
  * to ensure consistent output rendering.
  *
  * Rules:

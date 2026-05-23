@@ -1,11 +1,9 @@
 import escapeStringRegexp from "escape-string-regexp";
 import { prisma } from "../db";
-import llmModels from "./llmModels.json";
-import type { LLMModelRegistry } from "./llmModels.types";
+import { llmModels } from "./loadModelCatalog";
 
 const getImportedModelCosts = () => {
-  const registry = llmModels as LLMModelRegistry;
-  const models = registry.models;
+  const models = llmModels.models;
 
   // Convert models to cost entries with regex patterns
   const tokenModels: Record<

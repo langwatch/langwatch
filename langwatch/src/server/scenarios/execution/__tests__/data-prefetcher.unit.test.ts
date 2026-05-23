@@ -50,7 +50,6 @@ describe("prefetchScenarioData", () => {
 
   const defaultProject = {
     apiKey: "test-api-key",
-    defaultModel: "anthropic/claude-3-sonnet",
   };
 
   const defaultModelParams: LiteLLMParams = {
@@ -94,6 +93,10 @@ describe("prefetchScenarioData", () => {
       getSecrets: vi.fn().mockResolvedValue({}),
     };
 
+    const modelResolver = {
+      resolve: vi.fn().mockResolvedValue("anthropic/claude-3-sonnet"),
+    };
+
     return {
       scenarioFetcher,
       promptFetcher,
@@ -101,6 +104,7 @@ describe("prefetchScenarioData", () => {
       workflowVersionFetcher,
       projectFetcher,
       modelParamsProvider,
+      modelResolver,
       projectSecretsFetcher,
       ...overrides,
     };
