@@ -1,4 +1,4 @@
-import { prisma } from "../src/server/db";
+import { prisma } from "../../../src/server/db";
 
 async function main() {
   const orgs = await prisma.organization.findMany({

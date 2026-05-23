@@ -15,8 +15,11 @@ if (!team) {
 }
 
 const existing = await prisma.user.findFirst({ where: { email: EMAIL } });
-let userId = existing?.id;
-if (!existing) {
+let userId;
+if (existing) {
+  userId = existing.id;
+  console.log("user already exists", userId);
+} else {
   const created = await prisma.user.create({
     data: {
       email: EMAIL,
@@ -26,8 +29,6 @@ if (!existing) {
   });
   userId = created.id;
   console.log("created user", userId);
-} else {
-  console.log("user already exists", userId);
 }
 
 const orgUser = await prisma.organizationUser.findFirst({
