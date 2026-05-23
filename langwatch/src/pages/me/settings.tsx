@@ -389,7 +389,7 @@ export default function MySettingsPage() {
           </SectionCard>
         ) : null}
 
-        <SectionCard title="Budget">
+        <SectionCard title="Personal budget">
           {ctx.summary.budgetUsd === null ? (
             <VStack align="start" gap={1}>
               <Text fontSize="sm" color="fg.muted">
