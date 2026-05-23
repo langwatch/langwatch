@@ -1,19 +1,17 @@
-/* eslint-disable */
 /**
  * Emit one OTLP trace with a chain of error spans, intended for the
  * StatusChip interactive-tooltip dogfood. Mirrors the screenshot the
- * customer report used to motivate the work — a top-level workflow
+ * customer report used to motivate the work, a top-level workflow
  * span errors with "Connection error.", and a couple of llm + chain
  * leaf spans error underneath so the popover has multiple chips.
  *
  * Usage:
  *   LW_API_KEY=sk-lw-... LW_ENDPOINT=http://localhost:5560 \
- *     npx tsx scripts/dogfood-error-trace.ts
+ *     npx tsx langwatch/scripts/dogfood/traces/error-trace.ts
  */
 import { randomBytes } from "node:crypto";
 
-const ENDPOINT =
-  process.env.LW_ENDPOINT ?? "http://localhost:5560";
+const ENDPOINT = process.env.LW_ENDPOINT ?? "http://localhost:5560";
 const API_KEY = process.env.LW_API_KEY;
 if (!API_KEY) {
   console.error("LW_API_KEY is required");
@@ -21,7 +19,6 @@ if (!API_KEY) {
 }
 
 const NOW_NS = BigInt(Date.now()) * 1_000_000n;
-const SEC_NS = 1_000_000_000n;
 
 function id(bytes: number): string {
   return randomBytes(bytes).toString("hex");
