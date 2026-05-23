@@ -1,5 +1,5 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef } from "react";
 import { useFocusSectionStore } from "../../../stores/focusSectionStore";
 import type {
   SpanTreeNode,
@@ -18,6 +18,7 @@ import { EmptyEventsState, EmptyHint } from "./EmptyStates";
 import { EventCard } from "./EventCard";
 import { useAutoOpenSections } from "./sectionPresence";
 import { SectionFocusGlow } from "./SectionFocusGlow";
+import { useSectionFocusGlow } from "./useSectionFocusGlow";
 import { countFlatLeaves } from "./utils";
 
 export function TraceSummaryAccordions({
@@ -107,52 +108,14 @@ export function TraceSummaryAccordions({
   // overflow menus, …). When a request matches this trace, ensure the
   // requested section is in `openSections` and scroll it into view.
   const containerRef = useRef<HTMLDivElement>(null);
-  const pendingFocus = useFocusSectionStore((s) => s.pending);
-  const clearFocus = useFocusSectionStore((s) => s.clear);
   const requestFocus = useFocusSectionStore((s) => s.request);
-  const [glow, setGlow] = useState<{
-    target: HTMLElement;
-    nonce: number;
-  } | null>(null);
-  const handleGlowDone = useCallback(() => setGlow(null), []);
-  useEffect(() => {
-    if (!pendingFocus) return;
-    if (pendingFocus.traceId !== trace.traceId) return;
-    if (!sections.includes(pendingFocus.section as never)) return;
-    setOpenSections(
-      openSections.includes(pendingFocus.section)
-        ? openSections
-        : [...openSections, pendingFocus.section],
-    );
-    const glowSection = pendingFocus.section;
-    const glowNonce = pendingFocus.nonce;
-    const root = containerRef.current;
-    // Two rAFs so the accordion has actually expanded before we measure
-    // + scroll. The first flushes the open-state setState; layout
-    // commits on the second.
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        const el = root?.querySelector<HTMLElement>(
-          `[data-section="${glowSection}"]`,
-        );
-        if (!el) return;
-        el.scrollIntoView({ behavior: "smooth", block: "start" });
-        // Mount the overlay AFTER the scroll starts so the pulse lands
-        // on the section already in view rather than ticking out
-        // mid-scroll. The nonce keys the overlay so a re-click
-        // remounts + restarts the keyframe.
-        setGlow({ target: el, nonce: glowNonce });
-      });
-    });
-    clearFocus();
-  }, [
-    pendingFocus,
-    trace.traceId,
+  const { glow, handleGlowDone } = useSectionFocusGlow({
+    traceId: trace.traceId,
     sections,
     openSections,
     setOpenSections,
-    clearFocus,
-  ]);
+    containerRef,
+  });
 
   return (
     <Box ref={containerRef}>

@@ -214,13 +214,27 @@ function StatusChip({
     requestFocus({ traceId: trace.traceId, section: "exceptions" });
   }, [requestFocus, setActiveTab, setViewMode, trace.traceId]);
 
+  // Same focus request without the activeTab override, so a span pill
+  // inside the popover can flip to the span tab (via `selectSpan`)
+  // without our callback then yanking the operator back to summary.
+  // The pulse lands on whichever accordion stack is mounted next —
+  // `SpanAccordions` for span tab, `TraceSummaryAccordions` for
+  // summary — since both observe the same focus store.
+  const focusExceptionsKeepTab = useCallback(() => {
+    requestFocus({ traceId: trace.traceId, section: "exceptions" });
+  }, [requestFocus, trace.traceId]);
+
   const jumpToSpan = useCallback(
     (spanId: string) => {
+      // Land on the span detail tab — `selectSpan` flips activeTab to
+      // "span" internally, so we just ensure trace mode here. The
+      // accordion-side focus-glow observer on SpanAccordions will catch
+      // the follow-up `requestFocus({section: "exceptions"})` fired by
+      // ExceptionsContent and pulse the span's own Exceptions section.
       setViewMode("trace");
-      setActiveTab("summary");
       selectSpan(spanId);
     },
-    [selectSpan, setActiveTab, setViewMode],
+    [selectSpan, setViewMode],
   );
 
   // OK / non-error rendering keeps the existing static-tooltip recipe —
@@ -291,7 +305,7 @@ function StatusChip({
               error={trace.error}
               errorSpans={errorSpans}
               onSelectSpan={jumpToSpan}
-              onFocusSection={focusExceptions}
+              onFocusSection={focusExceptionsKeepTab}
               density="compact"
             />
             {/* Anchor row: nudges the operator that the popover is a
