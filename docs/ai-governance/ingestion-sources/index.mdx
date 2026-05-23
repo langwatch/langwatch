@@ -55,7 +55,7 @@ For source types where the puller worker is not yet wired (the three "setup-cont
 
 ## Auth contract: same shape across every receiver
 
-All push-mode + webhook receivers use `Authorization: Bearer lw_is_<secret>` (the same shape the gateway uses for its `lw_vk_` virtual keys, just a different prefix). Mismatched `:sourceId` path vs. resolved-secret source ID returns `401 unauthorized` without leaking which one exists. The 24-hour rotation grace window is documented in the IngestionSource lifecycle architecture.
+All push-mode + webhook receivers use `Authorization: Bearer lw_is_<secret>` (the same shape the gateway uses for its `vk-lw-` virtual keys, just a different prefix). Mismatched `:sourceId` path vs. resolved-secret source ID returns `401 unauthorized` without leaking which one exists. The 24-hour rotation grace window is documented in the IngestionSource lifecycle architecture.
 
 ## Verification: same loop for every active source
 

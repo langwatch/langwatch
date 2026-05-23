@@ -139,7 +139,7 @@ Dev terminal              LangWatch                  Provider
 $ langwatch               app.langwatch.ai           api.anthropic.com
   login --device  ◀──SSO──▶  /api/auth/cli/*
   ↓ writes ~/.langwatch
-  ↓ ANTHROPIC_AUTH_TOKEN=lw_vk_...
+  ↓ ANTHROPIC_AUTH_TOKEN=vk-lw-...
 
 $ langwatch claude  ──exec(anthropic_url)─▶  gateway.langwatch.ai
                                               │ resolve VK
@@ -152,7 +152,7 @@ $ langwatch claude  ──exec(anthropic_url)─▶  gateway.langwatch.ai
 Why Tier 1 wins:
 
 - **Per-user attribution at the credential layer.** Each user's
-  `lw_vk_...` carries `principal_id=<userId>`. Every request,
+  `vk-lw-...` carries `principal_id=<userId>`. Every request,
   every trace, every cost roll-up attributes to the right person
   without parsing the model's `user` field at the provider.
 - **Mid-flight policy.** Gateway can block before the call goes
