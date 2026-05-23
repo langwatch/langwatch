@@ -1,5 +1,5 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFocusSectionStore } from "../../../stores/focusSectionStore";
 import type {
   SpanTreeNode,
@@ -19,8 +19,6 @@ import { EventCard } from "./EventCard";
 import { useAutoOpenSections } from "./sectionPresence";
 import { SectionFocusGlow } from "./SectionFocusGlow";
 import { countFlatLeaves } from "./utils";
-
-const SECTION_GLOW_DURATION_MS = 1500;
 
 export function TraceSummaryAccordions({
   trace,
@@ -111,6 +109,11 @@ export function TraceSummaryAccordions({
   const containerRef = useRef<HTMLDivElement>(null);
   const pendingFocus = useFocusSectionStore((s) => s.pending);
   const clearFocus = useFocusSectionStore((s) => s.clear);
+  const [glow, setGlow] = useState<{
+    target: HTMLElement;
+    nonce: number;
+  } | null>(null);
+  const handleGlowDone = useCallback(() => setGlow(null), []);
   useEffect(() => {
     if (!pendingFocus) return;
     if (pendingFocus.traceId !== trace.traceId) return;
@@ -120,38 +123,27 @@ export function TraceSummaryAccordions({
         ? openSections
         : [...openSections, pendingFocus.section],
     );
-    // Wait one frame so the accordion has actually expanded before we
-    // measure + scroll. Two rAFs because the first only flushes the
-    // open-state setState; layout commits on the second.
     const glowSection = pendingFocus.section;
+    const glowNonce = pendingFocus.nonce;
     const root = containerRef.current;
-    const fadeTimer = window.setTimeout(() => {
-      root
-        ?.querySelector<HTMLElement>(`[data-section="${glowSection}"]`)
-        ?.removeAttribute("data-section-focus");
-    }, SECTION_GLOW_DURATION_MS);
+    // Two rAFs so the accordion has actually expanded before we measure
+    // + scroll. The first flushes the open-state setState; layout
+    // commits on the second.
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         const el = root?.querySelector<HTMLElement>(
           `[data-section="${glowSection}"]`,
         );
-        el?.scrollIntoView({ behavior: "smooth", block: "start" });
-        // Set the focus attribute AFTER the scroll so the keyframe's
-        // initial transparent frame doesn't elapse mid-scroll — the
-        // operator sees the pulse on the section already in view.
-        // Clear-then-set so re-clicking the same chip restarts the
-        // animation instead of getting swallowed by the running one.
-        if (el) {
-          el.removeAttribute("data-section-focus");
-          // Force a style flush so the re-applied attribute restarts
-          // the keyframe even when the previous run was still in-flight.
-          void el.offsetWidth;
-          el.setAttribute("data-section-focus", "1");
-        }
+        if (!el) return;
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
+        // Mount the overlay AFTER the scroll starts so the pulse lands
+        // on the section already in view rather than ticking out
+        // mid-scroll. The nonce keys the overlay so a re-click
+        // remounts + restarts the keyframe.
+        setGlow({ target: el, nonce: glowNonce });
       });
     });
     clearFocus();
-    return () => window.clearTimeout(fadeTimer);
   }, [
     pendingFocus,
     trace.traceId,
@@ -167,7 +159,14 @@ export function TraceSummaryAccordions({
           attribution row at the top of the summary panel. It's now
           pinned to the right of the SpanTabBar so it stays visible
           when the user scrolls the summary content. */}
-      <SectionFocusGlow />
+      {glow ? (
+        <SectionFocusGlow
+          key={glow.nonce}
+          target={glow.target}
+          nonce={glow.nonce}
+          onDone={handleGlowDone}
+        />
+      ) : null}
       <AccordionShell value={openSections} onValueChange={setOpenSections}>
         {sections.map((id, idx) => {
           const isFirst = idx === 0;
