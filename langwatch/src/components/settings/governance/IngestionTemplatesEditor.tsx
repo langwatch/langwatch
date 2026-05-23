@@ -483,7 +483,6 @@ function EditOttlDrawer({
                     statements={statements}
                     onChange={setStatements}
                     enabled={true}
-                    autoFillStarter={false}
                   />
                 )
               )}

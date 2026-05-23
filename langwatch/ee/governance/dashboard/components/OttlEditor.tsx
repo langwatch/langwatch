@@ -26,7 +26,7 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { Plus, RotateCcw, Trash2 } from "lucide-react";
+import { FileText, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { api } from "~/utils/api";
@@ -39,11 +39,6 @@ interface OttlEditorProps {
   /** Whether to render the editor at all. Caller can hide for source
    *  types that don't accept OTTL (pull-mode adapters etc.). */
   enabled: boolean;
-  /** When the user picked a source type that has a starter template
-   *  AND the current statements are empty, the editor auto-fills with
-   *  the starter. Allow caller to suppress (e.g. edit-drawer should
-   *  never auto-fill — admin already chose). */
-  autoFillStarter?: boolean;
 }
 
 interface PerStatementStatus {
@@ -59,7 +54,6 @@ export function OttlEditor({
   statements,
   onChange,
   enabled,
-  autoFillStarter = true,
 }: OttlEditorProps) {
   const [validationStatus, setValidationStatus] = useState<
     PerStatementStatus[]
@@ -75,21 +69,6 @@ export function OttlEditor({
   );
 
   const starterStatements = starterQuery.data?.statements;
-
-  // Auto-fill the starter template once when (a) auto-fill is on, (b)
-  // current statements are empty, and (c) the source type has a
-  // starter. Driven by an effect rather than a render-time onChange so
-  // the parent doesn't see a setState-during-render warning.
-  useEffect(() => {
-    if (!autoFillStarter) return;
-    if (!enabled) return;
-    if (statements.length > 0) return;
-    if (!starterStatements || starterStatements.length === 0) return;
-    onChange([...starterStatements]);
-    // intentional: re-run only when source type or starter data changes,
-    // not on every onChange identity tick
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sourceType, starterStatements?.join("\n"), autoFillStarter, enabled]);
 
   const validateMutation = api.ingestionSources.validateOttl.useMutation();
 
@@ -168,11 +147,12 @@ export function OttlEditor({
     onChange([...statements, ""]);
   };
 
-  const resetToStarter = () => {
+  const useTemplate = () => {
     if (starterStatements) onChange([...starterStatements]);
   };
 
   const hasStarter = (starterStatements ?? []).length > 0;
+  const isEmpty = statements.length === 0;
   const matchesStarter = useMemo(() => {
     if (!starterStatements || starterStatements.length === 0) return false;
     if (starterStatements.length !== statements.length) return false;
@@ -199,15 +179,43 @@ export function OttlEditor({
         </VStack>
         <Spacer />
         {validating && <Spinner size="xs" />}
-        {hasStarter && !matchesStarter && (
-          <Button size="xs" variant="ghost" onClick={resetToStarter}>
-            <RotateCcw size={12} /> Reset to starter
+        {hasStarter && !isEmpty && !matchesStarter && (
+          <Button size="xs" variant="ghost" onClick={useTemplate}>
+            <RotateCcw size={12} /> Reset to template
           </Button>
         )}
       </HStack>
 
+      {hasStarter && isEmpty && (
+        <Box
+          borderWidth="1px"
+          borderColor="orange.300"
+          backgroundColor="orange.50"
+          borderRadius="md"
+          padding={3}
+        >
+          <HStack alignItems="center" gap={3}>
+            <Box color="orange.600">
+              <FileText size={18} />
+            </Box>
+            <VStack align="start" gap={0} flex={1}>
+              <Text fontSize="sm" fontWeight="medium">
+                Template available for this source type
+              </Text>
+              <Text fontSize="xs" color="fg.muted">
+                Loads the canonical extraction statements maintained by LangWatch.
+                You can customize them after loading.
+              </Text>
+            </VStack>
+            <Button size="sm" colorPalette="orange" onClick={useTemplate}>
+              Use this template
+            </Button>
+          </HStack>
+        </Box>
+      )}
+
       <VStack align="stretch" gap={1}>
-        {statements.length === 0 && (
+        {isEmpty && !hasStarter && (
           <Text fontSize="xs" color="fg.muted" fontStyle="italic">
             No statements. Click “Add statement” to begin.
           </Text>

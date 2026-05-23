@@ -51,19 +51,22 @@ Feature: OTTL-driven OTLP ingestion source — extract usage + spend
   # handles every upstream tool without per-tool branches.
 
   # -------------------------------------------------------------------
-  # Source creation — starter template flow (claude_code)
+  # Source creation — Use this template flow (claude_code)
   # -------------------------------------------------------------------
-  Scenario: Admin creates a Claude Code source — starter template auto-fills
+  Scenario: Admin creates a Claude Code source — clicks Use this template
     When Alex visits "/settings/governance/ingestion-sources" and clicks
       "Add ingestion source"
     And selects source type "Claude Code (OTLP)"
-    Then the OTTL editor pre-fills with 9 starter statements that map
-      Claude Code's wire shape onto the canonical namespace, one per
-      output field, all gated on `attributes["event.name"] == "api_request"`
+    Then the OTTL editor renders empty with a callout offering the
+      canonical Claude Code template and a "Use this template" button
+    When Alex clicks "Use this template"
+    Then the editor populates with 9 statements that map Claude Code's
+      wire shape onto the canonical namespace, one per output field,
+      all gated on `attributes["event.name"] == "api_request"`
     And each statement passes validation (green dot per row)
     When Alex saves the source with name "claude-code-personal"
     Then the source row's `parserConfig.ottlStatements` matches the
-      starter template byte-for-byte
+      template byte-for-byte
     And the save response includes the OTLP endpoint URL +
       one-time ingest secret + shell-ready exporter env block
 

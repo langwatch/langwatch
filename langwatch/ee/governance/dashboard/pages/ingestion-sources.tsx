@@ -982,7 +982,6 @@ function SourceEditDrawer({
               statements={statements}
               onChange={setStatements}
               enabled={isOttlEnabledSourceType(source.sourceType)}
-              autoFillStarter={false}
             />
 
             <Text fontSize="xs" color="fg.muted">
