@@ -223,65 +223,71 @@ describe("ClickHouse metrics", () => {
       );
     });
 
-    it("queries system.backup_log for backup status", async () => {
-      const partsResult = {
-        json: vi.fn().mockResolvedValue({ data: [] }),
-      };
-      const backupResult = {
-        json: vi.fn().mockResolvedValue({
-          data: [
-            {
-              status: "BACKUP_CREATED",
-              cnt: "3",
-              last_success_time: "2024-01-15 10:00:00",
-              last_success_size: "1073741824",
-            },
-          ],
-        }),
-      };
-      const diskResult = {
-        json: vi.fn().mockResolvedValue({
-          data: [
-            { name: "default", total_space: "322122547200", free_space: "214748364800", used_space: "107374182400" },
-          ],
-        }),
-      };
-      const mockClient = {
-        query: vi.fn()
-          .mockResolvedValueOnce(partsResult)
-          .mockResolvedValueOnce(backupResult)
-          .mockResolvedValueOnce(diskResult),
-      } as unknown as ClickHouseClient;
+    describe("given backup status collection", () => {
+      describe("when system.backup_log returns data", () => {
+        it("queries system.backup_log for backup status", async () => {
+          const partsResult = {
+            json: vi.fn().mockResolvedValue({ data: [] }),
+          };
+          const backupResult = {
+            json: vi.fn().mockResolvedValue({
+              data: [
+                {
+                  status: "BACKUP_CREATED",
+                  cnt: "3",
+                  last_success_time: "2024-01-15 10:00:00",
+                  last_success_size: "1073741824",
+                },
+              ],
+            }),
+          };
+          const diskResult = {
+            json: vi.fn().mockResolvedValue({
+              data: [
+                { name: "default", total_space: "322122547200", free_space: "214748364800", used_space: "107374182400" },
+              ],
+            }),
+          };
+          const mockClient = {
+            query: vi.fn()
+              .mockResolvedValueOnce(partsResult)
+              .mockResolvedValueOnce(backupResult)
+              .mockResolvedValueOnce(diskResult),
+          } as unknown as ClickHouseClient;
 
-      await metrics.collectStorageStats(mockClient);
+          await metrics.collectStorageStats(mockClient);
 
-      // Should have been called 3 times: parts, backups, disks
-      expect(mockClient.query).toHaveBeenCalledTimes(3);
-      expect(mockClient.query).toHaveBeenCalledWith(
-        expect.objectContaining({
-          query: expect.stringContaining("system.backup_log"),
-        })
-      );
-      expect(mockClient.query).toHaveBeenCalledWith(
-        expect.objectContaining({
-          query: expect.stringContaining("system.disks"),
-        })
-      );
-    });
+          // Should have been called 3 times: parts, backups, disks
+          expect(mockClient.query).toHaveBeenCalledTimes(3);
+          expect(mockClient.query).toHaveBeenCalledWith(
+            expect.objectContaining({
+              query: expect.stringContaining("system.backup_log"),
+            })
+          );
+          expect(mockClient.query).toHaveBeenCalledWith(
+            expect.objectContaining({
+              query: expect.stringContaining("system.disks"),
+            })
+          );
+        });
+      });
 
-    it("handles system.backup_log query failure gracefully", async () => {
-      const partsResult = {
-        json: vi.fn().mockResolvedValue({ data: [] }),
-      };
-      const mockClient = {
-        query: vi.fn()
-          .mockResolvedValueOnce(partsResult)
-          .mockRejectedValueOnce(new Error("system.backup_log not enabled"))
-          .mockResolvedValueOnce({ json: vi.fn().mockResolvedValue({ data: [] }) }),
-      } as unknown as ClickHouseClient;
+      describe("when system.backup_log query fails", () => {
+        it("handles system.backup_log query failure gracefully", async () => {
+          const partsResult = {
+            json: vi.fn().mockResolvedValue({ data: [] }),
+          };
+          const mockClient = {
+            query: vi.fn()
+              .mockResolvedValueOnce(partsResult)
+              .mockRejectedValueOnce(new Error("system.backup_log not enabled"))
+              .mockResolvedValueOnce({ json: vi.fn().mockResolvedValue({ data: [] }) }),
+          } as unknown as ClickHouseClient;
 
-      // Should not throw — backup errors are handled gracefully
-      await expect(metrics.collectStorageStats(mockClient)).resolves.toBeUndefined();
+          // Should not throw — backup errors are handled gracefully
+          await expect(metrics.collectStorageStats(mockClient)).resolves.toBeUndefined();
+        });
+      });
     });
 
     it("handles query errors gracefully", async () => {
@@ -394,7 +400,7 @@ describe("ClickHouse metrics", () => {
     });
   });
 
-  describe("system.backup_log failure logging", () => {
+  describe("given system.backup_log failure logging", () => {
     const buildMockClient = (backupShouldFail: () => boolean) => {
       const partsResult = { json: vi.fn().mockResolvedValue({ data: [] }) };
       const successfulBackupResult = {
@@ -426,39 +432,43 @@ describe("ClickHouse metrics", () => {
         return typeof arg === "string" && arg.includes(needle);
       }).length;
 
-    it("emits exactly one warn for repeated failures until recovery", async () => {
-      const client = buildMockClient(() => true);
+    describe("when system.backup_log fails repeatedly", () => {
+      it("emits exactly one warn for repeated failures until recovery", async () => {
+        const client = buildMockClient(() => true);
 
-      await metrics.collectStorageStats(client);
-      await metrics.collectStorageStats(client);
-      await metrics.collectStorageStats(client);
+        await metrics.collectStorageStats(client);
+        await metrics.collectStorageStats(client);
+        await metrics.collectStorageStats(client);
 
-      // logger.warn signature is (obj, msg). First failure warns;
-      // subsequent failures fall through to debug.
-      expect(
-        countCallsMatching(loggerMocks.warn.mock.calls, 1, "system.backup_log"),
-      ).toBe(1);
+        // logger.warn signature is (obj, msg). First failure warns;
+        // subsequent failures fall through to debug.
+        expect(
+          countCallsMatching(loggerMocks.warn.mock.calls, 1, "system.backup_log"),
+        ).toBe(1);
+      });
     });
 
-    it("warns again on a fresh failure after recovering", async () => {
-      let shouldFail = true;
-      const client = buildMockClient(() => shouldFail);
+    describe("when system.backup_log recovers then fails again", () => {
+      it("warns again on a fresh failure after recovering", async () => {
+        let shouldFail = true;
+        const client = buildMockClient(() => shouldFail);
 
-      await metrics.collectStorageStats(client); // fail → warn (#1)
-      await metrics.collectStorageStats(client); // fail → debug (suppressed)
-      shouldFail = false;
-      await metrics.collectStorageStats(client); // recover → info
-      shouldFail = true;
-      await metrics.collectStorageStats(client); // fail → warn (#2)
+        await metrics.collectStorageStats(client); // fail → warn (#1)
+        await metrics.collectStorageStats(client); // fail → debug (suppressed)
+        shouldFail = false;
+        await metrics.collectStorageStats(client); // recover → info
+        shouldFail = true;
+        await metrics.collectStorageStats(client); // fail → warn (#2)
 
-      expect(
-        countCallsMatching(loggerMocks.warn.mock.calls, 1, "system.backup_log"),
-      ).toBe(2);
-      // logger.info("ClickHouse backup stats collection recovered ...")
-      // is called with the message as the first arg.
-      expect(
-        countCallsMatching(loggerMocks.info.mock.calls, 0, "recovered"),
-      ).toBe(1);
+        expect(
+          countCallsMatching(loggerMocks.warn.mock.calls, 1, "system.backup_log"),
+        ).toBe(2);
+        // logger.info("ClickHouse backup stats collection recovered ...")
+        // is called with the message as the first arg.
+        expect(
+          countCallsMatching(loggerMocks.info.mock.calls, 0, "recovered"),
+        ).toBe(1);
+      });
     });
   });
 });
