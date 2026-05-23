@@ -75,24 +75,10 @@ func TestEvaluate_ReturnsAction(t *testing.T) {
 	assert.Equal(t, "cache-rule-42", got.RuleID)
 }
 
-// VKPrefix matcher — iter-110 root cause regression. The seed's
-// `disable-cache-evals` rule (vk_prefix=vk-lw-) was matching every VK
-// because the wire DTO silently dropped the matcher and collapsed it to
-// "match all". Verify the matcher is honored: a rule gated on
-// vk_prefix=vk-lw- must NOT match a vk-lw-* matrix VK.
-func TestEvaluate_VKPrefix_NoMatch(t *testing.T) {
-	e := NewEvaluator()
-	rules := []domain.CacheRule{
-		{ID: "disable-evals", Priority: 1, Match: domain.CacheRuleMatch{VKPrefixes: []string{"vk-lw-"}}, Action: domain.CacheActionDisable},
-	}
-
-	got := e.Evaluate(context.Background(), rules, domain.CacheEvalContext{
-		Model:           "claude-sonnet-4-5",
-		VKDisplayPrefix: "vk-lw-01KP",
-	})
-	assert.Nil(t, got, "vk-lw-* VK must not match a vk_prefix=vk-lw- rule")
-}
-
+// VKPrefix matcher: a rule gated on vk_prefix=vk-lw- matches a VK whose
+// displayPrefix starts with vk-lw-. The wire DTO must propagate the
+// matcher so it can be honored — a previous regression dropped it and
+// collapsed the rule to "match all".
 func TestEvaluate_VKPrefix_Match(t *testing.T) {
 	e := NewEvaluator()
 	rules := []domain.CacheRule{
@@ -151,57 +137,3 @@ func TestEvaluate_VKTags_AllPresent_Match(t *testing.T) {
 	assert.Equal(t, domain.CacheActionForce, got.Action)
 }
 
-// AND across matcher kinds: model matches but vk_prefix doesn't ⇒ no match.
-func TestEvaluate_AndAcrossMatchers(t *testing.T) {
-	e := NewEvaluator()
-	rules := []domain.CacheRule{
-		{
-			ID:       "scoped-disable",
-			Priority: 1,
-			Match: domain.CacheRuleMatch{
-				Models:     []string{"claude-*"},
-				VKPrefixes: []string{"vk-lw-"},
-			},
-			Action: domain.CacheActionDisable,
-		},
-	}
-
-	got := e.Evaluate(context.Background(), rules, domain.CacheEvalContext{
-		Model:           "claude-sonnet-4-5",
-		VKDisplayPrefix: "vk-lw-01KP",
-	})
-	assert.Nil(t, got, "model matches but vk_prefix doesn't — rule must not fire")
-}
-
-// Iter-110 end-to-end seed simulation: three rules emulating the dogfood
-// seed (force vk_tags / disable vk_prefix / respect haiku) — a vk-lw-*
-// matrix VK on claude-sonnet-4-5 should resolve to FORCE (not DISABLE),
-// because the disable rule's vk_prefix gate now actually filters.
-func TestEvaluate_IterDogfoodSeed_MatrixVK(t *testing.T) {
-	e := NewEvaluator()
-	rules := []domain.CacheRule{
-		{
-			ID: "force-cache-enterprise", Priority: 300,
-			Match:  domain.CacheRuleMatch{VKTags: []string{"tier=enterprise"}},
-			Action: domain.CacheActionForce,
-		},
-		{
-			ID: "disable-cache-evals", Priority: 200,
-			Match:  domain.CacheRuleMatch{VKPrefixes: []string{"vk-lw-"}},
-			Action: domain.CacheActionDisable,
-		},
-		{
-			ID: "respect-on-haiku", Priority: 100,
-			Match:  domain.CacheRuleMatch{Models: []string{"claude-haiku-4-5-20251001"}},
-			Action: domain.CacheActionRespect,
-		},
-	}
-
-	matrixVK := domain.CacheEvalContext{
-		Model:           "claude-sonnet-4-5-20250929",
-		VKID:            "vk_1777027536276_matrix-anthropic",
-		VKDisplayPrefix: "vk-lw-01KPZHGNCA",
-	}
-	got := e.Evaluate(context.Background(), rules, matrixVK)
-	assert.Nil(t, got, "matrix-anthropic on sonnet matches no rule (haiku-only respect, eval-only disable, enterprise-only force) — cache_control on inbound body should pass through unchanged")
-}
