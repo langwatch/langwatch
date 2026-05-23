@@ -3,8 +3,10 @@ import { describe, it } from "node:test";
 
 import {
   hasSafeGate,
+  hasSensitivePermissions,
   jobBlocks,
   jobIfExpression,
+  usesNonGithubTokenSecret,
   usesPullRequestTarget,
 } from "./guard-pull-request-target.ts";
 
@@ -71,5 +73,14 @@ describe("pull_request_target workflow guard", () => {
     assert.ok(indentedJob);
     assert.equal(indentedJob.name, "build");
     assert.equal(hasSafeGate(indentedJob), true);
+  });
+
+  it("detects privileged pull_request_target risk signals", () => {
+    assert.equal(hasSensitivePermissions(["permissions:", "  contents: write"].join("\n")), true);
+    assert.equal(hasSensitivePermissions("permissions: write-all"), true);
+    assert.equal(hasSensitivePermissions("# contents: write"), false);
+
+    assert.equal(usesNonGithubTokenSecret("token: ${{ secrets.RELEASE_PLEASE_TOKEN }}"), true);
+    assert.equal(usesNonGithubTokenSecret("token: ${{ secrets.GITHUB_TOKEN }}"), false);
   });
 });

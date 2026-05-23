@@ -94,6 +94,22 @@ const hasUnsafeCheckout = (jobText: string): boolean =>
   jobText.includes("actions/checkout") &&
   unsafeHeadRefPatterns.some((pattern) => jobText.includes(pattern));
 
+export const hasSensitivePermissions = (text: string): boolean => {
+  const uncommentedText = text
+    .split(/\r?\n/)
+    .map(stripYamlComment)
+    .join("\n");
+
+  return [
+    /(^|\n)permissions:\s*write-all\b/,
+    /(^|\n)contents:\s*write\b/,
+    /(^|\n)pull-requests:\s*write\b/,
+  ].some((pattern) => pattern.test(uncommentedText));
+};
+
+export const usesNonGithubTokenSecret = (text: string): boolean =>
+  /secrets\.(?!GITHUB_TOKEN\b)[A-Za-z0-9_]+/.test(text);
+
 export const jobIfExpression = (job: JobBlock): string | undefined => {
   const fieldPattern = new RegExp(
     `^(\\s{${job.indent + 1},})([A-Za-z0-9_-]+):\\s*`,
@@ -177,11 +193,25 @@ const main = (): number => {
       continue;
     }
 
+    const workflowHasSensitivePermissions = hasSensitivePermissions(
+      lines.join("\n"),
+    );
+
     for (const job of jobBlocks(lines)) {
       const jobText = job.lines.join("\n");
-      if (hasUnsafeCheckout(jobText) && !hasSafeGate(job)) {
+      const risks = [
+        hasUnsafeCheckout(jobText) ? "checks out PR-head code" : undefined,
+        workflowHasSensitivePermissions || hasSensitivePermissions(jobText)
+          ? "has write permissions"
+          : undefined,
+        usesNonGithubTokenSecret(jobText)
+          ? "uses non-GITHUB_TOKEN secrets"
+          : undefined,
+      ].filter((risk) => risk !== undefined);
+
+      if (risks.length > 0 && !hasSafeGate(job)) {
         errors.push(
-          `${displayPath(repoRoot, path)}:${job.startLine}: job \`${job.name}\` checks out PR-head code ` +
+          `${displayPath(repoRoot, path)}:${job.startLine}: job \`${job.name}\` ${risks.join(", ")} ` +
             "from pull_request_target without an `approved-ci` or same-repo gate",
         );
       }

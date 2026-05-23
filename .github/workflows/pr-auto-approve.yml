@@ -99,6 +99,7 @@ jobs:
   firefighting:
     needs: preflight
     if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
       needs.preflight.outputs.short_circuit != 'true' &&
       contains(needs.preflight.outputs.labels, ',firefighting,')
     runs-on: ubuntu-latest
@@ -209,6 +210,7 @@ jobs:
   evaluate:
     needs: preflight
     if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
       needs.preflight.outputs.short_circuit != 'true' &&
       !contains(needs.preflight.outputs.labels, ',firefighting,')
     runs-on: ubuntu-latest
