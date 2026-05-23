@@ -43,7 +43,6 @@ export function TraceSummaryAccordions({
   const hasTraceAttributes = Object.keys(traceAttributes).length > 0;
   const hasAttributes = hasTraceAttributes || hasResourceAttributes;
   const hasScope = !!resources.scope?.name;
-  const hasError = trace.status === "error" && !!trace.error;
 
   const {
     rich: richEvals,
@@ -68,9 +67,16 @@ export function TraceSummaryAccordions({
   // the operator sees the same span order whether they're scanning
   // the popover or the expanded accordion.
   const errorSpans = useMemo(
-    () => (hasError ? rankedErrorSpans(spans) : []),
-    [spans, hasError],
+    () => (trace.status === "error" ? rankedErrorSpans(spans) : []),
+    [spans, trace.status],
   );
+  // Surface the Exceptions section whenever an error trace has either
+  // a trace-level error string or at least one errored span. The latter
+  // matters for traces that only have span-level failures (no rolled
+  // up trace.error), where the header chip would otherwise list pills
+  // that lead to a section gate that never opens.
+  const hasError =
+    trace.status === "error" && (!!trace.error || errorSpans.length > 0);
 
   const sections = useMemo(() => {
     const list: Array<

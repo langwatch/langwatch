@@ -21,7 +21,13 @@ export function rankedErrorSpans(spans: SpanTreeNode[]): ErrorSpanRanked[] {
   const depthOf = (spanId: string): number => {
     let depth = 0;
     let cur: SpanTreeNode | undefined = byId.get(spanId);
+    // Track visited ids so a malformed graph with cyclic parent links
+    // (e.g. an OTel exporter that mis-attributes parents) bails out
+    // instead of hanging the ranker.
+    const visited = new Set<string>();
     while (cur?.parentSpanId) {
+      if (visited.has(cur.spanId)) break;
+      visited.add(cur.spanId);
       const parent = byId.get(cur.parentSpanId);
       if (!parent) break;
       depth += 1;
