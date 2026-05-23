@@ -169,7 +169,7 @@ func TestRouter_AuthMiddleware_MissingToken(t *testing.T) {
 func TestRouter_AuthMiddleware_ValidToken(t *testing.T) {
 	auth := &mockAuth{
 		resolveFn: func(_ context.Context, token string) (*domain.Bundle, error) {
-			if token == "lw_vk_test" {
+			if token == "vk-lw-test" {
 				return testBundle(), nil
 			}
 			return nil, herr.New(context.Background(), domain.ErrInvalidAPIKey, nil)
@@ -189,7 +189,7 @@ func TestRouter_AuthMiddleware_ValidToken(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(chatBody()))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer lw_vk_test")
+	req.Header.Set("Authorization", "Bearer vk-lw-test")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -208,7 +208,7 @@ func TestRouter_AuthMiddleware_ValidToken(t *testing.T) {
 func TestRouter_AuthMiddleware_XGoogApiKey(t *testing.T) {
 	auth := &mockAuth{
 		resolveFn: func(_ context.Context, token string) (*domain.Bundle, error) {
-			if token == "lw_vk_test" {
+			if token == "vk-lw-test" {
 				return testBundle(), nil
 			}
 			return nil, herr.New(context.Background(), domain.ErrInvalidAPIKey, nil)
@@ -228,7 +228,7 @@ func TestRouter_AuthMiddleware_XGoogApiKey(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(chatBody()))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Goog-Api-Key", "lw_vk_test")
+	req.Header.Set("X-Goog-Api-Key", "vk-lw-test")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -238,7 +238,7 @@ func TestRouter_AuthMiddleware_XGoogApiKey(t *testing.T) {
 func TestRouter_AuthMiddleware_XApiKey(t *testing.T) {
 	auth := &mockAuth{
 		resolveFn: func(_ context.Context, token string) (*domain.Bundle, error) {
-			if token == "lw_vk_test" {
+			if token == "vk-lw-test" {
 				return testBundle(), nil
 			}
 			return nil, herr.New(context.Background(), domain.ErrInvalidAPIKey, nil)
@@ -258,7 +258,7 @@ func TestRouter_AuthMiddleware_XApiKey(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(chatBody()))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("x-api-key", "lw_vk_test")
+	req.Header.Set("x-api-key", "vk-lw-test")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -290,7 +290,7 @@ func TestRouter_DispatchError_RateLimited(t *testing.T) {
 	)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(chatBody()))
-	req.Header.Set("Authorization", "Bearer lw_vk_test")
+	req.Header.Set("Authorization", "Bearer vk-lw-test")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -326,7 +326,7 @@ func TestRouter_DispatchError_BudgetExceeded(t *testing.T) {
 	)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(chatBody()))
-	req.Header.Set("Authorization", "Bearer lw_vk_test")
+	req.Header.Set("Authorization", "Bearer vk-lw-test")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -356,7 +356,7 @@ func TestRouter_MetaHeaders(t *testing.T) {
 	)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(chatBody()))
-	req.Header.Set("Authorization", "Bearer lw_vk_test")
+	req.Header.Set("Authorization", "Bearer vk-lw-test")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -405,7 +405,7 @@ func TestRouter_BodySizeCap_RejectsOverLimit(t *testing.T) {
 	body = append(body, []byte(`"}]}`)...)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(body))
-	req.Header.Set("Authorization", "Bearer lw_vk_test")
+	req.Header.Set("Authorization", "Bearer vk-lw-test")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -433,7 +433,7 @@ func TestRouter_VersionHeader(t *testing.T) {
 	)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(chatBody()))
-	req.Header.Set("Authorization", "Bearer lw_vk_test")
+	req.Header.Set("Authorization", "Bearer vk-lw-test")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -485,7 +485,7 @@ func TestRouter_Responses_LargeBody_PicksStreamHandler(t *testing.T) {
 	require.Greater(t, len(body), 40*1024)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/responses", bytes.NewReader(body))
-	req.Header.Set("Authorization", "Bearer lw_vk_test")
+	req.Header.Set("Authorization", "Bearer vk-lw-test")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -566,7 +566,7 @@ func TestRouter_GeminiPassthrough_NonStreaming(t *testing.T) {
 
 	geminiBody := []byte(`{"contents":[{"role":"user","parts":[{"text":"hi"}]}]}`)
 	req := httptest.NewRequest(http.MethodPost, "/v1beta/models/gemini-2.5-flash:generateContent", bytes.NewReader(geminiBody))
-	req.Header.Set("X-Goog-Api-Key", "lw_vk_test")
+	req.Header.Set("X-Goog-Api-Key", "vk-lw-test")
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
@@ -621,7 +621,7 @@ func TestRouter_GeminiPassthrough_Streaming_PicksStream(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost,
 		"/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse",
 		bytes.NewReader([]byte(`{"contents":[{"role":"user","parts":[{"text":"hi"}]}]}`)))
-	req.Header.Set("X-Goog-Api-Key", "lw_vk_test")
+	req.Header.Set("X-Goog-Api-Key", "vk-lw-test")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 

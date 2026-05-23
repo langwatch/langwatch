@@ -25,13 +25,13 @@ VKs replace raw provider keys in your applications. The provider keys themselves
 
 ## Format
 
-`lw_vk_{live|test}_<26-char-ULID>`, 40 characters total.
+`vk-lw-{live|test}_<26-char-ULID>`, 40 characters total.
 
-- `lw_vk_`, fixed prefix, grep-friendly, scans well in DLP, GitGuardian.
+- `vk-lw-`, fixed prefix, grep-friendly, scans well in DLP, GitGuardian.
 - `live` or `test`, environment prefix. Prevents accidentally using a test key against production or vice versa.
 - 26-char Crockford-base32 ULID, time-prefixed, monotonic, renders sensibly in the dashboard and in your logs.
 
-The secret is shown **exactly once** at creation. After you dismiss the creation dialog it can never be retrieved again, only the first 12 characters (`lw_vk_live_01HZX9`) are visible in the list.
+The secret is shown **exactly once** at creation. After you dismiss the creation dialog it can never be retrieved again, only the first 12 characters (`vk-lw-01HZX9`) are visible in the list.
 
 Server-side, the secret is stored as `hex(hmac_sha256(server_pepper, secret))`. Peppered HMAC-SHA256 is the right primitive for API keys (as opposed to passwords), the VK body already carries 130 bits of entropy as a ULID, so argon2id-style stretching would just add 50–100 ms of pointless latency on every cold resolve-key call. A short prefix is stored alongside for grep/lookup.
 
@@ -111,7 +111,7 @@ Two flavours:
 - **Personal access VK**: bound to one user principal. Best for "give the engineer a key their local tools can use." Inherits budgets scoped to that user.
 - **Shared VK**: bound to a service-account principal. Best for applications. Can be rotated independently of user offboarding.
 
-Both use the same `lw_vk_live_…` format; the difference is the principal the VK resolves to and which budgets apply.
+Both use the same `vk-lw-…` format; the difference is the principal the VK resolves to and which budgets apply.
 
 ## Permissions
 

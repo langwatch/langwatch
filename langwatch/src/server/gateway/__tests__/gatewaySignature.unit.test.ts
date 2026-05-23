@@ -14,7 +14,7 @@ const VECTOR = {
   method: "POST",
   path: "/api/internal/gateway/resolve-key",
   timestamp: "1734567890",
-  body: '{"key_presented":"lw_vk_live_01HZX","gateway_node_id":"gw-a"}',
+  body: '{"key_presented":"vk-lw-01HZX","gateway_node_id":"gw-a"}',
   bodySha256:
     "59f25745b66fbb0c7b3714572d20ffef741817b84b86093e4ac6af243af66816",
   signature:

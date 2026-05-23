@@ -17,7 +17,7 @@ from openai import OpenAI
 
 client = OpenAI(
     base_url="https://gateway.langwatch.ai/v1",
-    api_key="lw_vk_live_01HZX9K3M...",
+    api_key="vk-lw-01HZX9K3M...",
 )
 
 resp = client.chat.completions.create(
@@ -38,7 +38,7 @@ from openai import OpenAI
 
 client = OpenAI(
     base_url="https://gateway.langwatch.ai/v1",
-    api_key="lw_vk_live_...",
+    api_key="vk-lw-...",
     default_headers=langwatch.get_gateway_headers(),   # injects traceparent + X-LangWatch-*
 )
 
@@ -98,7 +98,7 @@ def _traceparent_headers() -> dict[str, str]:
 
 client = OpenAI(
     base_url="https://gateway.langwatch.ai/v1",
-    api_key="lw_vk_live_...",
+    api_key="vk-lw-...",
     default_headers=_traceparent_headers(),
 )
 ```
@@ -144,7 +144,7 @@ import anthropic
 
 client = anthropic.Anthropic(
     base_url="https://gateway.langwatch.ai",
-    api_key="lw_vk_live_...",   # SDK accepts VK here; gateway also accepts via x-api-key
+    api_key="vk-lw-...",   # SDK accepts VK here; gateway also accepts via x-api-key
 )
 
 resp = client.messages.create(
@@ -159,7 +159,7 @@ resp = client.messages.create(
 ```python
 client = anthropic.Anthropic(
     base_url="https://gateway.langwatch.ai",
-    api_key="lw_vk_live_...",
+    api_key="vk-lw-...",
     default_headers=langwatch.get_gateway_headers(),
 )
 ```
@@ -175,7 +175,7 @@ from langchain_openai import ChatOpenAI
 
 llm = ChatOpenAI(
     base_url="https://gateway.langwatch.ai/v1",
-    api_key="lw_vk_live_...",
+    api_key="vk-lw-...",
     default_headers=langwatch.get_gateway_headers(),
     model="gpt-5-mini",
 )
@@ -190,7 +190,7 @@ from llama_index.llms.openai import OpenAI
 
 llm = OpenAI(
     api_base="https://gateway.langwatch.ai/v1",
-    api_key="lw_vk_live_...",
+    api_key="vk-lw-...",
     default_headers=langwatch.get_gateway_headers(),
     model="gpt-5-mini",
 )
@@ -207,7 +207,7 @@ Replace the hostname:
 ```python
 client = OpenAI(
     base_url="https://langwatch-gateway.your-corp.internal/v1",
-    api_key="lw_vk_live_...",
+    api_key="vk-lw-...",
 )
 ```
 

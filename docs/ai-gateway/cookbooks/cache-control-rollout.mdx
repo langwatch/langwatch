@@ -76,7 +76,7 @@ Send any request through an enterprise-tagged VK:
 
 ```bash
 curl https://gateway.langwatch.ai/v1/messages \
-  -H "Authorization: Bearer lw_vk_live_ENT_01HZX9..." \
+  -H "Authorization: Bearer vk-lw-ENT_01HZX9..." \
   -H "x-api-key: $LANGWATCH_ANTHROPIC_HEADER" \
   -d '{ "model": "claude-haiku-4-5-20251001", "max_tokens": 128, "messages": [...] }'
 ```
@@ -108,7 +108,7 @@ On `/v1/chat/completions` (OpenAI), the rule still fires + attributes + bumps th
 
 ## Scenario 2: Disable cache for evaluation traffic
 
-Your eval suite uses dedicated VKs prefixed `lw_vk_eval_*` and tags every request with `X-Langwatch-Suite: evals`. You want these to hit provider caches as rarely as possible, fresh completions keep eval scores honest.
+Your eval suite uses dedicated VKs prefixed `vk-lw-*` and tags every request with `X-Langwatch-Suite: evals`. You want these to hit provider caches as rarely as possible, fresh completions keep eval scores honest.
 
 ### Author
 
@@ -117,7 +117,7 @@ langwatch cache-rules create \
   --name disable-cache-evals \
   --priority 200 \
   --mode disable \
-  --match-vk-prefix lw_vk_eval_ \
+  --match-vk-prefix vk-lw- \
   --match-metadata X-Langwatch-Suite=evals
 ```
 
@@ -127,7 +127,7 @@ Matchers are ANDed, this rule only fires when BOTH the VK prefix and the metadat
 
 ```bash
 curl https://gateway.langwatch.ai/v1/messages \
-  -H "Authorization: Bearer lw_vk_eval_01HZ..." \
+  -H "Authorization: Bearer vk-lw-01HZ..." \
   -H "X-Langwatch-Suite: evals" \
   -d '{ "model": "claude-haiku-4-5-20251001", ... "system": [...], "messages": [...] }'
 ```

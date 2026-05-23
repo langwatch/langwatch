@@ -207,7 +207,7 @@ describe("PersonalVirtualKeyService", () => {
 
       expect(issued.virtualKey.id).toBeDefined();
       expect(issued.virtualKey.name).toBe("default");
-      expect(issued.secret).toMatch(/^lw_vk_(live|test)_/);
+      expect(issued.secret).toMatch(/^vk-lw-(live|test)_/);
       expect(issued.baseUrl).toContain("gateway");
 
       const project = await prisma.project.findUnique({

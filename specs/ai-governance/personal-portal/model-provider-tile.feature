@@ -55,7 +55,7 @@ Feature: AI Tools Portal — Model-provider tile inline VK creation
       | base URL      | "https://gateway.langwatch.ai/v1"    |
 
   Scenario: secret reveal toggles between masked and full
-    Given the success state is showing for issued key "lw_vk_live_abc123def456789"
+    Given the success state is showing for issued key "vk-lw-abc123def456789"
     When user "jane@acme.com" clicks the eye icon
     Then the full secret renders inline
     And the icon swaps to eye-off
@@ -63,10 +63,10 @@ Feature: AI Tools Portal — Model-provider tile inline VK creation
     Then the secret returns to its masked form
 
   Scenario: copy button copies the FULL secret regardless of mask state
-    Given the success state is showing for issued key "lw_vk_live_abc123def456789"
+    Given the success state is showing for issued key "vk-lw-abc123def456789"
     And the secret is currently masked
     When user "jane@acme.com" clicks the copy button
-    Then the system clipboard receives the full secret string "lw_vk_live_abc123def456789"
+    Then the system clipboard receives the full secret string "vk-lw-abc123def456789"
     And the copy icon swaps to check icon for ~1.5 seconds
 
   Scenario: "Issue another" returns to the form

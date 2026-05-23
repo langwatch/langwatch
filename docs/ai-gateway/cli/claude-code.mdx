@@ -25,7 +25,7 @@ If you have a **service-virtual-key** for non-personal traffic, or you want ever
 
 ```bash
 export ANTHROPIC_BASE_URL="https://gateway.langwatch.ai"
-export ANTHROPIC_AUTH_TOKEN="lw_vk_live_01HZX..."
+export ANTHROPIC_AUTH_TOKEN="vk-lw-01HZX..."
 claude
 ```
 
@@ -39,7 +39,7 @@ Replace the hostname:
 
 ```bash
 export ANTHROPIC_BASE_URL="https://langwatch-gateway.your-corp.internal"
-export ANTHROPIC_AUTH_TOKEN="lw_vk_live_..."
+export ANTHROPIC_AUTH_TOKEN="vk-lw-..."
 ```
 
 The gateway's `/v1/messages` path is the same whether on the LangWatch cloud or self-hosted.
@@ -50,7 +50,7 @@ For engineers juggling projects with different budgets or provider allow-lists, 
 
 ```bash
 # .envrc
-export ANTHROPIC_AUTH_TOKEN="lw_vk_live_<project-specific-vk>"
+export ANTHROPIC_AUTH_TOKEN="vk-lw-<project-specific-vk>"
 ```
 
 Then every `claude` session inherits the project-scoped VK, its budget, and its guardrails.

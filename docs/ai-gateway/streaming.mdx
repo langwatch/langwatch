@@ -76,7 +76,7 @@ Guardrails with `direction: stream_chunk` run on **chunks with visible delta tex
 
 ```python
 from openai import OpenAI
-client = OpenAI(base_url="https://gateway.langwatch.ai/v1", api_key="lw_vk_live_...")
+client = OpenAI(base_url="https://gateway.langwatch.ai/v1", api_key="vk-lw-...")
 
 for chunk in client.chat.completions.create(
     model="gpt-5-mini",
@@ -90,7 +90,7 @@ for chunk in client.chat.completions.create(
 
 ```python
 import anthropic
-client = anthropic.Anthropic(base_url="https://gateway.langwatch.ai", api_key="lw_vk_live_...")
+client = anthropic.Anthropic(base_url="https://gateway.langwatch.ai", api_key="vk-lw-...")
 
 with client.messages.stream(
     model="claude-haiku-4-5-20251001",

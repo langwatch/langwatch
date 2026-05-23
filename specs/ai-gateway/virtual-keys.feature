@@ -20,7 +20,7 @@ Feature: AI Gateway — Virtual Keys
   So that I can give downstream clients (SDKs, coding CLIs, production apps) a single
   credential that routes through the LangWatch AI Gateway to any configured provider
 
-  A virtual key (VK) is a LangWatch-issued credential (format `lw_vk_{live|test}_<26-char-ulid>`,
+  A virtual key (VK) is a LangWatch-issued credential (format `vk-lw-{live|test}_<26-char-ulid>`,
   40 chars total — see specs/ai-gateway/_shared/contract.md §2) that the Gateway service resolves to:
   an owning project/team/org, a principal for attribution, a set of provider credentials with a
   fallback chain, model aliases, cache policy, guardrail policy, policy rules, and budgets.
@@ -49,15 +49,15 @@ Feature: AI Gateway — Virtual Keys
     And I select providers "openai" and "anthropic"
     And I click "Create"
     Then a new virtual key is created
-    And the full secret is displayed exactly once with format "lw_vk_{live|test}_<26-char Crockford-base32 ULID>"
+    And the full secret is displayed exactly once with format "vk-lw-{live|test}_<26-char Crockford-base32 ULID>"
     And a "Copy" button is shown
     And a "I've saved it, close" confirmation is required before dismiss
     And after dismissal the full secret can never be retrieved again
-    And only the key prefix "lw_vk_live_xxxx…" is visible in the list
+    And only the key prefix "vk-lw-xxxx…" is visible in the list
 
   @integration
   Scenario: Virtual key secret is stored as peppered HMAC-SHA256 hash
-    Given I created a virtual key "demo-key" with secret "lw_vk_live_01HZX9K3M…"
+    Given I created a virtual key "demo-key" with secret "vk-lw-01HZX9K3M…"
     When the database row for "demo-key" is inspected
     Then the "hashedSecret" column contains hex(hmac_sha256(LW_VIRTUAL_KEY_PEPPER, raw_secret))
     And it does NOT contain the raw secret
@@ -204,10 +204,10 @@ Feature: AI Gateway — Virtual Keys
 
   @integration
   Scenario: Rotate virtual key issues a new secret and invalidates the previous one
-    Given virtual key "prod-key" has secret "lw_vk_live_01HZX9K3MA…"
+    Given virtual key "prod-key" has secret "vk-lw-01HZX9K3MA…"
     When I click "Rotate secret" on "prod-key"
     And I confirm the rotation
-    Then a new secret "lw_vk_live_01HZX9K3MB…" is generated and shown once
+    Then a new secret "vk-lw-01HZX9K3MB…" is generated and shown once
     And the previous secret stays valid for 24 hours (grace window) so clients can roll over
     And an audit log entry "gateway.virtual_key.rotated" is recorded
 

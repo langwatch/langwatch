@@ -25,7 +25,7 @@ API key → environment; Langfuse / Helicone API key → project).
 
 | Path | Auth credential | Stamps applied | Resolved `TenantId` |
 |---|---|---|---|
-| Gateway VK (`langwatch claude/codex/cursor/gemini` wrappers) | `lw_vk_*` (project + owner-scoped) | `langwatch.virtual_key_id`, `langwatch.user.id` | `VK.projectId` (resolved at reactor side) |
+| Gateway VK (`langwatch claude/codex/cursor/gemini` wrappers) | `vk-lw-*` (project + owner-scoped) | `langwatch.virtual_key_id`, `langwatch.user.id` | `VK.projectId` (resolved at reactor side) |
 | Direct OTLP push (legacy SDK) | Project-scoped OTLP auth token | none required (token IS scope) | `token.projectId` |
 | Pull-mode IngestionSource (`s3_custom`, `copilot_studio`, `openai_compliance`, `claude_compliance`, `workato`, `claude_cowork`, `http_custom`) | `IngestionSource.ingestSecretHash` (puller-side) | n/a — event source already credentialed at the puller | `ensureHiddenGovernanceProject(orgId).id` |
 | OTel-direct push IngestionSource (`otel_generic`) | `IngestionSource.ingestSecretHash` HMAC | event tagged with `IngestionSource.id` | `ensureHiddenGovernanceProject(orgId).id` |

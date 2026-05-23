@@ -13,7 +13,7 @@ func BenchmarkSign(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	body := []byte(`{"key_presented":"lw_vk_live_01HZX0123456789ABCDEFGHIJ","gateway_node_id":"gw-bench"}`)
+	body := []byte(`{"key_presented":"vk-lw-01HZX0123456789ABCDEFGHIJ","gateway_node_id":"gw-bench"}`)
 
 	b.ResetTimer()
 	b.ReportAllocs()

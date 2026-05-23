@@ -94,7 +94,7 @@ func TestResolve_StaleEntry_AuthRejection_401_EvictsAndRejects(t *testing.T) {
 		{err: herr.New(context.Background(), domain.ErrInvalidAPIKey, nil)},
 	}}
 	svc, _ := newService(t, Options{Resolver: resolver, ConfigFetcher: resolver})
-	rawKey := "lw_vk_live_test_001"
+	rawKey := "vk-lw-test_001"
 	seedExpiredEntry(t, svc, rawKey, "vk_001", 30*time.Second)
 
 	_, err := svc.Resolve(context.Background(), rawKey)
@@ -114,7 +114,7 @@ func TestResolve_StaleEntry_AuthRejection_403Revoked_EvictsAndRejects(t *testing
 		{err: herr.New(context.Background(), domain.ErrKeyRevoked, nil)},
 	}}
 	svc, _ := newService(t, Options{Resolver: resolver, ConfigFetcher: resolver})
-	rawKey := "lw_vk_live_test_002"
+	rawKey := "vk-lw-test_002"
 	seedExpiredEntry(t, svc, rawKey, "vk_002", 30*time.Second)
 
 	_, err := svc.Resolve(context.Background(), rawKey)
@@ -143,7 +143,7 @@ func TestResolve_StaleEntry_TransportFailure_ServesStaleAndBumpsSoft(t *testing.
 		t.Run(tc.name, func(t *testing.T) {
 			resolver := &fakeResolver{returns: []resolverReturn{{err: tc.err}}}
 			svc, logs := newService(t, Options{Resolver: resolver, ConfigFetcher: resolver})
-			rawKey := "lw_vk_live_" + tc.name
+			rawKey := "vk-lw-" + tc.name
 			vkID := "vk_" + tc.name
 			seedExpiredEntry(t, svc, rawKey, vkID, 30*time.Second)
 
@@ -200,7 +200,7 @@ func TestResolve_StaleEntry_HardCapExceeded_EvictsAndRejects(t *testing.T) {
 		SoftBump:      1 * time.Second,
 		HardGrace:     2 * time.Second,
 	})
-	rawKey := "lw_vk_live_hardcap"
+	rawKey := "vk-lw-hardcap"
 	// Seed an entry whose original JWT exp is already past the hard cap
 	// (staleness > HardGrace).
 	seedExpiredEntry(t, svc, rawKey, "vk_hardcap", 10*time.Second)
@@ -236,7 +236,7 @@ func TestResolve_StaleEntry_RecoveryReplacesEntryWithFreshBundle(t *testing.T) {
 		{bundle: freshBundle("vk_recovered", freshExp)},
 	}}
 	svc, _ := newService(t, Options{Resolver: resolver, ConfigFetcher: resolver})
-	rawKey := "lw_vk_live_recover"
+	rawKey := "vk-lw-recover"
 	seedExpiredEntry(t, svc, rawKey, "vk_recovered", 30*time.Second)
 
 	bundle, err := svc.Resolve(context.Background(), rawKey)
@@ -267,7 +267,7 @@ func TestRefreshBackground_TransportFailure_BumpsSoft(t *testing.T) {
 	transportErr := herr.New(context.Background(), domain.ErrAuthUpstream, nil)
 	resolver := &fakeResolver{returns: []resolverReturn{{err: transportErr}}}
 	svc, logs := newService(t, Options{Resolver: resolver, ConfigFetcher: resolver, SoftBump: 5 * time.Minute})
-	rawKey := "lw_vk_live_bgtransport"
+	rawKey := "vk-lw-bgtransport"
 	// Seed an entry near soft expiry but not past it (so background path is invoked).
 	originalExp := time.Now().Add(30 * time.Second)
 	svc.storeL1(hashKey(rawKey), freshBundle("vk_bgtransport", originalExp))
@@ -303,7 +303,7 @@ func TestRefreshBackground_AuthRejection_EvictsEntry(t *testing.T) {
 		{err: herr.New(context.Background(), domain.ErrKeyRevoked, nil)},
 	}}
 	svc, _ := newService(t, Options{Resolver: resolver, ConfigFetcher: resolver})
-	rawKey := "lw_vk_live_bgrevoked"
+	rawKey := "vk-lw-bgrevoked"
 	originalExp := time.Now().Add(30 * time.Second)
 	svc.storeL1(hashKey(rawKey), freshBundle("vk_bgrevoked", originalExp))
 
@@ -360,7 +360,7 @@ func TestResolve_StaleEntry_HardGraceZero_DisablesStaleWhileError(t *testing.T) 
 		ConfigFetcher: resolver,
 		HardGrace:     1 * time.Nanosecond,
 	})
-	rawKey := "lw_vk_live_legacy"
+	rawKey := "vk-lw-legacy"
 	seedExpiredEntry(t, svc, rawKey, "vk_legacy", 30*time.Second)
 
 	_, err := svc.Resolve(context.Background(), rawKey)

@@ -119,7 +119,7 @@ agents they want sandboxed inside their LangWatch deployment.
 
 ```
 dev's CLI / agent  ──┐
-   ANTHROPIC_AUTH_TOKEN=lw_vk_*       ┌─────────────────────────┐
+   ANTHROPIC_AUTH_TOKEN=vk-lw-*       ┌─────────────────────────┐
    ANTHROPIC_BASE_URL=gw.lw.ai/api   ▶│  AI Gateway (Bifrost)   │
                                       │  • resolve VK → policy  │
                                       │  • check budget         │

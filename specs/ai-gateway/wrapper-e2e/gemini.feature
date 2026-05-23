@@ -11,7 +11,7 @@ Feature: `langwatch gemini` wrapper end-to-end
 
   Scenario: `langwatch gemini` injects Gemini-flavored env vars
     When the harness spawns `langwatch gemini --version`
-    Then env contains `GEMINI_API_KEY=lw_vk_<alice's VK>` OR `GOOGLE_API_KEY=lw_vk_<alice's VK>` (per Gemini CLI's accepted env conventions)
+    Then env contains `GEMINI_API_KEY=vk-lw-<alice's VK>` OR `GOOGLE_API_KEY=vk-lw-<alice's VK>` (per Gemini CLI's accepted env conventions)
     And env contains the gateway base URL via the appropriate Google AI SDK env var
 
   Scenario: Gemini invocation routes through gateway

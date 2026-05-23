@@ -38,7 +38,7 @@ Response:
       "name": "prod-key",
       "description": null,
       "environment": "live",
-      "prefix": "lw_vk_live_01H",
+      "prefix": "vk-lw-01H",
       "last_four": "NZ0Z",
       "status": "ACTIVE",
       "principal_user_id": null,
@@ -79,7 +79,7 @@ Response `201`:
 ```json
 {
   "virtual_key": { /* full VK shape per List */ },
-  "secret": "lw_vk_live_01HZX9K3MABCDEFGH...JIKLMN0Z"
+  "secret": "vk-lw-01HZX9K3MABCDEFGH...JIKLMN0Z"
 }
 ```
 
@@ -121,7 +121,7 @@ Response `200`:
 ```json
 {
   "virtual_key": { /* ... */ },
-  "secret": "lw_vk_live_NEW..."
+  "secret": "vk-lw-NEW..."
 }
 ```
 
@@ -311,7 +311,7 @@ Requires `gatewayCacheRules:create`. At least one matcher is required (rules tha
   "priority": 200,
   "enabled": true,
   "matchers": {
-    "vk_prefix": "lw_vk_eval_",
+    "vk_prefix": "vk-lw-",
     "request_metadata": { "x-langwatch-suite": "evals" }
   },
   "action": { "mode": "disable" }
@@ -322,7 +322,7 @@ Matcher fields (all optional, ANDed):
 
 | field | type | semantics |
 |---|---|---|
-| `vk_id` | string | Exact match against the VK's display prefix form (`lw_vk_live_...`) |
+| `vk_id` | string | Exact match against the VK's display prefix form (`vk-lw-...`) |
 | `vk_prefix` | string | `strings.HasPrefix` against the same VK display prefix |
 | `vk_tags` | string[] | VK must carry EVERY listed tag (AND subset) |
 | `principal_id` | string | Exact match against the VK's principal user |

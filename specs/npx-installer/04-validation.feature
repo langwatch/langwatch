@@ -69,7 +69,7 @@ Feature: End-to-end validation after `npx @langwatch/server` boots
     And the result is persisted to clickhouse
 
   Scenario: A chat completion through the AI Gateway records a trace
-    Given I am signed in with project "p1" and have created a virtual key "lw_vk_test_xxx"
+    Given I am signed in with project "p1" and have created a virtual key "vk-lw-xxx"
     When I POST a chat completion to http://localhost:5563/v1/chat/completions with that virtual key
     Then the response is a valid OpenAI completion JSON
     And a trace appears in /api/traces with attribute "langwatch.origin=ai_gateway"

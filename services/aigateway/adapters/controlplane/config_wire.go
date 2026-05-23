@@ -87,11 +87,8 @@ type cacheRuleWire struct {
 // cacheMatchersWire mirrors the matchers shape emitted by the control-plane
 // materialiser (langwatch/src/server/gateway/config.materialiser.ts:121-128).
 // Every recognized matcher must have an explicit field — silently dropping a
-// matcher at unmarshal collapses the rule's effective scope to "match all"
-// and was the iter-110 root cause of the matrix anthropic/bedrock cache cells
-// returning cache_creation=0 / cache_read=0 (the seed's `disable-cache-evals`
-// rule, gated on `vk_prefix=lw_vk_eval_`, fell through to matching every VK
-// including matrix-* ones, stripping `cache_control` from the system block).
+// matcher at unmarshal collapses the rule's effective scope to "match all",
+// which has caused stripped `cache_control` on system blocks in matrix tests.
 type cacheMatchersWire struct {
 	Model           string            `json:"model"`
 	PrincipalID     string            `json:"principal_id"`

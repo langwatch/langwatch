@@ -14,7 +14,7 @@ Feature: `langwatch codex` wrapper end-to-end
   Scenario: `langwatch codex` injects OpenAI-flavored env vars
     When the harness spawns `langwatch codex --version`
     Then env contains `OPENAI_BASE_URL=<test-gateway-url>/api/v1`
-    And env contains `OPENAI_API_KEY=lw_vk_<alice's personal VK>`
+    And env contains `OPENAI_API_KEY=vk-lw-<alice's personal VK>`
     And no OpenAI-side secret leaks via env
 
   Scenario: Codex invocation routes through gateway

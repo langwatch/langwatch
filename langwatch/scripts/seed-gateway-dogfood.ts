@@ -508,7 +508,6 @@ async function main() {
       "Disable cache for evaluation traffic so every eval hits a fresh completion",
     priority: 200,
     matchers: {
-      vk_prefix: "lw_vk_eval_",
       request_metadata: { "x-langwatch-suite": "evals" },
     },
     action: { mode: "disable" },
@@ -610,9 +609,7 @@ async function upsertVirtualKey(
     return { vkId: existing.id, secret: "(existing; rotate to see)", wasExisting: true };
   }
 
-  const secret = mintVirtualKeySecret(
-    input.environment === "LIVE" ? "live" : "test",
-  );
+  const secret = mintVirtualKeySecret();
   const { displayPrefix } = parseVirtualKey(secret);
   const hashedSecret = hashVirtualKeySecret(secret);
 
@@ -907,8 +904,8 @@ async function seedAuditLog(args: {
     action: "gateway.virtual_key.rotated",
     targetKind: "virtual_key",
     targetId: args.virtualKeys[1]?.id ?? "vk_unknown",
-    before: { displayPrefix: "lw_vk_a1b2c3" } as Prisma.InputJsonValue,
-    after: { displayPrefix: "lw_vk_f7e8d9" } as Prisma.InputJsonValue,
+    before: { displayPrefix: "vk-lw-a1b2c3" } as Prisma.InputJsonValue,
+    after: { displayPrefix: "vk-lw-f7e8d9" } as Prisma.InputJsonValue,
     createdAt: daysAgo(3),
   });
   // Revoke event for the sandbox

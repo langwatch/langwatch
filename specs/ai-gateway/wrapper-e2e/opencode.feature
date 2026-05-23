@@ -13,7 +13,7 @@ Feature: `langwatch opencode` wrapper end-to-end
   Scenario: `langwatch opencode` injects the right env vars per OpenCode's conventions
     When the harness spawns `langwatch opencode --version`
     Then env contains `OPENCODE_LLM_BASE_URL=<test-gateway-url>/api/v1`
-    And env contains `OPENCODE_LLM_API_KEY=lw_vk_<alice's VK>`
+    And env contains `OPENCODE_LLM_API_KEY=vk-lw-<alice's VK>`
     (env-var names per OpenCode's documented LLM-config conventions)
 
   Scenario: OpenCode invocation routes through gateway

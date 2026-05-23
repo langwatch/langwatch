@@ -61,7 +61,7 @@ policy automatically. Revoking access is one click.
 └────────┬────────┘           ┌──────────────────┐
          │                    │  LangWatch app   │
          │  short-lived       │  /api/auth/cli/* │
-         │  bearer (lw_vk_*)  │                  │
+         │  bearer (vk-lw-*)  │                  │
          ▼                    └────────┬─────────┘
 ┌──────────────────┐                   │ trust
 │  AI Gateway      │◀──────────────────┘ (virtual key
@@ -85,7 +85,7 @@ attribute usage to the right person without leaking tokens.
 ## What stays the same vs the existing AI Gateway
 
 - **Virtual keys still drive every request.** Personal VKs are the
-  same shape as service VKs — same `lw_vk_…` secret format, same
+  same shape as service VKs — same `vk-lw-…` secret format, same
   gateway code path. The discriminator is the project the VK lives
   in (`Project.isPersonal=true`).
 - **The OpenAI-compatible API at `/api/v1/*` is unchanged.** Any tool

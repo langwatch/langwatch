@@ -207,7 +207,7 @@ function notImplemented(c: Context) {
 /**
  * §4.1 — resolve a raw virtual key to a signed JWT + current revision.
  *
- * Request:  { key_presented: "lw_vk_live_01HZX...", gateway_node_id: "gw-eks-abc" }
+ * Request:  { key_presented: "vk-lw-01HZX...", gateway_node_id: "gw-eks-abc" }
  * Response: { jwt, revision, key_id, display_prefix }
  */
 app.post("/resolve-key", async (c) => {

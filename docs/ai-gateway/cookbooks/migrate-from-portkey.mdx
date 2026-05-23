@@ -13,7 +13,7 @@ Portkey and LangWatch both sit between your app and the upstream LLM providers, 
 | What you did in Portkey | What it becomes in LangWatch | Notes |
 |---|---|---|
 | **Virtual Key** (proxy credential for a single provider account) | **Provider Binding** at a project | LangWatch splits Portkey's "VK" into two primitives, a **ModelProvider** (the actual provider credential, org/team/project-scoped) and a **GatewayProviderCredential** (the gateway-level binding with rate-limit + slot + fallback priority). |
-| **Key, API Key** (client-facing credential) | **Virtual Key** (`lw_vk_live_…`) | LangWatch's VK is what your client code presents. It points to one or more bindings via the fallback chain, attaches budgets, and carries per-caller policy. |
+| **Key, API Key** (client-facing credential) | **Virtual Key** (`vk-lw-…`) | LangWatch's VK is what your client code presents. It points to one or more bindings via the fallback chain, attaches budgets, and carries per-caller policy. |
 | **Config** (JSON routing blob) | **VK `config.*` JSON** + **GatewayProviderCredential** fields | LangWatch spreads a Portkey config across two JSON shapes, client-side routing lives in the VK, provider-side defaults live in the binding. |
 | **Budget** (spend cap, key-scoped) | **GatewayBudget** (org, team, project, VK, principal scoped) | LangWatch budgets are hierarchical: a single request is checked against *every* applicable budget, from org down. Portkey scopes at the key level only. |
 | **Guardrails** (input/output filters attached to a key) | **Evaluator monitors with `executionMode=AS_GUARDRAIL`** attached to a VK | LangWatch leverages the existing evaluator/monitor pipeline. Any LangWatch evaluator can become a gateway guardrail, no separate product surface. |
@@ -46,7 +46,7 @@ import OpenAI from "openai";
 
 const openai = new OpenAI({
   baseURL: "https://gateway.langwatch.ai/v1",
-  apiKey: process.env.LANGWATCH_VK,       // e.g. lw_vk_live_01HZX9K3M...
+  apiKey: process.env.LANGWATCH_VK,       // e.g. vk-lw-01HZX9K3M...
 });
 
 const response = await openai.chat.completions.create({ ... });

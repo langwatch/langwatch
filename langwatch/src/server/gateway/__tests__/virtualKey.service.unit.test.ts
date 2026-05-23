@@ -186,7 +186,7 @@ describe("VirtualKeyService.create", () => {
       const result = await mocks.service.create({ ...baseCreate });
 
       // Raw secret is exposed via the return value…
-      expect(result.secret).toMatch(/^lw_vk_live_/);
+      expect(result.secret).toMatch(/^vk-lw-/);
       // …but the hashedSecret passed to the repo never matches the raw.
       const created = mocks.createMock.mock.calls[0]?.[0] as {
         hashedSecret: string;
@@ -401,7 +401,7 @@ describe("VirtualKeyService.rotate", () => {
         actorUserId: "user_01",
       });
 
-      expect(result.secret).toMatch(/^lw_vk_live_/);
+      expect(result.secret).toMatch(/^vk-lw-/);
       const rotateArgs = mocks.rotateSecretMock.mock.calls[0];
       // Arg 4 is the old hashedSecret per the repository signature.
       expect(rotateArgs?.[4]).toBe("HASHED_CURRENT");

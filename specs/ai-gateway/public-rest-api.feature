@@ -214,7 +214,7 @@ Feature: Public REST API — /api/gateway/v1/*
       }
       """
     Then the response status is 201
-    And the body has a non-empty `secret` field starting with "lw_vk_live_"
+    And the body has a non-empty `secret` field starting with "vk-lw-"
     And the body's `virtual_key.name` is "ci-key"
     And the body's `virtual_key.prefix` + "..." + `virtual_key.last_four` reconstructs the secret-visible portion
     And subsequent GET of the same key returns the virtual_key but NOT the secret

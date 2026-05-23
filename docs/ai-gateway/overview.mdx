@@ -19,7 +19,7 @@ Swap your OpenAI `base_url` + `api_key` and you're done. Don't have a virtual ke
 
 ```bash curl
 curl https://gateway.langwatch.ai/v1/chat/completions \
-  -H "Authorization: Bearer lw_vk_live_..." \
+  -H "Authorization: Bearer vk-lw-..." \
   -H "Content-Type: application/json" \
   -d '{"model":"gpt-5-mini","messages":[{"role":"user","content":"ping"}]}'
 ```
@@ -28,7 +28,7 @@ curl https://gateway.langwatch.ai/v1/chat/completions \
 from openai import OpenAI
 client = OpenAI(
     base_url="https://gateway.langwatch.ai/v1",
-    api_key="lw_vk_live_...",
+    api_key="vk-lw-...",
 )
 client.chat.completions.create(
     model="gpt-5-mini",
@@ -40,7 +40,7 @@ client.chat.completions.create(
 import OpenAI from "openai";
 const client = new OpenAI({
   baseURL: "https://gateway.langwatch.ai/v1",
-  apiKey: "lw_vk_live_...",
+  apiKey: "vk-lw-...",
 });
 await client.chat.completions.create({
   model: "gpt-5-mini",
@@ -67,9 +67,9 @@ The LangWatch AI Gateway replaces every direct provider call with a single call 
 
 ## What it gives you
 
-- **OpenAI-compatible endpoint** at `/v1/chat/completions`, `/v1/embeddings`, `/v1/models`, etc. Drop in `OPENAI_BASE_URL=https://gateway.langwatch.ai/v1` and `OPENAI_API_KEY=lw_vk_live_…` and every existing OpenAI-SDK codebase works unchanged.
+- **OpenAI-compatible endpoint** at `/v1/chat/completions`, `/v1/embeddings`, `/v1/models`, etc. Drop in `OPENAI_BASE_URL=https://gateway.langwatch.ai/v1` and `OPENAI_API_KEY=vk-lw-…` and every existing OpenAI-SDK codebase works unchanged.
 - **Anthropic-compatible endpoint** at `/v1/messages` so Claude Code and native Anthropic SDKs work by setting `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN` to your gateway URL and a LangWatch virtual key.
-- **Virtual keys**: LangWatch-issued credentials (`lw_vk_live_<ulid>`) with project/team/org scope. Show-once secrets, peppered-HMAC-SHA256 hashed, rotatable, revokable within 60 seconds.
+- **Virtual keys**: LangWatch-issued credentials (`vk-lw-<ulid>`) with project/team/org scope. Show-once secrets, peppered-HMAC-SHA256 hashed, rotatable, revokable within 60 seconds.
 - **Hierarchical budgets**: enforce spend limits at organisation, team, project, virtual-key, or principal scope with windowed periods (minute → total) and soft-warn or hard-block semantics.
 - **Per-request guardrails**: invoke your LangWatch evaluators inline on the request, response, or each streaming chunk. Decisions: `allow`, `block`, `modify` (redact).
 - **Tool, MCP, URL policy**: block or allowlist tool calls, MCP server references, or outbound URLs by regex before the request ever leaves your gateway.
@@ -82,7 +82,7 @@ The LangWatch AI Gateway replaces every direct provider call with a single call 
 ## Architecture at a glance
 
 ```
-┌─────────────────────┐        Authorization: Bearer lw_vk_live_…
+┌─────────────────────┐        Authorization: Bearer vk-lw-…
 │  Customer SDK /     │  ──────────────────────────────────────────▶
 │  Coding CLI         │                                              │
 └─────────────────────┘                                              │

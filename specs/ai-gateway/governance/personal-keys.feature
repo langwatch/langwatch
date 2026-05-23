@@ -41,7 +41,7 @@ Feature: AI Gateway Governance — Personal virtual keys
       | projectId         | jane's personal project id (isPersonal=true)       |
       | principalUserId   | "user_jane_123"                                    |
       | routingPolicyId   | the org's default "developer-default" policy id    |
-      | secretPrefix      | starts with "lw_vk_live_"                          |
+      | secretPrefix      | starts with "vk-lw-"                          |
       | revokedAt         | null                                               |
     And the personal VK secret is returned exactly once in the device-exchange response (`default_personal_vk`)
     And subsequent logins re-use the existing personal VK rather than re-issuing
@@ -144,8 +144,8 @@ Feature: AI Gateway Governance — Personal virtual keys
 
   @bdd @personal-keys @gateway-resolution
   Scenario: Gateway resolves a personal VK and stamps trace attribution
-    Given user "jane@acme.com" has a personal VK with secret "lw_vk_live_<...>"
-    And jane's CLI is running `langwatch claude` which sends ANTHROPIC_AUTH_TOKEN=lw_vk_live_<...>
+    Given user "jane@acme.com" has a personal VK with secret "vk-lw-<...>"
+    And jane's CLI is running `langwatch claude` which sends ANTHROPIC_AUTH_TOKEN=vk-lw-<...>
     When the gateway receives a `POST /v1/messages` with that bearer token
     Then the gateway resolves the VK with these JWT claims:
       | claim                | value                          |

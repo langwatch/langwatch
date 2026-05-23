@@ -269,11 +269,11 @@ curl -sSf https://gateway.acme.com/healthz
 
 # Auth echo (requires a VK from your langwatch control plane)
 curl -sSf https://gateway.acme.com/v1/models \
-  -H "Authorization: Bearer lw_vk_live_01JXXX..."
+  -H "Authorization: Bearer vk-lw-01JXXX..."
 
 # Full completion (tests auth + routing + upstream + observability pipeline)
 curl -sSf https://gateway.acme.com/v1/chat/completions \
-  -H "Authorization: Bearer lw_vk_live_01JXXX..." \
+  -H "Authorization: Bearer vk-lw-01JXXX..." \
   -H "Content-Type: application/json" \
   -d '{"model":"openai/gpt-5-mini","messages":[{"role":"user","content":"ping"}]}'
 ```

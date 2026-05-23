@@ -57,7 +57,7 @@
 ### What we adopt
 
 - **`wire_api: "responses" | "chat"` distinction for Codex CLI.** This is the single biggest insight from Nexos's docs: Codex can either speak the OpenAI Responses API (`/v1/responses`) or Chat Completions API (`/v1/chat/completions`), and which one works depends on the model + provider. **Claude via OpenAI Responses API is not supported**; Codex must switch `wire_api: "chat"` for non-OpenAI-native models routed through the gateway.
-- **Bearer token auth via env var** (`NEXOS_AI_API_KEY` in their case; `OPENAI_API_KEY=lw_vk_live_…` for us — simpler because we use the standard OpenAI env name so no CLI code change).
+- **Bearer token auth via env var** (`NEXOS_AI_API_KEY` in their case; `OPENAI_API_KEY=vk-lw-…` for us — simpler because we use the standard OpenAI env name so no CLI code change).
 - **Per-project config in `~/.codex/config.toml`** with `model`, `wire_api`, `env_key`, `model_verbosity`. Our Codex docs should walk through exactly this file.
 - **Trust levels for Codex command execution per project directory.** That's Codex-side (not gateway-side), but worth noting in our docs so engineers understand the security model of Codex + our tool-blocking as a belt-and-braces defence.
 

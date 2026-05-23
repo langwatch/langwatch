@@ -14,7 +14,7 @@ Feature: `langwatch cursor` wrapper end-to-end
   Scenario: Cursor wrapper env injection
     When the harness spawns `langwatch cursor --print-env`
     Then env contains `ANTHROPIC_BASE_URL=<test-gateway-url>/api/v1`
-    And env contains `ANTHROPIC_AUTH_TOKEN=lw_vk_<alice's VK>`
+    And env contains `ANTHROPIC_AUTH_TOKEN=vk-lw-<alice's VK>`
     And cursor-specific env vars (e.g. `CURSOR_TELEMETRY_ENDPOINT`) are unset / passthrough
 
   Scenario: Cursor invocation against Anthropic-shaped endpoint

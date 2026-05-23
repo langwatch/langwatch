@@ -52,7 +52,7 @@ type BundleConfig struct {
 	// ProjectOTLPToken is the project's auth token for AI trace export.
 	ProjectOTLPToken string
 
-	// VKDisplayPrefix is the VK's public display prefix (e.g. "lw_vk_live_…").
+	// VKDisplayPrefix is the VK's public display prefix (e.g. "vk-lw-…").
 	// Carried so rule matchers can target VKs by prefix without leaking the
 	// secret. Sourced from the control-plane config payload.
 	VKDisplayPrefix string

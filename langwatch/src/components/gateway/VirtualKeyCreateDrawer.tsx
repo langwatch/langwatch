@@ -182,7 +182,7 @@ export function VirtualKeyCreateDrawer({
               <Field.Label>
                 Environment
                 <FieldInfoTooltip
-                  description="Live keys mint 'lw_vk_live_' prefix; test keys mint 'lw_vk_test_'. Prefix is the accident-prevention signal — the gateway rejects test keys against production providers when 'live-only' mode is set on the org."
+                  description="Live keys mint 'vk-lw-' prefix; test keys mint 'vk-lw-'. Prefix is the accident-prevention signal — the gateway rejects test keys against production providers when 'live-only' mode is set on the org."
                   docHref="/ai-gateway/virtual-keys#format"
                 />
               </Field.Label>
@@ -200,7 +200,7 @@ export function VirtualKeyCreateDrawer({
                 </NativeSelect.Field>
               </NativeSelect.Root>
               <Field.HelperText>
-                Shape-of-key prefix (lw_vk_live_ vs lw_vk_test_) for
+                Shape-of-key prefix (vk-lw- vs vk-lw-) for
                 accident-prevention.
               </Field.HelperText>
             </Field.Root>

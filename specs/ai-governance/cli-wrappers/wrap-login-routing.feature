@@ -13,7 +13,7 @@ Feature: CLI wrapper login → token → env injection → routing
       | field                         | value                          |
       | gateway_url                   | http://gw.test                 |
       | control_plane_url             | http://app.test                |
-      | default_personal_vk.secret    | lw_vk_test_xyz                 |
+      | default_personal_vk.secret    | vk-lw-xyz                 |
     is persisted at `LANGWATCH_CONFIG_DIR`
     And the underlying tool binaries (`claude`, `codex`, `opencode`, etc.) are
       installed as executables on PATH that read their standard provider env vars
@@ -70,7 +70,7 @@ Feature: CLI wrapper login → token → env injection → routing
   # Env injection — per-tool standard provider env vars
   # ─────────────────────────────────────────────────────────────────────
   Scenario Outline: Wrap injects the right env vars for each tool
-    Given the user is logged in with `gateway_url = http://gw.test` and a personal VK `lw_vk_test_xyz`
+    Given the user is logged in with `gateway_url = http://gw.test` and a personal VK `vk-lw-xyz`
     When the user runs `langwatch <tool>`
     Then a child process is spawned for `<tool>` with stdio inherited
     And the child's environment contains every var in `<expected_env_vars>` set to the values listed
@@ -78,11 +78,11 @@ Feature: CLI wrapper login → token → env injection → routing
 
     Examples:
       | tool      | expected_env_vars                                                                                                                                            |
-      | claude    | ANTHROPIC_BASE_URL=http://gw.test/api/v1/anthropic; ANTHROPIC_AUTH_TOKEN=lw_vk_test_xyz                                                                       |
-      | codex     | OPENAI_BASE_URL=http://gw.test/api/v1/openai; OPENAI_API_KEY=lw_vk_test_xyz                                                                                  |
-      | cursor    | OPENAI_BASE_URL=http://gw.test/api/v1/openai; OPENAI_API_KEY=lw_vk_test_xyz; ANTHROPIC_BASE_URL=http://gw.test/api/v1/anthropic; ANTHROPIC_AUTH_TOKEN=lw_vk_test_xyz |
-      | gemini    | GOOGLE_GENAI_API_BASE=http://gw.test/api/v1/gemini; GEMINI_API_KEY=lw_vk_test_xyz                                                                            |
-      | opencode  | OPENAI_BASE_URL=http://gw.test/api/v1/openai; OPENAI_API_KEY=lw_vk_test_xyz; ANTHROPIC_BASE_URL=http://gw.test/api/v1/anthropic; ANTHROPIC_AUTH_TOKEN=lw_vk_test_xyz |
+      | claude    | ANTHROPIC_BASE_URL=http://gw.test/api/v1/anthropic; ANTHROPIC_AUTH_TOKEN=vk-lw-xyz                                                                       |
+      | codex     | OPENAI_BASE_URL=http://gw.test/api/v1/openai; OPENAI_API_KEY=vk-lw-xyz                                                                                  |
+      | cursor    | OPENAI_BASE_URL=http://gw.test/api/v1/openai; OPENAI_API_KEY=vk-lw-xyz; ANTHROPIC_BASE_URL=http://gw.test/api/v1/anthropic; ANTHROPIC_AUTH_TOKEN=vk-lw-xyz |
+      | gemini    | GOOGLE_GENAI_API_BASE=http://gw.test/api/v1/gemini; GEMINI_API_KEY=vk-lw-xyz                                                                            |
+      | opencode  | OPENAI_BASE_URL=http://gw.test/api/v1/openai; OPENAI_API_KEY=vk-lw-xyz; ANTHROPIC_BASE_URL=http://gw.test/api/v1/anthropic; ANTHROPIC_AUTH_TOKEN=vk-lw-xyz |
 
   Scenario: Trailing slash on gateway_url is stripped before composing base URLs
     Given the user is logged in with `gateway_url = http://gw.test/`
@@ -101,30 +101,30 @@ Feature: CLI wrapper login → token → env injection → routing
   # ─────────────────────────────────────────────────────────────────────
   Scenario: Wrapped claude routes Anthropic requests to the gateway with the VK
     Given a fake gateway recording inbound requests at `http://gw.test/api/v1/anthropic`
-    And the user is logged in with VK `lw_vk_test_xyz`
+    And the user is logged in with VK `vk-lw-xyz`
     When the user runs `langwatch claude` and the underlying claude binary
       issues a POST to `${ANTHROPIC_BASE_URL}/v1/messages` with header
       `Authorization: Bearer ${ANTHROPIC_AUTH_TOKEN}`
     Then the fake gateway records exactly one request to path `/api/v1/anthropic/v1/messages`
-    And the recorded request's Authorization header is "Bearer lw_vk_test_xyz"
+    And the recorded request's Authorization header is "Bearer vk-lw-xyz"
 
   Scenario: Wrapped codex routes OpenAI requests to the gateway with the VK
     Given a fake gateway recording inbound requests at `http://gw.test/api/v1/openai`
-    And the user is logged in with VK `lw_vk_test_xyz`
+    And the user is logged in with VK `vk-lw-xyz`
     When the user runs `langwatch codex` and the underlying codex binary
       issues a POST to `${OPENAI_BASE_URL}/v1/chat/completions` with header
       `Authorization: Bearer ${OPENAI_API_KEY}`
     Then the fake gateway records exactly one request to path `/api/v1/openai/v1/chat/completions`
-    And the recorded request's Authorization header is "Bearer lw_vk_test_xyz"
+    And the recorded request's Authorization header is "Bearer vk-lw-xyz"
 
   Scenario: Wrapped opencode routes via OpenAI-compatible env vars to the gateway
     Given a fake gateway recording inbound requests at `http://gw.test/api/v1/openai`
-    And the user is logged in with VK `lw_vk_test_xyz`
+    And the user is logged in with VK `vk-lw-xyz`
     When the user runs `langwatch opencode` and the underlying opencode binary
       issues a POST to `${OPENAI_BASE_URL}/v1/chat/completions` with header
       `Authorization: Bearer ${OPENAI_API_KEY}`
     Then the fake gateway records exactly one request to path `/api/v1/openai/v1/chat/completions`
-    And the recorded request's Authorization header is "Bearer lw_vk_test_xyz"
+    And the recorded request's Authorization header is "Bearer vk-lw-xyz"
 
   # ─────────────────────────────────────────────────────────────────────
   # Budget pre-check — Screen-8 box + exit 2 BEFORE spawn

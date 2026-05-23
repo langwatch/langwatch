@@ -20,7 +20,7 @@ Each test reads these from env vars — missing env = `t.Skip`, never fails.
 ```bash
 # openai — simple completion
 GATEWAY_URL=http://localhost:5563 \
-LW_VK=lw_vk_live_... \
+LW_VK=vk-lw-... \
 LW_PROJECT_API_KEY=sk-lw-... \
 OPENAI_MODEL=gpt-5-mini \
   go test -tags=live_openai -run TestOpenAI_SimpleCompletion ./services/aigateway/tests/matrix/... -v

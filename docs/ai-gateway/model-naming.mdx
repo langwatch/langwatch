@@ -22,7 +22,7 @@ The gateway accepts three ways to reference a model in the `model` field of a re
 
 ```bash
 curl https://gateway.langwatch.ai/v1/chat/completions \
-  -H "Authorization: Bearer lw_vk_live_..." \
+  -H "Authorization: Bearer vk-lw-..." \
   -d '{"model":"gpt-5-mini","messages":[{"role":"user","content":"hi"}]}'
 ```
 
@@ -37,7 +37,7 @@ Matches what every OpenAI-SDK codebase already writes. Works on any VK where the
 
 ```bash
 curl https://gateway.langwatch.ai/v1/chat/completions \
-  -H "Authorization: Bearer lw_vk_live_..." \
+  -H "Authorization: Bearer vk-lw-..." \
   -d '{"model":"openai/gpt-5-mini","messages":[{"role":"user","content":"hi"}]}'
 ```
 
@@ -54,7 +54,7 @@ The supported prefixes are: `openai`, `anthropic`, `azure`, `bedrock`, `vertex`,
 
 ```bash
 curl https://gateway.langwatch.ai/v1/chat/completions \
-  -H "Authorization: Bearer lw_vk_live_..." \
+  -H "Authorization: Bearer vk-lw-..." \
   -d '{"model":"coding-small","messages":[{"role":"user","content":"hi"}]}'
 ```
 

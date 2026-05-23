@@ -60,7 +60,7 @@ Feature: langwatch CLI — virtual-keys subcommands
   Scenario: Create a virtual key with defaults
     When I run `langwatch virtual-keys create --name prod-key --provider openai`
     Then the exit code is 0
-    And stdout contains "Created virtual key: lw_vk_live_01HZX..."
+    And stdout contains "Created virtual key: vk-lw-01HZX..."
     And stdout displays the full secret in a highlighted box
     And stdout warns that the secret will not be shown again
     And stdout suggests "Copy now:" with the full secret
@@ -73,7 +73,7 @@ Feature: langwatch CLI — virtual-keys subcommands
   @integration @cli @unimplemented
   Scenario: Create in test mode
     When I run `langwatch virtual-keys create --name test-key --env test --provider openai`
-    Then the created key has prefix "lw_vk_test_"
+    Then the created key has prefix "vk-lw-"
     And the env badge in the output shows "test"
 
   @integration @cli @unimplemented

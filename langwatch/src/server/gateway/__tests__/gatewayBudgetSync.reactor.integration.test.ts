@@ -157,7 +157,7 @@ describe("gatewayBudgetSync reactor — real PG + real CH", () => {
         projectId: PROJECT_ID,
         name: "test-vk",
         hashedSecret: `hash-${suffix}`,
-        displayPrefix: "lw_vk_live_xxx",
+        displayPrefix: "vk-lw-xxx",
         principalUserId: USER_ID,
         createdById: USER_ID,
       },

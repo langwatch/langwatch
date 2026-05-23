@@ -18,7 +18,7 @@ Feature: Ingestion attribution invariant — credential is authoritative; payloa
 
   | Path | Auth credential | Stamps | TenantId resolved at |
   | --- | --- | --- | --- |
-  | Gateway VK (`langwatch claude/codex/cursor/gemini`) | `lw_vk_*` (project + owner-scoped) | `langwatch.virtual_key_id`, `langwatch.user.id` | `VK.projectId` (resolved at reactor) |
+  | Gateway VK (`langwatch claude/codex/cursor/gemini`) | `vk-lw-*` (project + owner-scoped) | `langwatch.virtual_key_id`, `langwatch.user.id` | `VK.projectId` (resolved at reactor) |
   | Direct OTLP push (legacy SDK / project-scoped agents) | Project-scoped OTLP auth token | none required (token IS scope) | `token.projectId` |
   | Pull-mode IngestionSource (S3 / copilot_studio / openai_compliance / claude_compliance / workato / cowork / s3_custom / http_custom) | `IngestionSource.ingestSecretHash` | event source already credentialed at puller | `ensureHiddenGovernanceProject(orgId).id` (single org-wide hidden Gov project) |
   | OTel-direct push-mode IngestionSource (`otel_generic`) | `IngestionSource.ingestSecretHash` HMAC | event tagged with `IngestionSource.id` | `ensureHiddenGovernanceProject(orgId).id` |
@@ -51,7 +51,7 @@ Feature: Ingestion attribution invariant — credential is authoritative; payloa
   Background:
     Given the org has all four ingestion paths active:
       | path                | credential                     |
-      | gateway-vk          | `lw_vk_acme_userA_dev`         |
+      | gateway-vk          | `vk-lw-acme_userA_dev`         |
       | direct-otlp         | project-scoped OTLP token      |
       | pull-mode           | IngestionSource S3 puller cred |
       | otel-generic        | IngestionSource HMAC secret    |
@@ -229,10 +229,10 @@ Feature: Ingestion attribution invariant — credential is authoritative; payloa
 
   @bdd @ingestion @cross-org @security
   Scenario: Cross-org credential reuse is rejected at the receiver
-    Given org A has a VK `lw_vk_orgA_userX`
+    Given org A has a VK `vk-lw-orgA_userX`
     And org B has a totally separate IngestionSource credential
     When an OTLP push or pull-mode payload arrives at org B's receiver
-        carrying org A's `lw_vk_orgA_userX` as auth
+        carrying org A's `vk-lw-orgA_userX` as auth
     Then the receiver returns 401 (auth failure — credential not in
         org B's credential set)
     And NO row is written to ClickHouse

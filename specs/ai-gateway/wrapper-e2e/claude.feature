@@ -15,7 +15,7 @@ Feature: `langwatch claude` wrapper end-to-end
   Scenario: `langwatch claude` injects the right env vars
     When the e2e harness spawns `langwatch claude --version` (with a stubbed Claude binary that prints its env vars)
     Then the spawned binary's env contains `ANTHROPIC_BASE_URL=<test-gateway-url>/api/v1`
-    And the spawned binary's env contains `ANTHROPIC_AUTH_TOKEN=lw_vk_<alice's personal VK>`
+    And the spawned binary's env contains `ANTHROPIC_AUTH_TOKEN=vk-lw-<alice's personal VK>`
     And no other Anthropic-related secret leaks via env
 
   Scenario: First completion routes through the gateway

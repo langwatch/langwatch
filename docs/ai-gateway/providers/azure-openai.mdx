@@ -44,7 +44,7 @@ The gateway translates the outgoing path + query string to Azure's format (`/ope
 
 ## Auth headers
 
-OpenAI uses `Authorization: Bearer`, Azure uses `api-key: <hex>`. Bifrost/core swaps headers automatically based on the ModelProvider type. The client-facing VK auth is always `Authorization: Bearer lw_vk_live_…` (or one of the alternates, see [Virtual Keys](/ai-gateway/virtual-keys)).
+OpenAI uses `Authorization: Bearer`, Azure uses `api-key: <hex>`. Bifrost/core swaps headers automatically based on the ModelProvider type. The client-facing VK auth is always `Authorization: Bearer vk-lw-…` (or one of the alternates, see [Virtual Keys](/ai-gateway/virtual-keys)).
 
 ## AAD, Managed Identity
 

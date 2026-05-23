@@ -22,16 +22,16 @@ Deployment: separate pod, separate container. Load balancer routes `/v1/**` path
 
 ## 2. Virtual-key format
 
-`lw_vk_{env}_{ulid}` where `env ∈ {live, test}`, `ulid` is a 26-char Crockford base32 ULID.
+`vk-lw-{env}_{ulid}` where `env ∈ {live, test}`, `ulid` is a 26-char Crockford base32 ULID.
 
-Total length: **40 chars** (`lw_vk_live_01HZX9K3M...`).
+Total length: **40 chars** (`vk-lw-01HZX9K3M...`).
 
 **Rules:**
 
-- Prefix `lw_vk_` is fixed and searchable (grep/DLP friendly).
+- Prefix `vk-lw-` is fixed and searchable (grep/DLP friendly).
 - Env prefix prevents accidental dev-key-in-prod / vice versa (Stripe pattern).
 - Body is ULID: monotonic, k-sortable, time-prefixed. No b62 random — ULID sorts sensibly in the dashboard.
-- Stored server-side as `hex(hmac_sha256(LW_VIRTUAL_KEY_PEPPER, key))` alongside a short display prefix (`lw_vk_live_01HZX9` visible, rest hashed). Peppered HMAC-SHA256 (not argon2id) is chosen because (a) the VK body is a 130-bit ULID — already brute-force-infeasible, (b) argon2id would add 50–100 ms to every cold resolve-key call which defeats the gateway's latency budget, (c) Stripe/GitHub use the same pattern for API keys, (d) deterministic hash enables O(1) lookup by hash (argon2id's random salt would force a table scan). Constant-time compare on verify.
+- Stored server-side as `hex(hmac_sha256(LW_VIRTUAL_KEY_PEPPER, key))` alongside a short display prefix (`vk-lw-01HZX9` visible, rest hashed). Peppered HMAC-SHA256 (not argon2id) is chosen because (a) the VK body is a 130-bit ULID — already brute-force-infeasible, (b) argon2id would add 50–100 ms to every cold resolve-key call which defeats the gateway's latency budget, (c) Stripe/GitHub use the same pattern for API keys, (d) deterministic hash enables O(1) lookup by hash (argon2id's random salt would force a table scan). Constant-time compare on verify.
 - Key is shown **once** at creation; not retrievable afterward.
 - Rotation: user can rotate a VK in place (same `vk_id`, new secret, old secret valid for 24h grace).
 - **Pepper rotation:** `LW_VIRTUAL_KEY_PEPPER` rotates via a dual-pepper lookup window — during rotation, the control-plane verifies with both the new and old pepper (returning OK on either match) and re-hashes to the new pepper on next use. Complete rotation = re-hash all live VKs in a background job, then drop the old pepper. Documented SOP in self-hosting ops guide.
@@ -39,9 +39,9 @@ Total length: **40 chars** (`lw_vk_live_01HZX9K3M...`).
 
 **Header accepted by the gateway:**
 
-1. `Authorization: Bearer lw_vk_...` (OpenAI-compatible, default).
-2. `x-api-key: lw_vk_...` (Anthropic-compatible fallback for Claude-shaped clients).
-3. `api-key: lw_vk_...` (Azure-compatible fallback).
+1. `Authorization: Bearer vk-lw-...` (OpenAI-compatible, default).
+2. `x-api-key: vk-lw-...` (Anthropic-compatible fallback for Claude-shaped clients).
+3. `api-key: vk-lw-...` (Azure-compatible fallback).
 
 The gateway accepts all three and normalises internally.
 
@@ -103,7 +103,7 @@ LW_GATEWAY_INTERNAL_SECRET = "shared-test-secret-32byteslong!!"
 method      = "POST"
 path        = "/api/internal/gateway/resolve-key"
 timestamp   = "1734567890"
-body        = {"key_presented":"lw_vk_live_01HZX","gateway_node_id":"gw-a"}
+body        = {"key_presented":"vk-lw-01HZX","gateway_node_id":"gw-a"}
 body_sha256 = 59f25745b66fbb0c7b3714572d20ffef741817b84b86093e4ac6af243af66816
 canonical   = "POST\n/api/internal/gateway/resolve-key\n1734567890\n59f25745b66fbb0c7b3714572d20ffef741817b84b86093e4ac6af243af66816"
 signature   = 4e4c8634b10a7ef719cf6d56b89b7f44a5ac7544c03d98ef132b79d36a1a6a1f
@@ -138,7 +138,7 @@ Response:
 ```json
 {
   "keys": [
-    { "jwt": "...", "revision": 142, "key_id": "vk_...", "display_prefix": "lw_vk_live_01HZX9", "config": { ... §4.2 shape ... } },
+    { "jwt": "...", "revision": 142, "key_id": "vk_...", "display_prefix": "vk-lw-01HZX9", "config": { ... §4.2 shape ... } },
     ...
   ],
   "next_page_token": "<opaque>|null",
@@ -152,7 +152,7 @@ After bootstrap, the gateway calls `/changes?since=<current_revision>` to stream
 
 Request:
 ```json
-{ "key_presented": "lw_vk_live_01HZX...", "gateway_node_id": "gw-eks-abc" }
+{ "key_presented": "vk-lw-01HZX...", "gateway_node_id": "gw-eks-abc" }
 ```
 
 Response (200):
@@ -161,7 +161,7 @@ Response (200):
   "jwt": "<HS256 signed, TTL 15m>",
   "revision": 142,
   "key_id": "vk_01HZX...",
-  "display_prefix": "lw_vk_live_01HZX9"
+  "display_prefix": "vk-lw-01HZX9"
 }
 ```
 

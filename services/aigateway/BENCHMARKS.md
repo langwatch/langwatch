@@ -91,7 +91,7 @@ For p50/p99 latency under sustained RPS, use the vegeta harness:
 go run ./services/aigateway/loadtest \
   -rps=1000 -duration=30s \
   -target=http://localhost:5563/v1/chat/completions \
-  -token=lw_vk_test_...
+  -token=vk-lw-...
 ```
 
 See `services/aigateway/loadtest/` for the full harness and analysis scripts.

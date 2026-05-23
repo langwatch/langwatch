@@ -89,7 +89,7 @@ describe("GatewayBudgetService — PRINCIPAL cascade", () => {
         projectId: PROJECT_ID,
         name: `pcasc-vk-${ns}`,
         hashedSecret: `hash-${ns}`,
-        displayPrefix: `lw_vk_test_${ns.slice(0, 4)}`,
+        displayPrefix: `vk-lw-${ns.slice(0, 4)}`,
         createdById: ACTOR_ID,
       },
     });

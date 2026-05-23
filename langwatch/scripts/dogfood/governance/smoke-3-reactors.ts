@@ -113,9 +113,9 @@ async function seed() {
       createdById: user.id,
     },
   });
-  const secret = mintVirtualKeySecret("live");
+  const secret = mintVirtualKeySecret();
   const hashed = hashVirtualKeySecret(secret);
-  const displayPrefix = secret.slice(0, 18);
+  const displayPrefix = secret.slice(0, 13);
   const vk = await prisma.virtualKey.create({
     data: {
       id: rid("vk_smoke"),

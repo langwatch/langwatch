@@ -12,7 +12,7 @@ Beyond plain pass-through, the gateway preserves tool-call streaming deltas byte
 
 ```
 POST /v1/messages
-x-api-key: lw_vk_live_<ULID>     # or Authorization: Bearer lw_vk_live_...
+x-api-key: vk-lw-<ULID>     # or Authorization: Bearer vk-lw-...
 anthropic-version: 2023-06-01
 Content-Type: application/json
 ```
@@ -178,7 +178,7 @@ Claude Code uses `/v1/messages` natively. Setup is:
 
 ```bash
 export ANTHROPIC_BASE_URL="https://gateway.langwatch.ai"
-export ANTHROPIC_AUTH_TOKEN="lw_vk_live_..."
+export ANTHROPIC_AUTH_TOKEN="vk-lw-..."
 claude
 ```
 

@@ -1693,11 +1693,11 @@ model VirtualKey {
   status      VirtualKeyStatus      @default(ACTIVE)
 
   // Credential material. Full secret format:
-  //   lw_vk_{live|test}_<26-char-crockford-ulid>  (40 chars total)
+  //   vk-lw-{live|test}_<26-char-crockford-ulid>  (40 chars total)
   // Only the hashed form and a short display prefix (first 18 chars) are
   // kept after creation. The full secret is shown exactly once.
   hashedSecret  String // argon2id(secret + server pepper)
-  displayPrefix String // e.g. "lw_vk_live_01HZX9"
+  displayPrefix String // e.g. "vk-lw-01HZX9"
 
   // Principal to attribute traces to when this VK is used. Optional because
   // a VK can be owned by a project without binding to a specific human.

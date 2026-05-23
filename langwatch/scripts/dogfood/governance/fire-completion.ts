@@ -5,7 +5,7 @@
  *
  * Usage:
  *   pnpm tsx scripts/dogfood/governance/fire-completion.ts \
- *     --vk lw_vk_live_<...> \
+ *     --vk vk-lw-<...> \
  *     --model claude-sonnet-4 \
  *     --prompt "Write a haiku about retrieval-augmented generation."
  *

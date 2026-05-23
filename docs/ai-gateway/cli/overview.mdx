@@ -102,10 +102,10 @@ X-Langwatch-Request-Id: req_8f1250b94a959c1b2502792c757264
 X-Langwatch-Span-Id: 53e32e8f6030ef05
 X-Langwatch-Trace-Id: e8aeda507fb93fafd3d2c20bbef283d6
 
-{"error":{"type":"invalid_api_key","code":"missing_api_key","message":"missing API key; supply Authorization: Bearer lw_vk_... or x-api-key"}}
+{"error":{"type":"invalid_api_key","code":"missing_api_key","message":"missing API key; supply Authorization: Bearer vk-lw-... or x-api-key"}}
 ```
 
-The error message names both accepted auth headers, `Authorization: Bearer lw_vk_...` (OpenAI SDK, Claude Code, Cursor, Aider) AND `x-api-key` (Anthropic SDK). Either works against either endpoint.
+The error message names both accepted auth headers, `Authorization: Bearer vk-lw-...` (OpenAI SDK, Claude Code, Cursor, Aider) AND `x-api-key` (Anthropic SDK). Either works against either endpoint.
 
 `Traceparent` + `X-Langwatch-Span-Id` + `X-Langwatch-Trace-Id` are present even on unauth 401s, observability of probe-abuse, misconfigured CLIs is available without inspecting access logs.
 

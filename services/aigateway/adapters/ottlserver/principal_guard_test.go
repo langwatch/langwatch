@@ -87,7 +87,7 @@ func TestPrincipalGuard_OttlAddsProtectedKey_KeyRemovedPostTransform(t *testing.
 	// rule that mints one out of thin air must NOT survive.
 
 	rec := postTransform(t, srv, logs, []string{
-		`set(attributes["langwatch.virtual_key_id"], "lw_vk_phantom") where attributes["event.name"] == "api_request"`,
+		`set(attributes["langwatch.virtual_key_id"], "vk-lw-phantom") where attributes["event.name"] == "api_request"`,
 	})
 
 	require.Equal(t, http.StatusOK, rec.Code)

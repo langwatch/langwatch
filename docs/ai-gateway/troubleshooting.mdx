@@ -18,7 +18,7 @@ Every gateway response carries `X-LangWatch-Request-Id`. Grab it from your clien
 
 ```bash
 # 1. Is the VK format right?
-echo "$LANGWATCH_VK" | grep -E '^lw_vk_(live|test)_[0-9A-HJKMNP-TV-Z]{26}$' || echo "malformed"
+echo "$LANGWATCH_VK" | grep -E '^vk-lw-(live|test)_[0-9A-HJKMNP-TV-Z]{26}$' || echo "malformed"
 
 # 2. Is it actually getting through?
 curl -sD- -o/dev/null -H "Authorization: Bearer $LANGWATCH_VK" \
@@ -29,7 +29,7 @@ curl -sD- -o/dev/null -H "Authorization: Bearer $LANGWATCH_VK" \
 1. Env var expansion failed, `$LANGWATCH_VK` is empty at runtime. Check your deploy config.
 2. VK was rotated; client still holds the old secret. Update to the new one.
 3. VK was revoked. Status in UI → Gateway → Virtual Keys.
-4. You pasted the prefix (`lw_vk_live_01HZX...`) instead of the full secret. The secret is always 40 chars total.
+4. You pasted the prefix (`vk-lw-01HZX...`) instead of the full secret. The secret is always 40 chars total.
 5. Rare: the gateway's auth cache is stale. Should resolve within 30 s via `/changes`. If persistent, check control-plane `/api/internal/gateway/changes` is reachable.
 
 ## `403 model_not_allowed`

@@ -51,7 +51,7 @@ The rest of this page covers the **service-virtual-key** flow used for non-perso
 5. (Optional) Attach a budget, pick a cache mode, attach guardrails.
 6. Click **Create**.
 
-The full secret (`lw_vk_live_01HZX9K3M…`) is displayed **exactly once**. Copy it now and store it in a secret manager. After you dismiss the dialog, LangWatch can never show it again, only the prefix `lw_vk_live_01HZX9` remains visible in the list.
+The full secret (`vk-lw-01HZX9K3M…`) is displayed **exactly once**. Copy it now and store it in a secret manager. After you dismiss the dialog, LangWatch can never show it again, only the prefix `vk-lw-01HZX9` remains visible in the list.
 
 ## 2. Call the gateway (OpenAI-compatible)
 
@@ -86,7 +86,7 @@ from openai import OpenAI
 
 client = OpenAI(
     base_url="https://gateway.langwatch.ai/v1",
-    api_key="lw_vk_live_...",
+    api_key="vk-lw-...",
 )
 
 resp = client.chat.completions.create(

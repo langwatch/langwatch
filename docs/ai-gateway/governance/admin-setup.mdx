@@ -209,7 +209,7 @@ In **AI Gateway → Activity**:
 - Per-user request counts and spend, in real time.
 - A **By tool** breakdown (Claude Code vs Codex vs Cursor).
 - A **By model** breakdown.
-- The full audit trail of `lw_vk_…` issuance, `langwatch login`
+- The full audit trail of `vk-lw-…` issuance, `langwatch login`
   events, budget violations, and policy denials.
 
 In **Settings → Members**:
@@ -312,7 +312,7 @@ pnpm tsx scripts/dogfood/seed-personas.ts \
 
 # 4. Fire a real completion through the gateway
 pnpm tsx scripts/dogfood/fire-completion.ts \
-  --vk lw_vk_live_<...> \
+  --vk vk-lw-<...> \
   --model claude-sonnet-4 \
   --prompt "Write a haiku about retrieval-augmented generation."
 

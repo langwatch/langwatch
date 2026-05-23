@@ -139,7 +139,7 @@ export class VirtualKeyService {
       ...defaultVirtualKeyConfig(),
       ...(input.config ?? {}),
     });
-    const secret = mintVirtualKeySecret(input.environment);
+    const secret = mintVirtualKeySecret();
     const { displayPrefix } = parseVirtualKey(secret);
     const hashedSecret = hashVirtualKeySecret(secret);
 
@@ -334,9 +334,7 @@ export class VirtualKeyService {
       });
     }
     const before = serialiseForAudit(existing);
-    const newSecret = mintVirtualKeySecret(
-      existing.environment === "LIVE" ? "live" : "test",
-    );
+    const newSecret = mintVirtualKeySecret();
     const { displayPrefix: newDisplayPrefix } = parseVirtualKey(newSecret);
     const newHashedSecret = hashVirtualKeySecret(newSecret);
     const previousSecretValidUntil = new Date(Date.now() + ROTATION_GRACE_MS);

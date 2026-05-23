@@ -17,7 +17,7 @@ function stubVk(
     hashedSecret: "a".repeat(64),
     previousHashedSecret: null,
     previousSecretExpiresAt: null,
-    displayPrefix: "lw_vk_live_01HZX",
+    displayPrefix: "vk-lw-01HZX",
     principalUserId: null,
     revision: 42n,
     config: { modelAliases: {}, metadata: {} } as any,
@@ -78,7 +78,7 @@ describe("GatewayConfigMaterialiser", () => {
       expect(bundle.organization_id).toBe("org_01");
       expect(bundle.environment).toBe("live");
       expect(bundle.status).toBe("active");
-      expect(bundle.display_prefix).toBe("lw_vk_live_01HZX");
+      expect(bundle.display_prefix).toBe("vk-lw-01HZX");
     });
 
     it("maps revoked status to 'revoked'", async () => {
