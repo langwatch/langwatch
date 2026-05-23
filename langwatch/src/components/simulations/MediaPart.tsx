@@ -1,9 +1,11 @@
 /**
  * MediaPart — renders a single AG-UI media content part inline.
  *
- * Handles three shapes:
+ * Handles four shapes:
  *  - URL source (source.type="url" or binary with url set): renders native HTML5 element.
  *  - Inline data (source.type="data" or binary with data set): renders with a data: URI (legacy back-compat).
+ *  - Post-extraction input_audio (type="input_audio", input_audio.url set): renders native <audio controls>
+ *    pointing at the stored-object URL produced by content-extractor.ts after externalizing the audio bytes.
  *  - Missing: when the URL returns a 404/missing status, renders a placeholder badge.
  *
  * Uses native HTML5 <audio>, <img>, <video> — no third-party player library.
@@ -36,6 +38,16 @@ export type MediaPartData =
       url?: string;
       data?: string;
       filename?: string;
+    }
+  | {
+      /**
+       * Post-extraction OpenAI Realtime API audio part.
+       * content-extractor.ts rewrites {type:"input_audio", input_audio:{data, format}}
+       * into this shape after externalizing the audio bytes to stored_objects.
+       * url is the /api/files/<id> path; data is cleared after extraction.
+       */
+      type: "input_audio";
+      input_audio: { url?: string; mimeType?: string; data?: string };
     };
 
 // ---------------------------------------------------------------------------
@@ -99,6 +111,19 @@ export function MediaPart({ part, projectId }: MediaPartProps) {
     } else {
       src = "";
     }
+  } else if (part.type === "input_audio") {
+    // Post-extraction OpenAI Realtime API audio part.
+    // URL wins: if url is set, use it directly.
+    // Only fall back to a data: URI when url is absent AND both data and mimeType are present.
+    mimeType = part.input_audio.mimeType;
+    category = "audio";
+    if (part.input_audio.url) {
+      src = part.input_audio.url;
+    } else if (part.input_audio.data && part.input_audio.mimeType) {
+      src = `data:${part.input_audio.mimeType};base64,${part.input_audio.data}`;
+    } else {
+      src = "";
+    }
   } else {
     mimeType = part.source.mimeType;
     category = resolveMediaCategory(part.type, mimeType);
@@ -113,7 +138,11 @@ export function MediaPart({ part, projectId }: MediaPartProps) {
   const isUrlBased =
     src !== "" &&
     !src.startsWith("data:") &&
-    (part.type === "binary" ? !!part.url : part.source.type === "url");
+    (part.type === "binary"
+      ? !!part.url
+      : part.type === "input_audio"
+        ? !!part.input_audio.url
+        : part.source.type === "url");
 
   const [status, setStatus] = useState<LoadStatus>(isUrlBased ? "loading" : "ok");
 

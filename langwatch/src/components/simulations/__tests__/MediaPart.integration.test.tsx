@@ -180,6 +180,95 @@ describe("<MediaPart/>", () => {
     });
   });
 
+  describe("when a message has a post-extraction input_audio part", () => {
+    /** @scenario AC1 "Post-extraction input_audio part renders a native audio element pointing at the stored URL" */
+    it("renders an <audio controls> element pointing at the stored wav URL", () => {
+      render(
+        <MediaPart
+          projectId={TEST_PROJECT_ID}
+          part={{
+            type: "input_audio",
+            input_audio: {
+              url: "/api/files/stored-audio-id",
+              mimeType: "audio/wav",
+            },
+          }}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      const audio = screen.getByTestId("media-part-audio") as HTMLAudioElement;
+      expect(audio).toBeInTheDocument();
+      expect(audio.tagName.toLowerCase()).toBe("audio");
+      expect(audio).toHaveAttribute("src", "/api/files/stored-audio-id");
+      expect(audio).toHaveAttribute("controls");
+    });
+
+    /** @scenario AC1 "Post-extraction input_audio part with an mp3 mimeType still renders an audio element" */
+    it("renders an <audio controls> element pointing at the stored mp3 URL", () => {
+      render(
+        <MediaPart
+          projectId={TEST_PROJECT_ID}
+          part={{
+            type: "input_audio",
+            input_audio: {
+              url: "/api/files/voice-turn-mp3",
+              mimeType: "audio/mpeg",
+            },
+          }}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      const audio = screen.getByTestId("media-part-audio") as HTMLAudioElement;
+      expect(audio).toBeInTheDocument();
+      expect(audio).toHaveAttribute("src", "/api/files/voice-turn-mp3");
+      expect(audio).toHaveAttribute("controls");
+    });
+
+    /** @scenario AC1 "Post-extraction input_audio part without a mimeType still renders an audio element" */
+    it("renders an <audio controls> element even when mimeType is absent", () => {
+      render(
+        <MediaPart
+          projectId={TEST_PROJECT_ID}
+          part={{
+            type: "input_audio",
+            input_audio: {
+              url: "/api/files/no-mime-id",
+            },
+          }}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      const audio = screen.getByTestId("media-part-audio") as HTMLAudioElement;
+      expect(audio).toBeInTheDocument();
+      expect(audio).toHaveAttribute("src", "/api/files/no-mime-id");
+      expect(audio).toHaveAttribute("controls");
+    });
+
+    /** @scenario "MediaPart discriminator prefers input_audio.url over any leftover input_audio.data" */
+    it("uses the URL and does not construct a data: URI when url is set", () => {
+      render(
+        <MediaPart
+          projectId={TEST_PROJECT_ID}
+          part={{
+            type: "input_audio",
+            input_audio: {
+              url: "/api/files/wins-over-data",
+              data: undefined,
+            },
+          }}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      const audio = screen.getByTestId("media-part-audio") as HTMLAudioElement;
+      expect(audio).toHaveAttribute("src", "/api/files/wins-over-data");
+      expect(audio.getAttribute("src")).not.toMatch(/^data:/);
+    });
+  });
+
   describe("when the tRPC probe returns status: 'missing' (row exists, blob gone)", () => {
     /** @scenario "Trace timeline shows a missing badge when the byte content is no longer retrievable" */
     it("renders a missing-badge placeholder labeled with the mediaType", async () => {
