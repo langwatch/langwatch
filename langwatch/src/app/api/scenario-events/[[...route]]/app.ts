@@ -9,6 +9,7 @@ import type { ScenarioEvent } from "~/server/scenarios/scenario-event.types";
 import { DEFAULT_SET_ID } from "~/server/scenarios/internal-set-id";
 import { responseSchemas, scenarioEventSchema } from "~/server/scenarios/schemas";
 import { createLogger } from "~/utils/logger/server";
+import { pMapLimited } from "~/utils/p-map-limited";
 import {
   encodeContent,
   encodeEnd,
@@ -136,12 +137,6 @@ export const route = app.delete(
           "application/json": { schema: resolver(responseSchemas.archive) },
         },
       },
-      400: {
-        description: "Missing or invalid scenarioSetId",
-        content: {
-          "application/json": { schema: resolver(responseSchemas.error) },
-        },
-      },
     },
   }),
   zValidator("query", z.object({ scenarioSetId: z.string().min(1, "scenarioSetId query parameter is required") })),
@@ -230,6 +225,10 @@ function isStreamingEvent(type: string): boolean {
   );
 }
 
+/**
+ * Exported as a test seam — unit-testable without driving the full Hono auth chain.
+ * Promote to a service if a second caller appears.
+ */
 export async function archiveScenarioSetRuns(
   projectId: string,
   scenarioSetId: string,
@@ -255,22 +254,6 @@ export async function archiveScenarioSetRuns(
   }, 8);
 
   return { archived, failed, scenarioSetId, hasMore: reachedCap };
-}
-
-async function pMapLimited<T>(
-  items: T[],
-  fn: (item: T) => Promise<void>,
-  concurrency: number,
-): Promise<void> {
-  const executing = new Set<Promise<void>>();
-  for (const item of items) {
-    const p = fn(item).then(() => {
-      executing.delete(p);
-    });
-    executing.add(p);
-    if (executing.size >= concurrency) await Promise.race(executing);
-  }
-  await Promise.all(executing);
 }
 
 async function broadcastStreamingEvent(

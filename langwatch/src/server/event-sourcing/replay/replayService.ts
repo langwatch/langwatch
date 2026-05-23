@@ -35,6 +35,7 @@ import {
 } from "./replayMarkers";
 import { pauseProjection, unpauseProjection, waitForActiveJobs, waitForAllActiveJobs } from "./replayDrain";
 import { FoldAccumulator } from "./replayExecutor";
+import { pMapLimited } from "~/utils/p-map-limited";
 
 /** Minimal log interface — CLI provides concrete implementation. */
 export interface ReplayLogWriter {
@@ -922,20 +923,4 @@ export class ReplayService {
 
     return { eventsReplayed: eventsProcessed };
   }
-}
-
-async function pMapLimited<T>(
-  items: T[],
-  fn: (item: T) => Promise<void>,
-  concurrency: number,
-): Promise<void> {
-  const executing = new Set<Promise<void>>();
-  for (const item of items) {
-    const p = fn(item).then(() => {
-      executing.delete(p);
-    });
-    executing.add(p);
-    if (executing.size >= concurrency) await Promise.race(executing);
-  }
-  await Promise.all(executing);
 }
