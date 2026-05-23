@@ -652,6 +652,7 @@
             "group": "Get Started",
             "pages": [
               "ai-governance/overview",
+              "ai-governance/track-your-claude-code-usage",
               "ai-governance/getting-started-developer",
               "ai-governance/getting-started-admin",
               "ai-governance/open-core-licensing"
