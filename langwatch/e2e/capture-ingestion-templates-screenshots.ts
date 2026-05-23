@@ -5,12 +5,12 @@ import { chromium } from "playwright";
 /**
  * Captures the 5 IngestionTemplate v1 docs screenshots end-to-end against a
  * running dev stack (http://localhost:5560). Saves PNGs to
- * `langwatch/docs/images/ai-governance/ingestion-templates/` for Andre's docs
- * §2 + §4 placeholder swap.
+ * `~/Projects/pr-screenshots/ingestion-templates/` (the shared image-hosting
+ * repo); push from there to update Mintlify references.
  *
  * Prerequisites:
- *   1. Dev stack running: `make dev` or `make dev-scenarios`
- *   2. e2e/auth.json exists — run `npx ts-node e2e/save-auth-state.ts` once
+ *   1. Dev stack running: `make quickstart`
+ *   2. e2e/auth.json exists — run `npx tsx e2e/save-auth-state.ts` once
  *      to capture rogerio's session interactively (or any persona that has a
  *      personal project + at least one IngestionTemplate binding installed
  *      with traces visible at /me/traces).
@@ -29,10 +29,12 @@ import { chromium } from "playwright";
  *   - me-traces-detail-tokens-model-cost.png
  */
 const BASE_URL = process.env.BASE_URL ?? "http://localhost:5560";
-const OUTPUT_DIR = path.resolve(
-  __dirname,
-  "../docs/images/ai-governance/ingestion-templates",
-);
+const OUTPUT_DIR =
+  process.env.OUTPUT_DIR ??
+  path.resolve(
+    process.env.HOME ?? "",
+    "Projects/pr-screenshots/ingestion-templates",
+  );
 const AUTH_FILE = path.resolve(__dirname, "auth.json");
 const VIEWPORT = { width: 1440, height: 900 };
 
