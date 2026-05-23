@@ -123,7 +123,7 @@ describe("GovernanceContentStripService.governanceTargetOrgId", () => {
 
   describe("when origin is 'binding' and organization_id is set", () => {
     // Closes ralph-loop gap #5 — UserIngestionBinding-routed traces
-    // (lwub_*) need to participate in the org's no-spy / strip-IO policy.
+    // (ik-lw-*) need to participate in the org's no-spy / strip-IO policy.
     // See bindingProvenance.utils.ts:BINDING_ORIGIN_VALUE.
     it("returns the organization id (binding traces are subject to the policy)", () => {
       const orgId = GovernanceContentStripService.governanceTargetOrgId({

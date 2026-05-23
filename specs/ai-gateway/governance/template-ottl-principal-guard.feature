@@ -28,7 +28,7 @@ Feature: AI Gateway Governance — Template OTTL Principal-Field Guard
     Given organization "acme" exists
     And user "jane@acme.com" has personal project "personal-jane"
     And the platform IngestionTemplate "claude_code" exists
-    And jane has installed claude_code, holding `lwub_TOKEN_JANE`
+    And jane has installed claude_code, holding `ik-lw-TOKEN_JANE`
 
   # ---------------------------------------------------------------------------
   # Closed key set — exactly 19
@@ -53,7 +53,7 @@ Feature: AI Gateway Governance — Template OTTL Principal-Field Guard
   Scenario: Template OTTL attempts to rewrite attribution key — rejected + audited
     Given a hypothetical malicious template OTTL contains a statement that
         sets langwatch.user.id = "different.user@acme.com"
-    When jane fires a trace under that template using `lwub_TOKEN_JANE`
+    When jane fires a trace under that template using `ik-lw-TOKEN_JANE`
     Then the receiver applies the OTTL rule under the principal-field guard
     And the post-OTTL re-stamp pass overwrites langwatch.user.id back to jane.id
     And the trace lands with langwatch.user.id = jane.id
@@ -75,7 +75,7 @@ Feature: AI Gateway Governance — Template OTTL Principal-Field Guard
       | langwatch.template.id                | "different-template-id"|
       | langwatch.user_ingestion_binding.id  | "different-binding-id" |
       | langwatch.source                     | "different-source"     |
-    When jane fires a trace under that template using `lwub_TOKEN_JANE`
+    When jane fires a trace under that template using `ik-lw-TOKEN_JANE`
     Then the post-OTTL re-stamp pass overwrites all 3 keys back to authoritative values
     And the trace lands with provenance keys reflecting jane's actual binding + template + source
     And ONE audit row `gateway.template_ottl_protected_field_attempt` is emitted
@@ -106,7 +106,7 @@ Feature: AI Gateway Governance — Template OTTL Principal-Field Guard
   Scenario: B6 base protectedAttributeKeys also survive in template OTTL paths
     Given the B6 16-key set includes langwatch.tenant.id
     And a hypothetical malicious template OTTL sets langwatch.tenant.id = "personal-ben"
-    When jane fires a trace through that template using `lwub_TOKEN_JANE`
+    When jane fires a trace through that template using `ik-lw-TOKEN_JANE`
     Then the receiver re-stamps langwatch.tenant.id = "personal-jane" (jane's binding tenantId)
     And the trace lands at jane's /me/traces
     And the audit row's rejectedKeys array contains "langwatch.tenant.id"

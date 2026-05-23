@@ -113,17 +113,17 @@ flow at `1d5ddb1fe` (Ask A dogfood) and the Hono flow at sergey's
 Same `claude` session:
 
 > "Install a UserIngestionBinding for me on the claude_code template
-> and print the lwub_ token."
+> and print the ik-lw- token."
 
 Claude Code calls:
 
 1. `mcp__langwatch__governance_user_ingestion_bindings_install`
    with `template_id: <claude_code-id>` → returns
-   `{ binding: {...}, token: "lwub_..." }`
+   `{ binding: {...}, token: "ik-lw-..." }`
 
-The lwub_ token is shown ONCE — `claude` will print it inline. Copy it
+The ik-lw- token is shown ONCE — `claude` will print it inline. Copy it
 into your Anthropic / Claude Code OTel telemetry config (e.g. via
-`OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer lwub_...`) and start
+`OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer ik-lw-...`) and start
 emitting traces.
 
 **Verify**: `gateway.user_ingestion_binding.installed` audit row with

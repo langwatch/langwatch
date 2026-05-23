@@ -122,7 +122,7 @@ describe("UserIngestionBindingService.install", () => {
         organizationId: ORG_ID,
         templateId: TEMPLATE_ID,
       });
-      expect(result.token).toMatch(/^lwub_/);
+      expect(result.token).toMatch(/^ik-lw-/);
       expect(result.binding.userId).toBe(ALICE_ID);
       expect(result.binding.templateId).toBe(TEMPLATE_ID);
       expect(result.binding.organizationId).toBe(ORG_ID);

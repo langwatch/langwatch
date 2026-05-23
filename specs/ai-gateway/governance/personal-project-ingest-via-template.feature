@@ -12,7 +12,7 @@ Feature: AI Gateway Governance — Personal-Project Ingest via Template (end-to-
     Claude Code holds the user's Anthropic OAuth session locally.
     LangWatch never participates in that OAuth flow.
     The user's LangWatch-side credential is just the binding access token
-    (`lwub_<base32>`), which they paste into OTEL_EXPORTER_OTLP_HEADERS.
+    (`ik-lw-<base32>`), which they paste into OTEL_EXPORTER_OTLP_HEADERS.
 
   Per the locked v1 contract:
     Receiver flow: prefix-discriminate → SHA256 hash lookup → defense-in-depth
@@ -27,7 +27,7 @@ Feature: AI Gateway Governance — Personal-Project Ingest via Template (end-to-
     And the platform IngestionTemplate "claude_code" exists with canonical
         OTTL rules mapping anthropic.usage.* → gen_ai.usage.*
     And jane has installed the claude_code template, holding binding
-        access token `lwub_TOKEN_JANE` and OTLP endpoint
+        access token `ik-lw-TOKEN_JANE` and OTLP endpoint
         `https://app.langwatch.ai/v1/traces`
 
   # ---------------------------------------------------------------------------
@@ -36,7 +36,7 @@ Feature: AI Gateway Governance — Personal-Project Ingest via Template (end-to-
 
   @bdd @personal-project-ingest @happy-path
   Scenario: Claude Code emits a trace; it lands at /me/traces with canonical shape
-    Given jane has set OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer lwub_TOKEN_JANE"
+    Given jane has set OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ik-lw-TOKEN_JANE"
     When jane runs Claude Code locally and it emits a span with attributes:
       | attribute                       | value                  |
       | gen_ai.system                   | "anthropic"            |
@@ -46,7 +46,7 @@ Feature: AI Gateway Governance — Personal-Project Ingest via Template (end-to-
       | claude.code.session_id          | "abc123"               |
     Then the receiver:
       | step | action                                                        |
-      | 1    | prefix-discriminates `lwub_*`                                  |
+      | 1    | prefix-discriminates `ik-lw-*`                                  |
       | 2    | SHA256-hash-lookup → finds jane's binding                      |
       | 3    | defense-in-depth re-verify (isPersonal + team.ownerUserId)     |
       | 4    | sets tenantId = "personal-jane" (binding.personalProjectId)    |
@@ -89,9 +89,9 @@ Feature: AI Gateway Governance — Personal-Project Ingest via Template (end-to-
   @bdd @personal-project-ingest @cross-user-isolation
   Scenario: User A's traces are visible only on user A's /me/traces
     Given user "ben@acme.com" has personal project "personal-ben"
-    And ben has installed claude_code, holding token `lwub_TOKEN_BEN`
-    When jane fires 5 Claude Code traces using `lwub_TOKEN_JANE`
-    And ben fires 3 Claude Code traces using `lwub_TOKEN_BEN`
+    And ben has installed claude_code, holding token `ik-lw-TOKEN_BEN`
+    When jane fires 5 Claude Code traces using `ik-lw-TOKEN_JANE`
+    And ben fires 3 Claude Code traces using `ik-lw-TOKEN_BEN`
     Then jane's /me/traces shows 5 traces (her bindings only)
     And ben's /me/traces shows 3 traces (his bindings only)
     And neither user sees the other's traces under any filter

@@ -3,10 +3,10 @@
 /**
  * Token utilities for UserIngestionBinding.
  *
- * Format: `lwub_<base32>`
- *   - prefix: `lwub_` (lower-case, "LangWatch User Binding") — used by the
- *     receiver to discriminate between project apiKey, VirtualKey,
- *     IngestionSource, and UserIngestionBinding tokens at auth time.
+ * Format: `ik-lw-<base32>`
+ *   - prefix: `ik-lw-` (ingestion key, LangWatch) — function-named, paired
+ *     with `sk-lw-` (secret), `vk-lw-` (virtual), `pat-lw-` (legacy). Used
+ *     by the receiver to discriminate token kinds at auth time.
  *   - base32 body: 48 chars from the URL-safe Crockford-ish alphabet, no
  *     padding. Matches the entropy budget of `pat-lw-` PAT secrets while
  *     staying single-segment (no internal `_` split — receiver hashes the
@@ -19,8 +19,8 @@
 import crypto from "node:crypto";
 import { customAlphabet } from "nanoid";
 
-export const BINDING_TOKEN_PREFIX = "lwub_" as const;
-export const BINDING_TOKEN_PREFIX_DISPLAY_LENGTH = 8 as const;
+export const BINDING_TOKEN_PREFIX = "ik-lw-" as const;
+export const BINDING_TOKEN_PREFIX_DISPLAY_LENGTH = 9 as const;
 const BINDING_TOKEN_BODY_LENGTH = 48 as const;
 const BINDING_TOKEN_ALPHABET =
   "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
@@ -34,8 +34,8 @@ export interface IssuedBindingToken {
   /** The full plaintext token, shown ONCE to the user. */
   token: string;
   /**
-   * The first 8 chars of the full token (including the `lwub_` prefix
-   * — i.e. `lwub_` + 3 body chars). Stored as `bindingAccessTokenPrefix`
+   * The first 9 chars of the full token (including the `ik-lw-` prefix
+   * — i.e. `ik-lw-` + 3 body chars). Stored as `bindingAccessTokenPrefix`
    * for "is this the right token" recognition in the /me Trace Ingest
    * tile. Never used for auth.
    */
@@ -57,7 +57,7 @@ export function issueBindingToken(): IssuedBindingToken {
 }
 
 /**
- * Strip the `lwub_` prefix and return the body, or `null` when the
+ * Strip the `ik-lw-` prefix and return the body, or `null` when the
  * input doesn't carry the binding-token prefix. Receiver uses this to
  * prefix-discriminate before hashing.
  */
@@ -73,7 +73,7 @@ export function hashBindingTokenBody(body: string): string {
 }
 
 /**
- * Computes the storage hash for a full `lwub_<body>` token. Convenience
+ * Computes the storage hash for a full `ik-lw-<body>` token. Convenience
  * for callers who hold the full token (e.g. install drawer issuing a
  * fresh token to the DB).
  */

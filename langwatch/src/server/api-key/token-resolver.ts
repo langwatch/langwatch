@@ -51,7 +51,7 @@ export type OrgResolvedToken = {
 /**
  * Strategy-based token resolver. Routes tokens to the correct verification
  * path based on prefix and structure:
- *   - lwub_*  → UserIngestionBinding hash lookup → personal project
+ *   - ik-lw-*  → UserIngestionBinding hash lookup → personal project
  *   - pat-lw-* → API key lookup (old PAT format, backward compat)
  *   - sk-lw-{id}_{secret} → API key lookup (new format)
  *   - sk-lw-* (no underscore) → legacy project key lookup
@@ -178,7 +178,7 @@ export class TokenResolver {
   }
 
   /**
-   * Resolves a `lwub_<base32>` UserIngestionBinding token. Path:
+   * Resolves a `ik-lw-<base32>` UserIngestionBinding token. Path:
    *   1. Strip prefix, hash post-prefix body with SHA-256.
    *   2. Indexed lookup against `bindingAccessTokenHash`.
    *   3. Defense-in-depth re-verify: project still personal, owner

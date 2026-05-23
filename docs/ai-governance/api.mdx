@@ -75,9 +75,9 @@ The second resource to ship is `user-ingestion-bindings` (Sergey's Lane B-2 comm
 | Verb | Method + path | Returns | RBAC |
 |---|---|---|---|
 | `list` | `GET /api/governance/user-ingestion-bindings` | `{ data: UserIngestionBindingDto[] }` (caller-scoped, cross-user reads are not possible) | `organization:view` + PAT bound to a User |
-| `install` | `POST /api/governance/user-ingestion-bindings` | `{ binding: ..., token: "lwub_…" }` (token returned exactly once; thereafter only `binding_access_token_prefix` is visible) | `organization:view` + PAT bound to a User |
+| `install` | `POST /api/governance/user-ingestion-bindings` | `{ binding: ..., token: "ik-lw-…" }` (token returned exactly once; thereafter only `binding_access_token_prefix` is visible) | `organization:view` + PAT bound to a User |
 | `uninstall` | `DELETE /api/governance/user-ingestion-bindings/:id` | `{ uninstalled: true }` | `organization:view` + PAT bound to a User |
-| `rotate` | `POST /api/governance/user-ingestion-bindings/:id/rotate` | `{ binding: ..., token: "lwub_…" }` (hard-cut rotation per spec, old token is invalid immediately) | `organization:view` + PAT bound to a User |
+| `rotate` | `POST /api/governance/user-ingestion-bindings/:id/rotate` | `{ binding: ..., token: "ik-lw-…" }` (hard-cut rotation per spec, old token is invalid immediately) | `organization:view` + PAT bound to a User |
 
 `user-ingestion-bindings` is **caller-scoped**: every org member manages their own bindings, no admin enumeration. Two consequences worth noting:
 

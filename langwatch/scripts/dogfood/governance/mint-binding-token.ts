@@ -1,12 +1,12 @@
 /**
  * mint-binding-token.ts — issue a UserIngestionBinding access token
- * (lwub_*) for fixture-fast-loop testing.
+ * (ik-lw-*) for fixture-fast-loop testing.
  *
  * Real users get a token by clicking "Install" in /me Trace Ingest,
  * which calls the same UserIngestionBindingService.install. There is
  * no UI path that emits raw OTLP claiming forged provenance keys, so
  * the forge-attempt regression must come from a wrapper script — this
- * one. Token printed to stdout in `lwub_*` form so it can be piped
+ * one. Token printed to stdout in `ik-lw-*` form so it can be piped
  * directly into emit-otlp.sh:
  *
  *   TOKEN=$(npx tsx langwatch/scripts/dogfood/governance/mint-binding-token.ts \

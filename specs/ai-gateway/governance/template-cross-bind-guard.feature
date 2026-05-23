@@ -13,7 +13,7 @@ Feature: AI Gateway Governance — Template Cross-Bind Guard
        is the caller's active-workspace input. Cross-user binding is
        unrepresentable in the input shape.
     2. RUNTIME guard at receive — token-as-scope. If user A presents
-       lwub_TOKEN_A and the payload claims TenantId=user_B's personalProject,
+       ik-lw-TOKEN_A and the payload claims TenantId=user_B's personalProject,
        the receiver re-stamps to user A's bound personalProjectId via the
        protectedTemplateAttributeKeys (19-key) post-OTTL guard. Forge attempt
        emits `gateway.template_ottl_protected_field_attempt` audit row.
@@ -23,7 +23,7 @@ Feature: AI Gateway Governance — Template Cross-Bind Guard
     And user "jane@acme.com" has personal project "personal-jane"
     And user "ben@acme.com" has personal project "personal-ben"
     And both users have installed the claude_code template, holding
-        `lwub_TOKEN_JANE` and `lwub_TOKEN_BEN` respectively
+        `ik-lw-TOKEN_JANE` and `ik-lw-TOKEN_BEN` respectively
 
   # ---------------------------------------------------------------------------
   # Layer 1 — structural impossibility at install
@@ -58,7 +58,7 @@ Feature: AI Gateway Governance — Template Cross-Bind Guard
 
   @bdd @cross-bind-guard @token-as-scope @forge-attempt
   Scenario: Forge attempt — payload claims TenantId=other-user, receiver re-stamps
-    When jane fires an OTLP payload using `lwub_TOKEN_JANE` with malicious resource attrs:
+    When jane fires an OTLP payload using `ik-lw-TOKEN_JANE` with malicious resource attrs:
       | attribute                          | value           |
       | langwatch.tenant.id                | "personal-ben"  |
       | langwatch.user.id                  | ben.id          |
@@ -78,7 +78,7 @@ Feature: AI Gateway Governance — Template Cross-Bind Guard
 
   @bdd @cross-bind-guard @token-as-scope @cross-user-receive
   Scenario: User A's token cannot deliver traces to user B's project under any payload manipulation
-    When jane fires N OTLP payloads with various forge-attempt variants using `lwub_TOKEN_JANE`
+    When jane fires N OTLP payloads with various forge-attempt variants using `ik-lw-TOKEN_JANE`
     Then ALL N traces land at jane's /me/traces (personalProjectId="personal-jane")
     And ZERO traces land at ben's /me/traces
 
@@ -105,7 +105,7 @@ Feature: AI Gateway Governance — Template Cross-Bind Guard
     Given jane's binding row has been manually tampered (out-of-band SQL) so
         binding.personalProjectId now points at ben's project, but
         binding.userId still equals jane.id
-    When jane fires a trace using `lwub_TOKEN_JANE`
+    When jane fires a trace using `ik-lw-TOKEN_JANE`
     Then the receiver's defense-in-depth re-verify step fails:
         binding.personalProject.team.ownerUserId !== binding.userId
     And the receiver returns 401 with no body content

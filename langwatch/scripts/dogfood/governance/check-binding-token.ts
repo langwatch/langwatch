@@ -1,7 +1,7 @@
 /**
  * check-binding-token.ts — diagnostic helper that walks the same
  * hash-lookup path the receiver uses (`tokenResolver.resolveUserIngestionBinding`)
- * to explain why a given lwub_* token resolves or 401s. Use when
+ * to explain why a given ik-lw-* token resolves or 401s. Use when
  * `emit-otlp.sh` returns 401 to find which check tripped.
  */
 import { PrismaClient } from "@prisma/client";
@@ -14,7 +14,7 @@ import {
 async function main() {
   const token = process.argv[2];
   if (!token) {
-    console.error("Usage: tsx check-binding-token.ts <lwub_...>");
+    console.error("Usage: tsx check-binding-token.ts <ik-lw-...>");
     process.exit(2);
   }
   const prisma = new PrismaClient();

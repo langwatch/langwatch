@@ -59,7 +59,7 @@ export const userIngestionBindingsRouter = createTRPCRouter({
    * per spec).
    *
    * Returns the issued plaintext token ONCE. Subsequent reads only see
-   * the prefix (8 chars).
+   * the prefix (9 chars).
    */
   install: protectedProcedure
     .input(

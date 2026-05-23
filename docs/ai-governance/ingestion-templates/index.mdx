@@ -48,7 +48,7 @@ That's an Ingestion Template:
   admins click **Clone to customise** which calls
   `ingestionTemplates.cloneFromPlatform`, then **Edit OTTL** on the new org-authored
   row to refine the rules.
-- **User side:** a binding token (`lwub_…`) scoped to your personal project. You paste
+- **User side:** a binding token (`ik-lw-…`) scoped to your personal project. You paste
   that token into your tool's OTLP exporter; the tool ships, the receiver attributes
   + applies the resolved template's OTTL (empty for platform defaults, admin-authored
   for org forks).
@@ -92,13 +92,13 @@ gen_ai.\* canonical. Cost/tokens/model populated automatically by the receiver."
 The drawer shows:
 
 - **OTLP endpoint**: read-only, copyable.
-- **Binding token**: `lwub_…` issued one-time, with a Show/Hide toggle. Copy it
-  while it's visible; after you dismiss the drawer it's masked to its first 8
+- **Binding token**: `ik-lw-…` issued one-time, with a Show/Hide toggle. Copy it
+  while it's visible; after you dismiss the drawer it's masked to its first 9
   characters.
 - **Snippet preview**: pre-wired environment variables for Claude Code:
   ```bash
   export OTEL_EXPORTER_OTLP_ENDPOINT="https://app.langwatch.ai/api/otel"
-  export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer lwub_<your-token>"
+  export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ik-lw-<your-token>"
   ```
   (Self-hosted: replace the host with your LangWatch base URL. The drawer always
   shows the correct endpoint for your instance.)
@@ -181,10 +181,10 @@ shape.
 
 ### Receiver resolution flow
 
-When your tool emits an OTLP payload with `Authorization: Bearer lwub_<token>`, the
+When your tool emits an OTLP payload with `Authorization: Bearer ik-lw-<token>`, the
 receiver:
 
-1. **Prefix-discriminates** the bearer, `lwub_*` → UserIngestionBinding lookup.
+1. **Prefix-discriminates** the bearer, `ik-lw-*` → UserIngestionBinding lookup.
 2. **Hashes** the token (SHA256) and looks up the binding by
    `bindingAccessTokenHash` (B-tree indexed; sub-millisecond on PG).
 3. **Defense-in-depth re-verifies** that the binding's project is personal AND its
@@ -271,7 +271,7 @@ For security reviewers evaluating the feature.
 
 ### Trust boundary
 
-- **Token = scope.** The `lwub_*` binding token authoritatively determines which
+- **Token = scope.** The `ik-lw-*` binding token authoritatively determines which
   personal project a trace lands in. Payload-level claims about user, team, org, project
   attribution are advisory and re-stamped post-OTTL.
 - **Cross-bind guard at install** is structural: `bindingService.install` does not accept
@@ -350,7 +350,7 @@ SOC2, ISO27001 evidence collection.
 ### Does LangWatch see my Anthropic OAuth token?
 
 No. Claude Code holds your Anthropic OAuth session locally; LangWatch never participates
-in that flow. The only credential LangWatch holds is the binding token (`lwub_…`) we
+in that flow. The only credential LangWatch holds is the binding token (`ik-lw-…`) we
 issue you, which is scoped to your personal project.
 
 ### What happens if I rotate the binding token?

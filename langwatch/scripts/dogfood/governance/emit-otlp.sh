@@ -3,7 +3,7 @@
 # emit-otlp.sh — fake OTLP emitter for IngestionTemplate dogfood rituals.
 #
 # Posts a canned OTLP/HTTP traces payload to the LangWatch receiver with a
-# UserIngestionBinding access token (lwub_*) as Bearer auth. Replaces the
+# UserIngestionBinding access token (ik-lw-*) as Bearer auth. Replaces the
 # need to fire real upstream traffic (Anthropic 20x credits, Cursor agent
 # runs, etc.) when exercising the per-template dogfood ritual.
 #
@@ -11,14 +11,14 @@
 #
 #   1. NORMAL — selects a per-template canned payload by slug:
 #        ./emit-otlp.sh \
-#          --binding-token lwub_xxxxx \
+#          --binding-token ik-lw-xxxxx \
 #          --template-id claude_code \
 #          [--base-url http://localhost:5560] [--count 1]
 #      Reads payloads/<template-id>.json (Ariana owns the canned shapes).
 #
 #   2. FORGE — selects a forge-attempt payload by category:
 #        ./emit-otlp.sh \
-#          --binding-token lwub_xxxxx \
+#          --binding-token ik-lw-xxxxx \
 #          --forge-attempt attribution
 #      Reads payloads/forge-attempt/<category>.json. Each category claims
 #      a different protected-key class (attribution / provenance) so the
@@ -42,11 +42,11 @@ PAYLOADS_DIR="${SCRIPT_DIR}/payloads"
 usage() {
   cat >&2 <<USAGE
 Usage:
-  $(basename "$0") --binding-token <lwub_*> [--template-id <slug> | --forge-attempt <category>]
+  $(basename "$0") --binding-token <ik-lw-*> [--template-id <slug> | --forge-attempt <category>]
                    [--base-url <url>] [--count <n>] [--forge-tenant-id <id>] [--verbose]
 
 Required:
-  --binding-token <lwub_*>      UserIngestionBinding access token (Bearer auth).
+  --binding-token <ik-lw-*>      UserIngestionBinding access token (Bearer auth).
   --template-id <slug>          Use payloads/<slug>.json (NORMAL mode).
   --forge-attempt <category>    Use payloads/forge-attempt/<category>.json (FORGE mode).
                                 One of --template-id or --forge-attempt is required.
@@ -95,7 +95,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 [[ -n "$BINDING_TOKEN" ]] || { usage; die "--binding-token is required"; }
-[[ "$BINDING_TOKEN" == lwub_* ]] || die "--binding-token must start with 'lwub_' (got prefix '${BINDING_TOKEN%%_*}_')"
+[[ "$BINDING_TOKEN" == ik-lw-* ]] || die "--binding-token must start with 'ik-lw-' (got prefix '${BINDING_TOKEN%%_*}_')"
 
 if [[ -n "$TEMPLATE_ID" && -n "$FORGE_CATEGORY" ]]; then
   die "--template-id and --forge-attempt are mutually exclusive"

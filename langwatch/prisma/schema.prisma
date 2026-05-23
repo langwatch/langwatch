@@ -2216,7 +2216,7 @@ model IngestionTemplate {
 }
 
 /// User-managed binding from an IngestionTemplate to the user's personal
-/// project. Holds the `lwub_<base32>` binding access token (hashed) the
+/// project. Holds the `ik-lw-<base32>` binding access token (hashed) the
 /// user pastes into their upstream tool's OTLP exporter Bearer auth.
 ///
 /// Cross-bind guard is service-layer (structural-impossibility): the
@@ -2252,7 +2252,7 @@ model UserIngestionBinding {
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  /// SHA256 hex of the `lwub_<base32>` token. Receiver auth path:
+  /// SHA256 hex of the `ik-lw-<base32>` token. Receiver auth path:
   /// SHA256(incoming Bearer) → indexed lookup. Single source of truth
   /// for binding auth.
   bindingAccessTokenHash String @unique

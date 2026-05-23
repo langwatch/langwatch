@@ -12,7 +12,7 @@ Two parts of the spec'd ritual are deferred to v1.1 / v2 per @sergey's lane-S ch
 
 | Capability | v1 status | What it means for the ritual |
 |---|---|---|
-| Receiver auth via lwub_* token | ✅ shipped (60ae9847a) | hash lookup → defense-in-depth re-verify → personal project tenancy works end-to-end |
+| Receiver auth via ik-lw-* token | ✅ shipped (60ae9847a) | hash lookup → defense-in-depth re-verify → personal project tenancy works end-to-end |
 | Receiver-stamped attribution keys (B6 16-key set: `langwatch.user.id`, `.team.id`, `.organization.id`, `.project.id`, `.tenant_id`, etc.) | ✅ shipped (existing B6 guard) | trace lands with correct user/team/org/project regardless of what the payload claims |
 | Receiver-stamped provenance keys (`langwatch.template.id`, `.user_ingestion_binding.id`, `.source`) | 🔵 deferred (next sergey commit) | Step 4 Then-clause asserting these keys is **blocked on sergey's provenance-stamping work** |
 | 19-key `protectedTemplateAttributeKeys` principal-field guard | 🟡 deferred to v1.1 / v2 | v1 templates ship empty `ottlRules` → no template OTTL ever runs → no audit row fires v1. **Step 6 forge-audit-row Then-clause is blocked on the principal-field-guard work.** Receiver still re-stamps attribution keys via existing B6 guard. |
@@ -44,7 +44,7 @@ Two parallel tracks. Both must pass (modulo the deferred-step exemptions above).
 
 - `pnpm dev` running against postgres + clickhouse + aigateway (`make dev-scenarios` or `make dev-full`)
 - `scripts/dogfood/governance/seed-personas.ts` has been run (creates `jane@acme.com` + `ben@acme.com` with personal projects)
-- The user under dogfood has installed the `<TEMPLATE_SLUG>` template via `/me` Trace Ingest (binding row exists; binding access token `lwub_*` captured)
+- The user under dogfood has installed the `<TEMPLATE_SLUG>` template via `/me` Trace Ingest (binding row exists; binding access token `ik-lw-*` captured)
 - `scripts/dogfood/governance/emit-otlp.sh` is on `PATH` (or invoked by full path)
 - Canned payload exists at `scripts/dogfood/governance/payloads/<TEMPLATE_SLUG>.json`
 
@@ -69,7 +69,7 @@ Open `/me`, scroll to the **Trace Ingest** section, click **Install** on the `<T
 Verify:
 - Drawer opens with template name + iconKey + description copy
 - Endpoint URL renders (read-only, copyable): `<BASE_HOST>/api/otel` — the OTEL SDK exporter auto-appends `/v1/traces` per OTLP convention. Receiver POSTs land at `<BASE_HOST>/api/otel/v1/traces`. The drawer shows the BASE URL (matches `OpenTelemetrySetup` pattern + the `OTEL_EXPORTER_OTLP_ENDPOINT` env-var convention).
-- Binding access token renders (one-time-show, masked thereafter, prefix-only display): `lwub_<8-char-prefix>…`
+- Binding access token renders (one-time-show, masked thereafter, prefix-only display): first 9 chars `ik-lw-XYZ…`
 - Copy button works for endpoint, token, and the full env-var snippet
 - Copy disambiguation copy is present:
   - For `claude_code` / `cursor` / `claude_cowork`: 'OTTL pre-applied. Source-shaped (cost/tokens/model normalized).'
@@ -95,7 +95,7 @@ If the audit row never appears, **blocker** (governance-trail integrity).
 
 ```bash
 ./scripts/dogfood/governance/emit-otlp.sh \
-  --binding-token <lwub_TOKEN_FROM_STEP_1> \
+  --binding-token <ik-lw-TOKEN_FROM_STEP_1> \
   --template-id <TEMPLATE_SLUG> \
   --base-url http://localhost:5560 \
   --count 1
@@ -144,12 +144,12 @@ Re-emit using the forge fixtures. **Both variants must run.**
 ```bash
 # Attribution forge — claims B6 16-key attribution set
 ./scripts/dogfood/governance/emit-otlp.sh \
-  --binding-token <lwub_TOKEN_FROM_STEP_1> \
+  --binding-token <ik-lw-TOKEN_FROM_STEP_1> \
   --forge-attempt attribution
 
 # Provenance forge — claims langwatch.template.id / .user_ingestion_binding.id / .source
 ./scripts/dogfood/governance/emit-otlp.sh \
-  --binding-token <lwub_TOKEN_FROM_STEP_1> \
+  --binding-token <ik-lw-TOKEN_FROM_STEP_1> \
   --forge-attempt provenance
 ```
 
@@ -166,16 +166,16 @@ If the receiver echoes the FORGE_* values into the trace (instead of restoring a
 
 ### Step 7 — Hard-cut rotation
 
-Trigger token rotation from the `/me` Trace Ingest tile (rotate button on the installed tile). Capture the new `lwub_*` token.
+Trigger token rotation from the `/me` Trace Ingest tile (rotate button on the installed tile). Capture the new `ik-lw-*` token.
 
 Verify:
 - New token `T_NEW` is issued and shown one-time in a drawer (same shape as install drawer)
 - `bindingAccessTokenHash` column updates to `SHA256(T_NEW)` (verifiable by tail-of-`pg_dump` or Prisma Studio)
-- `bindingAccessTokenPrefix` column updates to `T_NEW`'s first 8 chars
+- `bindingAccessTokenPrefix` column updates to `T_NEW`'s first 9 chars
 - The previous token is **revoked immediately** (no grace window):
   ```bash
   ./scripts/dogfood/governance/emit-otlp.sh \
-    --binding-token <lwub_TOKEN_OLD_FROM_STEP_1> \
+    --binding-token <ik-lw-TOKEN_OLD_FROM_STEP_1> \
     --template-id <TEMPLATE_SLUG>
   ```
   Expected: `fail … status=401 …` — receiver returns 401 with no enumeration (silent, no 'token revoked' leakage).
@@ -210,14 +210,14 @@ Run the same 7-step structure but **using the real UI for clicks, the real upstr
 - Navigate to `/me`, scroll to Trace Ingest section
 - Click `<TEMPLATE_SLUG>` tile → install drawer opens
 - Complete the credential form (otlp_token = nothing to fill; static_api_key = paste real key; agent_id = enter real agent id) and click Save
-- Verify the binding lwub_* token shows one-time, copy it for steps R3-R6
+- Verify the binding ik-lw-* token shows one-time, copy it for steps R3-R6
 - Verify the tile flips to green-checked
 - **Screenshot**: `<TEMPLATE_SLUG>-real-install-drawer.png` + `<TEMPLATE_SLUG>-tile-green-checked.png`
 
 ### R3 — Run the real upstream tool against the binding
 
 - **<TEMPLATE-SPECIFIC: real upstream tool invocation>**:
-  - `claude_code` → set `OTEL_EXPORTER_OTLP_ENDPOINT=<BASE_HOST>/api/otel` + `OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer <lwub_TOKEN>"` in env, run an actual `claude` CLI session that emits real OTLP. Per sergey's checkpoint: Claude Code already emits canonical gen_ai natively, so v1 receiver passthrough suffices. **Conditional blocker**: only blocked if the locally-installed Claude Code version doesn't emit OTLP at all (e.g., older builds before OTLP exporter wiring). If yes-OTLP-emitting, dogfoodable today.
+  - `claude_code` → set `OTEL_EXPORTER_OTLP_ENDPOINT=<BASE_HOST>/api/otel` + `OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer <ik-lw-TOKEN>"` in env, run an actual `claude` CLI session that emits real OTLP. Per sergey's checkpoint: Claude Code already emits canonical gen_ai natively, so v1 receiver passthrough suffices. **Conditional blocker**: only blocked if the locally-installed Claude Code version doesn't emit OTLP at all (e.g., older builds before OTLP exporter wiring). If yes-OTLP-emitting, dogfoodable today.
   - `cursor` → configure Cursor's telemetry export endpoint, run an actual Cursor agent action against a real codebase. **Conditional blocker**: only blocked if Cursor's OTLP-export configurability isn't surfaced in the version I'm running.
   - `claude_cowork` → run a real claude_cowork session pointed at the binding. **Conditional blocker**: only blocked if the claude_cowork CLI/SDK doesn't emit OTLP yet.
   - `raw_otlp_advanced` → discovery card on /me Trace Ingest section that deep-links to /me/settings#otlp; user grabs the personal project apiKey + runs any OTel-instrumented script (Python `opentelemetry-instrument`, Node `@opentelemetry/sdk-node`). This one IS dogfoodable today; no IngestionTemplate row exists for it (per andre PM call at 348936e4f).

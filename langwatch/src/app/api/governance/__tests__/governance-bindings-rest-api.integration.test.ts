@@ -309,7 +309,7 @@ describe("Feature: User-Ingestion-Bindings REST API", () => {
       expect(body.binding.template_id).toBe(testTemplateId);
       expect(body.binding.user_id).toBe(testUser.id);
       expect(body.binding.personal_project_id).toBe(testPersonalProject.id);
-      expect(body.token).toMatch(/^lwub_[a-z0-9]+$/i);
+      expect(body.token).toMatch(/^ik-lw-[a-z0-9]+$/i);
       expect(body.binding.binding_access_token_prefix).toBe(
         body.token.slice(0, body.binding.binding_access_token_prefix.length),
       );

@@ -15,7 +15,7 @@ Feature: AI Gateway Governance — Sessions and Devices Inventory
     Three credential classes share one inventory:
       • web session — short-lived cookie + refresh
       • CLI device session — `langwatch login --device` against ~/.langwatch
-      • binding token — `lwub_<base32>` minted from /me Trace Ingest
+      • binding token — `ik-lw-<base32>` minted from /me Trace Ingest
 
   Per ingestion-templates-catalog.feature + user-ingestion-binding-lifecycle.feature:
     Binding tokens are TODAY surfaced ONLY at /me Trace Ingest tile-grid

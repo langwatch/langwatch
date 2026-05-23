@@ -65,7 +65,7 @@ because**:
 
 3. **No agent-blocking customer report**. The "Claude Code 20x company
    governance" use case maps to ingestion-templates + bindings
-   specifically — the OTTL fork-and-customize flow + per-user lwub_
+   specifically — the OTTL fork-and-customize flow + per-user ik-lw-
    token install. The other 10 resources are admin-internal (governance
    admin sets policy, users don't poke at it). Agent-driven CRUD via
    MCP is high-value for the user-flow resources, low-value for the

@@ -7,7 +7,7 @@ Feature: AI Gateway Governance — UserIngestionBinding Lifecycle
 
   Per ingestion-templates-catalog.feature + ingestion-attribution.feature:
     UserIngestionBinding is the v1 personal-ingest binding model.
-    Token format: `lwub_<base32>` prefix-discriminated by the receiver.
+    Token format: `ik-lw-<base32>` prefix-discriminated by the receiver.
     Credential lookup: `bindingAccessTokenHash` (SHA256, B-tree indexed).
     Cross-bind guard: SERVICE-LAYER. Input MUST NOT accept personalProjectId
     — server resolves via `getPersonalProjectForUser(userId, organizationId)`

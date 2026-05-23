@@ -62,7 +62,7 @@ walkers are a TODO — parameterize by slug.
 
 Gates:
 - Tile click opens drawer
-- "Issue binding token" mints `lwub_<base32>` token (captured via tRPC response body regex `/"token":"(lwub_[A-Za-z0-9_]+)"/`)
+- "Issue binding token" mints `ik-lw-<base32>` token (captured via tRPC response body regex `/"token":"(ik-lw-[A-Za-z0-9_]+)"/`)
 - "Rotate token" path works when tile is already installed (no 409 CONFLICT)
 - Token shown ONCE — does not survive page reload
 - Tile renders green Check + Installed badge + token prefix after install
@@ -106,7 +106,7 @@ Gate: trace lands, but `gen_ai.*` fields only populate if client already shapes 
 ```bash
 docker exec wise-mixing-zebra-app-1 \
   bash scripts/dogfood/governance/emit-otlp.sh \
-  --token lwub_<binding-of-org-A> \
+  --token ik-lw-<binding-of-org-A> \
   --forge-tenant-id <org-B-id>
 ```
 

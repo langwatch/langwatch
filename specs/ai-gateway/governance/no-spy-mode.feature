@@ -22,7 +22,7 @@ Feature: AI Gateway Governance — No-Spy Mode (org-level content stripping)
   Per ingestion-templates-catalog.feature + admin-trace-access.feature:
     No-spy mode applies to EVERY trace ingestion path uniformly:
       • gateway VK proxy traces
-      • UserIngestionBinding traces (lwub_*)
+      • UserIngestionBinding traces (ik-lw-*)
       • IngestionSource pull/push traces
       • Direct OTLP project apiKey traces
     Per-path opt-out is NOT supported — the org-level mode is authoritative.
@@ -100,8 +100,8 @@ Feature: AI Gateway Governance — No-Spy Mode (org-level content stripping)
   Scenario: strip_io applies to UserIngestionBinding-routed traces
     Given the org's mode is "strip_io"
     And user "jane@acme-privacy.com" has installed the claude_code template
-        and holds binding token `lwub_TOKEN_JANE`
-    When jane fires a trace through `lwub_TOKEN_JANE`
+        and holds binding token `ik-lw-TOKEN_JANE`
+    When jane fires a trace through `ik-lw-TOKEN_JANE`
     Then the trace lands at /me/traces with:
       | attribute                       | value                                                       |
       | gen_ai.usage.* + cost.usd       | populated                                                    |

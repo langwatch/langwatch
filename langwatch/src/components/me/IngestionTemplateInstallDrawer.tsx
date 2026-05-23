@@ -41,7 +41,7 @@ export type IngestionTemplateMeta = {
 };
 
 export type IngestionBindingResult = {
-  /** Plaintext lwub_<base32> token — shown ONCE, copied by user. */
+  /** Plaintext ik-lw-<base32> token — shown ONCE, copied by user. */
   token: string;
   /** OTLP endpoint URL (`{BASE_HOST}/api/otel`). */
   endpoint: string;
@@ -52,7 +52,7 @@ export type IngestionBindingResult = {
  *
  * v1 supports otlp_token-only templates (credentialSchema=null): the
  * drawer auto-issues on open via the parent's onInstall callback, then
- * shows the endpoint + lwub_* token + a copy-paste env-var snippet. The
+ * shows the endpoint + ik-lw-* token + a copy-paste env-var snippet. The
  * token is plaintext-shown ONCE — once the drawer closes, the user can
  * still see the prefix on the tile but never the secret again.
  *

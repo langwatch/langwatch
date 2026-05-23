@@ -313,7 +313,7 @@ export function registerGovernanceMcpTools(
 
   server.tool(
     "governance_user_ingestion_bindings_install",
-    "Install a binding for the caller for the given template, returning the lwub_* token (shown ONCE). Requires OAuth-authenticated session + organization:view. Mirrors POST /api/governance/user-ingestion-bindings.",
+    "Install a binding for the caller for the given template, returning the ik-lw-* token (shown ONCE). Requires OAuth-authenticated session + organization:view. Mirrors POST /api/governance/user-ingestion-bindings.",
     {
       template_id: z.string(),
     },
@@ -351,7 +351,7 @@ export function registerGovernanceMcpTools(
 
   server.tool(
     "governance_user_ingestion_bindings_rotate",
-    "Hard-cut rotate the binding token. Returns the new lwub_* token (shown ONCE); the previous one is invalidated immediately. Mirrors POST /api/governance/user-ingestion-bindings/:id/rotate.",
+    "Hard-cut rotate the binding token. Returns the new ik-lw-* token (shown ONCE); the previous one is invalidated immediately. Mirrors POST /api/governance/user-ingestion-bindings/:id/rotate.",
     { binding_id: z.string() },
     async ({ binding_id }) => {
       const r = await resolve();

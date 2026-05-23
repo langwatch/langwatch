@@ -36,7 +36,7 @@ import { api } from "~/utils/api";
  * defaults ship with iconAsset=NULL.
  *
  * Install fires `api.userIngestionBindings.install` mutation. The
- * plaintext lwub_<base32> token is shown ONCE in the drawer and stored
+ * plaintext ik-lw-<base32> token is shown ONCE in the drawer and stored
  * in component state for the session — bindings list query tells us
  * which templates are installed (drives green-check), but the token
  * doesn't survive page reload (matches "shown once" UX).
