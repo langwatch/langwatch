@@ -103,7 +103,7 @@ export function IngestionTemplateInstallDrawer({
   installError: string | null;
   /**
    * True when the user already has a binding for this template. Drives the
-   * CTA copy: 'Issue binding token' (fresh) vs 'Rotate token' (replace).
+   * CTA copy: 'Use this template' (fresh) vs 'Rotate token' (replace).
    * Without this signal the drawer would mint-only and 409 on every
    * already-installed template.
    */
