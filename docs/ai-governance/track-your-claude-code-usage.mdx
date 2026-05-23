@@ -185,7 +185,7 @@ For self-hosted (`npx @langwatch/server`), data never leaves your machine. The P
 
 **Cost shows $0 even though traces land.** The model alias in the span does not match a current entry in LangWatch's cost catalog. Check the span's `gen_ai.request.model` attribute and confirm it is a current-gen identifier (`claude-sonnet-4-6`, `claude-opus-4-7`, `claude-haiku-4-5`). Legacy aliases (`claude-3-5-sonnet-20241022`) silently produce NULL cost. Update Claude Code or pin the model alias to the current value.
 
-**OTLP endpoint reachable but no source-id in the URL (Path A).** You closed the install drawer before clicking **Use this template**. Open the Claude Code tile again, run the install flow, copy the full env block from the drawer (not just the headers).
+**Token works but Authorization header malformed (Path A).** Verify the env block has `Authorization=Bearer ik-lw-...` with an equals sign (not a colon) and no trailing whitespace from copy-paste. The `ik-lw-` token is the source identity itself, so the OTLP endpoint stays the same for every personal binding; only the bearer header changes per user.
 
 **Self-hosted: app starts but `/me` is empty.** Make sure you signed up with email/password (the SaaS SSO providers are disabled by default in `npx @langwatch/server`). If you signed up but the page is blank, check `docker logs` on the langwatch container for migration errors.
 
