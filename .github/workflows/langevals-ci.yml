@@ -1,7 +1,7 @@
 # Always-run workflow with internal path gating + aggregator. See #3223.
 # Branch protection requires `langevals-complete` (includes docker-build).
-# `pull_request_target` runs real tests on `approved-ci` labeled dependabot
-# PRs (per-job `if:` guards); that event forces `relevant=true`.
+# `pull_request_target` runs real tests only after an `approved-ci` label
+# is applied (per-job `if:` guards); that event forces `relevant=true`.
 name: langevals-ci
 
 on:
@@ -38,8 +38,7 @@ jobs:
     if: >
       needs.changes.outputs.relevant == 'true'
       && (github.event_name != 'pull_request_target'
-          || (github.event.label.name == 'approved-ci'
-              && github.event.pull_request.user.login == 'dependabot[bot]'))
+          || github.event.label.name == 'approved-ci')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -67,8 +66,7 @@ jobs:
     if: >
       needs.changes.outputs.relevant == 'true'
       && (github.event_name != 'pull_request_target'
-          || (github.event.label.name == 'approved-ci'
-              && github.event.pull_request.user.login == 'dependabot[bot]'))
+          || github.event.label.name == 'approved-ci')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -112,8 +110,7 @@ jobs:
     if: >
       needs.changes.outputs.relevant == 'true'
       && (github.event_name != 'pull_request_target'
-          || (github.event.label.name == 'approved-ci'
-              && github.event.pull_request.user.login == 'dependabot[bot]'))
+          || github.event.label.name == 'approved-ci')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
