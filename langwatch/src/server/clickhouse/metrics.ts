@@ -267,7 +267,15 @@ export async function collectStorageStats(
       setClickHouseTableParts(row.table, parseInt(row.parts_count, 10));
     }
 
-    // Collect backup status metrics
+    // Collect backup status metrics from system.backup_log (persistent).
+    // We deliberately query system.backup_log instead of system.backups:
+    // system.backups is an in-memory table that gets wiped on CH restart,
+    // which happens on every app deploy (the CH image tag is bumped by the
+    // build pipeline). After a restart the in-memory table is empty until
+    // the next scheduled backup runs, so a freshly-rolled worker pod sees
+    // zero rows and never emits the gauge, tripping the "Backup Reporting
+    // Absent" alert despite backups being healthy. system.backup_log is a
+    // persistent system table that retains entries across restarts.
     try {
       interface BackupStats {
         status: string;
@@ -283,7 +291,7 @@ export async function collectStorageStats(
             count() as cnt,
             maxIf(end_time, status = 'BACKUP_CREATED') as last_success_time,
             argMaxIf(total_size, end_time, status = 'BACKUP_CREATED') as last_success_size
-          FROM system.backups
+          FROM system.backup_log
           GROUP BY status
         `,
       });
@@ -316,13 +324,13 @@ export async function collectStorageStats(
       if (!backupStatsCollectionFailing) {
         logger.warn(
           { error: backupError },
-          "Failed to collect ClickHouse backup stats from system.backups (further failures suppressed until recovery)",
+          "Failed to collect ClickHouse backup stats from system.backup_log (further failures suppressed until recovery)",
         );
         backupStatsCollectionFailing = true;
       } else {
         logger.debug(
           { error: backupError },
-          "Failed to collect ClickHouse backup stats from system.backups",
+          "Failed to collect ClickHouse backup stats from system.backup_log",
         );
       }
     }

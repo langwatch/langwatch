@@ -223,7 +223,7 @@ describe("ClickHouse metrics", () => {
       );
     });
 
-    it("queries system.backups for backup status", async () => {
+    it("queries system.backup_log for backup status", async () => {
       const partsResult = {
         json: vi.fn().mockResolvedValue({ data: [] }),
       };
@@ -259,7 +259,7 @@ describe("ClickHouse metrics", () => {
       expect(mockClient.query).toHaveBeenCalledTimes(3);
       expect(mockClient.query).toHaveBeenCalledWith(
         expect.objectContaining({
-          query: expect.stringContaining("system.backups"),
+          query: expect.stringContaining("system.backup_log"),
         })
       );
       expect(mockClient.query).toHaveBeenCalledWith(
@@ -269,14 +269,14 @@ describe("ClickHouse metrics", () => {
       );
     });
 
-    it("handles system.backups query failure gracefully", async () => {
+    it("handles system.backup_log query failure gracefully", async () => {
       const partsResult = {
         json: vi.fn().mockResolvedValue({ data: [] }),
       };
       const mockClient = {
         query: vi.fn()
           .mockResolvedValueOnce(partsResult)
-          .mockRejectedValueOnce(new Error("system.backups not found"))
+          .mockRejectedValueOnce(new Error("system.backup_log not enabled"))
           .mockResolvedValueOnce({ json: vi.fn().mockResolvedValue({ data: [] }) }),
       } as unknown as ClickHouseClient;
 
@@ -394,7 +394,7 @@ describe("ClickHouse metrics", () => {
     });
   });
 
-  describe("system.backups failure logging", () => {
+  describe("system.backup_log failure logging", () => {
     const buildMockClient = (backupShouldFail: () => boolean) => {
       const partsResult = { json: vi.fn().mockResolvedValue({ data: [] }) };
       const successfulBackupResult = {
@@ -404,9 +404,9 @@ describe("ClickHouse metrics", () => {
       return {
         query: vi.fn(async ({ query }: { query: string }) => {
           if (query.includes("system.parts")) return partsResult;
-          if (query.includes("system.backups")) {
+          if (query.includes("system.backup_log")) {
             if (backupShouldFail()) {
-              throw new Error("system.backups not found");
+              throw new Error("system.backup_log not enabled");
             }
             return successfulBackupResult;
           }
@@ -436,7 +436,7 @@ describe("ClickHouse metrics", () => {
       // logger.warn signature is (obj, msg). First failure warns;
       // subsequent failures fall through to debug.
       expect(
-        countCallsMatching(loggerMocks.warn.mock.calls, 1, "system.backups"),
+        countCallsMatching(loggerMocks.warn.mock.calls, 1, "system.backup_log"),
       ).toBe(1);
     });
 
@@ -452,7 +452,7 @@ describe("ClickHouse metrics", () => {
       await metrics.collectStorageStats(client); // fail → warn (#2)
 
       expect(
-        countCallsMatching(loggerMocks.warn.mock.calls, 1, "system.backups"),
+        countCallsMatching(loggerMocks.warn.mock.calls, 1, "system.backup_log"),
       ).toBe(2);
       // logger.info("ClickHouse backup stats collection recovered ...")
       // is called with the message as the first arg.
