@@ -45,6 +45,7 @@ import { LoadingScreen } from "./LoadingScreen";
 import { MainMenu, MENU_WIDTH_COMPACT, MENU_WIDTH_EXPANDED } from "./MainMenu";
 import { SavedViewsBar } from "./messages/SavedViewsBar";
 import { ProjectAvatar } from "./ProjectAvatar";
+import { PresenceMenuItem } from "./sidebar/PresenceMenuItem";
 import { SdkRadarBanner } from "./SdkRadarBanner";
 import { UpgradeModal } from "./UpgradeModal";
 import { Link } from "./ui/link";
@@ -359,6 +360,10 @@ export const DashboardLayout = ({
     router.pathname.startsWith("/[project]/messages") ||
     router.pathname.startsWith("/[project]/analytics");
   const showSavedViews = isTracesOrAnalyticsPage;
+  // The presence toggle is meaningful only on the traces v2 lens
+  // (multiplayer cursors + section presence are wired there). Gate the
+  // avatar-menu entry so it stays off the other surfaces' chrome.
+  const showPresenceMenuItem = router.pathname.startsWith("/[project]/traces");
 
   return (
     <Box
@@ -553,6 +558,7 @@ export const DashboardLayout = ({
                     <Menu.Item value="settings" asChild>
                       <Link href="/settings">Settings</Link>
                     </Menu.Item>
+                    {showPresenceMenuItem && <PresenceMenuItem />}
                     <Menu.Item value="logout" asChild>
                       <a href="/api/auth/logout">Logout</a>
                     </Menu.Item>
