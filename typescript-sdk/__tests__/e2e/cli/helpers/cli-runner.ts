@@ -40,7 +40,13 @@ export class CliRunner {
   private log(message: string): void {
     const timestamp = new Date().toISOString();
     const logEntry = `[${timestamp}] ${message}\n`;
-    fs.appendFileSync(this.logPath, logEntry);
+    try {
+      fs.appendFileSync(this.logPath, logEntry);
+    } catch (e: unknown) {
+      // Silently swallow ENOENT: timers set up for stdin input may fire
+      // after afterEach removes testDir. Any other error is real and should propagate.
+      if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
+    }
   }
 
   /**
