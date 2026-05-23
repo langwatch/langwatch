@@ -109,6 +109,7 @@ export function TraceSummaryAccordions({
   const containerRef = useRef<HTMLDivElement>(null);
   const pendingFocus = useFocusSectionStore((s) => s.pending);
   const clearFocus = useFocusSectionStore((s) => s.clear);
+  const requestFocus = useFocusSectionStore((s) => s.request);
   const [glow, setGlow] = useState<{
     target: HTMLElement;
     nonce: number;
@@ -267,6 +268,12 @@ export function TraceSummaryAccordions({
                   error={trace.error}
                   errorSpans={errorSpans}
                   onSelectSpan={onSelectSpan}
+                  onFocusSection={() =>
+                    requestFocus({
+                      traceId: trace.traceId,
+                      section: "exceptions",
+                    })
+                  }
                 />
               </Section>
             );

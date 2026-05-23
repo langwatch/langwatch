@@ -291,6 +291,7 @@ function StatusChip({
               error={trace.error}
               errorSpans={errorSpans}
               onSelectSpan={jumpToSpan}
+              onFocusSection={focusExceptions}
               density="compact"
             />
             {/* Anchor row: nudges the operator that the popover is a

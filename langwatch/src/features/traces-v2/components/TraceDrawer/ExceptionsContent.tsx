@@ -11,6 +11,15 @@ interface ExceptionsContentProps {
   /** Click handler for a span pill — jumps the drawer to that span. */
   onSelectSpan?: (spanId: string) => void;
   /**
+   * Optional sibling-callback fired alongside `onSelectSpan` so the
+   * Exceptions section pulses + scrolls into view when the operator
+   * jumps via a pill. The chip popover wires this to re-fire the
+   * header chip's focus pipeline; the accordion-embedded variant wires
+   * it to re-pulse the section the operator is already viewing so the
+   * eye lands back on the row that owns the selected span.
+   */
+  onFocusSection?: () => void;
+  /**
    * Compact mode tightens paddings + truncation widths so the same
    * block fits comfortably inside a hover popover. The full-size
    * variant is what the Exceptions accordion uses inline.
@@ -37,6 +46,7 @@ export function ExceptionsContent({
   error,
   errorSpans,
   onSelectSpan,
+  onFocusSection,
   density = "comfortable",
   header,
 }: ExceptionsContentProps) {
@@ -94,6 +104,7 @@ export function ExceptionsContent({
                 // ran) doesn't swallow the jump request.
                 e.stopPropagation();
                 onSelectSpan?.(span.spanId);
+                onFocusSection?.();
               }}
               paddingX={2}
               height="22px"
