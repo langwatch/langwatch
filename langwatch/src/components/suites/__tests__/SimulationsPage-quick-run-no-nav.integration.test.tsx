@@ -281,6 +281,7 @@ describe("SimulationsPage quick-run no-navigation invariant (#3363)", () => {
         capturedOnRunScheduled.current!("suite_target", "batch_002");
 
         expect(mockRouterPush).not.toHaveBeenCalled();
+        expect(mockGetSummariesInvalidate).toHaveBeenCalled();
       });
     });
 
@@ -296,6 +297,7 @@ describe("SimulationsPage quick-run no-navigation invariant (#3363)", () => {
         capturedOnRunScheduled.current!("suite_target", "batch_003");
 
         expect(mockRouterPush).not.toHaveBeenCalled();
+        expect(mockGetSummariesInvalidate).toHaveBeenCalled();
       });
     });
   });
