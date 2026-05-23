@@ -53,15 +53,14 @@ local errorKey        = KEYS[7]
 local totalPendingKey = KEYS[8]
 local groupId         = ARGV[1]
 
--- Total dropped = staged jobs (ZCARD) + the active job if one exists.
--- The active job is in flight on a worker; once that worker calls
--- COMPLETE_LUA it will be a no-op because the activeKey is gone, so the
--- total-pending counter would otherwise leak forever. We must account
--- for it here. Added post-2026-05-11 incident — bulk drain at 500K
--- scale would otherwise leave the stat permanently overstated.
+-- Total dropped = staged jobs (ZCARD) only. Previously this also counted
+-- the active job (+hadActive), but since the counter DECR moved from
+-- COMPLETE_LUA to DISPATCH (PR #4181), the active job's INCR is already
+-- compensated at dispatch time. Counting it again here would double-DECR.
+-- Added post-2026-05-11 incident — bulk drain at 500K scale would
+-- otherwise leave the stat permanently overstated.
 local pendingCount = redis.call("ZCARD", jobsKey)
-local hadActive    = redis.call("EXISTS", activeKey)
-local totalDropped = pendingCount + hadActive
+local totalDropped = pendingCount
 
 redis.call("DEL", jobsKey)
 redis.call("DEL", dataKey)

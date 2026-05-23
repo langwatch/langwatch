@@ -1733,6 +1733,7 @@ describe("GroupStagingScripts", () => {
     });
 
     describe("when the happy path completes normally", () => {
+      /** @scenario Counter tracks jobs in :jobs ZSETs through happy path */
       it("total-pending returns to 0 after stage → dispatch → complete", async () => {
         await scripts.stage(makeJob({ stagedJobId: "j1", groupId: "g1", dispatchAfterMs: 100 }));
         await scripts.stage(makeJob({ stagedJobId: "j2", groupId: "g2", dispatchAfterMs: 100 }));
@@ -1753,11 +1754,14 @@ describe("GroupStagingScripts", () => {
     });
 
     describe("when active key expires before COMPLETE", () => {
-      it("leaks the counter — documents the current drift bug", async () => {
+      /** @scenario Counter stays accurate when activeKey expires before COMPLETE */
+      it("counter stays accurate — DECR happened at dispatch, not complete", async () => {
         await scripts.stage(makeJob({ stagedJobId: "j1", groupId: "g-leak", dispatchAfterMs: 100 }));
         expect(await inspectTotalPending()).toBe(1);
 
         await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
+        // DECR happened at dispatch time (ZREM from :jobs). Counter is now 0.
+        expect(await inspectTotalPending()).toBe(0);
 
         // Simulate active key expiry (Redis TTL fires or saturation delays heartbeat)
         await redis.del(`${keyPrefix()}group:g-leak:active`);
@@ -1765,15 +1769,16 @@ describe("GroupStagingScripts", () => {
         const completed = await scripts.complete({ groupId: "g-leak", stagedJobId: "j1" });
         expect(completed).toBe(false);
 
-        // BUG: counter is still 1 — the DECR was skipped because active key didn't match.
-        // The job was already removed from :jobs at dispatch time (ZREM),
-        // and its data was HDEL'd. It can never be re-processed.
-        // This is the root cause of the 826K phantom counter in production.
-        expect(await inspectTotalPending()).toBe(1);
+        // FIX: counter is 0 — DECR already happened at dispatch time.
+        // COMPLETE_LUA no longer touches the counter, so active key
+        // expiry can't cause drift. This was the root cause of the
+        // 826K phantom counter in production.
+        expect(await inspectTotalPending()).toBe(0);
       });
     });
 
     describe("when a job is retried via retryRestage", () => {
+      /** @scenario Counter tracks retry restage as a new pending job */
       it("total-pending returns to 0 after stage → dispatch → retryRestage → dispatch → complete", async () => {
         await scripts.stage(makeJob({ stagedJobId: "j1", groupId: "g-retry", dispatchAfterMs: 100 }));
         expect(await inspectTotalPending()).toBe(1);
@@ -1808,6 +1813,7 @@ describe("GroupStagingScripts", () => {
     });
 
     describe("when a job exhausts retries via restageAndBlock", () => {
+      /** @scenario Counter tracks restage-and-block as a new pending job */
       it("total-pending returns to 0 after stage → dispatch → restageAndBlock → unblock → dispatch → complete", async () => {
         await scripts.stage(makeJob({ stagedJobId: "j1", groupId: "g-block", dispatchAfterMs: 100 }));
         expect(await inspectTotalPending()).toBe(1);
@@ -1894,47 +1900,46 @@ describe("GroupStagingScripts", () => {
       });
     });
 
-    describe("proposed fix validation", () => {
-      it("DECR at dispatch without compensating INCR in retryRestage causes negative drift", async () => {
-        // This test simulates the NAIVE 2-script fix proposed in the post-mortem
-        // (move DECR from COMPLETE to DISPATCH) to PROVE it's incomplete.
-        // It manually applies DECR at dispatch points without adding the
-        // compensating INCR in retryRestage.
-
-        const pendingKey = `${keyPrefix()}stats:total-pending`;
+    describe("4-script fix validation (DECR at dispatch + compensating INCRs)", () => {
+      it("dispatch→retry→dispatch cycle stays balanced with real scripts", async () => {
+        // Previously this test simulated the NAIVE 2-script fix manually
+        // to prove it was incomplete (negative drift). Now the real scripts
+        // implement the full 4-script fix: DECR at dispatch + INCR at
+        // retryRestage/restageAndBlock. No manual counter manipulation needed.
 
         // Stage: INCR → counter = 1
-        await scripts.stage(makeJob({ stagedJobId: "j1", groupId: "g-naive", dispatchAfterMs: 100 }));
+        await scripts.stage(makeJob({ stagedJobId: "j1", groupId: "g-balanced", dispatchAfterMs: 100 }));
         expect(await inspectTotalPending()).toBe(1);
 
-        // Dispatch: the real script doesn't DECR, so we simulate it manually
+        // Dispatch: DECR at ZREM → counter = 0
         await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
-        await redis.decr(pendingKey);
         expect(await inspectTotalPending()).toBe(0);
 
-        // retryRestage: adds new job to :jobs but NO compensating INCR
+        // retryRestage: INCR (job re-enters :jobs) → counter = 1
         await scripts.retryRestage({
-          groupId: "g-naive",
+          groupId: "g-balanced",
           stagedJobId: "j1",
           newStagedJobId: "j1/r/1",
           dispatchAfterMs: 300,
           jobDataJson: JSON.stringify({ attempt: 2 }),
           backoffMs: 500,
         });
+        expect(await inspectTotalPending()).toBe(1);
+
+        // Active key expires, dispatch retry: DECR → counter = 0
+        await redis.del(`${keyPrefix()}group:g-balanced:active`);
+        await scripts.dispatch({ nowMs: 400, activeTtlSec: 60 });
         expect(await inspectTotalPending()).toBe(0);
 
-        // Active key expires, dispatch retry: again simulate DECR-at-dispatch
-        await redis.del(`${keyPrefix()}group:g-naive:active`);
-        await scripts.dispatch({ nowMs: 400, activeTtlSec: 60 });
-        await redis.decr(pendingKey);
-
-        // Counter is now -1. This proves the naive fix creates NEGATIVE drift.
-        expect(await inspectTotalPending()).toBe(-1);
+        // Complete: no counter change → counter = 0
+        await scripts.complete({ groupId: "g-balanced", stagedJobId: "j1/r/1" });
+        expect(await inspectTotalPending()).toBe(0);
       });
     });
 
     describe("counter reconciliation invariant", () => {
-      it("total-pending equals sum of ZCARD(:jobs) + EXISTS(:active) across all groups", async () => {
+      /** @scenario Counter equals sum of all :jobs ZSET cardinalities */
+      it("total-pending equals sum of ZCARD(:jobs) across all groups", async () => {
         await scripts.stage(makeJob({ stagedJobId: "a1", groupId: "g-recon-a", dispatchAfterMs: 100 }));
         await scripts.stage(makeJob({ stagedJobId: "a2", groupId: "g-recon-a", dispatchAfterMs: 200 }));
         await scripts.stage(makeJob({ stagedJobId: "b1", groupId: "g-recon-b", dispatchAfterMs: 100 }));
@@ -1945,24 +1950,27 @@ describe("GroupStagingScripts", () => {
         await scripts.dispatch({ nowMs: 300, activeTtlSec: 60 });
         await scripts.dispatch({ nowMs: 300, activeTtlSec: 60 });
 
-        // Reconcile: counter should equal actual state
+        // Reconcile: counter should equal jobs in :jobs ZSETs only.
+        // Active (in-flight) jobs were already DECRed at dispatch time.
         const groups = ["g-recon-a", "g-recon-b", "g-recon-c"];
         let actualPending = 0;
         for (const g of groups) {
           const jobCount = await redis.zcard(`${keyPrefix()}group:${g}:jobs`);
-          const hasActive = await redis.exists(`${keyPrefix()}group:${g}:active`);
-          actualPending += jobCount + hasActive;
+          actualPending += jobCount;
         }
 
         expect(await inspectTotalPending()).toBe(actualPending);
       });
 
-      it("retryRestage breaks the invariant — retry adds a job without INCR", async () => {
+      it("retryRestage preserves the invariant — retry INCRs when job re-enters :jobs", async () => {
         await scripts.stage(makeJob({ stagedJobId: "j1", groupId: "g-recon-retry", dispatchAfterMs: 100 }));
         expect(await inspectTotalPending()).toBe(1);
 
+        // Dispatch: DECR → counter = 0
         await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
+        expect(await inspectTotalPending()).toBe(0);
 
+        // retryRestage: INCR → counter = 1
         await scripts.retryRestage({
           groupId: "g-recon-retry",
           stagedJobId: "j1",
@@ -1972,18 +1980,12 @@ describe("GroupStagingScripts", () => {
           backoffMs: 500,
         });
 
-        // retryRestage ZADD'd a new job to :jobs without INCR.
-        // ZCARD(:jobs) = 1 (retry job) + EXISTS(:active) = 1 = actual 2
-        // But total-pending = 1 (only the original STAGE INCR'd).
-        // This is BY DESIGN in the current system: the counter tracks
-        // "original work the system owes", not "total jobs in Redis."
+        // retryRestage ZADD'd a new job AND INCR'd the counter.
+        // ZCARD(:jobs) = 1 (retry job), counter = 1. Invariant holds.
         const jobCount = await redis.zcard(`${keyPrefix()}group:g-recon-retry:jobs`);
-        const hasActive = await redis.exists(`${keyPrefix()}group:g-recon-retry:active`);
-        const actualInRedis = jobCount + hasActive;
-
+        expect(jobCount).toBe(1);
         expect(await inspectTotalPending()).toBe(1);
-        expect(actualInRedis).toBe(2);
-        expect(await inspectTotalPending()).not.toBe(actualInRedis);
+        expect(await inspectTotalPending()).toBe(jobCount);
       });
     });
   });
@@ -2016,48 +2018,48 @@ describe("GroupStagingScripts", () => {
       expect(after).toBe(0);
     });
 
-    it("also decrements for an active in-flight job (active key is dropped, COMPLETE_LUA would no-op)", async () => {
+    it("decrements only staged jobs — active job was already DECRed at dispatch", async () => {
       // Stage two, dispatch one (now active), then drain. Total dropped
-      // should be 2: 1 staged + 1 active. total-pending must drop by 2,
-      // not 1, otherwise the active job's eventual COMPLETE_LUA call —
-      // which now no-ops because the active key is gone — would leak the
-      // counter forever.
+      // should be 1 (just j2 in :jobs). j1's INCR was already compensated
+      // by DECR at dispatch time. Drain must NOT count the active job
+      // again or the counter goes negative.
       await scripts.stage(makeJob({ stagedJobId: "j1", groupId: "g-active", dispatchAfterMs: 100 }));
       await scripts.stage(makeJob({ stagedJobId: "j2", groupId: "g-active", dispatchAfterMs: 200 }));
 
-      const before = Number(await redis.get(`${keyPrefix()}stats:total-pending`));
-      expect(before).toBe(2);
+      const afterStage = Number(await redis.get(`${keyPrefix()}stats:total-pending`));
+      expect(afterStage).toBe(2);
 
-      // Move j1 from staged → active
+      // Move j1 from staged → active (DECR at dispatch → counter = 1)
       const dispatched = await scripts.dispatch({ nowMs: 150, activeTtlSec: 60 });
       expect(dispatched).not.toBeNull();
       expect(dispatched!.stagedJobId).toBe("j1");
-      // Sanity: active key exists, only j2 left in staged jobsKey
       expect(await inspectActiveKey("g-active")).toBe("j1");
-      const staged = await inspectGroupJobs("g-active");
-      expect(staged.filter((s) => !s.match(/^\d+$/))).toEqual(["j2"]);
+
+      const afterDispatch = Number(await redis.get(`${keyPrefix()}stats:total-pending`));
+      expect(afterDispatch).toBe(1); // j2 still in :jobs
 
       const result = await repo.drainGroup({ queueName: QUEUE_NAME, groupId: "g-active" });
-      expect(result.jobsRemoved).toBe(2); // 1 staged (j2) + 1 active (j1)
+      expect(result.jobsRemoved).toBe(1); // only j2 (staged), not j1 (active)
 
       const after = Number(await redis.get(`${keyPrefix()}stats:total-pending`));
-      expect(after).toBe(0); // started at 2, dropped 2
+      expect(after).toBe(0);
     });
 
-    it("decrements only the active count when no jobs are staged", async () => {
-      // Edge case: ZCARD=0 but activeKey exists. Drop must still account for 1.
+    it("drain on a fully-dispatched group drops 0 jobs", async () => {
+      // Edge case: ZCARD=0 because the only job was dispatched (DECRed).
+      // activeKey exists but drain must NOT count it — already DECRed.
       await scripts.stage(makeJob({ stagedJobId: "j1", groupId: "g-only-active", dispatchAfterMs: 100 }));
       await scripts.dispatch({ nowMs: 150, activeTtlSec: 60 });
-      const beforeStaged = await inspectGroupJobs("g-only-active");
-      expect(beforeStaged.filter((s) => !s.match(/^\d+$/))).toEqual([]);
       expect(await inspectActiveKey("g-only-active")).toBe("j1");
 
       const before = Number(await redis.get(`${keyPrefix()}stats:total-pending`));
+      expect(before).toBe(0); // dispatch already DECRed
+
       const result = await repo.drainGroup({ queueName: QUEUE_NAME, groupId: "g-only-active" });
-      expect(result.jobsRemoved).toBe(1);
+      expect(result.jobsRemoved).toBe(0); // no staged jobs to drop
 
       const after = Number(await redis.get(`${keyPrefix()}stats:total-pending`));
-      expect(after).toBe(before - 1);
+      expect(after).toBe(0);
     });
 
     it("returns 0 and does not touch total-pending when the group is empty", async () => {
