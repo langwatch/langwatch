@@ -436,11 +436,12 @@ const CLICKHOUSE_TRANSIENT_CODES = new Set([
  * `@clickhouse/client` embeds the code inside `error.message` rather than
  * as a separate `code` property (typical for HTTP responses).
  */
-const CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS = [
+export const CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS = [
   "Too many simultaneous queries",
   "TIMEOUT_EXCEEDED",
   "SOCKET_TIMEOUT",
   "NETWORK_ERROR",
+  "MEMORY_LIMIT_EXCEEDED",
   "connect ECONNREFUSED",
   "connect ETIMEDOUT",
   "QUERY_WAS_CANCELLED",

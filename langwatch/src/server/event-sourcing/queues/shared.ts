@@ -8,7 +8,7 @@
  *   1 → 500ms, 2 → 1s, 3 → 2s, 4 → 4s, 5 → 8s, 6 → 16s, 7 → 32s,
  *   8 → 64s, 9 → 128s, 10 → 256s, 11 → 512s, 12 → 600s (cap), 13+ → 600s.
  *
- * Cumulative wait across 25 attempts (24 gaps) ≈ 2h 38m, which is enough
+ * Cumulative wait across 25 attempts (24 gaps) ≈ 2h 27m, which is enough
  * room to ride out a ClickHouse rolling restart / ZooKeeper session-recovery
  * cycle without parking the group in `:blocked`. Failed jobs sit in the
  * Redis zset until they succeed or are drained, so a long budget never

@@ -401,6 +401,14 @@ describe("classifyClickHouseError", () => {
       expect(classifyClickHouseError(new Error("connect ETIMEDOUT"))).toBe(ErrorCategory.RECOVERABLE);
     });
 
+    it("returns RECOVERABLE for MEMORY_LIMIT_EXCEEDED message-only (no `code` field)", () => {
+      expect(
+        classifyClickHouseError(
+          new Error("Code: 241. DB::Exception: Memory limit (for query) exceeded: would use 3.5 GiB. (MEMORY_LIMIT_EXCEEDED)"),
+        ),
+      ).toBe(ErrorCategory.RECOVERABLE);
+    });
+
     it("returns RECOVERABLE for 'Query was cancelled' message (CH replica graceful shutdown)", () => {
       expect(
         classifyClickHouseError(

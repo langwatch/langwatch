@@ -4,6 +4,7 @@ import {
   observeClickHouseQueryDuration,
   incrementClickHouseQueryCount,
 } from "~/server/clickhouse/metrics";
+import { CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS } from "~/server/event-sourcing/services/errorHandling";
 
 const logger = createLogger("langwatch:clickhouse:resilient");
 const queryLogger = createLogger("langwatch:clickhouse:query");
@@ -17,33 +18,19 @@ const TRANSIENT_NETWORK_CODES = new Set([
 ]);
 
 /**
- * ClickHouse server error fragments that indicate a transient condition.
- * Mirrors `classifyClickHouseError` in event-sourcing/services/errorHandling.ts
- * so the inline insert retry loop catches the same cluster-recovery cases
- * (ZK reconnect, replica shutdown, KILL during graceful shutdown) as the
- * outer group-queue retry layer.
+ * Reuses the canonical transient-message list from
+ * event-sourcing/services/errorHandling.ts so the inline insert retry
+ * loop catches the exact same set of cluster-recovery cases (ZK
+ * reconnect, replica shutdown, KILL during graceful shutdown, overload)
+ * as the outer group-queue retry classifier. Importing instead of
+ * duplicating keeps the two layers in lock-step forever.
  */
-const TRANSIENT_MESSAGE_FRAGMENTS = [
-  "MEMORY_LIMIT_EXCEEDED",
-  "QUERY_WAS_CANCELLED",
-  "Query was cancelled",
-  "TABLE_IS_READ_ONLY",
-  "Table is in readonly mode",
-  "KEEPER_EXCEPTION",
-  "Coordination::Exception",
-  "Session expired",
-  "Connection loss",
-  "CANNOT_READ_ALL_DATA",
-  "Write buffer has been canceled",
-  "NETWORK_ERROR",
-] as const;
-
 function isTransientError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
 
   const message = error.message;
   if (/timeout/i.test(message)) return true;
-  for (const fragment of TRANSIENT_MESSAGE_FRAGMENTS) {
+  for (const fragment of CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS) {
     if (message.includes(fragment)) return true;
   }
 
