@@ -7,7 +7,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import { LuCircleX } from "react-icons/lu";
 import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
 import { useSpanDetail } from "../../../hooks/useSpanDetail";
@@ -20,6 +20,8 @@ import { AccordionShell, Section } from "./AccordionShell";
 import { EmptyEventsState, EmptyHint } from "./EmptyStates";
 import { EventCard } from "./EventCard";
 import { useAutoOpenSections } from "./sectionPresence";
+import { SectionFocusGlow } from "./SectionFocusGlow";
+import { useSectionFocusGlow } from "./useSectionFocusGlow";
 import { countFlatLeaves } from "./utils";
 
 export function SpanAccordions({
@@ -75,8 +77,17 @@ export function SpanAccordions({
     events: hasEvents,
   });
 
+  const containerRef = useRef<HTMLDivElement>(null);
+  const { glow, handleGlowDone } = useSectionFocusGlow({
+    traceId,
+    sections,
+    openSections,
+    setOpenSections,
+    containerRef,
+  });
+
   return (
-    <Box>
+    <Box ref={containerRef}>
       {/* Span-switch loading banner — makes it explicit that the panel
         below is still resolving, instead of letting the user stare at
         an empty accordion stack and wonder if anything's happening. */}
@@ -106,6 +117,14 @@ export function SpanAccordions({
         detail. The tab-bar chip already covers the same trace-level
         attribution; nothing else to add here.
       */}
+      {glow ? (
+        <SectionFocusGlow
+          key={glow.nonce}
+          target={glow.target}
+          nonce={glow.nonce}
+          onDone={handleGlowDone}
+        />
+      ) : null}
       {detailQuery.isLoading ? (
         <VStack align="stretch" gap={2} padding={4}>
           <Skeleton height="32px" borderRadius="md" />
