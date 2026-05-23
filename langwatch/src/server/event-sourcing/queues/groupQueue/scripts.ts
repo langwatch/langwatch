@@ -365,26 +365,28 @@ while offset < scanBudget and dispatched < maxJobs do
   for _, groupId in ipairs(groups) do
     if dispatched >= maxJobs then break end
 
-    if redis.call("SISMEMBER", blockedKey, groupId) == 0 then
-      -- Tenant soft-cap check (no-op when tenantCap == 0).
-      local tenantOverCap = false
-      local tenantCountKey = nil
-      if tenantCap > 0 then
-        local slashPos = string.find(groupId, "/", 1, true)
-        if slashPos and slashPos > 1 then
-          local tenantId = string.sub(groupId, 1, slashPos - 1)
-          tenantCountKey = keyPrefix .. "tenant_active:" .. tenantId
-          local cached = tenantCapCache[tenantId]
-          if cached == nil then
-            local n = tonumber(redis.call("GET", tenantCountKey)) or 0
-            cached = n >= tenantCap
-            tenantCapCache[tenantId] = cached
-          end
-          if cached then tenantOverCap = true end
+    -- Tenant soft-cap check (no-op when tenantCap == 0).
+    -- Checked before SISMEMBER so over-cap groups skip with 0 Redis commands
+    -- (the cap result is cached per-tenant in a Lua table).
+    local tenantOverCap = false
+    local tenantCountKey = nil
+    if tenantCap > 0 then
+      local slashPos = string.find(groupId, "/", 1, true)
+      if slashPos and slashPos > 1 then
+        local tenantId = string.sub(groupId, 1, slashPos - 1)
+        tenantCountKey = keyPrefix .. "tenant_active:" .. tenantId
+        local cached = tenantCapCache[tenantId]
+        if cached == nil then
+          local n = tonumber(redis.call("GET", tenantCountKey)) or 0
+          cached = n >= tenantCap
+          tenantCapCache[tenantId] = cached
         end
+        if cached then tenantOverCap = true end
       end
+    end
 
-      if not tenantOverCap then
+    if not tenantOverCap then
+      if redis.call("SISMEMBER", blockedKey, groupId) == 0 then
         local activeKey = keyPrefix .. "group:" .. groupId .. ":active"
         -- Defensive activeKey check — covers legacy state during migration
         -- and the small race between ZADD ready and ZADD active.
@@ -477,7 +479,7 @@ while offset < scanBudget and dispatched < maxJobs do
           end
         end
       end
-      end
+    end
     end
   end
 

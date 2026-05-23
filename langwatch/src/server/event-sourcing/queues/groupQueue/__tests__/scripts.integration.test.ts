@@ -1713,6 +1713,175 @@ describe("GroupStagingScripts", () => {
       expect(results).toHaveLength(1);
       expect(results[0]!.stagedJobId).toBe("j1");
     });
+
+    // Parity with specs/event-sourcing/tenant-soft-cap.feature
+    // @integration @tenant-cap @batch scenarios
+    describe("when tenant cap interacts with dispatchBatch", () => {
+      const TENANT_CAP_ENV = "LANGWATCH_DISPATCH_TENANT_CAP";
+      let originalEnv: string | undefined;
+
+      beforeEach(() => {
+        originalEnv = process.env[TENANT_CAP_ENV];
+      });
+
+      afterEach(() => {
+        if (originalEnv === undefined) {
+          delete process.env[TENANT_CAP_ENV];
+        } else {
+          process.env[TENANT_CAP_ENV] = originalEnv;
+        }
+      });
+
+      /** @scenario DISPATCH_BATCH skips over-cap groups and dispatches under-cap groups in one call */
+      it("over-cap tenant groups are skipped, under-cap tenant groups dispatch", async () => {
+        process.env[TENANT_CAP_ENV] = "1";
+
+        for (let i = 0; i < 5; i++) {
+          await scripts.stage(
+            makeJob({
+              stagedJobId: `noisy-j${i}`,
+              groupId: `proj_noisy/g${i}`,
+              dispatchAfterMs: 1000,
+            }),
+          );
+        }
+        await scripts.stage(
+          makeJob({
+            stagedJobId: "quiet-j1",
+            groupId: "proj_quiet/g1",
+            dispatchAfterMs: 1001,
+          }),
+        );
+
+        const results = await scripts.dispatchBatch({
+          nowMs: 2000,
+          activeTtlSec: 60,
+          maxJobs: 10,
+        });
+
+        const dispatched = results.map((r) => r.groupId);
+        expect(dispatched).toContain("proj_noisy/g0");
+        expect(dispatched).toContain("proj_quiet/g1");
+        expect(dispatched).toHaveLength(2);
+      });
+
+      /** @scenario Over-cap tenant with a blocked group does not affect other tenants */
+      it("over-cap tenant blocked group is skipped without SISMEMBER affecting dispatch", async () => {
+        process.env[TENANT_CAP_ENV] = "2";
+
+        await scripts.stage(
+          makeJob({
+            stagedJobId: "j1",
+            groupId: "proj_noisy/g1",
+            dispatchAfterMs: 1000,
+          }),
+        );
+        await scripts.stage(
+          makeJob({
+            stagedJobId: "j2",
+            groupId: "proj_noisy/g2",
+            dispatchAfterMs: 1000,
+          }),
+        );
+        await scripts.stage(
+          makeJob({
+            stagedJobId: "j3",
+            groupId: "proj_noisy/g3",
+            dispatchAfterMs: 1000,
+          }),
+        );
+        await scripts.stage(
+          makeJob({
+            stagedJobId: "quiet-j1",
+            groupId: "proj_quiet/g1",
+            dispatchAfterMs: 1001,
+          }),
+        );
+
+        const first = await scripts.dispatchBatch({
+          nowMs: 2000,
+          activeTtlSec: 60,
+          maxJobs: 10,
+        });
+        expect(first.map((r) => r.groupId)).toContain("proj_noisy/g1");
+        expect(first.map((r) => r.groupId)).toContain("proj_noisy/g2");
+        expect(first.map((r) => r.groupId)).not.toContain("proj_noisy/g3");
+        expect(first.map((r) => r.groupId)).toContain("proj_quiet/g1");
+
+        // restageAndBlock frees g1's slot (counter 2→1). g2 still active
+        // so proj_noisy counter = 1. Complete proj_quiet/g1 so it frees
+        // its slot (counter 0). Now lower cap to 1: proj_noisy (counter=1)
+        // is at cap, proj_quiet (counter=0) is under cap.
+        await scripts.restageAndBlock({
+          groupId: "proj_noisy/g1",
+          newStagedJobId: "j1-retry",
+          score: 5000,
+          jobDataJson: first.find((r) => r.groupId === "proj_noisy/g1")!.jobDataJson,
+          errorMessage: "test",
+        });
+        await scripts.complete({
+          groupId: "proj_quiet/g1",
+          stagedJobId: first.find((r) => r.groupId === "proj_quiet/g1")!.stagedJobId,
+        });
+        process.env[TENANT_CAP_ENV] = "1";
+
+        await scripts.stage(
+          makeJob({
+            stagedJobId: "quiet-j2",
+            groupId: "proj_quiet/g2",
+            dispatchAfterMs: 3001,
+          }),
+        );
+
+        const second = await scripts.dispatchBatch({
+          nowMs: 4000,
+          activeTtlSec: 60,
+          maxJobs: 10,
+        });
+
+        expect(second.map((r) => r.groupId)).not.toContain("proj_noisy/g1");
+        expect(second.map((r) => r.groupId)).not.toContain("proj_noisy/g3");
+        expect(second.map((r) => r.groupId)).toContain("proj_quiet/g2");
+      });
+
+      /** @scenario Drift cleanup runs for under-cap tenants in batch dispatch */
+      it("drift cleanup still runs for under-cap tenants with empty job ZSETs", async () => {
+        process.env[TENANT_CAP_ENV] = "10";
+
+        await scripts.stage(
+          makeJob({
+            stagedJobId: "j1",
+            groupId: "proj_acme/g1",
+            dispatchAfterMs: 1000,
+          }),
+        );
+
+        const batch1 = await scripts.dispatchBatch({
+          nowMs: 2000,
+          activeTtlSec: 60,
+          maxJobs: 10,
+        });
+        expect(batch1).toHaveLength(1);
+
+        await scripts.complete({
+          groupId: "proj_acme/g1",
+          stagedJobId: batch1[0]!.stagedJobId,
+        });
+
+        await redis.zadd(`${keyPrefix()}ready`, 2500, "proj_acme/g-zombie");
+        const readyBefore = await inspectReadySet();
+        expect(readyBefore).toContain("proj_acme/g-zombie");
+
+        await scripts.dispatchBatch({
+          nowMs: 3000,
+          activeTtlSec: 60,
+          maxJobs: 10,
+        });
+
+        const readyAfter = await inspectReadySet();
+        expect(readyAfter).not.toContain("proj_acme/g-zombie");
+      });
+    });
   });
   });
 
