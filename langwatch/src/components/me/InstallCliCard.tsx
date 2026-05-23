@@ -8,11 +8,12 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Check, Copy, Terminal } from "lucide-react";
+import { Check, Copy, ExternalLink, Terminal } from "lucide-react";
 import { useState } from "react";
 
 import { Link } from "~/components/ui/link";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
+import { docsUrl } from "~/utils/docsUrl";
 
 /**
  * Empty-state install affordance for the LangWatch CLI.
@@ -54,18 +55,16 @@ export function InstallCliCard({
   const baseHost = publicEnv.data?.BASE_HOST ?? "https://app.langwatch.ai";
 
   // On SaaS, the CLI's hardcoded default already points at app.langwatch.ai
-  // — no env override needed. On self-hosted, prepend the LANGWATCH_ENDPOINT
-  // env so the very first `langwatch login` targets the right control plane.
-  // (Once Andre's `--endpoint` flag lands, we can pivot to
-  // `langwatch login --endpoint <host>` for cleaner copy-paste; both
-  // achieve the same end-state today via env override.)
-  const installCommand = isSaas
-    ? "npm install -g langwatch"
-    : `LANGWATCH_ENDPOINT=${baseHost} npm install -g langwatch`;
+  // — no override needed. On self-hosted, pass the endpoint as a flag on
+  // `langwatch login` so the first authenticated call targets the right
+  // control plane (the login flow persists the value so subsequent CLI
+  // commands don't need the flag). `npm install` itself never talks to
+  // LangWatch, so no env / flag needed there.
+  const installCommand = "npm install -g langwatch";
 
   const loginCommand = isSaas
     ? "langwatch login"
-    : `LANGWATCH_ENDPOINT=${baseHost} langwatch login`;
+    : `langwatch login --endpoint ${baseHost}`;
 
   return (
     <Box
@@ -73,7 +72,8 @@ export function InstallCliCard({
       borderColor="border.muted"
       borderRadius="md"
       padding={5}
-      backgroundColor="bg.subtle"
+      backgroundColor="bg"
+      boxShadow="sm"
       width="full"
     >
       <VStack align="stretch" gap={4}>
@@ -102,18 +102,30 @@ export function InstallCliCard({
 
         {!isSaas && (
           <Text fontSize="xs" color="fg.muted">
-            Self-hosted detected — commands target{" "}
-            <Code fontSize="xs">{baseHost}</Code>. The endpoint is persisted
-            after the first login; later commands don&apos;t need the prefix.
+            Self-hosted detected. The login flag targets{" "}
+            <Code fontSize="xs">{baseHost}</Code>; the endpoint is persisted
+            after that first login, so subsequent commands don&apos;t need it.
           </Text>
         )}
 
         <HStack gap={2}>
           <Button size="xs" variant="outline" asChild>
-            <Link href="/integration/install">Install guide ↗</Link>
+            <Link
+              href={docsUrl("/integration/install")}
+              isExternal
+              gap={1}
+            >
+              Install guide <ExternalLink size={12} />
+            </Link>
           </Button>
           <Button size="xs" variant="ghost" asChild>
-            <Link href="/integration/cli">CLI reference ↗</Link>
+            <Link
+              href={docsUrl("/integration/cli")}
+              isExternal
+              gap={1}
+            >
+              CLI reference <ExternalLink size={12} />
+            </Link>
           </Button>
         </HStack>
       </VStack>
@@ -147,7 +159,7 @@ function CommandRow({
         borderWidth="1px"
         borderColor="border.muted"
         borderRadius="sm"
-        backgroundColor="bg"
+        backgroundColor="bg.subtle"
       >
         <Code
           flex={1}

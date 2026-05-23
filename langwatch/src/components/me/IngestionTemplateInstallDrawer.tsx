@@ -24,6 +24,21 @@ import { toaster } from "~/components/ui/toaster";
 
 const SECRET_MASK = "•".repeat(48);
 
+function buildEnvSnippet(slug: string, endpoint: string, token: string): string {
+  const base = `export OTEL_EXPORTER_OTLP_ENDPOINT="${endpoint}"
+export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${token}"`;
+  if (slug === "claude_code") {
+    return [
+      `export CLAUDE_CODE_ENABLE_TELEMETRY=1`,
+      `export OTEL_LOGS_EXPORTER=otlp`,
+      `export OTEL_METRICS_EXPORTER=otlp`,
+      `export OTEL_EXPORTER_OTLP_PROTOCOL=http/json`,
+      base,
+    ].join("\n");
+  }
+  return base;
+}
+
 export type IngestionTemplateMeta = {
   slug: string;
   displayName: string;
@@ -120,11 +135,22 @@ export function IngestionTemplateInstallDrawer({
     toaster.create({ title: `${label} copied to clipboard`, type: "success" });
   };
 
+  const renderedToken = showSecret
+    ? installResult?.token ?? ""
+    : SECRET_MASK;
+  const copyToken = installResult?.token ?? "";
+
+  // Claude Code only emits OTLP when CLAUDE_CODE_ENABLE_TELEMETRY=1 plus
+  // the OTEL_LOGS_EXPORTER + OTEL_METRICS_EXPORTER + OTEL_EXPORTER_OTLP_PROTOCOL
+  // trio. Without those four, Claude Code silently does nothing even with
+  // a valid endpoint + token. Other ingestion sources (cursor, claude_cowork,
+  // raw OTLP) need only the endpoint + bearer header — they enable
+  // telemetry through their own configuration.
   const envVarsSnippet = installResult
-    ? `export OTEL_EXPORTER_OTLP_ENDPOINT="${installResult.endpoint}"
-export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${
-        showSecret ? installResult.token : SECRET_MASK
-      }"`
+    ? buildEnvSnippet(template.slug, installResult.endpoint, renderedToken)
+    : "";
+  const envVarsCopy = installResult
+    ? buildEnvSnippet(template.slug, installResult.endpoint, copyToken)
     : "";
 
   return (
@@ -174,14 +200,14 @@ export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${
                 </VStack>
               ) : (
                 <Button onClick={onInstall} colorPalette="orange">
-                  Issue binding token
+                  Use this template
                 </Button>
               )
             )}
 
             {isInstalling && (
               <Text fontSize="sm" color="fg.muted">
-                {hasExistingBinding ? "Rotating token…" : "Issuing binding token…"}
+                {hasExistingBinding ? "Rotating token…" : "Installing template…"}
               </Text>
             )}
 
@@ -241,13 +267,7 @@ export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${
                     <Button
                       size="xs"
                       variant="ghost"
-                      onClick={() =>
-                        copy(
-                          `export OTEL_EXPORTER_OTLP_ENDPOINT="${installResult.endpoint}"
-export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${installResult.token}"`,
-                          "Env vars",
-                        )
-                      }
+                      onClick={() => copy(envVarsCopy, "Env vars")}
                     >
                       <Copy size={12} /> Copy
                     </Button>

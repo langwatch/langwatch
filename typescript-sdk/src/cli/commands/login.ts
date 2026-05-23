@@ -99,14 +99,19 @@ export const loginCommand = async (
   },
 ): Promise<void> => {
   try {
-    // If `--endpoint` was passed, persist it BEFORE the chosen flow runs
-    // so subsequent reads (in the device flow, in the API-key flow, in
-    // any sub-command spawned later) see the right control-plane URL.
-    // The 4-source resolver (flag > env > config > default) honors this
-    // value via the persisted-config layer for any flow that doesn't
-    // explicitly take a flag.
-    if (options?.endpoint) {
-      const trimmed = options.endpoint.replace(/\/+$/, "");
+    // Honor `--endpoint` flag OR `LANGWATCH_ENDPOINT` env. Persist the
+    // resolved value BEFORE the chosen flow runs so subsequent reads
+    // (in the device flow, the API-key flow, any sub-command spawned
+    // later) see the right control-plane URL. The 4-source resolver
+    // (flag > env > config > default) honors this value via the
+    // persisted-config layer for any flow that doesn't explicitly take
+    // a flag. The env var has the same precedence as the flag for the
+    // login flow itself so users running `LANGWATCH_ENDPOINT=... langwatch
+    // login` skip the cloud/self-hosted picker.
+    const endpointFromEnv = process.env.LANGWATCH_ENDPOINT?.trim();
+    const presetEndpoint = options?.endpoint ?? endpointFromEnv;
+    if (presetEndpoint) {
+      const trimmed = presetEndpoint.replace(/\/+$/, "");
       const cfg = loadConfig();
       cfg.control_plane_url = trimmed;
       saveConfig(cfg);

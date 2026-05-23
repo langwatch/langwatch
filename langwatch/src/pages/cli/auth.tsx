@@ -240,11 +240,15 @@ export default function CliAuthPage() {
         ok?: boolean;
         personal_vk_label?: string;
         error_description?: string;
+        message?: string;
       };
       if (!r.ok) {
         setAction({
           kind: "error",
-          message: data.error_description ?? `Approval failed (${r.status})`,
+          message:
+            data.message ??
+            data.error_description ??
+            `Approval failed (${r.status})`,
         });
         return;
       }

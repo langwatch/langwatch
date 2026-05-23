@@ -56,7 +56,7 @@ On `/me`, scroll to the **Trace Ingest** section. You will see a few tiles, one 
   ![Claude Code install drawer](/images/ai-governance/post-bypass/11-claude-code-install-drawer.png)
 </Frame>
 
-In the drawer, click **Use this template**. LangWatch creates a personal ingestion source bound to your account, generates a one-time access token (prefix `ik-lw-`), and writes the OTLP shape rules that turn Claude Code's raw spans into LangWatch's canonical `gen_ai.*` cost/token/model fields.
+In the drawer, click **Use this template**. LangWatch creates a personal binding for the template, generates a one-time access token (prefix `ik-lw-`), and applies the OTLP shape rules that turn Claude Code's raw spans into LangWatch's canonical `gen_ai.*` cost/token/model fields.
 
 <Warning>The token is shown once. Copy it before closing the drawer. If you lose it, rotate it from the same tile and re-do the env block.</Warning>
 
@@ -69,13 +69,13 @@ export CLAUDE_CODE_ENABLE_TELEMETRY=1
 export OTEL_LOGS_EXPORTER=otlp
 export OTEL_METRICS_EXPORTER=otlp
 export OTEL_EXPORTER_OTLP_PROTOCOL=http/json
-export OTEL_EXPORTER_OTLP_ENDPOINT="https://app.langwatch.ai/api/governance/otlp/<your-source-id>"
+export OTEL_EXPORTER_OTLP_ENDPOINT="https://app.langwatch.ai/api/otel"
 export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ik-lw-<the-token-you-just-copied>"
 ```
 
 Paste it into your shell, then restart Claude Code so it picks up the new env. If you use a shell config file (`~/.zshrc`, `~/.bashrc`), drop it there to persist across sessions.
 
-For self-hosted, the endpoint is `http://localhost:5560/api/governance/otlp/<your-source-id>` instead.
+For self-hosted, the endpoint is `http://localhost:5560/api/otel` instead.
 
 ### A3. Use Claude Code as normal
 
@@ -167,9 +167,9 @@ Same surface either way.
 
 `/me` → **Settings** → **Personal budget**. Set a monthly dollar cap. For Path B, the gateway enforces it (requests fail with `budget_exceeded` once you cross). For Path A, you get an alert at 80% and 100%; the actual API calls keep flowing (Anthropic does not give the receiver a way to gate them).
 
-### Set anomaly rules (optional)
+### Add anomaly rules (admin-scope only)
 
-`/me` → **Settings** → **Anomaly rules**. Pick a metric (cost per day, spike vs baseline, token usage by model) and a threshold. LangWatch evaluates the rule on every new trace and surfaces alerts on `/me`. See [Anomaly Rules](/ai-governance/anomaly-rules) for the full schema.
+Anomaly rules live on the org-admin surface, not `/me`, since they evaluate across every member's spend. If you have admin access, head to `/governance/anomaly-rules` to pick a metric (cost per day, spike vs baseline, token usage by model) and a threshold. See [Anomaly Rules](/ai-governance/anomaly-rules) for the full schema. Solo users on a personal org have admin scope by default.
 
 ## Privacy
 
@@ -183,7 +183,7 @@ For self-hosted (`npx @langwatch/server`), data never leaves your machine. The P
 
 **401 from the gateway (Path B).** Verify the `ANTHROPIC_AUTH_TOKEN` value starts with `vk-lw-`. If it starts with `sk-ant-` you are passing the raw Anthropic key, which the gateway rejects (auth gate is on the Virtual Key). Re-mint from the drawer and copy the new value.
 
-**Cost shows $0 even though traces land.** The model alias in the span does not match a current entry in LangWatch's cost catalog. Check the span's `gen_ai.request.model` attribute and confirm it is a current-gen identifier (`claude-sonnet-4-7`, `claude-opus-4-7`). Legacy aliases (`claude-3-5-sonnet-20241022`) silently produce NULL cost. Update Claude Code or pin the model alias to the current value.
+**Cost shows $0 even though traces land.** The model alias in the span does not match a current entry in LangWatch's cost catalog. Check the span's `gen_ai.request.model` attribute and confirm it is a current-gen identifier (`claude-sonnet-4-6`, `claude-opus-4-7`, `claude-haiku-4-5`). Legacy aliases (`claude-3-5-sonnet-20241022`) silently produce NULL cost. Update Claude Code or pin the model alias to the current value.
 
 **OTLP endpoint reachable but no source-id in the URL (Path A).** You closed the install drawer before clicking **Use this template**. Open the Claude Code tile again, run the install flow, copy the full env block from the drawer (not just the headers).
 

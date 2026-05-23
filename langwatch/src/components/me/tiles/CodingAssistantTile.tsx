@@ -7,7 +7,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Check, ChevronDown, ChevronRight, Copy } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Copy, ExternalLink } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -200,8 +200,9 @@ export function CodingAssistantTile({
                 href={rewriteDocsHostForLocalDev(config.setupDocsUrl)}
                 target="_blank"
                 rel="noopener noreferrer"
+                style={{ display: "inline-flex", alignItems: "center", gap: 4 }}
               >
-                Setup guide ↗
+                Setup guide <ExternalLink size={12} />
               </a>
             </Button>
           )}

@@ -560,18 +560,11 @@ app.post("/exchange", async (c: Context) => {
       );
     }
 
-    if (!record.personal_vk) {
-      logger.warn(
-        `[auth-cli] approved device_session device_code ${device_code} missing personal_vk payload — returning pending`,
-      );
-      return c.json(
-        {
-          error: "authorization_pending",
-          error_description: "Approval received but session not ready yet",
-        },
-        428,
-      );
-    }
+    // Personal VK is optional on the device session: orgs that haven't
+    // published a default RoutingPolicy yet (fresh signup, solo dev,
+    // dogfood account) can still sign the user in for governance / portal
+    // navigation. The CLI wrapper mints a VK lazily on first gateway call
+    // once a provider chain becomes available.
 
     // Mint access + refresh tokens, persist both in Redis with TTL so
     // protected CLI endpoints (/budget/status etc.) can validate Bearer
@@ -1412,33 +1405,35 @@ app.post("/approve", async (c: Context) => {
       displayEmail: session.user.email,
     });
   } catch (err) {
-    if (err instanceof NoDefaultRoutingPolicyError) {
-      // Spec — specs/ai-gateway/governance/personal-keys.feature lines
-      // 57-63: 409 with no_default_routing_policy and NO personal VK
-      // created. The CLI surfaces this as "ask your admin to publish
-      // a default routing policy".
-      return c.json(
+    if (
+      err instanceof NoDefaultRoutingPolicyError ||
+      err instanceof RoutingPolicyHasNoProvidersError
+    ) {
+      // Fresh signup / dogfood account / org that hasn't published a
+      // default RoutingPolicy (or whose policy has no providers bound):
+      // log the user in with a device session anyway. The CLI wrapper
+      // mints a personal VK lazily on the first gateway call, surfacing
+      // an actionable error at that point ("no model provider configured
+      // yet, add one at /me Model Providers"). Failing the entire
+      // approve flow here blocked solo devs from ever reaching the
+      // setup screens.
+      logger.info(
         {
-          error: "no_default_routing_policy",
-          message: err.message,
+          user_code,
+          organization_id,
+          reason:
+            err instanceof NoDefaultRoutingPolicyError
+              ? "no_default_routing_policy"
+              : "routing_policy_has_no_providers",
         },
-        409,
+        "[auth-cli] approving device session without personal VK; admin/user must configure provider before gateway use",
       );
-    }
-    if (err instanceof RoutingPolicyHasNoProvidersError) {
-      // G34 — the resolved policy exists but has zero providers
-      // configured. 422 (UNPROCESSABLE) per the validate-before-mint
-      // contract: well-formed request, but the org's state doesn't
-      // support processing it yet. The CLI surfaces this as "ask your
-      // admin to add providers in Routing Policies before issuing
-      // keys" — same actionable hint the /me portal renders.
-      return c.json(
-        {
-          error: "routing_policy_has_no_providers",
-          message: err.message,
-        },
-        422,
-      );
+      await approveDeviceCode({
+        deviceCode: record.device_code,
+        userId: session.user.id,
+        organizationId: organization_id,
+      });
+      return c.json({ ok: true, organization_id }, 200);
     }
     if (err instanceof PersonalVirtualKeyAlreadyExistsError) {
       // Issue an additional device-specific key instead so multiple
