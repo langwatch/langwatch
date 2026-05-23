@@ -51,8 +51,8 @@ jobs:
           - name: scalable-prod
             flags: "-f examples/values-scalable-prod.yaml"
     steps:
-      - uses: actions/checkout@v4
-      - uses: azure/setup-helm@v5
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: azure/setup-helm@dda3372f752e03dde6b3237bc9431cdc2f7a02a2 # v5
         with:
           version: v3.12.0
       - run: helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
@@ -81,8 +81,8 @@ jobs:
       run:
         working-directory: charts/langwatch
     steps:
-      - uses: actions/checkout@v4
-      - uses: azure/setup-helm@v5
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: azure/setup-helm@dda3372f752e03dde6b3237bc9431cdc2f7a02a2 # v5
         with:
           version: v3.12.0
       - name: Build clickhouse-serverless image
@@ -95,7 +95,7 @@ jobs:
       # gateway.image.{repository,tag,pullPolicy} to match.
       - name: Build gateway image
         run: docker build -t langwatch/ai-gateway:e2e -f ../../Dockerfile.go_service ../..
-      - uses: helm/kind-action@v1
+      - uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc # v1
         with:
           cluster_name: ${{ matrix.cluster }}
       - name: Load images into Kind
