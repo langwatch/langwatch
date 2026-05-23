@@ -25,7 +25,6 @@ import { projectRoutes } from "../utils/routes";
 import { useTableView } from "./messages/HeaderButtons";
 import { CollapsibleMenuGroup } from "./sidebar/CollapsibleMenuGroup";
 import { SideMenuLink } from "./sidebar/SideMenuLink";
-import { PresenceToggle } from "./sidebar/PresenceToggle";
 import { SupportMenu } from "./sidebar/SupportMenu";
 import { ThemeToggle } from "./sidebar/ThemeToggle";
 import { UsageIndicator } from "./sidebar/UsageIndicator";
@@ -421,7 +420,6 @@ export const MainMenu = React.memo(function MainMenu({
               />
             )}
             <SupportMenu showLabel={showExpanded} />
-            <PresenceToggle showLabel={showExpanded} />
             <ThemeToggle showLabel={showExpanded} />
           </VStack>
         </VStack>
