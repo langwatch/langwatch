@@ -27,7 +27,6 @@ import {
 import AiGatewayLayout from "~/components/gateway/AiGatewayLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { GatewayErrorPanel } from "~/components/gateway/GatewayErrorPanel";
-import { GatewayLayout } from "~/components/gateway/GatewayLayout";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Link } from "~/components/ui/link";
 import { Tooltip as UITooltip } from "~/components/ui/tooltip";
@@ -109,7 +108,7 @@ function GatewayUsagePage() {
   };
 
   return (
-    <GatewayLayout>
+    <AiGatewayLayout>
       <>
         <PageLayout.Header>
           <PageLayout.Heading>Usage</PageLayout.Heading>
@@ -261,7 +260,7 @@ function GatewayUsagePage() {
           )}
         </Box>
       </>
-    </GatewayLayout>
+    </AiGatewayLayout>
   );
 }
 

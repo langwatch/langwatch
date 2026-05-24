@@ -22,7 +22,6 @@ import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { BudgetEditDrawer } from "~/components/gateway/BudgetEditDrawer";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { formatBudgetUsd } from "~/components/gateway/formatBudgetUsd";
-import { GatewayLayout } from "~/components/gateway/GatewayLayout";
 import { Link } from "~/components/ui/link";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { toaster } from "~/components/ui/toaster";
@@ -86,7 +85,7 @@ function BudgetDetailPage() {
   const isArchived = !!budget?.archivedAt;
 
   return (
-    <GatewayLayout>
+    <AiGatewayLayout>
       <>
         <PageLayout.Header>
           <HStack>
@@ -348,7 +347,7 @@ function BudgetDetailPage() {
         loading={archiveMutation.isPending}
         onConfirm={confirmArchive}
       />
-    </GatewayLayout>
+    </AiGatewayLayout>
   );
 }
 

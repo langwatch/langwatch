@@ -27,7 +27,6 @@ import {
 import AiGatewayLayout from "~/components/gateway/AiGatewayLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
-import { GatewayLayout } from "~/components/gateway/GatewayLayout";
 import { VirtualKeyEditDrawer } from "~/components/gateway/VirtualKeyEditDrawer";
 import { VirtualKeySecretReveal } from "~/components/gateway/VirtualKeySecretReveal";
 import { VirtualKeyUsageSnippet } from "~/components/gateway/VirtualKeyUsageSnippet";
@@ -118,7 +117,7 @@ function VirtualKeyDetailPage() {
   };
 
   return (
-    <GatewayLayout>
+    <AiGatewayLayout>
       <>
         <PageLayout.Header>
           <HStack>
@@ -345,7 +344,7 @@ function VirtualKeyDetailPage() {
         secret={revealSecret?.secret ?? ""}
         kind="rotate"
       />
-    </GatewayLayout>
+    </AiGatewayLayout>
   );
 }
 

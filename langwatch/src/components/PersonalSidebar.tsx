@@ -7,6 +7,7 @@ import {
   Gauge,
   KeyRound,
   ListTree,
+  PlugZap,
   Smartphone,
   Sparkles,
 } from "lucide-react";
@@ -54,6 +55,7 @@ export const PersonalSidebar = React.memo(function PersonalSidebar({
       redirectToProjectOnboarding: false,
     });
   const isGovernanceActive = router.pathname.startsWith("/governance");
+  const isGatewayActive = router.pathname.startsWith("/settings/gateway");
   const { enabled: governancePreviewEnabled } = useFeatureFlag(
     "release_ui_ai_governance_enabled",
     {
@@ -61,8 +63,17 @@ export const PersonalSidebar = React.memo(function PersonalSidebar({
       enabled: !!organization?.id,
     },
   );
+  const { enabled: gatewayMenuEnabled } = useFeatureFlag(
+    "release_ui_ai_gateway_menu_enabled",
+    {
+      organizationId: organization?.id,
+      enabled: !!organization?.id,
+    },
+  );
   const showGovernanceEntry =
     governancePreviewEnabled && hasPermission("governance:view");
+  const showGatewayEntry =
+    gatewayMenuEnabled && hasPermission("virtualKeys:view");
   const personalProject = useMemo(() => {
     const userId = session.data?.user?.id;
     if (!userId || !organizations) return null;
@@ -190,7 +201,7 @@ export const PersonalSidebar = React.memo(function PersonalSidebar({
               isActive={isSettingsActive}
               showLabel={showExpanded}
             />
-            {showGovernanceEntry && (
+            {(showGovernanceEntry || showGatewayEntry) && (
               <>
                 <Text
                   fontSize="11px"
@@ -203,13 +214,24 @@ export const PersonalSidebar = React.memo(function PersonalSidebar({
                 >
                   {showExpanded ? "Govern" : <>&nbsp;</>}
                 </Text>
-                <SideMenuLink
-                  icon={Eye}
-                  label="AI Governance"
-                  href="/governance"
-                  isActive={isGovernanceActive}
-                  showLabel={showExpanded}
-                />
+                {showGatewayEntry && (
+                  <SideMenuLink
+                    icon={PlugZap}
+                    label="AI Gateway"
+                    href="/settings/gateway/virtual-keys"
+                    isActive={isGatewayActive}
+                    showLabel={showExpanded}
+                  />
+                )}
+                {showGovernanceEntry && (
+                  <SideMenuLink
+                    icon={Eye}
+                    label="AI Governance"
+                    href="/governance"
+                    isActive={isGovernanceActive}
+                    showLabel={showExpanded}
+                  />
+                )}
               </>
             )}
           </VStack>

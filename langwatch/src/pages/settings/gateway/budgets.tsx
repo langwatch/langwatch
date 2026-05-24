@@ -23,7 +23,6 @@ import { BudgetEditDrawer } from "~/components/gateway/BudgetEditDrawer";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { formatBudgetUsd } from "~/components/gateway/formatBudgetUsd";
 import { GatewayErrorPanel } from "~/components/gateway/GatewayErrorPanel";
-import { GatewayLayout } from "~/components/gateway/GatewayLayout";
 import { Link } from "~/components/ui/link";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Menu } from "~/components/ui/menu";
@@ -92,7 +91,7 @@ function BudgetsPage() {
   };
 
   return (
-    <GatewayLayout>
+    <AiGatewayLayout>
       <>
         <PageLayout.Header>
           <PageLayout.Heading>Budgets</PageLayout.Heading>
@@ -349,7 +348,7 @@ function BudgetsPage() {
         loading={archiveMutation.isPending}
         onConfirm={confirmArchive}
       />
-    </GatewayLayout>
+    </AiGatewayLayout>
   );
 }
 

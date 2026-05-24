@@ -20,7 +20,6 @@ import AiGatewayLayout from "~/components/gateway/AiGatewayLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { GatewayErrorPanel } from "~/components/gateway/GatewayErrorPanel";
-import { GatewayLayout } from "~/components/gateway/GatewayLayout";
 import { Link } from "~/components/ui/link";
 import { VirtualKeyCreateDrawer } from "~/components/gateway/VirtualKeyCreateDrawer";
 import { VirtualKeyEditDrawer } from "~/components/gateway/VirtualKeyEditDrawer";
@@ -172,7 +171,7 @@ function VirtualKeysPage() {
   };
 
   return (
-    <GatewayLayout>
+    <AiGatewayLayout>
       <>
         <PageLayout.Header>
           <PageLayout.Heading>Virtual Keys</PageLayout.Heading>
@@ -451,7 +450,7 @@ function VirtualKeysPage() {
         loading={revokeMutation.isPending}
         onConfirm={confirmRevoke}
       />
-    </GatewayLayout>
+    </AiGatewayLayout>
   );
 }
 

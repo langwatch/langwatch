@@ -27,7 +27,6 @@ import { CacheRuleCreateDrawer } from "~/components/gateway/CacheRuleCreateDrawe
 import { CacheRuleEditDrawer } from "~/components/gateway/CacheRuleEditDrawer";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { GatewayErrorPanel } from "~/components/gateway/GatewayErrorPanel";
-import { GatewayLayout } from "~/components/gateway/GatewayLayout";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
@@ -120,7 +119,7 @@ function CacheRulesPage() {
   const rows = listQuery.data ?? [];
 
   return (
-    <GatewayLayout>
+    <AiGatewayLayout>
       <>
         <PageLayout.Header>
           <PageLayout.Heading>Cache Rules</PageLayout.Heading>
@@ -300,7 +299,7 @@ function CacheRulesPage() {
         loading={archiveMutation.isPending}
         onConfirm={confirmArchive}
       />
-    </GatewayLayout>
+    </AiGatewayLayout>
   );
 }
 
