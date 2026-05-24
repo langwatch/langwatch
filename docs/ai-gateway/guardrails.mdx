@@ -99,7 +99,7 @@ A VK can have multiple guardrails in each direction; the gateway runs them in pa
 
 **Modify decisions.** When more than one guardrail in the same direction returns `modify`, the dispatcher applies them sequentially in `config.guardrails[direction]` array order (the order you set on the VK). Each `modify` rewrites the payload and the next `modify` sees the rewritten version. Modifies do NOT chain across directions: `request` modifies are applied before dispatch, `response` modifies are applied after the upstream response returns.
 
-**Stream chunks.** `stream_chunk` guardrails currently run in `block`-only mode in v1: a `modify` verdict on a stream chunk is accepted by the contract but the dispatcher rewrites are not yet wired (tracked alongside the metric-emission gap below — same hot-path). Use `request`/`response` `modify` for now if you need payload rewrites; `stream_chunk` is best used for `block` (e.g. cut a stream the moment a regex match appears on the way out).
+**Stream chunks.** `stream_chunk` guardrails currently run in `block`-only mode in v1: a `modify` verdict on a stream chunk is accepted by the contract but the dispatcher rewrites are not yet wired (tracked alongside the metric-emission gap below, same hot-path). Use `request`/`response` `modify` for now if you need payload rewrites; `stream_chunk` is best used for `block` (e.g. cut a stream the moment a regex match appears on the way out).
 
 ## Observability
 
