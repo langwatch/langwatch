@@ -103,6 +103,10 @@ export const useOrganizationTeamProject = (
   );
   const [localStorageProjectSlug, setLocalStorageProjectSlug] =
     useLocalStorage<string>("selectedProjectSlug", "");
+  const [, setLastVisitedHomeKind] = useLocalStorage<"" | "project" | "personal">(
+    "lastVisitedHomeKind",
+    "",
+  );
 
   const reservedProjectSlugs = useMemo(
     () => ["analytics", "datasets", "evaluations", "experiments", "messages"],
@@ -225,6 +229,13 @@ export const useOrganizationTeamProject = (
     }
     if (project && project.slug !== localStorageProjectSlug) {
       setLocalStorageProjectSlug(project.slug);
+    }
+    // Visiting any /[project]/* page marks the implicit home preference
+    // as "project". Pairs with MyLayout's "personal" marker so the `/`
+    // index resolver can fall through to whichever home was visited
+    // last when the user has no explicit pin set via the picker.
+    if (project) {
+      setLastVisitedHomeKind("project");
     }
     // We want to update localstorage values only once, forward, doesn't matter if localstorage
     // itself changes. This is because the user might have two tabs open in different projects,

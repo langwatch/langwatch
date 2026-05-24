@@ -1,5 +1,6 @@
 import { useRouter } from "~/utils/compat/next-router";
 import { useEffect } from "react";
+import { useLocalStorage } from "usehooks-ts";
 import { LoadingScreen } from "../components/LoadingScreen";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
@@ -27,9 +28,24 @@ export default function Index() {
     },
   );
 
+  // Implicit home-kind preference written from MyLayout (personal) and
+  // useOrganizationTeamProject (project). Honored only when the user
+  // has no explicit pin via the picker, so /me sticks the same way the
+  // last project does without overriding the user's deliberate choice.
+  const [lastVisitedHomeKind] = useLocalStorage<"" | "project" | "personal">(
+    "lastVisitedHomeKind",
+    "",
+  );
+
   useEffect(() => {
     if (resolved.data?.destination) {
-      void router.replace(resolved.data.destination);
+      // Explicit picker pin always wins. Only override the auto-detected
+      // destination when the user has no pin AND their last visit was /me.
+      const detectedFallback =
+        !resolved.data.isOverride &&
+        lastVisitedHomeKind === "personal" &&
+        resolved.data.destination !== "/me";
+      void router.replace(detectedFallback ? "/me" : resolved.data.destination);
       return;
     }
     if (resolved.isError && project) {
@@ -68,6 +84,7 @@ export default function Index() {
     organizations,
     isLoading,
     router,
+    lastVisitedHomeKind,
   ]);
 
   return <LoadingScreen />;
