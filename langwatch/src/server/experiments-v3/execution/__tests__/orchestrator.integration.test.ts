@@ -25,8 +25,10 @@ import type { EvaluationV3Event, ExecutionScope } from "../types";
  * - Redis available (for abort flags)
  * - Database available for test project
  */
-// Skip when NLP service isn't available (CI or prisma-integration tests)
-const hasNlpService = !!process.env.LANGWATCH_NLP_SERVICE;
+// Skip when NLP service or OpenAI key isn't available (CI or prisma-integration tests)
+// Both are required: NLP service processes requests, OpenAI key enables the model provider.
+const hasNlpService =
+  !!process.env.LANGWATCH_NLP_SERVICE && !!process.env.OPENAI_API_KEY;
 
 describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
   let project: Project;
