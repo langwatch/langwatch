@@ -381,7 +381,12 @@ export default function CliAuthPage() {
                   </Box>
                   <Text fontSize="sm" color="gray.600" textAlign="center">
                     Confirm this matches the code shown in your terminal.
-                    {expiryText ? ` ${expiryText}.` : ""}
+                    {expiryText ? (
+                      <>
+                        <br />
+                        {expiryText}.
+                      </>
+                    ) : null}
                   </Text>
 
                   {organizations && organizations.length > 1 && (
