@@ -125,6 +125,7 @@ describe("resolveControlPlaneEndpoint — 4-source priority", () => {
   });
 
   describe("resolveControlPlaneUrl convenience", () => {
+    /** @scenario every CLI command resolves the endpoint via the same single function */
     it("returns just the URL string", () => {
       process.env.LANGWATCH_ENDPOINT = "https://env.example.com";
       expect(resolveControlPlaneUrl()).toBe("https://env.example.com");
