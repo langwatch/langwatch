@@ -37,6 +37,7 @@ import {
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
 import { GatewayConfigMaterialiser } from "../config.materialiser";
+import { GatewayGuardrailService } from "../guardrail.service";
 import { VirtualKeyRepository } from "../virtualKey.repository";
 
 const suffix = nanoid(8);
@@ -45,6 +46,9 @@ const TEAM_ID = `team-mat-${suffix}`;
 const PROJECT_ID = `proj-mat-${suffix}`;
 const USER_ID = `usr-mat-${suffix}`;
 const EVALUATOR_ID = `eval-mat-${suffix}`;
+const EVALUATOR_NOT_GUARDRAIL_ID = `eval-mat-nongr-${suffix}`;
+const MONITOR_ID = `mon-mat-${suffix}`;
+const MONITOR_NOT_GUARDRAIL_ID = `mon-mat-nongr-${suffix}`;
 const MP_ID = `mp-mat-${suffix}`;
 const RP_ID = `rp-mat-${suffix}`;
 const GUARDRAIL_ID = `gr-mat-${suffix}`;
@@ -89,6 +93,47 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
         slug: `mat-eval-${suffix}`,
         type: "evaluator",
         config: {},
+      },
+    });
+    await prisma.evaluator.create({
+      data: {
+        id: EVALUATOR_NOT_GUARDRAIL_ID,
+        projectId: PROJECT_ID,
+        name: `Mat evaluator non-guardrail ${suffix}`,
+        slug: `mat-eval-nongr-${suffix}`,
+        type: "evaluator",
+        config: {},
+      },
+    });
+    // AS_GUARDRAIL monitor binds the first evaluator as guardrail-eligible.
+    await prisma.monitor.create({
+      data: {
+        id: MONITOR_ID,
+        projectId: PROJECT_ID,
+        evaluatorId: EVALUATOR_ID,
+        checkType: "evaluator",
+        name: `Mat monitor ${suffix}`,
+        slug: `mat-mon-${suffix}`,
+        executionMode: "AS_GUARDRAIL",
+        enabled: true,
+        preconditions: [],
+        parameters: {},
+      },
+    });
+    // ON_MESSAGE monitor for the second evaluator — same project but
+    // NOT a guardrail-eligible binding.
+    await prisma.monitor.create({
+      data: {
+        id: MONITOR_NOT_GUARDRAIL_ID,
+        projectId: PROJECT_ID,
+        evaluatorId: EVALUATOR_NOT_GUARDRAIL_ID,
+        checkType: "evaluator",
+        name: `Mat monitor non-guardrail ${suffix}`,
+        slug: `mat-mon-nongr-${suffix}`,
+        executionMode: "ON_MESSAGE",
+        enabled: true,
+        preconditions: [],
+        parameters: {},
       },
     });
     await prisma.modelProvider.create({
@@ -203,7 +248,10 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
       where: { id: { in: [VK_ID, VK_NO_RP_ID, VK_NO_PROJECT_ID] } },
     });
     await prisma.gatewayGuardrail.deleteMany({
-      where: { id: GUARDRAIL_ID },
+      where: { projectId: PROJECT_ID },
+    });
+    await prisma.monitor.deleteMany({
+      where: { id: { in: [MONITOR_ID, MONITOR_NOT_GUARDRAIL_ID] } },
     });
     await prisma.routingPolicyScope.deleteMany({
       where: { routingPolicyId: RP_ID },
@@ -213,7 +261,9 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
       where: { modelProviderId: MP_ID },
     });
     await prisma.modelProvider.deleteMany({ where: { id: MP_ID } });
-    await prisma.evaluator.deleteMany({ where: { id: EVALUATOR_ID } });
+    await prisma.evaluator.deleteMany({
+      where: { id: { in: [EVALUATOR_ID, EVALUATOR_NOT_GUARDRAIL_ID] } },
+    });
     await prisma.user.deleteMany({ where: { id: USER_ID } });
     await prisma.project.deleteMany({ where: { id: PROJECT_ID } });
     await prisma.team.deleteMany({ where: { id: TEAM_ID } });
@@ -301,6 +351,38 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
         urls: { deny: [], allow: null },
         models: { deny: [], allow: null },
       });
+    });
+  });
+
+  describe("when GatewayGuardrailService.create gates on AS_GUARDRAIL monitor", () => {
+    it("accepts an evaluator with at least one enabled AS_GUARDRAIL monitor in the project", async () => {
+      const service = GatewayGuardrailService.create(prisma);
+      const row = await service.create({
+        projectId: PROJECT_ID,
+        name: `Accept guardrail ${suffix}`,
+        description: null,
+        evaluatorId: EVALUATOR_ID,
+        direction: "POST",
+        failureMode: "FAIL_CLOSED",
+        actorUserId: USER_ID,
+      });
+      expect(row.id).toBeTruthy();
+      expect(row.evaluatorId).toBe(EVALUATOR_ID);
+      expect(row.direction).toBe("POST");
+    });
+
+    it("rejects an evaluator with no AS_GUARDRAIL monitor in the project", async () => {
+      const service = GatewayGuardrailService.create(prisma);
+      await expect(
+        service.create({
+          projectId: PROJECT_ID,
+          name: `Reject guardrail ${suffix}`,
+          description: null,
+          evaluatorId: EVALUATOR_NOT_GUARDRAIL_ID,
+          direction: "PRE",
+          actorUserId: USER_ID,
+        }),
+      ).rejects.toThrow(/evaluator_not_as_guardrail/);
     });
   });
 
