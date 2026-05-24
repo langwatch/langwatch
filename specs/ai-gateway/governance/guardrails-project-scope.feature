@@ -132,11 +132,19 @@ Feature: AI Gateway — GatewayGuardrail is a project-scoped first-class resourc
   # ============================================================================
 
   @bdd @guardrails @audit @unimplemented
-  Scenario: Every create / edit / delete / VK-attach emits an AuditLog row
-    When carol performs any of: create guardrail, edit guardrail, delete guardrail, attach guardrail to a VK, detach guardrail from a VK
+  Scenario: Every create / edit / archive / VK-attach emits an AuditLog row
+    When carol performs any of: create guardrail, edit guardrail, archive guardrail, attach guardrail to a VK, detach guardrail from a VK
     Then exactly one AuditLog row is emitted per action with:
-      | field      | shape                                                |
-      | action     | "gatewayGuardrail.{create,update,delete,attach,detach}" |
-      | actorId    | carol's userId                                       |
-      | targetId   | the GatewayGuardrail id (or VK id for attach/detach) |
-      | category   | "configuration_change"                               |
+      | field      | shape                                                              |
+      | action     | one of gateway.guardrail.{created,updated,archived}                |
+      |            | OR gateway.virtual_key.{guardrail_attached,guardrail_detached}     |
+      | actorId    | carol's userId                                                     |
+      | targetId   | the GatewayGuardrail id (CRUD) or VK id (attach/detach)            |
+      | category   | "configuration_change"                                             |
+    # Naming convention matches the existing gateway.<entity_snake>.<verb_past>
+    # shape (gateway.virtual_key.{created,updated,rotated,revoked} etc).
+    # Delete is "archived" because GatewayGuardrail uses soft-delete via
+    # archivedAt — no hard-delete path exists.
+    # VK-side attach/detach actions are filed under gateway.virtual_key.*
+    # because the AuditLog target is the VK row that opted in, not the
+    # guardrail row itself. CRUD actions live on the guardrail target.
