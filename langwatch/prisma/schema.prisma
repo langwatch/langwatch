@@ -103,6 +103,8 @@ model User {
   personalProjects        Project[]                @relation("PersonalProjectOwner")
   routingPoliciesCreated  RoutingPolicy[]          @relation("RoutingPolicyCreatedBy")
   routingPoliciesUpdated  RoutingPolicy[]          @relation("RoutingPolicyUpdatedBy")
+  gatewayGuardrailsCreated GatewayGuardrail[]      @relation("GatewayGuardrailCreatedBy")
+  gatewayGuardrailsUpdated GatewayGuardrail[]      @relation("GatewayGuardrailUpdatedBy")
   ingestionSourcesCreated IngestionSource[]        @relation("IngestionSourceCreatedBy")
   anomalyRulesCreated     AnomalyRule[]            @relation("AnomalyRuleCreatedBy")
   userIngestionBindings   UserIngestionBinding[]
@@ -396,6 +398,7 @@ model Project {
   suiteConfigurations      SimulationSuite[]
   savedViews               SavedView[]
   gatewayBudgets           GatewayBudget[]                     @relation("ProjectScopedGatewayBudgets")
+  gatewayGuardrails        GatewayGuardrail[]                  @relation("ProjectGatewayGuardrails")
   gatewayChangeEvents      GatewayChangeEvent[]
   userIngestionBindings    UserIngestionBinding[]
 
@@ -1357,6 +1360,7 @@ model Evaluator {
   copiedFrom            Evaluator?  @relation("EvaluatorCopies", fields: [copiedFromEvaluatorId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   copiedEvaluators      Evaluator[] @relation("EvaluatorCopies")
   monitors              Monitor[] // Monitors using this evaluator
+  gatewayGuardrails     GatewayGuardrail[] @relation("EvaluatorGatewayGuardrails")
   archivedAt            DateTime?
   createdAt             DateTime    @default(now())
   updatedAt             DateTime    @default(now()) @updatedAt
@@ -1891,6 +1895,60 @@ model RoutingPolicy {
   @@unique([organizationId, scope, scopeId, name])
   @@index([organizationId])
   @@index([scope, scopeId])
+}
+
+// ---------------------------------------------------------------------------
+// GatewayGuardrail — project-scoped Evaluator binding the gateway enforces
+// on inbound + outbound traffic per VK opt-in.
+//
+// Lifted from per-VK config (iter 110: vk.config.guardrails) so a project
+// admin can author one guardrail and attach it to N VKs by reference,
+// instead of duplicating the evaluator binding + failure mode on every VK.
+// VKs opt in via vk.config.guardrailAttachments[] of
+//   { direction, guardrailIds[] }
+// tuples; cross-project attach is rejected at write time.
+//
+// Project-scoped only (for now) per rchaves: a single non-null projectId
+// column, NO scope join table. Widening to team / org guardrails later
+// drops the column to nullable + adds a GatewayGuardrailScope join in a
+// separate migration. The single-column shape is intentional — keeps the
+// current constraint enforced at schema level, not at resolver level.
+//
+// Spec: specs/ai-gateway/governance/guardrails-project-scope.feature
+// ---------------------------------------------------------------------------
+enum GatewayGuardrailDirection {
+  PRE
+  POST
+  STREAM_CHUNK
+}
+
+enum GatewayGuardrailFailureMode {
+  FAIL_OPEN
+  FAIL_CLOSED
+}
+
+model GatewayGuardrail {
+  id          String                      @id @default(nanoid())
+  projectId   String
+  project     Project                     @relation("ProjectGatewayGuardrails", fields: [projectId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  evaluatorId String
+  evaluator   Evaluator                   @relation("EvaluatorGatewayGuardrails", fields: [evaluatorId], references: [id], onDelete: Restrict)
+  direction   GatewayGuardrailDirection
+  failureMode GatewayGuardrailFailureMode @default(FAIL_CLOSED)
+
+  archivedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @default(now()) @updatedAt
+  createdById String?
+  createdBy   User?     @relation("GatewayGuardrailCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedById String?
+  updatedBy   User?     @relation("GatewayGuardrailUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@index([projectId])
+  @@index([evaluatorId])
+  @@index([projectId, archivedAt])
 }
 
 /// Per-platform fleet configuration that connects a closed SaaS
