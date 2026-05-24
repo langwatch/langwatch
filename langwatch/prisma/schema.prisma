@@ -1691,7 +1691,7 @@ enum GatewayChangeEventKind {
   BUDGET_CREATED
   BUDGET_UPDATED
   BUDGET_DELETED
-  PROVIDER_BINDING_UPDATED
+  MODEL_PROVIDER_UPDATED
   CACHE_RULE_CREATED
   CACHE_RULE_UPDATED
   CACHE_RULE_DELETED
@@ -2467,17 +2467,19 @@ model GatewayBudgetLedger {
 
 model GatewayChangeEvent {
   // Monotonically-increasing revision the gateway long-polls on.
-  revision             BigInt                 @id @default(autoincrement())
-  organizationId       String
-  organization         Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  kind                 GatewayChangeEventKind
-  virtualKeyId         String?
-  budgetId             String?
-  providerCredentialId String?
-  projectId            String?
-  project              Project?               @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  payload              Json?
-  createdAt            DateTime               @default(now())
+  revision        BigInt                 @id @default(autoincrement())
+  organizationId  String
+  organization    Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  kind            GatewayChangeEventKind
+  virtualKeyId    String?
+  budgetId        String?
+  // Post-collapse: events pointing at a provider point at the
+  // ModelProvider directly (no separate binding row).
+  modelProviderId String?
+  projectId       String?
+  project         Project?               @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  payload         Json?
+  createdAt       DateTime               @default(now())
 
   @@index([organizationId, revision])
   @@index([projectId, revision])

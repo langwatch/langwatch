@@ -203,3 +203,15 @@ ALTER TABLE "ModelProvider" DROP COLUMN "projectId";
 
 -- Slot column on GPC is gone with the table drop above. No-op on MP
 -- because MP never had a slot column (it lived only on GPC).
+
+-- ---------------------------------------------------------------------------
+-- Step 9: GatewayChangeEvent — column + enum rename.
+-- The binding-update event kind + the per-event provider id pointed at
+-- GPC pre-collapse; both now point at ModelProvider directly.
+-- ---------------------------------------------------------------------------
+
+ALTER TYPE "GatewayChangeEventKind"
+    RENAME VALUE 'PROVIDER_BINDING_UPDATED' TO 'MODEL_PROVIDER_UPDATED';
+
+ALTER TABLE "GatewayChangeEvent"
+    RENAME COLUMN "providerCredentialId" TO "modelProviderId";

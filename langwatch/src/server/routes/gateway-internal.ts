@@ -31,6 +31,7 @@ import { GatewayBudgetService } from "~/server/gateway/budget.service";
 import { ChangeEventRepository } from "~/server/gateway/changeEvent.repository";
 import { GatewayConfigMaterialiser } from "~/server/gateway/config.materialiser";
 import { signGatewayJwt } from "~/server/gateway/gatewayJwt";
+import { resolveTraceProject } from "~/server/gateway/scopeResolver";
 import {
   VirtualKeyCryptoError,
   hashVirtualKeySecret,
@@ -316,28 +317,17 @@ app.post("/resolve-key", async (c) => {
     );
   }
 
-  const project = await prisma.project.findUnique({
-    where: { id: vk.projectId },
-    include: { team: true },
-  });
-  if (!project) {
-    return c.json(
-      {
-        error: {
-          type: "internal_error",
-          code: "project_orphaned",
-          message: "virtual key references missing project",
-        },
-      },
-      500,
-    );
-  }
+  // Resolve the trace project for OTLP routing. PROJECT-scoped VK with
+  // exactly one PROJECT scope -> that project; otherwise -> the org's
+  // `internal_governance` project; otherwise -> null (gateway skips
+  // span export rather than failing the auth handshake).
+  const traceProject = await resolveTraceProject(prisma, vk);
 
   const { jwt } = signGatewayJwt({
     vk_id: vk.id,
-    project_id: project.id,
-    team_id: project.teamId,
-    org_id: project.team.organizationId,
+    project_id: traceProject?.id ?? null,
+    team_id: traceProject?.teamId ?? null,
+    org_id: vk.organizationId,
     principal_id: vk.principalUserId,
     revision: vk.revision.toString(),
   });
@@ -359,15 +349,11 @@ app.post("/resolve-key", async (c) => {
  */
 app.get("/config/:vk_id", async (c) => {
   const vkId = c.req.param("vk_id");
-  // Two-step fetch avoids Prisma's `include` generating a nested
-  // findMany on GatewayProviderCredential that the multitenancy
-  // middleware rejects (no projectId in scope yet — VK IS what
-  // teaches us projectId). Step 1 uses the narrow findUnique
-  // exemption; step 2 scopes by the projectId we just learned.
-  const vkRow = await prisma.virtualKey.findUnique({
+  const vk = await prisma.virtualKey.findUnique({
     where: { id: vkId },
+    include: { scopes: true },
   });
-  if (!vkRow) {
+  if (!vk) {
     return c.json(
       {
         error: {
@@ -379,11 +365,6 @@ app.get("/config/:vk_id", async (c) => {
       404,
     );
   }
-  const providerCredentials = await prisma.virtualKeyProviderCredential.findMany({
-    where: { virtualKeyId: vkRow.id },
-    orderBy: { priority: "asc" },
-  });
-  const vk = { ...vkRow, providerCredentials };
 
   const ifNoneMatch = c.req.header("If-None-Match");
   const currentRevision = vk.revision.toString();
@@ -479,7 +460,7 @@ app.get("/changes", async (c) => {
             kind: e.kind,
             virtual_key_id: e.virtualKeyId,
             budget_id: e.budgetId,
-            provider_credential_id: e.providerCredentialId,
+            model_provider_id: e.modelProviderId,
             project_id: e.projectId,
             revision: e.revision.toString(),
           })),
@@ -524,6 +505,7 @@ app.post("/budget/check", async (c) => {
 
   const vk = await prisma.virtualKey.findUnique({
     where: { id: body.vk_id },
+    include: { scopes: true },
   });
   if (!vk) {
     return c.json(
@@ -537,22 +519,11 @@ app.post("/budget/check", async (c) => {
       404,
     );
   }
-  const project = await prisma.project.findUnique({
-    where: { id: vk.projectId },
-    include: { team: true },
-  });
-  if (!project) {
-    return c.json(
-      {
-        error: {
-          type: "internal_error",
-          code: "project_orphaned",
-          message: "virtual key references missing project",
-        },
-      },
-      500,
-    );
-  }
+  // Trace project resolution mirrors the /config/:vk_id and /resolve-key
+  // paths: single-PROJECT-scope VK uses that project; otherwise fall
+  // back to the org's internal_governance project; otherwise null —
+  // budget check still runs against ORG/VIRTUAL_KEY/PRINCIPAL scopes.
+  const traceProject = await resolveTraceProject(prisma, vk);
 
   // EC6 — admin oversight ("when did this user last use their VK")
   // was broken because /resolve-key only fires on bundle cache miss
@@ -584,9 +555,9 @@ app.post("/budget/check", async (c) => {
       : undefined,
   );
   const result = await service.check({
-    organizationId: project.team.organizationId,
-    teamId: project.teamId,
-    projectId: project.id,
+    organizationId: vk.organizationId,
+    teamId: traceProject?.teamId ?? null,
+    projectId: traceProject?.id ?? null,
     virtualKeyId: vk.id,
     principalUserId: vk.principalUserId,
     projectedCostUsd: body.projected_cost_usd,

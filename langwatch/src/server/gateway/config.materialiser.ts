@@ -1,32 +1,38 @@
 /**
  * Materialise the payload returned from `GET /api/internal/gateway/config/:vk_id`.
  *
- * Shape: contract §4.2. Caller loads the VirtualKey + its provider chain and
- * hands off to this module; we collect applicable budgets, normalise enums,
- * and assemble the JSON blob the Go gateway expects.
+ * Bundle shape lives in contract §4.2. Source of truth changed in the
+ * VK-binding collapse: GatewayProviderCredential is gone, ModelProvider
+ * absorbed its advanced gateway fields, and the VK's eligible-provider
+ * set is now computed from the VirtualKeyScope graph + an optional
+ * RoutingPolicy.modelProviderIds ordering. See `scopeResolver.ts` for
+ * the cascade walker.
  */
 import type {
   GatewayBudget,
   GatewayCacheRule,
-  GatewayProviderCredential,
   ModelProvider,
+  Prisma,
   PrismaClient,
-  Project,
-  Team,
   VirtualKey,
 } from "@prisma/client";
 
 import { decrypt } from "../../utils/encryption";
 import { GatewayBudgetClickHouseRepository } from "./budget.clickhouse.repository";
 import { GatewayCacheRuleService } from "./cacheRule.service";
+import {
+  eligibleModelProvidersForVk,
+  resolveTraceProject,
+} from "./scopeResolver";
 import { parseVirtualKeyConfig } from "./virtualKey.config";
-import type { VirtualKeyWithChain } from "./virtualKey.repository";
+import type { VirtualKeyWithScopes } from "./virtualKey.repository";
 
 export type ProviderSlot = {
-  // `id` is the per-org-unique provider credential identifier the Go
-  // gateway keys on (auth.ProviderCred.ID, json:"id"). Was historically
-  // emitted as `credentials_ref` for the resolve-later opaque-ref model
-  // that never shipped; renamed in contract §4.2 to match wire reality.
+  /**
+   * ModelProvider.id — the Go gateway keys credentials on this directly
+   * post-collapse (was the GPC id pre-collapse; one-to-one fold means
+   * the wire name `id` stays the same).
+   */
   id: string;
   slot: string;
   type: string;
@@ -38,13 +44,8 @@ export type ProviderSlot = {
    * - Bedrock: `{access_key, secret_key, session_token?, region?}`
    * - Vertex: `{project_id, project_number, region, auth_credentials}`
    * Decrypted from ModelProvider.customKeys (AES-256-GCM at rest).
-   * Finding #26 fix: without this field the gateway surfaces
-   * "no keys found for provider: <name>" on every /v1/* request.
    */
   credentials: Record<string, unknown>;
-  // Promoted out of `config` per contract §4.2 so Go-side ProviderCred
-  // can unmarshal directly into its top-level fields. Omitted when
-  // unset so the JSON remains terse.
   base_url?: string;
   region?: string;
   deployment_map?: Record<string, string>;
@@ -52,20 +53,24 @@ export type ProviderSlot = {
 };
 
 export type GatewayConfigPayload = {
-  revision: string; // serialised bigint
+  revision: string;
   vk_id: string;
   status: "active" | "revoked";
   display_prefix: string;
   environment: "live" | "test";
   organization_id: string;
-  project_id: string;
   /**
-   * Project API key the gateway uses as X-Auth-Token on OTLP span
-   * export so spans land in this VK's project's inbox. Not a new
-   * secret — same apiKey already authenticates /api/collector.
+   * project_id / project_otlp_token / team_id are populated when the VK
+   * has a single PROJECT scope, or when the org has an
+   * `internal_governance` project (TEAM/ORG-scoped VKs route traces
+   * there so the AI Governance ingestion view shows VK + receiver spans
+   * under one filter). Null for older self-hosted orgs without a
+   * governance project — the gateway skips span export rather than
+   * failing the config fetch.
    */
-  project_otlp_token: string;
-  team_id: string;
+  project_id: string | null;
+  project_otlp_token: string | null;
+  team_id: string | null;
   principal_id: string | null;
   providers: ProviderSlot[];
   fallback: {
@@ -100,22 +105,11 @@ export type GatewayConfigPayload = {
     scope: "organization" | "team" | "project" | "virtual_key" | "principal";
     scope_id: string;
     window: string;
-    limit_micro_usd: number; // microdollars (1/1_000_000 USD)
+    limit_micro_usd: number;
     spent_micro_usd: number;
-    /**
-     * Unix seconds (number). Must match the Go gateway's BudgetSpec.
-     * ResetsAt (int64) — previously emitted as ISO 8601 string here,
-     * which failed JSON decode on the Go side and cascaded into a
-     * "no VK config loaded" 400 on every dispatch against a VK with
-     * reachable budgets (finding #30 follow-up).
-     */
     resets_at: number;
     on_breach: "block" | "warn";
   }>;
-  // Cache-control rules pre-sorted by priority DESC, enabled-only.
-  // The gateway evaluates them first-match-wins in a linear scan on every
-  // request; the bundle-baked shape preserves the ~700 ns hot path (see
-  // specs/ai-gateway/cache-control-rules.feature §4).
   cache_rules: Array<{
     id: string;
     priority: number;
@@ -136,38 +130,18 @@ export type GatewayConfigPayload = {
   metadata: Record<string, unknown>;
 };
 
-type ProviderRow = GatewayProviderCredential & { modelProvider: ModelProvider };
-
 export class GatewayConfigMaterialiser {
-  /**
-   * `chRepo` is optional. When provided, the materialiser stamps the
-   * current-period spend for each applicable budget directly from the
-   * ClickHouse rollup (the source of truth post trace-fold cutover).
-   * When nil — test fixtures, or deploys without CH wired — falls back
-   * to `GatewayBudget.spentUsd` which is the legacy PG column that is
-   * no longer updated by writers and therefore always stale.
-   *
-   * EC4 lived in this gap: the gateway's Bundle.Config.Budget.Scopes
-   * is correctly invalidated on BUDGET_UPDATED change events (per
-   * 7d9632929), but the next re-materialise was reading the same
-   * stale PG number, so on-breach=block could never fire. With chRepo
-   * wired, every re-materialise reads fresh CH spend and the gateway's
-   * existing Precheck path (BlockMicroUSD - SpentMicroUSD <= 0) does
-   * the rest.
-   */
   constructor(
     private readonly prisma: PrismaClient,
     private readonly chRepo: GatewayBudgetClickHouseRepository | null = null,
   ) {}
 
-  async materialise(vk: VirtualKeyWithChain): Promise<GatewayConfigPayload> {
-    const project = await this.requireProject(vk.projectId);
-    const chain = await this.loadProviderChain(vk);
-    const budgets = await this.applicableBudgets(vk, project);
-    const spendByBudgetId = await this.loadCurrentSpend(project, budgets);
-    const cacheRules = await this.applicableCacheRules(
-      project.team.organizationId,
-    );
+  async materialise(vk: VirtualKeyWithScopes): Promise<GatewayConfigPayload> {
+    const providers = await eligibleModelProvidersForVk(this.prisma, vk);
+    const traceProject = await resolveTraceProject(this.prisma, vk);
+    const budgets = await this.applicableBudgets(vk, traceProject);
+    const spendByBudgetId = await this.loadCurrentSpend(vk, budgets);
+    const cacheRules = await this.applicableCacheRules(vk.organizationId);
     const config = parseVirtualKeyConfig(vk.config);
 
     return {
@@ -176,22 +150,15 @@ export class GatewayConfigMaterialiser {
       status: vk.status === "ACTIVE" ? "active" : "revoked",
       display_prefix: vk.displayPrefix,
       environment: vk.environment === "LIVE" ? "live" : "test",
-      organization_id: project.team.organizationId,
-      project_id: project.id,
-      // project_otlp_token lets the gateway authenticate span export to
-      // /api/otel on behalf of this project. The control-plane OTLP
-      // ingest authenticates exactly like /api/collector — per-project
-      // API token on X-Auth-Token — so using the project's apiKey here
-      // makes spans land in the VK's project's inbox (rchaves iter-66
-      // "traces not landing" ask). Bundles already travel inside the
-      // HMAC-signed internal gateway channel, so no new secret boundary.
-      project_otlp_token: project.apiKey,
-      team_id: project.teamId,
+      organization_id: vk.organizationId,
+      project_id: traceProject?.id ?? null,
+      project_otlp_token: traceProject?.apiKey ?? null,
+      team_id: traceProject?.teamId ?? null,
       principal_id: vk.principalUserId,
-      providers: chain.map((row, index) => buildProviderSlot(row, index)),
+      providers: providers.map((mp, index) => buildProviderSlot(mp, index)),
       fallback: {
         on: config.fallback.on,
-        chain: chain.map((row) => row.id),
+        chain: providers.map((mp) => mp.id),
         timeout_ms: config.fallback.timeoutMs,
         max_attempts: config.fallback.maxAttempts,
       },
@@ -222,9 +189,6 @@ export class GatewayConfigMaterialiser {
         scope_id: b.scopeId,
         window: b.window.toLowerCase(),
         limit_micro_usd: decimalToMicroUSD(b.limitUsd),
-        // EC4 — prefer the CH rollup (current-period sumMerge) over
-        // the stale PG column. Falls back to PG only when chRepo
-        // wasn't injected (legacy callers, test fixtures).
         spent_micro_usd: spendByBudgetId.has(b.id)
           ? decimalUSDStringToMicroUSD(spendByBudgetId.get(b.id)!)
           : decimalToMicroUSD(b.spentUsd),
@@ -242,126 +206,14 @@ export class GatewayConfigMaterialiser {
     return GatewayCacheRuleService.create(this.prisma).bundleFor(organizationId);
   }
 
-  private async requireProject(
-    projectId: string,
-  ): Promise<Project & { team: Team }> {
-    const project = await this.prisma.project.findUnique({
-      where: { id: projectId },
-      include: { team: true },
-    });
-    if (!project) throw new Error(`project ${projectId} not found`);
-    return project;
-  }
-
-  private async loadProviderChain(
-    vk: VirtualKeyWithChain,
-  ): Promise<ProviderRow[]> {
-    // Personal VKs (and any centrally-governed VK) carry routing via
-    // RoutingPolicy.providerCredentialIds rather than embedding their
-    // own VirtualKeyProviderCredential rows. When routingPolicyId is
-    // set we materialise the chain from the policy. Mirrors the
-    // VirtualKeyService.create branch that accepts an empty
-    // providerCredentialIds list iff routingPolicyId is set.
-    if (vk.routingPolicyId) {
-      return this.loadProviderChainFromPolicy(vk);
-    }
-    if (vk.providerCredentials.length === 0) return [];
-    // projectId is threaded through so the multitenancy middleware's
-    // guard is satisfied without adding GatewayProviderCredential to
-    // EXEMPT_MODELS. The VK we were handed was already tenancy-checked
-    // upstream, so we narrow the projectId to vk.projectId explicitly.
-    //
-    // Fail-closed filter on disabled state: skip rows whose binding has
-    // been soft-disabled (`disabledAt != null`) or whose underlying
-    // ModelProvider has been turned off (`modelProvider.enabled = false`).
-    // The cascade in `disableAllForModelProvider` covers the binding
-    // side; checking `modelProvider.enabled` here is the defense in
-    // depth for any window where the cascade hasn't run yet (it's
-    // logged-not-fatal at the router layer). A request that lands while
-    // the chain is empty fails closed at the gateway dispatcher.
-    const rows = await this.prisma.gatewayProviderCredential.findMany({
-      where: {
-        projectId: vk.projectId,
-        id: { in: vk.providerCredentials.map((p) => p.providerCredentialId) },
-        disabledAt: null,
-        modelProvider: { enabled: true },
-      },
-      include: { modelProvider: true },
-    });
-    // Preserve the chain ordering declared on the VK.
-    const byId = new Map(rows.map((r) => [r.id, r]));
-    return vk.providerCredentials
-      .map((p) => byId.get(p.providerCredentialId))
-      .filter((r): r is ProviderRow => Boolean(r));
-  }
-
   /**
-   * Resolve provider chain from RoutingPolicy.providerCredentialIds.
-   * RoutingPolicy is org-scoped and may reference GatewayProviderCredentials
-   * living in different projects of the same org (admin-published policy
-   * that personal VKs across the org's users all consume). We constrain
-   * the credential lookup to projects belonging to the policy's org so the
-   * tenancy boundary still holds — the middleware's projectId-guard would
-   * otherwise reject the cross-project findMany.
-   */
-  private async loadProviderChainFromPolicy(
-    vk: VirtualKeyWithChain,
-  ): Promise<ProviderRow[]> {
-    const policy = await this.prisma.routingPolicy.findUnique({
-      where: { id: vk.routingPolicyId! },
-    });
-    if (!policy) return [];
-    const credIds = parsePolicyCredentialIds(policy.providerCredentialIds);
-    if (credIds.length === 0) return [];
-
-    // Tenancy: find every project owned by the policy's organization,
-    // then constrain the credential lookup to that project set. The VK
-    // was already tenancy-checked upstream; this just satisfies the
-    // multitenancy middleware's projectId predicate without exempting
-    // GatewayProviderCredential from the guard.
-    const orgProjects = await this.prisma.project.findMany({
-      where: { team: { organizationId: policy.organizationId } },
-      select: { id: true },
-    });
-    const projectIds = orgProjects.map((p) => p.id);
-    if (projectIds.length === 0) return [];
-
-    // Fail-closed filter — same contract as the embedded-chain branch:
-    // a soft-disabled binding (cascade marker) or a disabled MP must
-    // not appear in the materialised chain. The Go gateway treats an
-    // empty chain as "no route", so the request fails closed instead
-    // of being dispatched to a credential that's been pulled.
-    const rows = await this.prisma.gatewayProviderCredential.findMany({
-      where: {
-        projectId: { in: projectIds },
-        id: { in: credIds },
-        disabledAt: null,
-        modelProvider: { enabled: true },
-      },
-      include: { modelProvider: true },
-    });
-    const byId = new Map(rows.map((r) => [r.id, r]));
-    return credIds
-      .map((id) => byId.get(id))
-      .filter((r): r is ProviderRow => Boolean(r));
-  }
-
-  /**
-   * Pull the current-period spend for the supplied budgets from CH and
-   * return a `budgetId → spentUsd (decimal string)` map. ORG/TEAM/
-   * PRINCIPAL-scoped budgets accumulate ledger rows under whichever
-   * project actually emitted the trace, so we hand CH every project
-   * id in the org rather than only the VK's own project (mirrors the
-   * `getSpendForBudgetsAcrossTenants` pattern from the budget service).
-   *
-   * Best-effort: any CH error logs and falls through to an empty map,
-   * which the caller treats as "no fresh spend, fall back to PG". Bias
-   * here is open — the gateway's request-handler still has Precheck as
-   * a downstream chokepoint, and a stale-but-non-zero spend is safer
-   * than a hard fail at config-fetch time.
+   * CH spend rollup. Best-effort: falls back to PG `spentUsd` when CH
+   * isn't wired (test fixtures, deploys without CH). Tenant set = every
+   * project under the VK's organization so ORG/TEAM/PRINCIPAL-scoped
+   * budgets see ledger rows under whichever project emitted the trace.
    */
   private async loadCurrentSpend(
-    project: Project & { team: Team },
+    vk: VirtualKey,
     budgets: GatewayBudget[],
   ): Promise<Map<string, string>> {
     if (this.chRepo === null || budgets.length === 0) {
@@ -369,7 +221,7 @@ export class GatewayConfigMaterialiser {
     }
     try {
       const orgProjects = await this.prisma.project.findMany({
-        where: { team: { organizationId: project.team.organizationId } },
+        where: { team: { organizationId: vk.organizationId } },
         select: { id: true },
       });
       const tenantIds = orgProjects.map((p) => p.id);
@@ -384,49 +236,38 @@ export class GatewayConfigMaterialiser {
       }
       return out;
     } catch {
-      // CH unavailable — let the caller fall back to PG. Logging is
-      // intentionally suppressed at this layer so a CH outage doesn't
-      // pour error noise per request; the budget.service.check path
-      // logs at the canonical layer.
       return new Map();
     }
   }
 
+  /**
+   * Every budget that applies to this VK. ORG-scope + VK-scope always
+   * apply. TEAM/PROJECT-scope apply only when a trace project resolves
+   * (single-project-scope VK or governance fallback).
+   */
   private async applicableBudgets(
     vk: VirtualKey,
-    project: Project & { team: Team },
+    traceProject: { id: string; teamId: string } | null,
   ): Promise<GatewayBudget[]> {
+    const ors: NonNullable<Prisma.GatewayBudgetWhereInput["OR"]> = [
+      { scopeType: "ORGANIZATION", scopeId: vk.organizationId },
+      { scopeType: "VIRTUAL_KEY", scopeId: vk.id },
+    ];
+    if (traceProject) {
+      ors.push({ scopeType: "TEAM", scopeId: traceProject.teamId });
+      ors.push({ scopeType: "PROJECT", scopeId: traceProject.id });
+    }
+    if (vk.principalUserId) {
+      ors.push({ scopeType: "PRINCIPAL", scopeId: vk.principalUserId });
+    }
     return this.prisma.gatewayBudget.findMany({
       where: {
-        organizationId: project.team.organizationId,
+        organizationId: vk.organizationId,
         archivedAt: null,
-        OR: [
-          { scopeType: "ORGANIZATION", scopeId: project.team.organizationId },
-          { scopeType: "TEAM", scopeId: project.teamId },
-          { scopeType: "PROJECT", scopeId: project.id },
-          { scopeType: "VIRTUAL_KEY", scopeId: vk.id },
-          vk.principalUserId
-            ? { scopeType: "PRINCIPAL", scopeId: vk.principalUserId }
-            : { id: "__never__" },
-        ],
+        OR: ors,
       },
     });
   }
-}
-
-// decryptCustomKeys turns ModelProvider.customKeys (AES-256-GCM
-// encrypted string, legacy plaintext objects accepted for back-compat)
-// into a plain key/value map. Mirrors
-// modelProvider.repository.ts#decryptCustomKeys.
-/**
- * RoutingPolicy.providerCredentialIds is a JSON array column; deserialise
- * to a flat string[]. Defensive — bad values just produce an empty chain
- * (and the gateway 404s "no provider configured" which is the right
- * surface for a misconfigured policy).
- */
-function parsePolicyCredentialIds(raw: unknown): string[] {
-  if (!Array.isArray(raw)) return [];
-  return raw.filter((v): v is string => typeof v === "string" && v.length > 0);
 }
 
 function decryptCustomKeys(raw: unknown): Record<string, unknown> {
@@ -442,14 +283,13 @@ function decryptCustomKeys(raw: unknown): Record<string, unknown> {
   return {};
 }
 
-// buildCredentials maps ModelProvider.customKeys (historical env-var-
-// style UPPER_SNAKE_CASE keys inherited from LiteLLM integration) to
-// the Go gateway's per-provider credential shape. See
-// services/gateway/internal/dispatch/account.go#pcToBifrostKey for the
-// consuming side.
-function buildCredentials(row: ProviderRow): Record<string, unknown> {
-  const provider = row.modelProvider.provider;
-  const customKeys = decryptCustomKeys(row.modelProvider.customKeys);
+// Map ModelProvider.customKeys (env-var-style UPPER_SNAKE_CASE inherited
+// from the LiteLLM integration) to the Go gateway's per-provider
+// credential shape. See services/aigateway/internal/dispatch/account.go
+// #pcToBifrostKey for the consuming side.
+function buildCredentials(mp: ModelProvider): Record<string, unknown> {
+  const provider = mp.provider;
+  const customKeys = decryptCustomKeys(mp.customKeys);
   const pick = (k: string): string =>
     typeof customKeys[k] === "string" ? (customKeys[k] as string) : "";
 
@@ -457,8 +297,12 @@ function buildCredentials(row: ProviderRow): Record<string, unknown> {
     case "azure": {
       return {
         api_key: pick("AZURE_OPENAI_API_KEY") || pick("api-key"),
-        endpoint: pick("AZURE_OPENAI_ENDPOINT") || pick("AZURE_API_GATEWAY_BASE_URL"),
-        api_version: pick("AZURE_OPENAI_API_VERSION") || pick("AZURE_API_GATEWAY_VERSION"),
+        endpoint:
+          pick("AZURE_OPENAI_ENDPOINT") ||
+          pick("AZURE_API_GATEWAY_BASE_URL"),
+        api_version:
+          pick("AZURE_OPENAI_API_VERSION") ||
+          pick("AZURE_API_GATEWAY_VERSION"),
       };
     }
     case "bedrock": {
@@ -498,7 +342,6 @@ function buildCredentials(row: ProviderRow): Record<string, unknown> {
     case "cloudflare":
       return { api_key: pick("CLOUDFLARE_API_KEY") };
     default: {
-      // Fallback: first UPPER_CASE_KEY ending in _API_KEY.
       const apiKey = Object.entries(customKeys).find(([k]) =>
         /_API_KEY$/.test(k),
       )?.[1];
@@ -507,48 +350,50 @@ function buildCredentials(row: ProviderRow): Record<string, unknown> {
   }
 }
 
-function buildProviderSlot(row: ProviderRow, index: number): ProviderSlot {
-  const credentials = buildCredentials(row);
-  const mp = row.modelProvider;
+function buildProviderSlot(mp: ModelProvider, index: number): ProviderSlot {
+  const credentials = buildCredentials(mp);
   const customKeys = decryptCustomKeys(mp.customKeys);
-  const baseURL = pickString(customKeys, "base_url") ?? pickString(customKeys, "BASE_URL");
-  // Region lives on credentials for Bedrock/Vertex; mirror to the
-  // top-level `region` field so the Go gateway's non-provider-specific
-  // code (logging, fallback, health probes) can read it without
-  // re-parsing the opaque credentials blob.
+  const baseURL =
+    pickString(customKeys, "base_url") ?? pickString(customKeys, "BASE_URL");
   const region = pickString(credentials, "region");
   const deploymentMap = mp.deploymentMapping
     ? (mp.deploymentMapping as Record<string, string>)
     : undefined;
   return {
-    id: row.id,
-    slot: row.slot ?? (index === 0 ? "primary" : `fallback_${index}`),
+    id: mp.id,
+    slot: index === 0 ? "primary" : `fallback_${index}`,
     type: mp.provider,
     credentials,
     ...(baseURL ? { base_url: baseURL } : {}),
     ...(region ? { region } : {}),
     ...(deploymentMap ? { deployment_map: deploymentMap } : {}),
-    config: buildProviderConfig(row),
+    config: buildProviderConfig(mp),
   };
 }
 
-function pickString(obj: Record<string, unknown>, key: string): string | undefined {
+function pickString(
+  obj: Record<string, unknown>,
+  key: string,
+): string | undefined {
   const v = obj[key];
   return typeof v === "string" && v.length > 0 ? v : undefined;
 }
 
-function buildProviderConfig(row: ProviderRow): Record<string, unknown> {
-  const gatewayExtras = (row.providerConfig ?? {}) as Record<string, unknown>;
+function buildProviderConfig(mp: ModelProvider): Record<string, unknown> {
+  const gatewayExtras = (mp.providerConfig ?? {}) as Record<string, unknown>;
   return {
     rate_limit: {
-      rpm: row.rateLimitRpm,
-      tpm: row.rateLimitTpm,
-      rpd: row.rateLimitRpd,
+      rpm: mp.rateLimitRpm,
+      tpm: mp.rateLimitTpm,
+      rpd: mp.rateLimitRpd,
     },
     health: {
-      status: row.healthStatus.toLowerCase(),
-      circuit_opened_at: row.circuitOpenedAt?.toISOString() ?? null,
+      status: mp.healthStatus.toLowerCase(),
+      circuit_opened_at: mp.circuitOpenedAt?.toISOString() ?? null,
     },
+    ...(mp.extraHeaders
+      ? { extra_headers: mp.extraHeaders as Record<string, unknown> }
+      : {}),
     ...gatewayExtras,
   };
 }
@@ -592,11 +437,6 @@ function decimalToMicroUSD(d: { toNumber(): number }): number {
   return Math.round(d.toNumber() * 1_000_000);
 }
 
-/**
- * Same conversion as `decimalToMicroUSD` but starting from CH's wire
- * shape (decimal string, e.g. "0.01013"). Used for the spend stamped
- * by `loadCurrentSpend` from `getSpendForBudgetsAcrossTenants`.
- */
 function decimalUSDStringToMicroUSD(s: string): number {
   const n = Number.parseFloat(s);
   if (!Number.isFinite(n)) return 0;

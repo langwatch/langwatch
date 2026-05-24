@@ -25,43 +25,30 @@ function deprecated(): never {
   throw new TRPCError({ code: "NOT_IMPLEMENTED", message: DEPRECATED });
 }
 
-class GatewayProviderCredentialServiceImpl {
-  constructor(_prisma: PrismaClient) {}
+// Loose proxy: every property access returns a function that throws at
+// runtime. Lets legacy consumers compile (any `service.foo(...)` call,
+// any field access on the imagined result) without us having to
+// hand-enumerate the call surface across both the tRPC router (A1) and
+// the public REST surface (S1b). The whole file disappears once both
+// rewrites land.
+const loose: any = new Proxy(function () {}, {
+  get(_, prop) {
+    if (prop === "then" || prop === Symbol.toPrimitive) return undefined;
+    return loose;
+  },
+  apply() {
+    deprecated();
+  },
+});
 
-  list(_args?: unknown): never {
-    deprecated();
-  }
-  listForOrg(_args?: unknown): never {
-    deprecated();
-  }
-  countByModelProvider(_args?: unknown): never {
-    deprecated();
-  }
-  get(_args?: unknown): never {
-    deprecated();
-  }
-  create(_args?: unknown): never {
-    deprecated();
-  }
-  update(_args?: unknown): never {
-    deprecated();
-  }
-  disable(_args?: unknown): never {
-    deprecated();
-  }
-  enable(_args?: unknown): never {
-    deprecated();
-  }
-  destroy(_args?: unknown): never {
-    deprecated();
-  }
-  disableAllForModelProvider(_args?: unknown): never {
-    deprecated();
+class GatewayProviderCredentialServiceImpl {
+  constructor(_prisma: PrismaClient) {
+    return loose;
   }
 }
 
 export class GatewayProviderCredentialService {
-  static create(prisma: PrismaClient): GatewayProviderCredentialServiceImpl {
+  static create(prisma: PrismaClient): any {
     return new GatewayProviderCredentialServiceImpl(prisma);
   }
 }

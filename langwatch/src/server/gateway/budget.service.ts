@@ -110,8 +110,11 @@ export type BudgetCheckDecision = "allow" | "soft_warn" | "hard_block";
 
 export type BudgetCheckInput = {
   organizationId: string;
-  teamId: string;
-  projectId: string;
+  // Post-collapse: a VK with no PROJECT scope (TEAM/ORG-only) and no
+  // governance-project fallback has no trace project; the corresponding
+  // TEAM/PROJECT-scoped budgets are simply skipped from the OR-clause.
+  teamId: string | null;
+  projectId: string | null;
   virtualKeyId: string;
   principalUserId?: string | null;
   projectedCostUsd: number | string;
@@ -303,11 +306,16 @@ export class GatewayBudgetService {
       case "PROJECT":
         return budget.scopeId;
       case "VIRTUAL_KEY": {
-        const vk = await this.prisma.virtualKey.findUnique({
-          where: { id: budget.scopeId },
-          select: { projectId: true },
+        // Post-collapse: VK no longer has a single projectId. Pick the
+        // first PROJECT-scope row; org-scoped VKs without a project
+        // scope have no single tenant (returns null → empty panel,
+        // same shape as ORG/TEAM-scoped budgets).
+        const scope = await this.prisma.virtualKeyScope.findFirst({
+          where: { virtualKeyId: budget.scopeId, scopeType: "PROJECT" },
+          select: { scopeId: true },
+          orderBy: { createdAt: "asc" },
         });
-        return vk?.projectId ?? null;
+        return scope?.scopeId ?? null;
       }
       case "ORGANIZATION":
       case "TEAM":
@@ -363,18 +371,25 @@ export class GatewayBudgetService {
       case "VIRTUAL_KEY": {
         const vk = await this.prisma.virtualKey.findUnique({
           where: { id: budget.scopeId },
-          select: {
-            name: true,
-            displayPrefix: true,
-            project: { select: { slug: true } },
-          },
+          select: { name: true, displayPrefix: true },
         });
+        const projectScope = await this.prisma.virtualKeyScope.findFirst({
+          where: { virtualKeyId: budget.scopeId, scopeType: "PROJECT" },
+          select: { scopeId: true },
+          orderBy: { createdAt: "asc" },
+        });
+        const project = projectScope
+          ? await this.prisma.project.findUnique({
+              where: { id: projectScope.scopeId },
+              select: { slug: true },
+            })
+          : null;
         return {
           kind: "VIRTUAL_KEY",
           id: budget.scopeId,
           name: vk?.name ?? budget.scopeId,
           secondary: vk?.displayPrefix ? `${vk.displayPrefix}…` : null,
-          projectSlug: vk?.project?.slug ?? null,
+          projectSlug: project?.slug ?? null,
         };
       }
       case "PRINCIPAL": {
@@ -560,19 +575,24 @@ export class GatewayBudgetService {
   async check(input: BudgetCheckInput): Promise<BudgetCheckResult> {
     const projected = new Prisma.Decimal(input.projectedCostUsd.toString());
 
+    const ors: Prisma.GatewayBudgetWhereInput[] = [
+      { scopeType: "ORGANIZATION", scopeId: input.organizationId },
+      { scopeType: "VIRTUAL_KEY", scopeId: input.virtualKeyId },
+    ];
+    if (input.teamId) {
+      ors.push({ scopeType: "TEAM", scopeId: input.teamId });
+    }
+    if (input.projectId) {
+      ors.push({ scopeType: "PROJECT", scopeId: input.projectId });
+    }
+    if (input.principalUserId) {
+      ors.push({ scopeType: "PRINCIPAL", scopeId: input.principalUserId });
+    }
     const applicable = await this.prisma.gatewayBudget.findMany({
       where: {
         organizationId: input.organizationId,
         archivedAt: null,
-        OR: [
-          { scopeType: "ORGANIZATION", scopeId: input.organizationId },
-          { scopeType: "TEAM", scopeId: input.teamId },
-          { scopeType: "PROJECT", scopeId: input.projectId },
-          { scopeType: "VIRTUAL_KEY", scopeId: input.virtualKeyId },
-          input.principalUserId
-            ? { scopeType: "PRINCIPAL", scopeId: input.principalUserId }
-            : { id: "__never__" },
-        ],
+        OR: ors,
       },
     });
 
@@ -582,12 +602,25 @@ export class GatewayBudgetService {
     // period boundaries — no `shouldResetBudget` branch needed on that
     // path. The PG path still needs it because the column accumulates
     // across periods until a writer resets it.
+    //
+    // Tenant fan-out: ORG/TEAM/PRINCIPAL-scoped budgets accumulate ledger
+    // rows under whichever project emitted the trace, so the CH query
+    // must consider every project in the org — not just the resolved
+    // trace project. Mirrors the materialiser's `loadCurrentSpend`.
     const chSpendByBudgetId = this.chRepo
-      ? new Map(
-          (await this.chRepo.getSpendForBudgets(input.projectId, applicable)).map(
-            (s) => [s.budgetId, s.spentUsd],
-          ),
-        )
+      ? await (async () => {
+          const orgProjects = await this.prisma.project.findMany({
+            where: { team: { organizationId: input.organizationId } },
+            select: { id: true },
+          });
+          const tenantIds = orgProjects.map((p) => p.id);
+          if (tenantIds.length === 0) return new Map<string, string>();
+          const spends = await this.chRepo!.getSpendForBudgetsAcrossTenants(
+            tenantIds,
+            applicable,
+          );
+          return new Map(spends.map((s) => [s.budgetId, s.spentUsd] as const));
+        })()
       : null;
 
     const now = new Date();

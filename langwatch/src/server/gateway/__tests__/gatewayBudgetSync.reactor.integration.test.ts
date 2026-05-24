@@ -154,12 +154,15 @@ describe("gatewayBudgetSync reactor — real PG + real CH", () => {
     await prisma.virtualKey.create({
       data: {
         id: VK_ID,
-        projectId: PROJECT_ID,
+        organizationId: ORG_ID,
         name: "test-vk",
         hashedSecret: `hash-${suffix}`,
         displayPrefix: "vk-lw-xxx",
         principalUserId: USER_ID,
         createdById: USER_ID,
+        scopes: {
+          create: [{ scopeType: "PROJECT", scopeId: PROJECT_ID }],
+        },
       },
     });
     await prisma.gatewayBudget.create({

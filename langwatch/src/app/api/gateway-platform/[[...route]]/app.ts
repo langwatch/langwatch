@@ -347,14 +347,15 @@ export const app = new Hono<{ Variables: Variables }>()
     }
     const organizationId = await orgIdForProject(project.id);
     const service = VirtualKeyService.create(prisma);
+    // REST wire still mints VKs scoped to the caller's project. Wire
+    // expansion to TEAM/ORG scopes lands with the S1b REST redesign.
     const input: CreateVirtualKeyInput = {
-      projectId: project.id,
       organizationId,
       name: body.data.name,
       description: body.data.description ?? null,
       environment: body.data.environment,
       principalUserId: body.data.principal_user_id ?? null,
-      providerCredentialIds: body.data.provider_credential_ids,
+      scopes: [{ scopeType: "PROJECT", scopeId: project.id }],
       config: body.data.config,
       // Machine principal — no human actor.
       actorUserId: machineActorForProject(project.id),
@@ -399,7 +400,8 @@ export const app = new Hono<{ Variables: Variables }>()
       const project = c.get("project");
       const id = c.req.param("id");
       const service = VirtualKeyService.create(prisma);
-      const vk = await service.getById(id, project.id);
+      const organizationId = await orgIdForProject(project.id);
+      const vk = await service.getById(id, organizationId);
       if (!vk) {
         return c.json(
           { error: { type: "not_found", code: "virtual_key_not_found", message: "virtual key not found" } },
@@ -450,12 +452,10 @@ export const app = new Hono<{ Variables: Variables }>()
     const service = VirtualKeyService.create(prisma);
     const updated = await service.update({
       id,
-      projectId: project.id,
       organizationId,
       actorUserId: machineActorForProject(project.id),
       name: body.data.name,
       description: body.data.description ?? null,
-      providerCredentialIds: body.data.provider_credential_ids,
       config: body.data.config,
     });
     return c.json({ virtual_key: toVkDto(updated) });
@@ -493,7 +493,6 @@ export const app = new Hono<{ Variables: Variables }>()
     const service = VirtualKeyService.create(prisma);
     const { virtualKey, secret } = await service.rotate({
       id,
-      projectId: project.id,
       organizationId,
       actorUserId: machineActorForProject(project.id),
     });
@@ -527,7 +526,6 @@ export const app = new Hono<{ Variables: Variables }>()
     const service = VirtualKeyService.create(prisma);
     const updated = await service.revoke({
       id,
-      projectId: project.id,
       organizationId,
       actorUserId: machineActorForProject(project.id),
     });
@@ -578,9 +576,9 @@ export const app = new Hono<{ Variables: Variables }>()
     async (c) => {
     const project = c.get("project");
     const service = GatewayProviderCredentialService.create(prisma);
-    const rows = await service.getAll(project.id);
+    const rows = (await service.getAll(project.id)) as any[];
     return c.json({
-      data: rows.map((row) => ({
+      data: rows.map((row: any) => ({
         id: row.id,
         model_provider_id: row.modelProviderId,
         model_provider_name: row.modelProvider.provider,

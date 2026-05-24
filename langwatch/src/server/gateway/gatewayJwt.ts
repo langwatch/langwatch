@@ -6,6 +6,12 @@
  *   { vk_id, project_id, team_id, org_id, principal_id, revision, exp,
  *     iat, iss, aud }
  *
+ * `project_id` + `team_id` are nullable post-collapse: a VK can be scoped
+ * at ORGANIZATION or TEAM, in which case the gateway falls back to the
+ * org's `internal_governance` project (if any) for span export. When even
+ * that fallback is unavailable (older self-hosted deploys), both fields
+ * are null and the gateway skips span export.
+ *
  * TTL: 15 minutes. Gateway refreshes at T+10 min asynchronously.
  */
 import jwt from "jsonwebtoken";
@@ -18,8 +24,8 @@ const TTL_SECONDS = 15 * 60;
 
 export type GatewayJwtClaims = {
   vk_id: string;
-  project_id: string;
-  team_id: string;
+  project_id: string | null;
+  team_id: string | null;
   org_id: string;
   principal_id: string | null;
   revision: string;

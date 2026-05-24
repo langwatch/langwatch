@@ -77,8 +77,15 @@ export class GatewayUsageService {
     projectId: string,
     window: UsageWindow,
   ): Promise<UsageSummary> {
+    // VKs reachable from this project. Post-collapse, a VK is reachable
+    // when it has at least one PROJECT scope row pointing at projectId.
+    // Wider TEAM/ORG cascade for the project page is a follow-up UX
+    // call — keep semantics tight for now so the page shows only VKs an
+    // operator has explicitly attached to the project.
     const virtualKeys = await this.prisma.virtualKey.findMany({
-      where: { projectId },
+      where: {
+        scopes: { some: { scopeType: "PROJECT", scopeId: projectId } },
+      },
       select: { id: true, name: true, displayPrefix: true },
     });
     const vkIds = virtualKeys.map((v) => v.id);
@@ -172,11 +179,14 @@ export class GatewayUsageService {
     virtualKeyId: string,
     window: UsageWindow,
   ): Promise<VirtualKeyUsageSummary> {
-    // Guard multitenancy — only proceed if the VK belongs to the
-    // given project. Matches the implicit projectId filter in
-    // summary() above.
+    // Guard multitenancy — only proceed if the VK is reachable from
+    // the given project (PROJECT-scope row matches). Matches the scope
+    // predicate used by `summary()` above.
     const vk = await this.prisma.virtualKey.findFirst({
-      where: { id: virtualKeyId, projectId },
+      where: {
+        id: virtualKeyId,
+        scopes: { some: { scopeType: "PROJECT", scopeId: projectId } },
+      },
       select: { id: true },
     });
     if (!vk || !this.chRepo) {
