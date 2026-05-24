@@ -62,7 +62,7 @@ async function main() {
     // Look for the URL with ?user_code= query param the CLI prints.
     if (!userCode) {
       const m = buf.match(/user_code=([A-Z0-9-]+)/i);
-      if (m) userCode = m[1];
+      if (m && m[1]) userCode = m[1];
     }
   });
   child.stderr.setEncoding("utf8");
@@ -122,7 +122,7 @@ async function main() {
         organizationId,
         personalProjectId: workspace.projects[0].id,
         personalTeamId: workspace.id,
-        label: `device-${userCode.replace("-", "").toLowerCase().slice(0, 6)}`,
+        label: `device-${userCode!.replace("-", "").toLowerCase().slice(0, 6)}`,
       });
     } else {
       throw err;
