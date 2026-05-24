@@ -247,7 +247,6 @@ model Organization {
   stripeCustomerId       String?                @unique
   currency               Currency               @default(EUR)
   pricingModel           PricingModel           @default(TIERED)
-  features               OrganizationFeature[]
   CustomRoles            CustomRole[]
   notifications          Notification[]
   subscriptions          Subscription[]
@@ -1122,20 +1121,6 @@ model WorkflowVersion {
   @@index([parentId])
   @@index([authorId])
   @@index([createdAt])
-}
-
-model OrganizationFeature {
-  id             String       @id @default(nanoid())
-  feature        String
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id])
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @default(now()) @updatedAt
-  trialEndDate   DateTime?
-
-  @@unique([feature, organizationId])
-  @@index([feature])
-  @@index([organizationId])
 }
 
 // AuditLog is the unified governance ledger. Both gateway-driven mutations
