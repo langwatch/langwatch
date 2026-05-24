@@ -58,6 +58,26 @@ if [[ "$NODE_ENV" = "development" ]]; then
   START_VITE_COMMAND="pnpm run dev:vite"
 fi
 
+# AI Gateway data plane (Go service). Bundled into pnpm dev so wrappers
+# (langwatch claude / codex / cursor / gemini / opencode) reach a live
+# gateway without a second terminal running `make service svc=aigateway`.
+# Skips silently when the port is already taken (another worktree's
+# gateway, or a manual run) so we don't double-bind, and when the Go
+# toolchain isn't on PATH (contributors who only touch the TS app).
+# Opt-out: LANGWATCH_SKIP_AIGATEWAY=1.
+START_GATEWAY_COMMAND=""
+if [[ "$NODE_ENV" = "development" && "$LANGWATCH_SKIP_AIGATEWAY" != "1" ]]; then
+  GATEWAY_PORT="${LW_GATEWAY_PORT:-5563}"
+  if ! command -v go >/dev/null 2>&1; then
+    echo "  ! aigateway: skipped (Go toolchain not in PATH); run \`make service svc=aigateway\` manually"
+  elif lsof -i ":$GATEWAY_PORT" -sTCP:LISTEN >/dev/null 2>&1; then
+    echo "  ✓ aigateway: already running on :$GATEWAY_PORT, reusing"
+  else
+    START_GATEWAY_COMMAND="make -C .. service svc=aigateway"
+    echo "  ✓ aigateway: auto-start on :$GATEWAY_PORT"
+  fi
+fi
+
 pnpm run start:prepare:db
 
 COMMANDS=()
@@ -69,6 +89,10 @@ fi
 if [ -n "$START_VITE_COMMAND" ]; then
   COMMANDS+=("$RUNTIME_ENV $START_VITE_COMMAND")
   NAMES+=("vite")
+fi
+if [ -n "$START_GATEWAY_COMMAND" ]; then
+  COMMANDS+=("$START_GATEWAY_COMMAND")
+  NAMES+=("gateway")
 fi
 if [ -n "$START_APP_COMMAND" ]; then
   COMMANDS+=("$RUNTIME_ENV $START_APP_COMMAND")
