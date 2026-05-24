@@ -178,4 +178,39 @@ describe("stagedLangevalsFetch", () => {
       expect(s3SendCalls).toHaveLength(1);
     });
   });
+
+  describe("when LANGEVALS_STAGING_THRESHOLD_BYTES is not configured", () => {
+    /** @scenario "Self-hosted langevals never stages regardless of payload size" */
+    it("posts inline regardless of payload size", async () => {
+      vi.resetModules();
+      vi.doMock("../../../env.mjs", () => ({
+        env: {
+          LANGEVALS_STAGING_THRESHOLD_BYTES: undefined,
+          LANGEVALS_STAGING_TTL_SECONDS: 600,
+          EVAL_MAX_PAYLOAD_BYTES: 50_000,
+          TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES: 500_000,
+        },
+      }));
+      const { stagedLangevalsFetch: optInFetch } = await import(
+        "../stagedFetch"
+      );
+
+      const big = { traces: "x".repeat(20_000) };
+
+      await optInFetch({
+        url: "https://langevals.test/topics/batch_clustering",
+        body: big,
+        projectId: "project_unit_e",
+        kind: "topic_clustering_batch",
+      });
+
+      expect(s3SendCalls).toHaveLength(0);
+      expect(presignerCalls).toHaveLength(0);
+      expect(fetchCalls).toHaveLength(1);
+      const headers = fetchCalls[0]!.init!.headers as Record<string, string>;
+      expect(headers["X-Payload-S3-URL"]).toBeUndefined();
+
+      vi.doUnmock("../../../env.mjs");
+    });
+  });
 });

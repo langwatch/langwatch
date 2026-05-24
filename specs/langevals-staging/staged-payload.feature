@@ -44,6 +44,13 @@ Feature: Auto S3 staging for large langevals payloads
     Then the body is staged via S3
     And the call succeeds
 
+  @unit
+  Scenario: Self-hosted langevals never stages regardless of payload size
+    Given LANGEVALS_STAGING_THRESHOLD_BYTES is not configured
+    When the control plane sends any payload to langevals
+    Then the body is posted inline
+    And no S3 upload happens
+
   # Langevals-side scenarios are implemented in Python tests under
   # langevals/tests/test_staged_payload.py. The feature-parity check
   # scans TS/Bats/Go test roots only; these scenarios stay untagged so

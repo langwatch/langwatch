@@ -81,15 +81,19 @@ export function createEnvConfig() {
       LANGWATCH_NLP_SERVICE: z.string().optional(),
       TOPIC_CLUSTERING_SERVICE: z.string().optional(),
       LANGEVALS_ENDPOINT: z.string().optional(),
-      // S3 staging for outbound langevals POSTs. Bodies above
-      // LANGEVALS_STAGING_THRESHOLD_BYTES are uploaded to S3 and the GET
-      // presigned URL is passed via X-Payload-S3-URL so callers stay
-      // below Lambda's 6 MB sync invoke cap. EVAL_MAX_PAYLOAD_BYTES and
-      // TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES are the hard upper bounds —
-      // anything larger is rejected before any network call. TTL bounds
-      // how long the presigned URL is valid; keep it short so a leaked
-      // URL doesn't grant long-window access.
-      LANGEVALS_STAGING_THRESHOLD_BYTES: z.coerce.number().int().positive().default(5_000_000),
+      // S3 staging for outbound langevals POSTs is opt-in: only relevant
+      // when langevals is fronted by AWS Lambda (6 MB sync-invoke cap).
+      // Self-hosted langevals on a plain HTTP service has no such cap,
+      // so leave LANGEVALS_STAGING_THRESHOLD_BYTES unset and bodies
+      // always go inline. When set, bodies above the threshold are
+      // uploaded to S3 and the GET presigned URL is forwarded via
+      // X-Payload-S3-URL. EVAL_MAX_PAYLOAD_BYTES and
+      // TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES are hard upper bounds —
+      // anything larger is rejected before any network call.
+      // LANGEVALS_STAGING_TTL_SECONDS bounds how long the presigned URL
+      // stays valid; keep it short so a leaked URL doesn't grant
+      // long-window access.
+      LANGEVALS_STAGING_THRESHOLD_BYTES: z.coerce.number().int().positive().optional(),
       LANGEVALS_STAGING_TTL_SECONDS: z.coerce.number().int().positive().default(600),
       EVAL_MAX_PAYLOAD_BYTES: z.coerce.number().int().positive().default(16_000_000),
       TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES: z.coerce.number().int().positive().default(180_000_000),

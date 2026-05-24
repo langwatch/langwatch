@@ -3,15 +3,18 @@
  * StagedPayloadMiddleware round-trip a real payload through real S3.
  *
  * Skipped unless LANGEVALS_E2E_ENABLED=1 because it needs:
- *   - lw-dev AWS credentials (or any S3 access) exported to env
+ *   - AWS credentials reachable via the SDK default chain
+ *     (set AWS_PROFILE=lw-dev and refresh SSO before running)
  *   - the langevals uv venv synced with the `langevals` + `topic_clustering`
- *     extras (the wrapper script handles both)
+ *     extras (uv resolves these on first `uv run`)
  *   - LANGEVALS_STAGING_THRESHOLD_BYTES set low enough to force staging
+ *   - OPENAI_API_KEY available (vitest auto-loads from langwatch/.env)
  *
- * Use scripts/run-langevals-staging-e2e.sh to exercise this locally;
+ * Run locally:
+ *   pnpm test:e2e:langevals-staging
  * CI does not run it (no shared dev S3 creds in GH Actions).
  *
- * Scenarios proven end-to-end (with wrapper threshold = 200 bytes both
+ * Scenarios proven end-to-end (with threshold = 200 bytes both
  * evaluator scenarios force the staged path; the inline branch is
  * covered exhaustively by the unit tests, no value duplicating it here):
  *   1. llm_boolean payload stages via real S3, langevals middleware
@@ -65,11 +68,6 @@ const describeFn = E2E_ENABLED ? describe : describe.skip;
 
 describeFn("stagedLangevalsFetch e2e (real S3 + real langevals)", () => {
   beforeAll(async () => {
-    if (!process.env.S3_BUCKET_NAME) {
-      throw new Error(
-        "S3_BUCKET_NAME must be set (wrapper script: run-langevals-staging-e2e.sh)",
-      );
-    }
     harness = await spawnLangevals();
   }, 120_000);
 
@@ -284,7 +282,14 @@ async function spawnLangevals(): Promise<Harness> {
   const baseUrl = `http://127.0.0.1:${port}`;
   await waitForHealth(baseUrl, 60_000);
 
-  const bucket = process.env.S3_BUCKET_NAME!;
+  // The npm script (`pnpm test:e2e:langevals-staging`) pre-resolves the
+  // AWS profile to S3_ACCESS_KEY_ID/SECRET/SESSION_TOKEN before invoking
+  // vitest, because the AWS SDK's default credential chain can't be
+  // loaded inside vitest's vite-node resolver (see
+  // https://github.com/aws/aws-sdk-js-v3/issues/4953 — surfaces as
+  // "Invalid URL" on the credential-provider-node module path). Bucket
+  // + region default to the lw-dev values for a one-command run.
+  const bucket = process.env.S3_BUCKET_NAME ?? "runtime-storage-dev";
   const s3 = new S3Client({
     region: process.env.S3_REGION ?? "eu-central-1",
     endpoint: process.env.S3_ENDPOINT,

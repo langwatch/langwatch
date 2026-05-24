@@ -88,10 +88,16 @@ export async function stagedLangevalsFetch(
     throw new PayloadTooLargeError(bytes, limit, kind);
   }
 
-  if (bytes <= threshold) {
+  // Staging is opt-in: only enabled when LANGEVALS_STAGING_THRESHOLD_BYTES
+  // is configured (SaaS / Lambda-fronted langevals). When unset (self-hosted
+  // HTTP langevals), all payloads go inline regardless of size — there's no
+  // 6 MB cap to dodge.
+  if (threshold === undefined || bytes <= threshold) {
     logger.debug(
       { projectId, kind, bytes, thresholdBytes: threshold, url },
-      "posting langevals payload inline (below staging threshold)",
+      threshold === undefined
+        ? "posting langevals payload inline (staging disabled)"
+        : "posting langevals payload inline (below staging threshold)",
     );
     return fetch(url, {
       method: "POST",
