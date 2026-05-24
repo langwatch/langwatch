@@ -51,12 +51,17 @@ export interface CliBootstrapResult {
   };
   /**
    * Authoritative gateway base URL for the CLI to use as `cfg.gateway_url`.
-   * Resolution: explicit `LW_GATEWAY_BASE_URL` wins, else SaaS pickes
-   * `https://gateway.langwatch.com`, else self-hosted defaults to
-   * `http://localhost:5563`. Mirrors the same helper used by the
-   * personal-VK reveal card so /me and CLI surfaces report the same
-   * URL — Ariana caught the CLI bootstrap displaying production while
-   * the dashboard showed localhost.
+   * Resolution order:
+   *   1. `LW_GATEWAY_PUBLIC_URL` — dedicated TS-side var, unambiguous.
+   *   2. `LW_GATEWAY_BASE_URL`   — legacy SaaS deploys where this var
+   *      still carried the public URL. In dev `scripts/start.sh`
+   *      hijacks it for the Go control-plane URL, so reading it on
+   *      dev would point the CLI at the Hono API (PORT+1000) and a
+   *      `langwatch claude` request would 404.
+   *   3. SaaS default `https://gateway.langwatch.com`.
+   *   4. Self-hosted default `http://localhost:5563`.
+   * Mirrors the same helper used by the personal-VK reveal card so /me
+   * and CLI surfaces report the same URL.
    */
   gatewayUrl: string;
   /**
@@ -70,6 +75,7 @@ export interface CliBootstrapResult {
 }
 
 function resolveGatewayUrl(): string {
+  if (env.LW_GATEWAY_PUBLIC_URL) return env.LW_GATEWAY_PUBLIC_URL;
   if (env.LW_GATEWAY_BASE_URL) return env.LW_GATEWAY_BASE_URL;
   return env.IS_SAAS
     ? "https://gateway.langwatch.com"

@@ -35,7 +35,11 @@ import { createTRPCRouter, protectedProcedure } from "../trpc";
  * routed to the wrong place (Ariana QA option-C dogfood finding).
  */
 const gatewayUrlOptions = () => ({
-  gatewayBaseUrl: env.LW_GATEWAY_BASE_URL,
+  // LW_GATEWAY_PUBLIC_URL is the unambiguous TS-side public-URL var.
+  // LW_GATEWAY_BASE_URL is the legacy fallback — kept for SaaS deploys
+  // where the value still carried the public URL before the Go gateway
+  // started hijacking the same name for control-plane discovery.
+  gatewayBaseUrl: env.LW_GATEWAY_PUBLIC_URL ?? env.LW_GATEWAY_BASE_URL,
   isSaas: env.IS_SAAS,
 });
 
