@@ -30,6 +30,11 @@ import { FieldInfoTooltip } from "~/components/gateway/FieldInfoTooltip";
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
 import { LoadingScreen } from "~/components/LoadingScreen";
 import { NotFoundScene } from "~/components/NotFoundScene";
+import { ProviderScopeChips } from "~/components/settings/ProviderScopeChips";
+import {
+  ScopeChipPicker,
+  type ScopeChipPickerEntry,
+} from "~/components/settings/ScopeChipPicker";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { Checkbox } from "~/components/ui/checkbox";
 import { Drawer } from "~/components/ui/drawer";
@@ -102,8 +107,7 @@ function RoutingPoliciesPage() {
   const [editingId, setEditingId] = useState<string | "new" | null>(null);
   const [policyToDelete, setPolicyToDelete] = useState<Policy | null>(null);
   const [composer, setComposer] = useState<{
-    scope: Scope;
-    scopeId: string;
+    scopes: ScopeChipPickerEntry[];
     name: string;
     description: string;
     strategy: Strategy;
@@ -111,6 +115,47 @@ function RoutingPoliciesPage() {
     modelAllowlist: string[];
     isDefault: boolean;
   } | null>(null);
+
+  const availableTeams = useMemo(
+    () => organization?.teams?.map((t) => ({ id: t.id, name: t.name })) ?? [],
+    [organization?.teams],
+  );
+  const availableProjects = useMemo(
+    () =>
+      organization?.teams?.flatMap((t) =>
+        t.projects.map((p) => ({
+          id: p.id,
+          name: `${p.name} · ${t.name}`,
+          teamId: t.id,
+        })),
+      ) ?? [],
+    [organization?.teams],
+  );
+  const teamNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const t of organization?.teams ?? []) map.set(t.id, t.name);
+    return map;
+  }, [organization?.teams]);
+  const projectNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const t of organization?.teams ?? []) {
+      for (const p of t.projects) map.set(p.id, p.name);
+    }
+    return map;
+  }, [organization?.teams]);
+  const resolveScopeEntriesWithNames = (
+    scopes: ScopeChipPickerEntry[],
+  ): ScopeChipPickerEntry[] =>
+    scopes.map((s) => ({
+      scopeType: s.scopeType,
+      scopeId: s.scopeId,
+      name:
+        s.scopeType === "ORGANIZATION"
+          ? organization?.name
+          : s.scopeType === "TEAM"
+            ? teamNameById.get(s.scopeId)
+            : projectNameById.get(s.scopeId),
+    }));
 
   const utils = api.useUtils();
   const refetch = () =>
@@ -192,8 +237,14 @@ function RoutingPoliciesPage() {
       project: [],
     };
     for (const p of policiesQuery.data ?? []) {
-      const s = p.scope as Scope;
-      if (out[s]) out[s].push(p);
+      // Multi-scope policies (post bug-7 step (vb)) bucket under the
+      // FIRST scope row. The PolicyRow shows the full scope chip list
+      // so the multi-scope nature is still visible to the operator.
+      const first = (p as any).scopes?.[0];
+      const scopeKey: Scope | undefined = first
+        ? (String(first.scopeType).toLowerCase() as Scope)
+        : (p.scope as Scope);
+      if (scopeKey && out[scopeKey]) out[scopeKey].push(p);
     }
     return out;
   }, [policiesQuery.data]);
@@ -205,9 +256,13 @@ function RoutingPoliciesPage() {
   ) => {
     setDrawerError(null);
     setEditingId("new");
+    const seedType = scope.toUpperCase() as ScopeChipPickerEntry["scopeType"];
+    const seedId =
+      seedType === "ORGANIZATION" ? orgId : scopeIdDefault;
     setComposer({
-      scope,
-      scopeId: scopeIdDefault,
+      scopes: seedId
+        ? [{ scopeType: seedType, scopeId: seedId }]
+        : [],
       name: "",
       description: "",
       strategy: "priority",
@@ -220,9 +275,20 @@ function RoutingPoliciesPage() {
   const startEdit = (p: Policy) => {
     setDrawerError(null);
     setEditingId(p.id);
+    const scopes: ScopeChipPickerEntry[] = Array.isArray((p as any).scopes)
+      ? (p as any).scopes.map((s: any) => ({
+          scopeType: s.scopeType as ScopeChipPickerEntry["scopeType"],
+          scopeId: s.scopeId,
+        }))
+      : [
+          {
+            scopeType: String(p.scope).toUpperCase() as
+              ScopeChipPickerEntry["scopeType"],
+            scopeId: p.scopeId,
+          },
+        ];
     setComposer({
-      scope: p.scope as Scope,
-      scopeId: p.scopeId,
+      scopes,
       name: p.name,
       description: p.description ?? "",
       strategy: p.strategy as Strategy,
@@ -242,15 +308,7 @@ function RoutingPoliciesPage() {
     if (editingId === "new") {
       createMutation.mutate({
         organizationId: orgId,
-        scopes: [
-          {
-            scopeType: composer.scope.toUpperCase() as
-              | "ORGANIZATION"
-              | "TEAM"
-              | "PROJECT",
-            scopeId: composer.scopeId,
-          },
-        ],
+        scopes: composer.scopes,
         name: composer.name,
         description: composer.description || null,
         modelProviderIds: composer.modelProviderIds,
@@ -418,6 +476,7 @@ function RoutingPoliciesPage() {
                     deleteMutation.isPending &&
                     deleteMutation.variables?.id === p.id
                   }
+                  resolveScopeEntriesWithNames={resolveScopeEntriesWithNames}
                 />
               ))}
             </VStack>
@@ -460,6 +519,11 @@ function RoutingPoliciesPage() {
           setEditingId(null);
           setComposer(null);
         }}
+        organizationId={orgId}
+        organizationName={organization?.name}
+        availableTeams={availableTeams}
+        availableProjects={availableProjects}
+        resolveScopeEntriesWithNames={resolveScopeEntriesWithNames}
       />
       <ConfirmDialog
         open={!!policyToDelete}
@@ -498,6 +562,7 @@ function PolicyRow({
   onDelete,
   isPendingSetDefault,
   isPendingDelete,
+  resolveScopeEntriesWithNames,
 }: {
   policy: Policy;
   onEdit: () => void;
@@ -505,6 +570,9 @@ function PolicyRow({
   onDelete: () => void;
   isPendingSetDefault: boolean;
   isPendingDelete: boolean;
+  resolveScopeEntriesWithNames: (
+    scopes: ScopeChipPickerEntry[],
+  ) => ScopeChipPickerEntry[];
 }) {
   const allowCount = Array.isArray(policy.modelAllowlist)
     ? (policy.modelAllowlist as string[]).length
@@ -512,6 +580,20 @@ function PolicyRow({
   const providerCount = Array.isArray(policy.modelProviderIds)
     ? (policy.modelProviderIds as string[]).length
     : 0;
+  const scopeEntries: ScopeChipPickerEntry[] = Array.isArray(
+    (policy as any).scopes,
+  )
+    ? (policy as any).scopes.map((s: any) => ({
+        scopeType: s.scopeType as ScopeChipPickerEntry["scopeType"],
+        scopeId: s.scopeId,
+      }))
+    : [
+        {
+          scopeType: String(policy.scope).toUpperCase() as
+            ScopeChipPickerEntry["scopeType"],
+          scopeId: policy.scopeId,
+        },
+      ];
 
   return (
     <HStack
@@ -521,8 +603,8 @@ function PolicyRow({
       padding={3}
       gap={3}
     >
-      <VStack align="start" gap={0} flex={1} minWidth={0}>
-        <HStack gap={2}>
+      <VStack align="start" gap={1} flex={1} minWidth={0}>
+        <HStack gap={2} flexWrap="wrap">
           <Text fontSize="sm" fontWeight="medium">
             {policy.name}
           </Text>
@@ -534,6 +616,10 @@ function PolicyRow({
           <Badge size="sm" variant="surface">
             {policy.strategy}
           </Badge>
+          <ProviderScopeChips
+            scopes={resolveScopeEntriesWithNames(scopeEntries)}
+            size="xs"
+          />
         </HStack>
         {policy.description && (
           <Text fontSize="xs" color="fg.muted">
@@ -574,8 +660,7 @@ function PolicyRow({
 }
 
 type ComposerState = {
-  scope: Scope;
-  scopeId: string;
+  scopes: ScopeChipPickerEntry[];
   name: string;
   description: string;
   strategy: Strategy;
@@ -722,12 +807,6 @@ function ChipListEditor({
     </VStack>
   );
 }
-
-const SCOPE_LABEL: Record<Scope, string> = {
-  organization: "Organization",
-  team: "Team",
-  project: "Project",
-};
 
 type ProviderCredentialOption = {
   id: string;
@@ -990,6 +1069,11 @@ function RoutingPolicyDrawer({
   onClearError,
   onSubmit,
   onCancel,
+  organizationId,
+  organizationName,
+  availableTeams,
+  availableProjects,
+  resolveScopeEntriesWithNames,
 }: {
   open: boolean;
   composer: ComposerState | null;
@@ -1003,11 +1087,18 @@ function RoutingPolicyDrawer({
   onClearError: () => void;
   onSubmit: () => void;
   onCancel: () => void;
+  organizationId: string | undefined;
+  organizationName?: string;
+  availableTeams: Array<{ id: string; name: string }>;
+  availableProjects: Array<{ id: string; name: string; teamId?: string }>;
+  resolveScopeEntriesWithNames: (
+    scopes: ScopeChipPickerEntry[],
+  ) => ScopeChipPickerEntry[];
 }) {
   const submitDisabled =
     !composer ||
     !composer.name.trim() ||
-    !composer.scopeId.trim() ||
+    composer.scopes.length === 0 ||
     composer.modelProviderIds.length === 0 ||
     isPending;
 
@@ -1030,12 +1121,32 @@ function RoutingPolicyDrawer({
         <Drawer.Body>
           {composer && (
             <VStack align="stretch" gap={4}>
-              <Field.Root>
-                <Field.Label>Scope</Field.Label>
-                <Text fontSize="sm" color="fg.muted">
-                  {SCOPE_LABEL[composer.scope]}
-                  {composer.scope !== "organization" && " — locked to this scope"}
-                </Text>
+              <Field.Root required>
+                <Field.Label>Scopes</Field.Label>
+                {mode === "create" ? (
+                  <ScopeChipPicker
+                    value={composer.scopes}
+                    onChange={(next) =>
+                      setComposer({ ...composer, scopes: next })
+                    }
+                    organizationId={organizationId}
+                    organizationName={organizationName}
+                    availableTeams={availableTeams}
+                    availableProjects={availableProjects}
+                    label=""
+                  />
+                ) : (
+                  <>
+                    <ProviderScopeChips
+                      scopes={resolveScopeEntriesWithNames(composer.scopes)}
+                    />
+                    <Field.HelperText>
+                      Scope is fixed after create. Delete and recreate to
+                      change which org / team / project this policy
+                      applies to.
+                    </Field.HelperText>
+                  </>
+                )}
               </Field.Root>
 
               <Field.Root required>
@@ -1070,23 +1181,6 @@ function RoutingPolicyDrawer({
                   </NativeSelect.Field>
                 </NativeSelect.Root>
               </Field.Root>
-
-              {composer.scope !== "organization" && mode === "create" && (
-                <Field.Root required>
-                  <Field.Label>
-                    {composer.scope === "team" ? "Team ID" : "Project ID"}
-                  </Field.Label>
-                  <Input
-                    value={composer.scopeId}
-                    onChange={(e) =>
-                      setComposer({ ...composer, scopeId: e.target.value })
-                    }
-                    placeholder={
-                      composer.scope === "team" ? "team_..." : "project_..."
-                    }
-                  />
-                </Field.Root>
-              )}
 
               <Field.Root>
                 <Field.Label>Description</Field.Label>
