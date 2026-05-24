@@ -120,6 +120,12 @@ function VirtualKeyDetailPage() {
     name: string;
     secret: string;
   } | null>(null);
+  // Drives the model name written into the "How to use" snippet. Starts
+  // at the bare OpenAI-SDK default; clicking a provider row in the
+  // eligible-MP preview rewrites this to `${vendor}/${defaultModel}` so
+  // the copy-pasteable example points at a model the VK can actually
+  // serve through that provider.
+  const [snippetModel, setSnippetModel] = useState<string>("gpt-5-mini");
 
   const canUpdate = hasPermission("virtualKeys:update");
   const canRotate = hasPermission("virtualKeys:rotate");
@@ -274,7 +280,7 @@ function VirtualKeyDetailPage() {
               </Section>
 
               <Section title="How to use">
-                <VirtualKeyUsageSnippet />
+                <VirtualKeyUsageSnippet model={snippetModel} />
               </Section>
 
               <Section title="Scope & routing">
@@ -327,11 +333,16 @@ function VirtualKeyDetailPage() {
                     }
                   />
                   <Box>
-                    <HStack mb={1.5} alignItems="center" gap={2}>
-                      <ConfigureModelProvidersLink scopes={vk.scopes ?? []} />
+                    <HStack
+                      mb={1.5}
+                      alignItems="center"
+                      gap={2}
+                      justifyContent="space-between"
+                    >
                       <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
                         Eligible model providers
                       </Text>
+                      <ConfigureModelProvidersLink scopes={vk.scopes ?? []} />
                     </HStack>
                     <EligibleModelProvidersPreview
                       scopes={vk.scopes ?? []}
@@ -343,6 +354,8 @@ function VirtualKeyDetailPage() {
                       providers={
                         (orgProvidersQuery.data?.providers ?? []) as any
                       }
+                      selectedModel={snippetModel}
+                      onSelectProviderModel={setSnippetModel}
                     />
                   </Box>
                 </VStack>

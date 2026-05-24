@@ -108,15 +108,7 @@ function RoutingPoliciesPage() {
 
   const [editingId, setEditingId] = useState<string | "new" | null>(null);
   const [policyToDelete, setPolicyToDelete] = useState<Policy | null>(null);
-  const [composer, setComposer] = useState<{
-    scopes: ScopeChipPickerEntry[];
-    name: string;
-    description: string;
-    strategy: Strategy;
-    modelProviderIds: string[];
-    modelAllowlist: string[];
-    isDefault: boolean;
-  } | null>(null);
+  const [composer, setComposer] = useState<ComposerState | null>(null);
 
   const availableTeams = useMemo(
     () => organization?.teams?.map((t) => ({ id: t.id, name: t.name })) ?? [],

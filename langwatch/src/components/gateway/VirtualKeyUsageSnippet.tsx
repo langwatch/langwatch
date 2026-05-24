@@ -41,6 +41,14 @@ export type VirtualKeyUsageSnippetProps = {
   gatewayBaseUrl?: string;
   /** Heading shown above the language selector. */
   title?: string;
+  /**
+   * Model string embedded in every snippet's chat-completions call.
+   * Defaults to the bare OpenAI-SDK drop-in (`gpt-5-mini`); pass
+   * `${vendor}/${model}` to disambiguate when the VK fans out across
+   * multiple providers. The VK detail page rewrites this when the
+   * user clicks an eligible-MP row.
+   */
+  model?: string;
 };
 
 type Language = "python" | "typescript" | "go" | "bash";
@@ -74,6 +82,7 @@ export function VirtualKeyUsageSnippet({
   secret,
   gatewayBaseUrl,
   title = "Usage example",
+  model = "gpt-5-mini",
 }: VirtualKeyUsageSnippetProps) {
   const { colorMode } = useColorMode();
   const credential = secret ?? "$LANGWATCH_VK_SECRET";
@@ -101,7 +110,7 @@ client = OpenAI(
 )
 
 response = client.chat.completions.create(
-    model="gpt-5-mini",
+    model="${model}",
     messages=[{"role": "user", "content": "Hello"}],
 )
 print(response.choices[0].message.content)`;
@@ -114,7 +123,7 @@ const client = new OpenAI({
 });
 
 const response = await client.chat.completions.create({
-  model: "gpt-5-mini",
+  model: "${model}",
   messages: [{ role: "user", content: "Hello" }],
 });
 console.log(response.choices[0].message.content);`;
@@ -136,7 +145,7 @@ func main() {
 \t)
 
 \tresponse, _ := client.Chat.Completions.New(context.Background(), openai.ChatCompletionNewParams{
-\t\tModel: "gpt-5-mini",
+\t\tModel: "${model}",
 \t\tMessages: []openai.ChatCompletionMessageParamUnion{
 \t\t\topenai.UserMessage("Hello"),
 \t\t},
@@ -148,7 +157,7 @@ func main() {
   -H "Authorization: Bearer ${credential}" \\
   -H "Content-Type: application/json" \\
   -d '{
-    "model": "gpt-5-mini",
+    "model": "${model}",
     "messages": [{"role": "user", "content": "Hello"}]
   }'`;
 
@@ -158,7 +167,7 @@ func main() {
       { key: "go", title: "Go", code: goSnippet, language: "go", highlightLines: [13 + goHighlightShift, 14 + goHighlightShift] },
       { key: "bash", title: "cURL", code: curlSnippet, language: "bash", highlightLines: [1 + curlHighlightShift, 2 + curlHighlightShift] },
     ];
-  }, [resolvedBaseUrl, credential, showRetrievalHint]);
+  }, [resolvedBaseUrl, credential, showRetrievalHint, model]);
 
   const tabs = useTabs({ defaultValue: "python" });
   const activeTab = tabItems.find((t) => t.key === tabs.value) ?? tabItems[0]!;
