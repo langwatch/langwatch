@@ -24,12 +24,20 @@ import { createHash, randomBytes } from "crypto";
 import { Prisma } from "@prisma/client";
 import type { IngestionSource, PrismaClient } from "@prisma/client";
 
+import { TRPCError } from "@trpc/server";
+
 import { env } from "~/env.mjs";
-import {
-  assertEnterprisePlan,
-  ENTERPRISE_FEATURE_ERRORS,
-} from "~/server/api/enterprise";
+import { getApp } from "~/server/app-layer/app";
+import { isEnterpriseTier } from "~/server/api/enterprise";
 import { ensureHiddenGovernanceProject } from "@ee/governance/services/governanceProject.service";
+
+/**
+ * Non-enterprise plans can create up to this many active IngestionSources
+ * per org. Composer separately restricts source TYPE to otel_generic, so
+ * a non-enterprise org gets 3 generic OTel sources to try the pillar
+ * before needing to upgrade. Spec: specs/ai-gateway/license-gate-governance.feature.
+ */
+export const NON_ENTERPRISE_INGESTION_SOURCE_CAP = 3;
 
 export type SourceType =
   | "otel_generic"
@@ -193,16 +201,26 @@ export class IngestionSourceService {
   async createSource(
     input: CreateIngestionSourceInput,
   ): Promise<CreatedIngestionSource> {
-    // Defense-in-depth license gate. The tRPC router already gates with
-    // requireEnterprisePlan; this service-layer assertion catches any
-    // non-tRPC caller (background workers, future webhook adapters) so
-    // a non-enterprise org can never end up with an IngestionSource row,
-    // regardless of which entry point reached the service. Spec:
-    // specs/ai-gateway/license-gate-governance.feature.
-    await assertEnterprisePlan({
+    // Defense-in-depth plan gate. Non-enterprise orgs can create up to
+    // NON_ENTERPRISE_INGESTION_SOURCE_CAP active sources (composer
+    // separately restricts source TYPE to otel_generic for them). This
+    // catches non-tRPC callers (background workers, webhook adapters)
+    // so the cap can't be bypassed regardless of entry point. Enterprise
+    // orgs are unbounded. Spec: specs/ai-gateway/license-gate-governance.feature.
+    const plan = await getApp().planProvider.getActivePlan({
       organizationId: input.organizationId,
-      errorMessage: ENTERPRISE_FEATURE_ERRORS.INGESTION_SOURCES,
     });
+    if (!isEnterpriseTier(plan.type)) {
+      const existing = await this.prisma.ingestionSource.count({
+        where: { organizationId: input.organizationId, archivedAt: null },
+      });
+      if (existing >= NON_ENTERPRISE_INGESTION_SOURCE_CAP) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: `Non-enterprise plans are limited to ${NON_ENTERPRISE_INGESTION_SOURCE_CAP} ingestion sources. Upgrade to Enterprise for unlimited.`,
+        });
+      }
+    }
 
     if (!SUPPORTED_SOURCE_TYPES.includes(input.sourceType)) {
       throw new Error(`Unsupported sourceType: ${input.sourceType}`);

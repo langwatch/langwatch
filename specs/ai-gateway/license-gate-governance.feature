@@ -1,31 +1,37 @@
 Feature: AI Gateway — Enterprise license gate on governance backend
   As an Apache-2.0-floor product with Enterprise-tier governance features
-  I want every governance read + write procedure to 403 on a non-enterprise plan
-  So that the upsell card the UI renders (`<EnterpriseLockedSurface>`) is
-  matched by an authoritative server-side denial — a non-enterprise org
-  cannot read or write governance data even via direct tRPC calls / scripts
+  I want every Enterprise-only governance read + write procedure to 403 on
+  a non-enterprise plan, EXCEPT IngestionSources which non-enterprise orgs
+  can use up to a per-org cap so the "try the guide" funnel stays open
+  So that the upsell card the UI renders is matched by an authoritative
+  server-side denial — a non-enterprise org cannot read or write
+  governance data even via direct tRPC calls / scripts
 
   Layered enforcement:
-   1. **UI**: `<EnterpriseLockedSurface>` wraps the page, shows upsell.
+   1. **UI**: `<EnterpriseLockedSurface>` wraps anomaly-rules / activity-monitor
+      / ocsf-export pages. IngestionSources page is unwrapped; the page
+      itself renders a `count / cap` badge and disables Add when at-cap.
    2. **tRPC router middleware**: `requireEnterprisePlan` 403s every
-      anomaly-rules / activity-monitor / ingestion-sources / ocsf-export
-      procedure regardless of how the call was initiated.
+      anomaly-rules / activity-monitor / ocsf-export procedure regardless
+      of how the call was initiated. IngestionSources router is ungated.
    3. **Service layer (defense-in-depth)**: `IngestionSourceService.createSource`
-      asserts the plan up-front so non-tRPC callers (background workers,
-      future webhook adapters, scripts) can't end-run the router.
+      enforces the non-enterprise cap up-front so non-tRPC callers
+      (background workers, future webhook adapters, scripts) can't end-run
+      the page's count check.
 
   Apache-2.0 floor — these are intentionally NOT gated and must keep
   working for non-enterprise orgs:
    - `aiTools.*` (Phase 7 portal — works for everyone)
    - `governance.setupState` + `governance.resolveHome` (per-user nav helpers)
    - `routingPolicies.*` (gateway-side, Apache-2.0)
+   - `ingestionSources.*` (capped at NON_ENTERPRISE_INGESTION_SOURCE_CAP per org)
 
   Background:
     Given organization "acme" exists on a non-enterprise plan
     And alice is an org ADMIN of "acme" with every governance permission
 
   # ============================================================================
-  # tRPC router gate — every gated procedure
+  # tRPC router gate — Enterprise-only procedures
   # ============================================================================
 
   @bdd @phase-4b @license-gate @router
@@ -44,8 +50,6 @@ Feature: AI Gateway — Enterprise license gate on governance backend
       | activityMonitor | recentAnomalies        |
       | activityMonitor | eventsForSource        |
       | activityMonitor | sourceHealthMetrics    |
-      | ingestionSources| list                   |
-      | ingestionSources| get                    |
       | governance      | ocsfExport             |
 
   @bdd @phase-4b @license-gate @router
@@ -59,10 +63,44 @@ Feature: AI Gateway — Enterprise license gate on governance backend
       | anomalyRules    | create          |
       | anomalyRules    | update          |
       | anomalyRules    | archive         |
-      | ingestionSources| create          |
-      | ingestionSources| update          |
-      | ingestionSources| rotateSecret    |
-      | ingestionSources| archive         |
+
+  # ============================================================================
+  # IngestionSources — non-enterprise can use up to the cap
+  # ============================================================================
+
+  @bdd @license-gate @ingestion-sources @cap
+  Scenario: Non-enterprise org can list and read its ingestion sources
+    When alice calls `ingestionSources.list({ organizationId: "acme" })`
+    Then the response is OK
+    And the result is the org's IngestionSources (possibly empty)
+
+  @bdd @license-gate @ingestion-sources @cap
+  Scenario: Non-enterprise org can create up to the cap
+    Given "acme" has 2 active IngestionSources
+    When alice calls `ingestionSources.create({ ... otel_generic ... })`
+    Then the response is OK and a 3rd source is persisted
+
+  @bdd @license-gate @ingestion-sources @cap
+  Scenario: Non-enterprise org gets FORBIDDEN on the source that would breach the cap
+    Given "acme" has NON_ENTERPRISE_INGESTION_SOURCE_CAP active IngestionSources
+    When alice calls `ingestionSources.create({ ... otel_generic ... })`
+    Then the response is FORBIDDEN
+    And the message includes "limited to 3 ingestion sources" and "Upgrade to Enterprise"
+    And no new IngestionSource row is created
+
+  @bdd @license-gate @ingestion-sources @cap
+  Scenario: Composer-level source-type restriction still applies on non-enterprise
+    Given "acme" has 0 active IngestionSources
+    When alice opens the Ingestion Sources composer
+    Then only `otel_generic` is selectable in the source-type dropdown
+    And the composer footer notes that other source types require Enterprise
+
+  @bdd @license-gate @ingestion-sources @cap
+  Scenario: Enterprise org has no cap on ingestion sources
+    Given carol is an org ADMIN of "carol-enterprise-org" on the Enterprise plan
+    And "carol-enterprise-org" has 50 active IngestionSources
+    When carol calls `ingestionSources.create({ ... }) `
+    Then the response is OK and a 51st source is persisted
 
   # ============================================================================
   # Order of denial — RBAC (UNAUTHORIZED) trumps license (FORBIDDEN)
@@ -89,24 +127,22 @@ Feature: AI Gateway — Enterprise license gate on governance backend
   # Service-layer defense-in-depth (IngestionSourceService.createSource)
   # ============================================================================
 
-  @bdd @phase-4b @license-gate @service-layer
-  Scenario: Non-tRPC caller of IngestionSourceService.createSource is rejected
-    Given a non-tRPC caller (background worker, script, or follow-up webhook
+  @bdd @license-gate @ingestion-sources @service-layer
+  Scenario: Non-tRPC caller cannot bypass the non-enterprise cap
+    Given "acme" already has NON_ENTERPRISE_INGESTION_SOURCE_CAP active IngestionSources
+    And a non-tRPC caller (background worker, script, or follow-up webhook
       adapter) attempts `IngestionSourceService.create(prisma).createSource({
         organizationId: "acme", sourceType: "otel_generic", name: "x", actorUserId: "alice" })`
     When the org is on a non-enterprise plan
     Then the call throws TRPCError FORBIDDEN
     And no IngestionSource row is created
     And no hidden Governance Project is created either
-    # Because the gate fires BEFORE ensureHiddenGovernanceProject.
+    # Because the cap check fires BEFORE ensureHiddenGovernanceProject.
 
-  @bdd @phase-4b @license-gate @service-layer
-  Scenario: Service-layer gate doesn't double-fail tRPC callers
+  @bdd @license-gate @ingestion-sources @service-layer
+  Scenario: Service-layer cap check doesn't double-fail enterprise callers
     Given the tRPC `ingestionSources.create` procedure is called on an
-      enterprise org (passes router middleware)
+      enterprise org
     When the procedure body calls `IngestionSourceService.createSource`
-    Then the service-layer assertEnterprisePlan call also passes
+    Then the service-layer plan check passes (enterprise == unbounded)
     And the IngestionSource is created normally
-    # The double-check is cheap (one planProvider.getActivePlan call) and
-    # the Apache-2.0 floor stays clear: the planProvider is the single
-    # source of truth.

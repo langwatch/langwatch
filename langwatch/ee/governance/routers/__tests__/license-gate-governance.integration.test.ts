@@ -184,28 +184,46 @@ describe("license-gate on governance backend", () => {
         ).rejects.toMatchObject({ code: "FORBIDDEN" });
       });
 
-      it("forbids ingestionSources.list", async () => {
-        await expect(
-          callerFor(adminUserId).ingestionSources.list({ organizationId }),
-        ).rejects.toMatchObject({
-          code: "FORBIDDEN",
-          message: expect.stringContaining("Ingestion sources"),
+      it("allows ingestionSources.list on non-enterprise (no router gate)", async () => {
+        // Non-enterprise plans can use ingestion sources up to a 3-source
+        // cap. List/get/update/rotate/archive are ungated; create enforces
+        // the cap. Composer separately restricts source type to otel_generic.
+        const result = await callerFor(adminUserId).ingestionSources.list({
+          organizationId,
         });
+        expect(Array.isArray(result)).toBe(true);
       });
 
-      it("forbids ingestionSources.create", async () => {
+      it("allows ingestionSources.create up to the 3-source cap, blocks the 4th", async () => {
+        for (let i = 1; i <= 3; i++) {
+          const result = await callerFor(adminUserId).ingestionSources.create({
+            organizationId,
+            sourceType: "otel_generic",
+            name: `free-tier-${i}-${ns}`,
+          });
+          expect(result.source.id).toBeDefined();
+        }
         await expect(
           callerFor(adminUserId).ingestionSources.create({
             organizationId,
             sourceType: "otel_generic",
-            name: "should-be-blocked",
+            name: `free-tier-over-cap-${ns}`,
           }),
-        ).rejects.toMatchObject({ code: "FORBIDDEN" });
-
-        const persisted = await prisma.ingestionSource.findFirst({
-          where: { organizationId, name: "should-be-blocked" },
+        ).rejects.toMatchObject({
+          code: "FORBIDDEN",
+          message: expect.stringContaining("limited to 3"),
         });
-        expect(persisted).toBeNull();
+
+        const overCap = await prisma.ingestionSource.findFirst({
+          where: { organizationId, name: `free-tier-over-cap-${ns}` },
+        });
+        expect(overCap).toBeNull();
+
+        // Clean up so the enterprise-plan suite below starts from a known
+        // count (it asserts list() returns an array — value isn't pinned).
+        await prisma.ingestionSource.deleteMany({
+          where: { organizationId, name: { startsWith: `free-tier-` } },
+        });
       });
 
       it("forbids governance.ocsfExport", async () => {

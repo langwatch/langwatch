@@ -30,7 +30,7 @@ import { useEffect, useMemo, useState } from "react";
 import { OttlEditor } from "@ee/governance/dashboard/components/OttlEditor";
 import { isOttlEnabledSourceType } from "@ee/governance/services/activity-monitor/ottlStarterTemplates";
 
-import { EnterpriseLockedSurface } from "~/components/enterprise/EnterpriseLockedSurface";
+import { NON_ENTERPRISE_INGESTION_SOURCE_CAP } from "@ee/governance/services/activity-monitor/ingestionSource.service";
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
 import { LoadingScreen } from "~/components/LoadingScreen";
 import { NotFoundScene } from "~/components/NotFoundScene";
@@ -273,6 +273,7 @@ function IngestionSourcesPage() {
       organizationId: orgId,
       enabled: !!orgId,
     });
+  const { isEnterprise } = useActivePlan();
 
   const sourcesQuery = api.ingestionSources.list.useQuery(
     { organizationId: orgId },
@@ -423,10 +424,6 @@ function IngestionSourcesPage() {
 
   return (
     <GovernanceLayout pageTitle="Ingestion Sources · Governance · LangWatch">
-      <EnterpriseLockedSurface
-        featureName="Ingestion Sources"
-        description="Custom ingestion sources beyond the OTel generic endpoint require an Enterprise plan. Existing OTel ingestion remains available on every plan."
-      >
       <VStack align="stretch" gap={6} width="full" maxW="container.xl">
         <HStack alignItems="end">
           <VStack align="start" gap={0}>
@@ -441,23 +438,37 @@ function IngestionSourcesPage() {
               Each source maps an external AI platform into the
               normalised activity stream via OTel push, webhook, or
               S3 audit drops.{" "}
-              <Link href="/governance" color="orange.600">
+              <Link href="/governance" color="blue.600">
                 Back to governance
               </Link>
               .
             </Text>
           </VStack>
           <Spacer />
-          <Button
-            size="sm"
-            colorPalette="blue"
-            onClick={() => {
-              setComposer(blankComposer());
-              setComposing(true);
-            }}
-          >
-            <Plus size={14} /> Add source
-          </Button>
+          <VStack align="end" gap={1}>
+            <Button
+              size="sm"
+              colorPalette="blue"
+              disabled={
+                !isEnterprise &&
+                (sourcesQuery.data?.length ?? 0) >=
+                  NON_ENTERPRISE_INGESTION_SOURCE_CAP
+              }
+              onClick={() => {
+                setComposer(blankComposer());
+                setComposing(true);
+              }}
+            >
+              <Plus size={14} /> Add source
+            </Button>
+            {!isEnterprise && (
+              <Text fontSize="xs" color="fg.muted">
+                {sourcesQuery.data?.length ?? 0} /{" "}
+                {NON_ENTERPRISE_INGESTION_SOURCE_CAP} sources used. Upgrade to
+                Enterprise for unlimited.
+              </Text>
+            )}
+          </VStack>
         </HStack>
 
         <SourceComposerDrawer
@@ -556,7 +567,6 @@ function IngestionSourcesPage() {
         onSubmit={(input) => updateMutation.mutate(input)}
         isPending={updateMutation.isPending}
       />
-      </EnterpriseLockedSurface>
     </GovernanceLayout>
   );
 }
@@ -1605,7 +1615,7 @@ function SecretModal({
                   store. See{" "}
                   <Link
                     href="https://docs.langwatch.ai/observability/trace-vs-activity-ingestion"
-                    color="orange.600"
+                    color="blue.600"
                   >
                     Choosing the right OTel endpoint
                   </Link>
