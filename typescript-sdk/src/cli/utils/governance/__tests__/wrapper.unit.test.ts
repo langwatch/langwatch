@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { envForTool } from "../wrapper";
+import { envForTool, preflightWrapper } from "../wrapper";
 import type { GovernanceConfig } from "../config";
 
 const cfg: GovernanceConfig = {
@@ -7,6 +7,23 @@ const cfg: GovernanceConfig = {
   control_plane_url: "http://app.example.com",
   default_personal_vk: { id: "vk_x", secret: "lw_vk_test_x", prefix: "lw_vk_t" },
 };
+
+const okFetch: typeof fetch = async () =>
+  new Response(null, { status: 200 });
+const refusedFetch: typeof fetch = async () => {
+  throw new Error("connect ECONNREFUSED 127.0.0.1:5563");
+};
+const five03Fetch: typeof fetch = async () =>
+  new Response("upstream", { status: 503 });
+
+const bootstrapWith = (names: string[]) => async () => ({
+  providers: names.map((name) => ({
+    name,
+    displayName: name,
+    models: [`${name}-default`],
+  })),
+  budget: { monthlyLimitUsd: null, monthlyUsedUsd: 0, period: "month" },
+});
 
 describe("envForTool", () => {
   it("claude → ANTHROPIC_BASE_URL + ANTHROPIC_AUTH_TOKEN", () => {
@@ -58,5 +75,93 @@ describe("envForTool", () => {
     const trailing: GovernanceConfig = { ...cfg, gateway_url: "http://gw.example.com/" };
     const env = envForTool(trailing, "claude").vars;
     expect(env.ANTHROPIC_BASE_URL).toBe("http://gw.example.com");
+  });
+});
+
+describe("preflightWrapper", () => {
+  describe("given the personal VK is missing", () => {
+    it("fails fast with a setup-providers hint", async () => {
+      const noVk: GovernanceConfig = { ...cfg, default_personal_vk: undefined };
+      const r = await preflightWrapper(noVk, "claude", {
+        fetchImpl: okFetch,
+        bootstrapImpl: bootstrapWith(["anthropic"]),
+      });
+      expect(r.ok).toBe(false);
+      expect(r.message).toContain("No personal virtual key");
+      expect(r.message).toContain("/settings/providers");
+      expect(r.message).toContain("langwatch login --device");
+    });
+  });
+
+  describe("given the gateway is unreachable", () => {
+    it("surfaces the network error and points at `make service svc=aigateway`", async () => {
+      const r = await preflightWrapper(cfg, "claude", {
+        fetchImpl: refusedFetch,
+        bootstrapImpl: bootstrapWith(["anthropic"]),
+      });
+      expect(r.ok).toBe(false);
+      expect(r.message).toContain("Cannot reach AI Gateway");
+      expect(r.message).toContain("ECONNREFUSED");
+      expect(r.message).toContain("make service svc=aigateway");
+    });
+
+    it("treats non-2xx as fatal too", async () => {
+      const r = await preflightWrapper(cfg, "claude", {
+        fetchImpl: five03Fetch,
+        bootstrapImpl: bootstrapWith(["anthropic"]),
+      });
+      expect(r.ok).toBe(false);
+      expect(r.message).toContain("returned HTTP 503");
+    });
+  });
+
+  describe("given the org has no matching upstream provider", () => {
+    it("blocks claude when only openai is configured", async () => {
+      const r = await preflightWrapper(cfg, "claude", {
+        fetchImpl: okFetch,
+        bootstrapImpl: bootstrapWith(["openai"]),
+      });
+      expect(r.ok).toBe(false);
+      expect(r.message).toContain("`anthropic`");
+      expect(r.message).toContain("/settings/providers");
+    });
+
+    it("passes cursor when either anthropic OR openai is present", async () => {
+      const r = await preflightWrapper(cfg, "cursor", {
+        fetchImpl: okFetch,
+        bootstrapImpl: bootstrapWith(["openai"]),
+      });
+      expect(r.ok).toBe(true);
+    });
+
+    it("passes gemini when google or gemini family is present", async () => {
+      const r = await preflightWrapper(cfg, "gemini", {
+        fetchImpl: okFetch,
+        bootstrapImpl: bootstrapWith(["google"]),
+      });
+      expect(r.ok).toBe(true);
+    });
+  });
+
+  describe("given all probes pass", () => {
+    it("returns ok=true", async () => {
+      const r = await preflightWrapper(cfg, "claude", {
+        fetchImpl: okFetch,
+        bootstrapImpl: bootstrapWith(["anthropic", "openai"]),
+      });
+      expect(r.ok).toBe(true);
+    });
+  });
+
+  describe("given bootstrap is unavailable (older server / network blip)", () => {
+    it("degrades to provider-check-skipped rather than blocking", async () => {
+      const r = await preflightWrapper(cfg, "claude", {
+        fetchImpl: okFetch,
+        bootstrapImpl: async () => {
+          throw new Error("bootstrap unreachable");
+        },
+      });
+      expect(r.ok).toBe(true);
+    });
   });
 });
