@@ -12,11 +12,11 @@ const baseInput: LoginCeremonyInput = {
 
 describe("formatLoginCeremony", () => {
   describe("when only the user email is known", () => {
-    it("renders the minimum ceremony — header + try-it + dashboard", () => {
+    it("renders the minimum ceremony with header, try-it, and open hint", () => {
       const lines = formatLoginCeremony({ email: "jane@acme.com" });
       expect(lines[0]).toBe("✓ Logged in as jane@acme.com");
       expect(lines).toContain("Try it:");
-      expect(lines).toContain("Or open your dashboard:");
+      expect(lines).toContain("Or open the app in your browser:");
     });
 
     it("appends the org name to the header when present", () => {
@@ -106,7 +106,7 @@ describe("formatLoginCeremony", () => {
       const lines = formatLoginCeremony(baseInput);
       const tryLines = lines.filter(
         (l) =>
-          l.startsWith("  $ langwatch") && !l.includes("langwatch dashboard"),
+          l.startsWith("  $ langwatch") && !l.includes("langwatch open"),
       );
       expect(tryLines).toHaveLength(3);
       expect(tryLines.find((l) => l.includes("claude"))).toBeDefined();
@@ -131,19 +131,19 @@ describe("formatLoginCeremony", () => {
     });
   });
 
-  describe("dashboard hint", () => {
+  describe("open hint", () => {
     it("appears by default", () => {
       const lines = formatLoginCeremony(baseInput);
-      expect(lines).toContain("Or open your dashboard:");
-      expect(lines).toContain("  $ langwatch dashboard");
+      expect(lines).toContain("Or open the app in your browser:");
+      expect(lines).toContain("  $ langwatch open");
     });
 
-    it("can be suppressed with dashboardCommand=false", () => {
+    it("can be suppressed with openCommand=false", () => {
       const lines = formatLoginCeremony({
         ...baseInput,
-        dashboardCommand: false,
+        openCommand: false,
       });
-      expect(lines).not.toContain("Or open your dashboard:");
+      expect(lines).not.toContain("Or open the app in your browser:");
     });
   });
 
@@ -175,8 +175,8 @@ describe("formatLoginCeremony", () => {
           "  $ langwatch codex   # use Codex",
           "  $ langwatch cursor  # use Cursor",
           "",
-          "Or open your dashboard:",
-          "  $ langwatch dashboard",
+          "Or open the app in your browser:",
+          "  $ langwatch open",
         ].join("\n"),
       );
     });

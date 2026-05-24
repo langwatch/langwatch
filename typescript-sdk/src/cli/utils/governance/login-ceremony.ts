@@ -18,8 +18,8 @@
  *     $ langwatch codex         # use Codex
  *     $ langwatch cursor        # use Cursor
  *
- *   Or open your dashboard:
- *     $ langwatch dashboard
+ *   Or open the app in your browser:
+ *     $ langwatch open
  *
  * Phase 1B.5 task 1.5a-cli-1 from PR #3524's Personal-Key Journey
  * section. Provider list + budget are OPTIONAL — when the backend
@@ -56,8 +56,8 @@ export interface LoginCeremonyInput {
   /** Wrappers shipped today (claude / codex / cursor / gemini-cli /
    *  generic shell). Caller decides which subset to surface. */
   wrappers?: string[];
-  /** Whether the `langwatch dashboard` command is available. */
-  dashboardCommand?: boolean;
+  /** Whether the `langwatch open` browser-launch command is available. */
+  openCommand?: boolean;
 }
 
 const DEFAULT_WRAPPERS = ["claude", "codex", "cursor"] as const;
@@ -132,10 +132,10 @@ export function formatLoginCeremony(input: LoginCeremonyInput): string[] {
     lines.push(`  $ ${padRight(cmd, cmdWidth)}${labelSuffix}`);
   }
 
-  if (input.dashboardCommand !== false) {
+  if (input.openCommand !== false) {
     lines.push("");
-    lines.push("Or open your dashboard:");
-    lines.push("  $ langwatch dashboard");
+    lines.push("Or open the app in your browser:");
+    lines.push("  $ langwatch open");
   }
 
   return lines;

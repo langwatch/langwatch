@@ -242,6 +242,22 @@ program
   });
 
 program
+  .command("open [path]")
+  .description(
+    "Open the LangWatch app in your browser. No path: /me in personal mode, project home if LANGWATCH_API_KEY is set. With a path: BASE/<path>.",
+  )
+  .option("--browser <name>", "browser to open (chrome|chromium|firefox|safari|none|<path>)")
+  .action(async (path: string | undefined, options: { browser?: string }) => {
+    try {
+      const { openCommand } = await import("./commands/open.js");
+      await openCommand({ path, browser: options.browser });
+    } catch (error) {
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
+      process.exit(1);
+    }
+  });
+
+program
   .command("request-increase")
   .description("Open the budget-increase request page (uses the gateway-issued signed URL when available).")
   .option("--browser <name>", "browser to open (chrome|chromium|firefox|safari|none|<path>)")
