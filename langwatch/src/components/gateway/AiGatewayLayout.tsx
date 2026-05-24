@@ -7,7 +7,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import {
-  BrainCircuit,
+  Brain,
   ExternalLink,
   Gauge,
   KeyRound,
@@ -73,7 +73,7 @@ export default function AiGatewayLayout({
                 <MenuLink
                   href={`/settings/model-providers`}
                   includePath={`/settings/model-providers`}
-                  icon={<BrainCircuit size={14} />}
+                  icon={<Brain size={14} />}
                   menuEnd={<ExternalLink size={12} aria-hidden />}
                   target="_blank"
                 >
