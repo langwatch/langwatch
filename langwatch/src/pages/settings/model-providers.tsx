@@ -19,6 +19,7 @@ import {
 } from "../../components/settings/DefaultModelsScopeFilter";
 import { ProviderScopeChips } from "../../components/settings/ProviderScopeChips";
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "~/utils/compat/next-router";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { useDrawer } from "~/hooks/useDrawer";
 import { api } from "~/utils/api";
@@ -89,6 +90,7 @@ export default function ModelsPage() {
   const [scopeFilter, setScopeFilter] = useState<PageScopeFilter>({
     kind: "all",
   });
+  const router = useRouter();
 
   // Build the `available` payload the filter dropdown needs (org / teams /
   // projects). Pulled from the current organization graph so the page
@@ -110,6 +112,40 @@ export default function ModelsPage() {
       ),
     };
   }, [organization]);
+
+  // Hydrate scope filter from `?scope=TYPE:id` deep-links (e.g. the
+  // "Configure" link on the VK create / edit drawer's Eligible Model
+  // Providers section). URL contract is the colon-joined token shape
+  // shared with VirtualKeyScope serialisation:
+  //   ?scope=ORGANIZATION:<id>   ?scope=TEAM:<id>   ?scope=PROJECT:<id>
+  // Re-runs when filterAvailable populates so the chip can pick up the
+  // human-readable name from the org graph instead of an opaque id.
+  useEffect(() => {
+    const raw = router.query.scope;
+    if (typeof raw !== "string") return;
+    const sepIdx = raw.indexOf(":");
+    if (sepIdx <= 0 || sepIdx === raw.length - 1) return;
+    const scopeType = raw.slice(0, sepIdx);
+    const scopeId = raw.slice(sepIdx + 1);
+    if (
+      scopeType !== "ORGANIZATION" &&
+      scopeType !== "TEAM" &&
+      scopeType !== "PROJECT"
+    )
+      return;
+    let name: string | undefined;
+    if (scopeType === "ORGANIZATION") {
+      name =
+        filterAvailable.organization?.id === scopeId
+          ? filterAvailable.organization.name
+          : undefined;
+    } else if (scopeType === "TEAM") {
+      name = filterAvailable.teams.find((t) => t.id === scopeId)?.name;
+    } else {
+      name = filterAvailable.projects.find((p) => p.id === scopeId)?.name;
+    }
+    setScopeFilter({ kind: "specific", scopeType, scopeId, name });
+  }, [router.query.scope, filterAvailable]);
 
   const allEnabledProviders = useMemo(() => {
     return allProvidersList.filter((provider) => provider.enabled);
