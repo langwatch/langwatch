@@ -6,18 +6,25 @@ import { Link } from "~/components/ui/link";
 /**
  * Persistent "Viewing as admin" banner rendered server-side in
  * DashboardLayout when the current admin is looking at another user's
- * personal workspace OR a team they're not a member of. Mirrors the
- * GitHub Sudo / Stripe "Acting as merchant" pattern — context-clarity
- * affordance preventing the admin from confusing whose dashboard they
- * see at a serial drill-through pace.
+ * personal workspace OR a team they're not an explicit TeamUser of.
+ *
+ * Copy splits by workspaceKind:
+ *   - personal: another user's private workspace. Mirrors GitHub Sudo /
+ *     Stripe "Acting as merchant", "This is not your data" is correct,
+ *     the admin is viewing content owned by a different principal.
+ *   - team: an org-owned team the admin is not an explicit member of.
+ *     The admin is still entitled to this data as org admin, so the
+ *     impersonation framing is wrong. Copy softens to a neutral
+ *     "Viewing as org admin" with the audit-log pointer, so a solo or
+ *     small-org admin drilling into teams they de-facto own does not
+ *     see scary boundary-violation language.
  *
  * Layout-component-driven (NOT a client-side flag) for reload-safety:
  * direct-pasting /[someUserPersonalProjectSlug]/traces as admin still
  * renders the banner on first paint.
  *
- * Audit/OCSF emission lives at the tRPC layer (Sergey's
- * `governance.viewWorkspaceAs`), independent of this banner. Banner
- * is the user-facing chrome; audit-log is the governance trail.
+ * Audit/OCSF emission lives at the tRPC layer
+ * (`governance.recordWorkspaceView`), independent of this banner.
  *
  * Spec: specs/ai-gateway/governance/admin-trace-access.feature
  */
@@ -28,6 +35,10 @@ export function AdminViewingAsBanner({
   workspaceLabel: string;
   workspaceKind: "personal" | "team";
 }) {
+  const message =
+    workspaceKind === "personal"
+      ? `Viewing ${workspaceLabel}'s personal workspace as org admin. This is not your data.`
+      : `Viewing ${workspaceLabel} as org admin.`;
   return (
     <Alert.Root status="info" variant="surface">
       <Alert.Indicator>
@@ -36,8 +47,7 @@ export function AdminViewingAsBanner({
       <Alert.Content>
         <HStack gap={2} flexWrap="wrap" alignItems="center" width="full">
           <Text fontSize="sm" fontWeight="medium">
-            Viewing {workspaceLabel}'s {workspaceKind} workspace as org
-            admin. This is not your data.
+            {message}
           </Text>
           <Text fontSize="xs" color="fg.muted">
             Each access is logged at{" "}
