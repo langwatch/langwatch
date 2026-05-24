@@ -1,6 +1,5 @@
 import { useMemo } from "react";
 
-import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 import type { WorkspaceSwitcherProps } from "./WorkspaceSwitcher";
@@ -13,10 +12,13 @@ import type { WorkspaceSwitcherProps } from "./WorkspaceSwitcher";
  * wiring. `current` is auto-derived inside the switcher via
  * `useWorkspaceCurrent`, so consumers don't need to thread it.
  *
- * Personal teams owned by OTHER users are filtered out — every user has a
- * private personal team (Team.isPersonal=true, ownerUserId=them) which
- * never appears in another user's switcher, even when an org admin can
- * structurally see them in the org.teams payload.
+ * Personal teams are filtered out across the board. Every user has a
+ * private personal team (Team.isPersonal=true, ownerUserId=them) — yours
+ * is already represented by the top-level "My Workspace" entry, and
+ * other users' never belong in your switcher. Surfacing your own would
+ * render as an "Org > Personal Workspace" duplicate of the personal
+ * entry above (rchaves caught this in dogfood). Same filter cascades to
+ * projects since they iterate via the filtered team list.
  *
  * Spec: specs/ai-gateway/governance/workspace-switcher.feature
  */
@@ -28,8 +30,6 @@ export function useWorkspaceData(): Pick<
     redirectToOnboarding: false,
     redirectToProjectOnboarding: false,
   });
-  const session = useRequiredSession();
-  const meUserId = session.data?.user?.id;
 
   return useMemo(() => {
     const personal = {
@@ -39,12 +39,11 @@ export function useWorkspaceData(): Pick<
       subtitle: "Personal usage, personal budget",
     };
 
-    // Fail-closed: a personal team without ownerUserId set (data drift) is
-    // hidden from everyone except via the explicit caller-owns check below.
-    // Previous form short-circuited to "visible" on null ownerUserId, which
-    // would silently leak orphaned personal teams.
-    const isVisibleTeam = (team: { isPersonal?: boolean; ownerUserId?: string | null }) =>
-      !team.isPersonal || team.ownerUserId === meUserId;
+    // Personal teams never render in the team list — the top-level
+    // "My Workspace" entry already covers the caller's own one, and
+    // every other user's belongs only to them. Cascades to projects
+    // since the projects flatMap iterates this filtered team list.
+    const isVisibleTeam = (team: { isPersonal?: boolean }) => !team.isPersonal;
 
     const teams = (organizations ?? [])
       .flatMap((org) =>
@@ -80,5 +79,5 @@ export function useWorkspaceData(): Pick<
       .sort((a, b) => a.label.localeCompare(b.label));
 
     return { personal, teams, projects };
-  }, [organizations, meUserId]);
+  }, [organizations]);
 }
