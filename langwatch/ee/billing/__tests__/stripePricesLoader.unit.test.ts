@@ -60,8 +60,17 @@ describe("stripeCatalog", () => {
         prices: {
           ...stripeCatalogData.prices,
           DEV_ONLY_PRICE_FOR_LOCAL_TESTING: {
-            test: { unit_amount: 100 },
-            live: null,
+            id: "price_dev_only_local_testing",
+            active: false,
+            livemode: false,
+            product: null,
+            unitAmount: 100,
+            currency: "usd",
+            type: "one_time" as const,
+            recurring: null,
+            nickname: null,
+            lookupKey: null,
+            metadata: {},
           },
         },
       };
