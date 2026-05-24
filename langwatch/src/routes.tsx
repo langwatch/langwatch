@@ -290,6 +290,46 @@ const routes: RouteObject[] = [
     path: "/:project/automations",
     ...page(() => import("./pages/[project]/automations")),
   },
+  // AI Gateway — org-scoped top-level routes. The data behind every
+  // gateway page is already org-scoped (VirtualKey / GatewayBudget /
+  // GatewayProviderCredential are all org-level Prisma models), so
+  // routing it project-scoped under /:project/gateway/* was a chrome
+  // accident, not a data boundary. The /:project/gateway/* paths
+  // remain registered as aliases for back-compat — same modules,
+  // different URL — so deep links from existing dashboards / docs /
+  // bookmarks keep resolving while new links target /ai-gateway/*.
+  {
+    path: "/ai-gateway",
+    ...page(() => import("./pages/[project]/gateway/index")),
+  },
+  {
+    path: "/ai-gateway/virtual-keys",
+    ...page(() => import("./pages/[project]/gateway/virtual-keys")),
+  },
+  {
+    path: "/ai-gateway/virtual-keys/:id",
+    ...page(() => import("./pages/[project]/gateway/virtual-keys/[id]")),
+  },
+  {
+    path: "/ai-gateway/budgets",
+    ...page(() => import("./pages/[project]/gateway/budgets")),
+  },
+  {
+    path: "/ai-gateway/budgets/:id",
+    ...page(() => import("./pages/[project]/gateway/budgets/[id]")),
+  },
+  {
+    path: "/ai-gateway/providers",
+    ...page(() => import("./pages/[project]/gateway/providers")),
+  },
+  {
+    path: "/ai-gateway/usage",
+    ...page(() => import("./pages/[project]/gateway/usage")),
+  },
+  {
+    path: "/ai-gateway/cache-rules",
+    ...page(() => import("./pages/[project]/gateway/cache-rules")),
+  },
   {
     path: "/:project/gateway",
     ...page(() => import("./pages/[project]/gateway/index")),

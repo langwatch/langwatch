@@ -303,9 +303,7 @@ export const MainMenu = React.memo(function MainMenu({
             />
 
             {(showGovernanceEntry ||
-              (gatewayMenuEnabled &&
-                hasPermission("virtualKeys:view") &&
-                project)) && (
+              (gatewayMenuEnabled && hasPermission("virtualKeys:view"))) && (
               <>
                 <Text
                   fontSize="11px"
@@ -318,22 +316,20 @@ export const MainMenu = React.memo(function MainMenu({
                 >
                   {showExpanded ? "Govern" : <>&nbsp;</>}
                 </Text>
-                {gatewayMenuEnabled &&
-                  hasPermission("virtualKeys:view") &&
-                  project && (
-                    <SideMenuLink
-                      icon={featureIcons.gateway.icon}
-                      label={projectRoutes.gateway.title}
-                      href={projectRoutes.gateway_virtual_keys.path.replace(
-                        "[project]",
-                        project.slug,
-                      )}
-                      isActive={router.pathname.includes("/gateway/")}
-                      showLabel={showExpanded}
-                      beta
-                      betaLabel="Beta"
-                    />
-                  )}
+                {gatewayMenuEnabled && hasPermission("virtualKeys:view") && (
+                  <SideMenuLink
+                    icon={featureIcons.gateway.icon}
+                    label={projectRoutes.gateway.title}
+                    href="/ai-gateway/virtual-keys"
+                    isActive={
+                      router.pathname.startsWith("/ai-gateway") ||
+                      router.pathname.includes("/gateway/")
+                    }
+                    showLabel={showExpanded}
+                    beta
+                    betaLabel="Beta"
+                  />
+                )}
                 {showGovernanceEntry && (
                   <SideMenuLink
                     icon={Eye}

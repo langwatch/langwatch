@@ -10,29 +10,28 @@ import { Gauge, KeyRound, LineChart, Plug, Zap } from "lucide-react";
 import { type PropsWithChildren } from "react";
 
 import { DashboardLayout } from "~/components/DashboardLayout";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 import { MenuLink } from "../MenuLink";
 
 /**
- * Layout for `/[project]/gateway/*` — mirrors GovernanceLayout pattern:
+ * Layout for `/ai-gateway/*` — mirrors GovernanceLayout pattern:
  * single-link parent in the main sidebar, full Virtual Keys / Budgets /
  * Providers / Cache Rules / Usage sub-nav rendered inside the page as a
  * thin left column. Each gateway page wraps with this layout instead of
  * the five-children CollapsibleMenuGroup that previously cluttered the
  * primary sidebar.
+ *
+ * Org-scoped (no project picker in the header) because every gateway
+ * resource — VirtualKey / GatewayBudget / GatewayProviderCredential —
+ * lives at the org level in the Prisma schema, so the chrome should
+ * reflect that boundary.
  */
 export default function AiGatewayLayout({
   children,
   pageTitle,
 }: PropsWithChildren<{ pageTitle?: string }>) {
-  const { project } = useOrganizationTeamProject({
-    redirectToOnboarding: false,
-    redirectToProjectOnboarding: false,
-  });
-  const slug = project?.slug ?? "";
   return (
-    <DashboardLayout pageTitle={pageTitle}>
+    <DashboardLayout orgScope pageTitle={pageTitle}>
       <Box width="full" paddingY={4} paddingX={4}>
         <Container maxW="container.xl" paddingX={0}>
           <HStack alignItems="start" gap={6} width="full">
@@ -57,36 +56,36 @@ export default function AiGatewayLayout({
                   AI Gateway
                 </Text>
                 <MenuLink
-                  href={`/${slug}/gateway/virtual-keys`}
-                  includePath={`/${slug}/gateway/virtual-keys`}
+                  href={`/ai-gateway/virtual-keys`}
+                  includePath={`/ai-gateway/virtual-keys`}
                   icon={<KeyRound size={14} />}
                 >
                   Virtual Keys
                 </MenuLink>
                 <MenuLink
-                  href={`/${slug}/gateway/budgets`}
-                  includePath={`/${slug}/gateway/budgets`}
+                  href={`/ai-gateway/budgets`}
+                  includePath={`/ai-gateway/budgets`}
                   icon={<Gauge size={14} />}
                 >
                   Budgets
                 </MenuLink>
                 <MenuLink
-                  href={`/${slug}/gateway/providers`}
-                  includePath={`/${slug}/gateway/providers`}
+                  href={`/ai-gateway/providers`}
+                  includePath={`/ai-gateway/providers`}
                   icon={<Plug size={14} />}
                 >
                   Providers
                 </MenuLink>
                 <MenuLink
-                  href={`/${slug}/gateway/cache-rules`}
-                  includePath={`/${slug}/gateway/cache-rules`}
+                  href={`/ai-gateway/cache-rules`}
+                  includePath={`/ai-gateway/cache-rules`}
                   icon={<Zap size={14} />}
                 >
                   Cache Rules
                 </MenuLink>
                 <MenuLink
-                  href={`/${slug}/gateway/usage`}
-                  includePath={`/${slug}/gateway/usage`}
+                  href={`/ai-gateway/usage`}
+                  includePath={`/ai-gateway/usage`}
                   icon={<LineChart size={14} />}
                 >
                   Usage
