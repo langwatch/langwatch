@@ -11,16 +11,17 @@ Goal: catch misconfigurations in the gateway BEFORE they surface during an on-ca
 ## What it validates
 
 - The public REST API at `/api/gateway/v1/*` is reachable with the CI token.
-- Your `gpc_*` provider binding is healthy (reach actual upstream).
-- VK creation + secret reveal flow works.
+- A ModelProvider scoped at ORG/TEAM/PROJECT is healthy (reaches actual upstream) via its Advanced (Gateway) tab settings.
+- VK creation + secret reveal flow works at the requested scope.
 - VK resolves end-to-end against the gateway data plane.
 - Response carries `X-LangWatch-Trace-Id`, `X-LangWatch-Span-Id`, `X-LangWatch-Request-Id`, and `traceparent`.
 - VK revocation propagates (best-effort, cache TTL applies).
 
 ## Prerequisites
 
-- A CI-scoped API token stored in `CI_LANGWATCH_TOKEN` with scopes `virtualKeys:create`, `virtualKeys:delete`, `gatewayProviders:view`.
-- A healthy provider binding id in `CI_GPC_ID` (e.g. `gpc_01HZX...`). Mint it manually once in the LangWatch UI → Gateway → Providers or via `langwatch gateway-providers create`.
+- A CI-scoped API token stored in `CI_LANGWATCH_TOKEN` with scopes `virtualKeys:create`, `virtualKeys:delete`, `modelProviders:view` (all at the same ORGANIZATION the CI VK is created in).
+- A `CI_ORG_SLUG` env var naming the org scope (e.g. `acme`). The CI VK lives at this ORG scope so its eligible-MP set is the union of every ModelProvider visible from the org.
+- At least one healthy ModelProvider configured under **Settings → Model Providers** at ORG, TEAM, or PROJECT scope. Set the rate-limit / fallback fields on its Advanced (Gateway) tab if you want CI to exercise them.
 - `jq` available on the runner.
 
 ## The script
@@ -42,12 +43,12 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# 1. Mint short-lived VK
-echo "Creating CI VK..."
+# 1. Mint short-lived VK at the org scope (uses the org's default RoutingPolicy)
+echo "Creating CI VK at ORG:$CI_ORG_SLUG..."
 CREATE=$(langwatch virtual-keys create \
   --name "ci-smoke-$TIMESTAMP" \
   --env test \
-  --provider "$CI_GPC_ID" \
+  --scope "ORG:$CI_ORG_SLUG" \
   --format json)
 
 VK_ID=$(echo "$CREATE" | jq -r '.virtual_key.id')
@@ -122,7 +123,7 @@ jobs:
       - run: bash ci-smoke-test.sh
         env:
           CI_LANGWATCH_TOKEN: ${{ secrets.CI_LANGWATCH_TOKEN }}
-          CI_GPC_ID:           ${{ vars.CI_GPC_ID }}
+          CI_ORG_SLUG:         ${{ vars.CI_ORG_SLUG }}
           LANGWATCH_GATEWAY_URL: https://gateway.langwatch.ai
 ```
 
@@ -133,7 +134,7 @@ jobs:
 | `FAIL: empty VK id` | REST API returning malformed response | Check `GET /api/gateway/v1/virtual-keys` manually; examine control-plane logs |
 | `curl ... exit 7` | Gateway unreachable | Check the LB + DNS; `nslookup gateway.langwatch.ai` |
 | `curl ... 401` | VK secret didn't resolve at the gateway | Auth cache bootstrapped against a stale `/changes` feed; check control-plane-to-gateway HMAC agreement |
-| `curl ... 403 model_not_allowed` | VK's provider binding doesn't expose `gpt-5-mini` | Replace the model in the script with one your `$CI_GPC_ID` actually supports |
+| `curl ... 403 model_not_allowed` | No ModelProvider visible from `ORG:$CI_ORG_SLUG` exposes `gpt-5-mini` | Replace the model in the script with one your eligible ModelProviders actually support, or add an OpenAI ModelProvider at the org scope |
 | `FAIL: trace propagation` | Per-tenant OTel middleware is off | See [Observability → trace-id handshake](/ai-gateway/observability#trace-id-propagation--concrete-handshake) |
 | `FAIL: empty content` | Upstream returned no content, provider outage | Compare to raw response body saved in `$RESPONSE_FILE` |
 
