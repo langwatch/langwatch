@@ -157,35 +157,30 @@ describe("guardProjectId — exempt org-scoped gateway models", () => {
   });
 });
 
-describe("guardProjectId — project-scoped gateway models still guarded", () => {
-  describe("findMany on VirtualKey WITHOUT projectId in where", () => {
-    it("STILL throws — VirtualKey is project-scoped (regression guard)", async () => {
+describe("guardProjectId — org-scoped VirtualKey still guarded", () => {
+  describe("findMany on VirtualKey WITHOUT any tenancy predicate", () => {
+    it("STILL throws — VirtualKey requires organizationId/id/scope (regression guard)", async () => {
       await expect(
         runGuard({
           model: "VirtualKey",
           action: "findMany",
           args: { where: { status: "ACTIVE" } },
         }),
-      ).rejects.toThrow(/requires a 'projectId'/);
+      ).rejects.toThrow(/requires an 'organizationId'/);
     });
   });
 
-  describe("findMany on VirtualKey WITH projectId in where", () => {
-    it("does NOT throw (normal project-scoped query)", async () => {
+  describe("findMany on VirtualKey WITH organizationId in where", () => {
+    it("does NOT throw (canonical org-scoped query)", async () => {
       await expect(
         runGuard({
           model: "VirtualKey",
           action: "findMany",
-          args: { where: { projectId: "proj_01", status: "ACTIVE" } },
+          args: { where: { organizationId: "org_01", status: "ACTIVE" } },
         }),
       ).resolves.toBe("ok");
     });
   });
-
-  // GatewayProviderCredential coverage retired in iter 110: the model
-  // was folded into ModelProvider; advanced gateway fields live on the
-  // MP row directly. ModelProvider's tenancy invariant is covered by
-  // the ModelProvider SCOPED_MODELS regression suite below.
 });
 
 /**
@@ -210,7 +205,7 @@ describe("guardProjectId — SCOPED_MODELS (ModelProvider family)", () => {
           action: "findMany",
           args: { where: {} },
         }),
-      ).rejects.toThrow(/projectId.*row id.*scope predicate/);
+      ).rejects.toThrow(/row id or scope predicate/);
     });
   });
 
@@ -252,28 +247,16 @@ describe("guardProjectId — SCOPED_MODELS (ModelProvider family)", () => {
     });
   });
 
-  describe("ModelProvider.findMany with legacy projectId predicate", () => {
-    it("does NOT throw — legacy projectId column is still a valid tenancy clause", async () => {
-      await expect(
-        runGuard({
-          model: "ModelProvider",
-          action: "findMany",
-          args: { where: { projectId: "proj_01" } },
-        }),
-      ).resolves.toBe("ok");
-    });
-  });
-
-  describe("ModelProvider.create without scopes AND without projectId", () => {
-    /** @scenario A create without scopes or projectId throws */
-    it("THROWS — every create needs either projectId or scopes in the payload", async () => {
+  describe("ModelProvider.create without scopes", () => {
+    /** @scenario A create without scopes throws */
+    it("THROWS — every create needs a scopes relation in the payload", async () => {
       await expect(
         runGuard({
           model: "ModelProvider",
           action: "create",
           args: { data: { provider: "openai", enabled: true } },
         }),
-      ).rejects.toThrow(/either a 'projectId' or a 'scopes' relation/);
+      ).rejects.toThrow(/requires a 'scopes' relation/);
     });
   });
 
