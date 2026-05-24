@@ -909,10 +909,7 @@ export const DashboardLayout = ({
             <SdkRadarBanner />
 
             {adminViewingAs && (
-              <AdminViewingAsBanner
-                workspaceLabel={adminViewingAs.label}
-                workspaceKind={adminViewingAs.kind}
-              />
+              <AdminViewingAsBanner workspaceLabel={adminViewingAs.label} />
             )}
 
             {ssoStatus?.pendingSsoSetup && (

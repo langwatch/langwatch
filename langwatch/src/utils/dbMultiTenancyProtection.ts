@@ -350,7 +350,7 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
   VirtualKey: {
     validateWhere: (where) => {
       if (!where) {
-        return "requires an 'organizationId', row id, hashedSecret, or scope predicate";
+        return "requires an 'organizationId', row id, hashedSecret, principalUserId, or scope predicate";
       }
       const ok = validateRecursive(
         where,
@@ -363,11 +363,15 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
           // uniquely-keyed secret column too, so a where-clause that
           // names it is bounded.
           typeof c.previousHashedSecret === "string" ||
+          // Principal-identity lookup: "every VK this user owns" is a
+          // legitimate bounded query for user-deactivation / personal-VK
+          // listing flows. Cross-org by design but bounded by user.
+          typeof c.principalUserId === "string" ||
           hasScopePredicate(c),
       );
       return ok
         ? null
-        : "requires an 'organizationId', row id, hashedSecret, or scope predicate";
+        : "requires an 'organizationId', row id, hashedSecret, principalUserId, or scope predicate";
     },
     validateCreateData: (data) => {
       const records = Array.isArray(data) ? data : [data];

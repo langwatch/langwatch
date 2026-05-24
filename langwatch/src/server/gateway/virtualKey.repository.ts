@@ -17,6 +17,7 @@ import type {
 
 export type VirtualKeyWithScopes = VirtualKey & {
   scopes: VirtualKeyScope[];
+  principalUser?: { id: string; name: string | null; email: string | null } | null;
 };
 
 export type ScopeInput = {
@@ -54,7 +55,10 @@ export class VirtualKeyRepository {
     const client = tx ?? this.prisma;
     return client.virtualKey.findFirst({
       where: { id, organizationId },
-      include: { scopes: true },
+      include: {
+        scopes: true,
+        principalUser: { select: { id: true, name: true, email: true } },
+      },
     });
   }
 
@@ -65,7 +69,10 @@ export class VirtualKeyRepository {
     const client = tx ?? this.prisma;
     return client.virtualKey.findUnique({
       where: { id },
-      include: { scopes: true },
+      include: {
+        scopes: true,
+        principalUser: { select: { id: true, name: true, email: true } },
+      },
     });
   }
 
@@ -84,7 +91,10 @@ export class VirtualKeyRepository {
           },
         ],
       },
-      include: { scopes: true },
+      include: {
+        scopes: true,
+        principalUser: { select: { id: true, name: true, email: true } },
+      },
     });
   }
 
@@ -95,7 +105,10 @@ export class VirtualKeyRepository {
     const client = tx ?? this.prisma;
     return client.virtualKey.findMany({
       where: { organizationId },
-      include: { scopes: true },
+      include: {
+        scopes: true,
+        principalUser: { select: { id: true, name: true, email: true } },
+      },
       orderBy: { createdAt: "desc" },
     });
   }
@@ -116,7 +129,10 @@ export class VirtualKeyRepository {
           some: { scopeType: scope.scopeType, scopeId: scope.scopeId },
         },
       },
-      include: { scopes: true },
+      include: {
+        scopes: true,
+        principalUser: { select: { id: true, name: true, email: true } },
+      },
       orderBy: { createdAt: "desc" },
     });
   }
@@ -146,7 +162,10 @@ export class VirtualKeyRepository {
           })),
         },
       },
-      include: { scopes: true },
+      include: {
+        scopes: true,
+        principalUser: { select: { id: true, name: true, email: true } },
+      },
     });
   }
 
@@ -160,7 +179,10 @@ export class VirtualKeyRepository {
     return client.virtualKey.update({
       where: { id, organizationId },
       data: { config, revision: { increment: 1n } },
-      include: { scopes: true },
+      include: {
+        scopes: true,
+        principalUser: { select: { id: true, name: true, email: true } },
+      },
     });
   }
 
@@ -196,7 +218,10 @@ export class VirtualKeyRepository {
     return client.virtualKey.update({
       where: { id, organizationId },
       data: { routingPolicyId, revision: { increment: 1n } },
-      include: { scopes: true },
+      include: {
+        scopes: true,
+        principalUser: { select: { id: true, name: true, email: true } },
+      },
     });
   }
 
@@ -219,7 +244,10 @@ export class VirtualKeyRepository {
         previousSecretValidUntil,
         revision: { increment: 1n },
       },
-      include: { scopes: true },
+      include: {
+        scopes: true,
+        principalUser: { select: { id: true, name: true, email: true } },
+      },
     });
   }
 
@@ -240,7 +268,10 @@ export class VirtualKeyRepository {
         previousSecretValidUntil: null,
         revision: { increment: 1n },
       },
-      include: { scopes: true },
+      include: {
+        scopes: true,
+        principalUser: { select: { id: true, name: true, email: true } },
+      },
     });
   }
 

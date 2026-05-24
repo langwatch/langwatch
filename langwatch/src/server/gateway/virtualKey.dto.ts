@@ -27,6 +27,7 @@ export type VirtualKeyCamelDto = {
   status: "active" | "revoked";
   displayPrefix: string;
   principalUserId: string | null;
+  principalUser: { name: string | null; email: string | null } | null;
   scopes: VirtualKeyScopeEntry[];
   routingPolicyId: string | null;
   config: unknown;
@@ -66,6 +67,9 @@ function baseVk(vk: VirtualKeyWithScopes): BaseVk {
     status: vk.status === "ACTIVE" ? "active" : "revoked",
     displayPrefix: vk.displayPrefix,
     principalUserId: vk.principalUserId,
+    principalUser: vk.principalUser
+      ? { name: vk.principalUser.name, email: vk.principalUser.email }
+      : null,
     scopes: vk.scopes.map((s) => ({
       scopeType: s.scopeType,
       scopeId: s.scopeId,

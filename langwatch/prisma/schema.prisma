@@ -98,6 +98,7 @@ model User {
   apiKeys                 ApiKey[]
   gatewayBudgetsCreated   GatewayBudget[]          @relation("GatewayBudgetCreatedBy")
   principalGatewayBudgets GatewayBudget[]          @relation("PrincipalScopedGatewayBudgets")
+  principalVirtualKeys    VirtualKey[]             @relation("PrincipalScopedVirtualKeys")
   personalTeams           Team[]                   @relation("PersonalTeamOwner")
   personalProjects        Project[]                @relation("PersonalProjectOwner")
   routingPoliciesCreated  RoutingPolicy[]          @relation("RoutingPolicyCreatedBy")
@@ -1732,6 +1733,7 @@ model VirtualKey {
   // Set for personal VKs minted via `langwatch login --device`; null for
   // org-/team-/project-owned VKs minted by an admin.
   principalUserId String?
+  principalUser   User?   @relation("PrincipalScopedVirtualKeys", fields: [principalUserId], references: [id], onDelete: SetNull)
 
   // Slim config blob — per-key state only. The "gateway-config bundle"
   // that the gateway reads via /internal/gateway/config/:vk_id is now

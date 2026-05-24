@@ -108,19 +108,10 @@ export class GovernanceSetupStateService {
   }
 
   private async countPersonalVks(organizationId: string): Promise<number> {
-    // dbMultiTenancyProtection requires projectId on VirtualKey
-    // queries. Resolve the org's personal projects first, then count.
-    const personalProjects = await this.prisma.project.findMany({
-      where: {
-        team: { organizationId },
-        isPersonal: true,
-      },
-      select: { id: true },
-    });
-    if (personalProjects.length === 0) return 0;
     return this.prisma.virtualKey.count({
       where: {
-        projectId: { in: personalProjects.map((p) => p.id) },
+        organizationId,
+        principalUserId: { not: null },
         revokedAt: null,
       },
     });

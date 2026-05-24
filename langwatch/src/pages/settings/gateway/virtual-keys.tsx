@@ -322,6 +322,14 @@ function VirtualKeysPage() {
                       <ProviderScopeChips
                         scopes={scopeEntriesWithNames(vk.scopes)}
                         size="xs"
+                        principal={
+                          vk.principalUserId && vk.principalUser
+                            ? {
+                                name: vk.principalUser.name,
+                                email: vk.principalUser.email,
+                              }
+                            : undefined
+                        }
                       />
                     </Table.Cell>
                     <Table.Cell>
