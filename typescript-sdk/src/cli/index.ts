@@ -1261,21 +1261,24 @@ virtualKeysCmd
   .requiredOption("--name <name>", "Human-readable name for the key")
   .option("--description <desc>", "Optional description")
   .option("--env <env>", "Environment: live or test", "live")
-  .option("--provider <id...>", "Provider credential id(s) to bind (repeatable)")
-  .option("--principal <userId>", "Bind to a specific principal user id")
+  .option("--scope <typeAndId...>", "Scope row in TYPE:id form (repeatable). Types: ORG | TEAM | PROJECT. Example: --scope ORG:acme --scope TEAM:platform")
+  .option("--routing-policy <id>", "RoutingPolicy id to pin (otherwise uses the org's default policy)")
+  .option("--principal-user <userId>", "Mark this VK as personal and attribute spend to the named principal user")
   .option("-f, --format <format>", "Output format: text (default) or json", "text")
-  .action(async (options: { name: string; description?: string; env?: "live" | "test"; provider?: string[]; principal?: string; format?: string }) => {
+  .action(async (options: { name: string; description?: string; env?: "live" | "test"; scope?: string[]; routingPolicy?: string; principalUser?: string; format?: string }) => {
     const { createVirtualKeyCommand: impl } = await import("./commands/virtual-keys/create.js");
     await impl(options);
   });
 
 virtualKeysCmd
   .command("update <id>")
-  .description("Update a virtual key's name/description/providers/config (requires VK edit drawer-level changes)")
+  .description("Update a virtual key's name/description/scopes/routing-policy/config")
   .option("--name <name>", "New display name")
   .option("--description <desc>", "New description")
   .option("--clear-description", "Clear the description")
-  .option("--provider <id...>", "Replace the bound provider credential ids (repeatable; supplies the full set)")
+  .option("--scope <typeAndId...>", "Replace the scope set (repeatable; supplies the full set). Same TYPE:id form as create.")
+  .option("--routing-policy <id>", "Switch to a different RoutingPolicy (pass id)")
+  .option("--clear-routing-policy", "Unpin the routing policy; VK falls back to the org default ordering")
   .option("--config-json <json>", "Inline partial config JSON (model_aliases/cache/fallback/rate_limits/policy_rules). Merges with existing config")
   .option("--config-file <path>", "Read partial config JSON from a file")
   .option("-f, --format <format>", "Output format: text (default) or json", "text")
@@ -1283,7 +1286,9 @@ virtualKeysCmd
     name?: string;
     description?: string;
     clearDescription?: boolean;
-    provider?: string[];
+    scope?: string[];
+    routingPolicy?: string;
+    clearRoutingPolicy?: boolean;
     configJson?: string;
     configFile?: string;
     format?: string;
@@ -1390,54 +1395,6 @@ gatewayBudgetsCmd
   .option("-f, --format <format>", "Output format: text (default) or json", "text")
   .action(async (id: string, options: { format?: string }) => {
     const { archiveGatewayBudgetCommand: impl } = await import("./commands/gateway-budgets/archive.js");
-    await impl(id, options);
-  });
-
-// Add gateway-providers command group (AI Gateway)
-const gatewayProvidersCmd = program
-  .command("gateway-providers")
-  .description("Manage AI Gateway provider credential bindings");
-
-gatewayProvidersCmd
-  .command("list")
-  .description("List provider bindings attached to the current project's gateway")
-  .option("-f, --format <format>", "Output format: table (default) or json", "table")
-  .action(async (options: { format?: string }) => {
-    const { listGatewayProvidersCommand: impl } = await import("./commands/gateway-providers/list.js");
-    await impl(options);
-  });
-
-gatewayProvidersCmd
-  .command("create")
-  .description("Bind an existing model-provider to the gateway with optional rate limits")
-  .requiredOption("--model-provider <id>", "Existing model-provider id to bind")
-  .option("--slot <slot>", "Optional free-text slot tag (e.g. 'primary', 'eu-region')")
-  .option("--rate-limit-rpm <rpm>", "Requests per minute")
-  .option("--rate-limit-tpm <tpm>", "Tokens per minute")
-  .option("--rate-limit-rpd <rpd>", "Requests per day")
-  .option("--rotation-policy <p>", "auto|manual|external_secret_store")
-  .option("--fallback-priority <n>", "Global fallback priority (lower = earlier)")
-  .option("-f, --format <format>", "Output format: text (default) or json", "text")
-  .action(async (options: {
-    modelProvider: string;
-    slot?: string;
-    rateLimitRpm?: string;
-    rateLimitTpm?: string;
-    rateLimitRpd?: string;
-    rotationPolicy?: "auto" | "manual" | "external_secret_store";
-    fallbackPriority?: string;
-    format?: string;
-  }) => {
-    const { createGatewayProviderCommand: impl } = await import("./commands/gateway-providers/create.js");
-    await impl(options);
-  });
-
-gatewayProvidersCmd
-  .command("disable <id>")
-  .description("Disable a provider binding (stops routing traffic to it)")
-  .option("-f, --format <format>", "Output format: text (default) or json", "text")
-  .action(async (id: string, options: { format?: string }) => {
-    const { disableGatewayProviderCommand: impl } = await import("./commands/gateway-providers/disable.js");
     await impl(id, options);
   });
 

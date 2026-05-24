@@ -3,14 +3,15 @@ import ora from "ora";
 import { VirtualKeysApiService } from "@/client-sdk/services/virtual-keys/virtual-keys-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
-import { virtualKeyDetailUrl } from "./_shared";
+import { formatScope, parseScopeArg, virtualKeyDetailUrl } from "./_shared";
 
 export interface CreateVirtualKeyOptions {
   name: string;
   description?: string;
   env?: "live" | "test";
-  provider?: string[];
-  principal?: string;
+  scope?: string[];
+  routingPolicy?: string;
+  principalUser?: string;
   format?: string;
 }
 
@@ -22,10 +23,21 @@ export const createVirtualKeyCommand = async (options: CreateVirtualKeyOptions):
     process.exit(1);
   }
 
-  const providerIds = options.provider ?? [];
-  if (providerIds.length === 0) {
-    console.error(chalk.red("Error: at least one --provider <id> is required"));
-    console.error(chalk.gray("Hint: list available providers with `langwatch virtual-keys providers` or via the UI."));
+  const scopeArgs = options.scope ?? [];
+  if (scopeArgs.length === 0) {
+    console.error(chalk.red("Error: at least one --scope <TYPE:id> is required"));
+    console.error(chalk.gray("Examples:"));
+    console.error(chalk.gray("  --scope ORG:acme"));
+    console.error(chalk.gray("  --scope TEAM:platform --scope TEAM:data-sci"));
+    console.error(chalk.gray("  --scope PROJECT:demo"));
+    process.exit(1);
+  }
+
+  let scopes;
+  try {
+    scopes = scopeArgs.map(parseScopeArg);
+  } catch (error) {
+    console.error(chalk.red(`Error: ${(error as Error).message}`));
     process.exit(1);
   }
 
@@ -37,8 +49,9 @@ export const createVirtualKeyCommand = async (options: CreateVirtualKeyOptions):
       name: options.name,
       description: options.description,
       environment: options.env ?? "live",
-      principal_user_id: options.principal ?? null,
-      provider_credential_ids: providerIds,
+      principal_user_id: options.principalUser ?? null,
+      scopes,
+      routing_policy_id: options.routingPolicy ?? null,
     });
 
     spinner.succeed(`Created virtual key "${chalk.cyan(virtual_key.name)}"`);
@@ -59,7 +72,14 @@ export const createVirtualKeyCommand = async (options: CreateVirtualKeyOptions):
     console.log();
     console.log(chalk.gray("Virtual key id: ") + virtual_key.id);
     console.log(chalk.gray("Prefix:         ") + `${virtual_key.prefix}...${virtual_key.last_four}`);
-    const detailUrl = virtualKeyDetailUrl(virtual_key.project_id, virtual_key.id);
+    console.log(chalk.gray("Scopes:         ") + virtual_key.scopes.map(formatScope).join(", "));
+    if (virtual_key.routing_policy_id) {
+      console.log(chalk.gray("Routing policy: ") + virtual_key.routing_policy_id);
+    }
+    if (virtual_key.principal_user_id) {
+      console.log(chalk.gray("Principal:      ") + virtual_key.principal_user_id);
+    }
+    const detailUrl = virtualKeyDetailUrl(virtual_key.id);
     if (detailUrl) {
       console.log(chalk.gray("View in UI:     ") + chalk.cyan(detailUrl));
     }

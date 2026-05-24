@@ -4,6 +4,7 @@ import { VirtualKeysApiService } from "@/client-sdk/services/virtual-keys/virtua
 import { checkApiKey } from "../../utils/apiKey";
 import { formatTable } from "../../utils/formatting";
 import { failSpinner } from "../../utils/spinnerError";
+import { formatScope } from "./_shared";
 
 export const listVirtualKeysCommand = async (options?: { format?: string }): Promise<void> => {
   checkApiKey();
@@ -25,7 +26,7 @@ export const listVirtualKeysCommand = async (options?: { format?: string }): Pro
       console.log();
       console.log(chalk.gray("No virtual keys yet."));
       console.log(chalk.gray("Create one with:"));
-      console.log(chalk.cyan('  langwatch virtual-keys create --name "my-key" --provider <provider-id>'));
+      console.log(chalk.cyan('  langwatch virtual-keys create --name "my-key" --scope ORG:<slug>'));
       return;
     }
 
@@ -37,13 +38,13 @@ export const listVirtualKeysCommand = async (options?: { format?: string }): Pro
       Env: vk.environment === "live" ? chalk.yellow("live") : chalk.gray("test"),
       Status: vk.status === "ACTIVE" ? chalk.green("active") : chalk.red("revoked"),
       Prefix: `${vk.prefix}...${vk.last_four}`,
-      Providers: String(vk.provider_credential_ids.length),
+      Scopes: vk.scopes.map(formatScope).join(", ") || chalk.gray("—"),
       "Last used": vk.last_used_at ? new Date(vk.last_used_at).toLocaleDateString() : chalk.gray("—"),
     }));
 
     formatTable({
       data: tableData,
-      headers: ["ID", "Name", "Env", "Status", "Prefix", "Providers", "Last used"],
+      headers: ["ID", "Name", "Env", "Status", "Prefix", "Scopes", "Last used"],
       colorMap: {
         Name: chalk.cyan,
         ID: chalk.gray,
@@ -53,7 +54,7 @@ export const listVirtualKeysCommand = async (options?: { format?: string }): Pro
     console.log();
     console.log(
       chalk.gray(
-        `Use ${chalk.cyan("langwatch virtual-keys get <id>")} to see config and attached providers.`,
+        `Use ${chalk.cyan("langwatch virtual-keys get <id>")} to see scopes, routing policy, and config.`,
       ),
     );
   } catch (error) {

@@ -4,12 +4,15 @@ import type * as NodeFs from "node:fs";
 import { VirtualKeysApiService } from "@/client-sdk/services/virtual-keys/virtual-keys-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
+import { formatScope, parseScopeArg } from "./_shared";
 
 export interface UpdateVirtualKeyOptions {
   name?: string;
   description?: string;
   clearDescription?: boolean;
-  provider?: string[];
+  scope?: string[];
+  routingPolicy?: string;
+  clearRoutingPolicy?: boolean;
   configJson?: string;
   configFile?: string;
   format?: string;
@@ -56,16 +59,28 @@ export const updateVirtualKeyCommand = async (
     options.name === undefined &&
     options.description === undefined &&
     !options.clearDescription &&
-    (options.provider === undefined || options.provider.length === 0) &&
+    (options.scope === undefined || options.scope.length === 0) &&
+    options.routingPolicy === undefined &&
+    !options.clearRoutingPolicy &&
     config === undefined;
 
   if (noFieldsProvided) {
     console.error(
       chalk.red(
-        "Error: nothing to update. Provide at least one of --name, --description, --clear-description, --provider, --config-json, --config-file.",
+        "Error: nothing to update. Provide at least one of --name, --description, --clear-description, --scope, --routing-policy, --clear-routing-policy, --config-json, --config-file.",
       ),
     );
     process.exit(1);
+  }
+
+  let scopes;
+  if (options.scope && options.scope.length > 0) {
+    try {
+      scopes = options.scope.map(parseScopeArg);
+    } catch (err) {
+      console.error(chalk.red(`Error: ${(err as Error).message}`));
+      process.exit(1);
+    }
   }
 
   const service = new VirtualKeysApiService();
@@ -75,7 +90,8 @@ export const updateVirtualKeyCommand = async (
     const updated = await service.update(id, {
       name: options.name,
       description: options.clearDescription ? null : options.description,
-      provider_credential_ids: options.provider && options.provider.length > 0 ? options.provider : undefined,
+      scopes,
+      routing_policy_id: options.clearRoutingPolicy ? null : options.routingPolicy,
       config,
     });
 
@@ -90,7 +106,8 @@ export const updateVirtualKeyCommand = async (
     console.log(`${chalk.bold("ID:")}           ${updated.id}`);
     console.log(`${chalk.bold("Name:")}         ${chalk.cyan(updated.name)}`);
     if (updated.description) console.log(`${chalk.bold("Description:")}  ${updated.description}`);
-    console.log(`${chalk.bold("Providers:")}    ${updated.provider_credential_ids.join(", ") || chalk.gray("—")}`);
+    console.log(`${chalk.bold("Scopes:")}       ${updated.scopes.map(formatScope).join(", ") || chalk.gray("—")}`);
+    console.log(`${chalk.bold("Routing pol.:")} ${updated.routing_policy_id ?? chalk.gray("(default)")}`);
     console.log(`${chalk.bold("Updated:")}      ${new Date(updated.updated_at).toLocaleString()}`);
     console.log();
     console.log(chalk.gray("Config after update:"));
