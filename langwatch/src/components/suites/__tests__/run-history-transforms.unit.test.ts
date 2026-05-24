@@ -137,15 +137,15 @@ describe("groupRunsByTarget()", () => {
       const runs = [
         makeScenarioRunData({
           scenarioRunId: "r1",
-          metadata: { langwatch: { targetReferenceId: "agent-1" } },
+          metadata: { langwatch: { targetReferenceId: "agent-1", targetType: "code" as const } },
         }),
         makeScenarioRunData({
           scenarioRunId: "r2",
-          metadata: { langwatch: { targetReferenceId: "agent-1" } },
+          metadata: { langwatch: { targetReferenceId: "agent-1", targetType: "code" as const } },
         }),
         makeScenarioRunData({
           scenarioRunId: "r3",
-          metadata: { langwatch: { targetReferenceId: "prompt-1" } },
+          metadata: { langwatch: { targetReferenceId: "prompt-1", targetType: "prompt" as const } },
         }),
       ];
 
@@ -165,7 +165,7 @@ describe("groupRunsByTarget()", () => {
       const runs = [
         makeScenarioRunData({
           scenarioRunId: "r1",
-          metadata: { langwatch: { targetReferenceId: "agent-1" } },
+          metadata: { langwatch: { targetReferenceId: "agent-1", targetType: "code" as const } },
         }),
         makeScenarioRunData({
           scenarioRunId: "r2",
