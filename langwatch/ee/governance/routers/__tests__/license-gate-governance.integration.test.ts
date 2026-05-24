@@ -34,7 +34,10 @@ import { FREE_PLAN } from "@ee/licensing/constants";
 import type { PlanInfo } from "@ee/licensing/planInfo";
 
 import { prisma } from "~/server/db";
-import { IngestionSourceService } from "@ee/governance/services/activity-monitor/ingestionSource.service";
+import {
+  IngestionSourceService,
+  NON_ENTERPRISE_INGESTION_SOURCE_CAP,
+} from "@ee/governance/services/activity-monitor/ingestionSource.service";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import { PlanProviderService } from "~/server/app-layer/subscription/plan-provider";
@@ -270,8 +273,19 @@ describe("license-gate on governance backend", () => {
     });
 
     describe("service-layer defense-in-depth", () => {
-      it("rejects direct IngestionSourceService.createSource calls without going through tRPC", async () => {
+      it("rejects direct IngestionSourceService.createSource over the non-enterprise cap", async () => {
         const service = IngestionSourceService.create(prisma);
+        // Seed the cap so the next call trips the defense-in-depth gate
+        // regardless of entry point (this catches non-tRPC callers like
+        // background workers + webhook adapters).
+        for (let i = 0; i < NON_ENTERPRISE_INGESTION_SOURCE_CAP; i++) {
+          await service.createSource({
+            organizationId,
+            sourceType: "otel_generic",
+            name: `service-direct-seed-${i}`,
+            actorUserId: adminUserId,
+          });
+        }
         await expect(
           service.createSource({
             organizationId,

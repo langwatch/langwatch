@@ -128,7 +128,7 @@ describe("UserIngestionBindingService.install", () => {
       expect(result.binding.organizationId).toBe(ORG_ID);
       expect(result.binding.personalProjectId).toBe(ALICE_PROJECT_ID);
       expect(result.binding.bindingAccessTokenPrefix).toBe(
-        result.token.slice(0, 8),
+        result.token.slice(0, 9),
       );
     });
 
