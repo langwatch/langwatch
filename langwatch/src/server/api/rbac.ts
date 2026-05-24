@@ -31,6 +31,11 @@ export const Actions = {
   ROTATE: "rotate",
   ATTACH: "attach",
   DETACH: "detach",
+  // Resource-specific cross-principal audit action. Used today by
+  // `virtualKeys:viewOtherPersonal` so org admins can see every member's
+  // personal VKs during off-boarding sweeps. Personal-VK self-view stays
+  // implicit on principalUserId match (no perm needed for "see my own").
+  VIEW_OTHER_PERSONAL: "viewOtherPersonal",
 } as const;
 
 export type Action = (typeof Actions)[keyof typeof Actions];
@@ -163,6 +168,11 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     "virtualKeys:delete",
     "virtualKeys:rotate",
     "virtualKeys:manage",
+    // Off-boarding sweep capability — view personal VKs owned by OTHER
+    // users in the org (own personal-VK visibility stays implicit on
+    // principalUserId match, no perm needed). Spec-bound to
+    // vk-scope-rbac.feature + vk-personal-scope.feature.
+    "virtualKeys:viewOtherPersonal",
     "gatewayBudgets:view",
     "gatewayBudgets:create",
     "gatewayBudgets:update",
@@ -350,6 +360,16 @@ const ORGANIZATION_ROLE_PERMISSIONS: Record<
     // the org-wide grant below (admins also see the user-facing portal).
     "aiTools:view",
     "aiTools:manage",
+    // AI Gateway — org-level VK capabilities. `virtualKeys:manage`
+    // mirrors the TeamUserRole.ADMIN grant so org admins can author VKs
+    // at ORGANIZATION scope (the team-role short-circuit at
+    // rbac.ts:715/:1099 covers existing customers automatically; the
+    // explicit string here documents the perm-listing UI + future custom
+    // roles that don't inherit the short-circuit). `viewOtherPersonal`
+    // gives org admins the off-boarding sweep capability. Spec-bound to
+    // vk-scope-rbac.feature.
+    "virtualKeys:manage",
+    "virtualKeys:viewOtherPersonal",
   ],
   // MEMBER + EXTERNAL get aiTools:view so the /me portal renders for
   // every org member. Catalog management stays admin-only.

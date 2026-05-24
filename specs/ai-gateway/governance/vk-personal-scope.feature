@@ -67,16 +67,16 @@ Feature: AI Gateway — Personal Virtual Keys (principalUserId orthogonality)
     Then the response contains "vk_leo"
     And the response is returned without consulting `virtualKeys:view` (principalUserId match short-circuits)
 
-  Scenario: A peer cannot see another user's personal VK without virtualKeys:view:other-personal
+  Scenario: A peer cannot see another user's personal VK without virtualKeys:viewOtherPersonal
     Given "leo@acme.test" has a personal VK "vk_leo"
     And "maya@acme.test" is a member of ORGANIZATION "acme" with `virtualKeys:view` only
     When "maya@acme.test" calls `api.personalVirtualKeys.list` with `targetUserId="leo@acme.test"`
     Then the call returns 403 FORBIDDEN
     And the error code is "permission_denied"
-    And the error names the missing perm: "virtualKeys:view:other-personal"
+    And the error names the missing perm: "virtualKeys:viewOtherPersonal"
 
-  Scenario: Org admins with virtualKeys:view:other-personal can audit all personal VKs
-    Given "admin@acme.test" has `virtualKeys:view:other-personal` at ORGANIZATION "acme"
+  Scenario: Org admins with virtualKeys:viewOtherPersonal can audit all personal VKs
+    Given "admin@acme.test" has `virtualKeys:viewOtherPersonal` at ORGANIZATION "acme"
     And users "leo@acme.test", "maya@acme.test", "contractor@acme.test" each have personal VKs
     When "admin@acme.test" calls `api.personalVirtualKeys.list` without a targetUserId filter
     Then the response includes personal VKs for all three users

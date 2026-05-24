@@ -4,7 +4,7 @@ Feature: AI Gateway — Virtual Key RBAC (Path B, scope-aware perms)
   multi-scope schema. All gates use the existing `virtualKeys:*` perm
   vocabulary in `rbac.ts:160-165` (no new `virtualKeys:manage` enum
   entry — the perm already exists, this feature wires it to scope-aware
-  checks). One genuinely-new permission is added: `virtualKeys:view:other-personal`,
+  checks). One genuinely-new permission is added: `virtualKeys:viewOtherPersonal`,
   for org admins doing off-boarding sweeps over other users' personal VKs.
 
   ## Industry parity
@@ -137,15 +137,15 @@ Feature: AI Gateway — Virtual Key RBAC (Path B, scope-aware perms)
     Then the response contains "vk_leo"
     And the personalUserId-match path bypasses the standard `virtualKeys:view` check
 
-  Scenario: A user cannot view another user's personal VK without virtualKeys:view:other-personal
+  Scenario: A user cannot view another user's personal VK without virtualKeys:viewOtherPersonal
     Given user "leo@acme.test" has a personal VK "vk_leo"
-    And user "maya@acme.test" has only `virtualKeys:view` at ORGANIZATION "acme" (no view:other-personal)
+    And user "maya@acme.test" has only `virtualKeys:view` at ORGANIZATION "acme" (no viewOtherPersonal)
     When "maya@acme.test" calls `api.personalVirtualKeys.list` with `targetUserId="leo@acme.test"`
     Then the call returns 403 FORBIDDEN
-    And the message names the missing perm: "virtualKeys:view:other-personal"
+    And the message names the missing perm: "virtualKeys:viewOtherPersonal"
 
-  Scenario: Org admin with view:other-personal can audit other users' personal VKs (offboarding sweep)
-    Given user "admin@acme.test" has `virtualKeys:view:other-personal` at ORGANIZATION "acme"
+  Scenario: Org admin with viewOtherPersonal can audit other users' personal VKs (offboarding sweep)
+    Given user "admin@acme.test" has `virtualKeys:viewOtherPersonal` at ORGANIZATION "acme"
     And users "leo@acme.test" and "maya@acme.test" each have personal VKs
     When "admin@acme.test" calls `api.personalVirtualKeys.list` with no targetUserId filter
     Then the response includes personal VKs for "leo@acme.test" and "maya@acme.test"
@@ -154,15 +154,15 @@ Feature: AI Gateway — Virtual Key RBAC (Path B, scope-aware perms)
   # Default role-template seeds (new perm reaches existing customers automatically)
   # ============================================================================
 
-  Scenario: Existing org admins automatically gain virtualKeys:view:other-personal on migrate
-    Given the LegacyRoles migration adds `virtualKeys:view:other-personal` to OrganizationUserRole.ADMIN + TeamUserRole.ADMIN templates
+  Scenario: Existing org admins automatically gain virtualKeys:viewOtherPersonal on migrate
+    Given the LegacyRoles migration adds `virtualKeys:viewOtherPersonal` to OrganizationUserRole.ADMIN + TeamUserRole.ADMIN templates
     And an existing customer org has user "old-admin@acme.test" with OrganizationUserRole.ADMIN binding
     When the migration applies
     Then "old-admin@acme.test" can call `api.personalVirtualKeys.list` for other users immediately on next request
     And no per-org backfill is required
     And the RoleBinding rows themselves are untouched (template lookup is at runtime)
 
-  Scenario: Org member roles do NOT gain virtualKeys:view:other-personal
+  Scenario: Org member roles do NOT gain virtualKeys:viewOtherPersonal
     Given a user with OrganizationUserRole.MEMBER binding
     When the migration applies
     Then calling `api.personalVirtualKeys.list` for another user still returns 403
