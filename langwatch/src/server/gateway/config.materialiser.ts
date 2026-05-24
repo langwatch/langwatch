@@ -142,6 +142,7 @@ export class GatewayConfigMaterialiser {
     const spendByBudgetId = await this.loadCurrentSpend(vk, budgets);
     const cacheRules = await this.applicableCacheRules(vk.organizationId);
     const config = parseVirtualKeyConfig(vk.config);
+    const policySides = resolvePolicySideOfBundle(vk, config);
 
     return {
       revision: vk.revision.toString(),
@@ -160,7 +161,7 @@ export class GatewayConfigMaterialiser {
         timeout_ms: config.fallback.timeoutMs,
         max_attempts: config.fallback.maxAttempts,
       },
-      model_aliases: config.modelAliases,
+      model_aliases: policySides.modelAliases,
       models_allowed: config.modelsAllowed,
       cache: { mode: config.cache.mode, ttl_s: config.cache.ttlS },
       guardrails: {
@@ -170,12 +171,7 @@ export class GatewayConfigMaterialiser {
         request_fail_open: config.guardrails.requestFailOpen,
         response_fail_open: config.guardrails.responseFailOpen,
       },
-      policy_rules: {
-        tools: config.policyRules.tools,
-        mcp: config.policyRules.mcp,
-        urls: config.policyRules.urls,
-        models: config.policyRules.models,
-      },
+      policy_rules: policySides.policyRules,
       rate_limits: {
         rpm: config.rateLimits.rpm,
         tpm: config.rateLimits.tpm,
@@ -279,6 +275,86 @@ function decryptCustomKeys(raw: unknown): Record<string, unknown> {
     }
   }
   return {};
+}
+
+// Resolve the policy-side of the bundle (model aliases + policy rules)
+// from the VK's RoutingPolicy when present, falling back to the VK
+// config defaults otherwise. Post-bug-7 step (iv) the legacy VK config
+// keys are stripped so the fallback is always the empty default shape;
+// the RP read becomes the source of truth as soon as the VK has a
+// routingPolicyId pointing at a populated policy.
+//
+// Empty-rules normalize: the DB columns can hold `{}` (default at
+// creation time) but the bundle wire shape is contracted at
+// `{tools:{deny:[],allow:null}, mcp:..., urls:..., models:...}`.
+// Materialise the wire-correct shape regardless of DB content so the Go
+// resolver gets a stable structure (ariana R-lane CR pin from step (i)).
+type BundlePolicyRules = GatewayConfigPayload["policy_rules"];
+
+const EMPTY_POLICY_RULE_DIM = { deny: [] as string[], allow: null as string[] | null };
+
+function emptyPolicyRules(): BundlePolicyRules {
+  return {
+    tools: { ...EMPTY_POLICY_RULE_DIM },
+    mcp: { ...EMPTY_POLICY_RULE_DIM },
+    urls: { ...EMPTY_POLICY_RULE_DIM },
+    models: { ...EMPTY_POLICY_RULE_DIM },
+  };
+}
+
+function mergePolicyDim(
+  raw: unknown,
+): { deny: string[]; allow: string[] | null } {
+  if (!raw || typeof raw !== "object") return { ...EMPTY_POLICY_RULE_DIM };
+  const r = raw as { deny?: unknown; allow?: unknown };
+  const deny = Array.isArray(r.deny) ? r.deny.filter((x): x is string => typeof x === "string") : [];
+  const allow =
+    r.allow === null || r.allow === undefined
+      ? null
+      : Array.isArray(r.allow)
+        ? r.allow.filter((x): x is string => typeof x === "string")
+        : null;
+  return { deny, allow };
+}
+
+function normalisePolicyRules(raw: unknown): BundlePolicyRules {
+  if (!raw || typeof raw !== "object") return emptyPolicyRules();
+  const r = raw as Record<string, unknown>;
+  return {
+    tools: mergePolicyDim(r.tools),
+    mcp: mergePolicyDim(r.mcp),
+    urls: mergePolicyDim(r.urls),
+    models: mergePolicyDim(r.models),
+  };
+}
+
+function resolvePolicySideOfBundle(
+  vk: VirtualKeyWithScopes,
+  config: ReturnType<typeof parseVirtualKeyConfig>,
+): {
+  modelAliases: Record<string, string>;
+  policyRules: BundlePolicyRules;
+} {
+  const rp = vk.routingPolicy;
+  if (rp) {
+    const aliasesRaw = rp.modelAliases;
+    const aliases: Record<string, string> =
+      aliasesRaw && typeof aliasesRaw === "object" && !Array.isArray(aliasesRaw)
+        ? Object.fromEntries(
+            Object.entries(aliasesRaw as Record<string, unknown>).filter(
+              ([, v]) => typeof v === "string",
+            ) as Array<[string, string]>,
+          )
+        : {};
+    return {
+      modelAliases: aliases,
+      policyRules: normalisePolicyRules(rp.policyRules),
+    };
+  }
+  return {
+    modelAliases: config.modelAliases,
+    policyRules: normalisePolicyRules(config.policyRules),
+  };
 }
 
 // Map ModelProvider.customKeys (env-var-style UPPER_SNAKE_CASE inherited
