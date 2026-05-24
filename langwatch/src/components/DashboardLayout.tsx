@@ -422,13 +422,13 @@ export const DashboardLayout = ({
   const isOnOwnPersonalProject =
     !!team?.isPersonal && team.ownerUserId === session?.user?.id;
   // Admin viewing-as detection: org-admin is on a project that belongs
-  // to another user's Personal Workspace OR a team they're not a TeamUser
-  // of. Drives the persistent <AdminViewingAsBanner> chrome — context-
-  // clarity affordance preventing the admin from confusing whose
-  // workspace they're seeing during serial drill-throughs from the
-  // bird's-eye list. Server-side-gated DOM (rendered at this layout
-  // layer, NOT a client-side flag) so direct-paste of the URL still
-  // surfaces the banner on first paint.
+  // to ANOTHER user's Personal Workspace. Drives the persistent
+  // <AdminViewingAsBanner> chrome — the only legitimate "you're using
+  // admin bypass to view someone else's data" case. ORG:ADMIN cascades
+  // to every team in the org as implicit membership, so a team-kind
+  // banner would shout "viewing as admin" on the admin's own dashboards
+  // (rchaves bug 19: solo and small-org admins kept seeing it on teams
+  // they de-facto own). Team drill-throughs are silent.
   //
   // Gated to URL-anchored project routes ONLY — admin-self surfaces
   // (/governance, /settings/*, /me/*, /ops/*) MUST NOT fire the banner
@@ -438,17 +438,13 @@ export const DashboardLayout = ({
   // `[project]` slug pattern: only `/[project]/*` routes are real
   // project-scoped views where the impersonation chrome makes sense.
   const isProjectAnchoredRoute = router.pathname.startsWith("/[project]");
-  const adminViewingAs: { label: string; kind: "personal" | "team" } | null =
+  const adminViewingAs: { label: string } | null =
     isProjectAnchoredRoute &&
     organizationRole === OrganizationUserRole.ADMIN &&
-    team
-      ? team.isPersonal
-        ? team.ownerUserId !== session?.user?.id
-          ? { label: team.name, kind: "personal" as const }
-          : null
-        : !team.members?.some((m) => m.userId === session?.user?.id)
-          ? { label: team.name, kind: "team" as const }
-          : null
+    team &&
+    team.isPersonal &&
+    team.ownerUserId !== session?.user?.id
+      ? { label: team.name }
       : null;
   const isPersonalScopeRoute =
     personalScope ||
@@ -473,17 +469,12 @@ export const DashboardLayout = ({
       recordWorkspaceViewMutation.mutate({
         organizationId: organization.id,
         targetTeamId,
-        kind: adminViewingAs.kind,
+        kind: "personal",
         workspaceLabel: adminViewingAs.label,
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    targetTeamId,
-    organization?.id,
-    adminViewingAs?.kind,
-    adminViewingAs?.label,
-  ]);
+  }, [targetTeamId, organization?.id, adminViewingAs?.label]);
 
   if (
     !publicPage &&

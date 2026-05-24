@@ -69,8 +69,11 @@ Feature: Admin trace access — bird's-eye drill-in with persistent 'viewing as'
     When carol clicks the engineering row
     Then carol is routed to a scoped Traces view of the team's pooled
         traces (e.g. `/governance/workspaces/team/<engineeringTeamId>/traces`)
-    And the destination renders the team-impersonating banner variant
-        (similar shape to the user variant, naming the team)
+    And NO admin-viewing-as banner renders for the team drill-through
+        (ORG:ADMIN cascades to every team in the org as implicit
+        membership; team-kind banner was suppressed in bug 19 because
+        solo and small-org admins were seeing it on every team they
+        de-facto own — the audit-log row still writes server-side)
 
   @bdd @ui @admin-trace-access @bird-eye
   Scenario: Bird's-eye Org-wide row is NOT click-through (synthetic bucket)
@@ -79,6 +82,23 @@ Feature: Admin trace access — bird's-eye drill-in with persistent 'viewing as'
     Then the Org-wide row does NOT render as a clickable link
     And the row visually differentiates per the existing 'synthetic'
         subtitle treatment from G3 (already in production after a8f2342c8)
+
+  # ---------------------------------------------------------------------------
+  # Banner trigger contract: personal-workspace only
+  # ---------------------------------------------------------------------------
+
+  @bdd @ui @admin-trace-access @banner @regression @unimplemented
+  Scenario: AdminViewingAsBanner fires ONLY for cross-user personal-workspace access
+    Given carol holds OrganizationUserRole.ADMIN at the org level
+    When carol navigates to a project under another user's Personal
+        Workspace (Team.isPersonal = true AND Team.ownerUserId !=
+        carol.userId)
+    Then the AdminViewingAsBanner renders at the top of the page
+    But when carol navigates to a project owned by an org team carol
+        is NOT a direct TeamUser of
+    Then NO banner renders, because ORG:ADMIN cascades to every team
+        in the org as implicit membership and the banner would be
+        constantly-on noise rather than a meaningful affordance
 
   # ---------------------------------------------------------------------------
   # Persistent server-side-gated banner

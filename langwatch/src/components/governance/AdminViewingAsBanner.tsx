@@ -4,20 +4,17 @@ import { Eye, LogOut } from "lucide-react";
 import { Link } from "~/components/ui/link";
 
 /**
- * Persistent "Viewing as admin" banner rendered server-side in
- * DashboardLayout when the current admin is looking at another user's
- * personal workspace OR a team they're not an explicit TeamUser of.
+ * Persistent "Viewing as admin" banner rendered in DashboardLayout when
+ * the current admin is looking at another user's personal workspace.
  *
- * Copy splits by workspaceKind:
- *   - personal: another user's private workspace. Mirrors GitHub Sudo /
- *     Stripe "Acting as merchant", "This is not your data" is correct,
- *     the admin is viewing content owned by a different principal.
- *   - team: an org-owned team the admin is not an explicit member of.
- *     The admin is still entitled to this data as org admin, so the
- *     impersonation framing is wrong. Copy softens to a neutral
- *     "Viewing as org admin" with the audit-log pointer, so a solo or
- *     small-org admin drilling into teams they de-facto own does not
- *     see scary boundary-violation language.
+ * Personal workspaces are the only surface where the impersonation
+ * framing is real: a different principal owns the data, the admin is
+ * stepping into someone else's account. Team workspaces do NOT trigger
+ * this banner — ORG:ADMIN cascades to every team in the org as
+ * implicit membership, so flagging team drill-throughs as
+ * "impersonation" is noise (rchaves bug 19: solo and small-org admins
+ * who de-facto own every team kept seeing the banner on their own
+ * dashboard).
  *
  * Layout-component-driven (NOT a client-side flag) for reload-safety:
  * direct-pasting /[someUserPersonalProjectSlug]/traces as admin still
@@ -30,15 +27,10 @@ import { Link } from "~/components/ui/link";
  */
 export function AdminViewingAsBanner({
   workspaceLabel,
-  workspaceKind,
 }: {
   workspaceLabel: string;
-  workspaceKind: "personal" | "team";
 }) {
-  const message =
-    workspaceKind === "personal"
-      ? `Viewing ${workspaceLabel}'s personal workspace as org admin. This is not your data.`
-      : `Viewing ${workspaceLabel} as org admin.`;
+  const message = `Viewing ${workspaceLabel}'s personal workspace as org admin. This is not your data.`;
   return (
     <Alert.Root status="info" variant="surface">
       <Alert.Indicator>
@@ -48,7 +40,7 @@ export function AdminViewingAsBanner({
         <HStack gap={2} flexWrap="wrap" alignItems="center" width="full">
           <Text fontSize="sm" fontWeight="medium">
             {message}
-          </Text>
+          </Text>{" "}
           <Text fontSize="xs" color="fg.muted">
             Each access is logged at{" "}
             <Link href="/settings/audit-log" color="blue.600">
