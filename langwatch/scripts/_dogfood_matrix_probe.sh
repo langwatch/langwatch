@@ -58,13 +58,13 @@ probe() {
 JSON
 )
   local start_ms end_ms code
-  start_ms=$(date +%s%3N 2>/dev/null || python3 -c 'import time; print(int(time.time()*1000))')
+  start_ms=$(python3 -c 'import time; print(int(time.time()*1000))')
   code=$(curl -sS -o /tmp/_dogfood_matrix.out -w "%{http_code}" --max-time 20 \
     -X POST "${GATEWAY}/v1/chat/completions" \
     -H "Authorization: Bearer ${vk}" \
     -H "Content-Type: application/json" \
     -d "$body" 2>/dev/null || echo "000")
-  end_ms=$(date +%s%3N 2>/dev/null || python3 -c 'import time; print(int(time.time()*1000))')
+  end_ms=$(python3 -c 'import time; print(int(time.time()*1000))')
   local dur=$((end_ms - start_ms))
   if [ "$code" = "200" ]; then
     echo "✓ 200/${dur}ms"
@@ -82,7 +82,7 @@ main() {
   printf "| Provider \\\\ Scope |"
   for s in "${SCOPES[@]}"; do printf " %-10s |" "$s"; done
   printf "\n|---|"
-  for _ in "${SCOPES[@]}"; do printf "---|"; done
+  for _ in "${SCOPES[@]}"; do printf "%s" "---|"; done
   printf "\n"
 
   for p in "${PROVIDERS[@]}"; do
