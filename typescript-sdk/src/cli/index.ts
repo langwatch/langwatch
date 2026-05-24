@@ -236,8 +236,12 @@ program
 // Each `langwatch <tool>` exec's the underlying binary with the
 // right ANTHROPIC_*/OPENAI_*/GEMINI_* env vars injected pointing
 // at the gateway, after a Screen-8 budget pre-check.
+//
+// Marked `hidden:true` so they don't pollute the top-level command list
+// in `langwatch --help`; rendered together under a "Coding assistants:"
+// section via addHelpText below. `langwatch <tool> --help` still works.
 program
-  .command("claude")
+  .command("claude", { hidden: true })
   .description("Run `claude` (Claude Code) routed through the LangWatch gateway.")
   .allowUnknownOption(true)
   .helpOption(false)
@@ -252,7 +256,7 @@ program
   });
 
 program
-  .command("codex")
+  .command("codex", { hidden: true })
   .description("Run `codex` (OpenAI Codex CLI) routed through the LangWatch gateway.")
   .allowUnknownOption(true)
   .helpOption(false)
@@ -267,7 +271,7 @@ program
   });
 
 program
-  .command("cursor")
+  .command("cursor", { hidden: true })
   .description("Run `cursor` routed through the LangWatch gateway.")
   .allowUnknownOption(true)
   .helpOption(false)
@@ -282,7 +286,7 @@ program
   });
 
 program
-  .command("gemini")
+  .command("gemini", { hidden: true })
   .description("Run `gemini` (Gemini CLI) routed through the LangWatch gateway.")
   .allowUnknownOption(true)
   .helpOption(false)
@@ -297,7 +301,7 @@ program
   });
 
 program
-  .command("opencode")
+  .command("opencode", { hidden: true })
   .description("Run `opencode` routed through the LangWatch gateway (multi-provider; injects both Anthropic and OpenAI env vars).")
   .allowUnknownOption(true)
   .helpOption(false)
@@ -310,6 +314,22 @@ program
       process.exit(1);
     }
   });
+
+// 'after' (not 'afterAll') so the section only renders on `langwatch --help`,
+// not on every `langwatch <subcommand> --help` invocation.
+program.addHelpText(
+  "after",
+  [
+    "",
+    "Coding assistants:",
+    "  claude          Run `claude` (Claude Code) routed through the gateway",
+    "  codex           Run `codex` (OpenAI Codex CLI) routed through the gateway",
+    "  cursor          Run `cursor` routed through the gateway",
+    "  gemini          Run `gemini` (Gemini CLI) routed through the gateway",
+    "  opencode        Run `opencode` (multi-provider) routed through the gateway",
+    "",
+  ].join("\n"),
+);
 
 program
   .command("logout-device")
