@@ -1857,6 +1857,18 @@ model RoutingPolicy {
   // null/empty = "all models the eligible providers can serve".
   modelAllowlist Json?
 
+  // Model name rewrites applied before dispatch. Shape:
+  //   { "gpt-4o": "gpt-4o-mini", "claude": "anthropic/claude-haiku-4-5" }
+  // Hoisted from per-VK config (iter 110) onto the RoutingPolicy so a
+  // single policy edit updates every VK linked to it. Empty object = no
+  // rewrites.
+  modelAliases Json @default("{}")
+
+  // Provider-agnostic policy rules — deny/allow lists per dimension.
+  // Shape: { tools: { deny: string[]; allow: string[] | null }, mcp: {...}, urls: {...}, models: {...} }
+  // Hoisted from per-VK config (iter 110). Enforced pre-provider-dispatch.
+  policyRules Json @default("{}")
+
   // Routing strategy applied across the model-eligible subset.
   //   'priority'    — try modelProviderIds in order (default)
   //   'cost'        — pick lowest unit cost first
