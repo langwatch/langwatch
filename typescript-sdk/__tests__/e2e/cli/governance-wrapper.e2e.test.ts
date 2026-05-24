@@ -480,7 +480,10 @@ describe("governance CLI wrappers — e2e", () => {
     // appends its own canonical suffix to the base URL.
     //   "url" → expect bare gateway URL (no suffix)
     //   string literal → expect that exact value (used for VK auth tokens)
-    type ExpectedValue = "url" | string;
+    // `"url"` is a sentinel meaning "expect bare gateway URL (no suffix)";
+    // any other string is a literal expected value. The `& {}` brand keeps
+    // TypeScript from collapsing the union into plain `string`.
+    type ExpectedValue = "url" | (string & {});
     describe.each([
       {
         tool: "claude",
