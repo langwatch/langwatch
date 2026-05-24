@@ -17,11 +17,18 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
+import type { PrismaClient } from "@prisma/client";
+
+import type { Session } from "~/server/auth";
+
 import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
-import { virtualKeyConfigSchema } from "~/server/gateway/virtualKey.config";
+import {
+  virtualKeyConfigSchema,
+  type GuardrailAttachment,
+} from "~/server/gateway/virtualKey.config";
 import { toVirtualKeyCamelDto } from "~/server/gateway/virtualKey.dto";
 
-import { checkOrganizationPermission } from "../rbac";
+import { checkOrganizationPermission, hasProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const scopeInputSchema = z.object({
@@ -30,6 +37,92 @@ const scopeInputSchema = z.object({
 });
 
 const idInput = z.object({ organizationId: z.string(), id: z.string() });
+
+/**
+ * Resolve the single PROJECT scope a VK is reachable from. Guardrails are
+ * project-scoped, so a VK can only attach guardrails from this one
+ * project (its trace project). Returns null when the VK has zero or more
+ * than one PROJECT scope — neither has a well-defined guardrail surface.
+ */
+async function resolveVkProjectId(
+  prisma: PrismaClient,
+  organizationId: string,
+  vkId: string | null,
+  inputScopes: { scopeType: string; scopeId: string }[] | undefined,
+): Promise<string | null> {
+  let scopes = inputScopes;
+  if (!scopes && vkId) {
+    const vk = await prisma.virtualKey.findFirst({
+      where: { id: vkId, organizationId },
+      select: { scopes: { select: { scopeType: true, scopeId: true } } },
+    });
+    scopes = vk?.scopes;
+  }
+  const projectScopes = (scopes ?? []).filter((s) => s.scopeType === "PROJECT");
+  return projectScopes.length === 1 ? projectScopes[0]!.scopeId : null;
+}
+
+/**
+ * Validate guardrail attachments before handing off to the service:
+ *   - every referenced guardrail must belong to the VK's own project
+ *     (guardrails are project-scoped; the materialiser only ships the
+ *     VK trace-project's guardrails) — else BAD_REQUEST
+ *     `guardrail_project_mismatch`.
+ *   - the actor must hold `gatewayGuardrails:attach` on that project —
+ *     else FORBIDDEN `missing_perm:gatewayGuardrails:attach`.
+ *
+ * Spec: specs/ai-gateway/governance/guardrails-project-scope.feature
+ *       — @cross-project + @rbac scenarios.
+ */
+async function assertGuardrailAttachmentsAllowed(
+  ctx: { prisma: PrismaClient; session: Session | null },
+  vkProjectId: string | null,
+  attachments: GuardrailAttachment[] | undefined,
+): Promise<void> {
+  const referencedIds = Array.from(
+    new Set((attachments ?? []).flatMap((a) => a.guardrailIds)),
+  );
+  if (referencedIds.length === 0) return;
+
+  if (!vkProjectId) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message:
+        "guardrail_project_mismatch: virtual key is not scoped to a single project",
+    });
+  }
+
+  // Scope the lookup to the VK's own project. Any referenced guardrail
+  // that belongs to a different project (or doesn't exist) is simply
+  // absent from the result, so the membership check below rejects it.
+  // Scoping by projectId also satisfies the multitenancy middleware.
+  const rows = await ctx.prisma.gatewayGuardrail.findMany({
+    where: { id: { in: referencedIds }, projectId: vkProjectId },
+    select: { id: true },
+  });
+  const foundIds = new Set(rows.map((r) => r.id));
+
+  for (const id of referencedIds) {
+    if (!foundIds.has(id)) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: `guardrail_project_mismatch: guardrail ${id} is not in the virtual key's project`,
+      });
+    }
+  }
+
+  const allowed = await hasProjectPermission(
+    ctx,
+    vkProjectId,
+    "gatewayGuardrails:attach",
+  );
+  if (!allowed) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "missing_perm:gatewayGuardrails:attach",
+    });
+  }
+}
 
 export const virtualKeysRouter = createTRPCRouter({
   list: protectedProcedure
@@ -67,6 +160,17 @@ export const virtualKeysRouter = createTRPCRouter({
     )
     .use(checkOrganizationPermission("virtualKeys:manage"))
     .mutation(async ({ ctx, input }) => {
+      const vkProjectId = await resolveVkProjectId(
+        ctx.prisma,
+        input.organizationId,
+        null,
+        input.scopes,
+      );
+      await assertGuardrailAttachmentsAllowed(
+        ctx,
+        vkProjectId,
+        input.config?.guardrailAttachments,
+      );
       const service = VirtualKeyService.create(ctx.prisma);
       const { virtualKey, secret } = await service.create({
         organizationId: input.organizationId,
@@ -95,6 +199,17 @@ export const virtualKeysRouter = createTRPCRouter({
     )
     .use(checkOrganizationPermission("virtualKeys:manage"))
     .mutation(async ({ ctx, input }) => {
+      const vkProjectId = await resolveVkProjectId(
+        ctx.prisma,
+        input.organizationId,
+        input.id,
+        input.scopes,
+      );
+      await assertGuardrailAttachmentsAllowed(
+        ctx,
+        vkProjectId,
+        input.config?.guardrailAttachments,
+      );
       const service = VirtualKeyService.create(ctx.prisma);
       const updated = await service.update({
         id: input.id,

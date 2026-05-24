@@ -33,6 +33,7 @@ import {
   EligibleModelProvidersSummary,
 } from "~/components/gateway/EligibleModelProvidersPreview";
 import { FieldInfoTooltip } from "~/components/gateway/FieldInfoTooltip";
+import { GuardrailAttachmentsSection } from "~/components/gateway/GuardrailAttachmentsSection";
 import { VirtualKeyEditDrawer } from "~/components/gateway/VirtualKeyEditDrawer";
 import { VirtualKeySecretReveal } from "~/components/gateway/VirtualKeySecretReveal";
 import { VirtualKeyUsageSnippet } from "~/components/gateway/VirtualKeyUsageSnippet";
@@ -129,8 +130,34 @@ function VirtualKeyDetailPage() {
 
   const canUpdate = hasPermission("virtualKeys:update");
   const canRotate = hasPermission("virtualKeys:rotate");
+  const canAttachGuardrails = hasPermission("gatewayGuardrails:attach");
 
   const vk = detailQuery.data;
+
+  // Guardrails are project-scoped: only a VK reachable from exactly one
+  // PROJECT scope has a single guardrail surface to edit.
+  const guardrailProject = useMemo(() => {
+    const projectScopes = (vk?.scopes ?? []).filter(
+      (s) => s.scopeType === "PROJECT",
+    );
+    if (projectScopes.length !== 1) return null;
+    const id = projectScopes[0]!.scopeId;
+    for (const t of organization?.teams ?? []) {
+      const p = t.projects.find((proj) => proj.id === id);
+      if (p) return { id: p.id, slug: p.slug };
+    }
+    return { id, slug: null as string | null };
+  }, [vk?.scopes, organization?.teams]);
+
+  const guardrailAttachments = useMemo(
+    () =>
+      ((vk?.config as { guardrailAttachments?: unknown } | null)
+        ?.guardrailAttachments ?? []) as Array<{
+        direction: "pre" | "post" | "stream_chunk";
+        guardrailIds: string[];
+      }>,
+    [vk?.config],
+  );
 
   const confirmRotate = async () => {
     if (!vk || !orgId) return;
@@ -360,6 +387,16 @@ function VirtualKeyDetailPage() {
                   </Box>
                 </VStack>
               </Section>
+
+              <GuardrailAttachmentsSection
+                organizationId={orgId}
+                vkId={vk.id}
+                projectId={guardrailProject?.id ?? null}
+                projectSlug={guardrailProject?.slug ?? null}
+                attachments={guardrailAttachments}
+                canAttach={canAttachGuardrails}
+                onSaved={() => void detailQuery.refetch()}
+              />
 
               <ConfigurationSection config={vk.config as VkConfig | null} />
 

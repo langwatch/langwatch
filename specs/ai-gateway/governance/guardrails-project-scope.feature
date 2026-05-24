@@ -66,7 +66,7 @@ Feature: AI Gateway — GatewayGuardrail is a project-scoped first-class resourc
   # VK opt-in / opt-out: attachments live on VK
   # ============================================================================
 
-  @bdd @guardrails @vk-attach @unimplemented
+  @bdd @guardrails @vk-attach
   Scenario: VK attaches existing GatewayGuardrail rows by reference
     Given two GatewayGuardrail rows in PROJECT "demo": "gr-pii" (direction=pre) and "gr-toxicity" (direction=post)
     And a VirtualKey "vk-strict" scoped to PROJECT "demo"
@@ -77,7 +77,7 @@ Feature: AI Gateway — GatewayGuardrail is a project-scoped first-class resourc
     Then `vk-strict.config.guardrailAttachments` equals `[{direction:"pre", guardrailIds:["gr-pii"]}, {direction:"post", guardrailIds:["gr-toxicity"]}]`
     And the bundle ships `guardrail_attachments` of the same shape
 
-  @bdd @guardrails @vk-attach @cross-project @unimplemented
+  @bdd @guardrails @vk-attach @cross-project
   Scenario: VK cannot attach a guardrail from a different project
     Given GatewayGuardrail "gr-other" exists in PROJECT "ml-prod" (NOT "demo")
     And a VirtualKey "vk-demo" scoped to PROJECT "demo"

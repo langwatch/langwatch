@@ -22,6 +22,8 @@ import {
   defaultVirtualKeyConfig,
   parseVirtualKeyConfig,
   virtualKeyConfigSchema,
+  type GuardrailAttachment,
+  type GuardrailDirection,
   type VirtualKeyConfig,
 } from "./virtualKey.config";
 import {
@@ -212,12 +214,18 @@ export class VirtualKeyService {
     }
 
     const before = serialiseForAudit(existing);
+    const previousConfig = parseVirtualKeyConfig(existing.config);
     const config = input.config
       ? virtualKeyConfigSchema.parse({
-          ...parseVirtualKeyConfig(existing.config),
+          ...previousConfig,
           ...input.config,
         })
-      : parseVirtualKeyConfig(existing.config);
+      : previousConfig;
+
+    const guardrailDelta = diffGuardrailAttachments(
+      previousConfig.guardrailAttachments,
+      config.guardrailAttachments,
+    );
 
     if (input.routingPolicyId) {
       await this.assertRoutingPolicyBelongsToOrg(
@@ -272,6 +280,38 @@ export class VirtualKeyService {
         },
         tx,
       );
+      // Guardrail attach/detach are governance events distinct from a
+      // generic config edit; the AuditLog target stays the VK (the row
+      // that opted in), not the guardrail. One row per added / removed
+      // guardrail id so SIEM exports see each wire change individually.
+      for (const a of guardrailDelta.attached) {
+        await this.auditLog.append(
+          {
+            organizationId: input.organizationId,
+            projectId: null,
+            actorUserId: input.actorUserId,
+            action: "gateway.virtual_key.guardrail_attached",
+            targetKind: "virtual_key",
+            targetId: vk.id,
+            after: { direction: a.direction, guardrailId: a.guardrailId },
+          },
+          tx,
+        );
+      }
+      for (const d of guardrailDelta.detached) {
+        await this.auditLog.append(
+          {
+            organizationId: input.organizationId,
+            projectId: null,
+            actorUserId: input.actorUserId,
+            action: "gateway.virtual_key.guardrail_detached",
+            targetKind: "virtual_key",
+            targetId: vk.id,
+            before: { direction: d.direction, guardrailId: d.guardrailId },
+          },
+          tx,
+        );
+      }
       return vk;
     });
 
@@ -408,6 +448,44 @@ export class VirtualKeyService {
   private nextVirtualKeyId(): string {
     return `vk_${randomBytes(16).toString("base64url")}`;
   }
+}
+
+type GuardrailPair = { direction: GuardrailDirection; guardrailId: string };
+
+/**
+ * Flatten `[{direction, guardrailIds[]}]` tuples into per-(direction, id)
+ * pairs and diff old vs new so the update path can emit one
+ * attach/detach audit row per wire change.
+ */
+function diffGuardrailAttachments(
+  before: GuardrailAttachment[],
+  after: GuardrailAttachment[],
+): { attached: GuardrailPair[]; detached: GuardrailPair[] } {
+  const flatten = (attachments: GuardrailAttachment[]): Set<string> => {
+    const set = new Set<string>();
+    for (const a of attachments) {
+      for (const id of a.guardrailIds) set.add(`${a.direction} ${id}`);
+    }
+    return set;
+  };
+  const toPair = (key: string): GuardrailPair => {
+    const [direction, guardrailId] = key.split(" ");
+    return {
+      direction: direction as GuardrailDirection,
+      guardrailId: guardrailId!,
+    };
+  };
+  const beforeSet = flatten(before);
+  const afterSet = flatten(after);
+  const attached: GuardrailPair[] = [];
+  const detached: GuardrailPair[] = [];
+  for (const key of afterSet) {
+    if (!beforeSet.has(key)) attached.push(toPair(key));
+  }
+  for (const key of beforeSet) {
+    if (!afterSet.has(key)) detached.push(toPair(key));
+  }
+  return { attached, detached };
 }
 
 function serialiseForAudit(vk: VirtualKey): Prisma.InputJsonValue {
