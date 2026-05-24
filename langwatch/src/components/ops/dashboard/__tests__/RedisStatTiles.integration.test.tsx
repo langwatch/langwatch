@@ -102,6 +102,18 @@ describe("RedisStatTiles", () => {
         expect(memoryStat.textContent).toContain("79%");
         expect(memoryStat.getAttribute("data-warning")).toBe("false");
       });
+
+      it("uses the raw ratio (79.95% does not round up to 80% and trigger warning)", () => {
+        renderTiles({
+          redisMemoryUsedBytes: 7_995_000_000,
+          redisMemoryMaxBytes: 10_000_000_000,
+        });
+        const memoryStat = screen.getByTestId("redis-memory-stat");
+        // Displayed percent rounds to 80.0%, but the threshold check uses the
+        // raw 79.95 so warning stays false.
+        expect(memoryStat.textContent).toContain("80%");
+        expect(memoryStat.getAttribute("data-warning")).toBe("false");
+      });
     });
   });
 

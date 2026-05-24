@@ -19,15 +19,19 @@ export function RedisStatTiles({
     | "redisEngineCpuPercent"
   >;
 }) {
-  const memoryPercent =
+  // Compute the raw ratio for threshold checks, round only for display, so
+  // 79.95% does not round up to 80.0 and falsely trigger the warning.
+  const memoryPercentRaw =
     data.redisMemoryMaxBytes > 0
-      ? Math.round(
-          (data.redisMemoryUsedBytes / data.redisMemoryMaxBytes) * 100 * 10,
-        ) / 10
+      ? (data.redisMemoryUsedBytes / data.redisMemoryMaxBytes) * 100
       : null;
+  const memoryPercent =
+    memoryPercentRaw === null
+      ? null
+      : Math.round(memoryPercentRaw * 10) / 10;
 
   const memoryWarning =
-    memoryPercent !== null && memoryPercent >= MEMORY_WARN_PERCENT;
+    memoryPercentRaw !== null && memoryPercentRaw >= MEMORY_WARN_PERCENT;
   const cpuWarning =
     data.redisEngineCpuPercent !== null &&
     data.redisEngineCpuPercent >= CPU_WARN_PERCENT;

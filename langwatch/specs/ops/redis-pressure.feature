@@ -20,16 +20,23 @@ Feature: Redis pressure visibility on the Ops dashboard
 
   @integration
   Scenario: Memory tile shows used as the primary value
-    Given Redis reports used_memory=2.98GB, maxmemory=9.70GB, peak=9.78GB
+    Given Redis reports used_memory=2.98GB, maxmemory=9.69GB, peak=9.78GB
     When the dashboard loads
     Then the Redis mem tile shows "2.98GB" as the primary value
     And it shows "31% of 9.69GB" as the sublabel
 
   @integration
   Scenario: Memory tile turns red when Redis is near eviction
-    Given Redis reports used_memory=9.00GB and maxmemory=9.70GB
+    Given Redis reports used_memory=8.84GB and maxmemory=9.69GB
     When the dashboard loads
     Then the Redis mem tile is rendered in the warning color
+
+  @unit
+  Scenario: Memory warning uses the raw ratio so 79.95% does not round up to 80%
+    Given Redis reports used_memory and maxmemory at a ratio of 79.95%
+    When the dashboard data is built
+    Then the Redis mem tile is NOT rendered in the warning color
+    And the displayed percent is 80% (rounded to one decimal)
 
   @unit
   Scenario: Memory tile handles missing maxmemory configuration
