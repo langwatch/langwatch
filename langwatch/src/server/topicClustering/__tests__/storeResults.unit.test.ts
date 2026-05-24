@@ -2,15 +2,14 @@
  * Regression test for the prod incident where storeResults silently
  * dropped trace→topic assignments on SaaS.
  *
- * Repro: SaaS prod runs without Elasticsearch (ClickHouse-only).
- * esClient() returns a throwing proxy whose .bulk() throws
- * `Elasticsearch is not configured`. storeResults' legacy ES dual-write
- * sits BEFORE the AssignTopic command queue, so the throw bubbled up
- * and the event-sourcing path never fired. Topic rows landed in
- * Postgres, but trace_summaries.TopicId in ClickHouse stayed null
- * forever, leaving "Top Topics" empty in the UI.
+ * Original repro: storeResults ran a legacy ES dual-write BEFORE the
+ * AssignTopic command queue. With ES unconfigured on SaaS, the throwing
+ * proxy bubbled up and the queue never fired — trace_summaries.TopicId
+ * stayed null forever, leaving "Top Topics" empty in the UI.
  *
- * Fix: guard the ES bulk with isElasticsearchConfigured.
+ * Fix: deleted the ES dual-write entirely. The AssignTopic queue is now
+ * the only path. This test pins that contract so a future re-add of an
+ * ES write would have to deliberately update the test.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -24,13 +23,6 @@ vi.mock("~/server/db", () => ({
   },
 }));
 
-vi.mock("~/server/elasticsearch", () => ({
-  esClient: vi.fn(),
-  isElasticsearchConfigured: vi.fn(),
-  TRACE_INDEX: { alias: "search-traces-alias" },
-  traceIndexId: vi.fn(({ traceId }: { traceId: string }) => traceId),
-}));
-
 vi.mock("~/server/embeddings", () => ({
   getProjectEmbeddingsModel: vi.fn().mockResolvedValue({
     model: "text-embedding-3-small",
@@ -39,14 +31,6 @@ vi.mock("~/server/embeddings", () => ({
 }));
 
 const assignTopicMock = vi.fn().mockResolvedValue(undefined);
-const esBulkMock = vi.fn();
-const throwingEsClient = {
-  bulk: () => {
-    throw new Error(
-      "Elasticsearch is not configured (called .bulk()). Set ELASTICSEARCH_NODE_URL or remove this code path.",
-    );
-  },
-};
 
 vi.mock("~/server/app-layer/app", () => ({
   getApp: vi.fn(() => ({
@@ -68,10 +52,6 @@ vi.mock("~/server/background/queues/topicClusteringQueue", () => ({
 
 vi.mock("fetch-h2", () => ({ fetch: vi.fn() }));
 
-import {
-  esClient,
-  isElasticsearchConfigured,
-} from "~/server/elasticsearch";
 import { storeResults } from "../topicClustering";
 
 const sampleClusteringResult = {
@@ -93,21 +73,18 @@ const sampleClusteringResult = {
 
 beforeEach(() => {
   assignTopicMock.mockClear();
-  esBulkMock.mockClear();
-  vi.mocked(esClient).mockReset();
-  vi.mocked(isElasticsearchConfigured).mockReset();
 });
 
 describe("storeResults", () => {
-  describe("when Elasticsearch is not configured (SaaS prod)", () => {
-    /** @scenario "Trace assignments survive when Elasticsearch is not configured" */
-    it("skips the ES bulk write and still emits AssignTopic commands", async () => {
-      vi.mocked(isElasticsearchConfigured).mockResolvedValue(false);
-      vi.mocked(esClient).mockResolvedValue(throwingEsClient as any);
-
+  describe("when called with a clustering result", () => {
+    /** @scenario "Trace assignments flow through the AssignTopic command queue" */
+    it("emits AssignTopic commands for every assigned trace and does not touch Elasticsearch", async () => {
+      // No mock of ~/server/elasticsearch is set up. If storeResults
+      // accidentally re-grew an ES code path, the missing module would
+      // surface as an import-time failure or a vi.fn() not configured —
+      // either way the test fails. The absence is the assertion.
       await storeResults("project_regression", sampleClusteringResult, false);
 
-      expect(esClient).not.toHaveBeenCalled();
       expect(assignTopicMock).toHaveBeenCalledTimes(2);
       expect(assignTopicMock).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -117,26 +94,14 @@ describe("storeResults", () => {
           topicName: "Greetings",
         }),
       );
-    });
-  });
-
-  describe("when Elasticsearch IS configured (self-hosted on ES)", () => {
-    /** @scenario "Trace assignments dual-write to Elasticsearch when configured" */
-    it("performs the ES bulk write AND emits AssignTopic commands", async () => {
-      vi.mocked(isElasticsearchConfigured).mockResolvedValue(true);
-      const workingEsClient = { bulk: esBulkMock.mockResolvedValue({}) };
-      vi.mocked(esClient).mockResolvedValue(workingEsClient as any);
-
-      await storeResults("project_dualwrite", sampleClusteringResult, false);
-
-      expect(esBulkMock).toHaveBeenCalledTimes(1);
-      expect(esBulkMock).toHaveBeenCalledWith(
+      expect(assignTopicMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          index: "search-traces-alias",
-          refresh: true,
+          tenantId: "project_regression",
+          traceId: "trace_2",
+          topicId: "topic_a",
+          topicName: "Greetings",
         }),
       );
-      expect(assignTopicMock).toHaveBeenCalledTimes(2);
     });
   });
 });

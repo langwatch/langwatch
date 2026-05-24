@@ -1,8 +1,4 @@
 import type { ClickHouseClient } from "@clickhouse/client";
-import type {
-  QueryDslBoolQuery,
-  QueryDslQueryContainer,
-} from "@elastic/elasticsearch/lib/api/types";
 import { CostReferenceType, CostType, type Project } from "@prisma/client";
 import { fetch as fetchHTTP2 } from "fetch-h2";
 import { nanoid } from "nanoid";
@@ -10,7 +6,6 @@ import { env } from "../../env.mjs";
 import { OPENAI_EMBEDDING_DIMENSION } from "../../utils/constants";
 import { resolveModelForFeature } from "../modelProviders/resolveModelForFeature";
 import { createLogger } from "../../utils/logger/server";
-import { getExtractedInput } from "../../utils/traceExtraction";
 import {
   getProjectModelProviders,
   prepareLitellmParams,
@@ -19,17 +14,10 @@ import { getApp } from "../app-layer/app";
 import { scheduleTopicClusteringNextPage } from "../background/queues/topicClusteringQueue";
 import { getClickHouseClientForProject } from "../clickhouse/clickhouseClient";
 import { prisma } from "../db";
-import {
-  esClient,
-  isElasticsearchConfigured,
-  TRACE_INDEX,
-  traceIndexId,
-} from "../elasticsearch";
 import { getProjectEmbeddingsModel } from "../embeddings";
 import { getPayloadSizeHistogram } from "../metrics";
 import { stagedLangevalsFetch } from "../langevals/stagedFetch";
 import { isNlpGoEnabled } from "../nlpgo/nlpgoFetch";
-import type { ElasticSearchTrace, Trace } from "../tracer/types";
 import type {
   BatchClusteringParams,
   IncrementalClusteringParams,
@@ -238,66 +226,6 @@ async function fetchCountsFromClickHouse(
   };
 }
 
-async function fetchCountsFromElasticsearch(
-  projectId: string,
-): Promise<TraceCounts> {
-  const client = await esClient({ projectId });
-
-  const [totalTracesCount, tracesWithInputCount, recentTracesCount, assignedTracesCount] =
-    await Promise.all([
-      client.count({
-        index: TRACE_INDEX.alias,
-        body: { query: { term: { project_id: projectId } } },
-      }),
-      client.count({
-        index: TRACE_INDEX.alias,
-        body: {
-          query: {
-            bool: {
-              must: [
-                { term: { project_id: projectId } },
-                { exists: { field: "input.value" } },
-              ],
-            } as QueryDslBoolQuery,
-          },
-        },
-      }),
-      client.count({
-        index: TRACE_INDEX.alias,
-        body: {
-          query: {
-            bool: {
-              must: [
-                { term: { project_id: projectId } },
-                { range: { "timestamps.started_at": { gte: "now-30d" } } },
-              ],
-            } as QueryDslBoolQuery,
-          },
-        },
-      }),
-      client.count({
-        index: TRACE_INDEX.alias,
-        body: {
-          query: {
-            bool: {
-              must: [
-                { term: { project_id: projectId } },
-                { exists: { field: "metadata.topic_id" } },
-              ],
-            } as QueryDslBoolQuery,
-          },
-        },
-      }),
-    ]);
-
-  return {
-    totalTracesCount: totalTracesCount.count,
-    tracesWithInputCount: tracesWithInputCount.count,
-    recentTracesCount: recentTracesCount.count,
-    assignedTracesCount: assignedTracesCount.count,
-  };
-}
-
 async function fetchTracesFromClickHouse(
   clickhouse: ClickHouseClient,
   projectId: string,
@@ -439,124 +367,6 @@ function extractInputFromComputed(computedInput: string | null): string {
   } catch {
     return computedInput || "<empty>";
   }
-}
-
-async function fetchTracesFromElasticsearch(
-  projectId: string,
-  isIncrementalProcessing: boolean,
-  topicIds: string[],
-  subtopicIds: string[],
-  searchAfter?: [number, string],
-): Promise<TraceSearchResult> {
-  const client = await esClient({ projectId });
-
-  let presenceCondition: QueryDslQueryContainer[] = [
-    {
-      range: {
-        "timestamps.started_at": {
-          gte: "now-12M",
-          lt: "now",
-        },
-      },
-    },
-  ];
-  if (isIncrementalProcessing) {
-    presenceCondition = [
-      {
-        range: {
-          "timestamps.started_at": {
-            gte: "now-12M",
-            lt: "now",
-          },
-        },
-      },
-      {
-        bool: {
-          should: [
-            {
-              bool: {
-                must_not: topicIds.map((topicId) => ({
-                  term: { "metadata.topic_id": topicId },
-                })) as QueryDslQueryContainer[],
-              } as QueryDslBoolQuery,
-            },
-            {
-              bool: {
-                must_not: subtopicIds.map((subtopicId) => ({
-                  term: { "metadata.subtopic_id": subtopicId },
-                })) as QueryDslQueryContainer[],
-              } as QueryDslBoolQuery,
-            },
-          ],
-          minimum_should_match: 1,
-        },
-      },
-    ];
-  }
-
-  const result = await client.search<Trace>({
-    index: TRACE_INDEX.alias,
-    body: {
-      query: {
-        bool: {
-          must: [
-            { term: { project_id: projectId } },
-            ...presenceCondition,
-          ],
-        } as QueryDslBoolQuery,
-      },
-      _source: [
-        "trace_id",
-        "input",
-        "metadata.topic_id",
-        "metadata.subtopic_id",
-        "timestamps.started_at",
-      ],
-      sort: [{ "timestamps.started_at": "desc" }, { trace_id: "asc" }],
-      ...(searchAfter ? { search_after: searchAfter } : {}),
-      size: 2000,
-    },
-  });
-
-  logger.info(
-    {
-      projectId,
-      totalHits: result.hits.total,
-      returnedHits: result.hits.hits.length,
-    },
-    "Elasticsearch search results",
-  );
-
-  const rawTraces = result.hits.hits.map((hit) => hit._source!);
-
-  const traces: TopicClusteringTrace[] = rawTraces
-    .filter((trace) => {
-      const inputText = getExtractedInput(trace);
-      return inputText !== "<empty>" && inputText.length > 0;
-    })
-    .map((trace) => ({
-      trace_id: trace.trace_id,
-      input: getExtractedInput(trace).slice(0, 8192),
-      topic_id:
-        trace.metadata?.topic_id && topicIds.includes(trace.metadata.topic_id)
-          ? trace.metadata.topic_id
-          : null,
-      subtopic_id:
-        trace.metadata?.subtopic_id &&
-        subtopicIds.includes(trace.metadata.subtopic_id)
-          ? trace.metadata.subtopic_id
-          : null,
-    }));
-
-  const lastTraceSort = result.hits.hits.toReversed()[0]?.sort as
-    | [number, string]
-    | undefined;
-
-  return {
-    traces,
-    lastSort: lastTraceSort,
-    returnedCount: result.hits.hits.length,
-  };
 }
 
 const getProjectTopicClusteringModelProvider = async (project: Project) => {
@@ -756,30 +566,6 @@ export const storeResults = async (
         automaticallyGenerated: true,
       })),
       skipDuplicates: true,
-    });
-  }
-
-  const body = tracesToAssign.flatMap(({ trace_id, topic_id, subtopic_id }) => [
-    { update: { _id: traceIndexId({ traceId: trace_id, projectId }) } },
-    {
-      doc: {
-        metadata: { topic_id, subtopic_id },
-        timestamps: { updated_at: Date.now() },
-      } as Partial<ElasticSearchTrace>,
-    },
-  ]);
-
-  if (body.length > 0 && (await isElasticsearchConfigured({ projectId }))) {
-    // Legacy dual-write to the ES trace index for self-hosted installs
-    // still on Elasticsearch. SaaS is ClickHouse-only — gated here so the
-    // throwing unconfigured-ES proxy doesn't kill storeResults before the
-    // AssignTopic command queue (which feeds trace_summaries.TopicId)
-    // gets to run.
-    const client = await esClient({ projectId });
-    await client.bulk({
-      index: TRACE_INDEX.alias,
-      refresh: true,
-      body,
     });
   }
 
