@@ -128,6 +128,7 @@ export const teamRouter = createTRPCRouter({
           projects: {
             where: {
               archivedAt: null,
+              kind: { not: "internal_governance" },
             },
           },
         },
@@ -196,7 +197,10 @@ export const teamRouter = createTRPCRouter({
             },
           },
           projects: {
-            where: { archivedAt: null },
+            where: {
+              archivedAt: null,
+              kind: { not: "internal_governance" },
+            },
           },
         },
       });

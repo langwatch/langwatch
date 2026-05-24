@@ -1,8 +1,9 @@
-import { Box, VStack } from "@chakra-ui/react";
+import { Box, Text, VStack } from "@chakra-ui/react";
 import {
   Bot,
   ClipboardList,
   Database,
+  Eye,
   Gauge,
   KeyRound,
   ListTree,
@@ -12,6 +13,7 @@ import {
 import React, { useMemo, useState } from "react";
 import { useRouter } from "~/utils/compat/next-router";
 
+import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
@@ -46,10 +48,21 @@ export const PersonalSidebar = React.memo(function PersonalSidebar({
   const isSessionsActive = router.pathname.startsWith("/me/sessions");
 
   const session = useRequiredSession();
-  const { organizations } = useOrganizationTeamProject({
-    redirectToOnboarding: false,
-    redirectToProjectOnboarding: false,
-  });
+  const { organization, organizations, hasPermission } =
+    useOrganizationTeamProject({
+      redirectToOnboarding: false,
+      redirectToProjectOnboarding: false,
+    });
+  const isGovernanceActive = router.pathname.startsWith("/governance");
+  const { enabled: governancePreviewEnabled } = useFeatureFlag(
+    "release_ui_ai_governance_enabled",
+    {
+      organizationId: organization?.id,
+      enabled: !!organization?.id,
+    },
+  );
+  const showGovernanceEntry =
+    governancePreviewEnabled && hasPermission("governance:view");
   const personalProject = useMemo(() => {
     const userId = session.data?.user?.id;
     if (!userId || !organizations) return null;
@@ -177,6 +190,28 @@ export const PersonalSidebar = React.memo(function PersonalSidebar({
               isActive={isSettingsActive}
               showLabel={showExpanded}
             />
+            {showGovernanceEntry && (
+              <>
+                <Text
+                  fontSize="11px"
+                  fontWeight="medium"
+                  textTransform="uppercase"
+                  color="gray.500"
+                  paddingX={2}
+                  paddingTop={3}
+                  paddingBottom={1}
+                >
+                  {showExpanded ? "Govern" : <>&nbsp;</>}
+                </Text>
+                <SideMenuLink
+                  icon={Eye}
+                  label="AI Governance"
+                  href="/governance"
+                  isActive={isGovernanceActive}
+                  showLabel={showExpanded}
+                />
+              </>
+            )}
           </VStack>
 
           <VStack width="full" gap={0.5} align="start">
