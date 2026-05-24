@@ -445,7 +445,6 @@ function VirtualKeysPage() {
       {orgId && (
         <VirtualKeyEditDrawer
           organizationId={orgId}
-          projectId={project?.id}
           vk={editing}
           onOpenChange={(open) => {
             if (!open) setEditing(null);
