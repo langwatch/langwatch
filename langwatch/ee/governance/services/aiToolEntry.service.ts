@@ -894,7 +894,12 @@ export class AiToolEntryService {
     organizationId: string;
   }): Promise<Array<{ id: string; name: string }>> {
     const policies = await this.prisma.routingPolicy.findMany({
-      where: { organizationId, scope: "ORGANIZATION" },
+      where: {
+        organizationId,
+        scopes: {
+          some: { scopeType: "ORGANIZATION", scopeId: organizationId },
+        },
+      },
       select: { id: true, name: true },
       orderBy: [{ isDefault: "desc" }, { name: "asc" }],
     });

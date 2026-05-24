@@ -851,8 +851,9 @@ describe("aiToolsRouter integration", () => {
       const policy = await prisma.routingPolicy.create({
         data: {
           organizationId,
-          scope: "ORGANIZATION",
-          scopeId: organizationId,
+          scopes: {
+            create: [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
+          },
           name: `Drawer Default ${nanoid(4)}`,
           modelProviderIds: [],
           strategy: "priority",

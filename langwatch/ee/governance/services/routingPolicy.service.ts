@@ -168,17 +168,17 @@ export class RoutingPolicyService {
       input.organizationId,
       input.modelProviderIds,
     );
-    const primary = input.scopes[0]!;
     return await this.prisma.$transaction(async (tx) => {
       if (input.isDefault) {
-        // Clear any existing default that overlaps with any of the new
-        // scope rows.
+        // Clear any existing default whose scope row set overlaps with
+        // any of the new scope rows.
         for (const s of input.scopes) {
           await tx.routingPolicy.updateMany({
             where: {
               organizationId: input.organizationId,
-              scope: s.scopeType,
-              scopeId: s.scopeId,
+              scopes: {
+                some: { scopeType: s.scopeType, scopeId: s.scopeId },
+              },
               isDefault: true,
             },
             data: { isDefault: false },
@@ -188,11 +188,6 @@ export class RoutingPolicyService {
       return await tx.routingPolicy.create({
         data: {
           organizationId: input.organizationId,
-          // Legacy single-scope columns mirror the primary scope until
-          // they drop in step (vc); the join table below is the new
-          // source of truth.
-          scope: primary.scopeType,
-          scopeId: primary.scopeId,
           name: input.name,
           description: input.description ?? null,
           modelProviderIds: input.modelProviderIds as Prisma.InputJsonValue,
@@ -275,8 +270,9 @@ export class RoutingPolicyService {
         await tx.routingPolicy.updateMany({
           where: {
             organizationId,
-            scope: s.scopeType,
-            scopeId: s.scopeId,
+            scopes: {
+              some: { scopeType: s.scopeType, scopeId: s.scopeId },
+            },
             isDefault: true,
             NOT: { id },
           },

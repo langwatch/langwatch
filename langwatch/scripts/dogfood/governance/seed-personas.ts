@@ -207,8 +207,9 @@ export async function runSeedPersonas(
       const policy = await prisma.routingPolicy.create({
         data: {
           organizationId: org.id,
-          scope: "ORGANIZATION",
-          scopeId: org.id,
+          scopes: {
+            create: [{ scopeType: "ORGANIZATION", scopeId: org.id }],
+          },
           name: "developer-default",
           isDefault: true,
           strategy: "priority",

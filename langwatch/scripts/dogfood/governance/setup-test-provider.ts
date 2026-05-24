@@ -58,12 +58,13 @@ async function main(): Promise<void> {
     const policy = await prisma.routingPolicy.create({
       data: {
         organizationId: org.id,
-        scope: "ORGANIZATION",
-        scopeId: org.id,
+        scopes: {
+          create: [{ scopeType: "ORGANIZATION", scopeId: org.id }],
+        },
         name: "developer-default",
         isDefault: true,
         strategy: "priority",
-        providerCredentialIds: [providerId],
+        modelProviderIds: [providerId],
         modelAllowlist: ["gpt-5-mini", "gpt-5", "gpt-4o", "gpt-4o-mini"],
       },
     });

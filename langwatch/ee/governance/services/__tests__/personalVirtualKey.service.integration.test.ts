@@ -108,8 +108,9 @@ describe("PersonalVirtualKeyService (real DB)", () => {
       data: {
         id: ROUTING_POLICY_ID,
         organizationId: ORG_ID,
-        scope: "ORGANIZATION",
-        scopeId: ORG_ID,
+        scopes: {
+          create: [{ scopeType: "ORGANIZATION", scopeId: ORG_ID }],
+        },
         name: `pvk-rp-${suffix}`,
         isDefault: true,
         modelProviderIds: [MODEL_PROVIDER_ID],

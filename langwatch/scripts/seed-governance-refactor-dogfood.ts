@@ -347,19 +347,33 @@ async function ensureRoutingPolicy(
     mps.geminiMpId,
     mps.bedrockMpId,
   ].filter((id): id is string => typeof id === "string");
-  const policy = await prisma.routingPolicy.upsert({
+  const existing = await prisma.routingPolicy.findFirst({
     where: {
-      organizationId_scope_scopeId_name: {
-        organizationId: base.organizationId,
-        scope: "ORGANIZATION",
-        scopeId: base.organizationId,
-        name: "developer-default",
+      organizationId: base.organizationId,
+      name: "developer-default",
+      scopes: {
+        some: {
+          scopeType: "ORGANIZATION",
+          scopeId: base.organizationId,
+        },
       },
     },
-    create: {
+  });
+  if (existing) {
+    await prisma.routingPolicy.update({
+      where: { id: existing.id },
+      data: { modelProviderIds: chain },
+    });
+    return existing.id;
+  }
+  const policy = await prisma.routingPolicy.create({
+    data: {
       organizationId: base.organizationId,
-      scope: "ORGANIZATION",
-      scopeId: base.organizationId,
+      scopes: {
+        create: [
+          { scopeType: "ORGANIZATION", scopeId: base.organizationId },
+        ],
+      },
       name: "developer-default",
       description: "Try OpenAI first, fall back to other configured providers",
       strategy: "priority",
@@ -376,9 +390,6 @@ async function ensureRoutingPolicy(
         "anthropic.claude-3-5-haiku-20241022-v1:0",
       ],
       isDefault: true,
-    },
-    update: {
-      modelProviderIds: chain,
     },
   });
   return policy.id;

@@ -237,14 +237,13 @@ function RoutingPoliciesPage() {
       project: [],
     };
     for (const p of policiesQuery.data ?? []) {
-      // Multi-scope policies (post bug-7 step (vb)) bucket under the
-      // FIRST scope row. The PolicyRow shows the full scope chip list
-      // so the multi-scope nature is still visible to the operator.
-      const first = (p as any).scopes?.[0];
-      const scopeKey: Scope | undefined = first
-        ? (String(first.scopeType).toLowerCase() as Scope)
-        : (p.scope as Scope);
-      if (scopeKey && out[scopeKey]) out[scopeKey].push(p);
+      // Multi-scope policies bucket under the FIRST scope row. The
+      // PolicyRow shows the full scope chip list so the multi-scope
+      // nature is still visible to the operator.
+      const first = p.scopes?.[0];
+      if (!first) continue;
+      const scopeKey = String(first.scopeType).toLowerCase() as Scope;
+      if (out[scopeKey]) out[scopeKey].push(p);
     }
     return out;
   }, [policiesQuery.data]);
@@ -275,18 +274,10 @@ function RoutingPoliciesPage() {
   const startEdit = (p: Policy) => {
     setDrawerError(null);
     setEditingId(p.id);
-    const scopes: ScopeChipPickerEntry[] = Array.isArray((p as any).scopes)
-      ? (p as any).scopes.map((s: any) => ({
-          scopeType: s.scopeType as ScopeChipPickerEntry["scopeType"],
-          scopeId: s.scopeId,
-        }))
-      : [
-          {
-            scopeType: String(p.scope).toUpperCase() as
-              ScopeChipPickerEntry["scopeType"],
-            scopeId: p.scopeId,
-          },
-        ];
+    const scopes: ScopeChipPickerEntry[] = p.scopes.map((s) => ({
+      scopeType: s.scopeType as ScopeChipPickerEntry["scopeType"],
+      scopeId: s.scopeId,
+    }));
     setComposer({
       scopes,
       name: p.name,
@@ -580,20 +571,10 @@ function PolicyRow({
   const providerCount = Array.isArray(policy.modelProviderIds)
     ? (policy.modelProviderIds as string[]).length
     : 0;
-  const scopeEntries: ScopeChipPickerEntry[] = Array.isArray(
-    (policy as any).scopes,
-  )
-    ? (policy as any).scopes.map((s: any) => ({
-        scopeType: s.scopeType as ScopeChipPickerEntry["scopeType"],
-        scopeId: s.scopeId,
-      }))
-    : [
-        {
-          scopeType: String(policy.scope).toUpperCase() as
-            ScopeChipPickerEntry["scopeType"],
-          scopeId: policy.scopeId,
-        },
-      ];
+  const scopeEntries: ScopeChipPickerEntry[] = policy.scopes.map((s) => ({
+    scopeType: s.scopeType as ScopeChipPickerEntry["scopeType"],
+    scopeId: s.scopeId,
+  }));
 
   return (
     <HStack
