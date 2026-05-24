@@ -13,6 +13,7 @@ import {
   KeyRound,
   LineChart,
   Route,
+  Shield,
   Zap,
 } from "lucide-react";
 import { type PropsWithChildren } from "react";
@@ -92,6 +93,13 @@ export default function AiGatewayLayout({
                   icon={<Zap size={14} />}
                 >
                   Cache Rules
+                </MenuLink>
+                <MenuLink
+                  href={`/settings/gateway/guardrails`}
+                  includePath={`/settings/gateway/guardrails`}
+                  icon={<Shield size={14} />}
+                >
+                  Guardrails
                 </MenuLink>
                 <MenuLink
                   href={`/settings/gateway/usage`}

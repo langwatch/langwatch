@@ -323,6 +323,10 @@ const routes: RouteObject[] = [
     ...page(() => import("./pages/settings/gateway/cache-rules")),
   },
   {
+    path: "/settings/gateway/guardrails",
+    ...page(() => import("./pages/settings/gateway/guardrails")),
+  },
+  {
     path: "/:project/datasets",
     ...page(() => import("./pages/[project]/datasets")),
   },
