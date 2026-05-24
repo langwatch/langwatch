@@ -61,21 +61,26 @@ const EXEMPT_MODELS = [
    */
   "ApiKey",
   /**
-   * AI Gateway models. Budgets are organization-level (scopeType +
-   * scopeId identifies which target); ledger rows descend from VirtualKey
-   * via virtualKeyId rather than a direct projectId column; change-events
-   * and audit logs both allow null projectId for org-level mutations;
-   * VirtualKeyProviderCredential is a join table whose composite PK is
-   * (virtualKeyId, providerCredentialId) — projectId is reachable via
-   * the parent VK but not a direct column. VirtualKey and
-   * GatewayProviderCredential are project-scoped and stay under the
-   * middleware's normal guard.
+   * AI Gateway models. Post-iter-110 (collapse-VK-binding refactor):
+   * - GatewayBudget: org-level (scopeType + scopeId identifies which
+   *   target); no projectId column by design.
+   * - GatewayBudgetLedger: descends from VirtualKey via virtualKeyId
+   *   rather than a direct projectId column.
+   * - GatewayChangeEvent / GatewayAuditLog: allow null projectId for
+   *   org-level mutations; org tenancy is checked at the service
+   *   layer before any write.
+   * - VirtualKeyProviderCredential + GatewayProviderCredential: tables
+   *   dropped in iter 110 (folded into ModelProvider).
+   * - VirtualKey itself moved to SCOPED_MODELS below — post-iter-110
+   *   it's org-scoped (organizationId mandatory) and access narrows
+   *   via VirtualKeyScope rows, so the legacy projectId guard no
+   *   longer applies. SCOPED_MODELS enforces a row-id / scope /
+   *   organizationId predicate on every read + write.
    */
   "GatewayBudget",
   "GatewayBudgetLedger",
   "GatewayChangeEvent",
   "GatewayAuditLog",
-  "VirtualKeyProviderCredential",
   /**
    * GatewayCacheRule is organization-level (authored once, applies
    * across every VK owned by the org based on matcher shape). Same
@@ -278,28 +283,22 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
   ModelProvider: {
     validateWhere: (where) => {
       if (!where) {
-        return "requires a 'projectId', row id, or scope predicate in the where clause";
+        return "requires a row id or scope predicate in the where clause";
       }
       const ok = validateRecursive(
         where,
-        (c) =>
-          typeof c.projectId === "string" ||
-          (c.projectId && Array.isArray(c.projectId.in)) ||
-          hasIdOrInPredicate(c) ||
-          hasScopePredicate(c),
+        (c) => hasIdOrInPredicate(c) || hasScopePredicate(c),
       );
       return ok
         ? null
-        : "requires a 'projectId', row id, or scope predicate in the where clause";
+        : "requires a row id or scope predicate in the where clause";
     },
     validateCreateData: (data) => {
       const records = Array.isArray(data) ? data : [data];
       for (const d of records) {
         if (!d) return "create requires a data payload";
-        const hasProjectId = typeof d.projectId === "string";
-        const hasScopes = !!d.scopes;
-        if (!hasProjectId && !hasScopes) {
-          return "create requires either a 'projectId' or a 'scopes' relation in the data payload";
+        if (!d.scopes) {
+          return "create requires a 'scopes' relation in the data payload";
         }
       }
       return null;
@@ -332,6 +331,67 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
           typeof d.scopeId !== "string"
         ) {
           return "create requires modelProviderId + scopeType + scopeId in the data payload";
+        }
+      }
+      return null;
+    },
+  },
+  VirtualKey: {
+    validateWhere: (where) => {
+      if (!where) {
+        return "requires an 'organizationId', row id, hashedSecret, or scope predicate";
+      }
+      const ok = validateRecursive(
+        where,
+        (c) =>
+          typeof c.organizationId === "string" ||
+          (c.organizationId && Array.isArray(c.organizationId.in)) ||
+          hasIdOrInPredicate(c) ||
+          typeof c.hashedSecret === "string" ||
+          hasScopePredicate(c),
+      );
+      return ok
+        ? null
+        : "requires an 'organizationId', row id, hashedSecret, or scope predicate";
+    },
+    validateCreateData: (data) => {
+      const records = Array.isArray(data) ? data : [data];
+      for (const d of records) {
+        if (!d) return "create requires a data payload";
+        if (typeof d.organizationId !== "string") {
+          return "create requires an 'organizationId' in the data payload";
+        }
+      }
+      return null;
+    },
+  },
+  VirtualKeyScope: {
+    validateWhere: (where) => {
+      if (!where) {
+        return "requires a row id, virtualKeyId, or scope predicate";
+      }
+      const ok = validateRecursive(
+        where,
+        (c) =>
+          hasIdOrInPredicate(c) ||
+          typeof c.virtualKeyId === "string" ||
+          (c.virtualKeyId && Array.isArray(c.virtualKeyId.in)) ||
+          hasScopePredicate(c),
+      );
+      return ok
+        ? null
+        : "requires a row id, virtualKeyId, or scope predicate";
+    },
+    validateCreateData: (data) => {
+      const records = Array.isArray(data) ? data : [data];
+      for (const d of records) {
+        if (!d) return "create requires a data payload";
+        if (
+          typeof d.virtualKeyId !== "string" ||
+          typeof d.scopeType !== "string" ||
+          typeof d.scopeId !== "string"
+        ) {
+          return "create requires virtualKeyId + scopeType + scopeId in the data payload";
         }
       }
       return null;
