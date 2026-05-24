@@ -491,8 +491,6 @@ class OpsMetricsCollector {
       peakCompletedPerSec: this.peakCompletedPerSec,
       peakFailedPerSec: this.peakFailedPerSec,
       peakIngestedPerSec: this.peakIngestedPerSec,
-      redisMemoryUsed: redisInfo.usedMemoryHuman,
-      redisMemoryPeak: redisInfo.peakMemoryHuman,
       redisMemoryUsedBytes: redisInfo.usedMemoryBytes,
       redisMemoryPeakBytes: redisInfo.peakMemoryBytes,
       redisMemoryMaxBytes: redisInfo.maxMemoryBytes,

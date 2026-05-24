@@ -122,8 +122,6 @@ export interface DashboardData {
   peakCompletedPerSec: number;
   peakFailedPerSec: number;
   peakIngestedPerSec: number;
-  redisMemoryUsed: string;
-  redisMemoryPeak: string;
   redisMemoryUsedBytes: number;
   redisMemoryPeakBytes: number;
   redisMemoryMaxBytes: number;

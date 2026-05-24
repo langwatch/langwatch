@@ -8,12 +8,16 @@ export function LinkedStat({
   sublabel,
   href,
   color,
+  testId,
+  warning,
 }: {
   label: string;
   value: string;
   sublabel?: string;
   href?: string;
   color?: string;
+  testId?: string;
+  warning?: boolean;
 }) {
   const content = (
     <Stat.Root
@@ -22,6 +26,10 @@ export function LinkedStat({
       borderRadius="md"
       padding={2}
       transition="background 0.1s"
+      data-testid={testId}
+      data-warning={
+        warning === undefined ? undefined : warning ? "true" : "false"
+      }
     >
       <Stat.Label>
         <HStack gap={1}>

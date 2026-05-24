@@ -19,26 +19,24 @@ Feature: Redis pressure visibility on the Ops dashboard
   # ---------------------------------------------------------------------------
 
   @integration
-  Scenario: Memory usage panel shows used / max / percent
+  Scenario: Memory tile shows used as the primary value
     Given Redis reports used_memory=2.98GB, maxmemory=9.70GB, peak=9.78GB
     When the dashboard loads
-    Then the Redis pressure panel shows "2.98G / 9.70G" as the memory primary value
-    And it shows "31%" as the memory percent
-    And it shows "peak 9.78G" as a secondary label
+    Then the Redis mem tile shows "2.98GB" as the primary value
+    And it shows "31% of 9.69GB" as the sublabel
 
   @integration
-  Scenario: Memory percent turns red when Redis is near eviction
+  Scenario: Memory tile turns red when Redis is near eviction
     Given Redis reports used_memory=9.00GB and maxmemory=9.70GB
     When the dashboard loads
-    Then the memory percent value is rendered in the warning color
-    And the memory used / max line is rendered in the warning color
+    Then the Redis mem tile is rendered in the warning color
 
   @unit
-  Scenario: Memory panel handles missing maxmemory configuration
+  Scenario: Memory tile handles missing maxmemory configuration
     Given Redis reports maxmemory=0 (unlimited)
     When the dashboard loads
     Then the memory percent is omitted instead of showing "Infinity%"
-    And the used and peak values still render
+    And the sublabel falls back to "peak <bytes>"
 
   # ---------------------------------------------------------------------------
   # Engine CPU: new metric — the one that mattered in the incident
@@ -87,7 +85,7 @@ Feature: Redis pressure visibility on the Ops dashboard
     Then the engine CPU value is rendered in the warning color
 
   # ---------------------------------------------------------------------------
-  # Layout: replace the existing memory sublabel with a real panel
+  # Layout: inline tiles alongside the throughput metrics
   # ---------------------------------------------------------------------------
 
   @integration
@@ -97,7 +95,14 @@ Feature: Redis pressure visibility on the Ops dashboard
     Then the DLQ tile no longer carries a Redis memory string as sublabel
 
   @integration
+  Scenario: Redis stats appear inline with the throughput/latency tiles
+    Given the dashboard renders
+    When I view the top stat strip
+    Then Redis mem, Redis CPU, and Redis conns tiles appear alongside Staged/s, Completed/s, etc.
+    And the tiles wrap to a second row when the viewport is too narrow
+
+  @integration
   Scenario: Connected clients count is visible
     Given Redis reports 24 connected clients
     When the dashboard loads
-    Then the Redis pressure panel shows "24 clients"
+    Then the Redis conns tile shows "24" with a "clients" sublabel

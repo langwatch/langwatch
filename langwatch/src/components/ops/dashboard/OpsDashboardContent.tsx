@@ -22,7 +22,7 @@ import type { DashboardData } from "~/server/app-layer/ops/types";
 import { api } from "~/utils/api";
 import { ActiveOperationsSection } from "./ActiveOperationsSection";
 import { LinkedStat } from "./LinkedStat";
-import { RedisPressurePanel } from "./RedisPressurePanel";
+import { RedisStatTiles } from "./RedisStatTiles";
 import { ReplayHistorySection } from "./ReplayHistorySection";
 import { ThroughputChart } from "./ThroughputChart";
 
@@ -45,7 +45,7 @@ export function OpsDashboardContent({ data }: { data: DashboardData }) {
     <VStack align="stretch" gap={5} width="full">
       <ActiveOperationsSection data={data} />
 
-      <SimpleGrid columns={{ base: 2, md: 4, lg: 7 }} gap={1}>
+      <SimpleGrid columns={{ base: 2, md: 5, lg: 10 }} gap={1}>
         <LinkedStat
           label="Staged/s"
           value={formatRate(data.throughputIngestedPerSec)}
@@ -87,9 +87,8 @@ export function OpsDashboardContent({ data }: { data: DashboardData }) {
           value={totalDlq.toString()}
           color={totalDlq > 0 ? "orange.500" : undefined}
         />
+        <RedisStatTiles data={data} />
       </SimpleGrid>
-
-      <RedisPressurePanel data={data} />
 
       <Card.Root overflow="hidden">
         <Card.Body padding={4}>
