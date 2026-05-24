@@ -1,11 +1,12 @@
 /**
  * tRPC router for personal-VK lifecycle.
  *
- * Distinct from `virtualKeysRouter` (which is project-scoped, RBAC-gated
- * via `virtualKeys:create`/`update`/etc.). Personal-VK procedures are
- * authorised by the caller being the owner of the personal workspace —
- * no project-level RBAC required because the personal project IS the
- * caller's by construction.
+ * Distinct from `virtualKeysRouter` (which gates org-wide VK admin via
+ * `virtualKeys:manage` / `:rotate` / `:delete`). Personal-VK procedures
+ * are authorised by the caller being the principal user of the key, not
+ * by RBAC — every user can mint, list, and revoke their OWN keys in any
+ * org they belong to. Membership is verified via `assertOrgMembership`
+ * so a user can't operate against an org they aren't in.
  */
 import type { PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
@@ -124,11 +125,15 @@ export const personalVirtualKeysRouter = createTRPCRouter({
         displayEmail: ctx.session.user.email,
       });
 
-      // Reject duplicate labels at the application layer (the unique idx
-      // is on (projectId, name) and would surface a P2002 anyway).
+      // Reject duplicate labels at the application layer. Post-iter-110
+      // VirtualKey is org-scoped; the (organizationId, principalUserId,
+      // name) tuple is the personal-VK uniqueness contract (multiple
+      // users in the same org can each have a "default" key, but the
+      // same user cannot have two active "default" keys in one org).
       const existing = await ctx.prisma.virtualKey.findFirst({
         where: {
-          projectId: workspace.project.id,
+          organizationId: input.organizationId,
+          principalUserId: ctx.session.user.id,
           name: input.label,
           revokedAt: null,
         },
