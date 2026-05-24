@@ -11,27 +11,48 @@
  *        (if one exists at that scope).
  *     2. else the ORG-scoped default policy.
  *     3. else null — caller should fall back to a no-policy VK that
- *        relies on embedded VirtualKeyProviderCredential rows.
+ *        relies on the scope-cascade-resolved ModelProvider set.
  *
  * `setDefault` runs in a transaction so the "exactly one default per
  * scope" invariant (enforced by partial unique idx) can never observe
  * two defaults briefly during the swap.
  */
-import { Prisma, type PrismaClient, type RoutingPolicy } from "@prisma/client";
+import {
+  Prisma,
+  type PrismaClient,
+  type RoutingPolicy,
+  RoutingPolicyScopeType,
+} from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 
 export type RoutingPolicyScope = "organization" | "team" | "project";
 
+const WIRE_TO_ENUM: Record<RoutingPolicyScope, RoutingPolicyScopeType> = {
+  organization: RoutingPolicyScopeType.ORGANIZATION,
+  team: RoutingPolicyScopeType.TEAM,
+  project: RoutingPolicyScopeType.PROJECT,
+};
+
+function toEnumScope(scope: RoutingPolicyScope): RoutingPolicyScopeType {
+  const value = WIRE_TO_ENUM[scope.toLowerCase() as RoutingPolicyScope];
+  if (!value) {
+    throw new Error(`Invalid routing policy scope: ${scope}`);
+  }
+  return value;
+}
+
 /**
- * EC#3 — a routing policy must reference at least one provider
- * credential. An empty `providerCredentialIds` produces a policy that
- * silently fails closed at materialise-time (chain length 0) without
- * a clear admin signal. The router maps this to 422 with the
+ * EC#3 — a routing policy must reference at least one ModelProvider.
+ * An empty `modelProviderIds` produces a policy that silently fails
+ * closed at materialise-time (chain length 0) without a clear admin
+ * signal. The router maps this to 422 with the
  * `routing_policy_must_have_provider` code.
  */
 export class RoutingPolicyMustHaveProviderError extends Error {
   readonly code = "routing_policy_must_have_provider" as const;
-  constructor(message = "Routing policy must include at least one provider credential") {
+  constructor(
+    message = "Routing policy must include at least one ModelProvider",
+  ) {
     super(message);
     this.name = "RoutingPolicyMustHaveProviderError";
   }
@@ -43,7 +64,7 @@ export interface CreateRoutingPolicyInput {
   scopeId: string;
   name: string;
   description?: string | null;
-  providerCredentialIds: string[];
+  modelProviderIds: string[];
   modelAllowlist?: string[] | null;
   strategy?: "priority" | "cost" | "latency" | "round_robin";
   isDefault?: boolean;
@@ -55,7 +76,7 @@ export interface UpdateRoutingPolicyInput {
   organizationId: string;
   name?: string;
   description?: string | null;
-  providerCredentialIds?: string[];
+  modelProviderIds?: string[];
   modelAllowlist?: string[] | null;
   strategy?: "priority" | "cost" | "latency" | "round_robin";
   actorUserId: string;
@@ -76,7 +97,7 @@ export class RoutingPolicyService {
     return await this.prisma.routingPolicy.findMany({
       where: {
         organizationId,
-        ...(scope ? { scope } : {}),
+        ...(scope ? { scope: toEnumScope(scope) } : {}),
         ...(scopeId ? { scopeId } : {}),
       },
       orderBy: [{ isDefault: "desc" }, { name: "asc" }],
@@ -88,23 +109,15 @@ export class RoutingPolicyService {
   }
 
   async create(input: CreateRoutingPolicyInput): Promise<RoutingPolicy> {
-    // Defensive scope normalisation. Typed CreateRoutingPolicyInput
-    // already constrains scope to the lowercase enum at compile time,
-    // but admin/dogfood scripts that call this service via untyped
-    // wrappers can land uppercase variants — and resolveDefaultForUser
-    // queries scope='organization' (lowercase) so any uppercase row
-    // becomes silently invisible. Lowercase here as belt-and-suspenders.
-    const scope = input.scope.toLowerCase() as RoutingPolicyScope;
-    if (input.providerCredentialIds.length === 0) {
+    const scope = toEnumScope(input.scope);
+    if (input.modelProviderIds.length === 0) {
       throw new RoutingPolicyMustHaveProviderError();
     }
-    await this.assertProviderCredentialsBelongToOrg(
+    await this.assertModelProvidersBelongToOrg(
       input.organizationId,
-      input.providerCredentialIds,
+      input.modelProviderIds,
     );
     return await this.prisma.$transaction(async (tx) => {
-      // If isDefault was requested, atomically clear the existing default
-      // for this scope tier first so the partial unique idx never trips.
       if (input.isDefault) {
         await tx.routingPolicy.updateMany({
           where: {
@@ -124,7 +137,7 @@ export class RoutingPolicyService {
           scopeId: input.scopeId,
           name: input.name,
           description: input.description ?? null,
-          providerCredentialIds: input.providerCredentialIds as Prisma.InputJsonValue,
+          modelProviderIds: input.modelProviderIds as Prisma.InputJsonValue,
           modelAllowlist: input.modelAllowlist
             ? (input.modelAllowlist as Prisma.InputJsonValue)
             : Prisma.JsonNull,
@@ -139,13 +152,13 @@ export class RoutingPolicyService {
 
   async update(input: UpdateRoutingPolicyInput): Promise<RoutingPolicy> {
     const existing = await this.requireOwn(input.id, input.organizationId);
-    if (input.providerCredentialIds !== undefined) {
-      if (input.providerCredentialIds.length === 0) {
+    if (input.modelProviderIds !== undefined) {
+      if (input.modelProviderIds.length === 0) {
         throw new RoutingPolicyMustHaveProviderError();
       }
-      await this.assertProviderCredentialsBelongToOrg(
+      await this.assertModelProvidersBelongToOrg(
         input.organizationId,
-        input.providerCredentialIds,
+        input.modelProviderIds,
       );
     }
 
@@ -154,9 +167,9 @@ export class RoutingPolicyService {
     };
     if (input.name !== undefined) data.name = input.name;
     if (input.description !== undefined) data.description = input.description;
-    if (input.providerCredentialIds !== undefined)
-      data.providerCredentialIds =
-        input.providerCredentialIds as Prisma.InputJsonValue;
+    if (input.modelProviderIds !== undefined)
+      data.modelProviderIds =
+        input.modelProviderIds as Prisma.InputJsonValue;
     if (input.modelAllowlist !== undefined)
       data.modelAllowlist = input.modelAllowlist
         ? (input.modelAllowlist as Prisma.InputJsonValue)
@@ -233,7 +246,7 @@ export class RoutingPolicyService {
       const teamDefault = await this.prisma.routingPolicy.findFirst({
         where: {
           organizationId,
-          scope: "team",
+          scope: RoutingPolicyScopeType.TEAM,
           scopeId: personalTeamId,
           isDefault: true,
         },
@@ -244,7 +257,7 @@ export class RoutingPolicyService {
     return await this.prisma.routingPolicy.findFirst({
       where: {
         organizationId,
-        scope: "organization",
+        scope: RoutingPolicyScopeType.ORGANIZATION,
         scopeId: organizationId,
         isDefault: true,
       },
@@ -260,8 +273,7 @@ export class RoutingPolicyService {
     });
     // Collapse "not found" + "found-but-wrong-org" into the same NOT_FOUND
     // response — leaking the distinction would tell an attacker that an
-    // id exists in a foreign org. tRPC maps this to HTTP 404 instead of
-    // the bare-Error → 500 the caller previously got.
+    // id exists in a foreign org.
     if (!policy || policy.organizationId !== organizationId) {
       throw new TRPCError({
         code: "NOT_FOUND",
@@ -272,46 +284,48 @@ export class RoutingPolicyService {
   }
 
   /**
-   * Reject any providerCredentialId that doesn't resolve to a
-   * GatewayProviderCredential whose project belongs to the supplied
-   * organization. Counterpart to VirtualKeyService.create's policy-org
-   * check: VK.create trusts that a policy's chain has already been
-   * sanitised here, so this is the auth boundary for cross-org chain
-   * smuggling. Empty input short-circuits.
+   * Reject any modelProviderId that doesn't resolve to a ModelProvider
+   * reachable from the supplied organization. Counterpart to
+   * VirtualKeyService.create's policy-org check: VK.create trusts that
+   * a policy's chain has already been sanitised here.
    *
-   * Uses a two-step query because dbMultiTenancyProtection rejects
-   * GatewayProviderCredential queries that don't carry projectId in
-   * the WHERE — we resolve the org's project set first, then filter
-   * the credentials to that set.
+   * Reachability = the MP has at least one scope row pointing at the
+   * organization, one of its teams, or one of its projects.
    */
-  private async assertProviderCredentialsBelongToOrg(
+  private async assertModelProvidersBelongToOrg(
     organizationId: string,
-    providerCredentialIds: string[],
+    modelProviderIds: string[],
   ): Promise<void> {
-    if (providerCredentialIds.length === 0) return;
-    const projects = await this.prisma.project.findMany({
-      where: { team: { organizationId } },
-      select: { id: true },
+    if (modelProviderIds.length === 0) return;
+    const teams = await this.prisma.team.findMany({
+      where: { organizationId },
+      select: { id: true, projects: { select: { id: true } } },
     });
-    const projectIds = projects.map((p) => p.id);
-    if (projectIds.length === 0) {
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message:
-          "Organization has no projects — cannot reference any provider credentials",
-      });
-    }
-    const validCount = await this.prisma.gatewayProviderCredential.count({
+    const teamIds = teams.map((t) => t.id);
+    const projectIds = teams.flatMap((t) => t.projects.map((p) => p.id));
+    const reachable = await this.prisma.modelProvider.count({
       where: {
-        id: { in: providerCredentialIds },
-        projectId: { in: projectIds },
+        id: { in: modelProviderIds },
+        scopes: {
+          some: {
+            OR: [
+              { scopeType: "ORGANIZATION", scopeId: organizationId },
+              ...(teamIds.length > 0
+                ? [{ scopeType: "TEAM" as const, scopeId: { in: teamIds } }]
+                : []),
+              ...(projectIds.length > 0
+                ? [{ scopeType: "PROJECT" as const, scopeId: { in: projectIds } }]
+                : []),
+            ],
+          },
+        },
       },
     });
-    if (validCount !== providerCredentialIds.length) {
+    if (reachable !== modelProviderIds.length) {
       throw new TRPCError({
         code: "FORBIDDEN",
         message:
-          "One or more provider credentials do not belong to this organization",
+          "One or more ModelProviders are not reachable from this organization",
       });
     }
   }

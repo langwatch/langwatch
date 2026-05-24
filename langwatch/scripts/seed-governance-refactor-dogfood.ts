@@ -108,13 +108,13 @@ async function ensureUserOrgTeamsProjects(): Promise<
   });
 
   const platformTeam = await prisma.team.upsert({
-    where: { slug_organizationId: { slug: "platform", organizationId: organization.id } },
+    where: { slug: "platform" },
     create: { slug: "platform", name: "Platform", organizationId: organization.id },
     update: { name: "Platform" },
   });
 
   const dataSciTeam = await prisma.team.upsert({
-    where: { slug_organizationId: { slug: "data-sci", organizationId: organization.id } },
+    where: { slug: "data-sci" },
     create: { slug: "data-sci", name: "Data Science", organizationId: organization.id },
     update: { name: "Data Science" },
   });
@@ -176,52 +176,83 @@ async function ensureModelProviders(
   const anthropicKey = process.env.ANTHROPIC_API_KEY ?? null;
 
   // OpenAI at ORG scope — every VK in the org can resolve it via scope cascade.
-  const openai = await prisma.modelProvider.upsert({
-    where: { organizationId_slug: { organizationId: base.organizationId, slug: "openai" } },
-    create: {
-      slug: "openai",
-      name: "OpenAI",
-      provider: "openai",
-      organizationId: base.organizationId,
-      enabled: true,
-      customKeys: openaiKey ? { apiKey: openaiKey } : Prisma.DbNull,
-      // Advanced (Gateway) fields — keeps the gateway happy for the F matrix.
-      rateLimitRpm: 600,
-      fallbackPriorityGlobal: 10,
-      scopes: {
-        create: [{ scopeType: "ORGANIZATION", scopeId: base.organizationId }],
-      },
-    },
-    update: {
-      customKeys: openaiKey ? { apiKey: openaiKey } : Prisma.DbNull,
-      enabled: true,
-    },
+  // ModelProvider has no unique slug; idempotency falls back to a
+  // (name + ORG-scope) findFirst lookup.
+  const openai = await upsertModelProviderByName({
+    organizationId: base.organizationId,
+    name: "OpenAI",
+    provider: "openai",
+    customKeys: openaiKey ? { apiKey: openaiKey } : null,
+    rateLimitRpm: 600,
+    fallbackPriorityGlobal: 10,
+    scopes: [{ scopeType: "ORGANIZATION", scopeId: base.organizationId }],
   });
 
   // Anthropic at TEAM "platform" scope — only platform-scoped (or narrower)
   // VKs see it. Proves scope inheritance limits visibility.
-  const anthropic = await prisma.modelProvider.upsert({
-    where: { organizationId_slug: { organizationId: base.organizationId, slug: "anthropic" } },
-    create: {
-      slug: "anthropic",
-      name: "Anthropic",
-      provider: "anthropic",
-      organizationId: base.organizationId,
-      enabled: true,
-      customKeys: anthropicKey ? { apiKey: anthropicKey } : Prisma.DbNull,
-      rateLimitRpm: 300,
-      fallbackPriorityGlobal: 20,
-      scopes: {
-        create: [{ scopeType: "TEAM", scopeId: base.platformTeamId }],
-      },
-    },
-    update: {
-      customKeys: anthropicKey ? { apiKey: anthropicKey } : Prisma.DbNull,
-      enabled: true,
-    },
+  const anthropic = await upsertModelProviderByName({
+    organizationId: base.organizationId,
+    name: "Anthropic",
+    provider: "anthropic",
+    customKeys: anthropicKey ? { apiKey: anthropicKey } : null,
+    rateLimitRpm: 300,
+    fallbackPriorityGlobal: 20,
+    scopes: [{ scopeType: "TEAM", scopeId: base.platformTeamId }],
   });
 
   return { openaiMpId: openai.id, anthropicMpId: anthropic.id };
+}
+
+async function upsertModelProviderByName(input: {
+  organizationId: string;
+  name: string;
+  provider: string;
+  customKeys: Record<string, unknown> | null;
+  rateLimitRpm: number;
+  fallbackPriorityGlobal: number;
+  scopes: Array<{ scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }>;
+}): Promise<{ id: string }> {
+  const existing = await prisma.modelProvider.findFirst({
+    where: {
+      name: input.name,
+      scopes: {
+        some: {
+          scopeType: "ORGANIZATION",
+          scopeId: input.organizationId,
+        },
+      },
+    },
+    select: { id: true },
+  });
+  if (existing) {
+    await prisma.modelProvider.update({
+      where: { id: existing.id },
+      data: {
+        customKeys: input.customKeys
+          ? (input.customKeys as Prisma.InputJsonValue)
+          : Prisma.DbNull,
+        enabled: true,
+      },
+    });
+    return existing;
+  }
+  const created = await prisma.modelProvider.create({
+    data: {
+      name: input.name,
+      provider: input.provider,
+      enabled: true,
+      customKeys: input.customKeys
+        ? (input.customKeys as Prisma.InputJsonValue)
+        : Prisma.DbNull,
+      rateLimitRpm: input.rateLimitRpm,
+      fallbackPriorityGlobal: input.fallbackPriorityGlobal,
+      scopes: {
+        create: input.scopes,
+      },
+    },
+    select: { id: true },
+  });
+  return created;
 }
 
 async function ensureRoutingPolicy(

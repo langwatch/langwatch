@@ -39,7 +39,10 @@ export class ModelProviderRepository {
   ): Promise<ModelProviderWithScopes | null> {
     const client = tx ?? this.prisma;
     const result = await client.modelProvider.findFirst({
-      where: { id, projectId },
+      where: {
+        id,
+        scopes: { some: { scopeType: "PROJECT", scopeId: projectId } },
+      },
       include: { scopes: true },
     });
     return result ? this.withDecryptedKeys(result) : null;
@@ -52,7 +55,10 @@ export class ModelProviderRepository {
   ): Promise<ModelProviderWithScopes | null> {
     const client = tx ?? this.prisma;
     const result = await client.modelProvider.findFirst({
-      where: { provider, projectId },
+      where: {
+        provider,
+        scopes: { some: { scopeType: "PROJECT", scopeId: projectId } },
+      },
       include: { scopes: true },
     });
     return result ? this.withDecryptedKeys(result) : null;
@@ -64,7 +70,9 @@ export class ModelProviderRepository {
   ): Promise<ModelProviderWithScopes[]> {
     const client = tx ?? this.prisma;
     const results = await client.modelProvider.findMany({
-      where: { projectId },
+      where: {
+        scopes: { some: { scopeType: "PROJECT", scopeId: projectId } },
+      },
       include: { scopes: true },
     });
     return results.map((result) => this.withDecryptedKeys(result));

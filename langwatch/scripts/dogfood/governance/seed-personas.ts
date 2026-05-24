@@ -191,44 +191,34 @@ export async function runSeedPersonas(
     if (openaiKey) {
       const modelProvider = await prisma.modelProvider.create({
         data: {
-          projectId: project.id,
           name: "OpenAI",
           provider: "openai",
           enabled: true,
-          // customKeys is an AES-GCM encrypted JSON blob, not a plain object —
-          // config.materialiser decrypts and pick()s OPENAI_API_KEY off it
-          // before handing the value to the gateway. An empty {} produces
-          // {api_key: ""} downstream and the gateway 504s with
-          // "provider is required".
+          // customKeys is an AES-GCM encrypted JSON blob, not a plain
+          // object. config.materialiser decrypts and pick()s
+          // OPENAI_API_KEY before handing it to the gateway. Empty {}
+          // produces {api_key: ""} and the gateway 504s.
           customKeys: encrypt(JSON.stringify({ OPENAI_API_KEY: openaiKey })),
           scopes: { create: [{ scopeType: "ORGANIZATION", scopeId: org.id }] },
         },
       });
-      // GatewayProviderCredential wraps ModelProvider for gateway routing —
-      // RoutingPolicy.providerCredentialIds expects GatewayProviderCredential
-      // ids, NOT ModelProvider ids.
-      const gatewayCred = await prisma.gatewayProviderCredential.create({
-        data: {
-          projectId: project.id,
-          modelProviderId: modelProvider.id,
-          slot: "primary",
-        },
-      });
+      // RoutingPolicy.modelProviderIds points at ModelProvider directly
+      // post-collapse.
       const policy = await prisma.routingPolicy.create({
         data: {
           organizationId: org.id,
-          scope: "organization",
+          scope: "ORGANIZATION",
           scopeId: org.id,
           name: "developer-default",
           isDefault: true,
           strategy: "priority",
-          providerCredentialIds: [gatewayCred.id],
+          modelProviderIds: [modelProvider.id],
           modelAllowlist: ["gpt-5-mini", "gpt-5", "gpt-4o", "gpt-4o-mini"],
         },
       });
       modelProviderSeeded = true;
       process.stderr.write(
-        `[seed-personas] seeded org modelProvider=${modelProvider.id} gatewayCred=${gatewayCred.id} routing-policy=${policy.id} (org-default)\n`,
+        `[seed-personas] seeded org modelProvider=${modelProvider.id} routing-policy=${policy.id} (org-default)\n`,
       );
     } else {
       process.stderr.write(

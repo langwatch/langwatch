@@ -70,7 +70,9 @@ describe("Model Providers API", () => {
 
   afterEach(async () => {
     await prisma.modelProvider.deleteMany({
-      where: { projectId: testProjectId },
+      where: {
+        scopes: { some: { scopeType: "PROJECT", scopeId: testProjectId } },
+      },
     });
 
     await prisma.project.delete({

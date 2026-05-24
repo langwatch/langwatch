@@ -84,7 +84,7 @@ export const routingPoliciesRouter = createTRPCRouter({
         // closed (per a5601f80a) but with no admin signal at create
         // time. Reject up front so the failure is visible at the form,
         // not at the next 'langwatch login'.
-        providerCredentialIds: z
+        modelProviderIds: z
           .array(z.string())
           .min(1, "Routing policy must reference at least one provider credential"),
         modelAllowlist: z.array(z.string()).nullable().optional(),
@@ -102,7 +102,7 @@ export const routingPoliciesRouter = createTRPCRouter({
           scopeId: input.scopeId,
           name: input.name,
           description: input.description ?? null,
-          providerCredentialIds: input.providerCredentialIds,
+          modelProviderIds: input.modelProviderIds,
           modelAllowlist: input.modelAllowlist ?? null,
           strategy: input.strategy,
           isDefault: input.isDefault,
@@ -125,7 +125,7 @@ export const routingPoliciesRouter = createTRPCRouter({
         // root cause at edit time. `optional` lets callers omit the
         // field (no-op for chain), but when present it must be
         // non-empty.
-        providerCredentialIds: z
+        modelProviderIds: z
           .array(z.string())
           .min(1, "Routing policy must reference at least one provider credential")
           .optional(),
@@ -142,7 +142,7 @@ export const routingPoliciesRouter = createTRPCRouter({
           organizationId: input.organizationId,
           name: input.name,
           description: input.description,
-          providerCredentialIds: input.providerCredentialIds,
+          modelProviderIds: input.modelProviderIds,
           modelAllowlist: input.modelAllowlist,
           strategy: input.strategy,
           actorUserId: ctx.session.user.id,

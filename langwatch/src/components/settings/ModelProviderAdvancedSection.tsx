@@ -89,7 +89,7 @@ export function ModelProviderAdvancedSection({
   const [jsonError, setJsonError] = useState<string | null>(null);
 
   const updateAdvanced =
-    (api.modelProviders as any).updateAdvanced?.useMutation?.({
+    (api.modelProvider as any).updateAdvanced?.useMutation?.({
       onSuccess: () => {
         toaster.create({
           type: "success",

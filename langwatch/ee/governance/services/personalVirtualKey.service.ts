@@ -3,18 +3,17 @@
 /**
  * PersonalVirtualKeyService — owns personal-VK issuance + lifecycle.
  *
- * A personal VK is just a regular `VirtualKey` row whose `projectId`
- * points to a personal project (Project.isPersonal=true). No
- * polymorphic ownerType column — the personal nature is fully derived
- * from the project flag, which keeps the gateway dispatcher unchanged.
+ * A personal VK is a regular `VirtualKey` row scoped at the personal
+ * project via `VirtualKeyScope(scopeType=PROJECT)`. There is no
+ * polymorphic ownerType column — the personal nature is derived from
+ * the underlying Project.isPersonal flag.
  *
  * Service responsibilities:
  *   - `ensureDefault`: idempotently issue (or return existing) the
  *     user's "default personal VK" — the one the CLI gets back from
  *     /api/auth/cli/exchange. Auto-bound to the org's default
  *     RoutingPolicy when one exists.
- *   - `issue`: create an additional personal VK with a custom label
- *     (e.g. "jane-laptop", "jane-cron-runner").
+ *   - `issue`: create an additional personal VK with a custom label.
  *   - `list`: list the caller's personal VKs in an org.
  *   - `revoke`: revoke one of the caller's personal VKs.
  *   - `revokeAllForUser`: cascade-revoke on user deactivation.
@@ -25,7 +24,7 @@
 import { type PrismaClient } from "@prisma/client";
 
 import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
-import type { VirtualKeyWithChain } from "~/server/gateway/virtualKey.repository";
+import type { VirtualKeyWithScopes } from "~/server/gateway/virtualKey.repository";
 
 import { PersonalWorkspaceService } from "./personalWorkspace.service";
 import { RoutingPolicyService } from "./routingPolicy.service";
@@ -33,8 +32,8 @@ import { RoutingPolicyService } from "./routingPolicy.service";
 const DEFAULT_PERSONAL_VK_LABEL = "default";
 
 export interface IssuedPersonalVk {
-  /** Full VK row with chain. */
-  virtualKey: VirtualKeyWithChain;
+  /** Full VK row with scopes. */
+  virtualKey: VirtualKeyWithScopes;
   /** Raw secret — exposed once, never persisted. */
   secret: string;
   /** Gateway base URL the CLI plugs into ANTHROPIC_BASE_URL etc. */
@@ -66,13 +65,6 @@ export class PersonalVirtualKeyService {
       prisma,
       new PersonalWorkspaceService(prisma),
       new RoutingPolicyService(prisma),
-      // Resolution: explicit `LW_GATEWAY_BASE_URL` always wins, else
-      // pick the right default by deployment shape. Self-hosted/dev
-      // installs without an explicit override would otherwise show
-      // `gateway.langwatch.com` on the VK reveal card and the user's
-      // curl would route to production — Ariana caught this on a
-      // self-hosted dogfood. The Go gateway listens on :5563 by
-      // default (see langwatch/CLAUDE.md → "make service svc=aigateway").
       options?.gatewayBaseUrl ??
         (options?.isSaas
           ? "https://gateway.langwatch.com"
@@ -88,7 +80,7 @@ export class PersonalVirtualKeyService {
    *
    * Side-effects on first call:
    *   - Creates personal Team + Project if missing (via PersonalWorkspaceService).
-   *   - Creates VK named "default" inside that personal project.
+   *   - Creates VK named "default" scoped to the personal project.
    *   - Auto-binds to the org's default RoutingPolicy if one exists at
    *     the team/org tier.
    */
@@ -110,24 +102,24 @@ export class PersonalVirtualKeyService {
       displayEmail,
     });
 
-    // Look for an existing default-labelled personal VK on the
-    // personal project. Re-issue path returns the row without a new
-    // secret (we don't expose secrets after creation).
+    // Existing-key path: re-issue cannot return a fresh secret (the
+    // original is hashed-only). Subsequent logins on the same device
+    // just refresh tokens. Re-installing the CLI on a new device
+    // requires a new key (issue() below).
     const existing = await this.prisma.virtualKey.findFirst({
       where: {
-        projectId: workspace.project.id,
+        organizationId,
+        principalUserId: userId,
         name: DEFAULT_PERSONAL_VK_LABEL,
         revokedAt: null,
+        scopes: {
+          some: { scopeType: "PROJECT", scopeId: workspace.project.id },
+        },
       },
-      include: { providerCredentials: true },
+      include: { scopes: true },
     });
 
     if (existing) {
-      // For idempotency we cannot return a fresh secret (the original
-      // is hashed-only). The CLI is expected to call this on first
-      // login and persist the secret; subsequent logins on the same
-      // device just refresh tokens. If a user re-installs the CLI on
-      // a new device they need to issue a NEW key (issue() below).
       throw new PersonalVirtualKeyAlreadyExistsError(existing.id);
     }
 
@@ -173,9 +165,7 @@ export class PersonalVirtualKeyService {
     // Cross-org-policy guard. The tRPC caller (issuePersonal) accepts
     // a user-controlled routingPolicyId — without an org-scope check
     // here, a user could attach a policy from another organization
-    // they discovered the id of. Today the only path to this branch
-    // is the issuePersonal mutation; the device-exchange flow goes
-    // through resolveDefaultForUser which is already org-scoped.
+    // they discovered the id of.
     if (
       routingPolicyId &&
       policy &&
@@ -186,53 +176,29 @@ export class PersonalVirtualKeyService {
 
     // Spec contract (specs/ai-gateway/governance/personal-keys.feature
     // lines 57-63): when the caller relied on default-policy resolution
-    // (routingPolicyId omitted) and the org has no default policy, the
-    // device-exchange MUST 409 with `{ error: "no_default_routing_policy" }`
-    // and NO personal VK should be created. The earlier "create bare VK,
-    // gateway rejects later" approach contradicted that contract — calls
-    // would silently issue a VK secret that 4xxd at request time.
-    // Throw a typed error so the route translates it to the spec'd 409
-    // (see /api/auth/cli/exchange).
+    // and the org has no default policy, the device-exchange MUST 409
+    // with `{ error: "no_default_routing_policy" }` and NO personal VK
+    // should be created.
     if (routingPolicyId === undefined && !policy) {
       throw new NoDefaultRoutingPolicyError(organizationId);
     }
 
-    // G34 (Ariana QA dogfood): the resolved policy exists but has zero
-    // provider credentials configured. Minting here would succeed at
-    // /me's "Issue VK" step, then fail later with a gateway 504
-    // (`provider_timeout: provider is required`) the first time the
-    // user calls the gateway — green-success-then-mystery-failure UX.
-    // Validate at issue time so /me surfaces the actionable
-    // "ask your admin to add providers" guidance instead of after a
-    // copy-pasted curl.
-    if (policy && extractProviderCredentialIds(policy).length === 0) {
+    // G34: validate the resolved policy has at least one eligible
+    // ModelProvider before minting, otherwise the user copy-pastes a
+    // curl that 504s at the gateway.
+    if (policy && extractModelProviderIds(policy).length === 0) {
       throw new RoutingPolicyHasNoProvidersError(policy.id, policy.name);
     }
 
-    // Personal VKs delegate provider-chain resolution to the routing
-    // policy at request time — no embedded VirtualKeyProviderCredential
-    // rows. VirtualKeyService.create accepts an empty
-    // providerCredentialIds list iff `routingPolicyId` is set, and
-    // skips the per-project ownership assertion in that case (policies
-    // are org-scoped and may reference credentials living in other
-    // projects of the same org).
     const vkService = VirtualKeyService.create(this.prisma);
     const { virtualKey, secret } = await vkService.create({
-      projectId: personalProjectId,
       organizationId,
       name: label,
-      // Brief, non-redundant description rendered alongside the
-       // already-visible label in the /me/settings list (which prints
-       // `{description} · Last used …`). Earlier `Personal key for
-       // ${label}` just echoed the label back at the user — Ariana
-       // logged the duplication during option-C dogfood. The label
-       // itself is the primary identifier; description holds the
-       // category context.
       description: "Personal virtual key",
       environment: "live",
       principalUserId: userId,
       actorUserId: userId,
-      providerCredentialIds: [],
+      scopes: [{ scopeType: "PROJECT", scopeId: personalProjectId }],
       routingPolicyId: policy?.id ?? null,
     });
 
@@ -257,22 +223,9 @@ export class PersonalVirtualKeyService {
     userId: string;
     organizationId: string;
   }) {
-    // dbMultiTenancyProtection requires projectId in the WHERE on
-    // VirtualKey; relation filters don't satisfy it. Resolve the
-    // user's personal projects in this org first.
-    const personalProjects = await this.prisma.project.findMany({
-      where: {
-        isPersonal: true,
-        ownerUserId: userId,
-        team: { organizationId },
-      },
-      select: { id: true },
-    });
-    const personalProjectIds = personalProjects.map((p) => p.id);
-    if (personalProjectIds.length === 0) return [];
     return await this.prisma.virtualKey.findMany({
       where: {
-        projectId: { in: personalProjectIds },
+        organizationId,
         principalUserId: userId,
         revokedAt: null,
       },
@@ -294,7 +247,7 @@ export class PersonalVirtualKeyService {
   }
 
   /**
-   * Revoke a single personal VK. Verifies the VK is owned by `userId`
+   * Revoke a single personal VK. Verifies the VK belongs to `userId`
    * before delegating to the gateway VK service (which also writes the
    * audit + change-event entries).
    */
@@ -307,35 +260,22 @@ export class PersonalVirtualKeyService {
     organizationId: string;
     virtualKeyId: string;
   }) {
-    const vk = await this.prisma.virtualKey.findUnique({
-      where: { id: virtualKeyId },
-      select: {
-        id: true,
-        projectId: true,
-        principalUserId: true,
-        project: {
-          select: {
-            isPersonal: true,
-            ownerUserId: true,
-            team: { select: { organizationId: true } },
-          },
-        },
+    const vk = await this.prisma.virtualKey.findFirst({
+      where: {
+        id: virtualKeyId,
+        organizationId,
+        principalUserId: userId,
       },
+      select: { id: true, organizationId: true },
     });
-    if (
-      !vk ||
-      !vk.project.isPersonal ||
-      vk.project.ownerUserId !== userId ||
-      vk.project.team.organizationId !== organizationId
-    ) {
+    if (!vk) {
       throw new PersonalVirtualKeyNotFoundError(virtualKeyId);
     }
 
     const vkService = VirtualKeyService.create(this.prisma);
     return await vkService.revoke({
       id: vk.id,
-      projectId: vk.projectId,
-      organizationId,
+      organizationId: vk.organizationId,
       actorUserId: userId,
     });
   }
@@ -352,34 +292,19 @@ export class PersonalVirtualKeyService {
     userId: string;
     actorUserId: string;
   }): Promise<number> {
-    // Same projectId-in-WHERE constraint from dbMultiTenancyProtection
-    // as `list` above — resolve the user's personal projects across
-    // every org first.
-    const personalProjects = await this.prisma.project.findMany({
-      where: { isPersonal: true, ownerUserId: userId },
-      select: { id: true },
-    });
-    const personalProjectIds = personalProjects.map((p) => p.id);
-    if (personalProjectIds.length === 0) return 0;
     const personalVks = await this.prisma.virtualKey.findMany({
       where: {
-        projectId: { in: personalProjectIds },
         principalUserId: userId,
         revokedAt: null,
       },
-      select: {
-        id: true,
-        projectId: true,
-        project: { select: { team: { select: { organizationId: true } } } },
-      },
+      select: { id: true, organizationId: true },
     });
 
     const vkService = VirtualKeyService.create(this.prisma);
     for (const vk of personalVks) {
       await vkService.revoke({
         id: vk.id,
-        projectId: vk.projectId,
-        organizationId: vk.project.team.organizationId,
+        organizationId: vk.organizationId,
         actorUserId,
       });
     }
@@ -421,15 +346,8 @@ export class NoDefaultRoutingPolicyError extends Error {
 
 /**
  * Thrown by `issue()` when the resolved routing policy exists but has
- * zero provider credentials configured. Without providers, any
- * subsequent gateway call against the minted VK would 504 with
- * `provider_timeout`. Routes / tRPC handlers should translate this to
- * HTTP 409 with `{ error: "routing_policy_has_no_providers" }` so /me
- * (or the CLI) surfaces the "ask your admin to add providers"
- * guidance at mint time, not after a copy-pasted curl mysteriously
- * fails.
- *
- * Caught by Ariana QA dogfood (G34).
+ * zero ModelProviders configured. Without providers, any subsequent
+ * gateway call against the minted VK would 504 with `provider_timeout`.
  */
 export class RoutingPolicyHasNoProvidersError extends Error {
   constructor(
@@ -444,17 +362,15 @@ export class RoutingPolicyHasNoProvidersError extends Error {
 }
 
 /**
- * Read the `providerCredentialIds: Json` column off a RoutingPolicy
- * row as a `string[]`. The column is typed as `Json` in Prisma but is
- * always an array of credential ids in practice (default `"[]"`,
- * service-layer always writes an array). Returns `[]` for any
- * non-array shape (extra defensiveness in case migrations / manual
- * writes ever produce an unexpected encoding).
+ * Read the `modelProviderIds: Json` column off a RoutingPolicy row as a
+ * `string[]`. The column is typed as `Json` in Prisma but is always an
+ * array of ModelProvider ids in practice (default `"[]"`, service-layer
+ * always writes an array). Returns `[]` for any non-array shape.
  */
-function extractProviderCredentialIds(policy: {
-  providerCredentialIds: unknown;
+function extractModelProviderIds(policy: {
+  modelProviderIds: unknown;
 }): string[] {
-  const raw = policy.providerCredentialIds;
+  const raw = policy.modelProviderIds;
   if (!Array.isArray(raw)) return [];
   return raw.filter((x): x is string => typeof x === "string");
 }

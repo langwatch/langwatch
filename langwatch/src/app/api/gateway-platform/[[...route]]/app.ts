@@ -24,7 +24,9 @@ import { baseResponses } from "../../shared/base-responses";
 import { prisma } from "~/server/db";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
 import { GatewayCacheRuleService } from "~/server/gateway/cacheRule.service";
-import { GatewayProviderCredentialService } from "~/server/gateway/providerCredential.service";
+// GatewayProviderCredentialService removed in iter 110; /providers REST
+// routes return 410 Gone until A3 lands the ModelProvider-backed
+// replacement surface (current proposal: fold into /model-providers).
 import {
   VirtualKeyService,
   type CreateVirtualKeyInput,
@@ -574,25 +576,14 @@ export const app = new Hono<{ Variables: Variables }>()
     }),
     requireGatewayProvidersView,
     async (c) => {
-    const project = c.get("project");
-    const service = GatewayProviderCredentialService.create(prisma);
-    const rows = (await service.getAll(project.id)) as any[];
-    return c.json({
-      data: rows.map((row: any) => ({
-        id: row.id,
-        model_provider_id: row.modelProviderId,
-        model_provider_name: row.modelProvider.provider,
-        slot: row.slot,
-        rate_limit_rpm: row.rateLimitRpm,
-        rate_limit_tpm: row.rateLimitTpm,
-        rate_limit_rpd: row.rateLimitRpd,
-        rotation_policy: row.rotationPolicy.toLowerCase(),
-        fallback_priority_global: row.fallbackPriorityGlobal,
-        health_status: row.healthStatus.toLowerCase(),
-        disabled_at: row.disabledAt?.toISOString() ?? null,
-        created_at: row.createdAt.toISOString(),
-      })),
-    });
+    return c.json(
+      {
+        error: "gone",
+        message:
+          "Gateway provider bindings folded into ModelProvider in iter 110. Use GET /api/gateway-platform/v1/model-providers or the Advanced (Gateway) tab in the dashboard.",
+      },
+      410,
+    );
   })
 
   .post(
@@ -620,27 +611,14 @@ export const app = new Hono<{ Variables: Variables }>()
     }),
     requireGatewayProvidersManage,
     async (c) => {
-    const project = c.get("project");
-    const raw = (await c.req.json()) as Record<string, unknown>;
-    const organizationId = await orgIdForProject(project.id);
-    const service = GatewayProviderCredentialService.create(prisma);
-    const row = await service.create({
-      projectId: project.id,
-      organizationId,
-      modelProviderId: String(raw.model_provider_id ?? ""),
-      slot: typeof raw.slot === "string" ? raw.slot : undefined,
-      rateLimitRpm: (raw.rate_limit_rpm as number | null) ?? null,
-      rateLimitTpm: (raw.rate_limit_tpm as number | null) ?? null,
-      rateLimitRpd: (raw.rate_limit_rpd as number | null) ?? null,
-      rotationPolicy:
-        typeof raw.rotation_policy === "string" ? "MANUAL" : undefined,
-      extraHeaders: (raw.extra_headers as Prisma.InputJsonValue | null) ?? null,
-      providerConfig: (raw.provider_config as Prisma.InputJsonValue | null) ?? null,
-      fallbackPriorityGlobal:
-        (raw.fallback_priority_global as number | null) ?? null,
-      actorUserId: machineActorForProject(project.id),
-    });
-    return c.json({ provider_credential: { id: row.id } }, 201);
+    return c.json(
+      {
+        error: "gone",
+        message:
+          "Gateway provider bindings folded into ModelProvider in iter 110. Configure rate limits, providerConfig, fallback priority via the Advanced (Gateway) tab on /api/gateway-platform/v1/model-providers/:id.",
+      },
+      410,
+    );
   })
 
   // ── Budgets ─────────────────────────────────────────────────────────────

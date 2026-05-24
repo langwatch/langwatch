@@ -120,7 +120,8 @@ const DIMENSION_META: Record<
 };
 
 type VirtualKeyEditDrawerProps = {
-  projectId: string;
+  organizationId: string;
+  projectId?: string;
   vk: VirtualKeyDetail | null;
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;
@@ -129,6 +130,7 @@ type VirtualKeyEditDrawerProps = {
 type AliasPair = { from: string; to: string };
 
 export function VirtualKeyEditDrawer({
+  organizationId,
   projectId,
   vk,
   onOpenChange,
@@ -228,12 +230,13 @@ export function VirtualKeyEditDrawer({
   };
 
   const utils = api.useContext();
-  const credentialsQuery = api.gatewayProviders.list.useQuery(
-    { projectId },
-    { enabled: !!vk && !!projectId },
-  );
+  // Provider picker pending A3 rewrite — credentials list query went
+  // away with GatewayProviderCredential. Empty list keeps the drawer
+  // compiling; selectedProviderIds becomes a no-op until A3 swaps in
+  // the VirtualKeyScopePicker + RoutingPolicy selection UX.
+  const credentialsQuery = { data: [] as any[], isLoading: false } as const;
   const monitorsQuery = api.monitors.getAllForProject.useQuery(
-    { projectId },
+    { projectId: projectId ?? "" },
     { enabled: !!vk && !!projectId },
   );
   const availableMonitors = useMemo(() => {
@@ -258,7 +261,7 @@ export function VirtualKeyEditDrawer({
   };
   const updateMutation = api.virtualKeys.update.useMutation({
     onSuccess: async () => {
-      await utils.virtualKeys.list.invalidate({ projectId });
+      await utils.virtualKeys.list.invalidate({ organizationId });
     },
   });
 
@@ -340,11 +343,10 @@ export function VirtualKeyEditDrawer({
     }
     try {
       await updateMutation.mutateAsync({
-        projectId: vk.projectId,
+        organizationId,
         id: vk.id,
         name,
         description: description || null,
-        providerCredentialIds: providerIds,
         config: {
           modelAliases,
           cache: { mode: cacheMode, ttlS: cacheTtlS },
@@ -380,10 +382,10 @@ export function VirtualKeyEditDrawer({
     }
   };
 
-  const providerNameById = new Map(
+  const providerNameById = new Map<string, string>(
     availableProviders.map((p: any) => [
-      p.id,
-      p.modelProviderName ?? p.provider ?? p.id,
+      String(p.id),
+      String(p.modelProviderName ?? p.provider ?? p.id),
     ]),
   );
   const unselectedProviders = availableProviders.filter(

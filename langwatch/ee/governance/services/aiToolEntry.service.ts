@@ -778,25 +778,35 @@ export class AiToolEntryService {
     organizationId: string;
     userId: string;
   }): Promise<string[]> {
-    const projects = await this.prisma.project.findMany({
-      where: { team: { organizationId } },
-      select: { id: true },
+    const teams = await this.prisma.team.findMany({
+      where: { organizationId },
+      select: { id: true, projects: { select: { id: true } } },
     });
-    const projectIds = projects.map((p) => p.id);
-    if (projectIds.length === 0) return [];
+    const teamIds = teams.map((t) => t.id);
+    const projectIds = teams.flatMap((t) => t.projects.map((p) => p.id));
 
-    const rows = await this.prisma.gatewayProviderCredential.findMany({
+    const rows = await this.prisma.modelProvider.findMany({
       where: {
-        projectId: { in: projectIds },
+        enabled: true,
         disabledAt: null,
-        modelProvider: { enabled: true },
+        scopes: {
+          some: {
+            OR: [
+              { scopeType: "ORGANIZATION", scopeId: organizationId },
+              ...(teamIds.length > 0
+                ? [{ scopeType: "TEAM" as const, scopeId: { in: teamIds } }]
+                : []),
+              ...(projectIds.length > 0
+                ? [{ scopeType: "PROJECT" as const, scopeId: { in: projectIds } }]
+                : []),
+            ],
+          },
+        },
       },
-      select: { modelProvider: { select: { provider: true } } },
+      select: { provider: true },
     });
 
-    return Array.from(
-      new Set(rows.map((r) => r.modelProvider.provider).filter(Boolean)),
-    );
+    return Array.from(new Set(rows.map((r) => r.provider).filter(Boolean)));
   }
 
   /**
@@ -823,29 +833,44 @@ export class AiToolEntryService {
   }): Promise<
     Array<{ providerKey: string; displayName: string; configured: boolean }>
   > {
-    const projects = await this.prisma.project.findMany({
-      where: { team: { organizationId } },
-      select: { id: true },
+    const teams = await this.prisma.team.findMany({
+      where: { organizationId },
+      select: { id: true, projects: { select: { id: true } } },
     });
-    const projectIds = projects.map((p) => p.id);
+    const teamIds = teams.map((t) => t.id);
+    const projectIds = teams.flatMap((t) => t.projects.map((p) => p.id));
 
-    const configured =
-      projectIds.length > 0
-        ? new Set(
-            (
-              await this.prisma.gatewayProviderCredential.findMany({
-                where: {
-                  projectId: { in: projectIds },
-                  disabledAt: null,
-                  modelProvider: { enabled: true },
-                },
-                select: { modelProvider: { select: { provider: true } } },
-              })
-            )
-              .map((c) => c.modelProvider.provider)
-              .filter(Boolean),
-          )
-        : new Set<string>();
+    const configured = new Set(
+      (
+        await this.prisma.modelProvider.findMany({
+          where: {
+            enabled: true,
+            disabledAt: null,
+            scopes: {
+              some: {
+                OR: [
+                  { scopeType: "ORGANIZATION", scopeId: organizationId },
+                  ...(teamIds.length > 0
+                    ? [{ scopeType: "TEAM" as const, scopeId: { in: teamIds } }]
+                    : []),
+                  ...(projectIds.length > 0
+                    ? [
+                        {
+                          scopeType: "PROJECT" as const,
+                          scopeId: { in: projectIds },
+                        },
+                      ]
+                    : []),
+                ],
+              },
+            },
+          },
+          select: { provider: true },
+        })
+      )
+        .map((m) => m.provider)
+        .filter(Boolean),
+    );
 
     return Object.entries(supportedModelProviders)
       .filter(([, def]) => def.type === "llm")
@@ -869,7 +894,7 @@ export class AiToolEntryService {
     organizationId: string;
   }): Promise<Array<{ id: string; name: string }>> {
     const policies = await this.prisma.routingPolicy.findMany({
-      where: { organizationId, scope: "organization" },
+      where: { organizationId, scope: "ORGANIZATION" },
       select: { id: true, name: true },
       orderBy: [{ isDefault: "desc" }, { name: "asc" }],
     });

@@ -52,14 +52,35 @@ type ModelProviderDefinition = {
 export type MaybeStoredModelProvider = Omit<
   ModelProvider,
   | "id"
-  | "projectId"
   | "name"
   | "createdAt"
   | "updatedAt"
   | "customModels"
   | "customEmbeddingsModels"
+  // Advanced (gateway) fields land on persisted rows; form-time shapes
+  // omit them, so widen the type to make them optional here.
+  | "rateLimitRpm"
+  | "rateLimitTpm"
+  | "rateLimitRpd"
+  | "rotationPolicy"
+  | "providerConfig"
+  | "fallbackPriorityGlobal"
+  | "healthStatus"
+  | "circuitOpenedAt"
+  | "lastHealthCheckAt"
+  | "disabledAt"
 > & {
   id?: string;
+  rateLimitRpm?: number | null;
+  rateLimitTpm?: number | null;
+  rateLimitRpd?: number | null;
+  rotationPolicy?: "MANUAL";
+  providerConfig?: unknown;
+  fallbackPriorityGlobal?: number | null;
+  healthStatus?: "UNKNOWN" | "HEALTHY" | "DEGRADED" | "CIRCUIT_OPEN";
+  circuitOpenedAt?: Date | null;
+  lastHealthCheckAt?: Date | null;
+  disabledAt?: Date | null;
   /**
    * Human-readable name (iter 109). Optional in the inbound shape used
    * by form seeding where registry defaults get promoted before a row

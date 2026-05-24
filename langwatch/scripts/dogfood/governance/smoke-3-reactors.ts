@@ -119,7 +119,7 @@ async function seed() {
   const vk = await prisma.virtualKey.create({
     data: {
       id: rid("vk_smoke"),
-      projectId: project.id,
+      organizationId: org.id,
       name: "smoke-vk",
       environment: "LIVE",
       status: "ACTIVE",
@@ -128,6 +128,7 @@ async function seed() {
       principalUserId: user.id,
       config: defaultVirtualKeyConfig() as any,
       createdById: user.id,
+      scopes: { create: [{ scopeType: "PROJECT", scopeId: project.id }] },
     },
   });
   return { org, team, project, user, vk };
