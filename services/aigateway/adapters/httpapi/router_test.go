@@ -493,6 +493,62 @@ func TestRouter_Responses_LargeBody_PicksStreamHandler(t *testing.T) {
 	require.True(t, streamCalled, "Responses handler did not pick streaming path for stream:true beyond default peek window")
 }
 
+// Regression for bug 32: Claude Code sends 100 KiB+ /v1/messages bodies
+// with the top-level `stream` flag dead last (after the unbounded
+// messages array), and its offset grows with every conversation turn. A
+// fixed-size peek window — even the 256 KiB large variant — misses it
+// past that point, routing the streaming request through the
+// non-streaming handler: Anthropic answers 200+SSE, Bifrost can't
+// unmarshal the SSE frames as one JSON object, and the client gets a 502
+// with the SSE as the error body (claude then retries forever). Padding
+// the body past 256 KiB proves stream detection is size-independent
+// (full-body read), not merely a larger fixed peek.
+func TestRouter_Messages_HugeBody_PicksStreamHandler(t *testing.T) {
+	auth := &mockAuth{
+		resolveFn: func(_ context.Context, _ string) (*domain.Bundle, error) {
+			return testBundle(), nil
+		},
+	}
+
+	syncCalled := false
+	streamCalled := false
+	provider := &mockStreamProvider{
+		mockProvider: mockProvider{
+			dispatchFn: func(_ context.Context, _ *domain.Request, _ domain.Credential) (*domain.Response, error) {
+				syncCalled = true
+				return successResponse(), nil
+			},
+		},
+		dispatchStreamFn: func(_ context.Context, _ *domain.Request, _ domain.Credential) (domain.StreamIterator, error) {
+			streamCalled = true
+			return &emptyStreamIter{}, nil
+		},
+	}
+
+	router := buildRouter(
+		app.WithAuth(auth),
+		app.WithProviders(provider),
+		app.WithLogger(zap.NewNop()),
+	)
+
+	// ~1 MiB body — well past the 256 KiB large-peek — with `stream:true`
+	// at the very tail, mirroring how Claude Code serializes the field
+	// after a large messages/system payload.
+	padding := bytes.Repeat([]byte("x"), 1024*1024)
+	body := []byte(`{"model":"claude-opus-4-7","messages":[{"role":"user","content":"`)
+	body = append(body, padding...)
+	body = append(body, []byte(`"}],"stream":true}`)...)
+	require.Greater(t, len(body), 256*1024)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/messages", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer vk-lw-test")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	require.False(t, syncCalled, "messages handler routed huge stream:true body through non-streaming Dispatch")
+	require.True(t, streamCalled, "messages handler did not pick streaming path for stream:true beyond any fixed peek window")
+}
+
 type mockStreamProvider struct {
 	mockProvider
 	dispatchStreamFn func(ctx context.Context, req *domain.Request, cred domain.Credential) (domain.StreamIterator, error)

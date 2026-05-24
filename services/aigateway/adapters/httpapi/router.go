@@ -132,15 +132,14 @@ func chatHandler(deps RouterDeps) http.HandlerFunc {
 			return
 		}
 
-		peek, body, release, ok := readAndPeekBody(w, r, deps.MaxRequestBodyBytes)
+		body, ok := readFullBody(deps.Logger, w, r, deps.MaxRequestBodyBytes)
 		if !ok {
 			return
 		}
-		defer release()
 
-		model := app.PeekModel(peek)
-		if app.PeekStream(peek) {
-			result, err := deps.App.HandleChatStream(r.Context(), bundle, body, model)
+		model := app.PeekModel(body)
+		if app.PeekStream(body) {
+			result, err := deps.App.HandleChatStream(r.Context(), bundle, bytes.NewReader(body), model)
 			if err != nil {
 				writeError(deps.Logger, w, r.Context(), err)
 				return
@@ -148,7 +147,7 @@ func chatHandler(deps RouterDeps) http.HandlerFunc {
 			setMetaHeaders(w, result.Meta)
 			writeSSE(r.Context(), w, result.Iterator)
 		} else {
-			result, err := deps.App.HandleChat(r.Context(), bundle, body, model)
+			result, err := deps.App.HandleChat(r.Context(), bundle, bytes.NewReader(body), model)
 			if err != nil {
 				writeError(deps.Logger, w, r.Context(), err)
 				return
@@ -166,11 +165,10 @@ func messagesHandler(deps RouterDeps) http.HandlerFunc {
 			return
 		}
 
-		peek, body, release, ok := readAndPeekBody(w, r, deps.MaxRequestBodyBytes)
+		body, ok := readFullBody(deps.Logger, w, r, deps.MaxRequestBodyBytes)
 		if !ok {
 			return
 		}
-		defer release()
 
 		// One-off DEBUG dump of the inbound /v1/messages body — enabled by
 		// LW_LOG_MESSAGE_BODY=1. Lets operators see exactly what
@@ -181,14 +179,14 @@ func messagesHandler(deps RouterDeps) http.HandlerFunc {
 		// prompts.
 		if os.Getenv("LW_LOG_MESSAGE_BODY") == "1" {
 			deps.Logger.Info("/v1/messages request body",
-				zap.Int("peek_bytes", len(peek)),
-				zap.String("peek", string(peek)),
+				zap.Int("body_bytes", len(body)),
+				zap.String("body", string(body)),
 			)
 		}
 
-		model := app.PeekModel(peek)
-		if app.PeekStream(peek) {
-			result, err := deps.App.HandleMessagesStream(r.Context(), bundle, body, model)
+		model := app.PeekModel(body)
+		if app.PeekStream(body) {
+			result, err := deps.App.HandleMessagesStream(r.Context(), bundle, bytes.NewReader(body), model)
 			if err != nil {
 				writeError(deps.Logger, w, r.Context(), err)
 				return
@@ -196,7 +194,7 @@ func messagesHandler(deps RouterDeps) http.HandlerFunc {
 			setMetaHeaders(w, result.Meta)
 			writeSSE(r.Context(), w, result.Iterator)
 		} else {
-			result, err := deps.App.HandleMessages(r.Context(), bundle, body, model)
+			result, err := deps.App.HandleMessages(r.Context(), bundle, bytes.NewReader(body), model)
 			if err != nil {
 				writeError(deps.Logger, w, r.Context(), err)
 				return
@@ -220,18 +218,17 @@ func responsesHandler(deps RouterDeps) http.HandlerFunc {
 			return
 		}
 
-		// Large peek: codex 0.122+ and opencode send ~35-60 KiB bodies
-		// (full tool schemas + multi-turn developer input arrays) where
-		// the top-level `stream` field can land past the 32 KiB default
-		// window. Missing it routes a streaming request through the
-		// non-streaming handler, turns OpenAI's 200+SSE response into a
-		// Bifrost unmarshal failure, and surfaces as a 502 with the SSE
-		// frames as the error body.
-		peek, body, release, ok := readAndPeekBodyLarge(w, r, deps.MaxRequestBodyBytes)
+		// codex 0.122+ and opencode send ~35-60 KiB bodies (full tool
+		// schemas + multi-turn developer input arrays) where the top-level
+		// `stream` field lands at the tail. Detecting it from a prefix peek
+		// misroutes a streaming request through the non-streaming handler,
+		// turns OpenAI's 200+SSE response into a Bifrost unmarshal failure,
+		// and surfaces as a 502 with the SSE frames as the error body — so
+		// scan the full body, not a fixed window.
+		body, ok := readFullBody(deps.Logger, w, r, deps.MaxRequestBodyBytes)
 		if !ok {
 			return
 		}
-		defer release()
 
 		// Same one-off DEBUG body dump as /v1/messages — gated on
 		// LW_LOG_MESSAGE_BODY=1. Helpful for diagnosing codex/opencode
@@ -239,14 +236,14 @@ func responsesHandler(deps RouterDeps) http.HandlerFunc {
 		// codex-shaped tools[] or other Responses-API features.
 		if os.Getenv("LW_LOG_MESSAGE_BODY") == "1" {
 			deps.Logger.Info("/v1/responses request body",
-				zap.Int("peek_bytes", len(peek)),
-				zap.String("peek", string(peek)),
+				zap.Int("body_bytes", len(body)),
+				zap.String("body", string(body)),
 			)
 		}
 
-		model := app.PeekModel(peek)
-		if app.PeekStream(peek) {
-			result, err := deps.App.HandleResponsesStream(r.Context(), bundle, body, model)
+		model := app.PeekModel(body)
+		if app.PeekStream(body) {
+			result, err := deps.App.HandleResponsesStream(r.Context(), bundle, bytes.NewReader(body), model)
 			if err != nil {
 				writeError(deps.Logger, w, r.Context(), err)
 				return
@@ -254,7 +251,7 @@ func responsesHandler(deps RouterDeps) http.HandlerFunc {
 			setMetaHeaders(w, result.Meta)
 			writeSSE(r.Context(), w, result.Iterator)
 		} else {
-			result, err := deps.App.HandleResponses(r.Context(), bundle, body, model)
+			result, err := deps.App.HandleResponses(r.Context(), bundle, bytes.NewReader(body), model)
 			if err != nil {
 				writeError(deps.Logger, w, r.Context(), err)
 				return
@@ -437,15 +434,15 @@ func requireBundle(w http.ResponseWriter, r *http.Request, logger *zap.Logger) (
 	return bundle, true
 }
 
-// Peek sizes are tuned per-endpoint: larger than needed burns memory
-// on every hot-path request (256 KiB × QPS adds up on chat-completions
-// where bodies are small); smaller than needed silently misroutes
-// coding-agent requests on /v1/responses when `stream` lands past the
-// window. /v1/chat/completions and /v1/messages keep the 32 KiB
-// default; /v1/responses uses the 256 KiB variant because codex /
-// opencode routinely send 30-60 KiB bodies with `stream:true` at the
-// tail. Revisit per-endpoint if we observe misses elsewhere; consider
-// an env knob before widening the default.
+// Prefix-peek sizes for endpoints that do NOT decide streaming from a
+// body field: /v1/embeddings (never streams) uses the 32 KiB default,
+// and the Gemini passthrough (streaming decided by the URL suffix, peek
+// only locates the model) uses the 256 KiB variant for its larger
+// generate-content bodies. The chat / messages / responses dispatch
+// endpoints do NOT use these — they read the full body (readFullBody)
+// because their top-level `stream` flag lands at the tail, past any
+// fixed window, and a miss misroutes a streaming request to the
+// non-streaming handler (502 SSE-in-error-body).
 const (
 	defaultPeekBytes = 32 * 1024
 	largePeekBytes   = 256 * 1024
@@ -462,6 +459,36 @@ func readAndPeekBody(w http.ResponseWriter, r *http.Request, maxBytes int64) ([]
 // handler, surfacing as a 502 SSE-in-error-body to the client.
 func readAndPeekBodyLarge(w http.ResponseWriter, r *http.Request, maxBytes int64) ([]byte, io.Reader, func(), bool) {
 	return readAndPeekBodySized(w, r, maxBytes, largePeekBytes)
+}
+
+// readFullBody materializes the entire request body (capped at maxBytes)
+// so stream/model detection scans the whole payload instead of a prefix.
+// The top-level `stream` flag on chat / messages / responses bodies sits
+// at the tail, after the unbounded messages/input array — Claude Code
+// emits it dead last and its offset grows with every conversation turn,
+// so any fixed-size peek window misses it once the body outgrows the
+// window. A miss routes a streaming request through the non-streaming
+// handler; the provider answers 200+SSE, Bifrost cannot unmarshal the
+// SSE frames as a single JSON object, and the client gets a 502 with the
+// SSE as the error body. The body is read in full to forward upstream
+// regardless, so scanning all of it adds no extra I/O on the hot path.
+func readFullBody(logger *zap.Logger, w http.ResponseWriter, r *http.Request, maxBytes int64) ([]byte, bool) {
+	ctx := r.Context()
+	if maxBytes <= 0 {
+		maxBytes = config.DefaultMaxRequestBodyBytes
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxBytes)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		code := domain.ErrBadRequest
+		var mbe *http.MaxBytesError
+		if errors.As(err, &mbe) {
+			code = domain.ErrPayloadTooLarge
+		}
+		writeError(logger, w, ctx, herr.New(ctx, code, nil))
+		return nil, false
+	}
+	return body, true
 }
 
 func readAndPeekBodySized(w http.ResponseWriter, r *http.Request, maxBytes int64, peekSize int) ([]byte, io.Reader, func(), bool) {
