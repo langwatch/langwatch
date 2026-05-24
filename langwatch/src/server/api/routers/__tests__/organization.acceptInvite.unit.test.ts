@@ -32,7 +32,10 @@ vi.mock("../../../auditLog", () => ({
 // the unit's purpose is acceptInvite status-guard behaviour, not
 // personal-workspace internals (those have their own integration
 // test at personalWorkspace.service.integration.test.ts).
-vi.mock("../../../governance/personalWorkspace.service", () => ({
+// Path must match the import in organization.ts (`@ee/governance/services/...`).
+// Vite-test resolves @ee via tsconfig paths; using the same specifier here ensures
+// vi.mock hooks the actual module the router imports, not a sibling under src/.
+vi.mock("@ee/governance/services/personalWorkspace.service", () => ({
   PersonalWorkspaceService: class {
     constructor(_prisma: unknown) {}
     async ensure(_args: unknown) {

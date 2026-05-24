@@ -19,6 +19,15 @@ const RESOURCES_EXCLUDED_FROM_API_KEY_CATEGORIES = new Set<string>([
   Resources.GATEWAY_LOGS,
   Resources.GATEWAY_USAGE,
   Resources.GATEWAY_CACHE_RULES,
+  // Iter 110 governance resources — admin-config surfaces governed by
+  // RoleBinding alone, never reachable through user-issued API keys.
+  Resources.ROUTING_POLICIES,
+  Resources.GOVERNANCE,
+  Resources.INGESTION_SOURCES,
+  Resources.ANOMALY_RULES,
+  Resources.COMPLIANCE_EXPORT,
+  Resources.ACTIVITY_MONITOR,
+  Resources.AI_TOOLS,
 ]);
 
 describe("PERMISSION_CATEGORIES", () => {
