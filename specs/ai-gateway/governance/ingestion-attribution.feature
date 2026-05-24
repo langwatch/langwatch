@@ -84,7 +84,11 @@ Feature: Ingestion attribution invariant — credential is authoritative; payloa
       | pull-mode      | `ensureHiddenGovernanceProject(orgId).id`                    |
       | otel-generic   | `ensureHiddenGovernanceProject(orgId).id`                    |
 
-  @bdd @ingestion @attribution @security @regression
+  # S3-pull adapter path covered structurally in tenant-id-tag.unit.test
+  # (TenantId = receiver org, never payload-derived). End-to-end bulk
+  # import lacks a fixture-pull integration suite; pin as @unimplemented
+  # until the puller-adapter integration backfill lands.
+  @bdd @ingestion @attribution @security @regression @unimplemented
   Scenario: S3 bulk-import — every imported span lands at hidden Gov, payload user_id never used as TenantId
     Given an admin uploads a S3 fixture via a pull-mode IngestionSource
     And the fixture contains 3 spans with payload-side
@@ -126,7 +130,11 @@ Feature: Ingestion attribution invariant — credential is authoritative; payloa
     And an OCSF event is emitted noting the attempted rewrite
         (so admins see attempted forge attempts in audit)
 
-  @bdd @ingestion @attribution @ottl @regression
+  # OTTL allowlist is enforced at the transform-step level; the
+  # "rewrite cost/latency/url but never tenant-binding fields"
+  # invariant has no end-to-end fixture-pull integration test.
+  # Pin as @unimplemented until the OTTL backfill suite lands.
+  @bdd @ingestion @attribution @ottl @regression @unimplemented
   Scenario: Non-principal OTTL rewrites still work (no over-broad allowlist regression)
     Given an OTTL transform that rewrites NON-principal fields:
       | field                          | rewrite                       |
@@ -158,7 +166,10 @@ Feature: Ingestion attribution invariant — credential is authoritative; payloa
     Then the response contains the rows scoped to that admin's org
     And no cross-org leak: admin in org A sees ONLY org A's hidden Gov
 
-  @bdd @ingestion @quarantine @admin @regression
+  # Polling Alert + admin-only banner is gated by a flag; UI render-test
+  # would need a polling-state mock harness that doesn't exist yet.
+  # Pin as @unimplemented until the quarantine-admin UI suite lands.
+  @bdd @ingestion @quarantine @admin @regression @unimplemented
   Scenario: Admin warning surfaces when quarantine fill rate exceeds threshold (polling Alert)
     Given >N spans/min are landing in the hidden Gov project for the
         org over a sliding window (default N tuned to alert on

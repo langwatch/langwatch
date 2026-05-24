@@ -46,7 +46,10 @@ Feature: AI Gateway — Virtual Keys
   # VK creation — secret show-once, format, default config
   # ============================================================================
 
-  @integration
+  # End-to-end VK create lives in the dogfood matrix runs (PR-body Tier 1
+  # cells under "F-matrix wave 2"). Pin as @unimplemented until a
+  # VirtualKeyService.create integration backfill lands.
+  @integration @unimplemented
   Scenario: Create a virtual key with default config
     When I open the "AI Gateway" section
     And I click "New virtual key"
@@ -163,7 +166,11 @@ Feature: AI Gateway — Virtual Keys
     And updating the ModelProvider's API key bumps `ModelProvider.revision`
     And the next /config materialisation for "demo-key" reflects the new key
 
-  @integration
+  # Scope-cascade enforcement is exercised by the dogfood matrix
+  # (Anthropic TEAM-scoped → ORG/PERSONAL VKs correctly 404; PR-body
+  # Tier 1 cells). Pin as @unimplemented until a service-level
+  # backfill exists for the negative path.
+  @integration @unimplemented
   Scenario: Virtual key cannot select a provider outside its scope graph
     Given the chosen scope TEAM "platform" has eligible MPs ["openai", "anthropic"]
     And "bedrock" is scoped to TEAM "data-sci" only (NOT in scope for "platform")
@@ -209,7 +216,10 @@ Feature: AI Gateway — Virtual Keys
   # Rotation, revocation, restore
   # ============================================================================
 
-  @integration
+  # Rotate flow uses the same hashedSecret/previousHashedSecret OR-walker
+  # the dbMTP unit test now guards. Pin as @unimplemented until the
+  # VirtualKeyService.rotate integration backfill lands.
+  @integration @unimplemented
   Scenario: Rotate virtual key issues a new secret and invalidates the previous one
     Given virtual key "prod-key" has secret "vk-lw-01HZX9K3MA…"
     When I click "Rotate secret" on "prod-key"
@@ -226,7 +236,10 @@ Feature: AI Gateway — Virtual Keys
     And the alert is in addition to the orange warning "You will only see this secret once"
     And the dialog title reads "Save your rotated secret" (not the create flow's "Save your virtual key secret")
 
-  @integration
+  # Revoke status flip is enforced by the same multitenancy guard the
+  # VK service unit tests cover. Pin as @unimplemented until the
+  # auth-cache-TTL propagation test lands.
+  @integration @unimplemented
   Scenario: Revoke virtual key disables authentication immediately
     Given virtual key "prod-key" is active
     When I click "Revoke" and confirm
@@ -234,7 +247,10 @@ Feature: AI Gateway — Virtual Keys
     And the gateway returns error type "virtual_key_revoked" (401)
     And the change propagates within the configured auth-cache TTL (default 60s)
 
-  @integration
+  # UI-only assertion (no Restore button on revoked rows). Pin as
+  # @unimplemented until the VK list React-Testing-Library backfill
+  # lands.
+  @integration @unimplemented
   Scenario: Revoked virtual key cannot be restored (must mint new)
     Given virtual key "prod-key" is revoked
     When I look at its row in the list
@@ -274,7 +290,11 @@ Feature: AI Gateway — Virtual Keys
   # Audit and attribution
   # ============================================================================
 
-  @integration
+  # auditLog.consolidation.integration.test.ts covers append shape +
+  # downstream filtering; the per-VK mutation surface (create/rotate/
+  # edit/revoke each writes a row) needs a VirtualKeyService coverage
+  # pass. Pin as @unimplemented until that backfill lands.
+  @integration @unimplemented
   Scenario: Every VK mutation writes an audit log entry
     When I create, rotate, edit, or revoke a virtual key
     Then an audit log row is written with actor, action, target vk_id,
