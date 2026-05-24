@@ -8,20 +8,25 @@ import {
   NativeSelect,
   Separator,
   Spacer,
-  Spinner,
   Text,
   Textarea,
   VStack,
 } from "@chakra-ui/react";
 import { Ban, Gauge, Shield, Zap } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { Drawer } from "~/components/ui/drawer";
+import { Tooltip } from "~/components/ui/tooltip";
 import { toaster } from "~/components/ui/toaster";
-import { modelProviderIcons } from "~/server/modelProviders/iconsMap";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
+import { EligibleModelProvidersPreview } from "./EligibleModelProvidersPreview";
 import { FieldInfoTooltip } from "./FieldInfoTooltip";
+import {
+  VirtualKeyScopePicker,
+  type VirtualKeyScopeEntry,
+} from "./VirtualKeyScopePicker";
 
 type VirtualKeyCreateDrawerProps = {
   organizationId: string;
@@ -30,37 +35,64 @@ type VirtualKeyCreateDrawerProps = {
   onCreated: (result: { id: string; name: string; secret: string }) => void;
 };
 
-/**
- * "New virtual key" drawer — minimum viable form: name, description, env
- * toggle. A3 lane will rewrite this to use the VirtualKeyScopePicker and
- * RoutingPolicy picker; for now the drawer creates an ORG-scoped VK with
- * no policy, leaving routing fully up to the fallback chain.
- */
 export function VirtualKeyCreateDrawer({
   organizationId,
   open,
   onOpenChange,
   onCreated,
 }: VirtualKeyCreateDrawerProps) {
+  const { organization, team, project } = useOrganizationTeamProject();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [tagsCsv, setTagsCsv] = useState("");
   const [environment, setEnvironment] = useState<"live" | "test">("live");
-  const [selectedProviderIds, setSelectedProviderIds] = useState<string[]>([]);
+  const [scopes, setScopes] = useState<VirtualKeyScopeEntry[]>([]);
+  const [routingPolicyId, setRoutingPolicyId] = useState<string>("");
+
+  const availableTeams = useMemo(
+    () =>
+      organization?.teams?.map((t) => ({ id: t.id, name: t.name })) ?? [],
+    [organization?.teams],
+  );
+  const availableProjects = useMemo(
+    () =>
+      organization?.teams?.flatMap((t) =>
+        t.projects.map((p) => ({
+          id: p.id,
+          name: `${p.name} · ${t.name}`,
+          teamId: t.id,
+        })),
+      ) ?? [],
+    [organization?.teams],
+  );
+
+  // Seed the picker with the narrowest scope the user is currently in:
+  // project beats team beats org. Mirrors the ModelProvider create flow.
+  useEffect(() => {
+    if (!open || scopes.length > 0) return;
+    const seed: VirtualKeyScopeEntry | null = project?.id
+      ? { scopeType: "PROJECT", scopeId: project.id }
+      : team?.id
+      ? { scopeType: "TEAM", scopeId: team.id }
+      : organizationId
+      ? { scopeType: "ORGANIZATION", scopeId: organizationId }
+      : null;
+    if (seed) setScopes([seed]);
+  }, [open, scopes.length, project?.id, team?.id, organizationId]);
 
   const utils = api.useContext();
-  // Provider picker pending A3 rewrite — the legacy binding-list query
-  // was removed alongside GatewayProviderCredential. Empty list for now.
-  const credentialsQuery = { data: [] as any[], isLoading: false } as const;
   const createMutation = api.virtualKeys.create.useMutation({
     onSuccess: async () => {
       await utils.virtualKeys.list.invalidate({ organizationId });
     },
   });
-
-  const availableProviders = useMemo(
-    () => credentialsQuery.data ?? [],
-    [credentialsQuery.data],
+  const orgProvidersQuery = api.modelProvider.listAllForOrganizationForFrontend.useQuery(
+    { organizationId },
+    { enabled: open && !!organizationId },
+  );
+  const policiesQuery = api.routingPolicy.list.useQuery(
+    { organizationId },
+    { enabled: open && !!organizationId },
   );
 
   const reset = () => {
@@ -68,7 +100,8 @@ export function VirtualKeyCreateDrawer({
     setDescription("");
     setTagsCsv("");
     setEnvironment("live");
-    setSelectedProviderIds([]);
+    setScopes([]);
+    setRoutingPolicyId("");
   };
 
   const handleClose = () => {
@@ -79,8 +112,12 @@ export function VirtualKeyCreateDrawer({
 
   const handleSubmit = async () => {
     if (!name) {
+      toaster.create({ title: "Name is required", type: "error" });
+      return;
+    }
+    if (scopes.length === 0) {
       toaster.create({
-        title: "Name is required",
+        title: "Pick at least one scope for this key",
         type: "error",
       });
       return;
@@ -95,7 +132,8 @@ export function VirtualKeyCreateDrawer({
         name,
         description: description || undefined,
         environment,
-        scopes: [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
+        scopes,
+        routingPolicyId: routingPolicyId ? routingPolicyId : null,
         config: tags.length > 0 ? { metadata: { tags } } : undefined,
       });
       onCreated({
@@ -107,24 +145,26 @@ export function VirtualKeyCreateDrawer({
       onOpenChange(false);
     } catch (error) {
       toaster.create({
-        title: error instanceof Error ? error.message : "Failed to create virtual key",
+        title:
+          error instanceof Error ? error.message : "Failed to create virtual key",
         type: "error",
       });
     }
   };
 
-  const toggleProvider = (id: string) => {
-    setSelectedProviderIds((current) =>
-      current.includes(id)
-        ? current.filter((pid) => pid !== id)
-        : [...current, id],
-    );
-  };
+  const providers = orgProvidersQuery.data?.providers ?? [];
+  const policies = policiesQuery.data ?? [];
+
+  const cannotIssueReason = (() => {
+    if (!name) return "Name is required.";
+    if (scopes.length === 0) return "Pick at least one scope.";
+    return null;
+  })();
 
   return (
     <Drawer.Root
       open={open}
-      onOpenChange={(details) => handleClose()}
+      onOpenChange={() => handleClose()}
       placement="end"
       size="md"
     >
@@ -139,7 +179,7 @@ export function VirtualKeyCreateDrawer({
               <Field.Label>
                 Name
                 <FieldInfoTooltip
-                  description="Human-readable identifier shown in the list and audit log. Typical pattern: 'prod-openai' or 'codex-cli-team-ml'. Must be unique within the project."
+                  description="Human-readable identifier shown in the list and audit log. Typical pattern: 'prod-openai' or 'codex-cli-team-ml'. Must be unique within the organization."
                   docHref="/ai-gateway/virtual-keys#creating-a-vk"
                 />
               </Field.Label>
@@ -203,114 +243,69 @@ export function VirtualKeyCreateDrawer({
                 accident-prevention.
               </Field.HelperText>
             </Field.Root>
-            <Field.Root required>
+
+            <Separator />
+
+            <VirtualKeyScopePicker
+              scopes={scopes}
+              onScopesChange={setScopes}
+              organizationId={organizationId}
+              organizationName={organization?.name}
+              teamId={team?.id}
+              teamName={team?.name}
+              projectId={project?.id}
+              projectName={project?.name}
+              availableTeams={availableTeams}
+              availableProjects={availableProjects}
+              currentOrganizationId={organizationId}
+              currentTeamId={team?.id}
+              currentProjectId={project?.id}
+            />
+
+            <Field.Root>
               <Field.Label>
-                Provider fallback chain
+                Routing policy (optional)
                 <FieldInfoTooltip
-                  description="Ordered list of provider bindings. The gateway tries #1 first, then #2 on 5xx/timeout/rate-limit/circuit-breaker. Re-order with drag after creating (not wired yet — use the edit drawer for now)."
-                  docHref="/ai-gateway/concepts#fallback-chain"
+                  description="Force this VK to use a specific ordered set of ModelProviders instead of the scope-cascade fallback. Useful for compliance lanes (e.g. 'only EU providers') or cost lanes ('prefer cheapest tier first')."
+                  docHref="/ai-gateway/routing-policies"
                 />
               </Field.Label>
-              <VStack align="stretch" gap={2}>
-                {credentialsQuery.isLoading ? (
-                  <HStack>
-                    <Spinner size="sm" />
-                    <Text fontSize="sm">Loading providers…</Text>
-                  </HStack>
-                ) : availableProviders.length === 0 ? (
-                  <VStack
-                    align="stretch"
-                    gap={2}
-                    borderWidth="1px"
-                    borderColor="orange.200"
-                    borderRadius="md"
-                    background="orange.50"
-                    padding={3}
-                  >
-                    <Text fontSize="sm" fontWeight="medium">
-                      No provider bindings yet
-                    </Text>
-                    <Text fontSize="xs" color="fg.muted">
-                      A virtual key routes requests through{" "}
-                      <strong>provider bindings</strong> — wrappers around
-                      your configured LLM credentials that carry gateway
-                      settings (rate limits, fallback priority). Create at
-                      least one before minting a VK.
-                    </Text>
-                    <HStack>
-                      <Button
-                        size="xs"
-                        colorPalette="orange"
-                        onClick={() => {
-                          onOpenChange(false);
-                          if (typeof window !== "undefined") {
-                            window.location.href = "/settings/gateway/providers";
-                          }
-                        }}
-                      >
-                        Go to Providers →
-                      </Button>
-                    </HStack>
-                  </VStack>
-                ) : (
-                  availableProviders.map((p: any) => {
-                    const selected = selectedProviderIds.includes(p.id);
-                    const providerType =
-                      p.modelProviderName ?? p.provider ?? "";
-                    const icon =
-                      providerType in modelProviderIcons
-                        ? modelProviderIcons[
-                            providerType as keyof typeof modelProviderIcons
-                          ]
-                        : null;
-                    return (
-                      <HStack
-                        key={p.id}
-                        border="1px solid"
-                        borderColor={selected ? "orange.400" : "border.subtle"}
-                        borderRadius="md"
-                        paddingX={3}
-                        paddingY={2}
-                        cursor="pointer"
-                        onClick={() => toggleProvider(p.id)}
-                      >
-                        <Box
-                          width="20px"
-                          height="20px"
-                          flexShrink={0}
-                          display="flex"
-                          alignItems="center"
-                          justifyContent="center"
-                          css={{
-                            "& > svg": { width: "100%", height: "100%" },
-                          }}
-                        >
-                          {icon}
-                        </Box>
-                        <VStack align="start" gap={0}>
-                          <Text fontSize="sm" fontWeight="medium">
-                            {providerType || p.id}
-                          </Text>
-                          <Text fontSize="xs" color="fg.muted">
-                            slot: {p.slot ?? "primary"}
-                          </Text>
-                        </VStack>
-                        <Spacer />
-                        {selected && (
-                          <Badge colorPalette="orange">
-                            #{selectedProviderIds.indexOf(p.id) + 1}
-                          </Badge>
-                        )}
-                      </HStack>
-                    );
-                  })
-                )}
-              </VStack>
+              <NativeSelect.Root size="sm">
+                <NativeSelect.Field
+                  value={routingPolicyId}
+                  onChange={(e) => setRoutingPolicyId(e.target.value)}
+                >
+                  <option value="">
+                    Default — fall back to all eligible providers
+                  </option>
+                  {policies.map((p: any) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </NativeSelect.Field>
+              </NativeSelect.Root>
               <Field.HelperText>
-                Select one or more provider credentials. Order controls
-                fallback priority; re-order with drag later.
+                Default cascade tries every eligible provider in fallback
+                priority order. Pick a routing policy to constrain the set
+                further.
               </Field.HelperText>
             </Field.Root>
+
+            <Box>
+              <Text fontSize="xs" fontWeight="semibold" color="fg.muted" mb={1.5}>
+                Eligible model providers
+              </Text>
+              <EligibleModelProvidersPreview
+                scopes={scopes}
+                organizationId={organizationId}
+                organizationName={organization?.name}
+                availableTeams={availableTeams}
+                availableProjects={availableProjects}
+                isLoading={orgProvidersQuery.isLoading}
+                providers={providers as any}
+              />
+            </Box>
 
             <Separator />
             <CapabilityPreview />
@@ -318,18 +313,11 @@ export function VirtualKeyCreateDrawer({
         </Drawer.Body>
         <Drawer.Footer>
           <HStack width="full">
-            {(() => {
-              const missing: string[] = [];
-              if (!name) missing.push("name");
-              if (selectedProviderIds.length === 0)
-                missing.push("at least one provider");
-              if (missing.length === 0) return null;
-              return (
-                <Text fontSize="xs" color="fg.muted">
-                  Missing: {missing.join(", ")}
-                </Text>
-              );
-            })()}
+            {cannotIssueReason && (
+              <Text fontSize="xs" color="fg.muted">
+                {cannotIssueReason}
+              </Text>
+            )}
             <Spacer />
             <Button
               variant="ghost"
@@ -338,14 +326,21 @@ export function VirtualKeyCreateDrawer({
             >
               Cancel
             </Button>
-            <Button
-              colorPalette="orange"
-              onClick={handleSubmit}
-              loading={createMutation.isPending}
-              disabled={!name || selectedProviderIds.length === 0}
-            >
-              Create
-            </Button>
+            {cannotIssueReason ? (
+              <Tooltip content={cannotIssueReason}>
+                <Button colorPalette="orange" disabled>
+                  Create
+                </Button>
+              </Tooltip>
+            ) : (
+              <Button
+                colorPalette="orange"
+                onClick={handleSubmit}
+                loading={createMutation.isPending}
+              >
+                Create
+              </Button>
+            )}
           </HStack>
         </Drawer.Footer>
       </Drawer.Content>

@@ -36,7 +36,6 @@ import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { modelProviderIcons } from "~/server/modelProviders/iconsMap";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
@@ -246,11 +245,54 @@ function VirtualKeyDetailPage() {
                 <VirtualKeyUsageSnippet />
               </Section>
 
-              <Section title="Provider fallback chain">
-                <ProviderChainTable
-                  chain={vk.providerChain ?? []}
-                  fallbackIds={vk.providerCredentialIds}
-                />
+              <Section title="Scope & routing">
+                <VStack align="stretch" gap={2}>
+                  <HStack gap={1.5} flexWrap="wrap">
+                    {(vk.scopes ?? []).length === 0 ? (
+                      <Text fontSize="sm" color="fg.muted">
+                        No scopes assigned.
+                      </Text>
+                    ) : (
+                      (vk.scopes ?? []).map((s) => {
+                        const palette =
+                          s.scopeType === "ORGANIZATION"
+                            ? "blue"
+                            : s.scopeType === "TEAM"
+                            ? "purple"
+                            : "teal";
+                        return (
+                          <Badge
+                            key={`${s.scopeType}:${s.scopeId}`}
+                            colorPalette={palette}
+                            variant="subtle"
+                          >
+                            {s.scopeType}
+                          </Badge>
+                        );
+                      })
+                    )}
+                  </HStack>
+                  <HStack>
+                    <Text fontSize="sm" color="fg.muted">
+                      Routing policy:
+                    </Text>
+                    {vk.routingPolicyId ? (
+                      <Code fontSize="xs">{vk.routingPolicyId}</Code>
+                    ) : (
+                      <Text fontSize="sm" color="fg.muted">
+                        default cascade — all eligible providers in priority
+                        order
+                      </Text>
+                    )}
+                  </HStack>
+                  <Text fontSize="xs" color="fg.muted">
+                    The gateway resolves the eligible{" "}
+                    <Link href="/settings/model-providers">ModelProviders</Link>{" "}
+                    by walking upward from each scope: org-scoped MPs are
+                    visible to every VK, team-scoped MPs to VKs in that team
+                    and below, project-scoped MPs only to VKs in that project.
+                  </Text>
+                </VStack>
               </Section>
 
               <ConfigurationSection config={vk.config as VkConfig | null} />
@@ -361,12 +403,6 @@ type VkConfig = {
     streamChunk?: unknown[];
   };
   metadata?: { tags?: string[] };
-};
-
-type ChainEntry = {
-  providerCredentialId: string;
-  slot: string;
-  providerType: string;
 };
 
 type VkUsageData = {
@@ -585,100 +621,6 @@ function formatVkAmount(raw: string | number): string {
   return `$${n.toFixed(6)}`;
 }
 
-type ProviderKey = keyof typeof modelProviderIcons;
-
-function resolveIcon(providerType: string): React.ReactNode | null {
-  if (!providerType) return null;
-  if (providerType in modelProviderIcons) {
-    return modelProviderIcons[providerType as ProviderKey];
-  }
-  return null;
-}
-
-function ProviderChainTable({
-  chain,
-  fallbackIds,
-}: {
-  chain: ChainEntry[];
-  fallbackIds: string[];
-}) {
-  // Router's `get` procedure populates providerChain with enriched
-  // info (slot + providerType); list/create/rotate may not. Fall
-  // back to raw IDs if the enriched shape isn't present — keeps the
-  // panel rendering through transient states.
-  const rows: ChainEntry[] =
-    chain.length > 0
-      ? chain
-      : fallbackIds.map((id, idx) => ({
-          providerCredentialId: id,
-          slot: idx === 0 ? "primary" : `fallback-${idx}`,
-          providerType: "",
-        }));
-
-  if (rows.length === 0) {
-    return (
-      <Text fontSize="sm" color="fg.muted">
-        No providers bound.
-      </Text>
-    );
-  }
-
-  return (
-    <Table.Root size="sm">
-      <Table.Header>
-        <Table.Row>
-          <Table.ColumnHeader>Order</Table.ColumnHeader>
-          <Table.ColumnHeader>Provider</Table.ColumnHeader>
-          <Table.ColumnHeader>Slot</Table.ColumnHeader>
-          <Table.ColumnHeader>Credential ID</Table.ColumnHeader>
-        </Table.Row>
-      </Table.Header>
-      <Table.Body>
-        {rows.map((entry, idx) => {
-          const Icon = resolveIcon(entry.providerType);
-          return (
-            <Table.Row key={entry.providerCredentialId}>
-              <Table.Cell>
-                <Badge colorPalette="orange">#{idx + 1}</Badge>
-              </Table.Cell>
-              <Table.Cell>
-                <HStack gap={2}>
-                  <Box
-                    width="20px"
-                    height="20px"
-                    flexShrink={0}
-                    display="flex"
-                    alignItems="center"
-                    justifyContent="center"
-                    css={{
-                      "& > svg": {
-                        width: "100%",
-                        height: "100%",
-                      },
-                    }}
-                  >
-                    {Icon}
-                  </Box>
-                  <Text fontSize="sm" fontWeight="medium">
-                    {entry.providerType || "—"}
-                  </Text>
-                </HStack>
-              </Table.Cell>
-              <Table.Cell>
-                <Badge variant="subtle" colorPalette="gray">
-                  {entry.slot}
-                </Badge>
-              </Table.Cell>
-              <Table.Cell>
-                <Code fontSize="xs">{entry.providerCredentialId}</Code>
-              </Table.Cell>
-            </Table.Row>
-          );
-        })}
-      </Table.Body>
-    </Table.Root>
-  );
-}
 
 function ConfigurationSection({ config }: { config: VkConfig | null }) {
   if (!config) return null;

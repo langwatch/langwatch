@@ -13,7 +13,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Eye, KeyRound, MoreVertical, Pencil, Plus, RotateCw, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "~/utils/compat/next-router";
 
 import AiGatewayLayout from "~/components/gateway/AiGatewayLayout";
@@ -30,9 +30,10 @@ import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { modelProviderIcons } from "~/server/modelProviders/iconsMap";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { api } from "~/utils/api";
+
+type ScopeEntry = { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string };
 
 type CreatedSecret = {
   id: string;
@@ -57,6 +58,66 @@ function VirtualKeysPage() {
     { organizationId: orgId },
     { enabled: !!orgId },
   );
+  const policiesQuery = api.routingPolicy.list.useQuery(
+    { organizationId: orgId },
+    { enabled: !!orgId },
+  );
+  const policyNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const p of policiesQuery.data ?? []) {
+      map.set(p.id, p.name);
+    }
+    return map;
+  }, [policiesQuery.data]);
+  const teamNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const t of organization?.teams ?? []) map.set(t.id, t.name);
+    return map;
+  }, [organization?.teams]);
+  const projectNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const t of organization?.teams ?? []) {
+      for (const p of t.projects) map.set(p.id, p.name);
+    }
+    return map;
+  }, [organization?.teams]);
+  const ScopeChipList = ({ scopes }: { scopes: ScopeEntry[] }) => {
+    if (!scopes || scopes.length === 0) {
+      return (
+        <Text fontSize="xs" color="fg.muted">
+          —
+        </Text>
+      );
+    }
+    return (
+      <HStack gap={1} flexWrap="wrap">
+        {scopes.map((s) => {
+          const label =
+            s.scopeType === "ORGANIZATION"
+              ? `ORG${organization?.name ? `:${organization.name}` : ""}`
+              : s.scopeType === "TEAM"
+              ? `TEAM:${teamNameById.get(s.scopeId) ?? s.scopeId}`
+              : `PROJECT:${projectNameById.get(s.scopeId) ?? s.scopeId}`;
+          const palette =
+            s.scopeType === "ORGANIZATION"
+              ? "blue"
+              : s.scopeType === "TEAM"
+              ? "purple"
+              : "teal";
+          return (
+            <Badge
+              key={`${s.scopeType}:${s.scopeId}`}
+              variant="subtle"
+              colorPalette={palette}
+              fontSize="2xs"
+            >
+              {label}
+            </Badge>
+          );
+        })}
+      </HStack>
+    );
+  };
   const rotateMutation = api.virtualKeys.rotate.useMutation({
     onSuccess: () => utils.virtualKeys.list.invalidate({ organizationId: orgId }),
   });
@@ -169,7 +230,8 @@ function VirtualKeysPage() {
                   <Table.ColumnHeader>Prefix</Table.ColumnHeader>
                   <Table.ColumnHeader>Environment</Table.ColumnHeader>
                   <Table.ColumnHeader>Status</Table.ColumnHeader>
-                  <Table.ColumnHeader>Providers</Table.ColumnHeader>
+                  <Table.ColumnHeader>Scopes</Table.ColumnHeader>
+                  <Table.ColumnHeader>Routing policy</Table.ColumnHeader>
                   <Table.ColumnHeader>Last used</Table.ColumnHeader>
                   <Table.ColumnHeader></Table.ColumnHeader>
                 </Table.Row>
@@ -241,10 +303,19 @@ function VirtualKeysPage() {
                       </Badge>
                     </Table.Cell>
                     <Table.Cell>
-                      <ProviderChainBadges
-                        chain={vk.providerChain ?? []}
-                        fallbackLength={vk.fallbackChainLength}
-                      />
+                      <ScopeChipList scopes={vk.scopes} />
+                    </Table.Cell>
+                    <Table.Cell>
+                      {vk.routingPolicyId ? (
+                        <Badge variant="subtle" colorPalette="purple">
+                          {policyNameById.get(vk.routingPolicyId) ??
+                            vk.routingPolicyId}
+                        </Badge>
+                      ) : (
+                        <Text fontSize="xs" color="fg.muted">
+                          default cascade
+                        </Text>
+                      )}
                     </Table.Cell>
                     <Table.Cell>
                       {vk.lastUsedAt ? (
@@ -381,71 +452,6 @@ function VirtualKeysPage() {
         onConfirm={confirmRevoke}
       />
     </GatewayLayout>
-  );
-}
-
-type ChainEntry = {
-  providerCredentialId: string;
-  slot: string;
-  providerType: string;
-};
-
-function ProviderChainBadges({
-  chain,
-  fallbackLength,
-}: {
-  chain: ChainEntry[];
-  fallbackLength: number;
-}) {
-  // Graceful fallback: if the router hasn't enriched yet (or an old
-  // cache returns without providerChain), show the plain count.
-  if (chain.length === 0) {
-    return <Text fontSize="sm">{fallbackLength}</Text>;
-  }
-  const label = chain.map((c) => c.providerType).join(" → ");
-  return (
-    <Tooltip content={label}>
-      <HStack gap={1}>
-        {chain.map((entry, idx) => {
-          const icon =
-            entry.providerType in modelProviderIcons
-              ? modelProviderIcons[
-                  entry.providerType as keyof typeof modelProviderIcons
-                ]
-              : null;
-          return (
-            <HStack
-              key={entry.providerCredentialId}
-              gap={1}
-              align="center"
-            >
-              <Box
-                width="16px"
-                height="16px"
-                flexShrink={0}
-                display="flex"
-                alignItems="center"
-                justifyContent="center"
-                opacity={idx === 0 ? 1 : 0.6}
-                css={{
-                  "& > svg": {
-                    width: "100%",
-                    height: "100%",
-                  },
-                }}
-              >
-                {icon}
-              </Box>
-              {idx < chain.length - 1 && (
-                <Text fontSize="2xs" color="fg.muted">
-                  →
-                </Text>
-              )}
-            </HStack>
-          );
-        })}
-      </HStack>
-    </Tooltip>
   );
 }
 

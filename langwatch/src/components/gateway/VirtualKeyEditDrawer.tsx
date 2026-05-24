@@ -1,5 +1,4 @@
 import {
-  Badge,
   Box,
   Button,
   Code,
@@ -14,15 +13,20 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
+import { EligibleModelProvidersPreview } from "./EligibleModelProvidersPreview";
 import { FieldInfoTooltip } from "./FieldInfoTooltip";
-import { validateModelAliasesAgainstBoundProviders } from "./virtualKeyAliasValidation";
+import {
+  VirtualKeyScopePicker,
+  type VirtualKeyScopeEntry,
+} from "./VirtualKeyScopePicker";
 
 type PolicyRuleDimension = { deny: string[]; allow: string[] | null };
 
@@ -30,12 +34,13 @@ type GuardrailRef = { id: string; evaluator: string };
 
 type VirtualKeyDetail = {
   id: string;
-  projectId: string;
+  organizationId: string;
   name: string;
   description: string | null;
   environment: "live" | "test";
   status: "active" | "revoked";
-  providerCredentialIds: string[];
+  scopes: VirtualKeyScopeEntry[];
+  routingPolicyId: string | null;
   config: {
     modelAliases?: Record<string, string>;
     cache?: { mode: "respect" | "force" | "disable"; ttlS: number };
@@ -136,9 +141,10 @@ export function VirtualKeyEditDrawer({
   onOpenChange,
   onSaved,
 }: VirtualKeyEditDrawerProps) {
+  const { organization, team, project } = useOrganizationTeamProject();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [providerIds, setProviderIds] = useState<string[]>([]);
+  const [routingPolicyId, setRoutingPolicyId] = useState<string>("");
   const [aliases, setAliases] = useState<AliasPair[]>([]);
   const [cacheMode, setCacheMode] =
     useState<"respect" | "force" | "disable">("respect");
@@ -165,7 +171,7 @@ export function VirtualKeyEditDrawer({
     if (!vk) return;
     setName(vk.name);
     setDescription(vk.description ?? "");
-    setProviderIds(vk.providerCredentialIds);
+    setRoutingPolicyId(vk.routingPolicyId ?? "");
     setAliases(
       Object.entries(vk.config.modelAliases ?? {}).map(([from, to]) => ({
         from,
@@ -207,6 +213,23 @@ export function VirtualKeyEditDrawer({
     setResponseFailOpen(gr.responseFailOpen ?? false);
   }, [vk]);
 
+  const availableTeams = useMemo(
+    () =>
+      organization?.teams?.map((t) => ({ id: t.id, name: t.name })) ?? [],
+    [organization?.teams],
+  );
+  const availableProjects = useMemo(
+    () =>
+      organization?.teams?.flatMap((t) =>
+        t.projects.map((p) => ({
+          id: p.id,
+          name: `${p.name} · ${t.name}`,
+          teamId: t.id,
+        })),
+      ) ?? [],
+    [organization?.teams],
+  );
+
   const parseLines = (value: string): string[] =>
     value
       .split(/\r?\n/)
@@ -230,14 +253,17 @@ export function VirtualKeyEditDrawer({
   };
 
   const utils = api.useContext();
-  // Provider picker pending A3 rewrite — credentials list query went
-  // away with GatewayProviderCredential. Empty list keeps the drawer
-  // compiling; selectedProviderIds becomes a no-op until A3 swaps in
-  // the VirtualKeyScopePicker + RoutingPolicy selection UX.
-  const credentialsQuery = { data: [] as any[], isLoading: false } as const;
   const monitorsQuery = api.monitors.getAllForProject.useQuery(
     { projectId: projectId ?? "" },
     { enabled: !!vk && !!projectId },
+  );
+  const policiesQuery = api.routingPolicy.list.useQuery(
+    { organizationId },
+    { enabled: !!vk && !!organizationId },
+  );
+  const orgProvidersQuery = api.modelProvider.listAllForOrganizationForFrontend.useQuery(
+    { organizationId },
+    { enabled: !!vk && !!organizationId },
   );
   const availableMonitors = useMemo(() => {
     return (monitorsQuery.data ?? [])
@@ -265,40 +291,18 @@ export function VirtualKeyEditDrawer({
     },
   });
 
-  const availableProviders = useMemo(
-    () => credentialsQuery.data ?? [],
-    [credentialsQuery.data],
-  );
-
   const close = () => {
     if (updateMutation.isPending) return;
     onOpenChange(false);
-  };
-
-  const moveProvider = (index: number, delta: -1 | 1) => {
-    setProviderIds((ids) => {
-      const next = [...ids];
-      const target = index + delta;
-      if (target < 0 || target >= next.length) return ids;
-      [next[index], next[target]] = [next[target]!, next[index]!];
-      return next;
-    });
-  };
-
-  const removeProvider = (index: number) => {
-    setProviderIds((ids) => ids.filter((_, i) => i !== index));
-  };
-
-  const addProvider = (id: string) => {
-    if (!id || providerIds.includes(id)) return;
-    setProviderIds((ids) => [...ids, id]);
   };
 
   const addAlias = () => setAliases((a) => [...a, { from: "", to: "" }]);
   const removeAlias = (idx: number) =>
     setAliases((a) => a.filter((_, i) => i !== idx));
   const updateAlias = (idx: number, field: "from" | "to", value: string) => {
-    setAliases((a) => a.map((p, i) => (i === idx ? { ...p, [field]: value } : p)));
+    setAliases((a) =>
+      a.map((p, i) => (i === idx ? { ...p, [field]: value } : p)),
+    );
   };
 
   const submit = async () => {
@@ -307,39 +311,11 @@ export function VirtualKeyEditDrawer({
       toaster.create({ title: "Name is required", type: "error" });
       return;
     }
-    if (providerIds.length === 0) {
-      toaster.create({
-        title: "At least one provider is required",
-        type: "error",
-      });
-      return;
-    }
     const modelAliases: Record<string, string> = {};
     for (const pair of aliases) {
       if (pair.from.trim() && pair.to.trim()) {
         modelAliases[pair.from.trim()] = pair.to.trim();
       }
-    }
-    const boundProviderTypes = new Set(
-      providerIds
-        .map(
-          (id) =>
-            availableProviders.find((p: any) => p.id === id)?.modelProviderName,
-        )
-        .filter((t): t is string => !!t),
-    );
-    const { errors: aliasValidationErrors } =
-      validateModelAliasesAgainstBoundProviders({
-        aliases: modelAliases,
-        boundProviderTypes,
-      });
-    if (aliasValidationErrors.length > 0) {
-      toaster.create({
-        title: "Model alias refers to an unbound provider",
-        description: aliasValidationErrors.join(" "),
-        type: "error",
-      });
-      return;
     }
     try {
       await updateMutation.mutateAsync({
@@ -347,6 +323,7 @@ export function VirtualKeyEditDrawer({
         id: vk.id,
         name,
         description: description || null,
+        routingPolicyId: routingPolicyId ? routingPolicyId : null,
         config: {
           modelAliases,
           cache: { mode: cacheMode, ttlS: cacheTtlS },
@@ -376,21 +353,13 @@ export function VirtualKeyEditDrawer({
     } catch (error) {
       toaster.create({
         title:
-          error instanceof Error ? error.message : "Failed to update virtual key",
+          error instanceof Error
+            ? error.message
+            : "Failed to update virtual key",
         type: "error",
       });
     }
   };
-
-  const providerNameById = new Map<string, string>(
-    availableProviders.map((p: any) => [
-      String(p.id),
-      String(p.modelProviderName ?? p.provider ?? p.id),
-    ]),
-  );
-  const unselectedProviders = availableProviders.filter(
-    (p: any) => !providerIds.includes(p.id),
-  );
 
   return (
     <Drawer.Root
@@ -410,7 +379,7 @@ export function VirtualKeyEditDrawer({
               <Field.Label>
                 Name
                 <FieldInfoTooltip
-                  description="Human-readable identifier shown in the list and audit log. Must be unique within the project. Rename is non-breaking — the VK id + secret remain the same."
+                  description="Human-readable identifier shown in the list and audit log. Must be unique within the organization. Rename is non-breaking — the VK id + secret remain the same."
                   docHref="/ai-gateway/virtual-keys#creating-a-vk"
                 />
               </Field.Label>
@@ -449,74 +418,66 @@ export function VirtualKeyEditDrawer({
             </Field.Root>
 
             <Separator />
-            <Text fontSize="sm" fontWeight="semibold">
-              Provider fallback chain
-            </Text>
-            <VStack align="stretch" gap={2}>
-              {providerIds.length === 0 ? (
-                <Text fontSize="sm" color="fg.muted">
-                  No providers selected. Add at least one.
-                </Text>
-              ) : (
-                providerIds.map((id, idx) => (
-                  <HStack
-                    key={id}
-                    border="1px solid"
-                    borderColor="border.subtle"
-                    borderRadius="md"
-                    paddingX={3}
-                    paddingY={2}
-                  >
-                    <Badge colorPalette="orange">#{idx + 1}</Badge>
-                    <Text fontSize="sm">
-                      {providerNameById.get(id) ?? id}
-                    </Text>
-                    <Spacer />
-                    <IconButton
-                      aria-label="Move up"
-                      variant="ghost"
-                      size="xs"
-                      onClick={() => moveProvider(idx, -1)}
-                      disabled={idx === 0}
-                    >
-                      <ArrowUp size={12} />
-                    </IconButton>
-                    <IconButton
-                      aria-label="Move down"
-                      variant="ghost"
-                      size="xs"
-                      onClick={() => moveProvider(idx, 1)}
-                      disabled={idx === providerIds.length - 1}
-                    >
-                      <ArrowDown size={12} />
-                    </IconButton>
-                    <IconButton
-                      aria-label="Remove"
-                      variant="ghost"
-                      size="xs"
-                      onClick={() => removeProvider(idx)}
-                    >
-                      <Trash2 size={12} />
-                    </IconButton>
-                  </HStack>
-                ))
-              )}
-              {unselectedProviders.length > 0 && (
-                <NativeSelect.Root size="sm">
-                  <NativeSelect.Field
-                    value=""
-                    onChange={(e) => addProvider(e.target.value)}
-                  >
-                    <option value="">+ Add provider to chain…</option>
-                    {unselectedProviders.map((p: any) => (
-                      <option key={p.id} value={p.id}>
-                        {p.modelProviderName ?? p.provider ?? p.id}
-                      </option>
-                    ))}
-                  </NativeSelect.Field>
-                </NativeSelect.Root>
-              )}
-            </VStack>
+            {vk && (
+              <VirtualKeyScopePicker
+                scopes={vk.scopes}
+                onScopesChange={() => undefined}
+                isExisting
+                organizationId={organizationId}
+                organizationName={organization?.name}
+                teamId={team?.id}
+                teamName={team?.name}
+                projectId={project?.id}
+                projectName={project?.name}
+                availableTeams={availableTeams}
+                availableProjects={availableProjects}
+              />
+            )}
+
+            <Field.Root>
+              <Field.Label>
+                Routing policy
+                <FieldInfoTooltip
+                  description="Force this VK to use a specific ordered set of ModelProviders instead of the scope-cascade fallback. Change is non-breaking — clients keep working with the new policy on the next /config refresh."
+                  docHref="/ai-gateway/routing-policies"
+                />
+              </Field.Label>
+              <NativeSelect.Root size="sm">
+                <NativeSelect.Field
+                  value={routingPolicyId}
+                  onChange={(e) => setRoutingPolicyId(e.target.value)}
+                >
+                  <option value="">
+                    Default — fall back to all eligible providers
+                  </option>
+                  {(policiesQuery.data ?? []).map((p: any) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </NativeSelect.Field>
+              </NativeSelect.Root>
+              <Field.HelperText>
+                Default cascade uses all eligible providers in fallback
+                priority. Picking a policy constrains routing to its ordered
+                provider list.
+              </Field.HelperText>
+            </Field.Root>
+
+            <Box>
+              <Text fontSize="xs" fontWeight="semibold" color="fg.muted" mb={1.5}>
+                Eligible model providers
+              </Text>
+              <EligibleModelProvidersPreview
+                scopes={vk?.scopes ?? []}
+                organizationId={organizationId}
+                organizationName={organization?.name}
+                availableTeams={availableTeams}
+                availableProjects={availableProjects}
+                isLoading={orgProvidersQuery.isLoading}
+                providers={(orgProvidersQuery.data?.providers ?? []) as any}
+              />
+            </Box>
 
             <Separator />
             <HStack>
@@ -651,10 +612,7 @@ export function VirtualKeyEditDrawer({
               </Field.Root>
               <Field.Root flex={1}>
                 <Field.Label>
-                  tpm{" "}
-                  <Badge colorPalette="gray" fontSize="2xs" ml={1}>
-                    v1.1
-                  </Badge>
+                  tpm
                 </Field.Label>
                 <Input
                   value={tpm}
@@ -665,7 +623,7 @@ export function VirtualKeyEditDrawer({
                 />
                 <Field.HelperText>
                   Tokens / minute — requires pre-request token estimation;
-                  ships with Redis-coordinated cluster counters.
+                  ships with Redis-coordinated cluster counters (v1.1).
                 </Field.HelperText>
               </Field.Root>
               <Field.Root flex={1}>
@@ -854,13 +812,6 @@ export function VirtualKeyEditDrawer({
                 </Field.HelperText>
               </Field.Root>
             </HStack>
-
-            <Box paddingTop={2}>
-              <Text fontSize="xs" color="fg.muted">
-                Advanced controls (fallback triggers, principal binding) are
-                editable via the REST/CLI until a dedicated tab lands.
-              </Text>
-            </Box>
           </VStack>
         </Drawer.Body>
         <Drawer.Footer>
@@ -877,7 +828,7 @@ export function VirtualKeyEditDrawer({
               colorPalette="orange"
               onClick={submit}
               loading={updateMutation.isPending}
-              disabled={!name || providerIds.length === 0}
+              disabled={!name}
             >
               Save changes
             </Button>
