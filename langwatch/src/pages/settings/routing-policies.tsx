@@ -327,7 +327,7 @@ function RoutingPoliciesPage() {
                     no_default_routing_policy
                   </Text>
                   . Start with an Organization default that points at
-                  whichever provider credentials your team should use, then
+                  whichever model providers your team should use, then
                   override per-team or per-project as needed.
                 </Text>
                 <HStack gap={3} paddingTop={1}>
@@ -444,7 +444,7 @@ function RoutingPoliciesPage() {
             : []
         }
         credentialsLoading={credentialsQuery.isLoading}
-        gatewayProvidersAdminPath="/settings/gateway/providers"
+        modelProvidersAdminPath="/settings/model-providers"
         errorMessage={drawerError}
         onClearError={() => setDrawerError(null)}
         onSubmit={onSubmit}
@@ -731,7 +731,7 @@ type ProviderCredentialOption = {
 };
 
 /**
- * Structured ordered multi-select for provider credentials. Replaces
+ * Structured ordered multi-select for model providers. Replaces
  * the prior free-text ChipListEditor (G19) — the input expected raw
  * GatewayProviderCredential CUIDs and the placeholder hinted at slugs
  * like `mp_anthropic`, so admins typed slugs and got a 403 rejection
@@ -743,13 +743,13 @@ function ProviderCredentialPicker({
   onChange,
   available,
   loading,
-  gatewayProvidersAdminPath,
+  modelProvidersAdminPath,
 }: {
   selectedIds: string[];
   onChange: (next: string[]) => void;
   available: ProviderCredentialOption[];
   loading: boolean;
-  gatewayProvidersAdminPath: string | null;
+  modelProvidersAdminPath: string | null;
 }) {
   const byId = useMemo(() => {
     const map = new Map<string, ProviderCredentialOption>();
@@ -801,7 +801,7 @@ function ProviderCredentialPicker({
       <HStack gap={2}>
         <Spinner size="xs" />
         <Text fontSize="sm" color="fg.muted">
-          Loading provider credentials…
+          Loading model providers…
         </Text>
       </HStack>
     );
@@ -818,21 +818,20 @@ function ProviderCredentialPicker({
       >
         <VStack align="start" gap={1}>
           <Text fontSize="sm" fontWeight="semibold">
-            No gateway provider credentials yet
+            No model providers yet
           </Text>
           <Text fontSize="xs" color="fg.muted">
-            A routing policy points at one or more gateway provider
-            credentials. Configure at least one before saving this
-            policy.
+            A routing policy points at one or more model providers.
+            Configure at least one before saving this policy.
           </Text>
-          {gatewayProvidersAdminPath && (
+          {modelProvidersAdminPath && (
             <Link
-              href={gatewayProvidersAdminPath}
+              href={modelProvidersAdminPath}
               color="orange.700"
               fontSize="xs"
               fontWeight="medium"
             >
-              Open Gateway Providers admin →
+              Open Model Providers admin →
             </Link>
           )}
         </VStack>
@@ -851,23 +850,23 @@ function ProviderCredentialPicker({
       >
         <VStack align="start" gap={1}>
           <Text fontSize="sm" fontWeight="semibold">
-            All gateway provider credentials are disabled
+            All model providers are disabled
           </Text>
           <Text fontSize="xs" color="fg.muted">
             {available.length === 1
-              ? "The org has 1 gateway binding, but it's disabled."
-              : `The org has ${available.length} gateway bindings, but all are disabled.`}
-            {" "}Re-enable one (or bind a fresh credential) before this
-            policy can route traffic.
+              ? "The org has 1 model provider, but it's disabled."
+              : `The org has ${available.length} model providers, but all are disabled.`}
+            {" "}Re-enable one (or add a fresh one) before this policy can
+            route traffic.
           </Text>
-          {gatewayProvidersAdminPath && (
+          {modelProvidersAdminPath && (
             <Link
-              href={gatewayProvidersAdminPath}
+              href={modelProvidersAdminPath}
               color="orange.700"
               fontSize="xs"
               fontWeight="medium"
             >
-              Open Gateway Providers admin →
+              Open Model Providers admin →
             </Link>
           )}
         </VStack>
@@ -944,7 +943,7 @@ function ProviderCredentialPicker({
         <NativeSelect.Root size="sm">
           <NativeSelect.Field
             value=""
-            aria-label="Add provider credential"
+            aria-label="Add model provider"
             onChange={(e) => {
               const value = e.target.value;
               if (value) {
@@ -953,7 +952,7 @@ function ProviderCredentialPicker({
               }
             }}
           >
-            <option value="">+ Add provider credential…</option>
+            <option value="">+ Add model provider…</option>
             {remaining.map((option) => (
               <option key={option.id} value={option.id}>
                 {formatLabel(option)}
@@ -964,7 +963,7 @@ function ProviderCredentialPicker({
         </NativeSelect.Root>
       ) : (
         <Text fontSize="xs" color="fg.muted">
-          All configured provider credentials are in this policy.
+          All configured model providers are in this policy.
         </Text>
       )}
     </VStack>
@@ -979,7 +978,7 @@ function RoutingPolicyDrawer({
   isPending,
   availableCredentials,
   credentialsLoading,
-  gatewayProvidersAdminPath,
+  modelProvidersAdminPath,
   errorMessage,
   onClearError,
   onSubmit,
@@ -992,7 +991,7 @@ function RoutingPolicyDrawer({
   isPending: boolean;
   availableCredentials: ProviderCredentialOption[];
   credentialsLoading: boolean;
-  gatewayProvidersAdminPath: string | null;
+  modelProvidersAdminPath: string | null;
   errorMessage: string | null;
   onClearError: () => void;
   onSubmit: () => void;
@@ -1096,9 +1095,9 @@ function RoutingPolicyDrawer({
 
               <Field.Root required>
                 <Field.Label>
-                  Provider credentials (ordered)
+                  Model Providers (ordered)
                   <FieldInfoTooltip
-                    description="Ordered list of the org's gateway provider credentials. The gateway tries #1 first; on 5xx, timeout, rate-limit, or circuit-breaker the next item in the list takes over. Re-order with the ↑/↓ arrows on each row to set fallback priority."
+                    description="Ordered list of the org's model providers. The gateway tries #1 first; on 5xx, timeout, rate-limit, or circuit-breaker the next item in the list takes over. Re-order with the ↑/↓ arrows on each row to set fallback priority."
                     docHref="/ai-gateway/governance/routing-policies"
                   />
                 </Field.Label>
@@ -1109,7 +1108,7 @@ function RoutingPolicyDrawer({
                   }
                   available={availableCredentials}
                   loading={credentialsLoading}
-                  gatewayProvidersAdminPath={gatewayProvidersAdminPath}
+                  modelProvidersAdminPath={modelProvidersAdminPath}
                 />
                 <Field.HelperText>
                   First match wins. Use ↑/↓ to set fallback priority.
