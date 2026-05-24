@@ -20,17 +20,23 @@ set -euo pipefail
 GATEWAY="${LW_GATEWAY_BASE_URL:-http://localhost:5563}"
 
 declare -a SCOPES=("ORG" "TEAM" "PROJECT" "PERSONAL")
-declare -a PROVIDERS=("openai" "anthropic" "gemini" "bedrock" "deepseek" "groq")
+declare -a PROVIDERS=("openai" "anthropic" "gemini" "bedrock")
 
-# Smallest cheapest model per provider — anything that resolves through
-# the gateway's model-aliasing without burning tokens.
+# Smallest / cheapest model per provider.
 declare -A MODEL=(
   [openai]="gpt-5-mini"
-  [anthropic]="claude-3-5-haiku-latest"
-  [gemini]="gemini-2.0-flash-lite"
-  [bedrock]="anthropic.claude-3-5-haiku-20241022-v1:0"
-  [deepseek]="deepseek-chat"
-  [groq]="llama-3.1-8b-instant"
+  [anthropic]="claude-haiku-4-5"
+  [gemini]="gemini-2.5-flash"
+  [bedrock]="bedrock/anthropic.claude-3-5-haiku-20241022-v1:0"
+)
+
+# OpenAI gpt-5-* family rejects max_tokens; uses max_completion_tokens.
+# Anthropic + Gemini + Bedrock keep max_tokens.
+declare -A TOKEN_FIELD=(
+  [openai]="max_completion_tokens"
+  [anthropic]="max_tokens"
+  [gemini]="max_tokens"
+  [bedrock]="max_tokens"
 )
 
 vk_for_scope() {
@@ -52,9 +58,10 @@ probe() {
     return
   fi
   local model="${MODEL[$provider]}"
+  local token_field="${TOKEN_FIELD[$provider]:-max_tokens}"
   local body
   body=$(cat <<JSON
-{"model":"${model}","messages":[{"role":"user","content":"ping"}],"max_tokens":4,"stream":false}
+{"model":"${model}","messages":[{"role":"user","content":"ping"}],"${token_field}":8,"stream":false}
 JSON
 )
   local start_ms end_ms code

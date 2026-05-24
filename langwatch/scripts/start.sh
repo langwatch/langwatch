@@ -44,19 +44,25 @@ if [[ "$NODE_ENV" = "development" ]]; then
   # Each derived var is set only when unset, so explicit .env values win.
   #
   # Naming-collision note: the Go gateway reads LW_GATEWAY_BASE_URL as the
-  # CONTROL PLANE URL (it calls back to /api/internal/gateway/*). The TS
-  # side (CLI + /me VK reveal) reads the same var as the GATEWAY URL (what
-  # end users hit). The auto-derive sets the TS-facing meaning here and
-  # uses GATEWAY_CONTROL_PLANE_URL (the Go-side legacy alias) for the
-  # CP-bound direction so both halves land on correct values without a
-  # rename of either side's env.
+  # CONTROL PLANE URL (services/aigateway/config.go:113 — canonical,
+  # higher precedence than GATEWAY_CONTROL_PLANE_URL). The TS side (CLI
+  # + /me VK reveal) reads the same var name as the GATEWAY public URL.
+  # Same env, two semantics. Pre-resolution this caused the Go gateway
+  # to loop to its own :5563 in dev (LW_GATEWAY_BASE_URL=:5563 → CP URL
+  # → 404 → invalid_api_key cascade).
+  #
+  # Resolution: in dev, set LW_GATEWAY_BASE_URL to the CP URL (Go's
+  # interpretation wins). The TS gateway-public-URL default is a hard-
+  # coded :5563 fallback in personalVirtualKey.service.ts — that still
+  # works locally without the env var.
   _APP_PORT="${PORT:-5560}"
+  _API_PORT=$((_APP_PORT + 1000))
   GATEWAY_PORT_DERIVED=$((_APP_PORT + 3))
-  if [ -z "$GATEWAY_CONTROL_PLANE_URL" ] && [ -z "$LW_GATEWAY_BASE_URL" ]; then
-    export GATEWAY_CONTROL_PLANE_URL="http://localhost:${_APP_PORT}"
+  if [ -z "$GATEWAY_CONTROL_PLANE_URL" ]; then
+    export GATEWAY_CONTROL_PLANE_URL="http://localhost:${_API_PORT}"
   fi
   if [ -z "$LW_GATEWAY_BASE_URL" ]; then
-    export LW_GATEWAY_BASE_URL="http://localhost:${GATEWAY_PORT_DERIVED}"
+    export LW_GATEWAY_BASE_URL="$GATEWAY_CONTROL_PLANE_URL"
   fi
   if [ -z "$LW_GATEWAY_INTERNAL_URL" ]; then
     export LW_GATEWAY_INTERNAL_URL="http://localhost:${GATEWAY_PORT_DERIVED}"

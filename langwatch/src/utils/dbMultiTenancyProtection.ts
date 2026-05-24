@@ -276,6 +276,17 @@ const validateRecursive = (
       if (validateRecursive(clause, passes)) return true;
     }
   }
+  // OR semantics: every alternative branch must independently carry a
+  // tenancy predicate, otherwise the unbounded branch leaks rows. The
+  // canonical case is `findByHashedSecret`, which ORs together a current
+  // hashedSecret + an in-grace previousHashedSecret; both branches name
+  // a uniquely-keyed secret, so the guard recognises the query as bounded.
+  if (Array.isArray(where.OR) && where.OR.length > 0) {
+    const allBranchesBounded = where.OR.every((clause: any) =>
+      validateRecursive(clause, passes),
+    );
+    if (allBranchesBounded) return true;
+  }
   return false;
 };
 
@@ -348,6 +359,10 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
           (c.organizationId && Array.isArray(c.organizationId.in)) ||
           hasIdOrInPredicate(c) ||
           typeof c.hashedSecret === "string" ||
+          // Rotation grace-window lookup: previousHashedSecret is a
+          // uniquely-keyed secret column too, so a where-clause that
+          // names it is bounded.
+          typeof c.previousHashedSecret === "string" ||
           hasScopePredicate(c),
       );
       return ok

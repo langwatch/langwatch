@@ -53,6 +53,7 @@ import {
   hashVirtualKeySecret,
   mintVirtualKeySecret,
 } from "../src/server/gateway/virtualKey.crypto";
+import { encrypt } from "../src/utils/encryption";
 
 const prisma = new PrismaClient();
 
@@ -60,6 +61,16 @@ const DOGFOOD_USER_EMAIL = "dogfood@acme.test";
 const DOGFOOD_USER_NAME = "Dogfood Admin";
 const ORG_SLUG = "acme";
 const ORG_NAME = "ACME";
+
+/**
+ * Encrypt customKeys for the ModelProvider.customKeys column. The
+ * materialiser's decryptCustomKeys() accepts both encrypted strings AND
+ * plain objects, but prod always stores the encrypted form; seed in
+ * the same shape so the dogfood data exercises the decrypt path.
+ */
+function encryptKeys(keys: Record<string, string>): string {
+  return encrypt(JSON.stringify(keys));
+}
 
 interface SeedHandles {
   userId: string;
@@ -171,18 +182,29 @@ async function ensureUserOrgTeamsProjects(): Promise<
 
 async function ensureModelProviders(
   base: Omit<SeedHandles, "openaiMpId" | "anthropicMpId" | "routingPolicyId">,
-): Promise<{ openaiMpId: string; anthropicMpId: string }> {
+): Promise<{
+  openaiMpId: string;
+  anthropicMpId: string;
+  geminiMpId: string | null;
+  bedrockMpId: string | null;
+}> {
+  // Key names match what config.materialiser's buildCredentials() picks
+  // off customKeys for each provider (UPPER_SNAKE_CASE env-var style).
   const openaiKey = process.env.OPENAI_API_KEY ?? null;
   const anthropicKey = process.env.ANTHROPIC_API_KEY ?? null;
+  const geminiKey =
+    process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY ?? null;
+  const bedrockAccessKey = process.env.AWS_ACCESS_KEY_ID ?? null;
+  const bedrockSecretKey = process.env.AWS_SECRET_ACCESS_KEY ?? null;
+  const bedrockRegion =
+    process.env.AWS_REGION_NAME ?? process.env.AWS_REGION ?? "us-east-1";
 
   // OpenAI at ORG scope — every VK in the org can resolve it via scope cascade.
-  // ModelProvider has no unique slug; idempotency falls back to a
-  // (name + ORG-scope) findFirst lookup.
   const openai = await upsertModelProviderByName({
     organizationId: base.organizationId,
     name: "OpenAI",
     provider: "openai",
-    customKeys: openaiKey ? { apiKey: openaiKey } : null,
+    customKeys: openaiKey ? encryptKeys({ OPENAI_API_KEY: openaiKey }) : null,
     rateLimitRpm: 600,
     fallbackPriorityGlobal: 10,
     scopes: [{ scopeType: "ORGANIZATION", scopeId: base.organizationId }],
@@ -194,31 +216,77 @@ async function ensureModelProviders(
     organizationId: base.organizationId,
     name: "Anthropic",
     provider: "anthropic",
-    customKeys: anthropicKey ? { apiKey: anthropicKey } : null,
+    customKeys: anthropicKey
+      ? encryptKeys({ ANTHROPIC_API_KEY: anthropicKey })
+      : null,
     rateLimitRpm: 300,
     fallbackPriorityGlobal: 20,
     scopes: [{ scopeType: "TEAM", scopeId: base.platformTeamId }],
   });
 
-  return { openaiMpId: openai.id, anthropicMpId: anthropic.id };
+  // Gemini at ORG scope so any VK in the org can route through it
+  // alongside OpenAI. Only seeded when GEMINI_API_KEY (or
+  // GOOGLE_API_KEY fallback) is set in env.
+  const gemini = geminiKey
+    ? await upsertModelProviderByName({
+        organizationId: base.organizationId,
+        name: "Gemini",
+        provider: "gemini",
+        customKeys: encryptKeys({ GEMINI_API_KEY: geminiKey }),
+        rateLimitRpm: 300,
+        fallbackPriorityGlobal: 30,
+        scopes: [{ scopeType: "ORGANIZATION", scopeId: base.organizationId }],
+      })
+    : null;
+
+  // Bedrock at ORG scope. Requires AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY.
+  const bedrock =
+    bedrockAccessKey && bedrockSecretKey
+      ? await upsertModelProviderByName({
+          organizationId: base.organizationId,
+          name: "Bedrock",
+          provider: "bedrock",
+          customKeys: encryptKeys({
+            AWS_ACCESS_KEY_ID: bedrockAccessKey,
+            AWS_SECRET_ACCESS_KEY: bedrockSecretKey,
+            AWS_REGION_NAME: bedrockRegion,
+          }),
+          rateLimitRpm: 200,
+          fallbackPriorityGlobal: 40,
+          scopes: [{ scopeType: "ORGANIZATION", scopeId: base.organizationId }],
+        })
+      : null;
+
+  return {
+    openaiMpId: openai.id,
+    anthropicMpId: anthropic.id,
+    geminiMpId: gemini?.id ?? null,
+    bedrockMpId: bedrock?.id ?? null,
+  };
 }
 
 async function upsertModelProviderByName(input: {
   organizationId: string;
   name: string;
   provider: string;
-  customKeys: Record<string, unknown> | null;
+  customKeys: string | Record<string, unknown> | null;
   rateLimitRpm: number;
   fallbackPriorityGlobal: number;
   scopes: Array<{ scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }>;
 }): Promise<{ id: string }> {
+  // Idempotency: ANY MP with this `name` reachable from one of the
+  // input scopes counts as the same row. Matching only ORGANIZATION
+  // scope missed TEAM-scoped seeds and produced duplicate rows on
+  // every re-run.
   const existing = await prisma.modelProvider.findFirst({
     where: {
       name: input.name,
       scopes: {
         some: {
-          scopeType: "ORGANIZATION",
-          scopeId: input.organizationId,
+          OR: input.scopes.map((s) => ({
+            scopeType: s.scopeType,
+            scopeId: s.scopeId,
+          })),
         },
       },
     },
@@ -257,12 +325,24 @@ async function upsertModelProviderByName(input: {
 
 async function ensureRoutingPolicy(
   base: Omit<SeedHandles, "openaiMpId" | "anthropicMpId" | "routingPolicyId">,
-  mps: { openaiMpId: string; anthropicMpId: string },
+  mps: {
+    openaiMpId: string;
+    anthropicMpId: string;
+    geminiMpId: string | null;
+    bedrockMpId: string | null;
+  },
 ): Promise<string> {
-  // ORG-scope default policy that orders openai → anthropic for any VK
-  // that links to it. The vk_org row WILL link to this; the team/project
-  // ones will deliberately NOT link, exercising the no-policy default-fallback
-  // path locked in vk-config-bundle.feature.
+  // ORG-scope default policy that orders openai → anthropic (→ gemini →
+  // bedrock when those MPs are seeded with real keys) for any VK that
+  // links to it. The vk_org row WILL link to this; the team/project
+  // ones will deliberately NOT link, exercising the no-policy default
+  // fallback path locked in vk-config-bundle.feature.
+  const chain = [
+    mps.openaiMpId,
+    mps.anthropicMpId,
+    mps.geminiMpId,
+    mps.bedrockMpId,
+  ].filter((id): id is string => typeof id === "string");
   const policy = await prisma.routingPolicy.upsert({
     where: {
       organizationId_scope_scopeId_name: {
@@ -277,14 +357,24 @@ async function ensureRoutingPolicy(
       scope: "ORGANIZATION",
       scopeId: base.organizationId,
       name: "developer-default",
-      description: "Try OpenAI first, fall back to Anthropic",
+      description: "Try OpenAI first, fall back to other configured providers",
       strategy: "priority",
-      modelProviderIds: [mps.openaiMpId, mps.anthropicMpId],
-      modelAllowlist: ["gpt-5-mini", "gpt-5", "claude-3-5-haiku", "claude-sonnet-4"],
+      modelProviderIds: chain,
+      modelAllowlist: [
+        "gpt-5-mini",
+        "gpt-5",
+        "claude-haiku-4-5",
+        "claude-3-5-haiku",
+        "claude-3-5-haiku-latest",
+        "claude-sonnet-4",
+        "gemini-2.5-flash",
+        "gemini-2.0-flash",
+        "anthropic.claude-3-5-haiku-20241022-v1:0",
+      ],
       isDefault: true,
     },
     update: {
-      modelProviderIds: [mps.openaiMpId, mps.anthropicMpId],
+      modelProviderIds: chain,
     },
   });
   return policy.id;
@@ -428,7 +518,7 @@ async function main(): Promise<void> {
   console.log(`  ✓ user + org + 2 teams + 3 projects (org=${base.organizationId})`);
 
   const mps = await ensureModelProviders(base);
-  console.log(`  ✓ ModelProviders: openai(org), anthropic(team:platform)`);
+  console.log(`  ✓ ModelProviders: openai(org), anthropic(team:platform), gemini(org if GEMINI_API_KEY set), bedrock(org if AWS_ACCESS_KEY_ID+AWS_SECRET_ACCESS_KEY set)`);
 
   const routingPolicyId = await ensureRoutingPolicy(base, mps);
   console.log(`  ✓ RoutingPolicy: developer-default at ORG scope`);
