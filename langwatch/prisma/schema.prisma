@@ -1892,9 +1892,36 @@ model RoutingPolicy {
   // Back-relation to VirtualKey removed in iter 110 (no FK constraint;
   // VKs are looked up via prisma.virtualKey.findMany({ where: { routingPolicyId } })).
 
+  // Multi-scope assignments. A policy is selectable from any scope row
+  // (union semantics). The legacy `scope` + `scopeId` columns above are
+  // retained until the service-layer switch lands; new code reads from
+  // `scopes` exclusively. The (iiib) migration drops the legacy columns.
+  scopes RoutingPolicyScope[]
+
   @@unique([organizationId, scope, scopeId, name])
   @@index([organizationId])
   @@index([scope, scopeId])
+}
+
+// RoutingPolicyScope — N-scope access for RoutingPolicy. Mirrors
+// VirtualKeyScope + ModelProviderScope exactly. A single RP row is
+// reachable from any scope it has a matching entry for.
+//
+// Backfilled from RoutingPolicy.scope + RoutingPolicy.scopeId on
+// migration so every existing row keeps its current selectability.
+// The service-layer switch from RP.scope/scopeId -> RP.scopes[] lands
+// in a follow-up commit; the legacy columns drop with it.
+model RoutingPolicyScope {
+  id              String                 @id @default(nanoid())
+  routingPolicyId String
+  routingPolicy   RoutingPolicy          @relation(fields: [routingPolicyId], references: [id], onDelete: Cascade)
+  scopeType       RoutingPolicyScopeType
+  scopeId         String
+  createdAt       DateTime               @default(now())
+
+  @@unique([routingPolicyId, scopeType, scopeId])
+  @@index([scopeType, scopeId])
+  @@index([routingPolicyId])
 }
 
 // ---------------------------------------------------------------------------
