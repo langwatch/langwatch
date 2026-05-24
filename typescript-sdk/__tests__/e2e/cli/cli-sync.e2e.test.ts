@@ -174,13 +174,13 @@ describe("CLI E2E", () => {
         expect(localPromptFileManagement.getPromptFileContent(promptHandle))
           .toMatchInlineSnapshot(`
         "model: gpt-4-turbo
-        modelParameters:
-          temperature: 0.9
         messages:
           - role: system
             content: You are an updated system message.
           - role: user
             content: You are an updated user message.
+        modelParameters:
+          temperature: 0.9
         "
       `);
 
@@ -244,12 +244,8 @@ describe("CLI E2E", () => {
         }
         expect(remotePrompt.handle).toBe(promptHandle);
         expect(remotePrompt.model).toBe(localPrompt.model);
-        if (!localPrompt.modelParameters) {
-          throw new Error("Local prompt model parameters not found");
-        }
-        expect(remotePrompt.temperature).toBe(
-          localPrompt.modelParameters.temperature,
-        );
+        // Template omits temperature (gpt-5+ incompatible), so no temperature is synced
+        expect(remotePrompt.temperature).toBeUndefined();
         expect(remotePrompt.messages).toEqual(localPrompt.messages);
 
         // 5. Modify remote prompt
