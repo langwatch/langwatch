@@ -121,7 +121,6 @@ async function seed() {
       id: rid("vk_smoke"),
       organizationId: org.id,
       name: "smoke-vk",
-      environment: "LIVE",
       status: "ACTIVE",
       hashedSecret: hashed,
       displayPrefix,

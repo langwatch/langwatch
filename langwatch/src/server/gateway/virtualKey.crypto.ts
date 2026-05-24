@@ -7,10 +7,6 @@
  *   - Body is a monotonic ULID (128 random bits, 48 ms timestamp), encoded in
  *     Crockford base32 — sortable by creation time in dashboards.
  *
- * Environment (`live` / `test`) is a DB column on VirtualKey + a DTO field,
- * NOT encoded in the token. The token is identity-only; env is metadata
- * the control-plane looks up after hash match.
- *
  * Storage:
  *   - Raw secret: displayed to the user exactly once, never stored.
  *   - `hashedSecret` column: `HMAC-SHA256(pepper, secret)` hex string (64 chars).
@@ -29,12 +25,6 @@
 import { createHmac, randomBytes, timingSafeEqual } from "crypto";
 
 const VK_PREFIX = "vk-lw-";
-
-/**
- * Environment is metadata on the VirtualKey row, NOT encoded in the token.
- * Kept as a type alias for the DB column + DTO field.
- */
-export type VirtualKeyEnvironment = "live" | "test";
 
 // Crockford base32 alphabet (no I L O U to avoid visual ambiguity).
 const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
@@ -81,8 +71,7 @@ export function mintUlid(now: number = Date.now()): string {
 
 /**
  * Mint a new virtual-key secret. The resulting string is shown once to the
- * user and never stored in plaintext. Environment is metadata recorded on
- * the VirtualKey row separately, not in the token.
+ * user and never stored in plaintext.
  */
 export function mintVirtualKeySecret(now: number = Date.now()): string {
   return `${VK_PREFIX}${mintUlid(now)}`;

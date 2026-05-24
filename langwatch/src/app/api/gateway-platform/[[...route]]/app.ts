@@ -126,7 +126,6 @@ const virtualKeyDtoSchema = z.object({
   display_prefix: z.string(),
   name: z.string(),
   description: z.string().nullable(),
-  environment: z.enum(["live", "test"]),
   status: z.enum(["active", "revoked"]),
   principal_user_id: z.string().nullable(),
   provider_credential_ids: z.array(z.string()),
@@ -219,7 +218,6 @@ async function orgIdForProject(projectId: string): Promise<string> {
 const createVirtualKeySchema = z.object({
   name: z.string().min(1).max(128),
   description: z.string().optional(),
-  environment: z.enum(["live", "test"]).default("live"),
   principal_user_id: z.string().nullable().optional(),
   provider_credential_ids: z.array(z.string()).min(1),
   config: virtualKeyConfigSchema.partial().optional(),
@@ -355,7 +353,6 @@ export const app = new Hono<{ Variables: Variables }>()
       organizationId,
       name: body.data.name,
       description: body.data.description ?? null,
-      environment: body.data.environment,
       principalUserId: body.data.principal_user_id ?? null,
       scopes: [{ scopeType: "PROJECT", scopeId: project.id }],
       config: body.data.config,

@@ -37,7 +37,6 @@ type VirtualKeyDetail = {
   organizationId: string;
   name: string;
   description: string | null;
-  environment: "live" | "test";
   status: "active" | "revoked";
   scopes: VirtualKeyScopeEntry[];
   routingPolicyId: string | null;

@@ -29,7 +29,6 @@ export type CreateVirtualKeyData = {
   organizationId: string;
   name: string;
   description?: string | null;
-  environment: "LIVE" | "TEST";
   hashedSecret: string;
   displayPrefix: string;
   principalUserId?: string | null;
@@ -133,7 +132,6 @@ export class VirtualKeyRepository {
         organizationId: data.organizationId,
         name: data.name,
         description: data.description ?? null,
-        environment: data.environment,
         hashedSecret: data.hashedSecret,
         displayPrefix: data.displayPrefix,
         principalUserId: data.principalUserId ?? null,

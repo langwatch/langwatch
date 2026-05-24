@@ -8,6 +8,9 @@
  * derived from the scope graph + optional RoutingPolicy at request time
  * (see `scopeResolver.ts`); the DTO exposes the scope set + the
  * `routingPolicyId` so callers can render the binding-equivalent view.
+ *
+ * The token format is `vk-lw-<ulid>` with no live/test discriminator;
+ * the gateway never branches on environment, so there is no env field.
  */
 import type { VirtualKeyWithScopes } from "./virtualKey.repository";
 
@@ -21,7 +24,6 @@ export type VirtualKeyCamelDto = {
   organizationId: string;
   name: string;
   description: string | null;
-  environment: "live" | "test";
   status: "active" | "revoked";
   displayPrefix: string;
   principalUserId: string | null;
@@ -40,7 +42,6 @@ export type VirtualKeySnakeDto = {
   organization_id: string;
   name: string;
   description: string | null;
-  environment: "live" | "test";
   status: "active" | "revoked";
   display_prefix: string;
   principal_user_id: string | null;
@@ -62,7 +63,6 @@ function baseVk(vk: VirtualKeyWithScopes): BaseVk {
     organizationId: vk.organizationId,
     name: vk.name,
     description: vk.description,
-    environment: vk.environment === "LIVE" ? "live" : "test",
     status: vk.status === "ACTIVE" ? "active" : "revoked",
     displayPrefix: vk.displayPrefix,
     principalUserId: vk.principalUserId,
@@ -95,7 +95,6 @@ export function toVirtualKeySnakeDto(
     organization_id: base.organizationId,
     name: base.name,
     description: base.description,
-    environment: base.environment,
     status: base.status,
     display_prefix: base.displayPrefix,
     principal_user_id: base.principalUserId,

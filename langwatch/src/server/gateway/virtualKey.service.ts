@@ -41,7 +41,6 @@ export type CreateVirtualKeyInput = {
   organizationId: string;
   name: string;
   description?: string | null;
-  environment: "live" | "test";
   principalUserId?: string | null;
   actorUserId: string;
   /**
@@ -167,7 +166,6 @@ export class VirtualKeyService {
           organizationId: input.organizationId,
           name: input.name,
           description: input.description,
-          environment: input.environment === "live" ? "LIVE" : "TEST",
           hashedSecret,
           displayPrefix,
           principalUserId: input.principalUserId,

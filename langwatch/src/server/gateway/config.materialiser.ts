@@ -57,7 +57,6 @@ export type GatewayConfigPayload = {
   vk_id: string;
   status: "active" | "revoked";
   display_prefix: string;
-  environment: "live" | "test";
   organization_id: string;
   /**
    * project_id / project_otlp_token / team_id are populated when the VK
@@ -149,7 +148,6 @@ export class GatewayConfigMaterialiser {
       vk_id: vk.id,
       status: vk.status === "ACTIVE" ? "active" : "revoked",
       display_prefix: vk.displayPrefix,
-      environment: vk.environment === "LIVE" ? "live" : "test",
       organization_id: vk.organizationId,
       project_id: traceProject?.id ?? null,
       project_otlp_token: traceProject?.apiKey ?? null,

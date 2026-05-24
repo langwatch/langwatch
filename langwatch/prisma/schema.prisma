@@ -1610,10 +1610,6 @@ model BillingMeterCheckpoint {
 //   every gateway-surface mutation alongside platform mutations.
 // ============================================================================
 
-enum VirtualKeyEnvironment {
-  LIVE
-  TEST
-}
 
 enum VirtualKeyStatus {
   ACTIVE
@@ -1723,13 +1719,12 @@ model VirtualKey {
 
   name        String
   description String?
-  environment VirtualKeyEnvironment @default(LIVE)
-  status      VirtualKeyStatus      @default(ACTIVE)
+  status      VirtualKeyStatus @default(ACTIVE)
 
   // Credential material. Full secret format:
-  //   vk-lw-{live|test}_<26-char-crockford-ulid>  (40 chars total)
-  // Only the hashed form and a short display prefix (first 18 chars) are
-  // kept after creation. The full secret is shown exactly once.
+  //   vk-lw-<26-char-crockford-ulid>  (32 chars total)
+  // Only the hashed form and a short display prefix are kept after
+  // creation. The full secret is shown exactly once.
   hashedSecret  String // argon2id(secret + server pepper)
   displayPrefix String // e.g. "vk-lw-01HZX9"
 

@@ -45,7 +45,6 @@ export function VirtualKeyCreateDrawer({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [tagsCsv, setTagsCsv] = useState("");
-  const [environment, setEnvironment] = useState<"live" | "test">("live");
   const [scopes, setScopes] = useState<VirtualKeyScopeEntry[]>([]);
   const [routingPolicyId, setRoutingPolicyId] = useState<string>("");
 
@@ -99,7 +98,6 @@ export function VirtualKeyCreateDrawer({
     setName("");
     setDescription("");
     setTagsCsv("");
-    setEnvironment("live");
     setScopes([]);
     setRoutingPolicyId("");
   };
@@ -131,7 +129,6 @@ export function VirtualKeyCreateDrawer({
         organizationId,
         name,
         description: description || undefined,
-        environment,
         scopes,
         routingPolicyId: routingPolicyId ? routingPolicyId : null,
         config: tags.length > 0 ? { metadata: { tags } } : undefined,
@@ -217,33 +214,6 @@ export function VirtualKeyCreateDrawer({
                 AND-subset.
               </Field.HelperText>
             </Field.Root>
-            <Field.Root>
-              <Field.Label>
-                Environment
-                <FieldInfoTooltip
-                  description="Live keys mint 'vk-lw-' prefix; test keys mint 'vk-lw-'. Prefix is the accident-prevention signal — the gateway rejects test keys against production providers when 'live-only' mode is set on the org."
-                  docHref="/ai-gateway/virtual-keys#format"
-                />
-              </Field.Label>
-              <NativeSelect.Root size="sm">
-                <NativeSelect.Field
-                  value={environment}
-                  onChange={(e) =>
-                    setEnvironment(
-                      (e.target.value as "live" | "test") ?? "live",
-                    )
-                  }
-                >
-                  <option value="live">Live</option>
-                  <option value="test">Test</option>
-                </NativeSelect.Field>
-              </NativeSelect.Root>
-              <Field.HelperText>
-                Shape-of-key prefix (vk-lw- vs vk-lw-) for
-                accident-prevention.
-              </Field.HelperText>
-            </Field.Root>
-
             <Separator />
 
             <VirtualKeyScopePicker

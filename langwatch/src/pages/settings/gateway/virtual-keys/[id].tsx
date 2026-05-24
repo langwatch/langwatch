@@ -191,13 +191,6 @@ function VirtualKeyDetailPage() {
                 <DetailRow label="Prefix">
                   <Code fontSize="xs">{vk.displayPrefix}…</Code>
                 </DetailRow>
-                <DetailRow label="Environment">
-                  <Badge
-                    colorPalette={vk.environment === "live" ? "green" : "gray"}
-                  >
-                    {vk.environment}
-                  </Badge>
-                </DetailRow>
                 <DetailRow label="Status">
                   <Badge
                     colorPalette={vk.status === "active" ? "green" : "red"}

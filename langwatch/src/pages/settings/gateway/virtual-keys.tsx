@@ -227,7 +227,6 @@ function VirtualKeysPage() {
                 <Table.Row>
                   <Table.ColumnHeader>Name</Table.ColumnHeader>
                   <Table.ColumnHeader>Prefix</Table.ColumnHeader>
-                  <Table.ColumnHeader>Environment</Table.ColumnHeader>
                   <Table.ColumnHeader>Status</Table.ColumnHeader>
                   <Table.ColumnHeader>Scopes</Table.ColumnHeader>
                   <Table.ColumnHeader>Routing policy</Table.ColumnHeader>
@@ -286,13 +285,6 @@ function VirtualKeysPage() {
                       <Text fontFamily="mono" fontSize="xs">
                         {vk.displayPrefix}…
                       </Text>
-                    </Table.Cell>
-                    <Table.Cell>
-                      <Badge
-                        colorPalette={vk.environment === "live" ? "green" : "gray"}
-                      >
-                        {vk.environment}
-                      </Badge>
                     </Table.Cell>
                     <Table.Cell>
                       <Badge
