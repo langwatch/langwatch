@@ -46,6 +46,7 @@
  * Emits the minted VK secrets to stdout ONCE. Capture them for the F
  * full-matrix dogfood lane.
  */
+import { randomBytes } from "node:crypto";
 import { Prisma, PrismaClient } from "@prisma/client";
 
 import { nextResetAt } from "../src/server/gateway/budgetWindow";
@@ -138,7 +139,7 @@ async function ensureUserOrgTeamsProjects(): Promise<
       teamId: platformTeam.id,
       language: "typescript",
       framework: "openai",
-      apiKey: `sk-lw-dogfood-demo-${Math.random().toString(36).slice(2, 10)}`,
+      apiKey: `sk-lw-dogfood-demo-${randomBytes(4).toString("hex")}`,
     },
     update: { name: "Demo" },
   });
@@ -151,7 +152,7 @@ async function ensureUserOrgTeamsProjects(): Promise<
       teamId: platformTeam.id,
       language: "typescript",
       framework: "openai",
-      apiKey: `sk-lw-dogfood-billing-${Math.random().toString(36).slice(2, 10)}`,
+      apiKey: `sk-lw-dogfood-billing-${randomBytes(4).toString("hex")}`,
     },
     update: { name: "Billing" },
   });
@@ -164,7 +165,7 @@ async function ensureUserOrgTeamsProjects(): Promise<
       teamId: dataSciTeam.id,
       language: "python",
       framework: "openai",
-      apiKey: `sk-lw-dogfood-mlprod-${Math.random().toString(36).slice(2, 10)}`,
+      apiKey: `sk-lw-dogfood-mlprod-${randomBytes(4).toString("hex")}`,
     },
     update: { name: "ML Prod" },
   });
