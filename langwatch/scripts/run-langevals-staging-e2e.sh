@@ -44,6 +44,21 @@ if [[ -z "$UV_BIN" ]]; then
   exit 1
 fi
 
+# Real LLM keys are required: both the staged-llm-boolean eval and the
+# topic-clustering pipeline call real OpenAI. We source from langwatch/.env
+# rather than expecting the operator to export it, because the rest of
+# the e2e harness already reads other shared secrets that way.
+if [[ -z "${OPENAI_API_KEY:-}" ]]; then
+  if [[ -f langwatch/.env ]]; then
+    OPENAI_API_KEY="$(grep -E '^OPENAI_API_KEY=' langwatch/.env | head -1 | sed -E 's/^OPENAI_API_KEY=(\")?([^"]*)(\")?$/\2/')"
+    export OPENAI_API_KEY
+  fi
+fi
+if [[ -z "${OPENAI_API_KEY:-}" ]]; then
+  echo "ERROR: OPENAI_API_KEY not set and not found in langwatch/.env" >&2
+  exit 1
+fi
+
 export LANGEVALS_E2E_ENABLED=1
 export LANGEVALS_STAGING_THRESHOLD_BYTES="${LANGEVALS_STAGING_THRESHOLD_BYTES:-200}"
 export EVAL_MAX_PAYLOAD_BYTES="${EVAL_MAX_PAYLOAD_BYTES:-20000000}"

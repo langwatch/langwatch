@@ -11,15 +11,17 @@
  * Use scripts/run-langevals-staging-e2e.sh to exercise this locally;
  * CI does not run it (no shared dev S3 creds in GH Actions).
  *
- * Scenarios proven end-to-end:
- *   1. Tiny payload posts inline — no S3 object created.
- *   2. Above-threshold evaluator payload stages, langevals fetches it
- *      from S3, runs exact_match, returns the correct passed=true result.
- *   3. Above-threshold topic_clustering_batch payload stages, langevals
- *      fetches it, parses BatchClusteringParams, and reaches the actual
- *      clustering pipeline (logs `Starting batch clustering trace_count`
- *      before failing at the unreachable embeddings provider — proving
- *      the body was delivered intact).
+ * Scenarios proven end-to-end (with wrapper threshold = 200 bytes both
+ * evaluator scenarios force the staged path; the inline branch is
+ * covered exhaustively by the unit tests, no value duplicating it here):
+ *   1. llm_boolean payload stages via real S3, langevals middleware
+ *      fetches it, evaluator calls real OpenAI, returns a real verdict
+ *      with non-zero cost. Proves the LLM-as-judge path survives the
+ *      staging hop end-to-end.
+ *   2. topic_clustering_batch payload stages, langevals fetches it,
+ *      calls real OpenAI embeddings + naming model, returns at least
+ *      one named topic with traces assigned to it. Asserts the response
+ *      body shape and content, not just log lines.
  */
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -84,53 +86,39 @@ describeFn("stagedLangevalsFetch e2e (real S3 + real langevals)", () => {
     }
   });
 
-  it("posts inline when the body is below the staging threshold", async () => {
-    const h = harness!;
-    const before = await listStagingObjects(h);
-
-    const response = await stagedLangevalsFetch({
-      url: `${h.baseUrl}/langevals/exact_match/evaluate`,
-      projectId: "project_e2e_inline",
-      kind: "evaluation",
-      body: {
-        data: [{ output: "yes", expected_output: "yes" }],
-        settings: {},
-        env: {},
-      },
-    });
-
-    expect(response.status).toBe(200);
-    const json = (await response.json()) as Array<{ passed?: boolean }>;
-    expect(Array.isArray(json)).toBe(true);
-    expect(json[0]?.passed).toBe(true);
-
-    const after = await listStagingObjects(h);
-    expect(after.length).toBe(before.length);
-  }, 60_000);
-
-  it("stages a large evaluator payload through real S3 and runs exact_match end-to-end", async () => {
+  it("stages a large llm_boolean payload, real OpenAI runs after the S3 hop", async () => {
     const h = harness!;
 
     const padding = "x".repeat(2000);
     const response = await stagedLangevalsFetch({
-      url: `${h.baseUrl}/langevals/exact_match/evaluate`,
+      url: `${h.baseUrl}/langevals/llm_boolean/evaluate`,
       projectId: "project_e2e_eval",
       kind: "evaluation",
       body: {
         data: [
           {
-            output: `the answer is ${padding}`,
-            expected_output: `the answer is ${padding}`,
+            input: "What is the capital of France?",
+            output: `The capital of France is Paris. ${padding}`,
+            contexts: [`London is the capital of France. ${padding}`],
           },
         ],
-        settings: {},
-        env: {},
+        settings: {
+          model: "openai/gpt-5-mini",
+          prompt:
+            "You are an LLM evaluator. Evaluate as False if the output does not match what the provided context says, regardless of factual accuracy.",
+        },
+        env: { OPENAI_API_KEY: requireOpenAIKey() },
       },
     });
 
     expect(response.status).toBe(200);
-    const json = (await response.json()) as Array<{ passed?: boolean }>;
-    expect(json[0]?.passed).toBe(true);
+    const json = (await response.json()) as Array<EvalResult>;
+    const verdict = json[0];
+    // eslint-disable-next-line no-console
+    console.log("[e2e proof] llm_boolean verdict:", JSON.stringify(verdict));
+    expect(verdict?.status).toBe("processed");
+    expect(typeof verdict?.passed).toBe("boolean");
+    expect((verdict?.cost?.amount ?? 0) > 0).toBe(true);
 
     const staged = await listStagingObjects(h);
     const matching = staged.filter((k) =>
@@ -139,14 +127,35 @@ describeFn("stagedLangevalsFetch e2e (real S3 + real langevals)", () => {
     expect(matching.length).toBeGreaterThan(0);
 
     await waitForLog(h, "fetched staged payload", 5_000);
-  }, 90_000);
+  }, 120_000);
 
-  it("stages a large topic_clustering_batch payload through real S3 and reaches the clustering pipeline", async () => {
+  it("stages a topic_clustering_batch payload and returns real named topics", async () => {
     const h = harness!;
+    const apiKey = requireOpenAIKey();
 
-    const traces = Array.from({ length: 8 }, (_, i) => ({
+    // Two semantically distinct clusters, both above the
+    // MINIMUM_TRACES_PER_TOPIC=5 threshold so the hierarchy actually
+    // returns at least one topic. Real embeddings differentiate them.
+    const weather = [
+      "Why is the sky blue during the day?",
+      "What causes blue color in the sky?",
+      "Why does the daytime sky look blue from earth?",
+      "Explain blue sky scattering of sunlight.",
+      "Rayleigh scattering and the blue color of the sky",
+      "Why is the sky not green or red but blue?",
+    ];
+    const python = [
+      "How do I open a file in Python and read its contents?",
+      "Python file reading best practices with context managers",
+      "How can I parse JSON files in Python?",
+      "Reading large CSV files efficiently in Python",
+      "How do I write bytes to a file in Python?",
+      "Python pathlib vs os.path for reading files",
+    ];
+
+    const traces = [...weather, ...python].map((input, i) => ({
       trace_id: `trace_e2e_${i}`,
-      input: `${"why is the sky blue ".repeat(40)} ${i}`,
+      input,
       topic_id: null,
       subtopic_id: null,
     }));
@@ -158,22 +167,39 @@ describeFn("stagedLangevalsFetch e2e (real S3 + real langevals)", () => {
       body: {
         project_id: "project_e2e_topics",
         litellm_params: {
-          model: "openai/no-such-model",
-          api_key: "sk-fake-key-for-e2e",
+          model: "openai/gpt-5-mini",
+          api_key: apiKey,
         },
         embeddings_litellm_params: {
           model: "openai/text-embedding-3-small",
-          api_key: "sk-fake-key-for-e2e",
-          api_base: "http://127.0.0.1:1",
+          api_key: apiKey,
         },
         traces,
       },
     });
 
-    // 500 is expected — embeddings provider is intentionally unreachable.
-    // The point is the body was parsed by the route handler, which only
-    // happens if the middleware delivered the staged body intact.
-    expect([200, 500]).toContain(response.status);
+    expect(response.status).toBe(200);
+    const json = (await response.json()) as TopicClusteringResponse;
+    // eslint-disable-next-line no-console
+    console.log(
+      "[e2e proof] topics:",
+      JSON.stringify(json.topics),
+      "subtopics:",
+      JSON.stringify(json.subtopics),
+      "trace_assignments:",
+      JSON.stringify(json.traces),
+    );
+
+    expect(Array.isArray(json.topics)).toBe(true);
+    expect(json.topics.length).toBeGreaterThan(0);
+    expect(json.topics[0]?.name).toBeTruthy();
+
+    expect(Array.isArray(json.traces)).toBe(true);
+    expect(json.traces.length).toBeGreaterThan(0);
+    for (const t of json.traces) {
+      expect(typeof t.trace_id).toBe("string");
+      expect(typeof t.topic_id).toBe("string");
+    }
 
     const staged = await listStagingObjects(h);
     const matching = staged.filter((k) =>
@@ -181,14 +207,38 @@ describeFn("stagedLangevalsFetch e2e (real S3 + real langevals)", () => {
     );
     expect(matching.length).toBeGreaterThan(0);
 
-    // Two independent proofs the staged body actually reached the
-    // clustering route handler: (a) my middleware emitted its
-    // "fetched staged payload" line, (b) langevals reached the
-    // embeddings step (only possible after Pydantic parsed the body).
     await waitForLog(h, "fetched staged payload", 10_000);
-    await waitForLog(h, "embeddings", 10_000);
-  }, 120_000);
+  }, 180_000);
 });
+
+interface EvalResult {
+  status?: string;
+  passed?: boolean;
+  score?: number;
+  details?: string;
+  cost?: { amount?: number; currency?: string } | null;
+}
+
+interface TopicClusteringResponse {
+  topics: Array<{ id: string; name: string }>;
+  subtopics: Array<{ id: string; name: string; parent_id: string }>;
+  traces: Array<{
+    trace_id: string;
+    topic_id: string;
+    subtopic_id: string | null;
+  }>;
+  cost: { amount: number; currency: string } | null;
+}
+
+function requireOpenAIKey(): string {
+  const key = process.env.OPENAI_API_KEY;
+  if (!key) {
+    throw new Error(
+      "OPENAI_API_KEY must be set for the staged-payload e2e (the wrapper script sources it from langwatch/.env)",
+    );
+  }
+  return key;
+}
 
 async function spawnLangevals(): Promise<Harness> {
   const port = await pickFreePort();
