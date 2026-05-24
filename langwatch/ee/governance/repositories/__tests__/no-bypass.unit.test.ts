@@ -40,10 +40,13 @@ const ALLOWED_FILE_PATTERNS = [
   "ee/governance/services/platformIngestionTemplates.seeds.ts",
   "scripts/dogfood/",
   "src/app/api/governance/__tests__/",
-  // pat/token-resolver writes a separate auth-resolution path; it doesn't
-  // touch governance tables, so it's pre-emptively excluded if grep ever
-  // surfaces a false positive.
+  "src/mcp/__tests__/",
+  // Token resolvers (pat + api-key) are hot-path auth-resolution paths that
+  // look up bindings by hashed-token primary key. They don't write through
+  // the governance service contract (no audit needed for a read), so they
+  // bypass the repo layer by design.
   "src/server/pat/token-resolver.ts",
+  "src/server/api-key/token-resolver.ts",
 ];
 
 const GATED_TABLE_PATTERNS = [

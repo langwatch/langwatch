@@ -368,7 +368,7 @@ describe("GatewayBudgetService.getDetail", () => {
       );
       // VIRTUAL_KEY resolveScopeTarget chains vk → virtualKeyScope → project.
       // Override project.findUnique to return the linkback slug.
-      (baseMock as unknown as { project: { findUnique: typeof vi.fn } }).project.findUnique =
+      (baseMock as unknown as { project: { findUnique: unknown } }).project.findUnique =
         vi.fn(async () => ({ slug: "proj" }));
       const sut = GatewayBudgetService.create(baseMock);
       const detail = await sut.getDetail("b_01", "org_01");
