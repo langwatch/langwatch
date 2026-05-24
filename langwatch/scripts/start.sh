@@ -37,6 +37,34 @@ if [[ "$NODE_ENV" = "development" ]]; then
     export NEXTAUTH_URL="http://localhost:${PORT}"
     echo "  ✓ BASE_HOST=NEXTAUTH_URL=${BASE_HOST} (auto-aligned to PORT=${PORT})"
   fi
+
+  # AI Gateway port + URL auto-derivation. Default layout:
+  #   PORT          (5560) control plane (Vite + Hono via proxy)
+  #   PORT + 3      (5563) AI Gateway data plane (Go)
+  # Each derived var is set only when unset, so explicit .env values win.
+  #
+  # Naming-collision note: the Go gateway reads LW_GATEWAY_BASE_URL as the
+  # CONTROL PLANE URL (it calls back to /api/internal/gateway/*). The TS
+  # side (CLI + /me VK reveal) reads the same var as the GATEWAY URL (what
+  # end users hit). The auto-derive sets the TS-facing meaning here and
+  # uses GATEWAY_CONTROL_PLANE_URL (the Go-side legacy alias) for the
+  # CP-bound direction so both halves land on correct values without a
+  # rename of either side's env.
+  _APP_PORT="${PORT:-5560}"
+  GATEWAY_PORT_DERIVED=$((_APP_PORT + 3))
+  if [ -z "$GATEWAY_CONTROL_PLANE_URL" ] && [ -z "$LW_GATEWAY_BASE_URL" ]; then
+    export GATEWAY_CONTROL_PLANE_URL="http://localhost:${_APP_PORT}"
+  fi
+  if [ -z "$LW_GATEWAY_BASE_URL" ]; then
+    export LW_GATEWAY_BASE_URL="http://localhost:${GATEWAY_PORT_DERIVED}"
+  fi
+  if [ -z "$LW_GATEWAY_INTERNAL_URL" ]; then
+    export LW_GATEWAY_INTERNAL_URL="http://localhost:${GATEWAY_PORT_DERIVED}"
+  fi
+  if [ -z "$SERVER_ADDR" ]; then
+    export SERVER_ADDR=":${GATEWAY_PORT_DERIVED}"
+  fi
+  echo "  ✓ gateway: port=${GATEWAY_PORT_DERIVED} cp=${GATEWAY_CONTROL_PLANE_URL:-(unset, using LW_GATEWAY_BASE_URL)} public=${LW_GATEWAY_BASE_URL}"
 fi
 
 RUNTIME_ENV="DEBUG=langwatch:* DEBUG_HIDE_DATE=true DEBUG_COLORS=true"
@@ -67,14 +95,14 @@ fi
 # Opt-out: LANGWATCH_SKIP_AIGATEWAY=1.
 START_GATEWAY_COMMAND=""
 if [[ "$NODE_ENV" = "development" && "$LANGWATCH_SKIP_AIGATEWAY" != "1" ]]; then
-  GATEWAY_PORT="${LW_GATEWAY_PORT:-5563}"
+  _GATEWAY_PORT="${GATEWAY_PORT_DERIVED:-5563}"
   if ! command -v go >/dev/null 2>&1; then
     echo "  ! aigateway: skipped (Go toolchain not in PATH); run \`make service svc=aigateway\` manually"
-  elif lsof -i ":$GATEWAY_PORT" -sTCP:LISTEN >/dev/null 2>&1; then
-    echo "  ✓ aigateway: already running on :$GATEWAY_PORT, reusing"
+  elif lsof -i ":$_GATEWAY_PORT" -sTCP:LISTEN >/dev/null 2>&1; then
+    echo "  ✓ aigateway: already running on :$_GATEWAY_PORT, reusing"
   else
     START_GATEWAY_COMMAND="make -C .. service svc=aigateway"
-    echo "  ✓ aigateway: auto-start on :$GATEWAY_PORT"
+    echo "  ✓ aigateway: auto-start on :$_GATEWAY_PORT"
   fi
 fi
 
