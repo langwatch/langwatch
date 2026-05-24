@@ -271,7 +271,12 @@ Feature: Personal-workspace progressive feature unlock — minimal-by-default, c
         (the project IS the scope; `Project.ownerUserId` distinguishes
         personal projects from team / shared)
 
-  @bdd @api @personal-workspace @isolation @regression
+  # Backed by dbMultiTenancyProtection (Sergey's 67b0d229c + 80f3cf691):
+  # every trace.getById walks WHERE-clauses for organizationId membership,
+  # rejecting foreign reads at the Prisma middleware boundary. Pinned
+  # @unimplemented for the parity gate until a scenario-specific
+  # integration test gets added under traces.integration.test.ts.
+  @bdd @api @personal-workspace @isolation @regression @unimplemented
   Scenario: Cross-user read isolation — foreign trace.getById returns NOT_FOUND
     Given two users with separate Personal Projects and separate traces
     When user A direct-pastes user B's trace URL or calls
@@ -282,7 +287,13 @@ Feature: Personal-workspace progressive feature unlock — minimal-by-default, c
         exists, doesn't exist, or belongs to another user (no enumeration
         side-channel)
 
-  @bdd @ui @personal-workspace @isolation @regression
+  # Guarded by existing project-guard middleware (DashboardLayout +
+  # dbOrganizationIdProtection) which rejects foreign-project IDs at
+  # request time. End-to-end behaviour captured in cross-org Phase 5
+  # smoke (#160) and persona-aware-chrome regressions; pinned
+  # @unimplemented for a dedicated scenario binding when the next
+  # /me-namespace integration test pass lands.
+  @bdd @ui @personal-workspace @isolation @regression @unimplemented
   Scenario: Cross-user direct-paste of foreign personal-project URL fails project-guard
     Given user A has Personal Project `personalProjectIdA`
     And user B has Personal Project `personalProjectIdB`
@@ -299,7 +310,12 @@ Feature: Personal-workspace progressive feature unlock — minimal-by-default, c
   # Persona regression invariants — features gating only applies to personal
   # ---------------------------------------------------------------------------
 
-  @bdd @ui @personal-workspace @regression
+  # Personas resolver (PersonaResolverService) routes non-personal
+  # projects through the full sidebar without consulting the personal
+  # feature bundle; verified end-to-end in P10 cleanup + browser-QA
+  # rounds. @unimplemented until a render-level persona-routing test
+  # asserts the negative case (full library visible on non-personal).
+  @bdd @ui @personal-workspace @regression @unimplemented
   Scenario: Team / project-shared workspaces are unaffected by personal-features gating
     Given a user with team-membership + project-shared workspaces
     When they navigate to a non-personal project
