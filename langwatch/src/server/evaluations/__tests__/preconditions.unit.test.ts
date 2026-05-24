@@ -66,7 +66,7 @@ describe("evaluatePreconditions()", () => {
     });
 
     describe("when a trace arrives with no origin attribute", () => {
-      /** @scenario Origin "is" application treats missing origin as application (legacy default) */
+      /** @scenario 'Origin "is" application matches explicit "application" plus missing origin (backward-compat)' */
       it("passes the precondition", () => {
         const traceData = makeTraceData({ origin: undefined });
         expect(
@@ -161,6 +161,7 @@ describe("evaluatePreconditions()", () => {
     ];
 
     describe("when a trace arrives with input 'hello world'", () => {
+      /** @scenario '"is" rule on text fields does case-insensitive exact match' */
       /** @scenario "is" rule on text fields does case-insensitive exact match */
       it("passes the precondition (case-insensitive)", () => {
         const traceData = makeTraceData({ input: "hello world" });
@@ -197,6 +198,7 @@ describe("evaluatePreconditions()", () => {
     ];
 
     describe("when a trace arrives with labels ['production', 'api']", () => {
+      /** @scenario '"is" rule on array fields matches if value is in array' */
       /** @scenario "is" rule on array fields matches if value is in array */
       it("passes the precondition (value in array)", () => {
         const traceData = makeTraceData({
@@ -276,6 +278,7 @@ describe("evaluatePreconditions()", () => {
     ];
 
     describe("when a trace arrives with spanModels ['gpt-4', 'gpt-3.5']", () => {
+      /** @scenario '"is" on spans.model matches if ANY span has that model' */
       /** @scenario "is" on spans.model matches if ANY span has that model */
       it("passes the precondition", () => {
         const traceData = makeTraceData({
@@ -369,6 +372,7 @@ describe("evaluatePreconditions()", () => {
     ];
 
     describe("when a trace arrives with hasError = true", () => {
+      /** @scenario '"is" on traces.error matches error presence' */
       /** @scenario "is" on traces.error matches error presence */
       it("passes the precondition", () => {
         const traceData = makeTraceData({ hasError: true });
@@ -706,7 +710,7 @@ describe("evaluatePreconditions()", () => {
     ];
 
     describe("when a trace arrives with no userId set", () => {
-      /** @scenario Missing field values fail "is" checks */
+      /** @scenario 'Missing field values fail "is" and "contains" checks' */
       it("fails the precondition", () => {
         const traceData = makeTraceData({ userId: undefined });
         expect(
@@ -729,6 +733,7 @@ describe("evaluatePreconditions()", () => {
     ];
 
     describe("when a trace arrives with no userId set", () => {
+      /** @scenario 'Missing field values pass "not_contains" checks' */
       /** @scenario Missing field values pass "not_contains" checks */
       it("passes the precondition", () => {
         const traceData = makeTraceData({ userId: undefined });
@@ -763,7 +768,7 @@ describe("evaluatePreconditions()", () => {
     ];
 
     describe("when traces arrive matching the legacy rules", () => {
-      /** @scenario Existing preconditions with old fields still work */
+      /** @scenario "Existing preconditions with old fields still work" */
       it("evaluates identically to the old behavior", () => {
         const traceData = makeTraceData({
           input: "customer query",
@@ -956,7 +961,7 @@ describe("evaluatePreconditions()", () => {
     ];
 
     describe("when trace has customMetadata with environment = 'production'", () => {
-      /** @scenario Nested key filter - metadata.value with key */
+      /** @scenario "Nested key filter - metadata.value with key" */
       it("passes the precondition", () => {
         const traceData = makeTraceData({
           customMetadata: { environment: "production" },
@@ -1022,7 +1027,7 @@ describe("evaluatePreconditions()", () => {
     ];
 
     describe("when trace has topicId 'topic_123'", () => {
-      /** @scenario Topics filter matches topic ID */
+      /** @scenario "Topics filter matches topic ID" */
       it("passes the precondition", () => {
         const traceData = makeTraceData({ topicId: "topic_123" });
         expect(

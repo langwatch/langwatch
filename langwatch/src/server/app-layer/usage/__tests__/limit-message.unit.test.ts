@@ -33,7 +33,7 @@ describe("buildLimitMessage", () => {
     );
   });
 
-  /** @scenario Free-tier org on self-hosted told to buy a license */
+  /** @scenario Free-tier org on self-hosted told to get a license */
   it("tells a free-tier self-hosted org to buy a license at the configured base host", () => {
     envMock.IS_SAAS = false;
     envMock.BASE_HOST = "https://my-langwatch.example.com";
@@ -48,7 +48,7 @@ describe("buildLimitMessage", () => {
     );
   });
 
-  /** @scenario Paid TIERED org on SaaS told to upgrade with traces unit */
+  /** @scenario Paid org on SaaS told to upgrade with traces unit */
   it("tells a paid SaaS org to upgrade with the traces unit", () => {
     envMock.IS_SAAS = true;
     const message = buildLimitMessage({
