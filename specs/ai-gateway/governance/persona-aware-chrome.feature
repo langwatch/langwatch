@@ -146,7 +146,11 @@ Feature: AI Gateway Governance — Persona-aware chrome (sidebar + header)
     And the chrome on /governance renders the org-scope header (org name banner, NOT ProjectSelector)
     And the sidebar shows Home + Observe + Evaluate + Library + Govern + Gateway
 
-  @bdd @ui @persona-chrome @persona-4 @regression
+  # Govern sub-nav lives in the persona-4 layout component; sticky on every
+  # /settings/governance/* route. No multi-route Playwright sweep exists to
+  # assert the sub-nav stays present across the table's full route list.
+  # Pin @unimplemented until the persona-4 router sweep test lands.
+  @bdd @ui @persona-chrome @persona-4 @regression @unimplemented
   Scenario: Govern sub-nav stays put across every governance sub-route
     Given user is Persona 4 (governance admin) with both FFs on
     And the user is on "/governance" with the Govern sub-nav visible in

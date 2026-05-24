@@ -147,6 +147,7 @@ describe("AdminWorkspaceViewAuditService", () => {
     });
   });
 
+  /** @scenario Audit emission is idempotent within a 5-min window per (admin, target, kind) */
   it("dedups within the 5-minute window — second call returns recorded=false", async () => {
     const first = await prisma.auditLog.count({
       where: {
@@ -192,6 +193,7 @@ describe("AdminWorkspaceViewAuditService", () => {
     });
   });
 
+  /** @scenario Self-view short-circuit — no audit row for own-workspace or team-member view */
   it("short-circuits self-views (own personal workspace) without writing a row", async () => {
     const before = await prisma.auditLog.count({
       where: {

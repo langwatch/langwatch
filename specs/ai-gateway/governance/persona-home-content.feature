@@ -41,7 +41,11 @@ Feature: Persona-aware home CONTENT — what each persona sees on landing
   # + Access-Restricted on /governance; fixed by `137965526`.)
   # ---------------------------------------------------------------------------
 
-  @bdd @ui @persona-content @bootstrap @regression
+  # Routing branch in pages/index.tsx (the org-less → /onboarding/welcome
+  # path) shipped at 137965526. No e2e covers the fresh-signup → onboarding
+  # → resolver chain end-to-end. Pin @unimplemented until a Playwright
+  # signup-flow test exercises the full bootstrap sequence.
+  @bdd @ui @persona-content @bootstrap @regression @unimplemented
   Scenario: Fresh-signup user with no org bootstraps via /onboarding/welcome before the persona resolver runs
     Given a user has just completed /auth/signup
     And the user has zero Organization memberships (no org, no team, no project)

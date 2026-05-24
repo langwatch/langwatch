@@ -106,7 +106,12 @@ Feature: AI Gateway Governance — Ingestion Templates Catalog (personal-workspa
   # Regression / no-leak invariants
   # ---------------------------------------------------------------------------
 
-  @bdd @ingestion-templates @catalog @no-leak @regression
+  # No-leak invariant: persona-aware-chrome layout component branches on
+  # route shape to hide IngestionTemplate catalog under /[project]. No
+  # render-route test currently sweeps the catalog component's mount sites
+  # across /me and /[project]. Pin @unimplemented until that sweep test
+  # lands (single Vitest assert over the mount site list is enough).
+  @bdd @ingestion-templates @catalog @no-leak @regression @unimplemented
   Scenario: Trace Ingest section does NOT render under /[project] namespace
     Given jane is viewing project "/p_personal_jane/messages"
     When the page renders

@@ -84,7 +84,12 @@ Feature: Admin trace access — bird's-eye drill-in with persistent 'viewing as'
   # Persistent server-side-gated banner
   # ---------------------------------------------------------------------------
 
-  @bdd @ui @admin-trace-access @banner @regression
+  # AdminViewingAsBanner exists in DashboardLayout (langwatch/src/components)
+  # but no UI integration test currently asserts the cross-page persistence
+  # contract. Pinning @unimplemented; backfill needs Playwright + adminViewingAs
+  # session shim before a real test can drive nav across trace list / detail /
+  # filter / search / URL deep-link variants.
+  @bdd @ui @admin-trace-access @banner @regression @unimplemented
   Scenario: Persistent 'Viewing <user> as admin' banner renders on every admin-impersonating page
     Given carol drills into ariana's Personal Workspace traces
     Then a banner renders at the top of every page within the
@@ -106,7 +111,11 @@ Feature: Admin trace access — bird's-eye drill-in with persistent 'viewing as'
         way to remove it is via the Exit affordance, which leaves the
         impersonating context entirely
 
-  @bdd @ui @admin-trace-access @banner @regression
+  # SSR rendering of AdminViewingAsBanner is contracted but not test-covered.
+  # Needs a curl + grep harness (or jsdom + initial-HTML inspection) running
+  # against the layout component's RSC output to assert the banner DOM is in
+  # the initial HTML response and not hydration-injected. Pin @unimplemented.
+  @bdd @ui @admin-trace-access @banner @regression @unimplemented
   Scenario: Banner DOM is server-side-gated, NOT a client-only flag
     Given carol direct-pastes `/[arianaPersonalProjectSlug]/traces` in
         a fresh browser tab (no client-side state, no SPA hydration
@@ -125,7 +134,12 @@ Feature: Admin trace access — bird's-eye drill-in with persistent 'viewing as'
         does NOT silently bypass the audit-log emission — the audit
         row writes server-side independent of the banner DOM
 
-  @bdd @ui @admin-trace-access @banner @no-leak @regression
+  # Route-scope predicate fix landed at 3b712dd4a (no-leak onto admin-self
+  # surfaces); contract is in the layout's banner-detection branch. No router
+  # nav integration test covers the cross-route leak case yet; pin
+  # @unimplemented until a Playwright sweep of /governance + /settings + /me
+  # + /ops post-drill-in is added.
+  @bdd @ui @admin-trace-access @banner @no-leak @regression @unimplemented
   Scenario: Banner is scoped to project-anchored URLs only — does NOT leak onto admin-self surfaces
     Given carol previously drilled into ariana's Personal Workspace
     And `useOrganizationTeamProject` has resolved the team / project

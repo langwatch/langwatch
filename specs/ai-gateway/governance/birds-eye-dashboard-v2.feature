@@ -73,7 +73,11 @@ Feature: Bird's-eye governance dashboard v2 — graphs, Top-N framing, click-thr
     And the cell does NOT render "↑ 100%" or any percentage
     And the cell does NOT render in the warning (orange) color
 
-  @bdd @ui @birds-eye-v2 @phase-a @bug-fix @regression
+  # Fix shipped at 3f0f9a3ee (hasPriorBaseline guard applied to KPI summary
+  # card identically to SpendByTeam / SpendByUser rows). No render test
+  # currently asserts the "—" / "no prior data" mute path for the KPI card.
+  # Pin @unimplemented until a Vitest snapshot covers the zero-prior branch.
+  @bdd @ui @birds-eye-v2 @phase-a @bug-fix @regression @unimplemented
   Scenario: KPI summary card mutes its trend when prior window is zero
     Given the org has > 0 spend in the current window
     And the org has zero spend in the prior window
@@ -88,7 +92,10 @@ Feature: Bird's-eye governance dashboard v2 — graphs, Top-N framing, click-thr
       every trend-displaying surface on the page (KPI summary card +
       SpendByTeam table + SpendByUser table + future v2 cards)
 
-  @bdd @ui @birds-eye-v2 @phase-a @bug-fix @regression
+  # Cap fix shipped at 3f0f9a3ee. Render test for the >999% cap path on
+  # TeamRow is pending — needs a fixture row where prior=$0 + current=>0.
+  # Pin @unimplemented until the cap-rule snapshot lands.
+  @bdd @ui @birds-eye-v2 @phase-a @bug-fix @regression @unimplemented
   Scenario: TeamRow caps absurd trend percentages
     Given a SpendByTeam row's computed trend would render at e.g.
       "↑ 253806%" (e.g. prior=$0.000001 vs current=$2.50)
@@ -101,7 +108,12 @@ Feature: Bird's-eye governance dashboard v2 — graphs, Top-N framing, click-thr
       the underlying baseline is effectively zero (regression caught
       in B-2 recapture; fixed by 3f0f9a3ee)
 
-  @bdd @ch @birds-eye-v2 @phase-a @bug-fix @regression
+  # Bucket math fix shipped at 4f776a56e (DateTime64 passed direct to
+  # toStartOfDay, no ms-precision shift). Integration test for the
+  # dense-bucket assertion is pending — needs a CH fixture with traces
+  # spanning > 1 bucket. Pin @unimplemented until the CH integration test
+  # backfill lands.
+  @bdd @ch @birds-eye-v2 @phase-a @bug-fix @regression @unimplemented
   Scenario: spendOverTime CH bucket math operates on DateTime64 directly
     Given trace_summaries.OccurredAt is typed DateTime64(3, 'UTC')
     When the spendOverTime CH query bucketizes by day

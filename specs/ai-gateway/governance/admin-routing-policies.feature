@@ -133,7 +133,12 @@ Feature: AI Gateway Governance — Admin RoutingPolicies (decoupled from VK)
       | Set as default       | checkbox                                                                    |
     And the "Providers" picker only shows providers in the current scope or above
 
-  @bdd @ui @routing-policy @admin-drawer @regression
+  # Implementation shipped (the picker IS a multi-select on the new
+  # routing-policies drawer post-048acf6a7 sweep — verified visually in the
+  # PR-body "Routing Policy editor drawer" capture). No headless integration
+  # test asserts the widget role + literal-slug-rejected affordance yet. Pin
+  # @unimplemented until a Vitest + Testing Library render test drives it.
+  @bdd @ui @routing-policy @admin-drawer @regression @unimplemented
   Scenario: Provider picker is a structured multi-select, not a free-text CUID input
     Given the org has connected ModelProviders "Acme Anthropic Prod" + "Acme OpenAI Prod"
     When carol opens the new-policy drawer
@@ -157,7 +162,11 @@ Feature: AI Gateway Governance — Admin RoutingPolicies (decoupled from VK)
     # spec at the parent scenario already pinned the multi-select shape;
     # this scenario asserts the implementation matches.
 
-  @bdd @ui @routing-policy @admin-drawer @regression
+  # tRPC error surfacing on routingPolicies.create is wired in the drawer's
+  # submit handler (toast on 4xx). Render test for the error path requires
+  # mocking the tRPC client to reject and asserting the toast renders. Pin
+  # @unimplemented until that render-test backfill lands.
+  @bdd @ui @routing-policy @admin-drawer @regression @unimplemented
   Scenario: tRPC errors on policy create surface as toast or inline message
     Given carol submits a policy create call that the server rejects (any 4xx)
     When `routingPolicy.create` returns a tRPC error
