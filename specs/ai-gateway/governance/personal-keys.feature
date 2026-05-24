@@ -5,11 +5,13 @@ Feature: AI Gateway Governance — Personal virtual keys
   So that any coding tool I run (Claude Code, Codex, Cursor, Gemini CLI) just works
   with my identity attached and my company's spend caps enforced
 
-  Per gateway.md "Phase 1A":
-    A personal virtual key is just a `VirtualKey` row whose `projectId` points to
-    a personal project (Project.isPersonal=true, ownerUserId=user.id). The same
-    schema, the same gateway code, the same trace pipeline. The "personalness"
-    lives in the project, not in a polymorphic discriminator on the key.
+  A personal virtual key is a regular `VirtualKey` row with `principalUserId`
+  set; the `principalUserId` column is orthogonal to scope (see
+  vk-personal-scope.feature). The lazy-mint device-flow path issues the VK at
+  ORGANIZATION scope by default, so any project the user is a member of can
+  use it. The "personalness" is a column on the row, not a separate entity,
+  and the eligible ModelProvider set is resolved through the same scope
+  inheritance the rest of the system uses.
 
   Personal VKs reference a `RoutingPolicy` that an org admin published once
   (e.g. "developer-default" — providers + model allowlist + strategy).
@@ -38,10 +40,11 @@ Feature: AI Gateway Governance — Personal virtual keys
     Then the system creates exactly one personal VK for jane@acme.com in organization "acme"
     And the personal VK has:
       | field             | value                                              |
-      | projectId         | jane's personal project id (isPersonal=true)       |
+      | organizationId    | "acme"                                             |
+      | scopes            | [{ORGANIZATION, "acme"}]                           |
       | principalUserId   | "user_jane_123"                                    |
       | routingPolicyId   | the org's default "developer-default" policy id    |
-      | secretPrefix      | starts with "vk-lw-"                          |
+      | secretPrefix      | starts with "vk-lw-"                               |
       | revokedAt         | null                                               |
     And the personal VK secret is returned exactly once in the device-exchange response (`default_personal_vk`)
     And subsequent logins re-use the existing personal VK rather than re-issuing

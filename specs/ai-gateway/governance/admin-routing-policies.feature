@@ -9,9 +9,12 @@ Feature: AI Gateway Governance — Admin RoutingPolicies (decoupled from VK)
 
   Per gateway.md "the conceptual reframe":
     The credential should hold identity + reference policy, not embed policy.
-    `VirtualKey.routingPolicyId` references a `RoutingPolicy` row.
-    Per-credential `VirtualKeyProviderCredential` rows continue to work as the
-    *override* mechanism for production agents that need explicit chains.
+    `VirtualKey.routingPolicyId` references a `RoutingPolicy` row, which owns
+    the ordered chain of `ModelProvider` rows the gateway tries in sequence.
+    There is no per-VK binding table — overrides happen by assigning a more
+    specific RoutingPolicy to the VK. See vk-config-bundle.feature for the
+    materialiser contract that resolves a VK's chain from its policy plus its
+    scope-inherited eligible ModelProvider set.
 
   Background:
     Given organization "acme" exists
