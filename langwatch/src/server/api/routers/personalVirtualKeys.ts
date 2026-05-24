@@ -62,7 +62,7 @@ async function assertOrgMembership({
 export const personalVirtualKeysRouter = createTRPCRouter({
   /**
    * List the caller's personal VKs in an organization. Never returns
-   * the secret. Used by /me/settings to render the device list.
+   * the secret. Used by /me/configure to render the device list.
    */
   list: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
@@ -88,7 +88,7 @@ export const personalVirtualKeysRouter = createTRPCRouter({
    * exactly once — caller must persist it immediately.
    *
    * Used by:
-   *   - /me/settings "Add a new key" drawer (e.g. label="jane-laptop").
+   *   - /me/configure "Add a new key" drawer (e.g. label="jane-laptop").
    *   - The CLI device-flow approval handler for the FIRST personal
    *     VK on first login (label="default").
    */

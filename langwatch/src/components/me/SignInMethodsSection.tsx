@@ -54,7 +54,7 @@ const isCredentialAccount = (account: {
 };
 
 /**
- * Per-user sign-in methods section, embedded in /me/settings.
+ * Per-user sign-in methods section, embedded in /me/configure.
  *
  * Two practical shapes for ~100% of users:
  *   - Email/password (BetterAuth credentials, or Auth0 username-password):

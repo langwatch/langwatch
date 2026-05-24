@@ -38,13 +38,13 @@ export const noOrgBouncerRoutes = [
   "/settings/routing-policies",
   // Personal-scope pages — persona-1 (org-less CLI/IDE devs) is a
   // first-class persona per the persona-aware-chrome spec. They have
-  // a legitimate home at /me + /me/settings without needing to create
+  // a legitimate home at /me + /me/configure without needing to create
   // an org first. Without this exemption, CommandBar's global
   // useOrganizationTeamProject({redirectToOnboarding: true}) wins the
   // race and dumps them on /onboarding/welcome — exact opposite of the
   // p1 storyboard.
   "/me",
-  "/me/settings",
+  "/me/configure",
   // The root index is responsible for picking the right home per
   // persona (`pages/index.tsx` resolves via api.governance.resolveHome
   // for org-having users + falls back to /me for org-less p1). The

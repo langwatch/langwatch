@@ -236,9 +236,9 @@ describe("WorkspaceSwitcher", () => {
     });
   });
 
-  describe("when `current` is not passed and the route is /me/settings", () => {
+  describe("when `current` is not passed and the route is /me/configure", () => {
     it("still auto-detects personal", () => {
-      mockPathname = "/me/settings";
+      mockPathname = "/me/configure";
       renderSwitcher({
         personal,
         teams: [teamA],

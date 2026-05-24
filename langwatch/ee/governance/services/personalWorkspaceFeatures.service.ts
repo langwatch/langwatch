@@ -7,7 +7,7 @@
  * Personal workspaces ship minimal-by-default: Traces / My Usage /
  * Sessions / Settings only. The four "library" features (Evaluations
  * / Datasets / Annotations / Automations) are hidden behind a single
- * checkbox in `/me/settings → Workspace features` (or unlocked
+ * checkbox in `/me/configure → Workspace features` (or unlocked
  * progressively via the click-to-enable modal in the Traces Explorer).
  *
  * Storage is per-feature JSON (`Project.personalFeatures`) so future
@@ -170,7 +170,7 @@ export class PersonalWorkspaceFeaturesService {
         data: { personalFeatures: next as unknown as Prisma.InputJsonValue },
       });
       // Audit-log row visible to org admins via the existing audit
-      // RBAC AND to the user themselves on `/me/settings → Activity`.
+      // RBAC AND to the user themselves on `/me/configure → Activity`.
       // Forensic shape: previousState + newState as JSON metadata.
       await tx.auditLog.create({
         data: {

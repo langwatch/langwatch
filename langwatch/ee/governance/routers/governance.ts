@@ -205,7 +205,7 @@ export const governanceRouter = createTRPCRouter({
    * Writes:
    *   - `AuditLog` row (`action='governance.viewWorkspaceAs'`) — the
    *     SOC2 / ISO27001 evidence surface; visible at /settings/audit-log
-   *     to org admins AND to the user themselves on /me/settings →
+   *     to org admins AND to the user themselves on /me/configure →
    *     Activity (per the user-visible disclosure copy).
    *   - `governance_ocsf_events` mirror — best-effort SIEM stream
    *     parity; OCSF write failures don't fail the AuditLog write.

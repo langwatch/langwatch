@@ -864,7 +864,7 @@ export const userRouter = createTRPCRouter({
   /**
    * Persist (or clear) the user's pinned home destination. NULL clears
    * the pin and reverts to auto-detection. The picker UI (on
-   * /me/settings) calls this when the user picks a destination from the
+   * /me/configure) calls this when the user picks a destination from the
    * dropdown.
    *
    * Spec: specs/ai-gateway/governance/persona-home-content.feature
@@ -891,7 +891,7 @@ export const userRouter = createTRPCRouter({
     }),
 
   /**
-   * Snapshot of the user's home-page picker state for /me/settings:
+   * Snapshot of the user's home-page picker state for /me/configure:
    * the currently-pinned path (if any) + the auto-detected default
    * destination + the flags that drive which dropdown options to show.
    *

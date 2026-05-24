@@ -96,7 +96,7 @@ const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
 };
 
 /**
- * Header chip rendered on personal-scope routes (`/me`, `/me/settings`).
+ * Header chip rendered on personal-scope routes (`/me`, `/me/configure`).
  * Pinned to `current = personal` so the trigger always reads "My
  * Workspace" inside the personal-scope chrome, regardless of URL.
  *
@@ -325,7 +325,7 @@ export type DashboardLayoutProps = {
   publicPage?: boolean;
   compactMenu?: boolean;
   /**
-   * Set on personal-scope routes (`/me`, `/me/settings`) where the page
+   * Set on personal-scope routes (`/me`, `/me/configure`) where the page
    * intentionally has no project context. Disables the OTP hook's
    * "no project → bounce to /onboarding or /<defaultProjectSlug>"
    * redirect, which would otherwise hijack the route on first paint.

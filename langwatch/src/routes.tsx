@@ -255,8 +255,8 @@ const routes: RouteObject[] = [
     ...page(() => import("./pages/me/index")),
   },
   {
-    path: "/me/settings",
-    ...page(() => import("./pages/me/settings")),
+    path: "/me/configure",
+    ...page(() => import("./pages/me/configure")),
   },
   {
     path: "/me/sessions",

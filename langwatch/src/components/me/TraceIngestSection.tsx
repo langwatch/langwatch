@@ -27,7 +27,7 @@ import { api } from "~/utils/api";
  * Per `specs/ai-gateway/governance/ingestion-templates-catalog.feature`:
  *   exactly 4 visible tiles v1 — claude_code / cursor / claude_cowork
  *   (otlp_token install) + raw_otlp_advanced (visually distinct fallback
- *   discovery card pointing at /me/settings#otlp).
+ *   discovery card pointing at /me/configure#otlp).
  *
  * Tile metadata comes from `api.ingestionTemplates.list` (server is the
  * source of truth — admin can disable / org-author / archive). v1
@@ -43,7 +43,7 @@ import { api } from "~/utils/api";
  *
  * raw_otlp_advanced is rendered as a SEPARATE static tile (no
  * IngestionTemplate row, no install). It deep-links to
- * /me/settings#otlp — the BYO-OTLP fallback discovery card.
+ * /me/configure#otlp — the BYO-OTLP fallback discovery card.
  *
  * Per the no-leak invariant in catalog.feature: this component MUST
  * NOT render under /[project] chrome — only on /me. Embedding lives on
@@ -369,7 +369,7 @@ function RawOtlpAdvancedTile() {
             Bring your own OTLP, raw shape. Use for custom telemetry pipelines.
           </Text>
           <Link
-            href="/me/settings#otlp"
+            href="/me/configure#otlp"
             color="orange.600"
             fontSize="xs"
             fontWeight="medium"

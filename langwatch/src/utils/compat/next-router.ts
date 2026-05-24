@@ -56,7 +56,7 @@ const ROUTE_PATTERNS = [
   // /me as a project page (which collapses the WorkspaceSwitcher to project
   // context and breaks the personal nav).
   "/me",
-  "/me/settings",
+  "/me/configure",
   "/cli/auth",
   "/governance",
   "/:project/messages/:trace/:openTab/:span",

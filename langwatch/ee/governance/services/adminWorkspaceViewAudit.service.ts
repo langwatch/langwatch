@@ -15,7 +15,7 @@
  * floods the audit log with no forensic signal — collapsing the
  * burst to ONE row per (admin, target, kind, 5-min window) is
  * sufficient for both SOC2 evidence + admin self-discovery on
- * /me/settings → Activity.
+ * /me/configure → Activity.
  *
  * Spec: specs/ai-gateway/governance/admin-trace-access.feature
  *       specs/ai-gateway/governance/ingestion-attribution.feature

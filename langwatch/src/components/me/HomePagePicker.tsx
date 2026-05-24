@@ -27,7 +27,7 @@ interface PickerOption {
 }
 
 /**
- * Default-landing-page picker for /me/settings. Persists `User.lastHomePath`
+ * Default-landing-page picker for /me/configure. Persists `User.lastHomePath`
  * via api.user.setLastHomePath. Persona-aware: only surfaces destinations
  * the resolver would otherwise consider for this user — Persona-1 sees
  * Auto + Personal home; Persona-3 sees Auto + Project home; etc.

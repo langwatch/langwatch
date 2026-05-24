@@ -52,12 +52,12 @@ describe("BudgetExceededBanner", () => {
     it("renders the 'Request increase' link pointing to that URL", () => {
       renderBanner({
         requestIncreaseUrl:
-          "https://app.langwatch.example.com/me/settings#budget?req=abc",
+          "https://app.langwatch.example.com/me/configure#budget?req=abc",
       });
 
       const link = screen.getByRole("link", { name: /request increase/i });
       expect(link.getAttribute("href")).toBe(
-        "https://app.langwatch.example.com/me/settings#budget?req=abc",
+        "https://app.langwatch.example.com/me/configure#budget?req=abc",
       );
     });
   });

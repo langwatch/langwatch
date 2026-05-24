@@ -26,7 +26,7 @@ export type BudgetExceededBannerProps = {
   /** Scope of the binding budget: "user" | "team" | "project" | "organization" | "virtual_key". */
   scope: string;
   /**
-   * Pre-signed deep link to the request-increase flow on /me/settings.
+   * Pre-signed deep link to the request-increase flow on /me/configure.
    * Optional — when absent, the banner falls back to a static
    * "ask your admin" message without the CTA.
    */

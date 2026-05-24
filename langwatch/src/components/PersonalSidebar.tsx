@@ -1,13 +1,14 @@
 import { Box, Text, VStack } from "@chakra-ui/react";
 import {
   Bot,
+  Brain,
   ClipboardList,
   Database,
   Eye,
   Gauge,
-  KeyRound,
   ListTree,
-  PlugZap,
+  Settings as SettingsIcon,
+  Sliders,
   Smartphone,
   Sparkles,
 } from "lucide-react";
@@ -45,8 +46,12 @@ export const PersonalSidebar = React.memo(function PersonalSidebar({
   const currentWidth = showExpanded ? MENU_WIDTH_EXPANDED : MENU_WIDTH_COMPACT;
 
   const isUsageActive = router.pathname === "/me";
-  const isSettingsActive = router.pathname.startsWith("/me/settings");
+  const isConfigureActive = router.pathname.startsWith("/me/configure");
   const isSessionsActive = router.pathname.startsWith("/me/sessions");
+  const isOrgSettingsActive =
+    router.pathname === "/settings" ||
+    (router.pathname.startsWith("/settings") &&
+      !router.pathname.startsWith("/settings/gateway"));
 
   const session = useRequiredSession();
   const { organization, organizations, hasPermission } =
@@ -96,7 +101,7 @@ export const PersonalSidebar = React.memo(function PersonalSidebar({
   // Personal-workspace advanced features unlock the library nav entries
   // (datasets, evaluations, annotations, automations). Default-empty
   // storage means existing users see Traces only; clicking the bundle
-  // checkbox in /me/settings flips them on with one atomic flip + audit.
+  // checkbox in /me/configure flips them on with one atomic flip + audit.
   const featuresQuery = api.personalWorkspaceFeatures.get.useQuery(
     { projectId: personalProjectId ?? "" },
     { enabled: !!personalProjectId, refetchOnWindowFocus: false },
@@ -195,10 +200,10 @@ export const PersonalSidebar = React.memo(function PersonalSidebar({
               showLabel={showExpanded}
             />
             <SideMenuLink
-              icon={KeyRound}
-              label="Settings"
-              href="/me/settings"
-              isActive={isSettingsActive}
+              icon={Sliders}
+              label="Configure"
+              href="/me/configure"
+              isActive={isConfigureActive}
               showLabel={showExpanded}
             />
             {(showGovernanceEntry || showGatewayEntry) && (
@@ -216,7 +221,7 @@ export const PersonalSidebar = React.memo(function PersonalSidebar({
                 </Text>
                 {showGatewayEntry && (
                   <SideMenuLink
-                    icon={PlugZap}
+                    icon={Brain}
                     label="AI Gateway"
                     href="/settings/gateway/virtual-keys"
                     isActive={isGatewayActive}
@@ -237,6 +242,15 @@ export const PersonalSidebar = React.memo(function PersonalSidebar({
           </VStack>
 
           <VStack width="full" gap={0.5} align="start">
+            {hasPermission("organization:view") && (
+              <SideMenuLink
+                icon={SettingsIcon}
+                label="Settings"
+                href="/settings"
+                isActive={isOrgSettingsActive}
+                showLabel={showExpanded}
+              />
+            )}
             <SupportMenu showLabel={showExpanded} />
             <ThemeToggle showLabel={showExpanded} />
           </VStack>
