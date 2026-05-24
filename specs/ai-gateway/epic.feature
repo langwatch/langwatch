@@ -262,7 +262,7 @@ Feature: LangWatch AI Gateway — Cross-cutting epic
     Then the gateway returns 200 only if:
       | check                                                  |
       | bifrost/core is initialized                            |
-      | at least one provider credential resolves successfully |
+      | at least one ModelProvider resolves successfully       |
       | control-plane /internal/gateway/resolve-key is reachable OR bootstrap cache is populated |
       | the changes long-poll goroutine is running             |
     And if any check fails the endpoint returns 503 with a JSON body listing failing checks

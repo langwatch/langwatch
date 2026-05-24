@@ -85,3 +85,41 @@ Feature: AI Gateway — Per-user (PRINCIPAL) budgets in the strictest-wins casca
     Then the trace-fold reactor writes 5 rows to `gateway_budget_ledger_events`
     And each row carries the same `GatewayRequestId` (idempotency key)
     And the PRINCIPAL row has `BudgetId` matching alice's principal budget and `SpendUSD = 0.42`
+
+  # ============================================================================
+  # Multi-scope VK — budget cascade with refactored VK shape
+  # ============================================================================
+
+  @bdd @phase-1b @principal-cascade @multi-scope-vk
+  Scenario: Multi-scope VK (no PROJECT scope) routes budget.check with organizationId only
+    Given a VirtualKey "vk_org_wide" scoped to ORGANIZATION "acme" (no team/project scope)
+    And organization "acme" has a $1000/month ORG budget on_breach=BLOCK
+    And NO team or project budget applies to this request path
+    And alice has a $50/month PRINCIPAL budget
+    When the gateway makes a request with "vk_org_wide" attributed to alice
+    And calls `budget.check({ organizationId: "acme", teamId: null, projectId: null, virtualKeyId: "vk_org_wide", principalUserId: "user_alice", projectedCostUsd: "0.10" })`
+    Then `scopes` contains 3 entries: org, virtual_key, principal (no team, no project)
+    And the trace lands at org-level (no projectId claim on the JWT, see vk-config-bundle.feature)
+    And the PRINCIPAL budget cascade still pivots correctly on principalUserId
+
+  @bdd @phase-1b @principal-cascade @multi-scope-vk
+  Scenario: VK scoped to multiple PROJECTs routes budget.check with no projectId (org-level trace)
+    Given a VirtualKey "vk_multi_project" scoped to PROJECT "gateway-demo" AND PROJECT "ml-prod"
+    When the gateway makes a request with "vk_multi_project"
+    And calls `budget.check` with projectId=null (per the spec — VK has 2 project scopes)
+    Then no per-project PROJECT budget is consulted in this cascade walk
+    And the cascade still includes ORG / VK / PRINCIPAL (if present)
+    And the trace lands at org-level
+    # Documented consequence (also in vk-config-bundle.feature): per-project
+    # trace search will not surface this VK's traces by design. Surfaced in
+    # R3b docs sweep so users don't report it as a bug.
+
+  @bdd @phase-1b @principal-cascade @multi-scope-vk
+  Scenario: VK scoped to exactly one PROJECT routes per-project budget normally
+    Given a VirtualKey "vk_single_project" scoped to PROJECT "gateway-demo" only
+    And project "gateway-demo" has a $200/month PROJECT budget
+    When the gateway makes a request with "vk_single_project"
+    And calls `budget.check` with projectId="gateway-demo"
+    Then the PROJECT budget is included in `scopes`
+    And the trace's JWT carries `project_id="gateway-demo"`
+    And per-project trace search surfaces these requests (the one-PROJECT-scope happy path)
