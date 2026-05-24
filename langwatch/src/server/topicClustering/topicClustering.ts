@@ -19,7 +19,12 @@ import { getApp } from "../app-layer/app";
 import { scheduleTopicClusteringNextPage } from "../background/queues/topicClusteringQueue";
 import { getClickHouseClientForProject } from "../clickhouse/clickhouseClient";
 import { prisma } from "../db";
-import { esClient, TRACE_INDEX, traceIndexId } from "../elasticsearch";
+import {
+  esClient,
+  isElasticsearchConfigured,
+  TRACE_INDEX,
+  traceIndexId,
+} from "../elasticsearch";
 import { getProjectEmbeddingsModel } from "../embeddings";
 import { getPayloadSizeHistogram } from "../metrics";
 import { stagedLangevalsFetch } from "../langevals/stagedFetch";
@@ -764,7 +769,12 @@ export const storeResults = async (
     },
   ]);
 
-  if (body.length > 0) {
+  if (body.length > 0 && (await isElasticsearchConfigured({ projectId }))) {
+    // Legacy dual-write to the ES trace index for self-hosted installs
+    // still on Elasticsearch. SaaS is ClickHouse-only — gated here so the
+    // throwing unconfigured-ES proxy doesn't kill storeResults before the
+    // AssignTopic command queue (which feeds trace_summaries.TopicId)
+    // gets to run.
     const client = await esClient({ projectId });
     await client.bulk({
       index: TRACE_INDEX.alias,

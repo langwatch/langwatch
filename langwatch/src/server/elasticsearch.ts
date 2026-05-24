@@ -76,6 +76,40 @@ const unconfiguredEsClient: ElasticClient = new Proxy({} as ElasticClient, {
   },
 });
 
+/**
+ * True if Elasticsearch is configured for this caller, either via the
+ * global `ELASTICSEARCH_NODE_URL` env or via an organization-level
+ * override. Mirrors the resolution order in `esClient` so a caller that
+ * gates on this will never receive the throwing proxy unless config
+ * changes mid-call.
+ *
+ * SaaS prod is ClickHouse-only (no ES) so callers that still write to ES
+ * for back-compat must guard the call with this; otherwise the throwing
+ * proxy short-circuits the whole code path and silently drops later
+ * work (see PR #4189's topicClustering fix — ES bulk threw, the
+ * AssignTopic command queue never fired, and trace_summaries.TopicId
+ * stayed null, leaving "Top Topics" empty in the UI).
+ */
+export const isElasticsearchConfigured = async (
+  args?: { projectId: string } | { organizationId: string } | { test: true },
+): Promise<boolean> => {
+  if (!args || "test" in args) {
+    return !!env.ELASTICSEARCH_NODE_URL;
+  }
+  if ("organizationId" in args) {
+    const organization = await prisma.organization.findUnique({
+      where: { id: args.organizationId },
+    });
+    if (organization?.elasticsearchNodeUrl) return true;
+  } else if ("projectId" in args) {
+    const project = await getOrgElasticsearchDetailsFromProject(
+      args.projectId,
+    );
+    if (project?.elasticsearchNodeUrl) return true;
+  }
+  return !!env.ELASTICSEARCH_NODE_URL;
+};
+
 export const esClient = async (
   args?: { projectId: string } | { organizationId: string } | { test: true },
 ): Promise<ElasticClient> => {

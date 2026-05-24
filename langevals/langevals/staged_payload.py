@@ -54,6 +54,21 @@ _MAX_STAGED_BYTES = _env_int("LANGEVALS_STAGED_MAX_BYTES", _DEFAULT_MAX_BYTES)
 
 
 logger = logging.getLogger("langevals.staged_payload")
+# Default Python stdlib root level is WARNING and uvicorn doesn't attach a
+# handler to our namespace; without this nudge every successful staged
+# fetch would silently drop its log line, leaving operators no way to
+# correlate a slow evaluator call with the S3 hop. We respect an
+# explicit LANGEVALS_STAGED_LOG_LEVEL override if set.
+_log_level_name = os.getenv("LANGEVALS_STAGED_LOG_LEVEL", "INFO").upper()
+_log_level = getattr(logging, _log_level_name, logging.INFO)
+logger.setLevel(_log_level)
+if not logger.handlers:
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(
+        logging.Formatter("[staged-payload] %(levelname)s %(message)s"),
+    )
+    logger.addHandler(_handler)
+    logger.propagate = False
 
 
 class StagedPayloadMiddleware:
