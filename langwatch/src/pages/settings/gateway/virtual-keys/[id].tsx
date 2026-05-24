@@ -27,6 +27,7 @@ import {
 import AiGatewayLayout from "~/components/gateway/AiGatewayLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
+import { FieldInfoTooltip } from "~/components/gateway/FieldInfoTooltip";
 import { VirtualKeyEditDrawer } from "~/components/gateway/VirtualKeyEditDrawer";
 import { VirtualKeySecretReveal } from "~/components/gateway/VirtualKeySecretReveal";
 import { VirtualKeyUsageSnippet } from "~/components/gateway/VirtualKeyUsageSnippet";
@@ -185,10 +186,12 @@ function VirtualKeyDetailPage() {
           ) : (
             <VStack align="stretch" gap={6} maxWidth="900px">
               <Section title="Identity">
-                <DetailRow label="ID">
-                  <Code fontSize="xs">{vk.id}</Code>
-                </DetailRow>
-                <DetailRow label="Prefix">
+                <DetailRow
+                  label="Prefix"
+                  labelHint={
+                    <FieldInfoTooltip description="First chars of the secret. The full secret is shown only once at create or rotate — if it's lost, rotate the key to mint a fresh one." />
+                  }
+                >
                   <Code fontSize="xs">{vk.displayPrefix}…</Code>
                 </DetailRow>
                 <DetailRow label="Status">
@@ -363,16 +366,21 @@ function Section({
 
 function DetailRow({
   label,
+  labelHint,
   children,
 }: {
   label: string;
+  labelHint?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <HStack gap={4} align="flex-start">
-      <Text fontSize="sm" color="fg.muted" minWidth="140px">
-        {label}
-      </Text>
+      <HStack gap={1} minWidth="140px">
+        <Text fontSize="sm" color="fg.muted">
+          {label}
+        </Text>
+        {labelHint}
+      </HStack>
       {children}
     </HStack>
   );

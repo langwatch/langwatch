@@ -78,9 +78,22 @@ export function VirtualKeyUsageSnippet({
   const { colorMode } = useColorMode();
   const credential = secret ?? "$LANGWATCH_VK_SECRET";
   const resolvedBaseUrl = resolveGatewayBaseUrl(gatewayBaseUrl);
+  const showRetrievalHint = !secret;
 
   const tabItems: TabItem[] = useMemo(() => {
-    const pythonSnippet = `from openai import OpenAI
+    const reminder =
+      "The full secret is shown only once during create or rotate. If you do not have it saved, rotate to mint a fresh one.";
+    const hashHint = showRetrievalHint
+      ? `# ${reminder}\n# Set LANGWATCH_VK_SECRET in your shell, or paste the secret in place of $LANGWATCH_VK_SECRET below.\n\n`
+      : "";
+    const slashHint = showRetrievalHint
+      ? `// ${reminder}\n// Set LANGWATCH_VK_SECRET in your shell, or paste the secret in place of $LANGWATCH_VK_SECRET below.\n\n`
+      : "";
+    const pythonHighlightShift = showRetrievalHint ? 3 : 0;
+    const tsHighlightShift = showRetrievalHint ? 3 : 0;
+    const goHighlightShift = showRetrievalHint ? 3 : 0;
+    const curlHighlightShift = showRetrievalHint ? 3 : 0;
+    const pythonSnippet = `${hashHint}from openai import OpenAI
 
 client = OpenAI(
     base_url="${resolvedBaseUrl}",
@@ -93,7 +106,7 @@ response = client.chat.completions.create(
 )
 print(response.choices[0].message.content)`;
 
-    const typescriptSnippet = `import OpenAI from "openai";
+    const typescriptSnippet = `${slashHint}import OpenAI from "openai";
 
 const client = new OpenAI({
   baseURL: "${resolvedBaseUrl}",
@@ -106,7 +119,7 @@ const response = await client.chat.completions.create({
 });
 console.log(response.choices[0].message.content);`;
 
-    const goSnippet = `package main
+    const goSnippet = `${slashHint}package main
 
 import (
 \t"context"
@@ -131,7 +144,7 @@ func main() {
 \tfmt.Println(response.Choices[0].Message.Content)
 }`;
 
-    const curlSnippet = `curl ${resolvedBaseUrl}/chat/completions \\
+    const curlSnippet = `${hashHint}curl ${resolvedBaseUrl}/chat/completions \\
   -H "Authorization: Bearer ${credential}" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -140,12 +153,12 @@ func main() {
   }'`;
 
     return [
-      { key: "python", title: "Python", code: pythonSnippet, language: "python", highlightLines: [4, 5] },
-      { key: "typescript", title: "TypeScript", code: typescriptSnippet, language: "typescript", highlightLines: [4, 5] },
-      { key: "go", title: "Go", code: goSnippet, language: "go", highlightLines: [13, 14] },
-      { key: "bash", title: "cURL", code: curlSnippet, language: "bash", highlightLines: [1, 2] },
+      { key: "python", title: "Python", code: pythonSnippet, language: "python", highlightLines: [4 + pythonHighlightShift, 5 + pythonHighlightShift] },
+      { key: "typescript", title: "TypeScript", code: typescriptSnippet, language: "typescript", highlightLines: [4 + tsHighlightShift, 5 + tsHighlightShift] },
+      { key: "go", title: "Go", code: goSnippet, language: "go", highlightLines: [13 + goHighlightShift, 14 + goHighlightShift] },
+      { key: "bash", title: "cURL", code: curlSnippet, language: "bash", highlightLines: [1 + curlHighlightShift, 2 + curlHighlightShift] },
     ];
-  }, [resolvedBaseUrl, credential]);
+  }, [resolvedBaseUrl, credential, showRetrievalHint]);
 
   const tabs = useTabs({ defaultValue: "python" });
   const activeTab = tabItems.find((t) => t.key === tabs.value) ?? tabItems[0]!;
@@ -240,13 +253,6 @@ func main() {
           </ClientOnly>
         </CodeBlock.AdapterProvider>
       </Tabs.RootProvider>
-      {!secret && (
-        <Text textStyle="xs" color="fg.muted">
-          Set <code>LANGWATCH_VK_SECRET</code> to the VK secret from the
-          create-or-rotate flow. The raw secret is shown once and not
-          retrievable afterwards.
-        </Text>
-      )}
     </VStack>
   );
 }

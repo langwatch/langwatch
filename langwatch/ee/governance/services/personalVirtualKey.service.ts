@@ -195,7 +195,6 @@ export class PersonalVirtualKeyService {
       organizationId,
       name: label,
       description: "Personal virtual key",
-      environment: "live",
       principalUserId: userId,
       actorUserId: userId,
       scopes: [{ scopeType: "PROJECT", scopeId: personalProjectId }],

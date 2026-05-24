@@ -120,6 +120,7 @@ export function VirtualKeyScopePicker({
         availableTeams={availableTeams}
         availableProjects={availableProjects}
         label=""
+        showSummary={false}
         currentOrganizationId={currentOrganizationId}
         currentTeamId={currentTeamId}
         currentProjectId={currentProjectId}

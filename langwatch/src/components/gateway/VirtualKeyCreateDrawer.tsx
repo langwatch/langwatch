@@ -232,6 +232,21 @@ export function VirtualKeyCreateDrawer({
               currentProjectId={project?.id}
             />
 
+            <Box>
+              <Text fontSize="xs" fontWeight="semibold" color="fg.muted" mb={1.5}>
+                Eligible model providers
+              </Text>
+              <EligibleModelProvidersPreview
+                scopes={scopes}
+                organizationId={organizationId}
+                organizationName={organization?.name}
+                availableTeams={availableTeams}
+                availableProjects={availableProjects}
+                isLoading={orgProvidersQuery.isLoading}
+                providers={providers as any}
+              />
+            </Box>
+
             <Field.Root>
               <Field.Label>
                 Routing policy (optional)
@@ -261,21 +276,6 @@ export function VirtualKeyCreateDrawer({
                 further.
               </Field.HelperText>
             </Field.Root>
-
-            <Box>
-              <Text fontSize="xs" fontWeight="semibold" color="fg.muted" mb={1.5}>
-                Eligible model providers
-              </Text>
-              <EligibleModelProvidersPreview
-                scopes={scopes}
-                organizationId={organizationId}
-                organizationName={organization?.name}
-                availableTeams={availableTeams}
-                availableProjects={availableProjects}
-                isLoading={orgProvidersQuery.isLoading}
-                providers={providers as any}
-              />
-            </Box>
 
             <Separator />
             <CapabilityPreview />

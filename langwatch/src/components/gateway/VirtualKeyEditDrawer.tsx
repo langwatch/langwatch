@@ -433,6 +433,21 @@ export function VirtualKeyEditDrawer({
               />
             )}
 
+            <Box>
+              <Text fontSize="xs" fontWeight="semibold" color="fg.muted" mb={1.5}>
+                Eligible model providers
+              </Text>
+              <EligibleModelProvidersPreview
+                scopes={vk?.scopes ?? []}
+                organizationId={organizationId}
+                organizationName={organization?.name}
+                availableTeams={availableTeams}
+                availableProjects={availableProjects}
+                isLoading={orgProvidersQuery.isLoading}
+                providers={(orgProvidersQuery.data?.providers ?? []) as any}
+              />
+            </Box>
+
             <Field.Root>
               <Field.Label>
                 Routing policy
@@ -462,21 +477,6 @@ export function VirtualKeyEditDrawer({
                 provider list.
               </Field.HelperText>
             </Field.Root>
-
-            <Box>
-              <Text fontSize="xs" fontWeight="semibold" color="fg.muted" mb={1.5}>
-                Eligible model providers
-              </Text>
-              <EligibleModelProvidersPreview
-                scopes={vk?.scopes ?? []}
-                organizationId={organizationId}
-                organizationName={organization?.name}
-                availableTeams={availableTeams}
-                availableProjects={availableProjects}
-                isLoading={orgProvidersQuery.isLoading}
-                providers={(orgProvidersQuery.data?.providers ?? []) as any}
-              />
-            </Box>
 
             <Separator />
             <HStack>

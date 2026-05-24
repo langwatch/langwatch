@@ -8,6 +8,7 @@ import {
   Heading,
   Spacer,
   Spinner,
+  Tabs,
   Table,
   Text,
   VStack,
@@ -129,8 +130,18 @@ function VirtualKeysPage() {
   const [editing, setEditing] = useState<any | null>(null);
   const [rotating, setRotating] = useState<{ id: string; name: string } | null>(null);
   const [revoking, setRevoking] = useState<{ id: string; name: string } | null>(null);
+  const [statusTab, setStatusTab] = useState<"active" | "revoked">("active");
 
-  const rows = listQuery.data ?? [];
+  const allRows = listQuery.data ?? [];
+  const activeRows = useMemo(
+    () => allRows.filter((vk) => vk.status === "active"),
+    [allRows],
+  );
+  const revokedRows = useMemo(
+    () => allRows.filter((vk) => vk.status === "revoked"),
+    [allRows],
+  );
+  const rows = statusTab === "active" ? activeRows : revokedRows;
 
   const confirmRotate = async () => {
     if (!rotating || !orgId) return;
@@ -196,7 +207,7 @@ function VirtualKeysPage() {
               error={listQuery.error}
               onRetry={() => listQuery.refetch()}
             />
-          ) : rows.length === 0 ? (
+          ) : allRows.length === 0 ? (
             <EmptyState.Root>
               <EmptyState.Content>
                 <EmptyState.Indicator>
@@ -220,6 +231,41 @@ function VirtualKeysPage() {
               </EmptyState.Content>
             </EmptyState.Root>
           ) : (
+            <VStack align="stretch" gap={3} width="full">
+              {revokedRows.length > 0 && (
+                <Tabs.Root
+                  value={statusTab}
+                  onValueChange={(d) =>
+                    setStatusTab(d.value as "active" | "revoked")
+                  }
+                  variant="line"
+                  size="sm"
+                >
+                  <Tabs.List>
+                    <Tabs.Trigger value="active">
+                      Active
+                      <Badge variant="subtle" colorPalette="gray" ml={1.5}>
+                        {activeRows.length}
+                      </Badge>
+                    </Tabs.Trigger>
+                    <Tabs.Trigger value="revoked">
+                      Revoked
+                      <Badge variant="subtle" colorPalette="gray" ml={1.5}>
+                        {revokedRows.length}
+                      </Badge>
+                    </Tabs.Trigger>
+                  </Tabs.List>
+                </Tabs.Root>
+              )}
+              {rows.length === 0 ? (
+                <Card.Root width="full">
+                  <Card.Body>
+                    <Text fontSize="sm" color="fg.muted" textAlign="center" py={6}>
+                      No {statusTab} keys.
+                    </Text>
+                  </Card.Body>
+                </Card.Root>
+              ) : (
             <Card.Root width="full" overflow="hidden">
               <Card.Body paddingY={0} paddingX={0}>
             <Table.Root variant="line" size="md" width="full">
@@ -383,6 +429,8 @@ function VirtualKeysPage() {
             </Table.Root>
               </Card.Body>
             </Card.Root>
+              )}
+            </VStack>
           )}
         </Box>
       </>
