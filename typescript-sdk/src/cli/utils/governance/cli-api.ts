@@ -220,6 +220,14 @@ export interface CliBootstrapResponse {
    * an error.
    */
   gatewayUrl?: string;
+  /**
+   * First org admin's email (by createdAt). Rendered as a mailto in
+   * wrapper preflight failure messages so non-admin users get a real
+   * contact path instead of a vague "ask your admin". `null` when the
+   * org has no admin yet; `undefined` on legacy servers without the
+   * field (CLI falls back to a generic line).
+   */
+  adminEmail?: string | null;
 }
 
 /**

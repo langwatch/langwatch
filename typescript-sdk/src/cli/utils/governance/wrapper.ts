@@ -114,6 +114,20 @@ export interface PreflightOptions {
 }
 
 /**
+ * Render the "who to talk to" footer attached to every preflight
+ * failure message. Single source of truth so the admin-mailto format
+ * stays consistent across the three failure shapes. Bootstrap is the
+ * source of `adminEmail`; on legacy servers or unreachable control
+ * planes it'll be null and we fall back to a generic line.
+ */
+function renderContactFooter(adminEmail: string | null | undefined): string {
+  if (adminEmail) {
+    return `Need help? Contact your LangWatch admin: ${adminEmail}\n`;
+  }
+  return `If you need help, contact your LangWatch admin.\n`;
+}
+
+/**
  * Pre-exec probe for `langwatch <tool>` wrappers. Three layered checks,
  * each gracefully degrading rather than blocking on transient hiccups:
  *
@@ -124,15 +138,22 @@ export interface PreflightOptions {
  *      env from a prior session — a confusing ConnectionRefused
  *      against a stale base URL.
  *   2. `GET <gateway_url>/healthz` reachable. Catches "data plane not
- *      running" on self-hosted (`make service svc=aigateway` not started)
- *      and bad `LANGWATCH_GATEWAY_URL` overrides. Network errors here
- *      are fatal: if the gateway isn't reachable the tool will spin in
- *      a retry loop and there's no recovery.
+ *      running" and bad `LANGWATCH_GATEWAY_URL` overrides. Fatal: if
+ *      the gateway isn't reachable the tool will spin in a retry loop
+ *      and there's no recovery. We don't name a specific run command
+ *      (`make`, helm chart, docker compose, `npx @langwatch/server`,
+ *      etc.) because deployments vary — point the user at the admin
+ *      contact instead.
  *   3. `getCliBootstrap()` providers cover the tool's family. Catches
- *      the dogfood-account shape where login succeeds but the org has
- *      no AI provider configured yet, so the gateway has nothing to
- *      route to. 404 / missing-providers data passes through (older
- *      self-hosted servers without the endpoint).
+ *      the shape where login succeeds but the org has no AI provider
+ *      configured yet, so the gateway has nothing to route to. 404 /
+ *      missing-providers data passes through (older self-hosted
+ *      servers without the endpoint).
+ *
+ * Bootstrap is fetched up-front (it lives on the control plane,
+ * independent of the gateway data plane) so every failure message can
+ * embed the org admin's email as a real contact path. A bootstrap
+ * error is non-fatal — we just lose the admin mailto and continue.
  */
 export async function preflightWrapper(
   cfg: GovernanceConfig,
@@ -140,6 +161,10 @@ export async function preflightWrapper(
   opts: PreflightOptions = {},
 ): Promise<PreflightResult> {
   const cp = cfg.control_plane_url.replace(/\/+$/, "");
+  const bootstrap = await (opts.bootstrapImpl ?? getCliBootstrap)(cfg).catch(
+    () => null,
+  );
+  const adminEmail = bootstrap?.adminEmail ?? null;
 
   if (!cfg.default_personal_vk?.secret) {
     return {
@@ -147,9 +172,11 @@ export async function preflightWrapper(
       message:
         `No personal virtual key on this account.\n` +
         `Your organization needs at least one AI provider configured before\n` +
-        `\`langwatch ${tool}\` can route requests. Ask an admin to set one up at\n` +
-        `  ${cp}/settings/providers\n` +
-        `Then run \`langwatch login --device\` to refresh your credentials.\n`,
+        `\`langwatch ${tool}\` can route requests.\n` +
+        `If you're an admin, set one up at\n` +
+        `  ${cp}/settings/model-providers\n` +
+        `then run \`langwatch login --device\` to refresh your credentials.\n` +
+        renderContactFooter(adminEmail),
     };
   }
 
@@ -167,8 +194,8 @@ export async function preflightWrapper(
         message:
           `AI Gateway at ${gw} returned HTTP ${res.status}.\n` +
           `The wrapper cannot route \`langwatch ${tool}\` requests until the\n` +
-          `data plane is healthy. If self-hosted, check that the gateway service\n` +
-          `is running (\`make service svc=aigateway\`).\n`,
+          `data plane is healthy. Check that the LangWatch gateway is running.\n` +
+          renderContactFooter(adminEmail),
       };
     }
   } catch (err) {
@@ -177,32 +204,32 @@ export async function preflightWrapper(
       message:
         `Cannot reach AI Gateway at ${gw}\n` +
         `  ${(err as Error).message}\n` +
-        `If self-hosted, start the gateway with \`make service svc=aigateway\`.\n` +
-        `If using cloud, check your network or set LANGWATCH_GATEWAY_URL.\n`,
+        `Check that the LangWatch gateway is running, or set LANGWATCH_GATEWAY_URL\n` +
+        `if you've deployed it elsewhere.\n` +
+        renderContactFooter(adminEmail),
     };
   }
 
   const need = TOOL_PROVIDER_FAMILIES[tool];
-  if (need && need.length > 0) {
-    const bootstrap = await (opts.bootstrapImpl ?? getCliBootstrap)(cfg).catch(
-      () => null,
-    );
-    if (bootstrap && Array.isArray(bootstrap.providers)) {
-      const have = new Set(
-        bootstrap.providers.map((p) => p.name.toLowerCase()),
-      );
-      const matches = need.filter((n) => have.has(n));
-      if (matches.length === 0) {
-        const list = need.map((n) => `\`${n}\``).join(" or ");
-        return {
-          ok: false,
-          message:
-            `No ${list} provider is configured for your organization.\n` +
-            `\`langwatch ${tool}\` needs at least one to route requests through the gateway.\n` +
-            `Ask an admin to configure one at\n` +
-            `  ${cp}/settings/providers\n`,
-        };
-      }
+  if (
+    need &&
+    need.length > 0 &&
+    bootstrap &&
+    Array.isArray(bootstrap.providers)
+  ) {
+    const have = new Set(bootstrap.providers.map((p) => p.name.toLowerCase()));
+    const matches = need.filter((n) => have.has(n));
+    if (matches.length === 0) {
+      const list = need.map((n) => `\`${n}\``).join(" or ");
+      return {
+        ok: false,
+        message:
+          `No ${list} provider is configured for your organization.\n` +
+          `\`langwatch ${tool}\` needs at least one to route requests through the gateway.\n` +
+          `If you're an admin, configure one at\n` +
+          `  ${cp}/settings/model-providers\n` +
+          renderContactFooter(adminEmail),
+      };
     }
   }
 

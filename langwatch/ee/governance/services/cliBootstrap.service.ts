@@ -59,6 +59,14 @@ export interface CliBootstrapResult {
    * the dashboard showed localhost.
    */
   gatewayUrl: string;
+  /**
+   * Mailto target the CLI can render when preflight fails (gateway
+   * down, no provider configured, no personal VK). First org admin by
+   * createdAt, same selection used by the budget-exceeded payload so
+   * the user sees a consistent "ask this person" address across
+   * surfaces. Null when the org has no admin row yet.
+   */
+  adminEmail: string | null;
 }
 
 function resolveGatewayUrl(): string {
@@ -103,8 +111,20 @@ export class CliBootstrapService {
       teamId: workspace.team.id,
       projectId: workspace.project.id,
     });
+    const adminEmail = await this.resolveAdminEmail(input.organizationId);
 
-    return { providers, budget, gatewayUrl: resolveGatewayUrl() };
+    return { providers, budget, gatewayUrl: resolveGatewayUrl(), adminEmail };
+  }
+
+  private async resolveAdminEmail(
+    organizationId: string,
+  ): Promise<string | null> {
+    const admin = await this.prisma.organizationUser.findFirst({
+      where: { organizationId, role: "ADMIN" },
+      include: { user: { select: { email: true } } },
+      orderBy: { createdAt: "asc" },
+    });
+    return admin?.user.email ?? null;
   }
 
   private async resolveProviders(
@@ -206,5 +226,6 @@ function emptyBootstrap(): CliBootstrapResult {
       period: "MONTHLY",
     },
     gatewayUrl: resolveGatewayUrl(),
+    adminEmail: null,
   };
 }

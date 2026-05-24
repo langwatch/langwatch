@@ -16,13 +16,17 @@ const refusedFetch: typeof fetch = async () => {
 const five03Fetch: typeof fetch = async () =>
   new Response("upstream", { status: 503 });
 
-const bootstrapWith = (names: string[]) => async () => ({
+const bootstrapWith = (
+  names: string[],
+  adminEmail: string | null = "admin@acme.test",
+) => async () => ({
   providers: names.map((name) => ({
     name,
     displayName: name,
     models: [`${name}-default`],
   })),
   budget: { monthlyLimitUsd: null, monthlyUsedUsd: 0, period: "month" },
+  adminEmail,
 });
 
 describe("envForTool", () => {
@@ -80,7 +84,7 @@ describe("envForTool", () => {
 
 describe("preflightWrapper", () => {
   describe("given the personal VK is missing", () => {
-    it("fails fast with a setup-providers hint", async () => {
+    it("fails fast with a model-providers setup hint", async () => {
       const noVk: GovernanceConfig = { ...cfg, default_personal_vk: undefined };
       const r = await preflightWrapper(noVk, "claude", {
         fetchImpl: okFetch,
@@ -88,13 +92,15 @@ describe("preflightWrapper", () => {
       });
       expect(r.ok).toBe(false);
       expect(r.message).toContain("No personal virtual key");
-      expect(r.message).toContain("/settings/providers");
+      expect(r.message).toContain("/settings/model-providers");
+      expect(r.message).not.toContain("/settings/providers\n"); // exact URL check
       expect(r.message).toContain("langwatch login --device");
+      expect(r.message).toContain("admin@acme.test"); // contact footer
     });
   });
 
   describe("given the gateway is unreachable", () => {
-    it("surfaces the network error and points at `make service svc=aigateway`", async () => {
+    it("surfaces the network error without naming a specific run command", async () => {
       const r = await preflightWrapper(cfg, "claude", {
         fetchImpl: refusedFetch,
         bootstrapImpl: bootstrapWith(["anthropic"]),
@@ -102,7 +108,11 @@ describe("preflightWrapper", () => {
       expect(r.ok).toBe(false);
       expect(r.message).toContain("Cannot reach AI Gateway");
       expect(r.message).toContain("ECONNREFUSED");
-      expect(r.message).toContain("make service svc=aigateway");
+      expect(r.message).toContain("LangWatch gateway is running");
+      // Deployment shape varies (helm / docker-compose / npx / make);
+      // never recommend a dev-only command like `make service`.
+      expect(r.message).not.toContain("make service");
+      expect(r.message).toContain("admin@acme.test");
     });
 
     it("treats non-2xx as fatal too", async () => {
@@ -112,6 +122,17 @@ describe("preflightWrapper", () => {
       });
       expect(r.ok).toBe(false);
       expect(r.message).toContain("returned HTTP 503");
+      expect(r.message).not.toContain("make service");
+    });
+
+    it("falls back to generic admin line when bootstrap has no admin email", async () => {
+      const r = await preflightWrapper(cfg, "claude", {
+        fetchImpl: refusedFetch,
+        bootstrapImpl: bootstrapWith(["anthropic"], null),
+      });
+      expect(r.ok).toBe(false);
+      expect(r.message).toContain("contact your LangWatch admin");
+      expect(r.message).not.toMatch(/admin@/);
     });
   });
 
@@ -123,7 +144,8 @@ describe("preflightWrapper", () => {
       });
       expect(r.ok).toBe(false);
       expect(r.message).toContain("`anthropic`");
-      expect(r.message).toContain("/settings/providers");
+      expect(r.message).toContain("/settings/model-providers");
+      expect(r.message).toContain("admin@acme.test");
     });
 
     it("passes cursor when either anthropic OR openai is present", async () => {
