@@ -314,12 +314,6 @@ export function VirtualKeyEditDrawer({
       toaster.create({ title: "Name is required", type: "error" });
       return;
     }
-    const modelAliases: Record<string, string> = {};
-    for (const pair of aliases) {
-      if (pair.from.trim() && pair.to.trim()) {
-        modelAliases[pair.from.trim()] = pair.to.trim();
-      }
-    }
     try {
       await updateMutation.mutateAsync({
         organizationId,
@@ -328,20 +322,11 @@ export function VirtualKeyEditDrawer({
         description: description || null,
         routingPolicyId: routingPolicyId ? routingPolicyId : null,
         config: {
-          modelAliases,
           cache: { mode: cacheMode, ttlS: cacheTtlS },
           rateLimits: {
             rpm: rpm ? Number.parseInt(rpm, 10) : null,
             tpm: tpm ? Number.parseInt(tpm, 10) : null,
             rpd: rpd ? Number.parseInt(rpd, 10) : null,
-          },
-          policyRules: buildPolicyRules(),
-          guardrails: {
-            pre: guardrails.pre,
-            post: guardrails.post,
-            streamChunk: guardrails.streamChunk,
-            requestFailOpen,
-            responseFailOpen,
           },
           metadata: {
             tags: tagsCsv

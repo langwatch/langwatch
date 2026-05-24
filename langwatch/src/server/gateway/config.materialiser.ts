@@ -27,6 +27,20 @@ import {
 import { parseVirtualKeyConfig } from "./virtualKey.config";
 import type { VirtualKeyWithScopes } from "./virtualKey.repository";
 
+export type GuardrailWire = {
+  id: string;
+  name: string;
+  evaluator_id: string;
+  evaluator_slug: string | null;
+  direction: "pre" | "post" | "stream_chunk";
+  failure_mode: "fail_open" | "fail_closed";
+};
+
+export type GuardrailAttachmentWire = {
+  direction: "pre" | "post" | "stream_chunk";
+  guardrail_ids: string[];
+};
+
 export type ProviderSlot = {
   /**
    * ModelProvider.id — the Go gateway keys credentials on this directly
@@ -81,13 +95,11 @@ export type GatewayConfigPayload = {
   model_aliases: Record<string, string>;
   models_allowed: string[] | null;
   cache: { mode: "respect" | "force" | "disable"; ttl_s: number };
-  guardrails: {
-    pre: { id: string; evaluator: string }[];
-    post: { id: string; evaluator: string }[];
-    stream_chunk: { id: string; evaluator: string }[];
-    request_fail_open: boolean;
-    response_fail_open: boolean;
-  };
+  // Flat per-project guardrail catalog the VK is allowed to reference.
+  // The Go dispatcher looks up entries by id from guardrail_attachments
+  // and invokes them per direction.
+  guardrails: GuardrailWire[];
+  guardrail_attachments: GuardrailAttachmentWire[];
   policy_rules: {
     tools: { deny: string[]; allow: string[] | null };
     mcp: { deny: string[]; allow: string[] | null };
@@ -143,6 +155,11 @@ export class GatewayConfigMaterialiser {
     const cacheRules = await this.applicableCacheRules(vk.organizationId);
     const config = parseVirtualKeyConfig(vk.config);
     const policySides = resolvePolicySideOfBundle(vk, config);
+    const guardrailSides = await this.resolveGuardrailSideOfBundle(
+      vk,
+      config,
+      traceProject,
+    );
 
     return {
       revision: vk.revision.toString(),
@@ -164,13 +181,8 @@ export class GatewayConfigMaterialiser {
       model_aliases: policySides.modelAliases,
       models_allowed: config.modelsAllowed,
       cache: { mode: config.cache.mode, ttl_s: config.cache.ttlS },
-      guardrails: {
-        pre: config.guardrails.pre,
-        post: config.guardrails.post,
-        stream_chunk: config.guardrails.streamChunk,
-        request_fail_open: config.guardrails.requestFailOpen,
-        response_fail_open: config.guardrails.responseFailOpen,
-      },
+      guardrails: guardrailSides.guardrails,
+      guardrail_attachments: guardrailSides.attachments,
       policy_rules: policySides.policyRules,
       rate_limits: {
         rpm: config.rateLimits.rpm,
@@ -198,6 +210,55 @@ export class GatewayConfigMaterialiser {
     organizationId: string,
   ): Promise<GatewayCacheRule[]> {
     return GatewayCacheRuleService.create(this.prisma).bundleFor(organizationId);
+  }
+
+  /**
+   * Project-scoped guardrails the gateway is allowed to invoke for this
+   * VK + the VK's attachment tuples. GatewayGuardrail is project-scoped
+   * so the flat catalog is fetched against the VK's resolved trace
+   * project. VKs without a trace project (ORG/TEAM-scoped without
+   * internal_governance fallback) cannot invoke any guardrail; both
+   * arrays come back empty in that case.
+   */
+  private async resolveGuardrailSideOfBundle(
+    vk: VirtualKeyWithScopes,
+    config: ReturnType<typeof parseVirtualKeyConfig>,
+    traceProject: { id: string; teamId: string } | null,
+  ): Promise<{
+    guardrails: GuardrailWire[];
+    attachments: GuardrailAttachmentWire[];
+  }> {
+    if (!traceProject) {
+      return { guardrails: [], attachments: [] };
+    }
+    const rows = await this.prisma.gatewayGuardrail.findMany({
+      where: { projectId: traceProject.id, archivedAt: null },
+      include: { evaluator: { select: { slug: true } } },
+    });
+    const guardrails: GuardrailWire[] = rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      evaluator_id: r.evaluatorId,
+      evaluator_slug: r.evaluator?.slug ?? null,
+      direction:
+        r.direction === "PRE"
+          ? "pre"
+          : r.direction === "POST"
+            ? "post"
+            : "stream_chunk",
+      failure_mode: r.failureMode === "FAIL_OPEN" ? "fail_open" : "fail_closed",
+    }));
+    const guardrailIdSet = new Set(rows.map((r) => r.id));
+    // Drop attachment references to guardrails that no longer exist or
+    // belong to a different project; the gateway should never see a
+    // dangling id.
+    const attachments: GuardrailAttachmentWire[] = config.guardrailAttachments
+      .map((a) => ({
+        direction: a.direction,
+        guardrail_ids: a.guardrailIds.filter((id) => guardrailIdSet.has(id)),
+      }))
+      .filter((a) => a.guardrail_ids.length > 0);
+    return { guardrails, attachments };
   }
 
   /**
@@ -330,30 +391,27 @@ function normalisePolicyRules(raw: unknown): BundlePolicyRules {
 
 function resolvePolicySideOfBundle(
   vk: VirtualKeyWithScopes,
-  config: ReturnType<typeof parseVirtualKeyConfig>,
+  _config: ReturnType<typeof parseVirtualKeyConfig>,
 ): {
   modelAliases: Record<string, string>;
   policyRules: BundlePolicyRules;
 } {
   const rp = vk.routingPolicy;
-  if (rp) {
-    const aliasesRaw = rp.modelAliases;
-    const aliases: Record<string, string> =
-      aliasesRaw && typeof aliasesRaw === "object" && !Array.isArray(aliasesRaw)
-        ? Object.fromEntries(
-            Object.entries(aliasesRaw as Record<string, unknown>).filter(
-              ([, v]) => typeof v === "string",
-            ) as Array<[string, string]>,
-          )
-        : {};
-    return {
-      modelAliases: aliases,
-      policyRules: normalisePolicyRules(rp.policyRules),
-    };
+  if (!rp) {
+    return { modelAliases: {}, policyRules: emptyPolicyRules() };
   }
+  const aliasesRaw = rp.modelAliases;
+  const aliases: Record<string, string> =
+    aliasesRaw && typeof aliasesRaw === "object" && !Array.isArray(aliasesRaw)
+      ? Object.fromEntries(
+          Object.entries(aliasesRaw as Record<string, unknown>).filter(
+            ([, v]) => typeof v === "string",
+          ) as Array<[string, string]>,
+        )
+      : {};
   return {
-    modelAliases: config.modelAliases,
-    policyRules: normalisePolicyRules(config.policyRules),
+    modelAliases: aliases,
+    policyRules: normalisePolicyRules(rp.policyRules),
   };
 }
 
