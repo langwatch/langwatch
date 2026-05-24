@@ -430,8 +430,8 @@ function UsageSection({ data }: { data: VkUsageData | null }) {
     return (
       <Section title="Usage (last 30 days)">
         <Text fontSize="sm" color="fg.muted">
-          No debits in the last 30 days. The gateway writes the ledger
-          after a completed request against this virtual key.
+          No usage in the last 30 days. Send a request through this
+          virtual key and it'll show up here.
         </Text>
       </Section>
     );
@@ -527,7 +527,7 @@ function UsageSection({ data }: { data: VkUsageData | null }) {
         {data.recentDebits.length > 0 && (
           <VStack align="stretch" gap={1}>
             <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-              Recent debits
+              Recent activity
             </Text>
             <Table.Root size="sm" variant="line">
               <Table.Header>

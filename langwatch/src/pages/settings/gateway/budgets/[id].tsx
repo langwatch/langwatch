@@ -253,18 +253,17 @@ function BudgetDetailPage() {
                 )}
               </Section>
 
-              <Section title="Recent debits">
+              <Section title="Recent activity">
                 {budget.recentLedger.length === 0 ? (
                   <EmptyState.Root size="sm">
                     <EmptyState.Content>
                       <EmptyState.Indicator>
                         <Receipt size={24} />
                       </EmptyState.Indicator>
-                      <EmptyState.Title>No debits yet</EmptyState.Title>
+                      <EmptyState.Title>No usage yet</EmptyState.Title>
                       <EmptyState.Description>
-                        Debits land here once the trace-fold reactor projects a
-                        completed request against a VK in this scope onto the
-                        ClickHouse budget ledger.
+                        Activity shows up here after the first completed request
+                        against a virtual key in this scope.
                       </EmptyState.Description>
                     </EmptyState.Content>
                   </EmptyState.Root>
@@ -318,8 +317,8 @@ function BudgetDetailPage() {
                   </Table.Root>
                 )}
                 <Text fontSize="xs" color="fg.muted" mt={1}>
-                  Most recent 20 debits. Full history lives on the ClickHouse
-                  budget ledger — query via Usage for aggregates.
+                  Most recent 20 requests. See Usage for aggregates over the
+                  full history.
                 </Text>
               </Section>
             </VStack>
