@@ -402,8 +402,8 @@ async function mintVk(input: {
 }): Promise<MintedVk> {
   // Always mint a fresh secret on first run; on re-run, idempotency falls
   // back to the existing row (we detect by organizationId+name).
-  const existing = await prisma.virtualKey.findUnique({
-    where: { organizationId_name: { organizationId: input.organizationId, name: input.name } },
+  const existing = await prisma.virtualKey.findFirst({
+    where: { organizationId: input.organizationId, name: input.name },
     include: { scopes: true },
   });
   if (existing) {

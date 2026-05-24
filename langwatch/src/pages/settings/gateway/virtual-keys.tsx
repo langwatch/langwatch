@@ -13,7 +13,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Eye, KeyRound, MoreVertical, Pencil, Plus, RotateCw, Trash2 } from "lucide-react";
+import { Ban, Eye, Gauge, KeyRound, MoreVertical, Pencil, Plus, RotateCw, Shield, Trash2, Zap } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useRouter } from "~/utils/compat/next-router";
 
@@ -21,6 +21,7 @@ import AiGatewayLayout from "~/components/gateway/AiGatewayLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { GatewayErrorPanel } from "~/components/gateway/GatewayErrorPanel";
+import { ProviderScopeChips } from "~/components/settings/ProviderScopeChips";
 import { Link } from "~/components/ui/link";
 import { VirtualKeyCreateDrawer } from "~/components/gateway/VirtualKeyCreateDrawer";
 import { VirtualKeyEditDrawer } from "~/components/gateway/VirtualKeyEditDrawer";
@@ -81,43 +82,17 @@ function VirtualKeysPage() {
     }
     return map;
   }, [organization?.teams]);
-  const ScopeChipList = ({ scopes }: { scopes: ScopeEntry[] }) => {
-    if (!scopes || scopes.length === 0) {
-      return (
-        <Text fontSize="xs" color="fg.muted">
-          —
-        </Text>
-      );
-    }
-    return (
-      <HStack gap={1} flexWrap="wrap">
-        {scopes.map((s) => {
-          const label =
-            s.scopeType === "ORGANIZATION"
-              ? `ORG${organization?.name ? `:${organization.name}` : ""}`
-              : s.scopeType === "TEAM"
-              ? `TEAM:${teamNameById.get(s.scopeId) ?? s.scopeId}`
-              : `PROJECT:${projectNameById.get(s.scopeId) ?? s.scopeId}`;
-          const palette =
-            s.scopeType === "ORGANIZATION"
-              ? "blue"
-              : s.scopeType === "TEAM"
-              ? "purple"
-              : "teal";
-          return (
-            <Badge
-              key={`${s.scopeType}:${s.scopeId}`}
-              variant="subtle"
-              colorPalette={palette}
-              fontSize="2xs"
-            >
-              {label}
-            </Badge>
-          );
-        })}
-      </HStack>
-    );
-  };
+  const scopeEntriesWithNames = (scopes: ScopeEntry[]) =>
+    scopes.map((s) => ({
+      scopeType: s.scopeType,
+      scopeId: s.scopeId,
+      name:
+        s.scopeType === "ORGANIZATION"
+          ? organization?.name
+          : s.scopeType === "TEAM"
+            ? teamNameById.get(s.scopeId)
+            : projectNameById.get(s.scopeId),
+    }));
   const rotateMutation = api.virtualKeys.rotate.useMutation({
     onSuccess: () => utils.virtualKeys.list.invalidate({ organizationId: orgId }),
   });
@@ -189,7 +164,7 @@ function VirtualKeysPage() {
           <Spacer />
           {canCreate && (
             <Button
-              colorPalette="orange"
+              variant="outline"
               size="sm"
               onClick={() => setCreateOpen(true)}
             >
@@ -208,28 +183,31 @@ function VirtualKeysPage() {
               onRetry={() => listQuery.refetch()}
             />
           ) : allRows.length === 0 ? (
-            <EmptyState.Root>
-              <EmptyState.Content>
-                <EmptyState.Indicator>
-                  <KeyRound size={32} />
-                </EmptyState.Indicator>
-                <EmptyState.Title>No virtual keys yet</EmptyState.Title>
-                <EmptyState.Description>
-                  Mint your first virtual key to route requests through the
-                  LangWatch AI Gateway with budgets, guardrails, and
-                  per-tenant tracing attached.
-                </EmptyState.Description>
-                {canCreate && (
-                  <Button
-                    colorPalette="orange"
-                    onClick={() => setCreateOpen(true)}
-                    mt={2}
-                  >
-                    <Plus size={14} /> New virtual key
-                  </Button>
-                )}
-              </EmptyState.Content>
-            </EmptyState.Root>
+            <VStack gap={6} align="center" maxWidth="640px" marginX="auto" paddingY={8}>
+              <EmptyState.Root>
+                <EmptyState.Content>
+                  <EmptyState.Indicator>
+                    <KeyRound size={32} />
+                  </EmptyState.Indicator>
+                  <EmptyState.Title>No virtual keys yet</EmptyState.Title>
+                  <EmptyState.Description>
+                    Mint your first virtual key to route requests through the
+                    LangWatch AI Gateway with budgets, guardrails, and
+                    per-tenant tracing attached.
+                  </EmptyState.Description>
+                  {canCreate && (
+                    <Button
+                      colorPalette="orange"
+                      onClick={() => setCreateOpen(true)}
+                      mt={2}
+                    >
+                      <Plus size={14} /> New virtual key
+                    </Button>
+                  )}
+                </EmptyState.Content>
+              </EmptyState.Root>
+              <GatewayCapabilityPreview />
+            </VStack>
           ) : (
             <VStack align="stretch" gap={3} width="full">
               {revokedRows.length > 0 && (
@@ -240,6 +218,7 @@ function VirtualKeysPage() {
                   }
                   variant="line"
                   size="sm"
+                  colorPalette="blue"
                 >
                   <Tabs.List>
                     <Tabs.Trigger value="active">
@@ -340,7 +319,10 @@ function VirtualKeysPage() {
                       </Badge>
                     </Table.Cell>
                     <Table.Cell>
-                      <ScopeChipList scopes={vk.scopes} />
+                      <ProviderScopeChips
+                        scopes={scopeEntriesWithNames(vk.scopes)}
+                        size="xs"
+                      />
                     </Table.Cell>
                     <Table.Cell>
                       {vk.routingPolicyId ? (
@@ -491,6 +473,88 @@ function VirtualKeysPage() {
         onConfirm={confirmRevoke}
       />
     </AiGatewayLayout>
+  );
+}
+
+function GatewayCapabilityPreview() {
+  const rows: Array<{
+    icon: React.ReactNode;
+    label: string;
+    defaultValue: string;
+    detail: string;
+  }> = [
+    {
+      icon: <Zap size={14} />,
+      label: "Cache control",
+      defaultValue: "respect",
+      detail:
+        "Provider-agnostic passthrough. Anthropic cache_control, OpenAI/Azure automatic, Gemini cachedContent. Switch to disable/force per key.",
+    },
+    {
+      icon: <Shield size={14} />,
+      label: "Guardrails",
+      defaultValue: "none",
+      detail:
+        "Attach pre/post/stream_chunk monitors. Block-by-default, opt-in fail-open per direction.",
+    },
+    {
+      icon: <Ban size={14} />,
+      label: "Blocked patterns",
+      defaultValue: "none",
+      detail:
+        "RE2 deny/allow for tools, MCP servers, URLs, and models. Enforced pre-provider-dispatch at zero cost.",
+    },
+    {
+      icon: <Gauge size={14} />,
+      label: "Rate limits",
+      defaultValue: "unlimited",
+      detail:
+        "Per-VK RPM and RPD. 429 + Retry-After emitted by the gateway when exceeded.",
+    },
+  ];
+  return (
+    <VStack align="stretch" gap={2} width="full">
+      <HStack>
+        <Text fontSize="sm" fontWeight="semibold">
+          What the gateway gives you
+        </Text>
+        <Badge colorPalette="gray" fontSize="2xs">
+          preview
+        </Badge>
+      </HStack>
+      <Box
+        borderWidth="1px"
+        borderColor="border.subtle"
+        borderRadius="md"
+        padding={3}
+      >
+        <VStack align="stretch" gap={3}>
+          {rows.map((row) => (
+            <HStack key={row.label} align="start" gap={3}>
+              <Box color="fg.muted" mt={1}>
+                {row.icon}
+              </Box>
+              <VStack align="start" gap={0} flex={1}>
+                <HStack>
+                  <Text fontSize="sm" fontWeight="medium">
+                    {row.label}
+                  </Text>
+                  <Badge variant="subtle" colorPalette="gray" fontSize="2xs">
+                    default: {row.defaultValue}
+                  </Badge>
+                </HStack>
+                <Text fontSize="xs" color="fg.muted">
+                  {row.detail}
+                </Text>
+              </VStack>
+            </HStack>
+          ))}
+        </VStack>
+      </Box>
+      <Text fontSize="xs" color="fg.muted">
+        Open the key's edit drawer after creation to configure any of these.
+      </Text>
+    </VStack>
   );
 }
 

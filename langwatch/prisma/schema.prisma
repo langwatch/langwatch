@@ -1770,7 +1770,6 @@ model VirtualKey {
   // deterministic across runs and Go-side parsers.
   routingPolicyId String?
 
-  @@unique([organizationId, name])
   @@unique([hashedSecret])
   @@index([organizationId])
   @@index([displayPrefix])

@@ -144,7 +144,11 @@ export default function ModelsPage() {
     } else {
       name = filterAvailable.projects.find((p) => p.id === scopeId)?.name;
     }
-    setScopeFilter({ kind: "specific", scopeType, scopeId, name });
+    if (name !== undefined) {
+      setScopeFilter({ kind: "specific", scopeType, scopeId, name } as PageScopeFilter);
+    } else {
+      setScopeFilter({ kind: "specific", scopeType, scopeId } as PageScopeFilter);
+    }
   }, [router.query.scope, filterAvailable]);
 
   const allEnabledProviders = useMemo(() => {
