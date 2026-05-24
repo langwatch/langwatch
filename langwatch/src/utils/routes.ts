@@ -198,11 +198,6 @@ export const projectRoutes = {
     title: "Budget",
     parent: "gateway_budgets",
   },
-  gateway_providers: {
-    path: "/settings/gateway/providers",
-    title: "Providers",
-    parent: "gateway",
-  },
   gateway_usage: {
     path: "/settings/gateway/usage",
     title: "Usage",

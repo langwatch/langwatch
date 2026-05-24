@@ -6,7 +6,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Gauge, KeyRound, LineChart, Plug, Zap } from "lucide-react";
+import { Gauge, KeyRound, LineChart, Zap } from "lucide-react";
 import { type PropsWithChildren } from "react";
 
 import { DashboardLayout } from "~/components/DashboardLayout";
@@ -68,13 +68,6 @@ export default function AiGatewayLayout({
                   icon={<Gauge size={14} />}
                 >
                   Budgets
-                </MenuLink>
-                <MenuLink
-                  href={`/settings/gateway/providers`}
-                  includePath={`/settings/gateway/providers`}
-                  icon={<Plug size={14} />}
-                >
-                  Providers
                 </MenuLink>
                 <MenuLink
                   href={`/settings/gateway/cache-rules`}

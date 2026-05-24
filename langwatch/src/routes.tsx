@@ -315,10 +315,6 @@ const routes: RouteObject[] = [
     ...page(() => import("./pages/settings/gateway/budgets/[id]")),
   },
   {
-    path: "/settings/gateway/providers",
-    ...page(() => import("./pages/settings/gateway/providers")),
-  },
-  {
     path: "/settings/gateway/usage",
     ...page(() => import("./pages/settings/gateway/usage")),
   },
