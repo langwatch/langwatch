@@ -41,7 +41,7 @@ export function AdminViewingAsBanner({
           </Text>
           <Text fontSize="xs" color="fg.muted">
             Each access is logged at{" "}
-            <Link href="/settings/audit-log" color="orange.600">
+            <Link href="/settings/audit-log" color="blue.600">
               /settings/audit-log
             </Link>
             .

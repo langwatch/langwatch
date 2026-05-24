@@ -60,7 +60,7 @@ export default function GovernanceLayout({
                   textTransform="uppercase"
                   letterSpacing="wider"
                 >
-                  Governance
+                  AI Governance
                 </Text>
                 <MenuLink
                   href="/governance"

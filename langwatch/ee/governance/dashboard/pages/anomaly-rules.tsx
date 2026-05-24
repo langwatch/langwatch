@@ -361,7 +361,7 @@ function AnomalyRulesPage() {
             <Text color="fg.muted" fontSize="sm" maxW="3xl">
               Define thresholds that page on-call when activity drifts.
               Rules surface on the{" "}
-              <Link href="/governance" color="orange.600">
+              <Link href="/governance" color="blue.600">
                 governance overview
               </Link>{" "}
               once they fire.
@@ -664,7 +664,7 @@ function RuleComposer({
               <code>after_hours</code>, …) are{" "}
               <Link
                 href="/ai-gateway/governance/anomaly-rules"
-                color="orange.600"
+                color="blue.600"
               >
                 preview
               </Link>{" "}
@@ -704,7 +704,7 @@ function RuleComposer({
                   size="xs"
                   variant="ghost"
                   fontSize="xs"
-                  color="orange.600"
+                  color="blue.600"
                   onClick={() =>
                     setScopeIdMode((m) =>
                       m === "picker" ? "custom" : "picker",
@@ -779,7 +779,7 @@ function RuleComposer({
             <Link
               href={docsUrl("/ai-governance/anomaly-rules#threshold-config")}
               isExternal
-              color="orange.600"
+              color="blue.600"
               fontSize="xs"
               fontWeight="medium"
             >
@@ -815,7 +815,7 @@ function RuleComposer({
         >
           <Text fontSize="xs" color="purple.900">
             <strong>Alert destinations:</strong> alerts surface on the{" "}
-            <Link href="/governance" color="orange.600">
+            <Link href="/governance" color="blue.600">
               governance dashboard
             </Link>{" "}
             today. Slack, PagerDuty, webhook, and email destinations ship
@@ -823,7 +823,7 @@ function RuleComposer({
             destination fields then. (See{" "}
             <Link
               href="/ai-gateway/governance/anomaly-rules"
-              color="orange.600"
+              color="blue.600"
             >
               anomaly rules docs
             </Link>{" "}

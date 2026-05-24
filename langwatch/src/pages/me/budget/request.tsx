@@ -160,7 +160,7 @@ export default function RequestBudgetIncreasePage() {
               <Alert.Description fontSize="sm">
                 We emailed {adminEmail ?? "your organization admin"} with the
                 spend context. They'll review and update the budget in
-                Settings → Governance → Budgets.
+                Settings → AI Governance → Budgets.
               </Alert.Description>
             </Box>
           </Alert.Root>

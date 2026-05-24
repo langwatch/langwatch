@@ -80,19 +80,19 @@ function GovernanceTeamDetailPage() {
 
   const team = (teamsQuery.data ?? []).find((t) => t.teamId === teamId);
   const pageTitle = team
-    ? `${team.teamName} · Governance · LangWatch`
-    : "Team · Governance · LangWatch";
+    ? `${team.teamName} · AI Governance · LangWatch`
+    : "Team · AI Governance · LangWatch";
 
   return (
     <GovernanceLayout pageTitle={pageTitle}>
       <VStack align="stretch" gap={4} width="full" maxW="container.xl">
         <VStack align="start" gap={1}>
           <Text fontSize="xs" color="fg.muted">
-            <Link href="/settings/governance" color="orange.600">
-              ← Governance
+            <Link href="/settings/governance" color="blue.600">
+              ← AI Governance
             </Link>{" "}
             ·{" "}
-            <Link href="/settings/governance/teams" color="orange.600">
+            <Link href="/settings/governance/teams" color="blue.600">
               All teams
             </Link>
           </Text>
@@ -159,7 +159,7 @@ function GovernanceTeamDetailPage() {
                 <>
                   <Link
                     href={`/${teamProjectSlug}/traces`}
-                    color="orange.600"
+                    color="blue.600"
                     fontSize="sm"
                     fontWeight="medium"
                   >
@@ -174,7 +174,7 @@ function GovernanceTeamDetailPage() {
               )}
               <Link
                 href="/settings/governance"
-                color="orange.600"
+                color="blue.600"
                 fontSize="sm"
                 fontWeight="medium"
               >

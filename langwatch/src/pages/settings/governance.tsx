@@ -148,12 +148,12 @@ function GovernanceOverviewPage() {
       summary.openAnomalyCount > 0);
 
   return (
-    <GovernanceLayout pageTitle="Governance · LangWatch">
+    <GovernanceLayout pageTitle="AI Governance · LangWatch">
       <VStack align="stretch" gap={6} width="full" maxW="container.xl">
         <HStack alignItems="end">
           <VStack align="start" gap={1}>
             <HStack gap={2}>
-              <Heading size="md">Governance</Heading>
+              <Heading size="md">AI Governance</Heading>
               <Badge colorPalette="purple" variant="subtle">
                 Preview
               </Badge>
@@ -316,7 +316,7 @@ function GovernanceOverviewPage() {
             teams.length > 0 ? (
               <Link
                 href="/settings/governance/teams"
-                color="orange.600"
+                color="blue.600"
                 fontSize="sm"
               >
                 View all teams →
@@ -345,7 +345,7 @@ function GovernanceOverviewPage() {
             users.length > 0 ? (
               <Link
                 href="/settings/governance/users"
-                color="orange.600"
+                color="blue.600"
                 fontSize="sm"
               >
                 View all users →
@@ -398,7 +398,7 @@ function GovernanceOverviewPage() {
               </Text>
               <Link
                 href="/settings/governance/ingestion-sources"
-                color="orange.600"
+                color="blue.600"
               >
                 + Add a source
               </Link>
@@ -663,7 +663,7 @@ function SetupItem({
           {description}
         </Text>
       </VStack>
-      <Link href={href} color="orange.600">
+      <Link href={href} color="blue.600">
         {ctaLabel}
       </Link>
     </HStack>

@@ -141,13 +141,13 @@ function GovernanceTeamsListPage() {
   const teams = teamsQuery.data ?? [];
 
   return (
-    <GovernanceLayout pageTitle="Teams · Governance · LangWatch">
+    <GovernanceLayout pageTitle="Teams · AI Governance · LangWatch">
       <VStack align="stretch" gap={4} width="full" maxW="container.xl">
         <HStack alignItems="end">
           <VStack align="start" gap={1}>
             <Text fontSize="xs" color="fg.muted">
-              <Link href="/settings/governance" color="orange.600">
-                ← Governance
+              <Link href="/settings/governance" color="blue.600">
+                ← AI Governance
               </Link>{" "}
               · All teams
             </Text>

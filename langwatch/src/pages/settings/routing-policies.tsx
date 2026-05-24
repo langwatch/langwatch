@@ -285,7 +285,7 @@ function RoutingPoliciesPage() {
     );
 
   return (
-    <GovernanceLayout pageTitle="Routing Policies · Governance · LangWatch">
+    <GovernanceLayout pageTitle="Routing Policies · AI Governance · LangWatch">
       <VStack align="stretch" gap={6} width="full" maxW="container.xl">
         <HStack alignItems="end">
           <VStack align="start" gap={0}>

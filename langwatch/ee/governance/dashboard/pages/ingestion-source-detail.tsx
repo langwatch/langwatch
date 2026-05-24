@@ -202,7 +202,7 @@ function IngestionSourceDetailPage() {
             <HStack gap={2}>
               <Link
                 href="/settings/governance/ingestion-sources"
-                color="orange.600"
+                color="blue.600"
                 fontSize="xs"
               >
                 <HStack gap={1}>
@@ -400,7 +400,7 @@ function EmptyEventsHint({ source }: { source: Source }) {
         project API key — different auth, same trace store. See{" "}
         <Link
           href="https://docs.langwatch.ai/observability/trace-vs-activity-ingestion"
-          color="orange.600"
+          color="blue.600"
         >
           Choosing the right OTel endpoint
         </Link>
@@ -452,7 +452,7 @@ function EmptyEventsHint({ source }: { source: Source }) {
             shape didn&apos;t parse. See the{" "}
             <Link
               href="https://docs.langwatch.ai/ai-gateway/governance/ingestion-sources/otel-generic"
-              color="orange.600"
+              color="blue.600"
             >
               otel-generic docs
             </Link>{" "}

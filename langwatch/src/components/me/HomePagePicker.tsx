@@ -88,7 +88,7 @@ export function HomePagePicker({ organizationId }: Props) {
     if (persona === "governance_admin") {
       opts.push({
         value: "governance",
-        label: "Governance overview",
+        label: "AI Governance overview",
         description: "Always land on the org bird's-eye dashboard",
         path: "/settings/governance",
       });

@@ -70,19 +70,19 @@ function GovernanceUserDetailPage() {
 
   const user = (usersQuery.data ?? []).find((u) => u.actor === actor);
   const pageTitle = user
-    ? `${user.actor} · Governance · LangWatch`
-    : "User · Governance · LangWatch";
+    ? `${user.actor} · AI Governance · LangWatch`
+    : "User · AI Governance · LangWatch";
 
   return (
     <GovernanceLayout pageTitle={pageTitle}>
       <VStack align="stretch" gap={4} width="full" maxW="container.xl">
         <VStack align="start" gap={1}>
           <Text fontSize="xs" color="fg.muted">
-            <Link href="/settings/governance" color="orange.600">
-              ← Governance
+            <Link href="/settings/governance" color="blue.600">
+              ← AI Governance
             </Link>{" "}
             ·{" "}
-            <Link href="/settings/governance/users" color="orange.600">
+            <Link href="/settings/governance/users" color="blue.600">
               All users
             </Link>
           </Text>
@@ -147,7 +147,7 @@ function GovernanceUserDetailPage() {
                 <>
                   <Link
                     href={`/${personalProject.projectSlug}/traces`}
-                    color="orange.600"
+                    color="blue.600"
                     fontSize="sm"
                     fontWeight="medium"
                   >
@@ -161,7 +161,7 @@ function GovernanceUserDetailPage() {
               )}
               <Link
                 href="/settings/governance"
-                color="orange.600"
+                color="blue.600"
                 fontSize="sm"
                 fontWeight="medium"
               >

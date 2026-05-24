@@ -132,13 +132,13 @@ function GovernanceUsersListPage() {
   const users = usersQuery.data ?? [];
 
   return (
-    <GovernanceLayout pageTitle="Users · Governance · LangWatch">
+    <GovernanceLayout pageTitle="Users · AI Governance · LangWatch">
       <VStack align="stretch" gap={4} width="full" maxW="container.xl">
         <HStack alignItems="end">
           <VStack align="start" gap={1}>
             <Text fontSize="xs" color="fg.muted">
-              <Link href="/settings/governance" color="orange.600">
-                ← Governance
+              <Link href="/settings/governance" color="blue.600">
+                ← AI Governance
               </Link>{" "}
               · All users
             </Text>

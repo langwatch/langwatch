@@ -412,7 +412,7 @@ export const MainMenu = React.memo(function MainMenu({
                 {showGovernanceEntry && (
                   <SideMenuLink
                     icon={Eye}
-                    label="Governance"
+                    label="AI Governance"
                     href="/governance"
                     isActive={
                       router.pathname === "/governance" ||
