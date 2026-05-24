@@ -99,16 +99,9 @@ describe("user.cliBootstrap integration", () => {
 
   afterAll(async () => {
     const orgIds = [ORG_ID, OTHER_ORG_ID];
-    const projects = await prisma.project.findMany({
-      where: { team: { organizationId: { in: orgIds } } },
-      select: { id: true },
+    await prisma.virtualKey.deleteMany({
+      where: { organizationId: { in: orgIds } },
     });
-    const projectIds = projects.map((p) => p.id);
-    if (projectIds.length > 0) {
-      await prisma.virtualKey.deleteMany({
-        where: { projectId: { in: projectIds } },
-      });
-    }
     await prisma.project.deleteMany({
       where: { team: { organizationId: { in: orgIds } } },
     });

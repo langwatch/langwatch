@@ -95,12 +95,9 @@ describe("GET /api/auth/cli/budget/status", () => {
       where: { team: { organizationId: ORG_ID } },
       select: { id: true },
     });
-    const projectIds = projects.map((p) => p.id);
-    if (projectIds.length > 0) {
-      await prisma.virtualKey.deleteMany({
-        where: { projectId: { in: projectIds } },
-      });
-    }
+    await prisma.virtualKey.deleteMany({
+      where: { organizationId: ORG_ID },
+    });
     await prisma.organizationUser.deleteMany({
       where: { organizationId: ORG_ID },
     });

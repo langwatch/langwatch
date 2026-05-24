@@ -77,16 +77,9 @@ describe("PersonalWorkspaceService — auto-create personal team + project", () 
     // assigned dynamically inside ensure() so we wipe by org/owner.
     // dbMultiTenancyProtection requires projectId in the WHERE for
     // VirtualKey — resolve project ids explicitly first.
-    const projects = await prisma.project.findMany({
-      where: { team: { organizationId: ORG_ID } },
-      select: { id: true },
+    await prisma.virtualKey.deleteMany({
+      where: { organizationId: ORG_ID },
     });
-    const projectIds = projects.map((p) => p.id);
-    if (projectIds.length > 0) {
-      await prisma.virtualKey.deleteMany({
-        where: { projectId: { in: projectIds } },
-      });
-    }
     await prisma.roleBinding.deleteMany({ where: { organizationId: ORG_ID } });
     await prisma.teamUser.deleteMany({
       where: { team: { organizationId: ORG_ID } },

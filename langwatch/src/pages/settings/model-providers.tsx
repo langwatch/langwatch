@@ -82,22 +82,6 @@ export default function ModelsPage() {
   } | null>(null);
 
   // Surface how many gateway bindings would be left orphaned by
-  // disabling this provider. The disable action sets enabled:false
-  // rather than deleting, so the cascade semantics that Prisma's
-  // onDelete:Cascade would have applied to GatewayProviderCredential
-  // never fire — admins need a count to know downstream gateway routes
-  // will silently break.
-  const gatewayBindingsCountQuery = api.gatewayProviders.countByModelProvider.useQuery(
-    {
-      organizationId: organization?.id ?? "",
-      modelProviderId: providerToDisable?.id ?? "",
-    },
-    {
-      enabled: !!organization?.id && !!providerToDisable?.id,
-      refetchOnWindowFocus: false,
-    },
-  );
-  const gatewayBindingsCount = gatewayBindingsCountQuery.data ?? 0;
 
   // One scope filter drives both tables on this page (Model Providers
   // and Default Models). Shape matches the DefaultModelsScopeFilter
@@ -472,30 +456,10 @@ export default function ModelsPage() {
                   Default model configs that reference this provider will
                   surface as &ldquo;Update needed&rdquo; in the table below.
                 </Text>
-                {gatewayBindingsCount > 0 && (
-                  <Box
-                    borderWidth="1px"
-                    borderColor="orange.300"
-                    borderRadius="md"
-                    backgroundColor="orange.50"
-                    padding={3}
-                    width="full"
-                  >
-                    <Text fontSize="sm" fontWeight="semibold" color="orange.800">
-                      {gatewayBindingsCount}{" "}
-                      {gatewayBindingsCount === 1
-                        ? "gateway binding"
-                        : "gateway bindings"}{" "}
-                      will become unusable
-                    </Text>
-                    <Text fontSize="xs" color="orange.700" marginTop={1}>
-                      Routing policies and virtual keys that route through
-                      this provider will start failing. Re-enable the
-                      provider, or remove the bindings on the AI Gateway
-                      Providers page first.
-                    </Text>
-                  </Box>
-                )}
+                {/* Binding-count warning was tied to GatewayProviderCredential,
+                    folded into ModelProvider in iter 110. The disable action
+                    sets ModelProvider.enabled=false which is itself the
+                    source of truth — no separate binding to count. */}
               </VStack>
             </Dialog.Body>
             <Dialog.Footer>

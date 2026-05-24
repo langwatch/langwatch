@@ -189,7 +189,7 @@ export default async function main() {
 
     for (const row of rows) {
       const result = migrateCustomModelsRow({
-        row: { ...row, projectId: project.id },
+        row,
         registryLookup: getProviderModelOptions,
       });
 

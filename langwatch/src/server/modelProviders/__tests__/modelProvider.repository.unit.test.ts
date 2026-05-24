@@ -68,14 +68,15 @@ function createScope(
 function createModelProvider(
   overrides: Partial<ModelProviderWithScopes> & {
     scopes?: ModelProviderScope[];
+    /** Convenience: seeds a single PROJECT-scope row if `scopes` isn't given. */
+    projectId?: string;
   } = {},
 ): ModelProviderWithScopes {
-  const { scopes, ...rest } = overrides;
+  const { scopes, projectId, ...rest } = overrides;
   const id = rest.id ?? "mp_test123";
-  const projectId = rest.projectId ?? "proj_test";
+  const seedProjectId = projectId ?? "proj_test";
   return {
     id,
-    projectId,
     name: "OpenAI",
     provider: "openai",
     enabled: true,
@@ -84,9 +85,19 @@ function createModelProvider(
     customEmbeddingsModels: null,
     deploymentMapping: null,
     extraHeaders: [],
+    rateLimitRpm: null,
+    rateLimitTpm: null,
+    rateLimitRpd: null,
+    rotationPolicy: "MANUAL",
+    providerConfig: null,
+    fallbackPriorityGlobal: null,
+    healthStatus: "UNKNOWN",
+    circuitOpenedAt: null,
+    lastHealthCheckAt: null,
+    disabledAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),
-    scopes: scopes ?? [createScope("PROJECT", projectId, id)],
+    scopes: scopes ?? [createScope("PROJECT", seedProjectId, id)],
     ...rest,
   };
 }
@@ -208,7 +219,10 @@ describe("ModelProviderRepository", () => {
         await repository.findById("mp_test123", "proj_test");
 
         expect(prisma.modelProvider.findFirst).toHaveBeenCalledWith({
-          where: { id: "mp_test123", projectId: "proj_test" },
+          where: {
+            id: "mp_test123",
+            scopes: { some: { scopeType: "PROJECT", scopeId: "proj_test" } },
+          },
           include: { scopes: true },
         });
       });

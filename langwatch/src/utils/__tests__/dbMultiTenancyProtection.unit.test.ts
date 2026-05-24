@@ -74,39 +74,9 @@ describe("guardProjectId — exempt org-scoped gateway models", () => {
     });
   });
 
-  describe("createMany on VirtualKeyProviderCredential without projectId", () => {
-    it("does NOT throw — join table, projectId reachable via parent VK", async () => {
-      // This path is hit on every VK create + every update that changes the
-      // provider chain (see virtualKey.repository.replaceProviderChain).
-      await expect(
-        runGuard({
-          model: "VirtualKeyProviderCredential",
-          action: "createMany",
-          args: {
-            data: [
-              {
-                virtualKeyId: "vk_01",
-                providerCredentialId: "gpc_01",
-                priority: 0,
-              },
-            ],
-          },
-        }),
-      ).resolves.toBe("ok");
-    });
-  });
-
-  describe("deleteMany on VirtualKeyProviderCredential by virtualKeyId", () => {
-    it("does NOT throw — same join-table rationale", async () => {
-      await expect(
-        runGuard({
-          model: "VirtualKeyProviderCredential",
-          action: "deleteMany",
-          args: { where: { virtualKeyId: "vk_01" } },
-        }),
-      ).resolves.toBe("ok");
-    });
-  });
+  // VirtualKeyProviderCredential coverage retired in iter 110: the
+  // binding join table was dropped; chain ordering moved to
+  // RoutingPolicy.modelProviderIds.
 
   describe("findMany on GatewayCacheRule with only organizationId filter", () => {
     it("does NOT throw (org-scoped; cache rules apply across every VK in the org)", async () => {
@@ -212,19 +182,10 @@ describe("guardProjectId — project-scoped gateway models still guarded", () =>
     });
   });
 
-  describe("create on GatewayProviderCredential WITHOUT projectId in data", () => {
-    it("STILL throws — provider credentials are project-scoped", async () => {
-      await expect(
-        runGuard({
-          model: "GatewayProviderCredential",
-          action: "create",
-          args: {
-            data: { modelProviderId: "mp_01", slot: "primary" },
-          },
-        }),
-      ).rejects.toThrow(/requires a 'projectId'/);
-    });
-  });
+  // GatewayProviderCredential coverage retired in iter 110: the model
+  // was folded into ModelProvider; advanced gateway fields live on the
+  // MP row directly. ModelProvider's tenancy invariant is covered by
+  // the ModelProvider SCOPED_MODELS regression suite below.
 });
 
 /**

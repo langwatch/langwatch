@@ -90,13 +90,13 @@ function RoutingPoliciesPage() {
     { enabled: !!orgId, refetchOnWindowFocus: false },
   );
 
-  // G19 — fuel the structured picker on the drawer with the org's actual
-  // gateway provider credentials. Without this, admins were left typing
-  // raw CUIDs against a `mp_anthropic` placeholder that didn't match any
-  // real ID format and sat below the visible toast layer.
-  const credentialsQuery = api.gatewayProviders.listForOrg.useQuery(
-    { organizationId: orgId },
-    { enabled: !!orgId, refetchOnWindowFocus: false },
+  // Fuel the structured picker on the drawer with the org's actual
+  // ModelProviders (visible at ORG / TEAM / PROJECT scopes via the
+  // standard scope cascade). Returns id + provider for the drawer's
+  // tagged picker.
+  const credentialsQuery = api.modelProvider.getAllForProject.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project?.id, refetchOnWindowFocus: false },
   );
 
   const [editingId, setEditingId] = useState<string | "new" | null>(null);
@@ -107,7 +107,7 @@ function RoutingPoliciesPage() {
     name: string;
     description: string;
     strategy: Strategy;
-    providerCredentialIds: string[];
+    modelProviderIds: string[];
     modelAllowlist: string[];
     isDefault: boolean;
   } | null>(null);
@@ -211,7 +211,7 @@ function RoutingPoliciesPage() {
       name: "",
       description: "",
       strategy: "priority",
-      providerCredentialIds: [],
+      modelProviderIds: [],
       modelAllowlist: [],
       isDefault: initialIsDefault,
     });
@@ -226,8 +226,8 @@ function RoutingPoliciesPage() {
       name: p.name,
       description: p.description ?? "",
       strategy: p.strategy as Strategy,
-      providerCredentialIds: Array.isArray(p.providerCredentialIds)
-        ? (p.providerCredentialIds as string[])
+      modelProviderIds: Array.isArray(p.modelProviderIds)
+        ? (p.modelProviderIds as string[])
         : [],
       modelAllowlist: Array.isArray(p.modelAllowlist)
         ? (p.modelAllowlist as string[])
@@ -246,7 +246,7 @@ function RoutingPoliciesPage() {
         scopeId: composer.scopeId,
         name: composer.name,
         description: composer.description || null,
-        providerCredentialIds: composer.providerCredentialIds,
+        modelProviderIds: composer.modelProviderIds,
         modelAllowlist:
           composer.modelAllowlist.length > 0 ? composer.modelAllowlist : null,
         strategy: composer.strategy,
@@ -258,7 +258,7 @@ function RoutingPoliciesPage() {
         id: editingId,
         name: composer.name,
         description: composer.description || null,
-        providerCredentialIds: composer.providerCredentialIds,
+        modelProviderIds: composer.modelProviderIds,
         modelAllowlist:
           composer.modelAllowlist.length > 0 ? composer.modelAllowlist : null,
         strategy: composer.strategy,
@@ -428,7 +428,21 @@ function RoutingPoliciesPage() {
             ? createMutation.isPending
             : updateMutation.isPending
         }
-        availableCredentials={credentialsQuery.data ?? []}
+        availableCredentials={
+          credentialsQuery.data
+            ? Object.entries(credentialsQuery.data)
+                .filter(([, mp]) => mp && mp.id)
+                .map(([providerKey, mp]: [string, any]) => ({
+                  id: mp.id as string,
+                  modelProviderName: mp.name ?? providerKey,
+                  slot: "primary",
+                  disabledAt: mp.disabledAt
+                    ? new Date(mp.disabledAt).toISOString()
+                    : null,
+                  healthStatus: (mp.healthStatus as string) ?? "UNKNOWN",
+                }))
+            : []
+        }
         credentialsLoading={credentialsQuery.isLoading}
         gatewayProvidersAdminPath="/settings/gateway/providers"
         errorMessage={drawerError}
@@ -488,8 +502,8 @@ function PolicyRow({
   const allowCount = Array.isArray(policy.modelAllowlist)
     ? (policy.modelAllowlist as string[]).length
     : 0;
-  const providerCount = Array.isArray(policy.providerCredentialIds)
-    ? (policy.providerCredentialIds as string[]).length
+  const providerCount = Array.isArray(policy.modelProviderIds)
+    ? (policy.modelProviderIds as string[]).length
     : 0;
 
   return (
@@ -558,7 +572,7 @@ type ComposerState = {
   name: string;
   description: string;
   strategy: Strategy;
-  providerCredentialIds: string[];
+  modelProviderIds: string[];
   modelAllowlist: string[];
   isDefault: boolean;
 };
@@ -988,7 +1002,7 @@ function RoutingPolicyDrawer({
     !composer ||
     !composer.name.trim() ||
     !composer.scopeId.trim() ||
-    composer.providerCredentialIds.length === 0 ||
+    composer.modelProviderIds.length === 0 ||
     isPending;
 
   return (
@@ -1089,9 +1103,9 @@ function RoutingPolicyDrawer({
                   />
                 </Field.Label>
                 <ProviderCredentialPicker
-                  selectedIds={composer.providerCredentialIds}
+                  selectedIds={composer.modelProviderIds}
                   onChange={(next) =>
-                    setComposer({ ...composer, providerCredentialIds: next })
+                    setComposer({ ...composer, modelProviderIds: next })
                   }
                   available={availableCredentials}
                   loading={credentialsLoading}

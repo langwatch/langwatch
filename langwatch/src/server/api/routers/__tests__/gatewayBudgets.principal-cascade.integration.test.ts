@@ -86,11 +86,14 @@ describe("GatewayBudgetService — PRINCIPAL cascade", () => {
     await prisma.virtualKey.create({
       data: {
         id: VK_ID,
-        projectId: PROJECT_ID,
+        organizationId: ORG_ID,
         name: `pcasc-vk-${ns}`,
         hashedSecret: `hash-${ns}`,
         displayPrefix: `vk-lw-${ns.slice(0, 4)}`,
         createdById: ACTOR_ID,
+        scopes: {
+          create: [{ scopeType: "PROJECT", scopeId: PROJECT_ID }],
+        },
       },
     });
 
@@ -100,7 +103,7 @@ describe("GatewayBudgetService — PRINCIPAL cascade", () => {
   afterAll(async () => {
     await prisma.gatewayBudget.deleteMany({ where: { organizationId: ORG_ID } });
     await prisma.virtualKey.deleteMany({
-      where: { projectId: PROJECT_ID, id: VK_ID },
+      where: { organizationId: ORG_ID, id: VK_ID },
     });
     await prisma.organizationUser.deleteMany({
       where: { organizationId: ORG_ID },

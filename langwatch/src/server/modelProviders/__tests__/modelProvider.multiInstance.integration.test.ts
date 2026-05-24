@@ -81,7 +81,11 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
     });
 
     afterAll(async () => {
-      await prisma.modelProvider.deleteMany({ where: { projectId } });
+      await prisma.modelProvider.deleteMany({
+        where: {
+          scopes: { some: { scopeType: "PROJECT", scopeId: projectId } },
+        },
+      });
       await prisma.roleBinding.deleteMany({ where: { organizationId } });
       await prisma.organizationUser.deleteMany({ where: { organizationId } });
       await prisma.user.deleteMany({ where: { id: orgAdminUserId } });
