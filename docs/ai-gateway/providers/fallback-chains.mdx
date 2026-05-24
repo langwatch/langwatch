@@ -110,4 +110,4 @@ When a request hits a circuit that's currently `open`, the gateway skips to the 
 
 ## Sizing the chain
 
-Diminishing returns after 3 entries, by the time you've burnt ~60s trying three providers, the latency budget of the original call is gone and the client has probably given up. Use chains of 2-3 for latency-sensitive traffic; longer chains are fine for batch/offline.
+Diminishing returns after 3 entries. With the default `timeout_ms=30000` and `max_attempts=3`, the worst-case wall-clock to exhaust the chain is ~90s; the latency budget of the original call is gone well before then and the client has probably given up. Use chains of 2-3 for latency-sensitive traffic and lower per-entry `timeout_ms` if you need a tighter total budget; longer chains are fine for batch/offline.

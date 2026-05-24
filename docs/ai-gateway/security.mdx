@@ -93,10 +93,10 @@ Six resources, each with standard CRUD + specialized actions:
 |---|---|---|---|---|
 | `virtualKeys` | `virtualKeys:view` | `:create` | `:update` | `:delete`, `:rotate` |
 | `gatewayBudgets` | `:view` | `:create` | `:update` | `:delete` |
-| `gatewayProviders` | `:view` |, | `:update` |, |
-| `gatewayGuardrails` | `:view` | `:attach` |, | `:detach` |
-| `gatewayLogs` | `:view` |, |, |, |
-| `gatewayUsage` | `:view` |, |, |, |
+| `gatewayProviders` | `:view` | n/a | `:update` | n/a |
+| `gatewayGuardrails` | `:view` | `:attach` | n/a | `:detach` |
+| `gatewayLogs` | `:view` | n/a | n/a | n/a |
+| `gatewayUsage` | `:view` | n/a | n/a | n/a |
 
 Each resource also supports a `:manage` permission that acts as a superset of all actions for that resource, useful for custom roles that should get full control over one surface without opening every individual verb.
 
