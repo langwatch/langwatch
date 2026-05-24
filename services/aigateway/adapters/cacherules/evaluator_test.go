@@ -136,4 +136,3 @@ func TestEvaluate_VKTags_AllPresent_Match(t *testing.T) {
 	require.NotNil(t, got)
 	assert.Equal(t, domain.CacheActionForce, got.Action)
 }
-
