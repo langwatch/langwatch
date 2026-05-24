@@ -20,16 +20,13 @@ These commands are **not** for end-user developers, they don't proxy completions
 ## Prerequisites
 
 ```bash
-# Enable the governance preview surface (off by default)
-export LANGWATCH_GOVERNANCE_PREVIEW=1
-
 # Authenticate via device-flow OAuth, opens your browser to /cli/auth
 langwatch login --device
 ```
 
 The same `~/.langwatch/config.json` the rest of the governance CLI uses persists the Bearer access token. Token TTL is 1h with a long-lived refresh token; the CLI rotates transparently. `langwatch logout-device` server-revokes both.
 
-If `LANGWATCH_GOVERNANCE_PREVIEW` is unset the `ingest` and `governance` subcommands aren't even registered, `langwatch --help` won't list them. This matches the web app's PostHog gate (`release_ui_ai_governance_enabled`) so the preview ships cleanly behind a single fence on each surface.
+The `ingest` and `governance` subcommands are always registered — `langwatch --help` lists them once the CLI is installed. Per-account governance entitlement is enforced server-side.
 
 ## `langwatch governance status`
 
@@ -255,6 +252,6 @@ Three surfaces, one backend:
 | Web `/settings/governance/ingestion-sources/:id` detail | Per-source SRE | tRPC: `api.activityMonitor.eventsForSource`, `api.activityMonitor.sourceHealthMetrics` |
 | **CLI `governance status`, `ingest list/health/tail`** | **Terminal-first SRE, on-call** | **REST: `GET /api/auth/cli/governance/*`, Bearer adapter that imports the same service classes the tRPC procedures use, byte-for-byte matching IO** |
 
-The REST endpoints are flag-gated implicitly: the CLI never registers the subcommands without `LANGWATCH_GOVERNANCE_PREVIEW=1`, and the endpoints reuse the existing `validateAccessToken()` Bearer helper that's been in production since the device-flow CLI shipped, so opening this surface doesn't introduce a new auth path.
+The REST endpoints reuse the existing `validateAccessToken()` Bearer helper that's been in production since the device-flow CLI shipped, so opening this surface doesn't introduce a new auth path. Per-account governance entitlement is enforced at the endpoint layer.
 
 For the bigger picture, five-tier integration ladder, persona-based routing, the daily-use vs admin-authoring split, see [the control plane overview](/ai-governance/control-plane).

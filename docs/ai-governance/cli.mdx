@@ -16,18 +16,18 @@ LangWatch already has top-level CLI commands for trace ingestion (`langwatch ing
 - **No collision**: top-level resource names like `members`, `invites`, `sessions` would overlap with non-governance concepts in a flat layout. Namespacing keeps them unambiguous.
 - **One mental model**: every governance verb sits under one prefix; once you know `langwatch governance anomaly-rules list`, you know the shape of every command in the namespace.
 
-## Preview gate
+## Availability
 
-The governance CLI ships in v1 behind a preview flag, `LANGWATCH_GOVERNANCE_PREVIEW=1`. Without the flag set, the `governance` subcommand is hidden from `--help` and returns "unknown command" if invoked. This lets the surface evolve through early customer adoption without locking a contract that's still being shaped. Once the corresponding `release_ui_ai_governance_enabled` PostHog flag flips for an org, the CLI gate flips alongside.
+Once you install the CLI, the `governance` subcommand is available out of the box, no env flag needed. Per-account governance entitlement is enforced server-side: if your account doesn't have governance enabled, the server returns a clear error pointing you at your admin.
 
 ```bash
-LANGWATCH_GOVERNANCE_PREVIEW=1 langwatch governance --help
+langwatch governance --help
 ```
 
 ## Help discovery
 
 ```bash
-LANGWATCH_GOVERNANCE_PREVIEW=1 langwatch governance --help
+langwatch governance --help
 # Manage governance resources (ingestion templates, user ingestion bindings)
 # from the CLI. Mirrors the public REST surface at /api/governance/*, every
 # mutating call lands an audit row with metadata.surface='cli'.
@@ -37,7 +37,7 @@ LANGWATCH_GOVERNANCE_PREVIEW=1 langwatch governance --help
 #   ingestion-templates      CRUD on IngestionTemplate rows.
 #   user-ingestion-bindings  Manage UserIngestionBindings (caller-scoped).
 
-LANGWATCH_GOVERNANCE_PREVIEW=1 langwatch governance ingestion-templates --help
+langwatch governance ingestion-templates --help
 # Verbs:
 #   list                Read enabled templates visible to the caller's org.
 #   admin-list          Read includes ottl_rules and disabled rows (admin shape).
@@ -68,12 +68,12 @@ If your apiKey is scoped narrowly (e.g. `governance:read` only), `list` succeeds
 ## Output formats
 
 ```bash
-LANGWATCH_GOVERNANCE_PREVIEW=1 langwatch governance ingestion-templates list
+langwatch governance ingestion-templates list
 # Default: human-readable table
 
-LANGWATCH_GOVERNANCE_PREVIEW=1 langwatch governance ingestion-templates list --json
+langwatch governance ingestion-templates list --json
 # One JSON object per record on stdout, suitable for piping through jq:
-LANGWATCH_GOVERNANCE_PREVIEW=1 langwatch governance ingestion-templates list --json | jq '.[] | select(.source_type=="claude_code")'
+langwatch governance ingestion-templates list --json | jq '.[] | select(.source_type=="claude_code")'
 ```
 
 Use `--json` in scripts and CI; the human table is for interactive exploration.
@@ -97,7 +97,7 @@ Every state-changing CLI invocation emits an audit row with `AuditLog.metadata.s
 The header-validating Hono helper + the 7 mutation call-sites switching from hardcoded `'hono'` to `resolveSurfaceFromRequest(req)` ship in Lane-B's CLI scaffold at `ed51b0ea1`. The `X-LangWatch-Surface: cli` constant lives at `typescript-sdk/src/cli/utils/governance/surface.ts`.
 
 ```bash
-LANGWATCH_GOVERNANCE_PREVIEW=1 langwatch governance audit-log query --filter 'surface=cli' --since '24h ago'
+langwatch governance audit-log query --filter 'surface=cli' --since '24h ago'
 ```
 
 ## Setup-from-scratch via agent (v1 preview)
@@ -105,8 +105,6 @@ LANGWATCH_GOVERNANCE_PREVIEW=1 langwatch governance audit-log query --filter 'su
 The end-state, what the umbrella spec calls the "agentic dogfood gate", is that an agent can fully configure governance for a fresh org by chaining CLI commands. The v1 preview ships the IngestionTemplate authoring + binding-install slice; budgets, anomaly-rules, audit-log fold in as their CLI surfaces ship.
 
 ```bash
-export LANGWATCH_GOVERNANCE_PREVIEW=1
-
 # 1. List existing platform templates (admin shape, includes ottl_rules)
 langwatch governance ingestion-templates admin-list --json
 

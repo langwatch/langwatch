@@ -403,8 +403,7 @@ endpoints afterwards.
 
 The same backend, exercised through the CLI without ever opening
 a browser. After `langwatch login --device`, four read-only
-governance debug helpers go live (gated behind
-`LANGWATCH_GOVERNANCE_PREVIEW=1`):
+governance debug helpers go live:
 
 ```text
 $ langwatch governance status
@@ -478,11 +477,9 @@ behind a single fence on each surface:
   Existing AI Gateway menu surface stays on the unrelated
   `release_ui_ai_gateway_menu_enabled` flag, they ship
   independently.
-- **CLI:** env var `LANGWATCH_GOVERNANCE_PREVIEW=1`. Off by default.
-  When unset, the new subcommands aren't registered and
-  `langwatch login` shows only `--api-key`. Existing
-  `langwatch login --api-key`, dataset, prompts, scenarios
-  surface is untouched and ships as-is.
+- **CLI:** always available once installed. Per-account governance
+  entitlement is enforced server-side, so the surface ships without
+  a client-side flag.
 - **Backend:** the tRPC procedures, REST endpoints, gateway 402
   payload, and Prisma schema are not flag-gated. Hiding only the
   user-facing surfaces lets the long-lived branch merge cleanly

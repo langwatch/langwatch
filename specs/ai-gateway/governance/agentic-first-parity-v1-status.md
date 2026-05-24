@@ -126,10 +126,10 @@ For each resource, do these in order before opening the route file:
 
 5. **CLI commands**. Mirror `typescript-sdk/src/cli/commands/governance/ingestion-templates.ts`
    + `user-ingestion-bindings.ts` + add to the subcommand tree in
-   `typescript-sdk/src/cli/index.ts` under the existing
-   `LANGWATCH_GOVERNANCE_PREVIEW=1` gate. Use `requestREST` from
-   `cli/utils/governance/cli-api.ts` so `X-LangWatch-Surface: cli` is
-   sent automatically.
+   `typescript-sdk/src/cli/index.ts`. Commands are always available
+   once the CLI is installed; per-account entitlement is enforced
+   server-side. Use `requestREST` from `cli/utils/governance/cli-api.ts`
+   so `X-LangWatch-Surface: cli` is sent automatically.
 
 6. **MCP tools**. Mirror `src/mcp/governance-tools.ts`
    `governance_<resource>_<verb>` registration. Read tools allowed for

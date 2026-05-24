@@ -234,8 +234,8 @@ order we prioritise.
 Every governance UI surface is gated behind one app feature flag —
 `release_ui_ai_governance_enabled` — so this long-lived branch can
 merge into main without exposing in-progress features to current
-customers. The CLI mirrors this with one env var,
-`LANGWATCH_GOVERNANCE_PREVIEW=1`. Both default off.
+customers. The CLI surface is always available once installed; per-
+account governance entitlement is enforced server-side.
 
 The AI Gateway product itself ships as-is to customers on the
 existing `release_ui_ai_gateway_menu_enabled` flag. The governance
@@ -306,7 +306,7 @@ langwatch/src/pages/settings/                        # Admin routing policies, i
 langwatch/src/pages/cli/auth.tsx                     # Device-flow approval UX
 
 typescript-sdk/src/cli/commands/                     # Unified langwatch CLI
-typescript-sdk/src/cli/utils/governance/             # Device-flow client, config, wrappers, preview-flag
+typescript-sdk/src/cli/utils/governance/             # Device-flow client, config, wrappers
 
 charts/langwatch/                                    # Umbrella chart with NOTES.txt
 charts/gateway/                                      # AI Gateway sub-chart

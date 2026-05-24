@@ -9,10 +9,8 @@ Feature: CLI ingest debug commands
   archive intentionally stay browser-only until the setup flow is
   stable end-to-end.
 
-  All commands are gated behind LANGWATCH_GOVERNANCE_PREVIEW=1, like
-  the rest of the governance CLI surface. Without the env var, the
-  commands aren't registered and `langwatch --help` doesn't show
-  them.
+  All commands are always available once the CLI is installed.
+  Per-account governance entitlement is enforced server-side.
 
   All commands authenticate via the device-flow access token in
   ~/.langwatch/config.json (Bearer lw_at_*). They reuse the same
@@ -23,7 +21,6 @@ Feature: CLI ingest debug commands
 
   Background:
     Given I have a valid device-flow session in ~/.langwatch/config.json
-    And LANGWATCH_GOVERNANCE_PREVIEW is set to "1"
 
   Scenario: langwatch ingest list shows my org's IngestionSources
     Given my org has 2 active IngestionSources and 1 archived source
@@ -86,14 +83,8 @@ Feature: CLI ingest debug commands
     And a one-line summary of recent spend is rendered
     And the exit code is 0
 
-  Scenario: governance commands without LANGWATCH_GOVERNANCE_PREVIEW
-    Given LANGWATCH_GOVERNANCE_PREVIEW is unset
-    When I run `langwatch ingest list`
-    Then commander emits "unknown command 'ingest'"
-    And the exit code is non-zero
-
   Scenario: governance commands without a device-flow session
     Given ~/.langwatch/config.json does not exist
-    When I run `langwatch ingest list` with LANGWATCH_GOVERNANCE_PREVIEW=1
+    When I run `langwatch ingest list`
     Then stderr says "Not logged in. Run `langwatch login --device` first."
     And the exit code is 1
