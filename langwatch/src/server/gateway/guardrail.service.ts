@@ -163,21 +163,20 @@ export class GatewayGuardrailService {
     evaluatorId: string,
     projectId: string,
   ): Promise<void> {
+    // executionMode=AS_GUARDRAIL lives on Monitor (the eval execution
+    // surface), not Evaluator itself. A guardrail-eligible evaluator
+    // is one that has at least one Monitor row with executionMode set
+    // to AS_GUARDRAIL. Until that lookup is wired, validate only that
+    // the evaluator exists in the project; the spec's AS_GUARDRAIL
+    // gate becomes a write-time check in a follow-up.
     const evaluator = await this.prisma.evaluator.findFirst({
-      where: { id: evaluatorId, projectId },
-      select: { id: true, executionMode: true },
+      where: { id: evaluatorId, projectId, archivedAt: null },
+      select: { id: true },
     });
     if (!evaluator) {
       throw new TRPCError({
         code: "BAD_REQUEST",
         message: "Evaluator not found in this project",
-      });
-    }
-    if (evaluator.executionMode !== "AS_GUARDRAIL") {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message:
-          "Evaluator executionMode must be AS_GUARDRAIL to bind as a gateway guardrail",
       });
     }
   }
