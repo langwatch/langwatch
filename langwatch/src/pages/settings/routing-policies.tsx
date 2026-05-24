@@ -5,8 +5,10 @@ import {
   Field,
   Heading,
   HStack,
+  IconButton,
   Input,
   NativeSelect,
+  Separator,
   Spacer,
   Spinner,
   Text,
@@ -268,6 +270,8 @@ function RoutingPoliciesPage() {
       modelProviderIds: [],
       modelAllowlist: [],
       isDefault: initialIsDefault,
+      aliases: [],
+      policyRules: EMPTY_POLICY_RULES,
     });
   };
 
@@ -278,6 +282,10 @@ function RoutingPoliciesPage() {
       scopeType: s.scopeType as ScopeChipPickerEntry["scopeType"],
       scopeId: s.scopeId,
     }));
+    const aliasesObj = ((p as any).modelAliases ?? {}) as Record<
+      string,
+      string
+    >;
     setComposer({
       scopes,
       name: p.name,
@@ -290,11 +298,24 @@ function RoutingPoliciesPage() {
         ? (p.modelAllowlist as string[])
         : [],
       isDefault: p.isDefault,
+      aliases: Object.entries(aliasesObj).map(([from, to]) => ({
+        from,
+        to,
+      })),
+      policyRules: policyRulesFromServer((p as any).policyRules),
     });
   };
 
   const onSubmit = () => {
     if (!composer) return;
+
+    const aliasesPayload: Record<string, string> = {};
+    for (const pair of composer.aliases) {
+      const from = pair.from.trim();
+      const to = pair.to.trim();
+      if (from && to) aliasesPayload[from] = to;
+    }
+    const policyRulesPayload = buildPolicyRulesPayload(composer.policyRules);
 
     if (editingId === "new") {
       createMutation.mutate({
@@ -307,6 +328,8 @@ function RoutingPoliciesPage() {
           composer.modelAllowlist.length > 0 ? composer.modelAllowlist : null,
         strategy: composer.strategy,
         isDefault: composer.isDefault,
+        modelAliases: aliasesPayload,
+        policyRules: policyRulesPayload,
       });
     } else if (editingId) {
       updateMutation.mutate({
@@ -318,6 +341,8 @@ function RoutingPoliciesPage() {
         modelAllowlist:
           composer.modelAllowlist.length > 0 ? composer.modelAllowlist : null,
         strategy: composer.strategy,
+        modelAliases: aliasesPayload,
+        policyRules: policyRulesPayload,
       });
     }
   };
@@ -640,6 +665,9 @@ function PolicyRow({
   );
 }
 
+type AliasPair = { from: string; to: string };
+type PolicyDim = "tools" | "mcp" | "urls" | "models";
+
 type ComposerState = {
   scopes: ScopeChipPickerEntry[];
   name: string;
@@ -648,7 +676,90 @@ type ComposerState = {
   modelProviderIds: string[];
   modelAllowlist: string[];
   isDefault: boolean;
+  aliases: AliasPair[];
+  policyRules: Record<PolicyDim, { deny: string; allow: string }>;
 };
+
+const EMPTY_POLICY_RULES: Record<PolicyDim, { deny: string; allow: string }> = {
+  tools: { deny: "", allow: "" },
+  mcp: { deny: "", allow: "" },
+  urls: { deny: "", allow: "" },
+  models: { deny: "", allow: "" },
+};
+
+const POLICY_DIM_META: Record<
+  PolicyDim,
+  { label: string; placeholderDeny: string; helper: string }
+> = {
+  tools: {
+    label: "Tools",
+    placeholderDeny: "e.g. ^shell_.*\ndelete_user",
+    helper:
+      "RE2 regexes matched against OpenAI tools[].function.name + Anthropic tools[].name. Deny wins.",
+  },
+  mcp: {
+    label: "MCP servers",
+    placeholderDeny: "e.g. unapproved\\.example\\.com",
+    helper:
+      "Matched against mcp_servers[].name and .url. Deny wins; applies before dispatch.",
+  },
+  urls: {
+    label: "URLs",
+    placeholderDeny: "e.g. internal\\.corp\\..*",
+    helper:
+      "Extracted from the raw request body (user messages, tool args, system prompts). First deny match returns 403 url_not_allowed.",
+  },
+  models: {
+    label: "Models (policy)",
+    placeholderDeny: "e.g. gpt-4o-search.*",
+    helper:
+      "RE2 regex policy distinct from the model allowlist above. Use this to enforce company policy (e.g. no non-deterministic models).",
+  },
+};
+
+function parseLines(value: string): string[] {
+  return value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+}
+
+function buildPolicyRulesPayload(
+  rules: Record<PolicyDim, { deny: string; allow: string }>,
+): Record<PolicyDim, { deny: string[]; allow: string[] | null }> {
+  const out: Record<PolicyDim, { deny: string[]; allow: string[] | null }> =
+    {} as Record<PolicyDim, { deny: string[]; allow: string[] | null }>;
+  for (const dim of ["tools", "mcp", "urls", "models"] as PolicyDim[]) {
+    const denyArr = parseLines(rules[dim].deny);
+    const allowArr = parseLines(rules[dim].allow);
+    out[dim] = {
+      deny: denyArr,
+      allow: allowArr.length > 0 ? allowArr : null,
+    };
+  }
+  return out;
+}
+
+function policyRulesFromServer(
+  raw: unknown,
+): Record<PolicyDim, { deny: string; allow: string }> {
+  const out = { ...EMPTY_POLICY_RULES };
+  if (!raw || typeof raw !== "object") return out;
+  const src = raw as Record<string, unknown>;
+  for (const dim of ["tools", "mcp", "urls", "models"] as PolicyDim[]) {
+    const dimRaw = src[dim];
+    if (!dimRaw || typeof dimRaw !== "object") continue;
+    const dimObj = dimRaw as { deny?: unknown; allow?: unknown };
+    const deny = Array.isArray(dimObj.deny)
+      ? (dimObj.deny as unknown[]).filter((x): x is string => typeof x === "string")
+      : [];
+    const allow = Array.isArray(dimObj.allow)
+      ? (dimObj.allow as unknown[]).filter((x): x is string => typeof x === "string")
+      : [];
+    out[dim] = { deny: deny.join("\n"), allow: allow.join("\n") };
+  }
+  return out;
+}
 
 /**
  * Inline chip-list editor for ordered string lists. Used for routing-policy
@@ -1212,6 +1323,159 @@ function RoutingPolicyDrawer({
                   Empty = no restriction. Globs match against the requested model name.
                 </Field.HelperText>
               </Field.Root>
+
+              <Separator />
+              <HStack>
+                <Text fontSize="sm" fontWeight="semibold">
+                  Model aliases
+                </Text>
+                <FieldInfoTooltip
+                  description="Rewrite the model name a client requests before it reaches the provider. Useful for mapping 'gpt-4o' -> 'gpt-4o-mini' for cost control, or fanning one logical model across providers."
+                  docHref="/ai-gateway/model-aliases"
+                />
+              </HStack>
+              <Text fontSize="xs" color="fg.muted">
+                Per-policy alias rewrite. Applied to the model field before
+                dispatch.
+              </Text>
+              <VStack align="stretch" gap={2}>
+                {composer.aliases.map((pair, idx) => (
+                  <HStack key={idx}>
+                    <Input
+                      placeholder="from (e.g. gpt-4o)"
+                      size="sm"
+                      value={pair.from}
+                      onChange={(e) =>
+                        setComposer({
+                          ...composer,
+                          aliases: composer.aliases.map((p, i) =>
+                            i === idx ? { ...p, from: e.target.value } : p,
+                          ),
+                        })
+                      }
+                    />
+                    <Text>{"->"}</Text>
+                    <Input
+                      placeholder="to (e.g. gpt-4o-mini)"
+                      size="sm"
+                      value={pair.to}
+                      onChange={(e) =>
+                        setComposer({
+                          ...composer,
+                          aliases: composer.aliases.map((p, i) =>
+                            i === idx ? { ...p, to: e.target.value } : p,
+                          ),
+                        })
+                      }
+                    />
+                    <IconButton
+                      aria-label="Remove alias"
+                      variant="ghost"
+                      size="xs"
+                      onClick={() =>
+                        setComposer({
+                          ...composer,
+                          aliases: composer.aliases.filter(
+                            (_, i) => i !== idx,
+                          ),
+                        })
+                      }
+                    >
+                      <Trash2 size={12} />
+                    </IconButton>
+                  </HStack>
+                ))}
+                <Button
+                  size="xs"
+                  variant="outline"
+                  onClick={() =>
+                    setComposer({
+                      ...composer,
+                      aliases: [
+                        ...composer.aliases,
+                        { from: "", to: "" },
+                      ],
+                    })
+                  }
+                >
+                  <Plus size={12} /> Add alias
+                </Button>
+              </VStack>
+
+              <Separator />
+              <HStack>
+                <Text fontSize="sm" fontWeight="semibold">
+                  Policy rules
+                </Text>
+                <FieldInfoTooltip
+                  description="RE2 regex deny/allow lists across 4 dimensions: tools, MCP servers, URLs, models. Enforced pre-dispatch (zero provider cost). Deny wins."
+                  docHref="/ai-gateway/policy-rules"
+                />
+              </HStack>
+              <Text fontSize="xs" color="fg.muted">
+                One pattern per line. Broken regex returns 503 fail-closed
+                (never silent bypass).
+              </Text>
+              {(["tools", "mcp", "urls", "models"] as PolicyDim[]).map(
+                (dim) => (
+                  <Box key={dim}>
+                    <Text fontSize="sm" fontWeight="medium" mb={1}>
+                      {POLICY_DIM_META[dim].label}
+                    </Text>
+                    <Text fontSize="xs" color="fg.muted" mb={2}>
+                      {POLICY_DIM_META[dim].helper}
+                    </Text>
+                    <HStack gap={3} align="flex-start">
+                      <Field.Root flex={1}>
+                        <Field.Label fontSize="xs">Deny</Field.Label>
+                        <Textarea
+                          value={composer.policyRules[dim].deny}
+                          onChange={(e) =>
+                            setComposer({
+                              ...composer,
+                              policyRules: {
+                                ...composer.policyRules,
+                                [dim]: {
+                                  ...composer.policyRules[dim],
+                                  deny: e.target.value,
+                                },
+                              },
+                            })
+                          }
+                          placeholder={POLICY_DIM_META[dim].placeholderDeny}
+                          rows={3}
+                          fontFamily="mono"
+                          fontSize="xs"
+                        />
+                      </Field.Root>
+                      <Field.Root flex={1}>
+                        <Field.Label fontSize="xs">
+                          Allow (optional)
+                        </Field.Label>
+                        <Textarea
+                          value={composer.policyRules[dim].allow}
+                          onChange={(e) =>
+                            setComposer({
+                              ...composer,
+                              policyRules: {
+                                ...composer.policyRules,
+                                [dim]: {
+                                  ...composer.policyRules[dim],
+                                  allow: e.target.value,
+                                },
+                              },
+                            })
+                          }
+                          placeholder="leave blank = no allowlist"
+                          rows={3}
+                          fontFamily="mono"
+                          fontSize="xs"
+                        />
+                      </Field.Root>
+                    </HStack>
+                  </Box>
+                ),
+              )}
 
               <Checkbox
                 checked={composer.isDefault}
