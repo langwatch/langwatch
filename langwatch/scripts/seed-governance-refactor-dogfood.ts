@@ -198,7 +198,10 @@ async function ensureModelProviders(
   const bedrockAccessKey = process.env.AWS_ACCESS_KEY_ID ?? null;
   const bedrockSecretKey = process.env.AWS_SECRET_ACCESS_KEY ?? null;
   const bedrockRegion =
-    process.env.AWS_REGION_NAME ?? process.env.AWS_REGION ?? "us-east-1";
+    process.env.AWS_REGION_NAME ??
+    process.env.AWS_REGION ??
+    process.env.AWS_DEFAULT_REGION ??
+    "us-east-1";
 
   // OpenAI at ORG scope — every VK in the org can resolve it via scope cascade.
   const openai = await upsertModelProviderByName({

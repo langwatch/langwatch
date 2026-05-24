@@ -27,7 +27,7 @@ declare -A MODEL=(
   [openai]="gpt-5-mini"
   [anthropic]="claude-haiku-4-5"
   [gemini]="gemini-2.5-flash"
-  [bedrock]="bedrock/anthropic.claude-3-5-haiku-20241022-v1:0"
+  [bedrock]="bedrock/qwen.qwen3-32b-v1:0"
 )
 
 # OpenAI gpt-5-* family rejects max_tokens; uses max_completion_tokens.
