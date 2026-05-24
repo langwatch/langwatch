@@ -63,6 +63,7 @@ describe("langwatch/package.json", () => {
       ).toBe(false);
     });
 
+    /** @scenario No postinstall script reaches the network to download goose */
     it("no install-lifecycle script downloads a binary from the network", () => {
       const scripts = pkg.scripts ?? {};
       const installKeys = Object.keys(scripts).filter((k) =>

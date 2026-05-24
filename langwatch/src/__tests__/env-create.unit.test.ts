@@ -134,6 +134,7 @@ describe("gatewaySecretsSchema", () => {
       errorSpy.mockRestore();
     });
 
+    /** @scenario First-run env validation surfaces a self-documenting error for unset gateway secrets */
     it("throws a Zod min(32) error naming the sentinel value", () => {
       // Call createEnv with the real gatewaySecretsSchema imported from env-create.mjs.
       // This exercises the actual min(32) constraint — NOT an inline copy — so a
