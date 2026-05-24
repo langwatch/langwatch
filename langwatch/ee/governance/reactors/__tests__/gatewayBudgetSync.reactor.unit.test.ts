@@ -89,7 +89,9 @@ const event: TraceProcessingEvent = {
 } as unknown as TraceProcessingEvent;
 
 function mockDeps(
-  vk: { id: string; projectId: string; principalUserId: string | null } | null,
+  vk:
+    | { id: string; organizationId: string; principalUserId: string | null }
+    | null,
   project:
     | { id: string; teamId: string; team: { organizationId: string } }
     | null,
@@ -162,11 +164,15 @@ describe("gatewayBudgetSync reactor", () => {
     });
   });
 
-  describe("when the VK belongs to a different project", () => {
+  describe("when the VK belongs to a different org", () => {
     it("logs + skips without writing to CH", async () => {
       const { deps, insertDebit } = mockDeps(
-        { id: "vk-1", projectId: "project-other", principalUserId: null },
-        null,
+        { id: "vk-1", organizationId: "org-other", principalUserId: null },
+        {
+          id: "project-1",
+          teamId: "team-1",
+          team: { organizationId: "org-1" },
+        },
       );
       const reactor = createGatewayBudgetSyncReactor(deps);
 
@@ -187,7 +193,7 @@ describe("gatewayBudgetSync reactor", () => {
   describe("when the VK has no applicable budgets", () => {
     it("skips the CH write — no rows to fold", async () => {
       const { deps, insertDebit } = mockDeps(
-        { id: "vk-1", projectId: "project-1", principalUserId: null },
+        { id: "vk-1", organizationId: "org-1", principalUserId: null },
         {
           id: "project-1",
           teamId: "team-1",
@@ -221,7 +227,7 @@ describe("gatewayBudgetSync reactor", () => {
       } as GatewayBudget;
 
       const { deps, insertDebit } = mockDeps(
-        { id: "vk-1", projectId: "project-1", principalUserId: null },
+        { id: "vk-1", organizationId: "org-1", principalUserId: null },
         {
           id: "project-1",
           teamId: "team-1",
@@ -271,7 +277,7 @@ describe("gatewayBudgetSync reactor", () => {
       } as GatewayBudget;
 
       const { deps, insertDebit } = mockDeps(
-        { id: "vk-1", projectId: "project-1", principalUserId: null },
+        { id: "vk-1", organizationId: "org-1", principalUserId: null },
         {
           id: "project-1",
           teamId: "team-1",
