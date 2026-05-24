@@ -24,7 +24,7 @@ import {
   YAxis,
 } from "recharts";
 
-import { DashboardLayout } from "~/components/DashboardLayout";
+import AiGatewayLayout from "~/components/gateway/AiGatewayLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { GatewayErrorPanel } from "~/components/gateway/GatewayErrorPanel";
 import { GatewayLayout } from "~/components/gateway/GatewayLayout";
@@ -389,5 +389,5 @@ function StatTile({
 }
 
 export default withPermissionGuard("gatewayUsage:view", {
-  layoutComponent: DashboardLayout,
+  layoutComponent: AiGatewayLayout,
 })(GatewayUsagePage);

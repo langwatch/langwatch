@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 
-import { DashboardLayout } from "~/components/DashboardLayout";
+import AiGatewayLayout from "~/components/gateway/AiGatewayLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { GatewayErrorPanel } from "~/components/gateway/GatewayErrorPanel";
@@ -412,5 +412,5 @@ function HealthBadge({ status }: { status: string }) {
 }
 
 export default withPermissionGuard("gatewayProviders:view", {
-  layoutComponent: DashboardLayout,
+  layoutComponent: AiGatewayLayout,
 })(ProvidersPage);

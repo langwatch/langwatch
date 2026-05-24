@@ -6,13 +6,8 @@ import {
   Eye,
   Film,
   Flag,
-  Gauge,
   History,
-  KeyRound,
-  LineChart,
-  Plug,
   Shield,
-  Zap,
 } from "lucide-react";
 import { useRouter } from "~/utils/compat/next-router";
 import React, { useState } from "react";
@@ -326,87 +321,17 @@ export const MainMenu = React.memo(function MainMenu({
                 {gatewayMenuEnabled &&
                   hasPermission("virtualKeys:view") &&
                   project && (
-                    <CollapsibleMenuGroup
+                    <SideMenuLink
                       icon={featureIcons.gateway.icon}
                       label={projectRoutes.gateway.title}
-                      project={project}
+                      href={projectRoutes.gateway_virtual_keys.path.replace(
+                        "[project]",
+                        project.slug,
+                      )}
+                      isActive={router.pathname.includes("/gateway/")}
                       showLabel={showExpanded}
                       beta
                       betaLabel="Beta"
-                      children={[
-                        {
-                          icon: KeyRound,
-                          label: projectRoutes.gateway_virtual_keys.title,
-                          href: projectRoutes.gateway_virtual_keys.path.replace(
-                            "[project]",
-                            project.slug,
-                          ),
-                          isActive: router.pathname.includes(
-                            "/gateway/virtual-keys",
-                          ),
-                        },
-                        ...(hasPermission("gatewayBudgets:view")
-                          ? [
-                              {
-                                icon: Gauge,
-                                label: projectRoutes.gateway_budgets.title,
-                                href: projectRoutes.gateway_budgets.path.replace(
-                                  "[project]",
-                                  project.slug,
-                                ),
-                                isActive:
-                                  router.pathname.includes("/gateway/budgets"),
-                              },
-                            ]
-                          : []),
-                        ...(hasPermission("gatewayProviders:view")
-                          ? [
-                              {
-                                icon: Plug,
-                                label: projectRoutes.gateway_providers.title,
-                                href: projectRoutes.gateway_providers.path.replace(
-                                  "[project]",
-                                  project.slug,
-                                ),
-                                isActive:
-                                  router.pathname.includes("/gateway/providers"),
-                              },
-                            ]
-                          : []),
-                        ...(hasPermission("gatewayCacheRules:view")
-                          ? [
-                              {
-                                icon: Zap,
-                                label: projectRoutes.gateway_cache_rules.title,
-                                href: projectRoutes.gateway_cache_rules.path.replace(
-                                  "[project]",
-                                  project.slug,
-                                ),
-                                isActive: router.pathname.includes(
-                                  "/gateway/cache-rules",
-                                ),
-                              },
-                            ]
-                          : []),
-                        ...(hasPermission("gatewayUsage:view")
-                          ? [
-                              {
-                                icon: LineChart,
-                                label: projectRoutes.gateway_usage.title,
-                                href: projectRoutes.gateway_usage.path.replace(
-                                  "[project]",
-                                  project.slug,
-                                ),
-                                isActive:
-                                  router.pathname.endsWith("/gateway/usage"),
-                              },
-                            ]
-                          : []),
-                        // Audit log entry removed — gateway audit rows are now
-                        // surfaced under /settings/audit-log alongside platform
-                        // governance events. Deep-links from VK / Budget detail
-                        // pages target /settings/audit-log directly.
-                      ]}
                     />
                   )}
                 {showGovernanceEntry && (

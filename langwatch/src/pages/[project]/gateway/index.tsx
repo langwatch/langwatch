@@ -1,7 +1,7 @@
 import { useRouter } from "~/utils/compat/next-router";
 import { useEffect } from "react";
 
-import { DashboardLayout } from "~/components/DashboardLayout";
+import AiGatewayLayout from "~/components/gateway/AiGatewayLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
@@ -23,5 +23,5 @@ function GatewayIndex() {
 }
 
 export default withPermissionGuard("virtualKeys:view", {
-  layoutComponent: DashboardLayout,
+  layoutComponent: AiGatewayLayout,
 })(GatewayIndex);

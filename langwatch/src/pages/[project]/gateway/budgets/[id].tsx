@@ -17,7 +17,7 @@ import {
 import { Archive, ArrowLeft, FileClock, Pencil, Receipt } from "lucide-react";
 import { useState } from "react";
 
-import { DashboardLayout } from "~/components/DashboardLayout";
+import AiGatewayLayout from "~/components/gateway/AiGatewayLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { BudgetEditDrawer } from "~/components/gateway/BudgetEditDrawer";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
@@ -467,5 +467,5 @@ function formatAmount(raw: string | number): string {
 }
 
 export default withPermissionGuard("gatewayBudgets:view", {
-  layoutComponent: DashboardLayout,
+  layoutComponent: AiGatewayLayout,
 })(BudgetDetailPage);

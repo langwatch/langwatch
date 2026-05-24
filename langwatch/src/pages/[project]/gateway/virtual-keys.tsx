@@ -16,7 +16,7 @@ import { Eye, KeyRound, MoreVertical, Pencil, Plus, RotateCw, Trash2 } from "luc
 import { useState } from "react";
 import { useRouter } from "~/utils/compat/next-router";
 
-import { DashboardLayout } from "~/components/DashboardLayout";
+import AiGatewayLayout from "~/components/gateway/AiGatewayLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { GatewayErrorPanel } from "~/components/gateway/GatewayErrorPanel";
@@ -448,5 +448,5 @@ function ProviderChainBadges({
 }
 
 export default withPermissionGuard("virtualKeys:view", {
-  layoutComponent: DashboardLayout,
+  layoutComponent: AiGatewayLayout,
 })(VirtualKeysPage);

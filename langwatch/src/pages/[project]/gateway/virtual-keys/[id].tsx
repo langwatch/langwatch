@@ -24,7 +24,7 @@ import {
   YAxis,
 } from "recharts";
 
-import { DashboardLayout } from "~/components/DashboardLayout";
+import AiGatewayLayout from "~/components/gateway/AiGatewayLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { GatewayLayout } from "~/components/gateway/GatewayLayout";
@@ -804,5 +804,5 @@ function ConfigurationSection({ config }: { config: VkConfig | null }) {
 }
 
 export default withPermissionGuard("virtualKeys:view", {
-  layoutComponent: DashboardLayout,
+  layoutComponent: AiGatewayLayout,
 })(VirtualKeyDetailPage);

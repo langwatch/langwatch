@@ -16,7 +16,7 @@ import { Archive, Eye, Gauge, MoreVertical, Pencil, Plus } from "lucide-react";
 import { useState } from "react";
 import { useRouter } from "~/utils/compat/next-router";
 
-import { DashboardLayout } from "~/components/DashboardLayout";
+import AiGatewayLayout from "~/components/gateway/AiGatewayLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { BudgetCreateDrawer } from "~/components/gateway/BudgetCreateDrawer";
 import { BudgetEditDrawer } from "~/components/gateway/BudgetEditDrawer";
@@ -401,5 +401,5 @@ function ScopeCell({
 }
 
 export default withPermissionGuard("gatewayBudgets:view", {
-  layoutComponent: DashboardLayout,
+  layoutComponent: AiGatewayLayout,
 })(BudgetsPage);

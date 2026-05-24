@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 
-import { DashboardLayout } from "~/components/DashboardLayout";
+import AiGatewayLayout from "~/components/gateway/AiGatewayLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { CacheRuleCreateDrawer } from "~/components/gateway/CacheRuleCreateDrawer";
 import { CacheRuleEditDrawer } from "~/components/gateway/CacheRuleEditDrawer";
@@ -373,5 +373,5 @@ function ActionBadge({
 }
 
 export default withPermissionGuard("gatewayCacheRules:view", {
-  layoutComponent: DashboardLayout,
+  layoutComponent: AiGatewayLayout,
 })(CacheRulesPage);
