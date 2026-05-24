@@ -75,8 +75,8 @@ export const SideMenuItem = ({
     <HStack
       width={showLabel ? "full" : "auto"}
       height={MENU_ITEM_HEIGHT}
-      gap={2}
-      paddingX={2}
+      gap={3}
+      paddingX={3}
       borderRadius="lg"
       backgroundColor={isActive ? "nav.bgActive" : "transparent"}
       _hover={{
