@@ -103,6 +103,11 @@ export interface RedisInfo {
   peakMemoryBytes: number;
   maxMemoryBytes: number;
   connectedClients: number;
+  // Engine CPU is derived between successive INFO cpu samples. We expose the
+  // raw cumulative counters here so the collector can diff them across collect
+  // cycles without a second piece of state.
+  usedCpuUserMainThreadSeconds: number;
+  usedCpuSysMainThreadSeconds: number;
 }
 
 export interface DashboardData {
@@ -117,12 +122,14 @@ export interface DashboardData {
   peakCompletedPerSec: number;
   peakFailedPerSec: number;
   peakIngestedPerSec: number;
-  redisMemoryUsed: string;
-  redisMemoryPeak: string;
   redisMemoryUsedBytes: number;
   redisMemoryPeakBytes: number;
   redisMemoryMaxBytes: number;
   redisConnectedClients: number;
+  // null on the first collection cycle (need two samples to derive a rate)
+  // and on the cycle immediately after a Redis restart (cumulative counters
+  // go backwards). Rounded to one decimal place when present.
+  redisEngineCpuPercent: number | null;
   processCpuPercent: number;
   processMemoryUsedMb: number;
   processMemoryTotalMb: number;

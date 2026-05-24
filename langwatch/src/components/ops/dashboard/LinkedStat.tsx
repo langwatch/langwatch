@@ -8,12 +8,16 @@ export function LinkedStat({
   sublabel,
   href,
   color,
+  testId,
+  warning,
 }: {
   label: string;
   value: string;
   sublabel?: string;
   href?: string;
   color?: string;
+  testId?: string;
+  warning?: boolean;
 }) {
   const content = (
     <Stat.Root
@@ -22,21 +26,30 @@ export function LinkedStat({
       borderRadius="md"
       padding={2}
       transition="background 0.1s"
+      data-testid={testId}
+      data-warning={
+        warning === undefined ? undefined : warning ? "true" : "false"
+      }
     >
-      <Stat.Label>
+      <Stat.Label whiteSpace="nowrap">
         <HStack gap={1}>
           <Text>{label}</Text>
           {href && <ArrowUpRight size={10} />}
         </HStack>
       </Stat.Label>
-      <HStack gap={1.5} alignItems="baseline">
-        <Stat.ValueText color={color}>{value}</Stat.ValueText>
-        {sublabel && (
-          <Text textStyle="xs" color="fg.muted" fontWeight="normal">
-            {sublabel}
-          </Text>
-        )}
-      </HStack>
+      <Stat.ValueText color={color} whiteSpace="nowrap">
+        {value}
+      </Stat.ValueText>
+      {sublabel && (
+        <Text
+          textStyle="xs"
+          color="fg.muted"
+          fontWeight="normal"
+          whiteSpace="nowrap"
+        >
+          {sublabel}
+        </Text>
+      )}
     </Stat.Root>
   );
 
