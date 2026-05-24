@@ -96,10 +96,7 @@ model User {
   groupMemberships        GroupMembership[]
   roleBindings            RoleBinding[]
   apiKeys                 ApiKey[]
-  virtualKeysCreated      VirtualKey[]             @relation("VirtualKeyCreatedBy")
-  virtualKeysRevoked      VirtualKey[]             @relation("VirtualKeyRevokedBy")
   gatewayBudgetsCreated   GatewayBudget[]          @relation("GatewayBudgetCreatedBy")
-  principalVirtualKeys    VirtualKey[]             @relation("VirtualKeyPrincipalUser")
   principalGatewayBudgets GatewayBudget[]          @relation("PrincipalScopedGatewayBudgets")
   personalTeams           Team[]                   @relation("PersonalTeamOwner")
   personalProjects        Project[]                @relation("PersonalProjectOwner")
@@ -377,7 +374,6 @@ model Project {
   triggers                 Trigger[]
   experiments              Experiment[]
   annotations              Annotation[]
-  modelProviders           ModelProvider[]
   projectSecrets           ProjectSecret[]
   TriggerSent              TriggerSent[]
   annotationScores         AnnotationScore[]
@@ -399,8 +395,6 @@ model Project {
   scenarios                Scenario[]
   suiteConfigurations      SimulationSuite[]
   savedViews               SavedView[]
-  virtualKeys              VirtualKey[]
-  gatewayProviderCreds     GatewayProviderCredential[]
   gatewayBudgets           GatewayBudget[]                     @relation("ProjectScopedGatewayBudgets")
   gatewayChangeEvents      GatewayChangeEvent[]
   userIngestionBindings    UserIngestionBinding[]
@@ -755,14 +749,23 @@ model Annotation {
   @@index([projectId, traceId])
 }
 
+// ModelProvider — org-scoped, multi-scope provider configuration.
+//
+// Iter 110: absorbed GatewayProviderCredential entirely. The gateway
+// data-plane reads its provider chain directly from ModelProvider +
+// RoutingPolicy.modelProviderIds. Multi-deployment (Azure regions,
+// OpenAI base-url variants) ships as N MP rows with auto-suffixed
+// names (iter 109 pattern) — no `slot` discriminator column anymore.
+//
+// Access via ModelProviderScope only. No `projectId` legacy pointer;
+// reads filter by the caller's membership set against scope rows.
+//
+// "Advanced (Gateway)" tab in the drawer surfaces the rate-limit /
+// extraHeaders / providerConfig / fallbackPriorityGlobal / health
+// fields below — same fields that lived on GatewayProviderCredential
+// pre-110, just collapsed onto the provider they always 1:1-bound.
 model ModelProvider {
-  id                     String                      @id @default(nanoid())
-  // Legacy pointer. Always the project the row was originally
-  // created under (or a sibling project in the same org/team for
-  // org/team-scoped credentials). Kept so existing per-project
-  // lookups keep compiling; access is granted via ModelProviderScope.
-  projectId              String
-  project                Project                     @relation(fields: [projectId], references: [id])
+  id                     String   @id @default(nanoid())
   // Human-readable name (iter 109): one "OpenAI" by default, auto-
   // suffixed as "OpenAI 2" / "OpenAI 3" when duplicates coexist
   // under the same organization. Model selectors use this to group
@@ -772,16 +775,42 @@ model ModelProvider {
   provider               String
   enabled                Boolean
   customKeys             Json?
+  // Provider-side custom headers — appended on every request the
+  // gateway routes through this MP. (Pre-110 this lived on GPC.)
   extraHeaders           Json?
   customModels           Json?
   customEmbeddingsModels Json?
   deploymentMapping      Json?
-  createdAt              DateTime                    @default(now())
-  updatedAt              DateTime                    @default(now()) @updatedAt
-  scopes                 ModelProviderScope[]
-  gatewayCredentials     GatewayProviderCredential[]
 
-  @@index([projectId])
+  // Gateway rate-limits (advanced). Optional caps applied per MP.
+  rateLimitRpm           Int?
+  rateLimitTpm           Int?
+  rateLimitRpd           Int?
+
+  // Per-MP credential rotation policy (gateway-only). v1 ships MANUAL
+  // only; AUTO + external-secret-store integration are v1.1 scope.
+  rotationPolicy         GatewayProviderRotationPolicy @default(MANUAL)
+
+  // Provider-specific routing hints (e.g. bedrock region, azure
+  // deployment override). Gateway applies on top of standard config.
+  providerConfig         Json?
+
+  // Fallback priority used when a VK has no RoutingPolicy. Lower =
+  // tried first. Tiebreak by createdAt ASC. Deterministic across runs.
+  fallbackPriorityGlobal Int?
+
+  // Health / circuit breaker state written by the gateway.
+  healthStatus           GatewayProviderHealthStatus @default(UNKNOWN)
+  circuitOpenedAt        DateTime?
+  lastHealthCheckAt      DateTime?
+
+  disabledAt             DateTime?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @default(now()) @updatedAt
+  scopes                 ModelProviderScope[]
+
+  @@index([healthStatus])
+  @@index([fallbackPriorityGlobal])
 }
 
 // Principal-style N-scope access (iter 109, ADR-016 follow-up): a
@@ -1682,10 +1711,30 @@ enum GatewayCacheRuleMode {
   DISABLE
 }
 
+// VirtualKey — org-scoped, multi-scope routing key for the AI Gateway.
+//
+// Iter 110 refactor: collapsed VirtualKey -> GatewayProviderCredential
+// binding entirely (per rchaves). Provider-routing knobs (rpm/tpm/headers/
+// providerConfig/etc) moved onto ModelProvider's "Advanced (Gateway)" tab.
+// Per-VK chain ordering moved onto RoutingPolicy.modelProviderIds. Per-VK
+// header overrides removed (use a sibling ModelProvider row for that 1%).
+//
+// Scoping mirrors ModelProviderScope (iter 109): a single VirtualKey row
+// is reachable from multiple scopes (org / team / project) via
+// VirtualKeyScope rows. No `projectId` column — multitenant key is
+// `organizationId` (mandatory, matches the new dbMultiTenancyProtection
+// invariant).
+//
+// `principalUserId` stays orthogonal to scopes: it marks "who owns this
+// personal VK" for trace attribution + admin-view filtering, not "where
+// can this route". A personal VK is a VK with `principalUserId` set; its
+// scopes (typically ORGANIZATION) determine the routing reach.
+//
+// No DB-level FK constraints (codebase convention) — string columns +
+// indexes; integrity enforced at service layer.
 model VirtualKey {
-  id        String  @id @default(nanoid())
-  projectId String
-  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  id             String @id @default(nanoid())
+  organizationId String
 
   name        String
   description String?
@@ -1699,17 +1748,18 @@ model VirtualKey {
   hashedSecret  String // argon2id(secret + server pepper)
   displayPrefix String // e.g. "vk-lw-01HZX9"
 
-  // Principal to attribute traces to when this VK is used. Optional because
-  // a VK can be owned by a project without binding to a specific human.
+  // Principal user the VK is attributed to for trace ownership + audit.
+  // Set for personal VKs minted via `langwatch login --device`; null for
+  // org-/team-/project-owned VKs minted by an admin.
   principalUserId String?
-  principalUser   User?   @relation("VirtualKeyPrincipalUser", fields: [principalUserId], references: [id])
 
-  // Config blob. Mirrors the shape of `GET /internal/gateway/config/:vk_id`.
-  // Stored as a single JSON blob so the control-plane can version it and
-  // return it to the gateway without reassembling from many tables. Fields:
-  //   model_aliases, models_allowed, cache, guardrails, policy_rules,
-  //   rate_limits, fallback (non-chain scalars). The chain itself is
-  //   materialised in VirtualKeyProviderCredential for FK integrity.
+  // Slim config blob — per-key state only. The "gateway-config bundle"
+  // that the gateway reads via /internal/gateway/config/:vk_id is now
+  // materialised on-read from the scope graph (eligible ModelProviders
+  // resolved by VirtualKeyScope + the linked RoutingPolicy ordering),
+  // not pre-baked into this field. Allowed keys: `model_aliases`,
+  // `models_allowed`. Everything else (rate_limits, fallback, cache,
+  // guardrails) moved to ModelProvider (Advanced tab) or RoutingPolicy.
   config Json @default("{}")
 
   // Revision — every mutation bumps this; gateway uses it to skip config
@@ -1723,33 +1773,60 @@ model VirtualKey {
 
   revokedAt   DateTime?
   revokedById String?
-  revokedBy   User?     @relation("VirtualKeyRevokedBy", fields: [revokedById], references: [id])
 
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @default(now()) @updatedAt
   createdById String
-  createdBy   User      @relation("VirtualKeyCreatedBy", fields: [createdById], references: [id])
   lastUsedAt  DateTime?
 
-  providerCredentials VirtualKeyProviderCredential[]
-  budgets             GatewayBudget[]                @relation("VirtualKeyScopedGatewayBudgets")
-  ledgerEntries       GatewayBudgetLedger[]
+  scopes        VirtualKeyScope[]
+  budgets       GatewayBudget[]       @relation("VirtualKeyScopedGatewayBudgets")
+  ledgerEntries GatewayBudgetLedger[]
 
   // Optional RoutingPolicy reference. When set, gateway pulls
-  // provider chain + model allowlist from the policy instead of
-  // the embedded VirtualKeyProviderCredential rows. Used by
-  // personal keys and any centrally-governed VK.
+  // ordered ModelProvider chain from the policy. When null, the
+  // materialiser falls back to ordering eligible ModelProviders
+  // by `fallbackPriorityGlobal` (asc) then `createdAt` (asc) —
+  // deterministic across runs and Go-side parsers.
   routingPolicyId String?
-  routingPolicy   RoutingPolicy? @relation(fields: [routingPolicyId], references: [id], onDelete: SetNull)
 
-  @@unique([projectId, name])
+  @@unique([organizationId, name])
   @@unique([hashedSecret])
-  @@index([projectId])
+  @@index([organizationId])
   @@index([displayPrefix])
   @@index([status])
   @@index([principalUserId])
   @@index([revision])
   @@index([routingPolicyId])
+}
+
+// VirtualKeyScope — N-scope access for VirtualKey, mirrors
+// ModelProviderScope exactly. A single VK row is reachable from any
+// scope it has a matching entry for. Writing requires the caller to
+// hold the matching `virtualKeys:manage` permission at that scope.
+//
+// Scope-cascade resolution (read-time): a VK at PROJECT:P sees
+// ModelProviders scoped at PROJECT:P, TEAM:P.team, or
+// ORGANIZATION:vk.organizationId. A VK at ORGANIZATION sees only
+// ORGANIZATION-scoped MPs (no leakage down). Same upward-walking
+// intersection rule used by ModelDefaultConfig.
+enum VirtualKeyScopeType {
+  ORGANIZATION
+  TEAM
+  PROJECT
+}
+
+model VirtualKeyScope {
+  id           String              @id @default(nanoid())
+  virtualKeyId String
+  virtualKey   VirtualKey          @relation(fields: [virtualKeyId], references: [id], onDelete: Cascade)
+  scopeType    VirtualKeyScopeType
+  scopeId      String
+  createdAt    DateTime            @default(now())
+
+  @@unique([virtualKeyId, scopeType, scopeId])
+  @@index([scopeType, scopeId])
+  @@index([virtualKeyId])
 }
 
 // ---------------------------------------------------------------------------
@@ -1769,28 +1846,38 @@ model VirtualKey {
 // `isDefault=true` (one per scope tier) makes the policy auto-apply when
 // `virtualKey.issuePersonal` is called without an explicit policyId.
 // ---------------------------------------------------------------------------
+// RoutingPolicyScopeType — normalised from the legacy String 'scope'
+// column to a proper Postgres enum, matching the per-table convention
+// used by ModelProviderScopeType / GatewayBudgetScopeType / etc.
+enum RoutingPolicyScopeType {
+  ORGANIZATION
+  TEAM
+  PROJECT
+}
+
 model RoutingPolicy {
   id             String       @id @default(nanoid())
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  scope   String // 'organization' | 'team' | 'project'
+  scope   RoutingPolicyScopeType
   scopeId String
 
   name        String
   description String?
 
-  // Ordered list of GatewayProviderCredential.id values. JSON for
-  // shape flexibility; gateway materialises into provider chain at
-  // request time.
-  providerCredentialIds Json @default("[]")
+  // Ordered list of ModelProvider.id values (post-iter-110: GPC merged
+  // into MP, the chain refers to MPs directly). JSON for shape
+  // flexibility; gateway materialises into provider chain at request
+  // time. Order = try-first when strategy = 'priority'.
+  modelProviderIds Json @default("[]")
 
   // Optional model allowlist (JSON array of glob patterns).
   // null/empty = "all models the eligible providers can serve".
   modelAllowlist Json?
 
   // Routing strategy applied across the model-eligible subset.
-  //   'priority'    — try providerCredentialIds in order (default)
+  //   'priority'    — try modelProviderIds in order (default)
   //   'cost'        — pick lowest unit cost first
   //   'latency'     — pick fastest healthy provider
   //   'round_robin' — distribute evenly
@@ -1805,7 +1892,8 @@ model RoutingPolicy {
   updatedById String?
   updatedBy   User?    @relation("RoutingPolicyUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
 
-  virtualKeys VirtualKey[]
+  // Back-relation to VirtualKey removed in iter 110 (no FK constraint;
+  // VKs are looked up via prisma.virtualKey.findMany({ where: { routingPolicyId } })).
 
   @@unique([organizationId, scope, scopeId, name])
   @@index([organizationId])
@@ -2288,66 +2376,12 @@ model UserIngestionBinding {
   @@index([personalProjectId])
 }
 
-model GatewayProviderCredential {
-  id        String  @id @default(nanoid())
-  projectId String
-  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  modelProviderId String
-  modelProvider   ModelProvider @relation(fields: [modelProviderId], references: [id], onDelete: Cascade)
-
-  // A project can register the same ModelProvider under multiple slots
-  // (e.g. "primary", "secondary" for the same vendor with different
-  // deployments or quota tiers). Unique per (project, provider, slot).
-  slot String @default("primary")
-
-  // Gateway-only settings — do NOT leak to litellm/legacy path.
-  rateLimitRpm           Int?
-  rateLimitTpm           Int?
-  rateLimitRpd           Int?
-  rotationPolicy         GatewayProviderRotationPolicy @default(MANUAL)
-  extraHeaders           Json? // appended by gateway only
-  fallbackPriorityGlobal Int? // used when a VK has no explicit chain
-
-  // Provider-specific routing hints (e.g. bedrock region, azure deployment
-  // override) that the gateway applies on top of ModelProvider defaults.
-  providerConfig Json?
-
-  // Health / circuit breaker state written by the gateway.
-  healthStatus      GatewayProviderHealthStatus @default(UNKNOWN)
-  circuitOpenedAt   DateTime?
-  lastHealthCheckAt DateTime?
-
-  disabledAt DateTime?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @default(now()) @updatedAt
-
-  virtualKeyBindings VirtualKeyProviderCredential[]
-  ledgerEntries      GatewayBudgetLedger[]
-
-  @@unique([projectId, modelProviderId, slot])
-  @@index([projectId])
-  @@index([modelProviderId])
-  @@index([healthStatus])
-}
-
-model VirtualKeyProviderCredential {
-  virtualKeyId         String
-  providerCredentialId String
-  // Position in the VK's fallback chain. Lower = higher priority.
-  priority             Int
-  // Optional per-binding overrides that apply only when this VK routes via
-  // this credential (e.g. alternate extra headers, alternate model alias set).
-  overrides            Json?
-  createdAt            DateTime @default(now())
-
-  virtualKey         VirtualKey                @relation(fields: [virtualKeyId], references: [id], onDelete: Cascade)
-  providerCredential GatewayProviderCredential @relation(fields: [providerCredentialId], references: [id], onDelete: Cascade)
-
-  @@id([virtualKeyId, providerCredentialId])
-  @@unique([virtualKeyId, priority])
-  @@index([providerCredentialId])
-}
+// GatewayProviderCredential + VirtualKeyProviderCredential were both
+// dropped in iter 110 (collapse-VK-binding refactor). Provider-routing
+// knobs (rateLimitRpm/Tpm/Rpd, extraHeaders, providerConfig,
+// fallbackPriorityGlobal, rotationPolicy, health-status / circuit
+// state) live on `ModelProvider` directly; the order-of-providers
+// ("which to try first") lives on `RoutingPolicy.modelProviderIds`.
 
 model GatewayBudget {
   id             String                 @id @default(nanoid())
@@ -2406,10 +2440,12 @@ model GatewayBudgetLedger {
   budgetId String
   budget   GatewayBudget @relation(fields: [budgetId], references: [id], onDelete: Cascade)
 
-  virtualKeyId         String
-  virtualKey           VirtualKey                 @relation(fields: [virtualKeyId], references: [id], onDelete: Cascade)
-  providerCredentialId String?
-  providerCredential   GatewayProviderCredential? @relation(fields: [providerCredentialId], references: [id])
+  virtualKeyId    String
+  virtualKey      VirtualKey @relation(fields: [virtualKeyId], references: [id], onDelete: Cascade)
+  // Post-iter-110 GPC merged into ModelProvider; ledger entries point
+  // at the MP directly. Column kept nullable for ledger rows whose
+  // resolving provider has since been deleted (audit-only state).
+  modelProviderId String?
 
   // Idempotency key — ULID produced by the gateway per request. Dedup for 24h.
   gatewayRequestId String
@@ -2419,7 +2455,6 @@ model GatewayBudgetLedger {
   tokensCacheRead  Int                       @default(0)
   tokensCacheWrite Int                       @default(0)
   model            String
-  providerSlot     String?
   durationMs       Int?
   status           GatewayBudgetLedgerStatus @default(SUCCESS)
   occurredAt       DateTime                  @default(now())
