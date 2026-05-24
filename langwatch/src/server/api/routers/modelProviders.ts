@@ -263,6 +263,71 @@ export const modelProviderRouter = createTRPCRouter({
     }),
 
   /**
+   * Advanced gateway settings (rate limits, fallback priority, rotation
+   * policy, provider config) for a single ModelProvider. Split from the
+   * main `update` so the Advanced tab can ship its own payload without
+   * round-tripping the full provider (avoids reseeding credentials /
+   * scopes on every rate-limit tweak).
+   *
+   * Iter 110: fields landed on ModelProvider via S0 schema after
+   * GatewayProviderCredential was folded in. v1 ships MANUAL rotation
+   * only; AUTO + secret-store integration are v1.1 scope. Spec:
+   * specs/ai-gateway/gateway-provider-settings.feature.
+   */
+  updateAdvanced: protectedProcedure
+    .input(
+      z.object({
+        id: z.string().min(1),
+        rateLimitRpm: z.number().int().min(0).nullable().optional(),
+        rateLimitTpm: z.number().int().min(0).nullable().optional(),
+        rateLimitRpd: z.number().int().min(0).nullable().optional(),
+        fallbackPriorityGlobal: z.number().int().nullable().optional(),
+        rotationPolicy: z.enum(["MANUAL"]).optional(),
+        providerConfig: z.object({}).passthrough().nullable().optional(),
+      }),
+    )
+    .use(checkOrganizationPermission("organization:manage"))
+    .mutation(async ({ input, ctx }) => {
+      const { id, ...rest } = input;
+      return await ctx.prisma.modelProvider.update({
+        where: { id },
+        data: {
+          ...(rest.rateLimitRpm !== undefined && {
+            rateLimitRpm: rest.rateLimitRpm,
+          }),
+          ...(rest.rateLimitTpm !== undefined && {
+            rateLimitTpm: rest.rateLimitTpm,
+          }),
+          ...(rest.rateLimitRpd !== undefined && {
+            rateLimitRpd: rest.rateLimitRpd,
+          }),
+          ...(rest.fallbackPriorityGlobal !== undefined && {
+            fallbackPriorityGlobal: rest.fallbackPriorityGlobal,
+          }),
+          ...(rest.rotationPolicy !== undefined && {
+            rotationPolicy: rest.rotationPolicy,
+          }),
+          ...(rest.providerConfig !== undefined && {
+            providerConfig: rest.providerConfig ?? undefined,
+          }),
+        },
+        select: {
+          id: true,
+          rateLimitRpm: true,
+          rateLimitTpm: true,
+          rateLimitRpd: true,
+          fallbackPriorityGlobal: true,
+          rotationPolicy: true,
+          providerConfig: true,
+          healthStatus: true,
+          circuitOpenedAt: true,
+          lastHealthCheckAt: true,
+          disabledAt: true,
+        },
+      });
+    }),
+
+  /**
    * Validates a stored or env var API key against a custom or default base URL.
    * Gets API key from DB or env var and validates against the provided URL (or default if not provided).
    */
