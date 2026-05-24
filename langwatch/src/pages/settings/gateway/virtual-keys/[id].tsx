@@ -186,13 +186,11 @@ function VirtualKeyDetailPage() {
           ) : (
             <VStack align="stretch" gap={6} maxWidth="900px">
               <Section title="Identity">
-                <DetailRow
-                  label="Prefix"
-                  labelHint={
+                <DetailRow label="Prefix">
+                  <HStack gap={1}>
+                    <Code fontSize="xs">{vk.displayPrefix}…</Code>
                     <FieldInfoTooltip description="First chars of the secret. The full secret is shown only once at create or rotate — if it's lost, rotate the key to mint a fresh one." />
-                  }
-                >
-                  <Code fontSize="xs">{vk.displayPrefix}…</Code>
+                  </HStack>
                 </DetailRow>
                 <DetailRow label="Status">
                   <Badge
@@ -366,21 +364,16 @@ function Section({
 
 function DetailRow({
   label,
-  labelHint,
   children,
 }: {
   label: string;
-  labelHint?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <HStack gap={4} align="flex-start">
-      <HStack gap={1} minWidth="140px">
-        <Text fontSize="sm" color="fg.muted">
-          {label}
-        </Text>
-        {labelHint}
-      </HStack>
+      <Text fontSize="sm" color="fg.muted" minWidth="140px">
+        {label}
+      </Text>
       {children}
     </HStack>
   );
