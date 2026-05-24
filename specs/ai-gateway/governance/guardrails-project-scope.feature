@@ -114,7 +114,7 @@ Feature: AI Gateway — GatewayGuardrail is a project-scoped first-class resourc
     Then the action returns FORBIDDEN with code "missing_perm:gatewayGuardrails:manage"
     And the same denial applies to edit and delete actions on existing rows
 
-  @bdd @guardrails @rbac @unimplemented
+  @bdd @guardrails @rbac
   Scenario: gatewayGuardrails:attach is required on the VK side to wire a guardrail to a VK
     Given user "ariana@acme.test" holds `virtualKeys:manage` + `gatewayGuardrails:view` but NOT `gatewayGuardrails:attach`
     When ariana saves a VK with a non-empty `guardrailAttachments` list

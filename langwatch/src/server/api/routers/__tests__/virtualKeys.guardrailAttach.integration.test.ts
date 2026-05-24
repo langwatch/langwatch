@@ -4,7 +4,7 @@
  * Integration coverage for the VK guardrail-attach write path on
  * `api.virtualKeys.update`. Real Postgres test container, no mocks.
  *
- * Validates the two server-side invariants behind the attach UI:
+ * Validates the server-side invariants behind the attach UI:
  *   1. Project-scope guard — a VK can only attach guardrails from its own
  *      project; a guardrail from another project is rejected BAD_REQUEST
  *      `guardrail_project_mismatch` and the VK config is left unchanged.
@@ -12,6 +12,12 @@
  *      `config.guardrailAttachments` as `{direction, guardrailIds[]}`
  *      tuples and emits a `gateway.virtual_key.guardrail_attached`
  *      AuditLog row targeted at the VK.
+ *   3. Perm gate — a caller holding `virtualKeys:manage` but NOT
+ *      `gatewayGuardrails:attach` on the VK's project is rejected
+ *      FORBIDDEN `missing_perm:gatewayGuardrails:attach`. The denial must
+ *      fire on the guardrail-attach gate, not the upstream
+ *      `virtualKeys:manage` org gate — otherwise the test would pass for
+ *      the wrong reason.
  *
  * Spec: specs/ai-gateway/governance/guardrails-project-scope.feature
  */
@@ -42,8 +48,16 @@ describe("virtualKeys.update — guardrail attach", () => {
   const DEMO_GUARDRAIL_ID = `gr-demo-${ns}`;
   const OTHER_GUARDRAIL_ID = `gr-other-${ns}`;
   const VK_ID = `vk-${ns}`;
+  // Second principal: holds virtualKeys:manage (passes the org gate) but
+  // NOT gatewayGuardrails:attach (fails the project gate). Modelled with
+  // an ORG-scoped CUSTOM role since no built-in role grants that combo —
+  // org ADMIN cascades attach, MEMBER lacks virtualKeys:manage.
+  const NOATTACH_USER_ID = `usr-noattach-${ns}`;
+  const NOATTACH_USER_EMAIL = `noattach-${ns}@example.com`;
+  const NOATTACH_ROLE_ID = `crole-${ns}`;
 
   let caller: ReturnType<typeof appRouter.createCaller>;
+  let noAttachCaller: ReturnType<typeof appRouter.createCaller>;
 
   beforeAll(async () => {
     await startTestContainers();
@@ -144,6 +158,56 @@ describe("virtualKeys.update — guardrail attach", () => {
         } as any,
       }),
     );
+
+    // Denial principal: a CUSTOM role granting virtualKeys:manage +
+    // gatewayGuardrails:view but NOT gatewayGuardrails:attach, bound at
+    // ORGANIZATION scope. OrganizationUser.role=MEMBER so the org-role
+    // fast path never grants attach on its own.
+    await prisma.user.create({
+      data: {
+        id: NOATTACH_USER_ID,
+        email: NOATTACH_USER_EMAIL,
+        name: "No Attach Tester",
+      },
+    });
+    await prisma.organizationUser.create({
+      data: {
+        organizationId: ORG_ID,
+        userId: NOATTACH_USER_ID,
+        role: OrganizationUserRole.MEMBER,
+      },
+    });
+    await prisma.customRole.create({
+      data: {
+        id: NOATTACH_ROLE_ID,
+        organizationId: ORG_ID,
+        name: `manage-no-attach-${ns}`,
+        permissions: ["virtualKeys:manage", "gatewayGuardrails:view"],
+      },
+    });
+    await prisma.roleBinding.create({
+      data: {
+        organizationId: ORG_ID,
+        userId: NOATTACH_USER_ID,
+        role: TeamUserRole.CUSTOM,
+        customRoleId: NOATTACH_ROLE_ID,
+        scopeType: RoleBindingScopeType.ORGANIZATION,
+        scopeId: ORG_ID,
+      },
+    });
+
+    noAttachCaller = appRouter.createCaller(
+      createInnerTRPCContext({
+        session: {
+          user: {
+            id: NOATTACH_USER_ID,
+            email: NOATTACH_USER_EMAIL,
+            name: "No Attach Tester",
+          },
+          expires: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+        } as any,
+      }),
+    );
   }, 60_000);
 
   afterAll(async () => {
@@ -159,11 +223,14 @@ describe("virtualKeys.update — guardrail attach", () => {
       where: { projectId: { in: [DEMO_PROJECT_ID, OTHER_PROJECT_ID] } },
     });
     await prisma.roleBinding.deleteMany({ where: { organizationId: ORG_ID } });
+    await prisma.customRole.deleteMany({ where: { organizationId: ORG_ID } });
     await prisma.teamUser.deleteMany({ where: { team: { organizationId: ORG_ID } } });
     await prisma.project.deleteMany({ where: { teamId: TEAM_ID } });
     await prisma.team.deleteMany({ where: { organizationId: ORG_ID } });
     await prisma.organizationUser.deleteMany({ where: { organizationId: ORG_ID } });
-    await prisma.user.deleteMany({ where: { id: USER_ID } });
+    await prisma.user.deleteMany({
+      where: { id: { in: [USER_ID, NOATTACH_USER_ID] } },
+    });
     await prisma.organization.deleteMany({ where: { id: ORG_ID } });
     await stopTestContainers();
   });
@@ -223,6 +290,38 @@ describe("virtualKeys.update — guardrail attach", () => {
         direction: "pre",
         guardrailId: DEMO_GUARDRAIL_ID,
       });
+    });
+  });
+
+  describe("when the caller lacks gatewayGuardrails:attach on the project", () => {
+    /** @scenario gatewayGuardrails:attach is required on the VK side to wire a guardrail to a VK */
+    it("rejects with missing_perm:gatewayGuardrails:attach", async () => {
+      await expect(
+        noAttachCaller.virtualKeys.update({
+          organizationId: ORG_ID,
+          id: VK_ID,
+          config: {
+            guardrailAttachments: [
+              { direction: "pre", guardrailIds: [DEMO_GUARDRAIL_ID] },
+            ],
+          },
+        }),
+      ).rejects.toThrow(/missing_perm:gatewayGuardrails:attach/);
+    });
+
+    // Guards against a false-green: the denial must come from the
+    // guardrail-attach project gate, NOT the upstream virtualKeys:manage
+    // org gate. If the CUSTOM role failed to grant virtualKeys:manage the
+    // call would 401 on the org gate and the test above would still pass
+    // for the wrong reason. Prove the caller clears the org gate by
+    // letting it run an update with NO guardrail attachments.
+    it("clears the virtualKeys:manage org gate (attach gate is the only blocker)", async () => {
+      const updated = await noAttachCaller.virtualKeys.update({
+        organizationId: ORG_ID,
+        id: VK_ID,
+        description: "noattach caller cleared the org gate",
+      });
+      expect(updated.id).toBe(VK_ID);
     });
   });
 });
