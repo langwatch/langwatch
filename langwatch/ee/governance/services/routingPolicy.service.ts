@@ -4,6 +4,14 @@
  * RoutingPolicyService — admin-defined routing templates that VirtualKeys
  * reference instead of embedding their own fallback chain.
  *
+ * Multi-scope model (post-bug-7 step vb): every policy carries one or
+ * more `RoutingPolicyScope` rows that determine which VKs can select
+ * it. Selectability rule per spec
+ * routing-policy-scope-cascade.feature L20-21:
+ *
+ *   A VK at scope S can select a RoutingPolicy P iff at least one of
+ *   P's scope rows is an ancestor of S or equal to S.
+ *
  * Resolution rules (consulted at VK issuance time, not at request time):
  *
  *   resolveDefaultForUser(userId, organizationId) =
@@ -21,11 +29,21 @@ import {
   Prisma,
   type PrismaClient,
   type RoutingPolicy,
+  type RoutingPolicyScope as RoutingPolicyScopeRow,
   RoutingPolicyScopeType,
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 
 export type RoutingPolicyScope = "organization" | "team" | "project";
+
+export type RoutingPolicyScopeEntry = {
+  scopeType: RoutingPolicyScopeType;
+  scopeId: string;
+};
+
+export type RoutingPolicyWithScopes = RoutingPolicy & {
+  scopes: RoutingPolicyScopeRow[];
+};
 
 const WIRE_TO_ENUM: Record<RoutingPolicyScope, RoutingPolicyScopeType> = {
   organization: RoutingPolicyScopeType.ORGANIZATION,
@@ -58,16 +76,27 @@ export class RoutingPolicyMustHaveProviderError extends Error {
   }
 }
 
+export class RoutingPolicyMustHaveScopeError extends Error {
+  readonly code = "routing_policy_must_have_scope" as const;
+  constructor(
+    message = "Routing policy must include at least one scope",
+  ) {
+    super(message);
+    this.name = "RoutingPolicyMustHaveScopeError";
+  }
+}
+
 export interface CreateRoutingPolicyInput {
   organizationId: string;
-  scope: RoutingPolicyScope;
-  scopeId: string;
+  scopes: RoutingPolicyScopeEntry[];
   name: string;
   description?: string | null;
   modelProviderIds: string[];
   modelAllowlist?: string[] | null;
   strategy?: "priority" | "cost" | "latency" | "round_robin";
   isDefault?: boolean;
+  modelAliases?: Record<string, string>;
+  policyRules?: Record<string, unknown>;
   actorUserId: string;
 }
 
@@ -79,37 +108,59 @@ export interface UpdateRoutingPolicyInput {
   modelProviderIds?: string[];
   modelAllowlist?: string[] | null;
   strategy?: "priority" | "cost" | "latency" | "round_robin";
+  modelAliases?: Record<string, string>;
+  policyRules?: Record<string, unknown>;
   actorUserId: string;
 }
 
 export class RoutingPolicyService {
   constructor(private readonly prisma: PrismaClient) {}
 
+  /**
+   * List policies in an org, optionally filtered to those selectable
+   * from a specific scope per the spec cascade rule. When `selectableForScope`
+   * is passed, returns every RP that has at least one scope row at the
+   * given scope OR an ancestor scope (ORG dominates TEAM dominates PROJECT).
+   */
   async list({
     organizationId,
-    scope,
-    scopeId,
+    selectableForScope,
   }: {
     organizationId: string;
-    scope?: RoutingPolicyScope;
-    scopeId?: string;
-  }): Promise<RoutingPolicy[]> {
+    selectableForScope?: { scopeType: RoutingPolicyScopeType; scopeId: string };
+  }): Promise<RoutingPolicyWithScopes[]> {
+    if (!selectableForScope) {
+      return await this.prisma.routingPolicy.findMany({
+        where: { organizationId },
+        include: { scopes: true },
+        orderBy: [{ isDefault: "desc" }, { name: "asc" }],
+      });
+    }
+    const ancestorPredicates = await this.ancestorScopePredicates(
+      organizationId,
+      selectableForScope,
+    );
     return await this.prisma.routingPolicy.findMany({
       where: {
         organizationId,
-        ...(scope ? { scope: toEnumScope(scope) } : {}),
-        ...(scopeId ? { scopeId } : {}),
+        scopes: { some: { OR: ancestorPredicates } },
       },
+      include: { scopes: true },
       orderBy: [{ isDefault: "desc" }, { name: "asc" }],
     });
   }
 
-  async findById(id: string): Promise<RoutingPolicy | null> {
-    return await this.prisma.routingPolicy.findUnique({ where: { id } });
+  async findById(id: string): Promise<RoutingPolicyWithScopes | null> {
+    return await this.prisma.routingPolicy.findUnique({
+      where: { id },
+      include: { scopes: true },
+    });
   }
 
-  async create(input: CreateRoutingPolicyInput): Promise<RoutingPolicy> {
-    const scope = toEnumScope(input.scope);
+  async create(input: CreateRoutingPolicyInput): Promise<RoutingPolicyWithScopes> {
+    if (input.scopes.length === 0) {
+      throw new RoutingPolicyMustHaveScopeError();
+    }
     if (input.modelProviderIds.length === 0) {
       throw new RoutingPolicyMustHaveProviderError();
     }
@@ -117,24 +168,31 @@ export class RoutingPolicyService {
       input.organizationId,
       input.modelProviderIds,
     );
+    const primary = input.scopes[0]!;
     return await this.prisma.$transaction(async (tx) => {
       if (input.isDefault) {
-        await tx.routingPolicy.updateMany({
-          where: {
-            organizationId: input.organizationId,
-            scope,
-            scopeId: input.scopeId,
-            isDefault: true,
-          },
-          data: { isDefault: false },
-        });
+        // Clear any existing default that overlaps with any of the new
+        // scope rows.
+        for (const s of input.scopes) {
+          await tx.routingPolicy.updateMany({
+            where: {
+              organizationId: input.organizationId,
+              scope: s.scopeType,
+              scopeId: s.scopeId,
+              isDefault: true,
+            },
+            data: { isDefault: false },
+          });
+        }
       }
-
       return await tx.routingPolicy.create({
         data: {
           organizationId: input.organizationId,
-          scope,
-          scopeId: input.scopeId,
+          // Legacy single-scope columns mirror the primary scope until
+          // they drop in step (vc); the join table below is the new
+          // source of truth.
+          scope: primary.scopeType,
+          scopeId: primary.scopeId,
           name: input.name,
           description: input.description ?? null,
           modelProviderIds: input.modelProviderIds as Prisma.InputJsonValue,
@@ -143,14 +201,23 @@ export class RoutingPolicyService {
             : Prisma.JsonNull,
           strategy: input.strategy ?? "priority",
           isDefault: input.isDefault ?? false,
+          modelAliases: (input.modelAliases ?? {}) as Prisma.InputJsonValue,
+          policyRules: (input.policyRules ?? {}) as Prisma.InputJsonValue,
           createdById: input.actorUserId,
           updatedById: input.actorUserId,
+          scopes: {
+            create: input.scopes.map((s) => ({
+              scopeType: s.scopeType,
+              scopeId: s.scopeId,
+            })),
+          },
         },
+        include: { scopes: true },
       });
     });
   }
 
-  async update(input: UpdateRoutingPolicyInput): Promise<RoutingPolicy> {
+  async update(input: UpdateRoutingPolicyInput): Promise<RoutingPolicyWithScopes> {
     const existing = await this.requireOwn(input.id, input.organizationId);
     if (input.modelProviderIds !== undefined) {
       if (input.modelProviderIds.length === 0) {
@@ -175,16 +242,22 @@ export class RoutingPolicyService {
         ? (input.modelAllowlist as Prisma.InputJsonValue)
         : Prisma.JsonNull;
     if (input.strategy !== undefined) data.strategy = input.strategy;
+    if (input.modelAliases !== undefined)
+      data.modelAliases = input.modelAliases as Prisma.InputJsonValue;
+    if (input.policyRules !== undefined)
+      data.policyRules = input.policyRules as Prisma.InputJsonValue;
 
     return await this.prisma.routingPolicy.update({
       where: { id: existing.id },
       data,
+      include: { scopes: true },
     });
   }
 
   /**
    * Make `id` the default for its scope tier. Atomic swap: clears the
-   * existing default in the same transaction.
+   * existing default in the same transaction across every scope row
+   * the target policy carries.
    */
   async setDefault({
     id,
@@ -194,24 +267,26 @@ export class RoutingPolicyService {
     id: string;
     organizationId: string;
     actorUserId: string;
-  }): Promise<RoutingPolicy> {
+  }): Promise<RoutingPolicyWithScopes> {
     const target = await this.requireOwn(id, organizationId);
 
     return await this.prisma.$transaction(async (tx) => {
-      await tx.routingPolicy.updateMany({
-        where: {
-          organizationId,
-          scope: target.scope,
-          scopeId: target.scopeId,
-          isDefault: true,
-          NOT: { id },
-        },
-        data: { isDefault: false },
-      });
-
+      for (const s of target.scopes) {
+        await tx.routingPolicy.updateMany({
+          where: {
+            organizationId,
+            scope: s.scopeType,
+            scopeId: s.scopeId,
+            isDefault: true,
+            NOT: { id },
+          },
+          data: { isDefault: false },
+        });
+      }
       return await tx.routingPolicy.update({
         where: { id: target.id },
         data: { isDefault: true, updatedById: actorUserId },
+        include: { scopes: true },
       });
     });
   }
@@ -241,15 +316,17 @@ export class RoutingPolicyService {
   }: {
     organizationId: string;
     personalTeamId?: string;
-  }): Promise<RoutingPolicy | null> {
+  }): Promise<RoutingPolicyWithScopes | null> {
     if (personalTeamId) {
       const teamDefault = await this.prisma.routingPolicy.findFirst({
         where: {
           organizationId,
-          scope: RoutingPolicyScopeType.TEAM,
-          scopeId: personalTeamId,
           isDefault: true,
+          scopes: {
+            some: { scopeType: RoutingPolicyScopeType.TEAM, scopeId: personalTeamId },
+          },
         },
+        include: { scopes: true },
       });
       if (teamDefault) return teamDefault;
     }
@@ -257,19 +334,22 @@ export class RoutingPolicyService {
     return await this.prisma.routingPolicy.findFirst({
       where: {
         organizationId,
-        scope: RoutingPolicyScopeType.ORGANIZATION,
-        scopeId: organizationId,
         isDefault: true,
+        scopes: {
+          some: { scopeType: RoutingPolicyScopeType.ORGANIZATION, scopeId: organizationId },
+        },
       },
+      include: { scopes: true },
     });
   }
 
   private async requireOwn(
     id: string,
     organizationId: string,
-  ): Promise<RoutingPolicy> {
+  ): Promise<RoutingPolicyWithScopes> {
     const policy = await this.prisma.routingPolicy.findUnique({
       where: { id },
+      include: { scopes: true },
     });
     // Collapse "not found" + "found-but-wrong-org" into the same NOT_FOUND
     // response — leaking the distinction would tell an attacker that an
@@ -281,6 +361,35 @@ export class RoutingPolicyService {
       });
     }
     return policy;
+  }
+
+  /**
+   * For the spec selectability rule, return the set of scope-row
+   * predicates that "the given scope can see". A VK at PROJECT P sees
+   * RPs scoped at PROJECT P, TEAM containing P, or ORG containing P.
+   */
+  private async ancestorScopePredicates(
+    organizationId: string,
+    scope: { scopeType: RoutingPolicyScopeType; scopeId: string },
+  ): Promise<Prisma.RoutingPolicyScopeWhereInput[]> {
+    const predicates: Prisma.RoutingPolicyScopeWhereInput[] = [
+      { scopeType: RoutingPolicyScopeType.ORGANIZATION, scopeId: organizationId },
+    ];
+    if (scope.scopeType === RoutingPolicyScopeType.TEAM) {
+      predicates.push({ scopeType: RoutingPolicyScopeType.TEAM, scopeId: scope.scopeId });
+    } else if (scope.scopeType === RoutingPolicyScopeType.PROJECT) {
+      const project = await this.prisma.project.findUnique({
+        where: { id: scope.scopeId },
+        select: { teamId: true },
+      });
+      if (project) {
+        predicates.push({ scopeType: RoutingPolicyScopeType.TEAM, scopeId: project.teamId });
+      }
+      predicates.push({ scopeType: RoutingPolicyScopeType.PROJECT, scopeId: scope.scopeId });
+    } else {
+      // ORG scope sees only ORG-scoped policies (no descent leakage).
+    }
+    return predicates;
   }
 
   /**
@@ -330,3 +439,8 @@ export class RoutingPolicyService {
     }
   }
 }
+
+// Re-export legacy wire-shape helper for callers that still pass the
+// string form (e.g. CLI + integration tests). Will drop once consumers
+// are swept to the enum directly.
+export { toEnumScope };

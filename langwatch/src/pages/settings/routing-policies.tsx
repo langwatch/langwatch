@@ -242,8 +242,15 @@ function RoutingPoliciesPage() {
     if (editingId === "new") {
       createMutation.mutate({
         organizationId: orgId,
-        scope: composer.scope,
-        scopeId: composer.scopeId,
+        scopes: [
+          {
+            scopeType: composer.scope.toUpperCase() as
+              | "ORGANIZATION"
+              | "TEAM"
+              | "PROJECT",
+            scopeId: composer.scopeId,
+          },
+        ],
         name: composer.name,
         description: composer.description || null,
         modelProviderIds: composer.modelProviderIds,

@@ -1,15 +1,21 @@
 /**
  * tRPC router for admin-defined routing policies.
  *
+ * Multi-scope contract post-bug-7 step (vb): inputs accept a `scopes[]`
+ * array of {scopeType, scopeId} entries. The legacy {scope, scopeId}
+ * single-scope shape is gone — callers must migrate to the array form.
+ *
  * RBAC: org-level "routingPolicies:manage" permission for mutations
  * (members can list). Mirrors the existing gatewayProviders router
  * pattern.
  */
+import { RoutingPolicyScopeType } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import {
   RoutingPolicyMustHaveProviderError,
+  RoutingPolicyMustHaveScopeError,
   RoutingPolicyService,
 } from "@ee/governance/services/routingPolicy.service";
 
@@ -17,14 +23,18 @@ import { checkOrganizationPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 /**
- * Translate the typed empty-providers guard into the 422 contract Ariana
- * pinned in EC3. Zod min(1) at the schema layer is the primary surface
- * (clean inline form validation), but service-layer callers (dogfood
- * scripts, future code paths) bypass Zod — this mapping keeps the wire
- * contract consistent regardless of caller.
+ * Translate the typed empty-providers / empty-scopes guards into 422
+ * with stable codes the frontend can branch on.
  */
-function mapEmptyProviderToTrpc(err: unknown): never {
+function mapServiceErrorToTrpc(err: unknown): never {
   if (err instanceof RoutingPolicyMustHaveProviderError) {
+    throw new TRPCError({
+      code: "UNPROCESSABLE_CONTENT",
+      message: err.message,
+      cause: err,
+    });
+  }
+  if (err instanceof RoutingPolicyMustHaveScopeError) {
     throw new TRPCError({
       code: "UNPROCESSABLE_CONTENT",
       message: err.message,
@@ -34,17 +44,23 @@ function mapEmptyProviderToTrpc(err: unknown): never {
   throw err;
 }
 
-const scopeSchema = z.enum(["organization", "team", "project"]);
+const scopeTypeSchema = z.nativeEnum(RoutingPolicyScopeType);
+const scopesArraySchema = z
+  .array(z.object({ scopeType: scopeTypeSchema, scopeId: z.string() }))
+  .min(1, "Routing policy must include at least one scope");
 const strategySchema = z.enum(["priority", "cost", "latency", "round_robin"]);
+const aliasesSchema = z.record(z.string(), z.string()).optional();
+const policyRulesSchema = z.record(z.string(), z.unknown()).optional();
 
 export const routingPoliciesRouter = createTRPCRouter({
-  /** List policies in an org, optionally filtered by scope. */
+  /** List policies in an org, optionally filtered to those selectable from a given scope. */
   list: protectedProcedure
     .input(
       z.object({
         organizationId: z.string(),
-        scope: scopeSchema.optional(),
-        scopeId: z.string().optional(),
+        selectableForScope: z
+          .object({ scopeType: scopeTypeSchema, scopeId: z.string() })
+          .optional(),
       }),
     )
     .use(checkOrganizationPermission("routingPolicies:view"))
@@ -52,18 +68,18 @@ export const routingPoliciesRouter = createTRPCRouter({
       const service = new RoutingPolicyService(ctx.prisma);
       return await service.list({
         organizationId: input.organizationId,
-        scope: input.scope,
-        scopeId: input.scopeId,
+        selectableForScope: input.selectableForScope,
       });
     }),
 
-  /** Get a single policy by id. */
+  /** Get a single policy by id (includes its scope rows). */
   get: protectedProcedure
     .input(z.object({ organizationId: z.string(), id: z.string() }))
     .use(checkOrganizationPermission("routingPolicies:view"))
     .query(async ({ ctx, input }) => {
       const policy = await ctx.prisma.routingPolicy.findUnique({
         where: { id: input.id },
+        include: { scopes: true },
       });
       if (!policy || policy.organizationId !== input.organizationId) {
         throw new TRPCError({ code: "NOT_FOUND" });
@@ -75,21 +91,17 @@ export const routingPoliciesRouter = createTRPCRouter({
     .input(
       z.object({
         organizationId: z.string(),
-        scope: scopeSchema,
-        scopeId: z.string(),
+        scopes: scopesArraySchema,
         name: z.string().min(1).max(128),
         description: z.string().nullable().optional(),
-        // EC3 — a routing policy without provider credentials would
-        // materialise an empty chain at gateway request time and fail
-        // closed (per a5601f80a) but with no admin signal at create
-        // time. Reject up front so the failure is visible at the form,
-        // not at the next 'langwatch login'.
         modelProviderIds: z
           .array(z.string())
           .min(1, "Routing policy must reference at least one provider credential"),
         modelAllowlist: z.array(z.string()).nullable().optional(),
         strategy: strategySchema.default("priority"),
         isDefault: z.boolean().default(false),
+        modelAliases: aliasesSchema,
+        policyRules: policyRulesSchema,
       }),
     )
     .use(checkOrganizationPermission("routingPolicies:manage"))
@@ -98,18 +110,19 @@ export const routingPoliciesRouter = createTRPCRouter({
       try {
         return await service.create({
           organizationId: input.organizationId,
-          scope: input.scope,
-          scopeId: input.scopeId,
+          scopes: input.scopes,
           name: input.name,
           description: input.description ?? null,
           modelProviderIds: input.modelProviderIds,
           modelAllowlist: input.modelAllowlist ?? null,
           strategy: input.strategy,
           isDefault: input.isDefault,
+          modelAliases: input.modelAliases,
+          policyRules: input.policyRules,
           actorUserId: ctx.session.user.id,
         });
       } catch (err) {
-        mapEmptyProviderToTrpc(err);
+        mapServiceErrorToTrpc(err);
       }
     }),
 
@@ -120,17 +133,14 @@ export const routingPoliciesRouter = createTRPCRouter({
         id: z.string(),
         name: z.string().min(1).max(128).optional(),
         description: z.string().nullable().optional(),
-        // EC3 — same invariant as create: an empty chain on update
-        // produces a policy that fails closed without surfacing the
-        // root cause at edit time. `optional` lets callers omit the
-        // field (no-op for chain), but when present it must be
-        // non-empty.
         modelProviderIds: z
           .array(z.string())
           .min(1, "Routing policy must reference at least one provider credential")
           .optional(),
         modelAllowlist: z.array(z.string()).nullable().optional(),
         strategy: strategySchema.optional(),
+        modelAliases: aliasesSchema,
+        policyRules: policyRulesSchema,
       }),
     )
     .use(checkOrganizationPermission("routingPolicies:manage"))
@@ -145,10 +155,12 @@ export const routingPoliciesRouter = createTRPCRouter({
           modelProviderIds: input.modelProviderIds,
           modelAllowlist: input.modelAllowlist,
           strategy: input.strategy,
+          modelAliases: input.modelAliases,
+          policyRules: input.policyRules,
           actorUserId: ctx.session.user.id,
         });
       } catch (err) {
-        mapEmptyProviderToTrpc(err);
+        mapServiceErrorToTrpc(err);
       }
     }),
 
