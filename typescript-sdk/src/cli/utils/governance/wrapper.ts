@@ -142,7 +142,7 @@ function renderContactFooter(adminEmail: string | null | undefined): string {
  *      the gateway isn't reachable the tool will spin in a retry loop
  *      and there's no recovery. We don't name a specific run command
  *      (`make`, helm chart, docker compose, `npx @langwatch/server`,
- *      etc.) because deployments vary — point the user at the admin
+ *      etc.) because deployments vary; point the user at the admin
  *      contact instead.
  *   3. `getCliBootstrap()` providers cover the tool's family. Catches
  *      the shape where login succeeds but the org has no AI provider
@@ -153,7 +153,7 @@ function renderContactFooter(adminEmail: string | null | undefined): string {
  * Bootstrap is fetched up-front (it lives on the control plane,
  * independent of the gateway data plane) so every failure message can
  * embed the org admin's email as a real contact path. A bootstrap
- * error is non-fatal — we just lose the admin mailto and continue.
+ * error is non-fatal; we just lose the admin mailto and continue.
  */
 export async function preflightWrapper(
   cfg: GovernanceConfig,
