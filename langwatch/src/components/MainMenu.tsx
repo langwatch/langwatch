@@ -3,7 +3,6 @@ import type { Project } from "@prisma/client";
 import {
   Activity,
   Anvil,
-  Eye,
   Film,
   Flag,
   History,
@@ -13,13 +12,13 @@ import { useRouter } from "~/utils/compat/next-router";
 import React, { useState } from "react";
 import { useOpsPermission } from "../hooks/useOpsPermission";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
-import { useFeatureFlag } from "../hooks/useFeatureFlag";
 import { usePublicEnv } from "../hooks/usePublicEnv";
 import { api } from "../utils/api";
 import { featureIcons } from "../utils/featureIcons";
 import { projectRoutes } from "../utils/routes";
 import { useTableView } from "./messages/HeaderButtons";
 import { CollapsibleMenuGroup } from "./sidebar/CollapsibleMenuGroup";
+import { GovernSection } from "./sidebar/GovernSection";
 import { SideMenuLink } from "./sidebar/SideMenuLink";
 import { SupportMenu } from "./sidebar/SupportMenu";
 import { ThemeToggle } from "./sidebar/ThemeToggle";
@@ -37,7 +36,7 @@ export const MainMenu = React.memo(function MainMenu({
   isCompact = false,
 }: MainMenuProps) {
   const router = useRouter();
-  const { organization, project, hasPermission, isPublicRoute } =
+  const { project, hasPermission, isPublicRoute } =
     useOrganizationTeamProject();
   const [isHovered, setIsHovered] = useState(false);
 
@@ -45,34 +44,6 @@ export const MainMenu = React.memo(function MainMenu({
     { projectId: project?.id ?? "" },
     { enabled: !!project?.id },
   );
-
-  // AI Gateway menu is feature-flagged pre-GA. Flip it on for internal
-  // dogfooding by setting FEATURE_FLAG_FORCE_ENABLE=release_ui_ai_gateway_menu_enabled
-  // on the server (see featureFlagService.posthog.ts). Otherwise targeting
-  // is driven by PostHog release conditions.
-  const { enabled: gatewayMenuEnabled } = useFeatureFlag(
-    "release_ui_ai_gateway_menu_enabled",
-    {
-      projectId: project?.id,
-      organizationId: organization?.id,
-      enabled: !!project,
-    },
-  );
-
-  // Governance section is gated on:
-  //   (a) the user holds `governance:view` permission, AND
-  //   (b) the `release_ui_ai_governance_enabled` flag is on
-  // No additional gating on hasIngestionSources / hasPersonalVKs / etc.
-  // Admins must see Govern to bootstrap their first IngestionSource —
-  // gating on data presence creates a chicken-and-egg discoverability
-  // trap. The feature flag is the operator's rollout knob.
-  // Spec: specs/ai-gateway/governance/persona-aware-chrome.feature
-  const { enabled: governancePreviewEnabled } = useFeatureFlag(
-    "release_ui_ai_governance_enabled",
-    { projectId: project?.id, enabled: !!project },
-  );
-  const showGovernanceEntry =
-    governancePreviewEnabled && hasPermission("governance:view");
 
   // In compact mode, show expanded view on hover
   const showExpanded = !isCompact || isHovered;
@@ -302,48 +273,7 @@ export const MainMenu = React.memo(function MainMenu({
               showLabel={showExpanded}
             />
 
-            {(showGovernanceEntry ||
-              (gatewayMenuEnabled && hasPermission("virtualKeys:view"))) && (
-              <>
-                <Text
-                  fontSize="11px"
-                  fontWeight="medium"
-                  textTransform="uppercase"
-                  color="gray.500"
-                  paddingX={2}
-                  paddingTop={3}
-                  paddingBottom={1}
-                >
-                  {showExpanded ? "Govern" : <>&nbsp;</>}
-                </Text>
-                {gatewayMenuEnabled && hasPermission("virtualKeys:view") && (
-                  <SideMenuLink
-                    icon={featureIcons.gateway.icon}
-                    label={projectRoutes.gateway.title}
-                    href="/settings/gateway/virtual-keys"
-                    isActive={router.pathname.startsWith("/settings/gateway")}
-                    showLabel={showExpanded}
-                    beta
-                    betaLabel="Beta"
-                  />
-                )}
-                {showGovernanceEntry && (
-                  <SideMenuLink
-                    icon={Eye}
-                    label="AI Governance"
-                    href="/governance"
-                    isActive={
-                      router.pathname === "/governance" ||
-                      router.pathname === "/settings/governance" ||
-                      router.pathname.startsWith("/settings/governance/")
-                    }
-                    showLabel={showExpanded}
-                    beta
-                    betaLabel="Preview"
-                  />
-                )}
-              </>
-            )}
+            <GovernSection showExpanded={showExpanded} />
 
             <OpsSection showExpanded={showExpanded} />
           </VStack>

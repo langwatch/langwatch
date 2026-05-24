@@ -1,10 +1,8 @@
-import { Box, Text, VStack } from "@chakra-ui/react";
+import { Box, VStack } from "@chakra-ui/react";
 import {
   Bot,
-  Brain,
   ClipboardList,
   Database,
-  Eye,
   Gauge,
   ListTree,
   Settings as SettingsIcon,
@@ -15,12 +13,12 @@ import {
 import React, { useMemo, useState } from "react";
 import { useRouter } from "~/utils/compat/next-router";
 
-import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
 import { MENU_WIDTH_COMPACT, MENU_WIDTH_EXPANDED } from "./MainMenu";
+import { GovernSection } from "./sidebar/GovernSection";
 import { SideMenuLink } from "./sidebar/SideMenuLink";
 import { SupportMenu } from "./sidebar/SupportMenu";
 import { ThemeToggle } from "./sidebar/ThemeToggle";
@@ -54,31 +52,10 @@ export const PersonalSidebar = React.memo(function PersonalSidebar({
       !router.pathname.startsWith("/settings/gateway"));
 
   const session = useRequiredSession();
-  const { organization, organizations, hasPermission } =
-    useOrganizationTeamProject({
-      redirectToOnboarding: false,
-      redirectToProjectOnboarding: false,
-    });
-  const isGovernanceActive = router.pathname.startsWith("/governance");
-  const isGatewayActive = router.pathname.startsWith("/settings/gateway");
-  const { enabled: governancePreviewEnabled } = useFeatureFlag(
-    "release_ui_ai_governance_enabled",
-    {
-      organizationId: organization?.id,
-      enabled: !!organization?.id,
-    },
-  );
-  const { enabled: gatewayMenuEnabled } = useFeatureFlag(
-    "release_ui_ai_gateway_menu_enabled",
-    {
-      organizationId: organization?.id,
-      enabled: !!organization?.id,
-    },
-  );
-  const showGovernanceEntry =
-    governancePreviewEnabled && hasPermission("governance:view");
-  const showGatewayEntry =
-    gatewayMenuEnabled && hasPermission("virtualKeys:view");
+  const { organizations, hasPermission } = useOrganizationTeamProject({
+    redirectToOnboarding: false,
+    redirectToProjectOnboarding: false,
+  });
   const personalProject = useMemo(() => {
     const userId = session.data?.user?.id;
     if (!userId || !organizations) return null;
@@ -206,39 +183,7 @@ export const PersonalSidebar = React.memo(function PersonalSidebar({
               isActive={isConfigureActive}
               showLabel={showExpanded}
             />
-            {(showGovernanceEntry || showGatewayEntry) && (
-              <>
-                <Text
-                  fontSize="11px"
-                  fontWeight="medium"
-                  textTransform="uppercase"
-                  color="gray.500"
-                  paddingX={2}
-                  paddingTop={3}
-                  paddingBottom={1}
-                >
-                  {showExpanded ? "Govern" : <>&nbsp;</>}
-                </Text>
-                {showGatewayEntry && (
-                  <SideMenuLink
-                    icon={Brain}
-                    label="AI Gateway"
-                    href="/settings/gateway/virtual-keys"
-                    isActive={isGatewayActive}
-                    showLabel={showExpanded}
-                  />
-                )}
-                {showGovernanceEntry && (
-                  <SideMenuLink
-                    icon={Eye}
-                    label="AI Governance"
-                    href="/governance"
-                    isActive={isGovernanceActive}
-                    showLabel={showExpanded}
-                  />
-                )}
-              </>
-            )}
+            <GovernSection showExpanded={showExpanded} />
           </VStack>
 
           <VStack width="full" gap={0.5} align="start">
