@@ -233,7 +233,6 @@ export class PersonalVirtualKeyService {
         name: true,
         description: true,
         displayPrefix: true,
-        environment: true,
         status: true,
         principalUserId: true,
         routingPolicyId: true,
