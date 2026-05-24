@@ -98,9 +98,38 @@ export function computeGatewaySignature(
  * channels from leaking which failed (invalid sig vs. replayed request).
  * Machine-to-machine only; never touches the user session.
  */
+/**
+ * Emit the auth-decision code at WARN level so the generic
+ * loggerMiddleware's `status=401` line gets a sibling that names
+ * the specific reason (missing_signature / invalid_signature /
+ * timestamp_out_of_window / virtual_key_not_found / ...). Without
+ * this, a dogfooder seeing 401 in the api log has to guess between
+ * five paths since the response body isn't echoed by the request
+ * logger. Includes the gateway node ID when present so multi-node
+ * deployments can correlate which gateway sent the bad request.
+ */
+function logAuthDecision(
+  c: Context,
+  code: string,
+  status: number,
+  detail?: Record<string, unknown>,
+): void {
+  logger.warn(
+    {
+      code,
+      status,
+      path: new URL(c.req.url).pathname,
+      gatewayNodeId: c.req.header("X-LangWatch-Gateway-Node") ?? null,
+      ...detail,
+    },
+    `gateway-internal auth: ${code}`,
+  );
+}
+
 async function verifyGatewaySignature(c: Context, next: Next) {
   const secret = process.env.LW_GATEWAY_INTERNAL_SECRET ?? env.LW_GATEWAY_INTERNAL_SECRET;
   if (!secret) {
+    logAuthDecision(c, "gateway_internal_secret_missing", 500);
     return c.json(
       {
         error: {
@@ -116,6 +145,10 @@ async function verifyGatewaySignature(c: Context, next: Next) {
   const presentedSig = c.req.header("X-LangWatch-Gateway-Signature");
   const presentedTs = c.req.header("X-LangWatch-Gateway-Timestamp");
   if (!presentedSig || !presentedTs) {
+    logAuthDecision(c, "missing_signature", 401, {
+      hasSignature: Boolean(presentedSig),
+      hasTimestamp: Boolean(presentedTs),
+    });
     return c.json(
       {
         error: {
@@ -142,6 +175,7 @@ async function verifyGatewaySignature(c: Context, next: Next) {
   const a = Buffer.from(expected);
   const b = Buffer.from(presentedSig);
   if (a.length !== b.length || !timingSafeEqual(a, b)) {
+    logAuthDecision(c, "invalid_signature", 401);
     return c.json(
       {
         error: {
@@ -156,6 +190,7 @@ async function verifyGatewaySignature(c: Context, next: Next) {
 
   const ts = Number.parseInt(presentedTs, 10);
   if (!Number.isFinite(ts)) {
+    logAuthDecision(c, "invalid_timestamp", 401, { presentedTs });
     return c.json(
       {
         error: {
@@ -169,6 +204,9 @@ async function verifyGatewaySignature(c: Context, next: Next) {
   }
   const now = Math.floor(Date.now() / 1000);
   if (Math.abs(now - ts) > GATEWAY_SIGNATURE_WINDOW_SECONDS) {
+    logAuthDecision(c, "timestamp_out_of_window", 401, {
+      driftSeconds: now - ts,
+    });
     return c.json(
       {
         error: {
@@ -233,6 +271,7 @@ app.post("/resolve-key", async (c) => {
     parseVirtualKey(presented);
   } catch (err) {
     if (err instanceof VirtualKeyCryptoError) {
+      logAuthDecision(c, err.code, 401);
       return c.json(
         {
           error: {
@@ -251,6 +290,7 @@ app.post("/resolve-key", async (c) => {
   const service = VirtualKeyService.create(prisma);
   const vk = await service.getByHashedSecretInternal(hashed);
   if (!vk) {
+    logAuthDecision(c, "virtual_key_not_found", 401);
     return c.json(
       {
         error: {
@@ -263,6 +303,7 @@ app.post("/resolve-key", async (c) => {
     );
   }
   if (vk.status === "REVOKED") {
+    logAuthDecision(c, "virtual_key_revoked", 403, { vkId: vk.id });
     return c.json(
       {
         error: {
