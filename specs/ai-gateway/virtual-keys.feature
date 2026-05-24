@@ -20,10 +20,15 @@ Feature: AI Gateway — Virtual Keys
   So that I can give downstream clients (SDKs, coding CLIs, production apps) a single
   credential that routes through the LangWatch AI Gateway to any configured provider
 
-  A virtual key (VK) is a LangWatch-issued credential (format `vk-lw-{live|test}_<26-char-ulid>`,
-  40 chars total — see specs/ai-gateway/_shared/contract.md §2) that the Gateway service resolves to:
-  an owning project/team/org, a principal for attribution, a set of provider credentials with a
-  fallback chain, model aliases, cache policy, guardrail policy, policy rules, and budgets.
+  A virtual key (VK) is a LangWatch-issued credential (format `vk-lw-<26-char-ulid>`,
+  32 chars total — see specs/ai-gateway/_shared/contract.md §2) that the Gateway
+  service resolves to: an `organizationId` (mandatory tenant key), one-or-more
+  `VirtualKeyScope` rows (ORGANIZATION / TEAM / PROJECT), an optional
+  `principalUserId` (personal-VK marker, orthogonal to scope), a `RoutingPolicy`
+  reference (or null → default-policy fallback per vk-config-bundle.feature),
+  model aliases, models_allowed list, and the bundle of routable ModelProviders
+  resolved live from the scope graph (see vk-scope-inheritance.feature).
+
   The secret half is displayed exactly once at creation and stored as a
   peppered HMAC-SHA256 hash (see contract.md §2 for why HMAC-SHA256 over argon2id:
   ULID body is already brute-force-infeasible at 130 bits, argon2id would add
@@ -34,8 +39,8 @@ Feature: AI Gateway — Virtual Keys
     Given I am logged in
     And I am a member of organization "acme"
     And organization "acme" has team "platform" with project "gateway-demo"
-    And project "gateway-demo" has "openai" and "anthropic" providers configured
-    And I have "virtualKeys:manage" permission on project "gateway-demo"
+    And ModelProviders "openai" and "anthropic" are scoped to TEAM "platform"
+    And I have "virtualKeys:manage" at TEAM "platform"
 
   # ============================================================================
   # VK creation — secret show-once, format, default config
@@ -49,7 +54,7 @@ Feature: AI Gateway — Virtual Keys
     And I select providers "openai" and "anthropic"
     And I click "Create"
     Then a new virtual key is created
-    And the full secret is displayed exactly once with format "vk-lw-{live|test}_<26-char Crockford-base32 ULID>"
+    And the full secret is displayed exactly once with format "vk-lw-<26-char Crockford-base32 ULID>"
     And a "Copy" button is shown
     And a "I've saved it, close" confirmation is required before dismiss
     And after dismissal the full secret can never be retrieved again
@@ -150,41 +155,43 @@ Feature: AI Gateway — Virtual Keys
   # ============================================================================
 
   @integration @unimplemented
-  Scenario: Virtual key references existing project ModelProvider credentials
-    Given project "gateway-demo" has ModelProvider "openai" with key "sk-existing"
-    When I create virtual key "demo-key" and select "openai"
-    Then the virtual key is linked to the existing "openai" ModelProvider row
-    And no duplicate credential is created
-    And updating the ModelProvider's API key reflects for the virtual key on next
-      gateway cache refresh
+  Scenario: Virtual key references existing ModelProvider rows via scope inheritance
+    Given a ModelProvider "openai" scoped to TEAM "platform" with key "sk-existing"
+    When I create virtual key "demo-key" scoped to TEAM "platform" with no explicit RoutingPolicy
+    Then the bundle materialiser resolves "openai" as eligible via TEAM-scope match
+    And no duplicate credential row is created (single source of truth is the ModelProvider)
+    And updating the ModelProvider's API key bumps `ModelProvider.revision`
+    And the next /config materialisation for "demo-key" reflects the new key
 
   @integration
-  Scenario: Virtual key cannot select a provider not configured on its project
-    Given project "gateway-demo" does not have "bedrock" configured
-    When I open the "new virtual key" drawer
-    Then "bedrock" is disabled in the providers select with a hint to configure it first
+  Scenario: Virtual key cannot select a provider outside its scope graph
+    Given the chosen scope TEAM "platform" has eligible MPs ["openai", "anthropic"]
+    And "bedrock" is scoped to TEAM "data-sci" only (NOT in scope for "platform")
+    When I open the "new virtual key" drawer and pick scope TEAM "platform"
+    Then "bedrock" is not listed in the "Eligible Model Providers" panel
+    And the create flow cannot reference it; explicitly attempting via API returns 400
+      with code "mp_out_of_vk_scope" naming "bedrock"
 
   # ============================================================================
-  # Fallback chain configuration
+  # Fallback chain configuration (lives on RoutingPolicy, not on the VK)
   # ============================================================================
 
   @integration @unimplemented
-  Scenario: Ordered fallback chain is persisted and retrieved
-    Given I am editing virtual key "prod-key"
-    When I set the fallback chain to ["anthropic", "openai", "azure"]
-    And I click "Save"
-    Then the virtual key config returns fallback_chain in that order
-    And the gateway config endpoint returns matching provider_credentials_ref ordering
+  Scenario: Per-VK chain ordering is owned by RoutingPolicy.model_provider_ids
+    Given a RoutingPolicy "rp-strict" with strategy="ordered" and model_provider_ids=["anthropic", "openai", "azure"]
+    And a VirtualKey "prod-key" scoped to ORGANIZATION "acme" with routingPolicyId="rp-strict"
+    When the gateway materialises the /config bundle for "prod-key"
+    Then `routing_policy.model_provider_ids` equals ["anthropic", "openai", "azure"]
+    And `model_providers[]` order matches that sequence
+    And changing the policy's model_provider_ids bumps every dependent VK's revision
 
   @integration @unimplemented
-  Scenario: Fallback trigger conditions are configurable per VK
-    Given I am editing virtual key "prod-key"
-    When I enable fallback on "5xx", "429", and "timeout"
-    And I set timeout_ms to 30000
-    And I set max_attempts to 3
-    Then the virtual key config persists these triggers
-    And the resolved config payload contains
-      { on: ["5xx","429","timeout"], timeout_ms: 30000, max_attempts: 3 }
+  Scenario: Fallback trigger conditions live on RoutingPolicy (per-policy, not per-VK)
+    Given a RoutingPolicy "rp-resilient" with triggers={on:["5xx","429","timeout"], timeout_ms:30000, max_attempts:3}
+    And a VirtualKey "prod-key" with routingPolicyId="rp-resilient"
+    When the bundle is materialised
+    Then `routing_policy.triggers` equals {on:["5xx","429","timeout"], timeout_ms:30000, max_attempts:3}
+    And the gateway applies those triggers per-request, not per-VK
 
   # ============================================================================
   # Model aliases
@@ -313,19 +320,22 @@ Feature: AI Gateway — Virtual Keys
     Given virtual key "prod-key" exists
     When the gateway calls "POST /internal/gateway/resolve-key" with the raw secret
     Then the response contains a signed JWT with claims
-      { vk_id, project_id, team_id, org_id, principal_id, revision, exp }
+      { vk_id, organization_id, project_id, principal_user_id, revision, exp }
+    And `project_id` is non-null only when the VK has exactly one PROJECT scope
+      (else null — see vk-config-bundle.feature)
     And no provider credentials, no budget totals, no guardrail policies are in the JWT
 
   @integration @unimplemented
-  Scenario: GET /internal/gateway/config/:vk_id returns full config
+  Scenario: GET /internal/gateway/config/:vk_id returns the materialised bundle
     Given the gateway has verified a JWT for vk_id "vk_123"
     When the gateway calls "GET /internal/gateway/config/vk_123" with "If-None-Match: 42"
     And the current revision is 42
     Then the response is 304 Not Modified
     When the gateway calls the same endpoint with "If-None-Match: 41"
-    Then the response is 200 with the full config payload
-    And the payload includes providers, fallback_chain, model_aliases, cache,
-      guardrails, policy_rules, budgets, rate_limits, and a new revision
+    Then the response is 200 with the bundle payload (shape locked in vk-config-bundle.feature)
+    And the payload includes organization_id, scopes, model_providers[], routing_policy,
+      key_state, and a new revision
+    And the payload does NOT include `bindings[]` or `provider_credentials[]` (legacy shape)
 
   @integration @unimplemented
   Scenario: GET /internal/gateway/changes?since=N long-polls for mutations

@@ -193,11 +193,13 @@ Returns the warm-cache config (fat, not on hot path). Supports conditional `If-N
 {
   "revision": 142,
   "vk_id": "vk_01HZX...",
-  "providers": [
+  "organization_id": "org_acme",
+  "scopes": [{ "scope_type": "ORGANIZATION", "scope_id": "org_acme" }],
+  "model_providers": [
     {
-      "id": "pc_01HZ...",
-      "slot": "primary",
+      "id": "mp_01HZ...",
       "type": "openai|anthropic|azure_openai|bedrock|vertex|gemini|custom_openai",
+      "scope": { "scope_type": "ORGANIZATION", "scope_id": "org_acme" },
       "credentials": {
         /* Opaque JSON embedded on the wire. Shape varies by provider type —
            the control plane decrypts ModelProvider.customKeys (per-org KMS)
@@ -571,7 +573,7 @@ Each lane's feature file elaborates the contract with testable scenarios. Keep t
 
 - `specs/ai-gateway/virtual-keys.feature` — VK CRUD, show-once-secret, peppered HMAC-SHA256 hashing (§2), provider-creds linking, fallback chain, rotation/revoke, RBAC, attribution, internal endpoints (resolve-key JWT + config/:vk_id ETag + /changes long-poll).
 - `specs/ai-gateway/budgets.feature` — hierarchical scopes (org/team/project/vk/principal), windows (min→total), `on_breach: block|warn`, trace-driven ClickHouse fold (idempotent by `gateway_request_id`), timezone-aware resets.
-- `specs/ai-gateway/gateway-provider-settings.feature` — `GatewayProviderCredential` binding over existing `ModelProvider` rows; gateway-only settings (rate limits, rotation policy, gateway-only extraHeaders) that must not leak into the legacy litellm path.
+- `specs/ai-gateway/gateway-provider-settings.feature` — ModelProvider IS the single source of truth (no separate `GatewayProviderCredential` binding); gateway-only settings (rate limits, rotation policy, gateway-only extraHeaders) live on the ModelProvider Advanced (Gateway) tab and must not leak into the legacy litellm path.
 - `specs/ai-gateway/epic.feature` — cross-cutting E2E scenarios (end-to-end request through gateway → fallback → OTel trace → trace-driven budget fold → per-tenant OTel emit).
 - `specs/ai-gateway/` (pending, Lane A): `gateway-service.feature`, `health-checks.feature`, `auth-cache.feature`, `provider-routing.feature`, `caching-passthrough.feature`, `fallback.feature`, `streaming.feature`, `guardrails.feature`.
 
@@ -583,8 +585,8 @@ When a spec and this contract disagree, **the contract wins** and the spec is am
 
 LangWatch already stores `ModelProvider` rows (OPENAI_API_KEY etc) for evaluators/playground via litellm. We do **not** duplicate these.
 
-- VK config's `providers[].id = pc_...` references the `GatewayProviderCredential` row that binds a `ModelProvider`. The materialiser decrypts `ModelProvider.customKeys` (per-org KMS) at bundle-emit time and embeds the cleartext as `providers[].credentials` JSON — gateway never sees encrypted bytes on the wire.
-- Provider credential pool gets a new entity `ProviderCredential` (one-per-provider-per-project can already exist; we extend to allow multiple slots).
+- VK config's `model_providers[].id = mp_...` references the `ModelProvider` row directly (no binding table). The materialiser decrypts `ModelProvider.customKeys` (per-org KMS) at bundle-emit time and embeds the cleartext as `model_providers[].credentials` JSON — gateway never sees encrypted bytes on the wire.
+- Multi-deployment scenarios (Azure regions, OpenAI base-url variants) are modelled as sibling `ModelProvider` rows — there is no `slot` enum.
 - Playground / evaluators continue to use litellm path (untouched). Gateway uses bifrost/core. Keys are shared, paths are separate. No litellm migration in this epic.
 - A VK can optionally expose itself as a provider inside the playground (`"Use this virtual key in playground"` toggle) — post-MVP nice-to-have, not blocking.
 
@@ -663,17 +665,17 @@ Auth: existing LangWatch API tokens (personal access or service-account) present
 | `POST` | `/api/gateway/v1/budgets` | Create budget | `gatewayBudgets:create` |
 | `PATCH` | `/api/gateway/v1/budgets/:id` | Update | `gatewayBudgets:update` |
 | `DELETE` | `/api/gateway/v1/budgets/:id` | Delete | `gatewayBudgets:delete` |
-| `GET` | `/api/gateway/v1/provider-credentials` | List gateway-scoped provider bindings | `gatewayProviders:view` |
-| `POST` | `/api/gateway/v1/provider-credentials` | Create binding over existing ModelProvider | `gatewayProviders:manage` |
-| `PATCH` | `/api/gateway/v1/provider-credentials/:id` | Update binding | `gatewayProviders:manage` |
-| `DELETE` | `/api/gateway/v1/provider-credentials/:id` | Delete binding | `gatewayProviders:manage` |
+| `GET` | `/api/gateway/v1/model-providers` | List ModelProviders (gateway + legacy paths share this) | `modelProviders:view` |
+| `POST` | `/api/gateway/v1/model-providers` | Create ModelProvider (with optional gateway-Advanced fields) | `modelProviders:manage` |
+| `PATCH` | `/api/gateway/v1/model-providers/:id` | Update (including Advanced fields) | `modelProviders:manage` |
+| `DELETE` | `/api/gateway/v1/model-providers/:id` | Delete | `modelProviders:manage` |
 | `GET` | `/api/gateway/v1/usage` | Spend / volume aggregations | `gatewayUsage:view` |
 
 **Response shape convention:** snake_case (`virtual_key_id`, `created_at`) to match the OpenAI / Anthropic API aesthetic that external integrations already expect.
 
 **Error envelope:** identical to the gateway data-plane error envelope (OpenAI-compatible). Type enum extended with `resource_not_found` (`404`) and `validation_error` (`422`).
 
-**Shared service layer:** the Hono REST routes and the internal tRPC routes **both** call the same `VirtualKeyService`, `GatewayBudgetService`, `GatewayProviderCredentialService`. No business logic is duplicated. Only the DTO-shape helpers differ (snake_case for REST, camelCase for tRPC) and they live in a shared mapper module (`src/server/gateway/mappers/`).
+**Shared service layer:** the Hono REST routes and the internal tRPC routes **both** call the same `VirtualKeyService`, `GatewayBudgetService`, `ModelProviderService`. No business logic is duplicated. Only the DTO-shape helpers differ (snake_case for REST, camelCase for tRPC) and they live in a shared mapper module (`src/server/gateway/mappers/`).
 
 **OpenAPI spec:** generated via `pnpm run openapi:gen` (TBD if not present) and published at `/api/gateway/v1/openapi.json` plus the docs site.
 
