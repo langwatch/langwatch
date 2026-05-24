@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { projectFactory } from "~/factories/project.factory";
 import { prisma } from "~/server/db";
 import { MASKED_KEY_PLACEHOLDER } from "~/utils/constants";
+import { ModelProviderRepository } from "~/server/modelProviders/modelProvider.repository";
 import { app } from "../[[...route]]/app";
 
 describe("Model Providers API", () => {
@@ -211,13 +212,10 @@ describe("Model Providers API", () => {
           customKeys: { OPENAI_API_KEY: MASKED_KEY_PLACEHOLDER },
         });
 
-        // Verify original key still in DB
-        const saved = await prisma.modelProvider.findFirst({
-          where: {
-            provider: "openai",
-            scopes: { some: { scopeType: "PROJECT", scopeId: testProjectId } },
-          },
-        });
+        // Verify original key still in DB. Use the repository so the
+        // encrypted-at-rest payload is decrypted before assertion.
+        const repo = new ModelProviderRepository(prisma);
+        const saved = await repo.findByProvider("openai", testProjectId);
         expect(
           (saved?.customKeys as Record<string, string>)?.OPENAI_API_KEY,
         ).toBe("sk-original-key");
