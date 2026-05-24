@@ -22,6 +22,7 @@ import { prisma } from "../db";
 import { esClient, TRACE_INDEX, traceIndexId } from "../elasticsearch";
 import { getProjectEmbeddingsModel } from "../embeddings";
 import { getPayloadSizeHistogram } from "../metrics";
+import { stagedLangevalsFetch } from "../langevals/stagedFetch";
 import { isNlpGoEnabled } from "../nlpgo/nlpgoFetch";
 import type { ElasticSearchTrace, Trace } from "../tracer/types";
 import type {
@@ -873,10 +874,13 @@ export const fetchTopicsBatchClustering = async (
     "uploading traces data for project",
   );
 
-  const response = await fetchHTTP2(
-    `${endpoint.baseUrl}/topics/batch_clustering`,
-    { method: "POST", json: params },
-  );
+  const response = await postToTopicClustering({
+    projectId,
+    engine: endpoint.engine,
+    url: `${endpoint.baseUrl}/topics/batch_clustering`,
+    body: params,
+    kind: "topic_clustering_batch",
+  });
 
   if (!response.ok) {
     let body = await response.text();
@@ -919,10 +923,13 @@ export const fetchTopicsIncrementalClustering = async (
     "uploading traces data for project",
   );
 
-  const response = await fetchHTTP2(
-    `${endpoint.baseUrl}/topics/incremental_clustering`,
-    { method: "POST", json: params },
-  );
+  const response = await postToTopicClustering({
+    projectId,
+    engine: endpoint.engine,
+    url: `${endpoint.baseUrl}/topics/incremental_clustering`,
+    body: params,
+    kind: "topic_clustering_incremental",
+  });
 
   if (!response.ok) {
     let body = await response.text();
@@ -943,4 +950,31 @@ export const fetchTopicsIncrementalClustering = async (
   const result = (await response.json()) as TopicClusteringResponse;
 
   return result;
+};
+
+/**
+ * The langwatch_nlp engine runs on a k8s pod behind an ingress that
+ * historically accepts ~100 MB bodies — fetch-h2 (HTTP/2) is preserved
+ * there to avoid regressing self-hosted operators with large batches.
+ *
+ * The langevals engine runs on AWS Lambda which hard-caps sync invokes
+ * at 6 MB; we stage anything past LANGEVALS_STAGING_THRESHOLD_BYTES to
+ * S3 and pass the presigned URL via X-Payload-S3-URL.
+ */
+const postToTopicClustering = async (opts: {
+  projectId: string;
+  engine: "langevals" | "langwatch_nlp";
+  url: string;
+  body: BatchClusteringParams | IncrementalClusteringParams;
+  kind: "topic_clustering_batch" | "topic_clustering_incremental";
+}) => {
+  if (opts.engine === "langevals") {
+    return stagedLangevalsFetch({
+      url: opts.url,
+      body: opts.body,
+      projectId: opts.projectId,
+      kind: opts.kind,
+    });
+  }
+  return fetchHTTP2(opts.url, { method: "POST", json: opts.body });
 };

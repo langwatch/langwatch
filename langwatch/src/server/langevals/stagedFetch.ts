@@ -1,0 +1,175 @@
+import { PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { nanoid } from "nanoid";
+
+import { env } from "../../env.mjs";
+import { createS3Client } from "../storage";
+import { createLogger } from "../../utils/logger/server";
+
+const logger = createLogger("langwatch:langevals:stagedFetch");
+
+const STAGING_PREFIX = "langevals-staging";
+const STAGED_HEADER = "X-Payload-S3-URL";
+
+/**
+ * Which langevals call path we're making. Drives:
+ *   - the per-kind hard cap (eval vs topic clustering)
+ *   - log attribution so we can split metrics in CloudWatch
+ *
+ * Adding a new kind is intentional friction — pick the right cap, don't
+ * fall through to a generic default.
+ */
+export type LangevalsCallKind =
+  | "evaluation"
+  | "topic_clustering_batch"
+  | "topic_clustering_incremental";
+
+export class PayloadTooLargeError extends Error {
+  constructor(
+    public readonly bytes: number,
+    public readonly limitBytes: number,
+    public readonly kind: LangevalsCallKind,
+  ) {
+    super(
+      `${kind} payload is ${bytes} bytes, exceeds configured cap of ${limitBytes} bytes`,
+    );
+    this.name = "PayloadTooLargeError";
+  }
+}
+
+interface StagedFetchOptions {
+  url: string;
+  body: unknown;
+  projectId: string;
+  kind: LangevalsCallKind;
+  headers?: Record<string, string>;
+}
+
+function maxBytesForKind(kind: LangevalsCallKind): number {
+  switch (kind) {
+    case "evaluation":
+      return env.EVAL_MAX_PAYLOAD_BYTES;
+    case "topic_clustering_batch":
+    case "topic_clustering_incremental":
+      return env.TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES;
+  }
+}
+
+/**
+ * POST a JSON body to a langevals endpoint, auto-staging via S3 +
+ * presigned GET URL when the body exceeds LANGEVALS_STAGING_THRESHOLD_BYTES.
+ *
+ * Why: langevals on SaaS is fronted by AWS Lambda whose sync request body
+ * is capped at 6 MB. Topic clustering batches and long-input evaluators
+ * regularly exceed that. Staging keeps the inbound request tiny (just the
+ * presigned URL in a header) while the actual payload rides over S3.
+ *
+ * Hard caps are per-kind and applied BEFORE any network call so we fail
+ * fast with an actionable error rather than racing the upstream's 413.
+ *
+ * Returns the raw Response so callers keep full control over status / body
+ * handling — same contract as a plain fetch().
+ */
+export async function stagedLangevalsFetch(
+  opts: StagedFetchOptions,
+): Promise<Response> {
+  const { url, body, projectId, kind, headers = {} } = opts;
+
+  const serialized = Buffer.from(JSON.stringify(body), "utf-8");
+  const bytes = serialized.byteLength;
+  const limit = maxBytesForKind(kind);
+  const threshold = env.LANGEVALS_STAGING_THRESHOLD_BYTES;
+
+  if (bytes > limit) {
+    logger.error(
+      { projectId, kind, bytes, limitBytes: limit, url },
+      "langevals payload exceeds configured hard cap, rejecting before any network call",
+    );
+    throw new PayloadTooLargeError(bytes, limit, kind);
+  }
+
+  if (bytes <= threshold) {
+    logger.debug(
+      { projectId, kind, bytes, thresholdBytes: threshold, url },
+      "posting langevals payload inline (below staging threshold)",
+    );
+    return fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...headers },
+      body: serialized,
+    });
+  }
+
+  const ttlSeconds = env.LANGEVALS_STAGING_TTL_SECONDS;
+  const stagedUrl = await stagePayload({
+    projectId,
+    kind,
+    serialized,
+    ttlSeconds,
+  });
+
+  logger.info(
+    {
+      projectId,
+      kind,
+      bytes,
+      thresholdBytes: threshold,
+      limitBytes: limit,
+      ttlSeconds,
+      stagedUrlHost: safeUrlHost(stagedUrl),
+      target: url,
+    },
+    "staged large langevals payload via presigned S3 URL",
+  );
+
+  return fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      [STAGED_HEADER]: stagedUrl,
+      ...headers,
+    },
+  });
+}
+
+interface StagePayloadInput {
+  projectId: string;
+  kind: LangevalsCallKind;
+  serialized: Buffer;
+  ttlSeconds: number;
+}
+
+async function stagePayload(input: StagePayloadInput): Promise<string> {
+  const { projectId, kind, serialized, ttlSeconds } = input;
+
+  const { s3Client, s3Bucket } = await createS3Client(projectId);
+  const key = `${STAGING_PREFIX}/${projectId}/${kind}/${Date.now()}-${nanoid()}.json`;
+
+  await s3Client.send(
+    new PutObjectCommand({
+      Bucket: s3Bucket,
+      Key: key,
+      Body: serialized,
+      ContentType: "application/json",
+    }),
+  );
+
+  logger.debug(
+    { projectId, kind, bucket: s3Bucket, key, bytes: serialized.byteLength },
+    "uploaded staged payload to S3",
+  );
+
+  return getSignedUrl(
+    s3Client,
+    new GetObjectCommand({ Bucket: s3Bucket, Key: key }),
+    { expiresIn: ttlSeconds },
+  );
+}
+
+function safeUrlHost(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return "<invalid-url>";
+  }
+}
