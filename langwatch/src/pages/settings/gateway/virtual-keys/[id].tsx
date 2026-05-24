@@ -42,13 +42,14 @@ import { useRouter } from "~/utils/compat/next-router";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 
 function VirtualKeyDetailPage() {
-  const { project, hasPermission } = useOrganizationTeamProject();
+  const { organization, project, hasPermission } = useOrganizationTeamProject();
   const router = useRouter();
   const vkId = typeof router.query.id === "string" ? router.query.id : "";
+  const orgId = organization?.id ?? "";
 
   const detailQuery = api.virtualKeys.get.useQuery(
-    { projectId: project?.id ?? "", id: vkId },
-    { enabled: !!project?.id && !!vkId },
+    { organizationId: orgId, id: vkId },
+    { enabled: !!orgId && !!vkId },
   );
   const usageWindow = useMemo(() => {
     const to = new Date();
@@ -67,11 +68,11 @@ function VirtualKeyDetailPage() {
   const utils = api.useContext();
   const rotateMutation = api.virtualKeys.rotate.useMutation({
     onSuccess: () =>
-      utils.virtualKeys.get.invalidate({ projectId: project?.id, id: vkId }),
+      utils.virtualKeys.get.invalidate({ organizationId: orgId, id: vkId }),
   });
   const revokeMutation = api.virtualKeys.revoke.useMutation({
     onSuccess: () =>
-      utils.virtualKeys.get.invalidate({ projectId: project?.id, id: vkId }),
+      utils.virtualKeys.get.invalidate({ organizationId: orgId, id: vkId }),
   });
 
   const [editing, setEditing] = useState(false);
@@ -88,10 +89,10 @@ function VirtualKeyDetailPage() {
   const vk = detailQuery.data;
 
   const confirmRotate = async () => {
-    if (!vk || !project) return;
+    if (!vk || !orgId) return;
     try {
       const result = await rotateMutation.mutateAsync({
-        projectId: project.id,
+        organizationId: orgId,
         id: vk.id,
       });
       setRevealSecret({ name: vk.name, secret: result.secret });
@@ -105,9 +106,9 @@ function VirtualKeyDetailPage() {
   };
 
   const confirmRevoke = async () => {
-    if (!vk || !project) return;
+    if (!vk || !orgId) return;
     try {
-      await revokeMutation.mutateAsync({ projectId: project.id, id: vk.id });
+      await revokeMutation.mutateAsync({ organizationId: orgId, id: vk.id });
       setRevoking(false);
     } catch (err) {
       toaster.create({
@@ -261,9 +262,10 @@ function VirtualKeyDetailPage() {
         </Box>
       </>
 
-      {project?.id && vk && (
+      {orgId && vk && (
         <VirtualKeyEditDrawer
-          projectId={project.id}
+          organizationId={orgId}
+          projectId={project?.id}
           vk={editing ? (vk as any) : null}
           onOpenChange={(open) => {
             if (!open) setEditing(false);

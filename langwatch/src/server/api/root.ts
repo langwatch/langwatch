@@ -56,7 +56,6 @@ import { userRouter } from "./routers/user";
 import { gatewayBudgetsRouter } from "./routers/gatewayBudgets";
 import { gatewayCacheRulesRouter } from "./routers/gatewayCacheRules";
 import { gatewayUsageRouter } from "./routers/gatewayUsage";
-import { gatewayProvidersRouter } from "./routers/gatewayProviders";
 import { virtualKeysRouter } from "./routers/virtualKeys";
 import { personalVirtualKeysRouter } from "./routers/personalVirtualKeys";
 import { personalWorkspaceFeaturesRouter } from "./routers/personalWorkspaceFeatures";
@@ -143,7 +142,6 @@ const coreRouters = {
   governance: governanceRouter,
   personalSessions: personalSessionsRouter,
   sessionPolicy: sessionPolicyRouter,
-  gatewayProviders: gatewayProvidersRouter,
   gatewayBudgets: gatewayBudgetsRouter,
   gatewayCacheRules: gatewayCacheRulesRouter,
   gatewayUsage: gatewayUsageRouter,

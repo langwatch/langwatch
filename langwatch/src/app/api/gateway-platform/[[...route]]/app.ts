@@ -821,45 +821,14 @@ export const app = new Hono<{ Variables: Variables }>()
     }),
     requireGatewayProvidersUpdate,
     async (c) => {
-    const project = c.get("project");
-    const id = c.req.param("id");
-    const raw = (await c.req.json()) as Record<string, unknown>;
-    const organizationId = await orgIdForProject(project.id);
-    const service = GatewayProviderCredentialService.create(prisma);
-    const row = await service.update({
-      id,
-      projectId: project.id,
-      organizationId,
-      actorUserId: machineActorForProject(project.id),
-      slot: typeof raw.slot === "string" ? raw.slot : undefined,
-      rateLimitRpm:
-        raw.rate_limit_rpm === undefined
-          ? undefined
-          : (raw.rate_limit_rpm as number | null),
-      rateLimitTpm:
-        raw.rate_limit_tpm === undefined
-          ? undefined
-          : (raw.rate_limit_tpm as number | null),
-      rateLimitRpd:
-        raw.rate_limit_rpd === undefined
-          ? undefined
-          : (raw.rate_limit_rpd as number | null),
-      rotationPolicy:
-        typeof raw.rotation_policy === "string" ? "MANUAL" : undefined,
-      extraHeaders:
-        raw.extra_headers === undefined
-          ? undefined
-          : (raw.extra_headers as Prisma.InputJsonValue | null),
-      providerConfig:
-        raw.provider_config === undefined
-          ? undefined
-          : (raw.provider_config as Prisma.InputJsonValue | null),
-      fallbackPriorityGlobal:
-        raw.fallback_priority_global === undefined
-          ? undefined
-          : (raw.fallback_priority_global as number | null),
-    });
-    return c.json({ provider_credential: { id: row.id } });
+    return c.json(
+      {
+        error: "gone",
+        message:
+          "Gateway provider bindings folded into ModelProvider in iter 110. PATCH the advanced fields via PATCH /api/gateway-platform/v1/model-providers/:id.",
+      },
+      410,
+    );
   })
 
   .delete(
@@ -890,17 +859,14 @@ export const app = new Hono<{ Variables: Variables }>()
     }),
     requireGatewayProvidersManage,
     async (c) => {
-    const project = c.get("project");
-    const id = c.req.param("id");
-    const organizationId = await orgIdForProject(project.id);
-    const service = GatewayProviderCredentialService.create(prisma);
-    const row = await service.disable({
-      id,
-      projectId: project.id,
-      organizationId,
-      actorUserId: machineActorForProject(project.id),
-    });
-    return c.json({ provider_credential: { id: row.id, disabled_at: row.disabledAt?.toISOString() ?? null } });
+    return c.json(
+      {
+        error: "gone",
+        message:
+          "Gateway provider bindings folded into ModelProvider in iter 110. Disable the underlying ModelProvider via DELETE /api/gateway-platform/v1/model-providers/:id (soft-disable).",
+      },
+      410,
+    );
   })
 
   // ── Cache-control rules ────────────────────────────────────────────────

@@ -24,7 +24,7 @@ import { api } from "~/utils/api";
 import { FieldInfoTooltip } from "./FieldInfoTooltip";
 
 type VirtualKeyCreateDrawerProps = {
-  projectId: string;
+  organizationId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCreated: (result: { id: string; name: string; secret: string }) => void;
@@ -32,12 +32,12 @@ type VirtualKeyCreateDrawerProps = {
 
 /**
  * "New virtual key" drawer — minimum viable form: name, description, env
- * toggle, provider-credential multi-pick. Advanced fields (model aliases,
- * cache mode, fallback triggers) land once the provider-binding UI is in
- * place; for the first-use scenario the defaults are fine.
+ * toggle. A3 lane will rewrite this to use the VirtualKeyScopePicker and
+ * RoutingPolicy picker; for now the drawer creates an ORG-scoped VK with
+ * no policy, leaving routing fully up to the fallback chain.
  */
 export function VirtualKeyCreateDrawer({
-  projectId,
+  organizationId,
   open,
   onOpenChange,
   onCreated,
@@ -49,13 +49,12 @@ export function VirtualKeyCreateDrawer({
   const [selectedProviderIds, setSelectedProviderIds] = useState<string[]>([]);
 
   const utils = api.useContext();
-  const credentialsQuery = api.gatewayProviders.list.useQuery(
-    { projectId },
-    { enabled: open && !!projectId },
-  );
+  // Provider picker pending A3 rewrite — the legacy binding-list query
+  // was removed alongside GatewayProviderCredential. Empty list for now.
+  const credentialsQuery = { data: [] as any[], isLoading: false } as const;
   const createMutation = api.virtualKeys.create.useMutation({
     onSuccess: async () => {
-      await utils.virtualKeys.list.invalidate({ projectId });
+      await utils.virtualKeys.list.invalidate({ organizationId });
     },
   });
 
@@ -79,9 +78,9 @@ export function VirtualKeyCreateDrawer({
   };
 
   const handleSubmit = async () => {
-    if (!name || selectedProviderIds.length === 0) {
+    if (!name) {
       toaster.create({
-        title: "Name and at least one provider are required",
+        title: "Name is required",
         type: "error",
       });
       return;
@@ -92,11 +91,11 @@ export function VirtualKeyCreateDrawer({
         .map((t) => t.trim())
         .filter((t) => t.length > 0);
       const result = await createMutation.mutateAsync({
-        projectId,
+        organizationId,
         name,
         description: description || undefined,
         environment,
-        providerCredentialIds: selectedProviderIds,
+        scopes: [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
         config: tags.length > 0 ? { metadata: { tags } } : undefined,
       });
       onCreated({

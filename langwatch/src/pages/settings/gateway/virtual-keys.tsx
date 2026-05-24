@@ -44,23 +44,24 @@ type CreatedSecret = {
 };
 
 function VirtualKeysPage() {
-  const { project, hasPermission } = useOrganizationTeamProject();
+  const { organization, project, hasPermission } = useOrganizationTeamProject();
   const router = useRouter();
   const canCreate = hasPermission("virtualKeys:create");
   const canRotate = hasPermission("virtualKeys:rotate");
-  const canRevoke = hasPermission("virtualKeys:update");
+  const canRevoke = hasPermission("virtualKeys:delete");
   const canUpdate = hasPermission("virtualKeys:update");
 
   const utils = api.useContext();
+  const orgId = organization?.id ?? "";
   const listQuery = api.virtualKeys.list.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: !!project?.id },
+    { organizationId: orgId },
+    { enabled: !!orgId },
   );
   const rotateMutation = api.virtualKeys.rotate.useMutation({
-    onSuccess: () => utils.virtualKeys.list.invalidate({ projectId: project?.id }),
+    onSuccess: () => utils.virtualKeys.list.invalidate({ organizationId: orgId }),
   });
   const revokeMutation = api.virtualKeys.revoke.useMutation({
-    onSuccess: () => utils.virtualKeys.list.invalidate({ projectId: project?.id }),
+    onSuccess: () => utils.virtualKeys.list.invalidate({ organizationId: orgId }),
   });
 
   const [createOpen, setCreateOpen] = useState(false);
@@ -72,10 +73,10 @@ function VirtualKeysPage() {
   const rows = listQuery.data ?? [];
 
   const confirmRotate = async () => {
-    if (!rotating || !project?.id) return;
+    if (!rotating || !orgId) return;
     try {
       const result = await rotateMutation.mutateAsync({
-        projectId: project.id,
+        organizationId: orgId,
         id: rotating.id,
       });
       setRevealSecret({
@@ -94,10 +95,10 @@ function VirtualKeysPage() {
   };
 
   const confirmRevoke = async () => {
-    if (!revoking || !project?.id) return;
+    if (!revoking || !orgId) return;
     try {
       await revokeMutation.mutateAsync({
-        projectId: project.id,
+        organizationId: orgId,
         id: revoking.id,
       });
       setRevoking(null);
@@ -324,9 +325,9 @@ function VirtualKeysPage() {
         </Box>
       </>
 
-      {project?.id && (
+      {orgId && (
         <VirtualKeyCreateDrawer
-          projectId={project.id}
+          organizationId={orgId}
           open={createOpen}
           onOpenChange={setCreateOpen}
           onCreated={(created) =>
@@ -341,9 +342,10 @@ function VirtualKeysPage() {
         secret={revealSecret?.secret ?? ""}
         kind={revealSecret?.kind ?? "create"}
       />
-      {project?.id && (
+      {orgId && (
         <VirtualKeyEditDrawer
-          projectId={project.id}
+          organizationId={orgId}
+          projectId={project?.id}
           vk={editing}
           onOpenChange={(open) => {
             if (!open) setEditing(null);
