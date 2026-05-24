@@ -4,6 +4,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 
 import {
   WorkspaceSwitcher,
@@ -355,7 +356,8 @@ describe("WorkspaceSwitcher", () => {
       label: "Globex Project",
     };
 
-    it("groups teams under their org name as section headers", () => {
+    it("groups teams under their org name as section headers", async () => {
+      const user = userEvent.setup();
       renderSwitcher({
         personal,
         teams: [teamAcmeDefault, teamGlobexDefault],
@@ -363,16 +365,20 @@ describe("WorkspaceSwitcher", () => {
         current: { kind: "personal" },
       });
 
-      // Trigger to open
-      screen.getByRole("button", { name: /switch workspace/i }).click();
+      // Chakra v3 Menu (Ark) needs the full pointer chain to open in jsdom;
+      // native Element.click() leaves it data-state="closed".
+      await user.click(
+        screen.getByRole("button", { name: /switch workspace/i }),
+      );
 
       // Both org names render as section headers, disambiguating the
       // identical "Default Team" rows that would otherwise look duplicated.
-      expect(screen.getByText("Acme")).toBeInTheDocument();
+      expect(await screen.findByText("Acme")).toBeInTheDocument();
       expect(screen.getByText("Globex")).toBeInTheDocument();
     });
 
-    it("does NOT render the generic 'Teams & projects' header in multi-org mode", () => {
+    it("does NOT render the generic 'Teams & projects' header in multi-org mode", async () => {
+      const user = userEvent.setup();
       renderSwitcher({
         personal,
         teams: [teamAcmeDefault, teamGlobexDefault],
@@ -380,14 +386,18 @@ describe("WorkspaceSwitcher", () => {
         current: { kind: "personal" },
       });
 
-      screen.getByRole("button", { name: /switch workspace/i }).click();
+      await user.click(
+        screen.getByRole("button", { name: /switch workspace/i }),
+      );
 
       // The generic header is only used in single-org mode; with multiple
-      // orgs each org name is its own header.
+      // orgs each org name is its own header. Wait for an org header to
+      // confirm the menu opened before asserting absence of the generic.
+      await screen.findByText("Acme");
       expect(screen.queryByText("Teams & projects")).not.toBeInTheDocument();
     });
 
-    it("disambiguates same-name orgs by appending the slug to the header", () => {
+    it("disambiguates same-name orgs by appending the slug to the header", async () => {
       const teamAcmeAlt = {
         ...teamAcmeDefault,
         teamId: "team_acme_alt",
@@ -412,10 +422,13 @@ describe("WorkspaceSwitcher", () => {
         current: { kind: "personal" },
       });
 
-      screen.getByRole("button", { name: /switch workspace/i }).click();
+      const user = userEvent.setup();
+      await user.click(
+        screen.getByRole("button", { name: /switch workspace/i }),
+      );
 
       // Two orgs both named "Acme" should be distinguishable in the dropdown.
-      expect(screen.getByText("Acme · acme")).toBeInTheDocument();
+      expect(await screen.findByText("Acme · acme")).toBeInTheDocument();
       expect(screen.getByText("Acme · acme-2")).toBeInTheDocument();
     });
   });
