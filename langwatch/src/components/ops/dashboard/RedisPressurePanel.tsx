@@ -1,4 +1,4 @@
-import { Card, HStack, SimpleGrid, Stat, Text, VStack } from "@chakra-ui/react";
+import { Card, HStack, SimpleGrid, Stat, Text } from "@chakra-ui/react";
 import type { DashboardData } from "~/server/app-layer/ops/types";
 
 // Color thresholds match CloudWatch's default alarms for ElastiCache. The
@@ -46,7 +46,10 @@ export function RedisPressurePanel({
         </HStack>
 
         <SimpleGrid columns={{ base: 1, md: 3 }} gap={4}>
-          <Stat.Root data-testid="redis-memory-stat">
+          <Stat.Root
+            data-testid="redis-memory-stat"
+            data-warning={memoryWarning ? "true" : "false"}
+          >
             <Stat.Label>Memory</Stat.Label>
             <HStack gap={1.5} alignItems="baseline">
               <Stat.ValueText color={memoryWarning ? "red.500" : undefined}>
@@ -60,6 +63,7 @@ export function RedisPressurePanel({
                   color={memoryWarning ? "red.500" : "fg.muted"}
                   fontWeight="normal"
                   data-testid="redis-memory-percent"
+                  data-warning={memoryWarning ? "true" : "false"}
                 >
                   {memoryPercent}%
                 </Text>
@@ -70,7 +74,10 @@ export function RedisPressurePanel({
             </Text>
           </Stat.Root>
 
-          <Stat.Root data-testid="redis-engine-cpu-stat">
+          <Stat.Root
+            data-testid="redis-engine-cpu-stat"
+            data-warning={cpuWarning ? "true" : "false"}
+          >
             <Stat.Label>Engine CPU</Stat.Label>
             <HStack gap={1.5} alignItems="baseline">
               <Stat.ValueText color={cpuWarning ? "red.500" : undefined}>

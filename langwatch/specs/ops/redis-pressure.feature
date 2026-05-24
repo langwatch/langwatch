@@ -37,7 +37,7 @@ Feature: Redis pressure visibility on the Ops dashboard
   Scenario: Memory panel handles missing maxmemory configuration
     Given Redis reports maxmemory=0 (unlimited)
     When the dashboard loads
-    Then the memory percent shows "-" instead of "Infinity%"
+    Then the memory percent is omitted instead of showing "Infinity%"
     And the used and peak values still render
 
   # ---------------------------------------------------------------------------

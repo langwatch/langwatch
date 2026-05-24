@@ -86,16 +86,35 @@ describe("RedisPressurePanel", () => {
 
   describe("given Redis memory is near eviction", () => {
     describe("when the used:max ratio crosses the 80% threshold", () => {
-      it("renders the memory percent in the warning color", () => {
+      it("marks the memory stat and percent as warning", () => {
         renderPanel({
           redisMemoryUsedBytes: 9_500_000_000,
           redisMemoryMaxBytes: 10_000_000_000,
         });
         const percentEl = screen.getByTestId("redis-memory-percent");
-        // Chakra translates `color="red.500"` to a CSS var or inline color.
-        // We assert the percent value rendered AND inherit the warning style
-        // by checking the percent rendered crossed the threshold.
         expect(percentEl.textContent).toContain("95%");
+        // Chakra v3 applies `color="red.500"` via a CSS variable on a class,
+        // not via inline style, so we expose the warning state as a
+        // `data-warning` attribute. That attribute is the contract this
+        // test pins — color details are free to evolve.
+        expect(percentEl.getAttribute("data-warning")).toBe("true");
+        expect(
+          screen.getByTestId("redis-memory-stat").getAttribute("data-warning"),
+        ).toBe("true");
+      });
+
+      it("does NOT mark the memory stat as warning when below the threshold", () => {
+        // Just below 80%
+        renderPanel({
+          redisMemoryUsedBytes: 7_900_000_000,
+          redisMemoryMaxBytes: 10_000_000_000,
+        });
+        const percentEl = screen.getByTestId("redis-memory-percent");
+        expect(percentEl.textContent).toContain("79%");
+        expect(percentEl.getAttribute("data-warning")).toBe("false");
+        expect(
+          screen.getByTestId("redis-memory-stat").getAttribute("data-warning"),
+        ).toBe("false");
       });
     });
   });
@@ -118,11 +137,19 @@ describe("RedisPressurePanel", () => {
 
   describe("given Redis engine CPU is saturated", () => {
     describe("when CPU is at 95%", () => {
-      it("renders the engine-CPU value", () => {
+      it("marks the engine-CPU stat as warning", () => {
         renderPanel({ redisEngineCpuPercent: 95 });
-        expect(
-          screen.getByTestId("redis-engine-cpu-stat").textContent,
-        ).toContain("95%");
+        const cpuStat = screen.getByTestId("redis-engine-cpu-stat");
+        expect(cpuStat.textContent).toContain("95%");
+        expect(cpuStat.getAttribute("data-warning")).toBe("true");
+      });
+
+      it("does NOT mark the engine-CPU stat as warning below the threshold", () => {
+        // Just below 70%
+        renderPanel({ redisEngineCpuPercent: 69 });
+        const cpuStat = screen.getByTestId("redis-engine-cpu-stat");
+        expect(cpuStat.textContent).toContain("69%");
+        expect(cpuStat.getAttribute("data-warning")).toBe("false");
       });
     });
   });

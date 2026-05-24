@@ -10,8 +10,8 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
 import { page } from "@vitest/browser/context";
+import { afterEach, describe, expect, it } from "vitest";
 import { RedisPressurePanel } from "../RedisPressurePanel";
 
 const wrap = (panel: React.ReactNode) => (
@@ -50,7 +50,9 @@ describe("RedisPressurePanel — visual capture", () => {
       );
       expect(container).toBeDefined();
       await page.viewport(1280, 400);
-      await page.screenshot({ path: "__screenshots__/redis-pressure-healthy.png" });
+      await page.screenshot({
+        path: "__screenshots__/redis-pressure-healthy.png",
+      });
     });
   });
 
@@ -72,7 +74,9 @@ describe("RedisPressurePanel — visual capture", () => {
       );
       expect(container).toBeDefined();
       await page.viewport(1280, 400);
-      await page.screenshot({ path: "__screenshots__/redis-pressure-sampling.png" });
+      await page.screenshot({
+        path: "__screenshots__/redis-pressure-sampling.png",
+      });
     });
   });
 
