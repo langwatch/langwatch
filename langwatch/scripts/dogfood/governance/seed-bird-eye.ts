@@ -114,14 +114,8 @@ function parseArgs(argv: string[]): Args {
   return out as Args;
 }
 
-function rng(): number {
-  // Non-cryptographic: dogfood seed only. Use crypto.randomBytes so the
-  // CodeQL js/insecure-randomness scan stays clean on the seed scripts.
-  return randomBytes(4).readUInt32BE(0) / 0x100000000;
-}
-
 function pickModel(): ModelMix {
-  const r = rng();
+  const r = Math.random();
   let cum = 0;
   for (const m of MODELS) {
     cum += m.weight;
@@ -131,7 +125,7 @@ function pickModel(): ModelMix {
 }
 
 function rand(min: number, max: number): number {
-  return Math.floor(min + rng() * (max - min));
+  return Math.floor(min + Math.random() * (max - min));
 }
 
 function hex(n: number): string {
@@ -153,7 +147,7 @@ function pickDaysAgo(maxDays: number, recentSkew: number): number {
   // Per-source skew (see SOURCE_TIME_SKEWS) gives each department a
   // distinct visual story on the spend-over-time chart instead of every
   // team sharing the same uniform +86% shape.
-  const r = rng();
+  const r = Math.random();
   return Math.floor(2 * maxDays * Math.pow(r, recentSkew));
 }
 
@@ -351,7 +345,7 @@ async function seedTraceSummaries({
     // Skew distribution: source 0 (Customer Support) dominates so the
     // rollup has a clear winner and a long tail. Persona skew matches.
     const sourceIdx =
-      rng() < 0.5 ? 0 : 1 + (rng() < 0.66 ? 0 : rng() < 0.5 ? 1 : 2);
+      Math.random() < 0.5 ? 0 : 1 + (Math.random() < 0.66 ? 0 : Math.random() < 0.5 ? 1 : 2);
     const source = sources[Math.min(sourceIdx, sources.length - 1)]!;
     // Per-source time skew so each team has a distinct trend shape —
     // see SOURCE_TIME_SKEWS for the per-index rationale.
