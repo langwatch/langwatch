@@ -10,15 +10,15 @@ The gateway delegates provider-specific dispatch to [`bifrost/core`](https://git
 
 Every provider credential lives in the LangWatch **Model Providers** table (under **Settings → Model Providers**). It's the same surface that powers evaluators and the playground, no separate "gateway providers" store.
 
-To use a credential in the gateway, create a `GatewayProviderCredential` binding that references it + layers on gateway-only settings (rate limits, rotation, extra headers). Each VK then binds to one or more `GatewayProviderCredential`s as its primary + fallback chain.
+Gateway-only settings (rate limits, fallback priority, providerConfig overrides) live directly on the **ModelProvider** itself, on the **Advanced (Gateway)** tab of the editor. There is no separate binding wrapper. VKs reference ModelProviders by id; the order in the bound routing policy drives primary + fallback selection.
 
 ```
-ModelProvider (raw credential)
-  └── GatewayProviderCredential (gateway-specific binding)
-       └── VirtualKey.providers[] (ordered primary + fallback)
+ModelProvider (raw credential + Advanced/Gateway settings)
+  └── RoutingPolicy.modelProviderIds[] (ordered primary + fallback)
+       └── VirtualKey.routingPolicyId (or default policy from the org)
 ```
 
-This layering means: rotating the raw OpenAI key rotates it everywhere; changing a rate limit or extra header only affects gateway traffic; binding a VK to a different provider is a one-click edit.
+This means: rotating the raw OpenAI key rotates it everywhere; changing a rate limit only affects gateway traffic (it's on the Advanced tab, not the basic credential); changing a VK's provider mix is one edit to the routing policy it references.
 
 ## Supported providers (v1)
 
@@ -46,4 +46,4 @@ See [Fallback Chains](/ai-gateway/providers/fallback-chains) for trigger semanti
 
 ## Multi-region, multi-account
 
-Each provider binding pins a region (Azure endpoint, Bedrock region, Vertex project). If an organisation spans multiple regions, create one `GatewayProviderCredential` per region with a naming convention (e.g. `openai-eu`, `openai-us`) and use VK `model_aliases` to route `gpt-5-mini-eu` vs `gpt-5-mini-us` to the right credential.
+Each ModelProvider row pins a region (Azure endpoint, Bedrock region, Vertex project). If an organisation spans multiple regions, create sibling ModelProvider rows of the same family with a naming convention (e.g. `openai-eu`, `openai-us`) and use VK `model_aliases` to route `gpt-5-mini-eu` vs `gpt-5-mini-us` to the right ModelProvider id.

@@ -28,9 +28,9 @@ controller, replace the port-forward with the public URL.
 
 ## 2. Add at least one Model Provider credential
 
-Personal keys reference a `RoutingPolicy` which references a
-`GatewayProviderCredential`. Without at least one provider
-configured, no key, personal or service, can route traffic.
+Personal keys reference a `RoutingPolicy` whose `modelProviderIds[]`
+points at one or more `ModelProvider` rows. Without at least one
+provider configured, no key, personal or service, can route traffic.
 
 In the UI: **Settings → Model Providers → Add provider**.
 

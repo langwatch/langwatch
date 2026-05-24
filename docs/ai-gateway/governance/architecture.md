@@ -171,8 +171,9 @@ Closed SaaS (Cowork / Copilot / Workato / OpenAI / Claude / S3)
 | `Project` (`isPersonal`) | Work artifact: agents, datasets, evals | `isPersonal=true` for personal projects |
 | `User`, `OrganizationUser`, `RoleBinding` | Identity + RBAC | RoleBindings replacing legacy TeamUser |
 | `RoutingPolicy` | Provider chain template | Org-scoped; hierarchical via `scope`+`scopeId` |
-| `VirtualKey` | The actual credential issued to a caller | Scoped to a Project; references RoutingPolicy |
-| `GatewayProviderCredential` | Upstream LLM API key | Scoped to a Project |
+| `VirtualKey` | The actual credential issued to a caller | `organizationId` + `VirtualKeyScope[]` (multi-scope at ORG/TEAM/PROJECT); references RoutingPolicy; optional `principalUserId` for personal VKs |
+| `VirtualKeyScope` | One scope row per VK (1:N) | Cascade upward to derive eligible ModelProviders |
+| `ModelProvider` | Upstream LLM API key (basic creds) + Gateway-only fields (RPM/TPM/RPD, fallback priority, providerConfig) on the **Advanced (Gateway)** tab | Scoped to ORGANIZATION/TEAM/PROJECT; one record per credential — no separate gateway binding |
 | `GatewayBudget` | Spend limit | Scope = ORG / TEAM / PROJECT / VK / PRINCIPAL |
 | `IngestionSource` | Per-platform fleet config | Org-scoped; carries ingestSecret + parserConfig |
 

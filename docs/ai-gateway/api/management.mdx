@@ -1,6 +1,6 @@
 ---
 title: Management REST API
-description: Manage virtual keys, budgets, and provider bindings programmatically via /api/gateway/v1/*.
+description: Manage virtual keys, budgets, and routing policies programmatically via /api/gateway/v1/*.
 sidebarTitle: Management REST
 ---
 
@@ -392,13 +392,13 @@ Management endpoints are rate-limited to 100 req/min/token. For bulk operations,
 
 ## Shared service layer
 
-Both the REST API and the tRPC routers (`virtualKeys.*`, `gatewayBudgets.*`, `gatewayProviders.*`) call the same service classes on the server, `VirtualKeyService`, `GatewayBudgetService`, `GatewayProviderCredentialService`. The only difference between REST and tRPC is the DTO shape (snake_case vs camelCase). Behaviour is identical.
+Both the REST API and the tRPC routers (`virtualKeys.*`, `gatewayBudgets.*`, `modelProviders.*`) call the same service classes on the server, `VirtualKeyService`, `GatewayBudgetService`, and the platform-wide ModelProvider service. The only difference between REST and tRPC is the DTO shape (snake_case vs camelCase). Behaviour is identical.
 
 This matters for testing: the BDD scenarios in `specs/ai-gateway/public-rest-api.feature` include a parity check that asserts the two surfaces return equivalent data for the same resource after case normalization. If you rely on a field in one, it's guaranteed to exist in the other.
 
 ## OpenAPI
 
-All REST routes are annotated with `hono-openapi`'s `describeRoute` schemas. The generated OpenAPI 3.1 spec is served at `/api/gateway/v1/openapi.json` and renders inside the platform's API-reference UI. The CLI's `VirtualKeysApiService`, `GatewayBudgetsApiService`, `GatewayProvidersApiService` DTOs are hand-authored against the same schemas; a v1.1 improvement is to regenerate them from the OpenAPI output so drift fails at build time.
+All REST routes are annotated with `hono-openapi`'s `describeRoute` schemas. The generated OpenAPI 3.1 spec is served at `/api/gateway/v1/openapi.json` and renders inside the platform's API-reference UI. The CLI's `VirtualKeysApiService`, `GatewayBudgetsApiService` DTOs are hand-authored against the same schemas; a v1.1 improvement is to regenerate them from the OpenAPI output so drift fails at build time.
 
 ## See also
 

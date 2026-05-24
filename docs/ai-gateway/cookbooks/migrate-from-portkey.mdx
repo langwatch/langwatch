@@ -12,13 +12,13 @@ Portkey and LangWatch both sit between your app and the upstream LLM providers, 
 
 | What you did in Portkey | What it becomes in LangWatch | Notes |
 |---|---|---|
-| **Virtual Key** (proxy credential for a single provider account) | **Provider Binding** at a project | LangWatch splits Portkey's "VK" into two primitives, a **ModelProvider** (the actual provider credential, org/team/project-scoped) and a **GatewayProviderCredential** (the gateway-level binding with rate-limit + slot + fallback priority). |
-| **Key, API Key** (client-facing credential) | **Virtual Key** (`vk-lw-…`) | LangWatch's VK is what your client code presents. It points to one or more bindings via the fallback chain, attaches budgets, and carries per-caller policy. |
-| **Config** (JSON routing blob) | **VK `config.*` JSON** + **GatewayProviderCredential** fields | LangWatch spreads a Portkey config across two JSON shapes, client-side routing lives in the VK, provider-side defaults live in the binding. |
+| **Virtual Key** (proxy credential for a single provider account) | **ModelProvider** (with Advanced/Gateway tab) | LangWatch keeps a single primitive for provider credentials: the **ModelProvider**, scoped to ORGANIZATION/TEAM/PROJECT. Gateway-only fields (rate limits, fallback priority, providerConfig overrides) live on the Advanced (Gateway) tab of the same record. |
+| **Key, API Key** (client-facing credential) | **Virtual Key** (`vk-lw-…`) | LangWatch's VK is what your client code presents. It references a routing policy whose `modelProviderIds[]` is the ordered fallback chain, attaches budgets, and carries per-caller policy. |
+| **Config** (JSON routing blob) | **VK `config.*` JSON** + **RoutingPolicy.modelProviderIds[]** + **ModelProvider Advanced tab fields** | LangWatch spreads a Portkey config across three places, client-side routing lives in the VK, provider ordering lives in the routing policy, provider-side defaults live on the ModelProvider Advanced tab. |
 | **Budget** (spend cap, key-scoped) | **GatewayBudget** (org, team, project, VK, principal scoped) | LangWatch budgets are hierarchical: a single request is checked against *every* applicable budget, from org down. Portkey scopes at the key level only. |
 | **Guardrails** (input/output filters attached to a key) | **Evaluator monitors with `executionMode=AS_GUARDRAIL`** attached to a VK | LangWatch leverages the existing evaluator/monitor pipeline. Any LangWatch evaluator can become a gateway guardrail, no separate product surface. |
-| **Strategy: fallback** (provider retry ladder) | **VK `config.fallback_chain` + GatewayProviderCredential slots** | Ordered list of slot names (`primary`, `fallback-1`, …) that walk on 5xx/429/timeout per the standard precedence. |
-| **Strategy: loadbalance** (weight-spread across keys) | v1.1, see §Outstanding | LangWatch v1 doesn't ship multi-key sibling loadbalancing; the Portkey loadbalancer is the biggest v1 gap. v1.1 adds sibling-key rotation under GatewayProviderCredential. |
+| **Strategy: fallback** (provider retry ladder) | **RoutingPolicy.modelProviderIds[]** | Ordered list of ModelProvider ids that walk on 5xx/429/timeout per the standard precedence. The position in the array determines `primary`, `fallback-1`, … in the UI. |
+| **Strategy: loadbalance** (weight-spread across keys) | v1.1, see §Outstanding | LangWatch v1 doesn't ship multi-key sibling loadbalancing; the Portkey loadbalancer is the biggest v1 gap. v1.1 adds sibling-ModelProvider rotation driven by the routing policy. |
 | **Cache (Simple)** | **Anthropic `cache_control` passthrough + `X-LangWatch-Cache` override** | LangWatch v1 is pass-through by default (respect Anthropic's explicit cache hints) + rule-based enforcement for force/disable. Semantic caching is v1.1. |
 | **Cache (Semantic)** | v1.1, `specs/ai-gateway/semantic-caching.feature` drafted | Not in v1. |
 | **Prompt Library** | **LangWatch Prompt Management** (native product surface) | Already-existing LangWatch feature, separate from the gateway. |
@@ -57,7 +57,7 @@ Two things moved:
 1. **No Portkey SDK.** LangWatch speaks the OpenAI protocol natively, use any official OpenAI client (Node, Python, Go, Java). Same story for Anthropic: `new Anthropic({ baseURL: "https://gateway.langwatch.ai" })` with your VK as the `apiKey`.
 2. **`virtualKey` header → `apiKey` bearer.** Portkey carries the VK in a custom header; LangWatch just uses the standard bearer so you don't need provider-specific plumbing.
 
-## Config migration: Portkey Config JSON → LangWatch VK + Bindings
+## Config migration: Portkey Config JSON → LangWatch VK + ModelProviders
 
 A typical Portkey config:
 
@@ -79,21 +79,21 @@ Maps to:
 
 Go to **Settings → Model Providers** and add entries for OpenAI + Anthropic with your provider-issued API keys. These are the LangWatch equivalent of Portkey's "Virtual Keys to actual providers" layer, and they're reusable across gateway AND prompt playground AND evaluators.
 
-**Step 2, create Provider Bindings under the gateway**
+**Step 2, fill the ModelProvider Advanced (Gateway) tab**
 
-From **AI Gateway → Providers → Bind provider**:
+Open each ModelProvider you created in Step 1 and switch to the **Advanced (Gateway)** tab:
 
-| Binding | Slot | Rate limit | Fallback priority |
-|---|---|---|---|
-| OpenAI (from ModelProviders) | `primary` | `rpm=60 rpd=10000` (or your caps) | 1 |
-| Anthropic (from ModelProviders) | `fallback-1` | `rpm=30 rpd=5000` | 2 |
+| ModelProvider | Rate limit | Fallback priority (global) |
+|---|---|---|
+| OpenAI | `rpm=60 rpd=10000` (or your caps) | 1 |
+| Anthropic | `rpm=30 rpd=5000` | 2 |
 
-**Step 3, create a Virtual Key with the fallback chain**
+**Step 3, create a Virtual Key with the routing policy**
 
-From **AI Gateway → Virtual Keys → New virtual key**:
+From **AI Gateway → Routing Policies → New routing policy** create a policy whose `modelProviderIds[]` is `[<openai-id>, <anthropic-id>]`. Then from **AI Gateway → Virtual Keys → New virtual key**:
 
 - **Name**: whatever you called the Portkey config (e.g. `prod-chat`)
-- **Fallback chain**: `primary` then `fallback-1`
+- **Routing policy**: the one you just created (or leave unset to use the org default, which orders by `fallbackPriorityGlobal` then `createdAt`)
 - **Cache policy**: `respect` (default, honours Anthropic `cache_control` passthrough)
 - **Optional**: attach an existing LangWatch evaluator with `executionMode=AS_GUARDRAIL` as a `pre` or `post` hook if you had Portkey guardrails.
 
@@ -141,6 +141,6 @@ Some Portkey features don't have LangWatch v1 equivalents. If any of these are l
 
 - [Virtual Keys](/ai-gateway/virtual-keys): the LangWatch VK reference.
 - [Budgets](/ai-gateway/budgets): hierarchical budget semantics.
-- [Provider Bindings](/ai-gateway/provider-bindings): the scope model.
+- [Gateway provider settings](/ai-gateway/provider-bindings): the Advanced (Gateway) tab on each ModelProvider.
 - [Credential-leak incident response](/ai-gateway/cookbooks/credential-leak-incident): the "oh no it's on GitHub" playbook.
 - [Cache-control rollout](/ai-gateway/cookbooks/cache-control-rollout): how to roll cache rules to production.

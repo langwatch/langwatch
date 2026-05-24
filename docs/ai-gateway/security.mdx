@@ -55,18 +55,18 @@ Once a VK is resolved, the gateway caches a short-lived JWT (15 min TTL) contain
 
 ### Traces
 
-Every span carries `langwatch.{vk_id, project_id, team_id, organization_id}`. The gateway ships all spans to a single OTel endpoint (`GATEWAY_OTEL_DEFAULT_ENDPOINT`); LangWatch ingest reads `langwatch.project_id` off each span and files the trace under the owning project. Tenant isolation is enforced at the ingest layer: a span's `project_id` must match a project the gateway is authorized to write to (validated via the VK's provider binding at bundle-resolve time), and ClickHouse storage partitions on `TenantId` with middleware-enforced predicates on every query.
+Every span carries `langwatch.{vk_id, project_id, team_id, organization_id}`. The gateway ships all spans to a single OTel endpoint (`GATEWAY_OTEL_DEFAULT_ENDPOINT`); LangWatch ingest reads `langwatch.project_id` off each span and files the trace under the owning project (or the org's `internal_governance` project for TEAM/ORG-scoped VKs without a single project). Tenant isolation is enforced at the ingest layer: a span's `project_id` must resolve from the VK's scope cascade at bundle-resolve time, and ClickHouse storage partitions on `TenantId` with middleware-enforced predicates on every query.
 
 Implication: a bug or data leak in one project's span payload cannot land in another project's LangWatch UI. Cross-project queries are impossible from the gateway side.
 
 ### Upstream providers
 
-Each request's upstream call uses the VK's bound `provider_credential_id`. Credentials are scoped to the VK's owning project, so a VK in project A cannot use project B's OpenAI key even if both are in the same organization.
+Each request's upstream call uses one of the ModelProviders visible from the VK's scope cascade. The eligible set is the union of every ModelProvider whose scope (ORG/TEAM/PROJECT) is at or above one of the VK's scope rows. A VK scoped to PROJECT A cannot reach a TEAM-scoped ModelProvider on a sibling team, or a PROJECT-scoped credential on a different project.
 
 This is enforced at two layers:
 
-1. Control-plane RBAC, `POST /api/gateway/v1/virtual-keys` validates the caller has `gatewayProviders:view` on each `provider_credential_id` referenced.
-2. Gateway data-plane, the bundle returned by `/config/:vk_id` contains only the providers bound to that VK. The gateway has no way to reach a different project's provider even if a request is maliciously crafted.
+1. Control-plane RBAC, VK create/update validates the caller has `virtualKeys:manage` on each scope row AND `modelProviders:view` is satisfied by the scope cascade for every `model_provider_id` referenced in the bound routing policy.
+2. Gateway data-plane, the bundle returned by `/config/:vk_id` contains only the ModelProviders eligible for that VK's scope cascade. The gateway has no way to reach an out-of-scope provider even if a request is maliciously crafted.
 
 ### Budgets & debits
 

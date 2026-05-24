@@ -16,9 +16,10 @@ A LangWatch-issued credential of the form `vk-lw-{live|test}_<26-char-ULID>` (40
 
 Every gateway request **must** carry a VK. The VK resolves at the gateway to:
 
-- An **owning scope**: organisation → team → project → principal.
-- A **set of provider credentials**: the underlying OpenAI, Anthropic, Bedrock, etc. keys the VK may use. These are **reused** from LangWatch's existing Model Provider settings; the gateway does not duplicate credential storage.
-- A **fallback chain**: ordered list of providers to try if the primary fails.
+- An **owning organisation** (`organizationId`, always present) plus a **set of scope rows** (`VirtualKeyScope[]`) at any combination of `ORGANIZATION`, `TEAM`, `PROJECT`. The scope set drives the VK's eligible provider set and budget cascade; see [Virtual key scoping](/ai-gateway/virtual-keys#scoping).
+- An optional **principal** (`principalUserId`) — present on personal-access VKs minted via the CLI device-flow, orthogonal to the scope set.
+- A **set of provider credentials**: the underlying OpenAI, Anthropic, Bedrock, etc. keys the VK may use. Resolved at bundle-time by walking the VK's scopes upward and unioning every visible **ModelProvider**. These are **reused** from LangWatch's existing Model Provider settings; the gateway does not duplicate credential storage.
+- A **routing policy** (ordered list of ModelProvider ids the VK may dispatch through, with fallback semantics). The VK may pin a specific policy, or fall back to the org's default policy ordered by `fallbackPriorityGlobal` then `createdAt`.
 - **Model aliases**: a map like `{"gpt-4o": "azure/my-deployment"}` that lets the VK redirect a client-friendly model name to a specific provider/deployment.
 - **Cache policy**, **guardrail attachments**, **blocked patterns**, and **budgets** (see below).
 
@@ -70,7 +71,7 @@ Aliases always win over explicit `provider/model` form if both are defined for t
 
 ## Fallback chain
 
-Ordered list of provider credentials (not models) to try on failure. Triggered by:
+Ordered list of **ModelProvider** ids (not models) the VK may dispatch through. Carried on the routing policy bound to the VK (or, when the VK pins no policy, on the org's default policy). Triggered by:
 
 - `5xx` from upstream.
 - `timeout` exceeding the VK's configured `fallback.timeout_ms`.
@@ -85,15 +86,13 @@ Ordered list of provider credentials (not models) to try on failure. Triggered b
 
 For streaming: if the primary fails **before the first chunk**, fallback is transparent. Once chunks have started flowing, the stream stays on the original provider, otherwise the client would see a Frankenstein stream.
 
-## Provider binding
+## ModelProvider (gateway-side)
 
-A **Provider binding** (`GatewayProviderCredential`) is the gateway-level layer between a **ModelProvider** (where the actual API key lives) and a **virtual key** (where the caller sees the binding). The binding carries gateway-specific settings that don't belong on the underlying credential:
+The same **ModelProvider** record you configure under **Settings → Model Providers** is the only credential entity the gateway knows about. There is no separate gateway-binding wrapper; gateway-specific fields (RPM, TPM, RPD, fallback priority, providerConfig overrides) live on the ModelProvider itself, on the **Advanced (Gateway)** tab of the editor.
 
-- **Slot name**: the logical tag a VK references in its fallback chain (`primary`, `fallback-1`, `eu-region`, `canary`).
-- **Rate limits**: per-binding RPM + RPD caps that apply BEFORE upstream provider limits.
-- **Fallback priority**: global ordering across all bindings in a project.
+A ModelProvider lives at `ORGANIZATION`, `TEAM`, or `PROJECT` scope. Multiple deployments of the same provider family (e.g. OpenAI US vs OpenAI EU) are sibling ModelProvider rows with distinct names; VKs and routing policies reference them by id.
 
-One ModelProvider can back many bindings (e.g. the same OpenAI credential under `primary` + `canary` slots, each with different rate limits). Bindings live at the project scope; the underlying ModelProvider may live at org, team, project scope (see [Provider Bindings → Scope & access](/ai-gateway/provider-bindings#scope--access)).
+See [Gateway provider settings](/ai-gateway/provider-bindings) for the field list and [vk-scope-inheritance.feature](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/governance/vk-scope-inheritance.feature) for how the eligible-provider set is derived from a VK's scope rows.
 
 ## Cache rule
 

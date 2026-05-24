@@ -4,7 +4,7 @@ description: How the gateway enforces RPM and RPD (and v1.1 TPM) across VKs, bin
 sidebarTitle: Rate limits
 ---
 
-The gateway enforces rate limits at two independent layers, the **VK** and the **provider binding**: with cross-dimension token-bucket accounting so a request only needs enough tokens in *every* applicable bucket to pass.
+The gateway enforces rate limits at two independent layers, the **VK** and the **ModelProvider** (Advanced/Gateway tab): with cross-dimension token-bucket accounting so a request only needs enough tokens in *every* applicable bucket to pass.
 
 ## Dimensions
 
@@ -32,8 +32,8 @@ When v1.1 ships, TPM will consume tokens based on actual usage reported by the p
 
 The gateway evaluates limits in the order it touches them:
 
-1. **Per-binding** (configured on `/gateway/providers`), protects a single upstream account from all traffic.
-2. **Per-VK** (configured on `/gateway/virtual-keys` drawer), protects a specific key from over-sending.
+1. **Per-ModelProvider** (configured on Settings → Model Providers → Advanced (Gateway) tab), protects a single upstream account from all traffic.
+2. **Per-VK** (configured on the VK drawer), protects a specific key from over-sending.
 
 A request must fit under **every** applicable bucket. No override mechanism, combining them is always AND.
 
@@ -66,9 +66,9 @@ The client key-switches on this header to show the right error in their own UI (
 
 ## Setting limits
 
-**Per VK**: `/gateway/virtual-keys` drawer → "Rate limits (per-VK)" section. See the drawer's `(i)` tooltips for per-field guidance.
+**Per VK**: VK drawer → "Rate limits (per-VK)" section. See the drawer's `(i)` tooltips for per-field guidance.
 
-**Per binding**: `/gateway/providers` drawer → "Rate limit (rpm)", "Rate limit (rpd)", "Rate limit (tpm)" fields. See [Provider bindings → RPM](/ai-gateway/providers#rate-limit-rpm).
+**Per ModelProvider**: Settings → Model Providers → row → **Advanced (Gateway)** tab → "Rate limit (rpm)", "Rate limit (rpd)", "Rate limit (tpm)" fields. See [Gateway provider settings → RPM](/ai-gateway/provider-bindings#rate-limit-rpm).
 
 Leave a field blank to inherit the upstream provider's own limit (i.e., no gateway-side throttle on that dimension).
 
@@ -93,9 +93,9 @@ In multi-replica deployments the buckets are **per-replica by default**: the gat
 
 | Action | Permission |
 |---|---|
-| View rate-limit settings | `virtualKeys:view` + `gatewayProviders:view` |
+| View rate-limit settings | `virtualKeys:view` + `modelProviders:view` |
 | Edit per-VK rate limits | `virtualKeys:update` |
-| Edit per-binding rate limits | `gatewayProviders:update` |
+| Edit per-ModelProvider rate limits | `modelProviders:update` |
 
 ## See also
 
