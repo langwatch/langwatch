@@ -94,9 +94,6 @@ export function VirtualKeyScopePicker({
       <VStack align="start" width="full" gap={2}>
         <SmallLabel>Scope</SmallLabel>
         <ProviderScopeChips scopes={scopes} />
-        <Text fontSize="xs" color="gray.600">
-          {summariseVkSelection(scopes)}
-        </Text>
         <Text fontSize="xs" color="gray.500">
           Scope is fixed after create. To change it, delete and recreate
           at the new scope.
@@ -125,9 +122,6 @@ export function VirtualKeyScopePicker({
         currentTeamId={currentTeamId}
         currentProjectId={currentProjectId}
       />
-      <Text fontSize="xs" color="gray.600">
-        {summariseVkSelection(scopes)}
-      </Text>
     </VStack>
   );
 }

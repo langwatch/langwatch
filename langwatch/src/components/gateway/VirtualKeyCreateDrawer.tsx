@@ -21,7 +21,11 @@ import { toaster } from "~/components/ui/toaster";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
-import { EligibleModelProvidersPreview } from "./EligibleModelProvidersPreview";
+import {
+  ConfigureModelProvidersLink,
+  EligibleModelProvidersPreview,
+  EligibleModelProvidersSummary,
+} from "./EligibleModelProvidersPreview";
 import { FieldInfoTooltip } from "./FieldInfoTooltip";
 import {
   VirtualKeyScopePicker,
@@ -231,11 +235,23 @@ export function VirtualKeyCreateDrawer({
               currentTeamId={team?.id}
               currentProjectId={project?.id}
             />
+            <EligibleModelProvidersSummary
+              scopes={scopes}
+              organizationId={organizationId}
+              organizationName={organization?.name}
+              availableTeams={availableTeams}
+              availableProjects={availableProjects}
+              isLoading={orgProvidersQuery.isLoading}
+              providers={providers as any}
+            />
 
             <Box>
-              <Text fontSize="xs" fontWeight="semibold" color="fg.muted" mb={1.5}>
-                Eligible model providers
-              </Text>
+              <HStack mb={1.5} alignItems="center" gap={2}>
+                <ConfigureModelProvidersLink scopes={scopes} />
+                <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+                  Eligible model providers
+                </Text>
+              </HStack>
               <EligibleModelProvidersPreview
                 scopes={scopes}
                 organizationId={organizationId}

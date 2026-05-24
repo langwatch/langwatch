@@ -21,7 +21,11 @@ import { toaster } from "~/components/ui/toaster";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
-import { EligibleModelProvidersPreview } from "./EligibleModelProvidersPreview";
+import {
+  ConfigureModelProvidersLink,
+  EligibleModelProvidersPreview,
+  EligibleModelProvidersSummary,
+} from "./EligibleModelProvidersPreview";
 import { FieldInfoTooltip } from "./FieldInfoTooltip";
 import {
   VirtualKeyScopePicker,
@@ -418,25 +422,39 @@ export function VirtualKeyEditDrawer({
 
             <Separator />
             {vk && (
-              <VirtualKeyScopePicker
-                scopes={vk.scopes}
-                onScopesChange={() => undefined}
-                isExisting
-                organizationId={organizationId}
-                organizationName={organization?.name}
-                teamId={team?.id}
-                teamName={team?.name}
-                projectId={project?.id}
-                projectName={project?.name}
-                availableTeams={availableTeams}
-                availableProjects={availableProjects}
-              />
+              <>
+                <VirtualKeyScopePicker
+                  scopes={vk.scopes}
+                  onScopesChange={() => undefined}
+                  isExisting
+                  organizationId={organizationId}
+                  organizationName={organization?.name}
+                  teamId={team?.id}
+                  teamName={team?.name}
+                  projectId={project?.id}
+                  projectName={project?.name}
+                  availableTeams={availableTeams}
+                  availableProjects={availableProjects}
+                />
+                <EligibleModelProvidersSummary
+                  scopes={vk.scopes}
+                  organizationId={organizationId}
+                  organizationName={organization?.name}
+                  availableTeams={availableTeams}
+                  availableProjects={availableProjects}
+                  isLoading={orgProvidersQuery.isLoading}
+                  providers={(orgProvidersQuery.data?.providers ?? []) as any}
+                />
+              </>
             )}
 
             <Box>
-              <Text fontSize="xs" fontWeight="semibold" color="fg.muted" mb={1.5}>
-                Eligible model providers
-              </Text>
+              <HStack mb={1.5} alignItems="center" gap={2}>
+                <ConfigureModelProvidersLink scopes={vk?.scopes ?? []} />
+                <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+                  Eligible model providers
+                </Text>
+              </HStack>
               <EligibleModelProvidersPreview
                 scopes={vk?.scopes ?? []}
                 organizationId={organizationId}
@@ -448,35 +466,37 @@ export function VirtualKeyEditDrawer({
               />
             </Box>
 
-            <Field.Root>
-              <Field.Label>
-                Routing policy
-                <FieldInfoTooltip
-                  description="Force this VK to use a specific ordered set of ModelProviders instead of the scope-cascade fallback. Change is non-breaking — clients keep working with the new policy on the next /config refresh."
-                  docHref="/ai-gateway/routing-policies"
-                />
-              </Field.Label>
-              <NativeSelect.Root size="sm">
-                <NativeSelect.Field
-                  value={routingPolicyId}
-                  onChange={(e) => setRoutingPolicyId(e.target.value)}
-                >
-                  <option value="">
-                    Default — fall back to all eligible providers
-                  </option>
-                  {(policiesQuery.data ?? []).map((p: any) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
+            {((policiesQuery.data ?? []).length > 0 || routingPolicyId) && (
+              <Field.Root>
+                <Field.Label>
+                  Routing policy
+                  <FieldInfoTooltip
+                    description="Force this VK to use a specific ordered set of ModelProviders instead of the scope-cascade fallback. Change is non-breaking — clients keep working with the new policy on the next /config refresh."
+                    docHref="/ai-gateway/routing-policies"
+                  />
+                </Field.Label>
+                <NativeSelect.Root size="sm">
+                  <NativeSelect.Field
+                    value={routingPolicyId}
+                    onChange={(e) => setRoutingPolicyId(e.target.value)}
+                  >
+                    <option value="">
+                      Default cascade (all eligible providers)
                     </option>
-                  ))}
-                </NativeSelect.Field>
-              </NativeSelect.Root>
-              <Field.HelperText>
-                Default cascade uses all eligible providers in fallback
-                priority. Picking a policy constrains routing to its ordered
-                provider list.
-              </Field.HelperText>
-            </Field.Root>
+                    {(policiesQuery.data ?? []).map((p: any) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </NativeSelect.Field>
+                </NativeSelect.Root>
+                <Field.HelperText>
+                  Default cascade uses all eligible providers in fallback
+                  priority. Picking a policy constrains routing to its
+                  ordered provider list.
+                </Field.HelperText>
+              </Field.Root>
+            )}
 
             <Separator />
             <HStack>

@@ -1,6 +1,8 @@
 import { Badge, Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import { ExternalLink } from "lucide-react";
 import { useMemo } from "react";
 
+import { Link } from "~/components/ui/link";
 import { modelProviderIcons } from "~/server/modelProviders/iconsMap";
 
 import type { VirtualKeyScopeEntry } from "./VirtualKeyScopePicker";
@@ -169,28 +171,15 @@ export function EligibleModelProvidersPreview({
 
   if (scopes.length === 0) {
     return (
-      <Box
-        borderWidth="1px"
-        borderColor="border.subtle"
-        borderRadius="md"
-        padding={3}
-      >
-        <Text fontSize="xs" color="fg.muted">
-          Pick a scope above to preview the routable models.
-        </Text>
-      </Box>
+      <Text fontSize="xs" color="fg.muted">
+        Pick a scope above to preview the routable models.
+      </Text>
     );
   }
 
   if (isLoading) {
     return (
-      <HStack
-        borderWidth="1px"
-        borderColor="border.subtle"
-        borderRadius="md"
-        padding={3}
-        gap={2}
-      >
+      <HStack gap={2}>
         <Spinner size="xs" />
         <Text fontSize="xs" color="fg.muted">
           Resolving eligible model providers…
@@ -198,8 +187,6 @@ export function EligibleModelProvidersPreview({
       </HStack>
     );
   }
-
-  const scopeSummary = summariseScopes(scopes, names);
 
   if (eligible.length === 0) {
     return (
@@ -227,71 +214,159 @@ export function EligibleModelProvidersPreview({
     );
   }
 
+  return (
+    <VStack align="stretch" gap={1}>
+      {eligible.map((mp) => {
+        const icon =
+          mp.provider in modelProviderIcons
+            ? modelProviderIcons[
+                mp.provider as keyof typeof modelProviderIcons
+              ]
+            : null;
+        return (
+          <HStack
+            key={mp.id}
+            borderWidth="1px"
+            borderColor="border.subtle"
+            borderRadius="md"
+            paddingX={2}
+            paddingY={1.5}
+            gap={2}
+          >
+            <Box
+              width="16px"
+              height="16px"
+              flexShrink={0}
+              display="flex"
+              alignItems="center"
+              justifyContent="center"
+              css={{ "& > svg": { width: "100%", height: "100%" } }}
+            >
+              {icon}
+            </Box>
+            <Text fontSize="sm" fontWeight="medium">
+              {mp.label}
+            </Text>
+            {mp.modelCount > 0 && (
+              <Text fontSize="xs" color="fg.muted">
+                · {mp.modelCount} {mp.modelCount === 1 ? "model" : "models"}
+              </Text>
+            )}
+            <Box flex={1} />
+            <Badge variant="subtle" colorPalette="gray" fontSize="2xs">
+              {scopeChipLabel(mp.inheritedFrom, names)}
+            </Badge>
+          </HStack>
+        );
+      })}
+    </VStack>
+  );
+}
+
+/**
+ * Single-sentence summary of the VK's reach + eligible-MP count. Rendered
+ * by the drawer directly under the scope picker so the user reads the
+ * implication of their scope choice before scanning the provider list.
+ *
+ * Kept as a separate component (rather than folded into the preview list)
+ * so the summary copy sits next to the scope picker and the list sits
+ * next to its own "Eligible model providers" section header.
+ */
+export function EligibleModelProvidersSummary({
+  scopes,
+  organizationId,
+  organizationName,
+  availableTeams,
+  availableProjects,
+  isLoading,
+  providers,
+}: {
+  scopes: VirtualKeyScopeEntry[];
+  organizationId: string | undefined;
+  organizationName?: string;
+  availableTeams: Array<{ id: string; name: string }>;
+  availableProjects: Array<{ id: string; name: string; teamId?: string }>;
+  isLoading?: boolean;
+  providers: OrgModelProvider[];
+}) {
+  const hierarchy = useMemo(() => {
+    const teamOfProject = new Map<string, string>();
+    for (const p of availableProjects) {
+      if (p.teamId) teamOfProject.set(p.id, p.teamId);
+    }
+    return { organizationId, teamOfProject };
+  }, [availableProjects, organizationId]);
+
+  const names = useMemo(() => {
+    const teamNames = new Map(availableTeams.map((t) => [t.id, t.name]));
+    const projectNames = new Map(
+      availableProjects.map((p) => {
+        const clean = p.name.split(" · ")[0] ?? p.name;
+        return [p.id, clean] as const;
+      }),
+    );
+    return { organizationName, teamNames, projectNames };
+  }, [availableTeams, availableProjects, organizationName]);
+
+  const eligible = useMemo(
+    () => resolveEligible(scopes, providers, hierarchy),
+    [scopes, providers, hierarchy],
+  );
+
+  if (scopes.length === 0 || isLoading || eligible.length === 0) return null;
+
+  const scopeSummary = summariseScopes(scopes, names);
   const totalModels = eligible.reduce((sum, p) => sum + p.modelCount, 0);
 
   return (
-    <VStack
-      align="stretch"
-      gap={2}
-      borderWidth="1px"
-      borderColor="border.subtle"
-      borderRadius="md"
-      padding={3}
+    <Text fontSize="xs" color="fg.muted">
+      This VK will be usable within {scopeSummary} and can fall back to{" "}
+      {eligible.length === 1 ? "1 provider" : `${eligible.length} providers`}
+      {totalModels > 0
+        ? ` (${totalModels} ${totalModels === 1 ? "model" : "models"})`
+        : ""}
+      .
+    </Text>
+  );
+}
+
+/**
+ * "Configure ↗" deep-link to /settings/model-providers, pre-seeded with
+ * a `?scope=TYPE:ID` query param for each currently-selected VK scope.
+ * Lands the admin on the provider list filtered to the same scope set the
+ * VK already targets, so adding a missing provider is one click away.
+ *
+ * The receiving page hydrates its local scopeFilter from router.query;
+ * if it doesn't, the user still arrives at the right page (option-a per
+ * the bug-10 split — full hydrate lands as a follow-up).
+ */
+export function ConfigureModelProvidersLink({
+  scopes,
+}: {
+  scopes: VirtualKeyScopeEntry[];
+}) {
+  const href = useMemo(() => {
+    if (scopes.length === 0) return "/settings/model-providers";
+    const params = new URLSearchParams();
+    for (const s of scopes) {
+      params.append("scope", `${s.scopeType}:${s.scopeId}`);
+    }
+    return `/settings/model-providers?${params.toString()}`;
+  }, [scopes]);
+
+  return (
+    <Link
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      color="blue.600"
+      fontSize="xs"
     >
-      <Text fontSize="xs" color="fg.muted">
-        This VK will be usable within {scopeSummary} and can fall back to{" "}
-        {eligible.length === 1 ? "1 provider" : `${eligible.length} providers`}
-        {totalModels > 0
-          ? ` (${totalModels} ${totalModels === 1 ? "model" : "models"})`
-          : ""}
-        .
-      </Text>
-      <VStack align="stretch" gap={1}>
-        {eligible.map((mp) => {
-          const icon =
-            mp.provider in modelProviderIcons
-              ? modelProviderIcons[
-                  mp.provider as keyof typeof modelProviderIcons
-                ]
-              : null;
-          return (
-            <HStack
-              key={mp.id}
-              borderWidth="1px"
-              borderColor="border.subtle"
-              borderRadius="md"
-              paddingX={2}
-              paddingY={1.5}
-              gap={2}
-            >
-              <Box
-                width="16px"
-                height="16px"
-                flexShrink={0}
-                display="flex"
-                alignItems="center"
-                justifyContent="center"
-                css={{ "& > svg": { width: "100%", height: "100%" } }}
-              >
-                {icon}
-              </Box>
-              <Text fontSize="sm" fontWeight="medium">
-                {mp.label}
-              </Text>
-              {mp.modelCount > 0 && (
-                <Text fontSize="xs" color="fg.muted">
-                  · {mp.modelCount} {mp.modelCount === 1 ? "model" : "models"}
-                </Text>
-              )}
-              <Box flex={1} />
-              <Badge variant="subtle" colorPalette="gray" fontSize="2xs">
-                {scopeChipLabel(mp.inheritedFrom, names)}
-              </Badge>
-            </HStack>
-          );
-        })}
-      </VStack>
-    </VStack>
+      <HStack gap={1} alignItems="center">
+        <Text as="span">Configure</Text>
+        <ExternalLink size={11} />
+      </HStack>
+    </Link>
   );
 }
 
