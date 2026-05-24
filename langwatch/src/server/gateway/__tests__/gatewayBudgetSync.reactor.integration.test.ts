@@ -189,12 +189,9 @@ describe("gatewayBudgetSync reactor — real PG + real CH", () => {
 
   afterAll(async () => {
     await prisma.gatewayBudget.deleteMany({ where: { id: BUDGET_ID } });
-    // dbMultiTenancyProtection requires projectId in WHERE for any model
-    // that carries one (VirtualKey is project-scoped). The id-only filter
-    // would be rejected as untenanted.
-    await prisma.virtualKey.deleteMany({
-      where: { id: VK_ID, projectId: PROJECT_ID },
-    });
+    // Post-collapse VirtualKey is org-scoped. The dbMTP SCOPED_MODELS
+    // guard accepts a row id as the tenancy proof for single-row writes.
+    await prisma.virtualKey.deleteMany({ where: { id: VK_ID } });
     await prisma.user.deleteMany({ where: { id: USER_ID } });
     await prisma.project.deleteMany({ where: { id: PROJECT_ID } });
     await prisma.team.deleteMany({ where: { id: TEAM_ID } });
