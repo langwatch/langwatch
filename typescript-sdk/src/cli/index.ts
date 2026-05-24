@@ -7,10 +7,6 @@ config();
 import { Command } from "commander";
 import { parsePromptSpec } from "./types";
 import { formatApiErrorMessage } from "../client-sdk/services/_shared/format-api-error";
-import {
-  isGovernancePreviewEnabled,
-  GOVERNANCE_PREVIEW_DISABLED_MESSAGE,
-} from "./utils/governance/preview-flag";
 import { experimentListRunsCommand } from "./commands/experiment/list-runs.js";
 import { experimentResultsCommand } from "./commands/experiment/results.js";
 import { experimentListCommand } from "./commands/experiment/list.js";
@@ -131,47 +127,28 @@ program
   .showHelpAfterError()
   .showSuggestionAfterError();
 
-// AI Governance preview is gated by LANGWATCH_GOVERNANCE_PREVIEW=1 — when
-// unset, the new subcommands and the `login --device` option don't get
-// registered, so they're invisible to `langwatch --help` and behave as
-// "unknown command" if invoked. This keeps the long-lived governance
-// branch merge-able into main without exposing preview features to
-// users who haven't opted in. Mirrors the web app's
-// `release_ui_ai_governance_enabled` PostHog flag.
-const governancePreview = isGovernancePreviewEnabled();
-
 // Top-level commands
 const loginCmd = program
   .command("login")
   .description(
-    governancePreview
-      ? "Login to LangWatch. With no flags, asks where (cloud vs self-hosted) and how (AI tools vs project SDK). For CI/agents pass --device, --api-key, or --token to skip prompts."
-      : "Login to LangWatch. Prompts for an API key, or pass --api-key for CI."
+    "Login to LangWatch. With no flags, asks where (cloud vs self-hosted) and how (AI tools vs project SDK). For CI/agents pass --device, --api-key, or --token to skip prompts.",
   )
   .option("--api-key <key>", "Set API key non-interactively (CI/agents that already have a project API key) — writes to .env")
-  .option("--endpoint <url>", "Override the LangWatch control-plane URL for this login (self-hosted instances)");
-
-if (governancePreview) {
-  loginCmd
-    .option(
-      "--device",
-      "RFC 8628 device-flow login via your company SSO; provisions a personal virtual key for Claude Code / Codex / Cursor / Gemini CLI",
-    )
-    .option(
-      "--token <token>",
-      "Set device-session token non-interactively (CI/agents that already have a pre-minted token from the dashboard) — writes to ~/.langwatch/config.json",
-    )
-    .option(
-      "--browser <name>",
-      "browser to open for device-flow approval (chrome|chromium|firefox|safari|none|<path>)",
-    );
-}
+  .option("--endpoint <url>", "Override the LangWatch control-plane URL for this login (self-hosted instances)")
+  .option(
+    "--device",
+    "RFC 8628 device-flow login via your company SSO; provisions a personal virtual key for Claude Code / Codex / Cursor / Gemini CLI",
+  )
+  .option(
+    "--token <token>",
+    "Set device-session token non-interactively (CI/agents that already have a pre-minted token from the dashboard) — writes to ~/.langwatch/config.json",
+  )
+  .option(
+    "--browser <name>",
+    "browser to open for device-flow approval (chrome|chromium|firefox|safari|none|<path>)",
+  );
 
 loginCmd.action(async (options: { apiKey?: string; device?: boolean; browser?: string; endpoint?: string; token?: string }) => {
-  if ((options.device || options.token) && !governancePreview) {
-    console.error(GOVERNANCE_PREVIEW_DISABLED_MESSAGE);
-    process.exit(1);
-  }
   try {
     await loginCommand(options);
   } catch (error) {
@@ -211,36 +188,6 @@ configCmd
     await configListCommand();
   });
 
-if (governancePreview) {
-// AI Gateway governance — read identity, deep-link, request budget increase.
-program
-  .command("whoami")
-  .description("Print the identity persisted by `langwatch login --device` (governance plane).")
-  .action(async () => {
-    try {
-      const { whoamiCommand } = await import("./commands/whoami.js");
-      await whoamiCommand();
-    } catch (error) {
-      console.error(`Error: ${formatApiErrorMessage({ error })}`);
-      process.exit(1);
-    }
-  });
-
-program
-  .command("me")
-  .description("Open your LangWatch personal dashboard (use --trace <id> to deep-link to a specific trace).")
-  .option("--trace <id>", "deep-link to a specific trace ID")
-  .option("--browser <name>", "browser to open (chrome|chromium|firefox|safari|none|<path>)")
-  .action(async (options: { trace?: string; browser?: string }) => {
-    try {
-      const { dashboardCommand } = await import("./commands/dashboard.js");
-      await dashboardCommand(options);
-    } catch (error) {
-      console.error(`Error: ${formatApiErrorMessage({ error })}`);
-      process.exit(1);
-    }
-  });
-
 program
   .command("open [path]")
   .description(
@@ -251,6 +198,20 @@ program
     try {
       const { openCommand } = await import("./commands/open.js");
       await openCommand({ path, browser: options.browser });
+    } catch (error) {
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
+      process.exit(1);
+    }
+  });
+
+// AI Gateway governance — read identity, deep-link, request budget increase.
+program
+  .command("whoami")
+  .description("Print the identity persisted by `langwatch login --device` (governance plane).")
+  .action(async () => {
+    try {
+      const { whoamiCommand } = await import("./commands/whoami.js");
+      await whoamiCommand();
     } catch (error) {
       console.error(`Error: ${formatApiErrorMessage({ error })}`);
       process.exit(1);
@@ -605,7 +566,6 @@ bindingsCmd
     );
     await rotateCommand(bindingId, options);
   });
-} // end if (governancePreview)
 
 // Add prompt command group
 const promptCmd = program

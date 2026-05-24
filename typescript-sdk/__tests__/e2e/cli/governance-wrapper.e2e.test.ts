@@ -283,7 +283,6 @@ function runCli(args: string[], opts: RunOpts = {}): Promise<RunResult> {
   }
   env.PATH = pathValue;
   env.LANGWATCH_CLI_CONFIG = configPath;
-  env.LANGWATCH_GOVERNANCE_PREVIEW = "1";
   env.LANGWATCH_ENDPOINT = cpUrl;
   env.LANGWATCH_GATEWAY_URL = gwUrl;
   // Default OFF so the existing scenarios still get the
