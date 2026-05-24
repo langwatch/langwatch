@@ -8,6 +8,7 @@ import {
   saveConfig,
   clearConfig,
   isLoggedIn,
+  isCanonicalVkSecret,
 } from "../config";
 
 const tmpFile = (): string => {
@@ -87,7 +88,11 @@ describe("governance config persistence", () => {
       expires_at: 1700000000,
       user: { id: "u_1", email: "j@x.com", name: "Jane" },
       organization: { id: "o_1", slug: "miro", name: "Miro" },
-      default_personal_vk: { id: "vk_1", secret: "lw_vk_test", prefix: "lw_vk_t" },
+      default_personal_vk: {
+        id: "vk_1",
+        secret: "vk-lw-01HZX9N4TESTULIDTESTULID00",
+        prefix: "vk-lw-01HZX9N",
+      },
       last_request_increase_url: "http://app.example/me/budget/request?signed=abc",
     };
     saveConfig(original);
@@ -98,6 +103,63 @@ describe("governance config persistence", () => {
     const loaded = loadConfig();
     expect(loaded).toEqual(expect.objectContaining(original));
     expect(isLoggedIn(loaded)).toBe(true);
+  });
+
+  describe("when a stored personal VK secret is in a legacy format", () => {
+    it("drops the stale default_personal_vk block on load", () => {
+      // Legacy `lw_vk_live_` secrets predate the canonical `vk-lw-` format
+      // and route every gateway call to a malformed_key 401. loadConfig
+      // must drop them so the wrapper preflight prompts a fresh login.
+      fs.writeFileSync(
+        p,
+        JSON.stringify({
+          gateway_url: "http://gw.example",
+          control_plane_url: "http://app.example",
+          access_token: "at_x",
+          default_personal_vk: {
+            id: "vk_legacy",
+            secret: "lw_vk_live_01KQX0YJTSTALELEGACYSECRET",
+            prefix: "lw_vk_live_",
+          },
+        }),
+      );
+      const loaded = loadConfig();
+      expect(loaded.default_personal_vk).toBeUndefined();
+      // Session itself is untouched — only the poisoned VK is dropped.
+      expect(loaded.access_token).toBe("at_x");
+    });
+
+    it("keeps a canonical vk-lw- secret intact", () => {
+      fs.writeFileSync(
+        p,
+        JSON.stringify({
+          gateway_url: "http://gw.example",
+          control_plane_url: "http://app.example",
+          default_personal_vk: {
+            id: "vk_ok",
+            secret: "vk-lw-01HZX9N4TESTULIDTESTULID00",
+            prefix: "vk-lw-01HZX9N",
+          },
+        }),
+      );
+      const loaded = loadConfig();
+      expect(loaded.default_personal_vk?.secret).toBe(
+        "vk-lw-01HZX9N4TESTULIDTESTULID00",
+      );
+    });
+  });
+
+  describe("isCanonicalVkSecret", () => {
+    it("accepts vk-lw- prefixed secrets", () => {
+      expect(isCanonicalVkSecret("vk-lw-01HZX9N4ABCDEF")).toBe(true);
+    });
+    it("rejects legacy lw_vk_live_ secrets", () => {
+      expect(isCanonicalVkSecret("lw_vk_live_01KQX0YJ")).toBe(false);
+    });
+    it("rejects undefined / empty", () => {
+      expect(isCanonicalVkSecret(undefined)).toBe(false);
+      expect(isCanonicalVkSecret("")).toBe(false);
+    });
   });
 
   it("env var override changes the path", () => {

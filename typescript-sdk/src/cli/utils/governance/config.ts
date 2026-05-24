@@ -62,6 +62,24 @@ function defaults(): GovernanceConfig {
 }
 
 /**
+ * Canonical personal-VK secret prefix. Mirrors the control plane's
+ * `vk-lw-<ULID>` minting format (langwatch virtualKey.crypto.ts). The
+ * gateway rejects anything else as malformed_key before any DB lookup,
+ * so a config carrying a legacy-format secret (older `lw_vk_live_*`
+ * logins) routes every `langwatch <tool>` call straight to a 401.
+ */
+const VK_SECRET_PREFIX = "vk-lw-";
+
+/**
+ * Whether a stored secret is in the format the current gateway can
+ * parse. Legacy secrets minted before the format change fail this and
+ * must be re-issued via a fresh login.
+ */
+export function isCanonicalVkSecret(secret: string | undefined): boolean {
+  return !!secret && secret.startsWith(VK_SECRET_PREFIX);
+}
+
+/**
  * Returns the absolute path to the config file. Override with
  * LANGWATCH_CLI_CONFIG for tests / non-default homes.
  */
@@ -78,7 +96,19 @@ export function loadConfig(): GovernanceConfig {
   try {
     const text = fs.readFileSync(p, "utf8");
     const parsed = JSON.parse(text) as Partial<GovernanceConfig>;
-    return { ...defaults(), ...parsed };
+    const cfg = { ...defaults(), ...parsed };
+    // Drop a legacy-format personal VK secret on load. Keeping it would
+    // route every `langwatch <tool>` call to a malformed_key 401; once
+    // dropped, the wrapper preflight tells the user to re-login and the
+    // next login persists a fresh `vk-lw-` secret. A valid canonical
+    // secret is never touched, so this won't wipe a working credential.
+    if (
+      cfg.default_personal_vk &&
+      !isCanonicalVkSecret(cfg.default_personal_vk.secret)
+    ) {
+      delete cfg.default_personal_vk;
+    }
+    return cfg;
   } catch (err) {
     throw new Error(`Failed to parse ${p}: ${(err as Error).message}`);
   }
