@@ -65,7 +65,14 @@ Feature: AI Gateway Governance — Personal virtual keys
     And the response body contains `{ "error": "no_default_routing_policy", "message": "Your organization admin must publish a default routing policy before personal keys can be issued." }`
     And no personal VK is created
 
-  @bdd @personal-keys @issuance @policy-resolution @regression
+  # Behavior is implemented end-to-end: personalVirtualKey.service.ts throws
+  # RoutingPolicyHasNoProvidersError when the resolved policy has empty
+  # modelProviderIds[], and personalVirtualKeys.ts router maps it to
+  # UNPROCESSABLE_CONTENT (422). No service-layer integration test exists
+  # yet for the empty-policy branch — pinned @unimplemented for the
+  # PR #3524 sweep; backfill candidate when ee/governance test suite gets
+  # its post-collapse rewrite pass.
+  @bdd @personal-keys @issuance @policy-resolution @regression @unimplemented
   Scenario: When the default RoutingPolicy has zero providers, personal-key issuance fails with a clear error (validate-before-mint)
     Given organization "acme" HAS a default RoutingPolicy
     But that policy has zero ProviderCredentials in its `providerCredentialIds` chain
