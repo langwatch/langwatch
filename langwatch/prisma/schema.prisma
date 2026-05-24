@@ -1770,11 +1770,13 @@ model VirtualKey {
   ledgerEntries GatewayBudgetLedger[]
 
   // Optional RoutingPolicy reference. When set, gateway pulls
-  // ordered ModelProvider chain from the policy. When null, the
-  // materialiser falls back to ordering eligible ModelProviders
-  // by `fallbackPriorityGlobal` (asc) then `createdAt` (asc) —
+  // ordered ModelProvider chain from the policy + the policy's
+  // modelAliases + policyRules. When null, the materialiser falls
+  // back to ordering eligible ModelProviders by
+  // `fallbackPriorityGlobal` (asc) then `createdAt` (asc) —
   // deterministic across runs and Go-side parsers.
   routingPolicyId String?
+  routingPolicy   RoutingPolicy? @relation("VirtualKeyRoutingPolicy", fields: [routingPolicyId], references: [id], onDelete: SetNull)
 
   @@unique([hashedSecret])
   @@index([organizationId])
@@ -1886,8 +1888,10 @@ model RoutingPolicy {
   updatedById String?
   updatedBy   User?    @relation("RoutingPolicyUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
 
-  // Back-relation to VirtualKey removed in iter 110 (no FK constraint;
-  // VKs are looked up via prisma.virtualKey.findMany({ where: { routingPolicyId } })).
+  // VKs that reference this policy. relationMode="prisma" so no SQL FK
+  // is emitted; this exists purely to let the materialiser hydrate the
+  // policy via `include: { routingPolicy: ... }` on the VK query.
+  virtualKeys VirtualKey[] @relation("VirtualKeyRoutingPolicy")
 
   // Multi-scope assignments. A policy is selectable from any scope row
   // (union semantics). RoutingPolicyScope is the only source of truth
