@@ -149,7 +149,25 @@ async function startFakeControlPlane(): Promise<{
     }
     if (req.url === "/api/auth/cli/bootstrap" && req.method === "GET") {
       res.writeHead(200, { "content-type": "application/json" });
-      res.end(JSON.stringify({ providers: [], budget: {} }));
+      // Wrapper preflight checks that the org has at least one provider
+      // from the tool's TOOL_PROVIDER_FAMILIES table (claude → anthropic,
+      // codex → openai, gemini → google|gemini, cursor + opencode → any
+      // of anthropic|openai). The fake CP advertises the full union so
+      // every wrapped-tool test sees its required family available and
+      // the preflight returns ok; tests that need to exercise the
+      // "no provider configured" branch should mount a narrower
+      // bootstrap from inside the test body.
+      res.end(
+        JSON.stringify({
+          providers: [
+            { name: "anthropic" },
+            { name: "openai" },
+            { name: "google" },
+            { name: "gemini" },
+          ],
+          budget: {},
+        }),
+      );
       return;
     }
     res.writeHead(404, { "content-type": "application/json" });
@@ -441,7 +459,7 @@ describe("governance CLI wrappers — e2e", () => {
         expect(res.status).toBe(0);
         expect(recordedDeviceCodeRequests).toBeGreaterThanOrEqual(1);
         const env = envFromStub(res.stdout ?? "");
-        expect(env.ANTHROPIC_BASE_URL).toBe(`${gwUrl}/api/v1/anthropic`);
+        expect(env.ANTHROPIC_BASE_URL).toBe(gwUrl);
         expect(env.ANTHROPIC_AUTH_TOKEN).toBe(TEST_VK);
         // Config got persisted by the auto-login path
         const cfg = readConfig();
@@ -454,11 +472,20 @@ describe("governance CLI wrappers — e2e", () => {
   });
 
   describe("env injection — per-tool standard env vars", () => {
+    // Provider base-URLs are set to the bare gateway URL. The Go aigateway
+    // routes OpenAI- and Anthropic-shaped requests at root (`/v1/chat/completions`,
+    // `/v1/messages`); per-provider sub-paths like `/api/v1/anthropic`
+    // were the Phase 11 design and were folded away when the Go dispatcher
+    // landed (see services/aigateway/adapters/httpapi/router*). Each SDK
+    // appends its own canonical suffix to the base URL.
+    //   "url" → expect bare gateway URL (no suffix)
+    //   string literal → expect that exact value (used for VK auth tokens)
+    type ExpectedValue = "url" | string;
     describe.each([
       {
         tool: "claude",
         expected: {
-          ANTHROPIC_BASE_URL: "/api/v1/anthropic",
+          ANTHROPIC_BASE_URL: "url" as ExpectedValue,
           ANTHROPIC_AUTH_TOKEN: TEST_VK,
         },
         mustNotInject: ["OPENAI_BASE_URL", "GOOGLE_GENAI_API_BASE"],
@@ -466,7 +493,7 @@ describe("governance CLI wrappers — e2e", () => {
       {
         tool: "codex",
         expected: {
-          OPENAI_BASE_URL: "/api/v1/openai",
+          OPENAI_BASE_URL: "url" as ExpectedValue,
           OPENAI_API_KEY: TEST_VK,
         },
         mustNotInject: ["ANTHROPIC_BASE_URL", "GOOGLE_GENAI_API_BASE"],
@@ -474,9 +501,9 @@ describe("governance CLI wrappers — e2e", () => {
       {
         tool: "opencode",
         expected: {
-          OPENAI_BASE_URL: "/api/v1/openai",
+          OPENAI_BASE_URL: "url" as ExpectedValue,
           OPENAI_API_KEY: TEST_VK,
-          ANTHROPIC_BASE_URL: "/api/v1/anthropic",
+          ANTHROPIC_BASE_URL: "url" as ExpectedValue,
           ANTHROPIC_AUTH_TOKEN: TEST_VK,
         },
         mustNotInject: ["GOOGLE_GENAI_API_BASE", "GEMINI_API_KEY"],
@@ -484,9 +511,9 @@ describe("governance CLI wrappers — e2e", () => {
       {
         tool: "cursor",
         expected: {
-          OPENAI_BASE_URL: "/api/v1/openai",
+          OPENAI_BASE_URL: "url" as ExpectedValue,
           OPENAI_API_KEY: TEST_VK,
-          ANTHROPIC_BASE_URL: "/api/v1/anthropic",
+          ANTHROPIC_BASE_URL: "url" as ExpectedValue,
           ANTHROPIC_AUTH_TOKEN: TEST_VK,
         },
         mustNotInject: ["GOOGLE_GENAI_API_BASE", "GEMINI_API_KEY"],
@@ -494,7 +521,7 @@ describe("governance CLI wrappers — e2e", () => {
       {
         tool: "gemini",
         expected: {
-          GOOGLE_GENAI_API_BASE: "/api/v1/gemini",
+          GOOGLE_GENAI_API_BASE: "url" as ExpectedValue,
           GEMINI_API_KEY: TEST_VK,
         },
         mustNotInject: ["ANTHROPIC_BASE_URL", "OPENAI_BASE_URL"],
@@ -508,11 +535,11 @@ describe("governance CLI wrappers — e2e", () => {
           const res = await runCli([tool]);
           expect(res.status).toBe(0);
           const env = envFromStub(res.stdout ?? "");
-          for (const [k, suffix] of Object.entries(expected)) {
-            if (suffix.startsWith("/")) {
-              expect(env[k]).toBe(`${gwUrl}${suffix}`);
+          for (const [k, want] of Object.entries(expected)) {
+            if (want === "url") {
+              expect(env[k]).toBe(gwUrl);
             } else {
-              expect(env[k]).toBe(suffix);
+              expect(env[k]).toBe(want);
             }
           }
           for (const k of mustNotInject) {
@@ -525,45 +552,43 @@ describe("governance CLI wrappers — e2e", () => {
 
   describe("routing — wrapped tool's HTTP traffic lands at the gateway with the VK", async () => {
     describe("when wrapped claude POSTs to ${ANTHROPIC_BASE_URL}/v1/messages", () => {
-      it("the fake gateway records the request at /api/v1/anthropic/v1/messages with Bearer VK", async () => {
+      it("the fake gateway records the request at /v1/messages with Bearer VK", async () => {
         writeLoggedInConfig();
         writeToolStub("claude", "post-anthropic");
         const res = await runCli(["claude"]);
         expect(res.status).toBe(0);
-        expect(recordedGwRequests).toHaveLength(1);
-        expect(recordedGwRequests[0]!.method).toBe("POST");
-        expect(recordedGwRequests[0]!.path).toBe(
-          "/api/v1/anthropic/v1/messages",
-        );
-        expect(recordedGwRequests[0]!.authorization).toBe(`Bearer ${TEST_VK}`);
+        // Filter out the wrapper's preflight GET /healthz probe; assert
+        // on the wrapped tool's POST landing only.
+        const posts = recordedGwRequests.filter((r) => r.method === "POST");
+        expect(posts).toHaveLength(1);
+        expect(posts[0]!.path).toBe("/v1/messages");
+        expect(posts[0]!.authorization).toBe(`Bearer ${TEST_VK}`);
       });
     });
 
     describe("when wrapped codex POSTs to ${OPENAI_BASE_URL}/v1/chat/completions", () => {
-      it("the fake gateway records the request at /api/v1/openai/v1/chat/completions with Bearer VK", async () => {
+      it("the fake gateway records the request at /v1/chat/completions with Bearer VK", async () => {
         writeLoggedInConfig();
         writeToolStub("codex", "post-openai");
         const res = await runCli(["codex"]);
         expect(res.status).toBe(0);
-        expect(recordedGwRequests).toHaveLength(1);
-        expect(recordedGwRequests[0]!.path).toBe(
-          "/api/v1/openai/v1/chat/completions",
-        );
-        expect(recordedGwRequests[0]!.authorization).toBe(`Bearer ${TEST_VK}`);
+        const posts = recordedGwRequests.filter((r) => r.method === "POST");
+        expect(posts).toHaveLength(1);
+        expect(posts[0]!.path).toBe("/v1/chat/completions");
+        expect(posts[0]!.authorization).toBe(`Bearer ${TEST_VK}`);
       });
     });
 
     describe("when wrapped opencode POSTs through OpenAI-compatible env vars", () => {
-      it("the fake gateway records the request at /api/v1/openai/v1/chat/completions with Bearer VK", async () => {
+      it("the fake gateway records the request at /v1/chat/completions with Bearer VK", async () => {
         writeLoggedInConfig();
         writeToolStub("opencode", "post-openai");
         const res = await runCli(["opencode"]);
         expect(res.status).toBe(0);
-        expect(recordedGwRequests).toHaveLength(1);
-        expect(recordedGwRequests[0]!.path).toBe(
-          "/api/v1/openai/v1/chat/completions",
-        );
-        expect(recordedGwRequests[0]!.authorization).toBe(`Bearer ${TEST_VK}`);
+        const posts = recordedGwRequests.filter((r) => r.method === "POST");
+        expect(posts).toHaveLength(1);
+        expect(posts[0]!.path).toBe("/v1/chat/completions");
+        expect(posts[0]!.authorization).toBe(`Bearer ${TEST_VK}`);
       });
     });
   });
@@ -612,7 +637,7 @@ describe("governance CLI wrappers — e2e", () => {
         const res = await runCli(["claude"]);
         expect(res.status).toBe(0);
         const env = envFromStub(res.stdout ?? "");
-        expect(env.ANTHROPIC_BASE_URL).toBe(`${gwUrl}/api/v1/anthropic`);
+        expect(env.ANTHROPIC_BASE_URL).toBe(gwUrl);
       });
     });
 
@@ -624,7 +649,7 @@ describe("governance CLI wrappers — e2e", () => {
         const res = await runCli(["claude"]);
         expect(res.status).toBe(0);
         const env = envFromStub(res.stdout ?? "");
-        expect(env.ANTHROPIC_BASE_URL).toBe(`${gwUrl}/api/v1/anthropic`);
+        expect(env.ANTHROPIC_BASE_URL).toBe(gwUrl);
       });
     });
   });
