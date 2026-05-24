@@ -124,10 +124,14 @@ export async function stagedLangevalsFetch(
 
   return fetch(url, {
     method: "POST",
+    // Caller headers are spread first so the contract-defining
+    // X-Payload-S3-URL and Content-Type cannot be silently overridden;
+    // letting a caller override the staged header would mean the
+    // upstream Lambda fetches the wrong URL (or no URL at all).
     headers: {
+      ...headers,
       "Content-Type": "application/json",
       [STAGED_HEADER]: stagedUrl,
-      ...headers,
     },
   });
 }

@@ -10,7 +10,9 @@ network-free.
 
 from __future__ import annotations
 
+import importlib
 import json
+import logging
 
 import httpx
 import pytest
@@ -18,7 +20,13 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from starlette.testclient import TestClient
 
-from langevals.staged_payload import StagedPayloadMiddleware
+# Single import style for langevals.staged_payload — CodeQL otherwise
+# flags the file for mixing `import X as` and `from X import Y` (the
+# 413 test reloads the module to pick up an env-driven cap change, so
+# the module-form import is what we want everywhere).
+import langevals.staged_payload as staged_payload_module
+
+StagedPayloadMiddleware = staged_payload_module.StagedPayloadMiddleware
 
 
 class _Echo(BaseModel):
@@ -95,14 +103,10 @@ class TestStagedPayloadMiddleware:
     ):
         monkeypatch.setenv("LANGEVALS_STAGED_MAX_BYTES", "32")
 
-        import importlib
-
-        import langevals.staged_payload as staged_module
-
-        importlib.reload(staged_module)
+        importlib.reload(staged_payload_module)
 
         app = FastAPI()
-        app.add_middleware(staged_module.StagedPayloadMiddleware)
+        app.add_middleware(staged_payload_module.StagedPayloadMiddleware)
 
         @app.post("/echo")
         def echo(body: _Echo) -> dict:  # pragma: no cover — should not be hit
@@ -128,7 +132,7 @@ class TestStagedPayloadMiddleware:
         assert response.status_code == 413
         assert "exceeds" in response.json()["detail"]
 
-        importlib.reload(staged_module)
+        importlib.reload(staged_payload_module)
 
     def test_staged_request_fetch_failure_returns_502(
         self, monkeypatch: pytest.MonkeyPatch
@@ -146,3 +150,70 @@ class TestStagedPayloadMiddleware:
 
         assert response.status_code == 502
         assert "X-Payload-S3-URL" in response.json()["detail"]
+
+    @pytest.mark.parametrize(
+        "url,reason_fragment",
+        [
+            ("http://s3.example/staging/k.json", "https"),
+            ("https://localhost/staging/k.json", "loopback"),
+            ("https://127.0.0.1/staging/k.json", "non-public"),
+            ("https://10.0.0.5/staging/k.json", "non-public"),
+            ("https://169.254.169.254/latest/meta-data/", "non-public"),
+            ("https://[::1]/staging/k.json", "non-public"),
+        ],
+    )
+    def test_ssrf_guard_rejects_non_public_urls(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        url: str,
+        reason_fragment: str,
+    ):
+        # If the guard fails open we'd see the mock transport hit. The
+        # transport asserts on use, so any pass-through is a test fail.
+        def handler(request: httpx.Request) -> httpx.Response:  # pragma: no cover
+            raise AssertionError(
+                f"SSRF guard let {request.url} through to httpx fetch"
+            )
+
+        _patch_httpx(monkeypatch, handler)
+
+        client = TestClient(_build_app())
+        response = client.post(
+            "/echo",
+            headers={"X-Payload-S3-URL": url},
+        )
+
+        assert response.status_code == 400
+        assert "invalid" in response.json()["detail"].lower()
+        _ = reason_fragment  # documented in parametrize for triage
+
+    def test_fetch_failure_log_does_not_include_raw_exception_string(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        caplog: pytest.LogCaptureFixture,
+    ):
+        # The presigned URL itself MUST NOT appear in log output even on
+        # error. We trigger a failure path and assert the URL string is
+        # absent from anything emitted by the middleware's logger.
+        secret_url = "https://s3.example/staging/leaky.json?X-Amz-Signature=DEAD"
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(403, content=b"Forbidden")
+
+        _patch_httpx(monkeypatch, handler)
+        caplog.set_level(logging.ERROR, logger="langevals.staged_payload")
+
+        client = TestClient(_build_app())
+        response = client.post(
+            "/echo",
+            headers={"X-Payload-S3-URL": secret_url},
+        )
+
+        assert response.status_code == 502
+        captured = "\n".join(record.getMessage() for record in caplog.records)
+        captured += "\n" + "\n".join(
+            str(record.__dict__) for record in caplog.records
+        )
+        assert "X-Amz-Signature" not in captured
+        assert "DEAD" not in captured
+        assert "leaky.json" not in captured

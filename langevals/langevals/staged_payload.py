@@ -19,6 +19,7 @@ around ``receive`` keeps the rest of the request lifecycle intact.
 
 from __future__ import annotations
 
+import ipaddress
 import logging
 import os
 import time
@@ -91,6 +92,22 @@ class StagedPayloadMiddleware:
             await self.app(scope, receive, send)
             return
 
+        try:
+            _validate_staged_url(staged_url)
+        except _InvalidStagedUrl as exc:
+            # SSRF guard: reject anything that isn't an https URL pointing
+            # at a public host. The control plane signs URLs against S3
+            # endpoints which always resolve to public IPs, so a request
+            # carrying a loopback or RFC1918 host is either a misconfig
+            # or an attacker probing the lambda's VPC. Log the reason
+            # code only; never echo the rejected URL.
+            logger.warning(
+                "rejected X-Payload-S3-URL by SSRF guard",
+                extra={"reason": exc.reason},
+            )
+            await _send_error(send, 400, "invalid X-Payload-S3-URL")
+            return
+
         url_host = _safe_host(staged_url)
         started_at = time.perf_counter()
         try:
@@ -108,12 +125,19 @@ class StagedPayloadMiddleware:
             return
         except Exception as exc:
             elapsed_ms = (time.perf_counter() - started_at) * 1000
+            # Never log str(exc) here: presigned-URL fetch errors from
+            # httpx routinely embed the full signed URL (with auth query
+            # params) in their str(). Stick to type + upstream status so
+            # log destinations can't leak short-lived credentials.
+            upstream_status = getattr(
+                getattr(exc, "response", None), "status_code", None,
+            )
             logger.error(
                 "failed to fetch staged payload",
                 extra={
                     "staged_url_host": url_host,
-                    "error": str(exc),
                     "error_type": type(exc).__name__,
+                    "upstream_status": upstream_status,
                     "elapsed_ms": elapsed_ms,
                 },
             )
@@ -142,6 +166,48 @@ class _StagedPayloadTooLarge(Exception):
     def __init__(self, observed_bytes: int) -> None:
         super().__init__(f"observed {observed_bytes} bytes")
         self.observed_bytes = observed_bytes
+
+
+class _InvalidStagedUrl(Exception):
+    def __init__(self, reason: str) -> None:
+        super().__init__(reason)
+        self.reason = reason
+
+
+def _validate_staged_url(url: str) -> None:
+    """Reject anything that isn't an HTTPS URL pointing at a public host.
+
+    The host check covers both literal IPs (parsed via ``ipaddress``) and
+    the symbolic loopback name ``localhost``. Symbolic hostnames that
+    resolve to private space (eg. a /etc/hosts override) are NOT
+    pre-resolved here — that's by design, because httpx itself doesn't
+    apply private-IP filtering at connect time, so doing so would create
+    a TOCTOU window. The check guards against the common case where a
+    malicious header lists a literal RFC1918 / loopback / link-local
+    address; defense in depth against DNS-based pivots belongs at the
+    network layer (Lambda VPC egress rules).
+    """
+    parsed = urlparse(url)
+    if parsed.scheme != "https":
+        raise _InvalidStagedUrl("scheme must be https")
+    if not parsed.hostname:
+        raise _InvalidStagedUrl("missing host")
+    host = parsed.hostname.lower()
+    if host in ("localhost", "ip6-localhost", "ip6-loopback"):
+        raise _InvalidStagedUrl("host is loopback name")
+    try:
+        ip = ipaddress.ip_address(host)
+    except ValueError:
+        return
+    if (
+        ip.is_private
+        or ip.is_loopback
+        or ip.is_link_local
+        or ip.is_multicast
+        or ip.is_reserved
+        or ip.is_unspecified
+    ):
+        raise _InvalidStagedUrl("host is non-public IP")
 
 
 def _find_staged_header(headers: list[tuple[bytes, bytes]]) -> str | None:
