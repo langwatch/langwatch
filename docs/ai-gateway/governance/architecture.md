@@ -263,7 +263,7 @@ What's on this branch today:
 - ✅ AI Gateway with personal-key support
 - ✅ `user.personalBudget` tRPC + `BudgetExceededBanner`
 - ✅ Helm NOTES + post-install docs
-- ✅ Single feature flag + CLI env var gating
+- ✅ Single feature flag (`release_ui_ai_governance_enabled`) gating the UI surface; CLI surface is unconditionally installed and per-account entitlement is enforced server-side (no CLI-side env var gate)
 - ✅ This architecture doc + activity-monitor + ingestion-sources specs
 
 What this iteration adds (D2 foundation):
