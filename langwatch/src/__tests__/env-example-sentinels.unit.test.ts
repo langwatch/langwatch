@@ -45,12 +45,6 @@ function getPrecedingLines(key: string, windowSize = 5): string[] {
   return envExampleLines.slice(start, idx);
 }
 
-const KEYS = [
-  "LW_VIRTUAL_KEY_PEPPER",
-  "LW_GATEWAY_INTERNAL_SECRET",
-  "LW_GATEWAY_JWT_SECRET",
-] as const;
-
 describe("langwatch/.env.example", () => {
   describe("when the gateway-secret declarations are inspected", () => {
     /** @scenario .env.example ships a sentinel placeholder for LW_VIRTUAL_KEY_PEPPER */
