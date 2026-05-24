@@ -27,10 +27,16 @@ import {
 import AiGatewayLayout from "~/components/gateway/AiGatewayLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
+import {
+  ConfigureModelProvidersLink,
+  EligibleModelProvidersPreview,
+  EligibleModelProvidersSummary,
+} from "~/components/gateway/EligibleModelProvidersPreview";
 import { FieldInfoTooltip } from "~/components/gateway/FieldInfoTooltip";
 import { VirtualKeyEditDrawer } from "~/components/gateway/VirtualKeyEditDrawer";
 import { VirtualKeySecretReveal } from "~/components/gateway/VirtualKeySecretReveal";
 import { VirtualKeyUsageSnippet } from "~/components/gateway/VirtualKeyUsageSnippet";
+import { ProviderScopeChips } from "~/components/settings/ProviderScopeChips";
 import { Link } from "~/components/ui/link";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { toaster } from "~/components/ui/toaster";
@@ -50,6 +56,39 @@ function VirtualKeyDetailPage() {
     { organizationId: orgId, id: vkId },
     { enabled: !!orgId && !!vkId },
   );
+  const orgProvidersQuery =
+    api.modelProvider.listAllForOrganizationForFrontend.useQuery(
+      { organizationId: orgId },
+      { enabled: !!orgId },
+    );
+  const availableTeams = useMemo(
+    () =>
+      organization?.teams?.map((t) => ({ id: t.id, name: t.name })) ?? [],
+    [organization?.teams],
+  );
+  const availableProjects = useMemo(
+    () =>
+      organization?.teams?.flatMap((t) =>
+        t.projects.map((p) => ({
+          id: p.id,
+          name: `${p.name} · ${t.name}`,
+          teamId: t.id,
+        })),
+      ) ?? [],
+    [organization?.teams],
+  );
+  const teamNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const t of organization?.teams ?? []) map.set(t.id, t.name);
+    return map;
+  }, [organization?.teams]);
+  const projectNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const t of organization?.teams ?? []) {
+      for (const p of t.projects) map.set(p.id, p.name);
+    }
+    return map;
+  }, [organization?.teams]);
   const usageWindow = useMemo(() => {
     const to = new Date();
     const from = new Date(to.getTime() - 30 * 24 * 60 * 60 * 1000);
@@ -239,32 +278,30 @@ function VirtualKeyDetailPage() {
               </Section>
 
               <Section title="Scope & routing">
-                <VStack align="stretch" gap={2}>
-                  <HStack gap={1.5} flexWrap="wrap">
-                    {(vk.scopes ?? []).length === 0 ? (
-                      <Text fontSize="sm" color="fg.muted">
-                        No scopes assigned.
-                      </Text>
-                    ) : (
-                      (vk.scopes ?? []).map((s) => {
-                        const palette =
-                          s.scopeType === "ORGANIZATION"
-                            ? "blue"
-                            : s.scopeType === "TEAM"
-                            ? "purple"
-                            : "teal";
-                        return (
-                          <Badge
-                            key={`${s.scopeType}:${s.scopeId}`}
-                            colorPalette={palette}
-                            variant="subtle"
-                          >
-                            {s.scopeType}
-                          </Badge>
-                        );
-                      })
-                    )}
-                  </HStack>
+                <VStack align="stretch" gap={3}>
+                  <ProviderScopeChips
+                    scopes={(vk.scopes ?? []).map((s) => ({
+                      scopeType: s.scopeType as
+                        | "ORGANIZATION"
+                        | "TEAM"
+                        | "PROJECT",
+                      scopeId: s.scopeId,
+                      name:
+                        s.scopeType === "ORGANIZATION"
+                          ? organization?.name
+                          : s.scopeType === "TEAM"
+                            ? teamNameById.get(s.scopeId)
+                            : projectNameById.get(s.scopeId),
+                    }))}
+                    principal={
+                      vk.principalUserId && vk.principalUser
+                        ? {
+                            name: vk.principalUser.name,
+                            email: vk.principalUser.email,
+                          }
+                        : undefined
+                    }
+                  />
                   <HStack>
                     <Text fontSize="sm" color="fg.muted">
                       Routing policy:
@@ -278,13 +315,36 @@ function VirtualKeyDetailPage() {
                       </Text>
                     )}
                   </HStack>
-                  <Text fontSize="xs" color="fg.muted">
-                    The gateway resolves the eligible{" "}
-                    <Link href="/settings/model-providers">ModelProviders</Link>{" "}
-                    by walking upward from each scope: org-scoped MPs are
-                    visible to every VK, team-scoped MPs to VKs in that team
-                    and below, project-scoped MPs only to VKs in that project.
-                  </Text>
+                  <EligibleModelProvidersSummary
+                    scopes={vk.scopes ?? []}
+                    organizationId={orgId}
+                    organizationName={organization?.name}
+                    availableTeams={availableTeams}
+                    availableProjects={availableProjects}
+                    isLoading={orgProvidersQuery.isLoading}
+                    providers={
+                      (orgProvidersQuery.data?.providers ?? []) as any
+                    }
+                  />
+                  <Box>
+                    <HStack mb={1.5} alignItems="center" gap={2}>
+                      <ConfigureModelProvidersLink scopes={vk.scopes ?? []} />
+                      <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+                        Eligible model providers
+                      </Text>
+                    </HStack>
+                    <EligibleModelProvidersPreview
+                      scopes={vk.scopes ?? []}
+                      organizationId={orgId}
+                      organizationName={organization?.name}
+                      availableTeams={availableTeams}
+                      availableProjects={availableProjects}
+                      isLoading={orgProvidersQuery.isLoading}
+                      providers={
+                        (orgProvidersQuery.data?.providers ?? []) as any
+                      }
+                    />
+                  </Box>
                 </VStack>
               </Section>
 
