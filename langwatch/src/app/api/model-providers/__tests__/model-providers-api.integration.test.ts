@@ -111,7 +111,6 @@ describe("Model Providers API", () => {
       beforeEach(async () => {
         await prisma.modelProvider.create({
           data: {
-            projectId: testProjectId,
             name: "OpenAI",
             provider: "openai",
             enabled: true,
@@ -182,7 +181,6 @@ describe("Model Providers API", () => {
       beforeEach(async () => {
         await prisma.modelProvider.create({
           data: {
-            projectId: testProjectId,
             name: "OpenAI",
             provider: "openai",
             enabled: true,
@@ -215,7 +213,10 @@ describe("Model Providers API", () => {
 
         // Verify original key still in DB
         const saved = await prisma.modelProvider.findFirst({
-          where: { projectId: testProjectId, provider: "openai" },
+          where: {
+            provider: "openai",
+            scopes: { some: { scopeType: "PROJECT", scopeId: testProjectId } },
+          },
         });
         expect(
           (saved?.customKeys as Record<string, string>)?.OPENAI_API_KEY,

@@ -188,7 +188,6 @@ export class ModelProviderRepository {
     return client.modelProvider.create({
       data: {
         id: generate(KSUID_RESOURCES.MODEL_PROVIDER).toString(),
-        projectId: data.projectId,
         name: data.name,
         provider: data.provider,
         enabled: data.enabled,
@@ -248,7 +247,7 @@ export class ModelProviderRepository {
       }
 
       return workingTx.modelProvider.update({
-        where: { id, projectId },
+        where: { id },
         data: {
           ...rest,
           customKeys: encryptedKeys as Prisma.InputJsonValue | undefined,
@@ -269,12 +268,12 @@ export class ModelProviderRepository {
 
   async delete(
     id: string,
-    projectId: string,
+    _projectId: string,
     tx?: Prisma.TransactionClient,
   ): Promise<ModelProvider> {
     const client = tx ?? this.prisma;
     return client.modelProvider.delete({
-      where: { id, projectId },
+      where: { id },
     });
   }
 
@@ -285,7 +284,10 @@ export class ModelProviderRepository {
   ): Promise<Prisma.BatchPayload> {
     const client = tx ?? this.prisma;
     return client.modelProvider.deleteMany({
-      where: { provider, projectId },
+      where: {
+        provider,
+        scopes: { some: { scopeType: "PROJECT", scopeId: projectId } },
+      },
     });
   }
 

@@ -86,15 +86,15 @@ export function createGatewayBudgetSyncReactor(
           where: { id: virtualKeyId },
           select: {
             id: true,
-            projectId: true,
+            organizationId: true,
             principalUserId: true,
             lastUsedAt: true,
           },
         });
-        if (!vk || vk.projectId !== projectId) {
+        if (!vk) {
           logger.warn(
             { projectId, virtualKeyId, gatewayRequestId },
-            "gateway trace references unknown or cross-tenant VK — skipping fold",
+            "gateway trace references unknown VK — skipping fold",
           );
           return;
         }
@@ -125,14 +125,11 @@ export function createGatewayBudgetSyncReactor(
         );
         if (shouldTouch) {
           try {
-            // Same multitenancy guard wrinkle as 918731f06: bare `id`
-            // is rejected by the dbMultiTenancyProtection middleware
-            // on every project-scoped model. `projectId` is required
-            // (or `projectId.in`) — Ariana caught this via the WARN
-            // log after EC6 part 1 landed. The reactor already has
-            // both pieces, just bind them in the where clause.
+            // Post-collapse VirtualKey is org-scoped in SCOPED_MODELS; the
+            // dbMTP guard accepts a row id as tenancy proof for single-row
+            // writes, so the bare id-only where clause is valid.
             await deps.prisma.virtualKey.update({
-              where: { id: vk.id, projectId: vk.projectId },
+              where: { id: vk.id },
               data: { lastUsedAt: now },
             });
             logger.info(
@@ -162,6 +159,15 @@ export function createGatewayBudgetSyncReactor(
           logger.warn(
             { projectId, virtualKeyId },
             "project missing team relation — skipping gateway budget fold",
+          );
+          return;
+        }
+        // Cross-tenant guard: post-collapse VKs carry organizationId only;
+        // the trace's tenant project must live under the same org.
+        if (project.team.organizationId !== vk.organizationId) {
+          logger.warn(
+            { projectId, virtualKeyId, gatewayRequestId },
+            "gateway trace references cross-tenant VK — skipping fold",
           );
           return;
         }
