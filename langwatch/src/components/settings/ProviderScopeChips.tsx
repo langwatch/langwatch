@@ -1,5 +1,7 @@
 import { Badge, HStack, Text } from "@chakra-ui/react";
-import { Building2, Folder, Server, Users } from "lucide-react";
+import { Building2, Folder, Server, User, Users } from "lucide-react";
+
+import { Tooltip } from "~/components/ui/tooltip";
 
 type ScopeEntry = {
   scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
@@ -14,21 +16,24 @@ type ScopeEntry = {
 
 /**
  * Renders a horizontal list of scope chips. Each chip shows the
- * scope's icon + name (e.g. "LangWatch", "Acme Team", "web-app").
- * Callers that only have access to the scope type fall back to the
- * bare type label — that's the legacy behaviour for surfaces that
- * haven't been wired up to pass names yet.
+ * scope's icon + name (e.g. "LangWatch", "Acme Team", "web-app") with
+ * a hover tooltip naming the scope type so the kind is unambiguous
+ * even when the icon is small or the row is dense. Callers that only
+ * have access to the scope type fall back to the bare type label —
+ * that's the legacy behaviour for surfaces that haven't been wired up
+ * to pass names yet.
  *
- * Bug fixed 2026-05-16: previously rendered "Organization" / "Team" /
- * "Project" with no name even when the caller knew the scope name,
- * producing ambiguous chips like "Team", "Team" when multiple teams
- * were attached to a provider. The shared screenshot from the
- * model-providers drawer proved the issue.
+ * For surfaces that render personal-owner state (personal VKs etc.)
+ * pass `principal` and an extra "Personal" chip is appended after the
+ * scope chips. Personal is orthogonal to scope (a personal VK still
+ * has a scope row), so the chip rendering keeps them visually
+ * adjacent rather than collapsing one into the other.
  */
 export function ProviderScopeChips({
   scopes,
   fallbackScopeType,
   system,
+  principal,
   size = "sm",
 }: {
   scopes?: ScopeEntry[];
@@ -42,6 +47,13 @@ export function ProviderScopeChips({
    * yet should NOT pass this — they want the bare empty render.
    */
   system?: boolean;
+  /**
+   * Personal-owner marker for VKs minted via `langwatch login --device`.
+   * Renders an additional "Personal" chip after the scope chips with
+   * the owner's display name / email and a "Personal: <owner>" tooltip.
+   * Orthogonal to scope — a personal VK still has its own scope row.
+   */
+  principal?: { name?: string | null; email?: string | null };
   size?: "sm" | "xs";
 }) {
   const entries: ScopeEntry[] = scopes && scopes.length > 0
@@ -50,18 +62,22 @@ export function ProviderScopeChips({
       ? [{ scopeType: fallbackScopeType, scopeId: "" }]
       : [];
   const iconSize = size === "xs" ? 10 : 12;
-  if (entries.length === 0) {
+  const principalLabel =
+    principal?.name?.trim() || principal?.email?.trim() || undefined;
+  if (entries.length === 0 && !principalLabel) {
     if (!system) return null;
     // Matches the "from System" labelling the default-model resolver
     // uses for the same conceptual tier (env-var-fed defaults).
     return (
       <HStack gap={1} wrap="wrap">
-        <Badge colorPalette="gray" variant="subtle" size={size}>
-          <HStack gap={1}>
-            <Server size={iconSize} aria-hidden />
-            <Text>System</Text>
-          </HStack>
-        </Badge>
+        <Tooltip content="System (built-in or env-var fed)">
+          <Badge colorPalette="gray" variant="subtle" size={size}>
+            <HStack gap={1}>
+              <Server size={iconSize} aria-hidden />
+              <Text>System</Text>
+            </HStack>
+          </Badge>
+        </Tooltip>
       </HStack>
     );
   }
@@ -70,34 +86,53 @@ export function ProviderScopeChips({
       {entries.map((entry) => {
         const key = `${entry.scopeType}:${entry.scopeId}`;
         if (entry.scopeType === "ORGANIZATION") {
+          const label = entry.name ?? "Organization";
           return (
-            <Badge key={key} colorPalette="blue" variant="subtle" size={size}>
-              <HStack gap={1}>
-                <Building2 size={iconSize} aria-hidden />
-                <Text>{entry.name ?? "Organization"}</Text>
-              </HStack>
-            </Badge>
+            <Tooltip key={key} content={`Organization: ${label}`}>
+              <Badge colorPalette="blue" variant="subtle" size={size}>
+                <HStack gap={1}>
+                  <Building2 size={iconSize} aria-hidden />
+                  <Text>{label}</Text>
+                </HStack>
+              </Badge>
+            </Tooltip>
           );
         }
         if (entry.scopeType === "TEAM") {
+          const label = entry.name ?? "Team";
           return (
-            <Badge key={key} colorPalette="purple" variant="subtle" size={size}>
-              <HStack gap={1}>
-                <Users size={iconSize} aria-hidden />
-                <Text>{entry.name ?? "Team"}</Text>
-              </HStack>
-            </Badge>
+            <Tooltip key={key} content={`Team: ${label}`}>
+              <Badge colorPalette="purple" variant="subtle" size={size}>
+                <HStack gap={1}>
+                  <Users size={iconSize} aria-hidden />
+                  <Text>{label}</Text>
+                </HStack>
+              </Badge>
+            </Tooltip>
           );
         }
+        const label = entry.name ?? "Project";
         return (
-          <Badge key={key} colorPalette="gray" variant="subtle" size={size}>
-            <HStack gap={1}>
-              <Folder size={iconSize} aria-hidden />
-              <Text>{entry.name ?? "Project"}</Text>
-            </HStack>
-          </Badge>
+          <Tooltip key={key} content={`Project: ${label}`}>
+            <Badge colorPalette="gray" variant="subtle" size={size}>
+              <HStack gap={1}>
+                <Folder size={iconSize} aria-hidden />
+                <Text>{label}</Text>
+              </HStack>
+            </Badge>
+          </Tooltip>
         );
       })}
+      {principalLabel && (
+        <Tooltip content={`Personal: ${principalLabel}`}>
+          <Badge colorPalette="teal" variant="subtle" size={size}>
+            <HStack gap={1}>
+              <User size={iconSize} aria-hidden />
+              <Text>{principalLabel}</Text>
+            </HStack>
+          </Badge>
+        </Tooltip>
+      )}
     </HStack>
   );
 }
