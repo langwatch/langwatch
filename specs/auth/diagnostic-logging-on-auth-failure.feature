@@ -8,15 +8,21 @@ Feature: Diagnostic logging on auth failure
     Given the unified auth middleware is mounted on a Hono route
     And a request reaches the middleware
 
-  @unit
+  @unit @unimplemented
   Scenario: extractCredentials returns null because no auth header was sent
+    # Partially bound: extractCredentials null-return is verified at
+    # api-key/__tests__/auth-middleware.unit.test.ts. WARN emission and
+    # diagnostic field content require middleware-level integration test fixtures.
     When the request has no Authorization, X-Auth-Token, or X-Project-Id headers
     Then the middleware emits a single WARN-level log line at "langwatch:api:unified-auth"
     And the log line contains userAgent, traceparent, x-forwarded-for, path, method
     And the log line records hasEmptyAuthToken=false (no header at all)
 
-  @unit
+  @unit @unimplemented
   Scenario: extractCredentials returns null because X-Auth-Token was sent empty
+    # Partially bound: hasEmptyAuthToken field is verified at
+    # api-key/__tests__/auth-middleware.unit.test.ts (collectAuthDiagnostics).
+    # WARN emission and message content require middleware-level integration fixtures.
     When the request has X-Auth-Token: "" (empty string)
     Then the middleware emits a single WARN-level log line at "langwatch:api:unified-auth"
     And the log line records hasEmptyAuthToken=true
