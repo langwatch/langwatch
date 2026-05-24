@@ -6,7 +6,15 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Gauge, KeyRound, LineChart, PlugZap, Route, Zap } from "lucide-react";
+import {
+  BrainCircuit,
+  ExternalLink,
+  Gauge,
+  KeyRound,
+  LineChart,
+  Route,
+  Zap,
+} from "lucide-react";
 import { type PropsWithChildren } from "react";
 
 import { DashboardLayout } from "~/components/DashboardLayout";
@@ -63,6 +71,15 @@ export default function AiGatewayLayout({
                   Virtual Keys
                 </MenuLink>
                 <MenuLink
+                  href={`/settings/model-providers`}
+                  includePath={`/settings/model-providers`}
+                  icon={<BrainCircuit size={14} />}
+                  menuEnd={<ExternalLink size={12} aria-hidden />}
+                  target="_blank"
+                >
+                  Model Providers
+                </MenuLink>
+                <MenuLink
                   href={`/settings/gateway/budgets`}
                   includePath={`/settings/gateway/budgets`}
                   icon={<Gauge size={14} />}
@@ -82,13 +99,6 @@ export default function AiGatewayLayout({
                   icon={<LineChart size={14} />}
                 >
                   Usage
-                </MenuLink>
-                <MenuLink
-                  href={`/settings/model-providers`}
-                  includePath={`/settings/model-providers`}
-                  icon={<PlugZap size={14} />}
-                >
-                  Model Providers
                 </MenuLink>
                 <MenuLink
                   href={`/settings/routing-policies`}
