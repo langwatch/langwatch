@@ -245,11 +245,7 @@ export function VirtualKeyCreateDrawer({
                         onClick={() => {
                           onOpenChange(false);
                           if (typeof window !== "undefined") {
-                            window.location.href =
-                              window.location.pathname.replace(
-                                /\/gateway.*$/,
-                                "/gateway/providers",
-                              );
+                            window.location.href = "/settings/gateway/providers";
                           }
                         }}
                       >

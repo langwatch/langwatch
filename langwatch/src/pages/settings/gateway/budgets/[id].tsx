@@ -91,7 +91,7 @@ function BudgetDetailPage() {
         <PageLayout.Header>
           <HStack>
             <Link
-              href={`/${project?.slug}/gateway/budgets`}
+              href={`/settings/gateway/budgets`}
               color="fg.muted"
               fontSize="sm"
             >
@@ -298,7 +298,7 @@ function BudgetDetailPage() {
                           </Table.Cell>
                           <Table.Cell>
                             <Link
-                              href={`/${project?.slug}/gateway/virtual-keys/${line.virtualKeyId}`}
+                              href={`/settings/gateway/virtual-keys/${line.virtualKeyId}`}
                               color="orange.600"
                             >
                               <Text fontSize="sm">{line.virtualKeyName}</Text>
@@ -412,7 +412,7 @@ function ScopeBadge({
   const kindLabel = target.kind.toLowerCase().replace("_", " ");
   const vkHref =
     target.kind === "VIRTUAL_KEY"
-      ? `/${target.projectSlug ?? projectSlug ?? ""}/gateway/virtual-keys/${target.id}`
+      ? `/settings/gateway/virtual-keys/${target.id}`
       : null;
   return (
     <HStack gap={2} align="baseline">

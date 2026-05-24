@@ -75,7 +75,6 @@ function RoutingPoliciesPage() {
     redirectToOnboarding: false,
   });
   const orgId = organization?.id ?? "";
-  const projectSlug = project?.slug ?? "";
   // Admin-in-empty-org (org but no project) is exempted from the no-org
   // bouncer for this route — the FF query must resolve on org alone, not
   // gate on project. Project remains a hint for PostHog cohort targeting.
@@ -431,9 +430,7 @@ function RoutingPoliciesPage() {
         }
         availableCredentials={credentialsQuery.data ?? []}
         credentialsLoading={credentialsQuery.isLoading}
-        gatewayProvidersAdminPath={
-          projectSlug ? `/${projectSlug}/gateway/providers` : null
-        }
+        gatewayProvidersAdminPath="/settings/gateway/providers"
         errorMessage={drawerError}
         onClearError={() => setDrawerError(null)}
         onSubmit={onSubmit}

@@ -3,22 +3,18 @@ import { useEffect } from "react";
 
 import AiGatewayLayout from "~/components/gateway/AiGatewayLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 /**
- * AI Gateway index — default route redirects to the virtual keys list. The
- * section is composed of sibling pages: /gateway/virtual-keys, /gateway/budgets,
- * /gateway/providers, /gateway/usage. Keeping the index lightweight avoids a
- * dead landing page.
+ * AI Gateway index — default landing redirects to the virtual keys list.
+ * The section is composed of sibling pages: /settings/gateway/virtual-keys,
+ * /settings/gateway/budgets, /settings/gateway/providers,
+ * /settings/gateway/usage.
  */
 function GatewayIndex() {
   const router = useRouter();
-  const { project } = useOrganizationTeamProject();
   useEffect(() => {
-    if (project?.slug) {
-      void router.replace(`/${project.slug}/gateway/virtual-keys`);
-    }
-  }, [project?.slug, router]);
+    void router.replace(`/settings/gateway/virtual-keys`);
+  }, [router]);
   return null;
 }
 

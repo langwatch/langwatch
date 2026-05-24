@@ -181,14 +181,14 @@ function VirtualKeysPage() {
                     _hover={{ bg: "bg.subtle" }}
                     onClick={() =>
                       void router.push(
-                        `/${project?.slug}/gateway/virtual-keys/${vk.id}`,
+                        `/settings/gateway/virtual-keys/${vk.id}`,
                       )
                     }
                   >
                     <Table.Cell>
                       <VStack align="start" gap={1}>
                         <Link
-                          href={`/${project?.slug}/gateway/virtual-keys/${vk.id}`}
+                          href={`/settings/gateway/virtual-keys/${vk.id}`}
                           fontWeight="medium"
                         >
                           {vk.name}
@@ -276,7 +276,7 @@ function VirtualKeysPage() {
                               value="details"
                               onClick={() =>
                                 void router.push(
-                                  `/${project?.slug}/gateway/virtual-keys/${vk.id}`,
+                                  `/settings/gateway/virtual-keys/${vk.id}`,
                                 )
                               }
                             >

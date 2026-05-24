@@ -320,11 +320,8 @@ export const MainMenu = React.memo(function MainMenu({
                   <SideMenuLink
                     icon={featureIcons.gateway.icon}
                     label={projectRoutes.gateway.title}
-                    href="/ai-gateway/virtual-keys"
-                    isActive={
-                      router.pathname.startsWith("/ai-gateway") ||
-                      router.pathname.includes("/gateway/")
-                    }
+                    href="/settings/gateway/virtual-keys"
+                    isActive={router.pathname.startsWith("/settings/gateway")}
                     showLabel={showExpanded}
                     beta
                     betaLabel="Beta"

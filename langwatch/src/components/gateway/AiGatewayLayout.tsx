@@ -56,36 +56,36 @@ export default function AiGatewayLayout({
                   AI Gateway
                 </Text>
                 <MenuLink
-                  href={`/ai-gateway/virtual-keys`}
-                  includePath={`/ai-gateway/virtual-keys`}
+                  href={`/settings/gateway/virtual-keys`}
+                  includePath={`/settings/gateway/virtual-keys`}
                   icon={<KeyRound size={14} />}
                 >
                   Virtual Keys
                 </MenuLink>
                 <MenuLink
-                  href={`/ai-gateway/budgets`}
-                  includePath={`/ai-gateway/budgets`}
+                  href={`/settings/gateway/budgets`}
+                  includePath={`/settings/gateway/budgets`}
                   icon={<Gauge size={14} />}
                 >
                   Budgets
                 </MenuLink>
                 <MenuLink
-                  href={`/ai-gateway/providers`}
-                  includePath={`/ai-gateway/providers`}
+                  href={`/settings/gateway/providers`}
+                  includePath={`/settings/gateway/providers`}
                   icon={<Plug size={14} />}
                 >
                   Providers
                 </MenuLink>
                 <MenuLink
-                  href={`/ai-gateway/cache-rules`}
-                  includePath={`/ai-gateway/cache-rules`}
+                  href={`/settings/gateway/cache-rules`}
+                  includePath={`/settings/gateway/cache-rules`}
                   icon={<Zap size={14} />}
                 >
                   Cache Rules
                 </MenuLink>
                 <MenuLink
-                  href={`/ai-gateway/usage`}
-                  includePath={`/ai-gateway/usage`}
+                  href={`/settings/gateway/usage`}
+                  includePath={`/settings/gateway/usage`}
                   icon={<LineChart size={14} />}
                 >
                   Usage

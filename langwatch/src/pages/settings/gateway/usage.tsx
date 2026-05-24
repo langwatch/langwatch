@@ -210,7 +210,7 @@ function GatewayUsagePage() {
                       <Table.Row key={row.virtualKeyId}>
                         <Table.Cell>
                           <Link
-                            href={`/${project?.slug}/gateway/virtual-keys/${row.virtualKeyId}`}
+                            href={`/settings/gateway/virtual-keys/${row.virtualKeyId}`}
                           >
                             {row.name}
                           </Link>

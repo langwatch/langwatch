@@ -123,7 +123,7 @@ function VirtualKeyDetailPage() {
         <PageLayout.Header>
           <HStack>
             <Link
-              href={`/${project?.slug}/gateway/virtual-keys`}
+              href={`/settings/gateway/virtual-keys`}
               color="fg.muted"
               fontSize="sm"
             >

@@ -180,14 +180,14 @@ function BudgetsPage() {
                       _hover={{ bg: "bg.subtle" }}
                       onClick={() =>
                         void router.push(
-                          `/${project?.slug}/gateway/budgets/${b.id}`,
+                          `/settings/gateway/budgets/${b.id}`,
                         )
                       }
                     >
                       <Table.Cell>
                         <VStack align="start" gap={0}>
                           <Link
-                            href={`/${project?.slug}/gateway/budgets/${b.id}`}
+                            href={`/settings/gateway/budgets/${b.id}`}
                           >
                             <Text fontWeight="medium">{b.name}</Text>
                           </Link>
@@ -282,7 +282,7 @@ function BudgetsPage() {
                               value="details"
                               onClick={() =>
                                 void router.push(
-                                  `/${project?.slug}/gateway/budgets/${b.id}`,
+                                  `/settings/gateway/budgets/${b.id}`,
                                 )
                               }
                             >
@@ -373,7 +373,7 @@ function ScopeCell({
   const kindLabel = scopeType.toLowerCase().replace("_", " ");
   const vkHref =
     scopeTarget?.kind === "VIRTUAL_KEY"
-      ? `/${scopeTarget.projectSlug ?? projectSlug ?? ""}/gateway/virtual-keys/${scopeTarget.id}`
+      ? `/settings/gateway/virtual-keys/${scopeTarget.id}`
       : null;
   return (
     <VStack align="start" gap={0.5}>
