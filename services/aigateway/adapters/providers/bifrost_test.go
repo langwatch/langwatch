@@ -7,6 +7,8 @@ import (
 
 	bfschemas "github.com/maximhq/bifrost/core/schemas"
 	"github.com/tidwall/gjson"
+
+	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
 // Regression: Bifrost's providers/utils EnrichError stores raw provider
@@ -177,5 +179,40 @@ func TestEnsureStreamIncludeUsage_PreservesMessages(t *testing.T) {
 
 	if !gjson.GetBytes(out, "stream_options.include_usage").Bool() {
 		t.Fatalf("expected stream_options.include_usage=true on output")
+	}
+}
+
+// given a Bedrock credential carrying the litellm aws_* key names (the shape
+// the gatewayproxy /go/proxy route produces, vs the canonical names the
+// dispatcheradapter produces)
+// when the credential is mapped to a Bifrost key
+// then the AWS credentials land on the BedrockKeyConfig, so the normal
+// (non-VPCE) Bedrock path is not left with empty credentials on that route.
+func TestCredentialToBifrostKey_BedrockHonorsAWSStyleKeys(t *testing.T) {
+	cred := domain.Credential{
+		ID:         "c",
+		ProviderID: domain.ProviderBedrock,
+		Extra: map[string]string{
+			"aws_access_key_id":     "AKIA-x",
+			"aws_secret_access_key": "secret-x",
+			"aws_session_token":     "session-x",
+			"aws_region_name":       "us-east-1",
+		},
+	}
+	k := credentialToBifrostKey(cred, bfschemas.Bedrock)
+	if k.BedrockKeyConfig == nil {
+		t.Fatal("BedrockKeyConfig is nil")
+	}
+	if k.BedrockKeyConfig.AccessKey.Val != "AKIA-x" {
+		t.Errorf("AccessKey = %q, want AKIA-x", k.BedrockKeyConfig.AccessKey.Val)
+	}
+	if k.BedrockKeyConfig.SecretKey.Val != "secret-x" {
+		t.Errorf("SecretKey = %q, want secret-x", k.BedrockKeyConfig.SecretKey.Val)
+	}
+	if k.BedrockKeyConfig.SessionToken == nil || k.BedrockKeyConfig.SessionToken.Val != "session-x" {
+		t.Errorf("SessionToken not honored: %+v", k.BedrockKeyConfig.SessionToken)
+	}
+	if k.BedrockKeyConfig.Region == nil || k.BedrockKeyConfig.Region.Val != "us-east-1" {
+		t.Errorf("Region not honored: %+v", k.BedrockKeyConfig.Region)
 	}
 }
