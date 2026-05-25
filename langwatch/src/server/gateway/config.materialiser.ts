@@ -139,6 +139,17 @@ export type GatewayConfigPayload = {
     };
   }>;
   metadata: Record<string, unknown>;
+  /**
+   * Org-level governance knobs the gateway applies at error time. Nested
+   * object so per-error-class messages can be added later without a wire
+   * break. `account_error_message`: when non-empty, the gateway swaps the
+   * human-facing message for account-level terminal errors the end user
+   * cannot self-resolve (org gateway spending limit reached → our own 402;
+   * org provider account exhausted → upstream credit/quota terminal error)
+   * for this string, preserving HTTP status + error type + retry headers.
+   * Empty = verbatim provider passthrough (the bug-33 default).
+   */
+  governance: { account_error_message: string };
 };
 
 export class GatewayConfigMaterialiser {
@@ -159,6 +170,9 @@ export class GatewayConfigMaterialiser {
       vk,
       config,
       traceProject,
+    );
+    const governanceMessage = await this.resolveGovernanceMessage(
+      vk.organizationId,
     );
 
     return {
@@ -203,7 +217,25 @@ export class GatewayConfigMaterialiser {
       })),
       cache_rules: cacheRules.map(cacheRuleToWire),
       metadata: config.metadata ?? {},
+      governance: { account_error_message: governanceMessage },
     };
+  }
+
+  /**
+   * The org's admin-set governance error message, or "" when unset. Empty
+   * keeps the gateway on verbatim provider-error passthrough (bug-33
+   * default); a non-empty string opts the org into re-messaging
+   * account-level terminal errors (our own budget 402 + upstream
+   * credit/quota terminal errors) while preserving status + retry headers.
+   */
+  private async resolveGovernanceMessage(
+    organizationId: string,
+  ): Promise<string> {
+    const org = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { governanceAccountErrorMessage: true },
+    });
+    return org?.governanceAccountErrorMessage ?? "";
   }
 
   private async applicableCacheRules(
