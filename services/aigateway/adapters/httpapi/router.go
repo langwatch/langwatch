@@ -679,6 +679,12 @@ func writeUpstreamError(w http.ResponseWriter, ue *domain.UpstreamError) {
 	if status <= 0 {
 		status = http.StatusBadGateway
 	}
+	// Forward the upstream's retry-signaling headers (Retry-After,
+	// x-should-retry) so the client can honor the provider's backoff and
+	// terminal-vs-retryable hint, not just the status code.
+	for k, v := range ue.Headers {
+		w.Header().Set(k, v)
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	if len(ue.Body) > 0 {

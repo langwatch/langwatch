@@ -139,9 +139,10 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 			return &domain.Response{
 				Body:       rawBody,
 				StatusCode: status,
+				Headers:    forwardableUpstreamHeaders(bifrostResponseHeaders(bfCtx)),
 			}, nil
 		}
-		return nil, errFromBifrost(ctx, berr)
+		return nil, errFromBifrost(ctx, berr, bifrostResponseHeaders(bfCtx))
 	}
 
 	// /v1/messages callers (Anthropic SDK, claude-code, ...) expect the
@@ -198,9 +199,10 @@ func (r *BifrostRouter) dispatchResponses(
 			return &domain.Response{
 				Body:       rawBody,
 				StatusCode: status,
+				Headers:    forwardableUpstreamHeaders(bifrostResponseHeaders(bfCtx)),
 			}, nil
 		}
-		return nil, errFromBifrost(ctx, berr)
+		return nil, errFromBifrost(ctx, berr, bifrostResponseHeaders(bfCtx))
 	}
 
 	// Prefer the provider's native response bytes so /v1/responses
@@ -252,9 +254,10 @@ func (r *BifrostRouter) dispatchEmbeddings(
 			return &domain.Response{
 				Body:       rawBody,
 				StatusCode: status,
+				Headers:    forwardableUpstreamHeaders(bifrostResponseHeaders(bfCtx)),
 			}, nil
 		}
-		return nil, errFromBifrost(ctx, berr)
+		return nil, errFromBifrost(ctx, berr, bifrostResponseHeaders(bfCtx))
 	}
 
 	body, _ := sonic.Marshal(resp)
@@ -380,7 +383,7 @@ func (r *BifrostRouter) DispatchStream(ctx context.Context, req *domain.Request,
 
 	ch, berr := r.bf.ChatCompletionStreamRequest(bfCtx, bfReq)
 	if berr != nil {
-		return nil, errFromBifrost(ctx, berr)
+		return nil, errFromBifrost(ctx, berr, bifrostResponseHeaders(bfCtx))
 	}
 
 	return &bifrostStreamIterator{ch: ch}, nil
@@ -413,7 +416,7 @@ func (r *BifrostRouter) dispatchResponsesStream(
 
 	ch, berr := r.bf.ResponsesStreamRequest(bfCtx, bfReq)
 	if berr != nil {
-		return nil, errFromBifrost(ctx, berr)
+		return nil, errFromBifrost(ctx, berr, bifrostResponseHeaders(bfCtx))
 	}
 	return &bifrostStreamIterator{ch: ch}, nil
 }
@@ -440,9 +443,10 @@ func (r *BifrostRouter) dispatchPassthrough(
 			return &domain.Response{
 				Body:       rawBody,
 				StatusCode: status,
+				Headers:    forwardableUpstreamHeaders(bifrostResponseHeaders(bfCtx)),
 			}, nil
 		}
-		return nil, errFromBifrost(ctx, berr)
+		return nil, errFromBifrost(ctx, berr, bifrostResponseHeaders(bfCtx))
 	}
 
 	status := resp.StatusCode
@@ -483,7 +487,7 @@ func (r *BifrostRouter) dispatchPassthroughStream(
 
 	ch, berr := r.bf.PassthroughStream(bfCtx, provider, bfReq)
 	if berr != nil {
-		return nil, errFromBifrost(ctx, berr)
+		return nil, errFromBifrost(ctx, berr, bifrostResponseHeaders(bfCtx))
 	}
 	return &bifrostStreamIterator{ch: ch, rawFraming: true}, nil
 }
@@ -758,7 +762,7 @@ func mapProvider(id domain.ProviderID) bfschemas.ModelProvider {
 // rawResponseFromBifrostError branch: streaming dispatch can only return an
 // error, so the upstream status + body ride on UpstreamError instead of a
 // *domain.Response.
-func errFromBifrost(ctx context.Context, berr *bfschemas.BifrostError) error {
+func errFromBifrost(ctx context.Context, berr *bfschemas.BifrostError, respHeaders map[string]string) error {
 	status := 0
 	if berr.StatusCode != nil {
 		status = *berr.StatusCode
@@ -771,7 +775,47 @@ func errFromBifrost(ctx context.Context, berr *bfschemas.BifrostError) error {
 		StatusCode: status,
 		Body:       body,
 		Message:    bfErrorMsg(berr),
+		Headers:    forwardableUpstreamHeaders(respHeaders),
 	}
+}
+
+// bifrostResponseHeaders reads the provider's HTTP response headers that
+// Bifrost stashes on the dispatch context (provider handlers call
+// ctx.SetValue(BifrostContextKeyProviderResponseHeaders, ...) before returning,
+// including on the non-2xx error path). Returns nil when absent.
+func bifrostResponseHeaders(bfCtx *bfschemas.BifrostContext) map[string]string {
+	if bfCtx == nil {
+		return nil
+	}
+	if v, ok := bfCtx.Value(bfschemas.BifrostContextKeyProviderResponseHeaders).(map[string]string); ok {
+		return v
+	}
+	return nil
+}
+
+// forwardableUpstreamHeaders selects the upstream response headers that are
+// safe and useful to forward to the client on an error: the retry-signaling
+// headers Retry-After (backoff hint on 429/503) and x-should-retry (the
+// provider's canonical terminal-vs-retryable signal). Everything else
+// (transport headers, content-length, auth echoes) is dropped. Match is
+// case-insensitive; output uses canonical names.
+func forwardableUpstreamHeaders(in map[string]string) map[string]string {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make(map[string]string, 2)
+	for k, v := range in {
+		switch strings.ToLower(k) {
+		case "retry-after":
+			out["Retry-After"] = v
+		case "x-should-retry":
+			out["x-should-retry"] = v
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 func classifyBifrostError(ctx context.Context, berr *bfschemas.BifrostError) error {

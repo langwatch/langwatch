@@ -24,6 +24,10 @@ type UpstreamError struct {
 	// Message is the provider's error message, used to build a minimal
 	// envelope when Body is empty.
 	Message string
+	// Headers carries the upstream's retry-signaling response headers
+	// (Retry-After, x-should-retry) so the client can honor the provider's
+	// backoff hint and terminal-vs-retryable signal instead of guessing.
+	Headers map[string]string
 }
 
 func (e *UpstreamError) Error() string {

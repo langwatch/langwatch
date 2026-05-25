@@ -201,7 +201,15 @@ func TestErrFromBifrost_TerminalStatusForwardsVerbatim(t *testing.T) {
 		},
 	}
 
-	err := errFromBifrost(context.Background(), berr)
+	// Upstream sends its terminal signal + a noise header; only the
+	// retry-signaling headers should ride through, with canonical casing.
+	respHeaders := map[string]string{
+		"x-should-retry": "false",
+		"retry-after":    "30",
+		"content-length": "97",
+	}
+
+	err := errFromBifrost(context.Background(), berr, respHeaders)
 	ue, ok := err.(*domain.UpstreamError)
 	if !ok {
 		t.Fatalf("expected *domain.UpstreamError, got %T", err)
@@ -211,6 +219,15 @@ func TestErrFromBifrost_TerminalStatusForwardsVerbatim(t *testing.T) {
 	}
 	if !bytes.Equal(ue.Body, rawBody) {
 		t.Fatalf("body not forwarded verbatim:\n want %s\n got  %s", rawBody, ue.Body)
+	}
+	if ue.Headers["x-should-retry"] != "false" {
+		t.Fatalf("x-should-retry not forwarded: %v", ue.Headers)
+	}
+	if ue.Headers["Retry-After"] != "30" {
+		t.Fatalf("Retry-After not forwarded (canonical key): %v", ue.Headers)
+	}
+	if _, ok := ue.Headers["content-length"]; ok {
+		t.Fatalf("non-retry header content-length must be dropped: %v", ue.Headers)
 	}
 }
 
@@ -222,7 +239,7 @@ func TestErrFromBifrost_StatusWithoutRawBody(t *testing.T) {
 		StatusCode: intPtr(402),
 		Error:      &bfschemas.ErrorField{Message: "payment required"},
 	}
-	err := errFromBifrost(context.Background(), berr)
+	err := errFromBifrost(context.Background(), berr, nil)
 	ue, ok := err.(*domain.UpstreamError)
 	if !ok {
 		t.Fatalf("expected *domain.UpstreamError, got %T", err)
@@ -241,7 +258,7 @@ func TestErrFromBifrost_NoStatusFallsBackToClassify(t *testing.T) {
 	berr := &bfschemas.BifrostError{
 		Error: &bfschemas.ErrorField{Message: "dial tcp: timeout"},
 	}
-	err := errFromBifrost(context.Background(), berr)
+	err := errFromBifrost(context.Background(), berr, nil)
 	if _, ok := err.(*domain.UpstreamError); ok {
 		t.Fatalf("transport failure must not become an UpstreamError")
 	}
