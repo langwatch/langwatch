@@ -91,6 +91,28 @@ export const tracesRouter = createTRPCRouter({
       return evaluations[input.traceId];
     }),
 
+  // Protected (not public-share): the read is keyed by evaluationId, which is
+  // only tenant-scoped, so authorization must be the whole project too. A
+  // public-share token is scoped to a single trace and could otherwise be used
+  // to read any evaluation's inputs in the project by supplying another
+  // evaluationId. Public-shared trace drawers already get inputs eagerly from
+  // the public `getEvaluations`; this lazy fallback stays project-gated.
+  getEvaluationInputs: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        evaluationId: z.string(),
+      }),
+    )
+    .use(checkProjectPermission("traces:view"))
+    .query(async ({ input, ctx }) => {
+      const traceService = TraceService.create(ctx.prisma);
+      return traceService.getEvaluationInputs(
+        input.projectId,
+        input.evaluationId,
+      );
+    }),
+
   getEvaluationsMultiple: protectedProcedure
     .input(
       z.object({

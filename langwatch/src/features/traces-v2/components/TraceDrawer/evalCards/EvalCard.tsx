@@ -5,6 +5,7 @@ import {
   Flex,
   HStack,
   Icon,
+  Spinner,
   Text,
   VStack,
 } from "@chakra-ui/react";
@@ -14,6 +15,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { AZURE_SAFETY_NOT_CONFIGURED_MESSAGE } from "~/server/app-layer/evaluations/azure-safety-env";
 import { formatCost, formatDuration } from "../../../utils/formatters";
 import { RunHistorySparkline } from "./RunHistorySparkline";
+import { useEvalInputs } from "./useEvalInputs";
 import { type EvalEntry, formatInputValue, isNoVerdict, STATUS } from "./utils";
 
 export function EvalCard({
@@ -55,8 +57,17 @@ export function EvalCard({
   const hasErrorMessage = !!eval_.errorMessage;
   const hasStacktrace =
     !!eval_.errorStacktrace && eval_.errorStacktrace.length > 0;
-  const inputEntries = eval_.inputs ? Object.entries(eval_.inputs) : [];
-  const hasInputs = inputEntries.length > 0;
+  const hasListInputs =
+    !!eval_.inputs && Object.keys(eval_.inputs).length > 0;
+  // Inputs load lazily per-card (see useEvalInputs): the verdict list drops
+  // the heavy `Inputs` blob under ClickHouse memory pressure, and even when
+  // it's present we don't ship it until a card is expanded. Evals that
+  // produced a verdict or errored always recorded inputs, so offer the expand
+  // for them and fetch on open.
+  const canLazyLoadInputs =
+    !!eval_.evaluationId &&
+    (status === "pass" || status === "fail" || status === "error");
+  const mightHaveInputs = hasListInputs || canLazyLoadInputs;
   const hasRetries = (eval_.retries ?? 0) > 0;
   // The labeled categorical/boolean verdict is sometimes more informative
   // than the numeric score (e.g. score=1 with label="safe").
@@ -92,7 +103,11 @@ export function EvalCard({
     status === "error" && (!!eval_.evaluationId || !!eval_.evaluatorId);
   // Whether we have anything that warrants the "Show details" expand.
   const hasExpandableDetails =
-    hasInputs || hasStacktrace || hasLabel || showErrorPanel || showErrorIds;
+    mightHaveInputs ||
+    hasStacktrace ||
+    hasLabel ||
+    showErrorPanel ||
+    showErrorIds;
   const hasFooterRow =
     !!eval_.spanName || meta.length > 0 || hasExpandableDetails;
 
@@ -255,8 +270,7 @@ export function EvalCard({
           onSelectSpan={onSelectSpan}
           meta={meta}
           tone={tone}
-          inputEntries={inputEntries}
-          hasInputs={hasInputs}
+          mightHaveInputs={mightHaveInputs}
           hasStacktrace={hasStacktrace}
           hasLabel={hasLabel}
           showErrorPanel={showErrorPanel}
@@ -273,8 +287,7 @@ function EvalCardFooter({
   onSelectSpan,
   meta,
   tone,
-  inputEntries,
-  hasInputs,
+  mightHaveInputs,
   hasStacktrace,
   hasLabel,
   showErrorPanel,
@@ -285,8 +298,7 @@ function EvalCardFooter({
   onSelectSpan?: (spanId: string) => void;
   meta: string[];
   tone: (typeof STATUS)[keyof typeof STATUS];
-  inputEntries: [string, unknown][];
-  hasInputs: boolean;
+  mightHaveInputs: boolean;
   hasStacktrace: boolean;
   hasLabel: boolean;
   showErrorPanel: boolean;
@@ -294,6 +306,12 @@ function EvalCardFooter({
   hasExpandableDetails: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  // Fetch inputs only once the panel is open and only if the list query
+  // didn't already carry them (the hook short-circuits to the list inputs).
+  const { inputEntries, isLoading: inputsLoading } = useEvalInputs({
+    eval_,
+    enabled: open,
+  });
 
   return (
     <>
@@ -448,35 +466,46 @@ function EvalCardFooter({
               </Box>
             </DetailRow>
           )}
-          {hasInputs && (
+          {mightHaveInputs && (
             <DetailRow label="Inputs">
-              <VStack align="stretch" gap={1}>
-                {inputEntries.map(([key, value]) => (
-                  <HStack key={key} align="flex-start" gap={2} minWidth={0}>
-                    <Text
-                      textStyle="2xs"
-                      color="fg.subtle"
-                      flexShrink={0}
-                      minWidth="80px"
-                    >
-                      {key}
-                    </Text>
-                    <Box
-                      as="pre"
-                      textStyle="2xs"
-                      color="fg"
-                      whiteSpace="pre-wrap"
-                      wordBreak="break-word"
-                      margin={0}
-                      flex={1}
-                      maxHeight="160px"
-                      overflow="auto"
-                    >
-                      {formatInputValue(value)}
-                    </Box>
-                  </HStack>
-                ))}
-              </VStack>
+              {inputsLoading ? (
+                <HStack gap={2} color="fg.subtle">
+                  <Spinner size="xs" />
+                  <Text textStyle="2xs">Loading inputs…</Text>
+                </HStack>
+              ) : inputEntries.length > 0 ? (
+                <VStack align="stretch" gap={1}>
+                  {inputEntries.map(([key, value]) => (
+                    <HStack key={key} align="flex-start" gap={2} minWidth={0}>
+                      <Text
+                        textStyle="2xs"
+                        color="fg.subtle"
+                        flexShrink={0}
+                        minWidth="80px"
+                      >
+                        {key}
+                      </Text>
+                      <Box
+                        as="pre"
+                        textStyle="2xs"
+                        color="fg"
+                        whiteSpace="pre-wrap"
+                        wordBreak="break-word"
+                        margin={0}
+                        flex={1}
+                        maxHeight="160px"
+                        overflow="auto"
+                      >
+                        {formatInputValue(value)}
+                      </Box>
+                    </HStack>
+                  ))}
+                </VStack>
+              ) : (
+                <Text textStyle="2xs" color="fg.subtle" fontStyle="italic">
+                  No inputs recorded
+                </Text>
+              )}
             </DetailRow>
           )}
         </VStack>

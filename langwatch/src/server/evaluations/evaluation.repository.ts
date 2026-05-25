@@ -19,4 +19,16 @@ export interface EvaluationRepository {
     traceIds: string[];
     protections?: Protections;
   }): Promise<Record<string, TraceEvaluation[]>>;
+
+  /**
+   * Fetch the heavy `inputs` blob for a single evaluation, on demand. Kept
+   * off the list reads so the trace-wide query stays light; loaded lazily
+   * when a single evaluation is expanded. Returns null when the backend has
+   * no inputs to offer.
+   */
+  getEvaluationInputs(params: {
+    projectId: string;
+    evaluationId: string;
+    protections?: Protections;
+  }): Promise<Record<string, unknown> | null>;
 }
