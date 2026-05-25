@@ -8,6 +8,48 @@ import type { ClickHouseEvaluationRunRow } from "./evaluation-run.mappers";
 import { mapClickHouseEvaluationToTraceEvaluation } from "./evaluation-run.mappers";
 import type { TraceEvaluation } from "./evaluation-run.types";
 
+/**
+ * Columns the evaluation mapper actually reads, minus the heavy `Inputs`
+ * blob. `evaluation_runs` is `ORDER BY (TenantId, EvaluationId)`, so a
+ * `TraceId` filter can't prune granules — ClickHouse reads whole granules
+ * to evaluate the predicate, and when `Inputs` holds multi-MB payloads
+ * (RAG contexts, full conversations) materialising one granule blows past
+ * the per-query memory ceiling. The light projection lets us still return
+ * verdicts/scores when the heavy read would OOM.
+ */
+const EVAL_COLUMNS_LIGHT = [
+  "ProjectionId",
+  "TenantId",
+  "EvaluationId",
+  "Version",
+  "EvaluatorId",
+  "EvaluatorType",
+  "EvaluatorName",
+  "TraceId",
+  "IsGuardrail",
+  "Status",
+  "Score",
+  "Passed",
+  "Label",
+  "Details",
+  "Error",
+  "ScheduledAt",
+  "StartedAt",
+  "CompletedAt",
+  "LastProcessedEventId",
+  "UpdatedAt",
+].join(", ");
+
+const EVAL_COLUMNS_WITH_INPUTS = `${EVAL_COLUMNS_LIGHT}, Inputs`;
+
+/**
+ * ClickHouse raises this when a query would exceed `max_memory_usage`.
+ * We match on the stable prefix rather than the (variable) GiB figures.
+ */
+function isMemoryLimitError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /memory limit\s*(exceeded|.*exceeded)/i.test(message);
+}
 
 /**
  * Service for fetching per-trace evaluation runs from ClickHouse.
@@ -69,10 +111,10 @@ export class ClickHouseEvaluationService {
           "Fetching evaluations for trace from ClickHouse",
         );
 
-        try {
+        const runQuery = async (columns: string) => {
           const result = await clickHouseClient.query({
             query: `
-              SELECT *
+              SELECT ${columns}
               FROM evaluation_runs
               WHERE TenantId = {tenantId:String}
                 AND TraceId = {traceId:String}
@@ -84,18 +126,27 @@ export class ClickHouseEvaluationService {
                   GROUP BY TenantId, EvaluationId
                 )
             `,
-            query_params: {
-              tenantId: projectId,
-              traceId,
-            },
+            query_params: { tenantId: projectId, traceId },
             format: "JSONEachRow",
           });
+          return (await result.json()) as ClickHouseEvaluationRunRow[];
+        };
 
-          const rows =
-            (await result.json()) as ClickHouseEvaluationRunRow[];
-
+        try {
+          const rows = await runQuery(EVAL_COLUMNS_WITH_INPUTS);
           return rows.map(mapClickHouseEvaluationToTraceEvaluation);
         } catch (error) {
+          if (isMemoryLimitError(error)) {
+            // Heavy `Inputs` blobs blew the memory ceiling — retry without
+            // them so the operator still sees verdicts/scores instead of a
+            // 500. The eval card hides its inputs section when absent.
+            this.logger.warn(
+              { projectId, traceId },
+              "Evaluations read hit the ClickHouse memory limit; retrying without Inputs",
+            );
+            const rows = await runQuery(EVAL_COLUMNS_LIGHT);
+            return rows.map(mapClickHouseEvaluationToTraceEvaluation);
+          }
           this.logger.error(
             {
               projectId,
@@ -151,10 +202,10 @@ export class ClickHouseEvaluationService {
           "Fetching evaluations for multiple traces from ClickHouse",
         );
 
-        try {
+        const runQuery = async (columns: string) => {
           const result = await clickHouseClient.query({
             query: `
-              SELECT *
+              SELECT ${columns}
               FROM evaluation_runs
               WHERE TenantId = {tenantId:String}
                 AND TraceId IN ({traceIds:Array(String)})
@@ -166,17 +217,15 @@ export class ClickHouseEvaluationService {
                   GROUP BY TenantId, EvaluationId
                 )
             `,
-            query_params: {
-              tenantId: projectId,
-              traceIds,
-            },
+            query_params: { tenantId: projectId, traceIds },
             format: "JSONEachRow",
           });
+          return (await result.json()) as ClickHouseEvaluationRunRow[];
+        };
 
-          const rows =
-            (await result.json()) as ClickHouseEvaluationRunRow[];
-
-          // Group by TraceId
+        const groupByTrace = (
+          rows: ClickHouseEvaluationRunRow[],
+        ): Record<string, TraceEvaluation[]> => {
           const grouped: Record<string, TraceEvaluation[]> = {};
           for (const traceId of traceIds) {
             grouped[traceId] = [];
@@ -192,9 +241,22 @@ export class ClickHouseEvaluationService {
               );
             }
           }
-
           return grouped;
+        };
+
+        try {
+          return groupByTrace(await runQuery(EVAL_COLUMNS_WITH_INPUTS));
         } catch (error) {
+          if (isMemoryLimitError(error)) {
+            // Heavy `Inputs` blobs blew the memory ceiling — retry without
+            // them so the operator still sees verdicts/scores instead of a
+            // 500. The eval card hides its inputs section when absent.
+            this.logger.warn(
+              { projectId, traceIdCount: traceIds.length },
+              "Evaluations read hit the ClickHouse memory limit; retrying without Inputs",
+            );
+            return groupByTrace(await runQuery(EVAL_COLUMNS_LIGHT));
+          }
           this.logger.error(
             {
               projectId,

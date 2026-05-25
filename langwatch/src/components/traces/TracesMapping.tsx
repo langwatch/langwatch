@@ -13,6 +13,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowRight } from "react-feather";
 import type { Trace } from "~/server/tracer/types";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { useAnnotationsByTraceIds } from "../../hooks/useAnnotationsByTraceIds";
 import type { Workflow } from "../../optimization_studio/types/dsl";
 import type { DatasetRecordEntry } from "../../server/datasets/types";
 import {
@@ -111,13 +112,11 @@ export const TracesMapping = ({
     task: state.workbenchState.task,
   }));
 
-  const annotationScores = api.annotation.getByTraceIds.useQuery(
-    {
-      projectId: project?.id ?? "",
-      traceIds: traces.map((trace) => trace.trace_id),
-    },
-    { enabled: !!project, refetchOnWindowFocus: false },
-  );
+  const annotationScores = useAnnotationsByTraceIds({
+    projectId: project?.id ?? "",
+    traceIds: traces.map((trace) => trace.trace_id),
+    enabled: !!project,
+  });
   const getAnnotationScoreOptions = api.annotationScore.getAllActive.useQuery(
     { projectId: project?.id ?? "" },
     {
