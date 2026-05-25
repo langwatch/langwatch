@@ -19,6 +19,7 @@
  * resolution from there.
  */
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import { createS3Client } from "../storage";
 
 const s3ClientConstructorCalls: any[] = [];
 
@@ -185,5 +186,84 @@ describe("createS3Client credential mode handling", () => {
       expect(config.credentials).toBeUndefined();
       expect("credentials" in config).toBe(false);
     });
+  });
+});
+
+describe("region resolution — AWS endpoint, keyless (IRSA path)", () => {
+  beforeEach(() => {
+    s3ClientConstructorCalls.length = 0;
+    delete process.env.S3_ENDPOINT;
+    delete process.env.S3_ACCESS_KEY_ID;
+    delete process.env.S3_SECRET_ACCESS_KEY;
+    delete process.env.S3_SESSION_TOKEN;
+    delete process.env.S3_REGION;
+    delete process.env.S3_BUCKET_NAME;
+  });
+
+  it("passes region: undefined to S3Client when endpoint is unset and no keys", async () => {
+    // Arrange: no S3_ENDPOINT, no S3_REGION, no credentials (IRSA path)
+    await createS3Client("test-project");
+    const call = s3ClientConstructorCalls[0];
+    expect(call).not.toHaveProperty("region");
+  });
+
+  it("passes region: undefined when endpoint is *.amazonaws.com and no keys", async () => {
+    process.env.S3_ENDPOINT = "https://s3.eu-central-1.amazonaws.com";
+    await createS3Client("test-project");
+    const call = s3ClientConstructorCalls[0];
+    expect(call).not.toHaveProperty("region");
+  });
+});
+
+describe("region resolution — non-AWS endpoint (BYOC/R2/MinIO)", () => {
+  beforeEach(() => {
+    s3ClientConstructorCalls.length = 0;
+    delete process.env.S3_ENDPOINT;
+    delete process.env.S3_ACCESS_KEY_ID;
+    delete process.env.S3_SECRET_ACCESS_KEY;
+    delete process.env.S3_SESSION_TOKEN;
+    delete process.env.S3_REGION;
+    delete process.env.S3_BUCKET_NAME;
+  });
+
+  it("keeps region: 'auto' for R2 endpoint", async () => {
+    process.env.S3_ENDPOINT = "https://abc123.r2.cloudflarestorage.com";
+    await createS3Client("test-project");
+    const call = s3ClientConstructorCalls[0];
+    expect(call.region).toBe("auto");
+  });
+
+  it("keeps region: 'auto' for MinIO endpoint", async () => {
+    process.env.S3_ENDPOINT = "http://minio:9000";
+    await createS3Client("test-project");
+    const call = s3ClientConstructorCalls[0];
+    expect(call.region).toBe("auto");
+  });
+});
+
+describe("region resolution — explicit S3_REGION always wins", () => {
+  beforeEach(() => {
+    s3ClientConstructorCalls.length = 0;
+    delete process.env.S3_ENDPOINT;
+    delete process.env.S3_ACCESS_KEY_ID;
+    delete process.env.S3_SECRET_ACCESS_KEY;
+    delete process.env.S3_SESSION_TOKEN;
+    delete process.env.S3_REGION;
+    delete process.env.S3_BUCKET_NAME;
+  });
+
+  it("uses S3_REGION when set, even for AWS endpoint without keys", async () => {
+    process.env.S3_REGION = "eu-central-1";
+    await createS3Client("test-project");
+    const call = s3ClientConstructorCalls[0];
+    expect(call.region).toBe("eu-central-1");
+  });
+
+  it("uses S3_REGION when set, even for BYOC endpoint", async () => {
+    process.env.S3_REGION = "us-east-1";
+    process.env.S3_ENDPOINT = "http://minio:9000";
+    await createS3Client("test-project");
+    const call = s3ClientConstructorCalls[0];
+    expect(call.region).toBe("us-east-1");
   });
 });
