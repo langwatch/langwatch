@@ -22,6 +22,7 @@ func (a *App) coreDispatch(ctx context.Context, call *pipeline.Call) (*domain.Re
 		}, classifyProviderError)
 	call.Meta.FallbackCount = countFallbacks(el)
 	el.Release()
+	resp, err = applyGovernanceMessage(call.Bundle.Config, resp, err)
 	if err != nil {
 		return nil, err
 	}
@@ -39,7 +40,7 @@ func (a *App) coreDispatchStream(ctx context.Context, call *pipeline.Call) (doma
 		}, classifyProviderError)
 	call.Meta.FallbackCount = countFallbacks(el)
 	el.Release()
-	if err != nil {
+	if _, err = applyGovernanceMessage(call.Bundle.Config, nil, err); err != nil {
 		return nil, err
 	}
 	return iter, nil

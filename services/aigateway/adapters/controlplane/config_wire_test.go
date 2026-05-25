@@ -1,6 +1,7 @@
 package controlplane
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -105,5 +106,26 @@ func TestBuildGuardrails(t *testing.T) {
 		assert.Empty(t, got.Pre)
 		assert.Empty(t, got.Post)
 		assert.Empty(t, got.StreamChunk)
+	})
+}
+
+// The governance.account_error_message field round-trips from the bundle JSON
+// into domain.BundleConfig so the gateway can apply the org's admin-set
+// message. Absent governance object -> empty (verbatim passthrough default).
+func TestToDomain_GovernanceAccountErrorMessage(t *testing.T) {
+	t.Run("present", func(t *testing.T) {
+		var w configWire
+		err := json.Unmarshal([]byte(`{"governance":{"account_error_message":"Contact your LangWatch admin"}}`), &w)
+		assert.NoError(t, err)
+		got := w.toDomain()
+		assert.Equal(t, "Contact your LangWatch admin", got.Governance.AccountErrorMessage)
+	})
+
+	t.Run("absent governance object defaults to empty", func(t *testing.T) {
+		var w configWire
+		err := json.Unmarshal([]byte(`{"display_prefix":"vk-lw-x"}`), &w)
+		assert.NoError(t, err)
+		got := w.toDomain()
+		assert.Equal(t, "", got.Governance.AccountErrorMessage)
 	})
 }

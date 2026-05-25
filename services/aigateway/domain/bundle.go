@@ -62,6 +62,25 @@ type BundleConfig struct {
 	// yet — but plumbed end-to-end so future tag wiring is a one-line add
 	// in the control-plane materialiser.
 	VKTags []string
+
+	// Governance carries org-level governance knobs that shape gateway
+	// behavior beyond routing (e.g. the admin-set message shown when an
+	// account-level error blocks a governed user).
+	Governance GovernanceConfig
+}
+
+// GovernanceConfig holds org-level governance settings resolved into the
+// per-VK bundle by the control-plane materialiser.
+type GovernanceConfig struct {
+	// AccountErrorMessage is the org admin's custom message shown to a
+	// governed user when an account-level error blocks their request — the
+	// org's own budget block (402) or an upstream provider account
+	// exhaustion (e.g. credit/quota). A governed user can't act on the
+	// provider's billing portal (the org admin owns the account), so the org
+	// points them at the right contact instead. Empty = unset: the budget
+	// block falls back to a built-in default and upstream errors pass
+	// through verbatim.
+	AccountErrorMessage string
 }
 
 // ModelAlias maps a friendly name to a provider + model.
