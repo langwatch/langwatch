@@ -1,4 +1,8 @@
-import { PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import {
+  DeleteObjectCommand,
+  GetObjectCommand,
+  PutObjectCommand,
+} from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { nanoid } from "nanoid";
 
@@ -101,13 +105,16 @@ export async function stagedLangevalsFetch(
     );
     return fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json", ...headers },
+      // Content-Type is pinned last so callers can't override it: the
+      // body is always JSON-serialized here, same contract as the
+      // staged path below.
+      headers: { ...headers, "Content-Type": "application/json" },
       body: serialized,
     });
   }
 
   const ttlSeconds = env.LANGEVALS_STAGING_TTL_SECONDS;
-  const stagedUrl = await stagePayload({
+  const { s3Client, s3Bucket, key, stagedUrl } = await stagePayload({
     projectId,
     kind,
     serialized,
@@ -128,18 +135,29 @@ export async function stagedLangevalsFetch(
     "staged large langevals payload via presigned S3 URL",
   );
 
-  return fetch(url, {
-    method: "POST",
-    // Caller headers are spread first so the contract-defining
-    // X-Payload-S3-URL and Content-Type cannot be silently overridden;
-    // letting a caller override the staged header would mean the
-    // upstream Lambda fetches the wrong URL (or no URL at all).
-    headers: {
-      ...headers,
-      "Content-Type": "application/json",
-      [STAGED_HEADER]: stagedUrl,
-    },
-  });
+  try {
+    return await fetch(url, {
+      method: "POST",
+      // Caller headers are spread first so the contract-defining
+      // X-Payload-S3-URL and Content-Type cannot be silently overridden;
+      // letting a caller override the staged header would mean the
+      // upstream Lambda fetches the wrong URL (or no URL at all).
+      headers: {
+        ...headers,
+        "Content-Type": "application/json",
+        [STAGED_HEADER]: stagedUrl,
+      },
+    });
+  } finally {
+    // Best-effort delete: by the time fetch() resolves, langevals has
+    // already fetched the presigned URL during its request handling, so
+    // the object is no longer needed. Staged bodies carry customer trace
+    // data and provider credentials (api keys, vertex_credentials,
+    // bedrock keys) so we don't want them lingering. A bucket lifecycle
+    // rule on the langevals-staging/ prefix is the orphan/crash fallback
+    // for the failure paths where this delete can't run.
+    await deleteStagedObject({ s3Client, s3Bucket, key, projectId, kind });
+  }
 }
 
 interface StagePayloadInput {
@@ -149,7 +167,14 @@ interface StagePayloadInput {
   ttlSeconds: number;
 }
 
-async function stagePayload(input: StagePayloadInput): Promise<string> {
+interface StagedObject {
+  s3Client: Awaited<ReturnType<typeof createS3Client>>["s3Client"];
+  s3Bucket: string;
+  key: string;
+  stagedUrl: string;
+}
+
+async function stagePayload(input: StagePayloadInput): Promise<StagedObject> {
   const { projectId, kind, serialized, ttlSeconds } = input;
 
   const { s3Client, s3Bucket } = await createS3Client(projectId);
@@ -169,11 +194,38 @@ async function stagePayload(input: StagePayloadInput): Promise<string> {
     "uploaded staged payload to S3",
   );
 
-  return getSignedUrl(
+  const stagedUrl = await getSignedUrl(
     s3Client,
     new GetObjectCommand({ Bucket: s3Bucket, Key: key }),
     { expiresIn: ttlSeconds },
   );
+
+  return { s3Client, s3Bucket, key, stagedUrl };
+}
+
+async function deleteStagedObject(args: {
+  s3Client: StagedObject["s3Client"];
+  s3Bucket: string;
+  key: string;
+  projectId: string;
+  kind: LangevalsCallKind;
+}): Promise<void> {
+  const { s3Client, s3Bucket, key, projectId, kind } = args;
+  try {
+    await s3Client.send(
+      new DeleteObjectCommand({ Bucket: s3Bucket, Key: key }),
+    );
+    logger.debug(
+      { projectId, kind, bucket: s3Bucket, key },
+      "deleted staged payload from S3 after use",
+    );
+  } catch (error) {
+    // Non-fatal: the lifecycle rule on langevals-staging/ will reap it.
+    logger.warn(
+      { projectId, kind, bucket: s3Bucket, key, error },
+      "failed to delete staged payload from S3 (lifecycle rule will reap it)",
+    );
+  }
 }
 
 function safeUrlHost(url: string): string {

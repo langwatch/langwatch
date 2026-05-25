@@ -30,6 +30,13 @@ Feature: Auto S3 staging for large langevals payloads
     And the POST body is empty
 
   @unit
+  Scenario: Staged S3 object is deleted after the upstream responds
+    Given a payload was staged to S3 for an upstream call
+    When the upstream langevals call returns
+    Then the staged object is deleted from the same bucket and key
+    And the delete failure is non-fatal because a bucket lifecycle rule reaps orphans
+
+  @unit
   Scenario: Eval payload above the eval hard cap is rejected before any network call
     Given the serialized request body is larger than the evaluator hard cap
     When the control plane calls the evaluator endpoint
