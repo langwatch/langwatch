@@ -36,29 +36,38 @@ import (
 // we accept both. Returns "" when no endpoint is configured (the common
 // non-managed Bedrock case, which stays on bifrost).
 func bedrockRuntimeEndpoint(cred domain.Credential) string {
-	if cred.Extra == nil {
-		return ""
+	return credExtra(cred, "bedrock_runtime_endpoint", "aws_bedrock_runtime_endpoint")
+}
+
+// credExtra reads the first non-empty value among the given Extra keys.
+// The two nlpgo entry points name AWS credential fields differently: the
+// dispatcheradapter (Studio / workflows) translates litellm_params to the
+// Bifrost-canonical access_key / secret_key / session_token / region, while
+// the gatewayproxy (/go/proxy) keeps the litellm aws_* names. Accepting both
+// keeps the VPCE dispatch correct regardless of which route built the cred.
+func credExtra(cred domain.Credential, keys ...string) string {
+	for _, k := range keys {
+		if v := cred.Extra[k]; v != "" {
+			return v
+		}
 	}
-	if v := cred.Extra["bedrock_runtime_endpoint"]; v != "" {
-		return v
-	}
-	return cred.Extra["aws_bedrock_runtime_endpoint"]
+	return ""
 }
 
 // newBedrockRuntimeClient builds an aws-sdk-go-v2 bedrockruntime client pinned
 // to the VPC endpoint, using the static AWS credentials carried on the
-// credential's Extra map (same keys the bifrost Bedrock key path reads).
+// credential's Extra map.
 func newBedrockRuntimeClient(cred domain.Credential, endpoint string) *bedrockruntime.Client {
-	region := cred.Extra["region"]
+	region := credExtra(cred, "region", "aws_region_name")
 	if region == "" {
 		region = "us-east-1"
 	}
 	cfg := aws.Config{
 		Region: region,
 		Credentials: credentials.NewStaticCredentialsProvider(
-			cred.Extra["access_key"],
-			cred.Extra["secret_key"],
-			cred.Extra["session_token"],
+			credExtra(cred, "access_key", "aws_access_key_id"),
+			credExtra(cred, "secret_key", "aws_secret_access_key"),
+			credExtra(cred, "session_token", "aws_session_token"),
 		),
 		// endpoint already includes scheme, e.g. "https://vpce-....amazonaws.com".
 		BaseEndpoint: aws.String(endpoint),

@@ -128,3 +128,56 @@ func TestBedrockRuntimeEndpoint_FallbackKey(t *testing.T) {
 		t.Fatalf("fallback key not honored, got %q", got)
 	}
 }
+
+// given a credential carrying the litellm aws_* key names (the shape the
+// gatewayproxy /go/proxy route produces, as opposed to the canonical names
+// the dispatcheradapter produces)
+// when a chat request is dispatched through dispatchBedrockVPCE
+// then the request still reaches the endpoint, proving the credential reader
+// honors both key conventions so the VPCE path works on either nlpgo route.
+func TestBedrockVPCE_DispatchHonorsAWSStyleCredentialKeys(t *testing.T) {
+	var hit bool
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hit = true
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{
+			"output": {"message": {"role": "assistant", "content": [{"text": "ok"}]}},
+			"stopReason": "end_turn",
+			"usage": {"inputTokens": 1, "outputTokens": 1, "totalTokens": 2}
+		}`))
+	}))
+	defer srv.Close()
+
+	router := &BifrostRouter{}
+	cred := domain.Credential{
+		ID:         "cred-aws",
+		ProviderID: domain.ProviderBedrock,
+		Extra: map[string]string{
+			"aws_bedrock_runtime_endpoint": srv.URL,
+			"aws_access_key_id":            "AKIAEXAMPLE",
+			"aws_secret_access_key":        "secretexample",
+			"aws_region_name":              "us-east-1",
+		},
+	}
+	req := &domain.Request{
+		Type:  domain.RequestTypeChat,
+		Model: "anthropic.claude-3-5-sonnet-20240620-v1:0",
+		Body:  []byte(`{"messages":[{"role":"user","content":"hi"}]}`),
+	}
+
+	endpoint := bedrockRuntimeEndpoint(cred)
+	if endpoint == "" {
+		t.Fatal("bedrockRuntimeEndpoint returned empty for the aws_* fallback key")
+	}
+	resp, err := router.dispatchBedrockVPCE(context.Background(), req, mapProvider(cred.ProviderID), req.Model, cred, endpoint)
+	if err != nil {
+		t.Fatalf("dispatchBedrockVPCE returned error: %v", err)
+	}
+	if !hit {
+		t.Fatal("endpoint never hit — aws_* credential keys were not honored")
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", resp.StatusCode)
+	}
+}

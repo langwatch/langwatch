@@ -92,3 +92,82 @@ func TestBedrockVPCELive_Ping(t *testing.T) {
 		t.Fatalf("expected non-zero usage; body=%s", string(resp.Body))
 	}
 }
+
+// TestBedrockVPCELive_PingStream is the streaming counterpart: it exercises
+// dispatchBedrockVPCEStream (ConverseStream over the BaseEndpoint) and asserts
+// the eventstream round-trips, accumulating non-empty text across chunks and a
+// terminal finish reason. Same env gating as the non-streaming ping.
+func TestBedrockVPCELive_PingStream(t *testing.T) {
+	endpoint := os.Getenv("BVPCE_ENDPOINT")
+	if endpoint == "" {
+		t.Skip("BVPCE_ENDPOINT not set; skipping live Bedrock VPCE stream test")
+	}
+	ak := os.Getenv("AWS_ACCESS_KEY_ID")
+	sk := os.Getenv("AWS_SECRET_ACCESS_KEY")
+	if ak == "" || sk == "" {
+		t.Skip("AWS creds not set; skipping live Bedrock VPCE stream test")
+	}
+	region := os.Getenv("BVPCE_REGION")
+	if region == "" {
+		region = "us-east-1"
+	}
+	model := os.Getenv("BVPCE_MODEL")
+	if model == "" {
+		t.Fatal("BVPCE_MODEL must be set (the inference-profile id to invoke)")
+	}
+
+	extra := map[string]string{
+		"bedrock_runtime_endpoint": endpoint,
+		"access_key":               ak,
+		"secret_key":               sk,
+		"region":                   region,
+	}
+	if st := os.Getenv("AWS_SESSION_TOKEN"); st != "" {
+		extra["session_token"] = st
+	}
+
+	cred := domain.Credential{
+		ID:         "live-bedrock-vpce-stream",
+		ProviderID: domain.ProviderBedrock,
+		Extra:      extra,
+	}
+	req := &domain.Request{
+		Type:  domain.RequestTypeChat,
+		Model: model,
+		Body:  []byte(`{"messages":[{"role":"user","content":"count from one to five in words, space separated"}],"max_tokens":32}`),
+	}
+
+	router := &BifrostRouter{}
+	iter, err := router.dispatchBedrockVPCEStream(context.Background(), req, mapProvider(cred.ProviderID), model, cred, endpoint)
+	if err != nil {
+		t.Fatalf("dispatchBedrockVPCEStream error: %v", err)
+	}
+	defer iter.Close()
+
+	var chunks, deltas int
+	var text, finish string
+	for iter.Next(context.Background()) {
+		chunks++
+		chunk := iter.Chunk()
+		if d := gjson.GetBytes(chunk, "choices.0.delta.content").String(); d != "" {
+			deltas++
+			text += d
+		}
+		if fr := gjson.GetBytes(chunk, "choices.0.finish_reason").String(); fr != "" {
+			finish = fr
+		}
+	}
+	if err := iter.Err(); err != nil {
+		t.Fatalf("stream iterator error: %v", err)
+	}
+
+	t.Logf("LIVE STREAM 200 via %s | model=%s | chunks=%d deltas=%d | finish=%q | text=%q",
+		endpoint, model, chunks, deltas, finish, text)
+
+	if deltas == 0 || text == "" {
+		t.Fatalf("expected non-empty streamed text; chunks=%d deltas=%d", chunks, deltas)
+	}
+	if finish == "" {
+		t.Fatalf("expected a terminal finish reason; got none over %d chunks", chunks)
+	}
+}
