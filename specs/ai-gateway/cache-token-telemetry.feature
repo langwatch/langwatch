@@ -32,7 +32,7 @@ Feature: AI Gateway — prompt-cache token telemetry and cache-aware cost
   # Gateway emission: the span must carry the cache breakdown
   # ==========================================================================
 
-  @bdd @gateway @cache-telemetry @integration @unimplemented
+  @bdd @gateway @cache-telemetry @integration
   Scenario: A cached request records the cache-read and cache-write token counts on the span
     Given a follow-up request reuses a large cached prompt prefix
     When the gateway completes the request
@@ -40,14 +40,14 @@ Feature: AI Gateway — prompt-cache token telemetry and cache-aware cost
     And the span records the number of tokens written to the cache
     And both are recorded separately from the fresh input-token count
 
-  @bdd @gateway @cache-telemetry @integration @unimplemented
+  @bdd @gateway @cache-telemetry @integration
   Scenario: The fresh input-token count excludes cached tokens
     Given a request whose prompt is mostly served from the cache
     When the gateway completes the request
     Then the span's input-token count is only the non-cached remainder
     And it does not double-count the tokens read from or written to the cache
 
-  @bdd @gateway @cache-telemetry @integration @unimplemented
+  @bdd @gateway @cache-telemetry @integration
   Scenario: A request with no cache activity records no cache tokens
     Given a request that neither reads nor writes the prompt cache
     When the gateway completes the request
@@ -58,7 +58,7 @@ Feature: AI Gateway — prompt-cache token telemetry and cache-aware cost
   # Cost: cache reads priced cheap, not as fresh input
   # ==========================================================================
 
-  @bdd @cost @cache-telemetry @integration @unimplemented
+  @bdd @cost @cache-telemetry @integration
   Scenario: Cost reflects cache pricing, not the full input price
     Given a span that read a large prompt prefix from the cache
     When the cost is computed for the span
