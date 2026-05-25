@@ -12,21 +12,11 @@ import (
 // BudgetPrecheckFunc checks whether the request is within budget.
 type BudgetPrecheckFunc func(ctx context.Context, bundle *domain.Bundle) (domain.BudgetVerdict, error)
 
-// defaultBudgetExceededMessage is the admin-actionable copy shown when an org
-// hits its gateway spending limit and hasn't set a custom governance message.
-// Avoids credit/billing wording so generic agent clients render it verbatim
-// instead of overlaying their own billing UI.
-const defaultBudgetExceededMessage = "Your organization's AI gateway spending limit has been reached. Contact your LangWatch admin to raise it."
-
-// budgetExceededMessage prefers the org's configured governance message and
-// falls back to the built-in default, so the 402 always carries actionable
-// copy instead of a bare error code.
-func budgetExceededMessage(cfg domain.BundleConfig) string {
-	if msg := cfg.Governance.AccountErrorMessage; msg != "" {
-		return msg
-	}
-	return defaultBudgetExceededMessage
-}
+// budgetExceededMessage is the admin-actionable copy shown when an org hits
+// its gateway spending limit, so the 402 carries actionable guidance instead
+// of a bare error code. Avoids credit/billing wording so generic agent clients
+// render it verbatim instead of overlaying their own billing UI.
+const budgetExceededMessage = "Your organization's AI gateway spending limit has been reached. Contact your LangWatch admin to raise it."
 
 // Budget creates an interceptor that prechecks budget before dispatch.
 // Cost recording is NOT done here — the trace-fold reactor on the control
@@ -43,7 +33,7 @@ func Budget(precheck BudgetPrecheckFunc, logger *zap.Logger) Interceptor {
 			// No action needed.
 		case domain.BudgetBlock:
 			return herr.New(ctx, domain.ErrBudgetExceeded, herr.M{
-				"message": budgetExceededMessage(call.Bundle.Config),
+				"message": budgetExceededMessage,
 			})
 		case domain.BudgetWarn:
 			call.Meta.BudgetWarnings = append(call.Meta.BudgetWarnings, "near_limit")

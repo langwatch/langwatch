@@ -57,38 +57,18 @@ func TestRewriteErrorMessage(t *testing.T) {
 	}
 }
 
-func TestApplyGovernanceMessage_Disabled(t *testing.T) {
-	// No configured message -> verbatim passthrough on both shapes.
-	cfg := domain.BundleConfig{}
-	body := []byte(`{"error":{"message":"Your credit balance is too low"}}`)
-
-	resp := &domain.Response{StatusCode: 400, Body: append([]byte(nil), body...)}
-	gotResp, _ := applyGovernanceMessage(cfg, resp, nil)
-	if string(gotResp.Body) != string(body) {
-		t.Fatalf("disabled: response body must be untouched, got %q", gotResp.Body)
-	}
-
-	ue := &domain.UpstreamError{StatusCode: 400, Body: append([]byte(nil), body...), Message: "Your credit balance is too low"}
-	_, gotErr := applyGovernanceMessage(cfg, nil, ue)
-	var got *domain.UpstreamError
-	if errors.As(gotErr, &got); got.Message != "Your credit balance is too low" {
-		t.Fatalf("disabled: error message must be untouched, got %q", got.Message)
-	}
-}
-
 func TestApplyGovernanceMessage_RewritesAccountError(t *testing.T) {
-	cfg := domain.BundleConfig{Governance: domain.GovernanceConfig{AccountErrorMessage: "Contact your LangWatch admin"}}
 	body := []byte(`{"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low"}}`)
 
 	// Stream shape: *UpstreamError.
 	ue := &domain.UpstreamError{StatusCode: 400, Body: append([]byte(nil), body...), Message: "Your credit balance is too low"}
-	_, gotErr := applyGovernanceMessage(cfg, nil, ue)
+	_, gotErr := applyGovernanceMessage(nil, ue)
 	var got *domain.UpstreamError
 	errors.As(gotErr, &got)
-	if got.Message != "Contact your LangWatch admin" {
+	if got.Message != accountExhaustionMessage {
 		t.Fatalf("UpstreamError.Message not rewritten: %q", got.Message)
 	}
-	if m := gjson.GetBytes(got.Body, "error.message").String(); m != "Contact your LangWatch admin" {
+	if m := gjson.GetBytes(got.Body, "error.message").String(); m != accountExhaustionMessage {
 		t.Fatalf("body message not rewritten: %q", m)
 	}
 	if got.StatusCode != 400 {
@@ -97,8 +77,8 @@ func TestApplyGovernanceMessage_RewritesAccountError(t *testing.T) {
 
 	// Non-stream shape: Response.
 	resp := &domain.Response{StatusCode: 400, Body: append([]byte(nil), body...)}
-	gotResp, _ := applyGovernanceMessage(cfg, resp, nil)
-	if m := gjson.GetBytes(gotResp.Body, "error.message").String(); m != "Contact your LangWatch admin" {
+	gotResp, _ := applyGovernanceMessage(resp, nil)
+	if m := gjson.GetBytes(gotResp.Body, "error.message").String(); m != accountExhaustionMessage {
 		t.Fatalf("response body message not rewritten: %q", m)
 	}
 	if gotResp.StatusCode != 400 {
@@ -106,14 +86,14 @@ func TestApplyGovernanceMessage_RewritesAccountError(t *testing.T) {
 	}
 }
 
-// A retryable rate-limit must NOT be re-messaged even when a governance
-// message is configured — it stays verbatim and retryable (bug-33 complement).
+// A retryable rate-limit must NOT be re-messaged — it stays verbatim and
+// retryable (the bug-33 complement: only terminal account exhaustion is
+// re-messaged).
 func TestApplyGovernanceMessage_LeavesRetryableVerbatim(t *testing.T) {
-	cfg := domain.BundleConfig{Governance: domain.GovernanceConfig{AccountErrorMessage: "Contact your admin"}}
 	body := []byte(`{"error":{"message":"Rate limit reached","type":"rate_limit_error"}}`)
 
 	ue := &domain.UpstreamError{StatusCode: 429, Body: append([]byte(nil), body...), Message: "Rate limit reached"}
-	_, gotErr := applyGovernanceMessage(cfg, nil, ue)
+	_, gotErr := applyGovernanceMessage(nil, ue)
 	var got *domain.UpstreamError
 	errors.As(gotErr, &got)
 	if got.Message != "Rate limit reached" {

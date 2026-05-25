@@ -19,15 +19,6 @@ type configWire struct {
 	PolicyRules          policyRulesWire           `json:"policy_rules"`
 	Budgets          []budgetWire       `json:"budgets"`
 	CacheRules       []cacheRuleWire    `json:"cache_rules"`
-	Governance       governanceWire     `json:"governance"`
-}
-
-// governanceWire carries org-level governance settings. account_error_message
-// is the admin-set message shown when an account-level error blocks a governed
-// user; absent/empty means unset (budget block uses a built-in default,
-// upstream errors pass through verbatim).
-type governanceWire struct {
-	AccountErrorMessage string `json:"account_error_message"`
 }
 
 type providerSlotWire struct {
@@ -167,7 +158,6 @@ func (w *configWire) toDomain() domain.BundleConfig {
 
 	cfg.PolicyRules = buildPolicyRules(w.PolicyRules)
 	cfg.CacheRules = buildCacheRules(w.CacheRules)
-	cfg.Governance.AccountErrorMessage = w.Governance.AccountErrorMessage
 
 	return cfg
 }
