@@ -364,12 +364,12 @@ func TestRouter_MetaHeaders(t *testing.T) {
 	assert.NotEmpty(t, rec.Header().Get("X-LangWatch-Gateway-Request-Id"))
 }
 
-// TestRouter_BodySizeCap_DefaultsTo32MiB pins the contract: a request
+// TestRouter_BodySizeCap_RejectsOverLimit pins the contract: a request
 // strictly over the explicit cap is rejected with 413, a request below is
 // accepted. Uses a small-ish 1 KiB cap so the test can fit a giant-enough
 // body in memory without dominating the test suite. Zero-cap fallback is
 // exercised implicitly by every other test in this file (buildRouter leaves
-// MaxRequestBodyBytes unset → fallback to 32 MiB).
+// MaxRequestBodyBytes unset → fallback to the default cap).
 func TestRouter_BodySizeCap_RejectsOverLimit(t *testing.T) {
 	auth := &mockAuth{
 		resolveFn: func(_ context.Context, _ string) (*domain.Bundle, error) {

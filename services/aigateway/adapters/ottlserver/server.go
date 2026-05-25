@@ -358,8 +358,9 @@ const (
 	// input at ~64KB before posting.
 	validateMaxBodyBytes = 256 * 1024
 
-	// 32MB matches gateway's default chat-completion ceiling. OTLP
-	// batches from a busy collector can be multi-MB; allow room.
+	// OTLP batches from a busy collector can be multi-MB; 32MB leaves
+	// room. Sized independently of the chat-completion body cap — this is
+	// internal OTLP transform traffic, not large-context LLM payloads.
 	transformMaxBodyBytes = 32 * 1024 * 1024
 )
 

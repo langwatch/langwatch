@@ -45,11 +45,11 @@ type RouterDeps struct {
 	// Required when OTTLServer is set.
 	InternalSecret string
 	// MaxRequestBodyBytes caps the per-request body size. 0 falls back to
-	// config.DefaultMaxRequestBodyBytes (32 MiB) — sized for 1M-context LLM
-	// workloads where legitimate requests can be multi-MB. Set higher on
-	// enterprise deployments that send full-context 1M Gemini / multi-image
-	// vision payloads; lower on public edge deployments to tighten DDoS
-	// protection.
+	// config.DefaultMaxRequestBodyBytes (128 MiB) — sized for large-context
+	// LLM workloads where legitimate requests run tens of MB (a 10M-token
+	// text context alone is ~40-50 MB). Set higher on enterprise deployments
+	// that send full-context multi-image / media payloads; lower on public
+	// edge deployments to tighten DDoS protection.
 	MaxRequestBodyBytes int64
 }
 
