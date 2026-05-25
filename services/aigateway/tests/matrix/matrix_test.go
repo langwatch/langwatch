@@ -406,6 +406,70 @@ func assertTraceCaptured(t *testing.T, traceID string) float64 {
 	}
 }
 
+// traceCacheMetrics is the cache-relevant slice of a trace's aggregated
+// metrics, read back via /api/trace/:id.
+type traceCacheMetrics struct {
+	totalCost           float64
+	cacheReadTokens     int
+	cacheCreationTokens int
+}
+
+// fetchTraceCacheMetrics polls /api/trace/:id until the trace lands with a
+// non-zero cost, then returns its cache-token + cost metrics. Mirrors
+// assertTraceCaptured's auth + readback but surfaces the cache fields, so the
+// cache cell can assert the SPAN carried the cache breakdown — not just the
+// upstream response body. The breakdown is dropped if the gateway fails to
+// thread cache_read_input_tokens / cache_creation_input_tokens through
+// bifrost → domain.Usage → the dotted gen_ai.usage.cache_read.input_tokens
+// attr, which bills a cached follow-up at full input price.
+func fetchTraceCacheMetrics(t *testing.T, traceID string) traceCacheMetrics {
+	t.Helper()
+	apiKey := requireEnv(t, "LW_PROJECT_API_KEY")
+
+	deadline := time.Now().Add(30 * time.Second)
+	backoff := 500 * time.Millisecond
+	url := lwBaseURL() + "/api/trace/" + traceID
+
+	for {
+		req, _ := http.NewRequest(http.MethodGet, url, nil)
+		req.Header.Set("X-Auth-Token", apiKey)
+		client := &http.Client{Timeout: 10 * time.Second}
+		resp, err := client.Do(req)
+		if err == nil && resp.StatusCode == http.StatusOK {
+			body, _ := io.ReadAll(resp.Body)
+			resp.Body.Close()
+			var parsed struct {
+				Metrics struct {
+					TotalCost                float64 `json:"total_cost"`
+					PromptTokens             int     `json:"prompt_tokens"`
+					CompletionTokens         int     `json:"completion_tokens"`
+					CacheReadInputTokens     int     `json:"cache_read_input_tokens"`
+					CacheCreationInputTokens int     `json:"cache_creation_input_tokens"`
+				} `json:"metrics"`
+			}
+			if err := json.Unmarshal(body, &parsed); err == nil {
+				if parsed.Metrics.PromptTokens+parsed.Metrics.CompletionTokens > 0 && parsed.Metrics.TotalCost > 0 {
+					return traceCacheMetrics{
+						totalCost:           parsed.Metrics.TotalCost,
+						cacheReadTokens:     parsed.Metrics.CacheReadInputTokens,
+						cacheCreationTokens: parsed.Metrics.CacheCreationInputTokens,
+					}
+				}
+			}
+		}
+		if resp != nil {
+			resp.Body.Close()
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("trace %s did not land with total_cost > 0 within 30s", traceID)
+		}
+		time.Sleep(backoff)
+		if backoff < 4*time.Second {
+			backoff *= 2
+		}
+	}
+}
+
 // runCell is the common end-to-end runner: fire → assert HTTP → wait for trace
 // with cost. Each provider's test file composes a resolvedCell + calls this.
 func runCell(t *testing.T, rc resolvedCell) float64 {
@@ -592,10 +656,34 @@ func runCacheCellWith(t *testing.T, rc resolvedCell, primeFn, readFn func(string
 		t.Errorf("%s/cache: want cache_read > 0 on 2nd call; got 0\nread body: %s", rc.provider, readBody)
 	}
 
-	// Verify the read trace lands on the platform with cost > 0 — the cache
-	// hit still costs a small amount even though it's discounted.
-	cost := assertTraceCaptured(t, readTraceID)
-	t.Logf("cell %s/cache: prime_trace=%s read_trace=%s cache_read_tokens=%d duration=%s captured_cost=$%.6f",
-		rc.provider, primeTraceID, readTraceID, cacheRead, time.Since(start), cost)
-	return cost
+	// The cache_read above proves the upstream RESPONSE body round-trips; it
+	// does NOT prove the gateway threaded the breakdown onto the SPAN. Read
+	// both traces back and assert the span-level cache metrics + discounted
+	// cost — the gateway→OTLP→ingest drop that billed a cached follow-up at
+	// full input price is invisible from the response body alone.
+	primeMetrics := fetchTraceCacheMetrics(t, primeTraceID)
+	readMetrics := fetchTraceCacheMetrics(t, readTraceID)
+
+	if readMetrics.cacheReadTokens == 0 {
+		t.Errorf("%s/cache: read trace span missing cache_read_input_tokens; response reported cache_read=%d but the span dropped it",
+			rc.provider, cacheRead)
+	}
+	if readMetrics.cacheReadTokens != cacheRead {
+		t.Errorf("%s/cache: span cache_read_input_tokens=%d != response cache_read=%d (breakdown not threaded intact)",
+			rc.provider, readMetrics.cacheReadTokens, cacheRead)
+	}
+	// Discounted-cost guard: a cache-READ call (cached bulk priced at ~0.1x
+	// input) must cost materially less than the cache-PRIMING call (same bulk
+	// written at ~1.25x input). When cache pricing isn't applied, both bill
+	// the inflated input count at full price and the read is NOT cheaper, so
+	// the half-of-prime threshold stays red until both emission and cost-calc
+	// land.
+	if readMetrics.totalCost > primeMetrics.totalCost*0.5 {
+		t.Errorf("%s/cache: read cost $%.6f not discounted vs prime cost $%.6f — cache pricing not applied",
+			rc.provider, readMetrics.totalCost, primeMetrics.totalCost)
+	}
+
+	t.Logf("cell %s/cache: prime_trace=%s read_trace=%s cache_read=%d span_cache_read=%d span_cache_write=%d prime_cost=$%.6f read_cost=$%.6f duration=%s",
+		rc.provider, primeTraceID, readTraceID, cacheRead, readMetrics.cacheReadTokens, primeMetrics.cacheCreationTokens, primeMetrics.totalCost, readMetrics.totalCost, time.Since(start))
+	return readMetrics.totalCost
 }
