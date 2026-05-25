@@ -32,6 +32,13 @@ import (
 // credit-balance 400 is raw-body-present, so both hold here.
 const upstreamCreditBody = `{"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API."}}`
 
+// A terminal 4xx that is NOT account-exhaustion (a malformed request). The
+// credit-balance variant is intentionally re-messaged by the governance layer
+// (see governance_messaging_test.go), so the verbatim-passthrough guarantee is
+// demonstrated here with a generic terminal error the governance layer leaves
+// untouched.
+const upstreamTerminalBody = `{"type":"error","error":{"type":"invalid_request_error","message":"messages: at least one message is required"}}`
+
 func errTransportAuth() *mockAuth {
 	return &mockAuth{
 		resolveFn: func(_ context.Context, _ string) (*domain.Bundle, error) {
@@ -54,7 +61,7 @@ func messagesRequest(stream bool) *http.Request {
 func TestRouter_UpstreamTerminal4xx_NonStreamVerbatim(t *testing.T) {
 	provider := &mockProvider{
 		dispatchFn: func(_ context.Context, _ *domain.Request, _ domain.Credential) (*domain.Response, error) {
-			return &domain.Response{StatusCode: http.StatusBadRequest, Body: []byte(upstreamCreditBody)}, nil
+			return &domain.Response{StatusCode: http.StatusBadRequest, Body: []byte(upstreamTerminalBody)}, nil
 		},
 	}
 	router := buildRouter(
@@ -67,7 +74,7 @@ func TestRouter_UpstreamTerminal4xx_NonStreamVerbatim(t *testing.T) {
 	router.ServeHTTP(rec, messagesRequest(false))
 
 	require.Equal(t, http.StatusBadRequest, rec.Code)
-	assert.JSONEq(t, upstreamCreditBody, rec.Body.String())
+	assert.JSONEq(t, upstreamTerminalBody, rec.Body.String())
 	assert.NotContains(t, rec.Body.String(), "provider_error",
 		"terminal upstream error must not be re-wrapped in a provider_error envelope")
 }
@@ -78,8 +85,8 @@ func TestRouter_UpstreamTerminal4xx_StreamVerbatim(t *testing.T) {
 		dispatchStreamFn: func(_ context.Context, _ *domain.Request, _ domain.Credential) (domain.StreamIterator, error) {
 			return nil, &domain.UpstreamError{
 				StatusCode: http.StatusBadRequest,
-				Body:       []byte(upstreamCreditBody),
-				Message:    "Your credit balance is too low to access the Anthropic API.",
+				Body:       []byte(upstreamTerminalBody),
+				Message:    "messages: at least one message is required",
 			}
 		},
 	}
@@ -94,7 +101,7 @@ func TestRouter_UpstreamTerminal4xx_StreamVerbatim(t *testing.T) {
 
 	require.Equal(t, http.StatusBadRequest, rec.Code,
 		"streaming terminal 4xx must forward the upstream status, not a 502 envelope")
-	assert.JSONEq(t, upstreamCreditBody, rec.Body.String())
+	assert.JSONEq(t, upstreamTerminalBody, rec.Body.String())
 }
 
 // @scenario "Terminal upstream error is identical across stream and non-stream"
