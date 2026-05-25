@@ -18,8 +18,8 @@ describe("buildEvaluatorFacetQuery", () => {
       /** @scenario Evaluator facet labels drop the type prefix */
       it("labels rows by name (or id) without the evaluator-type prefix", () => {
         const { sql } = buildEvaluatorFacetQuery(ctx());
-        // The type prefix used to read `[workflow] relevancy ...` and ate
-        // the room the name needs — the label is now name-or-id only.
+        // The label is name-or-id only: a bracketed `[type]` prefix repeats
+        // across rows and eats the room the name needs to disambiguate.
         expect(sql).not.toMatch(/concat\('\[',\s*EvaluatorType/);
         expect(sql).toMatch(
           /if\(ifNull\(EvaluatorName, ''\) != '', EvaluatorName, EvaluatorId\) AS facet_label/,

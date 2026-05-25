@@ -60,11 +60,6 @@ export const spansRouter = createTRPCRouter({
       return sortedSpans;
     }),
 
-  // Prompt Studio is an authenticated, project-scoped feature with no
-  // public-share path, so this stays project-gated. It was previously a
-  // publicProcedure guarded only by checkProjectPermission (effectively
-  // protected, since anon resolves to no permission) — protectedProcedure
-  // makes the intent explicit and removes the public-by-default footgun.
   getForPromptStudio: protectedProcedure
     .input(
       z.object({

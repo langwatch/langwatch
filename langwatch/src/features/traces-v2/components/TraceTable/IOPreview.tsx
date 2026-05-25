@@ -41,9 +41,8 @@ export const IOPreview: React.FC<IOPreviewProps> = ({ input, output }) => {
  *    the pseudo's suspenders.
  *  - The span itself is zero-width with `overflow: visible`, so the
  *    glyph hangs past the last character without consuming layout
- *    width. It therefore can't push the line wider, can't wrap onto a
- *    line of its own, and can't be the lonely "↵…" the old leading-
- *    glyph approach was working around.
+ *    width. It therefore can't push the line wider and can't wrap onto
+ *    a line of its own.
  */
 const BreakMarker = () => (
   <chakra.span
