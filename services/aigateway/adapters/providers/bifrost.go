@@ -128,10 +128,10 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 	// rejects the InvokeModel with a 403. Only the chat path needs it (the
 	// managed-Bedrock studio/eval traffic); other request types were handled
 	// above. A no-op for Bedrock credentials without a runtime endpoint.
-	if cred.ProviderID == domain.ProviderBedrock {
-		if endpoint := bedrockRuntimeEndpoint(cred); endpoint != "" {
-			return r.dispatchBedrockVPCE(ctx, req, provider, model, cred, endpoint)
-		}
+	if endpoint, err := bedrockVPCEEndpoint(cred); err != nil {
+		return nil, err
+	} else if endpoint != "" {
+		return r.dispatchBedrockVPCE(ctx, req, provider, model, cred, endpoint)
 	}
 
 	bfReq, dispatchCtx, err := buildChatRequest(ctx, req, provider, model)
@@ -385,10 +385,10 @@ func (r *BifrostRouter) DispatchStream(ctx context.Context, req *domain.Request,
 	// official Bedrock ConverseStream API over the customer's VPC endpoint —
 	// same rationale as the non-streaming Dispatch intercept above. A no-op for
 	// Bedrock credentials without a runtime endpoint.
-	if cred.ProviderID == domain.ProviderBedrock {
-		if endpoint := bedrockRuntimeEndpoint(cred); endpoint != "" {
-			return r.dispatchBedrockVPCEStream(ctx, req, provider, model, cred, endpoint)
-		}
+	if endpoint, err := bedrockVPCEEndpoint(cred); err != nil {
+		return nil, err
+	} else if endpoint != "" {
+		return r.dispatchBedrockVPCEStream(ctx, req, provider, model, cred, endpoint)
 	}
 
 	if req.Type == domain.RequestTypeChat && isOpenAICompatibleProvider(provider) {

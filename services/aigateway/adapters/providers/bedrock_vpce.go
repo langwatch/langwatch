@@ -15,6 +15,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -73,6 +75,51 @@ func newBedrockRuntimeClient(cred domain.Credential, endpoint string) *bedrockru
 		BaseEndpoint: aws.String(endpoint),
 	}
 	return bedrockruntime.NewFromConfig(cfg)
+}
+
+// validateBedrockEndpoint guards the customer-supplied runtime endpoint before
+// it is used as the SDK BaseEndpoint. The endpoint reaches the gateway from
+// credential Extra (set per-request by the nlpgo adapters), so an unconstrained
+// value would let a request steer the gateway's outbound call at an arbitrary
+// host — an SSRF surface. Public Bedrock (bedrock-runtime.<region>.amazonaws.com)
+// and PrivateLink VPC endpoints (vpce-*.vpce.amazonaws.com) both live under the
+// AWS-controlled amazonaws.com domain, so the endpoint must be an http/https URL
+// whose host is within .amazonaws.com; anything else is rejected (fail closed).
+func validateBedrockEndpoint(endpoint string) error {
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		return fmt.Errorf("bedrock vpce: invalid runtime endpoint %q: %w", endpoint, err)
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return fmt.Errorf("bedrock vpce: runtime endpoint scheme must be http or https, got %q", u.Scheme)
+	}
+	host := strings.ToLower(u.Hostname())
+	if host == "" {
+		return fmt.Errorf("bedrock vpce: runtime endpoint %q has no host", endpoint)
+	}
+	if !strings.HasSuffix(host, ".amazonaws.com") {
+		return fmt.Errorf("bedrock vpce: runtime endpoint host %q is not an amazonaws.com endpoint", host)
+	}
+	return nil
+}
+
+// bedrockVPCEEndpoint is the admission gate for the managed-Bedrock VPCE path.
+// It returns the runtime endpoint to dispatch through when the credential is a
+// Bedrock credential carrying a valid endpoint, "" to stay on the bifrost path,
+// or an error when an endpoint is present but fails validation (fail closed, so
+// an untrusted endpoint is rejected rather than silently routed elsewhere).
+func bedrockVPCEEndpoint(cred domain.Credential) (string, error) {
+	if cred.ProviderID != domain.ProviderBedrock {
+		return "", nil
+	}
+	endpoint := bedrockRuntimeEndpoint(cred)
+	if endpoint == "" {
+		return "", nil
+	}
+	if err := validateBedrockEndpoint(endpoint); err != nil {
+		return "", err
+	}
+	return endpoint, nil
 }
 
 // bedrockModelID resolves the public model id to the provider-specific

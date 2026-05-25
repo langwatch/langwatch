@@ -129,6 +129,66 @@ func TestBedrockRuntimeEndpoint_FallbackKey(t *testing.T) {
 	}
 }
 
+// given various runtime endpoint strings
+// when validateBedrockEndpoint inspects them
+// then only http/https URLs whose host is within the AWS-controlled
+// amazonaws.com domain are accepted, closing the SSRF surface while still
+// allowing both the public endpoint and PrivateLink VPC endpoints (incl. the
+// customer's plain-http :80 VPCE).
+func TestValidateBedrockEndpoint(t *testing.T) {
+	valid := []string{
+		"https://bedrock-runtime.us-east-1.amazonaws.com",
+		"http://vpce-0b96b0d0dd1bc0391-yyy7ck36.vpce-svc-02cf455d913d12412.us-east-1.vpce.amazonaws.com:80",
+		"https://bedrock-runtime-fips.us-west-2.amazonaws.com",
+	}
+	for _, e := range valid {
+		if err := validateBedrockEndpoint(e); err != nil {
+			t.Errorf("expected %q to be valid, got %v", e, err)
+		}
+	}
+
+	invalid := []string{
+		"", // empty
+		"http://169.254.169.254/latest/meta-data",        // instance metadata
+		"http://127.0.0.1:8080",                          // loopback
+		"https://internal-service.local",                 // internal host
+		"https://evil.com",                               // arbitrary external
+		"https://bedrock-runtime.amazonaws.com.evil.com", // suffix-spoof
+		"ftp://bedrock-runtime.us-east-1.amazonaws.com",  // bad scheme
+		"bedrock-runtime.us-east-1.amazonaws.com",        // no scheme/host
+	}
+	for _, e := range invalid {
+		if err := validateBedrockEndpoint(e); err == nil {
+			t.Errorf("expected %q to be rejected, got nil error", e)
+		}
+	}
+}
+
+// given credentials at the managed-Bedrock admission gate
+// when bedrockVPCEEndpoint evaluates them
+// then it returns the endpoint for a valid bedrock cred, "" to stay on bifrost
+// for a non-bedrock or endpoint-less cred, and an error (fail closed) when an
+// endpoint is present but untrusted.
+func TestBedrockVPCEEndpoint_Gate(t *testing.T) {
+	// non-bedrock provider → stay on bifrost
+	if ep, err := bedrockVPCEEndpoint(domain.Credential{ProviderID: domain.ProviderOpenAI, Extra: map[string]string{"bedrock_runtime_endpoint": "https://bedrock-runtime.us-east-1.amazonaws.com"}}); ep != "" || err != nil {
+		t.Errorf("non-bedrock cred: got (%q, %v), want (\"\", nil)", ep, err)
+	}
+	// bedrock without endpoint → stay on bifrost
+	if ep, err := bedrockVPCEEndpoint(domain.Credential{ProviderID: domain.ProviderBedrock}); ep != "" || err != nil {
+		t.Errorf("endpoint-less bedrock cred: got (%q, %v), want (\"\", nil)", ep, err)
+	}
+	// bedrock with valid endpoint → dispatch through it
+	good := "http://vpce-abc.vpce-svc.us-east-1.vpce.amazonaws.com:80"
+	if ep, err := bedrockVPCEEndpoint(domain.Credential{ProviderID: domain.ProviderBedrock, Extra: map[string]string{"bedrock_runtime_endpoint": good}}); ep != good || err != nil {
+		t.Errorf("valid bedrock cred: got (%q, %v), want (%q, nil)", ep, err, good)
+	}
+	// bedrock with untrusted endpoint → fail closed
+	if ep, err := bedrockVPCEEndpoint(domain.Credential{ProviderID: domain.ProviderBedrock, Extra: map[string]string{"bedrock_runtime_endpoint": "http://169.254.169.254"}}); err == nil || ep != "" {
+		t.Errorf("untrusted endpoint: got (%q, %v), want (\"\", error)", ep, err)
+	}
+}
+
 // given a credential carrying the litellm aws_* key names (the shape the
 // gatewayproxy /go/proxy route produces, as opposed to the canonical names
 // the dispatcheradapter produces)
