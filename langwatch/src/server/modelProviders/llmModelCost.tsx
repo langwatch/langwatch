@@ -12,6 +12,8 @@ const getImportedModelCosts = () => {
       regex: string;
       inputCostPerToken: number;
       outputCostPerToken: number;
+      cacheReadCostPerToken?: number;
+      cacheCreationCostPerToken?: number;
     }
   > = {};
 
@@ -49,6 +51,8 @@ const getImportedModelCosts = () => {
         regex,
         inputCostPerToken: model.pricing.inputCostPerToken ?? 0,
         outputCostPerToken: model.pricing.outputCostPerToken ?? 0,
+        cacheReadCostPerToken: model.pricing.inputCacheReadPerToken,
+        cacheCreationCostPerToken: model.pricing.inputCacheWritePerToken,
       };
     }
   }
@@ -70,6 +74,8 @@ const getImportedModelCosts = () => {
         regex: model.regex,
         inputCostPerToken: model.inputCostPerToken,
         outputCostPerToken: model.outputCostPerToken,
+        cacheReadCostPerToken: model.cacheReadCostPerToken,
+        cacheCreationCostPerToken: model.cacheCreationCostPerToken,
       };
     });
 
@@ -96,6 +102,13 @@ export type MaybeStoredLLMModelCost = {
   regex: string;
   inputCostPerToken?: number;
   outputCostPerToken?: number;
+  // Per-token rates for prompt-cache tokens. Read tokens are billed far
+  // below the input rate (~0.1x); write tokens above it (~1.25x/2x). Only
+  // the static registry carries these today (sourced from the catalog's
+  // inputCacheReadPerToken / inputCacheWritePerToken); custom costs leave
+  // them undefined and fall back to no cache discount.
+  cacheReadCostPerToken?: number;
+  cacheCreationCostPerToken?: number;
   updatedAt?: Date;
   createdAt?: Date;
 };
@@ -119,6 +132,8 @@ export const getStaticModelCosts = (): MaybeStoredLLMModelCost[] => {
         regex: value.regex,
         inputCostPerToken: value.inputCostPerToken,
         outputCostPerToken: value.outputCostPerToken,
+        cacheReadCostPerToken: value.cacheReadCostPerToken,
+        cacheCreationCostPerToken: value.cacheCreationCostPerToken,
       }))
       // Sort by the matched model suffix, not raw registry key length,
       // because vendor prefixes are optional in the generated regex.

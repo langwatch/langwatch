@@ -30,6 +30,43 @@ describe("computeSpanCost", () => {
     });
   });
 
+  describe("when span has prompt-cache tokens", () => {
+    it("prices cache-read tokens at the discounted cache rate, not the full input price", () => {
+      // A mostly-cached follow-up: 510 fresh input + 37127 cache-read + 14
+      // cache-write (the depleted-"yo" shape from the bug report).
+      const cacheAware = computeSpanCost({
+        attrs: {
+          "gen_ai.request.model": "claude-opus-4-7",
+          "gen_ai.usage.cache_read.input_tokens": 37127,
+          "gen_ai.usage.cache_creation.input_tokens": 14,
+        },
+        promptTokens: 510,
+        completionTokens: 12,
+      });
+      // The bug: the 37k cache-read tokens billed as full input price.
+      const asIfFullInput = computeSpanCost({
+        attrs: { "gen_ai.request.model": "claude-opus-4-7" },
+        promptTokens: 510 + 37127 + 14,
+        completionTokens: 12,
+      });
+      expect(cacheAware).toBeGreaterThan(0);
+      expect(cacheAware!).toBeLessThan(asIfFullInput!);
+    });
+
+    it("adds cache-read cost on top of the non-cached input (input treated as exclusive)", () => {
+      const cost = computeSpanCost({
+        attrs: {
+          "gen_ai.request.model": "claude-opus-4-7",
+          "gen_ai.usage.cache_read.input_tokens": 1000,
+        },
+        promptTokens: 100,
+        completionTokens: 0,
+      })!;
+      // claude-opus-4-7: input 5e-6/token, cache-read 5e-7/token.
+      expect(cost).toBeCloseTo(100 * 5e-6 + 1000 * 5e-7, 10);
+    });
+  });
+
   describe("when span has model in static registry", () => {
     it("uses static registry pricing", () => {
       const result = computeSpanCost({
