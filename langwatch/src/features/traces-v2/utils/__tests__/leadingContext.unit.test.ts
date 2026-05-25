@@ -3,6 +3,7 @@ import { splitLeadingContextBlocks } from "../leadingContext";
 
 describe("splitLeadingContextBlocks", () => {
   describe("when a context block precedes the human text", () => {
+    /** @scenario "Leading agent context is separated from the human message" */
     it("separates the leading block from the trailing prose", () => {
       const input =
         "<system-reminder>\nThe following skills are available\n</system-reminder>\n\nhi";
@@ -49,6 +50,7 @@ describe("splitLeadingContextBlocks", () => {
       expect(body).toBe("just a normal message");
     });
 
+    /** @scenario "Tags that follow the human text are left untouched" */
     it("does not strip tags that come after real prose", () => {
       const input = "here is some xml <config>x</config> for you";
       const { context, body } = splitLeadingContextBlocks(input);

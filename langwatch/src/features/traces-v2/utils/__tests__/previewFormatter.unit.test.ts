@@ -13,6 +13,7 @@ describe("formatPreview", () => {
   });
 
   describe("given prepended XML context above the human text", () => {
+    /** @scenario "The trace list preview shows the human text, not the boilerplate" */
     it("strips a leading system-reminder block from a plain string", () => {
       const input =
         "<system-reminder>\nThe following skills are available\n</system-reminder>\n\nhi";
@@ -33,6 +34,7 @@ describe("formatPreview", () => {
       expect(result.role).toBe("user");
     });
 
+    /** @scenario "A context-only message stays visible instead of blanking" */
     it("keeps a context-only message visible rather than blanking it", () => {
       const input = "<system-reminder>only context, no human text</system-reminder>";
       const result = formatPreview(input, opts);
