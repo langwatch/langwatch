@@ -267,7 +267,7 @@ func assistantContentBlocks(m bfschemas.ChatMessage) []brtypes.ContentBlock {
 	if m.ChatAssistantMessage == nil {
 		return blocks
 	}
-	for _, tc := range m.ChatAssistantMessage.ToolCalls {
+	for _, tc := range m.ToolCalls {
 		use := brtypes.ToolUseBlock{
 			Input: brdocument.NewLazyDocument(parseToolArguments(tc.Function.Arguments)),
 		}
@@ -287,8 +287,8 @@ func assistantContentBlocks(m bfschemas.ChatMessage) []brtypes.ContentBlock {
 // result text from the message content.
 func toolResultBlocks(m bfschemas.ChatMessage) []brtypes.ContentBlock {
 	var toolUseID string
-	if m.ChatToolMessage != nil && m.ChatToolMessage.ToolCallID != nil {
-		toolUseID = *m.ChatToolMessage.ToolCallID
+	if m.ChatToolMessage != nil && m.ToolCallID != nil {
+		toolUseID = *m.ToolCallID
 	}
 	var resultContent []brtypes.ToolResultContentBlock
 	for _, text := range messageTexts(m) {
@@ -344,7 +344,8 @@ func mapBedrockToolConfig(params *bfschemas.ChatParameters) *brtypes.ToolConfigu
 		return nil
 	}
 	var tools []brtypes.Tool
-	for _, t := range params.Tools {
+	for i := range params.Tools {
+		t := &params.Tools[i]
 		if t.Function == nil {
 			continue
 		}

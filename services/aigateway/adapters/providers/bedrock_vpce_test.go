@@ -79,7 +79,7 @@ func TestBedrockVPCE_DispatchHitsEndpointAndShapesResponse(t *testing.T) {
 		t.Fatalf("expected Converse path, got %q", captured.path)
 	}
 
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected status 200, got %d", resp.StatusCode)
 	}
 
