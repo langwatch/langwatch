@@ -1,6 +1,7 @@
 import { Box, Button, Icon, Text, VStack } from "@chakra-ui/react";
 import { useMemo, useState } from "react";
-import { LuChevronDown, LuChevronRight, LuWrench } from "react-icons/lu";
+import { LuChevronDown, LuChevronRight, LuFileText, LuWrench } from "react-icons/lu";
+import { splitLeadingContextBlocks } from "../../../utils/leadingContext";
 import { RenderedMarkdown } from "../markdownView";
 import { asMarkdownBody, parseContentBlocks } from "./parsing";
 import { ReasoningBlock } from "./ReasoningBlock";
@@ -166,6 +167,24 @@ export function BlockStack({
             />
           );
         }
+        // Collapse Claude-Code-style prepended context (<system-reminder>,
+        // MCP instructions, skills list) behind a disclosure when real prose
+        // follows it, so the human text reads first.
+        const { context, body } = splitLeadingContextBlocks(b.text);
+        if (context && body.trim()) {
+          return (
+            <VStack key={`t-${i}`} align="stretch" gap={1.5}>
+              <ContextDisclosure context={context} />
+              <Box textStyle="xs" color="fg" lineHeight="1.6">
+                <RenderedMarkdown
+                  markdown={asMarkdownBody(body)}
+                  paddingX={0}
+                  paddingY={0}
+                />
+              </Box>
+            </VStack>
+          );
+        }
         return (
           <Box key={`t-${i}`} textStyle="xs" color="fg" lineHeight="1.6">
             <RenderedMarkdown
@@ -276,5 +295,64 @@ export function BlockStack({
         </Text>
       )}
     </VStack>
+  );
+}
+
+/**
+ * Collapsible disclosure for the prepended context (system-reminder, MCP
+ * instructions, skills list) that agents stack above the human message.
+ * Collapsed by default so the actual conversation reads first; a one-line
+ * snippet hints at what is hidden, and expanding shows the full block.
+ */
+function ContextDisclosure({ context }: { context: string }) {
+  const [open, setOpen] = useState(false);
+  const snippet = useMemo(() => {
+    const flat = context.replace(/\s+/g, " ").trim();
+    return flat.length > 80 ? `${flat.slice(0, 80)}…` : flat;
+  }, [context]);
+
+  return (
+    <Box>
+      <Button
+        size="xs"
+        variant="ghost"
+        onClick={() => setOpen((v) => !v)}
+        paddingX={2}
+        paddingY={1}
+        height="auto"
+        color="fg.subtle"
+        _hover={{ color: "fg.muted", bg: "bg.muted" }}
+      >
+        <Icon
+          as={open ? LuChevronDown : LuChevronRight}
+          boxSize={3}
+          marginEnd={1}
+        />
+        <Icon as={LuFileText} boxSize={3} marginEnd={1.5} />
+        <Text textStyle="xs" fontWeight="500">
+          {open ? "Hide additional context" : "Hidden additional context"}
+        </Text>
+      </Button>
+      {!open && (
+        <Text
+          textStyle="2xs"
+          color="fg.subtle"
+          fontFamily="mono"
+          paddingX={2}
+          truncate
+        >
+          {snippet}
+        </Text>
+      )}
+      {open && (
+        <Box textStyle="xs" color="fg.muted" lineHeight="1.6" paddingTop={1}>
+          <RenderedMarkdown
+            markdown={asMarkdownBody(context)}
+            paddingX={0}
+            paddingY={0}
+          />
+        </Box>
+      )}
+    </Box>
   );
 }
