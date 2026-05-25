@@ -713,16 +713,21 @@ func credentialToBifrostKey(cred domain.Credential, provider bfschemas.ModelProv
 		k.AzureKeyConfig = cfg
 
 	case bfschemas.Bedrock:
+		// Two nlpgo routes feed Bedrock creds under different key names: the
+		// dispatcheradapter (Studio / workflows) translates to the canonical
+		// access_key / secret_key / session_token / region, while the
+		// gatewayproxy (/go/proxy) keeps the litellm aws_* names. Accept both
+		// so neither route lands here with empty credentials.
 		cfg := &bfschemas.BedrockKeyConfig{
-			AccessKey:   envVar(cred.Extra["access_key"]),
-			SecretKey:   envVar(cred.Extra["secret_key"]),
+			AccessKey:   envVar(credExtra(cred, "access_key", "aws_access_key_id")),
+			SecretKey:   envVar(credExtra(cred, "secret_key", "aws_secret_access_key")),
 			Deployments: cred.DeploymentMap,
 		}
-		if st, ok := cred.Extra["session_token"]; ok && st != "" {
+		if st := credExtra(cred, "session_token", "aws_session_token"); st != "" {
 			v := envVar(st)
 			cfg.SessionToken = &v
 		}
-		if region, ok := cred.Extra["region"]; ok && region != "" {
+		if region := credExtra(cred, "region", "aws_region_name"); region != "" {
 			v := envVar(region)
 			cfg.Region = &v
 		}
