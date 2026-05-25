@@ -167,16 +167,12 @@ export async function whenIClickSave(page: Page) {
   await expect(saveWithoutRunning).toBeVisible({ timeout: 5000 });
   await saveWithoutRunning.click();
 
-  // Wait for save to complete - the drawer shows a success toast
-  // Note: The drawer stays open after save (by design), so we wait for the toast
+  // Wait for save to complete, then let the drawer close itself.
+  // ScenarioFormDrawer calls onClose() automatically after the success toast,
+  // so clicking Close here would race the auto-close and cause flakiness.
   const successToast = page.getByText(/scenario (created|updated)/i);
   await expect(successToast).toBeVisible({ timeout: 10000 });
 
-  // Close the drawer by clicking the close button
-  const closeButton = page.getByRole("button", { name: "Close" }).last();
-  await closeButton.click();
-
-  // Wait for drawer to close
   await expect(saveButton).not.toBeVisible({ timeout: 10000 });
 }
 
