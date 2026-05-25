@@ -70,7 +70,7 @@ Feature: AI Gateway — prompt-cache token telemetry and cache-aware cost
   # End-to-end: a real cached follow-up is billed at cents, not dollars
   # ==========================================================================
 
-  @bdd @cache-telemetry @e2e @unimplemented
+  @bdd @cache-telemetry @e2e
   Scenario: A real cached follow-up is billed at the cache rate, not full input price
     Given a real agent wrapper sends a follow-up that reuses a cached prompt prefix
     When the trace lands in the product
