@@ -27,6 +27,8 @@ export const llmModelCostsRouter = createTRPCRouter({
         model: z.string(),
         inputCostPerToken: z.number().optional(),
         outputCostPerToken: z.number().optional(),
+        cacheReadCostPerToken: z.number().optional(),
+        cacheCreationCostPerToken: z.number().optional(),
         regex: z.string().refine((value) => isSafeRegex(value), {
           message:
             "Invalid or unsafe regular expression (avoid nested quantifiers like (a+)+)",
@@ -41,6 +43,8 @@ export const llmModelCostsRouter = createTRPCRouter({
         model,
         inputCostPerToken,
         outputCostPerToken,
+        cacheReadCostPerToken,
+        cacheCreationCostPerToken,
         regex,
       } = input;
 
@@ -52,6 +56,8 @@ export const llmModelCostsRouter = createTRPCRouter({
             model,
             inputCostPerToken,
             outputCostPerToken,
+            cacheReadCostPerToken,
+            cacheCreationCostPerToken,
             regex,
           },
         });
@@ -66,6 +72,8 @@ export const llmModelCostsRouter = createTRPCRouter({
           model,
           inputCostPerToken,
           outputCostPerToken,
+          cacheReadCostPerToken,
+          cacheCreationCostPerToken,
           regex,
         },
       });

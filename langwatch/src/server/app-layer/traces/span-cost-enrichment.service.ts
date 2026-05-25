@@ -41,6 +41,8 @@ export function createCostEnrichmentDeps(
         regex: r.regex,
         inputCostPerToken: r.inputCostPerToken ?? undefined,
         outputCostPerToken: r.outputCostPerToken ?? undefined,
+        cacheReadCostPerToken: r.cacheReadCostPerToken ?? undefined,
+        cacheCreationCostPerToken: r.cacheCreationCostPerToken ?? undefined,
         updatedAt: r.updatedAt,
         createdAt: r.createdAt,
       }));
@@ -92,6 +94,22 @@ export class OtlpSpanCostEnrichmentService {
         value: { doubleValue: matched.outputCostPerToken ?? 0 },
       },
     );
+
+    // Only emit cache-rate overrides when the custom cost defines them, so a
+    // model without an explicit cache rate keeps falling back to the input
+    // rate in the fold projection rather than being priced at zero.
+    if (matched.cacheReadCostPerToken != null) {
+      span.attributes.push({
+        key: "langwatch.model.cacheReadCostPerToken",
+        value: { doubleValue: matched.cacheReadCostPerToken },
+      });
+    }
+    if (matched.cacheCreationCostPerToken != null) {
+      span.attributes.push({
+        key: "langwatch.model.cacheCreationCostPerToken",
+        value: { doubleValue: matched.cacheCreationCostPerToken },
+      });
+    }
   }
 
 }

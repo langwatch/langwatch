@@ -16,6 +16,43 @@ describe("computeSpanCost", () => {
       expect(result).toBeCloseTo(0.00125, 6);
     });
 
+    it("prices cache tokens at the custom override rate when present", () => {
+      const result = computeSpanCost({
+        attrs: {
+          "langwatch.model.inputCostPerToken": 0.000005,
+          "langwatch.model.outputCostPerToken": 0.000015,
+          "langwatch.model.cacheReadCostPerToken": 0.0000005,
+          "langwatch.model.cacheCreationCostPerToken": 0.00000625,
+          "gen_ai.usage.cache_read.input_tokens": 1000,
+          "gen_ai.usage.cache_creation.input_tokens": 100,
+        },
+        promptTokens: 100,
+        completionTokens: 50,
+      });
+      // 100*5e-6 + 50*15e-6 + 1000*5e-7 + 100*6.25e-6 = 0.00250
+      expect(result).toBeCloseTo(
+        100 * 0.000005 +
+          50 * 0.000015 +
+          1000 * 0.0000005 +
+          100 * 0.00000625,
+        10,
+      );
+    });
+
+    it("falls back to the input rate for cache tokens when no cache override is set", () => {
+      const result = computeSpanCost({
+        attrs: {
+          "langwatch.model.inputCostPerToken": 0.000005,
+          "langwatch.model.outputCostPerToken": 0.000015,
+          "gen_ai.usage.cache_read.input_tokens": 1000,
+        },
+        promptTokens: 100,
+        completionTokens: 0,
+      });
+      // No cache override: cache reads billed at the input rate.
+      expect(result).toBeCloseTo(100 * 0.000005 + 1000 * 0.000005, 10);
+    });
+
     it("returns 0 without falling through when custom rates yield zero cost", () => {
       const result = computeSpanCost({
         attrs: {

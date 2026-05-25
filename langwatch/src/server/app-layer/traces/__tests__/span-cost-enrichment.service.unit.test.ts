@@ -72,6 +72,61 @@ describe("OtlpSpanCostEnrichmentService", () => {
       });
     });
 
+    describe("when custom pricing defines cache rates", () => {
+      it("sets cache read and write rate attributes on the span", async () => {
+        const customCost: MaybeStoredLLMModelCost = {
+          projectId: "project-1",
+          model: "gpt-4o",
+          regex: "^gpt-4o$",
+          inputCostPerToken: 0.000005,
+          outputCostPerToken: 0.000015,
+          cacheReadCostPerToken: 0.0000005,
+          cacheCreationCostPerToken: 0.00000625,
+        };
+        const deps = createMockDeps([customCost]);
+        const service = new OtlpSpanCostEnrichmentService(deps);
+        const span = createTestSpan([
+          { key: "gen_ai.request.model", value: { stringValue: "gpt-4o" } },
+        ]);
+
+        await service.enrichSpan(span, "project-1");
+
+        expect(span.attributes).toContainEqual({
+          key: "langwatch.model.cacheReadCostPerToken",
+          value: { doubleValue: 0.0000005 },
+        });
+        expect(span.attributes).toContainEqual({
+          key: "langwatch.model.cacheCreationCostPerToken",
+          value: { doubleValue: 0.00000625 },
+        });
+      });
+    });
+
+    describe("when custom pricing omits cache rates", () => {
+      it("does not set cache rate attributes so the input rate fallback applies", async () => {
+        const customCost: MaybeStoredLLMModelCost = {
+          projectId: "project-1",
+          model: "gpt-4o",
+          regex: "^gpt-4o$",
+          inputCostPerToken: 0.000005,
+          outputCostPerToken: 0.000015,
+        };
+        const deps = createMockDeps([customCost]);
+        const service = new OtlpSpanCostEnrichmentService(deps);
+        const span = createTestSpan([
+          { key: "gen_ai.request.model", value: { stringValue: "gpt-4o" } },
+        ]);
+
+        await service.enrichSpan(span, "project-1");
+
+        const cacheKeys = span.attributes.map((a) => a.key);
+        expect(cacheKeys).not.toContain("langwatch.model.cacheReadCostPerToken");
+        expect(cacheKeys).not.toContain(
+          "langwatch.model.cacheCreationCostPerToken",
+        );
+      });
+    });
+
     describe("when span has no model attribute", () => {
       it("returns without querying the database", async () => {
         const deps = createMockDeps();

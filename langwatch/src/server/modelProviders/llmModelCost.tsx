@@ -103,10 +103,10 @@ export type MaybeStoredLLMModelCost = {
   inputCostPerToken?: number;
   outputCostPerToken?: number;
   // Per-token rates for prompt-cache tokens. Read tokens are billed far
-  // below the input rate (~0.1x); write tokens above it (~1.25x/2x). Only
-  // the static registry carries these today (sourced from the catalog's
-  // inputCacheReadPerToken / inputCacheWritePerToken); custom costs leave
-  // them undefined and fall back to no cache discount.
+  // below the input rate (~0.1x); write tokens above it (~1.25x/2x). The
+  // static registry sources these from the catalog's inputCacheReadPerToken /
+  // inputCacheWritePerToken; custom overrides may set them too. When absent,
+  // cache tokens fall back to the input rate (counted, just not discounted).
   cacheReadCostPerToken?: number;
   cacheCreationCostPerToken?: number;
   updatedAt?: Date;
@@ -169,6 +169,9 @@ export const getLLMModelCosts = async ({
           regex: record.regex,
           inputCostPerToken: record.inputCostPerToken ?? undefined,
           outputCostPerToken: record.outputCostPerToken ?? undefined,
+          cacheReadCostPerToken: record.cacheReadCostPerToken ?? undefined,
+          cacheCreationCostPerToken:
+            record.cacheCreationCostPerToken ?? undefined,
           updatedAt: record.updatedAt,
           createdAt: record.createdAt,
         }) as MaybeStoredLLMModelCost,

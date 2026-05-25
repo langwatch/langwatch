@@ -44,9 +44,9 @@ export function computeSpanCost({
     ) ?? 0,
   );
 
-  // Priority 1: Custom cost rates from enrichment. Custom costs carry no
-  // dedicated cache rate, so cache tokens fall back to the input rate
-  // (counted, just not discounted).
+  // Priority 1: Custom cost rates from enrichment. A custom cost may carry
+  // its own cache rates (customer override); when it does not, cache tokens
+  // fall back to the input rate (counted, just not discounted).
   const numInputRate = coerceToNumber(
     attrs[ATTR_KEYS.LANGWATCH_MODEL_INPUT_COST_PER_TOKEN],
   );
@@ -55,10 +55,19 @@ export function computeSpanCost({
   );
   if (numInputRate !== null || numOutputRate !== null) {
     const inputRate = numInputRate ?? 0;
+    const cacheReadRate =
+      coerceToNumber(
+        attrs[ATTR_KEYS.LANGWATCH_MODEL_CACHE_READ_COST_PER_TOKEN],
+      ) ?? inputRate;
+    const cacheCreationRate =
+      coerceToNumber(
+        attrs[ATTR_KEYS.LANGWATCH_MODEL_CACHE_CREATION_COST_PER_TOKEN],
+      ) ?? inputRate;
     return (
       inputTokens * inputRate +
       outputTokens * (numOutputRate ?? 0) +
-      (cacheReadTokens + cacheCreationTokens) * inputRate
+      cacheReadTokens * cacheReadRate +
+      cacheCreationTokens * cacheCreationRate
     );
   }
 
