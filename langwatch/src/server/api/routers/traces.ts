@@ -91,6 +91,28 @@ export const tracesRouter = createTRPCRouter({
       return evaluations[input.traceId];
     }),
 
+  getEvaluationInputs: publicProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        traceId: z.string(),
+        evaluationId: z.string(),
+      }),
+    )
+    .use(
+      checkPermissionOrPubliclyShared(checkProjectPermission("traces:view"), {
+        resourceType: PublicShareResourceTypes.TRACE,
+        resourceParam: "traceId",
+      }),
+    )
+    .query(async ({ input, ctx }) => {
+      const traceService = TraceService.create(ctx.prisma);
+      return traceService.getEvaluationInputs(
+        input.projectId,
+        input.evaluationId,
+      );
+    }),
+
   getEvaluationsMultiple: protectedProcedure
     .input(
       z.object({

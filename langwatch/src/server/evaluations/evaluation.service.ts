@@ -128,4 +128,38 @@ export class EvaluationService {
       },
     );
   }
+
+  /**
+   * Lazily fetch one evaluation's inputs (see
+   * ClickHouseEvaluationService.getEvaluationInputs). Returns null when no
+   * inputs are available so the caller can fall back to whatever the list
+   * query carried.
+   *
+   * @param params.projectId - The project ID
+   * @param params.evaluationId - The evaluation to fetch inputs for
+   */
+  async getEvaluationInputs({
+    projectId,
+    evaluationId,
+  }: {
+    projectId: string;
+    evaluationId: string;
+  }): Promise<Record<string, unknown> | null> {
+    return this.tracer.withActiveSpan(
+      "EvaluationService.getEvaluationInputs",
+      {
+        attributes: {
+          "tenant.id": projectId,
+          "evaluation.id": evaluationId,
+        },
+      },
+      async (span) => {
+        span.setAttribute("backend", "clickhouse");
+        return this.clickHouseService.getEvaluationInputs({
+          projectId,
+          evaluationId,
+        });
+      },
+    );
+  }
 }

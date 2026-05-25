@@ -4,6 +4,7 @@ import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseCli
 import { prisma as defaultPrisma } from "~/server/db";
 import type { Protections } from "~/server/elasticsearch/protections";
 import { createLogger } from "~/utils/logger/server";
+import { safeJsonParse } from "~/utils/safeJsonParse";
 import type { ClickHouseEvaluationRunRow } from "./evaluation-run.mappers";
 import { mapClickHouseEvaluationToTraceEvaluation } from "./evaluation-run.mappers";
 import type { TraceEvaluation } from "./evaluation-run.types";
@@ -266,6 +267,83 @@ export class ClickHouseEvaluationService {
             "Failed to fetch evaluations for multiple traces from ClickHouse",
           );
           throw new Error("Failed to fetch evaluations for multiple traces");
+        }
+      },
+    );
+  }
+
+  /**
+   * Fetch the heavy `Inputs` blob for one evaluation, on demand.
+   *
+   * The list reads (`getEvaluationsForTrace` / `getEvaluationsMultiple`) drop
+   * `Inputs` under memory pressure because a `TraceId` filter can't prune
+   * granules, so the heavy column is read across every granule the tenant
+   * touches. This read is keyed by `EvaluationId` — the table's second sort
+   * column — so ClickHouse prunes to the matching granule(s) and the read
+   * stays bounded. The drawer calls it lazily when a single evaluation is
+   * expanded. Returns null when ClickHouse is not enabled, the evaluation
+   * recorded no inputs, or the (already-pruned) read still hits the ceiling.
+   */
+  async getEvaluationInputs({
+    projectId,
+    evaluationId,
+  }: {
+    projectId: string;
+    evaluationId: string;
+    protections?: Protections;
+  }): Promise<Record<string, unknown> | null> {
+    return await this.tracer.withActiveSpan(
+      "ClickHouseEvaluationService.getEvaluationInputs",
+      {
+        attributes: {
+          "tenant.id": projectId,
+          "evaluation.id": evaluationId,
+        },
+      },
+      async () => {
+        const clickHouseClient = await getClickHouseClientForProject(projectId);
+        if (!clickHouseClient) {
+          return null;
+        }
+
+        try {
+          const result = await clickHouseClient.query({
+            query: `
+              SELECT argMax(Inputs, UpdatedAt) AS Inputs
+              FROM evaluation_runs
+              WHERE TenantId = {tenantId:String}
+                AND EvaluationId = {evaluationId:String}
+            `,
+            query_params: { tenantId: projectId, evaluationId },
+            format: "JSONEachRow",
+          });
+          const rows = (await result.json()) as { Inputs: string | null }[];
+          const parsed = safeJsonParse(rows[0]?.Inputs ?? null);
+          return parsed &&
+            typeof parsed === "object" &&
+            !Array.isArray(parsed)
+            ? (parsed as Record<string, unknown>)
+            : null;
+        } catch (error) {
+          if (isMemoryLimitError(error)) {
+            // Even pruned to one evaluation the granule was too heavy. Degrade
+            // to "no inputs" rather than surfacing a 500 — the verdict already
+            // rendered from the list query.
+            this.logger.warn(
+              { projectId, evaluationId },
+              "Evaluation inputs read hit the ClickHouse memory limit even when keyed by EvaluationId",
+            );
+            return null;
+          }
+          this.logger.error(
+            {
+              projectId,
+              evaluationId,
+              error: error instanceof Error ? error.message : error,
+            },
+            "Failed to fetch evaluation inputs from ClickHouse",
+          );
+          throw new Error("Failed to fetch evaluation inputs");
         }
       },
     );
