@@ -12,6 +12,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/langwatch/langwatch/pkg/herr"
+	"github.com/langwatch/langwatch/pkg/retry"
 	"github.com/langwatch/langwatch/services/aigateway/app/pipeline"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
@@ -561,4 +562,39 @@ func TestPeekStream(t *testing.T) {
 	assert.True(t, PeekStream([]byte(`{"model":"gpt-4","stream":true}`)))
 	assert.False(t, PeekStream([]byte(`{"model":"gpt-4"}`)))
 	assert.False(t, PeekStream([]byte(`{"model":"gpt-4","stream":false}`)))
+}
+
+// A forwarded upstream error must drive credential fallback by its real HTTP
+// status: terminal 4xx (e.g. an Anthropic "credit balance too low" 400) is
+// non-retryable so the gateway stops instead of burning the next key on a
+// pointless retry; 429 and 5xx stay retryable so the fallback chain still
+// kicks in.
+func TestClassifyProviderError_UpstreamError(t *testing.T) {
+	cases := []struct {
+		status int
+		want   retry.Reason
+	}{
+		{400, retry.ReasonNonRetryable},
+		{401, retry.ReasonNonRetryable},
+		{402, retry.ReasonNonRetryable},
+		{403, retry.ReasonNonRetryable},
+		{404, retry.ReasonNonRetryable},
+		{422, retry.ReasonNonRetryable},
+		{429, retry.ReasonRateLimit},
+		{500, retry.ReasonRetryable5xx},
+		{502, retry.ReasonRetryable5xx},
+		{503, retry.ReasonRetryable5xx},
+	}
+	for _, c := range cases {
+		err := &domain.UpstreamError{StatusCode: c.status, Message: "x"}
+		assert.Equalf(t, c.want, classifyProviderError(err), "status %d", c.status)
+	}
+}
+
+func TestClassifyProviderError_HerrCodes(t *testing.T) {
+	ctx := context.Background()
+	assert.Equal(t, retry.ReasonTimeout, classifyProviderError(herr.New(ctx, domain.ErrProviderTimeout, nil)))
+	assert.Equal(t, retry.ReasonRateLimit, classifyProviderError(herr.New(ctx, domain.ErrRateLimited, nil)))
+	assert.Equal(t, retry.ReasonRetryable5xx, classifyProviderError(herr.New(ctx, domain.ErrProviderError, nil)))
+	assert.Equal(t, retry.ReasonNonRetryable, classifyProviderError(herr.New(ctx, domain.ErrBadRequest, nil)))
 }

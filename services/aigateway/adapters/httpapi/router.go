@@ -654,6 +654,11 @@ func writeSSE(ctx context.Context, w http.ResponseWriter, iter domain.StreamIter
 // writeError sends a herr directly to the client. For unexpected (non-herr)
 // errors it logs the details and returns a generic internal error.
 func writeError(logger *zap.Logger, w http.ResponseWriter, ctx context.Context, err error) {
+	var ue *domain.UpstreamError
+	if errors.As(err, &ue) {
+		writeUpstreamError(w, ue)
+		return
+	}
 	var e herr.E
 	if errors.As(err, &e) {
 		herr.WriteHTTP(w, e)
@@ -661,6 +666,33 @@ func writeError(logger *zap.Logger, w http.ResponseWriter, ctx context.Context, 
 	}
 	logger.Error("unhandled error", zap.Error(err))
 	herr.WriteHTTP(w, herr.New(ctx, domain.ErrInternal, nil))
+}
+
+// writeUpstreamError forwards a provider's terminal response to the client.
+// The provider's native error body is written byte-for-byte when present, so
+// the client sees the exact upstream envelope under the upstream's real
+// status code (not a masked 502) and can tell terminal from retryable. When
+// only the status + message are available, a minimal JSON envelope carrying
+// both is emitted instead.
+func writeUpstreamError(w http.ResponseWriter, ue *domain.UpstreamError) {
+	status := ue.StatusCode
+	if status <= 0 {
+		status = http.StatusBadGateway
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	if len(ue.Body) > 0 {
+		_, _ = w.Write(ue.Body)
+		return
+	}
+	body, _ := sonic.Marshal(map[string]any{
+		"error": map[string]any{
+			"type":    "provider_error",
+			"message": ue.Message,
+			"meta":    map[string]any{"status": status},
+		},
+	})
+	_, _ = w.Write(body)
 }
 
 var errorsRegistered bool

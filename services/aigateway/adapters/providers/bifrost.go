@@ -141,7 +141,7 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 				StatusCode: status,
 			}, nil
 		}
-		return nil, classifyBifrostError(ctx, berr)
+		return nil, errFromBifrost(ctx, berr)
 	}
 
 	// /v1/messages callers (Anthropic SDK, claude-code, ...) expect the
@@ -200,7 +200,7 @@ func (r *BifrostRouter) dispatchResponses(
 				StatusCode: status,
 			}, nil
 		}
-		return nil, classifyBifrostError(ctx, berr)
+		return nil, errFromBifrost(ctx, berr)
 	}
 
 	// Prefer the provider's native response bytes so /v1/responses
@@ -254,7 +254,7 @@ func (r *BifrostRouter) dispatchEmbeddings(
 				StatusCode: status,
 			}, nil
 		}
-		return nil, classifyBifrostError(ctx, berr)
+		return nil, errFromBifrost(ctx, berr)
 	}
 
 	body, _ := sonic.Marshal(resp)
@@ -380,7 +380,7 @@ func (r *BifrostRouter) DispatchStream(ctx context.Context, req *domain.Request,
 
 	ch, berr := r.bf.ChatCompletionStreamRequest(bfCtx, bfReq)
 	if berr != nil {
-		return nil, classifyBifrostError(ctx, berr)
+		return nil, errFromBifrost(ctx, berr)
 	}
 
 	return &bifrostStreamIterator{ch: ch}, nil
@@ -413,7 +413,7 @@ func (r *BifrostRouter) dispatchResponsesStream(
 
 	ch, berr := r.bf.ResponsesStreamRequest(bfCtx, bfReq)
 	if berr != nil {
-		return nil, classifyBifrostError(ctx, berr)
+		return nil, errFromBifrost(ctx, berr)
 	}
 	return &bifrostStreamIterator{ch: ch}, nil
 }
@@ -442,7 +442,7 @@ func (r *BifrostRouter) dispatchPassthrough(
 				StatusCode: status,
 			}, nil
 		}
-		return nil, classifyBifrostError(ctx, berr)
+		return nil, errFromBifrost(ctx, berr)
 	}
 
 	status := resp.StatusCode
@@ -483,7 +483,7 @@ func (r *BifrostRouter) dispatchPassthroughStream(
 
 	ch, berr := r.bf.PassthroughStream(bfCtx, provider, bfReq)
 	if berr != nil {
-		return nil, classifyBifrostError(ctx, berr)
+		return nil, errFromBifrost(ctx, berr)
 	}
 	return &bifrostStreamIterator{ch: ch, rawFraming: true}, nil
 }
@@ -744,6 +744,35 @@ func mapProvider(id domain.ProviderID) bfschemas.ModelProvider {
 }
 
 // --- Error classification ---
+
+// errFromBifrost turns a Bifrost dispatch error into the error the gateway
+// surfaces to the client. When the provider returned a real HTTP status, that
+// status (and the provider's native error body when Bifrost captured it) is
+// forwarded verbatim via UpstreamError — so a terminal upstream 4xx reaches
+// the client as that 4xx instead of a retryable 502, and the client can tell
+// terminal from retryable correctly. A zero status means there was no upstream
+// response (transport failure / timeout) — fall back to classification, which
+// maps it to provider_timeout / the gateway's own error taxonomy.
+//
+// This is the streaming-path counterpart to the non-stream
+// rawResponseFromBifrostError branch: streaming dispatch can only return an
+// error, so the upstream status + body ride on UpstreamError instead of a
+// *domain.Response.
+func errFromBifrost(ctx context.Context, berr *bfschemas.BifrostError) error {
+	status := 0
+	if berr.StatusCode != nil {
+		status = *berr.StatusCode
+	}
+	if status <= 0 {
+		return classifyBifrostError(ctx, berr)
+	}
+	body, _ := extractRawResponseBytes(berr.ExtraFields.RawResponse)
+	return &domain.UpstreamError{
+		StatusCode: status,
+		Body:       body,
+		Message:    bfErrorMsg(berr),
+	}
+}
 
 func classifyBifrostError(ctx context.Context, berr *bfschemas.BifrostError) error {
 	status := 0

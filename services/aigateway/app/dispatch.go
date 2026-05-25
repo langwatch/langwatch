@@ -2,6 +2,8 @@ package app
 
 import (
 	"context"
+	"errors"
+	"net/http"
 
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/pkg/retry"
@@ -68,6 +70,23 @@ func findCredential(creds []domain.Credential, id string) domain.Credential {
 }
 
 func classifyProviderError(err error) retry.Reason {
+	// A forwarded upstream response classifies by its real HTTP status: a
+	// terminal client error (4xx other than 429) must NOT trigger credential
+	// fallback — retrying a "credit balance too low" or "invalid request" on
+	// the next key is pointless and only delays the terminal error reaching
+	// the client. Rate-limit (429) and server errors (5xx) stay retryable so
+	// the gateway still falls back across the credential chain.
+	var ue *domain.UpstreamError
+	if errors.As(err, &ue) {
+		switch {
+		case ue.StatusCode == http.StatusTooManyRequests:
+			return retry.ReasonRateLimit
+		case ue.StatusCode >= 500:
+			return retry.ReasonRetryable5xx
+		default:
+			return retry.ReasonNonRetryable
+		}
+	}
 	switch {
 	case herr.IsCode(err, domain.ErrProviderTimeout):
 		return retry.ReasonTimeout

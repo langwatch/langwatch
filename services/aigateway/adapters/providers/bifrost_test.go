@@ -2,11 +2,15 @@ package providers
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"testing"
 
 	bfschemas "github.com/maximhq/bifrost/core/schemas"
 	"github.com/tidwall/gjson"
+
+	"github.com/langwatch/langwatch/pkg/herr"
+	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
 // Regression: Bifrost's providers/utils EnrichError stores raw provider
@@ -177,5 +181,71 @@ func TestEnsureStreamIncludeUsage_PreservesMessages(t *testing.T) {
 
 	if !gjson.GetBytes(out, "stream_options.include_usage").Bool() {
 		t.Fatalf("expected stream_options.include_usage=true on output")
+	}
+}
+
+func intPtr(i int) *int { return &i }
+
+// A terminal upstream status (4xx) must surface as a *domain.UpstreamError
+// carrying the provider's real status + native body verbatim, so the HTTP
+// layer forwards it instead of masking it as a retryable 502. Regression for
+// the credit-depleted-key retry storm: Anthropic returns 400 "credit balance
+// too low", the streaming path classified it 502, and claude-code retried 10x.
+func TestErrFromBifrost_TerminalStatusForwardsVerbatim(t *testing.T) {
+	rawBody := []byte(`{"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low"}}`)
+	berr := &bfschemas.BifrostError{
+		StatusCode: intPtr(400),
+		Error:      &bfschemas.ErrorField{Message: "Your credit balance is too low"},
+		ExtraFields: bfschemas.BifrostErrorExtraFields{
+			RawResponse: json.RawMessage(rawBody),
+		},
+	}
+
+	err := errFromBifrost(context.Background(), berr)
+	ue, ok := err.(*domain.UpstreamError)
+	if !ok {
+		t.Fatalf("expected *domain.UpstreamError, got %T", err)
+	}
+	if ue.StatusCode != 400 {
+		t.Fatalf("status: want 400, got %d", ue.StatusCode)
+	}
+	if !bytes.Equal(ue.Body, rawBody) {
+		t.Fatalf("body not forwarded verbatim:\n want %s\n got  %s", rawBody, ue.Body)
+	}
+}
+
+// When Bifrost did not capture the provider's raw body, the upstream status is
+// still preserved on the UpstreamError (the HTTP layer then emits a minimal
+// envelope carrying that status + message) — never collapsed to 502.
+func TestErrFromBifrost_StatusWithoutRawBody(t *testing.T) {
+	berr := &bfschemas.BifrostError{
+		StatusCode: intPtr(402),
+		Error:      &bfschemas.ErrorField{Message: "payment required"},
+	}
+	err := errFromBifrost(context.Background(), berr)
+	ue, ok := err.(*domain.UpstreamError)
+	if !ok {
+		t.Fatalf("expected *domain.UpstreamError, got %T", err)
+	}
+	if ue.StatusCode != 402 {
+		t.Fatalf("status: want 402, got %d", ue.StatusCode)
+	}
+	if len(ue.Body) != 0 {
+		t.Fatalf("expected empty body, got %s", ue.Body)
+	}
+}
+
+// A zero status means no upstream HTTP response (transport failure / timeout):
+// keep the existing classification (provider_timeout), not a forwarded status.
+func TestErrFromBifrost_NoStatusFallsBackToClassify(t *testing.T) {
+	berr := &bfschemas.BifrostError{
+		Error: &bfschemas.ErrorField{Message: "dial tcp: timeout"},
+	}
+	err := errFromBifrost(context.Background(), berr)
+	if _, ok := err.(*domain.UpstreamError); ok {
+		t.Fatalf("transport failure must not become an UpstreamError")
+	}
+	if !herr.IsCode(err, domain.ErrProviderTimeout) {
+		t.Fatalf("expected provider_timeout, got %v", err)
 	}
 }
