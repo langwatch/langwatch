@@ -28,6 +28,9 @@ import { AgentRepository, type TypedAgent } from "../../agents/agent.repository"
 import { prisma } from "../../db";
 import { PromptService, type VersionedPrompt } from "../../prompt-config/prompt.service";
 import { ScenarioService } from "../scenario.service";
+import { ProjectService } from "../../app-layer/projects/project.service";
+import { PrismaProjectRepository } from "../../app-layer/projects/repositories/project.prisma.repository";
+import { ModelProviderService } from "../../modelProviders/modelProvider.service";
 import { decrypt } from "~/utils/encryption";
 import {
   AuthConfigSchema,
@@ -763,6 +766,10 @@ export function createDataPrefetcherDependencies(): DataPrefetcherDependencies {
   const scenarioService = ScenarioService.create(prisma);
   const promptService = new PromptService(prisma);
   const agentRepository = new AgentRepository(prisma);
+  const projectService = new ProjectService(
+    new PrismaProjectRepository(prisma),
+    ModelProviderService.create(prisma),
+  );
 
   return {
     scenarioFetcher: {
@@ -896,5 +903,7 @@ export function createDataPrefetcherDependencies(): DataPrefetcherDependencies {
         }
       },
     },
+    defaultModelResolver: (projectId: string) =>
+      projectService.resolveDefaultModel(projectId),
   };
 }

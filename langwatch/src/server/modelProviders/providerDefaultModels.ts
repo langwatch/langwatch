@@ -14,15 +14,15 @@
  */
 export const PROVIDER_DEFAULT_MODELS: Partial<Record<string, string>> = {
   openai: "openai/gpt-5.2",
-  anthropic: "anthropic/claude-sonnet-4-5",
+  anthropic: "anthropic/claude-sonnet-4.5",
   gemini: "gemini/gemini-2.5-flash",
-  azure: "azure/gpt-5",
   deepseek: "deepseek/deepseek-r1",
   xai: "xai/grok-4",
   // bedrock: omitted — no single canonical default model
   // groq: omitted — no single canonical default model
   // vertex_ai: omitted — no single canonical default model
   // cerebras: omitted — no single canonical default model
+  // azure: omitted — deployment names are tenant-specific; no safe canonical default
   // custom: omitted — user-defined endpoint, default is unknowable
 };
 
@@ -37,7 +37,6 @@ export const PROVIDER_RESOLUTION_ORDER: string[] = [
   "openai",
   "anthropic",
   "gemini",
-  "azure",
   "deepseek",
   "xai",
 ];
