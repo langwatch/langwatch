@@ -2,6 +2,7 @@ import type { PrismaClient } from "@prisma/client";
 import { matchModelCostWithFallbacks } from "~/server/background/workers/collector/cost";
 import type { MaybeStoredLLMModelCost } from "~/server/modelProviders/llmModelCost";
 import type { OtlpSpan } from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
+import { ATTR_KEYS } from "./canonicalisation/extractors/_constants";
 import { extractModelName } from "./utils/spanModel";
 
 /**
@@ -86,11 +87,11 @@ export class OtlpSpanCostEnrichmentService {
 
     span.attributes.push(
       {
-        key: "langwatch.model.inputCostPerToken",
+        key: ATTR_KEYS.LANGWATCH_MODEL_INPUT_COST_PER_TOKEN,
         value: { doubleValue: matched.inputCostPerToken ?? 0 },
       },
       {
-        key: "langwatch.model.outputCostPerToken",
+        key: ATTR_KEYS.LANGWATCH_MODEL_OUTPUT_COST_PER_TOKEN,
         value: { doubleValue: matched.outputCostPerToken ?? 0 },
       },
     );
@@ -100,13 +101,13 @@ export class OtlpSpanCostEnrichmentService {
     // rate in the fold projection rather than being priced at zero.
     if (matched.cacheReadCostPerToken != null) {
       span.attributes.push({
-        key: "langwatch.model.cacheReadCostPerToken",
+        key: ATTR_KEYS.LANGWATCH_MODEL_CACHE_READ_COST_PER_TOKEN,
         value: { doubleValue: matched.cacheReadCostPerToken },
       });
     }
     if (matched.cacheCreationCostPerToken != null) {
       span.attributes.push({
-        key: "langwatch.model.cacheCreationCostPerToken",
+        key: ATTR_KEYS.LANGWATCH_MODEL_CACHE_CREATION_COST_PER_TOKEN,
         value: { doubleValue: matched.cacheCreationCostPerToken },
       });
     }
