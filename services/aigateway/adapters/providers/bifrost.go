@@ -125,13 +125,17 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 	// client with BaseEndpoint pinned to that VPCE, so the request is
 	// SigV4-signed for and sent to that host instead of the public AWS
 	// endpoint. Without this, the customer's VPCE-conditioned IAM policy
-	// rejects the InvokeModel with a 403. Only the chat path needs it (the
-	// managed-Bedrock studio/eval traffic); other request types were handled
+	// rejects the InvokeModel with a 403. Gated to RequestTypeChat only:
+	// /v1/messages must stay on the raw-forward path below (routing
+	// Anthropic-native bodies through Converse would drop messages-only
+	// fields like `thinking`); embeddings/responses/passthrough are handled
 	// above. A no-op for Bedrock credentials without a runtime endpoint.
-	if endpoint, err := bedrockVPCEEndpoint(cred); err != nil {
-		return nil, err
-	} else if endpoint != "" {
-		return r.dispatchBedrockVPCE(ctx, req, provider, model, cred, endpoint)
+	if req.Type == domain.RequestTypeChat {
+		if endpoint, err := bedrockVPCEEndpoint(cred); err != nil {
+			return nil, err
+		} else if endpoint != "" {
+			return r.dispatchBedrockVPCE(ctx, req, provider, model, cred, endpoint)
+		}
 	}
 
 	bfReq, dispatchCtx, err := buildChatRequest(ctx, req, provider, model)
@@ -383,12 +387,15 @@ func (r *BifrostRouter) DispatchStream(ctx context.Context, req *domain.Request,
 
 	// Managed-Bedrock with a per-request runtime endpoint streams through the
 	// official Bedrock ConverseStream API over the customer's VPC endpoint —
-	// same rationale as the non-streaming Dispatch intercept above. A no-op for
-	// Bedrock credentials without a runtime endpoint.
-	if endpoint, err := bedrockVPCEEndpoint(cred); err != nil {
-		return nil, err
-	} else if endpoint != "" {
-		return r.dispatchBedrockVPCEStream(ctx, req, provider, model, cred, endpoint)
+	// same rationale as the non-streaming Dispatch intercept above, and gated
+	// to RequestTypeChat for the same reason (/v1/messages stays raw-forward).
+	// A no-op for Bedrock credentials without a runtime endpoint.
+	if req.Type == domain.RequestTypeChat {
+		if endpoint, err := bedrockVPCEEndpoint(cred); err != nil {
+			return nil, err
+		} else if endpoint != "" {
+			return r.dispatchBedrockVPCEStream(ctx, req, provider, model, cred, endpoint)
+		}
 	}
 
 	if req.Type == domain.RequestTypeChat && isOpenAICompatibleProvider(provider) {

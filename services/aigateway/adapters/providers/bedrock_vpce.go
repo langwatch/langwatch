@@ -100,6 +100,13 @@ func validateBedrockEndpoint(endpoint string) error {
 	if !strings.HasSuffix(host, ".amazonaws.com") {
 		return fmt.Errorf("bedrock vpce: runtime endpoint host %q is not an amazonaws.com endpoint", host)
 	}
+	// Plaintext http is only acceptable for PrivateLink VPC endpoints
+	// (vpce-*.vpce.amazonaws.com), which front the customer's NLB without TLS.
+	// Public Bedrock (bedrock-runtime.<region>.amazonaws.com) must stay https
+	// so prompts/responses are never downgraded onto plaintext transport.
+	if u.Scheme == "http" && !strings.HasSuffix(host, ".vpce.amazonaws.com") {
+		return fmt.Errorf("bedrock vpce: plaintext http is only allowed for PrivateLink (.vpce.amazonaws.com) hosts, got %q", host)
+	}
 	return nil
 }
 

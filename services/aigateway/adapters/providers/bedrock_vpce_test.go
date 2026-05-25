@@ -139,6 +139,7 @@ func TestValidateBedrockEndpoint(t *testing.T) {
 	valid := []string{
 		"https://bedrock-runtime.us-east-1.amazonaws.com",
 		"http://vpce-0b96b0d0dd1bc0391-yyy7ck36.vpce-svc-02cf455d913d12412.us-east-1.vpce.amazonaws.com:80",
+		"https://vpce-0b96b0d0dd1bc0391-yyy7ck36.vpce-svc-02cf455d913d12412.us-east-1.vpce.amazonaws.com", // https VPCE also fine
 		"https://bedrock-runtime-fips.us-west-2.amazonaws.com",
 	}
 	for _, e := range valid {
@@ -156,6 +157,7 @@ func TestValidateBedrockEndpoint(t *testing.T) {
 		"https://bedrock-runtime.amazonaws.com.evil.com", // suffix-spoof
 		"ftp://bedrock-runtime.us-east-1.amazonaws.com",  // bad scheme
 		"bedrock-runtime.us-east-1.amazonaws.com",        // no scheme/host
+		"http://bedrock-runtime.us-east-1.amazonaws.com", // plaintext public bedrock (must be https; http only for .vpce hosts)
 	}
 	for _, e := range invalid {
 		if err := validateBedrockEndpoint(e); err == nil {

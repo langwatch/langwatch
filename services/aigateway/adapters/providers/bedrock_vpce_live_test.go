@@ -25,6 +25,7 @@ import (
 	"context"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/tidwall/gjson"
 
@@ -137,8 +138,12 @@ func TestBedrockVPCELive_PingStream(t *testing.T) {
 		Body:  []byte(`{"messages":[{"role":"user","content":"count from one to five in words, space separated"}],"max_tokens":32}`),
 	}
 
+	// Bound the stream so a stalled upstream can't hang the test forever.
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
 	router := &BifrostRouter{}
-	iter, err := router.dispatchBedrockVPCEStream(context.Background(), req, mapProvider(cred.ProviderID), model, cred, endpoint)
+	iter, err := router.dispatchBedrockVPCEStream(ctx, req, mapProvider(cred.ProviderID), model, cred, endpoint)
 	if err != nil {
 		t.Fatalf("dispatchBedrockVPCEStream error: %v", err)
 	}
@@ -146,7 +151,7 @@ func TestBedrockVPCELive_PingStream(t *testing.T) {
 
 	var chunks, deltas int
 	var text, finish string
-	for iter.Next(context.Background()) {
+	for iter.Next(ctx) {
 		chunks++
 		chunk := iter.Chunk()
 		if d := gjson.GetBytes(chunk, "choices.0.delta.content").String(); d != "" {
