@@ -1,6 +1,6 @@
 import { chakra, Flex, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { ArrowDown, ArrowUp, Bot, User, Wrench } from "lucide-react";
-import { Fragment, type ReactNode } from "react";
+import { Fragment, type ReactNode, useLayoutEffect, useRef } from "react";
 import type React from "react";
 import { useDensityTokens } from "../../hooks/useDensityTokens";
 import { useDensityStore } from "../../stores/densityStore";
@@ -56,9 +56,106 @@ const BreakMarker = () => (
     whiteSpace="nowrap"
     verticalAlign="baseline"
     color="fg.subtle"
-    css={{ "&::after": { content: '"↵"', marginInlineStart: "2px" } }}
+    css={{ "&::after": { content: '"↵"', marginInlineStart: "0.45em" } }}
   />
 );
+
+const CLAMP_LINES = 2;
+
+/**
+ * CSS rule that blanks a `BreakMarker` glyph once it's been tagged
+ * `data-newline-marker-hidden` by `useBreakMarkerClampGuard`. Hiding via
+ * the pseudo's `content` (rather than `display`/`visibility`) keeps the
+ * span's box on its line, so measuring it on the next resize pass stays
+ * stable.
+ */
+const HIDE_TRUNCATED_MARKER = {
+  "& [data-newline-marker][data-newline-marker-hidden]::after": {
+    content: '""',
+  },
+} as const;
+
+/**
+ * A `BreakMarker` only collides with the line clamp's `…` ellipsis when the
+ * cell overflows AND the marker sits on the last visible (clamped) line —
+ * that's the single line the clamp paints the ellipsis on. Markers on
+ * earlier, fully-visible lines are safe and keep showing. `markerTop` and
+ * `clampHeight` are measured relative to the clamped text box.
+ */
+export function shouldHideBreakMarker({
+  truncated,
+  markerTop,
+  clampHeight,
+}: {
+  truncated: boolean;
+  markerTop: number;
+  clampHeight: number;
+}): boolean {
+  if (!truncated) return false;
+  const lastVisibleLineTop = (clampHeight * (CLAMP_LINES - 1)) / CLAMP_LINES;
+  return markerTop >= lastVisibleLineTop - 1;
+}
+
+/**
+ * Tags the break markers that would overlap the clamp's `…` with
+ * `data-newline-marker-hidden` (see `shouldHideBreakMarker`). Re-evaluates
+ * on resize so it tracks column-width changes, not just the first paint.
+ * The text node is `position: relative` so each marker's `offsetTop` is
+ * measured against the clamped box.
+ */
+function useBreakMarkerClampGuard(text: string) {
+  const ref = useRef<HTMLParagraphElement>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const update = () => {
+      const truncated = el.scrollHeight > el.clientHeight + 1;
+      const clampHeight = el.clientHeight;
+      el.querySelectorAll<HTMLElement>("[data-newline-marker]").forEach((m) => {
+        m.toggleAttribute(
+          "data-newline-marker-hidden",
+          shouldHideBreakMarker({
+            truncated,
+            markerTop: m.offsetTop,
+            clampHeight,
+          }),
+        );
+      });
+    };
+    update();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [text]);
+  return ref;
+}
+
+/**
+ * Line-clamped preview text that renders hard breaks as non-selectable `↵`
+ * markers and suppresses only the marker on the truncated line (see
+ * `useBreakMarkerClampGuard`). Style props (`fontSize`, `color`,
+ * `textStyle`, …) are forwarded so both density rows can share it.
+ */
+const ClampedPreviewText: React.FC<
+  { text: string } & React.ComponentProps<typeof Text>
+> = ({ text, css, ...rest }) => {
+  const ref = useBreakMarkerClampGuard(text);
+  return (
+    <Text
+      ref={ref}
+      position="relative"
+      whiteSpace="pre-line"
+      lineClamp={CLAMP_LINES}
+      flex={1}
+      minWidth={0}
+      css={{ ...HIDE_TRUNCATED_MARKER, ...(css as object) }}
+      {...rest}
+    >
+      {renderWithBreakMarkers(text)}
+    </Text>
+  );
+};
 
 /**
  * Render preview text with a hard break shown as a trailing `BreakMarker`
@@ -158,22 +255,17 @@ const CompactRow: React.FC<CompactRowProps> = ({
         </Icon>
         <RoleIcon row={row} color={accent} direction={direction} />
       </Flex>
-      <Text
+      {/* Preserve real newlines coming through formatPreview (the row text
+          used to inline-render `↵` glyphs — now wraps onto a real second
+          line). Capped at 2 lines so the preview stays compact in the
+          table. */}
+      <ClampedPreviewText
+        text={row.text}
         fontSize={fontSize}
         color={textColor}
         fontStyle="italic"
         fontWeight="400"
-        // Preserve real newlines coming through formatPreview (the row
-        // text used to inline-render `↵` glyphs — now wraps onto a real
-        // second line). Cap at 2 lines so the preview stays compact in
-        // the table.
-        whiteSpace="pre-line"
-        lineClamp={2}
-        flex={1}
-        minWidth={0}
-      >
-        {renderWithBreakMarkers(row.text)}
-      </Text>
+      />
     </HStack>
   );
 };
@@ -244,15 +336,6 @@ const ComfortableRow: React.FC<{
     >
       {label}
     </Text>
-    <Text
-      textStyle="sm"
-      color={textColor}
-      whiteSpace="pre-line"
-      lineClamp={2}
-      flex={1}
-      minWidth={0}
-    >
-      {renderWithBreakMarkers(text)}
-    </Text>
+    <ClampedPreviewText text={text} textStyle="sm" color={textColor} />
   </HStack>
 );
