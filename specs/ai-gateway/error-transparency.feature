@@ -41,7 +41,7 @@ Feature: AI Gateway — transparent upstream error forwarding
   # Provider-origin: forward upstream status + body verbatim
   # ==========================================================================
 
-  @bdd @error-transparency @integration @unimplemented
+  @bdd @error-transparency @integration
   Scenario: Upstream terminal 4xx is forwarded verbatim on the non-streaming path
     Given the upstream provider responds 400 with a terminal error body
     And the request is non-streaming
@@ -50,7 +50,7 @@ Feature: AI Gateway — transparent upstream error forwarding
     And the response body is the upstream error body, unmodified
     And the gateway does not wrap it in a "provider_error" envelope
 
-  @bdd @error-transparency @integration @unimplemented
+  @bdd @error-transparency @integration
   Scenario: Upstream terminal 4xx is forwarded verbatim on the streaming path
     Given the upstream provider responds 400 with a terminal error body
     And the request is streaming (stream=true)
@@ -59,15 +59,15 @@ Feature: AI Gateway — transparent upstream error forwarding
     And the response body is the upstream error body, unmodified
     And the upstream status is the HTTP status, not buried in a meta field
 
-  @bdd @error-transparency @integration @unimplemented
+  @bdd @error-transparency @integration
   Scenario: Upstream retryable status is forwarded as-is without over-correction
     Given the upstream provider responds 429 with Retry-After: 30
     When the client calls the gateway with "vk-demo"
     Then the gateway responds with HTTP 429
-    And the Retry-After header is preserved
+    And the upstream retry-signalling headers (Retry-After, x-should-retry) are preserved
     And the gateway does not flatten the retryable 429 into a terminal 4xx
 
-  @bdd @error-transparency @integration @unimplemented
+  @bdd @error-transparency @integration
   Scenario: Terminal upstream error is identical across stream and non-stream
     Given the upstream provider responds 401 with a terminal error body
     When the client calls the gateway streaming and non-streaming with "vk-demo"
