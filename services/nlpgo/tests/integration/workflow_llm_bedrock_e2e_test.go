@@ -148,6 +148,14 @@ func TestSync_RealWorkflowEndToEnd_Bedrock(t *testing.T) {
 		"aws_secret_access_key": secretKey,
 		"aws_region_name":       region,
 	}
+	// Managed-Bedrock customers authenticate with STS-temporary credentials,
+	// which require the session token to be threaded through alongside the
+	// access/secret keys. Without it the harness can only exercise long-lived
+	// keys, not the managed customer path. The session token flows through the
+	// dispatcheradapter onto cred.Extra["session_token"] like the other creds.
+	if st := os.Getenv("AWS_SESSION_TOKEN"); st != "" {
+		litellmParams["aws_session_token"] = st
+	}
 	if ep := os.Getenv("BEDROCK_VPCE_ENDPOINT"); ep != "" {
 		litellmParams["aws_bedrock_runtime_endpoint"] = ep
 		t.Logf("routing through VPCE intercept via endpoint %s", ep)
