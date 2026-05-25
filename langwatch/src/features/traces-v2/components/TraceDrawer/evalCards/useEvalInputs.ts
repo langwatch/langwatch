@@ -1,7 +1,6 @@
 import { useMemo } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { useDrawerStore } from "../../../stores/drawerStore";
 import type { EvalEntry } from "./utils";
 
 export interface ResolvedEvalInputs {
@@ -29,22 +28,16 @@ export function useEvalInputs({
   enabled: boolean;
 }): ResolvedEvalInputs {
   const { project } = useOrganizationTeamProject();
-  const traceId = useDrawerStore((s) => s.traceId);
 
   const listInputs =
     eval_.inputs && Object.keys(eval_.inputs).length > 0 ? eval_.inputs : null;
 
   const needLazy =
-    enabled &&
-    !listInputs &&
-    !!eval_.evaluationId &&
-    !!project?.id &&
-    !!traceId;
+    enabled && !listInputs && !!eval_.evaluationId && !!project?.id;
 
   const query = api.traces.getEvaluationInputs.useQuery(
     {
       projectId: project?.id ?? "",
-      traceId: traceId ?? "",
       evaluationId: eval_.evaluationId ?? "",
     },
     {

@@ -30,11 +30,6 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   }),
 }));
 
-vi.mock("../../../../stores/drawerStore", () => ({
-  useDrawerStore: (selector: (s: { traceId: string | null }) => unknown) =>
-    selector({ traceId: "trace-1" }),
-}));
-
 import type { EvalEntry } from "../utils";
 import { EvalCard } from "../EvalCard";
 
@@ -88,11 +83,12 @@ describe("EvalCard evaluator inputs", () => {
 
         fireEvent.click(screen.getByText("Show details"));
 
-        // Expanded: the fetch is enabled and the inputs render.
+        // Expanded: the fetch is enabled and the inputs render. The read is
+        // keyed by evaluationId and authorized at the project level (no
+        // trace-scoped public-share path), so no traceId is sent.
         expect(getEvaluationInputsUseQueryMock).toHaveBeenLastCalledWith(
           expect.objectContaining({
             projectId: "project_test",
-            traceId: "trace-1",
             evaluationId: "eval-1",
           }),
           expect.objectContaining({ enabled: true }),
