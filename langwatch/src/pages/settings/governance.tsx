@@ -20,7 +20,6 @@ import {
 } from "lucide-react";
 import numeral from "numeral";
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
-import { GovernanceErrorMessageSection } from "~/components/governance/GovernanceErrorMessageSection";
 import { QuarantineFillAlert } from "~/components/governance/QuarantineFillAlert";
 import { SpendByTeamBar } from "~/components/governance/SpendByTeamBar";
 import {
@@ -416,8 +415,6 @@ function GovernanceOverviewPage() {
         <SessionPolicySection organizationId={orgId} />
 
         <ContentModeSection organizationId={orgId} />
-
-        <GovernanceErrorMessageSection organizationId={orgId} />
       </VStack>
     </GovernanceLayout>
   );
