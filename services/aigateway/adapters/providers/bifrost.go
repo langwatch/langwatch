@@ -120,6 +120,20 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 		return r.dispatchPassthrough(ctx, req, provider, model, cred)
 	}
 
+	// Managed-Bedrock with a per-request runtime endpoint (the customer's
+	// VPC endpoint) dispatches through the official AWS SDK bedrockruntime
+	// client with BaseEndpoint pinned to that VPCE, so the request is
+	// SigV4-signed for and sent to that host instead of the public AWS
+	// endpoint. Without this, the customer's VPCE-conditioned IAM policy
+	// rejects the InvokeModel with a 403. Only the chat path needs it (the
+	// managed-Bedrock studio/eval traffic); other request types were handled
+	// above. A no-op for Bedrock credentials without a runtime endpoint.
+	if cred.ProviderID == domain.ProviderBedrock {
+		if endpoint := bedrockRuntimeEndpoint(cred); endpoint != "" {
+			return r.dispatchBedrockVPCE(ctx, req, provider, model, cred, endpoint)
+		}
+	}
+
 	bfReq, dispatchCtx, err := buildChatRequest(ctx, req, provider, model)
 	if err != nil {
 		return nil, err
@@ -365,6 +379,16 @@ func (r *BifrostRouter) DispatchStream(ctx context.Context, req *domain.Request,
 
 	if req.Type == domain.RequestTypePassthrough {
 		return r.dispatchPassthroughStream(ctx, req, provider, model, cred)
+	}
+
+	// Managed-Bedrock with a per-request runtime endpoint streams through the
+	// official Bedrock ConverseStream API over the customer's VPC endpoint —
+	// same rationale as the non-streaming Dispatch intercept above. A no-op for
+	// Bedrock credentials without a runtime endpoint.
+	if cred.ProviderID == domain.ProviderBedrock {
+		if endpoint := bedrockRuntimeEndpoint(cred); endpoint != "" {
+			return r.dispatchBedrockVPCEStream(ctx, req, provider, model, cred, endpoint)
+		}
 	}
 
 	if req.Type == domain.RequestTypeChat && isOpenAICompatibleProvider(provider) {
