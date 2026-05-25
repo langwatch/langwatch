@@ -9,6 +9,7 @@ import {
   usePromptHistory,
   useScenarioGeneration,
 } from "../ScenarioAIGeneration";
+import { SCENARIO_AI_PROMPT_KEY } from "../services/scenarioPromptStorage";
 
 // Clean up after each test to avoid interference
 afterEach(() => {
@@ -20,6 +21,14 @@ afterEach(() => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("usePromptHistory", () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+  });
+
+  afterEach(() => {
+    sessionStorage.clear();
+  });
+
   it("starts with empty history", () => {
     const { result } = renderHook(() => usePromptHistory());
 
@@ -52,6 +61,25 @@ describe("usePromptHistory", () => {
     });
 
     expect(result.current.history).toEqual(["first", "second", "third"]);
+  });
+
+  describe("when sessionStorage has stored prompt", () => {
+    it("initializes history with stored prompt", () => {
+      sessionStorage.setItem(SCENARIO_AI_PROMPT_KEY, "Stored prompt");
+
+      const { result } = renderHook(() => usePromptHistory());
+
+      expect(result.current.history).toEqual(["Stored prompt"]);
+      expect(result.current.hasHistory).toBe(true);
+    });
+
+    it("clears sessionStorage after consumption", () => {
+      sessionStorage.setItem(SCENARIO_AI_PROMPT_KEY, "Stored prompt");
+
+      renderHook(() => usePromptHistory());
+
+      expect(sessionStorage.getItem(SCENARIO_AI_PROMPT_KEY)).toBeNull();
+    });
   });
 });
 
