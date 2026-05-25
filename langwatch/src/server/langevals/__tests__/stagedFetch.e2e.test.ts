@@ -25,6 +25,11 @@
  *      calls real OpenAI embeddings + naming model, returns at least
  *      one named topic with traces assigned to it. Asserts the response
  *      body shape and content, not just log lines.
+ *
+ * Both scenarios also assert the staged S3 object is gone after the call
+ * returns — the in-app finally deletes it, so nothing lingers in the
+ * bucket. The "fetched staged payload" log proves the body round-tripped
+ * through S3 before the delete.
  */
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -118,13 +123,17 @@ describeFn("stagedLangevalsFetch e2e (real S3 + real langevals)", () => {
     expect(typeof verdict?.passed).toBe("boolean");
     expect((verdict?.cost?.amount ?? 0) > 0).toBe(true);
 
+    // langevals emitting "fetched staged payload" proves the body did
+    // round-trip through S3 (the middleware pulled the presigned URL).
+    await waitForLog(h, "fetched staged payload", 5_000);
+
+    // ...and after the call returns, the in-app finally must have
+    // deleted the staged object, so nothing lingers in the bucket.
     const staged = await listStagingObjects(h);
     const matching = staged.filter((k) =>
       k.includes("project_e2e_eval/evaluation/"),
     );
-    expect(matching.length).toBeGreaterThan(0);
-
-    await waitForLog(h, "fetched staged payload", 5_000);
+    expect(matching).toEqual([]);
   }, 120_000);
 
   it("stages a topic_clustering_batch payload and returns real named topics", async () => {
@@ -199,13 +208,15 @@ describeFn("stagedLangevalsFetch e2e (real S3 + real langevals)", () => {
       expect(typeof t.topic_id).toBe("string");
     }
 
+    // Round-trip proof: langevals fetched the staged body from S3.
+    await waitForLog(h, "fetched staged payload", 10_000);
+
+    // Cleanup proof: the staged object is deleted after the call returns.
     const staged = await listStagingObjects(h);
     const matching = staged.filter((k) =>
       k.includes("project_e2e_topics/topic_clustering_batch/"),
     );
-    expect(matching.length).toBeGreaterThan(0);
-
-    await waitForLog(h, "fetched staged payload", 10_000);
+    expect(matching).toEqual([]);
   }, 180_000);
 });
 
