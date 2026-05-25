@@ -1,10 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mockEsClient = {
-  count: vi.fn(),
-  search: vi.fn(),
-  bulk: vi.fn(),
-};
 const mockClickHouseQuery = vi.fn();
 
 vi.mock("~/server/db", () => ({
@@ -13,16 +8,6 @@ vi.mock("~/server/db", () => ({
     topic: { findMany: vi.fn(), createMany: vi.fn(), deleteMany: vi.fn() },
     cost: { create: vi.fn() },
   },
-}));
-
-vi.mock("~/server/elasticsearch", () => ({
-  esClient: vi.fn().mockResolvedValue({
-    count: (...args: unknown[]) => mockEsClient.count(...args),
-    search: (...args: unknown[]) => mockEsClient.search(...args),
-    bulk: (...args: unknown[]) => mockEsClient.bulk(...args),
-  }),
-  TRACE_INDEX: { alias: "search-traces-alias" },
-  traceIndexId: vi.fn(({ traceId }: { traceId: string }) => traceId),
 }));
 
 vi.mock("~/server/clickhouse/clickhouseClient", () => ({
@@ -120,8 +105,6 @@ describe("clusterTopicsForProject", () => {
       await clusterTopicsForProject("proj-1", undefined, false);
 
       expect(mockClickHouseQuery).toHaveBeenCalledTimes(2); // counts + search
-      expect(mockEsClient.count).not.toHaveBeenCalled();
-      expect(mockEsClient.search).not.toHaveBeenCalled();
     });
 
     // Skipped: batchClusterTraces now calls getProjectTopicClusteringModelProvider
@@ -157,9 +140,6 @@ describe("clusterTopicsForProject", () => {
 
       await clusterTopicsForProject("proj-1", undefined, false);
 
-      // Should not have called ES at all
-      expect(mockEsClient.search).not.toHaveBeenCalled();
-      expect(mockEsClient.count).not.toHaveBeenCalled();
       // clustering service was called (via mocked fetch-h2)
       expect(mockFetchH2).toHaveBeenCalled();
     });

@@ -428,7 +428,20 @@ describe.skipIf(!hasTestcontainers)(
           depth: 1,
         }),
       );
-      await quietReactorWindow();
+      // Poll the prom counter instead of sleeping a fixed 1500ms. The
+      // reactor → BullMQ → metric write chain can take longer than that
+      // under parallel CI load, which flaked this test (PR #4189 CI:
+      // `expected 0 to be greater than or equal to 1`). The dispatch
+      // assertion stays as a post-condition: by the time the blocked
+      // counter ticks the reactor has decided not to dispatch.
+      await waitFor(
+        async () =>
+          (await readBlockedCounter("depth_direct")) > beforeBlocked,
+        {
+          timeoutMs: 20_000,
+          label: "loop-blocked counter incremented for depth_direct",
+        },
+      );
 
           expect(dispatcher.captured.length).toBe(dispatchesBefore);
           const afterBlocked = await readBlockedCounter("depth_direct");

@@ -5,6 +5,7 @@ import sys
 import dotenv
 from fastapi.responses import RedirectResponse
 
+from langevals.staged_payload import StagedPayloadMiddleware
 from langevals.utils import (
     get_cpu_count,
     get_evaluator_classes,
@@ -43,6 +44,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+app.add_middleware(StagedPayloadMiddleware)
 
 original_env = os.environ.copy()
 

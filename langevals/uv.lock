@@ -14,7 +14,7 @@ resolution-markers = [
 ]
 
 [options]
-exclude-newer = "2026-04-19T17:07:22.760704Z"
+exclude-newer = "2026-05-17T11:21:14.090686Z"
 exclude-newer-span = "P7D"
 
 [manifest]
@@ -2046,6 +2046,7 @@ source = { editable = "." }
 dependencies = [
     { name = "fastapi" },
     { name = "gunicorn" },
+    { name = "httpx" },
     { name = "langevals-core" },
     { name = "mangum" },
     { name = "markdown" },
@@ -2110,6 +2111,7 @@ dev = [
 requires-dist = [
     { name = "fastapi", specifier = ">=0.115.11" },
     { name = "gunicorn", specifier = ">=23.0.0" },
+    { name = "httpx", specifier = ">=0.27.0" },
     { name = "langevals-azure", marker = "extra == 'all'", editable = "evaluators/azure" },
     { name = "langevals-azure", marker = "extra == 'azure'", editable = "evaluators/azure" },
     { name = "langevals-core", editable = "langevals_core" },
