@@ -54,10 +54,8 @@ Rule: Each surface presents the separated context differently
     Then the preview shows the human text
     And it does not show the leading context boilerplate
 
-  # Presentation-level behavior verified in the browser during QA rather than
-  # in a bound test: the disclosure is thin rendering over the separation logic
-  # above, which is what carries the risk.
-  Scenario: The pretty view collapses the context behind a disclosure
+  @integration
+  Scenario: Prepended context is collapsed behind a disclosure in pretty mode
     Given a trace open in the drawer in pretty mode
     And the first message has context stacked above the human text
     Then the human text renders normally
