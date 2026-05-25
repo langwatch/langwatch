@@ -18,12 +18,19 @@ type Response struct {
 }
 
 // Usage holds token counts and cost information.
+//
+// PromptTokens is the provider's full prompt total and INCLUDES any cached
+// tokens (Bifrost sums cache reads/writes into it). CacheReadTokens and
+// CacheCreationTokens carry the cache breakdown so the span can report the
+// fresh, non-cached input separately and the cost can price each bucket once.
 type Usage struct {
-	PromptTokens     int
-	CompletionTokens int
-	TotalTokens      int
-	CostMicroUSD     int64  // cost in microdollars (1/1_000_000 USD)
-	Model            string // resolved model name from the request
+	PromptTokens        int
+	CompletionTokens    int
+	TotalTokens         int
+	CacheReadTokens     int    // tokens read from the prompt cache (priced at the cache-read rate)
+	CacheCreationTokens int    // tokens written to the prompt cache (priced at the cache-write rate)
+	CostMicroUSD        int64  // cost in microdollars (1/1_000_000 USD)
+	Model               string // resolved model name from the request
 }
 
 // StreamIterator provides pull-based iteration over streaming response chunks.

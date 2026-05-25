@@ -854,11 +854,16 @@ func extractUsage(resp *bfschemas.BifrostChatResponse) domain.Usage {
 	if resp == nil || resp.Usage == nil {
 		return domain.Usage{}
 	}
-	return domain.Usage{
+	u := domain.Usage{
 		PromptTokens:     resp.Usage.PromptTokens,
 		CompletionTokens: resp.Usage.CompletionTokens,
 		TotalTokens:      resp.Usage.TotalTokens,
 	}
+	if d := resp.Usage.PromptTokensDetails; d != nil {
+		u.CacheReadTokens = d.CachedReadTokens
+		u.CacheCreationTokens = d.CachedWriteTokens
+	}
+	return u
 }
 
 // extractResponsesUsage maps the Responses-API usage block onto the
@@ -869,11 +874,16 @@ func extractResponsesUsage(resp *bfschemas.BifrostResponsesResponse) domain.Usag
 	if resp == nil || resp.Usage == nil {
 		return domain.Usage{}
 	}
-	return domain.Usage{
+	u := domain.Usage{
 		PromptTokens:     resp.Usage.InputTokens,
 		CompletionTokens: resp.Usage.OutputTokens,
 		TotalTokens:      resp.Usage.TotalTokens,
 	}
+	if d := resp.Usage.InputTokensDetails; d != nil {
+		u.CacheReadTokens = d.CachedReadTokens
+		u.CacheCreationTokens = d.CachedWriteTokens
+	}
+	return u
 }
 
 // extractEmbeddingUsage maps Bifrost's embedding usage block. Embedding
@@ -929,12 +939,7 @@ func (it *bifrostStreamIterator) Next(ctx context.Context) bool {
 			data, _ := sonic.Marshal(chunk.BifrostChatResponse)
 			it.current = data
 			if chunk.BifrostChatResponse.Usage != nil {
-				u := chunk.BifrostChatResponse.Usage
-				it.usage = domain.Usage{
-					PromptTokens:     u.PromptTokens,
-					CompletionTokens: u.CompletionTokens,
-					TotalTokens:      u.TotalTokens,
-				}
+				it.usage = extractUsage(chunk.BifrostChatResponse)
 			}
 		} else if chunk.BifrostResponsesStreamResponse != nil {
 			// Responses API stream frames (response.created /
@@ -946,12 +951,7 @@ func (it *bifrostStreamIterator) Next(ctx context.Context) bool {
 			it.current = data
 			//nolint:staticcheck // explicit embedded-field reference matches the parallel branches above for readability.
 			if resp := chunk.BifrostResponsesStreamResponse.Response; resp != nil && resp.Usage != nil {
-				u := resp.Usage
-				it.usage = domain.Usage{
-					PromptTokens:     u.InputTokens,
-					CompletionTokens: u.OutputTokens,
-					TotalTokens:      u.TotalTokens,
-				}
+				it.usage = extractResponsesUsage(resp)
 			}
 		} else if chunk.BifrostPassthroughResponse != nil {
 			// Passthrough stream chunks carry the raw upstream bytes
@@ -1009,13 +1009,14 @@ func parseGeminiPassthroughUsage(body []byte) (domain.Usage, bool) {
 	if total == 0 {
 		total = prompt + completion
 	}
-	// Note: cachedContentTokenCount (when present) is folded into prompt
-	// tokens upstream by Gemini; the trace pipeline derives cache_read
-	// from a separate gen_ai.usage.cache_read attr, not from total.
+	// Gemini folds cachedContentTokenCount into promptTokenCount, so it rides
+	// inside PromptTokens; surfacing it as CacheReadTokens lets the span report
+	// the fresh input separately. Gemini bills no distinct cache-write tokens.
 	return domain.Usage{
 		PromptTokens:     prompt,
 		CompletionTokens: completion,
 		TotalTokens:      total,
+		CacheReadTokens:  int(usage.Get("cachedContentTokenCount").Int()),
 	}, true
 }
 

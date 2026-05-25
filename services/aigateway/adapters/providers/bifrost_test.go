@@ -266,3 +266,79 @@ func TestErrFromBifrost_NoStatusFallsBackToClassify(t *testing.T) {
 		t.Fatalf("expected provider_timeout, got %v", err)
 	}
 }
+
+// Bifrost sums cache reads/writes into PromptTokens; the cache breakdown lives
+// on PromptTokensDetails. extractUsage must carry it onto domain.Usage so the
+// span can report the fresh input separately and the cost can price each
+// bucket once (the cached-follow-up mis-cost bug).
+func TestExtractUsage_CacheTokens(t *testing.T) {
+	resp := &bfschemas.BifrostChatResponse{
+		Usage: &bfschemas.BifrostLLMUsage{
+			PromptTokens:     37651,
+			CompletionTokens: 12,
+			TotalTokens:      37663,
+			PromptTokensDetails: &bfschemas.ChatPromptTokensDetails{
+				CachedReadTokens:  37127,
+				CachedWriteTokens: 14,
+			},
+		},
+	}
+	u := extractUsage(resp)
+	if u.CacheReadTokens != 37127 {
+		t.Fatalf("CacheReadTokens: want 37127, got %d", u.CacheReadTokens)
+	}
+	if u.CacheCreationTokens != 14 {
+		t.Fatalf("CacheCreationTokens: want 14, got %d", u.CacheCreationTokens)
+	}
+	if u.PromptTokens != 37651 {
+		t.Fatalf("PromptTokens must stay the provider total (incl cache): got %d", u.PromptTokens)
+	}
+}
+
+// No PromptTokensDetails block (provider/request without caching) -> cache
+// counts stay zero, never negative or panicking on the nil pointer.
+func TestExtractUsage_NoCacheDetails(t *testing.T) {
+	resp := &bfschemas.BifrostChatResponse{
+		Usage: &bfschemas.BifrostLLMUsage{PromptTokens: 510, CompletionTokens: 12, TotalTokens: 522},
+	}
+	u := extractUsage(resp)
+	if u.CacheReadTokens != 0 || u.CacheCreationTokens != 0 {
+		t.Fatalf("expected zero cache tokens, got read=%d write=%d", u.CacheReadTokens, u.CacheCreationTokens)
+	}
+}
+
+// The Responses API carries the same breakdown under InputTokensDetails.
+func TestExtractResponsesUsage_CacheTokens(t *testing.T) {
+	resp := &bfschemas.BifrostResponsesResponse{
+		Usage: &bfschemas.ResponsesResponseUsage{
+			InputTokens:  37651,
+			OutputTokens: 12,
+			TotalTokens:  37663,
+			InputTokensDetails: &bfschemas.ResponsesResponseInputTokens{
+				CachedReadTokens:  37127,
+				CachedWriteTokens: 14,
+			},
+		},
+	}
+	u := extractResponsesUsage(resp)
+	if u.CacheReadTokens != 37127 || u.CacheCreationTokens != 14 {
+		t.Fatalf("cache tokens: want read=37127 write=14, got read=%d write=%d", u.CacheReadTokens, u.CacheCreationTokens)
+	}
+}
+
+// Gemini folds cachedContentTokenCount into promptTokenCount; the passthrough
+// usage parser must surface it as CacheReadTokens so the Gemini span splits
+// out the fresh input too.
+func TestParseGeminiPassthroughUsage_CacheRead(t *testing.T) {
+	body := []byte(`data: {"candidates":[],"usageMetadata":{"promptTokenCount":37651,"candidatesTokenCount":12,"totalTokenCount":37663,"cachedContentTokenCount":37127}}`)
+	u, ok := parseGeminiPassthroughUsage(body)
+	if !ok {
+		t.Fatalf("expected usageMetadata to parse")
+	}
+	if u.CacheReadTokens != 37127 {
+		t.Fatalf("CacheReadTokens: want 37127, got %d", u.CacheReadTokens)
+	}
+	if u.PromptTokens != 37651 {
+		t.Fatalf("PromptTokens: want 37651, got %d", u.PromptTokens)
+	}
+}
