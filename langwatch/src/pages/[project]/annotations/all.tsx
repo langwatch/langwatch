@@ -63,6 +63,12 @@ export default function Annotations() {
   );
 
   const annotations = hasAnyFilters ? filteredAnnotations : allAnnotations;
+  // In filtered mode the ids come from `traceGroups`, so its load must count
+  // toward the table's loading state — otherwise the table flashes an empty
+  // state before the ids (and then the annotations) arrive.
+  const annotationsLoading = hasAnyFilters
+    ? traceGroups.isLoading || filteredAnnotations.isLoading
+    : allAnnotations.isLoading;
 
   const traceIds = annotations.data?.map((annotation) => annotation.traceId);
 
@@ -198,7 +204,7 @@ export default function Annotations() {
       >
         <AnnotationsTable
           groupedAnnotations={groupedAnnotations}
-          allAnnotationsLoading={annotations.isLoading || traces.isLoading}
+          allAnnotationsLoading={annotationsLoading || traces.isLoading}
           heading="Annotations"
           isDone={true}
           tableHeader={tableHeader}

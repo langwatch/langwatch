@@ -165,11 +165,14 @@ const ClampedPreviewText: React.FC<
  * a copy of the selection round-trips to the original two-line string.
  */
 function renderWithBreakMarkers(text: string): ReactNode {
-  // Trim trailing whitespace/newlines so we never end on a break, and
-  // collapse runs of blank lines to a single break point.
-  const trimmed = text.replace(/\s+$/u, "");
-  const lines = trimmed.split(/\n+/);
-  if (lines.length <= 1) return trimmed;
+  // Strip trailing whitespace so we never end on a break, normalize CRLF/CR so
+  // a stray `\r` can't cling to a line, then collapse runs of blank lines to a
+  // single break. A compact two-line preview shows content, not blank gaps,
+  // and its text is already a processed preview (markdown-unwrapped and
+  // truncated), not the verbatim source — so blank-line fidelity isn't a goal.
+  const normalized = text.replace(/\s+$/u, "").replace(/\r\n?/g, "\n");
+  const lines = normalized.split(/\n+/);
+  if (lines.length <= 1) return normalized;
   return lines.map((line, i) => (
     <Fragment key={i}>
       {line}

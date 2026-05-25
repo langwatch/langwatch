@@ -145,8 +145,23 @@ export class ClickHouseEvaluationService {
               { projectId, traceId },
               "Evaluations read hit the ClickHouse memory limit; retrying without Inputs",
             );
-            const rows = await runQuery(EVAL_COLUMNS_LIGHT);
-            return rows.map(mapClickHouseEvaluationToTraceEvaluation);
+            try {
+              const rows = await runQuery(EVAL_COLUMNS_LIGHT);
+              return rows.map(mapClickHouseEvaluationToTraceEvaluation);
+            } catch (retryError) {
+              this.logger.error(
+                {
+                  projectId,
+                  traceId,
+                  error:
+                    retryError instanceof Error
+                      ? retryError.message
+                      : retryError,
+                },
+                "Failed to fetch evaluations for trace from ClickHouse after light-projection retry",
+              );
+              throw new Error("Failed to fetch evaluations for trace");
+            }
           }
           this.logger.error(
             {
@@ -256,7 +271,22 @@ export class ClickHouseEvaluationService {
               { projectId, traceIdCount: traceIds.length },
               "Evaluations read hit the ClickHouse memory limit; retrying without Inputs",
             );
-            return groupByTrace(await runQuery(EVAL_COLUMNS_LIGHT));
+            try {
+              return groupByTrace(await runQuery(EVAL_COLUMNS_LIGHT));
+            } catch (retryError) {
+              this.logger.error(
+                {
+                  projectId,
+                  traceIdCount: traceIds.length,
+                  error:
+                    retryError instanceof Error
+                      ? retryError.message
+                      : retryError,
+                },
+                "Failed to fetch evaluations for multiple traces from ClickHouse after light-projection retry",
+              );
+              throw new Error("Failed to fetch evaluations for multiple traces");
+            }
           }
           this.logger.error(
             {
