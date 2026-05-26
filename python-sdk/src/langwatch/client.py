@@ -611,7 +611,7 @@ class Client(LangWatchClientProtocol):
                 self.__set_langwatch_exporter(provider)
 
             if Client._flush_on_exit:
-                logger.info(
+                logger.debug(
                     "Registering atexit handler to flush tracer provider on exit"
                 )
                 atexit.register(provider.force_flush)
