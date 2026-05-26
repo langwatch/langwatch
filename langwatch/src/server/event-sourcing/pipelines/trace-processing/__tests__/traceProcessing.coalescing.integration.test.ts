@@ -120,7 +120,7 @@ describe.skipIf(!hasTestcontainers)(
 
         const executor = new FoldProjectionExecutor();
         const fold = new TraceSummaryFoldProjection({ store: traceSummaryStore });
-        const context = { aggregateId: traceId, tenantId: tenantIdString, key: traceId };
+        const context = { aggregateId: traceId, tenantId, key: traceId };
 
         const folded = (await executor.executeBatch(
           fold as never,
