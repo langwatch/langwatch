@@ -23,7 +23,7 @@ import { tracerMiddleware } from "~/app/api/middleware/tracer";
 import { hasProjectPermission } from "~/server/api/rbac";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
-import { persistedEvaluationsV3StateSchema } from "~/evaluations-v3/types/persistence";
+import { persistedEvaluationsV3StateSchema } from "~/experiments-v3/types/persistence";
 import { AVAILABLE_EVALUATORS } from "~/server/evaluations/evaluators.generated";
 import {
   getEvaluatorDefaultSettings,
