@@ -1551,6 +1551,7 @@ export class ClickHouseTraceService {
       allRows.sort((a, b) => {
         const timeDiff = a.ts_OccurredAt - b.ts_OccurredAt;
         if (timeDiff !== 0) return timeDiff * dir;
+        if (a.ts_TraceId === b.ts_TraceId) return 0;
         return a.ts_TraceId < b.ts_TraceId ? -dir : dir;
       });
 
