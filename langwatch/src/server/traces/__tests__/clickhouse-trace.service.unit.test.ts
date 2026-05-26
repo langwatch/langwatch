@@ -763,6 +763,52 @@ describe("ClickHouseTraceService", () => {
       });
     });
 
+    describe("when ClickHouse MEMORY_LIMIT_EXCEEDED on evaluations query", () => {
+      it("retries evaluations in batches and returns traces", async () => {
+        setupStandardMocks(["trace-1"]);
+
+        // Override the evaluations mock (4th call) — make it OOM then succeed
+        mockClickHouseQuery.mockReset();
+        const summaryRows = [makeSummaryRow("trace-1")];
+        mockClickHouseQuery
+          // count
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve([{ total: "1" }]),
+          })
+          // IDs
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve([{ TraceId: "trace-1" }]),
+          })
+          // summary
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve(summaryRows),
+          })
+          // evaluations — OOM
+          .mockRejectedValueOnce(
+            Object.assign(
+              new Error("Query memory limit exceeded"),
+              { type: "MEMORY_LIMIT_EXCEEDED" },
+            ),
+          )
+          // evaluations retry batch
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve([]),
+          });
+
+        const service = new ClickHouseTraceService({
+          project: { findUnique: mockPrismaFindUnique },
+        } as never);
+
+        const result = await service.getAllTracesForProject(
+          baseInput,
+          protections,
+        );
+
+        expect(result).not.toBeNull();
+        expect(result!.groups.flat()).toHaveLength(1);
+      });
+    });
+
     describe("when includeSpans is true", () => {
       it("fetches and attaches spans to traces", async () => {
         const summaryRow = makeSummaryRow("trace-1");

@@ -2203,6 +2203,15 @@ interface PromptStudioCandidateRow {
   StartTime: number;
 }
 
+function isClickHouseMemoryLimitError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return (
+    error.message.includes("MEMORY_LIMIT_EXCEEDED") ||
+    error.message.toLowerCase().includes("memory limit exceeded") ||
+    (error as { type?: string }).type === "MEMORY_LIMIT_EXCEEDED"
+  );
+}
+
 /**
  * Given a non-llm span the operator clicked "Open in Playground" from
  * (typically `Prompt.compile` or `PromptApiService.get`), find the
@@ -2214,15 +2223,6 @@ interface PromptStudioCandidateRow {
  *   3. First llm in the trace by start time as a last resort.
  * Returns null when the trace genuinely has no llm spans.
  */
-function isClickHouseMemoryLimitError(error: unknown): boolean {
-  if (!(error instanceof Error)) return false;
-  return (
-    error.message.includes("MEMORY_LIMIT_EXCEEDED") ||
-    error.message.toLowerCase().includes("memory limit exceeded") ||
-    (error as { type?: string }).type === "MEMORY_LIMIT_EXCEEDED"
-  );
-}
-
 function findNearestLlm<T extends PromptStudioCandidateRow>(
   rows: T[],
   requested: T,
