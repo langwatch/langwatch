@@ -37,8 +37,9 @@ import type { ReplayMarkerChecker } from "./replayMarkerCheck";
 
 /**
  * Default cap on how many same-aggregate fold events are coalesced into one
- * load/apply/store cycle. Bounds the drain + apply loop (and the re-stage loop
- * on failure) while still collapsing a backed-up group from O(n²) to O(n).
+ * load/apply/store cycle. Bounds the per-cycle drain + apply loop (and the
+ * re-stage loop on failure) while collapsing a backed-up group from O(n²) to
+ * O(n). A fold can opt out by setting options.coalesceMaxBatch = 1.
  */
 const DEFAULT_FOLD_COALESCE_MAX_BATCH = 100;
 
@@ -242,9 +243,19 @@ export class ProjectionRouter<
       projectionDefs[name] = {
         name,
         groupKeyFn: fold.key,
-        // Coalesce a backed-up group's events into one fold cycle. Defaults on
-        // for every fold (harmless at batch size 1 when keeping up); a fold can
-        // override or opt out via options.coalesceMaxBatch.
+        // Coalesce a backed-up group's events into one fold load/apply/store
+        // cycle. On for every fold (harmless at batch size 1 when the queue
+        // keeps up). Safe for all folds because: the final folded state is
+        // identical to applying events one at a time (pure left-fold, the
+        // intermediate stores never affect the result); processFoldProjectionBatch
+        // still dispatches reactors per event, so event-sensitive reactors
+        // (per-span eval sync, evaluation/scenario triggers keyed on event type)
+        // see every event; and out-of-order is handled identically to the
+        // single-event path (executeBatch sorts by occurredAt and uses the same
+        // checkpoint re-fold). The only difference is reactors observe the final
+        // batch fold-state, which is the correct "current state" for a
+        // react-after-fold side effect. A fold can opt out via
+        // options.coalesceMaxBatch = 1.
         coalesceMaxBatch: fold.options?.coalesceMaxBatch ?? DEFAULT_FOLD_COALESCE_MAX_BATCH,
         options: fold.options,
       };
@@ -698,6 +709,15 @@ export class ProjectionRouter<
         }
         if (toApply.length === 0) return;
 
+        // Apply (and dispatch reactors) in occurredAt order — the same order
+        // executeBatch folds in — so reactor metadata and the final state are
+        // consistent regardless of the order events were drained/dispatched in.
+        toApply = [...toApply].sort(
+          (a, b) =>
+            (((a as Record<string, unknown>).occurredAt as number) ?? 0) -
+            (((b as Record<string, unknown>).occurredAt as number) ?? 0),
+        );
+
         const first = toApply[0]!;
         const key = fold.key ? fold.key(first) : undefined;
         const storeContext: ProjectionStoreContext = {
@@ -712,15 +732,19 @@ export class ProjectionRouter<
           onFail: (ms) => { incrementEsFoldProjectionTotal(this.pipelineName, projectionName, "failed"); observeEsFoldProjectionDuration(this.pipelineName, projectionName, ms); },
         });
 
-        // Dispatch reactors once with the final state, using the last event.
+        // Dispatch reactors for EVERY folded event, with the final fold state.
+        // Fold-state reactors (broadcast, metadata, alerts) carry makeJobId
+        // dedup and collapse to one effective run, so firing per event is cheap.
+        // Per-span reactors must see every event: customEvaluationSync reads
+        // event.data.span to extract embedded SDK evals, and evaluationTrigger
+        // inspects each span's attributes — firing only once would silently
+        // drop N-1 spans' work, and only under backlog (the recovery path).
+        // The O(n²)->O(n) win lives in the single fold load/store, not here.
         const reactors = this.reactorsForFold.get(projectionName);
         if (reactors && reactors.length > 0) {
-          await this.dispatchToReactors(
-            projectionName,
-            reactors,
-            toApply[toApply.length - 1]!,
-            foldState,
-          );
+          for (const event of toApply) {
+            await this.dispatchToReactors(projectionName, reactors, event, foldState);
+          }
         }
       },
     );

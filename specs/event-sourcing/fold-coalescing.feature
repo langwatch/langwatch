@@ -40,6 +40,13 @@ Feature: Group-coalesced fold projections
     When the batch is folded
     Then the events are applied in occurredAt order
 
+  @unit @coalescing @reactors
+  Scenario: Coalescing still dispatches per-span reactors for every event
+    Given a coalesced batch of several events for one aggregate
+    When the batch is folded
+    Then the fold state is loaded and stored once
+    And reactors are dispatched once per event, in occurredAt order
+
   @integration @coalescing @queue
   Scenario: A backed-up group is folded in a single batch call
     Given a group with ten queued events
@@ -66,3 +73,9 @@ Feature: Group-coalesced fold projections
     Given a group whose first batch attempt fails
     When the group is retried
     Then every event is eventually processed and none are lost
+
+  @integration @coalescing @pipeline
+  Scenario: Coalesced folding produces the correct accumulated state through the pipeline
+    Given many spans recorded for one trace in quick succession
+    When the trace summary fold catches up
+    Then the accumulated span count persisted in ClickHouse equals the number of spans recorded

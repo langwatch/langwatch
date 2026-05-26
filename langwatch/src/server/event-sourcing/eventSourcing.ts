@@ -462,23 +462,23 @@ export class EventSourcing {
       },
       processBatch: async (payloads: Record<string, unknown>[]) => {
         if (payloads.length === 0) return;
-        // A coalesced batch is always one group → one registry entry. Resolve it
-        // from the first payload and hand the batch handler the clean payloads
-        // (routing metadata stripped).
+        // A coalesced batch is always one group → one registry entry. Resolve
+        // every payload and guard against a mixed/unknown batch (should never
+        // happen — the GroupQueue only coalesces same-group jobs — but a stray
+        // payload must never be misrouted to the wrong handler). On any mismatch
+        // fall back to per-item processing.
         const first = this.lookupEntry(payloads[0]!);
-        if (!first?.entry.processBatch) {
-          // No batch handler for this job type — process each individually.
-          for (const payload of payloads) {
-            const result = this.lookupEntry(payload);
+        const resolved = payloads.map((payload) => this.lookupEntry(payload));
+        const homogeneous =
+          !!first?.entry.processBatch &&
+          resolved.every((r) => r?.entry === first.entry);
+        if (!homogeneous) {
+          for (const result of resolved) {
             if (result) await result.entry.process(result.clean);
           }
           return;
         }
-        const cleanPayloads = payloads.map((payload) => {
-          const result = this.lookupEntry(payload);
-          return result ? result.clean : payload;
-        });
-        await first.entry.processBatch(cleanPayloads);
+        await first.entry.processBatch!(resolved.map((r) => r!.clean));
       },
     };
 
