@@ -161,10 +161,6 @@ export class TraceListClickHouseRepository implements TraceListRepository {
           TopicId,
           SubTopicId,
           AnnotationIds,
-          ScenarioRoleCosts,
-          ScenarioRoleLatencies,
-          ScenarioRoleSpans,
-          SpanCosts,
           toUnixTimestamp64Milli(LastEventOccurredAt) AS LastEventOccurredAt,
           TotalCount
         FROM (
@@ -211,10 +207,6 @@ export class TraceListClickHouseRepository implements TraceListRepository {
             TopicId,
             SubTopicId,
             AnnotationIds,
-            ScenarioRoleCosts,
-            ScenarioRoleLatencies,
-            ScenarioRoleSpans,
-            SpanCosts,
             LastEventOccurredAt,
             count() OVER () AS TotalCount
           FROM ${TABLE_NAME}
@@ -835,10 +827,6 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       subTopicId: row.SubTopicId,
       annotationIds: row.AnnotationIds ?? [],
       attributes: buildListAttributes(row),
-      scenarioRoleCosts: row.ScenarioRoleCosts ?? {},
-      scenarioRoleLatencies: row.ScenarioRoleLatencies ?? {},
-      scenarioRoleSpans: row.ScenarioRoleSpans ?? {},
-      spanCosts: row.SpanCosts ?? {},
       occurredAt: Number(row.OccurredAt),
       createdAt: Number(row.CreatedAt),
       updatedAt: Number(row.UpdatedAt),

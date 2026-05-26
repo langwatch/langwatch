@@ -43,7 +43,6 @@ import {
   TraceOriginService,
   TraceAttributeAccumulationService,
   TraceIOAccumulationService,
-  ScenarioRoleCostService,
   TracePromptAccumulationService,
   TraceNameResolutionService,
   accumulateEvents,
@@ -75,7 +74,6 @@ const traceIOExtractionService = new TraceIOExtractionService();
 const traceIOAccumulationService = new TraceIOAccumulationService(
   traceIOExtractionService,
 );
-const scenarioRoleCostService = new ScenarioRoleCostService(spanCostService);
 const tracePromptAccumulationService = new TracePromptAccumulationService();
 const traceNameResolutionService = new TraceNameResolutionService();
 
@@ -121,11 +119,6 @@ export function applySpanToSummary({
       ? [...new Set([...state.models, ...newModels])].sort()
       : state.models;
 
-  const roleAccumulation = scenarioRoleCostService.accumulateRoleCostLatency({
-    state,
-    span,
-  });
-
   // Precedence rules for traceName / rootSpanType / rootSpanStartTimeMs
   // live in TraceNameResolutionService — see that file for the full set.
   const {
@@ -166,7 +159,6 @@ export function applySpanToSummary({
     containsAi,
     ...promptRollup,
     attributes,
-    ...roleAccumulation,
     events,
   };
 }
@@ -250,10 +242,12 @@ export class TraceSummaryFoldProjection
       rootMetadataFromFallback: false,
       attributes: {},
       events: [],
-      scenarioRoleCosts: {},
-      scenarioRoleLatencies: {},
-      scenarioRoleSpans: {},
-      spanCosts: {},
+      // scenarioRoleCosts/Latencies/Spans and spanCosts are no longer
+      // accumulated in the fold state: they scaled O(span-count) and made each
+      // fold step O(n) (copy + re-serialize the whole growing blob), so a
+      // single long-lived trace turned folding into O(n^2). Scenario role
+      // cost/latency are now derived from stored_spans when simulation metrics
+      // are computed, keeping these off the hot path entirely.
       // Sentinel: 0 means "no spans received yet". The timing function uses
       // occurredAt > 0 to decide first-span vs min-of-existing. Using Date.now()
       // here would break Math.min logic -- wall-clock time >> span startTimeUnixMs.

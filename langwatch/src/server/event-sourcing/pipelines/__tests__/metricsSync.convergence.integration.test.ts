@@ -1,21 +1,24 @@
 /**
- * REAL integration test for per-role cost/latency metrics propagation.
+ * REAL integration test for per-role cost/latency metrics derivation.
  *
  * Sends actual OTLP spans through the trace processing pipeline with
- * ClickHouse + Redis, then verifies that scenarioRoleCosts/scenarioRoleLatencies are
- * accumulated in the trace summary fold state.
+ * ClickHouse, then verifies that scenario role cost/latency are correctly
+ * DERIVED from the stored spans (they are no longer accumulated on the fold,
+ * which kept the hot path O(1)).
  *
  * This test proves the full path:
- * 1. Span with scenario.role arrives
- * 2. traceSummary fold accumulates scenarioRoleCosts via parent-role inheritance
- * 3. Fold state is persisted to ClickHouse trace_summaries table
- * 4. Data can be read back from the store
+ * 1. Spans with scenario.role + child LLM spans arrive and are stored
+ * 2. The fold persists O(1) scalars to trace_summaries (no per-span maps)
+ * 3. Reading the stored spans back and deriving role metrics yields the
+ *    expected per-role cost (nearest-ancestor) and latency
  *
  * @see specs/features/suites/trace-role-cost-accumulation.feature
  */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
 import { SpanStorageClickHouseRepository } from "~/server/app-layer/traces/repositories/span-storage.clickhouse.repository";
+import { SpanCostService } from "../trace-processing/projections/services/span-cost.service";
+import { deriveScenarioRoleMetricsFromSpans } from "../trace-processing/projections/services/scenario-role-metrics.derivation";
 import { TraceSummaryService } from "~/server/app-layer/traces/trace-summary.service";
 import { TraceSummaryClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-summary.clickhouse.repository";
 import type { AggregateType } from "../../";
@@ -298,9 +301,7 @@ describe.skipIf(!hasTestcontainers)(
         while (Date.now() < deadline) {
           const result = await clickHouseClient.query({
             query: `
-              SELECT SpanCount, TotalCost,
-                ScenarioRoleCosts, ScenarioRoleLatencies, ScenarioRoleSpans,
-                Attributes
+              SELECT SpanCount, TotalCost, Attributes
               FROM trace_summaries
               WHERE TenantId = {tenantId:String}
                 AND TraceId = {traceId:String}
@@ -314,8 +315,6 @@ describe.skipIf(!hasTestcontainers)(
           const rows = await result.json();
           if (rows.length > 0) {
             console.log("[TEST] Found row, SpanCount:", (rows[0] as any).SpanCount,
-              "RoleCosts:", JSON.stringify((rows[0] as any).ScenarioRoleCosts),
-              "RoleLatencies:", JSON.stringify((rows[0] as any).ScenarioRoleLatencies),
               "Attrs:", JSON.stringify((rows[0] as any).Attributes));
             if ((rows[0] as any).SpanCount >= 4) {
               row = rows[0];
@@ -328,16 +327,28 @@ describe.skipIf(!hasTestcontainers)(
         expect(row).not.toBeNull();
         expect(row.SpanCount).toBe(4);
 
-        // Role costs should have Agent entry with accumulated LLM costs
-        expect(row.ScenarioRoleCosts).toBeDefined();
-        expect(row.ScenarioRoleCosts["Agent"]).toBeGreaterThan(0);
-
-        // Role latencies should have Agent entry = agent span duration (4000ms)
-        expect(row.ScenarioRoleLatencies).toBeDefined();
-        expect(row.ScenarioRoleLatencies["Agent"]).toBe(4000);
-
-        // scenario.run_id hoisted from root span to attributes
+        // scenario.run_id hoisted from root span to the fold attributes (O(1)).
         expect(row.Attributes["scenario.run_id"]).toBe("scenariorun_test123");
+
+        // Role cost/latency are derived from the stored spans, not the fold.
+        // Read them back and verify the derivation produces the expected
+        // per-role aggregates (both child LLM costs attributed to Agent; Agent
+        // latency = its own span duration).
+        const spanRepo = new SpanStorageClickHouseRepository(
+          async () => clickHouseClient,
+        );
+        const spans = await spanRepo.getNormalizedSpansByTraceId({
+          tenantId: tenantIdString,
+          traceId,
+        });
+        const { scenarioRoleCosts, scenarioRoleLatencies } =
+          deriveScenarioRoleMetricsFromSpans({
+            spans,
+            spanCostService: new SpanCostService(),
+          });
+
+        expect(scenarioRoleCosts["Agent"]).toBeGreaterThan(0);
+        expect(scenarioRoleLatencies["Agent"]).toBe(4000);
       }, 60_000);
     });
   },

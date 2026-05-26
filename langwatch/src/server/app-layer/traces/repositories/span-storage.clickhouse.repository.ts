@@ -3,6 +3,7 @@ import type { WithDateWrites } from "~/server/clickhouse/types";
 import {
   NormalizedSpanKind,
   NormalizedStatusCode,
+  type NormalizedSpan,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import { SecurityError } from "~/server/event-sourcing/services/errorHandling";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
@@ -18,7 +19,10 @@ import type {
   SpanStorageRepository,
   SpanSummaryRow,
 } from "./span-storage.repository";
-import { LANGWATCH_SIGNAL_BUCKETS } from "./span-storage.repository";
+import {
+  LANGWATCH_SIGNAL_BUCKETS,
+  MAX_DERIVATION_SPANS,
+} from "./span-storage.repository";
 
 const TABLE_NAME = "stored_spans" as const;
 
@@ -645,6 +649,67 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
           error: error instanceof Error ? error.message : String(error),
         },
         "Failed to get spans by trace ID from ClickHouse",
+      );
+      throw error;
+    }
+  }
+
+  async getNormalizedSpansByTraceId({
+    tenantId,
+    traceId,
+    limit,
+    occurredAtMs,
+  }: {
+    tenantId: string;
+    traceId: string;
+    limit?: number;
+  } & OccurredAtHint): Promise<NormalizedSpan[]> {
+    EventUtils.validateTenantId(
+      { tenantId },
+      "SpanStorageClickHouseRepository.getNormalizedSpansByTraceId",
+    );
+
+    const effectiveLimit = limit ?? MAX_DERIVATION_SPANS;
+
+    try {
+      return await withPartitionHint<NormalizedSpan[]>(
+        { occurredAtMs },
+        (rows) => rows.length === 0,
+        async (window) => {
+          const partition = partitionFragment(window);
+          const client = await this.resolveClient(tenantId);
+          const result = await client.query({
+            query: `
+              SELECT ${FULL_SPAN_SELECT}
+              FROM ${TABLE_NAME}
+              WHERE TenantId = {tenantId:String}
+                AND TraceId = {traceId:String}
+                ${partition.sqlAnd}
+                AND ${dedupInTuple(partition.sqlAndInner)}
+              ORDER BY StartTimeMs ASC
+              LIMIT {limit:UInt32}
+            `,
+            query_params: {
+              tenantId,
+              traceId,
+              limit: effectiveLimit,
+              ...partition.params,
+            },
+            format: "JSONEachRow",
+          });
+
+          const rows = (await result.json()) as FullSpanRow[];
+          return rows.map(mapChRowToNormalized);
+        },
+      );
+    } catch (error) {
+      logger.error(
+        {
+          tenantId,
+          traceId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "Failed to get normalized spans by trace ID from ClickHouse",
       );
       throw error;
     }

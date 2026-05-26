@@ -1,53 +1,24 @@
 import { describe, expect, it } from "vitest";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { NormalizedSpan } from "../../schemas/spans";
 import { SpanCostService } from "../services/span-cost.service";
-import { ScenarioRoleCostService } from "../services/scenario-role-cost.service";
 import {
   aggregateScenarioRoleMetrics,
   deriveScenarioRoleMetricsFromSpans,
   type ScenarioRoleSpanInput,
 } from "../services/scenario-role-metrics.derivation";
-import { createInitState, createTestSpan } from "./fixtures/trace-summary-test.fixtures";
+import { createTestSpan } from "./fixtures/trace-summary-test.fixtures";
 
 /**
  * The read-time scenario-role aggregator replaces the per-event fold
  * bookkeeping (scenarioRoleSpans + spanCosts) that grew O(n) with span count.
- * These tests pin its arithmetic and prove it produces IDENTICAL
- * scenarioRoleCosts / scenarioRoleLatencies to the legacy incremental
- * ScenarioRoleCostService for the same span set, regardless of arrival order.
+ * These tests pin its arithmetic (nearest-ancestor role resolution, cost
+ * summation, latency from direct-role spans only) and that it is independent
+ * of span arrival order, since it operates over the complete span set.
  */
 
 const spanCostService = new SpanCostService();
-const scenarioRoleCostService = new ScenarioRoleCostService(spanCostService);
 
-/**
- * Folds spans through the legacy incremental service the same way the fold
- * projection did, returning the final scenario role metrics.
- */
-function legacyFold(spans: NormalizedSpan[]): {
-  scenarioRoleCosts: Record<string, number>;
-  scenarioRoleLatencies: Record<string, number>;
-} {
-  let state = createInitState();
-  for (const span of spans) {
-    const result = scenarioRoleCostService.accumulateRoleCostLatency({
-      state,
-      span,
-    });
-    state = { ...state, ...result } as TraceSummaryData;
-  }
-  return {
-    scenarioRoleCosts: state.scenarioRoleCosts ?? {},
-    scenarioRoleLatencies: state.scenarioRoleLatencies ?? {},
-  };
-}
-
-function llmSpan(
-  spanId: string,
-  parentSpanId: string | null,
-  overrides: Partial<NormalizedSpan> = {},
-): NormalizedSpan {
+function llmSpan(spanId: string, parentSpanId: string | null): NormalizedSpan {
   return createTestSpan({
     id: spanId,
     spanId,
@@ -62,7 +33,6 @@ function llmSpan(
       "gen_ai.usage.input_tokens": 1000,
       "gen_ai.usage.output_tokens": 500,
     },
-    ...overrides,
   });
 }
 
@@ -70,17 +40,16 @@ function agentSpan(
   spanId: string,
   parentSpanId: string | null,
   role: string,
-  overrides: Partial<NormalizedSpan> = {},
+  durationMs = 3000,
 ): NormalizedSpan {
   return createTestSpan({
     id: spanId,
     spanId,
     parentSpanId,
     startTimeUnixMs: 1000,
-    endTimeUnixMs: 4000,
-    durationMs: 3000,
+    endTimeUnixMs: 1000 + durationMs,
+    durationMs,
     spanAttributes: { "scenario.role": role },
-    ...overrides,
   });
 }
 
@@ -171,42 +140,60 @@ describe("aggregateScenarioRoleMetrics", () => {
   });
 });
 
-describe("deriveScenarioRoleMetricsFromSpans parity with legacy incremental fold", () => {
-  const userAgent = agentSpan("user-agent", null, "user");
+describe("deriveScenarioRoleMetricsFromSpans", () => {
+  const userAgent = agentSpan("user-agent", null, "user", 1500);
   const userLlm = llmSpan("user-llm", "user-agent");
-  const asstAgent = agentSpan("asst-agent", null, "assistant");
+  const asstAgent = agentSpan("asst-agent", null, "assistant", 2500);
   const asstLlm = llmSpan("asst-llm", "asst-agent");
   const asstNestedLlm = llmSpan("asst-nested", "asst-llm");
 
-  const spans = [userAgent, userLlm, asstAgent, asstLlm, asstNestedLlm];
+  const inOrder = [userAgent, userLlm, asstAgent, asstLlm, asstNestedLlm];
+  // children before their role-bearing parents (the common OTel export order)
+  const outOfOrder = [userLlm, asstLlm, asstNestedLlm, userAgent, asstAgent];
 
-  describe("when spans arrive parent-before-children (in order)", () => {
-    it("matches the legacy service output", () => {
-      const derived = deriveScenarioRoleMetricsFromSpans({ spans, spanCostService });
-      expect(derived).toEqual(legacyFold(spans));
+  describe("when spans arrive in any order", () => {
+    it("produces the same result (operates over the complete set)", () => {
+      const a = deriveScenarioRoleMetricsFromSpans({ spans: inOrder, spanCostService });
+      const b = deriveScenarioRoleMetricsFromSpans({ spans: outOfOrder, spanCostService });
+      expect(a).toEqual(b);
     });
   });
 
-  describe("when a child LLM span arrives before its role-bearing parent", () => {
-    it("matches the legacy service output (retroactive assignment parity)", () => {
-      const outOfOrder = [userLlm, asstLlm, asstNestedLlm, userAgent, asstAgent];
-      const derived = deriveScenarioRoleMetricsFromSpans({
-        spans: outOfOrder,
+  describe("when role-bearing spans carry durations", () => {
+    it("sums latency per direct role from the role span itself", () => {
+      const { scenarioRoleLatencies } = deriveScenarioRoleMetricsFromSpans({
+        spans: inOrder,
         spanCostService,
       });
-      expect(derived).toEqual(legacyFold(outOfOrder));
+      expect(scenarioRoleLatencies).toEqual({ user: 1500, assistant: 2500 });
+    });
+  });
+
+  describe("when costed LLM spans nest under roles", () => {
+    it("attributes each LLM's cost to its nearest role ancestor and sums per role", () => {
+      const perLlmCost = spanCostService.extractTokenMetrics(userLlm).cost;
+      const { scenarioRoleCosts } = deriveScenarioRoleMetricsFromSpans({
+        spans: inOrder,
+        spanCostService,
+      });
+
+      if (perLlmCost > 0) {
+        // user role: 1 LLM (user-llm); assistant role: 2 LLMs (asst-llm +
+        // asst-nested, the nested one resolves to assistant via its chain).
+        expect(scenarioRoleCosts.user).toBeCloseTo(perLlmCost);
+        expect(scenarioRoleCosts.assistant).toBeCloseTo(perLlmCost * 2);
+      } else {
+        expect(scenarioRoleCosts).toEqual({});
+      }
     });
   });
 
   describe("when the trace has no scenario roles", () => {
-    it("both produce empty maps", () => {
+    it("produces empty maps", () => {
       const plain = [llmSpan("a", null), llmSpan("b", "a")];
-      const derived = deriveScenarioRoleMetricsFromSpans({
-        spans: plain,
-        spanCostService,
-      });
-      expect(derived).toEqual(legacyFold(plain));
-      expect(derived.scenarioRoleCosts).toEqual({});
+      expect(
+        deriveScenarioRoleMetricsFromSpans({ spans: plain, spanCostService }),
+      ).toEqual({ scenarioRoleCosts: {}, scenarioRoleLatencies: {} });
     });
   });
 });
