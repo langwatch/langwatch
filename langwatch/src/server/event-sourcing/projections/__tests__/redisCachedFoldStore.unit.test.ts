@@ -4,6 +4,12 @@ import type { FoldProjectionStore } from "../foldProjection.types";
 import type { ProjectionStoreContext } from "../projectionStoreContext";
 import { createTenantId } from "../../domain/tenantId";
 
+vi.mock("~/server/metrics", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("~/server/metrics")>()),
+  observeEsFoldStateBytes: vi.fn(),
+}));
+import { observeEsFoldStateBytes } from "~/server/metrics";
+
 interface TestState {
   count: number;
   name: string;
@@ -160,6 +166,41 @@ describe("RedisCachedFoldStore", () => {
       const state2 = await store.get("agg-1", TEST_CONTEXT);
       expect(state2).toEqual(newState);
       expect(inner.getCalls).toHaveLength(1);
+    });
+  });
+
+  describe("store() — oversized state visibility", () => {
+    /** @scenario 'An oversized state is surfaced instead of silently re-reading' */
+    it("records the serialized state size on a metric and still caches it", async () => {
+      const redis = createMockRedis();
+      const inner = createMockInnerStore();
+      const store = new RedisCachedFoldStore<TestState>(inner, redis as any, {
+        keyPrefix: "test_table",
+      });
+
+      const oversized: TestState = { count: 1, name: "x".repeat(2 * 1024 * 1024) };
+      await store.store(oversized, TEST_CONTEXT);
+
+      expect(observeEsFoldStateBytes).toHaveBeenCalled();
+      const lastCall = (observeEsFoldStateBytes as any).mock.calls.at(-1);
+      expect(lastCall[0]).toBe("test_table");
+      expect(lastCall[1]).toBeGreaterThan(1024 * 1024);
+      // Still cached — Redis handles large values; the point is visibility,
+      // not silently dropping to a ClickHouse-only read path.
+      expect(redis.set).toHaveBeenCalled();
+    });
+
+    it("records a small size for a normal state", async () => {
+      const redis = createMockRedis();
+      const inner = createMockInnerStore();
+      const store = new RedisCachedFoldStore<TestState>(inner, redis as any, {
+        keyPrefix: "test_table",
+      });
+
+      await store.store({ count: 1, name: "small" }, TEST_CONTEXT);
+
+      const lastCall = (observeEsFoldStateBytes as any).mock.calls.at(-1);
+      expect(lastCall[1]).toBeLessThan(1024 * 1024);
     });
   });
 });

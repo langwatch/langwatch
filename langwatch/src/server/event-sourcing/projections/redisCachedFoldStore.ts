@@ -6,11 +6,23 @@ import {
   observeEsFoldCacheGetDuration,
   observeEsFoldCacheStoreDuration,
   incrementEsFoldCacheRedisError,
+  observeEsFoldStateBytes,
 } from "~/server/metrics";
 import type { FoldProjectionStore } from "./foldProjection.types";
 import type { ProjectionStoreContext } from "./projectionStoreContext";
 
 const logger = createLogger("langwatch:event-sourcing:redis-cached-fold-store");
+
+/**
+ * Size past which a serialized fold state is considered too large to be a
+ * healthy cache entry. A state this big is the warning sign of an unbounded
+ * accumulation bug: it strains the cache and, if it grows further, forces a
+ * full re-read from the persistent store on every fold step (quadratic work
+ * that lets one aggregate monopolize the shared queue). We still cache it —
+ * Redis handles large values — but we record it on a metric and log it so
+ * the offending projection is visible instead of silently degrading.
+ */
+const FOLD_STATE_WARN_BYTES = 1024 * 1024;
 
 export interface RedisCachedFoldStoreOptions {
   keyPrefix: string;
@@ -111,9 +123,18 @@ export class RedisCachedFoldStore<State>
     await this.inner.store(state, context);
 
     // 2. Redis second — cache for fast reads on next fold step
+    const serialized = JSON.stringify(state);
+    const stateBytes = Buffer.byteLength(serialized, "utf8");
+    observeEsFoldStateBytes(this.keyPrefix, stateBytes);
+    if (stateBytes > FOLD_STATE_WARN_BYTES) {
+      logger.warn(
+        { aggregateId, stateBytes, projection: this.keyPrefix },
+        "Oversized fold state — risks cache strain and quadratic re-reads; bound the projection state",
+      );
+    }
     try {
       const key = this.redisKey(aggregateId, context);
-      await this.redis.set(key, JSON.stringify(state), "EX", this.ttlSeconds);
+      await this.redis.set(key, serialized, "EX", this.ttlSeconds);
     } catch (error) {
       incrementEsFoldCacheRedisError(this.keyPrefix, "set");
       logger.warn(

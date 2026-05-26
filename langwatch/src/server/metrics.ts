@@ -445,6 +445,19 @@ export const incrementEsFoldCacheRedisError = (
   operation: "get" | "set",
 ) => esFoldCacheRedisErrorTotal.labels(projectionName, operation).inc();
 
+register.removeSingleMetric("es_fold_state_bytes");
+const esFoldStateBytes = new Histogram({
+  name: "es_fold_state_bytes",
+  help: "Serialized byte size of fold state written through the cache. A large tail means one aggregate grew an oversized state that no longer fits the cache, forcing quadratic re-reads.",
+  labelNames: ["projection_name"] as const,
+  buckets: [1024, 8192, 65536, 262144, 1048576, 4194304, 16777216],
+});
+
+export const observeEsFoldStateBytes = (
+  projectionName: string,
+  bytes: number,
+) => esFoldStateBytes.labels(projectionName).observe(bytes);
+
 // ============================================================================
 // Stored Objects Metrics
 // ============================================================================
