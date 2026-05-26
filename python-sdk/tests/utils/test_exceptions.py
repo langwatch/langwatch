@@ -7,6 +7,8 @@ import pytest
 
 from langwatch.utils.exceptions import better_raise_for_status
 
+pytestmark = pytest.mark.unit
+
 
 def _response(status_code: int, json_body: object | None = None) -> httpx.Response:
     request = httpx.Request("POST", "https://app.langwatch.ai/api/evaluations/batch/log_results")
