@@ -131,8 +131,15 @@ describe.skipIf(!hasTestcontainers)(
         // In-memory result: every span folded, no double-count, no loss.
         expect(folded.spanCount).toBe(SPAN_COUNT);
 
-        // Persisted in ClickHouse: read the single stored summary back.
-        const persisted = (await traceSummaryStore.get(traceId, context)) as TraceSummaryData | null;
+        // Persisted in ClickHouse: read the single stored summary back. Poll to
+        // tolerate ClickHouse insert visibility lag (the row is written once).
+        let persisted: TraceSummaryData | null = null;
+        const deadline = Date.now() + 10000;
+        while (Date.now() < deadline) {
+          persisted = (await traceSummaryStore.get(traceId, context)) as TraceSummaryData | null;
+          if (persisted?.spanCount === SPAN_COUNT) break;
+          await new Promise((r) => setTimeout(r, 200));
+        }
         expect(persisted?.spanCount).toBe(SPAN_COUNT);
       }, 45000);
     });
