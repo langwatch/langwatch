@@ -765,10 +765,6 @@ describe("ClickHouseTraceService", () => {
 
     describe("when ClickHouse MEMORY_LIMIT_EXCEEDED on evaluations query", () => {
       it("retries evaluations in batches and returns traces", async () => {
-        setupStandardMocks(["trace-1"]);
-
-        // Override the evaluations mock (4th call) — make it OOM then succeed
-        mockClickHouseQuery.mockReset();
         const summaryRows = [makeSummaryRow("trace-1")];
         mockClickHouseQuery
           // count

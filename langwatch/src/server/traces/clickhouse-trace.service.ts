@@ -1427,7 +1427,7 @@ export class ClickHouseTraceService {
    * Fetch full trace summary rows for a set of trace IDs.
    * On ClickHouse MEMORY_LIMIT_EXCEEDED, retries in smaller batches
    * so that heavy ComputedInput/ComputedOutput columns don't blow the
-   * per-query memory cap.
+   * per-query memory cap. If a single batch still OOMs the error propagates.
    */
   private async fetchTraceSummaryRows({
     clickHouseClient,
