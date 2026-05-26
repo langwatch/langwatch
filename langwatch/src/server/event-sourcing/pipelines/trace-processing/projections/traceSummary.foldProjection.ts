@@ -59,50 +59,6 @@ const COMPUTED_IO_SCHEMA_VERSION = "2026-04-28" as const;
 
 const AI_SPAN_TYPES = new Set(["llm", "agent", "tool", "rag"]);
 
-/**
- * Max byte length stored for the computed trace input/output preview. The
- * full conversation text lives on the spans; the trace summary only needs a
- * representative preview, so an unbounded conversation (a long agent run)
- * must not bloat the fold state past what the cache can hold.
- */
-export const COMPUTED_IO_MAX_BYTES = 128 * 1024;
-const TRUNCATION_MARKER = "…[truncated]";
-
-function truncateToBytes(value: string | null): {
-  value: string | null;
-  truncated: boolean;
-} {
-  if (value === null || Buffer.byteLength(value, "utf8") <= COMPUTED_IO_MAX_BYTES) {
-    return { value, truncated: false };
-  }
-  // Slice on characters then trim until the UTF-8 byte budget (minus the
-  // marker) is met, so multibyte characters never push us back over.
-  let sliced = value.slice(0, COMPUTED_IO_MAX_BYTES);
-  const budget = COMPUTED_IO_MAX_BYTES - Buffer.byteLength(TRUNCATION_MARKER, "utf8");
-  while (Buffer.byteLength(sliced, "utf8") > budget && sliced.length > 0) {
-    sliced = sliced.slice(0, -1024);
-  }
-  return { value: sliced + TRUNCATION_MARKER, truncated: true };
-}
-
-/** @internal Exported for unit testing */
-export function capComputedIO(
-  computedInput: string | null,
-  computedOutput: string | null,
-): {
-  computedInput: string | null;
-  computedOutput: string | null;
-  computedIOTruncated: boolean;
-} {
-  const input = truncateToBytes(computedInput);
-  const output = truncateToBytes(computedOutput);
-  return {
-    computedInput: input.value,
-    computedOutput: output.value,
-    computedIOTruncated: input.truncated || output.truncated,
-  };
-}
-
 // ─── Main composition ───────────────────────────────────────────────
 
 const spanNormalizationPipelineService = new SpanNormalizationPipelineService(
@@ -187,20 +143,16 @@ export function applySpanToSummary({
 
   const promptRollup = tracePromptAccumulationService.accumulate({ state, span });
 
-  // Keep the fold state bounded: a state that outgrows the write-through
-  // cache forces a full re-read from the store on every fold step, which
-  // turns folding quadratic and lets one trace monopolise the queue.
-  const boundedAttributes =
+  // Keep the fold state bounded: the events list is the only field that grows
+  // with span count (computed I/O is replaced, not accumulated). A state that
+  // outgrows the write-through cache forces a full re-read from the store on
+  // every fold step, which turns folding quadratic and lets one trace
+  // monopolise the queue. Flag the truncation so consumers know events were
+  // dropped (the full events always remain on the spans).
+  const finalAttributes =
     eventsDropped && attributes["langwatch.reserved.events_truncated"] !== "true"
       ? { ...attributes, "langwatch.reserved.events_truncated": "true" }
       : attributes;
-  const { computedInput, computedOutput, computedIOTruncated } =
-    capComputedIO(io.computedInput, io.computedOutput);
-  const finalAttributes =
-    computedIOTruncated &&
-    boundedAttributes["langwatch.reserved.computed_io_truncated"] !== "true"
-      ? { ...boundedAttributes, "langwatch.reserved.computed_io_truncated": "true" }
-      : boundedAttributes;
 
   return {
     ...state,
@@ -216,8 +168,8 @@ export function applySpanToSummary({
     rootSpanStartTimeMs,
     ...tokens,
     ...status,
-    computedInput,
-    computedOutput,
+    computedInput: io.computedInput,
+    computedOutput: io.computedOutput,
     outputFromRootSpan: io.outputFromRootSpan,
     outputSpanEndTimeMs: io.outputSpanEndTimeMs,
     blockedByGuardrail: io.blockedByGuardrail,
