@@ -179,9 +179,8 @@ function useTypewriterPlaceholder(
 }
 
 /**
- * `⌘L` / `Ctrl+L` toggles the Langy panel globally. Mirrors
- * useGlobalAiShortcut from traces-v2. ⌘L is normally captured by the
- * browser to focus the URL bar; preventDefault claims it for the page
+ * `⌘I` / `Ctrl+I` toggles the Langy panel globally. Mirrors
+ * useGlobalAiShortcut from traces-v2. preventDefault claims it for the page
  * when keyboard focus is inside the document. If a text input is active
  * with a non-empty selection we bail to avoid hijacking OS shortcuts
  * users might be relying on (e.g. select-line).
@@ -191,7 +190,7 @@ function useGlobalLangyShortcut(onTrigger: () => void): void {
     const handler = (event: KeyboardEvent) => {
       const isAccel = event.metaKey || event.ctrlKey;
       if (!isAccel) return;
-      if (event.key !== "l" && event.key !== "L") return;
+      if (event.key !== "i" && event.key !== "I") return;
       if (event.altKey || event.shiftKey) return;
       const target = event.target;
       if (target instanceof HTMLElement) {
@@ -394,7 +393,7 @@ function LangyHandle({
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       aria-label={isOpen ? "Close Langy" : "Open Langy assistant"}
-      aria-keyshortcuts="Meta+L Control+L"
+      aria-keyshortcuts="Meta+I Control+I"
       position="fixed"
       right={isOpen ? `${PANEL_WIDTH}px` : 0}
       top="50%"
