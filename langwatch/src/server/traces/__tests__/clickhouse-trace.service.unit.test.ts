@@ -687,6 +687,60 @@ describe("ClickHouseTraceService", () => {
         expect(traces).toHaveLength(4);
       });
 
+      it("splits into 25-ID batches when retrying with >25 traces", async () => {
+        const traceIds = Array.from({ length: 30 }, (_, i) => `trace-${i}`);
+        const summaryRows = traceIds.map((id, i) => ({
+          ...makeSummaryRow(id),
+          ts_OccurredAt: Date.now() - i * 1000,
+        }));
+        const idRows = traceIds.map((id) => ({ TraceId: id }));
+
+        mockClickHouseQuery
+          // count
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve([{ total: String(traceIds.length) }]),
+          })
+          // IDs
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve(idRows),
+          })
+          // summary — OOM
+          .mockRejectedValueOnce(
+            new Error("MEMORY_LIMIT_EXCEEDED"),
+          )
+          // retry batch 1: traces 0-24
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve(summaryRows.slice(0, 25)),
+          })
+          // retry batch 2: traces 25-29
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve(summaryRows.slice(25)),
+          })
+          // evaluations
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve([]),
+          });
+
+        const service = new ClickHouseTraceService({
+          project: { findUnique: mockPrismaFindUnique },
+        } as never);
+
+        const result = await service.getAllTracesForProject(
+          { ...baseInput, pageSize: 30 } as GetAllTracesForProjectInput,
+          protections,
+        );
+
+        expect(result).not.toBeNull();
+        const traces = result!.groups.flat();
+        expect(traces).toHaveLength(30);
+
+        // Verify batch split: call 0=count, 1=IDs, 2=OOM, 3=batch1, 4=batch2
+        const batch1Params = mockClickHouseQuery.mock.calls[3]![0];
+        const batch2Params = mockClickHouseQuery.mock.calls[4]![0];
+        expect(batch1Params.query_params.pageTraceIds).toHaveLength(25);
+        expect(batch2Params.query_params.pageTraceIds).toHaveLength(5);
+      });
+
       it("re-throws non-OOM errors from summary query", async () => {
         const idRows = [{ TraceId: "trace-1" }];
 
