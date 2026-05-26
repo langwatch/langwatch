@@ -456,6 +456,30 @@ export class EventSourcing {
         }
         await result.entry.process(result.clean);
       },
+      coalesceMaxBatch: (payload: Record<string, unknown>) => {
+        const result = this.lookupEntry(payload);
+        return result?.entry.coalesceMaxBatch ?? 1;
+      },
+      processBatch: async (payloads: Record<string, unknown>[]) => {
+        if (payloads.length === 0) return;
+        // A coalesced batch is always one group → one registry entry. Resolve
+        // every payload and guard against a mixed/unknown batch (should never
+        // happen — the GroupQueue only coalesces same-group jobs — but a stray
+        // payload must never be misrouted to the wrong handler). On any mismatch
+        // fall back to per-item processing.
+        const first = this.lookupEntry(payloads[0]!);
+        const resolved = payloads.map((payload) => this.lookupEntry(payload));
+        const homogeneous =
+          !!first?.entry.processBatch &&
+          resolved.every((r) => r?.entry === first.entry);
+        if (!homogeneous) {
+          for (const result of resolved) {
+            if (result) await result.entry.process(result.clean);
+          }
+          return;
+        }
+        await first.entry.processBatch!(resolved.map((r) => r!.clean));
+      },
     };
 
     const effectiveRedis = this._redis;

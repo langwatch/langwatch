@@ -2702,3 +2702,104 @@ describe("GroupStagingScripts", () => {
     });
   });
 });
+
+async function inspectTotalPending() {
+  return redis.get(`${keyPrefix()}stats:total-pending`);
+}
+
+describe("GroupStagingScripts.drainGroupReady", () => {
+  describe("when a group has several due jobs", () => {
+    it("drains up to maxJobs in ascending score order with their data", async () => {
+      await scripts.stage(makeJob({ stagedJobId: "j1", dispatchAfterMs: 100, jobDataJson: '{"n":1}' }));
+      await scripts.stage(makeJob({ stagedJobId: "j2", dispatchAfterMs: 200, jobDataJson: '{"n":2}' }));
+      await scripts.stage(makeJob({ stagedJobId: "j3", dispatchAfterMs: 300, jobDataJson: '{"n":3}' }));
+
+      const drained = await scripts.drainGroupReady({
+        groupId: "group-a",
+        nowMs: 10_000,
+        maxJobs: 2,
+      });
+
+      expect(drained.map((d) => d.stagedJobId)).toEqual(["j1", "j2"]);
+      expect(drained.map((d) => d.jobDataJson)).toEqual(['{"n":1}', '{"n":2}']);
+      expect(drained.map((d) => d.originalScore)).toEqual([100, 200]);
+    });
+
+    it("removes drained jobs from the group's jobs zset and data hash", async () => {
+      await scripts.stage(makeJob({ stagedJobId: "j1", dispatchAfterMs: 100 }));
+      await scripts.stage(makeJob({ stagedJobId: "j2", dispatchAfterMs: 200 }));
+      await scripts.stage(makeJob({ stagedJobId: "j3", dispatchAfterMs: 300 }));
+
+      await scripts.drainGroupReady({ groupId: "group-a", nowMs: 10_000, maxJobs: 2 });
+
+      const jobs = await inspectGroupJobs("group-a");
+      expect(jobs).toEqual(["j3", "300"]);
+      const data = await inspectDataHash("group-a");
+      expect(Object.keys(data)).toEqual(["j3"]);
+    });
+
+    /** @scenario 'Draining siblings for coalescing decrements pending per job' */
+    it("decrements total-pending by the number drained", async () => {
+      await scripts.stage(makeJob({ stagedJobId: "j1", dispatchAfterMs: 100 }));
+      await scripts.stage(makeJob({ stagedJobId: "j2", dispatchAfterMs: 200 }));
+      await scripts.stage(makeJob({ stagedJobId: "j3", dispatchAfterMs: 300 }));
+      expect(await inspectTotalPending()).toBe("3");
+
+      await scripts.drainGroupReady({ groupId: "group-a", nowMs: 10_000, maxJobs: 2 });
+
+      expect(await inspectTotalPending()).toBe("1");
+    });
+  });
+
+  describe("when the group has an active key and ready entry", () => {
+    it("leaves active, ready, and blocked state untouched", async () => {
+      await scripts.stage(makeJob({ stagedJobId: "j1", dispatchAfterMs: 100 }));
+      await scripts.stage(makeJob({ stagedJobId: "j2", dispatchAfterMs: 200 }));
+      // Simulate the caller holding the active slot for the dispatched job.
+      await redis.set(`${keyPrefix()}group:group-a:active`, "dispatched-job");
+      const readyBefore = await inspectReadySet();
+
+      await scripts.drainGroupReady({ groupId: "group-a", nowMs: 10_000, maxJobs: 5 });
+
+      expect(await inspectActiveKey("group-a")).toBe("dispatched-job");
+      expect(await inspectReadySet()).toEqual(readyBefore);
+      expect(await inspectBlockedSet()).toEqual([]);
+    });
+  });
+
+  describe("when some jobs are future-scheduled", () => {
+    it("drains only the jobs due at nowMs", async () => {
+      await scripts.stage(makeJob({ stagedJobId: "due1", dispatchAfterMs: 100 }));
+      await scripts.stage(makeJob({ stagedJobId: "due2", dispatchAfterMs: 200 }));
+      await scripts.stage(makeJob({ stagedJobId: "future", dispatchAfterMs: 9_999 }));
+
+      const drained = await scripts.drainGroupReady({
+        groupId: "group-a",
+        nowMs: 1_000,
+        maxJobs: 10,
+      });
+
+      expect(drained.map((d) => d.stagedJobId)).toEqual(["due1", "due2"]);
+      const jobs = await inspectGroupJobs("group-a");
+      expect(jobs).toEqual(["future", "9999"]);
+    });
+  });
+
+  describe("when maxJobs is zero or negative", () => {
+    it("returns empty without touching the group", async () => {
+      await scripts.stage(makeJob({ stagedJobId: "j1", dispatchAfterMs: 100 }));
+
+      expect(await scripts.drainGroupReady({ groupId: "group-a", nowMs: 10_000, maxJobs: 0 })).toEqual([]);
+
+      const jobs = await inspectGroupJobs("group-a");
+      expect(jobs).toEqual(["j1", "100"]);
+      expect(await inspectTotalPending()).toBe("1");
+    });
+  });
+
+  describe("when the group is empty", () => {
+    it("returns empty", async () => {
+      expect(await scripts.drainGroupReady({ groupId: "nonexistent", nowMs: 10_000, maxJobs: 5 })).toEqual([]);
+    });
+  });
+});
