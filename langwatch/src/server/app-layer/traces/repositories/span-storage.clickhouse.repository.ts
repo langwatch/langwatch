@@ -669,7 +669,13 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       "SpanStorageClickHouseRepository.getNormalizedSpansByTraceId",
     );
 
-    const effectiveLimit = limit ?? MAX_DERIVATION_SPANS;
+    // MAX_DERIVATION_SPANS is a hard ceiling: a caller cannot raise it past the
+    // bounded-read guarantee, so even a leaked trace_id can never load the
+    // pipeline through this path.
+    const effectiveLimit = Math.min(
+      Math.max(1, Math.trunc(limit ?? MAX_DERIVATION_SPANS)),
+      MAX_DERIVATION_SPANS,
+    );
 
     try {
       return await withPartitionHint<NormalizedSpan[]>(

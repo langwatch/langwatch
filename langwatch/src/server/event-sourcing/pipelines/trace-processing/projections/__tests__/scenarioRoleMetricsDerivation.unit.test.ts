@@ -90,9 +90,9 @@ describe("aggregateScenarioRoleMetrics", () => {
         { spanId: "doGen", parentSpanId: "gen", role: undefined, cost: 0.2, durationMs: 300 },
       ];
 
-      expect(aggregateScenarioRoleMetrics(inputs).scenarioRoleCosts).toEqual({
-        user: 0.30000000000000004,
-      });
+      const { scenarioRoleCosts } = aggregateScenarioRoleMetrics(inputs);
+      expect(Object.keys(scenarioRoleCosts)).toEqual(["user"]);
+      expect(scenarioRoleCosts.user).toBeCloseTo(0.3);
     });
   });
 
