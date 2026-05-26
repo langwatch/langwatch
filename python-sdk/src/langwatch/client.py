@@ -62,6 +62,7 @@ class Client(LangWatchClientProtocol):
     _ignore_global_tracer_provider_override_warning: ClassVar[bool] = False
     _skip_open_telemetry_setup: ClassVar[bool] = False
     _tracer_provider: ClassVar[Optional[TracerProvider]] = None
+    _is_dedicated_provider: ClassVar[bool] = False
     _rest_api_client: ClassVar[Optional[LangWatchApiClient]] = None
     _registered_instrumentors: ClassVar[
         dict[opentelemetry.trace.TracerProvider, set[BaseInstrumentor]]
@@ -185,6 +186,7 @@ class Client(LangWatchClientProtocol):
                 Client._instrumentors = instrumentors
             if tracer_provider is not None:
                 Client._tracer_provider = tracer_provider
+                Client._is_dedicated_provider = True
             # Ensure OTEL is configured and instrumentors are registered for the active provider
             if not Client._skip_open_telemetry_setup:
                 Client._tracer_provider = self.__ensure_otel_setup(
@@ -279,6 +281,7 @@ class Client(LangWatchClientProtocol):
 
         if tracer_provider is not None:
             Client._tracer_provider = tracer_provider
+            Client._is_dedicated_provider = True
 
         # Set up base attributes with SDK info
         Client._base_attributes[AttributeKey.LangWatchSDKName] = (
@@ -382,6 +385,7 @@ class Client(LangWatchClientProtocol):
         cls._ignore_global_tracer_provider_override_warning = False
         cls._skip_open_telemetry_setup = False
         cls._tracer_provider = None
+        cls._is_dedicated_provider = False
         cls._rest_api_client = None
         cls._prompts_path = None
         cls._registered_instrumentors.clear()
@@ -570,6 +574,10 @@ class Client(LangWatchClientProtocol):
     def __ensure_otel_setup(
         self, tracer_provider: Optional[TracerProvider] = None
     ) -> TracerProvider:
+        if Client._is_dedicated_provider and tracer_provider is not None:
+            self.__set_langwatch_exporter(tracer_provider)
+            return tracer_provider
+
         settable_tracer_provider = (
             tracer_provider or self.__create_new_tracer_provider()
         )

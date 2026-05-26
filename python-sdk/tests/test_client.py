@@ -400,3 +400,99 @@ def test_nested_trace_linking_behavior() -> None:
 
         # The key point is that both decorators create their own traces
         # and the existing linking logic in _create_root_span handles relationships
+
+
+class TestDedicatedTracerProviderIsolation:
+    """Regression tests for issue #4203: dedicated TracerProvider must be
+    respected when passed, enabling isolation from other OTel SDKs (e.g. Sentry)."""
+
+    def setup_method(self) -> None:
+        Client.reset_for_testing()
+
+    def teardown_method(self) -> None:
+        Client.reset_for_testing()
+        import opentelemetry.trace as trace_api
+
+        trace_api._TRACER_PROVIDER = None  # type: ignore[attr-defined]
+        trace_api._TRACER_PROVIDER_SET_ONCE = trace_api.Once()  # type: ignore[attr-defined]
+
+    def test_dedicated_provider_used_when_global_exists(self) -> None:
+        """When another SDK (e.g. Sentry) has set a global TracerProvider,
+        passing a dedicated provider to LangWatch attaches the exporter
+        to the dedicated provider — not the global one."""
+        from opentelemetry.sdk.trace import TracerProvider
+        from opentelemetry import trace as trace_api
+
+        sentry_provider = TracerProvider()
+        trace_api.set_tracer_provider(sentry_provider)
+
+        lw_provider = TracerProvider()
+        client = Client(api_key="test-key", tracer_provider=lw_provider)
+
+        assert client.tracer_provider is lw_provider
+
+    def test_default_behavior_unchanged_without_custom_provider(self) -> None:
+        """When no tracer_provider is passed, _is_dedicated_provider stays
+        False and existing global-provider logic runs as before."""
+        Client(api_key="test-key")
+
+        assert Client._is_dedicated_provider is False
+
+    def test_dedicated_provider_does_not_become_global(self) -> None:
+        """When a dedicated provider is passed and the global is still a
+        ProxyTracerProvider, the dedicated provider must NOT replace the
+        global — it stays private for isolation."""
+        from opentelemetry.sdk.trace import TracerProvider
+        from opentelemetry import trace as trace_api
+
+        assert isinstance(
+            trace_api.get_tracer_provider(), trace_api.ProxyTracerProvider
+        )
+
+        lw_provider = TracerProvider()
+        client = Client(api_key="test-key", tracer_provider=lw_provider)
+
+        assert client.tracer_provider is lw_provider
+        assert isinstance(
+            trace_api.get_tracer_provider(), trace_api.ProxyTracerProvider
+        )
+
+    def test_instrumentors_register_against_dedicated_provider(self) -> None:
+        """Instrumentors must be registered with tracer_provider=dedicated,
+        not the global provider."""
+        from opentelemetry.sdk.trace import TracerProvider
+        from opentelemetry.instrumentation.instrumentor import BaseInstrumentor
+        from unittest.mock import MagicMock
+
+        lw_provider = TracerProvider()
+        mock_instrumentor = MagicMock(spec=BaseInstrumentor)
+
+        Client(
+            api_key="test-key",
+            tracer_provider=lw_provider,
+            instrumentors=[mock_instrumentor],
+        )
+
+        mock_instrumentor.instrument.assert_called_once_with(
+            tracer_provider=lw_provider
+        )
+
+    def test_reinit_on_api_key_change_with_dedicated_provider(self) -> None:
+        """Changing the API key triggers re-init. The re-init path calls
+        __setup_tracer_provider with no args — existing behavior preserved."""
+        from opentelemetry.sdk.trace import TracerProvider
+
+        lw_provider = TracerProvider()
+        client = Client(api_key="first-key", tracer_provider=lw_provider)
+
+        with (
+            patch.object(
+                client, "_Client__shutdown_tracer_provider"
+            ) as shutdown,
+            patch.object(
+                client, "_Client__setup_tracer_provider"
+            ) as setup_tracer,
+        ):
+            client.api_key = "second-key"
+            shutdown.assert_called_once()
+            setup_tracer.assert_called_once()
