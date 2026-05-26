@@ -36,6 +36,13 @@ import type { ProjectionStoreContext } from "./projectionStoreContext";
 import type { ReplayMarkerChecker } from "./replayMarkerCheck";
 
 /**
+ * Default cap on how many same-aggregate fold events are coalesced into one
+ * load/apply/store cycle. Bounds the drain + apply loop (and the re-stage loop
+ * on failure) while still collapsing a backed-up group from O(n²) to O(n).
+ */
+const DEFAULT_FOLD_COALESCE_MAX_BATCH = 100;
+
+/**
  * Central router that registers fold and map projections and dispatches events.
  *
  * - FoldProjections: enqueued to GroupQueue (per-aggregate ordering), incremental only
@@ -227,6 +234,7 @@ export class ProjectionRouter<
     const projectionDefs: Record<string, {
       name: string;
       groupKeyFn?: (event: EventType) => string;
+      coalesceMaxBatch?: number;
       options?: { killSwitch?: KillSwitchOptions };
     }> = {};
 
@@ -234,6 +242,10 @@ export class ProjectionRouter<
       projectionDefs[name] = {
         name,
         groupKeyFn: fold.key,
+        // Coalesce a backed-up group's events into one fold cycle. Defaults on
+        // for every fold (harmless at batch size 1 when keeping up); a fold can
+        // override or opt out via options.coalesceMaxBatch.
+        coalesceMaxBatch: fold.options?.coalesceMaxBatch ?? DEFAULT_FOLD_COALESCE_MAX_BATCH,
         options: fold.options,
       };
     }
@@ -255,6 +267,23 @@ export class ProjectionRouter<
           fold,
           triggerEvent,
           { tenantId: triggerEvent.tenantId },
+        );
+      },
+      async (projectionName, events, _context) => {
+        const fold = this.foldProjections.get(projectionName);
+        if (!fold) {
+          throw new ConfigurationError(
+            "ProjectionRouter",
+            `Fold projection "${projectionName}" not found`,
+            { projectionName },
+          );
+        }
+
+        await this.processFoldProjectionBatch(
+          projectionName,
+          fold,
+          events,
+          { tenantId: events[0]!.tenantId },
         );
       },
     );
@@ -610,6 +639,88 @@ export class ProjectionRouter<
         const reactors = this.reactorsForFold.get(projectionName);
         if (reactors && reactors.length > 0) {
           await this.dispatchToReactors(projectionName, reactors, event, foldState);
+        }
+      },
+    );
+  }
+
+  /**
+   * Processes a batch of same-aggregate events for a fold projection in a single
+   * load/apply/store cycle (see FoldProjectionExecutor.executeBatch). Used by the
+   * GroupQueue's coalescing path when a group is backed up. All events share the
+   * aggregate (and tenant), so kill-switch and store key are resolved once.
+   *
+   * Reactors fire once with the final folded state (using the last event), which
+   * is the correct coalesced behavior for the trace's debounced reactors.
+   */
+  private async processFoldProjectionBatch(
+    projectionName: string,
+    fold: FoldProjectionDefinition<any, EventType>,
+    events: EventType[],
+    context: EventStoreReadContext<EventType>,
+  ): Promise<void> {
+    if (events.length === 0) return;
+
+    await this.tracer.withActiveSpan(
+      "ProjectionRouter.processFoldProjectionBatch",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "projection.name": projectionName,
+          "event.count": events.length,
+          "event.aggregate_id": String(events[0]!.aggregateId),
+        },
+      },
+      async () => {
+        EventUtils.validateTenantId(context, "processFoldProjectionBatch");
+
+        // Check kill switch (all events share the tenant)
+        const disabled = await isComponentDisabled({
+          featureFlagService: this.featureFlagService,
+          aggregateType: this.aggregateType,
+          componentType: "projection",
+          componentName: projectionName,
+          tenantId: events[0]!.tenantId,
+          customKey: fold.options?.killSwitch?.customKey,
+          logger: this.logger,
+        });
+        if (disabled) return;
+
+        // Defer or skip events for which projection-replay is active.
+        let toApply = events;
+        if (this.replayMarkerChecker) {
+          const kept: EventType[] = [];
+          for (const event of events) {
+            const decision = await this.replayMarkerChecker.check(projectionName, event);
+            if (decision !== "skip") kept.push(event);
+          }
+          toApply = kept;
+        }
+        if (toApply.length === 0) return;
+
+        const first = toApply[0]!;
+        const key = fold.key ? fold.key(first) : undefined;
+        const storeContext: ProjectionStoreContext = {
+          aggregateId: String(first.aggregateId),
+          tenantId: first.tenantId,
+          key,
+        };
+
+        const foldState = await withMetrics({
+          fn: () => this.foldExecutor.executeBatch(fold, toApply, storeContext),
+          onComplete: (ms) => { incrementEsFoldProjectionTotal(this.pipelineName, projectionName, "completed"); observeEsFoldProjectionDuration(this.pipelineName, projectionName, ms); },
+          onFail: (ms) => { incrementEsFoldProjectionTotal(this.pipelineName, projectionName, "failed"); observeEsFoldProjectionDuration(this.pipelineName, projectionName, ms); },
+        });
+
+        // Dispatch reactors once with the final state, using the last event.
+        const reactors = this.reactorsForFold.get(projectionName);
+        if (reactors && reactors.length > 0) {
+          await this.dispatchToReactors(
+            projectionName,
+            reactors,
+            toApply[toApply.length - 1]!,
+            foldState,
+          );
         }
       },
     );

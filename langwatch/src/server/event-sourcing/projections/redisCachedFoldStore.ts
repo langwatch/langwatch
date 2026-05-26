@@ -18,6 +18,15 @@ export interface RedisCachedFoldStoreOptions {
 }
 
 /**
+ * Default cache TTL. Sized to outlast the processing of a single aggregate's
+ * event stream so the fold state stays warm in Redis across consecutive
+ * events, instead of expiring mid-stream and forcing a ClickHouse fallback
+ * read of the (potentially large) state on every event. Matches the queue's
+ * activeTtlSec — the upper bound on how long one aggregate stays in-flight.
+ */
+const DEFAULT_FOLD_CACHE_TTL_SECONDS = 300;
+
+/**
  * Wraps any FoldProjectionStore with a Redis write-through cache.
  *
  * - get(): Redis first, ClickHouse fallback on miss.
@@ -39,7 +48,7 @@ export class RedisCachedFoldStore<State>
     options: RedisCachedFoldStoreOptions,
   ) {
     this.keyPrefix = options.keyPrefix;
-    this.ttlSeconds = options.ttlSeconds ?? 30;
+    this.ttlSeconds = options.ttlSeconds ?? DEFAULT_FOLD_CACHE_TTL_SECONDS;
   }
 
   async get(

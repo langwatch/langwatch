@@ -456,6 +456,30 @@ export class EventSourcing {
         }
         await result.entry.process(result.clean);
       },
+      coalesceMaxBatch: (payload: Record<string, unknown>) => {
+        const result = this.lookupEntry(payload);
+        return result?.entry.coalesceMaxBatch ?? 1;
+      },
+      processBatch: async (payloads: Record<string, unknown>[]) => {
+        if (payloads.length === 0) return;
+        // A coalesced batch is always one group → one registry entry. Resolve it
+        // from the first payload and hand the batch handler the clean payloads
+        // (routing metadata stripped).
+        const first = this.lookupEntry(payloads[0]!);
+        if (!first?.entry.processBatch) {
+          // No batch handler for this job type — process each individually.
+          for (const payload of payloads) {
+            const result = this.lookupEntry(payload);
+            if (result) await result.entry.process(result.clean);
+          }
+          return;
+        }
+        const cleanPayloads = payloads.map((payload) => {
+          const result = this.lookupEntry(payload);
+          return result ? result.clean : payload;
+        });
+        await first.entry.processBatch(cleanPayloads);
+      },
     };
 
     const effectiveRedis = this._redis;

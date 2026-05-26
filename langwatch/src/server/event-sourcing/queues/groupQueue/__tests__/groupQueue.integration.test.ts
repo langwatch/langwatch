@@ -402,5 +402,183 @@ describe.skipIf(!hasTestcontainers)(
         });
       });
     });
+
+    describe("group coalescing", () => {
+      describe("when a group is backed up", () => {
+        /** @scenario 'A backed-up group is folded in a single batch call' */
+        it("folds the queued events into a single processBatch call", async () => {
+          const batches: TestPayload[][] = [];
+          const singles: TestPayload[] = [];
+          const queue = createQueue(
+            async (p) => {
+              singles.push(p);
+            },
+            {
+              processBatch: async (ps) => {
+                batches.push(ps as TestPayload[]);
+              },
+              coalesceMaxBatch: () => 50,
+              score: (p) => Number(p.value) * 1000,
+            },
+          );
+          await queue.waitUntilReady();
+
+          const payloads = Array.from({ length: 10 }, (_, i) => ({
+            id: `j${i}`,
+            groupId: "group-a",
+            value: String(i),
+          }));
+          await queue.sendBatch(payloads);
+
+          await vi.waitFor(
+            () => {
+              const total = batches.reduce((n, b) => n + b.length, 0) + singles.length;
+              expect(total).toBe(10);
+            },
+            { timeout: 10000, interval: 50 },
+          );
+
+          // Coalescing actually happened: at least one multi-event batch.
+          expect(batches.length).toBeGreaterThanOrEqual(1);
+          expect(Math.max(...batches.map((b) => b.length))).toBeGreaterThan(1);
+          // Every event processed exactly once across batches + singles.
+          const allIds = [...batches.flat(), ...singles].map((p) => p.id);
+          expect(new Set(allIds).size).toBe(10);
+        });
+
+        it("delivers a coalesced batch in ascending score order", async () => {
+          let largest: TestPayload[] = [];
+          const queue = createQueue(async () => {}, {
+            processBatch: async (ps) => {
+              if (ps.length > largest.length) largest = ps as TestPayload[];
+            },
+            coalesceMaxBatch: () => 50,
+            score: (p) => Number(p.value) * 1000,
+          });
+          await queue.waitUntilReady();
+
+          // Send shuffled; the queue must still fold them in score order.
+          await queue.sendBatch(
+            [4, 2, 0, 3, 1].map((n) => ({ id: `j${n}`, groupId: "group-a", value: String(n) })),
+          );
+
+          await vi.waitFor(
+            () => {
+              expect(largest.length).toBe(5);
+            },
+            { timeout: 10000, interval: 50 },
+          );
+          expect(largest.map((p) => Number(p.value))).toEqual([0, 1, 2, 3, 4]);
+        });
+
+        /** @scenario 'Coalescing respects the configured max batch size' */
+        it("never exceeds coalesceMaxBatch per call", async () => {
+          const batches: TestPayload[][] = [];
+          const singles: TestPayload[] = [];
+          const queue = createQueue(
+            async (p) => {
+              singles.push(p);
+            },
+            {
+              processBatch: async (ps) => {
+                batches.push(ps as TestPayload[]);
+              },
+              coalesceMaxBatch: () => 3,
+              score: (p) => Number(p.value) * 1000,
+            },
+          );
+          await queue.waitUntilReady();
+
+          await queue.sendBatch(
+            Array.from({ length: 9 }, (_, i) => ({ id: `j${i}`, groupId: "group-a", value: String(i) })),
+          );
+
+          await vi.waitFor(
+            () => {
+              const total = batches.reduce((n, b) => n + b.length, 0) + singles.length;
+              expect(total).toBe(9);
+            },
+            { timeout: 10000, interval: 50 },
+          );
+
+          for (const batch of batches) {
+            expect(batch.length).toBeLessThanOrEqual(3);
+          }
+          const allIds = [...batches.flat(), ...singles].map((p) => p.id);
+          expect(new Set(allIds).size).toBe(9);
+        });
+      });
+
+      describe("when coalescing is disabled (maxBatch 1)", () => {
+        /** @scenario 'Coalescing is a no-op when disabled' */
+        it("processes each event individually and never calls processBatch", async () => {
+          const batches: TestPayload[][] = [];
+          const singles: TestPayload[] = [];
+          const queue = createQueue(
+            async (p) => {
+              singles.push(p);
+            },
+            {
+              processBatch: async (ps) => {
+                batches.push(ps as TestPayload[]);
+              },
+              coalesceMaxBatch: () => 1,
+              score: (p) => Number(p.value) * 1000,
+            },
+          );
+          await queue.waitUntilReady();
+
+          await queue.sendBatch(
+            Array.from({ length: 5 }, (_, i) => ({ id: `j${i}`, groupId: "group-a", value: String(i) })),
+          );
+
+          await vi.waitFor(
+            () => {
+              expect(singles.length).toBe(5);
+            },
+            { timeout: 10000, interval: 50 },
+          );
+          expect(batches.length).toBe(0);
+        });
+      });
+
+      describe("when a coalesced batch fails", () => {
+        /** @scenario 'A failed coalesced batch re-stages its drained siblings' */
+        it("re-stages drained siblings so none are lost", async () => {
+          let attempts = 0;
+          const succeeded: TestPayload[] = [];
+          const queue = createQueue(
+            async (p) => {
+              succeeded.push(p);
+            },
+            {
+              processBatch: async (ps) => {
+                attempts++;
+                if (attempts === 1) {
+                  throw new Error("simulated batch failure");
+                }
+                for (const p of ps) succeeded.push(p as TestPayload);
+              },
+              coalesceMaxBatch: () => 50,
+              score: (p) => Number(p.value) * 1000,
+            },
+          );
+          await queue.waitUntilReady();
+
+          await queue.sendBatch(
+            Array.from({ length: 4 }, (_, i) => ({ id: `j${i}`, groupId: "group-a", value: String(i) })),
+          );
+
+          // Despite the first batch throwing, every event is eventually
+          // processed — the drained siblings were re-staged, not lost.
+          await vi.waitFor(
+            () => {
+              expect(new Set(succeeded.map((p) => p.id)).size).toBe(4);
+            },
+            { timeout: 20000, interval: 100 },
+          );
+        });
+      });
+    });
   },
 );
