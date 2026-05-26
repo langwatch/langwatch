@@ -45,7 +45,6 @@ import {
   TraceIOAccumulationService,
   TracePromptAccumulationService,
   TraceNameResolutionService,
-  accumulateEvents,
   shouldOverrideOutput,
   extractIOFromLogRecord,
   OUTPUT_SOURCE,
@@ -89,12 +88,11 @@ export function applySpanToSummary({
 }): TraceSummaryData {
   if (SYNTHETIC_SPAN_NAMES.has(span.name)) {
     // Synthetic spans (e.g. `langwatch.track_event`) must not contribute to
-    // timing/cost/I-O — they don't represent real execution. But the
-    // `/api/track_event` endpoint stuffs the user-tracked event payload
-    // into `span.events`, so we still need to hoist those onto the trace
-    // summary; otherwise the event vanishes between the span and the
-    // trace-level events list.
-    return { ...state, events: accumulateEvents({ state, span }) };
+    // timing/cost/I-O -- they don't represent real execution. Their payload
+    // (the `/api/track_event` endpoint stuffs the user-tracked event into
+    // `span.events`) is still persisted to stored_spans like any other span,
+    // so the trace-level events list is derived from there at read time.
+    return state;
   }
 
   const timing = spanTimingService.accumulateTiming({ state, span });
@@ -132,8 +130,6 @@ export function applySpanToSummary({
   const spanType = String(span.spanAttributes[ATTR_KEYS.SPAN_TYPE] ?? "");
   const containsAi = state.containsAi || AI_SPAN_TYPES.has(spanType);
 
-  const events = accumulateEvents({ state, span });
-
   const promptRollup = tracePromptAccumulationService.accumulate({ state, span });
 
   return {
@@ -159,7 +155,6 @@ export function applySpanToSummary({
     containsAi,
     ...promptRollup,
     attributes,
-    events,
   };
 }
 
@@ -241,13 +236,14 @@ export class TraceSummaryFoldProjection
       traceNameFromFallback: false,
       rootMetadataFromFallback: false,
       attributes: {},
-      events: [],
-      // scenarioRoleCosts/Latencies/Spans and spanCosts are no longer
+      // events, scenarioRoleCosts/Latencies/Spans and spanCosts are no longer
       // accumulated in the fold state: they scaled O(span-count) and made each
       // fold step O(n) (copy + re-serialize the whole growing blob), so a
-      // single long-lived trace turned folding into O(n^2). Scenario role
-      // cost/latency are now derived from stored_spans when simulation metrics
-      // are computed, keeping these off the hot path entirely.
+      // single long-lived trace turned folding into O(n^2). The trace-level
+      // events list and scenario role cost/latency are now derived from
+      // stored_spans at read time (events on the trace-detail read, scenario
+      // metrics when simulation metrics are computed), keeping all
+      // span-count-scaling collections off the hot path entirely.
       // Sentinel: 0 means "no spans received yet". The timing function uses
       // occurredAt > 0 to decide first-span vs min-of-existing. Using Date.now()
       // here would break Math.min logic -- wall-clock time >> span startTimeUnixMs.

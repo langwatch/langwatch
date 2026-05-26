@@ -119,17 +119,6 @@ export const traceSummaryDataSchema = z.object({
    * over.
    */
   rootMetadataFromFallback: z.boolean().optional(),
-  /** LangWatch SDK events hoisted from spans during fold projection. */
-  events: z
-    .array(
-      z.object({
-        spanId: z.string(),
-        timestamp: z.number(),
-        name: z.string(),
-        attributes: z.record(z.string(), z.string()),
-      }),
-    )
-    .optional(),
   occurredAt: z.number(),
   createdAt: z.number(),
   updatedAt: z.number(),

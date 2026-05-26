@@ -15,25 +15,16 @@ const logger = createLogger(
   "langwatch:app-layer:traces:trace-summary-repository",
 );
 
-type ClickHouseSummaryWriteRecord = Omit<
-  WithDateWrites<
-    ClickHouseSummaryRecord,
-    "OccurredAt" | "CreatedAt" | "UpdatedAt" | "LastEventOccurredAt"
-  >,
-  "Events.Timestamp"
-> & {
-  "Events.Timestamp": Date[];
-};
+type ClickHouseSummaryWriteRecord = WithDateWrites<
+  ClickHouseSummaryRecord,
+  "OccurredAt" | "CreatedAt" | "UpdatedAt" | "LastEventOccurredAt"
+>;
 
 interface ClickHouseSummaryRecord extends TraceSummaryFieldsBase {
   ProjectionId: string;
   Version: string;
   Attributes: Record<string, string>;
   HasAnnotation: number | null;
-  "Events.SpanId": string[];
-  "Events.Timestamp": string[];
-  "Events.Name": string[];
-  "Events.Attributes": Record<string, string>[];
   LastEventOccurredAt: number;
 }
 
@@ -235,11 +226,7 @@ export class TraceSummaryClickHouseRepository
           t.SubTopicId AS SubTopicId,
           t.AnnotationIds AS AnnotationIds,
           t.HasAnnotation AS HasAnnotation,
-          t.TraceName AS TraceName,
-          t.\`Events.SpanId\` AS \`Events.SpanId\`,
-          t.\`Events.Timestamp\` AS \`Events.Timestamp\`,
-          t.\`Events.Name\` AS \`Events.Name\`,
-          t.\`Events.Attributes\` AS \`Events.Attributes\`
+          t.TraceName AS TraceName
         FROM ${TABLE_NAME} AS t
         WHERE t.TenantId = {tenantId:String}
           AND t.TraceId = {traceId:String}
@@ -307,12 +294,6 @@ export class TraceSummaryClickHouseRepository
       annotationIds: record.AnnotationIds ?? [],
       traceName: record.TraceName ?? "",
       attributes: record.Attributes ?? {},
-      events: (record["Events.SpanId"] ?? []).map((spanId, i) => ({
-        spanId,
-        timestamp: new Date(record["Events.Timestamp"]![i]!).getTime(),
-        name: record["Events.Name"]![i]!,
-        attributes: record["Events.Attributes"]![i] ?? {},
-      })),
       occurredAt: record.OccurredAt,
       createdAt: record.CreatedAt,
       updatedAt: record.UpdatedAt,
@@ -378,10 +359,6 @@ export class TraceSummaryClickHouseRepository
       AnnotationIds: data.annotationIds,
       HasAnnotation: data.annotationIds.length > 0 ? 1 : 0,
       TraceName: data.traceName,
-      "Events.SpanId": (data.events ?? []).map((e) => e.spanId),
-      "Events.Timestamp": (data.events ?? []).map((e) => new Date(e.timestamp)),
-      "Events.Name": (data.events ?? []).map((e) => e.name),
-      "Events.Attributes": (data.events ?? []).map((e) => e.attributes),
     };
   }
 }

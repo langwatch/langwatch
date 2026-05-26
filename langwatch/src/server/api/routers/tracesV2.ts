@@ -13,6 +13,10 @@ import type { SpanSummaryRow } from "~/server/app-layer/traces/repositories/span
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import { changeTraceNameInputSchema } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
 import {
+  deriveTraceEventsFromSpans,
+  type DerivedTraceEvent,
+} from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
+import {
   TRACE_NAME_MAX_LENGTH,
   TRACE_NAME_MIN_LENGTH,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
@@ -83,7 +87,10 @@ function buildFilterWhere(input: {
 // Mappers – internal types → scoped output models
 // ---------------------------------------------------------------------------
 
-function mapTraceSummaryToHeader(summary: TraceSummaryData): TraceHeader {
+function mapTraceSummaryToHeader(
+  summary: TraceSummaryData,
+  events: DerivedTraceEvent[],
+): TraceHeader {
   const totalTokens =
     (summary.totalPromptTokenCount ?? 0) +
     (summary.totalCompletionTokenCount ?? 0);
@@ -126,7 +133,7 @@ function mapTraceSummaryToHeader(summary: TraceSummaryData): TraceHeader {
     lastUsedPromptVersionId: summary.lastUsedPromptVersionId ?? null,
     lastUsedPromptSpanId: summary.lastUsedPromptSpanId ?? null,
     attributes: summary.attributes,
-    events: summary.events ?? [],
+    events,
   };
 }
 
@@ -552,7 +559,16 @@ export const tracesV2Router = createTRPCRouter({
       if (!summary) {
         throw new TraceNotFoundError(input.traceId);
       }
-      return mapTraceSummaryToHeader(summary);
+      // The trace-level events list is derived from stored_spans (it is no
+      // longer carried on the fold state). Bounded by the span reader's
+      // derivation cap; the detail header is a single-trace, user-initiated
+      // read so this stays off any hot path.
+      const spans = await app.traces.spans.getNormalizedSpansByTraceId({
+        tenantId: input.projectId,
+        traceId: input.traceId,
+        ...occurredAtFromInput(input),
+      });
+      return mapTraceSummaryToHeader(summary, deriveTraceEventsFromSpans(spans));
     }),
 
   /**

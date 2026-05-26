@@ -4,6 +4,10 @@ import {
   deriveScenarioRoleMetricsFromSpans,
   type ScenarioRoleMetrics,
 } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/scenario-role-metrics.derivation";
+import {
+  deriveTraceEventsFromSpans,
+  type DerivedTraceEvent,
+} from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
 
 /** Minimal span reader this service needs (satisfied by SpanStorageService). */
 export interface NormalizedSpanReader {
@@ -42,5 +46,10 @@ export class TraceReadDerivationService {
       spans,
       spanCostService: this.spanCostService,
     });
+  }
+
+  async deriveEvents(params: DeriveParams): Promise<DerivedTraceEvent[]> {
+    const spans = await this.spans.getNormalizedSpansByTraceId(params);
+    return deriveTraceEventsFromSpans(spans);
   }
 }
