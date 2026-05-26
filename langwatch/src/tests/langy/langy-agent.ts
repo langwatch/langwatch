@@ -17,8 +17,9 @@ export function makeLangyAdapter(): AgentAdapter & { state: LangySessionState } 
     role: AgentRole.AGENT,
     call: async (input: AgentInput): Promise<AgentReturnTypes> => {
       const lastMessage = input.messages[input.messages.length - 1];
-      const text =
-        typeof lastMessage.content === "string"
+      const text = !lastMessage
+        ? ""
+        : typeof lastMessage.content === "string"
           ? lastMessage.content
           : Array.isArray(lastMessage.content)
             ? lastMessage.content
