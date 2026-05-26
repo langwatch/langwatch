@@ -1216,12 +1216,12 @@ app.post("/langy/chat", async (c) => {
     return c.json({ error: "Agent not configured" }, { status: 503 });
   }
 
-  const lastUserMessage = messages[messages.length - 1];
+  const lastMsg = messages[messages.length - 1];
   const userText =
-    typeof lastUserMessage?.content === "string"
-      ? lastUserMessage.content
-      : Array.isArray(lastUserMessage?.content)
-        ? lastUserMessage.content
+    typeof lastMsg?.content === "string"
+      ? lastMsg.content
+      : Array.isArray(lastMsg?.content)
+        ? lastMsg.content
             .filter((p: { type: string }) => p.type === "text")
             .map((p: { text: string }) => p.text)
             .join("")
