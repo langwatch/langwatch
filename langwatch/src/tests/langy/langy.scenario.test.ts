@@ -14,7 +14,6 @@ import { openai } from "@ai-sdk/openai";
 import { makeLangyAdapter } from "./langy-agent";
 import {
   listAgents,
-  listAnnotations,
   listDashboards,
   listDatasets,
   listEvaluators,
@@ -22,7 +21,6 @@ import {
   listPrompts,
   listScenarios,
   listTriggers,
-  listWorkflows,
 } from "./langwatch-api";
 
 const LW_BASE = process.env.LW_BASE_URL ?? "http://localhost:5560";
