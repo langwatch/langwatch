@@ -8,10 +8,8 @@
  * mutate experiments, or modify project state.
  */
 import {
-  convertToModelMessages,
   createUIMessageStream,
   createUIMessageStreamResponse,
-  stepCountIs,
   streamText,
   tool,
   type UIMessage,
@@ -43,10 +41,7 @@ import {
   LangyUserPreferencesService,
 } from "~/server/services/langy";
 import { ConversationToolIdSet } from "~/server/services/langy/toolIdValidator";
-import {
-  LANGY_TOOL_CALLS_PER_MESSAGE,
-  checkLangyMessageRateLimit,
-} from "~/server/middleware/rate-limit-langy";
+import { checkLangyMessageRateLimit } from "~/server/middleware/rate-limit-langy";
 import { esClient, TRACE_INDEX } from "~/server/elasticsearch";
 import type { NextRequestShim as any } from "./types";
 
@@ -265,9 +260,8 @@ app.post("/langy/chat", async (c) => {
     projectId,
   });
 
-  let model;
   try {
-    model = await getVercelAIModel(projectId);
+    await getVercelAIModel(projectId);
   } catch (error) {
     return c.json(
       {
