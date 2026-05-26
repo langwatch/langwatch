@@ -77,13 +77,18 @@ describe("trace dedup OOM safety", () => {
   const topicClusteringSource = fs.readFileSync(topicClusteringPath, "utf-8");
 
   // ---------------------------------------------------------------------------
-  // clickhouse-trace.service.ts: fetchTracesWithPagination
+  // clickhouse-trace.service.ts: fetchTracesWithPagination + fetchTraceSummaryRows
   // ---------------------------------------------------------------------------
   describe("fetchTracesWithPagination()", () => {
-    const body = extractMethodBody(
+    const paginationBody = extractMethodBody(
       traceServiceSource,
       "fetchTracesWithPagination",
     );
+    const summaryBody = extractMethodBody(
+      traceServiceSource,
+      "fetchTraceSummaryRows",
+    );
+    const body = paginationBody + summaryBody;
 
     describe("when the pagination query SQL is inspected", () => {
       it("does not use LIMIT 1 BY for deduplication", () => {

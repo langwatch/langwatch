@@ -1416,62 +1416,14 @@ export class ClickHouseTraceService {
         // Step 2: Fetch full data for just the page's trace IDs.
         // The dedup subquery is scoped to pageTraceIds so it only reads
         // N traces instead of the entire table.
-        const summaryResult = await clickHouseClient.query({
-          query: `
-            SELECT
-              ts.TraceId AS ts_TraceId,
-              ts.SpanCount AS ts_SpanCount,
-              ts.TotalDurationMs AS ts_TotalDurationMs,
-              ts.ComputedIOSchemaVersion AS ts_ComputedIOSchemaVersion,
-              ts.TimeToFirstTokenMs AS ts_TimeToFirstTokenMs,
-              ts.TimeToLastTokenMs AS ts_TimeToLastTokenMs,
-              ts.TokensPerSecond AS ts_TokensPerSecond,
-              ts.ContainsErrorStatus AS ts_ContainsErrorStatus,
-              ts.ContainsOKStatus AS ts_ContainsOKStatus,
-              ts.ErrorMessage AS ts_ErrorMessage,
-              ts.Models AS ts_Models,
-              ts.TotalCost AS ts_TotalCost,
-              ts.TokensEstimated AS ts_TokensEstimated,
-              ts.TotalPromptTokenCount AS ts_TotalPromptTokenCount,
-              ts.TotalCompletionTokenCount AS ts_TotalCompletionTokenCount,
-              ts.TopicId AS ts_TopicId,
-              ts.SubTopicId AS ts_SubTopicId,
-              ts.HasAnnotation AS ts_HasAnnotation,
-              ts.AnnotationIds AS ts_AnnotationIds,
-              ts.ComputedInput AS ts_ComputedInput,
-              ts.ComputedOutput AS ts_ComputedOutput,
-              ts.Attributes AS ts_Attributes,
-              ts.TraceName AS ts_TraceName,
-              toUnixTimestamp64Milli(ts.OccurredAt) AS ts_OccurredAt,
-              toUnixTimestamp64Milli(ts.CreatedAt) AS ts_CreatedAt,
-              toUnixTimestamp64Milli(ts.UpdatedAt) AS ts_UpdatedAt
-            FROM trace_summaries ts
-            WHERE ts.TenantId = {tenantId:String}
-              AND ts.OccurredAt >= fromUnixTimestamp64Milli({startDate:UInt64})
-              AND ts.OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})
-              AND ts.TraceId IN ({pageTraceIds:Array(String)})
-              AND (ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (
-                SELECT TenantId, TraceId, max(UpdatedAt)
-                FROM trace_summaries
-                WHERE TenantId = {tenantId:String}
-                  AND OccurredAt >= fromUnixTimestamp64Milli({startDate:UInt64})
-                  AND OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})
-                  AND TraceId IN ({pageTraceIds:Array(String)})
-                GROUP BY TenantId, TraceId
-              )
-            ORDER BY ts.OccurredAt ${orderDirection}, ts.TraceId ${orderDirection}
-          `,
-          query_params: {
-            tenantId: projectId,
-            startDate: startDate ?? 0,
-            endDate: endDate ?? Date.now(),
-            pageTraceIds,
-          },
-          format: "JSONEachRow",
+        const summaryRows = await this.fetchTraceSummaryRows({
+          clickHouseClient,
+          projectId,
+          startDate: startDate ?? 0,
+          endDate: endDate ?? Date.now(),
+          traceIds: pageTraceIds,
+          orderDirection,
         });
-
-        const summaryRows =
-          await summaryResult.json() as TraceSummaryRow[];
 
         const traces: Trace[] = summaryRows.map((row) => {
           const summary = this.rowToTraceSummaryData(row);
@@ -1485,6 +1437,125 @@ export class ClickHouseTraceService {
         return { traces, totalHits, lastTrace };
       },
     );
+  }
+
+  private static readonly SUMMARY_BATCH_SIZE = 25;
+
+  /**
+   * Fetch full trace summary rows for a set of trace IDs.
+   * On ClickHouse MEMORY_LIMIT_EXCEEDED, retries in smaller batches
+   * so that heavy ComputedInput/ComputedOutput columns don't blow the
+   * per-query memory cap.
+   */
+  private async fetchTraceSummaryRows({
+    clickHouseClient,
+    projectId,
+    startDate,
+    endDate,
+    traceIds,
+    orderDirection,
+  }: {
+    clickHouseClient: ClickHouseClient;
+    projectId: string;
+    startDate: number;
+    endDate: number;
+    traceIds: string[];
+    orderDirection: string;
+  }): Promise<TraceSummaryRow[]> {
+    const runQuery = async (ids: string[]) => {
+      const result = await clickHouseClient.query({
+        query: `
+          SELECT
+            ts.TraceId AS ts_TraceId,
+            ts.SpanCount AS ts_SpanCount,
+            ts.TotalDurationMs AS ts_TotalDurationMs,
+            ts.ComputedIOSchemaVersion AS ts_ComputedIOSchemaVersion,
+            ts.TimeToFirstTokenMs AS ts_TimeToFirstTokenMs,
+            ts.TimeToLastTokenMs AS ts_TimeToLastTokenMs,
+            ts.TokensPerSecond AS ts_TokensPerSecond,
+            ts.ContainsErrorStatus AS ts_ContainsErrorStatus,
+            ts.ContainsOKStatus AS ts_ContainsOKStatus,
+            ts.ErrorMessage AS ts_ErrorMessage,
+            ts.Models AS ts_Models,
+            ts.TotalCost AS ts_TotalCost,
+            ts.TokensEstimated AS ts_TokensEstimated,
+            ts.TotalPromptTokenCount AS ts_TotalPromptTokenCount,
+            ts.TotalCompletionTokenCount AS ts_TotalCompletionTokenCount,
+            ts.TopicId AS ts_TopicId,
+            ts.SubTopicId AS ts_SubTopicId,
+            ts.HasAnnotation AS ts_HasAnnotation,
+            ts.AnnotationIds AS ts_AnnotationIds,
+            ts.ComputedInput AS ts_ComputedInput,
+            ts.ComputedOutput AS ts_ComputedOutput,
+            ts.Attributes AS ts_Attributes,
+            ts.TraceName AS ts_TraceName,
+            toUnixTimestamp64Milli(ts.OccurredAt) AS ts_OccurredAt,
+            toUnixTimestamp64Milli(ts.CreatedAt) AS ts_CreatedAt,
+            toUnixTimestamp64Milli(ts.UpdatedAt) AS ts_UpdatedAt
+          FROM trace_summaries ts
+          WHERE ts.TenantId = {tenantId:String}
+            AND ts.OccurredAt >= fromUnixTimestamp64Milli({startDate:UInt64})
+            AND ts.OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})
+            AND ts.TraceId IN ({pageTraceIds:Array(String)})
+            AND (ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (
+              SELECT TenantId, TraceId, max(UpdatedAt)
+              FROM trace_summaries
+              WHERE TenantId = {tenantId:String}
+                AND OccurredAt >= fromUnixTimestamp64Milli({startDate:UInt64})
+                AND OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})
+                AND TraceId IN ({pageTraceIds:Array(String)})
+              GROUP BY TenantId, TraceId
+            )
+          ORDER BY ts.OccurredAt ${orderDirection}, ts.TraceId ${orderDirection}
+        `,
+        query_params: {
+          tenantId: projectId,
+          startDate,
+          endDate,
+          pageTraceIds: ids,
+        },
+        format: "JSONEachRow",
+      });
+      return result.json() as Promise<TraceSummaryRow[]>;
+    };
+
+    try {
+      return await runQuery(traceIds);
+    } catch (error) {
+      if (
+        !(error instanceof Error) ||
+        !error.message.includes("MEMORY_LIMIT_EXCEEDED")
+      ) {
+        throw error;
+      }
+
+      this.logger.warn(
+        `Summary query OOM for ${traceIds.length} traces, retrying in batches of ${ClickHouseTraceService.SUMMARY_BATCH_SIZE}`,
+      );
+
+      const allRows: TraceSummaryRow[] = [];
+      for (
+        let i = 0;
+        i < traceIds.length;
+        i += ClickHouseTraceService.SUMMARY_BATCH_SIZE
+      ) {
+        const batch = traceIds.slice(
+          i,
+          i + ClickHouseTraceService.SUMMARY_BATCH_SIZE,
+        );
+        const batchRows = await runQuery(batch);
+        allRows.push(...batchRows);
+      }
+
+      const dir = orderDirection === "DESC" ? -1 : 1;
+      allRows.sort((a, b) => {
+        const timeDiff = a.ts_OccurredAt - b.ts_OccurredAt;
+        if (timeDiff !== 0) return timeDiff * dir;
+        return a.ts_TraceId < b.ts_TraceId ? -dir : dir;
+      });
+
+      return allRows;
+    }
   }
 
   /**
