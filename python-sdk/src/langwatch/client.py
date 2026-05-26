@@ -574,9 +574,12 @@ class Client(LangWatchClientProtocol):
     def __ensure_otel_setup(
         self, tracer_provider: Optional[TracerProvider] = None
     ) -> TracerProvider:
-        if Client._is_dedicated_provider and tracer_provider is not None:
-            self.__set_langwatch_exporter(tracer_provider)
-            return tracer_provider
+        if Client._is_dedicated_provider:
+            dedicated = tracer_provider or Client._tracer_provider
+            if dedicated is not None:
+                self.__set_langwatch_exporter(dedicated)
+                return dedicated
+            return self.__create_new_tracer_provider()
 
         settable_tracer_provider = (
             tracer_provider or self.__create_new_tracer_provider()
