@@ -7,7 +7,7 @@ metadata:
 spec:
   containers:
   - name: agent
-    image: opencode-agent:v4
+    image: opencode-agent:v7
     imagePullPolicy: Never
     ports:
     - containerPort: 8080
