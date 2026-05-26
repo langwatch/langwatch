@@ -490,9 +490,12 @@ describe("Langy via HTTP wrapper", () => {
 
   // ── WRITE surfaces with Layer 2 verification ──────────────────────────
 
-  it("creates a dataset when asked", async () => {
+  it("creates a dataset when asked (Layer 2: appears in API)", async () => {
     const langy = makeLangyAdapter();
     const datasetName = `langy-scenario-test-${Date.now()}`;
+    const before = await listDatasets();
+    const beforeIds = new Set(before.map((d) => d.id));
+
     const result = await scenario.run({
       name: "create a dataset",
       description: `The user wants to create a small test dataset called "${datasetName}" with a few example rows.`,
@@ -516,6 +519,11 @@ describe("Langy via HTTP wrapper", () => {
     });
     if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
     expect(result.success).toBe(true);
+
+    const after = await listDatasets();
+    const created = after.find((d) => !beforeIds.has(d.id));
+    console.log(`Layer 2 dataset: ${created ? created.name : "NOT FOUND"}`);
+    expect(created).toBeTruthy();
   });
 
   it("creates a dataset with rows (Layer 2: rows actually exist)", async () => {
@@ -555,8 +563,11 @@ describe("Langy via HTTP wrapper", () => {
     expect(created!.recordCount).toBeGreaterThanOrEqual(3);
   });
 
-  it("creates a scenario when asked", async () => {
+  it("creates a scenario when asked (Layer 2: appears in API)", async () => {
     const langy = makeLangyAdapter();
+    const before = await listScenarios();
+    const beforeIds = new Set(before.map((s) => s.id));
+
     const result = await scenario.run({
       name: "create a scenario",
       description: "The user wants to create a basic scenario test for their agent — a single-turn customer-support check.",
@@ -576,6 +587,11 @@ describe("Langy via HTTP wrapper", () => {
     });
     if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
     expect(result.success).toBe(true);
+
+    const after = await listScenarios();
+    const newOnes = after.filter((s) => !beforeIds.has(s.id));
+    console.log(`Layer 2 scenarios delta: ${newOnes.length} new`);
+    expect(newOnes.length).toBeGreaterThan(0);
   });
 
   it("creates an evaluator (Layer 2: appears in API)", async () => {
