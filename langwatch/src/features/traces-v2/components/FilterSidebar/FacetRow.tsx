@@ -1,4 +1,4 @@
-import { Badge, Box, HStack, Text } from "@chakra-ui/react";
+import { Box, HStack, Text } from "@chakra-ui/react";
 import { memo, useCallback } from "react";
 import { analyzeOrGroups } from "~/server/app-layer/traces/query-language/queries";
 import { useFacetHoverStore } from "../../stores/facetHoverStore";
@@ -7,14 +7,6 @@ import { orGroupColor } from "./orGroupPalette";
 import { RowButton } from "./RowButton";
 import type { FacetItem, FacetValueState } from "./types";
 import { formatCount, paletteFromColor } from "./utils";
-
-const TYPED_LABEL_REGEX = /^\[([^\]]+)\]\s*(.+)$/;
-
-function parseTypedLabel(label: string): { typeTag?: string; text: string } {
-  const match = TYPED_LABEL_REGEX.exec(label);
-  if (!match) return { text: label };
-  return { typeTag: match[1], text: match[2]! };
-}
 
 const MIN_VISIBLE_FILL_PCT = 4;
 
@@ -44,8 +36,6 @@ export const FacetRow = memo(function FacetRow({
    * part of an OR group. */
   field?: string;
 }) {
-  const { typeTag, text } = parseTypedLabel(item.label);
-
   // Synthetic rows have no real count yet — render with zero fill so they
   // don't look like "0 matches" while we're still waiting on the real
   // descriptors. Once real data lands the row gets a count + bar.
@@ -180,19 +170,6 @@ export const FacetRow = memo(function FacetRow({
           flexShrink={0}
           transition="opacity 120ms ease, transform 120ms ease"
         />
-        {typeTag && (
-          <Badge
-            size="xs"
-            variant="outline"
-            color="fg.subtle"
-            paddingX={1}
-            flexShrink={0}
-            textTransform="lowercase"
-            fontWeight="500"
-          >
-            {typeTag}
-          </Badge>
-        )}
         <Text
           textStyle="xs"
           fontWeight={isActive ? "600" : "500"}
@@ -202,7 +179,7 @@ export const FacetRow = memo(function FacetRow({
           color={isActive ? "fg" : "fg.muted"}
           textDecoration={isExclude ? "line-through" : undefined}
         >
-          {text}
+          {item.label}
         </Text>
         {!item.synthetic && (
           <Text

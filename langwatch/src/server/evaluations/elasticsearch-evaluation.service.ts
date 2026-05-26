@@ -91,4 +91,17 @@ export class ElasticsearchEvaluationService {
 
     return result;
   }
+
+  /**
+   * Elasticsearch embeds an evaluation's inputs in the trace document, so the
+   * list read already carries them — there's nothing to lazily fetch. Returns
+   * null and lets the caller fall back to the inputs from the list query.
+   */
+  async getEvaluationInputs(_params: {
+    projectId: string;
+    evaluationId: string;
+    protections?: Protections;
+  }): Promise<Record<string, unknown> | null> {
+    return null;
+  }
 }

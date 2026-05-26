@@ -41,12 +41,31 @@ function shikiThemeForColorMode(colorMode: string): SharedShikiTheme {
  * with the same `(langs, themes)` returns the same promise. The
  * standalone `codeToTokens` / `codeToHtml` exports go through it too,
  * so our adapter and any direct callers share one instance.
+ *
+ * Chakra's shiki adapter calls `ctx.dispose()` in its `unloadContext`
+ * on every CodeBlock unmount and color-mode change. Because every
+ * CodeBlock resolves to this one shared instance, the first unmount
+ * would dispose the highlighter the still-mounted blocks depend on,
+ * and their next `codeToHtml`/`loadTheme` throws
+ * "Shiki instance has been disposed". The singleton is app-lifetime by
+ * design, so we neuter `dispose` to a no-op the first time we resolve
+ * it — nothing should ever tear this instance down.
  */
-function getSharedHighlighter(): Promise<SharedHighlighter> {
-  return getSingletonHighlighter({
+async function getSharedHighlighter(): Promise<SharedHighlighter> {
+  const highlighter = (await getSingletonHighlighter({
     langs: [...SHIKI_LANGS],
     themes: [...SHIKI_THEMES],
-  }) as Promise<SharedHighlighter>;
+  })) as SharedHighlighter & { dispose: () => void };
+
+  if (!(highlighter as { __lwDisposeNeutered?: boolean }).__lwDisposeNeutered) {
+    highlighter.dispose = () => {};
+    Object.defineProperty(highlighter, "__lwDisposeNeutered", {
+      value: true,
+      enumerable: false,
+    });
+  }
+
+  return highlighter;
 }
 
 export function useShikiAdapter(colorMode: string) {

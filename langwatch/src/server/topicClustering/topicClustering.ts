@@ -1,8 +1,4 @@
 import type { ClickHouseClient } from "@clickhouse/client";
-import type {
-  QueryDslBoolQuery,
-  QueryDslQueryContainer,
-} from "@elastic/elasticsearch/lib/api/types";
 import { CostReferenceType, CostType, type Project } from "@prisma/client";
 import { fetch as fetchHTTP2 } from "fetch-h2";
 import { nanoid } from "nanoid";
@@ -10,7 +6,6 @@ import { env } from "../../env.mjs";
 import { OPENAI_EMBEDDING_DIMENSION } from "../../utils/constants";
 import { resolveModelForFeature } from "../modelProviders/resolveModelForFeature";
 import { createLogger } from "../../utils/logger/server";
-import { getExtractedInput } from "../../utils/traceExtraction";
 import {
   getProjectModelProviders,
   prepareLitellmParams,
@@ -19,11 +14,10 @@ import { getApp } from "../app-layer/app";
 import { scheduleTopicClusteringNextPage } from "../background/queues/topicClusteringQueue";
 import { getClickHouseClientForProject } from "../clickhouse/clickhouseClient";
 import { prisma } from "../db";
-import { esClient, TRACE_INDEX, traceIndexId } from "../elasticsearch";
 import { getProjectEmbeddingsModel } from "../embeddings";
 import { getPayloadSizeHistogram } from "../metrics";
+import { stagedLangevalsFetch } from "../langevals/stagedFetch";
 import { isNlpGoEnabled } from "../nlpgo/nlpgoFetch";
-import type { ElasticSearchTrace, Trace } from "../tracer/types";
 import type {
   BatchClusteringParams,
   IncrementalClusteringParams,
@@ -232,66 +226,6 @@ async function fetchCountsFromClickHouse(
   };
 }
 
-async function fetchCountsFromElasticsearch(
-  projectId: string,
-): Promise<TraceCounts> {
-  const client = await esClient({ projectId });
-
-  const [totalTracesCount, tracesWithInputCount, recentTracesCount, assignedTracesCount] =
-    await Promise.all([
-      client.count({
-        index: TRACE_INDEX.alias,
-        body: { query: { term: { project_id: projectId } } },
-      }),
-      client.count({
-        index: TRACE_INDEX.alias,
-        body: {
-          query: {
-            bool: {
-              must: [
-                { term: { project_id: projectId } },
-                { exists: { field: "input.value" } },
-              ],
-            } as QueryDslBoolQuery,
-          },
-        },
-      }),
-      client.count({
-        index: TRACE_INDEX.alias,
-        body: {
-          query: {
-            bool: {
-              must: [
-                { term: { project_id: projectId } },
-                { range: { "timestamps.started_at": { gte: "now-30d" } } },
-              ],
-            } as QueryDslBoolQuery,
-          },
-        },
-      }),
-      client.count({
-        index: TRACE_INDEX.alias,
-        body: {
-          query: {
-            bool: {
-              must: [
-                { term: { project_id: projectId } },
-                { exists: { field: "metadata.topic_id" } },
-              ],
-            } as QueryDslBoolQuery,
-          },
-        },
-      }),
-    ]);
-
-  return {
-    totalTracesCount: totalTracesCount.count,
-    tracesWithInputCount: tracesWithInputCount.count,
-    recentTracesCount: recentTracesCount.count,
-    assignedTracesCount: assignedTracesCount.count,
-  };
-}
-
 async function fetchTracesFromClickHouse(
   clickhouse: ClickHouseClient,
   projectId: string,
@@ -433,124 +367,6 @@ function extractInputFromComputed(computedInput: string | null): string {
   } catch {
     return computedInput || "<empty>";
   }
-}
-
-async function fetchTracesFromElasticsearch(
-  projectId: string,
-  isIncrementalProcessing: boolean,
-  topicIds: string[],
-  subtopicIds: string[],
-  searchAfter?: [number, string],
-): Promise<TraceSearchResult> {
-  const client = await esClient({ projectId });
-
-  let presenceCondition: QueryDslQueryContainer[] = [
-    {
-      range: {
-        "timestamps.started_at": {
-          gte: "now-12M",
-          lt: "now",
-        },
-      },
-    },
-  ];
-  if (isIncrementalProcessing) {
-    presenceCondition = [
-      {
-        range: {
-          "timestamps.started_at": {
-            gte: "now-12M",
-            lt: "now",
-          },
-        },
-      },
-      {
-        bool: {
-          should: [
-            {
-              bool: {
-                must_not: topicIds.map((topicId) => ({
-                  term: { "metadata.topic_id": topicId },
-                })) as QueryDslQueryContainer[],
-              } as QueryDslBoolQuery,
-            },
-            {
-              bool: {
-                must_not: subtopicIds.map((subtopicId) => ({
-                  term: { "metadata.subtopic_id": subtopicId },
-                })) as QueryDslQueryContainer[],
-              } as QueryDslBoolQuery,
-            },
-          ],
-          minimum_should_match: 1,
-        },
-      },
-    ];
-  }
-
-  const result = await client.search<Trace>({
-    index: TRACE_INDEX.alias,
-    body: {
-      query: {
-        bool: {
-          must: [
-            { term: { project_id: projectId } },
-            ...presenceCondition,
-          ],
-        } as QueryDslBoolQuery,
-      },
-      _source: [
-        "trace_id",
-        "input",
-        "metadata.topic_id",
-        "metadata.subtopic_id",
-        "timestamps.started_at",
-      ],
-      sort: [{ "timestamps.started_at": "desc" }, { trace_id: "asc" }],
-      ...(searchAfter ? { search_after: searchAfter } : {}),
-      size: 2000,
-    },
-  });
-
-  logger.info(
-    {
-      projectId,
-      totalHits: result.hits.total,
-      returnedHits: result.hits.hits.length,
-    },
-    "Elasticsearch search results",
-  );
-
-  const rawTraces = result.hits.hits.map((hit) => hit._source!);
-
-  const traces: TopicClusteringTrace[] = rawTraces
-    .filter((trace) => {
-      const inputText = getExtractedInput(trace);
-      return inputText !== "<empty>" && inputText.length > 0;
-    })
-    .map((trace) => ({
-      trace_id: trace.trace_id,
-      input: getExtractedInput(trace).slice(0, 8192),
-      topic_id:
-        trace.metadata?.topic_id && topicIds.includes(trace.metadata.topic_id)
-          ? trace.metadata.topic_id
-          : null,
-      subtopic_id:
-        trace.metadata?.subtopic_id &&
-        subtopicIds.includes(trace.metadata.subtopic_id)
-          ? trace.metadata.subtopic_id
-          : null,
-    }));
-
-  const lastTraceSort = result.hits.hits.toReversed()[0]?.sort as
-    | [number, string]
-    | undefined;
-
-  return {
-    traces,
-    lastSort: lastTraceSort,
-    returnedCount: result.hits.hits.length,
-  };
 }
 
 const getProjectTopicClusteringModelProvider = async (project: Project) => {
@@ -753,25 +569,6 @@ export const storeResults = async (
     });
   }
 
-  const body = tracesToAssign.flatMap(({ trace_id, topic_id, subtopic_id }) => [
-    { update: { _id: traceIndexId({ traceId: trace_id, projectId }) } },
-    {
-      doc: {
-        metadata: { topic_id, subtopic_id },
-        timestamps: { updated_at: Date.now() },
-      } as Partial<ElasticSearchTrace>,
-    },
-  ]);
-
-  if (body.length > 0) {
-    const client = await esClient({ projectId });
-    await client.bulk({
-      index: TRACE_INDEX.alias,
-      refresh: true,
-      body,
-    });
-  }
-
   // Emit TopicAssignedEvents via command queue
   if (tracesToAssign.length > 0) {
     try {
@@ -873,10 +670,13 @@ export const fetchTopicsBatchClustering = async (
     "uploading traces data for project",
   );
 
-  const response = await fetchHTTP2(
-    `${endpoint.baseUrl}/topics/batch_clustering`,
-    { method: "POST", json: params },
-  );
+  const response = await postToTopicClustering({
+    projectId,
+    engine: endpoint.engine,
+    url: `${endpoint.baseUrl}/topics/batch_clustering`,
+    body: params,
+    kind: "topic_clustering_batch",
+  });
 
   if (!response.ok) {
     let body = await response.text();
@@ -919,10 +719,13 @@ export const fetchTopicsIncrementalClustering = async (
     "uploading traces data for project",
   );
 
-  const response = await fetchHTTP2(
-    `${endpoint.baseUrl}/topics/incremental_clustering`,
-    { method: "POST", json: params },
-  );
+  const response = await postToTopicClustering({
+    projectId,
+    engine: endpoint.engine,
+    url: `${endpoint.baseUrl}/topics/incremental_clustering`,
+    body: params,
+    kind: "topic_clustering_incremental",
+  });
 
   if (!response.ok) {
     let body = await response.text();
@@ -943,4 +746,31 @@ export const fetchTopicsIncrementalClustering = async (
   const result = (await response.json()) as TopicClusteringResponse;
 
   return result;
+};
+
+/**
+ * The langwatch_nlp engine runs on a k8s pod behind an ingress that
+ * historically accepts ~100 MB bodies — fetch-h2 (HTTP/2) is preserved
+ * there to avoid regressing self-hosted operators with large batches.
+ *
+ * The langevals engine runs on AWS Lambda which hard-caps sync invokes
+ * at 6 MB; we stage anything past LANGEVALS_STAGING_THRESHOLD_BYTES to
+ * S3 and pass the presigned URL via X-Payload-S3-URL.
+ */
+const postToTopicClustering = async (opts: {
+  projectId: string;
+  engine: "langevals" | "langwatch_nlp";
+  url: string;
+  body: BatchClusteringParams | IncrementalClusteringParams;
+  kind: "topic_clustering_batch" | "topic_clustering_incremental";
+}) => {
+  if (opts.engine === "langevals") {
+    return stagedLangevalsFetch({
+      url: opts.url,
+      body: opts.body,
+      projectId: opts.projectId,
+      kind: opts.kind,
+    });
+  }
+  return fetchHTTP2(opts.url, { method: "POST", json: opts.body });
 };

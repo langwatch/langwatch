@@ -53,3 +53,9 @@ Feature: Pending counter conservation across job lifecycle
     Given multiple tenants with staged, dispatched, and retried jobs
     When the system reaches a quiescent state
     Then total-pending equals the sum of ZCARD across all group :jobs ZSETs
+
+  @integration @counter @coalescing
+  Scenario: Draining siblings for coalescing decrements pending per job
+    Given a group with several staged jobs (INCR at stage)
+    When the coalescing path drains some of them in one call
+    Then the counter is decremented once per drained job (same as dispatch)

@@ -490,6 +490,53 @@ end
 return results
 `;
 
+/**
+ * Pop up to maxJobs additional DUE jobs from a single group's pending queue,
+ * WITHOUT touching the group's active/ready/blocked/signal state.
+ *
+ * Safe to call only while the caller already holds the group's active slot
+ * (dispatch sets group:<id>:active and excludes active groups from dispatch),
+ * so no other worker can concurrently dequeue from this group. Used to coalesce
+ * a backed-up group's queued events into a single fold load/apply/store cycle.
+ *
+ * Mirrors the per-job bookkeeping DISPATCH does for the jobs it removes:
+ * ZREM from the jobs zset, HDEL the job data, and DECR total-pending. It does
+ * NOT mark anything active and does NOT re-score ready — the caller's active
+ * job remains the one that frees the group on COMPLETE.
+ */
+const DRAIN_GROUP_LUA = `
+local jobsKey         = KEYS[1]
+local dataKey         = KEYS[2]
+local totalPendingKey = KEYS[3]
+
+local nowMs   = tonumber(ARGV[1])
+local maxJobs = tonumber(ARGV[2])
+
+local results = {}
+if maxJobs <= 0 then
+  return results
+end
+
+local entries = redis.call("ZRANGEBYSCORE", jobsKey, "-inf", nowMs, "WITHSCORES", "LIMIT", 0, maxJobs)
+local i = 1
+while i < #entries do
+  local stagedJobId   = entries[i]
+  local originalScore = entries[i + 1]
+  i = i + 2
+
+  redis.call("ZREM", jobsKey, stagedJobId)
+  local jobDataJson = redis.call("HGET", dataKey, stagedJobId)
+  redis.call("HDEL", dataKey, stagedJobId)
+  redis.call("DECR", totalPendingKey)
+
+  results[#results + 1] = stagedJobId
+  results[#results + 1] = jobDataJson or ""
+  results[#results + 1] = tostring(originalScore)
+end
+
+return results
+`;
+
 const COMPLETE_LUA = `
 local activeKey       = KEYS[1]
 local jobsKey         = KEYS[2]
@@ -742,6 +789,17 @@ return 1
 export interface DispatchResult {
   stagedJobId: string;
   groupId: string;
+  jobDataJson: string;
+  originalScore: number;
+}
+
+/**
+ * A job drained from a group's pending queue for batch coalescing.
+ * Unlike a DispatchResult it carries no groupId (the caller already knows it)
+ * and is never marked active — it is folded alongside the active job.
+ */
+export interface DrainedJob {
+  stagedJobId: string;
   jobDataJson: string;
   originalScore: number;
 }
@@ -1047,6 +1105,52 @@ export class GroupStagingScripts {
     );
 
     return result === 1;
+  }
+
+  /**
+   * Drain up to maxJobs additional DUE jobs from a group's pending queue without
+   * altering the group's active/ready state. Only safe while the caller holds
+   * the group's active slot. Returns the drained jobs (may be empty).
+   */
+  async drainGroupReady({
+    groupId,
+    nowMs,
+    maxJobs,
+  }: {
+    groupId: string;
+    nowMs: number;
+    maxJobs: number;
+  }): Promise<DrainedJob[]> {
+    if (maxJobs <= 0) return [];
+
+    const jobsKey = `${this.keyPrefix}group:${groupId}:jobs`;
+    const dataKey = `${this.keyPrefix}group:${groupId}:data`;
+    const totalPendingKey = `${this.keyPrefix}stats:total-pending`;
+
+    const result = await this.redis.eval(
+      DRAIN_GROUP_LUA,
+      3,
+      jobsKey,
+      dataKey,
+      totalPendingKey,
+      String(nowMs),
+      String(maxJobs),
+    );
+
+    if (!result || !Array.isArray(result) || result.length < 3) {
+      return [];
+    }
+
+    const drained: DrainedJob[] = [];
+    for (let i = 0; i + 3 <= result.length; i += 3) {
+      drained.push({
+        stagedJobId: String(result[i]),
+        jobDataJson: String(result[i + 1]),
+        originalScore: Number(result[i + 2]),
+      });
+    }
+
+    return drained;
   }
 
   /**

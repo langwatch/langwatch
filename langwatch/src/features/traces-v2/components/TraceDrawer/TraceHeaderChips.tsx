@@ -15,7 +15,7 @@ import {
 import { getEvalChipDisplay } from "~/utils/evaluationResults";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { TraceHeader } from "~/server/api/routers/tracesV2.schemas";
-import { api } from "~/utils/api";
+import { useAnnotationsByTraceIds } from "~/hooks/useAnnotationsByTraceIds";
 import { useConversationTurns } from "../../hooks/useConversationTurns";
 import type { RichEval } from "../../hooks/useTraceEvaluations";
 import {
@@ -101,17 +101,11 @@ function useAnnotationsChip(trace: TraceHeader): ChipDef | null {
       .filter((id) => id !== trace.traceId),
   ];
 
-  const annotations = api.annotation.getByTraceIds.useQuery(
-    { projectId: project?.id ?? "", traceIds },
-    {
-      enabled:
-        !!project?.id &&
-        traceIds.length > 0 &&
-        hasPermission("annotations:view"),
-      staleTime: 5 * 60_000,
-      refetchOnWindowFocus: false,
-    },
-  );
+  const annotations = useAnnotationsByTraceIds({
+    projectId: project?.id ?? "",
+    traceIds,
+    enabled: !!project?.id && hasPermission("annotations:view"),
+  });
 
   const items = annotations.data ?? [];
   if (items.length === 0) return null;
