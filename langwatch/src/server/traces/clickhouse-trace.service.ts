@@ -609,29 +609,11 @@ export class ClickHouseTraceService {
           const traceIds = groups.flat().map((t) => t.trace_id);
           let traceChecks: TracesForProjectResult["traceChecks"] = {};
           if (traceIds.length > 0 && clickHouseClient) {
-            const evalResult = await clickHouseClient.query({
-              query: `
-                SELECT *
-                FROM evaluation_runs
-                WHERE TenantId = {tenantId:String}
-                  AND TraceId IN ({traceIds:Array(String)})
-                  AND (TenantId, EvaluationId, UpdatedAt) IN (
-                    SELECT TenantId, EvaluationId, max(UpdatedAt)
-                    FROM evaluation_runs
-                    WHERE TenantId = {tenantId:String}
-                      AND TraceId IN ({traceIds:Array(String)})
-                    GROUP BY TenantId, EvaluationId
-                  )
-              `,
-              query_params: {
-                tenantId: input.projectId,
-                traceIds,
-              },
-              format: "JSONEachRow",
+            const evalRows = await this.fetchEvaluationRows({
+              clickHouseClient,
+              projectId: input.projectId,
+              traceIds,
             });
-
-            const evalRows =
-              (await evalResult.json()) as ClickHouseEvaluationRunRow[];
 
             const grouped: Record<
               string,
@@ -1522,10 +1504,7 @@ export class ClickHouseTraceService {
     try {
       return await runQuery(traceIds);
     } catch (error) {
-      if (
-        !(error instanceof Error) ||
-        !error.message.includes("MEMORY_LIMIT_EXCEEDED")
-      ) {
+      if (!isClickHouseMemoryLimitError(error)) {
         throw error;
       }
 
@@ -1554,6 +1533,72 @@ export class ClickHouseTraceService {
         if (a.ts_TraceId === b.ts_TraceId) return 0;
         return a.ts_TraceId < b.ts_TraceId ? -dir : dir;
       });
+
+      return allRows;
+    }
+  }
+
+  /**
+   * Fetch evaluation rows for a set of trace IDs.
+   * Same OOM-resilient pattern as fetchTraceSummaryRows.
+   */
+  private async fetchEvaluationRows({
+    clickHouseClient,
+    projectId,
+    traceIds,
+  }: {
+    clickHouseClient: ClickHouseClient;
+    projectId: string;
+    traceIds: string[];
+  }): Promise<ClickHouseEvaluationRunRow[]> {
+    const runQuery = async (ids: string[]) => {
+      const result = await clickHouseClient.query({
+        query: `
+          SELECT *
+          FROM evaluation_runs
+          WHERE TenantId = {tenantId:String}
+            AND TraceId IN ({traceIds:Array(String)})
+            AND (TenantId, EvaluationId, UpdatedAt) IN (
+              SELECT TenantId, EvaluationId, max(UpdatedAt)
+              FROM evaluation_runs
+              WHERE TenantId = {tenantId:String}
+                AND TraceId IN ({traceIds:Array(String)})
+              GROUP BY TenantId, EvaluationId
+            )
+        `,
+        query_params: {
+          tenantId: projectId,
+          traceIds: ids,
+        },
+        format: "JSONEachRow",
+      });
+      return result.json() as Promise<ClickHouseEvaluationRunRow[]>;
+    };
+
+    try {
+      return await runQuery(traceIds);
+    } catch (error) {
+      if (!isClickHouseMemoryLimitError(error)) {
+        throw error;
+      }
+
+      this.logger.warn(
+        `Evaluations query OOM for ${traceIds.length} traces, retrying in batches of ${ClickHouseTraceService.SUMMARY_BATCH_SIZE}`,
+      );
+
+      const allRows: ClickHouseEvaluationRunRow[] = [];
+      for (
+        let i = 0;
+        i < traceIds.length;
+        i += ClickHouseTraceService.SUMMARY_BATCH_SIZE
+      ) {
+        const batch = traceIds.slice(
+          i,
+          i + ClickHouseTraceService.SUMMARY_BATCH_SIZE,
+        );
+        const batchRows = await runQuery(batch);
+        allRows.push(...batchRows);
+      }
 
       return allRows;
     }
@@ -2169,6 +2214,15 @@ interface PromptStudioCandidateRow {
  *   3. First llm in the trace by start time as a last resort.
  * Returns null when the trace genuinely has no llm spans.
  */
+function isClickHouseMemoryLimitError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return (
+    error.message.includes("MEMORY_LIMIT_EXCEEDED") ||
+    error.message.toLowerCase().includes("memory limit exceeded") ||
+    (error as { type?: string }).type === "MEMORY_LIMIT_EXCEEDED"
+  );
+}
+
 function findNearestLlm<T extends PromptStudioCandidateRow>(
   rows: T[],
   requested: T,
