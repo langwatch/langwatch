@@ -13,10 +13,10 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
       chmod +x /usr/local/bin/opencode
 ENV PATH="/root/.local/bin:$PATH"
 
-# Install locally-built CLI and MCP server from source tarballs.
+# Install locally-built CLI (v0.29.0) and MCP server (v0.9.0) from main branch.
 # Build the tarballs first:
 #   cd typescript-sdk && pnpm pack --pack-destination /path/to/build-context/
-#   cd mcp-server && pnpm pack --pack-destination /path/to/build-context/
+#   cd mcp-server   && pnpm pack --pack-destination /path/to/build-context/
 # Then copy them into this directory before running `docker build`.
 COPY langwatch-0.29.0.tgz /tmp/langwatch.tgz
 COPY langwatch-mcp-server-0.9.0.tgz /tmp/langwatch-mcp-server.tgz
