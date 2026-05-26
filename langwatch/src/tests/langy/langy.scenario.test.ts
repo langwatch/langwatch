@@ -764,7 +764,7 @@ describe("Langy via HTTP wrapper", () => {
       console.log("No evaluators to update — skipping Layer 2 check");
       return;
     }
-    const target = before[0];
+    const target = before[0]!;
     const newName = `${target.name}-updated-${Date.now()}`;
 
     const result = await scenario.run({
@@ -798,7 +798,7 @@ describe("Langy via HTTP wrapper", () => {
       console.log("No prompts to update — skipping Layer 2 check");
       return;
     }
-    const target = before[0];
+    const target = before[0]!;
     const result = await scenario.run({
       name: "update prompt",
       description: `The user wants to update the system message of prompt "${target.handle ?? target.name}" to "You are a concise, expert assistant."`,

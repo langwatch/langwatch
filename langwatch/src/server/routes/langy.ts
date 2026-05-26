@@ -603,13 +603,8 @@ app.post("/langy/chat", async (c) => {
             error: `No built-in evaluator with type '${evaluatorType}'. Use list_evaluators('built_in') first.`,
           };
         }
-        const project = await prisma.project.findUnique({
-          where: { id: projectId },
-          select: { defaultModel: true, embeddingsModel: true },
-        });
         const defaults = getEvaluatorDefaultSettings(
           getEvaluatorDefinitions(evaluatorType),
-          project ?? undefined,
         ) as Record<string, unknown>;
         const mergedSettings: Record<string, unknown> = {
           ...defaults,
@@ -1211,15 +1206,9 @@ app.post("/langy/chat", async (c) => {
   }
 
   const lastMsg = messages[messages.length - 1];
-  const userText =
-    typeof lastMsg?.content === "string"
-      ? lastMsg.content
-      : Array.isArray(lastMsg?.content)
-        ? lastMsg.content
-            .filter((p: { type: string }) => p.type === "text")
-            .map((p: { text: string }) => p.text)
-            .join("")
-        : "";
+  const userText = extractAssistantText(
+    lastMsg?.parts as Array<Record<string, unknown>> | undefined,
+  );
 
   const fullPrompt = `${systemPrompt}\n\nUser: ${userText}`;
 
@@ -1239,7 +1228,7 @@ app.post("/langy/chat", async (c) => {
   let fullText = "";
 
   const stream = createUIMessageStream({
-    execute: async (writer) => {
+    execute: async ({ writer }) => {
       writer.write({ type: "text-start", id: textId });
 
       const reader = agentResponse.body!.getReader();

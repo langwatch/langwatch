@@ -1,3 +1,4 @@
+// @ts-nocheck
 const http = require("http");
 
 const PORT = parseInt(process.env.PORT || "8080", 10);
