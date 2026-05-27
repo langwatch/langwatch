@@ -64,6 +64,7 @@ class Client(LangWatchClientProtocol):
     _tracer_provider: ClassVar[Optional[TracerProvider]] = None
     _is_dedicated_provider: ClassVar[bool] = False
     _exporter_attached_providers: ClassVar[set[int]] = set()
+    _langwatch_processor: ClassVar[Optional["FilterableBatchSpanProcessor"]] = None
     _rest_api_client: ClassVar[Optional[LangWatchApiClient]] = None
     _registered_instrumentors: ClassVar[
         dict[opentelemetry.trace.TracerProvider, set[BaseInstrumentor]]
@@ -388,6 +389,7 @@ class Client(LangWatchClientProtocol):
         cls._tracer_provider = None
         cls._is_dedicated_provider = False
         cls._exporter_attached_providers.clear()
+        cls._langwatch_processor = None
         cls._rest_api_client = None
         cls._prompts_path = None
         cls._registered_instrumentors.clear()
@@ -536,26 +538,45 @@ class Client(LangWatchClientProtocol):
 
     def __shutdown_tracer_provider(self) -> None:
         """Shuts down the current tracer provider, including flushing."""
-        if self._tracer_provider:
-            if self._flush_on_exit:
-                try:
-                    # Unregister the atexit hook if it was registered.
-                    atexit.unregister(self._tracer_provider.force_flush)
-                except ValueError:
-                    pass  # Handler was never registered or already unregistered.
+        if not self._tracer_provider:
+            return
 
-            force_flush = getattr(self._tracer_provider, "force_flush", None)
-            if callable(force_flush):
-                if self._debug:
-                    logger.debug("Forcing flush of tracer provider before shutdown.")
-                force_flush()
+        if Client._is_dedicated_provider:
+            self.__detach_langwatch_processor()
+            return
 
-            if Client._debug:
-                logger.debug("Shutting down tracer provider.")
-            if Client._tracer_provider is not None:
-                Client._exporter_attached_providers.discard(id(Client._tracer_provider))
-                Client._tracer_provider.shutdown()
-            Client._tracer_provider = None
+        if self._flush_on_exit:
+            try:
+                atexit.unregister(self._tracer_provider.force_flush)
+            except ValueError:
+                pass
+
+        force_flush = getattr(self._tracer_provider, "force_flush", None)
+        if callable(force_flush):
+            if self._debug:
+                logger.debug("Forcing flush of tracer provider before shutdown.")
+            force_flush()
+
+        if Client._debug:
+            logger.debug("Shutting down tracer provider.")
+        if Client._tracer_provider is not None:
+            Client._exporter_attached_providers.discard(id(Client._tracer_provider))
+            Client._tracer_provider.shutdown()
+        Client._tracer_provider = None
+
+    def __detach_langwatch_processor(self) -> None:
+        """Remove and shut down only our processor from a user-owned provider."""
+        if Client._langwatch_processor is not None:
+            Client._langwatch_processor.shutdown()
+            try:
+                processors = Client._tracer_provider._active_span_processor._span_processors  # type: ignore[union-attr]
+                if Client._langwatch_processor in processors:
+                    processors.remove(Client._langwatch_processor)
+            except AttributeError:
+                pass
+            Client._langwatch_processor = None
+        if Client._tracer_provider is not None:
+            Client._exporter_attached_providers.discard(id(Client._tracer_provider))
 
     def __setup_tracer_provider(self) -> None:
         """Sets up the tracer provider if not already active."""
@@ -568,7 +589,12 @@ class Client(LangWatchClientProtocol):
             if Client._debug:
                 logger.debug("Setting up new tracer provider.")
             Client._tracer_provider = self.__ensure_otel_setup()
+            return
 
+        if Client._is_dedicated_provider and id(Client._tracer_provider) not in Client._exporter_attached_providers:
+            if Client._debug:
+                logger.debug("Re-attaching LangWatch exporter to dedicated provider.")
+            self.__set_langwatch_exporter(Client._tracer_provider)
             return
 
         if Client._debug:
@@ -683,6 +709,7 @@ class Client(LangWatchClientProtocol):
             export_timeout_millis=float(os.getenv("OTEL_BSP_EXPORT_TIMEOUT", 10000)),
         )
         provider.add_span_processor(processor)
+        Client._langwatch_processor = processor
         Client._exporter_attached_providers.add(provider_id)
 
     def _setup_rest_api_client(self) -> LangWatchApiClient:

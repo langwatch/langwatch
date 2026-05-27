@@ -508,16 +508,16 @@ class TestDedicatedTracerProviderIsolation:
         )
 
     def test_same_provider_reattaches_after_reinit(self) -> None:
-        """When the same provider object is passed again after an api_key
-        change, a fresh exporter must be attached (the old one was shut down)."""
+        """When api_key changes, the old processor is removed and a fresh
+        one attached — no dead processors accumulate."""
         from opentelemetry.sdk.trace import TracerProvider
 
         lw_provider = TracerProvider()
         Client(api_key="first-key", tracer_provider=lw_provider)
 
-        processors_before = len(lw_provider._active_span_processor._span_processors)
+        processors = lw_provider._active_span_processor._span_processors
+        assert len(processors) == 1
 
         Client(api_key="second-key", tracer_provider=lw_provider)
 
-        processors_after = len(lw_provider._active_span_processor._span_processors)
-        assert processors_after > processors_before
+        assert len(processors) == 1, f"Expected 1 processor (old removed, new added), got {len(processors)}"
