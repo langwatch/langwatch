@@ -9,6 +9,7 @@ import type {
   JobEntry,
 } from "./queue.repository";
 import { normalizeErrorMessage } from "../normalize-error-message";
+import { GROUP_QUEUE_REGISTRY_KEY } from "~/server/event-sourcing/queues/groupQueue/scripts";
 
 // ── Lua Scripts ──────────────────────────────────────────────────────
 
@@ -205,6 +206,24 @@ export class QueueRedisRepository implements QueueRepository {
   // ── Queue Discovery & Scanning ──────────────────────────────────
 
   async discoverQueueNames(): Promise<string[]> {
+    // Fast path: producers register their queue name on construction, so the
+    // registry set is the authoritative list and reads in O(1).
+    const registered = await this.redis.smembers(GROUP_QUEUE_REGISTRY_KEY);
+    if (registered.length > 0) {
+      return registered;
+    }
+
+    // Fallback for the window after deploy before any producer has registered
+    // (or a wiped registry): scan once, then backfill so the next call is O(1).
+    // Without this the dashboard would scan the full keyspace on every poll.
+    const names = await this.scanReadyKeyNames();
+    if (names.length > 0) {
+      await this.redis.sadd(GROUP_QUEUE_REGISTRY_KEY, ...names);
+    }
+    return names;
+  }
+
+  private async scanReadyKeyNames(): Promise<string[]> {
     const names = new Set<string>();
     let cursor = "0";
     do {

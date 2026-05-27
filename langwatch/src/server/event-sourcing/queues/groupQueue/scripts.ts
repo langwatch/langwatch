@@ -848,6 +848,16 @@ export function readTenantCap(): number {
 }
 
 /**
+ * Set holding every active group-queue name (e.g. "{event-sourcing/jobs}").
+ * Producers register themselves here on construction so the ops dashboard can
+ * enumerate queues with an O(1) SMEMBERS instead of an O(keyspace)
+ * `SCAN MATCH *:gq:ready`, which scanned all ~190K keys to find a single ready
+ * set and pegged the Redis main thread once the keyspace grew. The dedicated
+ * hash tag keeps the set in a single Redis Cluster slot.
+ */
+export const GROUP_QUEUE_REGISTRY_KEY = "{gq-registry}:names";
+
+/**
  * TypeScript wrapper for the group queue Lua scripts.
  * All Redis keys use the `{queueName}` hash tag for Redis Cluster compatibility.
  * Lua scripts derive per-group keys dynamically (e.g. keyPrefix .. "group:" .. groupId)
@@ -856,13 +866,23 @@ export function readTenantCap(): number {
  */
 export class GroupStagingScripts {
   private readonly keyPrefix: string;
+  private readonly queueName: string;
 
   constructor(
     private readonly redis: IORedis | Cluster,
     queueName: string,
   ) {
     // queueName already includes hash tags, e.g. "{pipeline/handler/spanStorage}"
+    this.queueName = queueName;
     this.keyPrefix = `${queueName}:gq:`;
+  }
+
+  /**
+   * Advertise this queue in the registry set so the ops dashboard discovers it
+   * without scanning the keyspace. Idempotent; safe to call once per process.
+   */
+  async registerQueue(): Promise<void> {
+    await this.redis.sadd(GROUP_QUEUE_REGISTRY_KEY, this.queueName);
   }
 
   /**

@@ -178,6 +178,16 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       this.queueName,
     );
 
+    // Advertise this queue in the registry set so the ops dashboard enumerates
+    // it via SMEMBERS instead of an O(keyspace) `SCAN MATCH *:gq:ready`.
+    // Best-effort: a miss only degrades discovery to the scan fallback.
+    void this.scripts.registerQueue().catch((err) => {
+      this.logger.debug(
+        { err, queueName: this.queueName },
+        "queue registry registration failed",
+      );
+    });
+
     // Per-tenant rate tracker (post-2026-05-11 incident follow-up). Cheap
     // pipelined writes on the producer hot path. AnomalyDetector worker
     // consumes the data; the tracker itself never blocks send(). The
