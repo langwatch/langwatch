@@ -11,7 +11,7 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional, Set
 import warnings
 
 import yaml
@@ -26,6 +26,9 @@ class LocalPromptLoader:
 
     _warned_no_prompts_path: bool = False
     _cached_project_root: Optional[Path] = None
+    # Prompt ids already logged as loaded, so a repeat fetch of the same prompt
+    # (e.g. a grading prompt re-read many times per turn) does not re-log.
+    _logged_prompt_ids: Set[str] = set()
 
     PROMPTS_CONFIG_FILE = "prompts.json"
 
@@ -174,10 +177,13 @@ class LocalPromptLoader:
                 )
                 return None
 
-            # Build PromptData directly
-            logger.info(
-                f"Successfully loaded prompt '{prompt_id}' from local file: {prompt_file_path}"
-            )
+            # Build PromptData directly. Log at INFO once per prompt id so the
+            # "loaded" line stays visible without spamming on every fetch.
+            if prompt_id not in LocalPromptLoader._logged_prompt_ids:
+                logger.info(
+                    f"Successfully loaded prompt '{prompt_id}' from local file: {prompt_file_path}"
+                )
+                LocalPromptLoader._logged_prompt_ids.add(prompt_id)
 
             # Convert messages
             messages = []
