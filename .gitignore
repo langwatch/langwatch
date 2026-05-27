@@ -98,3 +98,6 @@ preprocessed_configs/
 status
 uuid
 .claude/worktrees/
+
+# Per-scenario LLM conversation transcripts (langy.scenario.test.ts)
+langwatch/src/tests/langy/scenario-logs/
