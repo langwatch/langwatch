@@ -3,6 +3,7 @@ import type {
   SpanTreeNode,
   TraceHeader,
 } from "~/server/api/routers/tracesV2.schemas";
+import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
 import {
   abbreviateModel,
   formatCost,
@@ -589,6 +590,7 @@ export function buildTraceMarkdown(
   spans: SpanTreeNode[],
   opts: MarkdownConfig,
   fullSpans?: FullSpan[],
+  events: DerivedTraceEvent[] = [],
 ): string {
   const lines: string[] = [];
 
@@ -844,9 +846,9 @@ export function buildTraceMarkdown(
     }
   }
 
-  if (trace.events && trace.events.length > 0) {
+  if (events.length > 0) {
     lines.push("# events");
-    for (const evt of trace.events) {
+    for (const evt of events) {
       const offsetMs = Math.max(0, Math.round(evt.timestamp - trace.timestamp));
       lines.push(`  - ${evt.name} (+${offsetMs}ms)`);
     }

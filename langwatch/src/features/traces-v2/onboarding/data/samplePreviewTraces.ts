@@ -1395,7 +1395,6 @@ function buildRichArrivalHeader(): TraceHeader {
       "gen_ai.conversation.id": richArrival.conversationId ?? "",
       "langwatch.user_id": richArrival.userId ?? "",
     },
-    events: [],
   };
 }
 

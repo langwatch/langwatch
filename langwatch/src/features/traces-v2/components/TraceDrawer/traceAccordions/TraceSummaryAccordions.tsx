@@ -6,6 +6,7 @@ import type {
   TraceHeader,
 } from "~/server/api/routers/tracesV2.schemas";
 import { useTraceEvaluations } from "../../../hooks/useTraceEvaluations";
+import { useTraceEvents } from "../../../hooks/useTraceEvents";
 import { useTraceResources } from "../../../hooks/useTraceResources";
 import { rankedErrorSpans } from "../../../utils/errorSpans";
 import { AttributeTable } from "../AttributeTable";
@@ -32,11 +33,11 @@ export function TraceSummaryAccordions({
 }) {
   const hasIO = !!(trace.input || trace.output);
   const traceAttributes = trace.attributes ?? {};
-  // The trace summary fold projection hoists every span event onto the
-  // trace, including the legacy `/track-event` payloads (which the
-  // migration step attaches to the first span as OTel span events). One
-  // source, no merge.
-  const traceEvents = trace.events ?? [];
+  // Trace-level events are read as their own query (like evaluations), not off
+  // the header: the fold no longer carries them, so they're derived from
+  // stored_spans on demand. Includes legacy `/track-event` payloads, which the
+  // SDK attaches to a synthetic span as OTel span events.
+  const { events: traceEvents } = useTraceEvents();
   const resources = useTraceResources(trace.traceId);
   const hasResourceAttributes =
     Object.keys(resources.resourceAttributes).length > 0;
