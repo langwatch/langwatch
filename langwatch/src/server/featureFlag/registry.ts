@@ -139,6 +139,13 @@ export const FEATURE_FLAGS = [
     defaultValue: false,
     description: "Reveals the AI Gateway menu in the project sidebar.",
   },
+  {
+    key: "release_langy_enabled",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Enables the Langy in-product assistant. Staff-only gate is layered on top via isLangwatchStaff(); flag off = hidden for everyone including staff.",
+  },
 ] as const satisfies readonly FeatureFlagDefinition[];
 
 export const FEATURE_FLAG_FAMILIES = [
