@@ -515,9 +515,12 @@ class TestDedicatedTracerProviderIsolation:
         lw_provider = TracerProvider()
         Client(api_key="first-key", tracer_provider=lw_provider)
 
-        processors = lw_provider._active_span_processor._span_processors
-        assert len(processors) == 1
+        procs_before = lw_provider._active_span_processor._span_processors
+        assert len(procs_before) == 1
 
         Client(api_key="second-key", tracer_provider=lw_provider)
 
-        assert len(processors) == 1, f"Expected 1 processor (old removed, new added), got {len(processors)}"
+        procs_after = lw_provider._active_span_processor._span_processors
+        assert len(procs_after) == 1, (
+            f"Expected 1 processor (old removed, new added), got {len(procs_after)}"
+        )

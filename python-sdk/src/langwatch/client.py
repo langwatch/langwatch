@@ -569,9 +569,11 @@ class Client(LangWatchClientProtocol):
         if Client._langwatch_processor is not None:
             Client._langwatch_processor.shutdown()
             try:
-                processors = Client._tracer_provider._active_span_processor._span_processors  # type: ignore[union-attr]
-                if Client._langwatch_processor in processors:
-                    processors.remove(Client._langwatch_processor)
+                multi = Client._tracer_provider._active_span_processor  # type: ignore[union-attr]
+                old = Client._langwatch_processor
+                multi._span_processors = tuple(
+                    p for p in multi._span_processors if p is not old
+                )
             except AttributeError:
                 pass
             Client._langwatch_processor = None
