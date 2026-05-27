@@ -880,24 +880,6 @@ export const tracesV2Router = createTRPCRouter({
       };
     }),
 
-  events: protectedProcedure
-    .input(
-      z.object({
-        projectId: z.string(),
-        traceId: z.string(),
-        ...spanReadHintShape,
-      }),
-    )
-    .use(checkProjectPermission("traces:view"))
-    .query(async ({ input }) => {
-      const app = getApp();
-      return app.traces.spans.getEventsByTraceId({
-        tenantId: input.projectId,
-        traceId: input.traceId,
-        ...occurredAtFromInput(input),
-      });
-    }),
-
   /**
    * Trace-level events ({spanId, timestamp, name, attributes}) for the drawer.
    * Split off the header so the header stays a pure summary read; the drawer
