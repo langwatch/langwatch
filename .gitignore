@@ -119,3 +119,6 @@ uuid
 # PR-body screenshots live in the github.com/langwatch/pr-screenshots repo,
 # referenced by raw URL from the PR body — never committed to the product tree.
 langwatch/pr-screenshots/
+
+# Per-scenario LLM conversation transcripts (langy.scenario.test.ts)
+langwatch/src/tests/langy/scenario-logs/
