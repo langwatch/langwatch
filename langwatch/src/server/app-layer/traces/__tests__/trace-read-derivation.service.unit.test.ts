@@ -137,6 +137,38 @@ describe("TraceReadDerivationService", () => {
     });
   });
 
+  describe("given a read slower than the window", () => {
+    describe("when a concurrent caller arrives after the window would have elapsed", () => {
+      it("shares the still-in-flight read instead of firing a duplicate", async () => {
+        vi.useFakeTimers();
+        let reads = 0;
+        let resolveRead!: (value: never[]) => void;
+        const reader: NormalizedSpanReader = {
+          async getNormalizedSpansByTraceId() {
+            return [];
+          },
+          getTraceEventsByTraceId() {
+            reads++;
+            return new Promise((resolve) => {
+              resolveRead = resolve;
+            });
+          },
+        };
+        const service = new TraceReadDerivationService(reader);
+
+        const first = service.deriveEvents(BATCH_PARAMS);
+        // The window elapses while the read is still in flight.
+        vi.setSystemTime(Date.now() + 31_000);
+        const second = service.deriveEvents(BATCH_PARAMS);
+
+        expect(reads).toBe(1);
+
+        resolveRead([]);
+        await Promise.all([first, second]);
+      });
+    });
+  });
+
   describe("given a read that rejects", () => {
     describe("when the same derivation is retried", () => {
       it("does not cache the failure", async () => {
