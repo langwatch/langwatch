@@ -45,6 +45,19 @@ Feature: PostHog cost control
     Then the flag is evaluated locally without calling the PostHog /flags endpoint
     And no /flags request is made for that evaluation
 
+  Scenario: Processes that only read SYSTEM flags never start the local-evaluation poller
+    Given local evaluation is enabled
+    And a process imports the feature flag service but only ever evaluates SYSTEM-scoped flags
+    When those SYSTEM flags are evaluated
+    Then the PostHog client is never constructed in that process
+    And no background flag-definition polling runs in that process
+    And the flag values come from postgres
+
+  Scenario: A PostHog-backed flag builds the client lazily on first evaluation
+    Given local evaluation is enabled
+    When a PRODUCT flag with no operator override is first evaluated
+    Then the PostHog client is constructed once and reused for later evaluations
+
   Scenario: Backend falls back to remote evaluation when no personal API key is configured
     Given POSTHOG_KEY is configured but POSTHOG_FEATURE_FLAGS_KEY is not
     When the backend evaluates a feature flag
