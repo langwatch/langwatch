@@ -1,4 +1,5 @@
--- Langy assistant tables — see specs/assistant/memory-design.md §3
+-- Langy assistant tables — chat threads + messages.
+-- Project memory / user preferences were planned but cut from v1.
 
 -- LangyConversation
 CREATE TABLE "LangyConversation" (
@@ -35,53 +36,3 @@ CREATE TABLE "LangyMessage" (
 
 CREATE INDEX "LangyMessage_conversationId_createdAt_idx" ON "LangyMessage"("conversationId", "createdAt");
 CREATE INDEX "LangyMessage_projectId_idx" ON "LangyMessage"("projectId");
-
--- LangyProjectMemory
-CREATE TABLE "LangyProjectMemory" (
-    "id" TEXT NOT NULL,
-    "projectId" TEXT NOT NULL,
-    "content" TEXT NOT NULL,
-    "contentSummary" TEXT,
-    "contentVersion" INTEGER NOT NULL DEFAULT 1,
-    "generatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "refreshedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "lastEditorId" TEXT,
-
-    CONSTRAINT "LangyProjectMemory_pkey" PRIMARY KEY ("id")
-);
-
-CREATE UNIQUE INDEX "LangyProjectMemory_projectId_key" ON "LangyProjectMemory"("projectId");
-CREATE INDEX "LangyProjectMemory_projectId_idx" ON "LangyProjectMemory"("projectId");
-
--- LangyProjectMemoryHistory
-CREATE TABLE "LangyProjectMemoryHistory" (
-    "id" TEXT NOT NULL,
-    "projectMemoryId" TEXT NOT NULL,
-    "projectId" TEXT NOT NULL,
-    "contentVersion" INTEGER NOT NULL,
-    "content" TEXT NOT NULL,
-    "changedById" TEXT,
-    "changeReason" TEXT,
-    "changedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT "LangyProjectMemoryHistory_pkey" PRIMARY KEY ("id")
-);
-
-CREATE INDEX "LangyProjectMemoryHistory_projectMemoryId_changedAt_idx" ON "LangyProjectMemoryHistory"("projectMemoryId", "changedAt");
-CREATE INDEX "LangyProjectMemoryHistory_projectId_idx" ON "LangyProjectMemoryHistory"("projectId");
-
--- LangyUserPreferences
-CREATE TABLE "LangyUserPreferences" (
-    "id" TEXT NOT NULL,
-    "userId" TEXT NOT NULL,
-    "projectId" TEXT NOT NULL,
-    "mode" TEXT NOT NULL DEFAULT 'non_expert',
-    "dismissedSuggestionKinds" TEXT[] DEFAULT ARRAY[]::TEXT[],
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "LangyUserPreferences_pkey" PRIMARY KEY ("id")
-);
-
-CREATE UNIQUE INDEX "LangyUserPreferences_userId_projectId_key" ON "LangyUserPreferences"("userId", "projectId");
-CREATE INDEX "LangyUserPreferences_projectId_idx" ON "LangyUserPreferences"("projectId");
