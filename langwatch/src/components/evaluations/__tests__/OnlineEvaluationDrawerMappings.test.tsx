@@ -57,7 +57,7 @@ Element.prototype.scrollIntoView = vi.fn();
  * 4. User clicks on mapping input and sees trace fields
  * 5. User selects a nested field (e.g., metadata.thread_id)
  */
-// TODO(#3240): re-enable after react-admin 5.13.1 provider wrapper fix
+// TODO(#3240): re-enable once the drawer test provider wrapper is fixed.
 describe.skip("OnlineEvaluationDrawer + EvaluatorEditorDrawer Mapping Integration", () => {
   beforeEach(() => {
     vi.clearAllMocks();
