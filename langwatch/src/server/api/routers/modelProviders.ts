@@ -27,6 +27,7 @@ import {
   updateConfig,
 } from "../../modelProviders/modelDefaults.service";
 import { ModelProviderService } from "../../modelProviders/modelProvider.service";
+import { trackProjectEvent } from "~/server/posthog";
 import {
   checkOrganizationPermission,
   checkProjectPermission,
@@ -119,6 +120,12 @@ export const modelProviderRouter = createTRPCRouter({
       return await listOrgModelProvidersForFrontend(input.organizationId);
     }),
   update: protectedProcedure
+    // PostHog instrumentation: model_provider_configured fires on the
+    // first time keys are set (or on each rekey), gating on enabled +
+    // customKeys presence. This is the moment a user has actually given
+    // the platform credentials to talk to an LLM — without it, evaluators
+    // and prompts can't run, so it's a hard activation gate worth tracking
+    // distinctly from this generic "update" name.
     .input(
       z.object({
         id: z.string().optional(),
@@ -195,6 +202,29 @@ export const modelProviderRouter = createTRPCRouter({
         },
         { prisma: ctx.prisma, session: ctx.session },
       );
+
+      // Fire only when this looks like a "credentials supplied" event
+      // (enabled + customKeys present). A pure toggle or unset wouldn't
+      // count as setup — those would inflate adoption metrics.
+      const customKeysProvided =
+        input.customKeys != null &&
+        typeof input.customKeys === "object" &&
+        Object.keys(input.customKeys).length > 0;
+      if (input.enabled && customKeysProvided) {
+        trackProjectEvent({
+          prisma: ctx.prisma,
+          userId: ctx.session.user.id,
+          event: "model_provider_configured",
+          projectId: input.projectId,
+          properties: {
+            provider: input.provider,
+            isUpdate: Boolean(input.id),
+            hasCustomModels: Boolean(input.customModels),
+            hasDefaultModel: Boolean(input.defaultModel),
+            scopeCount: input.scopes?.length ?? (input.scopeId ? 1 : 0),
+          },
+        });
+      }
 
       return result;
     }),

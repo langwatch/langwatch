@@ -10,6 +10,7 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import { enforceLicenseLimit } from "~/server/license-enforcement";
+import { trackProjectEvent } from "~/server/posthog";
 import { ProjectRepository } from "~/server/projects/project.repository";
 import type { SuiteRunSummary } from "~/server/scenarios/scenario-event.types";
 import { SuiteDomainError } from "~/server/suites/errors";
@@ -37,7 +38,24 @@ export const suiteRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       await enforceLicenseLimit(ctx, input.projectId, "experiments");
       const service = createSuiteService(ctx.prisma);
-      return service.create(input);
+      const suite = await service.create(input);
+
+      // Simulation suites are a key Scenarios-product adoption signal.
+      // Pairs with the existing `scenario_created` event: scenarios live
+      // inside suites, so suite_created is the "container" adoption while
+      // scenario_created is the "content" adoption. Both together give
+      // us creation→usage of the simulations product.
+      trackProjectEvent({
+        prisma: ctx.prisma,
+        userId: ctx.session.user.id,
+        event: "suite_created",
+        projectId: input.projectId,
+        properties: {
+          suiteId: suite.id,
+        },
+      });
+
+      return suite;
     }),
 
   getAll: protectedProcedure

@@ -31,6 +31,7 @@ import { pMapLimited } from "../../event-sourcing/replay/pMapLimited";
 import { materializeNodeLlmConfigs } from "../../workflows/materializeNodeLlmConfigs";
 import { checkProjectPermission, hasProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { trackProjectEvent } from "~/server/posthog";
 
 const autoComputeLogger = createLogger("langwatch:workflows:auto-compute");
 
@@ -113,6 +114,22 @@ export const workflowRouter = createTRPCRouter({
           });
         })
         .catch(captureException);
+
+      // Studio adoption signal. `autoPublished` lets us split "exploratory"
+      // workflows (saved but not published) from "production" workflows
+      // (published on first save, e.g. evaluator-shaped workflows). The
+      // ratio of those is a quality-of-use signal.
+      trackProjectEvent({
+        prisma: ctx.prisma,
+        userId: ctx.session.user.id,
+        event: "workflow_created",
+        projectId: input.projectId,
+        properties: {
+          workflowId: workflow.id,
+          autoPublished: Boolean(input.publish),
+          name: input.dsl.name,
+        },
+      });
 
       return { workflow, version };
     }),
