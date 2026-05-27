@@ -2627,6 +2627,86 @@ describe("GroupStagingScripts", () => {
       expect(await redis.get(tenantCounterKey("proj_quiet"))).toBe("1");
     });
 
+    /** @scenario Over-cap groups are deferred so they don't starve other tenants on repeated polls */
+    it("defers over-cap groups to a future score so the next dispatch reaches other tenants immediately", async () => {
+      process.env[TENANT_CAP_ENV] = "1";
+
+      // proj_noisy stages 50 groups at score=1000 (head of zset)
+      const noisyJobs = Array.from({ length: 50 }, (_, i) =>
+        makeJob({
+          groupId: `proj_noisy/g${i}`,
+          stagedJobId: `noisy-j${i}`,
+          dispatchAfterMs: 1000,
+        }),
+      );
+      await scripts.stageBatch(noisyJobs);
+
+      // proj_quiet stages 1 group at score=1001 (later in zset)
+      await stageOne({
+        tenantId: "proj_quiet",
+        groupSuffix: "only",
+        stagedJobId: "quiet-j1",
+        dispatchAfterMs: 1001,
+      });
+
+      // First dispatch: proj_noisy/g0 wins
+      const first = await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 });
+      expect(first?.groupId).toMatch(/^proj_noisy\//);
+
+      // Second dispatch: proj_quiet wins (walk past over-cap noisy)
+      const second = await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 });
+      expect(second!.groupId).toBe("proj_quiet/only");
+
+      // Key assertion: over-cap noisy groups were deferred to future scores,
+      // so a third dispatch at the same nowMs returns null immediately
+      // instead of scanning through them again.
+      const third = await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 });
+      expect(third).toBeNull();
+
+      // The deferred groups are still in the ready set with future scores
+      const readyCount = await redis.zcard(`${keyPrefix()}ready`);
+      expect(readyCount).toBeGreaterThan(0);
+
+      // After the defer window (5s), they become eligible again
+      const afterDefer = await scripts.dispatch({ nowMs: 8000, activeTtlSec: 60 });
+      expect(afterDefer).toBeNull(); // still over cap, but proves they're scannable again
+    });
+
+    /** @scenario dispatchBatch defers over-cap groups the same way */
+    it("dispatchBatch defers over-cap groups to future scores", async () => {
+      process.env[TENANT_CAP_ENV] = "1";
+
+      const noisyJobs = Array.from({ length: 20 }, (_, i) =>
+        makeJob({
+          groupId: `proj_noisy/g${i}`,
+          stagedJobId: `noisy-j${i}`,
+          dispatchAfterMs: 1000,
+        }),
+      );
+      await scripts.stageBatch(noisyJobs);
+
+      await stageOne({
+        tenantId: "proj_quiet",
+        groupSuffix: "only",
+        stagedJobId: "quiet-j1",
+        dispatchAfterMs: 1001,
+      });
+
+      // Batch dispatch: gets 1 noisy + 1 quiet (cap=1 each)
+      const batch = await scripts.dispatchBatch({ nowMs: 2000, activeTtlSec: 60, maxJobs: 10 });
+      const groupIds = batch.map((r) => r.groupId);
+      expect(groupIds).toContain("proj_quiet/only");
+      expect(groupIds.filter((g) => g.startsWith("proj_noisy/"))).toHaveLength(1);
+
+      // Second batch: both tenants at cap, over-cap groups deferred
+      const batch2 = await scripts.dispatchBatch({ nowMs: 2000, activeTtlSec: 60, maxJobs: 10 });
+      expect(batch2).toHaveLength(0);
+
+      // Remaining noisy groups still in ready but with future scores
+      const dueNow = await redis.zcount(`${keyPrefix()}ready`, "-inf", "2000");
+      expect(dueNow).toBe(0);
+    });
+
     /** @scenario cap=0 produces zero tenant counter keys (back-compat regression) */
     it("when cap=0 (kill switch), no tenant_active:* keys are ever created", async () => {
       process.env[TENANT_CAP_ENV] = "0";
