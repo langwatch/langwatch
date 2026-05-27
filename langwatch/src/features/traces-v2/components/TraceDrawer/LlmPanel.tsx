@@ -6,6 +6,7 @@ import type {
   TraceHeader,
 } from "~/server/api/routers/tracesV2.schemas";
 import { useSpansFull } from "../../hooks/useSpansFull";
+import { useTraceEvents } from "../../hooks/useTraceEvents";
 import {
   buildTraceMarkdown,
   DEFAULT_MARKDOWN_CONFIG,
@@ -54,9 +55,11 @@ export function LlmPanel({ trace, spans }: LlmPanelProps) {
   );
   const fullSpans = fullSpansQuery.data;
 
+  const { events } = useTraceEvents();
+
   const markdown = useMemo(
-    () => buildTraceMarkdown(trace, spans, config, fullSpans),
-    [trace, spans, config, fullSpans],
+    () => buildTraceMarkdown(trace, spans, config, fullSpans, events),
+    [trace, spans, config, fullSpans, events],
   );
   const chunks = useMemo(() => splitTraceMarkdown(markdown), [markdown]);
 

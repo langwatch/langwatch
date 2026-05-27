@@ -48,11 +48,10 @@ export function createSimulationMetricsSyncReactor(
 
       if (!scenarioRunId) return;
 
-      const roleCosts = foldState.scenarioRoleCosts ?? {};
-      const roleLatencies = foldState.scenarioRoleLatencies ?? {};
-
-      // Only dispatch if there's actual metric data
-      if (Object.keys(roleCosts).length === 0 && foldState.totalCost === null) {
+      // Skip traces with nothing to aggregate. Role cost/latency are no longer
+      // accumulated on the fold; computeRunMetrics derives them per-trace from
+      // stored_spans, so we dispatch in pull mode rather than carrying metrics.
+      if (foldState.spanCount === 0 && foldState.totalCost === null) {
         return;
       }
 
@@ -60,7 +59,7 @@ export function createSimulationMetricsSyncReactor(
 
       logger.debug(
         { traceId, tenantId, scenarioRunId },
-        "Publishing trace metrics to simulation run (ECST)",
+        "Publishing trace metrics to simulation run (derived on compute)",
       );
 
       try {
@@ -68,11 +67,6 @@ export function createSimulationMetricsSyncReactor(
           tenantId,
           scenarioRunId,
           traceId,
-          metrics: {
-            totalCost: foldState.totalCost ?? 0,
-            roleCosts,
-            roleLatencies,
-          },
           retryCount: 0,
           occurredAt: Date.now(),
         });

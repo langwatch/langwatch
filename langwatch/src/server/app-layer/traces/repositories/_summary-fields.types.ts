@@ -46,8 +46,4 @@ export interface TraceSummaryFieldsBase {
   TopicId: string | null;
   SubTopicId: string | null;
   AnnotationIds: string[];
-  ScenarioRoleCosts: Record<string, number>;
-  ScenarioRoleLatencies: Record<string, number>;
-  ScenarioRoleSpans: Record<string, string>;
-  SpanCosts: Record<string, number>;
 }

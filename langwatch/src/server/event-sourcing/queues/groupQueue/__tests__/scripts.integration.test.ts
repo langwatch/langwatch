@@ -5,7 +5,12 @@ import {
   stopTestContainers,
   getTestRedisConnection,
 } from "../../../__tests__/integration/testContainers";
-import { GroupStagingScripts, type DispatchResult } from "../scripts";
+import {
+  GroupStagingScripts,
+  GROUP_KEY_TTL_MS,
+  GROUP_QUEUE_REGISTRY_KEY,
+  type DispatchResult,
+} from "../scripts";
 import { QueueRedisRepository } from "../../../../app-layer/ops/repositories/queue.redis.repository";
 
 let redis: Redis;
@@ -2622,6 +2627,86 @@ describe("GroupStagingScripts", () => {
       expect(await redis.get(tenantCounterKey("proj_quiet"))).toBe("1");
     });
 
+    /** @scenario Over-cap groups are deferred so they don't starve other tenants on repeated polls */
+    it("defers over-cap groups to a future score so the next dispatch reaches other tenants immediately", async () => {
+      process.env[TENANT_CAP_ENV] = "1";
+
+      // proj_noisy stages 50 groups at score=1000 (head of zset)
+      const noisyJobs = Array.from({ length: 50 }, (_, i) =>
+        makeJob({
+          groupId: `proj_noisy/g${i}`,
+          stagedJobId: `noisy-j${i}`,
+          dispatchAfterMs: 1000,
+        }),
+      );
+      await scripts.stageBatch(noisyJobs);
+
+      // proj_quiet stages 1 group at score=1001 (later in zset)
+      await stageOne({
+        tenantId: "proj_quiet",
+        groupSuffix: "only",
+        stagedJobId: "quiet-j1",
+        dispatchAfterMs: 1001,
+      });
+
+      // First dispatch: proj_noisy/g0 wins
+      const first = await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 });
+      expect(first?.groupId).toMatch(/^proj_noisy\//);
+
+      // Second dispatch: proj_quiet wins (walk past over-cap noisy)
+      const second = await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 });
+      expect(second!.groupId).toBe("proj_quiet/only");
+
+      // Key assertion: over-cap noisy groups were deferred to future scores,
+      // so a third dispatch at the same nowMs returns null immediately
+      // instead of scanning through them again.
+      const third = await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 });
+      expect(third).toBeNull();
+
+      // The deferred groups are still in the ready set with future scores
+      const readyCount = await redis.zcard(`${keyPrefix()}ready`);
+      expect(readyCount).toBeGreaterThan(0);
+
+      // After the defer window (5s), they become eligible again
+      const afterDefer = await scripts.dispatch({ nowMs: 8000, activeTtlSec: 60 });
+      expect(afterDefer).toBeNull(); // still over cap, but proves they're scannable again
+    });
+
+    /** @scenario dispatchBatch defers over-cap groups to future scores */
+    it("dispatchBatch defers over-cap groups to future scores", async () => {
+      process.env[TENANT_CAP_ENV] = "1";
+
+      const noisyJobs = Array.from({ length: 20 }, (_, i) =>
+        makeJob({
+          groupId: `proj_noisy/g${i}`,
+          stagedJobId: `noisy-j${i}`,
+          dispatchAfterMs: 1000,
+        }),
+      );
+      await scripts.stageBatch(noisyJobs);
+
+      await stageOne({
+        tenantId: "proj_quiet",
+        groupSuffix: "only",
+        stagedJobId: "quiet-j1",
+        dispatchAfterMs: 1001,
+      });
+
+      // Batch dispatch: gets 1 noisy + 1 quiet (cap=1 each)
+      const batch = await scripts.dispatchBatch({ nowMs: 2000, activeTtlSec: 60, maxJobs: 10 });
+      const groupIds = batch.map((r) => r.groupId);
+      expect(groupIds).toContain("proj_quiet/only");
+      expect(groupIds.filter((g) => g.startsWith("proj_noisy/"))).toHaveLength(1);
+
+      // Second batch: both tenants at cap, over-cap groups deferred
+      const batch2 = await scripts.dispatchBatch({ nowMs: 2000, activeTtlSec: 60, maxJobs: 10 });
+      expect(batch2).toHaveLength(0);
+
+      // Remaining noisy groups still in ready but with future scores
+      const dueNow = await redis.zcount(`${keyPrefix()}ready`, "-inf", "2000");
+      expect(dueNow).toBe(0);
+    });
+
     /** @scenario cap=0 produces zero tenant counter keys (back-compat regression) */
     it("when cap=0 (kill switch), no tenant_active:* keys are ever created", async () => {
       process.env[TENANT_CAP_ENV] = "0";
@@ -2699,6 +2784,293 @@ describe("GroupStagingScripts", () => {
 
       const signals = await inspectSignalList();
       expect(signals.length).toBeLessThanOrEqual(1000);
+    });
+  });
+});
+
+async function inspectTotalPending() {
+  return redis.get(`${keyPrefix()}stats:total-pending`);
+}
+
+describe("GroupStagingScripts.drainGroupReady", () => {
+  describe("when a group has several due jobs", () => {
+    it("drains up to maxJobs in ascending score order with their data", async () => {
+      await scripts.stage(makeJob({ stagedJobId: "j1", dispatchAfterMs: 100, jobDataJson: '{"n":1}' }));
+      await scripts.stage(makeJob({ stagedJobId: "j2", dispatchAfterMs: 200, jobDataJson: '{"n":2}' }));
+      await scripts.stage(makeJob({ stagedJobId: "j3", dispatchAfterMs: 300, jobDataJson: '{"n":3}' }));
+
+      const drained = await scripts.drainGroupReady({
+        groupId: "group-a",
+        nowMs: 10_000,
+        maxJobs: 2,
+      });
+
+      expect(drained.map((d) => d.stagedJobId)).toEqual(["j1", "j2"]);
+      expect(drained.map((d) => d.jobDataJson)).toEqual(['{"n":1}', '{"n":2}']);
+      expect(drained.map((d) => d.originalScore)).toEqual([100, 200]);
+    });
+
+    it("removes drained jobs from the group's jobs zset and data hash", async () => {
+      await scripts.stage(makeJob({ stagedJobId: "j1", dispatchAfterMs: 100 }));
+      await scripts.stage(makeJob({ stagedJobId: "j2", dispatchAfterMs: 200 }));
+      await scripts.stage(makeJob({ stagedJobId: "j3", dispatchAfterMs: 300 }));
+
+      await scripts.drainGroupReady({ groupId: "group-a", nowMs: 10_000, maxJobs: 2 });
+
+      const jobs = await inspectGroupJobs("group-a");
+      expect(jobs).toEqual(["j3", "300"]);
+      const data = await inspectDataHash("group-a");
+      expect(Object.keys(data)).toEqual(["j3"]);
+    });
+
+    /** @scenario 'Draining siblings for coalescing decrements pending per job' */
+    it("decrements total-pending by the number drained", async () => {
+      await scripts.stage(makeJob({ stagedJobId: "j1", dispatchAfterMs: 100 }));
+      await scripts.stage(makeJob({ stagedJobId: "j2", dispatchAfterMs: 200 }));
+      await scripts.stage(makeJob({ stagedJobId: "j3", dispatchAfterMs: 300 }));
+      expect(await inspectTotalPending()).toBe("3");
+
+      await scripts.drainGroupReady({ groupId: "group-a", nowMs: 10_000, maxJobs: 2 });
+
+      expect(await inspectTotalPending()).toBe("1");
+    });
+  });
+
+  describe("when the group has an active key and ready entry", () => {
+    it("leaves active, ready, and blocked state untouched", async () => {
+      await scripts.stage(makeJob({ stagedJobId: "j1", dispatchAfterMs: 100 }));
+      await scripts.stage(makeJob({ stagedJobId: "j2", dispatchAfterMs: 200 }));
+      // Simulate the caller holding the active slot for the dispatched job.
+      await redis.set(`${keyPrefix()}group:group-a:active`, "dispatched-job");
+      const readyBefore = await inspectReadySet();
+
+      await scripts.drainGroupReady({ groupId: "group-a", nowMs: 10_000, maxJobs: 5 });
+
+      expect(await inspectActiveKey("group-a")).toBe("dispatched-job");
+      expect(await inspectReadySet()).toEqual(readyBefore);
+      expect(await inspectBlockedSet()).toEqual([]);
+    });
+  });
+
+  describe("when some jobs are future-scheduled", () => {
+    it("drains only the jobs due at nowMs", async () => {
+      await scripts.stage(makeJob({ stagedJobId: "due1", dispatchAfterMs: 100 }));
+      await scripts.stage(makeJob({ stagedJobId: "due2", dispatchAfterMs: 200 }));
+      await scripts.stage(makeJob({ stagedJobId: "future", dispatchAfterMs: 9_999 }));
+
+      const drained = await scripts.drainGroupReady({
+        groupId: "group-a",
+        nowMs: 1_000,
+        maxJobs: 10,
+      });
+
+      expect(drained.map((d) => d.stagedJobId)).toEqual(["due1", "due2"]);
+      const jobs = await inspectGroupJobs("group-a");
+      expect(jobs).toEqual(["future", "9999"]);
+    });
+  });
+
+  describe("when maxJobs is zero or negative", () => {
+    it("returns empty without touching the group", async () => {
+      await scripts.stage(makeJob({ stagedJobId: "j1", dispatchAfterMs: 100 }));
+
+      expect(await scripts.drainGroupReady({ groupId: "group-a", nowMs: 10_000, maxJobs: 0 })).toEqual([]);
+
+      const jobs = await inspectGroupJobs("group-a");
+      expect(jobs).toEqual(["j1", "100"]);
+      expect(await inspectTotalPending()).toBe("1");
+    });
+  });
+
+  describe("when the group is empty", () => {
+    it("returns empty", async () => {
+      expect(await scripts.drainGroupReady({ groupId: "nonexistent", nowMs: 10_000, maxJobs: 5 })).toEqual([]);
+    });
+  });
+});
+
+describe("group-key TTL safety net", () => {
+  async function jobsTtl(groupId: string) {
+    return redis.pttl(`${keyPrefix()}group:${groupId}:jobs`);
+  }
+  async function dataTtl(groupId: string) {
+    return redis.pttl(`${keyPrefix()}group:${groupId}:data`);
+  }
+
+  function expectFreshTtl(pttl: number) {
+    // PTTL set and ~the configured window. The upper bound allows a small
+    // delay-derived extension (a job staged a few seconds out pushes expiry to
+    // dispatch + window), without admitting the multi-hour long-delay case.
+    expect(pttl).toBeGreaterThan(GROUP_KEY_TTL_MS - 60_000);
+    expect(pttl).toBeLessThanOrEqual(GROUP_KEY_TTL_MS + 60_000);
+  }
+
+  describe("when a job is staged", () => {
+    it("sets a bounded TTL on the jobs and data keys", async () => {
+      await scripts.stage(makeJob({ stagedJobId: "j1" }));
+
+      expectFreshTtl(await jobsTtl("group-a"));
+      expectFreshTtl(await dataTtl("group-a"));
+    });
+  });
+
+  describe("when a job is scheduled far beyond the safety window", () => {
+    it("extends the TTL to its dispatch time so it is not reaped early", async () => {
+      const dispatchAfterMs = Date.now() + 25 * 60 * 60 * 1000; // 25h out
+      await scripts.stage(makeJob({ stagedJobId: "j1", dispatchAfterMs }));
+
+      // Expiry derives from the scheduled dispatch + window, so it must outlive
+      // both the flat 6h window and the job's own due time.
+      const pttl = await jobsTtl("group-a");
+      expect(pttl).toBeGreaterThan(GROUP_KEY_TTL_MS);
+      expect(pttl).toBeGreaterThan(25 * 60 * 60 * 1000);
+    });
+  });
+
+  describe("when a group is dropped from ready without draining", () => {
+    it("its keys still carry a TTL so the strand self-expires", async () => {
+      await scripts.stage(makeJob({ stagedJobId: "j1" }));
+
+      // Simulate the incident mitigation: the ready set is cleared, but the
+      // group's jobs/data keys are left behind. Before the safety net these
+      // lingered forever (the ~82K-key / 4.79GB leak).
+      await redis.del(`${keyPrefix()}ready`);
+
+      expect(await inspectReadySet()).toEqual([]);
+      expect(await inspectGroupJobs("group-a")).toEqual(["j1", "1000"]);
+      expectFreshTtl(await jobsTtl("group-a"));
+      expectFreshTtl(await dataTtl("group-a"));
+    });
+  });
+
+  describe("when a batch of jobs is staged", () => {
+    it("sets a TTL on every touched group's keys", async () => {
+      await scripts.stageBatch([
+        makeJob({ stagedJobId: "j1", groupId: "group-a" }),
+        makeJob({ stagedJobId: "j2", groupId: "group-b" }),
+      ]);
+
+      expectFreshTtl(await jobsTtl("group-a"));
+      expectFreshTtl(await jobsTtl("group-b"));
+    });
+  });
+
+  describe("when a failed job is re-staged for retry", () => {
+    it("refreshes the TTL on the group keys", async () => {
+      await scripts.stage(makeJob({ stagedJobId: "j1", dispatchAfterMs: 100 }));
+      await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
+
+      await scripts.retryRestage({
+        groupId: "group-a",
+        stagedJobId: "j1",
+        newStagedJobId: "j1/r/1",
+        dispatchAfterMs: Date.now() + 5000,
+        jobDataJson: JSON.stringify({ retry: true }),
+        backoffMs: 5000,
+      });
+
+      expectFreshTtl(await jobsTtl("group-a"));
+      expectFreshTtl(await dataTtl("group-a"));
+    });
+  });
+
+  describe("when a group is blocked", () => {
+    it("clears the TTL so operator-managed failures are not reaped", async () => {
+      await scripts.stage(makeJob({ stagedJobId: "j1", dispatchAfterMs: 100 }));
+      await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
+      await scripts.restageAndBlock({
+        groupId: "group-a",
+        newStagedJobId: "j1/r/0",
+        score: 100,
+        jobDataJson: JSON.stringify({ retry: true }),
+      });
+
+      expect(await inspectBlockedSet()).toContain("group-a");
+      expect(await jobsTtl("group-a")).toBe(-1);
+      expect(await dataTtl("group-a")).toBe(-1);
+    });
+  });
+
+  describe("when an active job heartbeats with pending siblings", () => {
+    it("refreshes the pending-sibling jobs/data TTL", async () => {
+      await scripts.stage(makeJob({ stagedJobId: "active", dispatchAfterMs: 100 }));
+      await scripts.stage(makeJob({ stagedJobId: "sibling", dispatchAfterMs: 200 }));
+      await scripts.dispatch({ nowMs: 300, activeTtlSec: 60 }); // claims "active"
+
+      // Age the sibling keys' TTL well below the window; the heartbeat must
+      // bump it back so a long-running active job cannot reap its siblings.
+      await redis.pexpire(`${keyPrefix()}group:group-a:jobs`, 5_000);
+      await redis.pexpire(`${keyPrefix()}group:group-a:data`, 5_000);
+
+      await scripts.refreshActiveKey({
+        groupId: "group-a",
+        stagedJobId: "active",
+        activeTtlSec: 60,
+      });
+
+      expectFreshTtl(await jobsTtl("group-a"));
+      expectFreshTtl(await dataTtl("group-a"));
+    });
+  });
+
+  describe("when a blocked group is unblocked", () => {
+    it("restores the safety-net TTL the block path cleared", async () => {
+      const repo = new QueueRedisRepository(redis);
+      await scripts.stage(makeJob({ stagedJobId: "j1", dispatchAfterMs: 100 }));
+      await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
+      await scripts.restageAndBlock({
+        groupId: "group-a",
+        newStagedJobId: "j1/r/0",
+        score: 100,
+        jobDataJson: JSON.stringify({ retry: true }),
+      });
+      expect(await jobsTtl("group-a")).toBe(-1); // PERSISTed by the block path
+
+      await repo.unblockGroup({ queueName: QUEUE_NAME, groupId: "group-a" });
+
+      expectFreshTtl(await jobsTtl("group-a"));
+      expectFreshTtl(await dataTtl("group-a"));
+    });
+  });
+
+  describe("when a group is replayed from the DLQ", () => {
+    it("restores the safety-net TTL on the revived group", async () => {
+      const repo = new QueueRedisRepository(redis);
+      await scripts.stage(makeJob({ stagedJobId: "j1", dispatchAfterMs: 100 }));
+      await repo.moveToDlq({ queueName: QUEUE_NAME, groupId: "group-a" });
+      await repo.replayFromDlq({ queueName: QUEUE_NAME, groupId: "group-a" });
+
+      expectFreshTtl(await jobsTtl("group-a"));
+      expectFreshTtl(await dataTtl("group-a"));
+    });
+  });
+});
+
+describe("queue discovery via registry", () => {
+  let repo: QueueRedisRepository;
+
+  beforeEach(() => {
+    repo = new QueueRedisRepository(redis);
+  });
+
+  describe("when a producer has registered its queue name", () => {
+    it("discovers it from the registry set", async () => {
+      await scripts.registerQueue();
+
+      expect(await redis.smembers(GROUP_QUEUE_REGISTRY_KEY)).toContain(QUEUE_NAME);
+      expect(await repo.discoverQueueNames()).toContain(QUEUE_NAME);
+    });
+  });
+
+  describe("when the registry is empty but a ready set exists", () => {
+    it("scans once and backfills the registry", async () => {
+      // A ready key exists (a queue ran) but nothing registered yet.
+      await redis.zadd(`${keyPrefix()}ready`, 1000, "group-a");
+
+      const names = await repo.discoverQueueNames();
+
+      expect(names).toContain(QUEUE_NAME);
+      expect(await redis.smembers(GROUP_QUEUE_REGISTRY_KEY)).toContain(QUEUE_NAME);
     });
   });
 });

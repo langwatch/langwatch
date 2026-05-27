@@ -126,38 +126,68 @@ app.post(
       traceChecks: results.traceChecks,
     });
 
-    let traces: unknown[];
-    if (format === "digest") {
-      traces = enrichedTraces.map((trace) => ({
-        trace_id: trace.trace_id,
-        formatted_trace: formatTraceSummaryDigest(trace),
-        input: trace.input,
-        output: trace.output,
-        timestamps: trace.timestamps,
-        metadata: trace.metadata,
-        error: trace.error,
-        evaluations: trace.evaluations,
-        platformUrl: platformUrl({
-          projectSlug: project.slug,
-          path: `/messages/${trace.trace_id}`,
-        }),
-      }));
-    } else {
-      traces = enrichedTraces.map((trace) => ({
+    const formatTrace = (trace: Trace) => {
+      if (format === "digest") {
+        return {
+          trace_id: trace.trace_id,
+          formatted_trace: formatTraceSummaryDigest(trace),
+          input: trace.input,
+          output: trace.output,
+          timestamps: trace.timestamps,
+          metadata: trace.metadata,
+          error: trace.error,
+          evaluations: trace.evaluations,
+          platformUrl: platformUrl({
+            projectSlug: project.slug,
+            path: `/messages/${trace.trace_id}`,
+          }),
+        };
+      }
+      return {
         ...trace,
         platformUrl: platformUrl({
           projectSlug: project.slug,
           path: `/messages/${trace.trace_id}`,
         }),
-      }));
+      };
+    };
+
+    const pagination = JSON.stringify({
+      totalHits: results.totalHits,
+      scrollId: results.scrollId,
+    });
+
+    const serializedTraces: string[] = [];
+    for (const trace of enrichedTraces) {
+      try {
+        serializedTraces.push(JSON.stringify(formatTrace(trace)));
+      } catch (err) {
+        logger.error(
+          { traceId: trace.trace_id, error: err instanceof Error ? err.message : err },
+          "Failed to serialize trace, skipping",
+        );
+      }
     }
 
-    return c.json({
-      traces,
-      pagination: {
-        totalHits: results.totalHits,
-        scrollId: results.scrollId,
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(encoder.encode('{"traces":['));
+
+        for (let i = 0; i < serializedTraces.length; i++) {
+          const prefix = i > 0 ? "," : "";
+          controller.enqueue(encoder.encode(prefix + serializedTraces[i]!));
+        }
+
+        controller.enqueue(
+          encoder.encode(`],"pagination":${pagination}}`)
+        );
+        controller.close();
       },
+    });
+
+    return new Response(stream, {
+      headers: { "Content-Type": "application/json" },
     });
   },
 );

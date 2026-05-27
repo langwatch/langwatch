@@ -609,29 +609,11 @@ export class ClickHouseTraceService {
           const traceIds = groups.flat().map((t) => t.trace_id);
           let traceChecks: TracesForProjectResult["traceChecks"] = {};
           if (traceIds.length > 0 && clickHouseClient) {
-            const evalResult = await clickHouseClient.query({
-              query: `
-                SELECT *
-                FROM evaluation_runs
-                WHERE TenantId = {tenantId:String}
-                  AND TraceId IN ({traceIds:Array(String)})
-                  AND (TenantId, EvaluationId, UpdatedAt) IN (
-                    SELECT TenantId, EvaluationId, max(UpdatedAt)
-                    FROM evaluation_runs
-                    WHERE TenantId = {tenantId:String}
-                      AND TraceId IN ({traceIds:Array(String)})
-                    GROUP BY TenantId, EvaluationId
-                  )
-              `,
-              query_params: {
-                tenantId: input.projectId,
-                traceIds,
-              },
-              format: "JSONEachRow",
+            const evalRows = await this.fetchEvaluationRows({
+              clickHouseClient,
+              projectId: input.projectId,
+              traceIds,
             });
-
-            const evalRows =
-              (await evalResult.json()) as ClickHouseEvaluationRunRow[];
 
             const grouped: Record<
               string,
@@ -1416,62 +1398,14 @@ export class ClickHouseTraceService {
         // Step 2: Fetch full data for just the page's trace IDs.
         // The dedup subquery is scoped to pageTraceIds so it only reads
         // N traces instead of the entire table.
-        const summaryResult = await clickHouseClient.query({
-          query: `
-            SELECT
-              ts.TraceId AS ts_TraceId,
-              ts.SpanCount AS ts_SpanCount,
-              ts.TotalDurationMs AS ts_TotalDurationMs,
-              ts.ComputedIOSchemaVersion AS ts_ComputedIOSchemaVersion,
-              ts.TimeToFirstTokenMs AS ts_TimeToFirstTokenMs,
-              ts.TimeToLastTokenMs AS ts_TimeToLastTokenMs,
-              ts.TokensPerSecond AS ts_TokensPerSecond,
-              ts.ContainsErrorStatus AS ts_ContainsErrorStatus,
-              ts.ContainsOKStatus AS ts_ContainsOKStatus,
-              ts.ErrorMessage AS ts_ErrorMessage,
-              ts.Models AS ts_Models,
-              ts.TotalCost AS ts_TotalCost,
-              ts.TokensEstimated AS ts_TokensEstimated,
-              ts.TotalPromptTokenCount AS ts_TotalPromptTokenCount,
-              ts.TotalCompletionTokenCount AS ts_TotalCompletionTokenCount,
-              ts.TopicId AS ts_TopicId,
-              ts.SubTopicId AS ts_SubTopicId,
-              ts.HasAnnotation AS ts_HasAnnotation,
-              ts.AnnotationIds AS ts_AnnotationIds,
-              ts.ComputedInput AS ts_ComputedInput,
-              ts.ComputedOutput AS ts_ComputedOutput,
-              ts.Attributes AS ts_Attributes,
-              ts.TraceName AS ts_TraceName,
-              toUnixTimestamp64Milli(ts.OccurredAt) AS ts_OccurredAt,
-              toUnixTimestamp64Milli(ts.CreatedAt) AS ts_CreatedAt,
-              toUnixTimestamp64Milli(ts.UpdatedAt) AS ts_UpdatedAt
-            FROM trace_summaries ts
-            WHERE ts.TenantId = {tenantId:String}
-              AND ts.OccurredAt >= fromUnixTimestamp64Milli({startDate:UInt64})
-              AND ts.OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})
-              AND ts.TraceId IN ({pageTraceIds:Array(String)})
-              AND (ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (
-                SELECT TenantId, TraceId, max(UpdatedAt)
-                FROM trace_summaries
-                WHERE TenantId = {tenantId:String}
-                  AND OccurredAt >= fromUnixTimestamp64Milli({startDate:UInt64})
-                  AND OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})
-                  AND TraceId IN ({pageTraceIds:Array(String)})
-                GROUP BY TenantId, TraceId
-              )
-            ORDER BY ts.OccurredAt ${orderDirection}, ts.TraceId ${orderDirection}
-          `,
-          query_params: {
-            tenantId: projectId,
-            startDate: startDate ?? 0,
-            endDate: endDate ?? Date.now(),
-            pageTraceIds,
-          },
-          format: "JSONEachRow",
+        const summaryRows = await this.fetchTraceSummaryRows({
+          clickHouseClient,
+          projectId,
+          startDate: startDate ?? 0,
+          endDate: endDate ?? Date.now(),
+          traceIds: pageTraceIds,
+          orderDirection,
         });
-
-        const summaryRows =
-          await summaryResult.json() as TraceSummaryRow[];
 
         const traces: Trace[] = summaryRows.map((row) => {
           const summary = this.rowToTraceSummaryData(row);
@@ -1485,6 +1419,189 @@ export class ClickHouseTraceService {
         return { traces, totalHits, lastTrace };
       },
     );
+  }
+
+  private static readonly SUMMARY_BATCH_SIZE = 25;
+
+  /**
+   * Fetch full trace summary rows for a set of trace IDs.
+   * On ClickHouse MEMORY_LIMIT_EXCEEDED, retries in smaller batches
+   * so that heavy ComputedInput/ComputedOutput columns don't blow the
+   * per-query memory cap. If a single batch still OOMs the error propagates.
+   */
+  private async fetchTraceSummaryRows({
+    clickHouseClient,
+    projectId,
+    startDate,
+    endDate,
+    traceIds,
+    orderDirection,
+  }: {
+    clickHouseClient: ClickHouseClient;
+    projectId: string;
+    startDate: number;
+    endDate: number;
+    traceIds: string[];
+    orderDirection: string;
+  }): Promise<TraceSummaryRow[]> {
+    const runQuery = async (ids: string[]) => {
+      const result = await clickHouseClient.query({
+        query: `
+          SELECT
+            ts.TraceId AS ts_TraceId,
+            ts.SpanCount AS ts_SpanCount,
+            ts.TotalDurationMs AS ts_TotalDurationMs,
+            ts.ComputedIOSchemaVersion AS ts_ComputedIOSchemaVersion,
+            ts.TimeToFirstTokenMs AS ts_TimeToFirstTokenMs,
+            ts.TimeToLastTokenMs AS ts_TimeToLastTokenMs,
+            ts.TokensPerSecond AS ts_TokensPerSecond,
+            ts.ContainsErrorStatus AS ts_ContainsErrorStatus,
+            ts.ContainsOKStatus AS ts_ContainsOKStatus,
+            ts.ErrorMessage AS ts_ErrorMessage,
+            ts.Models AS ts_Models,
+            ts.TotalCost AS ts_TotalCost,
+            ts.TokensEstimated AS ts_TokensEstimated,
+            ts.TotalPromptTokenCount AS ts_TotalPromptTokenCount,
+            ts.TotalCompletionTokenCount AS ts_TotalCompletionTokenCount,
+            ts.TopicId AS ts_TopicId,
+            ts.SubTopicId AS ts_SubTopicId,
+            ts.HasAnnotation AS ts_HasAnnotation,
+            ts.AnnotationIds AS ts_AnnotationIds,
+            ts.ComputedInput AS ts_ComputedInput,
+            ts.ComputedOutput AS ts_ComputedOutput,
+            ts.Attributes AS ts_Attributes,
+            ts.TraceName AS ts_TraceName,
+            toUnixTimestamp64Milli(ts.OccurredAt) AS ts_OccurredAt,
+            toUnixTimestamp64Milli(ts.CreatedAt) AS ts_CreatedAt,
+            toUnixTimestamp64Milli(ts.UpdatedAt) AS ts_UpdatedAt
+          FROM trace_summaries ts
+          WHERE ts.TenantId = {tenantId:String}
+            AND ts.OccurredAt >= fromUnixTimestamp64Milli({startDate:UInt64})
+            AND ts.OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})
+            AND ts.TraceId IN ({pageTraceIds:Array(String)})
+            AND (ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (
+              SELECT TenantId, TraceId, max(UpdatedAt)
+              FROM trace_summaries
+              WHERE TenantId = {tenantId:String}
+                AND OccurredAt >= fromUnixTimestamp64Milli({startDate:UInt64})
+                AND OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})
+                AND TraceId IN ({pageTraceIds:Array(String)})
+              GROUP BY TenantId, TraceId
+            )
+          ORDER BY ts.OccurredAt ${orderDirection}, ts.TraceId ${orderDirection}
+        `,
+        query_params: {
+          tenantId: projectId,
+          startDate,
+          endDate,
+          pageTraceIds: ids,
+        },
+        format: "JSONEachRow",
+      });
+      return result.json() as Promise<TraceSummaryRow[]>;
+    };
+
+    try {
+      return await runQuery(traceIds);
+    } catch (error) {
+      if (!isClickHouseMemoryLimitError(error)) {
+        throw error;
+      }
+
+      this.logger.warn(
+        `Summary query OOM for ${traceIds.length} traces, retrying in batches of ${ClickHouseTraceService.SUMMARY_BATCH_SIZE}`,
+      );
+
+      const allRows: TraceSummaryRow[] = [];
+      for (
+        let i = 0;
+        i < traceIds.length;
+        i += ClickHouseTraceService.SUMMARY_BATCH_SIZE
+      ) {
+        const batch = traceIds.slice(
+          i,
+          i + ClickHouseTraceService.SUMMARY_BATCH_SIZE,
+        );
+        const batchRows = await runQuery(batch);
+        allRows.push(...batchRows);
+      }
+
+      const dir = orderDirection === "DESC" ? -1 : 1;
+      allRows.sort((a, b) => {
+        const timeDiff = a.ts_OccurredAt - b.ts_OccurredAt;
+        if (timeDiff !== 0) return timeDiff * dir;
+        if (a.ts_TraceId === b.ts_TraceId) return 0;
+        return a.ts_TraceId < b.ts_TraceId ? -dir : dir;
+      });
+
+      return allRows;
+    }
+  }
+
+  /**
+   * Fetch evaluation rows for a set of trace IDs.
+   * Same OOM-resilient pattern as fetchTraceSummaryRows.
+   */
+  private async fetchEvaluationRows({
+    clickHouseClient,
+    projectId,
+    traceIds,
+  }: {
+    clickHouseClient: ClickHouseClient;
+    projectId: string;
+    traceIds: string[];
+  }): Promise<ClickHouseEvaluationRunRow[]> {
+    const runQuery = async (ids: string[]) => {
+      const result = await clickHouseClient.query({
+        query: `
+          SELECT *
+          FROM evaluation_runs
+          WHERE TenantId = {tenantId:String}
+            AND TraceId IN ({traceIds:Array(String)})
+            AND (TenantId, EvaluationId, UpdatedAt) IN (
+              SELECT TenantId, EvaluationId, max(UpdatedAt)
+              FROM evaluation_runs
+              WHERE TenantId = {tenantId:String}
+                AND TraceId IN ({traceIds:Array(String)})
+              GROUP BY TenantId, EvaluationId
+            )
+        `,
+        query_params: {
+          tenantId: projectId,
+          traceIds: ids,
+        },
+        format: "JSONEachRow",
+      });
+      return result.json() as Promise<ClickHouseEvaluationRunRow[]>;
+    };
+
+    try {
+      return await runQuery(traceIds);
+    } catch (error) {
+      if (!isClickHouseMemoryLimitError(error)) {
+        throw error;
+      }
+
+      this.logger.warn(
+        `Evaluations query OOM for ${traceIds.length} traces, retrying in batches of ${ClickHouseTraceService.SUMMARY_BATCH_SIZE}`,
+      );
+
+      const allRows: ClickHouseEvaluationRunRow[] = [];
+      for (
+        let i = 0;
+        i < traceIds.length;
+        i += ClickHouseTraceService.SUMMARY_BATCH_SIZE
+      ) {
+        const batch = traceIds.slice(
+          i,
+          i + ClickHouseTraceService.SUMMARY_BATCH_SIZE,
+        );
+        const batchRows = await runQuery(batch);
+        allRows.push(...batchRows);
+      }
+
+      return allRows;
+    }
   }
 
   /**
@@ -2084,6 +2201,15 @@ interface PromptStudioCandidateRow {
   ParentSpanId: string | null;
   SpanAttributes: Record<string, unknown>;
   StartTime: number;
+}
+
+function isClickHouseMemoryLimitError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return (
+    error.message.includes("MEMORY_LIMIT_EXCEEDED") ||
+    error.message.toLowerCase().includes("memory limit exceeded") ||
+    (error as { type?: string }).type === "MEMORY_LIMIT_EXCEEDED"
+  );
 }
 
 /**

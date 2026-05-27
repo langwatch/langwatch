@@ -88,6 +88,13 @@ export interface FoldProjectionDefinition<
 export interface FoldProjectionOptions {
   /** Kill switch configuration. When enabled, the projection is disabled. */
   killSwitch?: KillSwitchOptions;
+  /**
+   * Maximum number of same-aggregate events to coalesce into a single
+   * load/apply/store cycle when the group is backed up. 1 (the default)
+   * disables coalescing. Higher values bound how much of a backed-up group
+   * is drained per dispatch — converting an O(n²) backlog into O(n).
+   */
+  coalesceMaxBatch?: number;
 }
 
 /**

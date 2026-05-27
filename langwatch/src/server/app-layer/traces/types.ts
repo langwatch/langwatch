@@ -81,11 +81,6 @@ export const traceSummaryDataSchema = z.object({
   subTopicId: z.string().nullable(),
   annotationIds: z.array(z.string()),
   attributes: z.record(z.string()),
-  scenarioRoleCosts: z.record(z.string(), z.number()).optional(),
-  scenarioRoleLatencies: z.record(z.string(), z.number()).optional(),
-  scenarioRoleSpans: z.record(z.string(), z.string()).optional(),
-  /** Per-span costs for retroactive role assignment when parent arrives after children. Internal bookkeeping. */
-  spanCosts: z.record(z.string(), z.number()).optional(),
   traceName: z.string(),
   /** Start time of the root span that set traceName, used for deterministic tie-breaking when multiple root spans exist. Internal bookkeeping. */
   rootSpanStartTimeMs: z.number().optional(),
@@ -124,17 +119,6 @@ export const traceSummaryDataSchema = z.object({
    * over.
    */
   rootMetadataFromFallback: z.boolean().optional(),
-  /** LangWatch SDK events hoisted from spans during fold projection. */
-  events: z
-    .array(
-      z.object({
-        spanId: z.string(),
-        timestamp: z.number(),
-        name: z.string(),
-        attributes: z.record(z.string(), z.string()),
-      }),
-    )
-    .optional(),
   occurredAt: z.number(),
   createdAt: z.number(),
   updatedAt: z.number(),

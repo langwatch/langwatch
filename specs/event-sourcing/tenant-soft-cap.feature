@@ -108,3 +108,31 @@ Feature: Per-tenant soft cap on in-flight dispatch
     Given a tenant "proj_acme" with a zombie group (empty jobs zset) on the ready zset
     When DISPATCH_BATCH_LUA is invoked
     Then the zombie group is removed from the ready zset
+
+  # Deferral — post-2026-05-27 incident follow-up
+  #
+  # When over-cap groups dominate the head of the ready zset (e.g.
+  # assignTopic backfill from a topic clustering fix), the scan budget
+  # (10K entries) can be exhausted re-scanning groups that will always
+  # be skipped — starving other tenants entirely. Deferring over-cap
+  # groups to a future score pushes them past the dispatch window so
+  # subsequent polls reach other tenants immediately.
+
+  @integration @tenant-cap @deferral
+  Scenario: Over-cap groups are deferred so they don't starve other tenants on repeated polls
+    Given a tenant "proj_noisy" with cap=1 and 50 groups at the head of the ready zset
+    And a tenant "proj_quiet" with 1 group later in the zset
+    When DISPATCH_LUA dispatches once (proj_noisy wins)
+    And DISPATCH_LUA dispatches again (proj_quiet wins, noisy groups deferred)
+    Then a third DISPATCH_LUA at the same timestamp returns nil immediately
+    And the deferred groups remain in the ready set with future scores
+    And the deferred groups become eligible again after the defer window
+
+  @integration @tenant-cap @batch @deferral
+  Scenario: dispatchBatch defers over-cap groups to future scores
+    Given a tenant "proj_noisy" with cap=1 and 20 groups at the head of the ready zset
+    And a tenant "proj_quiet" with 1 group later in the zset
+    When DISPATCH_BATCH_LUA is invoked with maxJobs=10
+    Then proj_noisy dispatches exactly 1 group and proj_quiet dispatches its group
+    And a second DISPATCH_BATCH_LUA returns zero results
+    And all remaining noisy groups have future scores past the dispatch window

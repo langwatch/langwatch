@@ -239,11 +239,24 @@ Feature: Evaluation execution - Backend
   # Hono SSE Endpoint
   # ==========================================================================
 
-  @unimplemented
-  Scenario: Endpoint requires authentication
-    Given no auth token
+  # The execute and abort endpoints are driven by the browser workbench, so
+  # they authenticate by the logged-in user session, not by a project API key.
+  # The public experiments REST API (list endpoint) lives under the same
+  # /api/experiments path and authenticates by API key. These two auth models
+  # must not collide: the API-key guard must never intercept a session-driven
+  # execute request and reject it before the session is checked.
+
+  Scenario: Browser execution authenticates by user session
+    Given a logged-in user running an evaluation from the workbench
+    And the request carries the user session but no project API key
     When I POST to /api/experiments/execute
-    Then I receive 401 Unauthorized
+    Then the request reaches the session-authenticated execute endpoint
+    And it is not rejected by the project API-key guard
+
+  Scenario: Execution endpoint rejects requests with no session
+    Given a request with neither a user session nor a project API key
+    When I POST to /api/experiments/execute
+    Then I receive 401 Unauthorized telling me to log in
 
   @unimplemented
   Scenario: Endpoint validates request body

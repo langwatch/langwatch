@@ -638,6 +638,173 @@ describe("ClickHouseTraceService", () => {
       });
     });
 
+    describe("when ClickHouse MEMORY_LIMIT_EXCEEDED on summary query", () => {
+      it("retries in smaller batches and returns all traces", async () => {
+        const traceIds = Array.from({ length: 4 }, (_, i) => `trace-${i}`);
+        const summaryRows = traceIds.map((id, i) => ({
+          ...makeSummaryRow(id),
+          ts_OccurredAt: Date.now() - i * 1000,
+        }));
+        const idRows = traceIds.map((id) => ({ TraceId: id }));
+
+        // Batch size is 25, so 4 traces fit in one retry batch
+        mockClickHouseQuery
+          // count
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve([{ total: String(traceIds.length) }]),
+          })
+          // IDs
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve(idRows),
+          })
+          // summary — OOM
+          .mockRejectedValueOnce(
+            new Error(
+              "Query memory limit exceeded: would use 3.50 GiB, " +
+                "maximum: 3.50 GiB: MEMORY_LIMIT_EXCEEDED",
+            ),
+          )
+          // retry batch (all 4 fit in one batch of 25)
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve(summaryRows),
+          })
+          // evaluations
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve([]),
+          });
+
+        const service = new ClickHouseTraceService({
+          project: { findUnique: mockPrismaFindUnique },
+        } as never);
+
+        const result = await service.getAllTracesForProject(
+          { ...baseInput, pageSize: 4 } as GetAllTracesForProjectInput,
+          protections,
+        );
+
+        expect(result).not.toBeNull();
+        const traces = result!.groups.flat();
+        expect(traces).toHaveLength(4);
+      });
+
+      it("splits into 25-ID batches when retrying with >25 traces", async () => {
+        const traceIds = Array.from({ length: 30 }, (_, i) => `trace-${i}`);
+        const summaryRows = traceIds.map((id, i) => ({
+          ...makeSummaryRow(id),
+          ts_OccurredAt: Date.now() - i * 1000,
+        }));
+        const idRows = traceIds.map((id) => ({ TraceId: id }));
+
+        mockClickHouseQuery
+          // count
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve([{ total: String(traceIds.length) }]),
+          })
+          // IDs
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve(idRows),
+          })
+          // summary — OOM
+          .mockRejectedValueOnce(
+            new Error("MEMORY_LIMIT_EXCEEDED"),
+          )
+          // retry batch 1: traces 0-24
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve(summaryRows.slice(0, 25)),
+          })
+          // retry batch 2: traces 25-29
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve(summaryRows.slice(25)),
+          })
+          // evaluations
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve([]),
+          });
+
+        const service = new ClickHouseTraceService({
+          project: { findUnique: mockPrismaFindUnique },
+        } as never);
+
+        const result = await service.getAllTracesForProject(
+          { ...baseInput, pageSize: 30 } as GetAllTracesForProjectInput,
+          protections,
+        );
+
+        expect(result).not.toBeNull();
+        const traces = result!.groups.flat();
+        expect(traces).toHaveLength(30);
+
+        // Verify batch split: call 0=count, 1=IDs, 2=OOM, 3=batch1, 4=batch2
+        const batch1Params = mockClickHouseQuery.mock.calls[3]![0];
+        const batch2Params = mockClickHouseQuery.mock.calls[4]![0];
+        expect(batch1Params.query_params.pageTraceIds).toHaveLength(25);
+        expect(batch2Params.query_params.pageTraceIds).toHaveLength(5);
+      });
+
+      it("re-throws non-OOM errors from summary query", async () => {
+        const idRows = [{ TraceId: "trace-1" }];
+
+        mockClickHouseQuery
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve([{ total: "1" }]),
+          })
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve(idRows),
+          })
+          .mockRejectedValueOnce(new Error("SYNTAX_ERROR: bad query"));
+
+        const service = new ClickHouseTraceService({
+          project: { findUnique: mockPrismaFindUnique },
+        } as never);
+
+        await expect(
+          service.getAllTracesForProject(baseInput, protections),
+        ).rejects.toThrow("SYNTAX_ERROR");
+      });
+    });
+
+    describe("when ClickHouse MEMORY_LIMIT_EXCEEDED on evaluations query", () => {
+      it("retries evaluations in batches and returns traces", async () => {
+        const summaryRows = [makeSummaryRow("trace-1")];
+        mockClickHouseQuery
+          // count
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve([{ total: "1" }]),
+          })
+          // IDs
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve([{ TraceId: "trace-1" }]),
+          })
+          // summary
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve(summaryRows),
+          })
+          // evaluations — OOM
+          .mockRejectedValueOnce(
+            Object.assign(
+              new Error("Query memory limit exceeded"),
+              { type: "MEMORY_LIMIT_EXCEEDED" },
+            ),
+          )
+          // evaluations retry batch
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve([]),
+          });
+
+        const service = new ClickHouseTraceService({
+          project: { findUnique: mockPrismaFindUnique },
+        } as never);
+
+        const result = await service.getAllTracesForProject(
+          baseInput,
+          protections,
+        );
+
+        expect(result).not.toBeNull();
+        expect(result!.groups.flat()).toHaveLength(1);
+      });
+    });
+
     describe("when includeSpans is true", () => {
       it("fetches and attaches spans to traces", async () => {
         const summaryRow = makeSummaryRow("trace-1");

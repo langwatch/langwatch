@@ -165,6 +165,7 @@ function createDeps(
     traceById: vi.fn().mockResolvedValue(undefined),
     addToAnnotationQueue: vi.fn().mockResolvedValue(undefined),
     addToDataset: vi.fn().mockResolvedValue(undefined),
+    deriveEvents: vi.fn().mockResolvedValue([]),
     ...overrides,
   };
 }
@@ -375,6 +376,74 @@ describe("evaluationAlertTrigger reactor", () => {
       await reactor.handle(event, context);
 
       expect(deps.triggers.claimSend).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a trigger filters on event fields", () => {
+    it("derives events from stored_spans and matches against them", async () => {
+      const trigger = createTrigger({
+        filters: {
+          "events.event_type": ["thumbs_up_down"],
+          "evaluations.passed": { "evaluator-1": ["true"] },
+        },
+      });
+      (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue([
+        trigger,
+      ]);
+      (deps.evaluationRuns.findByTraceId as any).mockResolvedValue([
+        createEvalFoldState({ evaluatorId: "evaluator-1", passed: true }),
+      ]);
+      (deps.deriveEvents as any).mockResolvedValue([
+        {
+          spanId: "span-1",
+          timestamp: 1700,
+          name: "thumbs_up_down",
+          attributes: {},
+        },
+      ]);
+
+      const reactor = createEvaluationAlertTriggerReactor(deps);
+      const event = createEvent();
+      const context: ReactorContext<EvaluationRunData> = {
+        tenantId: "tenant-1",
+        aggregateId: "eval-1",
+        foldState: createEvalFoldState(),
+      };
+
+      await reactor.handle(event, context);
+
+      expect(deps.deriveEvents).toHaveBeenCalledWith(
+        expect.objectContaining({ tenantId: "tenant-1", traceId: "trace-1" }),
+      );
+      expect(deps.triggers.claimSend).toHaveBeenCalled();
+    });
+  });
+
+  describe("when no trigger filters on event fields", () => {
+    it("does not derive events", async () => {
+      const trigger = createTrigger({
+        filters: {
+          "evaluations.passed": { "evaluator-1": ["true"] },
+        },
+      });
+      (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue([
+        trigger,
+      ]);
+      (deps.evaluationRuns.findByTraceId as any).mockResolvedValue([
+        createEvalFoldState({ evaluatorId: "evaluator-1", passed: true }),
+      ]);
+
+      const reactor = createEvaluationAlertTriggerReactor(deps);
+      const event = createEvent();
+      const context: ReactorContext<EvaluationRunData> = {
+        tenantId: "tenant-1",
+        aggregateId: "eval-1",
+        foldState: createEvalFoldState(),
+      };
+
+      await reactor.handle(event, context);
+
+      expect(deps.deriveEvents).not.toHaveBeenCalled();
     });
   });
 

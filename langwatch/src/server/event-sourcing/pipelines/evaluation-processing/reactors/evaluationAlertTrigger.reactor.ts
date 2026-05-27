@@ -1,11 +1,13 @@
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
 import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
 import {
   buildPreconditionTraceDataFromFoldState,
   classifyTriggerFilters,
   matchesEvaluationFilters,
   matchesTriggerFilters,
+  triggerFiltersReferenceEvents,
 } from "~/server/filters/triggerFilter.matcher";
 import { createLogger } from "~/utils/logger/server";
 import { captureException } from "~/utils/posthogErrorCapture";
@@ -33,6 +35,16 @@ export interface EvaluationAlertTriggerReactorDeps
   extends TriggerActionDispatchDeps {
   traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
   evaluationRuns: EvaluationRunService;
+  /**
+   * Derives the trace-level events list from stored_spans. Only invoked when a
+   * trigger actually filters on event fields, so the common path pays nothing.
+   */
+  deriveEvents: (params: {
+    tenantId: string;
+    traceId: string;
+    occurredAtMs?: number;
+    foldVersion?: number;
+  }) => Promise<DerivedTraceEvent[]>;
 }
 
 /**
@@ -123,7 +135,24 @@ export function createEvaluationAlertTriggerReactor(
         traceId,
       );
 
-      const traceData = buildPreconditionTraceDataFromFoldState(traceSummary);
+      // Derive the trace-level events list only if one of these triggers filters
+      // on event fields (the trace-level half of its filter set).
+      const needsEvents = triggersWithEvalFilters.some((t) =>
+        triggerFiltersReferenceEvents(classifyTriggerFilters(t.filters).traceFilters),
+      );
+      const events = needsEvents
+        ? await deps.deriveEvents({
+            tenantId,
+            traceId,
+            occurredAtMs: traceSummary.occurredAt,
+            foldVersion: traceSummary.spanCount,
+          })
+        : null;
+
+      const traceData = buildPreconditionTraceDataFromFoldState(
+        traceSummary,
+        events,
+      );
 
       for (const trigger of triggersWithEvalFilters) {
         try {

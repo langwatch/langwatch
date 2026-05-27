@@ -745,4 +745,100 @@ describe("ProjectionRouter", () => {
       });
     });
   });
+
+  describe("processFoldProjectionBatch (coalescing)", () => {
+    function makeBatchEvent(id: string, occurredAt: number): Event {
+      return createTestEvent(
+        TEST_CONSTANTS.AGGREGATE_ID,
+        TEST_CONSTANTS.AGGREGATE_TYPE,
+        tenantId,
+        TEST_CONSTANTS.EVENT_TYPE_1,
+        occurredAt,
+        undefined,
+        {},
+        id,
+      );
+    }
+
+    function batchFold(store: ReturnType<typeof createMockFoldProjectionStore>) {
+      return createMockFoldProjectionDefinition("my-fold", {
+        store,
+        eventTypes: [TEST_CONSTANTS.EVENT_TYPE_1],
+        init: () => ({ count: 0, LastEventOccurredAt: 0 }),
+        apply: (s: any, e: any) => ({
+          count: s.count + 1,
+          LastEventOccurredAt: Math.max(s.LastEventOccurredAt, e.occurredAt ?? 0),
+        }),
+      });
+    }
+
+    describe("when several events for one aggregate are coalesced", () => {
+      /** @scenario 'Coalescing still dispatches per-span reactors for every event' */
+      it("folds the batch once but fires reactors for every event", async () => {
+        const router = new ProjectionRouter(
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          TEST_CONSTANTS.PIPELINE_NAME,
+          createMockQueueManager(),
+        );
+        const store = createMockFoldProjectionStore();
+        (store.get as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+        const fold = batchFold(store);
+        router.registerFoldProjection(fold);
+
+        const seen: string[] = [];
+        const reactor: ReactorDefinition<Event> = {
+          name: "per-span-spy",
+          handle: async (event) => {
+            seen.push(event.id);
+          },
+        };
+        router.registerReactor("my-fold", reactor);
+
+        const events = [
+          makeBatchEvent("e1", 1000),
+          makeBatchEvent("e2", 2000),
+          makeBatchEvent("e3", 3000),
+        ];
+
+        await (router as any).processFoldProjectionBatch("my-fold", fold, events, { tenantId });
+
+        // The expensive fold load/store happens once — the O(n) win.
+        expect(store.get).toHaveBeenCalledTimes(1);
+        expect(store.store).toHaveBeenCalledTimes(1);
+        // Per-span reactors (embedded-eval sync, evaluation triggers) must see
+        // EVERY event, not just the last — otherwise N-1 spans are dropped.
+        expect(seen).toEqual(["e1", "e2", "e3"]);
+      });
+
+      it("dispatches reactors in occurredAt order even when events arrive shuffled", async () => {
+        const router = new ProjectionRouter(
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          TEST_CONSTANTS.PIPELINE_NAME,
+          createMockQueueManager(),
+        );
+        const store = createMockFoldProjectionStore();
+        (store.get as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+        const fold = batchFold(store);
+        router.registerFoldProjection(fold);
+
+        const seen: string[] = [];
+        router.registerReactor("my-fold", {
+          name: "spy",
+          handle: async (event) => {
+            seen.push(event.id);
+          },
+        });
+
+        const events = [
+          makeBatchEvent("third", 3000),
+          makeBatchEvent("first", 1000),
+          makeBatchEvent("second", 2000),
+        ];
+
+        await (router as any).processFoldProjectionBatch("my-fold", fold, events, { tenantId });
+
+        expect(seen).toEqual(["first", "second", "third"]);
+      });
+    });
+  });
 });

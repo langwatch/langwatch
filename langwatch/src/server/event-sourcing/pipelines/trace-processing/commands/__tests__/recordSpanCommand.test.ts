@@ -369,5 +369,44 @@ describe("RecordSpanCommand", () => {
         );
       });
     });
+
+    describe("when an attribute value is oversized", () => {
+      it("caps a multi-MB base64 image attribute on the emitted span", async () => {
+        const bigDataUrl = `data:image/png;base64,${"A".repeat(2 * 1024 * 1024)}`;
+        const command = createMockCommand("project-123", "trace-1", "span-1", [
+          { key: "langwatch.input", value: { stringValue: bigDataUrl } },
+        ]);
+
+        const events = await handler.handle(command);
+
+        const emittedSpan = events[0]!.data.span;
+        const inputAttr = emittedSpan.attributes.find(
+          (a) => a.key === "langwatch.input",
+        );
+        expect(inputAttr!.value.stringValue).toMatch(
+          /^\[truncated: \d+ bytes, image\/png\]$/,
+        );
+        // The huge payload must not survive into the folded event.
+        expect(inputAttr!.value.stringValue!.length).toBeLessThan(64);
+        // Original command data is left untouched (immutability contract).
+        expect(command.data.span.attributes[0]!.value.stringValue).toBe(
+          bigDataUrl,
+        );
+      });
+
+      it("leaves a normal small span attribute unchanged", async () => {
+        const command = createMockCommand("project-123", "trace-1", "span-1", [
+          { key: "langwatch.input", value: { stringValue: "what is 2+2?" } },
+        ]);
+
+        const events = await handler.handle(command);
+
+        const emittedSpan = events[0]!.data.span;
+        const inputAttr = emittedSpan.attributes.find(
+          (a) => a.key === "langwatch.input",
+        );
+        expect(inputAttr!.value.stringValue).toBe("what is 2+2?");
+      });
+    });
   });
 });
