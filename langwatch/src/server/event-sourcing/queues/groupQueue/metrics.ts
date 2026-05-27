@@ -5,6 +5,7 @@ const metricNames = [
   "gq_active_groups",
   "gq_pending_groups",
   "gq_blocked_groups",
+  "gq_parked_groups",
   "gq_groups_blocked_total",
   "gq_jobs_staged_total",
   "gq_jobs_dispatched_total",
