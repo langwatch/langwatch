@@ -148,11 +148,15 @@ export class TraceReadDerivationService {
   }
 
   private evict<T>(cache: Map<string, MemoEntry<T>>, now: number): void {
-    if (cache.size <= DERIVATION_MEMO_MAX_ENTRIES) return;
+    // Entries share a fixed TTL and are re-inserted at the back on each miss,
+    // so the front is always the soonest to expire. Sweep expired entries from
+    // the front and stop at the first live one (amortized O(1) per insert, not
+    // O(n) per call), so expired promises are released even when the cache
+    // never reaches the size cap. Then enforce the cap on whatever remains.
     for (const [k, entry] of cache) {
-      if (entry.expiresAt <= now) cache.delete(k);
+      if (entry.expiresAt > now) break;
+      cache.delete(k);
     }
-    // Map preserves insertion order, so the front is the oldest entry.
     while (cache.size > DERIVATION_MEMO_MAX_ENTRIES) {
       const oldest = cache.keys().next().value;
       if (oldest === undefined) break;
