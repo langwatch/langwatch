@@ -129,14 +129,15 @@ export function setupObservability(options: SetupObservabilityOptions = {}): Obs
     const existingProvider = getConcreteProvider(globalProvider);
 
     if (options.advanced?.attachToExistingProvider && existingProvider) {
-      const spanProcessors = getSpanProcessorsArray(existingProvider, logger);
-      if (spanProcessors) {
-        return attachToExistingProvider(spanProcessors, options, logger);
-      }
-      logger.error(
-        "attachToExistingProvider is enabled but the existing provider's internal span processors could not be accessed. " +
-        "This may be due to an incompatible OpenTelemetry version. Falling back to creating a new NodeSDK."
-      );
+      const handle = attachToExistingProvider(existingProvider, options, logger);
+      if (handle) return handle;
+
+      const errorMsg =
+        "attachToExistingProvider is enabled but the existing provider does not support adding span processors. " +
+        "This may be due to an incompatible OpenTelemetry version. No spans will be exported to LangWatch.";
+      if (options.advanced?.throwOnSetupError) throw new Error(errorMsg);
+      logger.error(errorMsg);
+      return createNoOpHandle(logger);
     }
 
     const sdk = createAndStartNodeSdk(options, logger, createMergedResource(
@@ -167,23 +168,26 @@ export function setupObservability(options: SetupObservabilityOptions = {}): Obs
   }
 }
 
-function getSpanProcessorsArray(provider: unknown, logger: Logger): SpanProcessor[] | null {
-  const activeProcessor = (provider as any)?._activeSpanProcessor;
-  if (activeProcessor && Array.isArray(activeProcessor._spanProcessors)) {
-    return activeProcessor._spanProcessors;
-  }
-  if (typeof (provider as any)?.addSpanProcessor === 'function') {
-    return null;
-  }
-  logger.debug("Could not find _activeSpanProcessor._spanProcessors on provider");
-  return null;
-}
-
 function attachToExistingProvider(
-  spanProcessors: SpanProcessor[],
+  provider: unknown,
   options: SetupObservabilityOptions,
   logger: Logger,
-): ObservabilityHandle {
+): ObservabilityHandle | null {
+  const internalArray = (provider as any)?._activeSpanProcessor?._spanProcessors;
+  const hasPublicApi = typeof (provider as any)?.addSpanProcessor === 'function';
+
+  if (!Array.isArray(internalArray) && !hasPublicApi) {
+    return null;
+  }
+
+  const addProcessor = (processor: SpanProcessor) => {
+    if (Array.isArray(internalArray)) {
+      internalArray.push(processor);
+    } else {
+      (provider as any).addSpanProcessor(processor);
+    }
+  };
+
   const langwatch = getLangWatchConfig(options);
   const addedProcessors: SpanProcessor[] = [];
 
@@ -198,21 +202,21 @@ function attachToExistingProvider(
       : new SimpleSpanProcessor(traceExporter);
 
     addedProcessors.push(processor);
-    spanProcessors.push(processor);
+    addProcessor(processor);
     logger.info("Attached LangWatch span processor to existing global provider");
   }
 
   if (options.traceExporter) {
     const traceExporterProcessor = new SimpleSpanProcessor(options.traceExporter);
     addedProcessors.push(traceExporterProcessor);
-    spanProcessors.push(traceExporterProcessor);
+    addProcessor(traceExporterProcessor);
     logger.debug("Attached user-provided traceExporter to existing provider");
   }
 
   if (options.spanProcessors?.length) {
     for (const processor of options.spanProcessors) {
       addedProcessors.push(processor);
-      spanProcessors.push(processor);
+      addProcessor(processor);
     }
     logger.debug(`Attached ${options.spanProcessors.length} user-provided span processors to existing provider`);
   }

@@ -506,3 +506,18 @@ class TestDedicatedTracerProviderIsolation:
         assert isinstance(
             trace_api.get_tracer_provider(), trace_api.ProxyTracerProvider
         )
+
+    def test_same_provider_reattaches_after_reinit(self) -> None:
+        """When the same provider object is passed again after an api_key
+        change, a fresh exporter must be attached (the old one was shut down)."""
+        from opentelemetry.sdk.trace import TracerProvider
+
+        lw_provider = TracerProvider()
+        Client(api_key="first-key", tracer_provider=lw_provider)
+
+        processors_before = len(lw_provider._active_span_processor._span_processors)
+
+        Client(api_key="second-key", tracer_provider=lw_provider)
+
+        processors_after = len(lw_provider._active_span_processor._span_processors)
+        assert processors_after > processors_before

@@ -553,6 +553,7 @@ class Client(LangWatchClientProtocol):
             if Client._debug:
                 logger.debug("Shutting down tracer provider.")
             if Client._tracer_provider is not None:
+                Client._exporter_attached_providers.discard(id(Client._tracer_provider))
                 Client._tracer_provider.shutdown()
             Client._tracer_provider = None
 
