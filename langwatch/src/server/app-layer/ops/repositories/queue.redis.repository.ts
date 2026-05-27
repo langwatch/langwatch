@@ -9,11 +9,15 @@ import type {
   JobEntry,
 } from "./queue.repository";
 import { normalizeErrorMessage } from "../normalize-error-message";
-import { GROUP_QUEUE_REGISTRY_KEY, TTL_HELPER_LUA } from "~/server/event-sourcing/queues/groupQueue/scripts";
+import {
+  GROUP_QUEUE_REGISTRY_KEY,
+  TTL_HELPER_LUA,
+  PARK_HELPER_LUA,
+} from "~/server/event-sourcing/queues/groupQueue/scripts";
 
 // ── Lua Scripts ──────────────────────────────────────────────────────
 
-const UNBLOCK_LUA = TTL_HELPER_LUA + `
+const UNBLOCK_LUA = TTL_HELPER_LUA + PARK_HELPER_LUA + `
 local blockedKey = KEYS[1]
 local activeKey  = KEYS[2]
 local jobsKey    = KEYS[3]
@@ -32,7 +36,11 @@ if wasBlocked > 0 then
   local pendingCount = redis.call("ZCARD", jobsKey)
   if pendingCount > 0 then
     local score = 1
-    redis.call("ZADD", readyKey, score, groupId)
+    -- Route through the parked-aware write so unblock can't clobber a parked
+    -- group back into the dispatch scan (TRAP 1). A blocked group is never
+    -- itself parked, so this normally writes straight to ready; if the tenant
+    -- is over cap, the next dispatch parks it again.
+    addToReadyOrParked(readyKey, groupId, score, false)
     -- The block path PERSISTs the group keys; restore the safety-net TTL now
     -- that the group is live again (dataKey = jobsKey with the ":jobs" suffix
     -- swapped for ":data").
@@ -138,7 +146,7 @@ redis.call("LTRIM", signalKey, 0, 999)
 return count
 `;
 
-const REPLAY_FROM_DLQ_LUA = TTL_HELPER_LUA + `
+const REPLAY_FROM_DLQ_LUA = TTL_HELPER_LUA + PARK_HELPER_LUA + `
 local dlqJobsKey   = KEYS[1]
 local dlqDataKey   = KEYS[2]
 local dlqErrorKey  = KEYS[3]
@@ -169,7 +177,10 @@ redis.call("DEL", dlqErrorKey)
 redis.call("SREM", dlqIndexKey, groupId)
 
 if count > 0 then
-  redis.call("ZADD", readyKey, 1, groupId)
+  -- Route through the parked-aware write so a replay can't clobber a parked
+  -- group back into the dispatch scan (TRAP 1). A DLQ group is never itself
+  -- parked; if the tenant is over cap, the next dispatch parks it again.
+  addToReadyOrParked(readyKey, groupId, 1, false)
   -- Restore the safety-net TTL on the revived group keys (DLQ keys carry none).
   refreshGroupKeyTtl(dstJobsKey, dstDataKey, nowMs)
 end
@@ -280,15 +291,39 @@ export class QueueRedisRepository implements QueueRepository {
     const blockedKey = `${prefix}blocked`;
     const dlqKey = `${prefix}dlq`;
     const totalPendingKey = `${prefix}stats:total-pending`;
+    const parkedTenantsKey = `${prefix}parked-tenants`;
 
-    const [readyCount, blockedCount, dlqCount, topReadyMembers, totalPendingRaw] =
-      await Promise.all([
-        this.redis.zcard(readyKey),
-        this.redis.scard(blockedKey),
-        this.redis.scard(dlqKey),
-        this.redis.zrevrange(readyKey, offset, offset + limit - 1, "WITHSCORES"),
-        this.redis.get(totalPendingKey),
-      ]);
+    const [
+      readyCount,
+      blockedCount,
+      dlqCount,
+      topReadyMembers,
+      totalPendingRaw,
+      parkedTenants,
+    ] = await Promise.all([
+      this.redis.zcard(readyKey),
+      this.redis.scard(blockedKey),
+      this.redis.scard(dlqKey),
+      this.redis.zrevrange(readyKey, offset, offset + limit - 1, "WITHSCORES"),
+      this.redis.get(totalPendingKey),
+      this.redis.smembers(parkedTenantsKey),
+    ]);
+
+    // Sum parked depth across the tenants currently over cap. The registry set
+    // is tiny (one entry per over-cap tenant), so this is a single SMEMBERS plus
+    // one ZCARD per parked tenant — effectively free in the cap=0 steady state
+    // where the registry is empty.
+    let parkedGroupCount = 0;
+    if (parkedTenants.length > 0) {
+      const parkedPipeline = this.redis.pipeline();
+      for (const tenantId of parkedTenants) {
+        parkedPipeline.zcard(`${prefix}parked:${tenantId}`);
+      }
+      const parkedResults = await parkedPipeline.exec();
+      for (const [err, val] of parkedResults ?? []) {
+        if (!err) parkedGroupCount += Number(val) || 0;
+      }
+    }
 
     const groupIds: string[] = [];
     const readyScores = new Map<string, number>();
@@ -458,6 +493,7 @@ export class QueueRedisRepository implements QueueRepository {
       activeGroupCount,
       totalPendingJobs,
       dlqCount,
+      parkedGroupCount,
       groups,
     };
   }

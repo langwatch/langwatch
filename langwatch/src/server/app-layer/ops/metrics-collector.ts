@@ -418,11 +418,13 @@ class OpsMetricsCollector {
 
     let totalGroups = 0;
     let blockedGroups = 0;
+    let parkedGroups = 0;
     let totalPendingJobs = 0;
 
     for (const q of fullQueues) {
       totalGroups += q.groups.length;
       blockedGroups += q.blockedGroupCount;
+      parkedGroups += q.parkedGroupCount;
       totalPendingJobs += q.totalPendingJobs;
     }
 
@@ -482,6 +484,7 @@ class OpsMetricsCollector {
     return {
       totalGroups,
       blockedGroups,
+      parkedGroups,
       totalPendingJobs,
       throughputIngestedPerSec: this.currentIngestedPerSec,
       totalCompleted: this.latestTotalCompleted,
@@ -976,8 +979,10 @@ class OpsMetricsCollector {
       this.hasBaseline = true;
 
       let totalBlockedCount = 0;
+      let totalParkedCount = 0;
       for (const q of queues) {
         totalBlockedCount += q.blockedGroupCount;
+        totalParkedCount += q.parkedGroupCount;
       }
 
       this.throughputBuffer.push({
@@ -987,6 +992,7 @@ class OpsMetricsCollector {
         failedPerSec: this.currentFailedPerSec,
         pendingCount: totalPending,
         blockedCount: totalBlockedCount,
+        parkedCount: totalParkedCount,
       });
 
       if (this.throughputBuffer.length > THROUGHPUT_BUFFER_SIZE) {

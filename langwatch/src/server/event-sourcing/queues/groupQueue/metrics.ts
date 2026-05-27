@@ -51,6 +51,12 @@ export const gqBlockedGroups = new Gauge({
   labelNames: ["queue_name"] as const,
 });
 
+export const gqParkedGroups = new Gauge({
+  name: "gq_parked_groups",
+  help: "Number of groups parked out of the ready scan because their tenant is at the in-flight soft cap. A sustained spike is the over-cap signal that previously surfaced only as an invisible dispatch-write storm; a non-draining floor flags a parked-group strand.",
+  labelNames: ["queue_name"] as const,
+});
+
 export const gqJobsStagedTotal = new Counter({
   name: "gq_jobs_staged_total",
   help: "Total number of jobs staged into the group queue",

@@ -106,6 +106,29 @@ local function unparkUpTo(readyKey, tenantId, slots)
   end
   return moved
 end
+
+-- Safety-net reconcile, run by DISPATCH on a cadence (not the normal path —
+-- COMPLETE-unpark frees slots as jobs finish). Restores parked groups whose
+-- tenant has dropped below cap, covering two cases COMPLETE cannot:
+--   * orphan recovery (TRAP 2): a crashed/timed-out tenant never fires COMPLETE,
+--     so its tenant_active key TTL-expires; read missing as 0 = under cap = unpark,
+--     else the parked groups strand forever (a new stranding mode).
+--   * cap disabled: flipping LANGWATCH_DISPATCH_TENANT_CAP to 0 must not leave
+--     groups parked out of the dispatch scan, so drain the whole tenant.
+-- Self-limiting via unparkUpTo (bounded by cap - active), so it never over-unparks.
+local function reconcileParked(readyKey, keyPrefix, tenantCap)
+  local tenants = redis.call("SMEMBERS", keyPrefix .. "parked-tenants")
+  for _, tenantId in ipairs(tenants) do
+    local slots
+    if tenantCap > 0 then
+      local active = tonumber(redis.call("GET", keyPrefix .. "tenant_active:" .. tenantId)) or 0
+      slots = tenantCap - active
+    else
+      slots = redis.call("ZCARD", keyPrefix .. "parked:" .. tenantId)
+    end
+    unparkUpTo(readyKey, tenantId, slots)
+  end
+end
 `;
 
 const STAGE_LUA = TTL_HELPER_LUA + PARK_HELPER_LUA + `
@@ -175,7 +198,7 @@ end
 
 -- Score = earliest pending dispatchAfter (LT keeps the smallest score per group)
 if shouldUpdateReady() then
-  redis.call("ZADD", readyKey, "LT", dispatchAfter, groupId)
+  addToReadyOrParked(readyKey, groupId, dispatchAfter, true)
 end
 
 redis.call("LPUSH", signalKey, "1")
@@ -187,7 +210,7 @@ redis.call("INCR", totalPendingKey)
 return 1
 `;
 
-const STAGE_BATCH_LUA = TTL_HELPER_LUA + `
+const STAGE_BATCH_LUA = TTL_HELPER_LUA + PARK_HELPER_LUA + `
 local readyKey        = KEYS[1]
 local signalKey       = KEYS[2]
 local totalPendingKey = KEYS[3]
@@ -263,7 +286,7 @@ for groupId, minScore in pairs(affectedGroups) do
   -- here would re-expose the group to ZRANGEBYSCORE before the next refresh.
   local activeKey = keyPrefix .. "group:" .. groupId .. ":active"
   if redis.call("EXISTS", activeKey) == 0 and redis.call("SISMEMBER", blockedKey, groupId) == 0 then
-    redis.call("ZADD", readyKey, "LT", minScore, groupId)
+    addToReadyOrParked(readyKey, groupId, minScore, true)
   end
 end
 
@@ -297,6 +320,23 @@ local tenantCap    = tonumber(ARGV[4]) or 0
 
 local hasPauses = redis.call("SCARD", pausedJobKey) > 0
 local activeUntil = nowMs + activeTtlSec * 1000
+
+-- Restore parked over-cap groups on a cadence (TRAP 2 orphan recovery + cap=0
+-- drain). COMPLETE-unpark handles the normal slot-freeing as jobs finish; this
+-- only backstops what it can't: a crashed/timed-out tenant that never fires
+-- COMPLETE (its tenant_active TTL-expires to 0 = under cap = unpark), and
+-- flipping the cap off (drain everything parked). Time-gated rather than
+-- per-poll so under sustained load (dispatch rarely idle) orphan recovery is
+-- not starved, while the cap=0 steady state pays only a GET + an occasional
+-- empty SMEMBERS. SCARD-gated so it is a true no-op when nothing is parked.
+local reconcileTsKey = keyPrefix .. "reconcile-ts"
+local lastReconcile = tonumber(redis.call("GET", reconcileTsKey)) or 0
+if (nowMs - lastReconcile) >= 2000 then
+  redis.call("SET", reconcileTsKey, nowMs)
+  if redis.call("SCARD", keyPrefix .. "parked-tenants") > 0 then
+    reconcileParked(readyKey, keyPrefix, tenantCap)
+  end
+end
 
 -- Pull only groups whose earliest job is due now (legacy entries with score=1 also pass).
 -- Active groups carry future scores (nowMs + activeTtlSec*1000) and are excluded.
@@ -457,6 +497,19 @@ local hasPauses = redis.call("SCARD", pausedJobKey) > 0
 local activeUntil = nowMs + activeTtlSec * 1000
 local results = {}
 local dispatched = 0
+
+-- Restore parked over-cap groups on a cadence (TRAP 2 orphan recovery + cap=0
+-- drain) — see DISPATCH_LUA for the rationale. COMPLETE-unpark handles the
+-- normal slot-freeing; this backstops crashed tenants and cap-disable. Time-
+-- and SCARD-gated so it is a no-op at the cap=0 steady state.
+local reconcileTsKey = keyPrefix .. "reconcile-ts"
+local lastReconcile = tonumber(redis.call("GET", reconcileTsKey)) or 0
+if (nowMs - lastReconcile) >= 2000 then
+  redis.call("SET", reconcileTsKey, nowMs)
+  if redis.call("SCARD", keyPrefix .. "parked-tenants") > 0 then
+    reconcileParked(readyKey, keyPrefix, tenantCap)
+  end
+end
 
 -- Pull only groups whose earliest job is due now. Active groups carry future
 -- scores so they are naturally excluded. Over-fetch by 3x (min 30) per page to
@@ -658,7 +711,7 @@ end
 return results
 `;
 
-const COMPLETE_LUA = `
+const COMPLETE_LUA = PARK_HELPER_LUA + `
 local activeKey       = KEYS[1]
 local jobsKey         = KEYS[2]
 local readyKey        = KEYS[3]
@@ -675,6 +728,10 @@ local jobName      = ARGV[3]
 -- prefix in (not a derived tenantId) lets us keep the cap optional
 -- without breaking back-compat with older call sites.
 local tenantCountKeyPrefix = ARGV[4]
+-- Tenant soft-cap (same value DISPATCH_LUA reads). When > 0, a completion
+-- frees a slot that may let one of the tenant's parked over-cap groups resume,
+-- so we unpark up to the freed headroom. 0 = cap disabled, no parking in play.
+local tenantCap = tonumber(ARGV[5]) or 0
 
 local currentActive = redis.call("GET", activeKey)
 if currentActive ~= stagedJobId then
@@ -698,13 +755,29 @@ if tenantCountKeyPrefix and tenantCountKeyPrefix ~= "" then
   end
 end
 
+-- Freed slot: restore up to (cap - now-active) of this tenant's parked groups
+-- so over-cap work deferred by DISPATCH resumes the moment capacity opens. This
+-- is the normal-case unpark; the dispatch reconcile only backstops orphans.
+-- Self-limiting (TRAP 3): bounded to current headroom so COMPLETE-unpark and the
+-- reconcile can't over-unpark into re-park churn. The LPUSH below wakes a waiter.
+if tenantCap > 0 then
+  local slashPos = string.find(groupId, "/", 1, true)
+  if slashPos and slashPos > 1 then
+    local tenantId = string.sub(groupId, 1, slashPos - 1)
+    local active = tonumber(redis.call("GET", tenantCountKeyPrefix .. tenantId)) or 0
+    unparkUpTo(readyKey, tenantId, tenantCap - active)
+  end
+end
+
 local pendingCount = redis.call("ZCARD", jobsKey)
 if pendingCount > 0 then
   -- Re-score ready with earliest pending job's dispatchAfter so dispatch sees
-  -- it again as soon as that job is due (could be past or future).
+  -- it again as soon as that job is due (could be past or future). Route through
+  -- the parked-aware write so the invariant holds even though a completing
+  -- (active) group is never itself parked.
   local nextJob = redis.call("ZRANGE", jobsKey, 0, 0, "WITHSCORES")
   if #nextJob >= 2 then
-    redis.call("ZADD", readyKey, tonumber(nextJob[2]), groupId)
+    addToReadyOrParked(readyKey, groupId, tonumber(nextJob[2]), false)
   else
     redis.call("ZREM", readyKey, groupId)
   end
@@ -856,7 +929,7 @@ end
 return 1
 `;
 
-const RETRY_RESTAGE_LUA = TTL_HELPER_LUA + `
+const RETRY_RESTAGE_LUA = TTL_HELPER_LUA + PARK_HELPER_LUA + `
 local activeKey       = KEYS[1]
 local totalPendingKey = KEYS[2]
 
@@ -890,9 +963,11 @@ end
 refreshGroupKeyTtl(groupJobsKey, groupDataKey, nowMs)
 
 -- 3. Update ready set score = future dispatch time so the group becomes
---    eligible exactly when the backoff window expires.
+--    eligible exactly when the backoff window expires. Route through the
+--    parked-aware write so the invariant holds (an active group entering retry
+--    is never itself parked, so this normally writes straight to ready).
 local readyKey = keyPrefix .. "ready"
-redis.call("ZADD", readyKey, dispatchAfterMs, groupId)
+addToReadyOrParked(readyKey, groupId, dispatchAfterMs, false)
 
 -- 4. Set active key TTL to match backoff period.
 --    While the key exists the group is locked (preserves FIFO ordering).
@@ -1260,6 +1335,7 @@ export class GroupStagingScripts {
       stagedJobId,
       jobName ?? "",
       `${this.keyPrefix}tenant_active:`,
+      String(readTenantCap()),
     );
 
     return result === 1;

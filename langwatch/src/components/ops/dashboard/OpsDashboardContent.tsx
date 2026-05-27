@@ -31,6 +31,10 @@ export function OpsDashboardContent({ data }: { data: DashboardData }) {
     (sum, q) => sum + q.blockedGroupCount,
     0,
   );
+  const totalParked = data.queues.reduce(
+    (sum, q) => sum + q.parkedGroupCount,
+    0,
+  );
   const totalDlq = data.queues.reduce((sum, q) => sum + q.dlqCount, 0);
 
   const queuesQuery = api.ops.listQueues.useQuery(undefined, {
@@ -71,6 +75,12 @@ export function OpsDashboardContent({ data }: { data: DashboardData }) {
           value={totalBlocked.toString()}
           sublabel={`${data.totalGroups} groups`}
           color={totalBlocked > 0 ? "red.500" : undefined}
+        />
+        <LinkedStat
+          label="Parked"
+          value={totalParked.toString()}
+          sublabel="over cap"
+          color={totalParked > 0 ? "orange.500" : undefined}
         />
         <LinkedStat
           label="P50"
