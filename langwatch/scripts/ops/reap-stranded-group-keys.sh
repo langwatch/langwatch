@@ -70,8 +70,20 @@ fi
 deleted=0
 while IFS="$(printf '\t')" read -r jobs_key data_key n; do
   $R DEL "$jobs_key" "$data_key" >/dev/null
-  [ "$n" -gt 0 ] && $R DECRBY "$total_pending_key" "$n" >/dev/null
   deleted=$((deleted + 1))
   [ $((deleted % 1000)) -eq 0 ] && echo "  ... deleted ${deleted}/${groups}"
 done < "$OUT"
+
+# Recompute stats:total-pending from the surviving groups rather than DECRing
+# per delete: the counter had already drifted negative from the incident, so a
+# per-group DECRBY would only compound the error. Sum the remaining job zsets.
+echo "recomputing ${total_pending_key} from surviving groups ..."
+remaining=0
+$R --scan --pattern "${PREFIX}group:*:jobs" | while IFS= read -r jk; do
+  c=$($R ZCARD "$jk")
+  remaining=$((remaining + c))
+  printf '%s\n' "$remaining" > /tmp/reap-remaining.count
+done
+remaining=$(cat /tmp/reap-remaining.count 2>/dev/null || echo 0)
+$R SET "$total_pending_key" "$remaining" >/dev/null
 echo "DONE deleted_groups=${deleted} total_pending_now=$($R GET "$total_pending_key")"
