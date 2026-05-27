@@ -139,6 +139,17 @@ export const FEATURE_FLAGS = [
     defaultValue: false,
     description: "Reveals the AI Gateway menu in the project sidebar.",
   },
+  // Per-project gate for trace blob offload (#4215 / ADR-021). Checked ONCE per
+  // ingestion request (not per span) via the postgres-cached store, so the
+  // hot-path cost is one cached lookup. When on, over-threshold span field
+  // values are offloaded to object storage (preview + ref) at the edge.
+  {
+    key: "release_trace_blob_offload",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Offloads over-threshold trace span field values (input/output/contexts) to object storage at ingestion, storing a bounded preview + a blob reference inline. Off = current behavior (full value flows through the pipeline).",
+  },
 ] as const satisfies readonly FeatureFlagDefinition[];
 
 export const FEATURE_FLAG_FAMILIES = [
