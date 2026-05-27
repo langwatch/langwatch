@@ -10327,93 +10327,94 @@ description: How to configure LangWatch for complete trace isolation when runnin
 icon: layer-group
 ---
 
-When you run LangWatch alongside another OTel-based SDK (for example, an APM
-tool), both SDKs may hook into the same global `TracerProvider`. This causes
-**cross-contamination** — LLM traces appear in the other tool and application
-traces appear in LangWatch.
+When you run LangWatch alongside another OTel-based SDK, both SDKs may hook
+into the same global `TracerProvider`. This causes **cross-contamination** —
+LLM traces appear in the other tool and application traces appear in LangWatch.
 
-Both SDKs support **true provider isolation** using a dedicated `TracerProvider`.
+Both LangWatch SDKs support **true provider isolation** using a dedicated
+`TracerProvider`. LangWatch attaches its exporter to the dedicated provider and
+does not touch the global — each SDK operates independently.
 
-## The Problem
+## Python
 
-OpenTelemetry has a single global `TracerProvider`. When two SDKs both connect to
-it, every span flows to every exporter:
-
-```
-┌─────────────────────────────────────────────┐
-│          Global TracerProvider               │
-│                                             │
-│  ┌─────────────┐    ┌────────────────────┐  │
-│  │ Other SDK's │    │ LangWatch's        │  │
-│  │ Exporter    │    │ Exporter           │  │
-│  └──────┬──────┘    └─────────┬──────────┘  │
-│         │                     │             │
-│    ALL spans              ALL spans         │
-└─────────────────────────────────────────────┘
-```
-
-Both exporters receive all spans — HTTP requests, database queries, LLM calls,
-and everything else.
-
-## Solution: Dedicated TracerProvider
-
-Both the Python and TypeScript SDKs support passing a dedicated `TracerProvider`.
-LangWatch attaches its exporter to that provider and does **not** touch the
-global. The other SDK keeps the global provider and never sees LLM traces.
-
-### Python
+Pass a dedicated `TracerProvider` to `langwatch.setup()`. LangWatch uses it
+exclusively, leaving the global provider for the other SDK:
 
 ```python
 from opentelemetry.sdk.trace import TracerProvider
 import langwatch
 
-# 1. The other OTel SDK initializes first (sets the global provider)
-
-# 2. Create a dedicated provider for LangWatch
+# The other OTel SDK initializes first and owns the global provider.
+# Create a dedicated provider for LangWatch:
 langwatch_provider = TracerProvider()
 
-# 3. LangWatch uses this provider exclusively
-langwatch.setup(tracer_provider=langwatch_provider)
+langwatch.setup(
+    api_key="...",
+    tracer_provider=langwatch_provider,
+)
 ```
 
-With a dedicated provider:
-- `langwatch.trace()` creates spans on the dedicated provider automatically
-- The other SDK only receives spans on the global provider
+That's it. From here:
+- `@langwatch.trace()` creates spans on the dedicated provider automatically
+- The other SDK continues using the global provider
 - Neither SDK sees the other's spans
 
-### TypeScript
+### Full example
+
+```python
+from opentelemetry.sdk.trace import TracerProvider
+import langwatch
+
+langwatch_provider = TracerProvider()
+langwatch.setup(api_key="...", tracer_provider=langwatch_provider)
+
+@langwatch.trace(name="llm-call")
+def chat(user_message: str):
+    # Your LLM call here — traced by LangWatch only
+    return response
+```
+
+## TypeScript
+
+Pass a dedicated `NodeTracerProvider` via the `tracerProvider` option.
+LangWatch attaches its exporter to it and skips global provider detection:
 
 ```typescript
 import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
 import { setupObservability } from "langwatch/observability/node";
 
-// 1. The other OTel SDK initializes first (sets the global provider)
-
-// 2. Create a dedicated provider for LangWatch
+// The other OTel SDK initializes first and owns the global provider.
+// Create a dedicated provider for LangWatch:
 const lwProvider = new NodeTracerProvider();
 
-// 3. LangWatch attaches its exporter to this provider only
 setupObservability({
   tracerProvider: lwProvider,
-  langwatch: {
-    apiKey: process.env.LANGWATCH_API_KEY,
-  },
+  langwatch: { apiKey: process.env.LANGWATCH_API_KEY },
 });
-
-// 4. Use lwProvider.getTracer() for LLM calls
-const tracer = lwProvider.getTracer("my-llm-service");
 ```
 
-With a dedicated provider:
-- Only spans created through `lwProvider.getTracer()` go to LangWatch
-- The global provider (used by the other SDK) is untouched
-- Neither SDK sees the other's spans
+Use `lwProvider.getTracer()` to create spans that go to LangWatch only:
+
+```typescript
+const tracer = lwProvider.getTracer("my-llm-service");
+
+await tracer.startActiveSpan("llm-call", async (span) => {
+  span.setAttribute("gen_ai.system", "openai");
+  span.setAttribute("langwatch.input", userMessage);
+  // Your LLM call here
+  span.setAttribute("langwatch.output", response);
+  span.end();
+});
+```
+
+Only spans created through `lwProvider.getTracer()` go to LangWatch. The global
+provider is untouched.
 
 <Note>
 Auto-instrumentations that emit spans through the global OTel API (like Vercel
-AI SDK's `experimental_telemetry`) will send spans to the global provider, not
-the dedicated one. For those, use `lwProvider.getTracer()` directly to create
-LLM spans on the isolated provider.
+AI SDK's `experimental_telemetry`) send spans to the global provider, not the
+dedicated one. For those, use `lwProvider.getTracer()` directly to create LLM
+spans on the isolated provider.
 </Note>
 
 ## Alternative: Coexistence (TypeScript)
