@@ -50,6 +50,20 @@ export interface TraceRequestCollectionResult {
 export interface TraceRequestCollectionDeps {
   dedup: SpanDedupService;
   recordSpan: (data: RecordSpanCommandData) => Promise<void>;
+  /**
+   * Optional edge offload (#4215 / ADR-021). When provided, runs on each
+   * normalized span before it is recorded — replacing over-threshold attribute
+   * values with a bounded preview + a reserved blob-ref attribute so every
+   * downstream copy (queue job, fold cache, event log, stored_spans,
+   * trace_summaries) stays small. Wired by the composition root only when the
+   * project's `release_trace_blob_offload` flag is on; absent ⇒ unchanged
+   * behavior. `projectId` is the ingestion `tenantId` (== project.id, see
+   * routes/otel.ts).
+   */
+  offloadSpanAttributes?: (args: {
+    projectId: string;
+    span: NormalizedIdSpan;
+  }) => Promise<NormalizedIdSpan>;
 }
 
 /**
@@ -224,9 +238,19 @@ export class TraceRequestCollectionService {
       }
       lockAcquired = lockResult === true;
 
+      // Edge offload (#4215): replace over-threshold field values with
+      // preview + blob ref before recording, so the span is small through the
+      // rest of the pipeline. No-op unless wired (flag-gated by the root).
+      const spanToRecord = this.deps.offloadSpanAttributes
+        ? await this.deps.offloadSpanAttributes({
+            projectId: tenantId,
+            span: normalizedSpan,
+          })
+        : normalizedSpan;
+
       await this.deps.recordSpan({
         tenantId,
-        span: normalizedSpan,
+        span: spanToRecord,
         resource,
         instrumentationScope: scope,
         piiRedactionLevel,

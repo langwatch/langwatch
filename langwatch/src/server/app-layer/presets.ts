@@ -54,6 +54,10 @@ import { NullMetricRecordStorageRepository } from "./traces/repositories/metric-
 import { SpanStorageService } from "./traces/span-storage.service";
 import { SpanStorageClickHouseRepository } from "./traces/repositories/span-storage.clickhouse.repository";
 import { NullSpanStorageRepository } from "./traces/repositories/span-storage.repository";
+import { BlobStore } from "./traces/blob-store.service";
+import { offloadOtlpSpanAttributes } from "./traces/otlp-span-offload";
+import { createS3Client } from "~/server/storage";
+import { getFeatureFlagStore } from "~/server/featureFlag/featureFlagStore.postgres";
 import { TokenizerService } from "./traces/tokenizer.service";
 import { LogRequestCollectionService } from "./traces/log-request-collection.service";
 import { MetricRequestCollectionService } from "./traces/metric-request-collection.service";
@@ -398,10 +402,29 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     queueSimulationRun: commands.simulations.queueRun,
   });
 
+  const blobStore = new BlobStore(createS3Client);
   const traceCollection = traced(
     new TraceRequestCollectionService({
       dedup: spanDedup,
       recordSpan: commands.traces.recordSpan,
+      // Edge offload (#4215), flag-gated per project. projectId === tenantId
+      // (routes/otel.ts passes project.id). Checked per span via the 5s-cached
+      // flag store, so effectively once per request.
+      offloadSpanAttributes: async ({ projectId, span }) => {
+        const enabled = await getFeatureFlagStore().get(
+          "release_trace_blob_offload",
+          { projectId },
+        );
+        if (enabled !== true) return span;
+        const attributes = await offloadOtlpSpanAttributes({
+          attributes: span.attributes,
+          projectId,
+          traceId: span.traceId,
+          spanId: span.spanId,
+          blobStore,
+        });
+        return attributes === span.attributes ? span : { ...span, attributes };
+      },
     }),
     "TraceRequestCollectionService",
   );
