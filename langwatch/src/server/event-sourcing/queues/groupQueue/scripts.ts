@@ -32,7 +32,83 @@ local function refreshGroupKeyTtl(jobsKey, dataKey, nowMs)
 end
 `;
 
-const STAGE_LUA = TTL_HELPER_LUA + `
+// Lua helper for the tenant soft-cap "parking" model, prepended to every script
+// that writes the ready set. Over-cap groups are moved OUT of ready into a
+// per-tenant parked zset ONCE (not re-scored every poll), so the dispatch scan
+// never re-sees them and the write volume no longer scales with backlog size.
+// They are restored when the tenant's in-flight count drops below the cap.
+//
+// Invariant: a group is in exactly one of {ready, parked, blocked, active}.
+// Every ready-writer routes through addToReadyOrParked so a stage/unblock/retry/
+// complete-restage can never clobber a parked group back into the dispatch scan
+// (which is what re-creates the over-cap ZADD storm). The parked set and the
+// parked-tenants registry share the same hash tag as ready (keyPrefix carries
+// it), so all keys stay in one Redis Cluster slot.
+export const PARK_HELPER_LUA = `
+-- Tenant segment of a groupId (everything before the first '/'), else the id.
+local function parkTenantOf(groupId)
+  local slashPos = string.find(groupId, "/", 1, true)
+  if slashPos and slashPos > 1 then return string.sub(groupId, 1, slashPos - 1) end
+  return groupId
+end
+
+-- readyKey is always keyPrefix .. "ready"; recover keyPrefix so the parked keys
+-- can be derived without threading an extra ARGV through every script.
+local function parkKeyPrefixOf(readyKey)
+  return string.sub(readyKey, 1, #readyKey - 5)
+end
+
+-- Route a ready-write to the parked set instead when the group is already
+-- parked, preserving the parked state (cap-free: only DISPATCH/COMPLETE decide
+-- to park/unpark). useLT mirrors the call site's ZADD semantics.
+local function addToReadyOrParked(readyKey, groupId, score, useLT)
+  local kp = parkKeyPrefixOf(readyKey)
+  local parkedKey = kp .. "parked:" .. parkTenantOf(groupId)
+  local target = readyKey
+  if redis.call("ZSCORE", parkedKey, groupId) then target = parkedKey end
+  if useLT then
+    redis.call("ZADD", target, "LT", score, groupId)
+  else
+    redis.call("ZADD", target, score, groupId)
+  end
+end
+
+-- Move an over-cap group out of ready into its tenant's parked set, preserving
+-- its ready score so it keeps priority when restored. Registers the tenant so
+-- the dispatch-tail reconcile can find it even if no COMPLETE ever fires.
+local function parkGroup(readyKey, groupId)
+  local score = redis.call("ZSCORE", readyKey, groupId)
+  if not score then return end
+  local kp = parkKeyPrefixOf(readyKey)
+  local tenantId = parkTenantOf(groupId)
+  redis.call("ZREM", readyKey, groupId)
+  redis.call("ZADD", kp .. "parked:" .. tenantId, score, groupId)
+  redis.call("SADD", kp .. "parked-tenants", tenantId)
+end
+
+-- Restore up to "slots" of a tenant's parked groups (lowest score = earliest
+-- due first) back into ready. Self-limiting: callers pass slots = cap - active
+-- so COMPLETE-unpark and the dispatch-tail reconcile can never over-unpark into
+-- a re-park churn (TRAP 3). Returns how many were moved.
+local function unparkUpTo(readyKey, tenantId, slots)
+  if slots <= 0 then return 0 end
+  local kp = parkKeyPrefixOf(readyKey)
+  local parkedKey = kp .. "parked:" .. tenantId
+  local members = redis.call("ZRANGE", parkedKey, 0, slots - 1, "WITHSCORES")
+  local moved = 0
+  for i = 1, #members, 2 do
+    redis.call("ZREM", parkedKey, members[i])
+    redis.call("ZADD", readyKey, tonumber(members[i + 1]), members[i])
+    moved = moved + 1
+  end
+  if redis.call("ZCARD", parkedKey) == 0 then
+    redis.call("SREM", kp .. "parked-tenants", tenantId)
+  end
+  return moved
+end
+`;
+
+const STAGE_LUA = TTL_HELPER_LUA + PARK_HELPER_LUA + `
 local groupJobsKey    = KEYS[1]
 local readyKey        = KEYS[2]
 local signalKey       = KEYS[3]
@@ -77,7 +153,7 @@ if dedupId ~= "" and dedupTtlMs > 0 then
       redis.call("SET", dedupKey, existingJobId, "PX", dedupTtlMs)
       -- Score = earliest pending dispatchAfter (LT keeps the smallest score per group)
       if shouldUpdateReady() then
-        redis.call("ZADD", readyKey, "LT", dispatchAfter, groupId)
+        addToReadyOrParked(readyKey, groupId, dispatchAfter, true)
       end
       refreshGroupKeyTtl(groupJobsKey, dataKey, nowMs)
       redis.call("LPUSH", signalKey, "1")
