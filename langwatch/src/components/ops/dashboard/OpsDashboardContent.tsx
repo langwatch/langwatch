@@ -58,7 +58,9 @@ export function OpsDashboardContent({ data }: { data: DashboardData }) {
         <LinkedStat
           label="Completed/s"
           value={formatRate(data.completedPerSec)}
-          sublabel={`${formatCount(data.totalCompleted)} total`}
+          sublabel={`peak ${formatRate(data.peakCompletedPerSec)} · ${formatCount(
+            data.totalCompleted,
+          )} total`}
         />
         <LinkedStat
           label="Failed/s"
