@@ -278,7 +278,7 @@ end
 return newStagedCount
 `;
 
-const DISPATCH_LUA = `
+const DISPATCH_LUA = PARK_HELPER_LUA + `
 local readyKey         = KEYS[1]
 local blockedKey       = KEYS[2]
 local pausedJobKey     = KEYS[3]
@@ -338,10 +338,11 @@ while offset < scanBudget do
           end
           if cached then
             tenantOverCap = true
-            -- Defer over-cap group past the dispatch window so subsequent
-            -- polls reach other tenants without re-scanning this group.
-            -- 5s ≈ one poll cycle; group becomes eligible again naturally.
-            redis.call("ZADD", readyKey, nowMs + 5000, groupId)
+            -- Park the over-cap group OUT of ready (once) so subsequent polls
+            -- reach other tenants without re-scanning it. Restored when the
+            -- tenant's in-flight count drops below cap (COMPLETE / reconcile).
+            -- Replaces the per-poll ZADD defer that scaled writes with backlog.
+            parkGroup(readyKey, groupId)
           end
         end
       end
@@ -439,7 +440,7 @@ end
 return nil
 `;
 
-const DISPATCH_BATCH_LUA = `
+const DISPATCH_BATCH_LUA = PARK_HELPER_LUA + `
 local readyKey         = KEYS[1]
 local blockedKey       = KEYS[2]
 local pausedJobKey     = KEYS[3]
@@ -500,7 +501,7 @@ while offset < scanBudget and dispatched < maxJobs do
         end
         if cached then
           tenantOverCap = true
-          redis.call("ZADD", readyKey, nowMs + 5000, groupId)
+          parkGroup(readyKey, groupId)
         end
       end
     end
