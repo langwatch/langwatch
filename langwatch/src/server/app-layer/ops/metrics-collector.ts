@@ -798,9 +798,17 @@ class OpsMetricsCollector {
 
       const cutoff =
         Date.now() - THROUGHPUT_BUFFER_SIZE * METRICS_COLLECT_INTERVAL_MS;
-      this.throughputBuffer = state.throughputBuffer.filter(
-        (p) => p.timestamp > cutoff,
-      );
+      // Backfill parkedCount on points persisted before the Parked series
+      // existed, so the chart never reads undefined/NaN for old history. The
+      // state version is intentionally not bumped: this keeps the rolling
+      // history AND the accumulated peaks across the deploy (a bump would zero
+      // them, including the freshly-added Completed/s peak tile).
+      this.throughputBuffer = state.throughputBuffer
+        .filter((p) => p.timestamp > cutoff)
+        .map((p) => ({
+          ...p,
+          parkedCount: (p as { parkedCount?: number }).parkedCount ?? 0,
+        }));
 
       this.latestTotalCompleted = state.latestTotalCompleted;
       this.latestTotalFailed = state.latestTotalFailed;
