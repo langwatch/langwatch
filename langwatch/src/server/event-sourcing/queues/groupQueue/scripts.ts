@@ -15,7 +15,24 @@ import type { Cluster } from "ioredis";
  */
 export const GROUP_KEY_TTL_MS = 6 * 60 * 60 * 1000;
 
-const STAGE_LUA = `
+// Lua helper, prepended to every script that writes group keys. Refreshes the
+// safety-net TTL on a group's jobs/data keys, deriving expiry from the LATEST
+// pending dispatch score so a job legitimately delayed past the window (e.g. a
+// monitor thread-idle timeout hours out) is never reaped before it is due. The
+// expiry is the later of (now + window) and (latest scheduled dispatch + window).
+const TTL_HELPER_LUA = `
+local function refreshGroupKeyTtl(jobsKey, dataKey, nowMs)
+  local latest = redis.call("ZRANGE", jobsKey, -1, -1, "WITHSCORES")
+  if not latest[2] then return end
+  local ttl = ${GROUP_KEY_TTL_MS}
+  local untilDue = (tonumber(latest[2]) - nowMs) + ${GROUP_KEY_TTL_MS}
+  if untilDue > ttl then ttl = untilDue end
+  redis.call("PEXPIRE", jobsKey, ttl)
+  redis.call("PEXPIRE", dataKey, ttl)
+end
+`;
+
+const STAGE_LUA = TTL_HELPER_LUA + `
 local groupJobsKey    = KEYS[1]
 local readyKey        = KEYS[2]
 local signalKey       = KEYS[3]
@@ -33,6 +50,7 @@ local dedupTtlMs     = tonumber(ARGV[5])
 local jobDataJson    = ARGV[6]
 local shouldExtend   = tonumber(ARGV[7])
 local shouldReplace  = tonumber(ARGV[8])
+local nowMs          = tonumber(ARGV[9])
 
 -- Skip ready-score updates while the group is processing (active key set) or
 -- blocked. In those states the ready score is owned by REFRESH_LUA / COMPLETE_LUA
@@ -61,8 +79,7 @@ if dedupId ~= "" and dedupTtlMs > 0 then
       if shouldUpdateReady() then
         redis.call("ZADD", readyKey, "LT", dispatchAfter, groupId)
       end
-      redis.call("PEXPIRE", groupJobsKey, ${GROUP_KEY_TTL_MS})
-      redis.call("PEXPIRE", dataKey, ${GROUP_KEY_TTL_MS})
+      refreshGroupKeyTtl(groupJobsKey, dataKey, nowMs)
       redis.call("LPUSH", signalKey, "1")
       redis.call("LTRIM", signalKey, 0, 999)
       return 0
@@ -74,8 +91,7 @@ end
 
 redis.call("ZADD", groupJobsKey, dispatchAfter, stagedJobId)
 redis.call("HSET", dataKey, stagedJobId, jobDataJson)
-redis.call("PEXPIRE", groupJobsKey, ${GROUP_KEY_TTL_MS})
-redis.call("PEXPIRE", dataKey, ${GROUP_KEY_TTL_MS})
+refreshGroupKeyTtl(groupJobsKey, dataKey, nowMs)
 
 if dedupId ~= "" and dedupTtlMs > 0 then
   redis.call("SET", dedupKey, stagedJobId, "PX", dedupTtlMs)
@@ -95,13 +111,15 @@ redis.call("INCR", totalPendingKey)
 return 1
 `;
 
-const STAGE_BATCH_LUA = `
+const STAGE_BATCH_LUA = TTL_HELPER_LUA + `
 local readyKey        = KEYS[1]
 local signalKey       = KEYS[2]
 local totalPendingKey = KEYS[3]
 
 local keyPrefix = ARGV[1]
 local count     = tonumber(ARGV[2])
+-- nowMs is appended after all per-job args, so it is always the last element.
+local nowMs     = tonumber(ARGV[#ARGV])
 
 local newStagedCount = 0
 local affectedGroups = {}
@@ -152,8 +170,7 @@ for i = 1, count do
     newStagedCount = newStagedCount + 1
   end
 
-  redis.call("PEXPIRE", groupJobsKey, ${GROUP_KEY_TTL_MS})
-  redis.call("PEXPIRE", dataKey, ${GROUP_KEY_TTL_MS})
+  refreshGroupKeyTtl(groupJobsKey, dataKey, nowMs)
 
   -- Track minimum dispatchAfter per affected group
   local existingMin = affectedGroups[groupId]
@@ -747,7 +764,7 @@ end
 return 1
 `;
 
-const RETRY_RESTAGE_LUA = `
+const RETRY_RESTAGE_LUA = TTL_HELPER_LUA + `
 local activeKey       = KEYS[1]
 local totalPendingKey = KEYS[2]
 
@@ -762,6 +779,7 @@ local retryTtlSec           = tonumber(ARGV[7])
 -- counter TTL aligned with the activeKey TTL across backoff retries
 -- so an in-flight retry doesn't expire its tenant slot.
 local tenantCountKeyPrefix  = ARGV[8]
+local nowMs                 = tonumber(ARGV[9])
 
 -- 1. Validate active key matches
 local currentActive = redis.call("GET", activeKey)
@@ -777,8 +795,7 @@ redis.call("HSET", groupDataKey, newStagedJobId, jobDataJson)
 if inserted == 1 then
   redis.call("INCR", totalPendingKey)
 end
-redis.call("PEXPIRE", groupJobsKey, ${GROUP_KEY_TTL_MS})
-redis.call("PEXPIRE", groupDataKey, ${GROUP_KEY_TTL_MS})
+refreshGroupKeyTtl(groupJobsKey, groupDataKey, nowMs)
 
 -- 3. Update ready set score = future dispatch time so the group becomes
 --    eligible exactly when the backoff window expires.
@@ -970,6 +987,7 @@ export class GroupStagingScripts {
       jobDataJson,
       String(shouldExtend ? 1 : 0),
       String(shouldReplace ? 1 : 0),
+      String(Date.now()),
     );
 
     return result === 1;
@@ -1011,6 +1029,8 @@ export class GroupStagingScripts {
         String((job.shouldReplace ?? true) ? 1 : 0),
       );
     }
+    // Appended last so the Lua reads it as ARGV[#ARGV] regardless of job count.
+    args.push(String(Date.now()));
 
     const result = await this.redis.eval(STAGE_BATCH_LUA, 3, readyKey, signalKey, totalPendingKey, ...args);
 
@@ -1317,6 +1337,7 @@ export class GroupStagingScripts {
       jobDataJson,
       String(retryTtlSec),
       `${this.keyPrefix}tenant_active:`,
+      String(Date.now()),
     );
 
     return result === 1;

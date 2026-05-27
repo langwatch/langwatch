@@ -2818,9 +2818,11 @@ describe("group-key TTL safety net", () => {
   }
 
   function expectFreshTtl(pttl: number) {
-    // PTTL set, within the configured window, and not stale (touched recently).
+    // PTTL set and ~the configured window. The upper bound allows a small
+    // delay-derived extension (a job staged a few seconds out pushes expiry to
+    // dispatch + window), without admitting the multi-hour long-delay case.
     expect(pttl).toBeGreaterThan(GROUP_KEY_TTL_MS - 60_000);
-    expect(pttl).toBeLessThanOrEqual(GROUP_KEY_TTL_MS);
+    expect(pttl).toBeLessThanOrEqual(GROUP_KEY_TTL_MS + 60_000);
   }
 
   describe("when a job is staged", () => {
@@ -2829,6 +2831,19 @@ describe("group-key TTL safety net", () => {
 
       expectFreshTtl(await jobsTtl("group-a"));
       expectFreshTtl(await dataTtl("group-a"));
+    });
+  });
+
+  describe("when a job is scheduled far beyond the safety window", () => {
+    it("extends the TTL to its dispatch time so it is not reaped early", async () => {
+      const dispatchAfterMs = Date.now() + 25 * 60 * 60 * 1000; // 25h out
+      await scripts.stage(makeJob({ stagedJobId: "j1", dispatchAfterMs }));
+
+      // Expiry derives from the scheduled dispatch + window, so it must outlive
+      // both the flat 6h window and the job's own due time.
+      const pttl = await jobsTtl("group-a");
+      expect(pttl).toBeGreaterThan(GROUP_KEY_TTL_MS);
+      expect(pttl).toBeGreaterThan(25 * 60 * 60 * 1000);
     });
   });
 
