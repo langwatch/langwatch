@@ -47,6 +47,23 @@ Feature: Group-coalesced fold projections
     Then the fold state is loaded and stored once
     And reactors are dispatched once per event, in occurredAt order
 
+  # The per-event reactor dispatch above keeps every span's work, but reactors
+  # that read trace-level data derived from stored_spans (alert triggers,
+  # scenario role metrics) would otherwise re-issue that multi-MB read once per
+  # event. Sharing it across the batch is what keeps the recovery path from
+  # re-amplifying reads on the single-threaded Redis/ClickHouse.
+  @unit @coalescing @reactors
+  Scenario: Repeated trace-level derivations for one trace read stored spans once
+    Given several reactor invocations derive trace data for the same trace at one fold cutoff
+    When they run within one coalesced batch window
+    Then the stored spans are read once, not once per invocation
+
+  @unit @coalescing @reactors
+  Scenario: A later fold cutoff derives from stored spans again
+    Given trace data already derived at one fold cutoff
+    When trace data is derived again at a later cutoff
+    Then the stored spans are read again for the newer cutoff
+
   @integration @coalescing @queue
   Scenario: A backed-up group is folded in a single batch call
     Given a group with ten queued events
