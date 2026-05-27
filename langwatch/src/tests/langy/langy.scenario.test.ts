@@ -22,6 +22,7 @@ import {
   listScenarios,
   listTriggers,
 } from "./langwatch-api";
+import { runScenarioAndLog } from "./scenario-logger";
 
 const LW_BASE = process.env.LW_BASE_URL ?? "http://localhost:5560";
 const LW_KEY = process.env.LANGWATCH_API_KEY ?? "";
@@ -53,7 +54,7 @@ describe("Langy via HTTP wrapper", () => {
 
   it("answers a traces request by calling search_traces", async () => {
     const langy = makeLangyAdapter();
-    const result = await scenario.run({
+    const result = await runScenarioAndLog({
       name: "search recent traces",
       description: "The user is using LangWatch and wants to see recent trace activity.",
       agents: [
@@ -76,7 +77,7 @@ describe("Langy via HTTP wrapper", () => {
 
   it("answers an analytics request by reporting the metric", async () => {
     const langy = makeLangyAdapter();
-    const result = await scenario.run({
+    const result = await runScenarioAndLog({
       name: "ask for cost",
       description: "The user wants the current cost of their LangWatch usage.",
       agents: [
@@ -99,7 +100,7 @@ describe("Langy via HTTP wrapper", () => {
 
   it("returns latency stats without asking for clarification", async () => {
     const langy = makeLangyAdapter();
-    const result = await scenario.run({
+    const result = await runScenarioAndLog({
       name: "latency query",
       description: "The user wants to know their average LLM latency.",
       agents: [
@@ -122,7 +123,7 @@ describe("Langy via HTTP wrapper", () => {
 
   it("returns p95 latency", async () => {
     const langy = makeLangyAdapter();
-    const result = await scenario.run({
+    const result = await runScenarioAndLog({
       name: "p95 latency",
       description: "The user asks for p95 latency specifically.",
       agents: [
@@ -144,7 +145,7 @@ describe("Langy via HTTP wrapper", () => {
 
   it("returns eval pass rate", async () => {
     const langy = makeLangyAdapter();
-    const result = await scenario.run({
+    const result = await runScenarioAndLog({
       name: "eval pass rate",
       description: "The user wants to know their evaluator pass rate.",
       agents: [
@@ -166,7 +167,7 @@ describe("Langy via HTTP wrapper", () => {
 
   it("returns analytics for a user-specified time range", async () => {
     const langy = makeLangyAdapter();
-    const result = await scenario.run({
+    const result = await runScenarioAndLog({
       name: "analytics with explicit time range",
       description: "The user specifies 'last week' — Langy should honor that, not default to 24h.",
       agents: [
@@ -188,7 +189,7 @@ describe("Langy via HTTP wrapper", () => {
 
   it("explains trace failures in plain English", async () => {
     const langy = makeLangyAdapter();
-    const result = await scenario.run({
+    const result = await runScenarioAndLog({
       name: "trace failure analysis",
       description: "The user wants Langy to find recent failed traces and explain what went wrong.",
       agents: [
@@ -211,7 +212,7 @@ describe("Langy via HTTP wrapper", () => {
 
   it("returns an analytics summary with a LangWatch dashboard link", async () => {
     const langy = makeLangyAdapter();
-    const result = await scenario.run({
+    const result = await runScenarioAndLog({
       name: "analytics with link",
       description: "The user wants their trace volume for the past week and a link to see the trend.",
       agents: [
@@ -238,7 +239,7 @@ describe("Langy via HTTP wrapper", () => {
 
   it("gets details for a specific trace by drilling in", async () => {
     const langy = makeLangyAdapter();
-    const result = await scenario.run({
+    const result = await runScenarioAndLog({
       name: "get trace detail",
       description: "The user wants to drill into a specific trace to see its inputs, outputs, and span details.",
       agents: [
@@ -270,7 +271,7 @@ describe("Langy via HTTP wrapper", () => {
 
   it("lists evaluators", async () => {
     const langy = makeLangyAdapter();
-    const result = await scenario.run({
+    const result = await runScenarioAndLog({
       name: "list evaluators",
       description: "The user wants to see what evaluators they have configured.",
       agents: [
@@ -292,7 +293,7 @@ describe("Langy via HTTP wrapper", () => {
 
   it("lists datasets", async () => {
     const langy = makeLangyAdapter();
-    const result = await scenario.run({
+    const result = await runScenarioAndLog({
       name: "list datasets",
       description: "The user wants to see their existing LangWatch datasets.",
       agents: [
@@ -314,7 +315,7 @@ describe("Langy via HTTP wrapper", () => {
 
   it("lists scenarios", async () => {
     const langy = makeLangyAdapter();
-    const result = await scenario.run({
+    const result = await runScenarioAndLog({
       name: "list scenarios",
       description: "The user wants to see their existing LangWatch scenario tests.",
       agents: [
@@ -336,7 +337,7 @@ describe("Langy via HTTP wrapper", () => {
 
   it("lists agents", async () => {
     const langy = makeLangyAdapter();
-    const result = await scenario.run({
+    const result = await runScenarioAndLog({
       name: "list agents",
       description: "The user wants to see the agents registered in LangWatch.",
       agents: [
@@ -358,7 +359,7 @@ describe("Langy via HTTP wrapper", () => {
 
   it("lists prompts", async () => {
     const langy = makeLangyAdapter();
-    const result = await scenario.run({
+    const result = await runScenarioAndLog({
       name: "list prompts",
       description: "The user wants to see their versioned prompts in LangWatch.",
       agents: [
@@ -380,7 +381,7 @@ describe("Langy via HTTP wrapper", () => {
 
   it("lists monitors", async () => {
     const langy = makeLangyAdapter();
-    const result = await scenario.run({
+    const result = await runScenarioAndLog({
       name: "list monitors",
       description: "The user wants to see what online evaluation monitors they have configured.",
       agents: [
@@ -403,7 +404,7 @@ describe("Langy via HTTP wrapper", () => {
 
   it("lists dashboards", async () => {
     const langy = makeLangyAdapter();
-    const result = await scenario.run({
+    const result = await runScenarioAndLog({
       name: "list dashboards",
       description: "The user wants to see their LangWatch custom dashboards.",
       agents: [
@@ -425,7 +426,7 @@ describe("Langy via HTTP wrapper", () => {
 
   it("lists workflows", async () => {
     const langy = makeLangyAdapter();
-    const result = await scenario.run({
+    const result = await runScenarioAndLog({
       name: "list workflows",
       description: "The user wants to see their LangWatch workflows.",
       agents: [
@@ -447,7 +448,7 @@ describe("Langy via HTTP wrapper", () => {
 
   it("lists triggers", async () => {
     const langy = makeLangyAdapter();
-    const result = await scenario.run({
+    const result = await runScenarioAndLog({
       name: "list triggers",
       description: "The user wants to see their LangWatch alert triggers.",
       agents: [
@@ -469,7 +470,7 @@ describe("Langy via HTTP wrapper", () => {
 
   it("audits the setup and reports the biggest gap", async () => {
     const langy = makeLangyAdapter();
-    const result = await scenario.run({
+    const result = await runScenarioAndLog({
       name: "audit setup",
       description: "The user wants Langy to audit their LangWatch setup and tell them the single biggest gap.",
       agents: [
@@ -500,7 +501,7 @@ describe("Langy via HTTP wrapper", () => {
     const before = await listDatasets();
     const beforeIds = new Set(before.map((d) => d.id));
 
-    const result = await scenario.run({
+    const result = await runScenarioAndLog({
       name: "create a dataset",
       description: `The user wants to create a small test dataset called "${datasetName}" with a few example rows.`,
       agents: [
@@ -536,7 +537,7 @@ describe("Langy via HTTP wrapper", () => {
     const before = await listDatasets();
     const beforeIds = new Set(before.map((d) => d.id));
 
-    const result = await scenario.run({
+    const result = await runScenarioAndLog({
       name: "create dataset with rows",
       description: `The user wants a dataset called "${datasetName}" with 3 capital city rows.`,
       agents: [
@@ -572,7 +573,7 @@ describe("Langy via HTTP wrapper", () => {
     const before = await listScenarios();
     const beforeIds = new Set(before.map((s) => s.id));
 
-    const result = await scenario.run({
+    const result = await runScenarioAndLog({
       name: "create a scenario",
       description: "The user wants to create a basic scenario test for their agent — a single-turn customer-support check.",
       agents: [
@@ -604,7 +605,7 @@ describe("Langy via HTTP wrapper", () => {
     const before = await listEvaluators();
     const beforeIds = new Set(before.map((e) => e.id));
 
-    const result = await scenario.run({
+    const result = await runScenarioAndLog({
       name: "create evaluator",
       description: `The user wants to create a hallucination evaluator named "${evaluatorName}".`,
       agents: [
@@ -640,7 +641,7 @@ describe("Langy via HTTP wrapper", () => {
     const before = await listAgents();
     const beforeIds = new Set(before.map((a) => a.id));
 
-    const result = await scenario.run({
+    const result = await runScenarioAndLog({
       name: "create agent",
       description: `The user wants to create a customer-support agent named "${agentName}".`,
       agents: [
@@ -676,7 +677,7 @@ describe("Langy via HTTP wrapper", () => {
     const before = await listMonitors();
     const beforeIds = new Set(before.map((m) => m.id));
 
-    const result = await scenario.run({
+    const result = await runScenarioAndLog({
       name: "create monitor",
       description: `The user wants a production monitor "${monitorName}" that runs the hallucination evaluator on every trace.`,
       agents: [
@@ -712,7 +713,7 @@ describe("Langy via HTTP wrapper", () => {
     const before = await listPrompts();
     const beforeIds = new Set(before.map((p) => p.id));
 
-    const result = await scenario.run({
+    const result = await runScenarioAndLog({
       name: "create prompt",
       description: `The user wants to externalize a prompt with handle "${promptHandle}" containing "You are a helpful assistant".`,
       agents: [
@@ -747,7 +748,7 @@ describe("Langy via HTTP wrapper", () => {
     const before = await listTriggers();
     const beforeIds = new Set(before.map((t) => t.id));
 
-    const result = await scenario.run({
+    const result = await runScenarioAndLog({
       name: "create trigger",
       description: `The user wants an alert trigger "${triggerName}" that fires whenever a hallucination evaluation fails.`,
       agents: [
@@ -787,7 +788,7 @@ describe("Langy via HTTP wrapper", () => {
     const target = before[0]!;
     const newName = `${target.name}-updated-${Date.now()}`;
 
-    const result = await scenario.run({
+    const result = await runScenarioAndLog({
       name: "update evaluator",
       description: `The user wants to rename the evaluator "${target.name}" to "${newName}".`,
       agents: [
@@ -819,7 +820,7 @@ describe("Langy via HTTP wrapper", () => {
       return;
     }
     const target = before[0]!;
-    const result = await scenario.run({
+    const result = await runScenarioAndLog({
       name: "update prompt",
       description: `The user wants to update the system message of prompt "${target.handle ?? target.name}" to "You are a concise, expert assistant."`,
       agents: [
@@ -849,7 +850,7 @@ describe("Langy via HTTP wrapper", () => {
     const before = await listDashboards();
     const beforeIds = new Set(before.map((d) => d.id));
 
-    const result = await scenario.run({
+    const result = await runScenarioAndLog({
       name: "create dashboard",
       description: `The user wants a new custom dashboard called "${dashboardName}".`,
       agents: [
@@ -884,7 +885,7 @@ describe("Langy via HTTP wrapper", () => {
     const before = await listDatasets();
     const beforeIds = new Set(before.map((d) => d.id));
 
-    const result = await scenario.run({
+    const result = await runScenarioAndLog({
       name: "multi-step search + create",
       description: `The user wants Langy to (1) look at recent traces, find failures, and (2) put them in a new dataset "${datasetTag}".`,
       agents: [
@@ -920,7 +921,7 @@ describe("Langy via HTTP wrapper", () => {
 
   it("returns a LangWatch URL when asked where to find prompts", async () => {
     const langy = makeLangyAdapter();
-    const result = await scenario.run({
+    const result = await runScenarioAndLog({
       name: "prompts deep-link",
       description: "The user asks where to see/manage their prompts in the LangWatch UI.",
       agents: [
@@ -943,7 +944,7 @@ describe("Langy via HTTP wrapper", () => {
 
   it("returns a deep link for datasets surface", async () => {
     const langy = makeLangyAdapter();
-    const result = await scenario.run({
+    const result = await runScenarioAndLog({
       name: "datasets deep-link",
       description: "The user asks where to browse their datasets in the UI.",
       agents: [
@@ -965,7 +966,7 @@ describe("Langy via HTTP wrapper", () => {
 
   it("returns a deep link for scenarios surface", async () => {
     const langy = makeLangyAdapter();
-    const result = await scenario.run({
+    const result = await runScenarioAndLog({
       name: "scenarios deep-link",
       description: "The user asks where to view scenario tests in the LangWatch UI.",
       agents: [
@@ -990,7 +991,7 @@ describe("Langy via HTTP wrapper", () => {
 
   it("maintains session context across two turns", async () => {
     const langy = makeLangyAdapter();
-    const result = await scenario.run({
+    const result = await runScenarioAndLog({
       name: "two-turn session memory",
       description: "The user asks about traces, then asks a follow-up that only makes sense if the agent remembers turn 1.",
       agents: [
@@ -1027,7 +1028,7 @@ describe("Langy via HTTP wrapper", () => {
     const before = await listEvaluators();
     const beforeIds = new Set(before.map((e) => e.id));
 
-    const result = await scenario.run({
+    const result = await runScenarioAndLog({
       name: "multiturn discover then create",
       description: `Three turns: ask what evaluators exist, ask for recommendation, then say "yes go ahead, name it ${evaluatorName}".`,
       agents: [
@@ -1063,7 +1064,7 @@ describe("Langy via HTTP wrapper", () => {
 
   it("multi-turn: trace lookup then drill-down (2 turns)", async () => {
     const langy = makeLangyAdapter();
-    const result = await scenario.run({
+    const result = await runScenarioAndLog({
       name: "trace lookup drill-down",
       description: "Turn 1: ask for recent traces. Turn 2: 'tell me more about the first one'.",
       agents: [
@@ -1092,7 +1093,7 @@ describe("Langy via HTTP wrapper", () => {
   it("multi-turn: create then update dataset (3 turns)", async () => {
     const langy = makeLangyAdapter();
     const datasetName = `langy-multiturn-ds-${Date.now()}`;
-    const result = await scenario.run({
+    const result = await runScenarioAndLog({
       name: "create then update dataset",
       description: `Turn 1: create "${datasetName}" with 2 rows. Turn 2: add another row. Turn 3: ask how many rows.`,
       agents: [
@@ -1129,7 +1130,7 @@ describe("Langy via HTTP wrapper", () => {
 
   it("multi-turn: clarification handled inline (2 turns)", async () => {
     const langy = makeLangyAdapter();
-    const result = await scenario.run({
+    const result = await runScenarioAndLog({
       name: "ambiguous followup",
       description: "Turn 1: vague ask 'how's my agent doing?'. Turn 2: 'I mean cost'.",
       agents: [
@@ -1160,7 +1161,7 @@ describe("Langy via HTTP wrapper", () => {
     const before = await listScenarios();
     const beforeIds = new Set(before.map((s) => s.id));
 
-    const result = await scenario.run({
+    const result = await runScenarioAndLog({
       name: "create scenario then run",
       description: "Turn 1: create a simple greeting scenario. Turn 2: run it. Tests that Langy can chain create→run without re-asking which scenario.",
       agents: [
@@ -1197,7 +1198,7 @@ describe("Langy via HTTP wrapper", () => {
 
   it("declines an out-of-scope request without going off-topic", async () => {
     const langy = makeLangyAdapter();
-    const result = await scenario.run({
+    const result = await runScenarioAndLog({
       name: "out of scope",
       description: "The user asks Langy to write a haiku — completely unrelated to LangWatch.",
       agents: [
@@ -1219,7 +1220,7 @@ describe("Langy via HTTP wrapper", () => {
 
   it("does not offer pagination when listing traces", async () => {
     const langy = makeLangyAdapter();
-    const result = await scenario.run({
+    const result = await runScenarioAndLog({
       name: "no pagination offer",
       description: "The user asks for recent traces. Langy should show the first batch and stop — no 'want more?' or scroll ID.",
       agents: [
@@ -1242,7 +1243,7 @@ describe("Langy via HTTP wrapper", () => {
 
   it("handles empty results gracefully (no hallucination)", async () => {
     const langy = makeLangyAdapter();
-    const result = await scenario.run({
+    const result = await runScenarioAndLog({
       name: "empty results graceful",
       description: "The user asks for traces from a far-future date range — there should be none. Langy should say 'no data' not invent results.",
       agents: [
@@ -1264,7 +1265,7 @@ describe("Langy via HTTP wrapper", () => {
 
   it("does not ask clarifying questions for an ambiguous but actionable request", async () => {
     const langy = makeLangyAdapter();
-    const result = await scenario.run({
+    const result = await runScenarioAndLog({
       name: "no clarifying questions",
       description: "The user says 'set up evaluations' — vague, but Langy should pick a sensible default and do it, not ask 10 questions.",
       agents: [
@@ -1286,7 +1287,7 @@ describe("Langy via HTTP wrapper", () => {
 
   it("does not offer next actions at the end of a response", async () => {
     const langy = makeLangyAdapter();
-    const result = await scenario.run({
+    const result = await runScenarioAndLog({
       name: "no next actions offered",
       description: "After completing a task, Langy should stop. It should not list 'here's what you can do next' options.",
       agents: [
