@@ -1,4 +1,5 @@
 export {
+  LangyConversationNotOwnedError,
   LangyConversationService,
   LangyConversationRepository,
 } from "./LangyConversationService";

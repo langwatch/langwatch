@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  LangyConversationNotOwnedError,
   LangyConversationRepository,
   LangyConversationService,
 } from "../LangyConversationService";
@@ -102,6 +103,71 @@ describe("LangyConversationService", () => {
         userId: "alice",
         title: undefined,
       });
+    });
+  });
+
+  describe("when ensureConversation is called with an id owned by the caller", () => {
+    it("returns the existing conversation without creating a new one", async () => {
+      const existing = {
+        id: "c1",
+        projectId: "p1",
+        userId: "alice",
+        isShared: false,
+      };
+      const repo = makeRepo({
+        findById: vi.fn().mockResolvedValue(existing),
+        create: vi.fn(),
+      });
+      const svc = new LangyConversationService(repo);
+      const result = await svc.ensureConversation({
+        projectId: "p1",
+        userId: "alice",
+        conversationId: "c1",
+      });
+      expect(result).toEqual(existing);
+      expect(repo.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when ensureConversation is called with an id owned by another user", () => {
+    it("throws LangyConversationNotOwnedError instead of silently forking a new conversation", async () => {
+      const repo = makeRepo({
+        findById: vi.fn().mockResolvedValue({
+          id: "c1",
+          projectId: "p1",
+          userId: "bob",
+          isShared: true,
+        }),
+        create: vi.fn(),
+      });
+      const svc = new LangyConversationService(repo);
+      await expect(
+        svc.ensureConversation({
+          projectId: "p1",
+          userId: "alice",
+          conversationId: "c1",
+        }),
+      ).rejects.toBeInstanceOf(LangyConversationNotOwnedError);
+      expect(repo.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when ensureConversation is called with a stale (deleted) id", () => {
+    it("creates a fresh conversation rather than throwing", async () => {
+      const repo = makeRepo({
+        findById: vi.fn().mockResolvedValue(null),
+        create: vi
+          .fn()
+          .mockResolvedValue({ id: "new", projectId: "p1", userId: "alice" }),
+      });
+      const svc = new LangyConversationService(repo);
+      const result = await svc.ensureConversation({
+        projectId: "p1",
+        userId: "alice",
+        conversationId: "deleted-id",
+      });
+      expect(result.id).toBe("new");
+      expect(repo.create).toHaveBeenCalled();
     });
   });
 
