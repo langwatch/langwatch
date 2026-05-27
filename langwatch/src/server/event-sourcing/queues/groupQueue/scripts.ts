@@ -20,7 +20,7 @@ export const GROUP_KEY_TTL_MS = 6 * 60 * 60 * 1000;
 // pending dispatch score so a job legitimately delayed past the window (e.g. a
 // monitor thread-idle timeout hours out) is never reaped before it is due. The
 // expiry is the later of (now + window) and (latest scheduled dispatch + window).
-const TTL_HELPER_LUA = `
+export const TTL_HELPER_LUA = `
 local function refreshGroupKeyTtl(jobsKey, dataKey, nowMs)
   local latest = redis.call("ZRANGE", jobsKey, -1, -1, "WITHSCORES")
   if not latest[2] then return end
@@ -643,7 +643,7 @@ redis.call("DEL", errorKey)
 return 1
 `;
 
-const REFRESH_LUA = `
+const REFRESH_LUA = TTL_HELPER_LUA + `
 local activeKey    = KEYS[1]
 local readyKey     = KEYS[2]
 local stagedJobId           = ARGV[1]
@@ -659,6 +659,12 @@ local tenantCountKeyPrefix  = ARGV[5]
 local currentActive = redis.call("GET", activeKey)
 if currentActive == stagedJobId then
   redis.call("EXPIRE", activeKey, activeTtlSec)
+  -- Keep the pending-sibling jobs/data keys alive while this group is actively
+  -- processing: a long-running active job must not let staged siblings expire
+  -- under the safety-net TTL. Derive the group keys from activeKey (strip the
+  -- ":active" suffix) so no extra args are needed.
+  local groupBase = string.sub(activeKey, 1, #activeKey - 7)
+  refreshGroupKeyTtl(groupBase .. ":jobs", groupBase .. ":data", nowMs)
   -- Refresh ready-zset score so it stays "active" until heartbeat stops or completion.
   -- Only update if the group is currently in ready — if RESTAGE_AND_BLOCK_LUA fired
   -- while this heartbeat was in flight, the group has been removed and we must not

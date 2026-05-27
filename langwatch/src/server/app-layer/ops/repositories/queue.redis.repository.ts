@@ -9,11 +9,11 @@ import type {
   JobEntry,
 } from "./queue.repository";
 import { normalizeErrorMessage } from "../normalize-error-message";
-import { GROUP_QUEUE_REGISTRY_KEY } from "~/server/event-sourcing/queues/groupQueue/scripts";
+import { GROUP_QUEUE_REGISTRY_KEY, TTL_HELPER_LUA } from "~/server/event-sourcing/queues/groupQueue/scripts";
 
 // ── Lua Scripts ──────────────────────────────────────────────────────
 
-const UNBLOCK_LUA = `
+const UNBLOCK_LUA = TTL_HELPER_LUA + `
 local blockedKey = KEYS[1]
 local activeKey  = KEYS[2]
 local jobsKey    = KEYS[3]
@@ -21,6 +21,7 @@ local readyKey   = KEYS[4]
 local signalKey  = KEYS[5]
 local errorKey   = KEYS[6]
 local groupId    = ARGV[1]
+local nowMs      = tonumber(ARGV[2])
 
 local wasBlocked = redis.call("SREM", blockedKey, groupId)
 
@@ -32,6 +33,11 @@ if wasBlocked > 0 then
   if pendingCount > 0 then
     local score = 1
     redis.call("ZADD", readyKey, score, groupId)
+    -- The block path PERSISTs the group keys; restore the safety-net TTL now
+    -- that the group is live again (dataKey = jobsKey with the ":jobs" suffix
+    -- swapped for ":data").
+    local dataKey = string.sub(jobsKey, 1, #jobsKey - 5) .. ":data"
+    refreshGroupKeyTtl(jobsKey, dataKey, nowMs)
   else
     redis.call("ZREM", readyKey, groupId)
   end
@@ -132,7 +138,7 @@ redis.call("LTRIM", signalKey, 0, 999)
 return count
 `;
 
-const REPLAY_FROM_DLQ_LUA = `
+const REPLAY_FROM_DLQ_LUA = TTL_HELPER_LUA + `
 local dlqJobsKey   = KEYS[1]
 local dlqDataKey   = KEYS[2]
 local dlqErrorKey  = KEYS[3]
@@ -142,6 +148,7 @@ local readyKey     = KEYS[6]
 local signalKey    = KEYS[7]
 local dlqIndexKey  = KEYS[8]
 local groupId      = ARGV[1]
+local nowMs        = tonumber(ARGV[2])
 
 local jobs = redis.call("ZRANGE", dlqJobsKey, 0, -1, "WITHSCORES")
 local count = #jobs / 2
@@ -163,6 +170,8 @@ redis.call("SREM", dlqIndexKey, groupId)
 
 if count > 0 then
   redis.call("ZADD", readyKey, 1, groupId)
+  -- Restore the safety-net TTL on the revived group keys (DLQ keys carry none).
+  refreshGroupKeyTtl(dstJobsKey, dstDataKey, nowMs)
 end
 
 redis.call("LPUSH", signalKey, "1")
@@ -632,6 +641,7 @@ export class QueueRedisRepository implements QueueRepository {
       `${prefix}signal`,
       `${prefix}group:${params.groupId}:error`,
       params.groupId,
+      String(Date.now()),
     );
     return { wasBlocked: result === 1 };
   }
@@ -667,6 +677,7 @@ export class QueueRedisRepository implements QueueRepository {
           `${prefix}signal`,
           `${prefix}group:${groupId}:error`,
           groupId,
+          String(Date.now()),
         );
       }
       const results = await pipeline.exec();
@@ -982,6 +993,7 @@ export class QueueRedisRepository implements QueueRepository {
       `${prefix}signal`,
       `${prefix}dlq`,
       params.groupId,
+      String(Date.now()),
     );
     return { jobsReplayed: Number(result) };
   }
@@ -1034,6 +1046,7 @@ export class QueueRedisRepository implements QueueRepository {
           `${prefix}signal`,
           `${prefix}dlq`,
           groupId,
+          String(Date.now()),
         );
       }
       const results = await pipeline.exec();
@@ -1105,6 +1118,7 @@ export class QueueRedisRepository implements QueueRepository {
         `${prefix}signal`,
         `${prefix}dlq`,
         groupId,
+        String(Date.now()),
       );
     }
     const results = await pipeline.exec();
@@ -1166,6 +1180,7 @@ export class QueueRedisRepository implements QueueRepository {
         `${prefix}signal`,
         `${prefix}group:${groupId}:error`,
         groupId,
+        String(Date.now()),
       );
     }
     const results = await unblockPipeline.exec();

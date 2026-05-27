@@ -2910,6 +2910,60 @@ describe("group-key TTL safety net", () => {
       expect(await dataTtl("group-a")).toBe(-1);
     });
   });
+
+  describe("when an active job heartbeats with pending siblings", () => {
+    it("refreshes the pending-sibling jobs/data TTL", async () => {
+      await scripts.stage(makeJob({ stagedJobId: "active", dispatchAfterMs: 100 }));
+      await scripts.stage(makeJob({ stagedJobId: "sibling", dispatchAfterMs: 200 }));
+      await scripts.dispatch({ nowMs: 300, activeTtlSec: 60 }); // claims "active"
+
+      // Age the sibling keys' TTL well below the window; the heartbeat must
+      // bump it back so a long-running active job cannot reap its siblings.
+      await redis.pexpire(`${keyPrefix()}group:group-a:jobs`, 5_000);
+      await redis.pexpire(`${keyPrefix()}group:group-a:data`, 5_000);
+
+      await scripts.refreshActiveKey({
+        groupId: "group-a",
+        stagedJobId: "active",
+        activeTtlSec: 60,
+      });
+
+      expectFreshTtl(await jobsTtl("group-a"));
+      expectFreshTtl(await dataTtl("group-a"));
+    });
+  });
+
+  describe("when a blocked group is unblocked", () => {
+    it("restores the safety-net TTL the block path cleared", async () => {
+      const repo = new QueueRedisRepository(redis);
+      await scripts.stage(makeJob({ stagedJobId: "j1", dispatchAfterMs: 100 }));
+      await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
+      await scripts.restageAndBlock({
+        groupId: "group-a",
+        newStagedJobId: "j1/r/0",
+        score: 100,
+        jobDataJson: JSON.stringify({ retry: true }),
+      });
+      expect(await jobsTtl("group-a")).toBe(-1); // PERSISTed by the block path
+
+      await repo.unblockGroup({ queueName: QUEUE_NAME, groupId: "group-a" });
+
+      expectFreshTtl(await jobsTtl("group-a"));
+      expectFreshTtl(await dataTtl("group-a"));
+    });
+  });
+
+  describe("when a group is replayed from the DLQ", () => {
+    it("restores the safety-net TTL on the revived group", async () => {
+      const repo = new QueueRedisRepository(redis);
+      await scripts.stage(makeJob({ stagedJobId: "j1", dispatchAfterMs: 100 }));
+      await repo.moveToDlq({ queueName: QUEUE_NAME, groupId: "group-a" });
+      await repo.replayFromDlq({ queueName: QUEUE_NAME, groupId: "group-a" });
+
+      expectFreshTtl(await jobsTtl("group-a"));
+      expectFreshTtl(await dataTtl("group-a"));
+    });
+  });
 });
 
 describe("queue discovery via registry", () => {
