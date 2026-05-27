@@ -1,5 +1,18 @@
 import type { LangyConversation, PrismaClient } from "@prisma/client";
 
+/**
+ * Thrown by ensureConversation when the caller passes a conversationId
+ * that belongs to a different user in the same project. The /chat route
+ * catches this and returns 403 rather than silently forking off a brand
+ * new conversation (which loses the caller's intent and confuses the UI).
+ */
+export class LangyConversationNotOwnedError extends Error {
+  constructor(public readonly conversationId: string) {
+    super(`Langy conversation ${conversationId} is not owned by the caller`);
+    this.name = "LangyConversationNotOwnedError";
+  }
+}
+
 export type ConversationListItem = {
   id: string;
   title: string | null;
@@ -185,12 +198,21 @@ export class LangyConversationService {
     title?: string | null;
   }): Promise<LangyConversation> {
     if (conversationId) {
-      const existing = await this.getById({
+      // Resolve straight from the repo, bypassing the share-aware getById:
+      // visibility of a shared conversation does not grant continuation rights.
+      const existing = await this.repository.findById({
         id: conversationId,
         projectId,
-        userId,
       });
-      if (existing && existing.userId === userId) return existing;
+      if (existing) {
+        if (existing.userId !== userId) {
+          throw new LangyConversationNotOwnedError(conversationId);
+        }
+        return existing;
+      }
+      // Soft-deleted or never existed in this project: fall through and create
+      // a fresh one. Acceptable because a stale id from a deleted conversation
+      // is a legitimate client state, unlike one owned by a different user.
     }
     return await this.repository.create({ projectId, userId, title });
   }

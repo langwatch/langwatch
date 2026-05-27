@@ -42,6 +42,7 @@ import { createLogger } from "~/utils/logger/server";
 import { auditLog } from "~/server/auditLog";
 import { TiktokenClient } from "~/server/app-layer/clients/tokenizer/tiktoken.client";
 import {
+  LangyConversationNotOwnedError,
   LangyConversationService,
   LangyMessageService,
   LangyProjectMemoryService,
@@ -198,15 +199,26 @@ app.post("/langy/chat", async (c) => {
 
   const conversationService = LangyConversationService.create(prisma);
 
-  const conversation = await conversationService.ensureConversation({
-    projectId,
-    userId: session.user.id,
-    conversationId: requestedConversationId ?? null,
-    title:
-      messages[0] && extractAssistantText(messages[0].parts as any)
-        ? extractAssistantText(messages[0].parts as any).slice(0, 80)
-        : null,
-  });
+  let conversation;
+  try {
+    conversation = await conversationService.ensureConversation({
+      projectId,
+      userId: session.user.id,
+      conversationId: requestedConversationId ?? null,
+      title:
+        messages[0] && extractAssistantText(messages[0].parts as any)
+          ? extractAssistantText(messages[0].parts as any).slice(0, 80)
+          : null,
+    });
+  } catch (error) {
+    if (error instanceof LangyConversationNotOwnedError) {
+      return c.json(
+        { error: "Conversation belongs to another user." },
+        { status: 403 },
+      );
+    }
+    throw error;
+  }
 
   const lastUserMessage = messages[messages.length - 1];
   const projectMemory = await loadInjectableProjectMemory(projectId);
