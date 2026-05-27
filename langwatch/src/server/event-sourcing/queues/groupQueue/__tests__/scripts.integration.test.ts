@@ -1616,9 +1616,11 @@ describe("GroupStagingScripts", () => {
       expect(result!.stagedJobId).toBe("j1");
     });
 
-    it("falls back gracefully when groupId has no '/' (single-segment id)", async () => {
+    it("parks a paused single-segment groupId (whole id is the tenant)", async () => {
       // Defensive: a groupId without "/" means the whole string is the tenant.
-      // This shouldn't happen in production but the Lua must not error.
+      // This shouldn't happen in production but the Lua must not error, and a
+      // paused single-segment tenant must still be parked out of the scan (via
+      // parkTenantOf), not left to skip-in-place.
       await scripts.stage(
         makeJob({
           stagedJobId: "j1",
@@ -1631,6 +1633,9 @@ describe("GroupStagingScripts", () => {
 
       const result = await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
       expect(result).toBeNull();
+      expect(
+        await redis.zcard(`${keyPrefix()}parked:single_segment_group`),
+      ).toBe(1);
     });
   });
   });
