@@ -442,12 +442,12 @@ class Client(LangWatchClientProtocol):
         Client._api_key = value
 
         if previous_key and not Client._skip_open_telemetry_setup:
-            # Shut down any existing tracer provider, as API key change requires re-initialization.
             self.__shutdown_tracer_provider()
 
-            # HACK: set global tracer provider to a proxy tracer provider back
-            opentelemetry.trace._TRACER_PROVIDER = None  # type: ignore
-            opentelemetry.trace._TRACER_PROVIDER_SET_ONCE = Once()  # type: ignore
+            if not Client._is_dedicated_provider:
+                # HACK: set global tracer provider to a proxy tracer provider back
+                opentelemetry.trace._TRACER_PROVIDER = None  # type: ignore
+                opentelemetry.trace._TRACER_PROVIDER_SET_ONCE = Once()  # type: ignore
 
         # Ensure provider/exporter exist after setting the key
         if (

@@ -477,22 +477,32 @@ class TestDedicatedTracerProviderIsolation:
             tracer_provider=lw_provider
         )
 
-    def test_reinit_on_api_key_change_with_dedicated_provider(self) -> None:
-        """Changing the API key triggers re-init. The re-init path calls
-        __setup_tracer_provider with no args — existing behavior preserved."""
+    def test_trace_uses_dedicated_provider_not_global(self) -> None:
+        """langwatch.trace() must create spans on the dedicated provider,
+        not the global one."""
         from opentelemetry.sdk.trace import TracerProvider
+        from langwatch.telemetry.tracing import LangWatchTrace
+
+        lw_provider = TracerProvider()
+        Client(api_key="test-key", tracer_provider=lw_provider)
+
+        trace_obj = LangWatchTrace(name="test-trace")
+        assert trace_obj._tracer_provider is lw_provider
+
+    def test_reinit_on_api_key_change_stays_dedicated(self) -> None:
+        """After api_key change, _is_dedicated_provider remains True and
+        a new isolated provider is created (not attached to global)."""
+        from opentelemetry.sdk.trace import TracerProvider
+        from opentelemetry import trace as trace_api
 
         lw_provider = TracerProvider()
         client = Client(api_key="first-key", tracer_provider=lw_provider)
+        assert Client._is_dedicated_provider is True
 
-        with (
-            patch.object(
-                client, "_Client__shutdown_tracer_provider"
-            ) as shutdown,
-            patch.object(
-                client, "_Client__setup_tracer_provider"
-            ) as setup_tracer,
-        ):
-            client.api_key = "second-key"
-            shutdown.assert_called_once()
-            setup_tracer.assert_called_once()
+        client.api_key = "second-key"
+
+        assert Client._is_dedicated_provider is True
+        assert client.tracer_provider is not None
+        assert isinstance(
+            trace_api.get_tracer_provider(), trace_api.ProxyTracerProvider
+        )

@@ -56,6 +56,9 @@ export function getConcreteProvider(provider: unknown): unknown {
   if (typeof (provider as any).addSpanProcessor === "function") {
     return provider;
   }
+  if ((provider as any)._activeSpanProcessor) {
+    return provider;
+  }
 
   // Check one level of delegate (ProxyTracerProvider pattern)
   let delegate;
@@ -75,6 +78,9 @@ export function getConcreteProvider(provider: unknown): unknown {
       return delegate;
     }
     if (typeof delegate.addSpanProcessor === "function") {
+      return delegate;
+    }
+    if (delegate._activeSpanProcessor) {
       return delegate;
     }
   }

@@ -2,43 +2,35 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { trace } from '@opentelemetry/api';
 import { setupObservability } from '../../setup';
 import { isConcreteProvider } from '../../../utils';
+import { NodeTracerProvider } from '@opentelemetry/sdk-trace-node';
 
 afterEach(() => {
   trace.disable();
 });
 
-function createTestProvider() {
-  return {
-    getTracer: vi.fn(),
-    addSpanProcessor: vi.fn(),
-    register: vi.fn(),
-    constructor: { name: 'NodeTracerProvider' },
-  };
-}
-
-// Integration tests for setupObservability with an existing global provider
 function createMockLogger() {
   return { error: vi.fn(), debug: vi.fn(), info: vi.fn(), warn: vi.fn() };
 }
 
 describe('setupObservability Integration - Existing Global Provider', () => {
-  it('should detect a real global provider and not re-initialize NodeSDK', async () => {
-    const globalProvider = createTestProvider();
-    trace.setGlobalTracerProvider(globalProvider as any);
+  it('detects a real global provider and returns no-op', async () => {
+    const provider = new NodeTracerProvider();
+    provider.register();
     const logger = createMockLogger();
+
     const handle = setupObservability({ langwatch: { apiKey: 'test-key' }, debug: { logger } });
+
     expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('OpenTelemetry is already set up in this process'));
-    expect(typeof handle.shutdown).toBe('function');
     await expect(handle.shutdown()).resolves.toBeUndefined();
-    // The global provider should still be concrete
     expect(isConcreteProvider(trace.getTracerProvider())).toBe(true);
   });
 });
 
 describe('setupObservability Integration - attachToExistingProvider', () => {
-  it('attaches LangWatch processor to existing provider when enabled', async () => {
-    const existingProvider = createTestProvider();
-    trace.setGlobalTracerProvider(existingProvider as any);
+  it('attaches LangWatch processor to real NodeTracerProvider', async () => {
+    const provider = new NodeTracerProvider();
+    provider.register();
+    const processorsBefore = (provider as any)._activeSpanProcessor._spanProcessors.length;
     const logger = createMockLogger();
 
     const handle = setupObservability({
@@ -47,7 +39,8 @@ describe('setupObservability Integration - attachToExistingProvider', () => {
       advanced: { attachToExistingProvider: true },
     });
 
-    expect(existingProvider.addSpanProcessor).toHaveBeenCalledTimes(1);
+    const processorsAfter = (provider as any)._activeSpanProcessor._spanProcessors.length;
+    expect(processorsAfter).toBe(processorsBefore + 1);
     expect(logger.info).toHaveBeenCalledWith(
       expect.stringContaining('Attached LangWatch span processor to existing global provider')
     );
@@ -55,9 +48,10 @@ describe('setupObservability Integration - attachToExistingProvider', () => {
     await expect(handle.shutdown()).resolves.toBeUndefined();
   });
 
-  it('returns no-op when attachToExistingProvider is false (default behavior)', async () => {
-    const existingProvider = createTestProvider();
-    trace.setGlobalTracerProvider(existingProvider as any);
+  it('returns no-op when attachToExistingProvider is false (default)', async () => {
+    const provider = new NodeTracerProvider();
+    provider.register();
+    const processorsBefore = (provider as any)._activeSpanProcessor._spanProcessors.length;
     const logger = createMockLogger();
 
     setupObservability({
@@ -65,15 +59,17 @@ describe('setupObservability Integration - attachToExistingProvider', () => {
       debug: { logger },
     });
 
-    expect(existingProvider.addSpanProcessor).not.toHaveBeenCalled();
+    const processorsAfter = (provider as any)._activeSpanProcessor._spanProcessors.length;
+    expect(processorsAfter).toBe(processorsBefore);
     expect(logger.error).toHaveBeenCalledWith(
       expect.stringContaining('OpenTelemetry is already set up in this process')
     );
   });
 
   it('does not attach when LangWatch is disabled', async () => {
-    const existingProvider = createTestProvider();
-    trace.setGlobalTracerProvider(existingProvider as any);
+    const provider = new NodeTracerProvider();
+    provider.register();
+    const processorsBefore = (provider as any)._activeSpanProcessor._spanProcessors.length;
     const logger = createMockLogger();
 
     setupObservability({
@@ -82,12 +78,14 @@ describe('setupObservability Integration - attachToExistingProvider', () => {
       advanced: { attachToExistingProvider: true },
     });
 
-    expect(existingProvider.addSpanProcessor).not.toHaveBeenCalled();
+    const processorsAfter = (provider as any)._activeSpanProcessor._spanProcessors.length;
+    expect(processorsAfter).toBe(processorsBefore);
   });
 
-  it('attaches user-provided span processors to existing provider', async () => {
-    const existingProvider = createTestProvider();
-    trace.setGlobalTracerProvider(existingProvider as any);
+  it('attaches user-provided span processors to real provider', async () => {
+    const provider = new NodeTracerProvider();
+    provider.register();
+    const processorsBefore = (provider as any)._activeSpanProcessor._spanProcessors.length;
     const logger = createMockLogger();
     const customProcessor = { onStart: vi.fn(), onEnd: vi.fn(), shutdown: vi.fn().mockResolvedValue(undefined), forceFlush: vi.fn() };
 
@@ -98,7 +96,8 @@ describe('setupObservability Integration - attachToExistingProvider', () => {
       advanced: { attachToExistingProvider: true },
     });
 
-    expect(existingProvider.addSpanProcessor).toHaveBeenCalledTimes(2);
+    const processorsAfter = (provider as any)._activeSpanProcessor._spanProcessors.length;
+    expect(processorsAfter).toBe(processorsBefore + 2);
     await expect(handle.shutdown()).resolves.toBeUndefined();
   });
 });
