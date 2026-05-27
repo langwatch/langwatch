@@ -62,6 +62,9 @@ class Client(LangWatchClientProtocol):
     _ignore_global_tracer_provider_override_warning: ClassVar[bool] = False
     _skip_open_telemetry_setup: ClassVar[bool] = False
     _tracer_provider: ClassVar[Optional[TracerProvider]] = None
+    _is_dedicated_provider: ClassVar[bool] = False
+    _exporter_attached_providers: ClassVar[set[int]] = set()
+    _langwatch_processor: ClassVar[Optional["FilterableBatchSpanProcessor"]] = None
     _rest_api_client: ClassVar[Optional[LangWatchApiClient]] = None
     _registered_instrumentors: ClassVar[
         dict[opentelemetry.trace.TracerProvider, set[BaseInstrumentor]]
@@ -184,7 +187,11 @@ class Client(LangWatchClientProtocol):
             if instrumentors is not None:
                 Client._instrumentors = instrumentors
             if tracer_provider is not None:
+                if Client._tracer_provider is not None and Client._tracer_provider is not tracer_provider:
+                    self.__detach_langwatch_processor()
+                    self.__uninstrument_from_old_provider()
                 Client._tracer_provider = tracer_provider
+                Client._is_dedicated_provider = True
             # Ensure OTEL is configured and instrumentors are registered for the active provider
             if not Client._skip_open_telemetry_setup:
                 Client._tracer_provider = self.__ensure_otel_setup(
@@ -278,7 +285,11 @@ class Client(LangWatchClientProtocol):
             Client._instrumentors = ()
 
         if tracer_provider is not None:
+            if Client._tracer_provider is not None and Client._tracer_provider is not tracer_provider:
+                self.__detach_langwatch_processor()
+                self.__uninstrument_from_old_provider()
             Client._tracer_provider = tracer_provider
+            Client._is_dedicated_provider = True
 
         # Set up base attributes with SDK info
         Client._base_attributes[AttributeKey.LangWatchSDKName] = (
@@ -382,6 +393,9 @@ class Client(LangWatchClientProtocol):
         cls._ignore_global_tracer_provider_override_warning = False
         cls._skip_open_telemetry_setup = False
         cls._tracer_provider = None
+        cls._is_dedicated_provider = False
+        cls._exporter_attached_providers.clear()
+        cls._langwatch_processor = None
         cls._rest_api_client = None
         cls._prompts_path = None
         cls._registered_instrumentors.clear()
@@ -436,12 +450,12 @@ class Client(LangWatchClientProtocol):
         Client._api_key = value
 
         if previous_key and not Client._skip_open_telemetry_setup:
-            # Shut down any existing tracer provider, as API key change requires re-initialization.
             self.__shutdown_tracer_provider()
 
-            # HACK: set global tracer provider to a proxy tracer provider back
-            opentelemetry.trace._TRACER_PROVIDER = None  # type: ignore
-            opentelemetry.trace._TRACER_PROVIDER_SET_ONCE = Once()  # type: ignore
+            if not Client._is_dedicated_provider:
+                # HACK: set global tracer provider to a proxy tracer provider back
+                opentelemetry.trace._TRACER_PROVIDER = None  # type: ignore
+                opentelemetry.trace._TRACER_PROVIDER_SET_ONCE = Once()  # type: ignore
 
         # Ensure provider/exporter exist after setting the key
         if (
@@ -530,25 +544,63 @@ class Client(LangWatchClientProtocol):
 
     def __shutdown_tracer_provider(self) -> None:
         """Shuts down the current tracer provider, including flushing."""
-        if self._tracer_provider:
-            if self._flush_on_exit:
+        if not self._tracer_provider:
+            return
+
+        if Client._is_dedicated_provider:
+            self.__detach_langwatch_processor()
+            return
+
+        if self._flush_on_exit:
+            try:
+                atexit.unregister(self._tracer_provider.force_flush)
+            except ValueError:
+                pass  # atexit handler was never registered or already unregistered
+
+        force_flush = getattr(self._tracer_provider, "force_flush", None)
+        if callable(force_flush):
+            if self._debug:
+                logger.debug("Forcing flush of tracer provider before shutdown.")
+            force_flush()
+
+        if Client._debug:
+            logger.debug("Shutting down tracer provider.")
+        if Client._tracer_provider is not None:
+            Client._exporter_attached_providers.discard(id(Client._tracer_provider))
+            Client._tracer_provider.shutdown()
+        Client._tracer_provider = None
+
+    def __detach_langwatch_processor(self) -> None:
+        """Remove and shut down only our processor from a user-owned provider."""
+        if Client._langwatch_processor is not None:
+            Client._langwatch_processor.force_flush()
+            Client._langwatch_processor.shutdown()
+            try:
+                multi = Client._tracer_provider._active_span_processor  # type: ignore[union-attr]
+                old = Client._langwatch_processor
+                multi._span_processors = tuple(
+                    p for p in multi._span_processors if p is not old
+                )
+            except AttributeError:
+                if Client._debug:
+                    logger.debug("Could not access provider internals to remove processor")
+            Client._langwatch_processor = None
+        if Client._tracer_provider is not None:
+            Client._exporter_attached_providers.discard(id(Client._tracer_provider))
+
+    def __uninstrument_from_old_provider(self) -> None:
+        """Uninstrument all instrumentors so they can be re-registered
+        against a new provider. OTel instrumentors no-op on instrument()
+        if already instrumented, so uninstrument must be called first."""
+        old_provider = Client._tracer_provider
+        if old_provider in Client._registered_instrumentors:
+            for instrumentor in Client._registered_instrumentors[old_provider]:
                 try:
-                    # Unregister the atexit hook if it was registered.
-                    atexit.unregister(self._tracer_provider.force_flush)
-                except ValueError:
-                    pass  # Handler was never registered or already unregistered.
-
-            force_flush = getattr(self._tracer_provider, "force_flush", None)
-            if callable(force_flush):
-                if self._debug:
-                    logger.debug("Forcing flush of tracer provider before shutdown.")
-                force_flush()
-
-            if Client._debug:
-                logger.debug("Shutting down tracer provider.")
-            if Client._tracer_provider is not None:
-                Client._tracer_provider.shutdown()
-            Client._tracer_provider = None
+                    instrumentor.uninstrument()
+                except Exception:
+                    if Client._debug:
+                        logger.debug(f"Failed to uninstrument {instrumentor}")
+            del Client._registered_instrumentors[old_provider]
 
     def __setup_tracer_provider(self) -> None:
         """Sets up the tracer provider if not already active."""
@@ -561,7 +613,12 @@ class Client(LangWatchClientProtocol):
             if Client._debug:
                 logger.debug("Setting up new tracer provider.")
             Client._tracer_provider = self.__ensure_otel_setup()
+            return
 
+        if Client._is_dedicated_provider and id(Client._tracer_provider) not in Client._exporter_attached_providers:
+            if Client._debug:
+                logger.debug("Re-attaching LangWatch exporter to dedicated provider.")
+            self.__set_langwatch_exporter(Client._tracer_provider)
             return
 
         if Client._debug:
@@ -570,6 +627,13 @@ class Client(LangWatchClientProtocol):
     def __ensure_otel_setup(
         self, tracer_provider: Optional[TracerProvider] = None
     ) -> TracerProvider:
+        if Client._is_dedicated_provider:
+            dedicated = tracer_provider or Client._tracer_provider
+            if dedicated is not None:
+                self.__set_langwatch_exporter(dedicated)
+                return dedicated
+            return self.__create_new_tracer_provider()
+
         settable_tracer_provider = (
             tracer_provider or self.__create_new_tracer_provider()
         )
@@ -628,6 +692,11 @@ class Client(LangWatchClientProtocol):
             ) from e
 
     def __set_langwatch_exporter(self, provider: TracerProvider) -> None:
+        provider_id = id(provider)
+        if provider_id in Client._exporter_attached_providers:
+            if Client._debug:
+                logger.debug("LangWatch exporter already attached to this provider, skipping")
+            return
         if not Client._api_key:
             raise ValueError("LangWatch API key is required but not provided")
 
@@ -664,6 +733,8 @@ class Client(LangWatchClientProtocol):
             export_timeout_millis=float(os.getenv("OTEL_BSP_EXPORT_TIMEOUT", 10000)),
         )
         provider.add_span_processor(processor)
+        Client._langwatch_processor = processor
+        Client._exporter_attached_providers.add(provider_id)
 
     def _setup_rest_api_client(self) -> LangWatchApiClient:
         """

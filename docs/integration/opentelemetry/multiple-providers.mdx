@@ -1,0 +1,139 @@
+---
+title: Running LangWatch with Other OTel SDKs
+sidebarTitle: Multiple OTel Providers
+description: How to configure LangWatch for complete trace isolation when running alongside another OpenTelemetry-based SDK.
+icon: layer-group
+---
+
+When you run LangWatch alongside another OTel-based SDK (for example, an APM
+tool), both SDKs may hook into the same global `TracerProvider`. This causes
+**cross-contamination** — LLM traces appear in the other tool and application
+traces appear in LangWatch.
+
+Both SDKs support **true provider isolation** using a dedicated `TracerProvider`.
+
+## The Problem
+
+OpenTelemetry has a single global `TracerProvider`. When two SDKs both connect to
+it, every span flows to every exporter:
+
+```
+┌─────────────────────────────────────────────┐
+│          Global TracerProvider               │
+│                                             │
+│  ┌─────────────┐    ┌────────────────────┐  │
+│  │ Other SDK's │    │ LangWatch's        │  │
+│  │ Exporter    │    │ Exporter           │  │
+│  └──────┬──────┘    └─────────┬──────────┘  │
+│         │                     │             │
+│    ALL spans              ALL spans         │
+└─────────────────────────────────────────────┘
+```
+
+Both exporters receive all spans — HTTP requests, database queries, LLM calls,
+and everything else.
+
+## Solution: Dedicated TracerProvider
+
+Both the Python and TypeScript SDKs support passing a dedicated `TracerProvider`.
+LangWatch attaches its exporter to that provider and does **not** touch the
+global. The other SDK keeps the global provider and never sees LLM traces.
+
+### Python
+
+```python
+from opentelemetry.sdk.trace import TracerProvider
+import langwatch
+
+# 1. The other OTel SDK initializes first (sets the global provider)
+
+# 2. Create a dedicated provider for LangWatch
+langwatch_provider = TracerProvider()
+
+# 3. LangWatch uses this provider exclusively
+langwatch.setup(tracer_provider=langwatch_provider)
+```
+
+With a dedicated provider:
+- `langwatch.trace()` creates spans on the dedicated provider automatically
+- The other SDK only receives spans on the global provider
+- Neither SDK sees the other's spans
+
+### TypeScript
+
+```typescript
+import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
+import { setupObservability } from "langwatch/observability/node";
+
+// 1. The other OTel SDK initializes first (sets the global provider)
+
+// 2. Create a dedicated provider for LangWatch
+const lwProvider = new NodeTracerProvider();
+
+// 3. LangWatch attaches its exporter to this provider only
+setupObservability({
+  tracerProvider: lwProvider,
+  langwatch: {
+    apiKey: process.env.LANGWATCH_API_KEY,
+  },
+});
+
+// 4. Use lwProvider.getTracer() for LLM calls
+const tracer = lwProvider.getTracer("my-llm-service");
+```
+
+With a dedicated provider:
+- Only spans created through `lwProvider.getTracer()` go to LangWatch
+- The global provider (used by the other SDK) is untouched
+- Neither SDK sees the other's spans
+
+<Note>
+Auto-instrumentations that emit spans through the global OTel API (like Vercel
+AI SDK's `experimental_telemetry`) will send spans to the global provider, not
+the dedicated one. For those, use `lwProvider.getTracer()` directly to create
+LLM spans on the isolated provider.
+</Note>
+
+## Alternative: Coexistence (TypeScript)
+
+If you don't need full isolation and just want LangWatch to receive spans from
+an existing provider, use `advanced.attachToExistingProvider`:
+
+```typescript
+setupObservability({
+  langwatch: { apiKey: process.env.LANGWATCH_API_KEY },
+  advanced: { attachToExistingProvider: true },
+});
+```
+
+This adds LangWatch's processor to the shared global provider. LangWatch
+receives **all** spans — use the `LangWatchTraceExporter` filter options to
+scope to LLM-only spans. See the
+[TypeScript SDK reference](/integration/typescript/reference) for filter
+configuration.
+
+## Alternative: Filtering (Python)
+
+If you prefer to share the global provider in Python, use `span_exclude_rules`:
+
+```python
+from langwatch.domain import SpanProcessingExcludeRule
+import langwatch
+
+langwatch.setup(
+    span_exclude_rules=[
+        SpanProcessingExcludeRule(
+            field_name="span_name",
+            match_operation="starts_with",
+            match_value="GET",
+        ),
+        SpanProcessingExcludeRule(
+            field_name="span_name",
+            match_operation="starts_with",
+            match_value="POST",
+        ),
+    ],
+)
+```
+
+This is a name-based blocklist. The dedicated provider approach is more reliable.

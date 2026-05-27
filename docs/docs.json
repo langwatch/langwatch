@@ -297,6 +297,7 @@
                 ]
               },
               "integration/opentelemetry/guide",
+              "integration/opentelemetry/multiple-providers",
               "integration/metadata-and-labels",
               {
                 "group": "Tutorials",
@@ -458,6 +459,7 @@
             "group": "Direct Integrations",
             "pages": [
               "integration/opentelemetry/guide",
+              "integration/opentelemetry/multiple-providers",
               "integration/rest-api"
             ]
           }
