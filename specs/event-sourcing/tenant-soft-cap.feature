@@ -83,6 +83,29 @@ Feature: Per-tenant soft cap on in-flight dispatch
     When a full dispatch then completion lifecycle runs for any tenant
     Then no tenant counter keys are ever created in Redis
 
+  # Defer-on-over-cap — when a tenant is at cap, the scheduler bumps that
+  # tenant's over-cap groups to a future score so subsequent polls don't
+  # re-scan them. Without this, every dispatch poll pays the full
+  # scan-past-noisy-tenant cost (see #4209).
+
+  @integration @tenant-cap @fairness @defer
+  Scenario: Over-cap groups are deferred so they don't starve other tenants on repeated polls
+    Given a tenant "proj_noisy" with cap=1 and 50 groups at the head of ready
+    And a tenant "proj_quiet" with 1 group later in the zset
+    When DISPATCH_LUA is invoked three times at the same nowMs
+    Then the first call dispatches a "proj_noisy" group
+    And the second call dispatches "proj_quiet"'s group after walking past over-cap noisy entries
+    And the third call returns null immediately because the over-cap noisy groups were rescored to a future window
+    And the deferred groups become eligible again once the defer window elapses
+
+  @integration @tenant-cap @batch @defer
+  Scenario: dispatchBatch defers over-cap groups the same way
+    Given a tenant "proj_noisy" with cap=1 and 20 groups at the head of ready
+    And a tenant "proj_quiet" with 1 group later in the zset
+    When DISPATCH_BATCH_LUA is invoked
+    Then over-cap "proj_noisy" groups are rescored to a future window
+    And a subsequent batch poll at the same nowMs does not re-scan the deferred entries
+
   # DISPATCH_BATCH_LUA parity — the batch path shares the same cap logic
   # but iterates multiple groups per EVAL. These scenarios guard against
   # the batch branch drifting from the single-dispatch path above.

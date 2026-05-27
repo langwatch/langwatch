@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useRequiredSession } from "~/hooks/useRequiredSession";

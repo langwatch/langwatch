@@ -1937,8 +1937,6 @@ model LangyProjectMemory {
     lastEditorId   String?
 
     history        LangyProjectMemoryHistory[]
-
-    @@index([projectId])
 }
 
 model LangyProjectMemoryHistory {

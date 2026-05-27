@@ -190,8 +190,14 @@ app.use("/langy/*", async (c, next) => {
   if (!isLangwatchStaff(session?.user?.email)) {
     return c.json({ error: "Langy is not available for your account" }, 403);
   }
+  // PRODUCT-scoped flag: rules may target a specific project. Pass projectId
+  // when it's in the query (GET routes); body-based routes (chat, etc.)
+  // can't share it here, so we fall back to the global eval. Keep this
+  // in sync with the UI gate in DashboardLayout.tsx (uses projectId+org).
+  const projectId = c.req.query("projectId") ?? undefined;
   const enabled = await featureFlagService.isEnabled("release_langy_enabled", {
     distinctId: session?.user?.id ?? "",
+    projectId,
   });
   if (!enabled) {
     return c.json({ error: "Langy is not currently enabled" }, 403);
@@ -222,6 +228,20 @@ app.post("/langy/chat", async (c) => {
 
   if (!projectId) {
     return c.json({ error: "Missing projectId" }, { status: 400 });
+  }
+
+  // Re-evaluate the flag with the body's projectId — the upstream
+  // middleware only had query params, so a project-scoped rule could be
+  // bypassed here without this second check.
+  const enabledForProject = await featureFlagService.isEnabled(
+    "release_langy_enabled",
+    {
+      distinctId: session.user.id,
+      projectId,
+    },
+  );
+  if (!enabledForProject) {
+    return c.json({ error: "Langy is not currently enabled" }, 403);
   }
 
   const hasPermission = await hasProjectPermission(

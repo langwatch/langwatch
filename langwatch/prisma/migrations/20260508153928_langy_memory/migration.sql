@@ -51,7 +51,6 @@ CREATE TABLE "LangyProjectMemory" (
 );
 
 CREATE UNIQUE INDEX "LangyProjectMemory_projectId_key" ON "LangyProjectMemory"("projectId");
-CREATE INDEX "LangyProjectMemory_projectId_idx" ON "LangyProjectMemory"("projectId");
 
 -- LangyProjectMemoryHistory
 CREATE TABLE "LangyProjectMemoryHistory" (
