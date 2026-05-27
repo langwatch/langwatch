@@ -48,6 +48,17 @@ const logger = createLogger("langwatch:api:langy");
 
 const LANGY_FALLBACK_MODEL = "openai/gpt-5-mini";
 
+// User-facing strings for the structured error events the pod's manager
+// emits. Anything not in this map falls through to the raw error string.
+const AGENT_ERROR_MESSAGES: Record<string, string> = {
+  "at-capacity":
+    "Langy is at capacity right now. Please retry in a minute.",
+  "turn-in-flight":
+    "Previous message is still being processed. Please wait for it to finish before sending another.",
+  "session-not-found":
+    "Conversation session expired on the agent. Send your message again to start a fresh session.",
+};
+
 function extractAssistantText(
   parts: Array<Record<string, unknown>> | undefined,
 ): string {
@@ -313,6 +324,7 @@ app.post("/langy/chat", async (c) => {
           try {
             const event = JSON.parse(line) as {
               type: string;
+              error?: string;
               part?: { type?: string; text?: string };
               properties?: {
                 field?: string;
@@ -320,6 +332,22 @@ app.post("/langy/chat", async (c) => {
                 part?: { type?: string; text?: string };
               };
             };
+            // Manager-emitted error events (at-capacity, turn-in-flight,
+            // session-not-found, generic). Without explicit handling
+            // these silently terminate the stream and the user sees an
+            // empty assistant reply. Surface as a visible delta + log.
+            if (event.type === "error") {
+              const errMsg = event.error ?? "agent error";
+              logger.warn(
+                { error: errMsg, conversationId: conversation.id },
+                "opencode agent returned error event",
+              );
+              const userMessage = AGENT_ERROR_MESSAGES[errMsg] ?? errMsg;
+              const delta = `\n\n_${userMessage}_`;
+              fullText += delta;
+              writer.write({ type: "text-delta", delta, id: textId });
+              continue;
+            }
             // Legacy shape (kept for older agent versions).
             if (event.type === "text" && event.part?.text) {
               fullText += event.part.text;

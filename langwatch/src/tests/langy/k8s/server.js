@@ -55,7 +55,24 @@ if (!INTERNAL_SECRET) {
 }
 
 // ---------- Worker registry ----------
-// conversationId -> { child, port, openCodeSessionId, lastSeen }
+// conversationId -> WorkerEntry
+//   {
+//     ready: Promise<WorkerInfo>,   // resolves when the subprocess is ready;
+//                                   // the entry is inserted into the map
+//                                   // BEFORE this promise settles, so a
+//                                   // second concurrent /chat for the same
+//                                   // conversationId awaits the same spawn
+//                                   // instead of racing into a duplicate one
+//     info: WorkerInfo | null,      // null while ready is pending; set once
+//                                   // the subprocess is up + session created
+//     lastSeen: number,             // reaper input
+//     inFlight: boolean,            // true while a turn is mid-stream; the
+//                                   // /chat handler refuses overlapping
+//                                   // turns on the same conversation so two
+//                                   // streams can't share one opencode
+//                                   // session
+//   }
+// WorkerInfo = { child, port, openCodeSessionId }
 const workers = new Map();
 
 // ---------- OpenCode SSE event types we treat as terminal ----------
@@ -255,13 +272,11 @@ async function streamSessionEvents(port, sessionId, res, signal) {
 
 // ---------- Worker lifecycle ----------
 
-async function spawnWorker(conversationId, credentials) {
-  if (workers.size >= MAX_WORKERS) {
-    const err = new Error("max-workers-reached");
-    err.code = "max-workers-reached";
-    throw err;
-  }
-
+// Spawn + wait-for-ready + create opencode session. Called from
+// getOrSpawnWorker, which is the only caller — never invoke directly:
+// the map entry must exist before the first await so concurrent
+// requests don't double-spawn.
+async function startWorkerSubprocess(conversationId, credentials) {
   const workerHome = path.join(SESSIONS_ROOT, conversationId);
   fs.mkdirSync(workerHome, { recursive: true });
   setupWorkerHome(workerHome, credentials);
@@ -289,15 +304,28 @@ async function spawnWorker(conversationId, credentials) {
     },
   );
 
+  // Identity check: only delete the entry if it still points at THIS
+  // child. A late-firing exit from a previously-killed worker must not
+  // remove a fresh entry that has since replaced it.
   child.on("exit", (code, signal) => {
     console.log(
       `worker ${conversationId} exited (code=${code}, signal=${signal})`,
     );
-    workers.delete(conversationId);
+    const current = workers.get(conversationId);
+    if (current?.info?.child === child) {
+      workers.delete(conversationId);
+    }
   });
 
+  // Single try wraps everything between spawn and "session created".
+  // Any failure here — readiness timeout, opencode crash during boot,
+  // /session POST failing — must kill the child so we don't leak a
+  // subprocess that's not in the workers map and not visible to the
+  // reaper.
+  let openCodeSessionId;
   try {
     await waitForReadiness(port, READINESS_TIMEOUT_MS);
+    openCodeSessionId = await createOpenCodeSession(port);
   } catch (err) {
     try {
       child.kill("SIGTERM");
@@ -305,14 +333,64 @@ async function spawnWorker(conversationId, credentials) {
     throw err;
   }
 
-  const openCodeSessionId = await createOpenCodeSession(port);
-
-  const info = { child, port, openCodeSessionId, lastSeen: Date.now() };
-  workers.set(conversationId, info);
   console.log(
     `worker ${conversationId} ready on :${port} (session ${openCodeSessionId})`,
   );
-  return info;
+  return { child, port, openCodeSessionId };
+}
+
+// Returns the WorkerEntry once the worker is ready. The map entry is
+// inserted BEFORE the first await, so a second concurrent first-turn
+// for the same conversationId awaits the same spawn instead of starting
+// a parallel one (which would leak an orphan subprocess invisible to
+// the reaper). Looped so that if N waiters were all blocked on a failed
+// spawn, only the first to resume actually spawns a replacement; the
+// rest see the new entry on the next iteration.
+async function getOrSpawnWorker(conversationId, credentials) {
+  while (true) {
+    const existing = workers.get(conversationId);
+    if (existing) {
+      try {
+        await existing.ready;
+        return existing;
+      } catch {
+        // ready rejected — the failing spawn's IIFE deleted the entry
+        // (see catch below). Loop to re-check whether another waiter
+        // has already started a fresh spawn before we try ourselves.
+        continue;
+      }
+    }
+
+    if (workers.size >= MAX_WORKERS) {
+      const err = new Error("max-workers-reached");
+      err.code = "max-workers-reached";
+      throw err;
+    }
+
+    const entry = {
+      ready: null,
+      info: null,
+      lastSeen: Date.now(),
+      inFlight: false,
+    };
+    entry.ready = (async () => {
+      try {
+        const info = await startWorkerSubprocess(conversationId, credentials);
+        entry.info = info;
+        return info;
+      } catch (err) {
+        // Remove only if we're still the registered entry — a fresh
+        // spawn started after us must not be evicted by our failure.
+        if (workers.get(conversationId) === entry) {
+          workers.delete(conversationId);
+        }
+        throw err;
+      }
+    })();
+    workers.set(conversationId, entry);
+    await entry.ready;
+    return entry;
+  }
 }
 
 function killWorker(conversationId, reason) {
@@ -320,15 +398,20 @@ function killWorker(conversationId, reason) {
   if (!w) return;
   console.log(`killing worker ${conversationId}: ${reason}`);
   try {
-    w.child.kill("SIGTERM");
+    w.info?.child.kill("SIGTERM");
   } catch {}
-  // The exit handler removes from map; force-clean here in case it races.
+  // The exit handler removes from map; force-clean here in case it races
+  // (or in case info is null because spawn is still in flight).
   workers.delete(conversationId);
 }
 
 setInterval(() => {
   const cutoff = Date.now() - WORKER_IDLE_MS;
   for (const [convId, w] of workers) {
+    // Don't reap workers that are mid-turn or still spawning. Skipping
+    // pending entries (info === null) avoids killing a subprocess
+    // before its map entry has a child handle to SIGTERM.
+    if (!w.info || w.inFlight) continue;
     if (w.lastSeen < cutoff) {
       killWorker(convId, "idle timeout");
     }
@@ -407,35 +490,58 @@ const server = http.createServer((req, res) => {
       const abort = new AbortController();
       req.on("close", () => abort.abort());
 
+      let acquiredWorker = null;
       try {
-        let worker = workers.get(conversationId);
-        if (!worker) {
-          try {
-            worker = await spawnWorker(conversationId, credentials);
-          } catch (err) {
-            if (err.code === "max-workers-reached") {
-              res.write(
-                JSON.stringify({ type: "error", error: "at-capacity" }) + "\n",
-              );
-              res.end();
-              return;
-            }
-            throw err;
+        let worker;
+        try {
+          worker = await getOrSpawnWorker(conversationId, credentials);
+        } catch (err) {
+          if (err.code === "max-workers-reached") {
+            res.write(
+              JSON.stringify({ type: "error", error: "at-capacity" }) + "\n",
+            );
+            res.end();
+            return;
           }
+          throw err;
         }
+
+        // Per-conversation turn mutex. Two overlapping turns on the
+        // same conversationId would share one opencode session and one
+        // /event stream, interleaving each other's deltas + terminal
+        // events. Refuse the second turn instead — the control plane
+        // surfaces this so the user sees a clear error rather than a
+        // corrupted reply.
+        if (worker.inFlight) {
+          res.write(
+            JSON.stringify({ type: "error", error: "turn-in-flight" }) + "\n",
+          );
+          res.end();
+          return;
+        }
+        worker.inFlight = true;
+        acquiredWorker = worker;
         worker.lastSeen = Date.now();
 
+        const info = worker.info;
+
+        // Defensive .catch so a rejection on the SSE side (e.g. opencode
+        // dies mid-stream) doesn't escape as an unhandled rejection when
+        // we early-return below without awaiting it.
+        let streamError = null;
         const streamPromise = streamSessionEvents(
-          worker.port,
-          worker.openCodeSessionId,
+          info.port,
+          info.openCodeSessionId,
           res,
           abort.signal,
-        );
+        ).catch((err) => {
+          streamError = err;
+        });
 
         try {
           await postMessage(
-            worker.port,
-            worker.openCodeSessionId,
+            info.port,
+            info.openCodeSessionId,
             system,
             prompt,
           );
@@ -444,7 +550,10 @@ const server = http.createServer((req, res) => {
             // Worker's internal opencode session vanished mid-turn (rare —
             // happens if opencode garbage-collects sessions on its own).
             // Kill the worker so the next request gets a fresh one.
+            // Killing the worker terminates the SSE source, which lets
+            // streamPromise settle via its .catch.
             killWorker(conversationId, "opencode session vanished");
+            abort.abort();
             res.write(
               JSON.stringify({ type: "error", error: "session-not-found" }) +
                 "\n",
@@ -452,10 +561,17 @@ const server = http.createServer((req, res) => {
             res.end();
             return;
           }
+          // Stream is still subscribed to /event waiting for a terminal
+          // event that will never come (we never successfully posted).
+          // Abort so reader.cancel() fires and streamPromise resolves
+          // via its .catch — otherwise it leaks an open HTTP connection
+          // to opencode for this worker's session.
+          abort.abort();
           throw err;
         }
 
         await streamPromise;
+        if (streamError) throw streamError;
         res.end();
       } catch (err) {
         console.error(`ERROR (${conversationId}):`, err.message);
@@ -465,6 +581,8 @@ const server = http.createServer((req, res) => {
           );
         } catch {}
         res.end();
+      } finally {
+        if (acquiredWorker) acquiredWorker.inFlight = false;
       }
     });
     return;
