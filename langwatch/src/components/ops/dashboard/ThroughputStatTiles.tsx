@@ -6,12 +6,7 @@ import {
 import type { DashboardData } from "~/server/app-layer/ops/types";
 import { LinkedStat } from "./LinkedStat";
 
-/**
- * The throughput / latency / backlog stat strip on the ops dashboard. Extracted
- * from OpsDashboardContent so the per-second tiles can be rendered in isolation
- * under test (mirrors RedisStatTiles). Returns a fragment of grid cells; the
- * parent SimpleGrid owns the layout.
- */
+/** The subset of dashboard data the throughput stat strip reads. */
 type ThroughputStatData = Pick<
   DashboardData,
   | "throughputIngestedPerSec"
@@ -29,6 +24,12 @@ type ThroughputStatData = Pick<
   | "queues"
 >;
 
+/**
+ * The throughput / latency / backlog stat strip on the ops dashboard. Extracted
+ * from OpsDashboardContent so the per-second tiles can be rendered in isolation
+ * under test (mirrors RedisStatTiles). Returns a fragment of grid cells; the
+ * parent SimpleGrid owns the layout.
+ */
 export function ThroughputStatTiles({ data }: { data: ThroughputStatData }) {
   const totalBlocked = data.queues.reduce(
     (sum, q) => sum + q.blockedGroupCount,
