@@ -24,20 +24,31 @@ export interface NormalizedSpanReader {
 interface DeriveParams {
   tenantId: string;
   traceId: string;
+  /**
+   * ClickHouse partition hint (the trace's EARLIEST span time). It narrows the
+   * partitions scanned; it is NOT a freshness cutoff and does not bound which
+   * spans come back, so it must not key the memo.
+   */
   occurredAtMs?: number;
+  /**
+   * Monotonic fold watermark — the fold's `spanCount`, which increments every
+   * time a span is folded. The memo is keyed on it so a cached derivation is
+   * reused only within one fold version (all of a coalesced batch's per-event
+   * reactors observe the same final state, so they share one read) and is
+   * dropped the moment newer spans land. Omit it to bypass the memo (a live
+   * read with no watermark must always hit storage).
+   */
+  foldVersion?: number;
 }
 
 /**
- * Window during which a derivation for the same (tenant, trace, cutoff) reuses
- * the in-flight or just-resolved span read. A coalesced fold batch dispatches
- * its reactors per event but with one shared final fold state, so every
- * reactor derives at the same occurredAt cutoff back-to-back; this window
- * collapses those identical reads into one. Kept short because the cutoff makes
- * each read deterministic, so the only thing aging out matters for is rare
- * out-of-order late spans.
+ * Window after which a memo entry is dropped purely as a memory backstop —
+ * correctness comes from the fold-version key, not from aging. An entry for a
+ * superseded version is simply never read again, so this only bounds how long
+ * an unused entry lingers.
  */
 const DERIVATION_READ_WINDOW_MS = 30_000;
-/** Cap so a burst of distinct traces can't grow the memo without bound. */
+/** Cap so a burst of distinct traces/versions can't grow the memo without bound. */
 const DERIVATION_MEMO_MAX_ENTRIES = 2_000;
 
 interface MemoEntry<T> {
@@ -55,11 +66,11 @@ interface MemoEntry<T> {
  *
  * The all-spans read these derivations issue is multi-MB for large traces. A
  * coalesced fold batch fires its reactors once per event but at one shared
- * occurredAt cutoff, so without coalescing the same read would run once per
+ * final fold state, so without coalescing the same read would run once per
  * span in the backlog — the read-amplification that re-saturated Redis/ClickHouse
- * during a backlog drain. The derivations are memoized per (tenant, trace,
- * cutoff) so a batch reads stored spans once regardless of how many reactors or
- * events it dispatches.
+ * during a backlog drain. The derivations are memoized per (tenant, trace, fold
+ * version) so a batch reads stored spans once regardless of how many reactors or
+ * events it dispatches, while a fold that has advanced (new spans) re-reads.
  */
 export class TraceReadDerivationService {
   private readonly spanCostService = new SpanCostService();
@@ -75,7 +86,11 @@ export class TraceReadDerivationService {
     params: DeriveParams,
   ): Promise<ScenarioRoleMetrics> {
     return this.memoize(this.scenarioRoleMetricsMemo, params, async () => {
-      const spans = await this.spans.getNormalizedSpansByTraceId(params);
+      const spans = await this.spans.getNormalizedSpansByTraceId({
+        tenantId: params.tenantId,
+        traceId: params.traceId,
+        occurredAtMs: params.occurredAtMs,
+      });
       return deriveScenarioRoleMetricsFromSpans({
         spans,
         spanCostService: this.spanCostService,
@@ -85,18 +100,23 @@ export class TraceReadDerivationService {
 
   async deriveEvents(params: DeriveParams): Promise<DerivedTraceEvent[]> {
     return this.memoize(this.eventsMemo, params, () =>
-      this.spans.getTraceEventsByTraceId(params),
+      this.spans.getTraceEventsByTraceId({
+        tenantId: params.tenantId,
+        traceId: params.traceId,
+        occurredAtMs: params.occurredAtMs,
+      }),
     );
   }
 
   /**
-   * Only deterministic reads are memoized: a derivation with an occurredAt
-   * cutoff returns the same spans no matter when it runs, so sharing it across
-   * a batch is safe. A live read (no cutoff) is left to pass straight through.
+   * Only memoize when a fold watermark is supplied: the key is the fold's
+   * version (spanCount), so a cached read is reused within one fold version and
+   * re-issued as soon as the fold advances. Without a watermark the read is
+   * non-deterministic over time and is left to pass straight through.
    */
   private memoKey(params: DeriveParams): string | null {
-    if (params.occurredAtMs === undefined) return null;
-    return `${params.tenantId}:${params.traceId}:${params.occurredAtMs}`;
+    if (params.foldVersion === undefined) return null;
+    return `${params.tenantId}:${params.traceId}:${params.foldVersion}`;
   }
 
   private memoize<T>(

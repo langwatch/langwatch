@@ -43,6 +43,7 @@ export interface EvaluationAlertTriggerReactorDeps
     tenantId: string;
     traceId: string;
     occurredAtMs?: number;
+    foldVersion?: number;
   }) => Promise<DerivedTraceEvent[]>;
 }
 
@@ -144,6 +145,7 @@ export function createEvaluationAlertTriggerReactor(
             tenantId,
             traceId,
             occurredAtMs: traceSummary.occurredAt,
+            foldVersion: traceSummary.spanCount,
           })
         : null;
 

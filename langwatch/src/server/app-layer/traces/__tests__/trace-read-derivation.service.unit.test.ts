@@ -24,21 +24,28 @@ class CountingReader implements NormalizedSpanReader {
   }
 }
 
-const CUTOFF_PARAMS = { tenantId: "t1", traceId: "trace-1", occurredAtMs: 1000 };
+// One coalesced batch: every per-event reactor observes the same final fold
+// state, so foldVersion (spanCount) is identical across the batch.
+const BATCH_PARAMS = {
+  tenantId: "t1",
+  traceId: "trace-1",
+  occurredAtMs: 1000,
+  foldVersion: 5,
+};
 
 afterEach(() => {
   vi.useRealTimers();
 });
 
 describe("TraceReadDerivationService", () => {
-  describe("given several reactor invocations derive trace data for the same trace at one fold cutoff", () => {
-    describe("when they run within one coalesced batch window", () => {
-      /** @scenario Repeated trace-level derivations for one trace read stored spans once */
+  describe("given several reactor invocations derive trace data for the same trace at one fold version", () => {
+    describe("when they run within one coalesced batch", () => {
+      /** @scenario Repeated trace-level derivations within one fold version read stored spans once */
       it("reads the stored events once, not once per invocation", async () => {
         const reader = new CountingReader();
         const service = new TraceReadDerivationService(reader);
 
-        for (let i = 0; i < 10; i++) await service.deriveEvents(CUTOFF_PARAMS);
+        for (let i = 0; i < 10; i++) await service.deriveEvents(BATCH_PARAMS);
 
         expect(reader.eventReads).toBe(1);
       });
@@ -48,7 +55,7 @@ describe("TraceReadDerivationService", () => {
         const service = new TraceReadDerivationService(reader);
 
         for (let i = 0; i < 10; i++) {
-          await service.deriveScenarioRoleMetrics(CUTOFF_PARAMS);
+          await service.deriveScenarioRoleMetrics(BATCH_PARAMS);
         }
 
         expect(reader.spanReads).toBe(1);
@@ -59,9 +66,9 @@ describe("TraceReadDerivationService", () => {
         const service = new TraceReadDerivationService(reader);
 
         await Promise.all([
-          service.deriveEvents(CUTOFF_PARAMS),
-          service.deriveEvents(CUTOFF_PARAMS),
-          service.deriveEvents(CUTOFF_PARAMS),
+          service.deriveEvents(BATCH_PARAMS),
+          service.deriveEvents(BATCH_PARAMS),
+          service.deriveEvents(BATCH_PARAMS),
         ]);
 
         expect(reader.eventReads).toBe(1);
@@ -69,27 +76,42 @@ describe("TraceReadDerivationService", () => {
     });
   });
 
-  describe("given trace data already derived at one fold cutoff", () => {
-    describe("when trace data is derived again at a later cutoff", () => {
-      /** @scenario A later fold cutoff derives from stored spans again */
-      it("reads the stored spans again for the newer cutoff", async () => {
+  describe("given trace data already derived at one fold version", () => {
+    describe("when the fold advances with newer spans", () => {
+      /** @scenario A derivation re-reads once the fold has advanced with new spans */
+      it("reads the stored spans again rather than serving the earlier result", async () => {
         const reader = new CountingReader();
         const service = new TraceReadDerivationService(reader);
 
-        await service.deriveEvents(CUTOFF_PARAMS);
-        await service.deriveEvents({ ...CUTOFF_PARAMS, occurredAtMs: 2000 });
+        await service.deriveEvents(BATCH_PARAMS);
+        await service.deriveEvents({ ...BATCH_PARAMS, foldVersion: 6 });
+
+        expect(reader.eventReads).toBe(2);
+      });
+    });
+
+    describe("when more spans arrive but the partition hint stays the same", () => {
+      // occurredAtMs is the trace's earliest span time and only a partition
+      // hint, so it does not change as the trace grows; keying on it would
+      // serve stale spans. The advancing foldVersion is what forces a re-read.
+      it("re-reads on the advanced fold version even with an unchanged occurredAtMs", async () => {
+        const reader = new CountingReader();
+        const service = new TraceReadDerivationService(reader);
+
+        await service.deriveEvents({ ...BATCH_PARAMS, occurredAtMs: 1000, foldVersion: 5 });
+        await service.deriveEvents({ ...BATCH_PARAMS, occurredAtMs: 1000, foldVersion: 7 });
 
         expect(reader.eventReads).toBe(2);
       });
     });
   });
 
-  describe("given a live derivation with no fold cutoff", () => {
+  describe("given a live derivation with no fold version", () => {
     describe("when it is derived repeatedly", () => {
       it("reads every time because a live read is non-deterministic", async () => {
         const reader = new CountingReader();
         const service = new TraceReadDerivationService(reader);
-        const live = { tenantId: "t1", traceId: "trace-1" };
+        const live = { tenantId: "t1", traceId: "trace-1", occurredAtMs: 1000 };
 
         await service.deriveEvents(live);
         await service.deriveEvents(live);
@@ -100,15 +122,15 @@ describe("TraceReadDerivationService", () => {
   });
 
   describe("given the read window has elapsed", () => {
-    describe("when the same derivation runs again", () => {
+    describe("when the same fold version is derived again", () => {
       it("reads the stored events again", async () => {
         vi.useFakeTimers();
         const reader = new CountingReader();
         const service = new TraceReadDerivationService(reader);
 
-        await service.deriveEvents(CUTOFF_PARAMS);
+        await service.deriveEvents(BATCH_PARAMS);
         vi.setSystemTime(Date.now() + 31_000);
-        await service.deriveEvents(CUTOFF_PARAMS);
+        await service.deriveEvents(BATCH_PARAMS);
 
         expect(reader.eventReads).toBe(2);
       });
@@ -131,10 +153,10 @@ describe("TraceReadDerivationService", () => {
         };
         const service = new TraceReadDerivationService(reader);
 
-        await expect(service.deriveEvents(CUTOFF_PARAMS)).rejects.toThrow(
+        await expect(service.deriveEvents(BATCH_PARAMS)).rejects.toThrow(
           "clickhouse blip",
         );
-        await expect(service.deriveEvents(CUTOFF_PARAMS)).resolves.toEqual([]);
+        await expect(service.deriveEvents(BATCH_PARAMS)).resolves.toEqual([]);
         expect(attempts).toBe(2);
       });
     });
