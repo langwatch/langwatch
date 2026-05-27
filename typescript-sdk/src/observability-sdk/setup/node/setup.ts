@@ -15,6 +15,7 @@ import { ConsoleLogger, type Logger } from "../../../logger";
 import { initializeObservabilitySdkConfig } from "../../config";
 import { setLangWatchLoggerProvider } from "../../logger";
 import { DEFAULT_ENDPOINT } from "@/internal/constants";
+import { registerInstrumentations } from "@opentelemetry/instrumentation";
 
 // Helper functions
 const createNoOpHandle = (logger: Logger): ObservabilityHandle => ({
@@ -121,6 +122,10 @@ export function setupObservability(options: SetupObservabilityOptions = {}): Obs
     dataCapture: options.dataCapture,
   });
 
+  if (options.tracerProvider) {
+    return setupDedicatedProvider(options.tracerProvider, options, logger);
+  }
+
   const earlyExit = checkForEarlyExit(options, logger);
   if (earlyExit) return earlyExit;
 
@@ -166,6 +171,94 @@ export function setupObservability(options: SetupObservabilityOptions = {}): Obs
     if (options.advanced?.throwOnSetupError) throw err;
     return createNoOpHandle(logger);
   }
+}
+
+function setupDedicatedProvider(
+  provider: import("@opentelemetry/api").TracerProvider,
+  options: SetupObservabilityOptions,
+  logger: Logger,
+): ObservabilityHandle {
+  const langwatch = getLangWatchConfig(options);
+  const addedProcessors: SpanProcessor[] = [];
+
+  const internalArray = (provider as any)?._activeSpanProcessor?._spanProcessors;
+  const hasPublicApi = typeof (provider as any)?.addSpanProcessor === 'function';
+
+  if (!Array.isArray(internalArray) && !hasPublicApi) {
+    const msg = "Dedicated tracerProvider does not support adding span processors.";
+    if (options.advanced?.throwOnSetupError) throw new Error(msg);
+    logger.error(msg);
+    return createNoOpHandle(logger);
+  }
+
+  const addProcessor = (processor: SpanProcessor) => {
+    if (Array.isArray(internalArray)) {
+      internalArray.push(processor);
+    } else {
+      (provider as any).addSpanProcessor(processor);
+    }
+  };
+
+  if (!langwatch.disabled) {
+    const traceExporter = new LangWatchTraceExporter({
+      apiKey: langwatch.apiKey,
+      endpoint: langwatch.endpoint,
+    });
+
+    const processor = langwatch.processorType === 'batch'
+      ? new BatchSpanProcessor(traceExporter)
+      : new SimpleSpanProcessor(traceExporter);
+
+    addedProcessors.push(processor);
+    addProcessor(processor);
+    logger.info("Attached LangWatch span processor to dedicated provider");
+  }
+
+  if (options.traceExporter) {
+    const p = new SimpleSpanProcessor(options.traceExporter);
+    addedProcessors.push(p);
+    addProcessor(p);
+  }
+
+  if (options.spanProcessors?.length) {
+    for (const p of options.spanProcessors) {
+      addedProcessors.push(p);
+      addProcessor(p);
+    }
+  }
+
+  if (options.instrumentations?.length) {
+    registerInstrumentations({
+      tracerProvider: provider,
+      instrumentations: options.instrumentations,
+    });
+    logger.info(`Registered ${options.instrumentations.length} instrumentations against dedicated provider`);
+  }
+
+  logger.info("LangWatch Observability SDK setup completed with dedicated provider (global provider untouched)");
+
+  return {
+    shutdown: async () => {
+      logger.debug("Shutting down dedicated LangWatch processors");
+      try {
+        await Promise.all(addedProcessors.map((p) => p.shutdown()));
+      } finally {
+        const candidates = [
+          (provider as any)?._activeSpanProcessor?._spanProcessors,
+          (provider as any)?.activeSpanProcessor?._spanProcessors,
+          (provider as any)?._registeredSpanProcessors,
+        ];
+        for (const arr of candidates) {
+          if (!Array.isArray(arr)) continue;
+          for (const p of addedProcessors) {
+            const idx = arr.indexOf(p);
+            if (idx !== -1) arr.splice(idx, 1);
+          }
+        }
+      }
+      logger.info("LangWatch processor shutdown complete");
+    },
+  };
 }
 
 function attachToExistingProvider(

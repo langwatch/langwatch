@@ -101,3 +101,46 @@ describe('setupObservability Integration - attachToExistingProvider', () => {
     await expect(handle.shutdown()).resolves.toBeUndefined();
   });
 });
+
+describe('setupObservability Integration - Dedicated TracerProvider', () => {
+  it('attaches LangWatch exporter to dedicated provider without touching global', async () => {
+    const sentry = new NodeTracerProvider();
+    sentry.register();
+    const sentryProcessorsBefore = (sentry as any)._activeSpanProcessor._spanProcessors.length;
+
+    const lwProvider = new NodeTracerProvider();
+    const lwProcessorsBefore = (lwProvider as any)._activeSpanProcessor._spanProcessors.length;
+    const logger = createMockLogger();
+
+    const handle = setupObservability({
+      tracerProvider: lwProvider,
+      langwatch: { apiKey: 'test-key' },
+      debug: { logger },
+    });
+
+    const lwProcessorsAfter = (lwProvider as any)._activeSpanProcessor._spanProcessors.length;
+    const sentryProcessorsAfter = (sentry as any)._activeSpanProcessor._spanProcessors.length;
+
+    expect(lwProcessorsAfter).toBe(lwProcessorsBefore + 1);
+    expect(sentryProcessorsAfter).toBe(sentryProcessorsBefore);
+    expect(logger.info).toHaveBeenCalledWith(
+      expect.stringContaining('dedicated provider')
+    );
+    await expect(handle.shutdown()).resolves.toBeUndefined();
+  });
+
+  it('skips checkForEarlyExit when dedicated provider is passed', async () => {
+    const sentry = new NodeTracerProvider();
+    sentry.register();
+    const logger = createMockLogger();
+
+    const lwProvider = new NodeTracerProvider();
+    setupObservability({
+      tracerProvider: lwProvider,
+      langwatch: { apiKey: 'test-key' },
+      debug: { logger },
+    });
+
+    expect(logger.error).not.toHaveBeenCalled();
+  });
+});

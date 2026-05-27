@@ -1,7 +1,7 @@
 import { type Logger } from "../../../logger";
 import { type Instrumentation } from "@opentelemetry/instrumentation";
 import { type SpanExporter, type SpanProcessor } from "@opentelemetry/sdk-trace-base";
-import { type ContextManager, type TextMapPropagator } from "@opentelemetry/api";
+import { type ContextManager, type TextMapPropagator, type TracerProvider } from "@opentelemetry/api";
 import { type LogRecordProcessor } from "@opentelemetry/sdk-logs";
 import { type IMetricReader } from "@opentelemetry/sdk-metrics";
 import { type ViewOptions } from "@opentelemetry/sdk-metrics";
@@ -134,6 +134,34 @@ export interface SetupObservabilityOptions {
    * @default "all"
    */
   dataCapture?: DataCaptureOptions;
+
+  /**
+   * Dedicated TracerProvider for complete isolation from other OTel SDKs.
+   *
+   * When provided, LangWatch attaches its exporter to this provider and
+   * does NOT touch the global provider. Spans created through this
+   * provider's tracers go only to LangWatch. The other SDK keeps the
+   * global provider and never sees LLM traces.
+   *
+   * Pass any instrumentations you want on this provider via the
+   * `instrumentations` option — they will be registered against this
+   * provider instead of the global one.
+   *
+   * @example
+   * ```typescript
+   * import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
+   *
+   * const lwProvider = new NodeTracerProvider();
+   * setupObservability({
+   *   tracerProvider: lwProvider,
+   *   langwatch: { apiKey: "..." },
+   * });
+   *
+   * // Use lwProvider.getTracer() for LLM calls
+   * const tracer = lwProvider.getTracer("my-llm-service");
+   * ```
+   */
+  tracerProvider?: TracerProvider;
 
   /**
    * Custom trace exporter for sending spans to external systems.
