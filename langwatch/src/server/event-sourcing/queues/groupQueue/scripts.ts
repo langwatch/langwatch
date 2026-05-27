@@ -4,6 +4,17 @@ import type { Cluster } from "ioredis";
 // Lua scripts inlined as string constants.
 // This avoids loader incompatibilities across turbopack, webpack, vitest, and tsx.
 
+/**
+ * Safety-net TTL (ms) refreshed on the per-group jobs/data keys every time they
+ * are written or dispatched. A live group is touched far more often than this
+ * (max gap between touches is one retry backoff, ~10 min), so the TTL never
+ * fires on real work. A group that falls out of the dispatch graph without
+ * draining (e.g. the ready set is cleared during incident mitigation) keeps its
+ * keys today forever; with the TTL they self-expire instead of accumulating.
+ * Interpolated into the Lua source so there is a single source of truth.
+ */
+export const GROUP_KEY_TTL_MS = 6 * 60 * 60 * 1000;
+
 const STAGE_LUA = `
 local groupJobsKey    = KEYS[1]
 local readyKey        = KEYS[2]
@@ -50,6 +61,8 @@ if dedupId ~= "" and dedupTtlMs > 0 then
       if shouldUpdateReady() then
         redis.call("ZADD", readyKey, "LT", dispatchAfter, groupId)
       end
+      redis.call("PEXPIRE", groupJobsKey, ${GROUP_KEY_TTL_MS})
+      redis.call("PEXPIRE", dataKey, ${GROUP_KEY_TTL_MS})
       redis.call("LPUSH", signalKey, "1")
       redis.call("LTRIM", signalKey, 0, 999)
       return 0
@@ -61,6 +74,8 @@ end
 
 redis.call("ZADD", groupJobsKey, dispatchAfter, stagedJobId)
 redis.call("HSET", dataKey, stagedJobId, jobDataJson)
+redis.call("PEXPIRE", groupJobsKey, ${GROUP_KEY_TTL_MS})
+redis.call("PEXPIRE", dataKey, ${GROUP_KEY_TTL_MS})
 
 if dedupId ~= "" and dedupTtlMs > 0 then
   redis.call("SET", dedupKey, stagedJobId, "PX", dedupTtlMs)
@@ -136,6 +151,9 @@ for i = 1, count do
     end
     newStagedCount = newStagedCount + 1
   end
+
+  redis.call("PEXPIRE", groupJobsKey, ${GROUP_KEY_TTL_MS})
+  redis.call("PEXPIRE", dataKey, ${GROUP_KEY_TTL_MS})
 
   -- Track minimum dispatchAfter per affected group
   local existingMin = affectedGroups[groupId]
@@ -679,6 +697,12 @@ if inserted == 1 then
   redis.call("INCR", totalPendingKey)
 end
 
+-- Blocked groups are operator-managed (DLQ triage / manual unblock) and must
+-- not be reaped by the group-key safety-net TTL, so clear any TTL set while the
+-- group was still in the active flow.
+redis.call("PERSIST", groupJobsKey)
+redis.call("PERSIST", groupDataKey)
+
 -- 3. Remove from ready set — blocked groups should not be scanned by dispatch.
 --    UNBLOCK_LUA re-adds the group when it is unblocked.
 redis.call("ZREM", readyKey, groupId)
@@ -753,6 +777,8 @@ redis.call("HSET", groupDataKey, newStagedJobId, jobDataJson)
 if inserted == 1 then
   redis.call("INCR", totalPendingKey)
 end
+redis.call("PEXPIRE", groupJobsKey, ${GROUP_KEY_TTL_MS})
+redis.call("PEXPIRE", groupDataKey, ${GROUP_KEY_TTL_MS})
 
 -- 3. Update ready set score = future dispatch time so the group becomes
 --    eligible exactly when the backoff window expires.
