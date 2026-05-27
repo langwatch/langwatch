@@ -42,7 +42,8 @@ import type {
  * @see registry.ts for the list of registered flags
  */
 export class FeatureFlagService implements FeatureFlagServiceInterface {
-  private readonly legacy: FeatureFlagServiceInterface;
+  private readonly legacyOverride?: FeatureFlagServiceInterface;
+  private legacyInstance?: FeatureFlagServiceInterface;
   private readonly store: FeatureFlagStorePostgres;
   private readonly logger = createLogger("langwatch:feature-flag-service");
 
@@ -52,8 +53,22 @@ export class FeatureFlagService implements FeatureFlagServiceInterface {
       store?: FeatureFlagStorePostgres;
     } = {},
   ) {
-    this.legacy = deps.legacy ?? this.createLegacyService();
+    this.legacyOverride = deps.legacy;
     this.store = deps.store ?? getFeatureFlagStore();
+  }
+
+  /**
+   * The legacy backend (PostHog when configured, memory otherwise) is built on
+   * first use, not in the constructor. Constructing the PostHog backend starts
+   * its background flag-definition poller, so a process that only ever
+   * evaluates SYSTEM flags (workers, the event-sourcing pipeline) never builds
+   * it and never polls PostHog. Only a PRODUCT/unregistered flag evaluation
+   * reaches here.
+   */
+  private get legacy(): FeatureFlagServiceInterface {
+    if (this.legacyOverride) return this.legacyOverride;
+    this.legacyInstance ??= this.createLegacyService();
+    return this.legacyInstance;
   }
 
   static create(): FeatureFlagService {
