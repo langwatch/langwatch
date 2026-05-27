@@ -183,7 +183,7 @@ describe("deserializeAttributes", () => {
   });
 });
 
-describe("clampSpanReadLimit", () => {
+describe("given a requested span-read limit", () => {
   describe("when no limit is given", () => {
     it("defaults to the hard ceiling", () => {
       expect(clampSpanReadLimit(undefined)).toBe(MAX_DERIVATION_SPANS);
@@ -214,6 +214,13 @@ describe("clampSpanReadLimit", () => {
   describe("when the requested limit is fractional", () => {
     it("truncates toward zero", () => {
       expect(clampSpanReadLimit(10.9)).toBe(10);
+    });
+  });
+
+  describe("when the requested limit is not a finite number", () => {
+    it("defaults to the ceiling instead of propagating NaN/Infinity", () => {
+      expect(clampSpanReadLimit(NaN)).toBe(MAX_DERIVATION_SPANS);
+      expect(clampSpanReadLimit(Infinity)).toBe(MAX_DERIVATION_SPANS);
     });
   });
 });

@@ -19,13 +19,12 @@ export const MAX_DERIVATION_SPANS = 512;
  * Clamps a requested span-read limit to the `[1, MAX_DERIVATION_SPANS]` range.
  * `MAX_DERIVATION_SPANS` is a hard ceiling a caller can only lower, never raise,
  * so every full-span / derivation read is bounded even for a leaked trace_id.
- * Undefined defaults to the ceiling (read as many as allowed, but no more).
+ * A missing or non-finite limit (undefined, NaN, Infinity) defaults to the
+ * ceiling so the value never propagates into a ClickHouse `UInt32` param.
  */
 export function clampSpanReadLimit(limit?: number): number {
-  return Math.min(
-    Math.max(1, Math.trunc(limit ?? MAX_DERIVATION_SPANS)),
-    MAX_DERIVATION_SPANS,
-  );
+  const requested = Number.isFinite(limit) ? (limit as number) : MAX_DERIVATION_SPANS;
+  return Math.min(Math.max(1, Math.trunc(requested)), MAX_DERIVATION_SPANS);
 }
 
 export interface SpanSummaryRow {
