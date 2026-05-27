@@ -31,6 +31,7 @@ import { ErrorBoundary } from "react-error-boundary";
 import { useLocalStorage } from "usehooks-ts";
 import { NotFoundScene } from "~/components/NotFoundScene";
 import Head from "~/utils/compat/next-head";
+import { isLangwatchStaff } from "~/utils/isLangwatchStaff";
 import { useRouter } from "~/utils/compat/next-router";
 import { ImpersonationBanner } from "../../ee/admin/ImpersonationBanner";
 import { ImpersonationSwitchBackMenuItem } from "../../ee/admin/ImpersonationSwitchBackMenuItem";
@@ -39,6 +40,7 @@ import { GlobalTraceV2DrawerMount } from "../features/traces-v2/components/Globa
 import { useDrawer } from "../hooks/useDrawer";
 import { useFeatureFlag } from "../hooks/useFeatureFlag";
 import { useLiteMemberGuard } from "../hooks/useLiteMemberGuard";
+import { useFeatureFlag } from "../hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { useOrgQueryParamSelection } from "../hooks/useOrgQueryParamSelection";
 import { usePlanManagementUrl } from "../hooks/usePlanManagementUrl";
@@ -594,7 +596,20 @@ export const DashboardLayout = ({
   const isProjectRoute =
     router.pathname === "/[project]" ||
     router.pathname.startsWith("/[project]/");
-  const showLangy = !publicPage && userIsPartOfTeam && isProjectRoute;
+  const { enabled: langyFlagEnabled } = useFeatureFlag(
+    "release_langy_enabled",
+    {
+      projectId: project?.id,
+      organizationId: organization?.id,
+      enabled: !!project,
+    },
+  );
+  const showLangy =
+    !publicPage &&
+    userIsPartOfTeam &&
+    isProjectRoute &&
+    isLangwatchStaff(user?.email) &&
+    langyFlagEnabled;
 
   return (
     <LangyProvider>
