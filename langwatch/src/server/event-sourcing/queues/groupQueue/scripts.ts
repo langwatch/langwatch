@@ -4,7 +4,35 @@ import type { Cluster } from "ioredis";
 // Lua scripts inlined as string constants.
 // This avoids loader incompatibilities across turbopack, webpack, vitest, and tsx.
 
-const STAGE_LUA = `
+/**
+ * Safety-net TTL (ms) refreshed on the per-group jobs/data keys every time they
+ * are written or dispatched. A live group is touched far more often than this
+ * (max gap between touches is one retry backoff, ~10 min), so the TTL never
+ * fires on real work. A group that falls out of the dispatch graph without
+ * draining (e.g. the ready set is cleared during incident mitigation) keeps its
+ * keys today forever; with the TTL they self-expire instead of accumulating.
+ * Interpolated into the Lua source so there is a single source of truth.
+ */
+export const GROUP_KEY_TTL_MS = 6 * 60 * 60 * 1000;
+
+// Lua helper, prepended to every script that writes group keys. Refreshes the
+// safety-net TTL on a group's jobs/data keys, deriving expiry from the LATEST
+// pending dispatch score so a job legitimately delayed past the window (e.g. a
+// monitor thread-idle timeout hours out) is never reaped before it is due. The
+// expiry is the later of (now + window) and (latest scheduled dispatch + window).
+export const TTL_HELPER_LUA = `
+local function refreshGroupKeyTtl(jobsKey, dataKey, nowMs)
+  local latest = redis.call("ZRANGE", jobsKey, -1, -1, "WITHSCORES")
+  if not latest[2] then return end
+  local ttl = ${GROUP_KEY_TTL_MS}
+  local untilDue = (tonumber(latest[2]) - nowMs) + ${GROUP_KEY_TTL_MS}
+  if untilDue > ttl then ttl = untilDue end
+  redis.call("PEXPIRE", jobsKey, ttl)
+  redis.call("PEXPIRE", dataKey, ttl)
+end
+`;
+
+const STAGE_LUA = TTL_HELPER_LUA + `
 local groupJobsKey    = KEYS[1]
 local readyKey        = KEYS[2]
 local signalKey       = KEYS[3]
@@ -22,6 +50,7 @@ local dedupTtlMs     = tonumber(ARGV[5])
 local jobDataJson    = ARGV[6]
 local shouldExtend   = tonumber(ARGV[7])
 local shouldReplace  = tonumber(ARGV[8])
+local nowMs          = tonumber(ARGV[9])
 
 -- Skip ready-score updates while the group is processing (active key set) or
 -- blocked. In those states the ready score is owned by REFRESH_LUA / COMPLETE_LUA
@@ -50,6 +79,7 @@ if dedupId ~= "" and dedupTtlMs > 0 then
       if shouldUpdateReady() then
         redis.call("ZADD", readyKey, "LT", dispatchAfter, groupId)
       end
+      refreshGroupKeyTtl(groupJobsKey, dataKey, nowMs)
       redis.call("LPUSH", signalKey, "1")
       redis.call("LTRIM", signalKey, 0, 999)
       return 0
@@ -61,6 +91,7 @@ end
 
 redis.call("ZADD", groupJobsKey, dispatchAfter, stagedJobId)
 redis.call("HSET", dataKey, stagedJobId, jobDataJson)
+refreshGroupKeyTtl(groupJobsKey, dataKey, nowMs)
 
 if dedupId ~= "" and dedupTtlMs > 0 then
   redis.call("SET", dedupKey, stagedJobId, "PX", dedupTtlMs)
@@ -80,13 +111,15 @@ redis.call("INCR", totalPendingKey)
 return 1
 `;
 
-const STAGE_BATCH_LUA = `
+const STAGE_BATCH_LUA = TTL_HELPER_LUA + `
 local readyKey        = KEYS[1]
 local signalKey       = KEYS[2]
 local totalPendingKey = KEYS[3]
 
 local keyPrefix = ARGV[1]
 local count     = tonumber(ARGV[2])
+-- nowMs is appended after all per-job args, so it is always the last element.
+local nowMs     = tonumber(ARGV[#ARGV])
 
 local newStagedCount = 0
 local affectedGroups = {}
@@ -136,6 +169,8 @@ for i = 1, count do
     end
     newStagedCount = newStagedCount + 1
   end
+
+  refreshGroupKeyTtl(groupJobsKey, dataKey, nowMs)
 
   -- Track minimum dispatchAfter per affected group
   local existingMin = affectedGroups[groupId]
@@ -608,7 +643,7 @@ redis.call("DEL", errorKey)
 return 1
 `;
 
-const REFRESH_LUA = `
+const REFRESH_LUA = TTL_HELPER_LUA + `
 local activeKey    = KEYS[1]
 local readyKey     = KEYS[2]
 local stagedJobId           = ARGV[1]
@@ -624,6 +659,12 @@ local tenantCountKeyPrefix  = ARGV[5]
 local currentActive = redis.call("GET", activeKey)
 if currentActive == stagedJobId then
   redis.call("EXPIRE", activeKey, activeTtlSec)
+  -- Keep the pending-sibling jobs/data keys alive while this group is actively
+  -- processing: a long-running active job must not let staged siblings expire
+  -- under the safety-net TTL. Derive the group keys from activeKey (strip the
+  -- ":active" suffix) so no extra args are needed.
+  local groupBase = string.sub(activeKey, 1, #activeKey - 7)
+  refreshGroupKeyTtl(groupBase .. ":jobs", groupBase .. ":data", nowMs)
   -- Refresh ready-zset score so it stays "active" until heartbeat stops or completion.
   -- Only update if the group is currently in ready — if RESTAGE_AND_BLOCK_LUA fired
   -- while this heartbeat was in flight, the group has been removed and we must not
@@ -679,6 +720,12 @@ if inserted == 1 then
   redis.call("INCR", totalPendingKey)
 end
 
+-- Blocked groups are operator-managed (DLQ triage / manual unblock) and must
+-- not be reaped by the group-key safety-net TTL, so clear any TTL set while the
+-- group was still in the active flow.
+redis.call("PERSIST", groupJobsKey)
+redis.call("PERSIST", groupDataKey)
+
 -- 3. Remove from ready set — blocked groups should not be scanned by dispatch.
 --    UNBLOCK_LUA re-adds the group when it is unblocked.
 redis.call("ZREM", readyKey, groupId)
@@ -723,7 +770,7 @@ end
 return 1
 `;
 
-const RETRY_RESTAGE_LUA = `
+const RETRY_RESTAGE_LUA = TTL_HELPER_LUA + `
 local activeKey       = KEYS[1]
 local totalPendingKey = KEYS[2]
 
@@ -738,6 +785,7 @@ local retryTtlSec           = tonumber(ARGV[7])
 -- counter TTL aligned with the activeKey TTL across backoff retries
 -- so an in-flight retry doesn't expire its tenant slot.
 local tenantCountKeyPrefix  = ARGV[8]
+local nowMs                 = tonumber(ARGV[9])
 
 -- 1. Validate active key matches
 local currentActive = redis.call("GET", activeKey)
@@ -753,6 +801,7 @@ redis.call("HSET", groupDataKey, newStagedJobId, jobDataJson)
 if inserted == 1 then
   redis.call("INCR", totalPendingKey)
 end
+refreshGroupKeyTtl(groupJobsKey, groupDataKey, nowMs)
 
 -- 3. Update ready set score = future dispatch time so the group becomes
 --    eligible exactly when the backoff window expires.
@@ -848,6 +897,16 @@ export function readTenantCap(): number {
 }
 
 /**
+ * Set holding every active group-queue name (e.g. "{event-sourcing/jobs}").
+ * Producers register themselves here on construction so the ops dashboard can
+ * enumerate queues with an O(1) SMEMBERS instead of an O(keyspace)
+ * `SCAN MATCH *:gq:ready`, which scanned all ~190K keys to find a single ready
+ * set and pegged the Redis main thread once the keyspace grew. The dedicated
+ * hash tag keeps the set in a single Redis Cluster slot.
+ */
+export const GROUP_QUEUE_REGISTRY_KEY = "{gq-registry}:names";
+
+/**
  * TypeScript wrapper for the group queue Lua scripts.
  * All Redis keys use the `{queueName}` hash tag for Redis Cluster compatibility.
  * Lua scripts derive per-group keys dynamically (e.g. keyPrefix .. "group:" .. groupId)
@@ -856,13 +915,23 @@ export function readTenantCap(): number {
  */
 export class GroupStagingScripts {
   private readonly keyPrefix: string;
+  private readonly queueName: string;
 
   constructor(
     private readonly redis: IORedis | Cluster,
     queueName: string,
   ) {
     // queueName already includes hash tags, e.g. "{pipeline/handler/spanStorage}"
+    this.queueName = queueName;
     this.keyPrefix = `${queueName}:gq:`;
+  }
+
+  /**
+   * Advertise this queue in the registry set so the ops dashboard discovers it
+   * without scanning the keyspace. Idempotent; safe to call once per process.
+   */
+  async registerQueue(): Promise<void> {
+    await this.redis.sadd(GROUP_QUEUE_REGISTRY_KEY, this.queueName);
   }
 
   /**
@@ -924,6 +993,7 @@ export class GroupStagingScripts {
       jobDataJson,
       String(shouldExtend ? 1 : 0),
       String(shouldReplace ? 1 : 0),
+      String(Date.now()),
     );
 
     return result === 1;
@@ -965,6 +1035,8 @@ export class GroupStagingScripts {
         String((job.shouldReplace ?? true) ? 1 : 0),
       );
     }
+    // Appended last so the Lua reads it as ARGV[#ARGV] regardless of job count.
+    args.push(String(Date.now()));
 
     const result = await this.redis.eval(STAGE_BATCH_LUA, 3, readyKey, signalKey, totalPendingKey, ...args);
 
@@ -1271,6 +1343,7 @@ export class GroupStagingScripts {
       jobDataJson,
       String(retryTtlSec),
       `${this.keyPrefix}tenant_active:`,
+      String(Date.now()),
     );
 
     return result === 1;

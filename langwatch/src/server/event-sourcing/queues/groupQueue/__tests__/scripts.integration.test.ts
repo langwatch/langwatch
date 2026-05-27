@@ -5,7 +5,12 @@ import {
   stopTestContainers,
   getTestRedisConnection,
 } from "../../../__tests__/integration/testContainers";
-import { GroupStagingScripts, type DispatchResult } from "../scripts";
+import {
+  GroupStagingScripts,
+  GROUP_KEY_TTL_MS,
+  GROUP_QUEUE_REGISTRY_KEY,
+  type DispatchResult,
+} from "../scripts";
 import { QueueRedisRepository } from "../../../../app-layer/ops/repositories/queue.redis.repository";
 
 let redis: Redis;
@@ -2800,6 +2805,192 @@ describe("GroupStagingScripts.drainGroupReady", () => {
   describe("when the group is empty", () => {
     it("returns empty", async () => {
       expect(await scripts.drainGroupReady({ groupId: "nonexistent", nowMs: 10_000, maxJobs: 5 })).toEqual([]);
+    });
+  });
+});
+
+describe("group-key TTL safety net", () => {
+  async function jobsTtl(groupId: string) {
+    return redis.pttl(`${keyPrefix()}group:${groupId}:jobs`);
+  }
+  async function dataTtl(groupId: string) {
+    return redis.pttl(`${keyPrefix()}group:${groupId}:data`);
+  }
+
+  function expectFreshTtl(pttl: number) {
+    // PTTL set and ~the configured window. The upper bound allows a small
+    // delay-derived extension (a job staged a few seconds out pushes expiry to
+    // dispatch + window), without admitting the multi-hour long-delay case.
+    expect(pttl).toBeGreaterThan(GROUP_KEY_TTL_MS - 60_000);
+    expect(pttl).toBeLessThanOrEqual(GROUP_KEY_TTL_MS + 60_000);
+  }
+
+  describe("when a job is staged", () => {
+    it("sets a bounded TTL on the jobs and data keys", async () => {
+      await scripts.stage(makeJob({ stagedJobId: "j1" }));
+
+      expectFreshTtl(await jobsTtl("group-a"));
+      expectFreshTtl(await dataTtl("group-a"));
+    });
+  });
+
+  describe("when a job is scheduled far beyond the safety window", () => {
+    it("extends the TTL to its dispatch time so it is not reaped early", async () => {
+      const dispatchAfterMs = Date.now() + 25 * 60 * 60 * 1000; // 25h out
+      await scripts.stage(makeJob({ stagedJobId: "j1", dispatchAfterMs }));
+
+      // Expiry derives from the scheduled dispatch + window, so it must outlive
+      // both the flat 6h window and the job's own due time.
+      const pttl = await jobsTtl("group-a");
+      expect(pttl).toBeGreaterThan(GROUP_KEY_TTL_MS);
+      expect(pttl).toBeGreaterThan(25 * 60 * 60 * 1000);
+    });
+  });
+
+  describe("when a group is dropped from ready without draining", () => {
+    it("its keys still carry a TTL so the strand self-expires", async () => {
+      await scripts.stage(makeJob({ stagedJobId: "j1" }));
+
+      // Simulate the incident mitigation: the ready set is cleared, but the
+      // group's jobs/data keys are left behind. Before the safety net these
+      // lingered forever (the ~82K-key / 4.79GB leak).
+      await redis.del(`${keyPrefix()}ready`);
+
+      expect(await inspectReadySet()).toEqual([]);
+      expect(await inspectGroupJobs("group-a")).toEqual(["j1", "1000"]);
+      expectFreshTtl(await jobsTtl("group-a"));
+      expectFreshTtl(await dataTtl("group-a"));
+    });
+  });
+
+  describe("when a batch of jobs is staged", () => {
+    it("sets a TTL on every touched group's keys", async () => {
+      await scripts.stageBatch([
+        makeJob({ stagedJobId: "j1", groupId: "group-a" }),
+        makeJob({ stagedJobId: "j2", groupId: "group-b" }),
+      ]);
+
+      expectFreshTtl(await jobsTtl("group-a"));
+      expectFreshTtl(await jobsTtl("group-b"));
+    });
+  });
+
+  describe("when a failed job is re-staged for retry", () => {
+    it("refreshes the TTL on the group keys", async () => {
+      await scripts.stage(makeJob({ stagedJobId: "j1", dispatchAfterMs: 100 }));
+      await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
+
+      await scripts.retryRestage({
+        groupId: "group-a",
+        stagedJobId: "j1",
+        newStagedJobId: "j1/r/1",
+        dispatchAfterMs: Date.now() + 5000,
+        jobDataJson: JSON.stringify({ retry: true }),
+        backoffMs: 5000,
+      });
+
+      expectFreshTtl(await jobsTtl("group-a"));
+      expectFreshTtl(await dataTtl("group-a"));
+    });
+  });
+
+  describe("when a group is blocked", () => {
+    it("clears the TTL so operator-managed failures are not reaped", async () => {
+      await scripts.stage(makeJob({ stagedJobId: "j1", dispatchAfterMs: 100 }));
+      await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
+      await scripts.restageAndBlock({
+        groupId: "group-a",
+        newStagedJobId: "j1/r/0",
+        score: 100,
+        jobDataJson: JSON.stringify({ retry: true }),
+      });
+
+      expect(await inspectBlockedSet()).toContain("group-a");
+      expect(await jobsTtl("group-a")).toBe(-1);
+      expect(await dataTtl("group-a")).toBe(-1);
+    });
+  });
+
+  describe("when an active job heartbeats with pending siblings", () => {
+    it("refreshes the pending-sibling jobs/data TTL", async () => {
+      await scripts.stage(makeJob({ stagedJobId: "active", dispatchAfterMs: 100 }));
+      await scripts.stage(makeJob({ stagedJobId: "sibling", dispatchAfterMs: 200 }));
+      await scripts.dispatch({ nowMs: 300, activeTtlSec: 60 }); // claims "active"
+
+      // Age the sibling keys' TTL well below the window; the heartbeat must
+      // bump it back so a long-running active job cannot reap its siblings.
+      await redis.pexpire(`${keyPrefix()}group:group-a:jobs`, 5_000);
+      await redis.pexpire(`${keyPrefix()}group:group-a:data`, 5_000);
+
+      await scripts.refreshActiveKey({
+        groupId: "group-a",
+        stagedJobId: "active",
+        activeTtlSec: 60,
+      });
+
+      expectFreshTtl(await jobsTtl("group-a"));
+      expectFreshTtl(await dataTtl("group-a"));
+    });
+  });
+
+  describe("when a blocked group is unblocked", () => {
+    it("restores the safety-net TTL the block path cleared", async () => {
+      const repo = new QueueRedisRepository(redis);
+      await scripts.stage(makeJob({ stagedJobId: "j1", dispatchAfterMs: 100 }));
+      await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
+      await scripts.restageAndBlock({
+        groupId: "group-a",
+        newStagedJobId: "j1/r/0",
+        score: 100,
+        jobDataJson: JSON.stringify({ retry: true }),
+      });
+      expect(await jobsTtl("group-a")).toBe(-1); // PERSISTed by the block path
+
+      await repo.unblockGroup({ queueName: QUEUE_NAME, groupId: "group-a" });
+
+      expectFreshTtl(await jobsTtl("group-a"));
+      expectFreshTtl(await dataTtl("group-a"));
+    });
+  });
+
+  describe("when a group is replayed from the DLQ", () => {
+    it("restores the safety-net TTL on the revived group", async () => {
+      const repo = new QueueRedisRepository(redis);
+      await scripts.stage(makeJob({ stagedJobId: "j1", dispatchAfterMs: 100 }));
+      await repo.moveToDlq({ queueName: QUEUE_NAME, groupId: "group-a" });
+      await repo.replayFromDlq({ queueName: QUEUE_NAME, groupId: "group-a" });
+
+      expectFreshTtl(await jobsTtl("group-a"));
+      expectFreshTtl(await dataTtl("group-a"));
+    });
+  });
+});
+
+describe("queue discovery via registry", () => {
+  let repo: QueueRedisRepository;
+
+  beforeEach(() => {
+    repo = new QueueRedisRepository(redis);
+  });
+
+  describe("when a producer has registered its queue name", () => {
+    it("discovers it from the registry set", async () => {
+      await scripts.registerQueue();
+
+      expect(await redis.smembers(GROUP_QUEUE_REGISTRY_KEY)).toContain(QUEUE_NAME);
+      expect(await repo.discoverQueueNames()).toContain(QUEUE_NAME);
+    });
+  });
+
+  describe("when the registry is empty but a ready set exists", () => {
+    it("scans once and backfills the registry", async () => {
+      // A ready key exists (a queue ran) but nothing registered yet.
+      await redis.zadd(`${keyPrefix()}ready`, 1000, "group-a");
+
+      const names = await repo.discoverQueueNames();
+
+      expect(names).toContain(QUEUE_NAME);
+      expect(await redis.smembers(GROUP_QUEUE_REGISTRY_KEY)).toContain(QUEUE_NAME);
     });
   });
 });
