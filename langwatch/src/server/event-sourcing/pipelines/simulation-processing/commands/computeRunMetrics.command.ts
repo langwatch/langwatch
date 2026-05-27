@@ -39,6 +39,7 @@ export interface ComputeRunMetricsDeps {
     tenantId: string;
     traceId: string;
     occurredAtMs?: number;
+    foldVersion?: number;
   }) => Promise<{
     scenarioRoleCosts: Record<string, number>;
     scenarioRoleLatencies: Record<string, number>;
@@ -124,6 +125,7 @@ export class ComputeRunMetricsCommand
           tenantId: tenantIdStr,
           traceId,
           occurredAtMs: traceSummary.occurredAt,
+          foldVersion: traceSummary.spanCount,
         });
 
       // Summary exists but not yet populated (cost enrichment still in progress).

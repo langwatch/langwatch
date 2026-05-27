@@ -28,6 +28,7 @@ export type AlertTriggerReactorDeps = TriggerActionDispatchDeps & {
     tenantId: string;
     traceId: string;
     occurredAtMs?: number;
+    foldVersion?: number;
   }) => Promise<DerivedTraceEvent[]>;
 };
 
@@ -67,6 +68,7 @@ export function createAlertTriggerReactor(
             tenantId,
             traceId,
             occurredAtMs: foldState.occurredAt,
+            foldVersion: foldState.spanCount,
           })
         : null;
 

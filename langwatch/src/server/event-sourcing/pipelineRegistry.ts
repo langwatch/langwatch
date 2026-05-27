@@ -217,6 +217,7 @@ export class PipelineRegistry {
       tenantId: string;
       traceId: string;
       occurredAtMs?: number;
+      foldVersion?: number;
     }) => Promise<DerivedTraceEvent[]>;
   } {
     const traceReadDerivation = new TraceReadDerivationService(

@@ -108,3 +108,24 @@ Feature: Per-tenant soft cap on in-flight dispatch
     Given a tenant "proj_acme" with a zombie group (empty jobs zset) on the ready zset
     When DISPATCH_BATCH_LUA is invoked
     Then the zombie group is removed from the ready zset
+
+  # Over-cap groups are pushed to a future score instead of being left at the
+  # head of ready, so repeated polls don't keep scanning past them every time.
+  # A quiet tenant deeper in the zset is reached immediately, and a follow-up
+  # poll returns nothing instead of re-walking the deferred groups; they become
+  # eligible again after the defer window.
+  @integration @tenant-cap @fairness
+  Scenario: Over-cap groups are deferred so they don't starve other tenants on repeated polls
+    Given a tenant "proj_noisy" over cap with many groups at the head of ready
+    And a tenant "proj_quiet" with one group later in the zset
+    When dispatch is polled repeatedly at the same time
+    Then "proj_quiet"'s group is dispatched
+    And the over-cap groups are pushed to a future score so the next poll skips them
+    And they become eligible again only after the defer window
+
+  @integration @tenant-cap @batch @fairness
+  Scenario: dispatchBatch defers over-cap groups the same way
+    Given a tenant over cap with groups on the ready zset
+    When DISPATCH_BATCH_LUA is invoked
+    Then the over-cap groups are deferred to a future score
+    And under-cap tenants are still served in the same batch
