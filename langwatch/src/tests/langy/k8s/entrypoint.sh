@@ -1,23 +1,13 @@
 #!/bin/bash
 set -e
-mkdir -p ~/.config/opencode
-cat > ~/.config/opencode/config.json << EOF
-{
-  "\$schema": "https://opencode.ai/config.json",
-  "model": "openai/gpt-5-mini",
-  "mcp": {
-    "langwatch": {
-      "type": "local",
-      "command": ["langwatch-mcp-server"],
-      "enabled": true,
-      "environment": {
-        "LANGWATCH_API_KEY": "${LANGWATCH_API_KEY}",
-        "LANGWATCH_ENDPOINT": "${LANGWATCH_ENDPOINT}"
-      }
-    }
-  }
-}
-EOF
+
+# This script runs ONCE at pod startup. It seeds /workspace with the
+# shared templates (skills + AGENTS.md) that the manager copies into
+# each per-conversation worker home at spawn time. The opencode
+# config.json is NOT written here — the manager writes one per worker
+# with that worker's credentials injected. We also do NOT start
+# opencode here; the manager spawns one opencode subprocess per
+# session on first message.
 
 mkdir -p /workspace/skills
 
@@ -264,13 +254,9 @@ Each skill is a how-to file in `./skills/`. Read the relevant skill file before 
 - Calling `list_agents` when user said "traces" → match exact words
 EOF
 
-# The AGENTS.md heredoc uses single-quoted EOF (so bash variables stay
-# literal). Substitute LANGWATCH_ENDPOINT here so the agent sees the
-# real URL in its system prompt and emits concrete deep links instead
-# of the literal placeholder.
-if [ -n "${LANGWATCH_ENDPOINT}" ]; then
-  sed -i "s|\${LANGWATCH_ENDPOINT}|${LANGWATCH_ENDPOINT}|g" /workspace/AGENTS.md
-fi
+# The AGENTS.md template keeps ${LANGWATCH_ENDPOINT} as a literal
+# placeholder. The manager substitutes it per-worker when it writes
+# the worker-local AGENTS.md at spawn time (since LANGWATCH_ENDPOINT
+# is now a per-session credential, not a pod-level env).
 
-/usr/local/bin/opencode serve --port 4096 --hostname 127.0.0.1 &
 exec "$@"
