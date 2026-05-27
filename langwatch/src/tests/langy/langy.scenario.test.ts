@@ -49,7 +49,7 @@ describe("Langy via HTTP wrapper", () => {
     await deleteAllTestDatasets();
   });
 
-  // ── ANALYTICS ────────────────────────────────────────────────────────
+  describe("when user asks about analytics or traces", () => {
 
   it("answers a traces request by calling search_traces", async () => {
     const langy = makeLangyAdapter();
@@ -264,7 +264,9 @@ describe("Langy via HTTP wrapper", () => {
     expect(result.success).toBe(true);
   });
 
-  // ── READ-ONLY listings ─────────────────────────────────────────────────
+  });
+
+  describe("when user requests read-only listings", () => {
 
   it("lists evaluators", async () => {
     const langy = makeLangyAdapter();
@@ -488,7 +490,9 @@ describe("Langy via HTTP wrapper", () => {
     expect(result.success).toBe(true);
   });
 
-  // ── WRITE surfaces with Layer 2 verification ──────────────────────────
+  });
+
+  describe("when user requests entity creation or update", () => {
 
   it("creates a dataset when asked (Layer 2: appears in API)", async () => {
     const langy = makeLangyAdapter();
@@ -910,7 +914,9 @@ describe("Langy via HTTP wrapper", () => {
     expect(created).toBeTruthy();
   });
 
-  // ── URL deep-link tests ───────────────────────────────────────────────
+  });
+
+  describe("when user asks for a deep-link URL", () => {
 
   it("returns a LangWatch URL when asked where to find prompts", async () => {
     const langy = makeLangyAdapter();
@@ -978,7 +984,9 @@ describe("Langy via HTTP wrapper", () => {
     expect(result.success).toBe(true);
   });
 
-  // ── SESSION MEMORY ────────────────────────────────────────────────────
+  });
+
+  describe("when the conversation carries session state", () => {
 
   it("maintains session context across two turns", async () => {
     const langy = makeLangyAdapter();
@@ -1009,7 +1017,9 @@ describe("Langy via HTTP wrapper", () => {
     expect(langy.state.sessionId).toBeTruthy();
   });
 
-  // ── MULTI-TURN scenarios ──────────────────────────────────────────────
+  });
+
+  describe("when the conversation spans multiple turns", () => {
 
   it("multi-turn: discovery then create (3 turns)", async () => {
     const langy = makeLangyAdapter();
@@ -1181,7 +1191,9 @@ describe("Langy via HTTP wrapper", () => {
     expect(newOnes.length).toBeGreaterThan(0);
   });
 
-  // ── NEGATIVE cases ────────────────────────────────────────────────────
+  });
+
+  describe("when the request is out of scope or unanswerable", () => {
 
   it("declines an out-of-scope request without going off-topic", async () => {
     const langy = makeLangyAdapter();
@@ -1292,5 +1304,6 @@ describe("Langy via HTTP wrapper", () => {
     });
     if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
     expect(result.success).toBe(true);
+  });
   });
 });
