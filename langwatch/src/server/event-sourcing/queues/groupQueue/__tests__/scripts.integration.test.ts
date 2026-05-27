@@ -2672,7 +2672,7 @@ describe("GroupStagingScripts", () => {
       expect(afterDefer).toBeNull(); // still over cap, but proves they're scannable again
     });
 
-    /** @scenario dispatchBatch defers over-cap groups the same way */
+    /** @scenario dispatchBatch defers over-cap groups to future scores */
     it("dispatchBatch defers over-cap groups to future scores", async () => {
       process.env[TENANT_CAP_ENV] = "1";
 
