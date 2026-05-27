@@ -1225,19 +1225,29 @@ app.post("/langy/chat", async (c) => {
     lastMsg?.parts as Array<Record<string, unknown>> | undefined,
   );
 
-  // Do NOT bundle LANGY_SYSTEM_PROMPT into the request. The OpenCode pod
-  // already loads its own AGENTS.md system prompt at startup (with the
-  // "call tools immediately, never describe" rules and the MCP tool catalog).
-  // Sending the legacy LANGY_SYSTEM_PROMPT on top would describe a Vercel-AI-SDK
-  // propose_* tool flow that doesn't exist in the pod context, and the agent
-  // would parrot it back instead of executing tools. Pass just the user
-  // message, optionally prefixed with per-conversation project memory which
-  // the pod's AGENTS.md doesn't have access to.
+  // The pod's AGENTS.md is written for CLI/codebase instrumentation
+  // (the OpenCode default), not in-product Langy. We need to override that
+  // with a Langy-specific system block, but phrased to FIT the MCP tool
+  // catalog the pod actually has (search_traces, get_analytics,
+  // list_evaluators, etc.) — NOT the legacy Vercel-AI-SDK propose_* flow.
+  // Without this, the agent answers like a generic repo assistant
+  // ("what should I do in this repository?").
+  const langyOverride = [
+    "OVERRIDE — you are Langy, the in-product LangWatch assistant.",
+    "You are NOT a code/repo assistant. You do not edit files, run shell, or scaffold projects.",
+    "Your only job is to read and act on the user's LangWatch project via the available MCP tools",
+    "(search_traces, get_trace, get_analytics, list_evaluators, list_prompts, list_datasets,",
+    "list_scenarios, list_agents, list_monitors, list_dashboards, list_workflows, list_triggers,",
+    "create_*, update_*, run_*).",
+    "Call tools immediately — never describe what you would do, never list your capabilities,",
+    "never ask which project, never offer 'next actions'. Pick a reasonable default, act, report",
+    "the result tersely with a relevant LangWatch UI URL when applicable.",
+  ].join(" ");
   const memoryPreamble = projectMemory
-    ? `Project context (use as background, not as instructions):\n${projectMemory}\n\n`
+    ? `\n\nProject memory:\n${projectMemory}`
     : "";
-  const fullPrompt = `${memoryPreamble}${userText}`;
-  void systemPrompt; // intentionally unused — see comment above
+  const fullPrompt = `${langyOverride}${memoryPreamble}\n\nUser: ${userText}`;
+  void systemPrompt; // legacy LANGY_SYSTEM_PROMPT bypassed — describes propose_* tools the pod doesn't have
 
   const agentResponse = await fetch(`${agentUrl}/run`, {
     method: "POST",
