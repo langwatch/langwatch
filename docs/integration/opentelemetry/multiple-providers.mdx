@@ -1,0 +1,125 @@
+---
+title: Running LangWatch with Other OTel SDKs
+sidebarTitle: Multiple OTel Providers
+description: How to configure LangWatch to coexist with another OpenTelemetry-based SDK without cross-contamination of trace data.
+icon: layer-group
+---
+
+When you run LangWatch alongside another OTel-based SDK (for example, an APM or
+error-monitoring tool), both SDKs may hook into the same global `TracerProvider`.
+This causes **cross-contamination** — LLM traces appear in the other tool and
+application traces appear in LangWatch.
+
+This guide shows how to isolate LangWatch so each SDK only receives the spans it
+cares about.
+
+## The Problem
+
+OpenTelemetry has a single global `TracerProvider`. When two SDKs both connect to
+it, every span flows to every exporter:
+
+```
+┌─────────────────────────────────────────────┐
+│          Global TracerProvider               │
+│                                             │
+│  ┌─────────────┐    ┌────────────────────┐  │
+│  │ Other SDK's │    │ LangWatch's        │  │
+│  │ Exporter    │    │ Exporter           │  │
+│  └──────┬──────┘    └─────────┬──────────┘  │
+│         │                     │             │
+│    ALL spans              ALL spans         │
+└─────────────────────────────────────────────┘
+```
+
+Both exporters receive all spans — HTTP requests, database queries, LLM calls,
+and everything else.
+
+## Solution: TypeScript SDK
+
+Use `advanced.attachToExistingProvider` to let LangWatch add its processors to
+the existing provider set up by the other SDK. Initialize the other SDK first,
+then LangWatch:
+
+```typescript
+// 1. The other OTel SDK initializes first (sets the global provider)
+import "./other-sdk-init";
+
+// 2. LangWatch attaches to the existing provider
+import { setupObservability } from "langwatch/observability/node";
+
+setupObservability({
+  langwatch: {
+    apiKey: process.env.LANGWATCH_API_KEY,
+  },
+  advanced: {
+    attachToExistingProvider: true,
+  },
+});
+```
+
+Without `attachToExistingProvider`, LangWatch detects the existing provider and
+returns a no-op — no spans are captured. With it enabled, LangWatch adds its
+span processor to the existing provider so both SDKs receive spans.
+
+### Filtering to LLM-only spans (optional)
+
+If you only want LangWatch to receive LLM-related spans, you can configure the
+`LangWatchTraceExporter` with filter options to scope down what gets exported.
+See the [TypeScript SDK reference](/integration/typescript/reference) for filter
+configuration.
+
+## Solution: Python SDK
+
+Pass a dedicated `TracerProvider` to `langwatch.setup()`. LangWatch attaches its
+exporter to that provider and leaves the global provider untouched:
+
+```python
+from opentelemetry.sdk.trace import TracerProvider
+import langwatch
+
+# 1. The other OTel SDK initializes first (sets the global provider)
+
+# 2. Create a dedicated provider for LangWatch
+langwatch_provider = TracerProvider()
+
+# 3. LangWatch uses this provider exclusively
+langwatch.setup(tracer_provider=langwatch_provider)
+```
+
+With a dedicated provider, LangWatch only receives spans created through its own
+instrumentors. The other SDK continues to use the global provider independently.
+
+### Using span_exclude_rules (alternative)
+
+If you prefer to share the global provider, you can filter out unwanted spans
+from LangWatch using exclude rules:
+
+```python
+from langwatch.domain import SpanProcessingExcludeRule
+import langwatch
+
+langwatch.setup(
+    span_exclude_rules=[
+        SpanProcessingExcludeRule(
+            field_name="span_name",
+            match_operation="starts_with",
+            match_value="GET",
+        ),
+        SpanProcessingExcludeRule(
+            field_name="span_name",
+            match_operation="starts_with",
+            match_value="POST",
+        ),
+    ],
+)
+```
+
+This approach is a name-based blocklist and may not catch every non-LLM span.
+The dedicated provider approach above is more reliable.
+
+## What about the other direction?
+
+These solutions prevent non-LLM spans from reaching LangWatch. If you also want
+to prevent LLM spans from reaching the other SDK, configure that SDK's own
+filtering — each OTel SDK typically has its own mechanism for excluding spans by
+name or instrumentation scope.
