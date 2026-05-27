@@ -88,7 +88,12 @@ class LangWatchTrace:
         expected_output: Optional[str] = None,
         api_key: Optional[str] = None,
         disable_sending: bool = False,
-        max_string_length: Optional[int] = 5000,
+        # Raised from 5000 to 32 KB so evaluations receive full input/output
+        # instead of "... (truncated string)" (#4215). 32 KB matches the gateway
+        # payload cap (ADR-017), bounding the worst case for projects without
+        # server-side blob offload. Set to None to disable client truncation
+        # entirely once server-side offload is enabled for your project.
+        max_string_length: Optional[int] = 32 * 1024,
         # Root span parameters
         span_id: Optional[str] = None,
         capture_input: bool = True,
