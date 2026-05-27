@@ -549,7 +549,7 @@ class Client(LangWatchClientProtocol):
             try:
                 atexit.unregister(self._tracer_provider.force_flush)
             except ValueError:
-                pass
+                pass  # atexit handler was never registered or already unregistered
 
         force_flush = getattr(self._tracer_provider, "force_flush", None)
         if callable(force_flush):
@@ -575,7 +575,8 @@ class Client(LangWatchClientProtocol):
                     p for p in multi._span_processors if p is not old
                 )
             except AttributeError:
-                pass
+                if Client._debug:
+                    logger.debug("Could not access provider internals to remove processor")
             Client._langwatch_processor = None
         if Client._tracer_provider is not None:
             Client._exporter_attached_providers.discard(id(Client._tracer_provider))
