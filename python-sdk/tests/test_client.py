@@ -560,3 +560,34 @@ class TestDedicatedTracerProviderIsolation:
 
         assert len(provider_a._active_span_processor._span_processors) == 0
         assert len(provider_b._active_span_processor._span_processors) == 1
+
+    def test_switch_provider_reinstruments_against_new_provider(self) -> None:
+        """When switching providers, instrumentors must be uninstrumented
+        from the old provider and re-registered against the new one."""
+        from opentelemetry.sdk.trace import TracerProvider
+        from opentelemetry.instrumentation.instrumentor import BaseInstrumentor
+
+        class TrackingInstrumentor(BaseInstrumentor):
+            instrument_calls: list = []
+            uninstrument_calls: list = []
+            def instrumentation_dependencies(self):
+                return []
+            def _instrument(self, **kwargs):
+                TrackingInstrumentor.instrument_calls.append(kwargs.get("tracer_provider"))
+            def _uninstrument(self, **kwargs):
+                TrackingInstrumentor.uninstrument_calls.append(True)
+
+        TrackingInstrumentor.instrument_calls = []
+        TrackingInstrumentor.uninstrument_calls = []
+        inst = TrackingInstrumentor()
+
+        provider_a = TracerProvider()
+        Client(api_key="test-key", tracer_provider=provider_a, instrumentors=[inst])
+        assert len(TrackingInstrumentor.instrument_calls) == 1
+        assert TrackingInstrumentor.instrument_calls[0] is provider_a
+
+        provider_b = TracerProvider()
+        Client(api_key="test-key", tracer_provider=provider_b, instrumentors=[inst])
+        assert len(TrackingInstrumentor.uninstrument_calls) == 1
+        assert len(TrackingInstrumentor.instrument_calls) == 2
+        assert TrackingInstrumentor.instrument_calls[1] is provider_b

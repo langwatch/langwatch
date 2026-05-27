@@ -189,6 +189,7 @@ class Client(LangWatchClientProtocol):
             if tracer_provider is not None:
                 if Client._tracer_provider is not None and Client._tracer_provider is not tracer_provider:
                     self.__detach_langwatch_processor()
+                    self.__uninstrument_from_old_provider()
                 Client._tracer_provider = tracer_provider
                 Client._is_dedicated_provider = True
             # Ensure OTEL is configured and instrumentors are registered for the active provider
@@ -286,6 +287,7 @@ class Client(LangWatchClientProtocol):
         if tracer_provider is not None:
             if Client._tracer_provider is not None and Client._tracer_provider is not tracer_provider:
                 self.__detach_langwatch_processor()
+                self.__uninstrument_from_old_provider()
             Client._tracer_provider = tracer_provider
             Client._is_dedicated_provider = True
 
@@ -584,6 +586,20 @@ class Client(LangWatchClientProtocol):
             Client._langwatch_processor = None
         if Client._tracer_provider is not None:
             Client._exporter_attached_providers.discard(id(Client._tracer_provider))
+
+    def __uninstrument_from_old_provider(self) -> None:
+        """Uninstrument all instrumentors so they can be re-registered
+        against a new provider. OTel instrumentors no-op on instrument()
+        if already instrumented, so uninstrument must be called first."""
+        old_provider = Client._tracer_provider
+        if old_provider in Client._registered_instrumentors:
+            for instrumentor in Client._registered_instrumentors[old_provider]:
+                try:
+                    instrumentor.uninstrument()
+                except Exception:
+                    if Client._debug:
+                        logger.debug(f"Failed to uninstrument {instrumentor}")
+            del Client._registered_instrumentors[old_provider]
 
     def __setup_tracer_provider(self) -> None:
         """Sets up the tracer provider if not already active."""
