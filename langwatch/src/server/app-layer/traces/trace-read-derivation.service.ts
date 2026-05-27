@@ -112,6 +112,11 @@ export class TraceReadDerivationService {
     if (hit && hit.expiresAt > now) return hit.value;
 
     const value = read();
+    // Delete before set so a refreshed (expired) key re-inserts at the end:
+    // Map.set on an existing key keeps its original position, which would let
+    // eviction drop a just-read entry as the "oldest". Re-inserting keeps the
+    // insertion order tracking last read.
+    cache.delete(key);
     cache.set(key, { value, expiresAt: now + DERIVATION_READ_WINDOW_MS });
     // Never cache a failed read: drop the entry so the next caller retries
     // instead of replaying the rejection for the whole window.
