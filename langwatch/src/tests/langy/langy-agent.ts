@@ -22,9 +22,9 @@ export function makeLangyAdapter(): AgentAdapter & { state: LangySessionState } 
         : typeof lastMessage.content === "string"
           ? lastMessage.content
           : Array.isArray(lastMessage.content)
-            ? lastMessage.content
-                .filter((p: any) => p?.type === "text")
-                .map((p: any) => p.text)
+            ? (lastMessage.content as Array<{ type?: string; text?: string }>)
+                .filter((p) => p?.type === "text")
+                .map((p) => p.text ?? "")
                 .join("")
             : "";
 
@@ -54,9 +54,16 @@ export function makeLangyAdapter(): AgentAdapter & { state: LangySessionState } 
           const line = buf.slice(0, nl).trim();
           buf = buf.slice(nl + 1);
           if (!line) continue;
-          let event: any;
-          try { event = JSON.parse(line); }
-          catch { continue; }
+          let event: {
+            type?: string;
+            sessionId?: string;
+            properties?: { field?: string; delta?: string };
+          };
+          try {
+            event = JSON.parse(line);
+          } catch {
+            continue;
+          }
           // Capture session id for the next turn — mirrors the langy.ts behavior.
           if (event.type === "langy.session" && typeof event.sessionId === "string") {
             state.sessionId = event.sessionId;

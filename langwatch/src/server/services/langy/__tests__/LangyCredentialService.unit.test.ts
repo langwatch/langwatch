@@ -6,12 +6,17 @@ vi.mock("~/utils/encryption", () => ({
   decrypt: vi.fn((value: string) => value.replace(/^enc:/, "")),
 }));
 
+import type { PrismaClient } from "@prisma/client";
+
 import {
   LangyCredentialResolutionError,
   LangyCredentialService,
 } from "../LangyCredentialService";
+import type { VirtualKeyService } from "~/server/gateway/virtualKey.service";
 
-function makePrisma(overrides: any = {}) {
+type MockOverrides = Partial<Record<string, Record<string, unknown>>>;
+
+function makePrisma(overrides: MockOverrides = {}): PrismaClient {
   return {
     project: {
       findUnique: vi.fn().mockResolvedValue({
@@ -29,16 +34,18 @@ function makePrisma(overrides: any = {}) {
       findFirst: vi.fn().mockResolvedValue({ id: "gpc-1" }),
       ...overrides.gatewayProviderCredential,
     },
-  } as any;
+  } as unknown as PrismaClient;
 }
 
-function makeVkService(overrides: any = {}) {
+function makeVkService(
+  overrides: Partial<VirtualKeyService> = {},
+): VirtualKeyService {
   return {
     create: vi
       .fn()
       .mockResolvedValue({ secret: "lw_vk_live_provisioned", virtualKey: { id: "vk-1" } }),
     ...overrides,
-  } as any;
+  } as unknown as VirtualKeyService;
 }
 
 beforeEach(() => {
@@ -169,7 +176,9 @@ describe("LangyCredentialService", () => {
       it("re-reads the winner's encrypted secret and returns the decrypted plaintext", async () => {
         const p2002 = new Prisma.PrismaClientKnownRequestError(
           "Unique constraint failed",
-          { code: "P2002", clientVersion: "test" } as any,
+          { code: "P2002", clientVersion: "test" } as unknown as ConstructorParameters<
+            typeof Prisma.PrismaClientKnownRequestError
+          >[1],
         );
         const prisma = makePrisma({
           projectSecret: {

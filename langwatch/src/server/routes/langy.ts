@@ -17,12 +17,13 @@
  * Every route is gated by `isLangwatchStaff(email)` AND
  * `release_langy_enabled` (see the middleware below).
  */
+import { generate } from "@langwatch/ksuid";
 import {
   createUIMessageStream,
   createUIMessageStreamResponse,
   type UIMessage,
 } from "ai";
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { loggerMiddleware } from "~/app/api/middleware/logger";
 import { tracerMiddleware } from "~/app/api/middleware/tracer";
 import { hasProjectPermission } from "~/server/api/rbac";
@@ -34,6 +35,7 @@ import { isLangwatchStaff } from "~/utils/isLangwatchStaff";
 import { createLogger } from "~/utils/logger/server";
 import { auditLog } from "~/server/auditLog";
 import { TiktokenClient } from "~/server/app-layer/clients/tokenizer/tiktoken.client";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import {
   LangyConversationNotOwnedError,
   LangyConversationService,
@@ -42,7 +44,7 @@ import {
   LangyMessageService,
 } from "~/server/services/langy";
 import { checkLangyMessageRateLimit } from "~/server/middleware/rate-limit-langy";
-import type { NextRequestShim as any } from "./types";
+import type { NextRequestShim } from "./types";
 
 const logger = createLogger("langwatch:api:langy");
 
@@ -119,7 +121,7 @@ export const app = new Hono().basePath("/api");
 app.use(tracerMiddleware({ name: "langy" }));
 app.use(loggerMiddleware());
 app.use("/langy/*", async (c, next) => {
-  const session = await getServerAuthSession({ req: c.req.raw as any });
+  const session = await getServerAuthSession({ req: c.req.raw as NextRequestShim });
   if (!isLangwatchStaff(session?.user?.email)) {
     return c.json({ error: "Langy is not available for your account" }, 403);
   }
@@ -133,7 +135,7 @@ app.use("/langy/*", async (c, next) => {
 });
 
 app.post("/langy/chat", async (c) => {
-  const session = await getServerAuthSession({ req: c.req.raw as any });
+  const session = await getServerAuthSession({ req: c.req.raw as NextRequestShim });
   if (!session) {
     return c.json(
       { error: "You must be logged in to access this endpoint." },
@@ -206,8 +208,8 @@ app.post("/langy/chat", async (c) => {
       userId: session.user.id,
       conversationId: requestedConversationId ?? null,
       title:
-        messages[0] && extractAssistantText(messages[0].parts as any)
-          ? extractAssistantText(messages[0].parts as any).slice(0, 80)
+        messages[0] && extractAssistantText(messages[0].parts as Array<Record<string, unknown>>)
+          ? extractAssistantText(messages[0].parts as Array<Record<string, unknown>>).slice(0, 80)
           : null,
     });
   } catch (error) {
@@ -301,7 +303,7 @@ app.post("/langy/chat", async (c) => {
     return c.json({ error: "Agent request failed" }, { status: 502 });
   }
 
-  const textId = crypto.randomUUID();
+  const textId = generate(KSUID_RESOURCES.EVENT).toString();
   let fullText = "";
 
   const stream = createUIMessageStream({
@@ -404,8 +406,8 @@ app.post("/langy/chat", async (c) => {
 // Conversation management
 // ============================================================================
 
-async function requireSessionAndPermission(c: any, projectId: string | undefined) {
-  const session = await getServerAuthSession({ req: c.req.raw as any });
+async function requireSessionAndPermission(c: Context, projectId: string | undefined) {
+  const session = await getServerAuthSession({ req: c.req.raw as NextRequestShim });
   if (!session) return { error: c.json({ error: "Unauthorized" }, { status: 401 }) };
   if (!projectId) return { error: c.json({ error: "Missing projectId" }, { status: 400 }) };
   const ok = await hasProjectPermission(

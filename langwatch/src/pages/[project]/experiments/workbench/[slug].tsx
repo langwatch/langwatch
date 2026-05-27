@@ -1,5 +1,6 @@
 import { Alert, Box, HStack, Spacer, VStack } from "@chakra-ui/react";
-import { nanoid } from "nanoid";
+import { generate } from "@langwatch/ksuid";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import { useRouter } from "~/utils/compat/next-router";
 import { useEffect, useMemo } from "react";
 
@@ -150,7 +151,7 @@ export default function ExperimentsWorkbenchPage() {
           fields: { identifier: string; type: string; optional?: boolean }[];
         };
         addEvaluator({
-          id: `evaluator_${nanoid()}`,
+          id: generate(KSUID_RESOURCES.EVALUATION).toString(),
           evaluatorType: evaluatorType as never,
           inputs: fields as never,
           dbEvaluatorId,
@@ -221,7 +222,7 @@ export default function ExperimentsWorkbenchPage() {
           ...(initialRows && initialRows.length > 0
             ? {
                 datasetRecords: initialRows.map((row) => ({
-                  id: nanoid(),
+                  id: generate(KSUID_RESOURCES.DATASET_RECORD).toString(),
                   entry: row,
                 })) as never,
               }
@@ -240,7 +241,10 @@ export default function ExperimentsWorkbenchPage() {
         await createDatasetRecords.mutateAsync({
           projectId,
           datasetId,
-          entries: rows.map((row) => ({ id: nanoid(), ...row })) as never,
+          entries: rows.map((row) => ({
+            id: generate(KSUID_RESOURCES.DATASET_RECORD).toString(),
+            ...row,
+          })) as never,
         });
         await utils.dataset.getAll.invalidate({ projectId });
         return projectSlug
