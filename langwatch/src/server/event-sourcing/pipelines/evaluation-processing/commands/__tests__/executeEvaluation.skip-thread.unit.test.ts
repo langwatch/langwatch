@@ -43,7 +43,6 @@ function buildDeps(
     evaluationExecution: {
       executeForTrace: vi.fn().mockResolvedValue({
         status: "skipped",
-        skipReason: "missing_thread_id",
         details: "Trace has no thread_id for thread-based evaluation",
       }),
     } as unknown as ExecuteEvaluationCommandDeps["evaluationExecution"],

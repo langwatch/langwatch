@@ -506,7 +506,7 @@ describe("EvaluationExecutionService", () => {
           });
 
           expect(result.status).toBe("skipped");
-          expect(result.skipReason).toBe("missing_thread_id");
+          expect(result.details).toContain("thread_id");
           // short-circuits before building thread data or calling the evaluator
           expect(
             mockTraceService.getTracesWithSpansByThreadIds,

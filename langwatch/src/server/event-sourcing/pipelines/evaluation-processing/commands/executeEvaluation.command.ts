@@ -251,19 +251,23 @@ export class ExecuteEvaluationCommand implements CommandHandler<
         workflowId,
       });
 
-      // A thread-based monitor on a trace without a thread_id can never run.
-      // Drop it with no event (like an unmet precondition) so it does not fold
-      // an evaluation result — a bulk re-evaluation over non-thread traces
-      // would otherwise emit thousands of error results, each paying the heavy
-      // evaluation-projection read.
-      if (result.status === "skipped" && result.skipReason === "missing_thread_id") {
+      // A trace the service could not evaluate (no thread_id for a thread-based
+      // monitor, errored trace with no I/O, etc.) comes back as "skipped". Drop
+      // it with no event, like an unmet precondition: a skipped run has no
+      // score to fold, and a bulk re-evaluation over non-evaluatable traces
+      // would otherwise emit thousands of results, each paying the heavy
+      // evaluation-projection read. Config skips (monitor not found, provider
+      // not configured) are emitted earlier via their own path and still
+      // surface in the UI.
+      if (result.status === "skipped") {
         logger.debug(
           {
             tenantId,
             evaluatorId: data.evaluatorId,
             traceId: data.traceId,
+            details: result.details,
           },
-          "Thread-based monitor on trace without thread_id — skipping",
+          "Trace not evaluatable — skipping with no result event",
         );
         return [];
       }

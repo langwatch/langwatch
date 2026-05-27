@@ -238,12 +238,12 @@ export class EvaluationExecutionService {
     // A thread-based evaluation needs a thread_id to group the conversation.
     // A trace without one can never be thread-evaluated, so skip it here —
     // before building thread data (which would throw) and before calling the
-    // evaluator. Callers drop this skip silently so a thread monitor running
-    // over non-thread traces stays cheap instead of erroring on every trace.
+    // evaluator. Callers drop every skipped result silently so a thread monitor
+    // running over non-thread traces stays cheap instead of erroring on every
+    // trace.
     if (isThreadLevel && !trace.metadata?.thread_id) {
       return {
         status: "skipped",
-        skipReason: "missing_thread_id",
         details: "Trace has no thread_id for thread-based evaluation",
       };
     }
