@@ -62,11 +62,22 @@ export function makeLangyAdapter(): AgentAdapter & { state: LangySessionState } 
             state.sessionId = event.sessionId;
             continue;
           }
-          // Pull text from any common shape.
-          const delta = event.delta ?? event.text ?? event.part?.text
-            ?? event.properties?.delta ?? event.properties?.text
-            ?? event.properties?.part?.text;
-          if (typeof delta === "string") assistantText += delta;
+          // Mirror langy.ts:316-327 exactly: only count text deltas emitted on
+          // the assistant's text part. Any broader cascade (taking text from
+          // `message.part.updated` or from `event.properties.part.text`) ends
+          // up (a) capturing the user's own prompt echo, since user messages
+          // arrive as the same shape, and (b) double-counting the assistant
+          // text — once via the streaming `delta` and again via the final
+          // `updated` event that carries the accumulated string. That is the
+          // sole cause of the "doubled response" pattern seen in older
+          // scenario-log transcripts; the in-product Langy was always clean.
+          if (
+            event.type === "message.part.delta" &&
+            event.properties?.field === "text" &&
+            typeof event.properties?.delta === "string"
+          ) {
+            assistantText += event.properties.delta;
+          }
         }
       }
       return { role: "assistant", content: assistantText || "(no response)" };
