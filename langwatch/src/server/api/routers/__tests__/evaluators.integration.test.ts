@@ -365,22 +365,22 @@ describe("Evaluators Endpoints", () => {
         throw new Error("Test user must have a team");
       }
 
-      const targetProjectExists = await prisma.project.findUnique({
+      // Upsert to avoid a unique-constraint race between parallel test
+      // shards / re-runs (findUnique + create can both fire across processes
+      // and the second create blows up with P2002 on id).
+      await prisma.project.upsert({
         where: { id: targetProjectId },
+        update: {},
+        create: {
+          id: targetProjectId,
+          name: "Test Project Copy Target",
+          slug: "test-project-copy-target",
+          apiKey: "test-api-key-evaluator-copy-target",
+          teamId: teamUser.team.id,
+          language: "en",
+          framework: "test-framework",
+        },
       });
-      if (!targetProjectExists) {
-        await prisma.project.create({
-          data: {
-            id: targetProjectId,
-            name: "Test Project Copy Target",
-            slug: "test-project-copy-target",
-            apiKey: "test-api-key-evaluator-copy-target",
-            teamId: teamUser.team.id,
-            language: "en",
-            framework: "test-framework",
-          },
-        });
-      }
 
       await prisma.evaluator.deleteMany({
         where: {
