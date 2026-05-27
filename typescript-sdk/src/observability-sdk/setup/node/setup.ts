@@ -224,11 +224,20 @@ function attachToExistingProvider(
   return {
     shutdown: async () => {
       logger.debug("Shutting down attached LangWatch processors");
-      await Promise.all(addedProcessors.map((p) => p.shutdown()));
-      if (Array.isArray(internalArray)) {
-        for (const p of addedProcessors) {
-          const idx = internalArray.indexOf(p);
-          if (idx !== -1) internalArray.splice(idx, 1);
+      try {
+        await Promise.all(addedProcessors.map((p) => p.shutdown()));
+      } finally {
+        const candidates = [
+          (provider as any)?._activeSpanProcessor?._spanProcessors,
+          (provider as any)?.activeSpanProcessor?._spanProcessors,
+          (provider as any)?._registeredSpanProcessors,
+        ];
+        for (const arr of candidates) {
+          if (!Array.isArray(arr)) continue;
+          for (const p of addedProcessors) {
+            const idx = arr.indexOf(p);
+            if (idx !== -1) arr.splice(idx, 1);
+          }
         }
       }
       logger.info("LangWatch processor shutdown complete");
