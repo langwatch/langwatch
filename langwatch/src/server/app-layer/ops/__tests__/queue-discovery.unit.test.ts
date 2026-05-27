@@ -8,10 +8,9 @@ function createRedis(overrides: Record<string, ReturnType<typeof vi.fn>> = {}) {
   return {
     smembers: vi.fn().mockResolvedValue([]),
     sadd: vi.fn().mockResolvedValue(1),
-    scan: vi.fn().mockResolvedValue(["0", []] satisfies ScanPage),
+    scan: vi.fn().mockResolvedValue(["0", []] as ScanPage),
     ...overrides,
-  } as unknown as Parameters<typeof QueueRedisRepository.prototype.constructor>[0] &
-    Record<string, ReturnType<typeof vi.fn>>;
+  };
 }
 
 describe("group queue discovery", () => {

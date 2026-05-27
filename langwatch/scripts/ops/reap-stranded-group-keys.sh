@@ -20,7 +20,10 @@
 
 set -eu
 
-PREFIX="${PREFIX:-{event-sourcing/jobs}:gq:}"
+# A literal "}" cannot live inside a ${VAR:-default} expansion in POSIX sh (the
+# first "}" closes the expansion), so set the default in two steps.
+PREFIX="${PREFIX:-}"
+[ -n "$PREFIX" ] || PREFIX='{event-sourcing/jobs}:gq:'
 APPLY="${APPLY:-0}"
 MIN_AGE_HOURS="${MIN_AGE_HOURS:-6}"
 OUT="${OUT:-/tmp/stranded-groups.tsv}"
