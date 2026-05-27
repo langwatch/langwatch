@@ -761,12 +761,9 @@ end
 -- Self-limiting (TRAP 3): bounded to current headroom so COMPLETE-unpark and the
 -- reconcile can't over-unpark into re-park churn. The LPUSH below wakes a waiter.
 if tenantCap > 0 then
-  local slashPos = string.find(groupId, "/", 1, true)
-  if slashPos and slashPos > 1 then
-    local tenantId = string.sub(groupId, 1, slashPos - 1)
-    local active = tonumber(redis.call("GET", tenantCountKeyPrefix .. tenantId)) or 0
-    unparkUpTo(readyKey, tenantId, tenantCap - active)
-  end
+  local tenantId = parkTenantOf(groupId)
+  local active = tonumber(redis.call("GET", tenantCountKeyPrefix .. tenantId)) or 0
+  unparkUpTo(readyKey, tenantId, tenantCap - active)
 end
 
 local pendingCount = redis.call("ZCARD", jobsKey)
