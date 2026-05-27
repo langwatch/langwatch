@@ -43,7 +43,11 @@ echo "mode=$([ "$APPLY" = "1" ] && echo APPLY || echo DISCOVER) prefix=${PREFIX}
 # Writes one "<jobs_key>\t<data_key>\t<job_count>" row per stranded group.
 : > "$OUT"
 $R --scan --pattern "${PREFIX}group:*:jobs" | while IFS= read -r jobs_key; do
-  gid=$(printf '%s' "$jobs_key" | sed -E "s#^.*:gq:group:(.*):jobs\$#\1#")
+  # Strip the actual ${PREFIX}group: prefix and :jobs suffix. Prefix-agnostic:
+  # never hard-code :gq: here, or a PREFIX override would mis-extract gid and
+  # the ready/active/blocked guards below would check the wrong group.
+  gid="${jobs_key#"${PREFIX}"group:}"
+  gid="${gid%:jobs}"
   active_key="${PREFIX}group:${gid}:active"
   data_key="${PREFIX}group:${gid}:data"
 
@@ -71,22 +75,29 @@ fi
 
 # ── Apply ─────────────────────────────────────────────────────────────────
 deleted=0
-while IFS="$(printf '\t')" read -r jobs_key data_key n; do
-  $R DEL "$jobs_key" "$data_key" >/dev/null
-  deleted=$((deleted + 1))
-  [ $((deleted % 1000)) -eq 0 ] && echo "  ... deleted ${deleted}/${groups}"
+failed=0
+while IFS="$(printf '\t')" read -r jobs_key data_key _; do
+  # Tolerate a transient redis-cli blip: one failed DEL must not abort the whole
+  # sweep under set -eu. The reaper is safe to re-run, but finishing in a single
+  # pass keeps the recompute below accurate.
+  if $R DEL "$jobs_key" "$data_key" >/dev/null; then
+    deleted=$((deleted + 1))
+  else
+    failed=$((failed + 1))
+    echo "  WARN: DEL failed for ${jobs_key} (transient?), continuing"
+  fi
+  [ $(((deleted + failed) % 1000)) -eq 0 ] && echo "  ... processed $((deleted + failed))/${groups}"
 done < "$OUT"
 
 # Recompute stats:total-pending from the surviving groups rather than DECRing
 # per delete: the counter had already drifted negative from the incident, so a
 # per-group DECRBY would only compound the error. Sum the remaining job zsets.
 echo "recomputing ${total_pending_key} from surviving groups ..."
-remaining=0
-$R --scan --pattern "${PREFIX}group:*:jobs" | while IFS= read -r jk; do
-  c=$($R ZCARD "$jk")
-  remaining=$((remaining + c))
-  printf '%s\n' "$remaining" > /tmp/reap-remaining.count
-done
-remaining=$(cat /tmp/reap-remaining.count 2>/dev/null || echo 0)
+# Sum the surviving job zsets straight through awk. No reused temp file: a fixed
+# /tmp path would feed a stale count into a later run whose scan returns nothing
+# (the while body runs in a pipe subshell, so it cannot export the sum directly).
+remaining=$($R --scan --pattern "${PREFIX}group:*:jobs" | while IFS= read -r jk; do
+  $R ZCARD "$jk"
+done | awk '{s+=$1} END {print s+0}')
 $R SET "$total_pending_key" "$remaining" >/dev/null
-echo "DONE deleted_groups=${deleted} total_pending_now=$($R GET "$total_pending_key")"
+echo "DONE deleted_groups=${deleted} failed_deletes=${failed} total_pending_now=$($R GET "$total_pending_key")"
