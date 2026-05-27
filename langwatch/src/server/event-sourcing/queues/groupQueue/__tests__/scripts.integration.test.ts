@@ -1433,7 +1433,7 @@ describe("GroupStagingScripts", () => {
     }
 
     /** @scenario Pausing a tenant halts dispatch for that tenant only */
-    it("skips a group whose tenantId-prefix is in paused-jobs as 'tenant:<id>'", async () => {
+    it("parks a paused tenant's group OUT of ready (not skip-in-place) and returns null", async () => {
       await scripts.stage(
         makeJob({
           stagedJobId: "j1",
@@ -1446,6 +1446,71 @@ describe("GroupStagingScripts", () => {
 
       const result = await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
       expect(result).toBeNull();
+
+      // The group is moved OUT of the ready scan into the tenant's parked set, so a
+      // large paused backlog can never plug the bounded scan and starve other tenants.
+      const ready = await inspectReadySet();
+      expect(ready).not.toContain("project_A/command/recordSpan/trace:xyz");
+      expect(await redis.zcard(`${keyPrefix()}parked:project_A`)).toBe(1);
+      expect(
+        await redis.sismember(`${keyPrefix()}parked-tenants`, "project_A"),
+      ).toBe(1);
+    });
+
+    /** @scenario A paused tenant's backlog does not block other tenants */
+    it("dispatches another tenant even when a paused tenant fills the front of ready", async () => {
+      // Paused tenant has several due groups at the FRONT of ready (lowest scores).
+      for (let i = 0; i < 5; i++) {
+        await scripts.stage(
+          makeJob({
+            stagedJobId: `bad${i}`,
+            groupId: `project_A/command/recordSpan/trace:${i}`,
+            dispatchAfterMs: 100 + i,
+            jobDataJson: makeBenignJobData(),
+          }),
+        );
+      }
+      // Another tenant's group is staged later (higher score = behind the paused ones).
+      await scripts.stage(
+        makeJob({
+          stagedJobId: "good",
+          groupId: "project_B/command/recordSpan/trace:b",
+          dispatchAfterMs: 200,
+          jobDataJson: makeBenignJobData(),
+        }),
+      );
+      await scripts.addPauseKey("tenant:project_A");
+
+      // Dispatch reaches project_B because project_A's groups are parked OUT of the
+      // scan as it walks past them, rather than re-skipped in place every poll.
+      const result = await scripts.dispatch({ nowMs: 300, activeTtlSec: 60 });
+      expect(result).not.toBeNull();
+      expect(result!.groupId).toBe("project_B/command/recordSpan/trace:b");
+
+      // All 5 paused groups were moved out of ready into parked.
+      expect(await redis.zcard(`${keyPrefix()}parked:project_A`)).toBe(5);
+    });
+
+    /** @scenario A still-paused tenant is not restored by the reconcile */
+    it("keeps groups parked across the reconcile while the tenant stays paused", async () => {
+      await scripts.stage(
+        makeJob({
+          stagedJobId: "j1",
+          groupId: "project_A/command/recordSpan/trace:xyz",
+          dispatchAfterMs: 100,
+          jobDataJson: makeBenignJobData(),
+        }),
+      );
+      await scripts.addPauseKey("tenant:project_A");
+
+      // First poll parks it.
+      expect(await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 })).toBeNull();
+      expect(await redis.zcard(`${keyPrefix()}parked:project_A`)).toBe(1);
+
+      // A later poll runs the reconcile (past the 2s gate), but the tenant is still
+      // paused so unparkUpTo refuses to restore: it stays parked, dispatch null.
+      expect(await scripts.dispatch({ nowMs: 2300, activeTtlSec: 60 })).toBeNull();
+      expect(await redis.zcard(`${keyPrefix()}parked:project_A`)).toBe(1);
     });
 
     it("dispatches groups for non-paused tenants while paused tenant is skipped", async () => {
@@ -1474,7 +1539,7 @@ describe("GroupStagingScripts", () => {
     });
 
     /** @scenario Unpausing a tenant resumes dispatch immediately */
-    it("resumes dispatch immediately after the tenant pause key is removed", async () => {
+    it("restores the parked group and resumes dispatch after the tenant pause key is removed", async () => {
       await scripts.stage(
         makeJob({
           stagedJobId: "j1",
@@ -1487,12 +1552,18 @@ describe("GroupStagingScripts", () => {
 
       const blocked = await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
       expect(blocked).toBeNull();
+      // Parked out of the ready scan while paused.
+      expect(await redis.zcard(`${keyPrefix()}parked:project_A`)).toBe(1);
 
       await scripts.removePauseKey("tenant:project_A");
 
-      const result = await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
+      // Unpausing restores the parked group via the dispatch reconcile (time-gated
+      // ~2s): advance the clock past the gate so the next poll reconciles the
+      // now-unpaused tenant back into ready and dispatches it in the same call.
+      const result = await scripts.dispatch({ nowMs: 2300, activeTtlSec: 60 });
       expect(result).not.toBeNull();
       expect(result!.stagedJobId).toBe("j1");
+      expect(await redis.zcard(`${keyPrefix()}parked:project_A`)).toBe(0);
     });
 
     it("does not pause an unrelated tenant whose id is a prefix of the paused one", async () => {
@@ -1536,9 +1607,11 @@ describe("GroupStagingScripts", () => {
       result = await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
       expect(result).toBeNull();
 
-      // Remove tenant pause — now dispatches
+      // Remove tenant pause — the tenant-paused group was parked out of the scan,
+      // so resumption is via the dispatch reconcile (time-gated ~2s): advance the
+      // clock past the gate so the next poll restores and dispatches it.
       await scripts.removePauseKey("tenant:project_A");
-      result = await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
+      result = await scripts.dispatch({ nowMs: 2300, activeTtlSec: 60 });
       expect(result).not.toBeNull();
       expect(result!.stagedJobId).toBe("j1");
     });

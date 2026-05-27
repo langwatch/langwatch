@@ -58,6 +58,29 @@ Feature: Queue pipeline pausing
     When the operator unpauses tenant A
     Then tenant A's groups resume dispatching within the next scan
 
+  # ============================================================================
+  # Pause must not block OTHER tenants — added 2026-05-27 post-incident
+  # ============================================================================
+  # A paused tenant can hold a very large due-now backlog. The dispatcher scans
+  # the shared ready queue with a bounded budget per poll; if a huge paused
+  # backlog sits at the front, the scan exhausts its budget skipping it and never
+  # reaches other tenants. So a paused tenant's groups are held out of the
+  # dispatch scan entirely (not skipped in place), and restored when unpaused.
+
+  @integration @v1 @tenant-pause
+  Scenario: A paused tenant's backlog does not block other tenants
+    Given tenant A is paused with many pending groups at the front of the queue
+    And tenant B has a pending group behind them
+    When the dispatcher runs
+    Then tenant B's group is dispatched
+    And tenant A's groups are held out of the dispatch scan
+
+  @integration @v1 @tenant-pause
+  Scenario: A still-paused tenant is not restored by the reconcile
+    Given tenant A is paused and its groups are held out of the dispatch scan
+    When the dispatcher reconcile runs while tenant A is still paused
+    Then tenant A's groups remain held out of the scan
+
   # Note: scenarios "active jobs at pause-time complete normally" and
   # "Ops UI controls" are covered by integration tests + manual QA below
   # and are not added as separate @scenario-bound unit tests because the
