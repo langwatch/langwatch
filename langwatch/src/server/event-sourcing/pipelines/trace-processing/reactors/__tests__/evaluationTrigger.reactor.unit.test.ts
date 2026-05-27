@@ -87,6 +87,21 @@ function createSpanEvent(opts: SpanEventOpts = {}): TraceProcessingEvent {
   } as unknown as TraceProcessingEvent;
 }
 
+function createTopicAssignedEvent(): TraceProcessingEvent {
+  return {
+    id: "event-1",
+    aggregateId: "trace-1",
+    aggregateType: "trace",
+    tenantId: "tenant-1",
+    createdAt: Date.now(),
+    occurredAt: Date.now(),
+    type: "lw.obs.trace.topic_assigned",
+    version: 1,
+    data: { topicId: "topic-1", subtopicId: null },
+    metadata: { traceId: "trace-1" },
+  } as unknown as TraceProcessingEvent;
+}
+
 function createOriginEvent(origin = "application"): TraceProcessingEvent {
   return {
     id: "event-1",
@@ -196,6 +211,52 @@ describe("evaluationTrigger reactor", () => {
       await reactor.handle(createOriginEvent(), createContext(state));
 
       expect(deps.monitors.getEnabledOnMessageMonitors).toHaveBeenCalledWith("tenant-1");
+      expect(deps.evaluation).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when the event is a derived enrichment (topic assignment)", () => {
+    /** @scenario a topic assignment does not re-run evaluations */
+    it("does not dispatch evaluations", async () => {
+      const deps = createDeps();
+      const reactor = createEvaluationTriggerReactor(deps);
+      const state = createFoldState({
+        attributes: { "langwatch.origin": "application" },
+      });
+
+      await reactor.handle(createTopicAssignedEvent(), createContext(state));
+
+      expect(deps.monitors.getEnabledOnMessageMonitors).not.toHaveBeenCalled();
+      expect(deps.evaluation).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the trace is older than the evaluation cutoff", () => {
+    /** @scenario evaluations do not re-run for a trace older than the cutoff */
+    it("does not dispatch even on a genuine new span", async () => {
+      const deps = createDeps();
+      const reactor = createEvaluationTriggerReactor(deps);
+      const state = createFoldState({
+        attributes: { "langwatch.origin": "application" },
+        occurredAt: Date.now() - 8 * 24 * 60 * 60 * 1000,
+      });
+
+      await reactor.handle(createSpanEvent(), createContext(state));
+
+      expect(deps.evaluation).not.toHaveBeenCalled();
+    });
+
+    /** @scenario a new span on a recent trace re-runs evaluations */
+    it("dispatches for a recent trace", async () => {
+      const deps = createDeps();
+      const reactor = createEvaluationTriggerReactor(deps);
+      const state = createFoldState({
+        attributes: { "langwatch.origin": "application" },
+        occurredAt: Date.now(),
+      });
+
+      await reactor.handle(createSpanEvent(), createContext(state));
+
       expect(deps.evaluation).toHaveBeenCalledTimes(1);
     });
   });

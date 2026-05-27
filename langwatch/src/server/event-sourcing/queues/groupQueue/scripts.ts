@@ -102,6 +102,14 @@ end
 -- so COMPLETE-unpark and the dispatch-tail reconcile can never over-unpark into
 -- a re-park churn (TRAP 3). Returns how many were moved.
 local function unparkUpTo(readyKey, tenantId, slots)
+  local kp = parkKeyPrefixOf(readyKey)
+  -- A paused tenant's groups stay parked OUT of the ready scan regardless of cap
+  -- headroom or the cap=0 drain: pause is an explicit operator hold and must win.
+  -- Otherwise COMPLETE-unpark / reconcile would restore them into ready and a large
+  -- paused backlog would plug the bounded dispatch scan for every other tenant again.
+  if redis.call("SISMEMBER", kp .. "paused-jobs", "tenant:" .. tenantId) == 1 then
+    return 0
+  end
   if slots <= 0 then return 0 end
   -- Bound the per-eval work so no single caller can ZRANGE + ZREM/ZADD an
   -- unbounded set and block the single Redis thread. The reconcile leaves the
@@ -109,7 +117,6 @@ local function unparkUpTo(readyKey, tenantId, slots)
   -- later cycles. (Normal cap>0 unparks pass slots = cap - active, far below
   -- this; the bound only bites the cap=0 kill-switch drain of a huge backlog.)
   if slots > ${PARK_RECONCILE_MAX_DRAIN} then slots = ${PARK_RECONCILE_MAX_DRAIN} end
-  local kp = parkKeyPrefixOf(readyKey)
   local parkedKey = kp .. "parked:" .. tenantId
   local members = redis.call("ZRANGE", parkedKey, 0, slots - 1, "WITHSCORES")
   local moved = 0
@@ -408,11 +415,28 @@ while offset < scanBudget do
         end
       end
 
+      -- Tenant-level pause: park the group OUT of ready (like over-cap) rather than
+      -- skip it in place. A paused tenant can hold a huge due-now backlog; left in
+      -- ready it sits at the front and the bounded scan burns its whole budget
+      -- skipping it, starving every other tenant (the 2026-05-27 head-of-line stall).
+      -- Parking moves it out so the scan reaches other tenants; the reconcile restores
+      -- it on unpause (unparkUpTo refuses to restore while still paused). Pipeline-level
+      -- pauses below stay skip-in-place (rarer, and need the job data to classify).
+      local tenantPaused = false
+      if hasPauses then
+        -- parkTenantOf handles both "tenant/..." and single-segment ids, so a
+        -- paused single-segment tenant is parked too, not left to skip-in-place.
+        if redis.call("SISMEMBER", pausedJobKey, "tenant:" .. parkTenantOf(groupId)) == 1 then
+          tenantPaused = true
+          parkGroup(readyKey, groupId)
+        end
+      end
+
       local activeKey = keyPrefix .. "group:" .. groupId .. ":active"
       -- Defensive activeKey check — covers legacy state during migration
       -- and the small race between ZADD ready and ZADD active.
       local activeJob = redis.call("GET", activeKey)
-      if (not activeJob) and (not tenantOverCap) then
+      if (not activeJob) and (not tenantOverCap) and (not tenantPaused) then
         local jobsKey = keyPrefix .. "group:" .. groupId .. ":jobs"
         local results = redis.call("ZRANGEBYSCORE", jobsKey, "-inf", nowMs, "WITHSCORES", "LIMIT", 0, 1)
 
@@ -580,7 +604,20 @@ while offset < scanBudget and dispatched < maxJobs do
       end
     end
 
-    if not tenantOverCap then
+    -- Tenant-level pause: park OUT of ready instead of skip-in-place, so a large
+    -- paused backlog cannot plug the bounded scan and starve other tenants
+    -- (head-of-line). See DISPATCH_LUA for the full rationale; unparkUpTo refuses
+    -- to restore a still-paused tenant, the reconcile restores it on unpause.
+    local tenantPaused = false
+    if hasPauses then
+      -- parkTenantOf handles single-segment ids too (see DISPATCH_LUA).
+      if redis.call("SISMEMBER", pausedJobKey, "tenant:" .. parkTenantOf(groupId)) == 1 then
+        tenantPaused = true
+        parkGroup(readyKey, groupId)
+      end
+    end
+
+    if not tenantOverCap and not tenantPaused then
       if redis.call("SISMEMBER", blockedKey, groupId) == 0 then
         local activeKey = keyPrefix .. "group:" .. groupId .. ":active"
         -- Defensive activeKey check — covers legacy state during migration

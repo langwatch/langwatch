@@ -15,6 +15,18 @@ import type { SpanInsertData } from "../types";
  */
 export const MAX_DERIVATION_SPANS = 512;
 
+/**
+ * Clamps a requested span-read limit to the `[1, MAX_DERIVATION_SPANS]` range.
+ * `MAX_DERIVATION_SPANS` is a hard ceiling a caller can only lower, never raise,
+ * so every full-span / derivation read is bounded even for a leaked trace_id.
+ * A missing or non-finite limit (undefined, NaN, Infinity) defaults to the
+ * ceiling so the value never propagates into a ClickHouse `UInt32` param.
+ */
+export function clampSpanReadLimit(limit?: number): number {
+  const requested = Number.isFinite(limit) ? (limit as number) : MAX_DERIVATION_SPANS;
+  return Math.min(Math.max(1, Math.trunc(requested)), MAX_DERIVATION_SPANS);
+}
+
 export interface SpanSummaryRow {
   spanId: string;
   parentSpanId: string | null;
@@ -77,8 +89,13 @@ export interface OccurredAtHint {
 export interface SpanStorageRepository {
   insertSpan(span: SpanInsertData): Promise<void>;
   insertSpans(spans: SpanInsertData[]): Promise<void>;
+  /**
+   * Full spans for a trace. Bounded by `MAX_DERIVATION_SPANS` (hard ceiling,
+   * always applied) so no caller can make this read unbounded on a leaked
+   * trace_id. `limit` may only lower the bound.
+   */
   getSpansByTraceId(
-    params: { tenantId: string; traceId: string } & OccurredAtHint,
+    params: { tenantId: string; traceId: string; limit?: number } & OccurredAtHint,
   ): Promise<Span[]>;
   /**
    * Normalized spans for a trace, used by read-time derivations (trace events

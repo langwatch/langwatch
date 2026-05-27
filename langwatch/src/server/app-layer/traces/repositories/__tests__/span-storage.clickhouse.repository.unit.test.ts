@@ -3,6 +3,10 @@ import {
   deserializeAttributes,
   serializeAttributes,
 } from "../span-storage.clickhouse.repository";
+import {
+  clampSpanReadLimit,
+  MAX_DERIVATION_SPANS,
+} from "../span-storage.repository";
 
 describe("serializeAttributes", () => {
   describe("when given string values", () => {
@@ -175,6 +179,48 @@ describe("deserializeAttributes", () => {
       const serialized = serializeAttributes(original);
       const deserialized = deserializeAttributes(serialized);
       expect(deserialized).toEqual(original);
+    });
+  });
+});
+
+describe("given a requested span-read limit", () => {
+  describe("when no limit is given", () => {
+    it("defaults to the hard ceiling", () => {
+      expect(clampSpanReadLimit(undefined)).toBe(MAX_DERIVATION_SPANS);
+    });
+  });
+
+  describe("when the requested limit is below the ceiling", () => {
+    it("keeps the requested limit", () => {
+      expect(clampSpanReadLimit(100)).toBe(100);
+    });
+  });
+
+  describe("when the requested limit exceeds the ceiling", () => {
+    it("clamps to the ceiling so a leaked trace_id cannot raise it", () => {
+      expect(clampSpanReadLimit(MAX_DERIVATION_SPANS + 50_000)).toBe(
+        MAX_DERIVATION_SPANS,
+      );
+    });
+  });
+
+  describe("when the requested limit is zero or negative", () => {
+    it("floors at 1", () => {
+      expect(clampSpanReadLimit(0)).toBe(1);
+      expect(clampSpanReadLimit(-10)).toBe(1);
+    });
+  });
+
+  describe("when the requested limit is fractional", () => {
+    it("truncates toward zero", () => {
+      expect(clampSpanReadLimit(10.9)).toBe(10);
+    });
+  });
+
+  describe("when the requested limit is not a finite number", () => {
+    it("defaults to the ceiling instead of propagating NaN/Infinity", () => {
+      expect(clampSpanReadLimit(NaN)).toBe(MAX_DERIVATION_SPANS);
+      expect(clampSpanReadLimit(Infinity)).toBe(MAX_DERIVATION_SPANS);
     });
   });
 });
