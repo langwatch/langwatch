@@ -113,3 +113,15 @@ Feature: Redis pressure visibility on the Ops dashboard
     Given Redis reports 24 connected clients
     When the dashboard loads
     Then the Redis conns tile shows "24" with a "clients" sublabel
+
+  # ---------------------------------------------------------------------------
+  # Throughput: Completed/s shows its peak, mirroring Staged/s, without losing
+  # the running total operators rely on.
+  # ---------------------------------------------------------------------------
+
+  @integration
+  Scenario: Completed/s tile shows the per-second peak alongside the running total
+    Given the dashboard reports a Completed/s peak and a running total
+    When the dashboard loads
+    Then the Completed/s tile sublabel shows the peak per second
+    And it keeps showing the running total

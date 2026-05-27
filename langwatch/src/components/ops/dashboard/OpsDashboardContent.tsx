@@ -13,25 +13,19 @@ import { BlockedCard } from "~/components/ops/queues/BlockedCard";
 import { DlqCard } from "~/components/ops/queues/DlqCard";
 import { GroupsCard } from "~/components/ops/queues/GroupsCard";
 import { PipelineTreeCard } from "~/components/ops/queues/PipelineTreeCard";
-import {
-  formatCount,
-  formatMs,
-  formatRate,
-} from "~/components/ops/shared/formatters";
 import type { DashboardData } from "~/server/app-layer/ops/types";
 import { api } from "~/utils/api";
 import { ActiveOperationsSection } from "./ActiveOperationsSection";
-import { LinkedStat } from "./LinkedStat";
 import { RedisStatTiles } from "./RedisStatTiles";
 import { ReplayHistorySection } from "./ReplayHistorySection";
 import { ThroughputChart } from "./ThroughputChart";
+import { ThroughputStatTiles } from "./ThroughputStatTiles";
 
 export function OpsDashboardContent({ data }: { data: DashboardData }) {
   const totalBlocked = data.queues.reduce(
     (sum, q) => sum + q.blockedGroupCount,
     0,
   );
-  const totalDlq = data.queues.reduce((sum, q) => sum + q.dlqCount, 0);
 
   const queuesQuery = api.ops.listQueues.useQuery(undefined, {
     refetchInterval: 10000,
@@ -46,47 +40,7 @@ export function OpsDashboardContent({ data }: { data: DashboardData }) {
       <ActiveOperationsSection data={data} />
 
       <SimpleGrid columns={{ base: 2, md: 5, lg: 10 }} gap={1}>
-        <LinkedStat
-          label="Staged/s"
-          value={formatRate(data.throughputIngestedPerSec)}
-          sublabel={`peak ${formatRate(data.peakIngestedPerSec)}`}
-        />
-        <LinkedStat
-          label="Completed/s"
-          value={formatRate(data.completedPerSec)}
-          sublabel={`${formatCount(data.totalCompleted)} total`}
-        />
-        <LinkedStat
-          label="Failed/s"
-          value={formatRate(data.failedPerSec)}
-          sublabel={
-            data.totalFailed > 0
-              ? `${formatCount(data.totalFailed)} total`
-              : undefined
-          }
-          color={data.failedPerSec > 0 ? "red.500" : undefined}
-        />
-        <LinkedStat
-          label="Blocked"
-          value={totalBlocked.toString()}
-          sublabel={`${data.totalGroups} groups`}
-          color={totalBlocked > 0 ? "red.500" : undefined}
-        />
-        <LinkedStat
-          label="P50"
-          value={formatMs(data.latencyP50Ms)}
-          sublabel={`peak ${formatMs(data.peakLatencyP50Ms)}`}
-        />
-        <LinkedStat
-          label="P99"
-          value={formatMs(data.latencyP99Ms)}
-          sublabel={`peak ${formatMs(data.peakLatencyP99Ms)}`}
-        />
-        <LinkedStat
-          label="DLQ"
-          value={totalDlq.toString()}
-          color={totalDlq > 0 ? "orange.500" : undefined}
-        />
+        <ThroughputStatTiles data={data} />
         <RedisStatTiles data={data} />
       </SimpleGrid>
 
