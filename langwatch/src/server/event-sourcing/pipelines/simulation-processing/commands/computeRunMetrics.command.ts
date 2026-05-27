@@ -128,7 +128,14 @@ export class ComputeRunMetricsCommand
 
       // Summary exists but not yet populated (cost enrichment still in progress).
       // Treat like missing summary — schedule retry so we pick it up later.
-      if (Object.keys(roleCosts).length === 0 && traceSummary.totalCost === null) {
+      // Role latency is enough on its own: a scenario trace can have
+      // role-bearing spans with latency but no cost (totalCost null, roleCosts
+      // empty), and those metrics are still worth emitting.
+      if (
+        Object.keys(roleCosts).length === 0 &&
+        Object.keys(roleLatencies).length === 0 &&
+        traceSummary.totalCost === null
+      ) {
         logger.debug(
           { tenantId, scenarioRunId, traceId, retryCount: data.retryCount },
           "Trace summary exists but has no metrics yet",

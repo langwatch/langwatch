@@ -666,7 +666,6 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     tenantId,
     traceId,
     limit,
-    occurredAtMs,
   }: {
     tenantId: string;
     traceId: string;
@@ -685,37 +684,34 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       MAX_DERIVATION_SPANS,
     );
 
+    // No partition-window hint here, unlike the "find anything" reads:
+    // derivations need the COMPLETE bounded span set, and the ±window fallback
+    // only triggers on an empty result. A trace whose spans straddle the
+    // window (long-running, clock skew, a reused trace_id) would otherwise
+    // return a partial set and silently skew the derived metrics. The
+    // (TenantId, TraceId) predicate keeps this selective; the LIMIT bounds it.
     try {
-      return await withPartitionHint<NormalizedSpan[]>(
-        { occurredAtMs },
-        (rows) => rows.length === 0,
-        async (window) => {
-          const partition = partitionFragment(window);
-          const client = await this.resolveClient(tenantId);
-          const result = await client.query({
-            query: `
-              SELECT ${FULL_SPAN_SELECT}
-              FROM ${TABLE_NAME}
-              WHERE TenantId = {tenantId:String}
-                AND TraceId = {traceId:String}
-                ${partition.sqlAnd}
-                AND ${dedupInTuple(partition.sqlAndInner)}
-              ORDER BY StartTimeMs ASC
-              LIMIT {limit:UInt32}
-            `,
-            query_params: {
-              tenantId,
-              traceId,
-              limit: effectiveLimit,
-              ...partition.params,
-            },
-            format: "JSONEachRow",
-          });
-
-          const rows = (await result.json()) as FullSpanRow[];
-          return rows.map(mapChRowToNormalized);
+      const client = await this.resolveClient(tenantId);
+      const result = await client.query({
+        query: `
+          SELECT ${FULL_SPAN_SELECT}
+          FROM ${TABLE_NAME}
+          WHERE TenantId = {tenantId:String}
+            AND TraceId = {traceId:String}
+            AND ${dedupInTuple("")}
+          ORDER BY StartTimeMs ASC
+          LIMIT {limit:UInt32}
+        `,
+        query_params: {
+          tenantId,
+          traceId,
+          limit: effectiveLimit,
         },
-      );
+        format: "JSONEachRow",
+      });
+
+      const rows = (await result.json()) as FullSpanRow[];
+      return rows.map(mapChRowToNormalized);
     } catch (error) {
       logger.error(
         {
@@ -858,7 +854,6 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
   async getTraceEventsByTraceId({
     tenantId,
     traceId,
-    occurredAtMs,
   }: {
     tenantId: string;
     traceId: string;
@@ -868,50 +863,47 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       "SpanStorageClickHouseRepository.getTraceEventsByTraceId",
     );
 
+    // No partition-window hint: this is a derivation read that needs the
+    // COMPLETE event set, and the ±window fallback only triggers on an empty
+    // result, so a trace straddling the window would silently lose events.
+    // There is no count to bound it by (events != spans), so we always read
+    // the full trace; the (TenantId, TraceId) predicate keeps it selective.
     try {
-      return await withPartitionHint<DerivedTraceEvent[]>(
-        { occurredAtMs },
-        (rows) => rows.length === 0,
-        async (window) => {
-          const partition = partitionFragment(window);
-          const client = await this.resolveClient(tenantId);
-          // Events-only ARRAY JOIN: reads just the `Events.*` columns, never
-          // the heavy span attribute/link payload. Includes exception events
-          // for parity with the trace-level list the fold used to carry.
-          const result = await client.query({
-            query: `
-              SELECT
-                SpanId AS spanId,
-                toUnixTimestamp64Milli(event_timestamp) AS timestamp,
-                event_name AS name,
-                event_attrs AS attributes
-              FROM ${TABLE_NAME}
-              WHERE TenantId = {tenantId:String}
-                AND TraceId = {traceId:String}
-                ${partition.sqlAnd}
-                AND ${dedupInTuple(partition.sqlAndInner)}
-              ARRAY JOIN
-                "Events.Timestamp" AS event_timestamp,
-                "Events.Name" AS event_name,
-                "Events.Attributes" AS event_attrs
-              ORDER BY event_timestamp ASC
-            `,
-            query_params: { tenantId, traceId, ...partition.params },
-            format: "JSONEachRow",
-          });
+      const client = await this.resolveClient(tenantId);
+      // Events-only ARRAY JOIN: reads just the `Events.*` columns, never the
+      // heavy span attribute/link payload. Includes exception events for
+      // parity with the trace-level list the fold used to carry.
+      const result = await client.query({
+        query: `
+          SELECT
+            SpanId AS spanId,
+            toUnixTimestamp64Milli(event_timestamp) AS timestamp,
+            event_name AS name,
+            event_attrs AS attributes
+          FROM ${TABLE_NAME}
+          WHERE TenantId = {tenantId:String}
+            AND TraceId = {traceId:String}
+            AND ${dedupInTuple("")}
+          ARRAY JOIN
+            "Events.Timestamp" AS event_timestamp,
+            "Events.Name" AS event_name,
+            "Events.Attributes" AS event_attrs
+          ORDER BY event_timestamp ASC
+        `,
+        query_params: { tenantId, traceId },
+        format: "JSONEachRow",
+      });
 
-          const rows = (await result.json()) as TraceEventRow[];
-          return rows.map((r) => ({
-            spanId: r.spanId,
-            timestamp:
-              typeof r.timestamp === "string"
-                ? parseInt(r.timestamp, 10)
-                : r.timestamp,
-            name: r.name,
-            attributes: r.attributes ?? {},
-          }));
-        },
-      );
+      const rows = (await result.json()) as TraceEventRow[];
+      return rows.map((r) => ({
+        spanId: r.spanId,
+        timestamp:
+          typeof r.timestamp === "string"
+            ? parseInt(r.timestamp, 10)
+            : r.timestamp,
+        name: r.name,
+        attributes: r.attributes ?? {},
+      }));
     } catch (error) {
       logger.error(
         {

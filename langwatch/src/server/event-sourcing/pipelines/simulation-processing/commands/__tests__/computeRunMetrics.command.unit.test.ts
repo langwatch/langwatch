@@ -160,6 +160,34 @@ describe("ComputeRunMetricsCommand", () => {
     });
   });
 
+  describe("when the scenario trace has role latency but no cost", () => {
+    it("emits metrics with totalCost 0 instead of retrying forever", async () => {
+      const deps = makeDeps({
+        traceSummaryStore: {
+          // Cost-free scenario trace: no totalCost, but role-bearing spans
+          // with latency. The readiness check must not treat this as "empty".
+          get: vi.fn().mockResolvedValue(makeTraceSummary({ totalCost: null })),
+          store: vi.fn(),
+        },
+        deriveScenarioRoleMetrics: vi.fn().mockResolvedValue({
+          scenarioRoleCosts: {},
+          scenarioRoleLatencies: { Agent: 4000 },
+        }),
+      });
+
+      const handler = new ComputeRunMetricsCommand(deps);
+      const events = await handler.handle(makeCommand() as any);
+
+      expect(deps.scheduleRetry).not.toHaveBeenCalled();
+      expect(events).toHaveLength(1);
+      expect(events[0]!.data).toMatchObject({
+        totalCost: 0,
+        roleCosts: {},
+        roleLatencies: { Agent: 4000 },
+      });
+    });
+  });
+
   describe("when ECST payload is provided", () => {
     it("emits event directly without reading store or deriving", async () => {
       const deps = makeDeps();
