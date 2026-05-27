@@ -404,7 +404,7 @@ def test_nested_trace_linking_behavior() -> None:
 
 class TestDedicatedTracerProviderIsolation:
     """Regression tests for issue #4203: dedicated TracerProvider must be
-    respected when passed, enabling isolation from other OTel SDKs (e.g. Sentry)."""
+    respected when passed, enabling isolation from other OTel-based SDKs."""
 
     def setup_method(self) -> None:
         Client.reset_for_testing()
@@ -417,14 +417,14 @@ class TestDedicatedTracerProviderIsolation:
         trace_api._TRACER_PROVIDER_SET_ONCE = trace_api.Once()  # type: ignore[attr-defined]
 
     def test_dedicated_provider_used_when_global_exists(self) -> None:
-        """When another SDK (e.g. Sentry) has set a global TracerProvider,
+        """When another OTel-based SDK has set a global TracerProvider,
         passing a dedicated provider to LangWatch attaches the exporter
         to the dedicated provider — not the global one."""
         from opentelemetry.sdk.trace import TracerProvider
         from opentelemetry import trace as trace_api
 
-        sentry_provider = TracerProvider()
-        trace_api.set_tracer_provider(sentry_provider)
+        external_provider = TracerProvider()
+        trace_api.set_tracer_provider(external_provider)
 
         lw_provider = TracerProvider()
         client = Client(api_key="test-key", tracer_provider=lw_provider)

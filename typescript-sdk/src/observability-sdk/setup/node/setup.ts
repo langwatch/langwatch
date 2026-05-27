@@ -1,6 +1,6 @@
 import { NodeSDK } from "@opentelemetry/sdk-node";
 import { SimpleLogRecordProcessor, BatchLogRecordProcessor, type LogRecordProcessor, ConsoleLogRecordExporter, LoggerProvider } from "@opentelemetry/sdk-logs";
-import { createMergedResource, isConcreteProvider } from "../utils";
+import { createMergedResource, getConcreteProvider, isConcreteProvider } from "../utils";
 import { type SetupObservabilityOptions, type ObservabilityHandle } from "./types";
 import { trace } from "@opentelemetry/api";
 import {
@@ -50,12 +50,17 @@ const checkForEarlyExit = (options: SetupObservabilityOptions, logger: Logger): 
   const alreadySetup = isConcreteProvider(globalProvider);
 
   if (alreadySetup && !options.advanced?.UNSAFE_forceOpenTelemetryReinitialization) {
+    if (options.advanced?.attachToExistingProvider) {
+      return null;
+    }
+
     logger.error(
       `OpenTelemetry is already set up in this process.\n` +
         `Spans will NOT be sent to LangWatch unless you add the LangWatch span processor or exporter to your existing OpenTelemetry setup.\n` +
         `You must either:\n` +
         `  1. Remove your existing OpenTelemetry setup and only use LangWatch,\n` +
         `  2. Add the LangWatch span processor to your existing setup, or replace the existing exporter with the LangWatch exporter.\n` +
+        `  3. Use advanced.attachToExistingProvider to let LangWatch attach its processors to the existing provider.\n` +
         `\nFor step-by-step instructions, see the LangWatch docs and check out the integration guide for your framework:\n` +
         `  https://docs.langwatch.ai/integration/typescript/guide\n` +
         `\nSee also: https://github.com/open-telemetry/opentelemetry-js/issues/5299`,
@@ -120,6 +125,13 @@ export function setupObservability(options: SetupObservabilityOptions = {}): Obs
   if (earlyExit) return earlyExit;
 
   try {
+    const globalProvider = trace.getTracerProvider();
+    const existingProvider = getConcreteProvider(globalProvider);
+
+    if (options.advanced?.attachToExistingProvider && existingProvider && typeof (existingProvider as any).addSpanProcessor === 'function') {
+      return attachToExistingProvider(existingProvider as any, options, logger);
+    }
+
     const sdk = createAndStartNodeSdk(options, logger, createMergedResource(
       options.attributes,
       options.serviceName,
@@ -146,6 +158,46 @@ export function setupObservability(options: SetupObservabilityOptions = {}): Obs
     if (options.advanced?.throwOnSetupError) throw err;
     return createNoOpHandle(logger);
   }
+}
+
+function attachToExistingProvider(
+  provider: { addSpanProcessor: (processor: SpanProcessor) => void },
+  options: SetupObservabilityOptions,
+  logger: Logger,
+): ObservabilityHandle {
+  const langwatch = getLangWatchConfig(options);
+  const processors: SpanProcessor[] = [];
+
+  if (!langwatch.disabled) {
+    const traceExporter = new LangWatchTraceExporter({
+      apiKey: langwatch.apiKey,
+      endpoint: langwatch.endpoint,
+    });
+
+    const processor = langwatch.processorType === 'batch'
+      ? new BatchSpanProcessor(traceExporter)
+      : new SimpleSpanProcessor(traceExporter);
+
+    processors.push(processor);
+    provider.addSpanProcessor(processor);
+    logger.info("Attached LangWatch span processor to existing global provider");
+  }
+
+  if (options.spanProcessors?.length) {
+    for (const processor of options.spanProcessors) {
+      processors.push(processor);
+      provider.addSpanProcessor(processor);
+    }
+    logger.debug(`Attached ${options.spanProcessors.length} user-provided span processors to existing provider`);
+  }
+
+  return {
+    shutdown: async () => {
+      logger.debug("Shutting down attached LangWatch processors");
+      await Promise.all(processors.map((p) => p.shutdown()));
+      logger.info("LangWatch processor shutdown complete");
+    },
+  };
 }
 
 export function createAndStartNodeSdk(

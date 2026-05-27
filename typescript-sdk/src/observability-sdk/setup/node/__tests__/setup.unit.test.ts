@@ -18,6 +18,7 @@ import { trace } from "@opentelemetry/api";
 // Mocks
 vi.mock("../../utils", () => ({
   isConcreteProvider: vi.fn(() => false),
+  getConcreteProvider: vi.fn(() => undefined),
   createMergedResource: vi.fn(() => resourceFromAttributes({})),
 }));
 vi.mock("../../../exporters", () => ({

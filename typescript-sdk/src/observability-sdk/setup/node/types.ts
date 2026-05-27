@@ -318,6 +318,21 @@ export interface SetupObservabilityOptions {
     UNSAFE_forceOpenTelemetryReinitialization?: boolean;
 
     /**
+     * Attach LangWatch processors to an existing global TracerProvider
+     * instead of returning a no-op when another OTel-based SDK has already
+     * initialized.
+     *
+     * Use this when running LangWatch alongside another OTel-based SDK.
+     * LangWatch will add its span processors to the
+     * existing provider so both SDKs receive spans. Combine with
+     * LangWatchTraceExporter filter options to scope LangWatch to only
+     * LLM-related spans.
+     *
+     * @default false
+     */
+    attachToExistingProvider?: boolean;
+
+    /**
      * Disable all observability setup and return no-op handles.
      *
      * When true, no OpenTelemetry setup will occur and all operations
