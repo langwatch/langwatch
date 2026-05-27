@@ -136,16 +136,20 @@ export interface SetupObservabilityOptions {
   dataCapture?: DataCaptureOptions;
 
   /**
-   * Dedicated TracerProvider for complete isolation from other OTel SDKs.
+   * Dedicated TracerProvider for complete trace isolation from other OTel SDKs.
    *
-   * When provided, LangWatch attaches its exporter to this provider and
-   * does NOT touch the global provider. Spans created through this
+   * When provided, LangWatch attaches its trace exporter to this provider
+   * and does NOT touch the global provider. Spans created through this
    * provider's tracers go only to LangWatch. The other SDK keeps the
    * global provider and never sees LLM traces.
    *
    * Pass any instrumentations you want on this provider via the
    * `instrumentations` option — they will be registered against this
    * provider instead of the global one.
+   *
+   * @remarks Trace-only mode. Log export (`logRecordProcessors`,
+   * `debug.consoleLogging`) is not supported when using a dedicated
+   * TracerProvider — use the default setup for full log+trace support.
    *
    * @example
    * ```typescript

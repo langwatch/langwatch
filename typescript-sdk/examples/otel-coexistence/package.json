@@ -1,7 +1,7 @@
 {
   "name": "otel-coexistence-example",
   "version": "1.0.0",
-  "description": "Example: running LangWatch alongside another OTel-based SDK",
+  "description": "Example: running LangWatch alongside another OTel-based SDK with true provider isolation",
   "type": "module",
   "scripts": {
     "start": "tsc && dotenv -- node dist/index.js",
@@ -10,10 +10,9 @@
   "author": "LangWatch",
   "license": "MIT",
   "dependencies": {
-    "@ai-sdk/openai": "^2.0.6",
     "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/sdk-trace-node": "^1.30.0",
-    "ai": "^5.0.52",
+    "@opentelemetry/sdk-trace-base": "^1.30.0",
     "dotenv-cli": "^10.0.0",
     "langwatch": "file:../../"
   },

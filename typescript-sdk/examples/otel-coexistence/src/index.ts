@@ -5,10 +5,16 @@
  * LangWatch uses a dedicated TracerProvider — the global provider
  * (owned by the other SDK) is untouched. No cross-contamination.
  *
- * Run: pnpm start
+ * This example uses manual spans to demonstrate isolation. Spans
+ * created via lwProvider.getTracer() go only to LangWatch. Spans
+ * created via the global trace.getTracer() go only to the external SDK.
  *
- * Expected: The LLM call appears in your LangWatch dashboard.
- * The "app-request" span only prints to console (external SDK).
+ * Note: Auto-instrumentation libraries that emit through the global
+ * OTel API (e.g. Vercel AI SDK's experimental_telemetry) will send
+ * spans to the global provider, not the dedicated one. Use
+ * lwProvider.getTracer() directly for LLM calls that must be isolated.
+ *
+ * Run: pnpm start
  */
 
 import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
@@ -36,32 +42,28 @@ const { shutdown } = setupObservability({
 
 console.log("[LangWatch] Dedicated provider set up (global untouched).\n");
 
-// ── Step 3: Make calls on each provider ─────────────────────────────
-import { openai } from "@ai-sdk/openai";
-import { generateText } from "ai";
-
+// ── Step 3: Create spans on each provider ───────────────────────────
 async function main() {
-  // App span on the global provider → goes to external SDK only
+  // App span on the global provider → external SDK only, NOT LangWatch
   const appTracer = trace.getTracer("app");
-  await appTracer.startActiveSpan("app-request", async (appSpan) => {
-    console.log("[App] app-request span (global provider → external SDK only)\n");
-    appSpan.end();
+  appTracer.startActiveSpan("app-request", (span) => {
+    console.log("[App] 'app-request' span → global provider (external SDK only)");
+    span.end();
   });
 
-  // LLM span on the dedicated provider → goes to LangWatch only
+  // LLM span on the dedicated provider → LangWatch only, NOT external SDK
   const llmTracer = lwProvider.getTracer("langwatch-llm");
-  await llmTracer.startActiveSpan("llm-call", async (llmSpan) => {
-    const result = await generateText({
-      model: openai("gpt-5-mini"),
-      prompt: "What is OpenTelemetry in one sentence?",
-    });
-    console.log(`[LLM Response] ${result.text}\n`);
-    llmSpan.end();
+  llmTracer.startActiveSpan("llm-call", (span) => {
+    span.setAttribute("gen_ai.system", "openai");
+    span.setAttribute("gen_ai.request.model", "gpt-5-mini");
+    console.log("[LLM] 'llm-call' span → dedicated provider (LangWatch only)");
+    span.end();
   });
 
+  console.log();
   await shutdown();
   await externalProvider.shutdown();
-  console.log("\n[Done] Check your LangWatch dashboard — only the LLM call should appear.");
+  console.log("[Done] Check your LangWatch dashboard — only 'llm-call' should appear.");
   console.log("The 'app-request' span should only be in the console output above.");
 }
 

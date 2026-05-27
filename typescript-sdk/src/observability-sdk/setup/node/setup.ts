@@ -122,8 +122,25 @@ export function setupObservability(options: SetupObservabilityOptions = {}): Obs
     dataCapture: options.dataCapture,
   });
 
+  if (options.advanced?.disabled) {
+    logger.debug("Observability disabled via advanced.disabled");
+    return createNoOpHandle(logger);
+  }
+
+  if (options.advanced?.skipOpenTelemetrySetup) {
+    logger.debug("Skipping OpenTelemetry setup");
+    return createNoOpHandle(logger);
+  }
+
   if (options.tracerProvider) {
-    return setupDedicatedProvider(options.tracerProvider, options, logger);
+    try {
+      return setupDedicatedProvider(options.tracerProvider, options, logger);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      logger.error(`Failed to set up dedicated provider: ${errorMessage}`);
+      if (options.advanced?.throwOnSetupError) throw err;
+      return createNoOpHandle(logger);
+    }
   }
 
   const earlyExit = checkForEarlyExit(options, logger);
@@ -227,15 +244,16 @@ function setupDedicatedProvider(
     }
   }
 
+  let unregisterInstrumentations: (() => void) | undefined;
   if (options.instrumentations?.length) {
-    registerInstrumentations({
+    unregisterInstrumentations = registerInstrumentations({
       tracerProvider: provider,
       instrumentations: options.instrumentations,
     });
     logger.info(`Registered ${options.instrumentations.length} instrumentations against dedicated provider`);
   }
 
-  logger.info("LangWatch Observability SDK setup completed with dedicated provider (global provider untouched)");
+  logger.info("LangWatch Observability SDK setup completed with dedicated provider (trace-only, global provider untouched)");
 
   return {
     shutdown: async () => {
@@ -255,6 +273,7 @@ function setupDedicatedProvider(
             if (idx !== -1) arr.splice(idx, 1);
           }
         }
+        unregisterInstrumentations?.();
       }
       logger.info("LangWatch processor shutdown complete");
     },

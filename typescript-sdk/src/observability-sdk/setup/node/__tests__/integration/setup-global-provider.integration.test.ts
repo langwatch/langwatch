@@ -143,4 +143,20 @@ describe('setupObservability Integration - Dedicated TracerProvider', () => {
 
     expect(logger.error).not.toHaveBeenCalled();
   });
+
+  it('honors advanced.disabled even when dedicated provider is passed', async () => {
+    const lwProvider = new NodeTracerProvider();
+    const processorsBefore = (lwProvider as any)._activeSpanProcessor._spanProcessors.length;
+    const logger = createMockLogger();
+
+    setupObservability({
+      tracerProvider: lwProvider,
+      langwatch: { apiKey: 'test-key' },
+      debug: { logger },
+      advanced: { disabled: true },
+    });
+
+    const processorsAfter = (lwProvider as any)._activeSpanProcessor._spanProcessors.length;
+    expect(processorsAfter).toBe(processorsBefore);
+  });
 });
