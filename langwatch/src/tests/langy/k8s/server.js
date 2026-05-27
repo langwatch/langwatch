@@ -47,7 +47,14 @@ const READINESS_TIMEOUT_MS = parseInt(
   10,
 );
 const REAPER_INTERVAL_MS = 30_000;
-const SESSIONS_ROOT = "/workspace/sessions";
+// Paths default to the in-pod layout. Overridable so the manager can be
+// exercised against a non-pod filesystem (e.g. local smoke tests, CI
+// runners without /workspace).
+const SESSIONS_ROOT =
+  process.env.LANGY_SESSIONS_ROOT || "/workspace/sessions";
+const AGENTS_TEMPLATE_PATH =
+  process.env.LANGY_AGENTS_TEMPLATE_PATH || "/workspace/AGENTS.md";
+const SKILLS_DIR = process.env.LANGY_SKILLS_DIR || "/workspace/skills";
 
 if (!INTERNAL_SECRET) {
   console.error("fatal: LANGY_INTERNAL_SECRET is required");
@@ -138,9 +145,9 @@ function setupWorkerHome(workerHome, credentials) {
   );
 
   // 2. Per-worker AGENTS.md with ${LANGWATCH_ENDPOINT} substituted in.
-  // The shared /workspace/AGENTS.md keeps the literal placeholder; we
+  // The shared AGENTS.md template keeps the literal placeholder; we
   // resolve it here so each worker emits concrete URLs in its replies.
-  const sharedAgents = fs.readFileSync("/workspace/AGENTS.md", "utf8");
+  const sharedAgents = fs.readFileSync(AGENTS_TEMPLATE_PATH, "utf8");
   const perWorkerAgents = sharedAgents.replaceAll(
     "${LANGWATCH_ENDPOINT}",
     credentials.langwatchEndpoint,
@@ -151,7 +158,7 @@ function setupWorkerHome(workerHome, credentials) {
   // references; no per-worker mutation expected.
   const skillsLink = path.join(workerHome, "skills");
   try {
-    fs.symlinkSync("/workspace/skills", skillsLink);
+    fs.symlinkSync(SKILLS_DIR, skillsLink);
   } catch (err) {
     // EEXIST is fine — leftover from a previous worker for the same
     // conversation that didn't get fully cleaned up.
