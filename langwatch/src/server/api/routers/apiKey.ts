@@ -5,6 +5,7 @@ import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { DomainError } from "~/server/app-layer/domain-error";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { auditLog } from "~/server/auditLog";
+import { trackServerEvent } from "~/server/posthog";
 import { skipPermissionCheck } from "../rbac";
 import { permissionFormatSchema } from "~/server/rbac/custom-role-permissions";
 
@@ -272,6 +273,27 @@ export const apiKeyRouter = createTRPCRouter({
             keyType: input.keyType,
             permissionMode: input.permissionMode,
             assignedToUserId: targetUserId,
+          },
+        });
+
+        // Critical activation step: a project API key is what unblocks SDK
+        // integration. Without this event we can't measure the lag from
+        // project_created → api_key_created → first_trace_received, which
+        // is the biggest gap to close on TTV (time to value).
+        trackServerEvent({
+          userId: ctx.session.user.id,
+          event: "api_key_created",
+          organizationId: input.organizationId,
+          properties: {
+            apiKeyId: apiKey.id,
+            keyType: input.keyType,
+            permissionMode: input.permissionMode,
+            isService,
+            assignedToOther: Boolean(
+              input.assignedToUserId &&
+                input.assignedToUserId !== ctx.session.user.id,
+            ),
+            hasExpiry: Boolean(input.expiresAt),
           },
         });
 

@@ -6,6 +6,7 @@ import type { Workflow } from "../../../optimization_studio/types/dsl";
 import { getWorkflowEntryOutputs } from "../../../optimization_studio/utils/workflowFields";
 import { EvaluatorService } from "../../evaluators/evaluator.service";
 import { enforceLicenseLimit } from "../../license-enforcement";
+import { trackProjectEvent } from "../../posthog";
 import { checkProjectPermission, hasProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { copyWorkflowWithDatasets, saveOrCommitWorkflowVersion } from "./workflows";
@@ -105,7 +106,7 @@ export const evaluatorsRouter = createTRPCRouter({
       }
 
       const evaluatorService = EvaluatorService.create(ctx.prisma);
-      return await evaluatorService.create({
+      const created = await evaluatorService.create({
         id: input.id,
         projectId: input.projectId,
         name: input.name,
@@ -113,6 +114,24 @@ export const evaluatorsRouter = createTRPCRouter({
         config: input.config as Prisma.InputJsonValue,
         workflowId: input.workflowId,
       });
+
+      // Feature-adoption signal. We already have `evaluation_ran` (the
+      // RUN event), but creation is the leading indicator — a user can
+      // create an evaluator and not run it for days, and that gap is
+      // exactly the friction worth measuring.
+      trackProjectEvent({
+        prisma: ctx.prisma,
+        userId: ctx.session.user.id,
+        event: "evaluator_created",
+        projectId: input.projectId,
+        properties: {
+          evaluatorId: input.id,
+          type: input.type,
+          hasWorkflow: Boolean(input.workflowId),
+        },
+      });
+
+      return created;
     }),
 
   /**

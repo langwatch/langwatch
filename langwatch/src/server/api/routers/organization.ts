@@ -89,6 +89,20 @@ export const organizationRouter = createTRPCRouter({
 
       await scheduleUsageStatsForOrganization(result.organization);
 
+      // Activation funnel step 2 on "the truth": user → org. Carries
+      // organizationId both as a property and via $groups so org-level
+      // breakdowns (plan distribution, org-count-by-week) work.
+      trackServerEvent({
+        userId: ctx.session.user.id,
+        event: "organization_created",
+        organizationId: result.organization.id,
+        properties: {
+          teamId: result.team.id,
+          hasPhoneNumber: Boolean(input.phoneNumber),
+          orgNameProvided: Boolean(input.orgName),
+        },
+      });
+
       return {
         success: true,
         organization: result.organization,
@@ -1040,6 +1054,20 @@ export const organizationRouter = createTRPCRouter({
           userId: session.user.id,
           invite,
         });
+      });
+
+      // Pairs with the existing `team_member_invited` event (which fires
+      // when the invite is SENT). Together they form the invite-acceptance
+      // funnel: invited → accepted. The gap is the expansion-conversion
+      // metric the founders track for collaboration features.
+      trackServerEvent({
+        userId: session.user.id,
+        event: "team_invite_accepted",
+        organizationId: invite.organization.id,
+        properties: {
+          inviteId: invite.id,
+          role: invite.role,
+        },
       });
 
       void getApp()

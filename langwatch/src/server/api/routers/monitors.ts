@@ -12,6 +12,7 @@ import {
 import { evaluatorsSchema } from "../../evaluations/evaluators.zod.generated";
 import { validatedPreconditionsSchema } from "../../evaluations/preconditionValidation";
 import { enforceLicenseLimit } from "../../license-enforcement";
+import { trackProjectEvent } from "../../posthog";
 import { coerceMonitorMappings } from "../../tracer/tracesMapping";
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
@@ -193,6 +194,29 @@ export const monitorsRouter = createTRPCRouter({
           evaluatorId,
           level: level ?? "trace",
           threadIdleTimeout,
+        },
+      });
+
+      // Monitor creation is the highest-leverage adoption event: it sets
+      // up continuous online evaluation, which is the LangWatch "always-on"
+      // value proposition. `executionMode` (ON_MESSAGE vs AS_GUARDRAIL vs
+      // MANUALLY) is the key breakdown — guardrails are a leading
+      // indicator of production usage.
+      trackProjectEvent({
+        prisma,
+        userId: ctx.session.user.id,
+        event: "monitor_created",
+        projectId,
+        properties: {
+          monitorId: newCheck.id,
+          checkType,
+          executionMode,
+          level: level ?? "trace",
+          sample,
+          hasEvaluator: Boolean(evaluatorId),
+          preconditionCount: Array.isArray(preconditions)
+            ? preconditions.length
+            : 0,
         },
       });
 

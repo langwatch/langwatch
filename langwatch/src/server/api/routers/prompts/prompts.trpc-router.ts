@@ -12,6 +12,7 @@ import {
 } from "~/prompts/schemas";
 import { afterPromptCreated } from "~/../ee/billing/nurturing/hooks/promptCreation";
 import { enforceLicenseLimit } from "~/server/license-enforcement";
+import { trackProjectEvent } from "~/server/posthog";
 import { PromptService } from "~/server/prompt-config";
 import { NotFoundError } from "~/server/prompt-config/errors";
 import { TagValidationError } from "~/server/prompt-config/repositories/llm-config-tag.repository";
@@ -232,6 +233,27 @@ export const promptsRouter = createTRPCRouter({
         projectId: input.projectId,
         userId: authorId,
       });
+
+      // Prompt creation is the bread-and-butter adoption event for the
+      // Prompts product. `source: "created"` distinguishes this from the
+      // copy path below — duplicated prompts inflate adoption but aren't
+      // true new authorship, so we split them.
+      if (authorId) {
+        trackProjectEvent({
+          prisma: ctx.prisma,
+          userId: authorId,
+          event: "prompt_created",
+          projectId: input.projectId,
+          properties: {
+            source: "created",
+            scope: input.data.scope ?? null,
+            hasMessages: Boolean(input.data.messages?.length),
+            hasInputs: Boolean(input.data.inputs?.length),
+            model: input.data.model ?? null,
+            hasDemonstrations: Boolean(input.data.demonstrations),
+          },
+        });
+      }
 
       return result;
     }),
@@ -547,6 +569,22 @@ export const promptsRouter = createTRPCRouter({
         projectId: input.projectId,
         userId: authorId,
       });
+
+      // Counterpart to the `prompt_created` event in the create() path —
+      // `source: "copied"` so dashboards can split "original authorship"
+      // from "duplication" without conflating them.
+      if (authorId) {
+        trackProjectEvent({
+          prisma: ctx.prisma,
+          userId: authorId,
+          event: "prompt_created",
+          projectId: input.projectId,
+          properties: {
+            source: "copied",
+            sourcePromptId: sourcePrompt.id,
+          },
+        });
+      }
 
       return { ...copiedPrompt, copiedFromPromptId: sourcePrompt.id };
     }),

@@ -15,6 +15,7 @@ import {
 } from "../../agents/agent.repository";
 import { AgentService } from "../../agents/agent.service";
 import { enforceLicenseLimit } from "../../license-enforcement";
+import { trackProjectEvent } from "../../posthog";
 import { checkProjectPermission, hasProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import {
@@ -119,7 +120,7 @@ export const agentsRouter = createTRPCRouter({
 
       const agentService = AgentService.create(ctx.prisma);
       // Config is validated by the refine above, safe to cast
-      return await agentService.create({
+      const created = await agentService.create({
         id: input.id,
         projectId: input.projectId,
         name: input.name,
@@ -127,6 +128,24 @@ export const agentsRouter = createTRPCRouter({
         config: input.config as AgentComponentConfig,
         workflowId: input.workflowId,
       });
+
+      // Feature-adoption breakdown driver. The `type` property powers
+      // the "which agent types are most created" insight on "the truth"
+      // — signature vs code vs workflow vs http tells us where users
+      // actually live in the agent product.
+      trackProjectEvent({
+        prisma: ctx.prisma,
+        userId: ctx.session.user.id,
+        event: "agent_created",
+        projectId: input.projectId,
+        properties: {
+          agentId: input.id,
+          type: input.type,
+          hasWorkflow: Boolean(input.workflowId),
+        },
+      });
+
+      return created;
     }),
 
   /**

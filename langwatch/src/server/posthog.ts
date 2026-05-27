@@ -1,3 +1,4 @@
+import type { PrismaClient } from "@prisma/client";
 import { PostHog } from "posthog-node";
 import { createLogger } from "~/utils/logger/server";
 import { env } from "../env.mjs";
@@ -60,17 +61,27 @@ export function getPostHogInstance(): PostHog | null {
 /**
  * Fire-and-forget server-side event tracking.
  * Silently no-ops when POSTHOG_KEY is not set (self-hosted without PostHog).
+ *
+ * Pass `organizationId` whenever it's in scope: it sets PostHog's `$groups`
+ * payload, which is the only way the "organization" group_type aggregations
+ * (org-level retention, plan breakdowns, WAU-by-org) on dashboards like
+ * "the truth" and "Langwatch Growth" can attribute server-side events to an
+ * org. Client-side capture inherits group context from `posthog.group()`
+ * called in usePostHogIdentify, but server-side captures don't — they must
+ * supply it explicitly per call.
  */
 export function trackServerEvent({
   userId,
   event,
   properties,
   projectId,
+  organizationId,
 }: {
   userId: string;
   event: string;
   properties?: Record<string, unknown>;
   projectId?: string;
+  organizationId?: string;
 }) {
   const posthog = getPostHogInstance();
   if (!posthog) return;
@@ -80,7 +91,65 @@ export function trackServerEvent({
     properties: {
       ...properties,
       ...(projectId ? { projectId } : {}),
+      ...(organizationId ? { organizationId } : {}),
     },
+    ...(organizationId
+      ? { groups: { organization: organizationId } }
+      : {}),
+  });
+}
+
+// Per-process cache. Project → org mapping is set at project creation and
+// never moves, so a single Prisma lookup per project per server lifetime
+// is enough to enrich every subsequent event with $groups.organization.
+const projectOrgCache = new Map<string, string>();
+
+/**
+ * Fire-and-forget tracking for project-scoped server events (a feature
+ * was created inside a project). Looks up the project's organization the
+ * first time we see a projectId and caches it, so every subsequent event
+ * for that project carries $groups.organization with zero extra Prisma
+ * calls.
+ *
+ * Use this for any "<resource>_created" event captured from a tRPC mutation
+ * scoped to a project. It's the server-side equivalent of the client-side
+ * posthog.group() call in usePostHogIdentify, and it's what unlocks
+ * per-org cohort/retention/breakdown analysis on dashboards like
+ * "the truth" and "Langwatch Growth".
+ */
+export function trackProjectEvent({
+  prisma,
+  userId,
+  event,
+  projectId,
+  properties,
+}: {
+  prisma: PrismaClient;
+  userId: string;
+  event: string;
+  projectId: string;
+  properties?: Record<string, unknown>;
+}): void {
+  void (async () => {
+    let organizationId = projectOrgCache.get(projectId);
+    if (!organizationId) {
+      const project = await prisma.project.findFirst({
+        where: { id: projectId },
+        select: { team: { select: { organizationId: true } } },
+      });
+      organizationId = project?.team.organizationId;
+      if (organizationId) projectOrgCache.set(projectId, organizationId);
+    }
+    trackServerEvent({
+      userId,
+      event,
+      projectId,
+      ...(organizationId ? { organizationId } : {}),
+      properties,
+    });
+  })().catch((err) => {
+    // Tracking must never break a write path. Log and swallow.
+    logger.warn({ err, event, projectId }, "trackProjectEvent failed");
   });
 }
 

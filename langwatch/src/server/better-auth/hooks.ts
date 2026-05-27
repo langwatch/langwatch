@@ -7,6 +7,7 @@ import { captureException } from "../../utils/posthogErrorCapture";
 import { isSsoProviderMatch, extractEmailDomain } from "./sso";
 import { InviteService } from "~/server/invites/invite.service";
 import { getApp } from "~/server/app-layer/app";
+import { trackServerEvent } from "~/server/posthog";
 import { fireSsoAutoAddNurturingCalls } from "../../../ee/billing/nurturing/hooks/ssoAutoAdd";
 
 const logger = createLogger("langwatch:better-auth:hooks");
@@ -107,6 +108,20 @@ export const afterUserCreate = async ({
   prisma: PrismaClient;
   user: { id: string; email: string; name: string };
 }): Promise<void> => {
+  // Top of the activation funnel on "the truth" dashboard. Fires once per
+  // brand-new user regardless of signup path (OAuth, SSO, credential),
+  // because this hook runs after the User row commits and before any of
+  // the SSO-auto-add branching below. Without this anchor, the activation
+  // funnel has no origin and TTV (time-to-first-trace) can't be measured.
+  trackServerEvent({
+    userId: user.id,
+    event: "signup_completed",
+    properties: {
+      emailDomain: extractEmailDomain(user.email),
+      hasDisplayName: Boolean(user.name),
+    },
+  });
+
   const domain = extractEmailDomain(user.email);
   if (!domain) return;
 
