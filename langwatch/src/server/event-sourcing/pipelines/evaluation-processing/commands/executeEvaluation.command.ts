@@ -251,6 +251,23 @@ export class ExecuteEvaluationCommand implements CommandHandler<
         workflowId,
       });
 
+      // A thread-based monitor on a trace without a thread_id can never run.
+      // Drop it with no event (like an unmet precondition) so it does not fold
+      // an evaluation result — a bulk re-evaluation over non-thread traces
+      // would otherwise emit thousands of error results, each paying the heavy
+      // evaluation-projection read.
+      if (result.status === "skipped" && result.skipReason === "missing_thread_id") {
+        logger.debug(
+          {
+            tenantId,
+            evaluatorId: data.evaluatorId,
+            traceId: data.traceId,
+          },
+          "Thread-based monitor on trace without thread_id — skipping",
+        );
+        return [];
+      }
+
       // 5. Record cost via service
       let costId: string | null = null;
       if (result.status === "processed" && result.cost) {

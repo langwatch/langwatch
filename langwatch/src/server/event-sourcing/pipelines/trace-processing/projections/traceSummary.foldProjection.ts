@@ -78,6 +78,14 @@ const traceNameResolutionService = new TraceNameResolutionService();
 
 // ─── Main composition ───────────────────────────────────────────────
 
+/**
+ * Max spans we fully process (normalize + derive) into a trace summary. A
+ * handful of traces accumulate tens of thousands of spans (reused trace_id,
+ * runaway loops); deriving every one pays unbounded cost for no added value.
+ * Past the cap we only keep counting so the true magnitude stays visible.
+ */
+export const MAX_PROCESSED_SPANS = 512;
+
 /** @internal Exported for unit testing */
 export function applySpanToSummary({
   state,
@@ -255,6 +263,13 @@ export class TraceSummaryFoldProjection
     event: SpanReceivedEvent,
     state: TraceSummaryData,
   ): TraceSummaryData {
+    // Past the processing cap, keep counting but skip the expensive
+    // normalization + derivation — a runaway trace cannot keep growing the
+    // fold cost. Derived fields stay frozen at the first MAX_PROCESSED_SPANS.
+    if (state.spanCount >= MAX_PROCESSED_SPANS) {
+      return { ...state, spanCount: state.spanCount + 1 };
+    }
+
     const normalizedSpan =
       spanNormalizationPipelineService.normalizeSpanReceived(
         event.tenantId,

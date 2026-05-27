@@ -13,7 +13,6 @@ import type { SingleEvaluationResult } from "~/server/evaluations/evaluators.gen
 import type { Trace } from "~/server/tracer/types";
 import type { LangEvalsClient } from "../../clients/langevals/langevals.client";
 import {
-  EvaluatorConfigError,
   EvaluatorNotFoundError,
   TraceNotEvaluatableError,
 } from "../errors";
@@ -467,6 +466,7 @@ describe("EvaluationExecutionService", () => {
           );
         });
 
+        /** @scenario a thread-based monitor still runs for a trace with a thread_id */
         it("includes evaluationThreadId in result", async () => {
           const { service } = createTestService({
             trace: threadTrace,
@@ -488,23 +488,30 @@ describe("EvaluationExecutionService", () => {
       });
 
       describe("when trace has no thread_id", () => {
-        it("throws EvaluatorConfigError", async () => {
-          const { service } = createTestService({
+        /** @scenario a thread-based monitor skips a trace without a thread_id */
+        it("returns skipped without calling the evaluator", async () => {
+          const { service, mockTraceService, mockClient } = createTestService({
             trace: buildTrace({ metadata: {} }),
           });
 
-          await expect(
-            service.executeForTrace({
-              ...defaultParams,
-              evaluatorType: "custom/thread-eval",
-              level: "thread",
-              mappings: {
-                mapping: {
-                  conversation: { source: "formatted_traces", type: "thread" },
-                },
-              } as any,
-            }),
-          ).rejects.toThrow(EvaluatorConfigError);
+          const result = await service.executeForTrace({
+            ...defaultParams,
+            evaluatorType: "custom/thread-eval",
+            level: "thread",
+            mappings: {
+              mapping: {
+                conversation: { source: "formatted_traces", type: "thread" },
+              },
+            } as any,
+          });
+
+          expect(result.status).toBe("skipped");
+          expect(result.skipReason).toBe("missing_thread_id");
+          // short-circuits before building thread data or calling the evaluator
+          expect(
+            mockTraceService.getTracesWithSpansByThreadIds,
+          ).not.toHaveBeenCalled();
+          expect(mockClient.evaluate).not.toHaveBeenCalled();
         });
       });
     });
