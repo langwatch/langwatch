@@ -1,9 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * Integration tests for LangyPanel L3 conversation history (PR-2.3).
- * Spec: specs/assistant/langy-memory.feature (L3 section).
- * Issue: #3955 (Phase 2). Epic: #3960.
+ * Integration tests for LangyPanel conversation history.
+ * Spec: specs/assistant/langy-baseline.feature
  *
  * Boundary mocks: useOrganizationTeamProject (project context),
  * @ai-sdk/react useChat (no real streaming), global.fetch (observable
