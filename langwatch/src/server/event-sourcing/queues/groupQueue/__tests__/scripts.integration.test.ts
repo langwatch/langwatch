@@ -9,6 +9,7 @@ import {
   GroupStagingScripts,
   GROUP_KEY_TTL_MS,
   GROUP_QUEUE_REGISTRY_KEY,
+  PARK_RECONCILE_MAX_DRAIN,
   type DispatchResult,
 } from "../scripts";
 import { QueueRedisRepository } from "../../../../app-layer/ops/repositories/queue.redis.repository";
@@ -2881,6 +2882,37 @@ describe("GroupStagingScripts", () => {
         expect(await redis.zcard(parkedKey("proj_acme"))).toBe(0);
         expect(
           await redis.sismember(`${keyPrefix()}parked-tenants`, "proj_acme"),
+        ).toBe(0);
+      });
+
+      it("drains a large parked backlog in bounded chunks when the cap is set to 0", async () => {
+        process.env[TENANT_CAP_ENV] = "0";
+        // Seed a large parked backlog directly — the parking mechanism is
+        // covered by the tests above; here we isolate the cap=0 kill-switch
+        // drain, which must NOT do one unbounded ZRANGE+ZREM/ZADD eval over the
+        // whole set (the May-27 442K-scale single-thread block this fix avoids).
+        const total = PARK_RECONCILE_MAX_DRAIN + 50;
+        const members: (string | number)[] = [];
+        for (let i = 0; i < total; i++) members.push(1000 + i, `proj_big/g${i}`);
+        await redis.zadd(`${keyPrefix()}parked:proj_big`, ...members);
+        await redis.sadd(`${keyPrefix()}parked-tenants`, "proj_big");
+        expect(await redis.zcard(parkedKey("proj_big"))).toBe(total);
+
+        // First reconcile past the 2s time-gate drains at most one chunk and
+        // leaves the tenant registered.
+        await scripts.dispatch({ nowMs: 5000, activeTtlSec: 60 });
+        expect(await redis.zcard(parkedKey("proj_big"))).toBe(
+          total - PARK_RECONCILE_MAX_DRAIN,
+        );
+        expect(
+          await redis.sismember(`${keyPrefix()}parked-tenants`, "proj_big"),
+        ).toBe(1);
+
+        // A later reconcile drains the remainder and clears the registry.
+        await scripts.dispatch({ nowMs: 8000, activeTtlSec: 60 });
+        expect(await redis.zcard(parkedKey("proj_big"))).toBe(0);
+        expect(
+          await redis.sismember(`${keyPrefix()}parked-tenants`, "proj_big"),
         ).toBe(0);
       });
 

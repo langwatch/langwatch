@@ -15,6 +15,17 @@ import type { Cluster } from "ioredis";
  */
 export const GROUP_KEY_TTL_MS = 6 * 60 * 60 * 1000;
 
+/**
+ * Max groups any single unpark moves in one Lua eval. The cap=0 kill switch
+ * drains a tenant's entire parked set; without a bound, flipping the cap off
+ * while a tenant has a huge parked backlog (the May 27 incident parked ~442K)
+ * would do one ZRANGE + per-group ZREM/ZADD over the whole set in a single eval
+ * and block the single Redis thread — recreating the stall the kill switch
+ * exists to stop. Bounding the per-eval work lets the 2s-gated reconcile drain
+ * gradually instead. Interpolated into the Lua for a single source of truth.
+ */
+export const PARK_RECONCILE_MAX_DRAIN = 1000;
+
 // Lua helper, prepended to every script that writes group keys. Refreshes the
 // safety-net TTL on a group's jobs/data keys, deriving expiry from the LATEST
 // pending dispatch score so a job legitimately delayed past the window (e.g. a
@@ -92,6 +103,12 @@ end
 -- a re-park churn (TRAP 3). Returns how many were moved.
 local function unparkUpTo(readyKey, tenantId, slots)
   if slots <= 0 then return 0 end
+  -- Bound the per-eval work so no single caller can ZRANGE + ZREM/ZADD an
+  -- unbounded set and block the single Redis thread. The reconcile leaves the
+  -- tenant registered until its parked set is empty, so the rest drains in
+  -- later cycles. (Normal cap>0 unparks pass slots = cap - active, far below
+  -- this; the bound only bites the cap=0 kill-switch drain of a huge backlog.)
+  if slots > ${PARK_RECONCILE_MAX_DRAIN} then slots = ${PARK_RECONCILE_MAX_DRAIN} end
   local kp = parkKeyPrefixOf(readyKey)
   local parkedKey = kp .. "parked:" .. tenantId
   local members = redis.call("ZRANGE", parkedKey, 0, slots - 1, "WITHSCORES")
@@ -124,7 +141,11 @@ local function reconcileParked(readyKey, keyPrefix, tenantCap)
       local active = tonumber(redis.call("GET", keyPrefix .. "tenant_active:" .. tenantId)) or 0
       slots = tenantCap - active
     else
-      slots = redis.call("ZCARD", keyPrefix .. "parked:" .. tenantId)
+      -- Cap disabled: drain the tenant, but in bounded chunks across reconciles
+      -- (unparkUpTo caps the per-eval work and keeps the tenant registered until
+      -- its parked set is empty), so flipping the kill switch with a huge parked
+      -- backlog can't block Redis in one eval.
+      slots = ${PARK_RECONCILE_MAX_DRAIN}
     end
     unparkUpTo(readyKey, tenantId, slots)
   end
