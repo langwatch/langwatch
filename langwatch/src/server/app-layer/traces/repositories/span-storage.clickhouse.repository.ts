@@ -5,6 +5,7 @@ import {
   NormalizedStatusCode,
   type NormalizedSpan,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
 import { SecurityError } from "~/server/event-sourcing/services/errorHandling";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import type { ElasticSearchEvent, Span } from "~/server/tracer/types";
@@ -215,6 +216,13 @@ interface EventRow {
   project_id: string;
   started_at: string | number;
   event_type: string;
+  attributes: Record<string, string>;
+}
+
+interface TraceEventRow {
+  spanId: string;
+  timestamp: string | number;
+  name: string;
   attributes: Record<string, string>;
 }
 
@@ -845,6 +853,76 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         }));
       },
     );
+  }
+
+  async getTraceEventsByTraceId({
+    tenantId,
+    traceId,
+    occurredAtMs,
+  }: {
+    tenantId: string;
+    traceId: string;
+  } & OccurredAtHint): Promise<DerivedTraceEvent[]> {
+    EventUtils.validateTenantId(
+      { tenantId },
+      "SpanStorageClickHouseRepository.getTraceEventsByTraceId",
+    );
+
+    try {
+      return await withPartitionHint<DerivedTraceEvent[]>(
+        { occurredAtMs },
+        (rows) => rows.length === 0,
+        async (window) => {
+          const partition = partitionFragment(window);
+          const client = await this.resolveClient(tenantId);
+          // Events-only ARRAY JOIN: reads just the `Events.*` columns, never
+          // the heavy span attribute/link payload. Includes exception events
+          // for parity with the trace-level list the fold used to carry.
+          const result = await client.query({
+            query: `
+              SELECT
+                SpanId AS spanId,
+                toUnixTimestamp64Milli(event_timestamp) AS timestamp,
+                event_name AS name,
+                event_attrs AS attributes
+              FROM ${TABLE_NAME}
+              WHERE TenantId = {tenantId:String}
+                AND TraceId = {traceId:String}
+                ${partition.sqlAnd}
+                AND ${dedupInTuple(partition.sqlAndInner)}
+              ARRAY JOIN
+                "Events.Timestamp" AS event_timestamp,
+                "Events.Name" AS event_name,
+                "Events.Attributes" AS event_attrs
+              ORDER BY event_timestamp ASC
+            `,
+            query_params: { tenantId, traceId, ...partition.params },
+            format: "JSONEachRow",
+          });
+
+          const rows = (await result.json()) as TraceEventRow[];
+          return rows.map((r) => ({
+            spanId: r.spanId,
+            timestamp:
+              typeof r.timestamp === "string"
+                ? parseInt(r.timestamp, 10)
+                : r.timestamp,
+            name: r.name,
+            attributes: r.attributes ?? {},
+          }));
+        },
+      );
+    } catch (error) {
+      logger.error(
+        {
+          tenantId,
+          traceId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "Failed to get trace events by trace ID from ClickHouse",
+      );
+      throw error;
+    }
   }
 
   async getEventsByTraceId({

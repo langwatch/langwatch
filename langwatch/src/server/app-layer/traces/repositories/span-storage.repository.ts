@@ -1,5 +1,6 @@
 import type { ElasticSearchEvent, Span } from "~/server/tracer/types";
 import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
 import type { SpanInsertData } from "../types";
 
 /**
@@ -95,6 +96,16 @@ export interface SpanStorageRepository {
       spanId: string;
     } & OccurredAtHint,
   ): Promise<Span | null>;
+  /**
+   * Trace-level events ({spanId, timestamp, name, attributes}) for the
+   * trace-detail read, derived from the spans' OTel events. Events-only
+   * (ARRAY JOIN over the `Events.*` columns, no heavy span attribute scan),
+   * so it is far cheaper than fetching whole spans. Includes exception events
+   * for parity with the list the fold used to carry.
+   */
+  getTraceEventsByTraceId(
+    params: { tenantId: string; traceId: string } & OccurredAtHint,
+  ): Promise<DerivedTraceEvent[]>;
   getEventsByTraceId(
     params: { tenantId: string; traceId: string } & OccurredAtHint,
   ): Promise<ElasticSearchEvent[]>;
@@ -175,6 +186,12 @@ export class NullSpanStorageRepository implements SpanStorageRepository {
     } & OccurredAtHint,
   ): Promise<Span | null> {
     return null;
+  }
+
+  async getTraceEventsByTraceId(
+    _params: { tenantId: string; traceId: string } & OccurredAtHint,
+  ): Promise<DerivedTraceEvent[]> {
+    return [];
   }
 
   async getEventsByTraceId(

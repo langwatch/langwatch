@@ -163,8 +163,8 @@ describe("traceSummary span flags", () => {
         // stuffs the user-tracked event into `span.events`. The fold no longer
         // hoists those onto the summary (that grew the fold state O(span-count));
         // the span is still persisted to stored_spans, so the trace-level events
-        // list is derived from there at read time. See
-        // trace-events.derivation.unit.test.ts for the read-side recovery.
+        // list is read from there on demand (the `getTraceEventsByTraceId`
+        // events-only query) at trace-detail time.
         const state = createInitState();
         const span = createTestSpan({
           parentSpanId: null,

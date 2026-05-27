@@ -215,6 +215,33 @@ describe("trace dedup OOM safety", () => {
   });
 
   // ---------------------------------------------------------------------------
+  // span-storage.clickhouse.repository.ts (app-layer): getTraceEventsByTraceId
+  // ---------------------------------------------------------------------------
+  describe("SpanStorageClickHouseRepository.getTraceEventsByTraceId() (app-layer)", () => {
+    const spanStoragePath = path.resolve(
+      __dirname,
+      "..",
+      "..",
+      "app-layer",
+      "traces",
+      "repositories",
+      "span-storage.clickhouse.repository.ts",
+    );
+    const spanStorageSource = fs.readFileSync(spanStoragePath, "utf-8");
+    const body = extractMethodBody(spanStorageSource, "getTraceEventsByTraceId");
+
+    describe("when the events-only query SQL is inspected", () => {
+      it("does not use LIMIT 1 BY for deduplication", () => {
+        expect(body).not.toContain("LIMIT 1 BY");
+      });
+
+      it("delegates dedup to the IN-tuple helper", () => {
+        expect(body).toContain("dedupInTuple");
+      });
+    });
+  });
+
+  // ---------------------------------------------------------------------------
   // collectUsageStats.ts: getChScenariosCount
   // ---------------------------------------------------------------------------
   describe("getChScenariosCount()", () => {

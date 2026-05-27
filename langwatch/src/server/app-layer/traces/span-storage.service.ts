@@ -1,5 +1,6 @@
 import type { ElasticSearchEvent, Span } from "~/server/tracer/types";
 import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
 import type {
   OccurredAtHint,
   SpanLangwatchSignalsRow,
@@ -33,6 +34,10 @@ export class SpanStorageService {
 
   async getSpanById(params: BySpanId): Promise<Span | null> {
     return this.repository.getSpanByIds(params);
+  }
+
+  async getTraceEventsByTraceId(params: ByTraceId): Promise<DerivedTraceEvent[]> {
+    return this.repository.getTraceEventsByTraceId(params);
   }
 
   async getEventsByTraceId(params: ByTraceId): Promise<ElasticSearchEvent[]> {

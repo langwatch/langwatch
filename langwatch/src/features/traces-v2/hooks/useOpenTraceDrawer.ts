@@ -44,12 +44,6 @@ function listItemToHeader(item: TraceListItem): TraceHeader {
     lastUsedPromptVersionId: null,
     lastUsedPromptSpanId: null,
     attributes: {},
-    events: (item.events ?? []).map((e) => ({
-      spanId: e.spanId,
-      timestamp: e.timestamp,
-      name: e.name,
-      attributes: {},
-    })),
   };
 }
 
@@ -169,11 +163,11 @@ export function useOpenTraceDrawer() {
             [],
           );
 
-          utils.tracesV2.events.setData(
+          utils.tracesV2.traceEvents.setData(
             { projectId: project.id, traceId: trace.traceId },
             [],
           );
-          utils.tracesV2.events.setData(
+          utils.tracesV2.traceEvents.setData(
             {
               projectId: project.id,
               traceId: trace.traceId,

@@ -89,16 +89,6 @@ const traceHeaderSchema = z.object({
   lastUsedPromptVersionId: z.string().nullable().default(null),
   lastUsedPromptSpanId: z.string().nullable().default(null),
   attributes: z.record(z.string()),
-  events: z
-    .array(
-      z.object({
-        spanId: z.string(),
-        timestamp: z.number(),
-        name: z.string(),
-        attributes: z.record(z.string()),
-      }),
-    )
-    .default([]),
 });
 
 export type TraceHeader = z.infer<typeof traceHeaderSchema>;

@@ -12,10 +12,7 @@ import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to
 import type { SpanSummaryRow } from "~/server/app-layer/traces/repositories/span-storage.repository";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import { changeTraceNameInputSchema } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
-import {
-  deriveTraceEventsFromSpans,
-  type DerivedTraceEvent,
-} from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
+import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
 import {
   TRACE_NAME_MAX_LENGTH,
   TRACE_NAME_MIN_LENGTH,
@@ -87,10 +84,7 @@ function buildFilterWhere(input: {
 // Mappers – internal types → scoped output models
 // ---------------------------------------------------------------------------
 
-function mapTraceSummaryToHeader(
-  summary: TraceSummaryData,
-  events: DerivedTraceEvent[],
-): TraceHeader {
+function mapTraceSummaryToHeader(summary: TraceSummaryData): TraceHeader {
   const totalTokens =
     (summary.totalPromptTokenCount ?? 0) +
     (summary.totalCompletionTokenCount ?? 0);
@@ -133,7 +127,6 @@ function mapTraceSummaryToHeader(
     lastUsedPromptVersionId: summary.lastUsedPromptVersionId ?? null,
     lastUsedPromptSpanId: summary.lastUsedPromptSpanId ?? null,
     attributes: summary.attributes,
-    events,
   };
 }
 
@@ -559,16 +552,7 @@ export const tracesV2Router = createTRPCRouter({
       if (!summary) {
         throw new TraceNotFoundError(input.traceId);
       }
-      // The trace-level events list is derived from stored_spans (it is no
-      // longer carried on the fold state). Bounded by the span reader's
-      // derivation cap; the detail header is a single-trace, user-initiated
-      // read so this stays off any hot path.
-      const spans = await app.traces.spans.getNormalizedSpansByTraceId({
-        tenantId: input.projectId,
-        traceId: input.traceId,
-        ...occurredAtFromInput(input),
-      });
-      return mapTraceSummaryToHeader(summary, deriveTraceEventsFromSpans(spans));
+      return mapTraceSummaryToHeader(summary);
     }),
 
   /**
@@ -908,6 +892,30 @@ export const tracesV2Router = createTRPCRouter({
     .query(async ({ input }) => {
       const app = getApp();
       return app.traces.spans.getEventsByTraceId({
+        tenantId: input.projectId,
+        traceId: input.traceId,
+        ...occurredAtFromInput(input),
+      });
+    }),
+
+  /**
+   * Trace-level events ({spanId, timestamp, name, attributes}) for the drawer.
+   * Split off the header so the header stays a pure summary read; the drawer
+   * fires this separately (like evals), and it reads only the `Events.*`
+   * columns rather than re-fetching the spans the tree already loads.
+   */
+  traceEvents: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        traceId: z.string(),
+        ...spanReadHintShape,
+      }),
+    )
+    .use(checkProjectPermission("traces:view"))
+    .query(async ({ input }): Promise<DerivedTraceEvent[]> => {
+      const app = getApp();
+      return app.traces.spans.getTraceEventsByTraceId({
         tenantId: input.projectId,
         traceId: input.traceId,
         ...occurredAtFromInput(input),
