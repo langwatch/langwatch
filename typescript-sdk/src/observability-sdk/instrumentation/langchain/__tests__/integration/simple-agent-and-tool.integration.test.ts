@@ -14,17 +14,20 @@ import { setupObservability } from "../../../../setup/node";
 import { getLangWatchTracer } from "../../../../tracer";
 import { NoOpLogger } from "../../../../../logger";
 
+const RUN_EXTERNAL = process.env.RUN_EXTERNAL_LLM_TESTS === "true";
+
+if (RUN_EXTERNAL && !process.env.OPENAI_API_KEY) {
+  throw new Error(
+    "RUN_EXTERNAL_LLM_TESTS is true but OPENAI_API_KEY is not set"
+  );
+}
+
 /**
  * Integration tests for LangChain instrumentation with real OpenTelemetry setup.
- *
- * These tests verify:
- * - Real LangChain integration with LangWatch tracing
- * - Actual span creation and data flow through OpenTelemetry
- * - Integration between LangChain callbacks and LangWatch spans
- * - Tool calling and agent execution tracing
+ * Requires RUN_EXTERNAL_LLM_TESTS=true and OPENAI_API_KEY to run.
  */
 
-describe("LangChain Integration Tests", () => {
+describe.skipIf(!RUN_EXTERNAL)("LangChain Integration Tests", () => {
   let spanExporter: InMemorySpanExporter;
   let spanProcessor: SimpleSpanProcessor;
   let observabilityHandle: Awaited<ReturnType<typeof setupObservability>>;

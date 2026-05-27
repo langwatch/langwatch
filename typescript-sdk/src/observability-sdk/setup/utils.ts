@@ -41,6 +41,16 @@ export function createMergedResource(
     .merge(userResource);
 }
 
+function hasAttachableProcessorRegistry(obj: unknown): boolean {
+  if (!obj || typeof obj !== "object") return false;
+  const candidates = [
+    (obj as any)?._activeSpanProcessor?._spanProcessors,
+    (obj as any)?.activeSpanProcessor?._spanProcessors,
+    (obj as any)?._registeredSpanProcessors,
+  ];
+  return candidates.some(Array.isArray);
+}
+
 /**
  * Returns the concrete OpenTelemetry provider (NodeTracerProvider or BasicTracerProvider),
  * either from the given provider or its delegate, or undefined if not found.
@@ -56,7 +66,7 @@ export function getConcreteProvider(provider: unknown): unknown {
   if (typeof (provider as any).addSpanProcessor === "function") {
     return provider;
   }
-  if ((provider as any)._activeSpanProcessor) {
+  if (hasAttachableProcessorRegistry(provider)) {
     return provider;
   }
 
@@ -80,7 +90,7 @@ export function getConcreteProvider(provider: unknown): unknown {
     if (typeof delegate.addSpanProcessor === "function") {
       return delegate;
     }
-    if (delegate._activeSpanProcessor) {
+    if (hasAttachableProcessorRegistry(delegate)) {
       return delegate;
     }
   }
