@@ -71,28 +71,30 @@ describe("trace summary fold state size", () => {
   });
 
   describe("given a trace that exceeds the processing cap", () => {
-    it("keeps counting but stops deriving past MAX_PROCESSED_SPANS", () => {
-      const projection = new TraceSummaryFoldProjection({ store: {} as any });
-      const atCap: TraceSummaryData = {
-        ...createInitState(),
-        spanCount: MAX_PROCESSED_SPANS,
-        models: ["gpt-5-mini"],
-        totalCost: 1.23,
-      };
-      // The span body is intentionally minimal: past the cap the handler
-      // short-circuits before normalizing it.
-      const event = {
-        tenantId: "tenant-1",
-        data: { span: { name: "should-not-be-processed" } },
-      } as any;
+    describe("when another span is received past MAX_PROCESSED_SPANS", () => {
+      it("keeps counting but stops deriving", () => {
+        const projection = new TraceSummaryFoldProjection({ store: {} as any });
+        const atCap: TraceSummaryData = {
+          ...createInitState(),
+          spanCount: MAX_PROCESSED_SPANS,
+          models: ["gpt-5-mini"],
+          totalCost: 1.23,
+        };
+        // The span body is intentionally minimal: past the cap the handler
+        // short-circuits before normalizing it.
+        const event = {
+          tenantId: "tenant-1",
+          data: { span: { name: "should-not-be-processed" } },
+        } as any;
 
-      const result = projection.handleTraceSpanReceived(event, atCap);
+        const result = projection.handleTraceSpanReceived(event, atCap);
 
-      // Still counted, so the true magnitude stays visible.
-      expect(result.spanCount).toBe(MAX_PROCESSED_SPANS + 1);
-      // Derived fields frozen — the span was not folded in.
-      expect(result.models).toEqual(["gpt-5-mini"]);
-      expect(result.totalCost).toBe(1.23);
+        // Still counted, so the true magnitude stays visible.
+        expect(result.spanCount).toBe(MAX_PROCESSED_SPANS + 1);
+        // Derived fields frozen — the span was not folded in.
+        expect(result.models).toEqual(["gpt-5-mini"]);
+        expect(result.totalCost).toBe(1.23);
+      });
     });
   });
 });

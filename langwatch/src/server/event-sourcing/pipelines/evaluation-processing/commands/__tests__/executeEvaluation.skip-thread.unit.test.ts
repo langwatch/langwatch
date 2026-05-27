@@ -69,16 +69,22 @@ function buildCommand(): Command<ExecuteEvaluationCommandData> {
 }
 
 describe("ExecuteEvaluationCommand", () => {
-  describe("when a thread-based monitor runs on a trace with no thread_id", () => {
-    /** @scenario a skipped thread evaluation emits no result event */
-    it("emits no result event", async () => {
-      const deps = buildDeps();
-      const command = new ExecuteEvaluationCommand(deps);
+  describe("given a thread-based monitor", () => {
+    describe("when it runs on a trace with no thread_id", () => {
+      /** @scenario a skipped thread evaluation emits no result event */
+      it("emits no result event", async () => {
+        const deps = buildDeps();
+        const command = new ExecuteEvaluationCommand(deps);
 
-      const events = await command.handle(buildCommand());
+        const events = await command.handle(buildCommand());
 
-      expect(events).toEqual([]);
-      expect(deps.costRecorder.recordCost).not.toHaveBeenCalled();
+        // Pin the skip to the missing-thread-id branch: the command must reach
+        // executeForTrace (which returns the skip) rather than bailing out at an
+        // earlier guard, otherwise an empty event list would be a false positive.
+        expect(deps.evaluationExecution.executeForTrace).toHaveBeenCalledTimes(1);
+        expect(events).toEqual([]);
+        expect(deps.costRecorder.recordCost).not.toHaveBeenCalled();
+      });
     });
   });
 });
