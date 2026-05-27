@@ -20,11 +20,17 @@ spec:
           imagePullPolicy: Never
           ports:
             - containerPort: 8080
-          # NOTE: NO credential env vars here. The manager (server.js) injects
+          # NO user credentials at pod level. The manager (server.js) injects
           # per-session credentials when it spawns each worker subprocess, so
-          # the pod itself boots completely credential-less. This is what makes
-          # the per-session isolation work — there's no shared key to fall back
-          # to or leak across sessions.
+          # there's no shared key to fall back to or leak across sessions.
+          # The ONE env var here is the service-to-service auth secret —
+          # the manager uses it to verify requests came from the control plane.
+          env:
+            - name: LANGY_INTERNAL_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: agent-secrets
+                  key: LANGY_INTERNAL_SECRET
           # Sized for v1 (low traffic, ~5-15 concurrent sessions). Bump
           # limits when usage justifies it — single-line change, no rollback risk.
           resources:
