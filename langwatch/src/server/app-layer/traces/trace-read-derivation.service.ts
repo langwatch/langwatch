@@ -137,12 +137,26 @@ export class TraceReadDerivationService {
     // eviction drop a just-read entry as the "oldest". Re-inserting keeps the
     // insertion order tracking last read.
     cache.delete(key);
-    cache.set(key, { value, expiresAt: now + DERIVATION_READ_WINDOW_MS });
-    // Never cache a failed read: drop the entry so the next caller retries
-    // instead of replaying the rejection for the whole window.
-    value.catch(() => {
-      if (cache.get(key)?.value === value) cache.delete(key);
-    });
+    // Keep an in-flight read shareable no matter how long it takes: start the
+    // freshness window only once the read resolves. Stamping expiresAt up front
+    // would let a read slower than the window expire mid-flight, so concurrent
+    // callers would miss the memo and fire duplicate reads — defeating
+    // single-flight exactly on the slow heavy-trace paths this exists for.
+    const entry: MemoEntry<T> = {
+      value,
+      expiresAt: Number.POSITIVE_INFINITY,
+    };
+    cache.set(key, entry);
+    value.then(
+      () => {
+        entry.expiresAt = Date.now() + DERIVATION_READ_WINDOW_MS;
+      },
+      // Never cache a failed read: drop the entry so the next caller retries
+      // instead of replaying the rejection.
+      () => {
+        if (cache.get(key) === entry) cache.delete(key);
+      },
+    );
     this.evict(cache, now);
     return value;
   }
