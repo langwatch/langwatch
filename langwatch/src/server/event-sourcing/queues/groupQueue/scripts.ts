@@ -260,7 +260,13 @@ while offset < scanBudget do
             cached = n >= tenantCap
             tenantCapCache[tenantId] = cached
           end
-          if cached then tenantOverCap = true end
+          if cached then
+            tenantOverCap = true
+            -- Defer over-cap group past the dispatch window so subsequent
+            -- polls reach other tenants without re-scanning this group.
+            -- 5s ≈ one poll cycle; group becomes eligible again naturally.
+            redis.call("ZADD", readyKey, nowMs + 5000, groupId)
+          end
         end
       end
 
@@ -416,7 +422,10 @@ while offset < scanBudget and dispatched < maxJobs do
           cached = n >= tenantCap
           tenantCapCache[tenantId] = cached
         end
-        if cached then tenantOverCap = true end
+        if cached then
+          tenantOverCap = true
+          redis.call("ZADD", readyKey, nowMs + 5000, groupId)
+        end
       end
     end
 
