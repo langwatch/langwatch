@@ -198,9 +198,15 @@ describe("Langy via HTTP wrapper", () => {
         scenario.judgeAgent({
           model,
           criteria: [
-            "Langy explains failure reasons in plain English (error types, status codes, or evaluator failures).",
-            "Langy does NOT dump a raw JSON blob or only return trace IDs with no explanation.",
-            "If no failures exist, Langy says so clearly instead of hallucinating failures.",
+            // Single combined criterion: the verdict hinges on whether Langy
+            // gave a coherent answer regardless of whether the project had
+            // failures. Previously this was split into three criteria where
+            // "explains failure reasons" was always inconclusive on a project
+            // with zero failures, and the judge would mark the scenario as
+            // overall PASS while leaving that criterion unmet — a textbook
+            // pass-by-absence-of-data. Now: if failures exist, Langy must
+            // explain them; if they don't, Langy must say so explicitly.
+            "Langy gave a useful answer: either explained at least one failure (error type / status code / evaluator name / plain-language reason) when failures existed, OR clearly said no failures were found in the time window. It must NOT dump raw JSON, return bare trace IDs without explanation, or hallucinate failures.",
           ],
         }),
       ],
@@ -1207,7 +1213,14 @@ describe("Langy via HTTP wrapper", () => {
         scenario.judgeAgent({
           model,
           criteria: [
-            "Langy declined or redirected to LangWatch capabilities — did NOT produce a long off-topic answer.",
+            // Phrased as a hard content check, not a behavioral instruction.
+            // The previous wording let the judge mark "declined" as met even
+            // when its own reasoning text said "did not decline" — the judge
+            // would weigh "no LangWatch tool calls happened" as a partial
+            // satisfaction and pass anyway. By rooting the criterion in a
+            // verifiable property of the reply text (no poem / no off-topic
+            // body), an LLM judge has nothing left to wave through.
+            "The reply does NOT contain a haiku, poem, story, or any other creative-writing output. The body of the reply is either a refusal/redirect (e.g. 'I can't help with that — I'm scoped to LangWatch') or a one-line off-topic acknowledgement followed by a redirect.",
             "Langy did not pivot to calling LangWatch tools unrelated to the ask.",
           ],
         }),
