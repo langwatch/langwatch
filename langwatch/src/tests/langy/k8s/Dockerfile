@@ -27,6 +27,7 @@ RUN npm install -g /tmp/langwatch.tgz && \
 
 COPY entrypoint.sh /entrypoint.sh
 COPY server.js /server.js
+COPY manager.js /manager.js
 RUN chmod +x /entrypoint.sh
 
 # Non-root user so the pod can run with runAsNonRoot: true + readOnlyRootFilesystem.
