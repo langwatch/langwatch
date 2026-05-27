@@ -21,8 +21,8 @@ import type {
   SpanSummaryRow,
 } from "./span-storage.repository";
 import {
+  clampSpanReadLimit,
   LANGWATCH_SIGNAL_BUCKETS,
-  MAX_DERIVATION_SPANS,
 } from "./span-storage.repository";
 
 const TABLE_NAME = "stored_spans" as const;
@@ -614,15 +614,21 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
   async getSpansByTraceId({
     tenantId,
     traceId,
+    limit,
     occurredAtMs,
   }: {
     tenantId: string;
     traceId: string;
+    limit?: number;
   } & OccurredAtHint): Promise<Span[]> {
     EventUtils.validateTenantId(
       { tenantId },
       "SpanStorageClickHouseRepository.getSpansByTraceId",
     );
+
+    // Hard ceiling, applied unconditionally: a leaked trace_id with a huge span
+    // count can never load the pipeline through this path, regardless of caller.
+    const effectiveLimit = clampSpanReadLimit(limit);
 
     try {
       return await withPartitionHint<Span[]>(
@@ -640,8 +646,14 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
                 ${partition.sqlAnd}
                 AND ${dedupInTuple(partition.sqlAndInner)}
               ORDER BY StartTimeMs ASC
+              LIMIT {limit:UInt32}
             `,
-            query_params: { tenantId, traceId, ...partition.params },
+            query_params: {
+              tenantId,
+              traceId,
+              limit: effectiveLimit,
+              ...partition.params,
+            },
             format: "JSONEachRow",
           });
 
@@ -677,13 +689,8 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       "SpanStorageClickHouseRepository.getNormalizedSpansByTraceId",
     );
 
-    // MAX_DERIVATION_SPANS is a hard ceiling: a caller cannot raise it past the
-    // bounded-read guarantee, so even a leaked trace_id can never load the
-    // pipeline through this path.
-    const effectiveLimit = Math.min(
-      Math.max(1, Math.trunc(limit ?? MAX_DERIVATION_SPANS)),
-      MAX_DERIVATION_SPANS,
-    );
+    // Hard ceiling so even a leaked trace_id can never load the pipeline.
+    const effectiveLimit = clampSpanReadLimit(limit);
 
     // The ±window hint prunes partitions on the happy path; the empty-result
     // fallback covers a stale/wrong hint. The window (±2 days) dwarfs any real
