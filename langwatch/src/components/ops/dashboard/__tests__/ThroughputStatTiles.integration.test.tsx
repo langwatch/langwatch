@@ -48,10 +48,12 @@ describe("ThroughputStatTiles", () => {
       expect(within(tile).getByText(/peak 7\.1k · 205\.7M total/)).toBeTruthy();
     });
 
-    it("still shows the total when there is no recorded peak yet", () => {
+    it("renders peak 0.00 with the total at cold start, mirroring Staged/s", () => {
       renderTiles({ peakCompletedPerSec: 0, totalCompleted: 1500 });
 
       const tile = screen.getByTestId("ops-completed-stat");
+      // Staged/s renders its peak unconditionally, so Completed/s matches: a
+      // zero peak shows "peak 0.00" rather than diverging from the sibling tile.
       expect(within(tile).getByText(/peak 0\.00 · 1\.5k total/)).toBeTruthy();
     });
   });
