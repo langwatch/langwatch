@@ -37,16 +37,6 @@ const getLangWatchConfig = (options: SetupObservabilityOptions) => {
 };
 
 const checkForEarlyExit = (options: SetupObservabilityOptions, logger: Logger): ObservabilityHandle | null => {
-  if (options.advanced?.disabled) {
-    logger.debug("Observability disabled via advanced.disabled");
-    return createNoOpHandle(logger);
-  }
-
-  if (options.advanced?.skipOpenTelemetrySetup) {
-    logger.debug("Skipping OpenTelemetry setup");
-    return createNoOpHandle(logger);
-  }
-
   const globalProvider = trace.getTracerProvider();
   const alreadySetup = isConcreteProvider(globalProvider);
 
@@ -209,10 +199,10 @@ function setupDedicatedProvider(
   }
 
   const addProcessor = (processor: SpanProcessor) => {
-    if (Array.isArray(internalArray)) {
-      internalArray.push(processor);
-    } else {
+    if (hasPublicApi) {
       (provider as any).addSpanProcessor(processor);
+    } else {
+      internalArray.push(processor);
     }
   };
 
@@ -293,10 +283,10 @@ function attachToExistingProvider(
   }
 
   const addProcessor = (processor: SpanProcessor) => {
-    if (Array.isArray(internalArray)) {
-      internalArray.push(processor);
-    } else {
+    if (hasPublicApi) {
       (provider as any).addSpanProcessor(processor);
+    } else {
+      internalArray.push(processor);
     }
   };
 

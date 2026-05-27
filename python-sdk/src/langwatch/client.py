@@ -573,6 +573,7 @@ class Client(LangWatchClientProtocol):
     def __detach_langwatch_processor(self) -> None:
         """Remove and shut down only our processor from a user-owned provider."""
         if Client._langwatch_processor is not None:
+            Client._langwatch_processor.force_flush()
             Client._langwatch_processor.shutdown()
             try:
                 multi = Client._tracer_provider._active_span_processor  # type: ignore[union-attr]
