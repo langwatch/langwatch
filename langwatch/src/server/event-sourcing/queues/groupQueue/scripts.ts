@@ -424,12 +424,11 @@ while offset < scanBudget do
       -- pauses below stay skip-in-place (rarer, and need the job data to classify).
       local tenantPaused = false
       if hasPauses then
-        local pp = string.find(groupId, "/", 1, true)
-        if pp and pp > 1 then
-          if redis.call("SISMEMBER", pausedJobKey, "tenant:" .. string.sub(groupId, 1, pp - 1)) == 1 then
-            tenantPaused = true
-            parkGroup(readyKey, groupId)
-          end
+        -- parkTenantOf handles both "tenant/..." and single-segment ids, so a
+        -- paused single-segment tenant is parked too, not left to skip-in-place.
+        if redis.call("SISMEMBER", pausedJobKey, "tenant:" .. parkTenantOf(groupId)) == 1 then
+          tenantPaused = true
+          parkGroup(readyKey, groupId)
         end
       end
 
@@ -611,12 +610,10 @@ while offset < scanBudget and dispatched < maxJobs do
     -- to restore a still-paused tenant, the reconcile restores it on unpause.
     local tenantPaused = false
     if hasPauses then
-      local pp = string.find(groupId, "/", 1, true)
-      if pp and pp > 1 then
-        if redis.call("SISMEMBER", pausedJobKey, "tenant:" .. string.sub(groupId, 1, pp - 1)) == 1 then
-          tenantPaused = true
-          parkGroup(readyKey, groupId)
-        end
+      -- parkTenantOf handles single-segment ids too (see DISPATCH_LUA).
+      if redis.call("SISMEMBER", pausedJobKey, "tenant:" .. parkTenantOf(groupId)) == 1 then
+        tenantPaused = true
+        parkGroup(readyKey, groupId)
       end
     end
 
