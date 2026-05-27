@@ -446,7 +446,7 @@ function LangyHandle({
           <Text>{isOpen ? "Close Langy" : "Open Langy"}</Text>
           <HStack gap={1}>
             <Kbd>⌘</Kbd>
-            <Kbd>L</Kbd>
+            <Kbd>I</Kbd>
           </HStack>
         </HStack>
       }

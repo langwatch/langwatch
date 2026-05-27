@@ -14,15 +14,22 @@ spec:
       labels:
         app: opencode-agent
     spec:
+      # fsGroup ensures the workspace emptyDir is writable by the agent user
+      # (UID 1000) on hosts where the volume mounts without group-write.
+      securityContext:
+        fsGroup: 1000
+        fsGroupChangePolicy: "OnRootMismatch"
       containers:
         - name: agent
-          image: opencode-agent:v7
+          image: opencode-agent:v8
           imagePullPolicy: Never
           ports:
             - containerPort: 8080
           # NO user credentials at pod level. The manager (server.js) injects
           # per-session credentials when it spawns each worker subprocess, so
           # there's no shared key to fall back to or leak across sessions.
+          # LANGWATCH_ENDPOINT is now per-session too — the manager substitutes
+          # it into each worker's AGENTS.md at spawn time, not entrypoint.sh.
           # The ONE env var here is the service-to-service auth secret —
           # the manager uses it to verify requests came from the control plane.
           env:
