@@ -37,6 +37,8 @@ import { TiktokenClient } from "~/server/app-layer/clients/tokenizer/tiktoken.cl
 import {
   LangyConversationNotOwnedError,
   LangyConversationService,
+  LangyCredentialResolutionError,
+  LangyCredentialService,
   LangyMessageService,
 } from "~/server/services/langy";
 import { checkLangyMessageRateLimit } from "~/server/middleware/rate-limit-langy";
@@ -45,6 +47,17 @@ import type { NextRequestShim as any } from "./types";
 const logger = createLogger("langwatch:api:langy");
 
 const LANGY_FALLBACK_MODEL = "openai/gpt-5-mini";
+
+// User-facing strings for the structured error events the pod's manager
+// emits. Anything not in this map falls through to the raw error string.
+const AGENT_ERROR_MESSAGES: Record<string, string> = {
+  "at-capacity":
+    "Langy is at capacity right now. Please retry in a minute.",
+  "turn-in-flight":
+    "Previous message is still being processed. Please wait for it to finish before sending another.",
+  "session-not-found":
+    "Conversation session expired on the agent. Send your message again to start a fresh session.",
+};
 
 function extractAssistantText(
   parts: Array<Record<string, unknown>> | undefined,
@@ -147,6 +160,11 @@ app.post("/langy/chat", async (c) => {
     logger.error("OPENCODE_AGENT_URL is not configured");
     return c.json({ error: "Agent not configured" }, { status: 503 });
   }
+  const internalSecret = process.env.LANGY_INTERNAL_SECRET;
+  if (!internalSecret) {
+    logger.error("LANGY_INTERNAL_SECRET is not configured");
+    return c.json({ error: "Agent not configured" }, { status: 503 });
+  }
 
   const hasPermission = await hasProjectPermission(
     { prisma, session },
@@ -232,12 +250,11 @@ app.post("/langy/chat", async (c) => {
   );
 
   // The pod's AGENTS.md is written for CLI/codebase instrumentation
-  // (the OpenCode default), not in-product Langy. We need to override that
-  // with a Langy-specific system block, but phrased to FIT the MCP tool
-  // catalog the pod actually has (search_traces, get_analytics,
-  // list_evaluators, etc.) — NOT the legacy Vercel-AI-SDK propose_* flow.
-  // Without this, the agent answers like a generic repo assistant
-  // ("what should I do in this repository?").
+  // (the OpenCode default), not in-product Langy. We override with a
+  // Langy-specific system block, phrased to fit the MCP tool catalog
+  // the pod actually has. Sent as `system` (not concatenated into the
+  // user prompt) so the model treats it as instructions, not user
+  // content — lower jailbreak risk and cleaner separation.
   const langyOverride = [
     "OVERRIDE — you are Langy, the in-product LangWatch assistant.",
     "You are NOT a code/repo assistant. You do not edit files, run shell, or scaffold projects.",
@@ -249,12 +266,33 @@ app.post("/langy/chat", async (c) => {
     "never ask which project, never offer 'next actions'. Pick a reasonable default, act, report",
     "the result tersely with a relevant LangWatch UI URL when applicable.",
   ].join(" ");
-  const fullPrompt = `${langyOverride}\n\nUser: ${userText}`;
 
-  const agentResponse = await fetch(`${agentUrl}/run`, {
+  let credentials;
+  try {
+    const credentialService = LangyCredentialService.create(prisma);
+    credentials = await credentialService.getOrProvision({
+      projectId,
+      actorUserId: session.user.id,
+    });
+  } catch (error) {
+    if (error instanceof LangyCredentialResolutionError) {
+      return c.json({ error: error.message }, { status: 409 });
+    }
+    throw error;
+  }
+
+  const agentResponse = await fetch(`${agentUrl}/chat`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ prompt: fullPrompt }),
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${internalSecret}`,
+    },
+    body: JSON.stringify({
+      conversationId: conversation.id,
+      prompt: userText,
+      system: langyOverride,
+      credentials,
+    }),
     signal: AbortSignal.timeout(120_000),
   });
 
@@ -286,6 +324,7 @@ app.post("/langy/chat", async (c) => {
           try {
             const event = JSON.parse(line) as {
               type: string;
+              error?: string;
               part?: { type?: string; text?: string };
               properties?: {
                 field?: string;
@@ -293,6 +332,22 @@ app.post("/langy/chat", async (c) => {
                 part?: { type?: string; text?: string };
               };
             };
+            // Manager-emitted error events (at-capacity, turn-in-flight,
+            // session-not-found, generic). Without explicit handling
+            // these silently terminate the stream and the user sees an
+            // empty assistant reply. Surface as a visible delta + log.
+            if (event.type === "error") {
+              const errMsg = event.error ?? "agent error";
+              logger.warn(
+                { error: errMsg, conversationId: conversation.id },
+                "opencode agent returned error event",
+              );
+              const userMessage = AGENT_ERROR_MESSAGES[errMsg] ?? errMsg;
+              const delta = `\n\n_${userMessage}_`;
+              fullText += delta;
+              writer.write({ type: "text-delta", delta, id: textId });
+              continue;
+            }
             // Legacy shape (kept for older agent versions).
             if (event.type === "text" && event.part?.text) {
               fullText += event.part.text;
