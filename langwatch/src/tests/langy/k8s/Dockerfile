@@ -32,7 +32,8 @@ RUN chmod +x /entrypoint.sh
 # Non-root user so the pod can run with runAsNonRoot: true + readOnlyRootFilesystem.
 # /workspace is owned by the agent user because the entrypoint creates skills/
 # and per-session directories there at runtime.
-RUN useradd -m -u 1000 -s /bin/bash agent && \
+RUN userdel -r ubuntu 2>/dev/null || true && \
+    useradd -m -u 1000 -s /bin/bash agent && \
     mkdir -p /workspace && \
     chown -R agent:agent /workspace
 

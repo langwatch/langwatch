@@ -14,17 +14,26 @@ spec:
       labels:
         app: opencode-agent
     spec:
+      securityContext:
+        fsGroup: 1000
+        fsGroupChangePolicy: "OnRootMismatch"
       containers:
         - name: agent
-          image: opencode-agent:v7
+          image: opencode-agent:v8
           imagePullPolicy: Never
           ports:
             - containerPort: 8080
+          env:
+            - name: LANGWATCH_ENDPOINT
+              value: "http://172.22.164.230:5560"
           # NOTE: NO credential env vars here. The manager (server.js) injects
           # per-session credentials when it spawns each worker subprocess, so
           # the pod itself boots completely credential-less. This is what makes
           # the per-session isolation work — there's no shared key to fall back
           # to or leak across sessions.
+          # LANGWATCH_ENDPOINT is a URL, not a credential — safe to bake in so
+          # entrypoint.sh's sed substitution into AGENTS.md resolves the deep
+          # link template at boot.
           # Sized for v1 (low traffic, ~5-15 concurrent sessions). Bump
           # limits when usage justifies it — single-line change, no rollback risk.
           resources:
