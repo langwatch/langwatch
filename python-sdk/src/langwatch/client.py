@@ -63,6 +63,7 @@ class Client(LangWatchClientProtocol):
     _skip_open_telemetry_setup: ClassVar[bool] = False
     _tracer_provider: ClassVar[Optional[TracerProvider]] = None
     _is_dedicated_provider: ClassVar[bool] = False
+    _exporter_attached_providers: ClassVar[set[int]] = set()
     _rest_api_client: ClassVar[Optional[LangWatchApiClient]] = None
     _registered_instrumentors: ClassVar[
         dict[opentelemetry.trace.TracerProvider, set[BaseInstrumentor]]
@@ -386,6 +387,7 @@ class Client(LangWatchClientProtocol):
         cls._skip_open_telemetry_setup = False
         cls._tracer_provider = None
         cls._is_dedicated_provider = False
+        cls._exporter_attached_providers.clear()
         cls._rest_api_client = None
         cls._prompts_path = None
         cls._registered_instrumentors.clear()
@@ -639,6 +641,11 @@ class Client(LangWatchClientProtocol):
             ) from e
 
     def __set_langwatch_exporter(self, provider: TracerProvider) -> None:
+        provider_id = id(provider)
+        if provider_id in Client._exporter_attached_providers:
+            if Client._debug:
+                logger.debug("LangWatch exporter already attached to this provider, skipping")
+            return
         if not Client._api_key:
             raise ValueError("LangWatch API key is required but not provided")
 
@@ -675,6 +682,7 @@ class Client(LangWatchClientProtocol):
             export_timeout_millis=float(os.getenv("OTEL_BSP_EXPORT_TIMEOUT", 10000)),
         )
         provider.add_span_processor(processor)
+        Client._exporter_attached_providers.add(provider_id)
 
     def _setup_rest_api_client(self) -> LangWatchApiClient:
         """

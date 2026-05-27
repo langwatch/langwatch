@@ -183,6 +183,13 @@ function attachToExistingProvider(
     logger.info("Attached LangWatch span processor to existing global provider");
   }
 
+  if (options.traceExporter) {
+    const traceExporterProcessor = new SimpleSpanProcessor(options.traceExporter);
+    processors.push(traceExporterProcessor);
+    provider.addSpanProcessor(traceExporterProcessor);
+    logger.debug("Attached user-provided traceExporter to existing provider");
+  }
+
   if (options.spanProcessors?.length) {
     for (const processor of options.spanProcessors) {
       processors.push(processor);
