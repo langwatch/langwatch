@@ -27,6 +27,10 @@ export interface QueueInfo {
   activeGroupCount: number;
   totalPendingJobs: number;
   dlqCount: number;
+  // Groups a tenant soft-cap parked OUT of the ready scan because the tenant is
+  // at its in-flight cap. Surfaced so a parking spike (the over-cap ZADD storm
+  // root) or a parked-group strand is visible instead of invisible backlog.
+  parkedGroupCount: number;
   groups: GroupInfo[];
 }
 
@@ -38,6 +42,7 @@ export interface QueueSummaryInfo {
   activeGroupCount: number;
   totalPendingJobs: number;
   dlqCount: number;
+  parkedGroupCount: number;
 }
 
 export interface ThroughputPoint {
@@ -47,6 +52,7 @@ export interface ThroughputPoint {
   failedPerSec: number;
   pendingCount: number;
   blockedCount: number;
+  parkedCount: number;
 }
 
 export interface PhaseMetrics {
@@ -113,6 +119,7 @@ export interface RedisInfo {
 export interface DashboardData {
   totalGroups: number;
   blockedGroups: number;
+  parkedGroups: number;
   totalPendingJobs: number;
   throughputIngestedPerSec: number;
   totalCompleted: number;

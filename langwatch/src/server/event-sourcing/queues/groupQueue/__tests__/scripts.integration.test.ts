@@ -9,6 +9,7 @@ import {
   GroupStagingScripts,
   GROUP_KEY_TTL_MS,
   GROUP_QUEUE_REGISTRY_KEY,
+  PARK_RECONCILE_MAX_DRAIN,
   type DispatchResult,
 } from "../scripts";
 import { QueueRedisRepository } from "../../../../app-layer/ops/repositories/queue.redis.repository";
@@ -2587,9 +2588,14 @@ describe("GroupStagingScripts", () => {
       expect(third).toBeNull();
       // Counter unchanged — over-cap groups don't INCR
       expect(await redis.get(tenantCounterKey("proj_noisy"))).toBe("2");
-      // g3 is still on ready zset waiting
+      // g3 was parked OUT of the ready scan (not left at the head to be
+      // re-walked on every poll) and registered for reconcile.
       const ready = await inspectReadySet();
-      expect(ready.some((s) => s === "proj_noisy/g3")).toBe(true);
+      expect(ready.some((s) => s === "proj_noisy/g3")).toBe(false);
+      expect(await redis.zcard(`${keyPrefix()}parked:proj_noisy`)).toBe(1);
+      expect(
+        await redis.sismember(`${keyPrefix()}parked-tenants`, "proj_noisy"),
+      ).toBe(1);
     });
 
     /** @scenario Over-cap tenant at the head of the zset does not starve other tenants */
@@ -2627,8 +2633,8 @@ describe("GroupStagingScripts", () => {
       expect(await redis.get(tenantCounterKey("proj_quiet"))).toBe("1");
     });
 
-    /** @scenario Over-cap groups are deferred so they don't starve other tenants on repeated polls */
-    it("defers over-cap groups to a future score so the next dispatch reaches other tenants immediately", async () => {
+    /** @scenario Over-cap groups are parked out of ready so they don't starve other tenants on repeated polls */
+    it("parks over-cap groups out of ready so the next dispatch reaches other tenants immediately", async () => {
       process.env[TENANT_CAP_ENV] = "1";
 
       // proj_noisy stages 50 groups at score=1000 (head of zset)
@@ -2649,31 +2655,34 @@ describe("GroupStagingScripts", () => {
         dispatchAfterMs: 1001,
       });
 
-      // First dispatch: proj_noisy/g0 wins
+      // First dispatch: proj_noisy/g0 wins (under cap)
       const first = await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 });
       expect(first?.groupId).toMatch(/^proj_noisy\//);
 
-      // Second dispatch: proj_quiet wins (walk past over-cap noisy)
+      // Second dispatch: proj_noisy is now at cap, so its remaining groups are
+      // parked OUT of ready as the scan walks past them, and proj_quiet wins.
       const second = await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 });
       expect(second!.groupId).toBe("proj_quiet/only");
 
-      // Key assertion: over-cap noisy groups were deferred to future scores,
-      // so a third dispatch at the same nowMs returns null immediately
-      // instead of scanning through them again.
+      // Key assertion: the over-cap noisy groups are no longer in the ready
+      // scan (parked), so a third poll at the same nowMs returns null without
+      // re-walking them — write volume no longer scales with backlog size.
       const third = await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 });
       expect(third).toBeNull();
 
-      // The deferred groups are still in the ready set with future scores
-      const readyCount = await redis.zcard(`${keyPrefix()}ready`);
-      expect(readyCount).toBeGreaterThan(0);
-
-      // After the defer window (5s), they become eligible again
-      const afterDefer = await scripts.dispatch({ nowMs: 8000, activeTtlSec: 60 });
-      expect(afterDefer).toBeNull(); // still over cap, but proves they're scannable again
+      // The 49 remaining noisy groups were moved OUT of ready into the parked
+      // set, and the tenant is registered so the reconcile can find it.
+      expect(await redis.zcard(`${keyPrefix()}parked:proj_noisy`)).toBe(49);
+      expect(
+        await redis.sismember(`${keyPrefix()}parked-tenants`, "proj_noisy"),
+      ).toBe(1);
+      // Ready now holds only the two active groups (g0 + quiet), both at future
+      // active scores — nothing is due, the parked backlog isn't re-scanned.
+      expect(await redis.zcount(`${keyPrefix()}ready`, "-inf", "2000")).toBe(0);
     });
 
-    /** @scenario dispatchBatch defers over-cap groups to future scores */
-    it("dispatchBatch defers over-cap groups to future scores", async () => {
+    /** @scenario dispatchBatch parks over-cap groups the same way */
+    it("dispatchBatch parks over-cap groups out of ready", async () => {
       process.env[TENANT_CAP_ENV] = "1";
 
       const noisyJobs = Array.from({ length: 20 }, (_, i) =>
@@ -2698,13 +2707,14 @@ describe("GroupStagingScripts", () => {
       expect(groupIds).toContain("proj_quiet/only");
       expect(groupIds.filter((g) => g.startsWith("proj_noisy/"))).toHaveLength(1);
 
-      // Second batch: both tenants at cap, over-cap groups deferred
+      // Second batch: both tenants at cap, nothing left to dispatch
       const batch2 = await scripts.dispatchBatch({ nowMs: 2000, activeTtlSec: 60, maxJobs: 10 });
       expect(batch2).toHaveLength(0);
 
-      // Remaining noisy groups still in ready but with future scores
-      const dueNow = await redis.zcount(`${keyPrefix()}ready`, "-inf", "2000");
-      expect(dueNow).toBe(0);
+      // The 19 remaining noisy groups were parked out of ready, not re-deferred
+      // within it.
+      expect(await redis.zcard(`${keyPrefix()}parked:proj_noisy`)).toBe(19);
+      expect(await redis.zcount(`${keyPrefix()}ready`, "-inf", "2000")).toBe(0);
     });
 
     /** @scenario cap=0 produces zero tenant counter keys (back-compat regression) */
@@ -2755,6 +2765,272 @@ describe("GroupStagingScripts", () => {
         `${keyPrefix()}tenant_active:*`,
       );
       expect(keysAfterRestage).toEqual([]);
+
+      // The parking machinery is also fully inert at cap=0: no parked zsets and
+      // no parked-tenants registry entry are ever created (protects the live
+      // cap=0 mitigation path from any new per-op overhead).
+      expect(await redis.keys(`${keyPrefix()}parked:*`)).toEqual([]);
+      expect(await redis.exists(`${keyPrefix()}parked-tenants`)).toBe(0);
+    });
+
+    // ────────────────────────────────────────────────────────────────────
+    // Parking model: over-cap groups are moved OUT of ready into a per-tenant
+    // parked zset (once), restored when the tenant drops below cap. This is the
+    // durable fix for the 2026-05-27 over-cap ZADD storm, where re-deferring a
+    // 442K-deep ready set every 5s saturated single-threaded Redis. Mutual
+    // exclusivity (a group is in exactly one of ready/parked/blocked/active) is
+    // the load-bearing invariant: every ready-writer must respect parked.
+    // ────────────────────────────────────────────────────────────────────
+    describe("parking over-cap groups", () => {
+      function parkedKey(tenantId: string) {
+        return `${keyPrefix()}parked:${tenantId}`;
+      }
+
+      /** @scenario A freed in-flight slot restores a parked group on completion */
+      it("restores a parked group to ready on completion, preserving its score", async () => {
+        process.env[TENANT_CAP_ENV] = "1";
+        await stageOne({
+          tenantId: "proj_acme",
+          groupSuffix: "g1",
+          stagedJobId: "j1",
+          dispatchAfterMs: 1000,
+        });
+        await stageOne({
+          tenantId: "proj_acme",
+          groupSuffix: "g2",
+          stagedJobId: "j2",
+          dispatchAfterMs: 1500,
+        });
+
+        const d1 = await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 });
+        expect(d1!.groupId).toBe("proj_acme/g1");
+        // Second poll parks g2 (tenant at cap=1) at its original score.
+        expect(await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 })).toBeNull();
+        expect(await redis.zrange(parkedKey("proj_acme"), 0, -1, "WITHSCORES")).toEqual([
+          "proj_acme/g2",
+          "1500",
+        ]);
+
+        // Completing g1 frees the slot → COMPLETE unparks g2 back into ready
+        // at its preserved score, and clears the now-empty registry entry.
+        await scripts.complete({ groupId: d1!.groupId, stagedJobId: d1!.stagedJobId });
+        expect(await redis.zcard(parkedKey("proj_acme"))).toBe(0);
+        expect(
+          await redis.sismember(`${keyPrefix()}parked-tenants`, "proj_acme"),
+        ).toBe(0);
+        expect(await redis.zscore(`${keyPrefix()}ready`, "proj_acme/g2")).toBe("1500");
+
+        // g2 is now dispatchable.
+        const d2 = await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 });
+        expect(d2!.groupId).toBe("proj_acme/g2");
+      });
+
+      /** @scenario A crashed tenant's parked groups are restored once its in-flight count expires */
+      it("reconciles parked groups back to ready when the tenant counter expires (orphan recovery)", async () => {
+        process.env[TENANT_CAP_ENV] = "1";
+        await stageOne({
+          tenantId: "proj_crash",
+          groupSuffix: "g1",
+          stagedJobId: "j1",
+          dispatchAfterMs: 1000,
+        });
+        await stageOne({
+          tenantId: "proj_crash",
+          groupSuffix: "g2",
+          stagedJobId: "j2",
+          dispatchAfterMs: 1001,
+        });
+
+        const d1 = await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 });
+        await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 }); // parks g2
+        expect(await redis.zcard(parkedKey("proj_crash"))).toBe(1);
+
+        // Simulate the worker crashing: the active job never completes and both
+        // the active key and the tenant_active counter TTL-expire. No COMPLETE
+        // fires, so without the dispatch reconcile g2 would strand forever.
+        await redis.del(`${keyPrefix()}tenant_active:proj_crash`);
+        await redis.del(`${keyPrefix()}group:${d1!.groupId}:active`);
+
+        // A later poll past the reconcile interval reads the missing counter as
+        // 0 (under cap) and restores g2 — even though dispatch was never idle in
+        // the way the return-nil path needs.
+        const recovered = await scripts.dispatch({ nowMs: 5000, activeTtlSec: 60 });
+        expect(recovered!.groupId).toBe("proj_crash/g2");
+        expect(await redis.zcard(parkedKey("proj_crash"))).toBe(0);
+      });
+
+      /** @scenario Disabling the cap restores all parked groups */
+      it("drains every parked group back to ready when the cap is set to 0", async () => {
+        process.env[TENANT_CAP_ENV] = "1";
+        for (let i = 1; i <= 3; i++) {
+          await stageOne({
+            tenantId: "proj_acme",
+            groupSuffix: `g${i}`,
+            stagedJobId: `j${i}`,
+            dispatchAfterMs: 1000 + i,
+          });
+        }
+        await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 }); // g1 active
+        await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 }); // parks g2, g3
+        expect(await redis.zcard(parkedKey("proj_acme"))).toBe(2);
+
+        // Operator flips the kill switch; a poll past the reconcile interval
+        // drains the whole parked set back into ready (cap disabled = nothing
+        // should stay parked out of the scan).
+        process.env[TENANT_CAP_ENV] = "0";
+        await scripts.dispatch({ nowMs: 5000, activeTtlSec: 60 });
+        expect(await redis.zcard(parkedKey("proj_acme"))).toBe(0);
+        expect(
+          await redis.sismember(`${keyPrefix()}parked-tenants`, "proj_acme"),
+        ).toBe(0);
+      });
+
+      it("drains a large parked backlog in bounded chunks when the cap is set to 0", async () => {
+        process.env[TENANT_CAP_ENV] = "0";
+        // Seed a large parked backlog directly — the parking mechanism is
+        // covered by the tests above; here we isolate the cap=0 kill-switch
+        // drain, which must NOT do one unbounded ZRANGE+ZREM/ZADD eval over the
+        // whole set (the May-27 442K-scale single-thread block this fix avoids).
+        const total = PARK_RECONCILE_MAX_DRAIN + 50;
+        const members: (string | number)[] = [];
+        for (let i = 0; i < total; i++) members.push(1000 + i, `proj_big/g${i}`);
+        await redis.zadd(`${keyPrefix()}parked:proj_big`, ...members);
+        await redis.sadd(`${keyPrefix()}parked-tenants`, "proj_big");
+        expect(await redis.zcard(parkedKey("proj_big"))).toBe(total);
+
+        // First reconcile past the 2s time-gate drains at most one chunk and
+        // leaves the tenant registered.
+        await scripts.dispatch({ nowMs: 5000, activeTtlSec: 60 });
+        expect(await redis.zcard(parkedKey("proj_big"))).toBe(
+          total - PARK_RECONCILE_MAX_DRAIN,
+        );
+        expect(
+          await redis.sismember(`${keyPrefix()}parked-tenants`, "proj_big"),
+        ).toBe(1);
+
+        // A later reconcile drains the remainder and clears the registry.
+        await scripts.dispatch({ nowMs: 8000, activeTtlSec: 60 });
+        expect(await redis.zcard(parkedKey("proj_big"))).toBe(0);
+        expect(
+          await redis.sismember(`${keyPrefix()}parked-tenants`, "proj_big"),
+        ).toBe(0);
+      });
+
+      /** @scenario Restoring parked groups never exceeds the tenant cap */
+      it("unparks no more than (cap - active) groups, so one completion frees exactly one", async () => {
+        process.env[TENANT_CAP_ENV] = "2";
+        for (let i = 1; i <= 5; i++) {
+          await stageOne({
+            tenantId: "proj_acme",
+            groupSuffix: `g${i}`,
+            stagedJobId: `j${i}`,
+            dispatchAfterMs: 1000 + i,
+          });
+        }
+        const d1 = await scripts.dispatch({ nowMs: 3000, activeTtlSec: 60 });
+        await scripts.dispatch({ nowMs: 3000, activeTtlSec: 60 });
+        expect(await redis.get(tenantCounterKey("proj_acme"))).toBe("2");
+        // Next poll parks the remaining 3 (tenant at cap=2).
+        expect(await scripts.dispatch({ nowMs: 3000, activeTtlSec: 60 })).toBeNull();
+        expect(await redis.zcard(parkedKey("proj_acme"))).toBe(3);
+
+        // Completing ONE frees exactly one slot → exactly ONE group unparks.
+        await scripts.complete({ groupId: d1!.groupId, stagedJobId: d1!.stagedJobId });
+        expect(await redis.zcard(parkedKey("proj_acme"))).toBe(2);
+        // The single restored group is the only one due in ready.
+        expect(await redis.zcount(`${keyPrefix()}ready`, "-inf", "3000")).toBe(1);
+      });
+
+      /** @scenario Staging a new job for a parked group keeps it parked */
+      it("keeps a parked group parked when a new job is staged for it (STAGE respects parked)", async () => {
+        process.env[TENANT_CAP_ENV] = "1";
+        await stageOne({
+          tenantId: "proj_acme",
+          groupSuffix: "g1",
+          stagedJobId: "j1",
+          dispatchAfterMs: 1000,
+        });
+        await stageOne({
+          tenantId: "proj_acme",
+          groupSuffix: "g2",
+          stagedJobId: "j2",
+          dispatchAfterMs: 1001,
+        });
+        await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 }); // g1 active
+        await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 }); // g2 parked
+        expect(await redis.zcard(parkedKey("proj_acme"))).toBe(1);
+
+        // Stage a lower-score job into the already-parked g2.
+        await scripts.stage(
+          makeJob({ groupId: "proj_acme/g2", stagedJobId: "j2b", dispatchAfterMs: 900 }),
+        );
+
+        // g2 must stay parked (absorbing the lower score there via LT), NOT
+        // reappear in the ready scan.
+        expect(await redis.zscore(`${keyPrefix()}ready`, "proj_acme/g2")).toBeNull();
+        expect(await redis.zrange(parkedKey("proj_acme"), 0, -1, "WITHSCORES")).toEqual([
+          "proj_acme/g2",
+          "900",
+        ]);
+      });
+
+      // The remaining ready-writers (STAGE_BATCH, RETRY_RESTAGE, ops UNBLOCK and
+      // REPLAY_FROM_DLQ) share the same addToReadyOrParked guard. These are extra
+      // regression coverage for the mutual-exclusivity invariant beyond the one
+      // bound scenario above.
+      it("keeps a parked group parked when stageBatch touches it", async () => {
+        process.env[TENANT_CAP_ENV] = "1";
+        await stageOne({
+          tenantId: "proj_acme",
+          groupSuffix: "g1",
+          stagedJobId: "j1",
+          dispatchAfterMs: 1000,
+        });
+        await stageOne({
+          tenantId: "proj_acme",
+          groupSuffix: "g2",
+          stagedJobId: "j2",
+          dispatchAfterMs: 1001,
+        });
+        await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 });
+        await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 }); // parks g2
+        expect(await redis.zcard(parkedKey("proj_acme"))).toBe(1);
+
+        await scripts.stageBatch([
+          makeJob({ groupId: "proj_acme/g2", stagedJobId: "j2b", dispatchAfterMs: 900 }),
+        ]);
+
+        expect(await redis.zscore(`${keyPrefix()}ready`, "proj_acme/g2")).toBeNull();
+        expect(await redis.zscore(parkedKey("proj_acme"), "proj_acme/g2")).toBe("900");
+      });
+
+      it("keeps a parked group parked when it is unblocked via the ops repo", async () => {
+        process.env[TENANT_CAP_ENV] = "1";
+        const repo = new QueueRedisRepository(redis);
+        await stageOne({
+          tenantId: "proj_acme",
+          groupSuffix: "g1",
+          stagedJobId: "j1",
+          dispatchAfterMs: 1000,
+        });
+        await stageOne({
+          tenantId: "proj_acme",
+          groupSuffix: "g2",
+          stagedJobId: "j2",
+          dispatchAfterMs: 1001,
+        });
+        await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 });
+        await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 }); // parks g2
+
+        // g2 is parked. Force it into the blocked set as if it had been blocked,
+        // then unblock it: UNBLOCK must route through the parked-aware write so
+        // it does not clobber g2 back into ready.
+        await redis.sadd(`${keyPrefix()}blocked`, "proj_acme/g2");
+        await repo.unblockGroup({ queueName: QUEUE_NAME, groupId: "proj_acme/g2" });
+
+        expect(await redis.zscore(`${keyPrefix()}ready`, "proj_acme/g2")).toBeNull();
+        expect(await redis.zcard(parkedKey("proj_acme"))).toBe(1);
+      });
     });
   });
 

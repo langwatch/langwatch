@@ -418,11 +418,13 @@ class OpsMetricsCollector {
 
     let totalGroups = 0;
     let blockedGroups = 0;
+    let parkedGroups = 0;
     let totalPendingJobs = 0;
 
     for (const q of fullQueues) {
       totalGroups += q.groups.length;
       blockedGroups += q.blockedGroupCount;
+      parkedGroups += q.parkedGroupCount;
       totalPendingJobs += q.totalPendingJobs;
     }
 
@@ -482,6 +484,7 @@ class OpsMetricsCollector {
     return {
       totalGroups,
       blockedGroups,
+      parkedGroups,
       totalPendingJobs,
       throughputIngestedPerSec: this.currentIngestedPerSec,
       totalCompleted: this.latestTotalCompleted,
@@ -795,9 +798,17 @@ class OpsMetricsCollector {
 
       const cutoff =
         Date.now() - THROUGHPUT_BUFFER_SIZE * METRICS_COLLECT_INTERVAL_MS;
-      this.throughputBuffer = state.throughputBuffer.filter(
-        (p) => p.timestamp > cutoff,
-      );
+      // Backfill parkedCount on points persisted before the Parked series
+      // existed, so the chart never reads undefined/NaN for old history. The
+      // state version is intentionally not bumped: this keeps the rolling
+      // history AND the accumulated peaks across the deploy (a bump would zero
+      // them, including the freshly-added Completed/s peak tile).
+      this.throughputBuffer = state.throughputBuffer
+        .filter((p) => p.timestamp > cutoff)
+        .map((p) => ({
+          ...p,
+          parkedCount: (p as { parkedCount?: number }).parkedCount ?? 0,
+        }));
 
       this.latestTotalCompleted = state.latestTotalCompleted;
       this.latestTotalFailed = state.latestTotalFailed;
@@ -976,8 +987,10 @@ class OpsMetricsCollector {
       this.hasBaseline = true;
 
       let totalBlockedCount = 0;
+      let totalParkedCount = 0;
       for (const q of queues) {
         totalBlockedCount += q.blockedGroupCount;
+        totalParkedCount += q.parkedGroupCount;
       }
 
       this.throughputBuffer.push({
@@ -987,6 +1000,7 @@ class OpsMetricsCollector {
         failedPerSec: this.currentFailedPerSec,
         pendingCount: totalPending,
         blockedCount: totalBlockedCount,
+        parkedCount: totalParkedCount,
       });
 
       if (this.throughputBuffer.length > THROUGHPUT_BUFFER_SIZE) {

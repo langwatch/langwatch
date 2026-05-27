@@ -69,6 +69,7 @@ describe("QueueService", () => {
       activeGroupCount: 0,
       totalPendingJobs: 0,
       dlqCount: 0,
+      parkedGroupCount: 0,
       groups,
     };
 
@@ -143,6 +144,7 @@ describe("QueueService", () => {
           activeGroupCount: 0,
           totalPendingJobs: 0,
           dlqCount: 0,
+          parkedGroupCount: 0,
           groups: [createGroup({ groupId: "other" }), group],
         };
         const repo = createMockRepo({
@@ -166,6 +168,7 @@ describe("QueueService", () => {
           activeGroupCount: 0,
           totalPendingJobs: 0,
           dlqCount: 0,
+          parkedGroupCount: 0,
           groups: [createGroup({ groupId: "other" })],
         };
         const repo = createMockRepo({
