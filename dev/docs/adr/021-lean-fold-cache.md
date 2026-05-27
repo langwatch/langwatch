@@ -19,21 +19,25 @@ Crucially, the fold's **decision** never needs the IO *text*: `accumulateIO` (`t
 
 ## Decision
 
-**Cache the fold's read-set; persist the write-set.**
+**Lean the fold cache by leaning the data that flows into it — at the edge — not by refactoring the fold.**
 
-1. `RedisCachedFoldStore` gains an optional `toCacheable(state)` projection (additive, already landed) applied before the Redis `SET`. ClickHouse still receives the full state.
-2. The trace-summary fold's `apply` must not require IO **text** to fold the next event. `accumulateIO`'s decisions are refactored to use explicit **presence flags** (`inputPresent`/`outputPresent`) + the existing winner scalars — not the carried text.
-3. `computedInput`/`computedOutput` move to a **dedicated write path** (own ReplacingMergeTree row keyed by `TraceId`) written **only on winner-change** (when `apply` has the new text in hand). The hot summary row (cached + CH) carries scalars + presence flags + a bounded preview — never the IO text.
-4. Reads (`trace_summaries` list + `getTracesWithSpans` detail/eval) resolve IO from the IO row; **returned bytes are unchanged**.
+The keystone is **edge offload** (#4215 Track 2): over-threshold field values are replaced with `{preview + ref}` at ingestion, *before* queue staging. By the time the fold runs, span IO is already small, so:
 
-This deliberately departs from ADR-007's "fold state = stored data": the cached shape is a lean **projection** of the fold state (cached ≠ stored ≠ working). The departure is the whole point — it's what lets the hot loop stay small.
+1. The fold's `computedInput`/`computedOutput` are **pick-winning** (one span's value, never concatenated — `shouldOverrideOutput` *overrides*), so post-offload they hold a **preview**, bounded by a single span ≤ threshold. The fold cache and the `trace_summaries` row are therefore **naturally lean** — no `accumulateIO` refactor, no IO-split table, no projection version bump for IO.
+2. The fold additionally records the **winning span's blob ref** so trace-level full IO resolves on read.
+3. `RedisCachedFoldStore.toCacheable` (additive, already landed) stays as a **secondary defence** to strip the still-growing small collections (`events[]`, `spanCosts`, accumulated `attributes`) for pathological many-span traces. It is not the primary mechanism.
+4. Reads (`trace_summaries` list + `getTracesWithSpans` detail/eval) resolve refs → full IO; list/search use the inline preview. **Returned bytes are unchanged.**
+
+## Superseded approach (rejected)
+
+An earlier draft of this ADR proposed refactoring `accumulateIO` onto presence-flags and splitting `computedInput/Output` into their own ReplacingMergeTree row written on winner-change. **Rejected** — edge offload makes the fold state lean for free, so that hot-path refactor (high blast radius on a versioned, replay-coordinated projection) is unnecessary. The clog is the *large single value*, which offload removes upstream; `computedOutput` never grew with span count (pick-winning), so there was never an O(N²)-in-IO problem to solve inside the fold.
 
 ## Consequences
 
 - Redis entries bounded regardless of IO size; no O(N²) serialize; **no added CH reads in the fold loop** (IO is never read to fold — a "rehydrate IO from CH on cache-hit" alternative was rejected because it re-reads CH every fold, defeating the cache).
-- Fold projection **output values are unchanged** (same IO chosen) → the existing 170 trace-processing projection unit tests are the behavior-preserving safety net for the refactor.
-- The persisted summary-row shape changes (IO columns move to their own row) → **projection version bump + replay per ADR-015**.
-- Establishes the `{preview + ref}` reference shape reused by #4215's Track 2 per-field S3 offload.
+- The fold projection **code is unchanged** (it just receives preview-sized IO once offload is on) → the existing 170 trace-processing projection unit tests stay green; no behavior-preserving refactor to risk.
+- **No projection version bump / replay** for the cache leanness — `trace_summaries` gains ref columns *additively*; the fold's computed values aren't recomputed differently.
+- Edge offload is the single mechanism that shrinks **all** the large-IO copies (queue job, fold cache, event log, `stored_spans`, `trace_summaries`); the lean fold cache is one consequence, not a separate workstream.
 
 ## Rules
 
