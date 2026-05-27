@@ -524,3 +524,39 @@ class TestDedicatedTracerProviderIsolation:
         assert len(procs_after) == 1, (
             f"Expected 1 processor (old removed, new added), got {len(procs_after)}"
         )
+
+    def test_switch_from_global_to_dedicated_detaches_old(self) -> None:
+        """Switching from global provider to dedicated must detach our
+        processor from the old global — no dangling exporter."""
+        from opentelemetry.sdk.trace import TracerProvider
+        from opentelemetry import trace as trace_api
+
+        Client(api_key="test-key")
+        global_provider = Client._tracer_provider
+        assert global_provider is not None
+        old_procs = global_provider._active_span_processor._span_processors
+        assert len(old_procs) == 1
+
+        lw_provider = TracerProvider()
+        Client(api_key="test-key", tracer_provider=lw_provider)
+
+        old_procs_after = global_provider._active_span_processor._span_processors
+        assert len(old_procs_after) == 0, (
+            f"Old provider should have 0 LW processors after switch, got {len(old_procs_after)}"
+        )
+        new_procs = lw_provider._active_span_processor._span_processors
+        assert len(new_procs) == 1
+
+    def test_switch_between_dedicated_providers_detaches_old(self) -> None:
+        """Switching from dedicated-A to dedicated-B must detach from A."""
+        from opentelemetry.sdk.trace import TracerProvider
+
+        provider_a = TracerProvider()
+        Client(api_key="test-key", tracer_provider=provider_a)
+        assert len(provider_a._active_span_processor._span_processors) == 1
+
+        provider_b = TracerProvider()
+        Client(api_key="test-key", tracer_provider=provider_b)
+
+        assert len(provider_a._active_span_processor._span_processors) == 0
+        assert len(provider_b._active_span_processor._span_processors) == 1

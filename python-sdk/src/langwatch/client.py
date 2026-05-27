@@ -187,6 +187,8 @@ class Client(LangWatchClientProtocol):
             if instrumentors is not None:
                 Client._instrumentors = instrumentors
             if tracer_provider is not None:
+                if Client._tracer_provider is not None and Client._tracer_provider is not tracer_provider:
+                    self.__detach_langwatch_processor()
                 Client._tracer_provider = tracer_provider
                 Client._is_dedicated_provider = True
             # Ensure OTEL is configured and instrumentors are registered for the active provider
@@ -282,6 +284,8 @@ class Client(LangWatchClientProtocol):
             Client._instrumentors = ()
 
         if tracer_provider is not None:
+            if Client._tracer_provider is not None and Client._tracer_provider is not tracer_provider:
+                self.__detach_langwatch_processor()
             Client._tracer_provider = tracer_provider
             Client._is_dedicated_provider = True
 
