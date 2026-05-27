@@ -1,50 +1,60 @@
 """
-Running LangWatch alongside another OTel-based SDK (e.g. an APM or
-error-monitoring tool).
+Example: Running LangWatch alongside another OTel-based SDK.
 
-Problem: Both SDKs hook into the same global TracerProvider, so all
-spans flow to both — LLM traces appear in the other tool and
-application traces appear in LangWatch.
+This simulates a real-world scenario where another SDK (e.g. an APM)
+has already initialized a global TracerProvider. LangWatch uses a
+dedicated provider so both SDKs operate independently.
 
-Solution: Pass a dedicated TracerProvider to langwatch.setup() so
-LangWatch uses its own isolated provider while the other SDK keeps
-the global one.
+Run:
+  LANGWATCH_API_KEY=your-key OPENAI_API_KEY=your-key python otel_provider_isolation.py
+
+Expected: The LLM call appears in your LangWatch dashboard. The
+"external" SDK's spans print to the console. No cross-contamination.
 """
 
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor, ConsoleSpanExporter
+from opentelemetry import trace
+
+# ── Step 1: Simulate another OTel SDK initializing first ────────────
+# In production this would be Sentry, Datadog, New Relic, etc.
+external_provider = TracerProvider()
+external_provider.add_span_processor(SimpleSpanProcessor(ConsoleSpanExporter()))
+trace.set_tracer_provider(external_provider)
+print("[External SDK] Global TracerProvider registered.\n")
+
+# ── Step 2: Initialize LangWatch with a dedicated provider ──────────
 import langwatch
 from openai import OpenAI
-from opentelemetry.sdk.trace import TracerProvider
 
-# 1. The other OTel SDK initializes first and sets the global provider.
-#    (This happens automatically when you import/init the other SDK.)
-
-# 2. Create a dedicated provider for LangWatch.
 langwatch_provider = TracerProvider()
-
-# 3. Pass it to langwatch.setup() — LangWatch attaches its exporter
-#    to this provider and leaves the global provider untouched.
 langwatch.setup(tracer_provider=langwatch_provider)
+print("[LangWatch] Using dedicated provider (global untouched).\n")
 
 client = OpenAI()
 
 
-@langwatch.trace(name="isolated-chat")
-async def chat(user_message: str):
+# ── Step 3: Make an LLM call — should appear in LangWatch ──────────
+@langwatch.trace(name="isolated-llm-call")
+def chat(user_message: str):
     langwatch.get_current_trace().autotrack_openai_calls(client)
 
     response = client.chat.completions.create(
-        model="gpt-5-mini",
+        model="gpt-4.1-nano",
         messages=[{"role": "user", "content": user_message}],
     )
     return response.choices[0].message.content
 
 
-async def main():
-    reply = await chat("Explain OTel in one sentence.")
-    print(reply)
+# ── Step 4: Also create an app-level span on the external provider ──
+# This should print to console (external SDK) but NOT appear in LangWatch.
+external_tracer = trace.get_tracer("external-app")
 
+with external_tracer.start_as_current_span("app-request"):
+    print("[App] Starting request...\n")
+    reply = chat("What is OpenTelemetry in one sentence?")
+    print(f"[LLM Response] {reply}\n")
 
-if __name__ == "__main__":
-    import asyncio
-
-    asyncio.run(main())
+external_provider.shutdown()
+print("\n[Done] Check your LangWatch dashboard for the LLM trace.")
+print("The 'app-request' span should only appear in console (external SDK), not LangWatch.")
