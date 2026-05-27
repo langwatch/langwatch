@@ -27,7 +27,7 @@ import { Hono, type Context } from "hono";
 import { loggerMiddleware } from "~/app/api/middleware/logger";
 import { tracerMiddleware } from "~/app/api/middleware/tracer";
 import { hasProjectPermission } from "~/server/api/rbac";
-import { getServerAuthSession } from "~/server/auth";
+import { getServerAuthSession, type Session } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { featureFlagService } from "~/server/featureFlag";
 import { isLangwatchStaff } from "~/utils/isLangwatchStaff";
@@ -143,7 +143,7 @@ async function gateLangyChatRequest({
   projectId,
 }: {
   c: Context;
-  session: { user: { id: string } };
+  session: Session;
   projectId: string;
 }): Promise<Response | null> {
   const hasPermission = await hasProjectPermission(
