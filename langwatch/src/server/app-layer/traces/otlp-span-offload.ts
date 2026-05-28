@@ -38,14 +38,22 @@ export async function offloadOtlpSpanAttributes({
 }): Promise<OtlpKeyValue[]> {
   const kept: OtlpKeyValue[] = [];
   const refAttrs: OtlpKeyValue[] = [];
+  let droppedReserved = false;
 
   for (const kv of attributes) {
+    // The reserved blob-ref namespace is server-owned. Drop any client-supplied
+    // entry with a reserved key before any other processing — a malicious client
+    // must not be able to inject a forged ref that would later be resolved and
+    // serve another project's blob to the attacker. CR-2 (#4215).
+    if (kv.key.startsWith(BLOB_REF_ATTR_PREFIX)) {
+      droppedReserved = true;
+      continue;
+    }
+
     const value = kv.value?.stringValue;
     if (
       typeof value === "string" &&
-      Buffer.byteLength(value, "utf-8") > thresholdBytes &&
-      // never re-offload an already-encoded ref attribute
-      !kv.key.startsWith(BLOB_REF_ATTR_PREFIX)
+      Buffer.byteLength(value, "utf-8") > thresholdBytes
     ) {
       const ref = await blobStore.put({
         projectId,
@@ -67,5 +75,8 @@ export async function offloadOtlpSpanAttributes({
     }
   }
 
-  return refAttrs.length > 0 ? [...kept, ...refAttrs] : attributes;
+  // Return original array only when nothing changed (no offloads, no stripped
+  // reserved keys) — preserves the reference-equality fast-path used by callers.
+  if (refAttrs.length === 0 && !droppedReserved) return attributes;
+  return [...kept, ...refAttrs];
 }

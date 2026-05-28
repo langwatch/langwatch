@@ -6,6 +6,7 @@ import {
 import {
   BlobStore,
   BlobIntegrityError,
+  UnauthorizedBlobAccessError,
   type S3ClientResolver,
 } from "./blob-store.service";
 
@@ -114,15 +115,48 @@ describe("BlobStore", () => {
 
   describe("given two organizations with separate buckets", () => {
     describe("when org B tries to read a ref produced by org A", () => {
-      it("cannot fetch it — the ref resolves only inside the owning org bucket", async () => {
+      it("cannot fetch it — throws UnauthorizedBlobAccessError before even reaching S3", async () => {
         const fake = fakeS3();
         const store = new BlobStore(resolverFor(fake));
         const ref = await store.put({ ...coords, value: "secret" }); // orgA:1 → orgA-bucket
 
-        // org B project resolves to orgB-bucket, where the key does not exist
+        // CR-1: key-prefix check fires before resolveS3Client is called — error
+        // is UnauthorizedBlobAccessError, not NoSuchKey from S3.
         await expect(
           store.get({ projectId: "orgB:9", ref }),
-        ).rejects.toThrow(/NoSuchKey/);
+        ).rejects.toBeInstanceOf(UnauthorizedBlobAccessError);
+      });
+    });
+  });
+
+  describe("given a blob ref whose key belongs to a different project", () => {
+    describe("when get is called with a mismatched projectId", () => {
+      it("throws UnauthorizedBlobAccessError without calling the S3 client", async () => {
+        // Capture the send spy before wrapping it as `never` inside fakeS3
+        const sendSpy = vi.fn(async (_command: unknown) => ({}));
+        const fakeWithSpy = {
+          objects: new Map<string, Buffer>(),
+          s3Client: { send: sendSpy } as never,
+        };
+        const store = new BlobStore(async (_projectId: string) => ({
+          s3Client: fakeWithSpy.s3Client,
+          s3Bucket: "any-bucket",
+        }));
+
+        // A ref that was created for orgA but presented with orgB's projectId
+        const foreignRef = {
+          key: "trace-blobs/orgA:1/trace-1/span-1/langwatch.output",
+          size: 10,
+          sha256: "abc",
+          encoding: "utf-8" as const,
+        };
+
+        await expect(
+          store.get({ projectId: "orgB:9", ref: foreignRef }),
+        ).rejects.toBeInstanceOf(UnauthorizedBlobAccessError);
+
+        // The S3 client must not have been called at all
+        expect(sendSpy).not.toHaveBeenCalled();
       });
     });
   });

@@ -206,7 +206,6 @@ describe("resolveOffloadedTraces()", () => {
     describe("when resolved", () => {
       it("returns spans unchanged", async () => {
         const blobSvc = fakeBlobResolutionService({});
-        const resolveSpy = blobSvc.resolve as ReturnType<typeof vi.fn>;
         const logger = createMockLogger();
 
         const result = await resolveOffloadedTraces({
@@ -336,6 +335,36 @@ describe("resolveOffloadedTraces()", () => {
         });
 
         expect(result.anyResolved).toBe(false);
+      });
+    });
+  });
+
+  describe("given a span with a reserved blob-ref attribute set to malformed JSON", () => {
+    const spanWithMalformedRef = makeSpan({
+      spanAttributes: {
+        "langwatch.output": "preview…",
+        [`${BLOB_REF_ATTR_PREFIX}langwatch.output`]: 'not-json{',
+      },
+    });
+
+    describe("when resolved", () => {
+      it("strips the reserved blob-ref key from returned span attributes", async () => {
+        const blobSvc = fakeBlobResolutionService({});
+        const logger = createMockLogger();
+
+        const result = await resolveOffloadedTraces({
+          projectId: "proj-1",
+          normalizedSpans: [spanWithMalformedRef],
+          blobResolutionService: blobSvc,
+          ioExtractionService: realIOService,
+          logger,
+        });
+
+        const attrs = result.resolvedSpans[0]!.spanAttributes;
+        const hasReservedKey = Object.keys(attrs).some((k) =>
+          k.startsWith(BLOB_REF_ATTR_PREFIX),
+        );
+        expect(hasReservedKey).toBe(false);
       });
     });
   });

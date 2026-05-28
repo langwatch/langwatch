@@ -10,7 +10,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Trace } from "~/server/tracer/types";
 import type { Protections } from "~/server/elasticsearch/protections";
-import { BLOB_REF_ATTR_PREFIX } from "~/server/app-layer/traces/blob-ref-attributes";
 import type { TraceBlobRef } from "~/server/app-layer/traces/blob-store.service";
 import { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import { SpanBlobResolutionService } from "~/server/app-layer/traces/span-blob-resolution.service";

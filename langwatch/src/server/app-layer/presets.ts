@@ -82,6 +82,7 @@ import { handleLicensePurchase } from "../../../ee/billing/services/licensePurch
 import { getSaaSPlanProvider } from "../../../ee/billing";
 import { InviteService } from "../invites/invite.service";
 import { env } from "~/env.mjs";
+import { createLogger } from "~/utils/logger/server";
 import { getPostHogInstance } from "~/server/posthog";
 import { getLicenseHandler } from "../subscriptionHandler";
 import { FREE_PLAN } from "../../../ee/licensing/constants";
@@ -418,20 +419,38 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
       // Edge offload (#4215), flag-gated per project. projectId === tenantId
       // (routes/otel.ts passes project.id). Checked per span via the 5s-cached
       // flag store, so effectively once per request.
+      //
+      // FAIL-OPEN: any error from the flag store (Postgres/network blip) or
+      // from offloadOtlpSpanAttributes (S3 outage, BlobStore.put throws) is
+      // caught here. We log at warn level and return the original span unchanged
+      // so that ingestion is never blocked by the offload path. CR-3 (#4215).
       offloadSpanAttributes: async ({ projectId, span }) => {
-        const enabled = await getFeatureFlagStore().get(
-          "release_trace_blob_offload",
-          { projectId },
-        );
-        if (enabled !== true) return span;
-        const attributes = await offloadOtlpSpanAttributes({
-          attributes: span.attributes,
-          projectId,
-          traceId: span.traceId,
-          spanId: span.spanId,
-          blobStore,
-        });
-        return attributes === span.attributes ? span : { ...span, attributes };
+        try {
+          const enabled = await getFeatureFlagStore().get(
+            "release_trace_blob_offload",
+            { projectId },
+          );
+          if (enabled !== true) return span;
+          const attributes = await offloadOtlpSpanAttributes({
+            attributes: span.attributes,
+            projectId,
+            traceId: span.traceId,
+            spanId: span.spanId,
+            blobStore,
+          });
+          return attributes === span.attributes ? span : { ...span, attributes };
+        } catch (err) {
+          createLogger("langwatch:traces:edge-offload-fail-open").warn(
+            {
+              projectId,
+              traceId: span.traceId,
+              spanId: span.spanId,
+              error: err instanceof Error ? err.message : String(err),
+            },
+            "Edge offload failed — falling back to unmodified span (fail-open)",
+          );
+          return span;
+        }
       },
     }),
     "TraceRequestCollectionService",

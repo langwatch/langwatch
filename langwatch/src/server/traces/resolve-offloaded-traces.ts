@@ -24,7 +24,7 @@ import {
   extractBlobRefsFromAttributes,
   hasBlobRefs,
 } from "~/server/app-layer/traces/blob-ref-attributes";
-import { BlobIntegrityError } from "~/server/app-layer/traces/blob-store.service";
+import { BlobIntegrityError, UnauthorizedBlobAccessError } from "~/server/app-layer/traces/blob-store.service";
 import type { SpanBlobResolutionService } from "~/server/app-layer/traces/span-blob-resolution.service";
 import type { ExtractedIO, TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
@@ -119,8 +119,9 @@ export async function resolveOffloadedTraces({
         );
 
       if (Object.keys(blobRefs).length === 0) {
-        // All ref keys were malformed JSON — keep span unchanged.
-        return span;
+        // All ref keys were malformed JSON — strip the reserved keys anyway so
+        // they never leak to clients, but keep the preview values intact. CR-4.
+        return { ...span, spanAttributes: cleanedAttrs };
       }
 
       try {
@@ -141,13 +142,15 @@ export async function resolveOffloadedTraces({
           error: err instanceof Error ? err.message : String(err),
         };
 
-        if (err instanceof BlobIntegrityError) {
-          // SHA-256 mismatch: possible tampering or storage corruption.
-          // Log loudly so ops and auditors see this; still return the preview
-          // rather than throwing — a corrupt blob must not break trace reads.
+        if (err instanceof BlobIntegrityError || err instanceof UnauthorizedBlobAccessError) {
+          // SHA-256 mismatch or cross-project access attempt: log loudly so ops
+          // and auditors see this; still return the preview rather than throwing
+          // — a corrupt or unauthorized blob must not break trace reads.
           logger.error(
             logContext,
-            "Blob integrity check failed for span — SHA-256 mismatch, keeping preview value",
+            err instanceof BlobIntegrityError
+              ? "Blob integrity check failed for span — SHA-256 mismatch, keeping preview value"
+              : "Unauthorized blob access attempt — forged blob-ref key, keeping preview value",
           );
         } else {
           // Missing blob (NoSuchKey) or transient S3 error — log at warn level.

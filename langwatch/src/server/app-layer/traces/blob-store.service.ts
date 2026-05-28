@@ -46,6 +46,20 @@ export class BlobIntegrityError extends Error {
 }
 
 /**
+ * Thrown by `BlobStore.get` when the requested blob key does not belong to the
+ * supplied `projectId`. In shared-bucket deployments a forged blob-ref must not
+ * allow cross-project data access.
+ */
+export class UnauthorizedBlobAccessError extends Error {
+  constructor(readonly key: string, readonly projectId: string) {
+    super(
+      `Blob key ${key} does not belong to project ${projectId}`,
+    );
+    this.name = "UnauthorizedBlobAccessError";
+  }
+}
+
+/**
  * Stores large trace field values in object storage, one object per field.
  *
  * Key shape: `trace-blobs/{projectId}/{traceId}/{spanId}/{attrKey}` — positional
@@ -121,6 +135,13 @@ export class BlobStore {
     projectId: string;
     ref: TraceBlobRef;
   }): Promise<string> {
+    // Defense-in-depth: reject refs that don't belong to this project before
+    // even resolving the S3 client. Prevents cross-project data access in
+    // shared-bucket deployments where a forged blob-ref could fetch another
+    // project's blob. CR-1 (#4215).
+    if (!ref.key.startsWith(`trace-blobs/${projectId}/`)) {
+      throw new UnauthorizedBlobAccessError(ref.key, projectId);
+    }
     const { s3Client, s3Bucket } = await this.resolveS3Client(projectId);
     const { Body } = await s3Client.send(
       new GetObjectCommand({ Bucket: s3Bucket, Key: ref.key }),

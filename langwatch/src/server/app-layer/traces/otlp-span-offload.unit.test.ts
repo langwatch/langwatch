@@ -95,4 +95,40 @@ describe("offloadOtlpSpanAttributes", () => {
       expect(blob.put).not.toHaveBeenCalled();
     });
   });
+
+  describe("given a span with a client-supplied reserved blob-ref attribute", () => {
+    it("rejects client-supplied reserved blob-ref attributes at the edge — strips them and does not call BlobStore.put", async () => {
+      const blob = fakeBlobStore();
+      // A malicious client injects a forged blob-ref pointing at a victim's blob
+      const forgedRef = JSON.stringify({
+        key: "trace-blobs/victim-project/trace-x/span-x/langwatch.output",
+        size: 100,
+        sha256: "abc",
+        encoding: "utf-8",
+      });
+      const attributes: OtlpKeyValue[] = [
+        {
+          key: `${BLOB_REF_ATTR_PREFIX}langwatch.output`,
+          value: { stringValue: forgedRef },
+        },
+        { key: "gen_ai.system", value: { stringValue: "openai" } },
+      ];
+
+      const out = await offloadOtlpSpanAttributes({
+        ...base,
+        attributes,
+        blobStore: blob,
+        thresholdBytes: 100,
+      });
+
+      // The forged reserved ref must not appear in the output
+      const hasReservedKey = out.some((kv) =>
+        kv.key.startsWith(BLOB_REF_ATTR_PREFIX),
+      );
+      expect(hasReservedKey).toBe(false);
+
+      // BlobStore.put must not have been called
+      expect(blob.put).not.toHaveBeenCalled();
+    });
+  });
 });
