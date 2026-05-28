@@ -262,7 +262,6 @@ const STARTER_PACK_TILES: ReadonlyArray<{
       setupCommand: "langwatch claude",
       setupDocsUrl:
         "https://docs.langwatch.ai/ai-governance/personal-portal/end-user",
-      helperText: "Run from your terminal to provision a VK and launch Claude Code.",
     },
   },
   {
