@@ -4,54 +4,37 @@ import {
   Heading,
   HStack,
   Input,
-  NativeSelect,
   Spinner,
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { ExternalLink } from "lucide-react";
 import { useState } from "react";
 
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
-import { LoadingScreen } from "~/components/LoadingScreen";
-import { NotFoundScene } from "~/components/NotFoundScene";
+import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { Link } from "~/components/ui/link";
 import { toaster } from "~/components/ui/toaster";
-import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
 
 type CostCenter = RouterOutputs["costCenters"]["list"][number];
-type AssignableEntity =
-  RouterOutputs["costCenters"]["assignments"]["users"][number];
-
-const UNASSIGNED = "";
 
 function CostCentersPage() {
   const { organization } = useOrganizationTeamProject({
     redirectToOnboarding: false,
   });
   const orgId = organization?.id ?? "";
-  const { enabled, isLoading: ffLoading } = useFeatureFlag(
-    "release_ui_ai_governance_enabled",
-    { organizationId: orgId, enabled: !!orgId },
-  );
 
   const utils = api.useUtils();
   const listQuery = api.costCenters.list.useQuery(
     { organizationId: orgId },
     { enabled: !!orgId, refetchOnWindowFocus: false },
   );
-  const assignmentsQuery = api.costCenters.assignments.useQuery(
-    { organizationId: orgId },
-    { enabled: !!orgId, refetchOnWindowFocus: false },
-  );
 
   const refresh = async () => {
-    await Promise.all([
-      utils.costCenters.list.invalidate({ organizationId: orgId }),
-      utils.costCenters.assignments.invalidate({ organizationId: orgId }),
-    ]);
+    await utils.costCenters.list.invalidate({ organizationId: orgId });
   };
 
   const [newName, setNewName] = useState("");
@@ -65,11 +48,8 @@ function CostCentersPage() {
       toaster.create({ title: "Create failed", description: e.message, type: "error" }),
   });
 
-  if (ffLoading) return <LoadingScreen />;
-  if (!enabled) return <NotFoundScene />;
-
   const costCenters = listQuery.data ?? [];
-  const assignments = assignmentsQuery.data;
+  const hasCostCenters = costCenters.length > 0;
 
   return (
     <GovernanceLayout pageTitle="Cost Centers · AI Governance · LangWatch">
@@ -139,43 +119,92 @@ function CostCentersPage() {
           onChanged={refresh}
         />
 
-        {assignmentsQuery.isLoading || !assignments ? (
-          <Box padding={6}>
-            <Spinner />
-          </Box>
-        ) : (
-          <>
-            <AssignmentSection
-              title="People"
-              description="A person's spend, including personal AI use, rolls up to their cost center."
-              entities={assignments.users}
-              costCenters={costCenters}
-              orgId={orgId}
-              kind="user"
-              onChanged={refresh}
-            />
-            <AssignmentSection
-              title="Teams"
-              description="A team cost center is the default its members and projects inherit when they have none of their own."
-              entities={assignments.teams}
-              costCenters={costCenters}
-              orgId={orgId}
-              kind="team"
-              onChanged={refresh}
-            />
-            <AssignmentSection
-              title="Projects"
-              description="A project is where an autonomous agent runs. Agent spend with no human principal rolls up to the project's cost center."
-              entities={assignments.projects}
-              costCenters={costCenters}
-              orgId={orgId}
-              kind="project"
-              onChanged={refresh}
-            />
-          </>
-        )}
+        {hasCostCenters && <AssignmentGuide />}
       </VStack>
     </GovernanceLayout>
+  );
+}
+
+function AssignmentGuide() {
+  return (
+    <VStack
+      align="stretch"
+      gap={0}
+      borderWidth="1px"
+      borderColor="border.muted"
+      borderRadius="md"
+      overflow="hidden"
+    >
+      <Box
+        paddingY={2}
+        paddingX={3}
+        borderBottomWidth="1px"
+        borderColor="border.muted"
+        backgroundColor="bg.subtle"
+      >
+        <Text
+          fontSize="xs"
+          fontWeight="semibold"
+          color="fg.muted"
+          textTransform="uppercase"
+          letterSpacing="wider"
+        >
+          Assigning cost centers
+        </Text>
+        <Text fontSize="xs" color="fg.subtle" marginTop={1}>
+          Assign people and teams to a cost center where you already manage
+          them. Spend rolls up by cost center, including personal AI use.
+        </Text>
+      </Box>
+      <AssignmentLink
+        href="/settings/members"
+        title="People"
+        description="A person's spend, including personal AI use, rolls up to their cost center. Assign each member from the members page."
+      />
+      <AssignmentLink
+        href="/settings/teams"
+        title="Teams"
+        description="A team cost center is the default its members and projects inherit when they have none of their own. Assign each team from the teams page."
+      />
+      <AssignmentLink
+        href="/settings"
+        title="Projects"
+        description="A project is where an autonomous agent runs. Agent spend with no human principal rolls up to the project's cost center. Assign a project from its settings."
+      />
+    </VStack>
+  );
+}
+
+function AssignmentLink({
+  href,
+  title,
+  description,
+}: {
+  href: string;
+  title: string;
+  description: string;
+}) {
+  return (
+    <Link href={href} variant="plain">
+      <HStack
+        paddingY={3}
+        paddingX={3}
+        borderBottomWidth="1px"
+        borderColor="border.muted"
+        justifyContent="space-between"
+        _hover={{ backgroundColor: "bg.muted" }}
+      >
+        <VStack align="start" gap={0}>
+          <Text fontSize="sm" fontWeight="medium" color="blue.600">
+            {title}
+          </Text>
+          <Text fontSize="xs" color="fg.muted" maxW="2xl">
+            {description}
+          </Text>
+        </VStack>
+        <ExternalLink size={16} color="var(--chakra-colors-fg-muted)" />
+      </HStack>
+    </Link>
   );
 }
 
@@ -340,127 +369,10 @@ function CostCenterRow({
   );
 }
 
-function AssignmentSection({
-  title,
-  description,
-  entities,
-  costCenters,
-  orgId,
-  kind,
-  onChanged,
-}: {
-  title: string;
-  description: string;
-  entities: AssignableEntity[];
-  costCenters: CostCenter[];
-  orgId: string;
-  kind: "user" | "team" | "project";
-  onChanged: () => Promise<void>;
-}) {
-  const assignUser = api.costCenters.assignUser.useMutation();
-  const assignTeam = api.costCenters.assignTeam.useMutation();
-  const assignProject = api.costCenters.assignProject.useMutation();
-
-  const assign = async (entityId: string, costCenterId: string | null) => {
-    try {
-      if (kind === "user") {
-        await assignUser.mutateAsync({
-          organizationId: orgId,
-          userId: entityId,
-          costCenterId,
-        });
-      } else if (kind === "team") {
-        await assignTeam.mutateAsync({
-          organizationId: orgId,
-          teamId: entityId,
-          costCenterId,
-        });
-      } else {
-        await assignProject.mutateAsync({
-          organizationId: orgId,
-          projectId: entityId,
-          costCenterId,
-        });
-      }
-      toaster.create({ title: "Assignment saved", type: "success" });
-      await onChanged();
-    } catch (e) {
-      toaster.create({
-        title: "Assignment failed",
-        description: e instanceof Error ? e.message : String(e),
-        type: "error",
-      });
-    }
-  };
-
-  return (
-    <VStack
-      align="stretch"
-      gap={0}
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="md"
-      overflow="hidden"
-    >
-      <Box
-        paddingY={2}
-        paddingX={3}
-        borderBottomWidth="1px"
-        borderColor="border.muted"
-        backgroundColor="bg.subtle"
-      >
-        <Text
-          fontSize="xs"
-          fontWeight="semibold"
-          color="fg.muted"
-          textTransform="uppercase"
-          letterSpacing="wider"
-        >
-          {title}
-        </Text>
-        <Text fontSize="xs" color="fg.subtle" marginTop={1}>
-          {description}
-        </Text>
-      </Box>
-      {entities.length === 0 ? (
-        <Box padding={4} color="fg.muted" fontSize="sm">
-          None to assign.
-        </Box>
-      ) : (
-        entities.map((entity) => (
-          <HStack
-            key={entity.id}
-            paddingY={2}
-            paddingX={3}
-            borderBottomWidth="1px"
-            borderColor="border.muted"
-            fontSize="sm"
-            justifyContent="space-between"
-          >
-            <Text>{entity.name}</Text>
-            <NativeSelect.Root size="sm" maxW="220px">
-              <NativeSelect.Field
-                value={entity.costCenterId ?? UNASSIGNED}
-                onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
-                  void assign(entity.id, e.target.value || null)
-                }
-              >
-                <option value={UNASSIGNED}>Unassigned</option>
-                {costCenters.map((cc) => (
-                  <option key={cc.id} value={cc.id}>
-                    {cc.name}
-                  </option>
-                ))}
-              </NativeSelect.Field>
-              <NativeSelect.Indicator />
-            </NativeSelect.Root>
-          </HStack>
-        ))
-      )}
-    </VStack>
-  );
-}
-
-export default withPermissionGuard("organization:manage", {
+export default withFeatureFlagGuard("release_ui_ai_governance_enabled", {
   bypassOnboardingRedirect: true,
-})(CostCentersPage);
+})(
+  withPermissionGuard("organization:manage", {
+    bypassOnboardingRedirect: true,
+  })(CostCentersPage),
+);

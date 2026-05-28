@@ -24,6 +24,8 @@ import { Controller, type SubmitHandler, useForm } from "react-hook-form";
 import { HorizontalFormControl } from "~/components/HorizontalFormControl";
 import { Tooltip } from "~/components/ui/tooltip";
 import { ProjectSelector } from "../components/DashboardLayout";
+import { CostCenterPicker } from "../components/settings/CostCenterPicker";
+import { useCostCenterColumn } from "../components/settings/useCostCenterColumn";
 import SettingsLayout from "../components/SettingsLayout";
 import {
   ProjectTechStackIcon,
@@ -346,6 +348,7 @@ function ProjectSettingsForm({ project }: { project: Project }) {
   const { organization, organizations } = useOrganizationTeamProject();
   const publicEnv = usePublicEnv();
   const { isFree } = useActivePlan();
+  const costCenter = useCostCenterColumn(organization?.id ?? "");
 
   const piiRedactionLevelCollection = createListCollection({
     items: [
@@ -558,6 +561,21 @@ function ProjectSettingsForm({ project }: { project: Project }) {
             />
             <Field.ErrorText>Name is required</Field.ErrorText>
           </HorizontalFormControl>
+          {costCenter.show && (
+            <HorizontalFormControl
+              label="Cost center"
+              helper="Agent spend with no human principal rolls up to this cost center"
+            >
+              <CostCenterPicker
+                organizationId={organization?.id ?? ""}
+                kind="project"
+                entityId={project.id}
+                value={costCenter.byProject.get(project.id) ?? null}
+                costCenters={costCenter.costCenters}
+                onAssigned={costCenter.refetch}
+              />
+            </HorizontalFormControl>
+          )}
           <HorizontalFormControl
             label="Tech Stack"
             helper="The project language and framework"
