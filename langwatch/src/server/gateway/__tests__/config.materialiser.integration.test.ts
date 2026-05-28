@@ -139,7 +139,6 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
     await prisma.modelProvider.create({
       data: {
         id: MP_ID,
-        organizationId: ORG_ID,
         name: "openai",
         provider: "openai",
         enabled: true,
