@@ -102,9 +102,9 @@ Feature: Large trace payloads — lean fold cache + edge blob-offload to S3
   Scenario: An over-threshold field is offloaded once with preview inline and ref recorded
     Given a span field value exceeds the offload threshold
     When the trace is collected at the ingestion edge
-    Then the full bytes are stored once in S3 under key "{org}/{traceId}/{spanId}/{attr}"
+    Then the full bytes are stored once in S3 under key "trace-blobs/{projectId}/{traceId}/{spanId}/{attr}"
     And the stored_spans projection holds the bounded preview for that field
-    And the SpanBlobRefs column holds the reference for that field
+    And a reserved blob-ref attribute "langwatch.reserved.blobref.{attr}" carries the reference inside the span's attribute map
     And the queue job, event log, and trace summary carry only preview, ref, and scalars
 
   @integration @track2
@@ -167,8 +167,9 @@ Feature: Large trace payloads — lean fold cache + edge blob-offload to S3
   #          >32 KB without langwatch.input_truncated"
   #   -> Scenario Outline: SDK transmits a 50 KB output in full ... (Python SDK, TypeScript SDK)
   #   -> Scenario: Gateway forwards a payload larger than 32 KB without flagging truncation
-  # AC T2.2: "Field > threshold stored once in S3 at {org}/{traceId}/{spanId}/{attr};
-  #          stored_spans holds preview, SpanBlobRefs holds ref"
+  # AC T2.2: "Field > threshold stored once in S3 at trace-blobs/{projectId}/{traceId}/{spanId}/{attr};
+  #          stored_spans holds preview; ref rides as a reserved span attribute
+  #          `langwatch.reserved.blobref.{attr}` (no schema change to the projection)"
   #   -> Scenario: An over-threshold field is offloaded once with preview inline and ref recorded
   # AC T2.3: "Round-trip integrity: sha256(S3 blob) == sha256(original)"
   #   -> Scenario: Offloaded blob round-trips with byte integrity
