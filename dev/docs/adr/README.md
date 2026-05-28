@@ -14,6 +14,13 @@ Document **important technical and architectural decisions** — context, trade-
 | [006](./006-redis-cluster-bullmq-hash-tags.md) | Redis cluster hash tags for BullMQ | Accepted |
 | [007](./007-event-sourcing-architecture.md) | Event sourcing architecture (fold/map projections) | Accepted |
 | [018](./018-form-validation-and-save.md) | Form validation and Save button behavior | Accepted |
+| [021](./021-transactional-outbox-for-stake-sensitive-dispatch.md) | Transactional outbox for stake-sensitive reactor dispatch | Accepted |
+| [022](./022-two-tier-dedup-triggersent-reactor-outbox.md) | Two-tier dedup: `TriggerSent` for match-claim, `ReactorOutbox` for dispatch state | Accepted |
+| [023](./023-groupqueue-wakeup-pattern-for-outbox.md) | GroupQueue wakeup pattern for outbox scheduling | Accepted |
+| [024](./024-withoutbox-pipeline-builder-primitive.md) | `.withOutbox` as a pipeline-builder primitive | Accepted |
+| [025](./025-notify-persistent-action-classification.md) | Notify vs persistent trigger action classification + per-trigger cadence | Accepted |
+| [026](./026-liquid-templates-for-trigger-notifications.md) | Liquid templates for user-customizable trigger notifications | Accepted |
+| [027](./027-typed-dispatcherror-contract.md) | Typed `DispatchError` contract for dispatch endpoints | Accepted |
 
 ## When to Write an ADR
 
