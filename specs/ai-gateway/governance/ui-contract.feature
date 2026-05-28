@@ -5,13 +5,12 @@ Feature: AI Gateway Governance — UI Contract (Lane B)
   log_records) with IngestionSource as origin metadata, hidden
   internal Governance Project per org as routing/tenancy artifact
   only, governance fold projections for derived KPIs/OCSF reads,
-  per-origin retention class on the unified store, cryptographic
-  tamper-evidence DEFERRED.
+  cryptographic tamper-evidence DEFERRED.
 
   This spec captures what the customer/admin sees in the UI and
   what they must NEVER see. Lane-A (Andre) owns the broader
   architecture/compliance/per-platform-mapping specs. Lane-S
-  (Sergey) owns the backend specs (folds, retention, event-log,
+  (Sergey) owns the backend specs (folds, event-log,
   receiver shapes). This file is the UI contract that constrains
   Lane-B implementation work after Sergey's data-layer cutover
   lands.
@@ -19,7 +18,6 @@ Feature: AI Gateway Governance — UI Contract (Lane B)
   Pairs with:
     - specs/ai-gateway/governance/unified-trace-substrate.feature   (Andre)
     - specs/ai-gateway/governance/governance-folds.feature           (Sergey)
-    - specs/ai-gateway/governance/per-origin-retention.feature       (Sergey)
     - specs/ai-gateway/governance/compliance-baseline.feature        (Andre)
     - specs/ai-gateway/governance/siem-ocsf-export.feature           (Andre)
     - specs/ai-gateway/governance/anomaly-detection.feature          (Sergey, updated)
@@ -51,7 +49,7 @@ Feature: AI Gateway Governance — UI Contract (Lane B)
     Given an IngestionSource "Cowork Production" exists
     When the admin navigates to "/settings/governance/ingestion-sources/<id>"
     Then the page renders the source's metadata (name, type, status,
-      retention class, recent volume)
+      recent volume)
     And the events tab below renders a single events feed mixing
       span-shape and log-shape rows from this source
     And no UI surface differentiates "this row is a span" vs "this row
@@ -168,28 +166,13 @@ Feature: AI Gateway Governance — UI Contract (Lane B)
             selection field
     When the admin opens the "Create ingestion source" composer at
       "/settings/governance/ingestion-sources/new"
-    Then the composer asks for: name, source type, per-platform config,
-      retention class
+    Then the composer asks for: name, source type, per-platform config
     And the composer does NOT ask the admin to select or assign a
       Project (the hidden Governance Project routing is done by the
       backend; it is never a user-facing field)
     And the composer does NOT mention "Governance Project" or
       "internal_governance" in any user-visible label, helper text,
       or tooltip
-
-  @bdd @ui @ui-contract @composer @retention
-  Scenario: The IngestionSource composer offers a retention class dropdown
-    When the admin opens the "Create ingestion source" composer
-    Then the composer renders a "Retention class" dropdown with options:
-      | option label                                          | value      |
-      | Operational (30 days)                                 | 30d        |
-      | Compliance (1 year)                                   | 1y         |
-      | Long-term audit (7 years, SOC2 / HIPAA / regulated)   | 7y         |
-    And the dropdown ceiling is enforced by the org's plan tier
-      (e.g. Free tier sees only "Operational"; Enterprise sees all three)
-    And the default selection is "Operational (30 days)"
-    And helper text reads "Determines how long events from this source
-      are retained on the LangWatch unified observability store."
 
   # ---------------------------------------------------------------------------
   # Reserved namespace — langwatch.governance.* is system-derived
@@ -203,7 +186,7 @@ Feature: AI Gateway Governance — UI Contract (Lane B)
       starts with "langwatch.governance."
     And helper text reads "The langwatch.governance.* namespace is
       reserved for system-derived attributes (anomaly_alert_id,
-      retention_class, etc.) and cannot be set by users."
+      etc.) and cannot be set by users."
     And langwatch.origin.* attributes are also reserved (same UX,
       same helper text), set by the receiver layer, not by users
 

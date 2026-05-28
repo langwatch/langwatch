@@ -63,24 +63,6 @@ export const SUPPORTED_SOURCE_TYPES: readonly SourceType[] = [
   "http_custom",
 ] as const;
 
-/** Canonical retention bucket values. Free-form string in the DB column
- *  for extensibility (matching IngestionSource.sourceType pattern); this
- *  constant is the source of truth in TS. CH TTL policy reads the value
- *  from `langwatch.governance.retention_class` at delete-time. */
-export const RETENTION_CLASSES = {
-  THIRTY_DAYS: "thirty_days",
-  ONE_YEAR: "one_year",
-  SEVEN_YEARS: "seven_years",
-} as const;
-export type RetentionClass =
-  (typeof RETENTION_CLASSES)[keyof typeof RETENTION_CLASSES];
-
-export const SUPPORTED_RETENTION_CLASSES: readonly RetentionClass[] = [
-  "thirty_days",
-  "one_year",
-  "seven_years",
-] as const;
-
 export interface CreateIngestionSourceInput {
   organizationId: string;
   teamId?: string | null;
@@ -88,7 +70,6 @@ export interface CreateIngestionSourceInput {
   name: string;
   description?: string | null;
   parserConfig?: Record<string, unknown>;
-  retentionClass?: RetentionClass;
   /**
    * Phase 10: opaque adapter config persisted on IngestionSource.pullConfig.
    * Worker resolves `pullConfig.adapter` through the pullerAdapterRegistry
@@ -108,7 +89,6 @@ export interface UpdateIngestionSourceInput {
   name?: string;
   description?: string | null;
   parserConfig?: Record<string, unknown>;
-  retentionClass?: RetentionClass;
   status?: "active" | "disabled" | "awaiting_first_event";
   teamId?: string | null;
 }
@@ -226,10 +206,6 @@ export class IngestionSourceService {
     if (!SUPPORTED_SOURCE_TYPES.includes(input.sourceType)) {
       throw new Error(`Unsupported sourceType: ${input.sourceType}`);
     }
-    const retentionClass = input.retentionClass ?? "thirty_days";
-    if (!SUPPORTED_RETENTION_CLASSES.includes(retentionClass)) {
-      throw new Error(`Unsupported retentionClass: ${retentionClass}`);
-    }
 
     // Lazy-ensure the hidden Governance Project on first source mint —
     // every IngestionSource for an org routes its events through this
@@ -265,7 +241,6 @@ export class IngestionSourceService {
         ingestSecretHash,
         parserConfig: mergedParserConfig as Prisma.InputJsonValue,
         pullSchedule: input.pullSchedule ?? null,
-        retentionClass,
         status: "awaiting_first_event",
         createdById: input.actorUserId,
       },
@@ -289,14 +264,6 @@ export class IngestionSourceService {
       data.parserConfig = encryptParserConfigCredentials(
         input.parserConfig,
       ) as Prisma.InputJsonValue;
-    }
-    if (input.retentionClass !== undefined) {
-      if (!SUPPORTED_RETENTION_CLASSES.includes(input.retentionClass)) {
-        throw new Error(
-          `Unsupported retentionClass: ${input.retentionClass}`,
-        );
-      }
-      data.retentionClass = input.retentionClass;
     }
     if (input.status !== undefined) data.status = input.status;
     if (input.teamId !== undefined) {

@@ -2073,19 +2073,6 @@ model IngestionSource {
   /// 'awaiting_first_event' (created but never received).
   status String @default("awaiting_first_event")
 
-  /// Per-origin retention class applied to every span/log emitted by
-  /// this source's events when they land in the unified observability
-  /// store (recorded_spans / log_records). Drives the CH TTL policy.
-  /// Values:
-  ///   - "thirty_days": operational debugging window (default)
-  ///   - "one_year":    compliance baseline (SOC2 / ISO 27001 / EU AI Act)
-  ///   - "seven_years": long-form audit (regulated industry)
-  /// Org plan ceiling enforced at the composer / API layer.
-  /// Stored as string for extensibility — the canonical set lives in
-  /// code (governance retention policy registry).
-  /// Spec: specs/ai-gateway/governance/retention.feature
-  retentionClass String @default("thirty_days")
-
   /// Last event timestamp observed (any direction). Surfaces in the
   /// admin UI as "last event 2 minutes ago".
   lastEventAt DateTime?

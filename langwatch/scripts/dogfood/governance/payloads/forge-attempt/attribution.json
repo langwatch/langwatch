@@ -19,7 +19,6 @@
           { "key": "langwatch.ingestion_source.id", "value": { "stringValue": "FORGE_isource_other" } },
           { "key": "langwatch.ingestion_source.source_type", "value": { "stringValue": "FORGE_stype" } },
           { "key": "langwatch.ingestion_source.organization_id", "value": { "stringValue": "FORGE_org_other" } },
-          { "key": "langwatch.governance.retention_class", "value": { "stringValue": "FORGE_retention" } },
           { "key": "langwatch.governance.anomaly_alert_id", "value": { "stringValue": "FORGE_alert_other" } }
         ]
       },
