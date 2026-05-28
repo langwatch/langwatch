@@ -170,12 +170,12 @@ beforeAll(async () => {
   teamId = team.id;
 
   const projA = projectFactory.build({ slug: `--so-files-proj-a-${nanoid(6)}` });
-  const createdA = await prisma.project.create({ data: { ...projA, teamId: team.id } });
+  const createdA = await prisma.project.create({ data: { ...projA, teamId: team.id, personalFeatures: {} } });
   projectAKey = createdA.apiKey;
   projectAId = createdA.id;
 
   const projB = projectFactory.build({ slug: `--so-files-proj-b-${nanoid(6)}` });
-  const createdB = await prisma.project.create({ data: { ...projB, teamId: team.id } });
+  const createdB = await prisma.project.create({ data: { ...projB, teamId: team.id, personalFeatures: {} } });
   projectBKey = createdB.apiKey;
   projectBId = createdB.id;
 });

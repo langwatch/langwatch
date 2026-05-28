@@ -31,7 +31,7 @@ describe("ModelProviderRepository Integration", () => {
   afterAll(async () => {
     if (createdProviderIds.length > 0) {
       await prisma.modelProvider.deleteMany({
-        where: { id: { in: createdProviderIds }, projectId },
+        where: { id: { in: createdProviderIds } },
       });
     }
   });
@@ -60,7 +60,7 @@ describe("ModelProviderRepository Integration", () => {
 
         // Read raw from prisma to verify DB value is encrypted
         const rawRow = await prisma.modelProvider.findFirst({
-          where: { id: created.id, projectId },
+          where: { id: created.id },
           select: { customKeys: true },
         });
 
@@ -83,7 +83,6 @@ describe("ModelProviderRepository Integration", () => {
         await prisma.modelProvider.create({
           data: {
             id,
-            projectId,
             name: "Azure OpenAI",
             provider: "azure",
             enabled: true,
@@ -141,7 +140,6 @@ describe("ModelProviderRepository Integration", () => {
         await prisma.modelProvider.create({
           data: {
             id: plaintextId,
-            projectId,
             name: "Cohere",
             provider: "cohere",
             enabled: true,
@@ -160,7 +158,6 @@ describe("ModelProviderRepository Integration", () => {
         await prisma.modelProvider.create({
           data: {
             id: nullId,
-            projectId,
             name: "Mistral",
             provider: "mistral",
             enabled: true,
@@ -214,7 +211,7 @@ describe("ModelProviderRepository Integration", () => {
         // Verify raw DB: non-null customKeys are now encrypted strings
         for (const id of migrationIds) {
           const raw = await prisma.modelProvider.findFirst({
-            where: { id, projectId },
+            where: { id },
             select: { customKeys: true },
           });
 

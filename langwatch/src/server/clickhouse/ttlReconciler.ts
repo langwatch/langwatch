@@ -12,7 +12,42 @@ export interface TableTTLEntry {
   ttlColumnExpression?: string;
   envVar: string;
   hardcodedDefault: number;
+  /**
+   * If true, the desired TTL expression is COMBINED: cold-storage
+   * MOVE clause + per-class DELETE clauses keyed off RetentionClass.
+   * This preserves the per-class retention TTL (migration 00022)
+   * when the reconciler runs on cold-storage-enabled installs.
+   *
+   * Used by stored_spans + stored_log_records, both of which carry
+   * the RetentionClass column populated by the trace pipeline write
+   * path (3c-ii) from the `langwatch.governance.retention_class`
+   * span/log attribute stamped by the receiver.
+   *
+   * Spec: specs/ai-gateway/governance/retention.feature.
+   */
+  preservePerClassRetention?: boolean;
+  /**
+   * Column reference used in the per-class DELETE TTL WHERE expressions.
+   * Defaults to ttlColumn. Override for tables where the TTL column is
+   * not a Date/DateTime (e.g. stored_log_records uses TimeUnixMs which
+   * is already DateTime64 — no override needed).
+   */
+  retentionTimeColumn?: string;
 }
+
+/**
+ * Per-class retention windows. Mirrors the IngestionSource.retentionClass
+ * enum in Postgres + the migration 00022 TTL clauses. Single source of
+ * truth in code; if these change the migration must update too.
+ */
+const PER_CLASS_RETENTION: ReadonlyArray<{
+  className: string;
+  intervalSql: string;
+}> = [
+  { className: "thirty_days", intervalSql: "INTERVAL 30 DAY" },
+  { className: "one_year", intervalSql: "INTERVAL 1 YEAR" },
+  { className: "seven_years", intervalSql: "INTERVAL 7 YEAR" },
+];
 
 /**
  * Single source of truth for table TTL configuration.
@@ -73,6 +108,7 @@ export const TABLE_TTL_CONFIG: readonly TableTTLEntry[] = [
     ttlColumn: "TimeUnixMs",
     envVar: "CLICKHOUSE_COLD_STORAGE_LOG_RECORDS_TTL_DAYS",
     hardcodedDefault: 49,
+    preservePerClassRetention: true,
   },
   {
     table: "stored_metric_records",
@@ -85,6 +121,9 @@ export const TABLE_TTL_CONFIG: readonly TableTTLEntry[] = [
     ttlColumn: "EndTime",
     envVar: "CLICKHOUSE_COLD_STORAGE_SPANS_TTL_DAYS",
     hardcodedDefault: 49,
+    preservePerClassRetention: true,
+    // Per-class DELETE clauses key off StartTime (matches migration 00022).
+    retentionTimeColumn: "StartTime",
   },
   {
     table: "trace_summaries",
@@ -144,6 +183,13 @@ export function parseTTLDaysFromEngineMetadata(
 
 /**
  * Builds the desired TTL SQL expression for a table.
+ *
+ * For tables with `preservePerClassRetention: true`, emits a combined
+ * TTL: cold-storage MOVE clause + 3 per-class DELETE clauses
+ * (thirty_days / one_year / seven_years). This is the Option-Y fix
+ * for the cold-storage / migration-00022 conflict — the reconciler
+ * preserves the per-class DELETE TTL (migration 00022) when applying
+ * cold-storage MOVE TTL on cold-storage-enabled installs.
  */
 export function buildDesiredTTLExpression({
   config,
@@ -153,7 +199,16 @@ export function buildDesiredTTLExpression({
   days: number;
 }): string {
   const colExpr = config.ttlColumnExpression ?? `toDateTime(${config.ttlColumn})`;
-  return `${colExpr} + INTERVAL ${days} DAY TO VOLUME 'cold'`;
+  const coldMoveClause = `${colExpr} + INTERVAL ${days} DAY TO VOLUME 'cold'`;
+  if (!config.preservePerClassRetention) {
+    return coldMoveClause;
+  }
+  const retentionTimeCol = config.retentionTimeColumn ?? config.ttlColumn;
+  const perClassClauses = PER_CLASS_RETENTION.map(
+    ({ className, intervalSql }) =>
+      `${retentionTimeCol} + ${intervalSql} DELETE WHERE RetentionClass = '${className}'`,
+  );
+  return [coldMoveClause, ...perClassClauses].join(", ");
 }
 
 interface ReconcileOptions {
@@ -249,7 +304,20 @@ export async function reconcileTTL(
       const desiredDays = resolveHotDays(tableConfig);
       const currentDays = parseTTLDaysFromEngineMetadata(engineFull);
 
-      if (currentDays === desiredDays) {
+      // For per-class-retention tables, also verify the 3 DELETE clauses
+      // are present in current engine metadata. If any are missing the
+      // table's TTL was clobbered (e.g. by an older reconciler run on a
+      // pre-migration-00022 schema) and we need to rebuild.
+      const perClassMissing = tableConfig.preservePerClassRetention
+        ? !PER_CLASS_RETENTION.every(({ className }) =>
+            new RegExp(
+              `RetentionClass\\s*=\\s*'${className}'`,
+              "i",
+            ).test(engineFull),
+          )
+        : false;
+
+      if (currentDays === desiredDays && !perClassMissing) {
         skippedCount++;
         if (options.verbose) {
           logger.debug(

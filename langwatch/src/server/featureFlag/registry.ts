@@ -139,6 +139,20 @@ export const FEATURE_FLAGS = [
     defaultValue: false,
     description: "Reveals the AI Gateway menu in the project sidebar.",
   },
+  {
+    key: "release_ui_ai_governance_enabled",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Gates the personal keys, admin oversight, RoutingPolicy, and IngestionSource UI surfaces. Distinct from release_ui_ai_gateway_menu_enabled — the existing gateway product ships unblocked while governance keeps cooking.",
+  },
+  {
+    key: "release_ui_traces_v2_enabled",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Enables the traces v2 surface (new drawer, lens-based saved views, interactive error chip popover). Per-device opt-in is layered on top via langwatch:traces-v2:* localStorage keys.",
+  },
 ] as const satisfies readonly FeatureFlagDefinition[];
 
 export const FEATURE_FLAG_FAMILIES = [

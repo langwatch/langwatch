@@ -48,6 +48,7 @@ describe("Scenarios API", () => {
       data: {
         ...testProject,
         teamId: testTeam.id,
+        personalFeatures: {},
       },
     });
 

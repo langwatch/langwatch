@@ -3,7 +3,7 @@ title: "Liquid Template Syntax"
 description: "Reference for the Liquid template syntax supported in LangWatch prompts: variables, conditionals, loops, filters, and more."
 ---
 
-LangWatch prompts use [Liquid](https://liquidjs.com/) as their template language — a more powerful alternative to Jinja-style templating with a cleaner syntax. If you're coming from Jinja2, you'll find Liquid familiar but with better support for filters, strict compilation modes, and safe rendering out of the box.
+LangWatch prompts use [Liquid](https://liquidjs.com/) as their template language, a more powerful alternative to Jinja-style templating with a cleaner syntax. If you're coming from Jinja2, you'll find Liquid familiar but with better support for filters, strict compilation modes, and safe rendering out of the box.
 
 Liquid gives you variables, conditionals, loops, and filters so you can build dynamic prompts without custom code.
 
@@ -46,7 +46,7 @@ The variables available depend on how you invoke the prompt:
 
 Control which parts of a prompt appear based on runtime values.
 
-### if / elsif / else
+### if, elsif, else
 
 ```liquid
 {% if tone == "formal" %}Dear {{ user_name }},{% elsif tone == "friendly" %}Hey {{ user_name }}!{% else %}Hello,{% endif %}
@@ -268,7 +268,7 @@ Include retrieved context only when it exists:
 The SDKs offer two compilation modes:
 
 - **`compile()`** -- Lenient. Undefined variables resolve to empty strings and missing conditions evaluate to false. Useful for optional fields.
-- **`compileStrict()`** (TypeScript) / **`compile_strict()`** (Python) -- Strict. Throws a `PromptCompilationError` if any variable used in the template is not provided. Use this to catch typos and missing data early.
+- **`compileStrict()`** (TypeScript), **`compile_strict()`** (Python) -- Strict. Throws a `PromptCompilationError` if any variable used in the template is not provided. Use this to catch typos and missing data early.
 
 ```python
 # Python - strict mode catches missing variables

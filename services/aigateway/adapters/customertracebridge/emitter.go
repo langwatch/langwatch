@@ -118,13 +118,28 @@ func (e *Emitter) EndSpan(ctx context.Context, params domain.AITraceParams) {
 		return
 	}
 
+	// PromptTokens includes any cached tokens; the span reports the fresh,
+	// non-cached input separately from the cache-read/cache-write counts so the
+	// cost calc prices each bucket once. Fall back to the full prompt if a
+	// provider ever reports cache counts that aren't folded into PromptTokens.
+	freshInput := params.Usage.PromptTokens - params.Usage.CacheReadTokens - params.Usage.CacheCreationTokens
+	if freshInput < 0 {
+		freshInput = params.Usage.PromptTokens
+	}
+
 	attrs := []attribute.KeyValue{
 		semconv.GenAIProviderNameKey.String(string(params.ProviderID)),
 		semconv.GenAIRequestModelKey.String(params.Model),
-		semconv.GenAIUsageInputTokensKey.Int(params.Usage.PromptTokens),
+		semconv.GenAIUsageInputTokensKey.Int(freshInput),
 		semconv.GenAIUsageOutputTokensKey.Int(params.Usage.CompletionTokens),
 		attrTotalUsage.Int(params.Usage.TotalTokens),
 		attrCost.Int64(params.Usage.CostMicroUSD),
+	}
+	if params.Usage.CacheReadTokens > 0 {
+		attrs = append(attrs, attribute.Int(gatewaytracer.AttrGenAIUsageCacheRead, params.Usage.CacheReadTokens))
+	}
+	if params.Usage.CacheCreationTokens > 0 {
+		attrs = append(attrs, attribute.Int(gatewaytracer.AttrGenAIUsageCacheCreate, params.Usage.CacheCreationTokens))
 	}
 	// VK id + request id let the control plane's trace-processing pipeline
 	// identify gateway traces and fold idempotent budget debits into ClickHouse.

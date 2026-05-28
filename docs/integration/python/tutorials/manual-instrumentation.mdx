@@ -82,7 +82,7 @@ Key points for manual instrumentation with context managers:
 - Use `with langwatch.trace(...)` or `async with langwatch.trace(...)` to start a trace.
 - Use `with langwatch.span(...)` or `async with langwatch.span(...)` inside a trace block to create nested spans.
 - The trace or span object is available in the `as trace:` or `as span:` part of the `with` statement.
-- Use methods like `span.add_event()`, and primarily `span.update(...)` / `trace.update(...)` to add details. The `update()` method is flexible for adding structured data like `input`, `output`, `metadata`, and `contexts`.
+- Use methods like `span.add_event()`, and primarily `span.update(...)`, `trace.update(...)` to add details. The `update()` method is flexible for adding structured data like `input`, `output`, `metadata`, and `contexts`.
 - This approach gives explicit control over the start and end of each instrumented block, as the context manager handles ending the span automatically.
 
 ### Direct Span Creation (`span.end()`)

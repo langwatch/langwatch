@@ -65,6 +65,7 @@ describe("Feature: Suites REST API", () => {
       data: {
         ...testProject,
         teamId: testTeam.id,
+        personalFeatures: {},
       },
     });
 

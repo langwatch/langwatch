@@ -1,239 +1,252 @@
 /**
- * tRPC router for the AI Gateway virtual-keys surface. UI calls these
- * procedures; the service layer runs in `~/server/gateway/virtualKey.service`.
+ * tRPC router for AI Gateway virtual keys.
  *
- * RBAC: every procedure guards on a project-scoped permission. Routes never
- * talk to the repository directly — they go through the service.
+ * Org-scoped (iter 110). Every procedure takes `organizationId` as the
+ * tenant key and gates on `virtualKeys:view` / `virtualKeys:manage` /
+ * `virtualKeys:rotate` / `virtualKeys:delete` at the organization
+ * scope. Per-scope enforcement (a caller can only create a VK at
+ * scopes where they hold `virtualKeys:manage`) lives in the service
+ * layer via `assertCanManageScopes`. Tier 2 lane A1 of the
+ * VK + ModelProvider refactor.
+ *
+ * Reads return the camel-cased DTO (`toVirtualKeyCamelDto`) — the
+ * `scopes[]` array + `routingPolicyId` carry the new eligible-provider
+ * derivation; the legacy `providerCredentialIds`/`providerChain`
+ * fields are no longer surfaced.
  */
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
+import type { PrismaClient } from "@prisma/client";
+
+import type { Session } from "~/server/auth";
+
 import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
-import { virtualKeyConfigSchema } from "~/server/gateway/virtualKey.config";
 import {
-  type EnrichedChainEntry,
-  toVirtualKeyCamelDto,
-} from "~/server/gateway/virtualKey.dto";
-import type { VirtualKeyWithChain } from "~/server/gateway/virtualKey.repository";
-import { checkProjectPermission } from "../rbac";
+  virtualKeyConfigSchema,
+  type GuardrailAttachment,
+} from "~/server/gateway/virtualKey.config";
+import { toVirtualKeyCamelDto } from "~/server/gateway/virtualKey.dto";
+
+import { checkOrganizationPermission, hasProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
-async function resolveOrganizationForProject(
-  ctx: { prisma: import("@prisma/client").PrismaClient },
-  projectId: string,
-) {
-  const project = await ctx.prisma.project.findUnique({
-    where: { id: projectId },
-    include: { team: true },
-  });
-  if (!project) {
-    throw new TRPCError({
-      code: "NOT_FOUND",
-      message: `Project ${projectId} not found`,
+const scopeInputSchema = z.object({
+  scopeType: z.enum(["ORGANIZATION", "TEAM", "PROJECT"]),
+  scopeId: z.string().min(1),
+});
+
+const idInput = z.object({ organizationId: z.string(), id: z.string() });
+
+/**
+ * Resolve the single PROJECT scope a VK is reachable from. Guardrails are
+ * project-scoped, so a VK can only attach guardrails from this one
+ * project (its trace project). Returns null when the VK has zero or more
+ * than one PROJECT scope — neither has a well-defined guardrail surface.
+ */
+async function resolveVkProjectId(
+  prisma: PrismaClient,
+  organizationId: string,
+  vkId: string | null,
+  inputScopes: { scopeType: string; scopeId: string }[] | undefined,
+): Promise<string | null> {
+  let scopes = inputScopes;
+  if (!scopes && vkId) {
+    const vk = await prisma.virtualKey.findFirst({
+      where: { id: vkId, organizationId },
+      select: { scopes: { select: { scopeType: true, scopeId: true } } },
     });
+    scopes = vk?.scopes;
   }
-  return { projectId: project.id, organizationId: project.team.organizationId };
+  const projectScopes = (scopes ?? []).filter((s) => s.scopeType === "PROJECT");
+  return projectScopes.length === 1 ? projectScopes[0]!.scopeId : null;
 }
 
-const idInput = z.object({ projectId: z.string(), id: z.string() });
+/**
+ * Validate guardrail attachments before handing off to the service:
+ *   - every referenced guardrail must belong to the VK's own project
+ *     (guardrails are project-scoped; the materialiser only ships the
+ *     VK trace-project's guardrails) — else BAD_REQUEST
+ *     `guardrail_project_mismatch`.
+ *   - the actor must hold `gatewayGuardrails:attach` on that project —
+ *     else FORBIDDEN `missing_perm:gatewayGuardrails:attach`.
+ *
+ * Spec: specs/ai-gateway/governance/guardrails-project-scope.feature
+ *       — @cross-project + @rbac scenarios.
+ */
+async function assertGuardrailAttachmentsAllowed(
+  ctx: { prisma: PrismaClient; session: Session | null },
+  vkProjectId: string | null,
+  attachments: GuardrailAttachment[] | undefined,
+): Promise<void> {
+  const referencedIds = Array.from(
+    new Set((attachments ?? []).flatMap((a) => a.guardrailIds)),
+  );
+  if (referencedIds.length === 0) return;
+
+  if (!vkProjectId) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message:
+        "guardrail_project_mismatch: virtual key is not scoped to a single project",
+    });
+  }
+
+  // Scope the lookup to the VK's own project. Any referenced guardrail
+  // that belongs to a different project (or doesn't exist) is simply
+  // absent from the result, so the membership check below rejects it.
+  // Scoping by projectId also satisfies the multitenancy middleware.
+  const rows = await ctx.prisma.gatewayGuardrail.findMany({
+    where: { id: { in: referencedIds }, projectId: vkProjectId },
+    select: { id: true },
+  });
+  const foundIds = new Set(rows.map((r) => r.id));
+
+  for (const id of referencedIds) {
+    if (!foundIds.has(id)) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: `guardrail_project_mismatch: guardrail ${id} is not in the virtual key's project`,
+      });
+    }
+  }
+
+  const allowed = await hasProjectPermission(
+    ctx,
+    vkProjectId,
+    "gatewayGuardrails:attach",
+  );
+  if (!allowed) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "missing_perm:gatewayGuardrails:attach",
+    });
+  }
+}
 
 export const virtualKeysRouter = createTRPCRouter({
   list: protectedProcedure
-    .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("virtualKeys:view"))
+    .input(z.object({ organizationId: z.string() }))
+    .use(checkOrganizationPermission("virtualKeys:view"))
     .query(async ({ ctx, input }) => {
       const service = VirtualKeyService.create(ctx.prisma);
-      const keys = await service.getAll(input.projectId);
-      // Batch-enrich all chains in one query for the whole list so
-      // rows can render provider-type icons without an N+1. One
-      // findMany over GatewayProviderCredential, grouped client-side.
-      const enrichedByVk = await enrichChainsForList(ctx.prisma, keys);
-      return keys.map((vk) => toVirtualKeyCamelDto(vk, enrichedByVk.get(vk.id) ?? []));
+      const keys = await service.getAll(input.organizationId);
+      return keys.map(toVirtualKeyCamelDto);
     }),
 
   get: protectedProcedure
     .input(idInput)
-    .use(checkProjectPermission("virtualKeys:view"))
+    .use(checkOrganizationPermission("virtualKeys:view"))
     .query(async ({ ctx, input }) => {
       const service = VirtualKeyService.create(ctx.prisma);
-      const vk = await service.getById(input.id, input.projectId);
+      const vk = await service.getById(input.id, input.organizationId);
       if (!vk) {
         throw new TRPCError({ code: "NOT_FOUND" });
       }
-      const enriched = await enrichChain(ctx.prisma, vk);
-      return toVirtualKeyCamelDto(vk, enriched);
+      return toVirtualKeyCamelDto(vk);
     }),
 
   create: protectedProcedure
     .input(
       z.object({
-        projectId: z.string(),
+        organizationId: z.string(),
         name: z.string().min(1).max(128),
         description: z.string().optional(),
-        environment: z.enum(["live", "test"]).default("live"),
         principalUserId: z.string().nullable().optional(),
-        providerCredentialIds: z.array(z.string()).min(1),
+        scopes: z.array(scopeInputSchema).min(1),
+        routingPolicyId: z.string().nullable().optional(),
         config: virtualKeyConfigSchema.partial().optional(),
       }),
     )
-    .use(checkProjectPermission("virtualKeys:create"))
+    .use(checkOrganizationPermission("virtualKeys:manage"))
     .mutation(async ({ ctx, input }) => {
-      const { organizationId } = await resolveOrganizationForProject(
+      const vkProjectId = await resolveVkProjectId(
+        ctx.prisma,
+        input.organizationId,
+        null,
+        input.scopes,
+      );
+      await assertGuardrailAttachmentsAllowed(
         ctx,
-        input.projectId,
+        vkProjectId,
+        input.config?.guardrailAttachments,
       );
       const service = VirtualKeyService.create(ctx.prisma);
       const { virtualKey, secret } = await service.create({
-        projectId: input.projectId,
-        organizationId,
+        organizationId: input.organizationId,
         name: input.name,
         description: input.description ?? null,
-        environment: input.environment,
         principalUserId: input.principalUserId ?? null,
-        providerCredentialIds: input.providerCredentialIds,
-        actorUserId: ctx.session.user.id,
+        scopes: input.scopes,
+        routingPolicyId: input.routingPolicyId ?? null,
         config: input.config,
+        actorUserId: ctx.session.user.id,
       });
-      return { virtualKey: toDetail(virtualKey), secret };
+      return { virtualKey: toVirtualKeyCamelDto(virtualKey), secret };
     }),
 
   update: protectedProcedure
     .input(
       z.object({
-        projectId: z.string(),
+        organizationId: z.string(),
         id: z.string(),
         name: z.string().min(1).max(128).optional(),
         description: z.string().nullable().optional(),
-        providerCredentialIds: z.array(z.string()).min(1).optional(),
+        scopes: z.array(scopeInputSchema).min(1).optional(),
+        routingPolicyId: z.string().nullable().optional(),
         config: virtualKeyConfigSchema.partial().optional(),
       }),
     )
-    .use(checkProjectPermission("virtualKeys:update"))
+    .use(checkOrganizationPermission("virtualKeys:manage"))
     .mutation(async ({ ctx, input }) => {
-      const { organizationId } = await resolveOrganizationForProject(
+      const vkProjectId = await resolveVkProjectId(
+        ctx.prisma,
+        input.organizationId,
+        input.id,
+        input.scopes,
+      );
+      await assertGuardrailAttachmentsAllowed(
         ctx,
-        input.projectId,
+        vkProjectId,
+        input.config?.guardrailAttachments,
       );
       const service = VirtualKeyService.create(ctx.prisma);
       const updated = await service.update({
         id: input.id,
-        projectId: input.projectId,
-        organizationId,
-        actorUserId: ctx.session.user.id,
+        organizationId: input.organizationId,
         name: input.name,
         description: input.description,
-        providerCredentialIds: input.providerCredentialIds,
+        scopes: input.scopes,
+        routingPolicyId: input.routingPolicyId,
         config: input.config,
+        actorUserId: ctx.session.user.id,
       });
-      return toDetail(updated);
+      return toVirtualKeyCamelDto(updated);
     }),
 
   rotate: protectedProcedure
     .input(idInput)
-    .use(checkProjectPermission("virtualKeys:rotate"))
+    .use(checkOrganizationPermission("virtualKeys:rotate"))
     .mutation(async ({ ctx, input }) => {
-      const { organizationId } = await resolveOrganizationForProject(
-        ctx,
-        input.projectId,
-      );
       const service = VirtualKeyService.create(ctx.prisma);
       const { virtualKey, secret } = await service.rotate({
         id: input.id,
-        projectId: input.projectId,
-        organizationId,
+        organizationId: input.organizationId,
         actorUserId: ctx.session.user.id,
       });
-      return { virtualKey: toDetail(virtualKey), secret };
+      return { virtualKey: toVirtualKeyCamelDto(virtualKey), secret };
     }),
 
   revoke: protectedProcedure
     .input(idInput)
-    .use(checkProjectPermission("virtualKeys:update"))
+    .use(checkOrganizationPermission("virtualKeys:delete"))
     .mutation(async ({ ctx, input }) => {
-      const { organizationId } = await resolveOrganizationForProject(
-        ctx,
-        input.projectId,
-      );
       const service = VirtualKeyService.create(ctx.prisma);
       const updated = await service.revoke({
         id: input.id,
-        projectId: input.projectId,
-        organizationId,
+        organizationId: input.organizationId,
         actorUserId: ctx.session.user.id,
       });
-      return toDetail(updated);
+      return toVirtualKeyCamelDto(updated);
     }),
 });
-
-// List rows don't render the enriched chain — they show a compact
-// "fallback chain length" badge — so we keep the empty-chain shape
-// for performance (no N×2 joins on list pagination). Detail view
-// calls enrichChain() explicitly.
-const toListItem = toVirtualKeyCamelDto;
-const toDetail = toVirtualKeyCamelDto;
-
-async function enrichChainsForList(
-  prisma: import("@prisma/client").PrismaClient,
-  vks: VirtualKeyWithChain[],
-): Promise<Map<string, EnrichedChainEntry[]>> {
-  const allIds = new Set<string>();
-  for (const vk of vks) {
-    for (const pc of vk.providerCredentials) {
-      allIds.add(pc.providerCredentialId);
-    }
-  }
-  if (allIds.size === 0 || vks.length === 0) return new Map();
-  const projectId = vks[0]!.projectId;
-  const rows = await prisma.gatewayProviderCredential.findMany({
-    where: { projectId, id: { in: [...allIds] } },
-    select: {
-      id: true,
-      slot: true,
-      modelProvider: { select: { provider: true } },
-    },
-  });
-  const byId = new Map(rows.map((r) => [r.id, r]));
-  const result = new Map<string, EnrichedChainEntry[]>();
-  for (const vk of vks) {
-    const entries: EnrichedChainEntry[] = [];
-    vk.providerCredentials.forEach((pc, idx) => {
-      const row = byId.get(pc.providerCredentialId);
-      if (!row) return;
-      entries.push({
-        providerCredentialId: pc.providerCredentialId,
-        slot: row.slot ?? (idx === 0 ? "primary" : `fallback-${idx}`),
-        providerType: row.modelProvider.provider,
-      });
-    });
-    result.set(vk.id, entries);
-  }
-  return result;
-}
-
-async function enrichChain(
-  prisma: import("@prisma/client").PrismaClient,
-  vk: VirtualKeyWithChain,
-): Promise<EnrichedChainEntry[]> {
-  const ids = vk.providerCredentials.map((pc) => pc.providerCredentialId);
-  if (ids.length === 0) return [];
-  const rows = await prisma.gatewayProviderCredential.findMany({
-    where: { projectId: vk.projectId, id: { in: ids } },
-    select: {
-      id: true,
-      slot: true,
-      modelProvider: { select: { provider: true } },
-    },
-  });
-  const byId = new Map(rows.map((r) => [r.id, r]));
-  return vk.providerCredentials
-    .map((pc, idx): EnrichedChainEntry | null => {
-      const row = byId.get(pc.providerCredentialId);
-      if (!row) return null;
-      return {
-        providerCredentialId: pc.providerCredentialId,
-        slot: row.slot ?? (idx === 0 ? "primary" : `fallback-${idx}`),
-        providerType: row.modelProvider.provider,
-      };
-    })
-    .filter((e): e is EnrichedChainEntry => e !== null);
-}

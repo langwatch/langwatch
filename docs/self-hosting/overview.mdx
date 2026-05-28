@@ -49,13 +49,13 @@ See [Architecture & Infrastructure](/self-hosting/infrastructure/architecture) f
 
 <CardGroup cols={2}>
 <Card title="LangWatch Cloud" icon="cloud">
-Fully managed by the LangWatch team. No infrastructure to manage — sign up and start sending traces in minutes.
+Fully managed by the LangWatch team. No infrastructure to manage, sign up and start sending traces in minutes.
 
 [Sign up at langwatch.ai](https://langwatch.ai)
 </Card>
 
 <Card title="Self-Managed" icon="server">
-Deploy the complete LangWatch stack on your own infrastructure — AWS, Azure, GCP, or bare metal. You manage everything: compute, databases, and storage. Full data sovereignty.
+Deploy the complete LangWatch stack on your own infrastructure, AWS, Azure, GCP, or bare metal. You manage everything: compute, databases, and storage. Full data sovereignty.
 
 [Get started with Kubernetes](/self-hosting/deployment/kubernetes-helm)
 </Card>
@@ -67,7 +67,7 @@ LangWatch manages the application. Your data lives on exclusive, dedicated insta
 </Card>
 
 <Card title="Hybrid" icon="arrows-split-up-and-left">
-LangWatch manages the control plane (App, Workers, NLP, LangEvals). You provide the data plane — ClickHouse and S3 in your VPC. Your trace data never leaves your network.
+LangWatch manages the control plane (App, Workers, NLP, LangEvals). You provide the data plane, ClickHouse and S3 in your VPC. Your trace data never leaves your network.
 
 [Learn more](/hybrid-setup/overview)
 </Card>
@@ -93,7 +93,7 @@ Choose the deployment method that fits your environment.
     icon="docker"
     href="/self-hosting/deployment/docker-compose"
   >
-    Quick local setup with Docker. Coming soon for v3 — currently available for v2.
+    Quick local setup with Docker. Coming soon for v3, currently available for v2.
   </Card>
   <Card
     title="Kubernetes (Helm)"
@@ -123,8 +123,8 @@ Choose the deployment method that fits your environment.
 - **Native ClickHouse backup/restore** simplifies disaster recovery without third-party tooling.
 - **Auto-tuned ClickHouse** via the `clickhouse-serverless` subchart adapts resource allocation to your workload.
 - **Composable Helm chart overlays** let you customize deployments without forking the chart.
-- **Deep OpenTelemetry integration** — ingest traces via OTLP, export platform metrics and logs via OTel for infrastructure monitoring.
-- **AI Gateway sub-chart** (optional) — terminate LLM traffic on your own perimeter with virtual keys, hierarchical budgets, multi-provider routing, guardrails, and prompt caching. Same Helm install, opt in via `gateway.enabled=true`. See [AI Gateway → Self-hosting](/ai-gateway/self-hosting/helm).
+- **Deep OpenTelemetry integration**: ingest traces via OTLP, export platform metrics and logs via OTel for infrastructure monitoring.
+- **AI Gateway sub-chart** (optional), terminate LLM traffic on your own perimeter with virtual keys, hierarchical budgets, multi-provider routing, guardrails, and prompt caching. Same Helm install, opt in via `gateway.enabled=true`. See [AI Gateway → Self-hosting](/ai-gateway/self-hosting/helm).
 
 ## Enterprise
 
@@ -132,7 +132,7 @@ For Cloud Enterprise or Hybrid deployments, [contact the LangWatch team](https:/
 
 Enterprise capabilities include:
 
-- **SSO / SCIM** -- integrate with your identity provider for seamless user provisioning
+- **SSO, SCIM** -- integrate with your identity provider for seamless user provisioning
 - **Role-based access control** -- fine-grained permissions across projects and teams
 - **Audit logs** -- full visibility into who did what and when
 - **Priority support** -- dedicated engineering assistance and SLA-backed response times

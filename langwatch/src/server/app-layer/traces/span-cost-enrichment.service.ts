@@ -2,6 +2,7 @@ import type { PrismaClient } from "@prisma/client";
 import { matchModelCostWithFallbacks } from "~/server/background/workers/collector/cost";
 import type { MaybeStoredLLMModelCost } from "~/server/modelProviders/llmModelCost";
 import type { OtlpSpan } from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
+import { ATTR_KEYS } from "./canonicalisation/extractors/_constants";
 import { extractModelName } from "./utils/spanModel";
 
 /**
@@ -41,6 +42,8 @@ export function createCostEnrichmentDeps(
         regex: r.regex,
         inputCostPerToken: r.inputCostPerToken ?? undefined,
         outputCostPerToken: r.outputCostPerToken ?? undefined,
+        cacheReadCostPerToken: r.cacheReadCostPerToken ?? undefined,
+        cacheCreationCostPerToken: r.cacheCreationCostPerToken ?? undefined,
         updatedAt: r.updatedAt,
         createdAt: r.createdAt,
       }));
@@ -84,14 +87,30 @@ export class OtlpSpanCostEnrichmentService {
 
     span.attributes.push(
       {
-        key: "langwatch.model.inputCostPerToken",
+        key: ATTR_KEYS.LANGWATCH_MODEL_INPUT_COST_PER_TOKEN,
         value: { doubleValue: matched.inputCostPerToken ?? 0 },
       },
       {
-        key: "langwatch.model.outputCostPerToken",
+        key: ATTR_KEYS.LANGWATCH_MODEL_OUTPUT_COST_PER_TOKEN,
         value: { doubleValue: matched.outputCostPerToken ?? 0 },
       },
     );
+
+    // Only emit cache-rate overrides when the custom cost defines them, so a
+    // model without an explicit cache rate keeps falling back to the input
+    // rate in the fold projection rather than being priced at zero.
+    if (matched.cacheReadCostPerToken != null) {
+      span.attributes.push({
+        key: ATTR_KEYS.LANGWATCH_MODEL_CACHE_READ_COST_PER_TOKEN,
+        value: { doubleValue: matched.cacheReadCostPerToken },
+      });
+    }
+    if (matched.cacheCreationCostPerToken != null) {
+      span.attributes.push({
+        key: ATTR_KEYS.LANGWATCH_MODEL_CACHE_CREATION_COST_PER_TOKEN,
+        value: { doubleValue: matched.cacheCreationCostPerToken },
+      });
+    }
   }
 
 }

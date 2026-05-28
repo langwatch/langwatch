@@ -17,11 +17,11 @@ When using the Helm chart, you rarely need to set environment variables directly
 
 | Variable | Description | Required | Default |
 |----------|-------------|----------|---------|
-| `DATABASE_URL` | PostgreSQL connection string | Yes | — |
-| `CLICKHOUSE_URL` | ClickHouse HTTP connection string (e.g. `http://user:pass@host:8123/langwatch`) | Yes | — |
-| `REDIS_URL` | Redis connection string | Yes | — |
+| `DATABASE_URL` | PostgreSQL connection string | Yes |, |
+| `CLICKHOUSE_URL` | ClickHouse HTTP connection string (e.g. `http://user:pass@host:8123/langwatch`) | Yes |, |
+| `REDIS_URL` | Redis connection string | Yes |, |
 | `NODE_ENV` | Environment (`production`, `development`) | No | `production` |
-| `BASE_HOST` | Internal base URL for the application | Yes | — |
+| `BASE_HOST` | Internal base URL for the application | Yes |, |
 | `NEXTAUTH_URL` | Public URL for authentication callbacks | Yes | Same as `BASE_HOST` |
 | `START_WORKERS` | Run workers in-process (`true`/`false`) | No | `false` |
 
@@ -140,18 +140,18 @@ When running on AWS with IRSA (IAM Roles for Service Accounts), you don't need t
 |----------|-------------|---------|
 | `EMAIL_ENABLED` | Enable email notifications | `false` |
 | `EMAIL_PROVIDER` | Email provider (`sendgrid`) | `sendgrid` |
-| `SENDGRID_API_KEY` | SendGrid API key | — |
-| `EMAIL_DEFAULT_FROM` | Default "from" address | — |
+| `SENDGRID_API_KEY` | SendGrid API key |, |
+| `EMAIL_DEFAULT_FROM` | Default "from" address |, |
 
 ## Evaluator Providers
 
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `AZURE_OPENAI_EVALUATOR_ENABLED` | Enable Azure OpenAI for evaluations | `false` |
-| `AZURE_OPENAI_EVALUATOR_ENDPOINT` | Azure OpenAI endpoint URL | — |
-| `AZURE_OPENAI_EVALUATOR_API_KEY` | Azure OpenAI API key | — |
+| `AZURE_OPENAI_EVALUATOR_ENDPOINT` | Azure OpenAI endpoint URL |, |
+| `AZURE_OPENAI_EVALUATOR_API_KEY` | Azure OpenAI API key |, |
 | `GOOGLE_EVALUATOR_ENABLED` | Enable Google AI for evaluations (PII detection) | `false` |
-| `GOOGLE_CREDENTIALS_JSON` | Google service account credentials JSON | — |
+| `GOOGLE_CREDENTIALS_JSON` | Google service account credentials JSON |, |
 
 ## Feature Flags
 
@@ -166,8 +166,8 @@ When running on AWS with IRSA (IAM Roles for Service Accounts), you don't need t
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `DISABLE_USAGE_STATS` | Disable anonymous usage analytics | `false` |
-| `SENTRY_DSN` | Sentry DSN for error tracking | — |
-| `METRICS_API_KEY` | API key for metrics collection | — |
+| `SENTRY_DSN` | Sentry DSN for error tracking |, |
+| `METRICS_API_KEY` | API key for metrics collection |, |
 
 ## Helm Chart Mapping
 

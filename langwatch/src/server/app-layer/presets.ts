@@ -14,6 +14,8 @@ import { InMemoryPresenceRepository } from "./presence/repositories/presence.mem
 import { createClickHouseClientFromConfig } from "./clients/clickhouse.factory";
 import { GatewayBudgetRepository } from "~/server/gateway/budget.repository";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
+import { GovernanceKpisClickHouseRepository } from "@ee/governance/services/governanceKpis.clickhouse.repository";
+import { GovernanceOcsfEventsClickHouseRepository } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
 import { NullLangevalsClient } from "./clients/langevals/langevals.client";
 import { LangEvalsHttpClient } from "./clients/langevals/langevals.http.client";
 import { createRedisConnectionFromConfig } from "./clients/redis.factory";
@@ -277,7 +279,10 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     : PlanProviderService.create({
         getActivePlan: async ({ organizationId }) => {
           const plan = await getLicenseHandler().getActivePlan(organizationId);
-          return { ...plan, planSource: plan.free ? "free" as const : "license" as const };
+          return {
+            ...plan,
+            planSource: plan.free ? ("free" as const) : ("license" as const),
+          };
         },
       });
 
@@ -371,6 +376,21 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
       }
     : undefined;
 
+  const governanceKpisSync = clickhouseEnabled
+    ? {
+        governanceKpisRepository: new GovernanceKpisClickHouseRepository(
+          resolveClickHouseClient,
+        ),
+      }
+    : undefined;
+
+  const governanceOcsfEventsSync = clickhouseEnabled
+    ? {
+        governanceOcsfEventsRepository:
+          new GovernanceOcsfEventsClickHouseRepository(resolveClickHouseClient),
+      }
+    : undefined;
+
   const registry = new PipelineRegistry({
     eventSourcing: es,
     repositories,
@@ -388,6 +408,8 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     billingCheckpoints: new PrismaBillingCheckpointService(prisma),
     usageReportingService,
     gatewayBudgetSync,
+    governanceKpisSync,
+    governanceOcsfEventsSync,
   });
   const commands = registry.registerAll();
   (globalForApp as any).__scenarioExecutionHandle = commands.scenarioExecutionHandle;

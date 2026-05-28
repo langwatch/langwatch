@@ -23,6 +23,16 @@ export const orderedResources: Resource[] = [
   Resources.AUDIT_LOG,
   Resources.TEAM,
   Resources.PROJECT,
+  // AI Governance — admins can grant subsets to custom roles
+  // (e.g. "security_analyst" → governance:view + activityMonitor:view).
+  Resources.GOVERNANCE,
+  Resources.INGESTION_SOURCES,
+  Resources.ANOMALY_RULES,
+  Resources.COMPLIANCE_EXPORT,
+  Resources.ACTIVITY_MONITOR,
+  // AI Tools Portal (Phase 7) — view defaults to all org roles, manage
+  // is admin-only. Custom roles can grant manage to scoped editors.
+  Resources.AI_TOOLS,
   // Resources.PLAYGROUND, // Hidden intentionally
 ];
 
@@ -42,6 +52,15 @@ export function getValidActionsForResource(resource: Resource): Action[] {
   if (resource === Resources.AUDIT_LOG) {
     // Audit log is read-only; rows are emitted by other services and never
     // mutated through this surface. Only :view is meaningful.
+    return [Actions.VIEW];
+  }
+  if (
+    resource === Resources.COMPLIANCE_EXPORT ||
+    resource === Resources.ACTIVITY_MONITOR
+  ) {
+    // OCSF SIEM export + activity monitor are read-only surfaces — rows
+    // are derived from governance_kpis_ocsf_events / trace_summaries
+    // folds, never created/updated/deleted through these endpoints.
     return [Actions.VIEW];
   }
   return [

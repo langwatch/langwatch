@@ -22,16 +22,16 @@ Deployment: separate pod, separate container. Load balancer routes `/v1/**` path
 
 ## 2. Virtual-key format
 
-`lw_vk_{env}_{ulid}` where `env ∈ {live, test}`, `ulid` is a 26-char Crockford base32 ULID.
+`vk-lw-{env}_{ulid}` where `env ∈ {live, test}`, `ulid` is a 26-char Crockford base32 ULID.
 
-Total length: **40 chars** (`lw_vk_live_01HZX9K3M...`).
+Total length: **40 chars** (`vk-lw-01HZX9K3M...`).
 
 **Rules:**
 
-- Prefix `lw_vk_` is fixed and searchable (grep/DLP friendly).
+- Prefix `vk-lw-` is fixed and searchable (grep/DLP friendly).
 - Env prefix prevents accidental dev-key-in-prod / vice versa (Stripe pattern).
 - Body is ULID: monotonic, k-sortable, time-prefixed. No b62 random — ULID sorts sensibly in the dashboard.
-- Stored server-side as `hex(hmac_sha256(LW_VIRTUAL_KEY_PEPPER, key))` alongside a short display prefix (`lw_vk_live_01HZX9` visible, rest hashed). Peppered HMAC-SHA256 (not argon2id) is chosen because (a) the VK body is a 130-bit ULID — already brute-force-infeasible, (b) argon2id would add 50–100 ms to every cold resolve-key call which defeats the gateway's latency budget, (c) Stripe/GitHub use the same pattern for API keys, (d) deterministic hash enables O(1) lookup by hash (argon2id's random salt would force a table scan). Constant-time compare on verify.
+- Stored server-side as `hex(hmac_sha256(LW_VIRTUAL_KEY_PEPPER, key))` alongside a short display prefix (`vk-lw-01HZX9` visible, rest hashed). Peppered HMAC-SHA256 (not argon2id) is chosen because (a) the VK body is a 130-bit ULID — already brute-force-infeasible, (b) argon2id would add 50–100 ms to every cold resolve-key call which defeats the gateway's latency budget, (c) Stripe/GitHub use the same pattern for API keys, (d) deterministic hash enables O(1) lookup by hash (argon2id's random salt would force a table scan). Constant-time compare on verify.
 - Key is shown **once** at creation; not retrievable afterward.
 - Rotation: user can rotate a VK in place (same `vk_id`, new secret, old secret valid for 24h grace).
 - **Pepper rotation:** `LW_VIRTUAL_KEY_PEPPER` rotates via a dual-pepper lookup window — during rotation, the control-plane verifies with both the new and old pepper (returning OK on either match) and re-hashes to the new pepper on next use. Complete rotation = re-hash all live VKs in a background job, then drop the old pepper. Documented SOP in self-hosting ops guide.
@@ -39,9 +39,9 @@ Total length: **40 chars** (`lw_vk_live_01HZX9K3M...`).
 
 **Header accepted by the gateway:**
 
-1. `Authorization: Bearer lw_vk_...` (OpenAI-compatible, default).
-2. `x-api-key: lw_vk_...` (Anthropic-compatible fallback for Claude-shaped clients).
-3. `api-key: lw_vk_...` (Azure-compatible fallback).
+1. `Authorization: Bearer vk-lw-...` (OpenAI-compatible, default).
+2. `x-api-key: vk-lw-...` (Anthropic-compatible fallback for Claude-shaped clients).
+3. `api-key: vk-lw-...` (Azure-compatible fallback).
 
 The gateway accepts all three and normalises internally.
 
@@ -103,7 +103,7 @@ LW_GATEWAY_INTERNAL_SECRET = "shared-test-secret-32byteslong!!"
 method      = "POST"
 path        = "/api/internal/gateway/resolve-key"
 timestamp   = "1734567890"
-body        = {"key_presented":"lw_vk_live_01HZX","gateway_node_id":"gw-a"}
+body        = {"key_presented":"vk-lw-01HZX","gateway_node_id":"gw-a"}
 body_sha256 = 59f25745b66fbb0c7b3714572d20ffef741817b84b86093e4ac6af243af66816
 canonical   = "POST\n/api/internal/gateway/resolve-key\n1734567890\n59f25745b66fbb0c7b3714572d20ffef741817b84b86093e4ac6af243af66816"
 signature   = 4e4c8634b10a7ef719cf6d56b89b7f44a5ac7544c03d98ef132b79d36a1a6a1f
@@ -138,7 +138,7 @@ Response:
 ```json
 {
   "keys": [
-    { "jwt": "...", "revision": 142, "key_id": "vk_...", "display_prefix": "lw_vk_live_01HZX9", "config": { ... §4.2 shape ... } },
+    { "jwt": "...", "revision": 142, "key_id": "vk_...", "display_prefix": "vk-lw-01HZX9", "config": { ... §4.2 shape ... } },
     ...
   ],
   "next_page_token": "<opaque>|null",
@@ -152,7 +152,7 @@ After bootstrap, the gateway calls `/changes?since=<current_revision>` to stream
 
 Request:
 ```json
-{ "key_presented": "lw_vk_live_01HZX...", "gateway_node_id": "gw-eks-abc" }
+{ "key_presented": "vk-lw-01HZX...", "gateway_node_id": "gw-eks-abc" }
 ```
 
 Response (200):
@@ -161,7 +161,7 @@ Response (200):
   "jwt": "<HS256 signed, TTL 15m>",
   "revision": 142,
   "key_id": "vk_01HZX...",
-  "display_prefix": "lw_vk_live_01HZX9"
+  "display_prefix": "vk-lw-01HZX9"
 }
 ```
 
@@ -193,11 +193,13 @@ Returns the warm-cache config (fat, not on hot path). Supports conditional `If-N
 {
   "revision": 142,
   "vk_id": "vk_01HZX...",
-  "providers": [
+  "organization_id": "org_acme",
+  "scopes": [{ "scope_type": "ORGANIZATION", "scope_id": "org_acme" }],
+  "model_providers": [
     {
-      "id": "pc_01HZ...",
-      "slot": "primary",
+      "id": "mp_01HZ...",
       "type": "openai|anthropic|azure_openai|bedrock|vertex|gemini|custom_openai",
+      "scope": { "scope_type": "ORGANIZATION", "scope_id": "org_acme" },
       "credentials": {
         /* Opaque JSON embedded on the wire. Shape varies by provider type —
            the control plane decrypts ModelProvider.customKeys (per-org KMS)
@@ -571,7 +573,7 @@ Each lane's feature file elaborates the contract with testable scenarios. Keep t
 
 - `specs/ai-gateway/virtual-keys.feature` — VK CRUD, show-once-secret, peppered HMAC-SHA256 hashing (§2), provider-creds linking, fallback chain, rotation/revoke, RBAC, attribution, internal endpoints (resolve-key JWT + config/:vk_id ETag + /changes long-poll).
 - `specs/ai-gateway/budgets.feature` — hierarchical scopes (org/team/project/vk/principal), windows (min→total), `on_breach: block|warn`, trace-driven ClickHouse fold (idempotent by `gateway_request_id`), timezone-aware resets.
-- `specs/ai-gateway/gateway-provider-settings.feature` — `GatewayProviderCredential` binding over existing `ModelProvider` rows; gateway-only settings (rate limits, rotation policy, gateway-only extraHeaders) that must not leak into the legacy litellm path.
+- `specs/ai-gateway/gateway-provider-settings.feature` — ModelProvider IS the single source of truth (no separate `GatewayProviderCredential` binding); gateway-only settings (rate limits, rotation policy, gateway-only extraHeaders) live on the ModelProvider Advanced (Gateway) tab and must not leak into the legacy litellm path.
 - `specs/ai-gateway/epic.feature` — cross-cutting E2E scenarios (end-to-end request through gateway → fallback → OTel trace → trace-driven budget fold → per-tenant OTel emit).
 - `specs/ai-gateway/` (pending, Lane A): `gateway-service.feature`, `health-checks.feature`, `auth-cache.feature`, `provider-routing.feature`, `caching-passthrough.feature`, `fallback.feature`, `streaming.feature`, `guardrails.feature`.
 
@@ -583,8 +585,8 @@ When a spec and this contract disagree, **the contract wins** and the spec is am
 
 LangWatch already stores `ModelProvider` rows (OPENAI_API_KEY etc) for evaluators/playground via litellm. We do **not** duplicate these.
 
-- VK config's `providers[].id = pc_...` references the `GatewayProviderCredential` row that binds a `ModelProvider`. The materialiser decrypts `ModelProvider.customKeys` (per-org KMS) at bundle-emit time and embeds the cleartext as `providers[].credentials` JSON — gateway never sees encrypted bytes on the wire.
-- Provider credential pool gets a new entity `ProviderCredential` (one-per-provider-per-project can already exist; we extend to allow multiple slots).
+- VK config's `model_providers[].id = mp_...` references the `ModelProvider` row directly (no binding table). The materialiser decrypts `ModelProvider.customKeys` (per-org KMS) at bundle-emit time and embeds the cleartext as `model_providers[].credentials` JSON — gateway never sees encrypted bytes on the wire.
+- Multi-deployment scenarios (Azure regions, OpenAI base-url variants) are modelled as sibling `ModelProvider` rows — there is no `slot` enum.
 - Playground / evaluators continue to use litellm path (untouched). Gateway uses bifrost/core. Keys are shared, paths are separate. No litellm migration in this epic.
 - A VK can optionally expose itself as a provider inside the playground (`"Use this virtual key in playground"` toggle) — post-MVP nice-to-have, not blocking.
 
@@ -663,17 +665,17 @@ Auth: existing LangWatch API tokens (personal access or service-account) present
 | `POST` | `/api/gateway/v1/budgets` | Create budget | `gatewayBudgets:create` |
 | `PATCH` | `/api/gateway/v1/budgets/:id` | Update | `gatewayBudgets:update` |
 | `DELETE` | `/api/gateway/v1/budgets/:id` | Delete | `gatewayBudgets:delete` |
-| `GET` | `/api/gateway/v1/provider-credentials` | List gateway-scoped provider bindings | `gatewayProviders:view` |
-| `POST` | `/api/gateway/v1/provider-credentials` | Create binding over existing ModelProvider | `gatewayProviders:manage` |
-| `PATCH` | `/api/gateway/v1/provider-credentials/:id` | Update binding | `gatewayProviders:manage` |
-| `DELETE` | `/api/gateway/v1/provider-credentials/:id` | Delete binding | `gatewayProviders:manage` |
+| `GET` | `/api/gateway/v1/model-providers` | List ModelProviders (gateway + legacy paths share this) | `modelProviders:view` |
+| `POST` | `/api/gateway/v1/model-providers` | Create ModelProvider (with optional gateway-Advanced fields) | `modelProviders:manage` |
+| `PATCH` | `/api/gateway/v1/model-providers/:id` | Update (including Advanced fields) | `modelProviders:manage` |
+| `DELETE` | `/api/gateway/v1/model-providers/:id` | Delete | `modelProviders:manage` |
 | `GET` | `/api/gateway/v1/usage` | Spend / volume aggregations | `gatewayUsage:view` |
 
 **Response shape convention:** snake_case (`virtual_key_id`, `created_at`) to match the OpenAI / Anthropic API aesthetic that external integrations already expect.
 
 **Error envelope:** identical to the gateway data-plane error envelope (OpenAI-compatible). Type enum extended with `resource_not_found` (`404`) and `validation_error` (`422`).
 
-**Shared service layer:** the Hono REST routes and the internal tRPC routes **both** call the same `VirtualKeyService`, `GatewayBudgetService`, `GatewayProviderCredentialService`. No business logic is duplicated. Only the DTO-shape helpers differ (snake_case for REST, camelCase for tRPC) and they live in a shared mapper module (`src/server/gateway/mappers/`).
+**Shared service layer:** the Hono REST routes and the internal tRPC routes **both** call the same `VirtualKeyService`, `GatewayBudgetService`, `ModelProviderService`. No business logic is duplicated. Only the DTO-shape helpers differ (snake_case for REST, camelCase for tRPC) and they live in a shared mapper module (`src/server/gateway/mappers/`).
 
 **OpenAPI spec:** generated via `pnpm run openapi:gen` (TBD if not present) and published at `/api/gateway/v1/openapi.json` plus the docs site.
 

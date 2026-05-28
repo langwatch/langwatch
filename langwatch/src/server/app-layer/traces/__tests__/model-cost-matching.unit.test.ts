@@ -16,6 +16,43 @@ describe("computeSpanCost", () => {
       expect(result).toBeCloseTo(0.00125, 6);
     });
 
+    it("prices cache tokens at the custom override rate when present", () => {
+      const result = computeSpanCost({
+        attrs: {
+          "langwatch.model.inputCostPerToken": 0.000005,
+          "langwatch.model.outputCostPerToken": 0.000015,
+          "langwatch.model.cacheReadCostPerToken": 0.0000005,
+          "langwatch.model.cacheCreationCostPerToken": 0.00000625,
+          "gen_ai.usage.cache_read.input_tokens": 1000,
+          "gen_ai.usage.cache_creation.input_tokens": 100,
+        },
+        promptTokens: 100,
+        completionTokens: 50,
+      });
+      // 100*5e-6 + 50*15e-6 + 1000*5e-7 + 100*6.25e-6 = 0.00250
+      expect(result).toBeCloseTo(
+        100 * 0.000005 +
+          50 * 0.000015 +
+          1000 * 0.0000005 +
+          100 * 0.00000625,
+        10,
+      );
+    });
+
+    it("falls back to the input rate for cache tokens when no cache override is set", () => {
+      const result = computeSpanCost({
+        attrs: {
+          "langwatch.model.inputCostPerToken": 0.000005,
+          "langwatch.model.outputCostPerToken": 0.000015,
+          "gen_ai.usage.cache_read.input_tokens": 1000,
+        },
+        promptTokens: 100,
+        completionTokens: 0,
+      });
+      // No cache override: cache reads billed at the input rate.
+      expect(result).toBeCloseTo(100 * 0.000005 + 1000 * 0.000005, 10);
+    });
+
     it("returns 0 without falling through when custom rates yield zero cost", () => {
       const result = computeSpanCost({
         attrs: {
@@ -27,6 +64,43 @@ describe("computeSpanCost", () => {
         completionTokens: 500,
       });
       expect(result).toBe(0);
+    });
+  });
+
+  describe("when span has prompt-cache tokens", () => {
+    it("prices cache-read tokens at the discounted cache rate, not the full input price", () => {
+      // A mostly-cached follow-up: 510 fresh input + 37127 cache-read + 14
+      // cache-write (the depleted-"yo" shape from the bug report).
+      const cacheAware = computeSpanCost({
+        attrs: {
+          "gen_ai.request.model": "claude-opus-4-7",
+          "gen_ai.usage.cache_read.input_tokens": 37127,
+          "gen_ai.usage.cache_creation.input_tokens": 14,
+        },
+        promptTokens: 510,
+        completionTokens: 12,
+      });
+      // The bug: the 37k cache-read tokens billed as full input price.
+      const asIfFullInput = computeSpanCost({
+        attrs: { "gen_ai.request.model": "claude-opus-4-7" },
+        promptTokens: 510 + 37127 + 14,
+        completionTokens: 12,
+      });
+      expect(cacheAware).toBeGreaterThan(0);
+      expect(cacheAware!).toBeLessThan(asIfFullInput!);
+    });
+
+    it("adds cache-read cost on top of the non-cached input (input treated as exclusive)", () => {
+      const cost = computeSpanCost({
+        attrs: {
+          "gen_ai.request.model": "claude-opus-4-7",
+          "gen_ai.usage.cache_read.input_tokens": 1000,
+        },
+        promptTokens: 100,
+        completionTokens: 0,
+      })!;
+      // claude-opus-4-7: input 5e-6/token, cache-read 5e-7/token.
+      expect(cost).toBeCloseTo(100 * 5e-6 + 1000 * 5e-7, 10);
     });
   });
 

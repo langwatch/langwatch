@@ -176,10 +176,11 @@ export default async function main() {
 
   for (const project of projects) {
     const rows = await prisma.modelProvider.findMany({
-      where: { projectId: project.id },
+      where: {
+        scopes: { some: { scopeType: "PROJECT", scopeId: project.id } },
+      },
       select: {
         id: true,
-        projectId: true,
         provider: true,
         customModels: true,
         customEmbeddingsModels: true,
@@ -207,7 +208,7 @@ export default async function main() {
 
       if (Object.keys(updateData).length > 0) {
         await prisma.modelProvider.update({
-          where: { id: row.id, projectId: row.projectId },
+          where: { id: row.id },
           data: updateData,
         });
         updatedCount++;

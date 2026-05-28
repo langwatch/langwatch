@@ -38,6 +38,97 @@ const fakeModelCosts: MaybeStoredLLMModelCost[] = [
   },
 ];
 
+describe("estimateCost", () => {
+  const opusWithCache: MaybeStoredLLMModelCost = {
+    projectId: "",
+    model: "anthropic/claude-opus-4-7",
+    regex: "^(anthropic\\/)?claude-opus-4[.-]7$",
+    inputCostPerToken: 0.00003,
+    outputCostPerToken: 0.00015,
+    cacheReadCostPerToken: 0.000003,
+    cacheCreationCostPerToken: 0.0000375,
+  };
+
+  describe("when only input and output tokens are given", () => {
+    it("prices input and output at their respective rates", () => {
+      expect(
+        estimateCost({
+          llmModelCost: opusWithCache,
+          inputTokens: 1000,
+          outputTokens: 100,
+        }),
+      ).toBeCloseTo(1000 * 0.00003 + 100 * 0.00015, 10);
+    });
+  });
+
+  describe("when cache read and write tokens are given", () => {
+    it("prices each bucket at its own rate, on top of the non-cached input", () => {
+      const cost = estimateCost({
+        llmModelCost: opusWithCache,
+        inputTokens: 510,
+        outputTokens: 12,
+        cacheReadTokens: 37127,
+        cacheCreationTokens: 14,
+      });
+      expect(cost).toBeCloseTo(
+        510 * 0.00003 +
+          12 * 0.00015 +
+          37127 * 0.000003 +
+          14 * 0.0000375,
+        10,
+      );
+    });
+
+    it("costs a mostly-cached follow-up far below pricing the cache reads as full input", () => {
+      const cacheAware = estimateCost({
+        llmModelCost: opusWithCache,
+        inputTokens: 510,
+        outputTokens: 12,
+        cacheReadTokens: 37127,
+        cacheCreationTokens: 14,
+      })!;
+      const asIfFullInput = estimateCost({
+        llmModelCost: opusWithCache,
+        inputTokens: 510 + 37127 + 14,
+        outputTokens: 12,
+      })!;
+      expect(cacheAware).toBeLessThan(asIfFullInput);
+    });
+  });
+
+  describe("when a cache rate is missing", () => {
+    it("falls back to the input rate so cached tokens are never free", () => {
+      const noCacheRates: MaybeStoredLLMModelCost = {
+        projectId: "",
+        model: "x/y",
+        regex: "^x\\/y$",
+        inputCostPerToken: 0.00001,
+        outputCostPerToken: 0.00002,
+      };
+      expect(
+        estimateCost({
+          llmModelCost: noCacheRates,
+          inputTokens: 100,
+          cacheReadTokens: 50,
+          cacheCreationTokens: 10,
+        }),
+      ).toBeCloseTo((100 + 50 + 10) * 0.00001, 10);
+    });
+  });
+
+  describe("when the model has no rates at all", () => {
+    it("returns undefined", () => {
+      expect(
+        estimateCost({
+          llmModelCost: { projectId: "", model: "z", regex: "^z$" },
+          inputTokens: 100,
+          cacheReadTokens: 50,
+        }),
+      ).toBeUndefined();
+    });
+  });
+});
+
 describe("normalizeModelName", () => {
   describe("when given uppercase letters", () => {
     it("converts to lowercase", () => {

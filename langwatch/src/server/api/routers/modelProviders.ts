@@ -19,13 +19,14 @@ import {
   updateConfig,
 } from "../../modelProviders/modelDefaults.service";
 import { ModelProviderService } from "../../modelProviders/modelProvider.service";
-import { trackProjectEvent } from "~/server/posthog";
 import {
+  authorizeInResolver,
   checkOrganizationPermission,
   checkProjectPermission,
   hasProjectPermission,
 } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { trackProjectEvent } from "~/server/posthog";
 import {
   validateKeyWithCustomUrl,
   validateProviderApiKey,
@@ -106,12 +107,6 @@ export const modelProviderRouter = createTRPCRouter({
       return await listOrgModelProvidersForFrontend(input.organizationId);
     }),
   update: protectedProcedure
-    // PostHog instrumentation: model_provider_configured fires on the
-    // first time keys are set (or on each rekey), gating on enabled +
-    // customKeys presence. This is the moment a user has actually given
-    // the platform credentials to talk to an LLM — without it, evaluators
-    // and prompts can't run, so it's a hard activation gate worth tracking
-    // distinctly from this generic "update" name.
     .input(
       z.object({
         id: z.string().optional(),
@@ -252,6 +247,42 @@ export const modelProviderRouter = createTRPCRouter({
     .use(checkOrganizationPermission("organization:view"))
     .query(({ input }) => {
       return { managed: isManagedProvider(input.organizationId, input.provider) };
+    }),
+
+  /**
+   * Advanced gateway settings (rate limits, fallback priority, rotation
+   * policy, provider config) for a single ModelProvider. Split from the
+   * main `update` so the Advanced tab can ship its own payload without
+   * round-tripping the full provider (avoids reseeding credentials /
+   * scopes on every rate-limit tweak).
+   *
+   * Iter 110: fields landed on ModelProvider via S0 schema after
+   * GatewayProviderCredential was folded in. v1 ships MANUAL rotation
+   * only; AUTO + secret-store integration are v1.1 scope. Spec:
+   * specs/ai-gateway/gateway-provider-settings.feature.
+   */
+  updateAdvanced: protectedProcedure
+    .input(
+      z.object({
+        id: z.string().min(1),
+        rateLimitRpm: z.number().int().min(0).nullable().optional(),
+        rateLimitTpm: z.number().int().min(0).nullable().optional(),
+        rateLimitRpd: z.number().int().min(0).nullable().optional(),
+        fallbackPriorityGlobal: z.number().int().nullable().optional(),
+        rotationPolicy: z.enum(["MANUAL"]).optional(),
+        providerConfig: z.object({}).passthrough().nullable().optional(),
+      }),
+    )
+    // Scope authz is data-dependent (the provider's own scope set), so it
+    // runs inside updateAdvancedSettings; this satisfies the builder's
+    // fail-closed permission gate while keeping audit + domain-error.
+    .use(authorizeInResolver)
+    .mutation(async ({ input, ctx }) => {
+      const service = ModelProviderService.create(ctx.prisma);
+      return await service.updateAdvancedSettings(
+        { prisma: ctx.prisma, session: ctx.session },
+        input,
+      );
     }),
 
   /**

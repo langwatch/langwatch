@@ -954,6 +954,6 @@ function TeamsAndProjects() {
   );
 }
 
-export default withPermissionGuard("team:view", {
+export default withPermissionGuard("organization:manage", {
   layoutComponent: SettingsLayout,
 })(TeamsAndProjects);

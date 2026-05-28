@@ -34,7 +34,7 @@ Feature: LangWatch AI Gateway — Cross-cutting epic
   Background:
     Given organization "acme" exists with team "platform" and project "gateway-demo"
     And project "gateway-demo" has "openai", "anthropic", and "bedrock" providers configured
-    And I have a virtual key "prod-key" with id starting "lw_vk_live_" for project "gateway-demo"
+    And I have a virtual key "prod-key" with id starting "vk-lw-" for project "gateway-demo"
     And the key "prod-key" has fallback chain [openai, anthropic]
     And the key "prod-key" has a monthly project budget of $100 with on_breach "block"
     And the LangWatch control-plane is running at "http://localhost:5560"
@@ -48,7 +48,7 @@ Feature: LangWatch AI Gateway — Cross-cutting epic
   Scenario: Single chat completion — OpenAI shape — succeeds and is attributed
     Given the gateway auth cache is warm for key "prod-key"
     When I POST /v1/chat/completions to the gateway with:
-      | header        | Authorization: Bearer lw_vk_live_...                    |
+      | header        | Authorization: Bearer vk-lw-...                    |
       | content-type  | application/json                                        |
       | body          | { "model": "gpt-5-mini", "messages": [{"role":"user","content":"hi"}] } |
     Then the gateway returns 200 within 3 seconds
@@ -67,7 +67,7 @@ Feature: LangWatch AI Gateway — Cross-cutting epic
   Scenario: Single message — Anthropic shape — succeeds via Claude Code-compatible path
     Given the gateway auth cache is warm for key "prod-key"
     When I POST /v1/messages to the gateway with:
-      | header        | x-api-key: lw_vk_live_...                               |
+      | header        | x-api-key: vk-lw-...                               |
       | header        | anthropic-version: 2023-06-01                           |
       | body          | { "model": "claude-haiku-4-5-20251001", "messages": [{"role":"user","content":"hi"}], "max_tokens": 64 } |
     Then the gateway returns 200 within 3 seconds
@@ -262,7 +262,7 @@ Feature: LangWatch AI Gateway — Cross-cutting epic
     Then the gateway returns 200 only if:
       | check                                                  |
       | bifrost/core is initialized                            |
-      | at least one provider credential resolves successfully |
+      | at least one ModelProvider resolves successfully       |
       | control-plane /internal/gateway/resolve-key is reachable OR bootstrap cache is populated |
       | the changes long-poll goroutine is running             |
     And if any check fails the endpoint returns 503 with a JSON body listing failing checks

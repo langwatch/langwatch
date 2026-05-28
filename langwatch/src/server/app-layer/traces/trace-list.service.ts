@@ -474,7 +474,7 @@ export class TraceListService {
   private async computeDiscover(
     params: DiscoverParams,
   ): Promise<FacetDescriptor[]> {
-    const TOP_N = 10;
+    const TOP_N = 50;
 
     // Partition the registry: simple-expression facets per table go through
     // the batched ClickHouse path; arrayJoin/queryBuilder/dynamic_keys facets

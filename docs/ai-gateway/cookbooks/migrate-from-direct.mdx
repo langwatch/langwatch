@@ -4,7 +4,7 @@ description: Move from app → OpenAI/Anthropic to app → LangWatch Gateway →
 sidebarTitle: Migrate from direct
 ---
 
-You're already calling OpenAI, Anthropic, Bedrock, etc. from your application. You want to add governance — budgets, fallback, policy-rule patterns, per-engineer attribution — without rewriting everything. This cookbook shows the minimum-effort migration.
+You're already calling OpenAI, Anthropic, Bedrock, etc. from your application. You want to add governance, budgets, fallback, policy-rule patterns, per-engineer attribution, without rewriting everything. This cookbook shows the minimum-effort migration.
 
 ## Before
 
@@ -30,53 +30,41 @@ Two env-var changes. That's the whole code migration if you're happy with defaul
 
 ## Pre-migration checklist
 
-- [ ] LangWatch project provisioned (you already have one for tracing — reuse it).
-- [ ] API token with `gatewayProviders:create` + `virtualKeys:create`. Use the LangWatch UI → Settings → API Tokens.
+- [ ] LangWatch project provisioned (you already have one for tracing, reuse it).
+- [ ] API token with `modelProviders:update` + `virtualKeys:create` at the same ORGANIZATION scope. Use the LangWatch UI → Settings → API Tokens.
 - [ ] Access to the upstream provider accounts (you'll rebind their existing keys inside LangWatch).
 
-## Step 1 — Register the providers you already use
+## Step 1: Configure the providers you already use
 
-For each provider (OpenAI / Anthropic / Bedrock / Azure / Vertex / Gemini), create a **gateway provider binding** that wraps the same upstream key you're already using:
+For each provider (OpenAI, Anthropic, Bedrock, Azure, Vertex, Gemini) configure (or reuse) a **ModelProvider** at the organization scope. In the UI: **Settings → Model Providers → Add Model Provider**. Pick `Scope = Organization` so every project in the org inherits the credential.
+
+Then open each row and switch to the **Advanced (Gateway)** tab to set the gateway-only fields:
+
+- **Rate limit (RPM / TPM / RPD)** — caps the gateway applies before dispatch.
+- **Fallback priority** — used when the org's default RoutingPolicy resolves more than one eligible MP (lower wins; tiebreak by createdAt).
+- **Provider config (JSON)** — region/deployment overrides (e.g. `{"region": "us-east-1"}`).
+
+No separate "gateway provider" entity to mint. The credential itself is the only thing.
+
+<Note>If you've never configured ModelProviders in LangWatch before, this is the same Settings page you'd use for prompt playground + evaluators — the gateway just reads from the same store.</Note>
+
+## Step 2: Mint your first virtual key
 
 ```bash
 export LANGWATCH_API_KEY="lwp_..."
 
-# Bind existing OpenAI key (the model-provider row already exists
-# because you've used LangWatch's trace-based billing UI before).
-langwatch gateway-providers create \
-  --model-provider mp_openai \
-  --slot primary \
-  --rotation-policy manual \
-  --format json | jq -r '.id'
-# → gpc_01HZX...
-
-langwatch gateway-providers create \
-  --model-provider mp_anthropic \
-  --slot primary \
-  --format json | jq -r '.id'
-# → gpc_01HZY...
-```
-
-Keep the returned `gpc_*` ids — you need them in the next step.
-
-<Note>If you've never configured providers in LangWatch before, do it first in the UI (Settings → Model Providers). The CLI above needs the `mp_*` id of an already-configured provider row.</Note>
-
-## Step 2 — Mint your first virtual key
-
-```bash
 langwatch virtual-keys create \
   --name "dev-migration" \
   --env live \
-  --provider gpc_01HZX... \
-  --provider gpc_01HZY... \
+  --scope ORG:acme \
   --format json | tee /tmp/vk.json
 
 export LANGWATCH_VK=$(jq -r '.secret' /tmp/vk.json)
 ```
 
-Save the secret. It's shown exactly once.
+Save the secret. It's shown exactly once. The VK lives at `ORG:acme` and inherits every ModelProvider visible from that scope. To pin a specific provider order, create a RoutingPolicy and pass `--routing-policy <id>`; otherwise the org's default ordering applies.
 
-## Step 3 — Flip the env vars in your app
+## Step 3: Flip the env vars in your app
 
 Dev/staging first:
 
@@ -105,9 +93,9 @@ curl -sD- -o/dev/null \
   grep -i x-langwatch-
 ```
 
-You should see `X-LangWatch-Request-Id`, `X-LangWatch-Trace-Id`, `X-LangWatch-Span-Id`. Paste the request id into the LangWatch search bar — the full trace is already there.
+You should see `X-LangWatch-Request-Id`, `X-LangWatch-Trace-Id`, `X-LangWatch-Span-Id`. Paste the request id into the LangWatch search bar, the full trace is already there.
 
-## Step 4 — Add your first policy
+## Step 4: Add your first policy
 
 The whole point of the migration. Pick the policy that maps to a real pain you have today:
 
@@ -124,24 +112,25 @@ Every VK attached to engineering principals now shares the $5K/month envelope.
 
 ### Automatic failover when OpenAI is flaky
 
-Edit the VK via the UI (Gateway → Virtual Keys → edit — once the VK edit drawer is live; until then use the `model_aliases` JSON on create):
+Create a RoutingPolicy listing the ModelProvider ids in dispatch order (OpenAI primary, Anthropic backup), then point the VK at it:
 
-```json
-{
-  "fallback": {
-    "chain": ["gpc_openai_primary", "gpc_anthropic_backup"],
-    "on": ["5xx", "timeout", "rate_limit", "network_error"],
-    "timeout_ms": 30000,
-    "max_attempts": 2
-  },
-  "model_aliases": {
-    "gpt-5-mini": "openai/gpt-5-mini",
-    "gpt-5-mini:fallback": "anthropic/claude-haiku-4-5-20251001"
-  }
-}
+```bash
+# Create a policy at org scope
+langwatch routing-policies create \
+  --scope ORG:acme \
+  --name "openai-then-anthropic" \
+  --strategy ordered \
+  --model-provider mp_openai_org \
+  --model-provider mp_anthropic_org \
+  --format json | jq -r '.id'
+# → rp_01HZX...
+
+# Re-bind the VK to it
+langwatch virtual-keys update vk_01HZX... \
+  --routing-policy rp_01HZX...
 ```
 
-When OpenAI throws a 503, the gateway re-dispatches the same prompt to Claude Haiku transparently. Your application sees a normal 200 response from `gpt-5-mini`.
+When OpenAI throws a 503, the gateway re-dispatches the same prompt to Anthropic transparently. Your application sees a normal 200 response. Tune the fallback conditions (5xx / timeout / rate_limit / network_error) via the VK `--config-json` field; the `model_aliases` map still lives there for client-side name redirects.
 
 ### Block destructive tools on engineer VKs
 
@@ -153,9 +142,9 @@ When OpenAI throws a 503, the gateway re-dispatches the same prompt to Claude Ha
 }
 ```
 
-Agent calls like `shell.exec("rm -rf ~")` get `403 tool_not_allowed` before they reach the model — the model never generates the destructive call path in the first place.
+Agent calls like `shell.exec("rm -rf ~")` get `403 tool_not_allowed` before they reach the model, the model never generates the destructive call path in the first place.
 
-## Step 5 — Wire trace propagation
+## Step 5: Wire trace propagation
 
 If you were already using LangWatch SDKs for tracing, propagate the trace id into the gateway so requests nest under your existing trace (no double-cost-attribution):
 
@@ -171,9 +160,9 @@ client = OpenAI(
 
 See [Python SDK → trace propagation](/ai-gateway/sdks/python#trace-propagation) and [TypeScript SDK](/ai-gateway/sdks/typescript#trace-propagation).
 
-## Step 6 — Rotate the original upstream keys
+## Step 6: Rotate the original upstream keys
 
-After a week of running through the gateway, the original upstream keys (`sk-proj-...`, `sk-ant-...`) should no longer be used by any application. Rotate them in the provider console — this is the only time you need to touch upstream again. The gateway still has access via its own encrypted copies of the old keys (fetched from the LangWatch control plane), and will continue to serve traffic uninterrupted.
+After a week of running through the gateway, the original upstream keys (`sk-proj-...`, `sk-ant-...`) should no longer be used by any application. Rotate them in the provider console, this is the only time you need to touch upstream again. The gateway still has access via its own encrypted copies of the old keys (fetched from the LangWatch control plane), and will continue to serve traffic uninterrupted.
 
 ## Troubleshooting
 
@@ -181,14 +170,14 @@ After a week of running through the gateway, the original upstream keys (`sk-pro
 |---|---|---|
 | `401 invalid_api_key` on every request | VK env var not loaded; or VK revoked | `echo $LANGWATCH_VK` to verify; check LangWatch UI for VK status |
 | `403 model_not_allowed` on a model you used before | VK's `models_allowed` is set restrictively | Edit VK to add the model, or remove the allowlist |
-| Calls succeed but no trace in LangWatch UI | Project-id mismatch between VK and where you're looking | `langwatch virtual-keys get <id>` → check `project_id` matches the project you're viewing |
+| Calls succeed but no trace in LangWatch UI | Scope-id mismatch between VK and where you're looking | `langwatch virtual-keys get <id>` → check `scopes` (and resolved `project_id` per vk-config-bundle rules — TEAM/ORG-scoped VKs file traces in the org's `internal_governance` project) |
 | Anthropic-side calls return `400 must provide max_tokens` | You removed `max_tokens` because OpenAI doesn't require it | Anthropic requires it; keep it set |
-| Response latency jumped by ~50 ms | Fallback is running every call (primary is down) | Check `X-LangWatch-Fallback-Count` — if > 0, fix the primary |
+| Response latency jumped by ~50 ms | Fallback is running every call (primary is down) | Check `X-LangWatch-Fallback-Count`, if > 0, fix the primary |
 
 ## What NOT to change
 
 - Request bodies: the gateway's whole point is byte-for-byte passthrough. Don't rewrite your payloads.
-- SDKs: the official OpenAI / Anthropic SDKs work unchanged. You don't need the LangWatch SDK for gateway integration (only for *trace propagation*).
+- SDKs: the official OpenAI, Anthropic SDKs work unchanged. You don't need the LangWatch SDK for gateway integration (only for *trace propagation*).
 - Streaming handlers: SSE passthrough is byte-identical post-first-chunk. Your streaming code should keep working.
 
 ## Rollback plan
@@ -202,10 +191,10 @@ OPENAI_API_KEY=sk-proj-...    # original key
 
 Redeploy. You're back to direct provider calls. Traces in LangWatch stop populating (the trace propagation + gateway spans go away), but your app works.
 
-Plan the first rollout behind a feature flag for this exact reason — 10% traffic through the gateway for a day before going 100%.
+Plan the first rollout behind a feature flag for this exact reason, 10% traffic through the gateway for a day before going 100%.
 
 ## See also
 
-- [Quickstart](/ai-gateway/quickstart) — green-field setup without migration.
-- [CI smoke test cookbook](/ai-gateway/cookbooks/ci-smoke-test) — automate gateway health verification.
-- [SDK integration](/ai-gateway/sdks/python) — trace propagation recipes.
+- [Quickstart](/ai-gateway/quickstart): green-field setup without migration.
+- [CI smoke test cookbook](/ai-gateway/cookbooks/ci-smoke-test): automate gateway health verification.
+- [SDK integration](/ai-gateway/sdks/python): trace propagation recipes.

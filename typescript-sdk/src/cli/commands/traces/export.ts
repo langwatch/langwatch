@@ -6,6 +6,7 @@ import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
 import { buildAuthHeaders } from "@/internal/api/auth";
 
+import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 export const exportTracesCommand = async (options: {
   startDate?: string;
   endDate?: string;
@@ -17,7 +18,7 @@ export const exportTracesCommand = async (options: {
   checkApiKey();
 
   const apiKey = process.env.LANGWATCH_API_KEY ?? "";
-  const endpoint = process.env.LANGWATCH_ENDPOINT ?? "https://app.langwatch.ai";
+  const endpoint = resolveControlPlaneUrl();
 
   const format = options.format ?? "jsonl";
   if (format !== "csv" && format !== "jsonl" && format !== "json") {

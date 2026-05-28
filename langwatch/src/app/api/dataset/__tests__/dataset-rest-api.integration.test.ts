@@ -68,6 +68,7 @@ describe("Feature: Dataset REST API", () => {
       data: {
         ...testProject,
         teamId: testTeam.id,
+        personalFeatures: {},
       },
     });
 

@@ -58,6 +58,8 @@ LangWatch provides the missing operations platform for AI applications. Every LL
   <Card title="Evaluations" description="Test quality with experiments, monitor production, guard against harm." icon="square-check" href="/evaluations/overview" />
   <Card title="Agent Simulations" description="Validate agent behavior with realistic multi-turn conversations." icon="masks-theater" href="/agent-simulations/introduction" />
   <Card title="Prompt Management" description="Version, test, and optimize prompts collaboratively." icon="code" href="/prompt-management/overview" />
+  <Card title="AI Gateway" description="Governed, observable, sub-millisecond-overhead OpenAI- and Anthropic-compatible endpoint for every LLM call in your org. Personal IDE keys, budgets, routing policies, anomaly detection." icon="route" href="/ai-gateway/overview" />
+  <Card title="AI Governance" description="One control plane above the gateway: per-user workspaces, ingestion sources, anomaly rules, OCSF/SIEM export, compliance architecture. The admin home for rolling LangWatch out company-wide." icon="shield-halved" href="/ai-governance/overview" />
 </CardGroup>
 
 ## Where to Start?
@@ -284,6 +286,79 @@ Pick your language and start tracking:
     arrow
   />
 </CardGroup>
+
+---
+
+# FILE: ./observability/trace-vs-activity-ingestion.mdx
+
+---
+title: Choosing the right OTel endpoint
+description: LangWatch exposes two OpenTelemetry-shaped URLs. They share the same internal pipeline; the split is auth + routing convenience. Trace ingestion (`/api/otel/v1/traces`) authenticates as a project; governance ingestion (`/api/ingest/otel/:sourceId`) authenticates as an IngestionSource the org admin authored. Both land in the same trace store, distinguished by origin metadata.
+sidebarTitle: Trace vs governance ingestion
+---
+
+LangWatch accepts OTLP/HTTP at two distinct URLs. They share **everything that matters internally**: the same hardened parser, the same trace pipeline, the same `recorded_spans` and `log_records` storage. The split is an **auth + routing convenience for customers**, not an architectural separation.
+
+## At a glance
+
+|  | `/api/otel/v1/traces` (existing, your apps) | `/api/ingest/otel/:sourceId` (governance, third-party platforms) |
+|---|---|---|
+| **Use it when** | Your application emits LLM traces, you want them in the LangWatch trace viewer | Your org runs a third-party AI platform (Claude Cowork, Workato, custom internal agents) and you want their audit data surfaced in LangWatch governance |
+| **Auth** | LangWatch project API key, PAT, `X-Auth-Token` or `Authorization: Bearer <project-token>` | IngestionSource bearer secret (`lw_is_<...>`), minted once via the secret-reveal modal |
+| **Tenancy** | Project-scoped (data lives in the project's CH partition) | Org-scoped, routed through a hidden internal Governance Project per org (lazy-ensured on first IngestionSource mint; never user-visible) |
+| **Storage** | `recorded_spans` + `log_records`, the LangWatch trace pipeline | **Same `recorded_spans` + `log_records`**, distinguished by `langwatch.origin.kind = "ingestion_source"` attribute stamped at the receiver edge |
+| **Downstream consumers** | Trace viewer, evaluations, simulations, prompts, online evals, PII redaction, cost enrichment | Same trace viewer + log-detail pane (drill-down works regardless of origin) **plus** governance dashboard at `/governance`, anomaly detection reactor, OCSF/SIEM forwarding |
+| **Plan accounting** | Counts against the project's trace allowance | Counts against the org's governance audit-event allowance |
+| **Source identity** | Whoever holds the project key (typically your own apps) | An IngestionSource the admin authored explicitly with per-platform config |
+| **Other shapes** | OTLP only | OTLP **plus** webhook envelope (`/api/ingest/webhook/:id` for Workato + s3_custom callback mode) and pull-mode workers for compliance feeds (OpenAI, Anthropic, Microsoft Copilot Studio) |
+
+## Decision tree
+
+**Are you instrumenting your own application?** (Python/TS SDK, OpenAI/Anthropic SDK auto-instrumentation, your own collector) → **`/api/otel/v1/traces`** with your project API key. See [Observability quickstart](/integration/quick-start).
+
+**Are you forwarding events from a third-party AI platform?** (Claude Cowork tenant, Workato workspace, Microsoft Copilot Studio, OpenAI Enterprise Compliance, custom S3 audit drops) → **`/api/ingest/otel/:sourceId`** (or `/webhook/:id` for non-OTLP feeds) with an IngestionSource bearer. The IngestionSource is created by an org admin under [Governance → Ingestion sources](/ai-governance/ingestion-sources/index). Per-platform setup pages: [Generic OTel](/ai-governance/ingestion-sources/otel-generic), [Claude Cowork](/ai-governance/ingestion-sources/claude-cowork), [Workato](/ai-governance/ingestion-sources/workato).
+
+**Are you driving an LLM call through the AI Gateway and want both?** That happens automatically, gateway requests already emit OTel traces back to the project that owns the virtual key, so your gateway traffic shows up in `/api/otel/v1/traces` semantics with no extra wiring. The governance endpoint is only for *external* platforms LangWatch doesn't proxy.
+
+## Why two URLs (not two pipelines)
+
+The two URLs are split for **auth + routing convenience**, not for architectural reasons. Internally they share everything that matters:
+
+- **Same hardened OTLP parser**: `langwatch/src/server/otel/parseOtlpBody.ts` (`readOtlpBody` + `parseOtlpTraces`, `parseOtlpLogs`) handles gzip, deflate, brotli decompression, JSON + protobuf decode, and the JSON-then-protobuf-encode fallback path. Both URLs call into it. There is no parser-quality gap.
+- **Same trace pipeline**: both URLs hand off to the existing `traces.collection.handleOtlpTraceRequest` (or `traces.logCollection.handleOtlpLogRequest` for log-shaped sources) that powers `/api/otel/v1/traces`. No parallel write path. No parallel storage.
+- **Same `recorded_spans` and `log_records` tables**, governance-ingested events land in the same ClickHouse storage that powers the rest of the platform. They're distinguished by reserved attribute namespaces stamped at the receiver edge:
+  - `langwatch.origin.kind = "ingestion_source"`, discriminator
+  - `langwatch.ingestion_source.{id, organization_id, source_type}`, source identity
+  - `langwatch.governance.retention_class`, derived governance context (driving CH TTL)
+- **Same trace viewer**: open a span in `/messages`, the rendering is identical regardless of which URL it came from. The origin attributes appear as read-only system metadata.
+- **Same compliance + RBAC + multitenancy machinery**: all the controls that have been hardened over years of running OTel ingest at scale apply equally to governance data.
+
+The auth + tenancy split is what's actually different:
+
+- **Auth model**: A project API key authorises a specific project to write its own traces. An IngestionSource bearer authorises a specific *external system* to push events into one slot the admin has provisioned for it. Different "who is allowed to do what?" questions.
+- **Tenancy resolution**: Trace data is partitioned per project. Governance data is org-scoped (the customer doesn't pick a project; the receiver routes it through a per-org hidden Governance Project the platform manages internally).
+- **Non-OTLP shapes**: The governance endpoint family also accepts webhook (`/api/ingest/webhook/:sourceId`) and pull-mode connectors. The webhook receiver normalises to OTLP `log_records` before handoff so the downstream pipeline only ever sees OTLP. The trace endpoint is OTLP-only.
+
+The internal-architecture decision behind this is captured in [ADR-018](https://github.com/langwatch/langwatch/blob/main/dev/docs/adr/018-governance-unified-observability-substrate.md): "governance ingestion is origin metadata on the existing unified observability substrate."
+
+## Common confusions
+
+**"My OTel collector is already pointed at `/api/otel/v1/traces`, do I need to add a second exporter for governance?"** No, not for your own apps. The trace endpoint is the right home for traces from systems your org owns. The governance endpoint is for *external* platforms (Cowork, Workato, etc.) that you don't own but want governance over.
+
+**"My collector pushes gzipped protobuf, does the governance endpoint accept that?"** Yes. Both URLs accept the full OTLP wire shape with all standard Content-Encoding values. Same shared parser.
+
+**"Can I send the same span to both endpoints?"** Technically yes, but it's not what the design assumes. A span describing a single LLM call doesn't need to be ingested twice. Spans you author from your own app go to the trace endpoint with your project key; spans you receive from a third-party platform go to the governance endpoint with an IngestionSource bearer.
+
+**"Will the two endpoints ever merge?"** Probably not, the auth + tenancy split is real customer-facing convenience. But the *internal* convergence already happened: every customer-facing claim about "what storage", "what trace viewer", "what compliance" applies equally to both URLs today. The two URLs share one pipeline.
+
+## Cross-references
+
+- [Observability quickstart](/integration/quick-start): set up `/api/otel/v1/traces` from a Python or TypeScript app.
+- [Governance → Ingestion sources](/ai-governance/ingestion-sources/index): set up `/api/ingest/otel/:sourceId` for an external platform.
+- [Generic OTel ingestion source](/ai-governance/ingestion-sources/otel-generic): copy-paste curl that pushes a canonical 5-attribute body to the governance endpoint.
+- [Compliance architecture](/ai-gateway/governance/compliance-architecture): how the unified substrate underwrites SOC 2, ISO 27001, EU AI Act, GDPR, HIPAA-most-uses out of the box.
+- [Per-origin retention](/ai-gateway/governance/retention): `thirty_days`, `one_year`, `seven_years` retention classes; how the CH TTL policy keys off the origin attribute.
+- [Governance CLI debug](/ai-gateway/governance/cli-debug): `langwatch ingest tail <id>` consumes the governance data; `langwatch ingest health <id>` shows per-source 24h/7d/30d volume.
 
 ---
 
@@ -553,6 +628,11 @@ const result = await generateText({
     <img src="/images/llm-observability/quick-start/setup-monitor.webp" />
   </Step>
 </Steps>
+
+## Next steps
+
+- **Need org-wide controls?** See [AI Governance](/ai-governance/overview) for per-user workspaces, anomaly detection, OCSF/SIEM export, and ingestion sources for non-gateway telemetry, paired with the AI Gateway data plane.
+- **Routing every LLM call through a single endpoint?** See [AI Gateway](/ai-gateway/overview): virtual keys, budgets, fallback chains, guardrails.
 
 ---
 
@@ -3987,7 +4067,7 @@ if __name__ == "__main__":
     main()
 ```
 
-### `evaluate()` / `async_evaluate()` Key Parameters
+### `evaluate()`, `async_evaluate()` Key Parameters
 
 The `evaluate()` and `async_evaluate()` methods are available on both `LangWatchSpan` and `LangWatchTrace` objects. They can also be imported from `langwatch.evaluations` and called as `langwatch.evaluate()` or `langwatch.async_evaluate()`, where you would then explicitly pass the `span` or `trace` argument. For detailed parameter descriptions, refer to the API reference:
 
@@ -4831,7 +4911,7 @@ Key points for manual instrumentation with context managers:
 - Use `with langwatch.trace(...)` or `async with langwatch.trace(...)` to start a trace.
 - Use `with langwatch.span(...)` or `async with langwatch.span(...)` inside a trace block to create nested spans.
 - The trace or span object is available in the `as trace:` or `as span:` part of the `with` statement.
-- Use methods like `span.add_event()`, and primarily `span.update(...)` / `trace.update(...)` to add details. The `update()` method is flexible for adding structured data like `input`, `output`, `metadata`, and `contexts`.
+- Use methods like `span.add_event()`, and primarily `span.update(...)`, `trace.update(...)` to add details. The `update()` method is flexible for adding structured data like `input`, `output`, `metadata`, and `contexts`.
 - This approach gives explicit control over the start and end of each instrumented block, as the context manager handles ending the span automatically.
 
 ### Direct Span Creation (`span.end()`)
@@ -8654,7 +8734,7 @@ span.set_attribute(AttributeKey.LangWatchPromptHandle, "customer-support-greetin
 
 <Accordion title="Full list of SDK constants">
 
-**TypeScript** — `import { attributes } from "langwatch"`
+**TypeScript**: `import { attributes } from "langwatch"`
 
 | Constant | Value |
 |----------|-------|
@@ -8681,7 +8761,7 @@ span.set_attribute(AttributeKey.LangWatchPromptHandle, "customer-support-greetin
 | `ATTR_LANGWATCH_PROMPT_SELECTED_ID` | `langwatch.prompt.selected.id` |
 | `ATTR_LANGWATCH_PROMPT_VARIABLES` | `langwatch.prompt.variables` |
 
-**Python** — `from langwatch.attributes import AttributeKey`
+**Python**: `from langwatch.attributes import AttributeKey`
 
 | Constant | Value |
 |----------|-------|
@@ -11161,7 +11241,7 @@ The [LangWatch MCP Server](https://www.npmjs.com/package/@langwatch/mcp-server) 
 - **Set up evaluations** to test and monitor your LLM outputs
 - **Search and inspect traces** from your LangWatch project directly in your editor
 - **Query analytics** to understand performance trends, costs, and error rates
-- **Manage prompts** — list, create, update, and version prompts without leaving your IDE
+- **Manage prompts**: list, create, update, and version prompts without leaving your IDE
 
 Instead of manually reading docs and writing boilerplate code, just ask your AI assistant to instrument your codebase with LangWatch, and it will do it for you.
 
@@ -11249,7 +11329,7 @@ Add to `.vscode/mcp.json` in your project (or use **MCP: Add Server** from the C
 1. Go to **Settings → Connectors**
 2. Click **Add connector**
 3. Enter the server URL: `https://app.langwatch.ai/sse`
-4. Click **Connect** — you'll be redirected to sign in and authorize access to your project
+4. Click **Connect**: you'll be redirected to sign in and authorize access to your project
 
 *Requires a Plus or Team plan.*
 
@@ -11259,19 +11339,19 @@ Add to `.vscode/mcp.json` in your project (or use **MCP: Add Server** from the C
 1. Go to **Settings → Connectors**
 2. Click **Add custom connector**
 3. Enter the server URL: `https://app.langwatch.ai/mcp`
-4. Click **Connect** — you'll be redirected to sign in and authorize access to your project
+4. Click **Connect**: you'll be redirected to sign in and authorize access to your project
 
 *Requires a Pro or Max plan.*
 
 
-### BoltAI / Other MCP Clients
+### BoltAI, Other MCP Clients
 
 For any MCP client that supports remote servers with OAuth:
 
 1. Add a new remote MCP server
 2. Enter the endpoint URL: `https://app.langwatch.ai/mcp`
 3. Select **OAuth (browser)** authentication
-4. Click **Connect** — you'll be redirected to sign in and authorize access to your project
+4. Click **Connect**: you'll be redirected to sign in and authorize access to your project
 
 The server supports OAuth Authorization Code + PKCE with Dynamic Client Registration, so any standards-compliant MCP client should work automatically.
 
@@ -11315,7 +11395,7 @@ Open your AI assistant chat (e.g., `Cmd/Ctrl + I` in Cursor, or `Cmd/Ctrl + Shif
 The MCP server runs in two modes:
 
 - **Local (stdio)**: Default. Runs as a subprocess of your coding assistant (Claude Code, Copilot, Cursor). API key set via `--apiKey` flag or `LANGWATCH_API_KEY` env var.
-- **Remote (HTTP/SSE)**: For web-based assistants (ChatGPT, Claude Chat, BoltAI, etc.). Hosted at `https://app.langwatch.ai`. Uses OAuth Authorization Code + PKCE — click Connect and sign in via your browser to authorize access to your project. Supports both Streamable HTTP (`/mcp`) and SSE (`/sse`) transports.
+- **Remote (HTTP/SSE)**: For web-based assistants (ChatGPT, Claude Chat, BoltAI, etc.). Hosted at `https://app.langwatch.ai`. Uses OAuth Authorization Code + PKCE, click Connect and sign in via your browser to authorize access to your project. Supports both Streamable HTTP (`/mcp`) and SSE (`/sse`) transports.
 
 ## Usage Examples
 
@@ -11603,8 +11683,8 @@ Search traces with filters, text query, and date range. Returns AI-readable trac
 
 **Parameters:**
 - `query` (optional): Text search query
-- `startDate` (optional): Start date — ISO string or relative like `"24h"`, `"7d"`, `"30d"`. Default: 24h ago
-- `endDate` (optional): End date — ISO string or relative. Default: now
+- `startDate` (optional): Start date, ISO string or relative like `"24h"`, `"7d"`, `"30d"`. Default: 24h ago
+- `endDate` (optional): End date, ISO string or relative. Default: now
 - `filters` (optional): Filter object (e.g. `{"metadata.labels": ["production"]}`)
 - `pageSize` (optional): Results per page (default: 25, max: 1000)
 - `scrollId` (optional): Pagination token from previous search
@@ -11625,7 +11705,7 @@ Query analytics timeseries from LangWatch. Metrics use `"category.name"` format 
 **Parameters:**
 - `metric` (required): Metric in `"category.name"` format (e.g., `"metadata.trace_id"`, `"performance.total_cost"`)
 - `aggregation` (optional): `avg`, `sum`, `min`, `max`, `median`, `p90`, `p95`, `p99`, `cardinality`, `terms`. Default: `avg`
-- `startDate` (optional): Start date — ISO string or relative. Default: 7 days ago
+- `startDate` (optional): Start date, ISO string or relative. Default: 7 days ago
 - `endDate` (optional): End date. Default: now
 - `groupBy` (optional): Group results by field
 - `filters` (optional): Filters to apply
@@ -14216,7 +14296,7 @@ If you're using an AI coding agent (Claude Code, Cursor, etc.) with the [LangWat
 | `platform_update_dataset_record` | Update a single record |
 | `platform_delete_dataset_records` | Delete records by IDs |
 
-The `platform_list_datasets` and `platform_get_dataset` tools support a `format` parameter — use `"json"` for raw data or `"digest"` (default) for AI-readable markdown.
+The `platform_list_datasets` and `platform_get_dataset` tools support a `format` parameter, use `"json"` for raw data or `"digest"` (default) for AI-readable markdown.
 
 ## Finding Your Dataset Slug
 
@@ -15123,7 +15203,7 @@ description: "Use tags to manage prompt deployment stages like production, stagi
 
 # Prompt Tags
 
-Tags let you label specific prompt versions for different deployment stages. Instead of fetching by version number, you can fetch by tag — so your application always gets the right version for its environment.
+Tags let you label specific prompt versions for different deployment stages. Instead of fetching by version number, you can fetch by tag, so your application always gets the right version for its environment.
 
 ## Built-in Tags
 
@@ -15143,7 +15223,7 @@ In the Prompt Playground, click the **Deploy** button to open the Deploy dialog.
 2. Assign it to `production`, `staging`, or any custom tag
 3. See which versions currently have each tag assigned
 
-This is the recommended way to promote a prompt version to production — it provides a clear audit trail and prevents accidental changes.
+This is the recommended way to promote a prompt version to production, it provides a clear audit trail and prevents accidental changes.
 
 ## Fetching by Tag in Your Application
 
@@ -15371,7 +15451,7 @@ Tag CRUD endpoints are **organization-scoped** (use an org-level API key). The a
 
 ## CLI
 
-CLI tag management is planned — see [issue #3090](https://github.com/langwatch/langwatch/issues/3090). Once available, you will be able to list, create, rename, delete, and assign tags from the command line.
+CLI tag management is planned, see [issue #3090](https://github.com/langwatch/langwatch/issues/3090). Once available, you will be able to list, create, rename, delete, and assign tags from the command line.
 
 ## Common Workflows
 
@@ -18065,29 +18145,29 @@ Response (completed):
 # FILE: ./evaluations/experiments/multimodal-evaluation.mdx
 
 ---
-title: Multimodal Evaluation — Images, PDFs, and Vision
+title: Multimodal Evaluation Images, PDFs, and Vision
 sidebarTitle: Multimodal Evaluation
 description: Evaluate image generation, document parsing, and other multimodal AI pipelines with LLM-as-a-Judge vision models.
 ---
 
-LangWatch supports multimodal evaluation out of the box. You can evaluate image inputs and outputs using any vision-capable model (GPT-4o, GPT-5.2, Claude Sonnet, Gemini, etc.) through the built-in LLM-as-a-Judge evaluators — no custom code required.
+LangWatch supports multimodal evaluation out of the box. You can evaluate image inputs and outputs using any vision-capable model (GPT-4o, GPT-5.2, Claude Sonnet, Gemini, etc.) through the built-in LLM-as-a-Judge evaluators, no custom code required.
 
 This covers common multimodal use cases:
-- **Image generation quality** — score outputs of image generation models
-- **Document parsing** — evaluate extracted metadata from PDFs and scanned documents
-- **Content moderation** — detect NSFW or low-quality uploaded images
-- **Visual QA** — evaluate answers to questions about images
-- **Image comparison** — compare generated outputs against reference images
+- **Image generation quality**: score outputs of image generation models
+- **Document parsing**: evaluate extracted metadata from PDFs and scanned documents
+- **Content moderation**: detect NSFW or low-quality uploaded images
+- **Visual QA**: evaluate answers to questions about images
+- **Image comparison**: compare generated outputs against reference images
 
 <Info>
 **Image support works with all three LLM-as-a-Judge evaluator types:**
-- **Boolean** — pass/fail evaluation (e.g. "Is the generated image photorealistic?")
-- **Score** — numeric score evaluation (e.g. "Rate image quality from 1-5")
-- **Category** — classification evaluation (e.g. "Classify the image as: excellent / good / poor")
+- **Boolean**: pass/fail evaluation (e.g. "Is the generated image photorealistic?")
+- **Score**: numeric score evaluation (e.g. "Rate image quality from 1-5")
+- **Category**: classification evaluation (e.g. "Classify the image as: excellent, good, poor")
 
 **See also:**
-- [Dataset Images](/datasets/dataset-images) — Setting up image columns in datasets
-- [Saved Evaluators](/evaluations/evaluators/saved-evaluators) — Reuse evaluators via API
+- [Dataset Images](/datasets/dataset-images): Setting up image columns in datasets
+- [Saved Evaluators](/evaluations/evaluators/saved-evaluators): Reuse evaluators via API
 </Info>
 
 ## Supported Image Formats
@@ -18103,7 +18183,7 @@ Images can be provided in any of these formats:
 Supported extensions: `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.svg`, `.bmp`, `.tiff`
 
 <Note>
-Image detection is strict by design — a field is treated as an image only when the **entire value** is an image URL or base64 string. Mixed text-and-image content is sent as plain text. This prevents unintended multipart content when a field happens to contain an image URL as part of a longer string.
+Image detection is strict by design, a field is treated as an image only when the **entire value** is an image URL or base64 string. Mixed text-and-image content is sent as plain text. This prevents unintended multipart content when a field happens to contain an image URL as part of a longer string.
 </Note>
 
 ## Evaluating Images via UI
@@ -18120,18 +18200,18 @@ Image detection is strict by design — a field is treated as an image only when
   </Frame>
 </div>
 
-4. Paste image URLs or base64 data URIs into the cells — the workbench renders them inline with click-to-expand
+4. Paste image URLs or base64 data URIs into the cells, the workbench renders them inline with click-to-expand
 
 ### Step 2: Add an LLM-as-a-Judge Evaluator
 
 1. Click **+ Add evaluator** on a row in the evaluators section
 2. Select an **LLM-as-a-Judge** evaluator (Boolean, Score, or Category)
 3. Choose a **vision-capable model** (e.g. `gpt-5.2`, `claude-sonnet-4-5-20250929`)
-4. Write a prompt that references the image fields — map dataset columns to the evaluator's `input`, `output`, `contexts`, or `expected_output` variables
+4. Write a prompt that references the image fields, map dataset columns to the evaluator's `input`, `output`, `contexts`, or `expected_output` variables
 
 The evaluator automatically detects image values and sends them as multipart content to the vision model. No special configuration needed.
 
-<Frame caption="Image evaluation workbench — LLM-as-a-Judge scoring virtual try-on quality with three image columns mapped to evaluator variables">
+<Frame caption="Image evaluation workbench, LLM-as-a-Judge scoring virtual try-on quality with three image columns mapped to evaluator variables">
   <img src="/images/evaluations/multimodal-image-evaluation-workbench.png" alt="LangWatch experiments workbench showing image evaluation with LLM-as-a-Judge score evaluator" />
 </Frame>
 
@@ -18757,7 +18837,7 @@ evaluation.log("coherence", {
 ## Comparing Multiple Targets
 
 When comparing different models, prompts, or configurations, use targets to organize your results.
-Both SDKs provide a `target()` / `withTarget()` context that automatically captures latency and enables context inference.
+Both SDKs provide a `target()`, `withTarget()` context that automatically captures latency and enables context inference.
 
 
   ### Python
@@ -18949,9 +19029,9 @@ for index, row in evaluation.loop(df.iterrows(), threads=4):
 
 ### Async-native mode
 
-The default `loop()` / `submit()` path above already parallelises — each submitted task runs in a worker thread, so sync and async tasks both speed up with no extra work on your side. That's the right choice for most users.
+The default `loop()`, `submit()` path above already parallelises, each submitted task runs in a worker thread, so sync and async tasks both speed up with no extra work on your side. That's the right choice for most users.
 
-Reach for `aloop()` / `asubmit()` only when your code is fully async-first and your task relies on async state whose identity is tied to one event loop. The threading path spins up a fresh event loop per worker, so those objects raise `"Future attached to a different loop"` on first use. `aloop` / `asubmit` keep every submitted task on the caller's event loop, so that state stays valid across concurrent items.
+Reach for `aloop()`, `asubmit()` only when your code is fully async-first and your task relies on async state whose identity is tied to one event loop. The threading path spins up a fresh event loop per worker, so those objects raise `"Future attached to a different loop"` on first use. `aloop`, `asubmit` keep every submitted task on the caller's event loop, so that state stays valid across concurrent items.
 
 ```python
 evaluation = langwatch.experiment.init("async-eval-example")
@@ -20531,7 +20611,7 @@ Go to the next step and select "When a message arrives":
 
 No need to change the execution settings, press "Next".
 
-Now, choose "Safety" evaluator category, and then "Prompt Injection / Jailbreak Detection":
+Now, choose "Safety" evaluator category, and then "Prompt Injection, Jailbreak Detection":
 
 <Frame>
 <img src="/images/real-time-evaluation/image 1.png" alt="" style={{ maxWidth: '400px' }} />
@@ -20792,7 +20872,7 @@ def calculate_mrr(predictions: list[str], ground_truth: list[str]):
     return mrr
 ```
 
-If you retrieve a large number of documents (e.g., 100) and only a few are relevant, you have **high recall but low precision** — forcing the LLM to sift through noise. If you retrieve very few documents and miss many relevant ones, you have **high precision but low recall** — limiting the LLM’s ability to generate good answers. Assuming LLMs improve at selecting relevant information, recall becomes more and more important. That's why most practitioners focus on optimizing recall. MRR is helpful when displaying citations to users. If citation quality isn’t critical for your app, focusing on precision and recall is often enough.
+If you retrieve a large number of documents (e.g., 100) and only a few are relevant, you have **high recall but low precision**: forcing the LLM to sift through noise. If you retrieve very few documents and miss many relevant ones, you have **high precision but low recall**: limiting the LLM’s ability to generate good answers. Assuming LLMs improve at selecting relevant information, recall becomes more and more important. That's why most practitioners focus on optimizing recall. MRR is helpful when displaying citations to users. If citation quality isn’t critical for your app, focusing on precision and recall is often enough.
 
 ## Generating Synthetic Data
 
@@ -21002,7 +21082,7 @@ We can see that the best configuration for recall is the small embedding model w
 
 ## Conclusion
 
-Based on our evaluation results, we can now make data-driven decisions about the RAG system. In this case, the smaller embedding model outperformed the larger one for our use case, which brings both performance and cost benefits. Since many factors influence RAG performance, it's important to run more experiments — varying parameters like:
+Based on our evaluation results, we can now make data-driven decisions about the RAG system. In this case, the smaller embedding model outperformed the larger one for our use case, which brings both performance and cost benefits. Since many factors influence RAG performance, it's important to run more experiments, varying parameters like:
 
 1. **Document chunking strategies**: Try different chunk sizes and overlap percentages
 2. **Adding a reranker**: Test if a separate reranking step improves precision
@@ -21011,7 +21091,7 @@ Based on our evaluation results, we can now make data-driven decisions about the
 
 Keep in mind: these results are specific to our test dataset. Your evaluations may reveal different trade-offs based on your domain and data characteristics.
 
-In the next notebook, we’ll explore how fine-tuning embedding models can impact retrieval — and why you (almost) always should.
+In the next notebook, we’ll explore how fine-tuning embedding models can impact retrieval, and why you (almost) always should.
 
 For the full notebook, check it out on: [GitHub](https://github.com/langwatch/cookbooks/blob/main/notebooks/simple-rag-app.ipynb).
 
@@ -22310,7 +22390,7 @@ Moving on, we’ll fine-tune a small open-source embedding model using just 256 
 
 One big reason to fine-tune open-source models is cost. After training, you can run them on your own hardware without worrying about per-query charges. If you’re handling a lot of traffic, this saves a lot of money fast.
 
-We’ll be using sentence-transformers — it’s easy to train, plays nicely with Hugging Face, and has plenty of community examples if you get stuck. Let's first transform our data in the format that sentence-transformer expects it.
+We’ll be using sentence-transformers, it’s easy to train, plays nicely with Hugging Face, and has plenty of community examples if you get stuck. Let's first transform our data in the format that sentence-transformer expects it.
 
 ```python
 from sentence_transformers import InputExample, losses
@@ -24104,6 +24184,186 @@ curl -X POST "https://app.langwatch.ai/api/track_event" \\
 
 ---
 
+# FILE: ./self-hosting/compliance.mdx
+
+---
+title: Self-hosting compliance
+description: What works in self-hosted LangWatch under the Apache 2.0 license vs what requires an Enterprise license. Persona-aware coverage map across SOC 2, ISO 27001, GDPR, HIPAA, EU AI Act, plus the substrate primitives behind each.
+sidebarTitle: Compliance
+---
+
+LangWatch is open-core. The Apache 2.0 self-hosted floor gives you a
+single trace store, append-only event log, persona-aware chrome,
+governed CLI flow, and 30-day retention, enough to satisfy basic
+auditability and PII redaction. Going beyond that, multi-source
+ingestion, multi-class retention, anomaly detection, OCSF/SIEM export,
+tamper-evidence, requires an **Enterprise** license.
+
+This page is the canonical self-hosted compliance map. Skim it before
+you commit to a deployment plan; the right tier for your org depends
+on which mechanisms you actually need on day one.
+
+<Info>**Pairs with:** [AI Governance → Compliance architecture](/ai-governance/compliance-architecture). That page documents the underlying substrate; this page narrows it to "what runs in *your* self-hosted box without buying anything else".</Info>
+
+## TL;DR: open-core split
+
+| Capability | Apache 2.0 floor | Enterprise |
+|---|---|---|
+| Single unified trace store + append-only event_log | ✅ | ✅ |
+| Per-project tenancy + RBAC catalog (5 default roles) | ✅ | ✅ |
+| Custom roles via `CustomRolePermissions` | ❌ | ✅ |
+| PII redaction at trace ingest (Presidio) | ✅ | ✅ |
+| Personal IDE keys + CLI device-flow login | ✅ | ✅ |
+| AI Tools Portal at `/me` (3-tile types, admin catalog) | ✅ | ✅ |
+| Routing policies for the AI Gateway | ✅ | ✅ |
+| Ingestion sources, `otel_generic` only, 1 source max | ✅ | ✅ |
+| Ingestion sources, multi-source (Workato, S3, Copilot Studio, OpenAI/Anthropic compliance APIs) | ❌ | ✅ |
+| Retention, `thirty_days` | ✅ | ✅ |
+| Retention, `one_year`, `seven_years` classes | ❌ | ✅ |
+| Anomaly Rules, admin-curated detection + dispatch | ❌ | ✅ |
+| OCSF/SIEM export (Splunk, Datadog, Sentinel pull API) | ❌ | ✅ |
+| Audit log, org-wide cross-team | ❌ | ✅ |
+| SCIM provisioning | ❌ | ✅ |
+| Tamper-evidence (Merkle-root publication) | ❌ | Enterprise (post-GA follow-up) |
+
+The split is enforced at three layers, see
+[Open-core licensing](/ai-governance/overview#open-core-licensing) for
+the layered enforcement (UI gating + tRPC middleware + service-layer
+defense-in-depth + CLI 402 envelope), and
+[Per-file license headers](/ai-governance/overview#per-file-license-headers)
+for the canonical SPDX header text on each tier.
+
+## SOC 2 Type II: what self-hosted underwrites
+
+SOC 2 Type II asks for **operating-effectiveness evidence over a 6-12 month
+window** that your security controls work as designed. The self-hosted
+Apache 2.0 floor gives you the controls + the audit-evidence machinery for
+the *common-criteria* baseline:
+
+| TSC | Mechanism | Tier |
+|---|---|---|
+| CC6.1, Logical access | RBAC catalog + per-project tenancy + RoleBinding scopes | Apache 2.0 |
+| CC6.6, Logical access (admin) | RBAC ADMIN role + `governance:manage` + `aiTools:manage` | Apache 2.0 |
+| CC6.7, Termination of access | CLI token revoke on user deactivation (CliTokenRevocationService, Phase 1B-1) | Apache 2.0 |
+| CC7.1, Detection | Anomaly rules on activity-event traffic (spend-spike, geo-mismatch, off-hours) | **Enterprise** |
+| CC7.2, Monitoring | Append-only event_log + 30-day retention | Apache 2.0 |
+| CC7.2, Monitoring (≥1y) | Per-origin retention TTL with `one_year`, `seven_years` classes | **Enterprise** |
+| CC7.4, Incident response | OCSF v1.1 SIEM export with cursor pagination | **Enterprise** |
+| CC8.1, Change management | Per-org settings audit + SCIM provisioning history | **Enterprise** |
+
+**Bottom line**: self-hosted Apache 2.0 is sufficient for the access-control + 30-day-monitoring portions of SOC 2 CC. Detection (CC7.1) and long-window monitoring (CC7.2 ≥1y) and incident-response export (CC7.4) and change-mgmt audit (CC8.1) all require Enterprise.
+
+## ISO 27001: same shape
+
+ISO 27001 Annex A controls map onto the same self-hosted-vs-Enterprise
+boundary as SOC 2 above. The Apache 2.0 floor gives you A.5 (policies),
+A.8 (asset management, tenant boundaries), A.9 (access control), A.12.4
+(logging, 30-day window). Anomaly detection (A.12.4 ≥6-month retention),
+SIEM export (A.16 incident management), and SCIM (A.9.2 user lifecycle)
+require Enterprise.
+
+## GDPR: Art. 32 + Art. 30 mapping
+
+| Article | Mechanism | Tier |
+|---|---|---|
+| Art. 32(1)(a), pseudonymisation | PII redaction at trace ingest (Presidio) | Apache 2.0 |
+| Art. 32(1)(b), confidentiality | Per-org tenancy + Layer-1 cross-org guards | Apache 2.0 |
+| Art. 32(1)(d), restoration | Backups (env-configured), trace store replay | Apache 2.0 |
+| Art. 30, record of processing | event_log @ 30d retention | Apache 2.0 |
+| Art. 30, record of processing (extended) | event_log @ `seven_years` retention | **Enterprise** |
+| Art. 33, breach notification | Anomaly rule dispatch (Slack, PagerDuty, SIEM webhook, email) | **Enterprise** |
+| Art. 35, DPIA evidence | OCSF/SIEM export bundle | **Enterprise** |
+
+If your processor agreement requires retention longer than 30 days OR a
+named breach-notification mechanism (Art. 33's "without undue delay,
+where feasible, not later than 72 hours"), Enterprise is the right tier
+even for non-EU customers because GDPR's extra-territorial scope
+applies.
+
+## HIPAA: most uses
+
+HIPAA's covered-entity vs business-associate split + the §164.312
+technical safeguards map cleanly onto the open-core split:
+
+- **§164.312(a)(1) Access control**: Apache 2.0 RBAC catalog + per-project tenancy
+- **§164.312(b) Audit controls**: Apache 2.0 event_log @ 30d retention
+- **§164.312(b) ≥6yr retention**: Enterprise `seven_years` retention class
+- **§164.312(c)(1) Integrity**: Enterprise tamper-evidence (post-GA follow-up)
+- **§164.312(d) Authentication**: Apache 2.0 SSO (env-configured) + Personal IDE keys
+- **§164.312(e) Transmission security**: Apache 2.0 (TLS at gateway + dataplane)
+
+**HIPAA-most-uses**: covered entities with PHI in LLM traces should
+treat Apache 2.0 as the floor for technical safeguards; the §164.312(b)
+6-year audit-log requirement and §164.312(c)(1) integrity (when you
+need cryptographic tamper-evidence) push toward Enterprise. For BAAs
+with explicit retention clauses, Enterprise is required.
+
+## EU AI Act: Art. 12 logging + Art. 18 record-keeping
+
+The EU AI Act's high-risk-AI logging requirements (Art. 12) and the
+provider/deployer record-keeping (Art. 18) map onto:
+
+- **Art. 12(1) automatic recording of events**: Apache 2.0 unified trace store + 30d retention
+- **Art. 12(2)(a) period of operation**: Apache 2.0 (trace timestamps in event_log)
+- **Art. 12(2)(b) reference DB used**: Apache 2.0 (`gen_ai.system` + `gen_ai.request.model` attrs on each span)
+- **Art. 12(2)(c) input data check**: Apache 2.0 (prompt + tool-call payloads on traces, redacted via Presidio)
+- **Art. 12(2)(d) human oversight**: **Enterprise** anomaly-rule dispatch (so a person reviews flagged events) + OCSF/SIEM forwarding
+- **Art. 18(1) record-keeping ≥10y**: This is **Enterprise**'s 10y retention class (note: shipped as `seven_years` today; 10y class is on the post-GA roadmap).
+
+Most enterprise-deploying-an-LLM-agent uses fall under Art. 12 (1-3
+year retention windows). Art. 18 record-keeping for high-risk systems
+explicitly requires the Enterprise retention extension.
+
+## What's *intentionally* unavailable on Apache 2.0
+
+Not "limited", *intentional* design boundaries that keep the open-core
+floor narrow enough to be free-as-in-beer-AND-as-in-speech:
+
+- **Anomaly detection + dispatch** is Enterprise. The detection is the
+  thing you pay for.
+- **Multi-class retention** is Enterprise. 30 days is sufficient for
+  CC7.2 monitoring + Art. 30 GDPR processing-records-baseline.
+- **OCSF/SIEM export** is Enterprise. Apache 2.0 customers can still
+  pull traces from the trace store via the same query API the dashboard
+  uses; what's gated is the *normalised OCSF event stream* with cursor
+  pagination + tenant-isolated read endpoints.
+- **Custom roles via `CustomRolePermissions` JSON** is Enterprise. The
+  default 5-role RBAC catalog (ADMIN, MEMBER, EXTERNAL + per-resource
+  view/manage actions) is Apache 2.0.
+- **SCIM provisioning** is Enterprise. Apache 2.0 customers can still
+  use SSO (Okta, Auth0, Azure AD) for sign-in.
+
+## Migrating from Apache 2.0 to Enterprise
+
+There's no schema migration. Adding an Enterprise license to a running
+self-hosted deployment unlocks the gated UI surfaces (`<EnterpriseLockedSurface>`
+flips to render the page content) and removes the router-layer
+`requireEnterprisePlan` middleware's 403, CLI 402 responses for those
+procedures + endpoints. Existing data, traces, event_log rows,
+RoleBinding entries, AiToolCatalogEntry rows, is unchanged.
+
+For the upgrade path:
+
+1. Provision your Enterprise license (contact sales).
+2. Set `LANGWATCH_LICENSE` (or equivalent, see your contract) in your
+   self-hosted env.
+3. Restart the control-plane pod, `pnpm dev` (no migration needed).
+4. The previously-gated surfaces light up immediately. Existing
+   `<EnterpriseLockedSurface>` wraps detect the plan flip on next page
+   render.
+
+Downgrade is symmetric (drop the env var, restart). All data stays
+queryable; gated surfaces re-gate.
+
+## Where to next
+
+- [AI Governance → Compliance architecture](/ai-governance/compliance-architecture): substrate mechanisms underlying the table above
+- [AI Governance → Open-core licensing](/ai-governance/overview#open-core-licensing): the layered enforcement (UI, tRPC, service, CLI)
+- [Self-hosting → Security](/self-hosting/security): TLS, env secrets, network boundaries
+- [Self-hosting → Configuration → SSO](/self-hosting/configuration/sso): Okta, Auth0, Azure AD wiring
+
+---
+
 # FILE: ./self-hosting/configuration/backups.mdx
 
 ---
@@ -24121,7 +24381,7 @@ LangWatch stores data across three systems. Each requires its own backup strateg
 
 ## PostgreSQL Backups
 
-PostgreSQL holds your control plane data — losing it means losing user accounts, project configurations, and monitor definitions.
+PostgreSQL holds your control plane data, losing it means losing user accounts, project configurations, and monitor definitions.
 
 ### Chart-Managed PostgreSQL
 
@@ -24185,7 +24445,7 @@ helm install langwatch langwatch/langwatch \
 
 ### S3 Authentication
 
-**IRSA / Workload Identity (recommended):**
+**IRSA, Workload Identity (recommended):**
 
 ```yaml
 clickhouse:
@@ -24238,7 +24498,7 @@ Restoring a backup will overwrite existing data in the target database. Always v
 
 ## ClickHouse Cold Storage
 
-Cold storage is separate from backups — it's a tiered storage strategy that automatically moves older data from local SSD to S3 for cost savings.
+Cold storage is separate from backups, it's a tiered storage strategy that automatically moves older data from local SSD to S3 for cost savings.
 
 ### How It Works
 
@@ -24317,11 +24577,11 @@ When using the Helm chart, you rarely need to set environment variables directly
 
 | Variable | Description | Required | Default |
 |----------|-------------|----------|---------|
-| `DATABASE_URL` | PostgreSQL connection string | Yes | — |
-| `CLICKHOUSE_URL` | ClickHouse HTTP connection string (e.g. `http://user:pass@host:8123/langwatch`) | Yes | — |
-| `REDIS_URL` | Redis connection string | Yes | — |
+| `DATABASE_URL` | PostgreSQL connection string | Yes |, |
+| `CLICKHOUSE_URL` | ClickHouse HTTP connection string (e.g. `http://user:pass@host:8123/langwatch`) | Yes |, |
+| `REDIS_URL` | Redis connection string | Yes |, |
 | `NODE_ENV` | Environment (`production`, `development`) | No | `production` |
-| `BASE_HOST` | Internal base URL for the application | Yes | — |
+| `BASE_HOST` | Internal base URL for the application | Yes |, |
 | `NEXTAUTH_URL` | Public URL for authentication callbacks | Yes | Same as `BASE_HOST` |
 | `START_WORKERS` | Run workers in-process (`true`/`false`) | No | `false` |
 
@@ -24440,18 +24700,18 @@ When running on AWS with IRSA (IAM Roles for Service Accounts), you don't need t
 |----------|-------------|---------|
 | `EMAIL_ENABLED` | Enable email notifications | `false` |
 | `EMAIL_PROVIDER` | Email provider (`sendgrid`) | `sendgrid` |
-| `SENDGRID_API_KEY` | SendGrid API key | — |
-| `EMAIL_DEFAULT_FROM` | Default "from" address | — |
+| `SENDGRID_API_KEY` | SendGrid API key |, |
+| `EMAIL_DEFAULT_FROM` | Default "from" address |, |
 
 ## Evaluator Providers
 
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `AZURE_OPENAI_EVALUATOR_ENABLED` | Enable Azure OpenAI for evaluations | `false` |
-| `AZURE_OPENAI_EVALUATOR_ENDPOINT` | Azure OpenAI endpoint URL | — |
-| `AZURE_OPENAI_EVALUATOR_API_KEY` | Azure OpenAI API key | — |
+| `AZURE_OPENAI_EVALUATOR_ENDPOINT` | Azure OpenAI endpoint URL |, |
+| `AZURE_OPENAI_EVALUATOR_API_KEY` | Azure OpenAI API key |, |
 | `GOOGLE_EVALUATOR_ENABLED` | Enable Google AI for evaluations (PII detection) | `false` |
-| `GOOGLE_CREDENTIALS_JSON` | Google service account credentials JSON | — |
+| `GOOGLE_CREDENTIALS_JSON` | Google service account credentials JSON |, |
 
 ## Feature Flags
 
@@ -24466,8 +24726,8 @@ When running on AWS with IRSA (IAM Roles for Service Accounts), you don't need t
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `DISABLE_USAGE_STATS` | Disable anonymous usage analytics | `false` |
-| `SENTRY_DSN` | Sentry DSN for error tracking | — |
-| `METRICS_API_KEY` | API key for metrics collection | — |
+| `SENTRY_DSN` | Sentry DSN for error tracking |, |
+| `METRICS_API_KEY` | API key for metrics collection |, |
 
 ## Helm Chart Mapping
 
@@ -24591,11 +24851,11 @@ Connect Grafana to your Prometheus instance to visualize LangWatch metrics.
 ### Key Dashboards
 
 Set up dashboards for:
-- **Trace throughput** — traces ingested per minute
-- **Worker queue depth** — BullMQ queue backlog (indicates processing bottleneck)
-- **ClickHouse query latency** — p50/p95/p99 query times
-- **Error rates** — HTTP 5xx responses from App and Workers
-- **Resource utilization** — CPU and memory per component
+- **Trace throughput**: traces ingested per minute
+- **Worker queue depth**: BullMQ queue backlog (indicates processing bottleneck)
+- **ClickHouse query latency**: p50/p95/p99 query times
+- **Error rates**: HTTP 5xx responses from App and Workers
+- **Resource utilization**: CPU and memory per component
 
 ### Example Queries
 
@@ -24729,7 +24989,7 @@ description: "Resource requirements, size profiles, and scaling recommendations 
 
 ### Kubernetes (production)
 
-- Minimum 3 nodes with 4 CPU / 16 GB each
+- Minimum 3 nodes with 4 CPU, 16 GB each
 - StorageClass that supports dynamic provisioning
 - See size profiles below for detailed per-component requirements
 
@@ -24821,8 +25081,8 @@ helm install langwatch langwatch/langwatch \
 
 | Bottleneck | Component to Scale | How |
 |---|---|---|
-| Trace ingestion is slow / queue backlog | LangWatch Workers | Increase `workers.replicaCount` |
-| UI is slow / many concurrent users | LangWatch App | Increase `app.replicaCount` |
+| Trace ingestion is slow, queue backlog | LangWatch Workers | Increase `workers.replicaCount` |
+| UI is slow, many concurrent users | LangWatch App | Increase `app.replicaCount` |
 | ClickHouse queries are slow | ClickHouse | Increase `clickhouse.cpu` and `clickhouse.memory` |
 | Evaluations are slow | LangEvals | Increase `langevals.replicaCount` |
 | Topic clustering is slow | LangWatch NLP | Increase `langwatch_nlp.replicaCount` |
@@ -25244,7 +25504,7 @@ You don't need to configure evaluator providers to use LangWatch. They're only r
 
 LangWatch can send notifications to Slack channels via webhooks for alerts and automations. This is configured in the LangWatch UI under **Automations**, not via environment variables.
 
-## S3 / Object Storage
+## S3, Object Storage
 
 Used for dataset storage and ClickHouse cold storage/backups. See:
 - [Backups](/self-hosting/configuration/backups) for ClickHouse cold storage and backup configuration
@@ -25293,11 +25553,11 @@ Docker Compose starts the following services:
 | Service | Image | Port | Description |
 |---------|-------|------|-------------|
 | `app` | `langwatch/langwatch:latest` | 5560 | Main application |
-| `workers` | `langwatch/langwatch:latest` | — | Background job processing |
+| `workers` | `langwatch/langwatch:latest` |, | Background job processing |
 | `langwatch_nlp` | `langwatch/langwatch_nlp:latest` | 5561 | NLP processing, workflows |
 | `langevals` | `langwatch/langevals:latest` | 5562 | Evaluators, guardrails |
 | `postgres` | `postgres:16` | 5432 | Control plane database |
-| `redis` | `redis:alpine` | — | Job queue, caching |
+| `redis` | `redis:alpine` |, | Job queue, caching |
 | `clickhouse` | `langwatch/clickhouse-serverless:0.2.0` | 8123 | Trace and analytics storage |
 
 ## Configuration
@@ -25401,18 +25661,18 @@ services:
 
 Docker Compose is suitable for evaluation and small teams but lacks:
 
-- **High availability** — single instance of each service
-- **Horizontal scaling** — cannot scale workers independently
-- **Automated backups** — no built-in backup scheduling
-- **TLS** — no built-in HTTPS (use a reverse proxy like nginx or Caddy)
+- **High availability**: single instance of each service
+- **Horizontal scaling**: cannot scale workers independently
+- **Automated backups**: no built-in backup scheduling
+- **TLS**: no built-in HTTPS (use a reverse proxy like nginx or Caddy)
 
 For production, migrate to the [Kubernetes Helm chart](/self-hosting/deployment/kubernetes-helm).
 
 ## Next Steps
 
-- [Docker Images](/self-hosting/deployment/docker-images) — Learn about each container image
-- [Kubernetes (Helm)](/self-hosting/deployment/kubernetes-helm) — Production deployment
-- [Environment Variables](/self-hosting/configuration/environment-variables) — Full configuration reference
+- [Docker Images](/self-hosting/deployment/docker-images): Learn about each container image
+- [Kubernetes (Helm)](/self-hosting/deployment/kubernetes-helm): Production deployment
+- [Environment Variables](/self-hosting/configuration/environment-variables): Full configuration reference
 
 ---
 
@@ -25420,7 +25680,7 @@ For production, migrate to the [Kubernetes Helm chart](/self-hosting/deployment/
 
 ---
 title: Docker Images
-description: "LangWatch Docker image reference — what each container does and how they communicate"
+description: "LangWatch Docker image reference, what each container does and how they communicate"
 ---
 
 LangWatch is distributed as three Docker images, each serving a distinct role in the platform.
@@ -25487,7 +25747,7 @@ LangEvals calls external LLM providers (OpenAI, Azure OpenAI, Google) to run mod
 
 The Helm chart also deploys:
 
-- `langwatch/clickhouse-serverless` — Performance-tweaked ClickHouse image optimized for LangWatch's event ingestion and analytical query patterns
+- `langwatch/clickhouse-serverless`, Performance-tweaked ClickHouse image optimized for LangWatch's event ingestion and analytical query patterns
 
 ## Service Communication
 
@@ -25608,7 +25868,7 @@ kubectl -n langwatch port-forward svc/langwatch-app 5560:5560
 ```
 
 <Warning>
-`autogen.enabled=true` generates random secrets on each install. This is fine for testing but not for production — secrets will change on reinstall and invalidate sessions. See [Production Deployment](#production-deployment) below.
+`autogen.enabled=true` generates random secrets on each install. This is fine for testing but not for production, secrets will change on reinstall and invalidate sessions. See [Production Deployment](#production-deployment) below.
 </Warning>
 
 ## Low-Resources Deployment
@@ -25878,7 +26138,7 @@ The chart ships with composable overlay files in `examples/overlays/`. Combine t
 
 ### Composing Overlays
 
-Overlays are composable — later files override earlier ones:
+Overlays are composable, later files override earlier ones:
 
 ```bash
 # Production with external DBs and S3 cold storage
@@ -25931,11 +26191,11 @@ clickhouse:
   memory: "8Gi" # Tunes memory limits, cache sizes, per-query limits
 ```
 
-You only need to set these two values — the subchart computes optimal settings for query limits, merge threads, insert batching, and S3 download parallelism.
+You only need to set these two values, the subchart computes optimal settings for query limits, merge threads, insert batching, and S3 download parallelism.
 
 ### AI Gateway sub-chart (optional)
 
-The umbrella chart bundles the AI Gateway as an opt-in sub-chart that runs alongside the core LangWatch app. Enabling it gives you virtual keys, hierarchical budgets, multi-provider routing via Bifrost, guardrails, and prompt caching — all governed by the same control plane.
+The umbrella chart bundles the AI Gateway as an opt-in sub-chart that runs alongside the core LangWatch app. Enabling it gives you virtual keys, hierarchical budgets, multi-provider routing via Bifrost, guardrails, and prompt caching, all governed by the same control plane.
 
 Minimum viable opt-in:
 
@@ -25948,8 +26208,8 @@ That ships sane defaults (2 replicas, ClusterIP service, no ingress). For per-en
 
 Three things to know before flipping it on:
 
-1. **Shared secrets must exist before install.** The gateway and the LangWatch app both mount `LW_GATEWAY_INTERNAL_SECRET` + `LW_GATEWAY_JWT_SECRET` (and the app additionally reads `LW_VIRTUAL_KEY_PEPPER`) — same byte-for-byte values. Pre-create the `gateway-runtime-secrets` Kubernetes Secret (the chart's `secrets.existingSecretName` default) holding all three keys before `helm install`, otherwise the gateway pod loops on `secret not found` until the install timeout. Override the name via `secrets.existingSecretName` if your platform conventions differ. See [AI Gateway → Self-hosting → Config → Secrets](/ai-gateway/self-hosting/config#secrets) for the recipe.
-2. **Public ingress needs DNS + TLS.** The gateway is what your LLM clients hit, so it usually wants its own hostname (e.g. `gateway.your-corp.com`) — separate cert, separate ingress rule. See [AI Gateway → Self-hosting → DNS & TLS](/ai-gateway/self-hosting/dns-and-tls).
+1. **Shared secrets must exist before install.** The gateway and the LangWatch app both mount `LW_GATEWAY_INTERNAL_SECRET` + `LW_GATEWAY_JWT_SECRET` (and the app additionally reads `LW_VIRTUAL_KEY_PEPPER`), same byte-for-byte values. Pre-create the `gateway-runtime-secrets` Kubernetes Secret (the chart's `secrets.existingSecretName` default) holding all three keys before `helm install`, otherwise the gateway pod loops on `secret not found` until the install timeout. Override the name via `secrets.existingSecretName` if your platform conventions differ. See [AI Gateway → Self-hosting → Config → Secrets](/ai-gateway/self-hosting/config#secrets) for the recipe.
+2. **Public ingress needs DNS + TLS.** The gateway is what your LLM clients hit, so it usually wants its own hostname (e.g. `gateway.your-corp.com`), separate cert, separate ingress rule. See [AI Gateway → Self-hosting → DNS & TLS](/ai-gateway/self-hosting/dns-and-tls).
 3. **Worker pods must be running.** Budget enforcement reads from a ClickHouse rollup that the trace-processing reactor folds into. If you deploy with `workers.enabled=false`, budgets stop accumulating spend and breach enforcement silently degrades. The default `workers.enabled=true` is correct for production.
 
 ## Upgrade
@@ -25982,7 +26242,7 @@ kubectl -n langwatch delete pvc --all
 
 ## FAQ
 
-### Istio / Service Mesh
+### Istio, Service Mesh
 
 If you're using Istio or another service mesh with automatic sidecar injection, the CronJob pods may fail because the sidecar keeps the pod alive after the job completes.
 
@@ -26055,7 +26315,7 @@ make example-up
 
 This will:
 1. Create a Kind cluster named `lw-local` (if it doesn't exist)
-2. Build all Docker images locally (if not already built — first build takes 15-30 min)
+2. Build all Docker images locally (if not already built, first build takes 15-30 min)
 3. Load images into the Kind cluster
 4. Install the Helm chart with `values-local.yaml` into the `lw-local` namespace
 
@@ -26088,10 +26348,10 @@ make images-local
 ```
 
 This builds four images:
-- `langwatch/langwatch:local` — App
-- `langwatch/langwatch_nlp:local` — NLP service
-- `langwatch/langevals:local` — Evaluators
-- `langwatch/clickhouse-serverless:next` — ClickHouse
+- `langwatch/langwatch:local`, App
+- `langwatch/langwatch_nlp:local`, NLP service
+- `langwatch/langevals:local`, Evaluators
+- `langwatch/clickhouse-serverless:next`, ClickHouse
 
 ### 3. Install the Helm Chart
 
@@ -26145,8 +26405,8 @@ The `values-local.yaml` profile deploys:
 | ClickHouse | 1 | Chart-managed, standalone |
 | Redis | 1 | Chart-managed |
 
-- `autogen.enabled: true` — secrets are auto-generated
-- `pullPolicy: Never` — uses locally-built images
+- `autogen.enabled: true`, secrets are auto-generated
+- `pullPolicy: Never`, uses locally-built images
 - Prometheus is disabled to save resources
 
 ## Teardown
@@ -26175,8 +26435,8 @@ First-time image builds take several minutes. Subsequent `make example-up` runs 
 
 ## Next Steps
 
-- [Production Kubernetes deployment](/self-hosting/deployment/kubernetes-helm) — Deploy to a real cluster
-- [Sizing & Scaling](/self-hosting/configuration/sizing-and-scaling) — Resource recommendations
+- [Production Kubernetes deployment](/self-hosting/deployment/kubernetes-helm): Deploy to a real cluster
+- [Sizing & Scaling](/self-hosting/configuration/sizing-and-scaling): Resource recommendations
 
 ---
 
@@ -26184,10 +26444,10 @@ First-time image builds take several minutes. Subsequent `make example-up` runs 
 
 ---
 title: Architecture & Infrastructure
-description: "How LangWatch components fit together — what you're deploying and how data flows through the system"
+description: "How LangWatch components fit together, what you're deploying and how data flows through the system"
 ---
 
-This page explains what you're deploying when you self-host LangWatch — the components, how they connect, and how data moves through the system. Understanding this will help you size, operate, and debug your deployment.
+This page explains what you're deploying when you self-host LangWatch, the components, how they connect, and how data moves through the system. Understanding this will help you size, operate, and debug your deployment.
 
 ## System Overview
 
@@ -26241,7 +26501,7 @@ Web UI, REST API, OTel ingestion, authentication, SSE real-time updates. The onl
 <Card title="Processing" icon="microchip">
 **LangWatch Workers**
 
-Event sourcing pipeline via BullMQ — span ingestion, trace summarisation, cost enrichment, evaluations, PII redaction, and more.
+Event sourcing pipeline via BullMQ, span ingestion, trace summarisation, cost enrichment, evaluations, PII redaction, and more.
 </Card>
 <Card title="Services" icon="flask">
 **LangWatch NLP** (:5561) and **LangEvals** (:5562)
@@ -26259,9 +26519,9 @@ Users, teams, projects, configurations, prompt versions. Managed via Prisma with
 All traces, spans, evaluations, experiments, analytics. Hot storage on SSD, cold storage on S3. Auto-tuned via the clickhouse-serverless subchart.
 </Card>
 <Card title="Queue & Storage" icon="layer-group">
-**Redis** — BullMQ job queue, caching, sessions.
+**Redis**: BullMQ job queue, caching, sessions.
 
-**S3** — ClickHouse cold storage, backups, datasets.
+**S3**: ClickHouse cold storage, backups, datasets.
 </Card>
 </CardGroup>
 
@@ -26269,21 +26529,21 @@ All traces, spans, evaluations, experiments, analytics. Hot storage on SSD, cold
 
 ### LangWatch App (port 5560)
 
-Next.js server — the single external entry point for all traffic:
+Next.js server, the single external entry point for all traffic:
 
-- **Web UI** — dashboards, trace explorer, prompt management, experiment views
-- **REST API + OTel ingestion** — receives spans from LangWatch SDKs
-- **Authentication** — NextAuth.js (email, Google, GitHub, GitLab, Azure AD, Cognito, Okta)
-- **SSE** — pushes real-time updates to connected browser clients
-- **Analytics queries** — reads from ClickHouse
-- **Control plane** — manages users, teams, projects via PostgreSQL
+- **Web UI**: dashboards, trace explorer, prompt management, experiment views
+- **REST API + OTel ingestion**: receives spans from LangWatch SDKs
+- **Authentication**: NextAuth.js (email, Google, GitHub, GitLab, Azure AD, Cognito, Okta)
+- **SSE**: pushes real-time updates to connected browser clients
+- **Analytics queries**: reads from ClickHouse
+- **Control plane**: manages users, teams, projects via PostgreSQL
 
 ### LangWatch Workers
 
 Same `langwatch/langwatch` image, started with `pnpm start:workers`. Consumes jobs from a BullMQ queue in Redis and runs the event sourcing pipeline (see below).
 
 - Deployed as a separate Kubernetes Deployment
-- Stateless — scale by adding replicas
+- Stateless, scale by adding replicas
 
 ### LangWatch NLP (port 5561)
 
@@ -26305,11 +26565,11 @@ Built-in evaluator library (Python):
 
 Both NLP and LangEvals make outbound calls to external LLM providers for model-based operations.
 
-### PostgreSQL — Control Plane
+### PostgreSQL: Control Plane
 
 Stores users, teams, projects, configurations, prompt versions, evaluator definitions. Managed via Prisma ORM with auto-migrations on startup.
 
-### ClickHouse — Data Plane
+### ClickHouse: Data Plane
 
 Stores all high-volume data: traces, spans, evaluations, experiments, analytics, and event sourcing events/projections.
 
@@ -26320,17 +26580,17 @@ Stores all high-volume data: traces, spans, evaluations, experiments, analytics,
 
 The `clickhouse-serverless` subchart auto-tunes internal parameters from two inputs: `cpu` and `memory`.
 
-The `langwatch/clickhouse-serverless` Docker image is a performance-tweaked ClickHouse build optimized for LangWatch's traffic patterns — high-throughput event ingestion with concurrent analytical queries.
+The `langwatch/clickhouse-serverless` Docker image is a performance-tweaked ClickHouse build optimized for LangWatch's traffic patterns, high-throughput event ingestion with concurrent analytical queries.
 
 **Tiered storage**: hot data on local SSD, cold data on S3 after a configurable TTL (default 49 days). Native `BACKUP`/`RESTORE` to S3.
 
 ### Redis
 
-- **BullMQ job queue** — connects the App to Workers with guaranteed delivery, retry, and backpressure
-- **Caching** — frequently accessed config and lookup data
-- **Sessions** — user session storage
+- **BullMQ job queue**: connects the App to Workers with guaranteed delivery, retry, and backpressure
+- **Caching**: frequently accessed config and lookup data
+- **Sessions**: user session storage
 
-### S3 / Object Storage
+### S3, Object Storage
 
 - ClickHouse cold storage (tiered after TTL)
 - ClickHouse backups (full + incremental)
@@ -26374,13 +26634,13 @@ graph LR
     J --> M
 ```
 
-Each step reads from the queue, does its work, and writes results to ClickHouse. Steps are independent — if one is slow (e.g., evaluation waiting on an LLM call), others continue processing.
+Each step reads from the queue, does its work, and writes results to ClickHouse. Steps are independent, if one is slow (e.g., evaluation waiting on an LLM call), others continue processing.
 
 ### How Data is Organized
 
 The pipeline produces three types of output:
 
-**Events** — immutable records of what happened. Stored in ClickHouse and never modified.
+**Events**: immutable records of what happened. Stored in ClickHouse and never modified.
 
 | Event | Produced By | What It Contains |
 |-------|------------|------------------|
@@ -26393,7 +26653,7 @@ The pipeline produces three types of output:
 | EvaluationCompleted | Evaluation Execution | Evaluator scores and results |
 | ExperimentResultRecorded | Experiment Processing | Run results for A/B tests |
 
-**Projections** — derived tables that dashboards and APIs read from. Built from events.
+**Projections**: derived tables that dashboards and APIs read from. Built from events.
 
 | Projection | Built From | Used By |
 |-----------|-----------|---------|
@@ -26404,16 +26664,16 @@ The pipeline produces three types of output:
 | Analytics | All events | Dashboard aggregations |
 | Topics | TraceSummarised + clustering | Conversation topic groups |
 
-**Reactions** — side effects triggered during processing.
+**Reactions**: side effects triggered during processing.
 
 | Reaction | Triggered By | Effect |
 |----------|-------------|--------|
 | SSE Update | Any event | Real-time UI refresh in browser |
-| Alert / Trigger | EvaluationCompleted | Slack, email, webhook notification |
+| Alert, Trigger | EvaluationCompleted | Slack, email, webhook notification |
 | Dataset Append | Automation rules | Auto-add traces to datasets |
 
 <Note>
-If Worker queue depth grows in Redis, it means processing is falling behind ingestion. The fix is to add more Worker replicas — each one is stateless and consumes jobs independently.
+If Worker queue depth grows in Redis, it means processing is falling behind ingestion. The fix is to add more Worker replicas, each one is stateless and consumes jobs independently.
 </Note>
 
 ## Data Flow
@@ -26441,9 +26701,9 @@ sequenceDiagram
 ```
 
 Additionally, Kubernetes CronJobs trigger periodic tasks via HTTP on the App:
-- **Topic clustering** — daily at midnight, via the NLP service
-- **Alert triggers** — every 3 minutes, evaluates monitor conditions
-- **Retention cleanup** — daily at 01:00, removes data past retention period
+- **Topic clustering**: daily at midnight, via the NLP service
+- **Alert triggers**: every 3 minutes, evaluates monitor conditions
+- **Retention cleanup**: daily at 01:00, removes data past retention period
 
 ## Network Topology
 
@@ -26451,7 +26711,7 @@ Only the App is exposed externally. Everything else is cluster-internal:
 
 | Component | Service Type | External |
 |-----------|-------------|----------|
-| App | Ingress / LoadBalancer | Yes |
+| App | Ingress, LoadBalancer | Yes |
 | Workers | None (no Service needed) | No |
 | NLP | ClusterIP | No |
 | LangEvals | ClusterIP | No |
@@ -26479,11 +26739,11 @@ LangWatch is deeply integrated with OpenTelemetry. The platform both **consumes*
 
 **Export**: LangWatch exports its own operational metrics, logs, and traces via OpenTelemetry for infrastructure debugging:
 
-- **Metrics** — Prometheus-compatible metrics from the App and Workers (request latency, queue depth, error rates)
-- **Logs** — Structured application logs from all components
-- **Traces** — Distributed traces of internal request processing
+- **Metrics**: Prometheus-compatible metrics from the App and Workers (request latency, queue depth, error rates)
+- **Logs**: Structured application logs from all components
+- **Traces**: Distributed traces of internal request processing
 
-This means you can monitor LangWatch itself using the same observability stack you use for the rest of your infrastructure — Grafana, Datadog, New Relic, or any OTel-compatible backend.
+This means you can monitor LangWatch itself using the same observability stack you use for the rest of your infrastructure, Grafana, Datadog, New Relic, or any OTel-compatible backend.
 
 LangWatch ships with off-the-shelf Grafana dashboards for monitoring the platform. See [Observability & Monitoring](/self-hosting/configuration/observability) for setup details.
 
@@ -26512,7 +26772,7 @@ title: Ops Dashboard
 description: "Real-time pipeline health monitoring with throughput, latency, and error tracking"
 ---
 
-The Ops Dashboard is the landing page of the Operations Console (`/ops`). It provides a real-time view of the event-sourcing pipeline — ingestion rates, processing throughput, latency percentiles, queue health, and top errors — all in a single screen.
+The Ops Dashboard is the landing page of the Operations Console (`/ops`). It provides a real-time view of the event-sourcing pipeline, ingestion rates, processing throughput, latency percentiles, queue health, and top errors, all in a single screen.
 
 <Frame>
 <img src="/images/ops/dashboard.png" alt="Ops Dashboard" />
@@ -26524,15 +26784,15 @@ The top of the dashboard displays six key metrics, each showing the current rate
 
 | Metric | What it measures | Secondary stat |
 |---|---|---|
-| **Staged/s** | Ingestion rate — commands entering the queue | Peak rate |
-| **Completed/s** | Processing throughput — commands fully processed | Total completed |
-| **Failed/s** | Failure rate — commands that errored | Total failed |
+| **Staged/s** | Ingestion rate, commands entering the queue | Peak rate |
+| **Completed/s** | Processing throughput, commands fully processed | Total completed |
+| **Failed/s** | Failure rate, commands that errored | Total failed |
 | **Blocked** | Groups stuck due to errors | Number of error groups |
 | **DLQ** | Items in the Dead Letter Queue | Redis memory usage |
-| **P50 / P99** | End-to-end processing latency | Peak latency |
+| **P50, P99** | End-to-end processing latency | Peak latency |
 
 <Tip>
-Metrics marked in red indicate an active problem — non-zero failure rates or blocked groups. Orange indicates a warning state, such as items in the DLQ.
+Metrics marked in red indicate an active problem, non-zero failure rates or blocked groups. Orange indicates a warning state, such as items in the DLQ.
 </Tip>
 
 ## Active Operations
@@ -26556,9 +26816,9 @@ Operators with `ops:manage` permission can **pause** and **unpause** individual 
 
 The bottom of the dashboard lists the top error patterns across all queues, showing:
 
-- **Count** — how many jobs hit this error
-- **Error message** — normalized and deduplicated
-- **Pipeline** — which pipeline stage produced the error
+- **Count**: how many jobs hit this error
+- **Error message**: normalized and deduplicated
+- **Pipeline**: which pipeline stage produced the error
 
 This gives a quick signal on whether errors are concentrated in a single pipeline or scattered across the system.
 
@@ -26566,9 +26826,9 @@ This gives a quick signal on whether errors are concentrated in a single pipelin
 
 The dashboard uses **Server-Sent Events (SSE)** for real-time metric streaming. A connection status indicator in the header shows:
 
-- **Connected** (green) — live SSE connection active
-- **Polling** (yellow) — SSE unavailable, falling back to 5-second polling
-- **Disconnected** (red) — no connection
+- **Connected** (green), live SSE connection active
+- **Polling** (yellow), SSE unavailable, falling back to 5-second polling
+- **Disconnected** (red), no connection
 
 Both modes deliver the same data; SSE simply provides lower-latency updates.
 
@@ -26585,7 +26845,7 @@ title: Deja View
 description: "Time-travel debugger for event-sourced aggregates"
 ---
 
-**Deja View** (`/ops/dejaview`) is a time-travel debugger for LangWatch's event-sourcing system. It lets you search for any aggregate, inspect its full event history, and compute any projection's state at any point in that history — all from a single interface.
+**Deja View** (`/ops/dejaview`) is a time-travel debugger for LangWatch's event-sourcing system. It lets you search for any aggregate, inspect its full event history, and compute any projection's state at any point in that history, all from a single interface.
 
 <Frame>
 <img src="/images/ops/dejaview-detail.png" alt="Deja View showing event timeline and projection state" />
@@ -26593,16 +26853,16 @@ description: "Time-travel debugger for event-sourced aggregates"
 
 ## When to Use Deja View
 
-- **Debugging projection state** — "Why does this trace show the wrong evaluation result?" Look at the events and compute the projection to see where state diverged.
-- **Investigating processing failures** — Find the aggregate, check what events were stored, and identify whether the issue is in the events or the projection.
-- **Auditing** — Review the complete history of any aggregate: every event that happened, in order.
-- **Verifying a replay** — After running a [projection replay](/self-hosting/ops/projection-replay), check that the rebuilt state looks correct.
+- **Debugging projection state**: "Why does this trace show the wrong evaluation result?" Look at the events and compute the projection to see where state diverged.
+- **Investigating processing failures**: Find the aggregate, check what events were stored, and identify whether the issue is in the events or the projection.
+- **Auditing**: Review the complete history of any aggregate: every event that happened, in order.
+- **Verifying a replay**: After running a [projection replay](/self-hosting/ops/projection-replay), check that the rebuilt state looks correct.
 
 ## Searching for Aggregates
 
 The search bar at the top accepts:
-- **Aggregate ID** (required) — the primary key of the aggregate you're looking for
-- **Tenant ID** (optional) — filter to a specific project/tenant
+- **Aggregate ID** (required), the primary key of the aggregate you're looking for
+- **Tenant ID** (optional), filter to a specific project/tenant
 
 Results appear in a table showing matching aggregates. Click a row to load its event stream.
 
@@ -26612,7 +26872,7 @@ Results appear in a table showing matching aggregates. Click a row to load its e
 
 ## Event Timeline
 
-Once an aggregate is selected, the bottom of the screen shows a **horizontal event timeline** — a color-coded sequence of numbered event boxes.
+Once an aggregate is selected, the bottom of the screen shows a **horizontal event timeline**: a color-coded sequence of numbered event boxes.
 
 - Each box represents one event, numbered sequentially
 - Colors are assigned by event type, with a legend at the top
@@ -26631,8 +26891,8 @@ Once an aggregate is selected, the bottom of the screen shows a **horizontal eve
 
 The center panel shows the current event's payload. Toggle between:
 
-- **Raw view** — the complete event data structure
-- **Diff view** — shows what changed compared to the previous event
+- **Raw view**: the complete event data structure
+- **Diff view**: shows what changed compared to the previous event
 
 Press `e` or click the toggle to open a detailed JSON viewer in the right panel for deeply nested event payloads.
 
@@ -26644,8 +26904,8 @@ This is the core of the time-travel capability: you can step through events and 
 
 For example:
 1. Select a projection (e.g., "TraceAnalytics")
-2. Navigate to event #5 — see the projection state after events 1-5
-3. Step forward to event #6 — see how the state changed
+2. Navigate to event #5, see the projection state after events 1-5
+3. Step forward to event #6, see how the state changed
 4. Compare with the current state to identify where things went wrong
 
 ## Deep Linking
@@ -26656,7 +26916,7 @@ Deja View encodes its full state in the URL fragment, making every view shareabl
 /ops/dejaview#query=trace_abc&tenant=project_xyz&event=5&proj=TraceAnalytics
 ```
 
-Copy the URL from your browser to share the exact view — aggregate, event position, and selected projection — with a colleague. No additional setup required.
+Copy the URL from your browser to share the exact view, aggregate, event position, and selected projection, with a colleague. No additional setup required.
 
 ## Common Workflows
 
@@ -26665,8 +26925,8 @@ Copy the URL from your browser to share the exact view — aggregate, event posi
 1. Search for the trace's aggregate ID
 2. Select the evaluation projection
 3. Step through events to find where the evaluation result was computed
-4. Check the event payload — is the input data correct?
-5. Check the projection state — does the fold logic produce the expected result?
+4. Check the event payload, is the input data correct?
+5. Check the projection state, does the fold logic produce the expected result?
 
 ### "Did the replay fix this aggregate?"
 
@@ -26690,7 +26950,7 @@ title: The Foundry
 description: "Interactive trace playground for building and sending synthetic traces"
 ---
 
-**The Foundry** (`/ops/foundry`) is an interactive trace builder and sender. It lets you construct complete trace hierarchies — LLM calls, tool invocations, RAG retrievals, agent steps — and send them to any LangWatch project. Use it to test ingestion pipelines, reproduce issues, or generate sample data.
+**The Foundry** (`/ops/foundry`) is an interactive trace builder and sender. It lets you construct complete trace hierarchies, LLM calls, tool invocations, RAG retrievals, agent steps, and send them to any LangWatch project. Use it to test ingestion pipelines, reproduce issues, or generate sample data.
 
 <Frame>
 <img src="/images/ops/foundry.png" alt="The Foundry trace builder" />
@@ -26703,14 +26963,14 @@ The Foundry is split into two panels:
 **Left sidebar:**
 - [Target project](#target-project) selector
 - Trace settings (service name, user ID, metadata)
-- [Span tree](#span-tree) — hierarchical view of all spans
-- [Execution controls](#sending-traces) — send button, batch settings, execution log
+- [Span tree](#span-tree): hierarchical view of all spans
+- [Execution controls](#sending-traces): send button, batch settings, execution log
 
 **Main area** with four tabs:
-- [Editor](#span-editor) — form-based span attribute editing
-- [Waterfall](#waterfall-view) — timeline visualization
-- [Graph](#graph-view) — DAG of span relationships
-- [JSON](#json-view) — raw trace configuration
+- [Editor](#span-editor): form-based span attribute editing
+- [Waterfall](#waterfall-view): timeline visualization
+- [Graph](#graph-view): DAG of span relationships
+- [JSON](#json-view): raw trace configuration
 
 ## Target Project
 
@@ -26721,14 +26981,14 @@ The project selector at the top of the sidebar determines where traces are sent.
 The span tree shows all spans in the trace as a nested hierarchy. Each span displays its type icon, name, and type badge.
 
 **Supported span types:**
-- **LLM** — language model calls with messages, model, temperature
-- **Agent** — autonomous agent steps
-- **Tool** — tool/function invocations
-- **RAG** — retrieval-augmented generation with document contexts
-- **Chain** — multi-step processing chains
-- **Prompt** — prompt template rendering
-- **Guardrail** — safety/validation checks
-- **Generic** — any other operation
+- **LLM**: language model calls with messages, model, temperature
+- **Agent**: autonomous agent steps
+- **Tool**: tool/function invocations
+- **RAG**: retrieval-augmented generation with document contexts
+- **Chain**: multi-step processing chains
+- **Prompt**: prompt template rendering
+- **Guardrail**: safety/validation checks
+- **Generic**: any other operation
 
 **Actions:**
 - Click a span to select it for editing
@@ -26739,13 +26999,13 @@ The span tree shows all spans in the trace as a nested hierarchy. Each span disp
 
 When a span is selected, the Editor tab shows a form with:
 
-- **Name** and **Type** — identity of the span
-- **Duration** and **Offset** (ms) — timing relative to the parent span
-- **Status** — OK, Error, or Unset
-- **Exception** — error message and stack trace (appears when status is Error)
-- **Input / Output** — data flowing through the span (text or JSON)
-- **Type-specific fields** — e.g., model and temperature for LLM spans, documents for RAG spans
-- **Custom Attributes** — arbitrary key-value pairs
+- **Name** and **Type**: identity of the span
+- **Duration** and **Offset** (ms), timing relative to the parent span
+- **Status**: OK, Error, or Unset
+- **Exception**: error message and stack trace (appears when status is Error)
+- **Input, Output**: data flowing through the span (text or JSON)
+- **Type-specific fields**: e.g., model and temperature for LLM spans, documents for RAG spans
+- **Custom Attributes**: arbitrary key-value pairs
 
 <Frame>
 <img src="/images/ops/foundry-editor.png" alt="Span editor form" />
@@ -26765,7 +27025,7 @@ A directed acyclic graph (DAG) showing span relationships as nodes and edges. No
 
 ## JSON View
 
-A Monaco code editor showing the full trace configuration as JSON. You can edit the JSON directly — changes are validated in real-time and reflected in the other views.
+A Monaco code editor showing the full trace configuration as JSON. You can edit the JSON directly, changes are validated in real-time and reflected in the other views.
 
 Buttons for **Format**, **Copy**, and **Reset** are available in the header.
 
@@ -26773,9 +27033,9 @@ Buttons for **Format**, **Copy**, and **Reset** are available in the header.
 
 The execution controls at the bottom of the sidebar let you send the configured trace:
 
-- **Run N times** — batch count (1–100)
-- **Stagger (ms)** — delay between batch items to avoid overwhelming the system
-- **Send Traces** — executes the batch
+- **Run N times**: batch count (1–100)
+- **Stagger (ms)**: delay between batch items to avoid overwhelming the system
+- **Send Traces**: executes the batch
 
 The **execution log** below the button shows the status of each send:
 - Pending, success (with copyable trace ID), or error
@@ -26817,7 +27077,7 @@ title: Operations Console
 description: "Monitor, manage, and debug your LangWatch event-sourcing pipeline from a single pane of glass"
 ---
 
-The **Ops Console** (`/ops`) is a platform-wide operations interface built for teams running LangWatch on their own infrastructure. It gives operators real-time visibility into the event-sourcing pipeline — queue health, processing throughput, error clusters — and the tools to act on problems without touching the database or restarting pods.
+The **Ops Console** (`/ops`) is a platform-wide operations interface built for teams running LangWatch on their own infrastructure. It gives operators real-time visibility into the event-sourcing pipeline, queue health, processing throughput, error clusters, and the tools to act on problems without touching the database or restarting pods.
 
 <Frame>
 <img src="/images/ops/dashboard.png" alt="Ops Dashboard overview" />
@@ -26827,12 +27087,12 @@ The **Ops Console** (`/ops`) is a platform-wide operations interface built for t
 
 | Scenario | Where to go |
 |---|---|
-| Traces aren't appearing in the UI | [Dashboard](/self-hosting/ops/dashboard) — check Staged/s and Failed/s rates |
-| Processing is stuck | [Queue Management](/self-hosting/ops/queue-management) — inspect blocked groups and error clusters |
-| A deployment broke a projection | [Projection Replay](/self-hosting/ops/projection-replay) — replay affected projections from a known-good date |
-| Need to debug a specific trace or aggregate | [Deja View](/self-hosting/ops/dejaview) — time-travel through the event stream |
-| Want to test trace ingestion against a project | [The Foundry](/self-hosting/ops/foundry) — build and send synthetic traces |
-| Failed jobs need reprocessing | [Queue Management](/self-hosting/ops/queue-management) — redrive from the DLQ |
+| Traces aren't appearing in the UI | [Dashboard](/self-hosting/ops/dashboard): check Staged/s and Failed/s rates |
+| Processing is stuck | [Queue Management](/self-hosting/ops/queue-management): inspect blocked groups and error clusters |
+| A deployment broke a projection | [Projection Replay](/self-hosting/ops/projection-replay): replay affected projections from a known-good date |
+| Need to debug a specific trace or aggregate | [Deja View](/self-hosting/ops/dejaview): time-travel through the event stream |
+| Want to test trace ingestion against a project | [The Foundry](/self-hosting/ops/foundry): build and send synthetic traces |
+| Failed jobs need reprocessing | [Queue Management](/self-hosting/ops/queue-management): redrive from the DLQ |
 
 ## Feature Overview
 
@@ -26861,7 +27121,7 @@ The Ops Console uses two dedicated permissions, separate from project-level RBAC
 | Permission | Grants |
 |---|---|
 | `ops:view` | Read-only access to all dashboards, metrics, and search |
-| `ops:manage` | Write access — unblock groups, drain queues, pause pipelines, start replays, redrive DLQ |
+| `ops:manage` | Write access, unblock groups, drain queues, pause pipelines, start replays, redrive DLQ |
 
 These are platform-wide permissions, not scoped to a specific project. Users without `ops:view` are redirected away from `/ops` routes.
 
@@ -26912,10 +27172,10 @@ graph LR
     Pause["1. Pause"] --> Drain["2. Drain"] --> Replay["3. Replay"] --> Unpause["4. Unpause"]
 ```
 
-1. **Pause** — Freeze the selected projections so new events don't interfere
-2. **Drain** — Wait for in-flight jobs to complete
-3. **Replay** — Reread events from ClickHouse and reprocess them through the projections
-4. **Unpause** — Resume normal processing
+1. **Pause**: Freeze the selected projections so new events don't interfere
+2. **Drain**: Wait for in-flight jobs to complete
+3. **Replay**: Reread events from ClickHouse and reprocess them through the projections
+4. **Unpause**: Resume normal processing
 
 ## Bulk Replay Wizard
 
@@ -26929,15 +27189,15 @@ Choose which tenants (projects) to replay:
 
 ### Step 2: Choose Date Range
 
-Set the **"Replay events since"** date — only events after this date are reprocessed. Quick-select buttons are available for common ranges (1, 2, 3, or 6 months).
+Set the **"Replay events since"** date, only events after this date are reprocessed. Quick-select buttons are available for common ranges (1, 2, 3, or 6 months).
 
-Once tenants and date are selected, the system automatically **discovers aggregates** — querying ClickHouse to find how many aggregates match each projection.
+Once tenants and date are selected, the system automatically **discovers aggregates**: querying ClickHouse to find how many aggregates match each projection.
 
 ### Step 3: Select Projections
 
 A table shows all available projections with:
 - **Projection name** and **pipeline**
-- **Aggregate count** — how many aggregates have data in the selected range
+- **Aggregate count**: how many aggregates have data in the selected range
 - Projections with no matching data are disabled
 
 Select individual projections or use **"Select all with data"** to check everything.
@@ -26949,8 +27209,8 @@ Before starting, a summary shows:
 - A description field for audit logging
 
 Two action options:
-- **Start Full Replay** — runs the four-phase replay process
-- **Dry Run** — processes 5 sample aggregates in memory without writing, to verify the projection logic is correct
+- **Start Full Replay**: runs the four-phase replay process
+- **Dry Run**: processes 5 sample aggregates in memory without writing, to verify the projection logic is correct
 
 ## Monitoring Progress
 
@@ -26958,11 +27218,11 @@ When a replay starts, a **progress drawer** slides open showing real-time metric
 
 - **Current phase** (pause, drain, replay, unpause)
 - **Current projection** being processed
-- **Aggregates processed** — progress bar with count and percentage
-- **Events processed** — total events replayed
-- **Throughput** — events per second
-- **Elapsed time** — wall clock since start
-- **Projection badges** — highlighting the currently active projection
+- **Aggregates processed**: progress bar with count and percentage
+- **Events processed**: total events replayed
+- **Throughput**: events per second
+- **Elapsed time**: wall clock since start
+- **Projection badges**: highlighting the currently active projection
 
 ## Replay History
 
@@ -27008,14 +27268,14 @@ This is useful when a single aggregate's projection state is incorrect and you w
 2. Select the affected projection(s)
 3. Set the date to when the bug was introduced (or earlier to be safe)
 4. Select affected tenants (or all)
-5. Start replay — the fixed projection code reprocesses all events
+5. Start replay, the fixed projection code reprocesses all events
 
 ### Debugging a single trace
 
 1. Expand the **Advanced: Single Aggregate Replay** section
 2. Enter the aggregate ID and tenant ID
 3. Select the projection you're investigating
-4. Replay — then check [Deja View](/self-hosting/ops/dejaview) to inspect the result
+4. Replay, then check [Deja View](/self-hosting/ops/dejaview) to inspect the result
 
 ---
 
@@ -27030,13 +27290,13 @@ Queue Management is handled through three sections of the [Ops Dashboard](/self-
 
 ## Error Groups & Blocked Queues
 
-When a job fails repeatedly, its group becomes **blocked** — no new jobs in that group are processed until the error is resolved. The Blocked section clusters these failures by normalized error message, so you can see patterns at a glance.
+When a job fails repeatedly, its group becomes **blocked**: no new jobs in that group are processed until the error is resolved. The Blocked section clusters these failures by normalized error message, so you can see patterns at a glance.
 
 Each error cluster shows:
-- **Count** — how many groups are affected
-- **Error message** — normalized sample
-- **Pipeline** — which pipeline stage produced the error
-- **Sample group IDs** — for quick identification
+- **Count**: how many groups are affected
+- **Error message**: normalized sample
+- **Pipeline**: which pipeline stage produced the error
+- **Sample group IDs**: for quick identification
 
 ### Actions on Blocked Groups
 
@@ -27049,7 +27309,7 @@ All write actions require the `ops:manage` permission.
 | **Unblock All** | Retries all blocked groups in the queue immediately |
 | **Canary Unblock** | Retries a small random sample (default 5, configurable up to 100) to test whether the underlying issue is resolved before unblocking everything |
 | **Move to DLQ** | Moves all blocked groups to the Dead Letter Queue for later inspection or reprocessing |
-| **Drain** | Permanently discards all jobs in an error cluster — use when jobs are unrecoverable |
+| **Drain** | Permanently discards all jobs in an error cluster, use when jobs are unrecoverable |
 
 <Warning>
 **Drain is irreversible.** Drained jobs cannot be recovered. Always prefer moving to DLQ first if there's any chance the jobs can be reprocessed later.
@@ -27057,13 +27317,13 @@ All write actions require the `ops:manage` permission.
 
 ## Dead Letter Queue (DLQ)
 
-The DLQ holds groups that were explicitly moved there — either automatically after exceeding retry limits or manually via the "Move to DLQ" action. Items in the DLQ are not processed until an operator takes action.
+The DLQ holds groups that were explicitly moved there, either automatically after exceeding retry limits or manually via the "Move to DLQ" action. Items in the DLQ are not processed until an operator takes action.
 
 Each DLQ entry shows:
-- **Queue name** — which queue the group came from
-- **Group ID** and **Pipeline** — for identification
-- **Error message** — the error that caused the failure
-- **Job count** — how many jobs are in the group
+- **Queue name**: which queue the group came from
+- **Group ID** and **Pipeline**: for identification
+- **Error message**: the error that caused the failure
+- **Job count**: how many jobs are in the group
 
 ### Redriving from the DLQ
 
@@ -27082,21 +27342,21 @@ Each DLQ entry shows:
 The Groups table provides a detailed per-group view of all processing groups across queues.
 
 Each row shows:
-- **Group ID** — the logical partition key
-- **Pipeline** — which pipeline stage this group belongs to
-- **Pending** — number of jobs waiting to be processed
-- **Retries** — retry count (orange if > 0)
-- **Oldest job age** — with a warning indicator if overdue
-- **Status** — `OK`, `Active`, `Blocked`, or `Stale`
+- **Group ID**: the logical partition key
+- **Pipeline**: which pipeline stage this group belongs to
+- **Pending**: number of jobs waiting to be processed
+- **Retries**: retry count (orange if > 0)
+- **Oldest job age**: with a warning indicator if overdue
+- **Status**: `OK`, `Active`, `Blocked`, or `Stale`
 
 ### Filtering
 
 Filter groups by status to focus on problems:
-- **All** — every group
-- **Blocked** — groups stuck due to errors
-- **Stale** — blocked groups that have been waiting too long
-- **Active** — groups currently being processed
-- **OK** — healthy groups
+- **All**: every group
+- **Blocked**: groups stuck due to errors
+- **Stale**: blocked groups that have been waiting too long
+- **Active**: groups currently being processed
+- **OK**: healthy groups
 
 A search box lets you filter by Group ID, Pipeline name, or error message.
 
@@ -27112,7 +27372,7 @@ Click any row to open the **Group Detail** dialog, which shows:
 
 ### Recovering from a bad deployment
 
-1. Check the **Blocked** section — a spike in blocked groups after a deploy usually means the new code is crashing
+1. Check the **Blocked** section, a spike in blocked groups after a deploy usually means the new code is crashing
 2. Roll back the deployment
 3. Use **Canary Unblock** to test that the rollback fixes the issue
 4. If the canary succeeds, **Unblock All** to resume processing
@@ -27186,13 +27446,13 @@ See [Architecture & Infrastructure](/self-hosting/infrastructure/architecture) f
 
 <CardGroup cols={2}>
 <Card title="LangWatch Cloud" icon="cloud">
-Fully managed by the LangWatch team. No infrastructure to manage — sign up and start sending traces in minutes.
+Fully managed by the LangWatch team. No infrastructure to manage, sign up and start sending traces in minutes.
 
 [Sign up at langwatch.ai](https://langwatch.ai)
 </Card>
 
 <Card title="Self-Managed" icon="server">
-Deploy the complete LangWatch stack on your own infrastructure — AWS, Azure, GCP, or bare metal. You manage everything: compute, databases, and storage. Full data sovereignty.
+Deploy the complete LangWatch stack on your own infrastructure, AWS, Azure, GCP, or bare metal. You manage everything: compute, databases, and storage. Full data sovereignty.
 
 [Get started with Kubernetes](/self-hosting/deployment/kubernetes-helm)
 </Card>
@@ -27204,7 +27464,7 @@ LangWatch manages the application. Your data lives on exclusive, dedicated insta
 </Card>
 
 <Card title="Hybrid" icon="arrows-split-up-and-left">
-LangWatch manages the control plane (App, Workers, NLP, LangEvals). You provide the data plane — ClickHouse and S3 in your VPC. Your trace data never leaves your network.
+LangWatch manages the control plane (App, Workers, NLP, LangEvals). You provide the data plane, ClickHouse and S3 in your VPC. Your trace data never leaves your network.
 
 [Learn more](/hybrid-setup/overview)
 </Card>
@@ -27230,7 +27490,7 @@ Choose the deployment method that fits your environment.
     icon="docker"
     href="/self-hosting/deployment/docker-compose"
   >
-    Quick local setup with Docker. Coming soon for v3 — currently available for v2.
+    Quick local setup with Docker. Coming soon for v3, currently available for v2.
   </Card>
   <Card
     title="Kubernetes (Helm)"
@@ -27260,8 +27520,8 @@ Choose the deployment method that fits your environment.
 - **Native ClickHouse backup/restore** simplifies disaster recovery without third-party tooling.
 - **Auto-tuned ClickHouse** via the `clickhouse-serverless` subchart adapts resource allocation to your workload.
 - **Composable Helm chart overlays** let you customize deployments without forking the chart.
-- **Deep OpenTelemetry integration** — ingest traces via OTLP, export platform metrics and logs via OTel for infrastructure monitoring.
-- **AI Gateway sub-chart** (optional) — terminate LLM traffic on your own perimeter with virtual keys, hierarchical budgets, multi-provider routing, guardrails, and prompt caching. Same Helm install, opt in via `gateway.enabled=true`. See [AI Gateway → Self-hosting](/ai-gateway/self-hosting/helm).
+- **Deep OpenTelemetry integration**: ingest traces via OTLP, export platform metrics and logs via OTel for infrastructure monitoring.
+- **AI Gateway sub-chart** (optional), terminate LLM traffic on your own perimeter with virtual keys, hierarchical budgets, multi-provider routing, guardrails, and prompt caching. Same Helm install, opt in via `gateway.enabled=true`. See [AI Gateway → Self-hosting](/ai-gateway/self-hosting/helm).
 
 ## Enterprise
 
@@ -27269,7 +27529,7 @@ For Cloud Enterprise or Hybrid deployments, [contact the LangWatch team](https:/
 
 Enterprise capabilities include:
 
-- **SSO / SCIM** -- integrate with your identity provider for seamless user provisioning
+- **SSO, SCIM** -- integrate with your identity provider for seamless user provisioning
 - **Role-based access control** -- fine-grained permissions across projects and teams
 - **Audit logs** -- full visibility into who did what and when
 - **Priority support** -- dedicated engineering assistance and SLA-backed response times
@@ -27318,7 +27578,7 @@ The `CREDENTIALS_SECRET` environment variable is used to encrypt API keys and cr
 
 | Path | Encryption |
 |------|-----------|
-| Client to App | TLS at Ingress / Load Balancer |
+| Client to App | TLS at Ingress, Load Balancer |
 | App to PostgreSQL | TLS (configure via connection string: `?sslmode=require`) |
 | App to ClickHouse | HTTPS (configure ClickHouse with TLS certificates) |
 | App to Redis | TLS (configure via connection string: `rediss://...`) |
@@ -27332,7 +27592,7 @@ For inter-service encryption, deploy a service mesh like Istio or Linkerd. This 
 
 ### Development (Auto-Generated)
 
-For development, enable `autogen.enabled: true` in the Helm chart. This generates random secrets automatically. Not suitable for production — secrets change on reinstall.
+For development, enable `autogen.enabled: true` in the Helm chart. This generates random secrets automatically. Not suitable for production, secrets change on reinstall.
 
 ### Production (Kubernetes Secrets)
 
@@ -27357,9 +27617,9 @@ secrets:
 
 For tighter security, use an external secrets operator to sync secrets from your cloud provider:
 
-- **AWS Secrets Manager** — via [External Secrets Operator](https://external-secrets.io/)
-- **HashiCorp Vault** — via [Vault Secrets Operator](https://developer.hashicorp.com/vault/docs/platform/k8s/vso)
-- **Azure Key Vault** — via [Azure Key Vault Provider](https://azure.github.io/secrets-store-csi-driver-provider-azure/)
+- **AWS Secrets Manager**: via [External Secrets Operator](https://external-secrets.io/)
+- **HashiCorp Vault**: via [Vault Secrets Operator](https://developer.hashicorp.com/vault/docs/platform/k8s/vso)
+- **Azure Key Vault**: via [Azure Key Vault Provider](https://azure.github.io/secrets-store-csi-driver-provider-azure/)
 
 The Helm chart's `secretKeyRef` pattern works with any Kubernetes Secret, regardless of how it was created.
 
@@ -27370,7 +27630,7 @@ The Helm chart's `secretKeyRef` pattern works with any Kubernetes Secret, regard
 - **Only the LangWatch App should be exposed externally** via Ingress or Load Balancer
 - All other components (Workers, NLP, LangEvals, PostgreSQL, ClickHouse, Redis) should be on internal networks only (ClusterIP services)
 - Place databases in private subnets with no internet access
-- Use VPC endpoints / PrivateLink for S3 access
+- Use VPC endpoints, PrivateLink for S3 access
 
 ### Kubernetes Network Policies
 
@@ -27403,7 +27663,7 @@ spec:
 
 | Source | Destination | Port | Protocol |
 |--------|-------------|------|----------|
-| Internet / VPN | App (Ingress) | 443 | HTTPS |
+| Internet, VPN | App (Ingress) | 443 | HTTPS |
 | App | PostgreSQL | 5432 | TCP |
 | App, Workers | ClickHouse | 8123 | HTTP |
 | App, Workers | Redis | 6379 | TCP |
@@ -27487,7 +27747,7 @@ The `langwatch` npm package is published with [npm provenance attestations](http
 
 ## Production Hardening Checklist
 
-- [ ] `autogen.enabled: false` — use manually created secrets
+- [ ] `autogen.enabled: false`, use manually created secrets
 - [ ] All secrets stored in a secrets manager (not inline in values.yaml)
 - [ ] TLS enabled on Ingress (HTTPS only)
 - [ ] Database connections use TLS (`?sslmode=require`)
@@ -27563,7 +27823,7 @@ First startup is slower because:
 
 Subsequent starts are faster. If it remains slow, check Docker resource allocation.
 
-## Kubernetes / Helm Issues
+## Kubernetes, Helm Issues
 
 ### Pods stuck in `CrashLoopBackOff`
 
@@ -27572,9 +27832,9 @@ Subsequent starts are faster. If it remains slow, check Docker resource allocati
 kubectl -n langwatch logs <pod-name> --previous
 
 # Common causes:
-# 1. Database connection failed — check DATABASE_URL secret
-# 2. Missing secrets — check autogen.enabled or secrets.existingSecret
-# 3. ClickHouse not ready — check clickhouse pod status
+# 1. Database connection failed, check DATABASE_URL secret
+# 2. Missing secrets, check autogen.enabled or secrets.existingSecret
+# 3. ClickHouse not ready, check clickhouse pod status
 ```
 
 ### Pods stuck in `Pending`
@@ -27623,7 +27883,7 @@ kubectl get pods -n ingress-nginx  # or your ingress namespace
 
 Ensure `app.http.baseHost` and `app.http.publicUrl` match the Ingress host.
 
-### Istio / Service Mesh
+### Istio, Service Mesh
 
 CronJob pods may hang after completion because the Istio sidecar keeps the pod alive.
 
@@ -27732,11 +27992,11 @@ This happens when a user already has an email/password account. Follow the [SSO 
 
 ### Grafana Dashboards
 
-LangWatch ships with off-the-shelf Grafana dashboards for monitoring the platform — including trace throughput, worker queue depth, ClickHouse performance, and error rates. See [Observability & Monitoring](/self-hosting/configuration/observability) for setup.
+LangWatch ships with off-the-shelf Grafana dashboards for monitoring the platform, including trace throughput, worker queue depth, ClickHouse performance, and error rates. See [Observability & Monitoring](/self-hosting/configuration/observability) for setup.
 
 ### Skynet (Internal Event Debugger)
 
-LangWatch includes Skynet, an internal event debugging tool that lets you inspect the event sourcing pipeline in real-time — view individual events, trace processing steps, and diagnose pipeline issues.
+LangWatch includes Skynet, an internal event debugging tool that lets you inspect the event sourcing pipeline in real-time, view individual events, trace processing steps, and diagnose pipeline issues.
 
 ## FAQ
 
@@ -27744,7 +28004,7 @@ LangWatch includes Skynet, an internal event debugging tool that lets you inspec
 
 Roughly 1 KB per span (compressed). See [Sizing & Scaling](/self-hosting/configuration/sizing-and-scaling#storage-sizing) for detailed estimates.
 
-### Can I use an existing PostgreSQL / Redis?
+### Can I use an existing PostgreSQL, Redis?
 
 Yes. Use the external database overlays:
 
@@ -27805,7 +28065,7 @@ title: Migrate to v3
 description: "Step-by-step guide to upgrade LangWatch from v1.x or v2.x to v3.0"
 ---
 
-LangWatch v3 replaces Elasticsearch/OpenSearch with **ClickHouse** as the primary data store. This guide walks you through the full migration — the process is the same whether you're coming from v1.x or v2.x.
+LangWatch v3 replaces Elasticsearch/OpenSearch with **ClickHouse** as the primary data store. This guide walks you through the full migration, the process is the same whether you're coming from v1.x or v2.x.
 
 <Tip>
 This is a **zero-downtime migration**. Elasticsearch and ClickHouse run side-by-side during the transition. New data flows to ClickHouse immediately, and you migrate historical data at your own pace.
@@ -27828,7 +28088,7 @@ This is a **zero-downtime migration**. Elasticsearch and ClickHouse run side-by-
 
 ## Prerequisites
 
-- **Back up your databases** — see [Backups](/self-hosting/configuration/backups)
+- **Back up your databases**: see [Backups](/self-hosting/configuration/backups)
 - **Check release notes** at [github.com/langwatch/langwatch/releases](https://github.com/langwatch/langwatch/releases)
 - **Test in staging** before upgrading production
 - Verify your Elasticsearch cluster is healthy (all shards green)
@@ -27836,7 +28096,7 @@ This is a **zero-downtime migration**. Elasticsearch and ClickHouse run side-by-
 
 ## Step 1: Deploy ClickHouse
 
-Add ClickHouse to your existing infrastructure. Your Elasticsearch instance stays running — both will operate in parallel during migration.
+Add ClickHouse to your existing infrastructure. Your Elasticsearch instance stays running, both will operate in parallel during migration.
 
 ### Docker Compose
 
@@ -27868,7 +28128,7 @@ volumes:
 
 ### Kubernetes (Helm)
 
-The v3 Helm chart includes the `clickhouse-serverless` subchart automatically. No additional setup is needed — ClickHouse will be deployed when you upgrade the chart in Step 2.
+The v3 Helm chart includes the `clickhouse-serverless` subchart automatically. No additional setup is needed, ClickHouse will be deployed when you upgrade the chart in Step 2.
 
 ## Step 2: Upgrade LangWatch to v3
 
@@ -27908,7 +28168,7 @@ helm upgrade langwatch langwatch/langwatch \
 ```
 
 <Note>
-The Helm chart configures `CLICKHOUSE_URL` automatically from the ClickHouse values — no manual env var needed for either managed or external ClickHouse.
+The Helm chart configures `CLICKHOUSE_URL` automatically from the ClickHouse values, no manual env var needed for either managed or external ClickHouse.
 </Note>
 
 ### What Happens on Startup
@@ -27924,7 +28184,7 @@ Keep your `ELASTICSEARCH_NODE_URL` configured during this phase. LangWatch v3 ca
 
 ## Step 3: Migrate Historical Data
 
-The `es-migration` tool reads documents from Elasticsearch and writes them to ClickHouse via the event-sourcing system. It runs outside of your LangWatch deployment — no Redis or BullMQ needed.
+The `es-migration` tool reads documents from Elasticsearch and writes them to ClickHouse via the event-sourcing system. It runs outside of your LangWatch deployment, no Redis or BullMQ needed.
 
 ### Setup
 
@@ -27960,7 +28220,7 @@ Point these at your actual Elasticsearch and ClickHouse instances. If they're ru
 
 **Credential requirements:**
 
-- **Elasticsearch**: Use a **read-only** user or API key. The migration tool only reads from ES — a read-only credential protects your source data from accidental writes.
+- **Elasticsearch**: Use a **read-only** user or API key. The migration tool only reads from ES, a read-only credential protects your source data from accidental writes.
 - **ClickHouse**: Use a user with **write access**. The tool needs to insert into `event_log` and projection tables.
 
 ### Disable ClickHouse TTLs Before Migrating
@@ -27969,7 +28229,7 @@ Point these at your actual Elasticsearch and ClickHouse instances. If they're ru
 **This step is critical.** If you skip it, ClickHouse may immediately expire or offload historical data as it arrives during migration.
 </Warning>
 
-LangWatch uses TTL rules to manage data retention and tiered storage in ClickHouse. By default, data older than 49 days is moved to cold storage (or dropped if cold storage isn't configured). When you migrate historical data from Elasticsearch, much of it will be older than 49 days — so ClickHouse would try to expire or offload it the moment it lands.
+LangWatch uses TTL rules to manage data retention and tiered storage in ClickHouse. By default, data older than 49 days is moved to cold storage (or dropped if cold storage isn't configured). When you migrate historical data from Elasticsearch, much of it will be older than 49 days, so ClickHouse would try to expire or offload it the moment it lands.
 
 **Before starting the migration**, set the TTL to a very high value so all migrated data stays in hot storage:
 
@@ -28041,7 +28301,7 @@ The tool migrates data in separate targets:
 
 Start small and verify before running the full migration:
 
-**1. Dry-run a single batch** — validate the mapping without writing anything:
+**1. Dry-run a single batch**: validate the mapping without writing anything:
 
 ```bash
 pnpm tsx src/index.ts traces-combined --dry-run --single-batch
@@ -28049,19 +28309,19 @@ pnpm tsx src/index.ts traces-combined --dry-run --single-batch
 
 Review the output in `./dry-run-traces-combined.json` to confirm the data looks correct.
 
-**2. Live single batch** — process one batch and verify in ClickHouse:
+**2. Live single batch**: process one batch and verify in ClickHouse:
 
 ```bash
 pnpm tsx src/index.ts traces-combined --single-batch
 ```
 
-**3. Limited run** — process a few thousand events to catch edge cases:
+**3. Limited run**: process a few thousand events to catch edge cases:
 
 ```bash
 MAX_EVENTS=5000 pnpm tsx src/index.ts traces-combined
 ```
 
-**4. Full migration** — migrate everything:
+**4. Full migration**: migrate everything:
 
 ```bash
 pnpm tsx src/index.ts all
@@ -28153,11 +28413,11 @@ helm upgrade langwatch langwatch/langwatch \
 
 ## Environment Variable Changes
 
-| Variable | v1.x / v2.x | v3.0 |
+| Variable | v1.x, v2.x | v3.0 |
 |----------|-------------|------|
 | `ELASTICSEARCH_NODE_URL` | Required | Remove |
 | `ELASTICSEARCH_API_KEY` | Optional | Remove |
-| `CLICKHOUSE_URL` | — | Required |
+| `CLICKHOUSE_URL` |, | Required |
 
 All other environment variables remain the same. See [Environment Variables](/self-hosting/configuration/environment-variables) for the full reference.
 
@@ -28179,7 +28439,7 @@ For timeouts or connection issues, the tool uses exponential backoff (up to 5 re
 
 - Check ClickHouse merge load in the progress output (`ch_parts` column)
 - Increase `CONCURRENCY` and `BATCH_SIZE` if your hardware can handle it
-- The tool auto-pauses when ClickHouse is under merge pressure — this is normal
+- The tool auto-pauses when ClickHouse is under merge pressure, this is normal
 
 ## Getting Help
 
@@ -28199,7 +28459,7 @@ description: "How to upgrade LangWatch to the latest version"
 ## Before You Upgrade
 
 1. **Check release notes** for breaking changes at [github.com/langwatch/langwatch/releases](https://github.com/langwatch/langwatch/releases)
-2. **Back up your databases** — see [Backups](/self-hosting/configuration/backups)
+2. **Back up your databases**: see [Backups](/self-hosting/configuration/backups)
 3. **Test in a staging environment** before upgrading production
 
 ## Docker Compose
@@ -28289,9 +28549,9 @@ docker compose up -d
 
 ## Breaking Changes
 
-### v1.x / v2.x to v3: ClickHouse Migration
+### v1.x, v2.x to v3: ClickHouse Migration
 
-LangWatch v3 replaces Elasticsearch/OpenSearch with ClickHouse as the primary data store. This is a zero-downtime migration — Elasticsearch and ClickHouse run side-by-side while you migrate historical data.
+LangWatch v3 replaces Elasticsearch/OpenSearch with ClickHouse as the primary data store. This is a zero-downtime migration, Elasticsearch and ClickHouse run side-by-side while you migrate historical data.
 
 See the **[full migration guide](/self-hosting/upgrade-v3)** for step-by-step instructions covering infrastructure setup, data migration, and cleanup.
 
@@ -28317,8 +28577,8 @@ kubectl -n langwatch get pvc
 | Chart Version | App Version | Kubernetes | Helm | Data Store |
 |--------------|-------------|------------|------|------------|
 | 3.x | 3.x | 1.28+ | 3.12+ | ClickHouse |
-| 2.x | 2.x | 1.25+ | 3.10+ | Elasticsearch / OpenSearch |
-| 1.x | 1.x | 1.25+ | 3.10+ | Elasticsearch / OpenSearch |
+| 2.x | 2.x | 1.25+ | 3.10+ | Elasticsearch, OpenSearch |
+| 1.x | 1.x | 1.25+ | 3.10+ | Elasticsearch, OpenSearch |
 
 ## Getting Help
 
@@ -28335,7 +28595,7 @@ If you encounter issues during an upgrade:
 
 ---
 title: Hybrid Setup
-description: Use LangWatch Cloud with your own data plane — keep full data ownership while leveraging LangWatch's managed control plane.
+description: Use LangWatch Cloud with your own data plane, keep full data ownership while leveraging LangWatch's managed control plane.
 ---
 
 # Hybrid Setup
@@ -28365,8 +28625,8 @@ graph LR
 
 ### What stays in your infrastructure
 
-- **ClickHouse** — All trace data, span payloads, evaluation results, and analytics. This is where your LLM inputs/outputs and sensitive content live.
-- **S3-compatible object storage** — Datasets, ClickHouse cold storage tiers, and backups.
+- **ClickHouse**: All trace data, span payloads, evaluation results, and analytics. This is where your LLM inputs/outputs and sensitive content live.
+- **S3-compatible object storage**: Datasets, ClickHouse cold storage tiers, and backups.
 
 ### What LangWatch Cloud manages
 
@@ -28378,10 +28638,10 @@ graph LR
 
 ## Benefits
 
-- **Data ownership** — Sensitive LLM interactions never leave your infrastructure. You can pull the plug at any time.
-- **Compliance** — Meet data residency requirements by deploying the data plane in your preferred region.
-- **No operational overhead** — LangWatch handles application updates, scaling, and maintenance of the control plane.
-- **Full functionality** — All LangWatch features work identically to the fully-hosted version.
+- **Data ownership**: Sensitive LLM interactions never leave your infrastructure. You can pull the plug at any time.
+- **Compliance**: Meet data residency requirements by deploying the data plane in your preferred region.
+- **No operational overhead**: LangWatch handles application updates, scaling, and maintenance of the control plane.
+- **Full functionality**: All LangWatch features work identically to the fully-hosted version.
 
 ## Requirements
 
@@ -28404,9 +28664,9 @@ The hybrid setup requires coordination with our team to configure the secure con
 **To get started:**
 
 1. **Contact us** at [support@langwatch.ai](mailto:support@langwatch.ai) or through your account manager
-2. **Provision your data plane** — We'll help you set up ClickHouse and S3 in your infrastructure
-3. **Configure the connection** — We'll establish a secure link (typically via VPC peering, PrivateLink, or VPN) between LangWatch Cloud and your data plane
-4. **Verify** — Run traces and confirm data flows correctly while staying in your infrastructure
+2. **Provision your data plane**: We'll help you set up ClickHouse and S3 in your infrastructure
+3. **Configure the connection**: We'll establish a secure link (typically via VPC peering, PrivateLink, or VPN) between LangWatch Cloud and your data plane
+4. **Verify**: Run traces and confirm data flows correctly while staying in your infrastructure
 
 <Card title="Interested in hybrid setup?" icon="envelope" href="mailto:support@langwatch.ai">
   Contact our team to discuss your requirements and get started with a hybrid deployment.
@@ -30604,8 +30864,8 @@ description: 'Search, retrieve, and share LangWatch traces via the REST API. Tra
 The Traces API lets you search and retrieve traces for your project. Each trace captures a complete LLM pipeline execution, including nested spans (LLM calls, tool calls, RAG retrievals), evaluations, and metadata.
 
 Both search and get-trace endpoints support a `format` parameter:
-- **`digest`** (default) — Returns an AI-readable formatted trace with hierarchical span tree, timing, inputs/outputs, and errors. Optimized for LLM consumption.
-- **`json`** — Returns the full raw trace data with all fields.
+- **`digest`** (default), Returns an AI-readable formatted trace with hierarchical span tree, timing, inputs/outputs, and errors. Optimized for LLM consumption.
+- **`json`**, Returns the full raw trace data with all fields.
 
 ## Authentication
 

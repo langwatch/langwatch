@@ -84,6 +84,8 @@ function LLMModelCostForm({
     model: string;
     inputCostPerToken: number;
     outputCostPerToken: number;
+    cacheReadCostPerToken?: number;
+    cacheCreationCostPerToken?: number;
     regex: string;
   };
 
@@ -96,12 +98,17 @@ function LLMModelCostForm({
       model: currentLLMModelCost?.model,
       inputCostPerToken: currentLLMModelCost?.inputCostPerToken,
       outputCostPerToken: currentLLMModelCost?.outputCostPerToken,
+      cacheReadCostPerToken: currentLLMModelCost?.cacheReadCostPerToken,
+      cacheCreationCostPerToken: currentLLMModelCost?.cacheCreationCostPerToken,
       regex: currentLLMModelCost?.regex,
     },
   });
 
   const onSubmit = (data: LLMModelCostForm) => {
     if (!project?.id) return;
+
+    const optionalRate = (value: number | undefined) =>
+      value == null || isNaN(value) ? undefined : value;
 
     createOrUpdate.mutate(
       {
@@ -110,6 +117,8 @@ function LLMModelCostForm({
         regex: data.regex,
         inputCostPerToken: data.inputCostPerToken,
         outputCostPerToken: data.outputCostPerToken,
+        cacheReadCostPerToken: optionalRate(data.cacheReadCostPerToken),
+        cacheCreationCostPerToken: optionalRate(data.cacheCreationCostPerToken),
         projectId: project.id,
       },
       {
@@ -218,6 +227,42 @@ function LLMModelCostForm({
           </InputGroup>
           <Field.ErrorText>
             {errors.outputCostPerToken?.message}
+          </Field.ErrorText>
+        </HorizontalFormControl>
+        <HorizontalFormControl
+          label="Cache Read Cost Per Token"
+          helper="Optional. Cost per cached input token read, in USD. Leave blank to bill cache reads at the input rate"
+          invalid={!!errors.cacheReadCostPerToken}
+        >
+          <InputGroup startElement={<Text>$</Text>}>
+            <Input
+              placeholder="0.00"
+              {...register("cacheReadCostPerToken", {
+                setValueAs: (value) =>
+                  value === "" || value == null ? undefined : Number(value),
+              })}
+            />
+          </InputGroup>
+          <Field.ErrorText>
+            {errors.cacheReadCostPerToken?.message}
+          </Field.ErrorText>
+        </HorizontalFormControl>
+        <HorizontalFormControl
+          label="Cache Write Cost Per Token"
+          helper="Optional. Cost per cached input token written, in USD. Leave blank to bill cache writes at the input rate"
+          invalid={!!errors.cacheCreationCostPerToken}
+        >
+          <InputGroup startElement={<Text>$</Text>}>
+            <Input
+              placeholder="0.00"
+              {...register("cacheCreationCostPerToken", {
+                setValueAs: (value) =>
+                  value === "" || value == null ? undefined : Number(value),
+              })}
+            />
+          </InputGroup>
+          <Field.ErrorText>
+            {errors.cacheCreationCostPerToken?.message}
           </Field.ErrorText>
         </HorizontalFormControl>
         <Button

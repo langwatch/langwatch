@@ -1,9 +1,9 @@
 ---
 title: Architecture & Infrastructure
-description: "How LangWatch components fit together — what you're deploying and how data flows through the system"
+description: "How LangWatch components fit together, what you're deploying and how data flows through the system"
 ---
 
-This page explains what you're deploying when you self-host LangWatch — the components, how they connect, and how data moves through the system. Understanding this will help you size, operate, and debug your deployment.
+This page explains what you're deploying when you self-host LangWatch, the components, how they connect, and how data moves through the system. Understanding this will help you size, operate, and debug your deployment.
 
 ## System Overview
 
@@ -57,7 +57,7 @@ Web UI, REST API, OTel ingestion, authentication, SSE real-time updates. The onl
 <Card title="Processing" icon="microchip">
 **LangWatch Workers**
 
-Event sourcing pipeline via BullMQ — span ingestion, trace summarisation, cost enrichment, evaluations, PII redaction, and more.
+Event sourcing pipeline via BullMQ, span ingestion, trace summarisation, cost enrichment, evaluations, PII redaction, and more.
 </Card>
 <Card title="Services" icon="flask">
 **LangWatch NLP** (:5561) and **LangEvals** (:5562)
@@ -75,9 +75,9 @@ Users, teams, projects, configurations, prompt versions. Managed via Prisma with
 All traces, spans, evaluations, experiments, analytics. Hot storage on SSD, cold storage on S3. Auto-tuned via the clickhouse-serverless subchart.
 </Card>
 <Card title="Queue & Storage" icon="layer-group">
-**Redis** — BullMQ job queue, caching, sessions.
+**Redis**: BullMQ job queue, caching, sessions.
 
-**S3** — ClickHouse cold storage, backups, datasets.
+**S3**: ClickHouse cold storage, backups, datasets.
 </Card>
 </CardGroup>
 
@@ -85,21 +85,21 @@ All traces, spans, evaluations, experiments, analytics. Hot storage on SSD, cold
 
 ### LangWatch App (port 5560)
 
-Next.js server — the single external entry point for all traffic:
+Next.js server, the single external entry point for all traffic:
 
-- **Web UI** — dashboards, trace explorer, prompt management, experiment views
-- **REST API + OTel ingestion** — receives spans from LangWatch SDKs
-- **Authentication** — NextAuth.js (email, Google, GitHub, GitLab, Azure AD, Cognito, Okta)
-- **SSE** — pushes real-time updates to connected browser clients
-- **Analytics queries** — reads from ClickHouse
-- **Control plane** — manages users, teams, projects via PostgreSQL
+- **Web UI**: dashboards, trace explorer, prompt management, experiment views
+- **REST API + OTel ingestion**: receives spans from LangWatch SDKs
+- **Authentication**: NextAuth.js (email, Google, GitHub, GitLab, Azure AD, Cognito, Okta)
+- **SSE**: pushes real-time updates to connected browser clients
+- **Analytics queries**: reads from ClickHouse
+- **Control plane**: manages users, teams, projects via PostgreSQL
 
 ### LangWatch Workers
 
 Same `langwatch/langwatch` image, started with `pnpm start:workers`. Consumes jobs from a BullMQ queue in Redis and runs the event sourcing pipeline (see below).
 
 - Deployed as a separate Kubernetes Deployment
-- Stateless — scale by adding replicas
+- Stateless, scale by adding replicas
 
 ### LangWatch NLP (port 5561)
 
@@ -121,11 +121,11 @@ Built-in evaluator library (Python):
 
 Both NLP and LangEvals make outbound calls to external LLM providers for model-based operations.
 
-### PostgreSQL — Control Plane
+### PostgreSQL: Control Plane
 
 Stores users, teams, projects, configurations, prompt versions, evaluator definitions. Managed via Prisma ORM with auto-migrations on startup.
 
-### ClickHouse — Data Plane
+### ClickHouse: Data Plane
 
 Stores all high-volume data: traces, spans, evaluations, experiments, analytics, and event sourcing events/projections.
 
@@ -136,17 +136,17 @@ Stores all high-volume data: traces, spans, evaluations, experiments, analytics,
 
 The `clickhouse-serverless` subchart auto-tunes internal parameters from two inputs: `cpu` and `memory`.
 
-The `langwatch/clickhouse-serverless` Docker image is a performance-tweaked ClickHouse build optimized for LangWatch's traffic patterns — high-throughput event ingestion with concurrent analytical queries.
+The `langwatch/clickhouse-serverless` Docker image is a performance-tweaked ClickHouse build optimized for LangWatch's traffic patterns, high-throughput event ingestion with concurrent analytical queries.
 
 **Tiered storage**: hot data on local SSD, cold data on S3 after a configurable TTL (default 49 days). Native `BACKUP`/`RESTORE` to S3.
 
 ### Redis
 
-- **BullMQ job queue** — connects the App to Workers with guaranteed delivery, retry, and backpressure
-- **Caching** — frequently accessed config and lookup data
-- **Sessions** — user session storage
+- **BullMQ job queue**: connects the App to Workers with guaranteed delivery, retry, and backpressure
+- **Caching**: frequently accessed config and lookup data
+- **Sessions**: user session storage
 
-### S3 / Object Storage
+### S3, Object Storage
 
 - ClickHouse cold storage (tiered after TTL)
 - ClickHouse backups (full + incremental)
@@ -190,13 +190,13 @@ graph LR
     J --> M
 ```
 
-Each step reads from the queue, does its work, and writes results to ClickHouse. Steps are independent — if one is slow (e.g., evaluation waiting on an LLM call), others continue processing.
+Each step reads from the queue, does its work, and writes results to ClickHouse. Steps are independent, if one is slow (e.g., evaluation waiting on an LLM call), others continue processing.
 
 ### How Data is Organized
 
 The pipeline produces three types of output:
 
-**Events** — immutable records of what happened. Stored in ClickHouse and never modified.
+**Events**: immutable records of what happened. Stored in ClickHouse and never modified.
 
 | Event | Produced By | What It Contains |
 |-------|------------|------------------|
@@ -209,7 +209,7 @@ The pipeline produces three types of output:
 | EvaluationCompleted | Evaluation Execution | Evaluator scores and results |
 | ExperimentResultRecorded | Experiment Processing | Run results for A/B tests |
 
-**Projections** — derived tables that dashboards and APIs read from. Built from events.
+**Projections**: derived tables that dashboards and APIs read from. Built from events.
 
 | Projection | Built From | Used By |
 |-----------|-----------|---------|
@@ -220,16 +220,16 @@ The pipeline produces three types of output:
 | Analytics | All events | Dashboard aggregations |
 | Topics | TraceSummarised + clustering | Conversation topic groups |
 
-**Reactions** — side effects triggered during processing.
+**Reactions**: side effects triggered during processing.
 
 | Reaction | Triggered By | Effect |
 |----------|-------------|--------|
 | SSE Update | Any event | Real-time UI refresh in browser |
-| Alert / Trigger | EvaluationCompleted | Slack, email, webhook notification |
+| Alert, Trigger | EvaluationCompleted | Slack, email, webhook notification |
 | Dataset Append | Automation rules | Auto-add traces to datasets |
 
 <Note>
-If Worker queue depth grows in Redis, it means processing is falling behind ingestion. The fix is to add more Worker replicas — each one is stateless and consumes jobs independently.
+If Worker queue depth grows in Redis, it means processing is falling behind ingestion. The fix is to add more Worker replicas, each one is stateless and consumes jobs independently.
 </Note>
 
 ## Data Flow
@@ -257,9 +257,9 @@ sequenceDiagram
 ```
 
 Additionally, Kubernetes CronJobs trigger periodic tasks via HTTP on the App:
-- **Topic clustering** — daily at midnight, via the NLP service
-- **Alert triggers** — every 3 minutes, evaluates monitor conditions
-- **Retention cleanup** — daily at 01:00, removes data past retention period
+- **Topic clustering**: daily at midnight, via the NLP service
+- **Alert triggers**: every 3 minutes, evaluates monitor conditions
+- **Retention cleanup**: daily at 01:00, removes data past retention period
 
 ## Network Topology
 
@@ -267,7 +267,7 @@ Only the App is exposed externally. Everything else is cluster-internal:
 
 | Component | Service Type | External |
 |-----------|-------------|----------|
-| App | Ingress / LoadBalancer | Yes |
+| App | Ingress, LoadBalancer | Yes |
 | Workers | None (no Service needed) | No |
 | NLP | ClusterIP | No |
 | LangEvals | ClusterIP | No |
@@ -295,11 +295,11 @@ LangWatch is deeply integrated with OpenTelemetry. The platform both **consumes*
 
 **Export**: LangWatch exports its own operational metrics, logs, and traces via OpenTelemetry for infrastructure debugging:
 
-- **Metrics** — Prometheus-compatible metrics from the App and Workers (request latency, queue depth, error rates)
-- **Logs** — Structured application logs from all components
-- **Traces** — Distributed traces of internal request processing
+- **Metrics**: Prometheus-compatible metrics from the App and Workers (request latency, queue depth, error rates)
+- **Logs**: Structured application logs from all components
+- **Traces**: Distributed traces of internal request processing
 
-This means you can monitor LangWatch itself using the same observability stack you use for the rest of your infrastructure — Grafana, Datadog, New Relic, or any OTel-compatible backend.
+This means you can monitor LangWatch itself using the same observability stack you use for the rest of your infrastructure, Grafana, Datadog, New Relic, or any OTel-compatible backend.
 
 LangWatch ships with off-the-shelf Grafana dashboards for monitoring the platform. See [Observability & Monitoring](/self-hosting/configuration/observability) for setup details.
 

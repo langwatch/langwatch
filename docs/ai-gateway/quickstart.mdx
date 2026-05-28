@@ -6,17 +6,36 @@ sidebarTitle: Quickstart
 
 This walkthrough takes you from zero to a traced, budget-gated LLM response.
 
-<Note>You'll need a LangWatch account, an **organisation admin** or **project admin** role, and at least one model provider (OpenAI, Anthropic, Azure OpenAI, Bedrock, Vertex, or Gemini) configured at **Settings → Model Providers**. If you haven't set one up yet, start there — the AI Gateway reuses those credentials.</Note>
+## Are you a developer or an admin?
+
+The fastest path depends on which side of the rollout you're on. **Pick one before continuing**:
 
 <CardGroup cols={2}>
-  <Card title="Python / TypeScript SDK" icon="code" href="/ai-gateway/sdks/python">
-    Drop-in for the OpenAI / Anthropic SDKs — swap `base_url` and `api_key`.
+  <Card title="I'm a developer" icon="laptop-code" href="/ai-gateway/governance/personal-keys">
+    Your admin already wired up the gateway and you got an SSO sign-in link or asked to install `langwatch`.
+
+    Skip ahead to **Personal IDE keys**: `langwatch login --device` provisions your virtual key automatically. You don't need to set up providers, budgets, or routing.
+  </Card>
+  <Card title="I'm an org admin" icon="shield-halved" href="/ai-gateway/governance/admin-setup">
+    Your company just bought governance and you're rolling it out for the team.
+
+    Skip ahead to **Admin setup**: connect SSO, providers, and routing policies once, every developer auto-onboards from there.
+  </Card>
+</CardGroup>
+
+The rest of this page covers the **service-virtual-key** flow used for non-personal traffic (server-to-server calls from your applications, evaluators, prompt playground, etc.). If that's what you're here for, read on.
+
+<Note>You'll need a LangWatch account, an **organisation admin** or **project admin** role, and at least one model provider (OpenAI, Anthropic, Azure OpenAI, Bedrock, Vertex, or Gemini) configured at **Settings → Model Providers**. If you haven't set one up yet, start there, the AI Gateway reuses those credentials.</Note>
+
+<CardGroup cols={2}>
+  <Card title="Python, TypeScript SDK" icon="code" href="/ai-gateway/sdks/python">
+    Drop-in for the OpenAI, Anthropic SDKs, swap `base_url` and `api_key`.
   </Card>
   <Card title="Use it from your coding assistant" icon="terminal" href="/ai-gateway/cli/overview">
     Wire Claude Code, Codex, OpenCode, Cursor, or Aider through the gateway.
   </Card>
   <Card title="Core concepts" icon="compass" href="/ai-gateway/concepts">
-    Virtual keys, budgets, provider bindings, cache rules, fallback chains.
+    Virtual keys, budgets, ModelProvider gateway settings, routing policies, cache rules, fallback chains.
   </Card>
   <Card title="API reference" icon="book" href="/ai-gateway/api/chat-completions">
     OpenAI-compatible `/v1/chat/completions` + Anthropic-shape `/v1/messages`.
@@ -27,12 +46,12 @@ This walkthrough takes you from zero to a traced, budget-gated LLM response.
 
 1. Open **AI Gateway → Virtual Keys** in the LangWatch app.
 2. Click **New virtual key**.
-3. Name it — e.g. `my-first-vk`.
+3. Name it, e.g. `my-first-vk`.
 4. Select which provider credentials it may use. The first one becomes the **primary**; later ones become the fallback chain.
 5. (Optional) Attach a budget, pick a cache mode, attach guardrails.
 6. Click **Create**.
 
-The full secret (`lw_vk_live_01HZX9K3M…`) is displayed **exactly once**. Copy it now and store it in a secret manager. After you dismiss the dialog, LangWatch can never show it again — only the prefix `lw_vk_live_01HZX9` remains visible in the list.
+The full secret (`vk-lw-01HZX9K3M…`) is displayed **exactly once**. Copy it now and store it in a secret manager. After you dismiss the dialog, LangWatch can never show it again, only the prefix `vk-lw-01HZX9` remains visible in the list.
 
 ## 2. Call the gateway (OpenAI-compatible)
 
@@ -67,7 +86,7 @@ from openai import OpenAI
 
 client = OpenAI(
     base_url="https://gateway.langwatch.ai/v1",
-    api_key="lw_vk_live_...",
+    api_key="vk-lw-...",
 )
 
 resp = client.chat.completions.create(
@@ -124,12 +143,12 @@ Every gateway trace carries these attributes:
 | `langwatch.team_id` | Owning team. |
 | `langwatch.org_id` | Owning organisation. |
 | `langwatch.principal_id` | User or service account that made the call. |
-| `gen_ai.usage.cache_read.input_tokens` / `gen_ai.usage.cache_creation.input_tokens` | Cache economics (OTel GenAI semconv; zero when cache bypassed). |
+| `gen_ai.usage.cache_read.input_tokens`, `gen_ai.usage.cache_creation.input_tokens` | Cache economics (OTel GenAI semconv; zero when cache bypassed). |
 | `langwatch.fallback.attempt` | 0 on primary success, N for fallback attempts. |
 
 ## 4. Add a budget
 
-Budgets live one level up from the key — they govern spend across whatever scope you attach them to.
+Budgets live one level up from the key, they govern spend across whatever scope you attach them to.
 
 1. Open **AI Gateway → Budgets**.
 2. Click **New budget**.
@@ -143,7 +162,7 @@ See [Budgets](/ai-gateway/budgets) for full scoping details.
 
 ## Next steps
 
-- [Concepts](/ai-gateway/concepts) — how VKs, budgets, guardrails, and fallback fit together.
-- [Fallback chains](/ai-gateway/providers/fallback-chains) — survive provider outages with no code change.
-- [Caching passthrough](/ai-gateway/caching-passthrough) — the load-bearing rule for keeping your 90% Anthropic cache discount.
-- [CLI Integrations](/ai-gateway/cli/overview) — ship the gateway to every developer's Claude Code / Codex / Cursor.
+- [Concepts](/ai-gateway/concepts): how VKs, budgets, guardrails, and fallback fit together.
+- [Fallback chains](/ai-gateway/providers/fallback-chains): survive provider outages with no code change.
+- [Caching passthrough](/ai-gateway/caching-passthrough): the load-bearing rule for keeping your 90% Anthropic cache discount.
+- [CLI Integrations](/ai-gateway/cli/overview): ship the gateway to every developer's Claude Code, Codex, Cursor.

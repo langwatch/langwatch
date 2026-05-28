@@ -61,6 +61,31 @@ export function createEnvConfig() {
       // HS256 secret used by control-plane to sign the short-lived JWT that the
       // gateway verifies on every request (contract §4.1). 32+ chars.
       LW_GATEWAY_JWT_SECRET: z.string().min(32).optional(),
+      // Public-facing base URL the AI Gateway is reachable at. The Go
+      // gateway re-uses this same var name in the OPPOSITE direction
+      // (gateway -> control plane), so in dev `scripts/start.sh` hijacks
+      // it for the Go interpretation. That collision means the TS side
+      // (CLI bootstrap, /me VK reveal) must NOT read this var directly
+      // when LW_GATEWAY_PUBLIC_URL is set; prefer that instead. Kept
+      // here for back-compat with hosted SaaS deploys where the value
+      // is correctly the public gateway URL.
+      LW_GATEWAY_BASE_URL: z.string().url().optional(),
+      // Public-facing data plane URL the CLI + /me VK reveal cards
+      // surface to the user. Distinct from LW_GATEWAY_BASE_URL because
+      // the Go gateway hijacks that name for its control-plane
+      // discovery; this var stays unambiguous on the TS read path. In
+      // dev: http://localhost:5563 (or `PORT + 3` when PORT is set);
+      // hosted SaaS: https://gateway.langwatch.com. Falls back to
+      // LW_GATEWAY_BASE_URL when unset for legacy deploys.
+      LW_GATEWAY_PUBLIC_URL: z.string().url().optional(),
+      // Internal control-plane → gateway URL for the HMAC-signed
+      // /internal/* surface (validate-ottl, transform). Different from
+      // LW_GATEWAY_BASE_URL because the Go gateway re-uses that name
+      // for the OPPOSITE direction (gateway → control plane), so a
+      // shared `.env` would otherwise collide. In dev:
+      // http://localhost:5563. In Docker: http://host.docker.internal:5563.
+      // Falls back to LW_GATEWAY_BASE_URL when unset for back-compat.
+      LW_GATEWAY_INTERNAL_URL: z.string().url().optional(),
       // Argon2id pepper mixed into virtual-key hashing. Rotating this
       // invalidates all existing VKs — treat as append-only / key-management.
       LW_VIRTUAL_KEY_PEPPER: z.string().min(32).optional(),
@@ -243,6 +268,9 @@ export function createEnvConfig() {
       NEXTAUTH_URL: process.env.NEXTAUTH_URL,
       LW_GATEWAY_INTERNAL_SECRET: process.env.LW_GATEWAY_INTERNAL_SECRET,
       LW_GATEWAY_JWT_SECRET: process.env.LW_GATEWAY_JWT_SECRET,
+      LW_GATEWAY_BASE_URL: process.env.LW_GATEWAY_BASE_URL,
+      LW_GATEWAY_PUBLIC_URL: process.env.LW_GATEWAY_PUBLIC_URL,
+      LW_GATEWAY_INTERNAL_URL: process.env.LW_GATEWAY_INTERNAL_URL,
       LW_VIRTUAL_KEY_PEPPER: process.env.LW_VIRTUAL_KEY_PEPPER,
       AUTH0_CLIENT_ID: process.env.AUTH0_CLIENT_ID,
       AUTH0_CLIENT_SECRET: process.env.AUTH0_CLIENT_SECRET,

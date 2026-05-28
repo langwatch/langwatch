@@ -75,7 +75,7 @@ func BenchmarkRouter_ChatCompletions(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(body)).WithContext(ctx)
-		req.Header.Set("Authorization", "Bearer lw_vk_live_01HZX0123456789ABCDEFGHIJ")
+		req.Header.Set("Authorization", "Bearer vk-lw-01HZX0123456789ABCDEFGHIJ")
 		req.Header.Set("Content-Type", "application/json")
 		rec := httptest.NewRecorder()
 		router.ServeHTTP(rec, req)

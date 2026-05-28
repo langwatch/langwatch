@@ -29,7 +29,7 @@ make example-up
 
 This will:
 1. Create a Kind cluster named `lw-local` (if it doesn't exist)
-2. Build all Docker images locally (if not already built — first build takes 15-30 min)
+2. Build all Docker images locally (if not already built, first build takes 15-30 min)
 3. Load images into the Kind cluster
 4. Install the Helm chart with `values-local.yaml` into the `lw-local` namespace
 
@@ -62,10 +62,10 @@ make images-local
 ```
 
 This builds four images:
-- `langwatch/langwatch:local` — App
-- `langwatch/langwatch_nlp:local` — NLP service
-- `langwatch/langevals:local` — Evaluators
-- `langwatch/clickhouse-serverless:next` — ClickHouse
+- `langwatch/langwatch:local`, App
+- `langwatch/langwatch_nlp:local`, NLP service
+- `langwatch/langevals:local`, Evaluators
+- `langwatch/clickhouse-serverless:next`, ClickHouse
 
 ### 3. Install the Helm Chart
 
@@ -119,8 +119,8 @@ The `values-local.yaml` profile deploys:
 | ClickHouse | 1 | Chart-managed, standalone |
 | Redis | 1 | Chart-managed |
 
-- `autogen.enabled: true` — secrets are auto-generated
-- `pullPolicy: Never` — uses locally-built images
+- `autogen.enabled: true`, secrets are auto-generated
+- `pullPolicy: Never`, uses locally-built images
 - Prometheus is disabled to save resources
 
 ## Teardown
@@ -149,5 +149,5 @@ First-time image builds take several minutes. Subsequent `make example-up` runs 
 
 ## Next Steps
 
-- [Production Kubernetes deployment](/self-hosting/deployment/kubernetes-helm) — Deploy to a real cluster
-- [Sizing & Scaling](/self-hosting/configuration/sizing-and-scaling) — Resource recommendations
+- [Production Kubernetes deployment](/self-hosting/deployment/kubernetes-helm): Deploy to a real cluster
+- [Sizing & Scaling](/self-hosting/configuration/sizing-and-scaling): Resource recommendations
