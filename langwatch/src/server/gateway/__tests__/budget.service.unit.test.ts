@@ -25,6 +25,7 @@ function mockChRepoWithEvents(
   }));
   return {
     recentEventsForBudget: async () => fullEvents,
+    getSpendForBudgetsAcrossTenants: async () => [],
   } as unknown as GatewayBudgetClickHouseRepository;
 }
 
@@ -61,6 +62,9 @@ function mockPrismaWithBudgets(budgets: GatewayBudget[]): PrismaClient {
   return {
     gatewayBudget: {
       findMany: async () => budgets,
+    },
+    project: {
+      findMany: async () => [{ id: "project_01" }],
     },
   } as unknown as PrismaClient;
 }
@@ -148,7 +152,7 @@ describe("GatewayBudgetService.check", () => {
         spentUsd: new Prisma.Decimal("0.00"), // dormant post-cutover
       });
       const chRepoStub = {
-        getSpendForBudgets: async () => [
+        getSpendForBudgetsAcrossTenants: async () => [
           { budgetId: "b_ch_sourced", spentUsd: "95.00" },
         ],
       } as unknown as Parameters<typeof GatewayBudgetService.create>[1];
@@ -313,10 +317,14 @@ describe("GatewayBudgetService.getDetail", () => {
       },
       project: {
         findUnique: vi.fn(async () => scopeRow),
+        findMany: vi.fn(async () => [{ id: "project_01" }]),
       },
       virtualKey: {
         findUnique: vi.fn(async () => scopeRow),
         findMany: vi.fn(async () => []),
+      },
+      virtualKeyScope: {
+        findFirst: vi.fn(async () => ({ scopeId: "project_01" })),
       },
       user: {
         findUnique: vi.fn(async () => scopeRow),
@@ -354,16 +362,15 @@ describe("GatewayBudgetService.getDetail", () => {
 
   describe("when scope is VIRTUAL_KEY", () => {
     it("includes the display prefix + project slug for linkback", async () => {
-      const sut = GatewayBudgetService.create(
-        mockPrismaWithDetail(
-          stubBudget({ scopeType: "VIRTUAL_KEY", scopeId: "vk_01" }),
-          {
-            name: "prod-openai",
-            displayPrefix: "lw_live_abc",
-            project: { slug: "proj" },
-          },
-        ),
+      const baseMock = mockPrismaWithDetail(
+        stubBudget({ scopeType: "VIRTUAL_KEY", scopeId: "vk_01" }),
+        { name: "prod-openai", displayPrefix: "lw_live_abc" },
       );
+      // VIRTUAL_KEY resolveScopeTarget chains vk → virtualKeyScope → project.
+      // Override project.findUnique to return the linkback slug.
+      (baseMock as unknown as { project: { findUnique: unknown } }).project.findUnique =
+        vi.fn(async () => ({ slug: "proj" }));
+      const sut = GatewayBudgetService.create(baseMock);
       const detail = await sut.getDetail("b_01", "org_01");
       expect(detail?.scopeTarget).toEqual({
         kind: "VIRTUAL_KEY",

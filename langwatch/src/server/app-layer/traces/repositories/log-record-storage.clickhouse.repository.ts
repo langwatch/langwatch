@@ -24,6 +24,12 @@ export class LogRecordStorageClickHouseRepository
     try {
       const client = await this.resolveClient(record.tenantId);
       const now = new Date();
+      // Per-origin retention class — denormalise from the log_record
+      // attribute stamped by the receiver (ingestionRoutes.ts) for
+      // governance ingest. Empty string for non-governance log records
+      // (no TTL applied). Migration 00022.
+      const retentionClass =
+        record.attributes["langwatch.governance.retention_class"] ?? "";
       await client.insert({
         table: TABLE_NAME,
         values: [
@@ -40,6 +46,7 @@ export class LogRecordStorageClickHouseRepository
             ResourceAttributes: record.resourceAttributes,
             ScopeName: record.scopeName,
             ScopeVersion: record.scopeVersion,
+            RetentionClass: retentionClass,
             CreatedAt: now,
             UpdatedAt: now,
           },

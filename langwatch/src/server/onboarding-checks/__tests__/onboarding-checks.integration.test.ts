@@ -50,7 +50,7 @@ describe("OnboardingChecksService Integration", () => {
     }
     if (createdEntityIds.modelProviders.length > 0) {
       await prisma.modelProvider.deleteMany({
-        where: { id: { in: createdEntityIds.modelProviders }, projectId },
+        where: { id: { in: createdEntityIds.modelProviders } },
       });
     }
   });
@@ -75,7 +75,6 @@ describe("OnboardingChecksService Integration", () => {
       const modelProvider = await prisma.modelProvider.create({
         data: {
           id: `test-provider-${Date.now()}`,
-          projectId,
           name: "OpenAI",
           provider: "openai",
           enabled: true,
@@ -97,7 +96,6 @@ describe("OnboardingChecksService Integration", () => {
       const disabledProvider = await prisma.modelProvider.create({
         data: {
           id: `test-disabled-provider-${Date.now()}`,
-          projectId,
           name: "Anthropic",
           provider: "anthropic",
           enabled: false,

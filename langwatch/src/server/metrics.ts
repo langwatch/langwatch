@@ -84,7 +84,8 @@ type JobType =
   | "usage_stats"
   | "usage_reporting"
   | "event_sourcing"
-  | "scenario";
+  | "scenario"
+  | "anomaly_detection";
 
 type JobStatus = "processing" | "completed" | "failed";
 

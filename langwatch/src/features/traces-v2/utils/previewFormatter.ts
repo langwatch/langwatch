@@ -21,6 +21,8 @@
  * outcome — a worse-but-correct preview is better than a thrown error.
  */
 
+import { splitLeadingContextBlocks } from "./leadingContext";
+
 const ELLIPSIS = "…";
 const NEWLINE_GLYPH = "↵"; // ↵
 
@@ -129,6 +131,15 @@ export function formatPreview(
       text = unwrap.text;
       role = unwrap.role;
     }
+  }
+
+  // 1b. Strip leading XML-context blocks (Claude Code prepends
+  //     <system-reminder> / MCP-instruction / skills-list tags above the
+  //     human text). Only strip when real prose follows, so a message that
+  //     is *only* tags stays visible rather than collapsing to empty.
+  const contextSplit = splitLeadingContextBlocks(text);
+  if (contextSplit.context && contextSplit.body.trim()) {
+    text = contextSplit.body;
   }
 
   // 2. Markdown noise strip — fences + images. Runs after unwrap so a

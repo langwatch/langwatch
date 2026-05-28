@@ -28,7 +28,25 @@ export function computeSpanCost({
   const inputTokens = promptTokens ?? 0;
   const outputTokens = completionTokens ?? 0;
 
-  // Priority 1: Custom cost rates from enrichment
+  // Prompt-cache token counts (OTEL semconv dotted form). These are
+  // emitted SEPARATELY from input_tokens — the gateway sends the
+  // non-cached input count, so cache buckets add on top rather than
+  // overlap. Read tokens bill ~0.1x the input rate, write tokens above
+  // it, so a cached follow-up must not be costed at the full input price.
+  const cacheReadTokens = Math.max(
+    0,
+    coerceToNumber(attrs[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]) ?? 0,
+  );
+  const cacheCreationTokens = Math.max(
+    0,
+    coerceToNumber(
+      attrs[ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS],
+    ) ?? 0,
+  );
+
+  // Priority 1: Custom cost rates from enrichment. A custom cost may carry
+  // its own cache rates (customer override); when it does not, cache tokens
+  // fall back to the input rate (counted, just not discounted).
   const numInputRate = coerceToNumber(
     attrs[ATTR_KEYS.LANGWATCH_MODEL_INPUT_COST_PER_TOKEN],
   );
@@ -36,8 +54,20 @@ export function computeSpanCost({
     attrs[ATTR_KEYS.LANGWATCH_MODEL_OUTPUT_COST_PER_TOKEN],
   );
   if (numInputRate !== null || numOutputRate !== null) {
+    const inputRate = numInputRate ?? 0;
+    const cacheReadRate =
+      coerceToNumber(
+        attrs[ATTR_KEYS.LANGWATCH_MODEL_CACHE_READ_COST_PER_TOKEN],
+      ) ?? inputRate;
+    const cacheCreationRate =
+      coerceToNumber(
+        attrs[ATTR_KEYS.LANGWATCH_MODEL_CACHE_CREATION_COST_PER_TOKEN],
+      ) ?? inputRate;
     return (
-      inputTokens * (numInputRate ?? 0) + outputTokens * (numOutputRate ?? 0)
+      inputTokens * inputRate +
+      outputTokens * (numOutputRate ?? 0) +
+      cacheReadTokens * cacheReadRate +
+      cacheCreationTokens * cacheCreationRate
     );
   }
 
@@ -51,7 +81,13 @@ export function computeSpanCost({
       ? (attrs[ATTR_KEYS.GEN_AI_REQUEST_MODEL] as string)
       : undefined);
 
-  if (resolvedModel && (inputTokens > 0 || outputTokens > 0)) {
+  if (
+    resolvedModel &&
+    (inputTokens > 0 ||
+      outputTokens > 0 ||
+      cacheReadTokens > 0 ||
+      cacheCreationTokens > 0)
+  ) {
     const matched = matchModelCostWithFallbacks(
       resolvedModel,
       getStaticModelCosts(),
@@ -61,6 +97,8 @@ export function computeSpanCost({
         llmModelCost: matched,
         inputTokens,
         outputTokens,
+        cacheReadTokens,
+        cacheCreationTokens,
       });
       if (computed !== undefined && computed > 0) return computed;
     }

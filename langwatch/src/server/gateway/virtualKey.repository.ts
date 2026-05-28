@@ -1,30 +1,52 @@
 /**
- * Data-access for VirtualKey. Every caller must pass `projectId` — the
- * multitenancy middleware rejects queries without it.
+ * Data-access for VirtualKey.
+ *
+ * Post-collapse model: VirtualKey is organization-scoped + reachable
+ * from N (scopeType, scopeId) entries in `VirtualKeyScope`. The
+ * dbMultiTenancyProtection middleware enforces that every where-clause
+ * carries one of `organizationId`, a row id, a `hashedSecret`, or a
+ * `scopes: { some: {...} }` predicate.
  */
 import type {
   Prisma,
   PrismaClient,
   VirtualKey,
-  VirtualKeyProviderCredential,
+  VirtualKeyScope,
+  VirtualKeyScopeType,
 } from "@prisma/client";
 
-export type VirtualKeyWithChain = VirtualKey & {
-  providerCredentials: VirtualKeyProviderCredential[];
+export type VirtualKeyWithScopes = VirtualKey & {
+  scopes: VirtualKeyScope[];
+  principalUser?: { id: string; name: string | null; email: string | null } | null;
+  routingPolicy?: {
+    id: string;
+    modelAliases: Prisma.JsonValue;
+    policyRules: Prisma.JsonValue;
+  } | null;
+};
+
+export type ScopeInput = {
+  scopeType: VirtualKeyScopeType;
+  scopeId: string;
 };
 
 export type CreateVirtualKeyData = {
   id: string;
-  projectId: string;
+  organizationId: string;
   name: string;
   description?: string | null;
-  environment: "LIVE" | "TEST";
   hashedSecret: string;
   displayPrefix: string;
   principalUserId?: string | null;
   config: Prisma.InputJsonValue;
   createdById: string;
-  providerCredentialIds: { id: string; priority: number }[];
+  /**
+   * Scope set the VK is reachable from. Empty array is rejected by the
+   * caller (a VK with no scopes is unreachable in any UI surface). At
+   * least one entry is required.
+   */
+  scopes: ScopeInput[];
+  routingPolicyId?: string | null;
 };
 
 export class VirtualKeyRepository {
@@ -32,31 +54,43 @@ export class VirtualKeyRepository {
 
   async findById(
     id: string,
-    projectId: string,
+    organizationId: string,
     tx?: Prisma.TransactionClient,
-  ): Promise<VirtualKeyWithChain | null> {
+  ): Promise<VirtualKeyWithScopes | null> {
     const client = tx ?? this.prisma;
     return client.virtualKey.findFirst({
-      where: { id, projectId },
-      include: { providerCredentials: { orderBy: { priority: "asc" } } },
+      where: { id, organizationId },
+      include: {
+        scopes: true,
+        principalUser: { select: { id: true, name: true, email: true } },
+        routingPolicy: {
+          select: { id: true, modelAliases: true, policyRules: true },
+        },
+      },
     });
   }
 
   async findByIdGlobal(
     id: string,
     tx?: Prisma.TransactionClient,
-  ): Promise<VirtualKeyWithChain | null> {
+  ): Promise<VirtualKeyWithScopes | null> {
     const client = tx ?? this.prisma;
     return client.virtualKey.findUnique({
       where: { id },
-      include: { providerCredentials: { orderBy: { priority: "asc" } } },
+      include: {
+        scopes: true,
+        principalUser: { select: { id: true, name: true, email: true } },
+        routingPolicy: {
+          select: { id: true, modelAliases: true, policyRules: true },
+        },
+      },
     });
   }
 
   async findByHashedSecret(
     hashedSecret: string,
     tx?: Prisma.TransactionClient,
-  ): Promise<VirtualKeyWithChain | null> {
+  ): Promise<VirtualKeyWithScopes | null> {
     const client = tx ?? this.prisma;
     return client.virtualKey.findFirst({
       where: {
@@ -68,18 +102,57 @@ export class VirtualKeyRepository {
           },
         ],
       },
-      include: { providerCredentials: { orderBy: { priority: "asc" } } },
+      include: {
+        scopes: true,
+        principalUser: { select: { id: true, name: true, email: true } },
+        routingPolicy: {
+          select: { id: true, modelAliases: true, policyRules: true },
+        },
+      },
     });
   }
 
-  async findAll(
-    projectId: string,
+  async findAllInOrganization(
+    organizationId: string,
     tx?: Prisma.TransactionClient,
-  ): Promise<VirtualKeyWithChain[]> {
+  ): Promise<VirtualKeyWithScopes[]> {
     const client = tx ?? this.prisma;
     return client.virtualKey.findMany({
-      where: { projectId },
-      include: { providerCredentials: { orderBy: { priority: "asc" } } },
+      where: { organizationId },
+      include: {
+        scopes: true,
+        principalUser: { select: { id: true, name: true, email: true } },
+        routingPolicy: {
+          select: { id: true, modelAliases: true, policyRules: true },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
+  /**
+   * Every VK reachable from a given scope entry. Used for the
+   * project / team / org settings pages — each page lists VKs that
+   * declare at least one matching scope row.
+   */
+  async findAllForScope(
+    scope: ScopeInput,
+    tx?: Prisma.TransactionClient,
+  ): Promise<VirtualKeyWithScopes[]> {
+    const client = tx ?? this.prisma;
+    return client.virtualKey.findMany({
+      where: {
+        scopes: {
+          some: { scopeType: scope.scopeType, scopeId: scope.scopeId },
+        },
+      },
+      include: {
+        scopes: true,
+        principalUser: { select: { id: true, name: true, email: true } },
+        routingPolicy: {
+          select: { id: true, modelAliases: true, policyRules: true },
+        },
+      },
       orderBy: { createdAt: "desc" },
     });
   }
@@ -87,76 +160,112 @@ export class VirtualKeyRepository {
   async create(
     data: CreateVirtualKeyData,
     tx?: Prisma.TransactionClient,
-  ): Promise<VirtualKeyWithChain> {
+  ): Promise<VirtualKeyWithScopes> {
     const client = tx ?? this.prisma;
     return client.virtualKey.create({
       data: {
         id: data.id,
-        projectId: data.projectId,
+        organizationId: data.organizationId,
         name: data.name,
         description: data.description ?? null,
-        environment: data.environment,
         hashedSecret: data.hashedSecret,
         displayPrefix: data.displayPrefix,
         principalUserId: data.principalUserId ?? null,
         config: data.config,
         createdById: data.createdById,
+        routingPolicyId: data.routingPolicyId ?? null,
         revision: 1n,
-        providerCredentials: {
-          create: data.providerCredentialIds.map(({ id, priority }) => ({
-            providerCredentialId: id,
-            priority,
+        scopes: {
+          create: data.scopes.map((s) => ({
+            scopeType: s.scopeType,
+            scopeId: s.scopeId,
           })),
         },
       },
-      include: { providerCredentials: { orderBy: { priority: "asc" } } },
+      include: {
+        scopes: true,
+        principalUser: { select: { id: true, name: true, email: true } },
+        routingPolicy: {
+          select: { id: true, modelAliases: true, policyRules: true },
+        },
+      },
     });
   }
 
   async updateConfig(
     id: string,
-    projectId: string,
+    organizationId: string,
     config: Prisma.InputJsonValue,
     tx?: Prisma.TransactionClient,
-  ): Promise<VirtualKeyWithChain> {
+  ): Promise<VirtualKeyWithScopes> {
     const client = tx ?? this.prisma;
     return client.virtualKey.update({
-      where: { id, projectId },
+      where: { id, organizationId },
       data: { config, revision: { increment: 1n } },
-      include: { providerCredentials: { orderBy: { priority: "asc" } } },
+      include: {
+        scopes: true,
+        principalUser: { select: { id: true, name: true, email: true } },
+        routingPolicy: {
+          select: { id: true, modelAliases: true, policyRules: true },
+        },
+      },
     });
   }
 
-  async replaceProviderChain(
+  /**
+   * Replace the VK's scope set in-place. Used by the edit drawer when
+   * an admin moves a VK between scopes. Two-step delete+createMany
+   * matches the pattern used by ModelProviderRepository.replaceScopes.
+   */
+  async replaceScopes(
     id: string,
-    providerCredentialIds: { id: string; priority: number }[],
+    scopes: ScopeInput[],
     tx?: Prisma.TransactionClient,
   ): Promise<void> {
     const client = tx ?? this.prisma;
-    await client.virtualKeyProviderCredential.deleteMany({
-      where: { virtualKeyId: id },
-    });
-    await client.virtualKeyProviderCredential.createMany({
-      data: providerCredentialIds.map(({ id: credId, priority }) => ({
+    await client.virtualKeyScope.deleteMany({ where: { virtualKeyId: id } });
+    if (scopes.length === 0) return;
+    await client.virtualKeyScope.createMany({
+      data: scopes.map((s) => ({
         virtualKeyId: id,
-        providerCredentialId: credId,
-        priority,
+        scopeType: s.scopeType,
+        scopeId: s.scopeId,
       })),
+    });
+  }
+
+  async setRoutingPolicy(
+    id: string,
+    organizationId: string,
+    routingPolicyId: string | null,
+    tx?: Prisma.TransactionClient,
+  ): Promise<VirtualKeyWithScopes> {
+    const client = tx ?? this.prisma;
+    return client.virtualKey.update({
+      where: { id, organizationId },
+      data: { routingPolicyId, revision: { increment: 1n } },
+      include: {
+        scopes: true,
+        principalUser: { select: { id: true, name: true, email: true } },
+        routingPolicy: {
+          select: { id: true, modelAliases: true, policyRules: true },
+        },
+      },
     });
   }
 
   async rotateSecret(
     id: string,
-    projectId: string,
+    organizationId: string,
     newHashedSecret: string,
     newDisplayPrefix: string,
     previousHashedSecret: string,
     previousSecretValidUntil: Date,
     tx?: Prisma.TransactionClient,
-  ): Promise<VirtualKeyWithChain> {
+  ): Promise<VirtualKeyWithScopes> {
     const client = tx ?? this.prisma;
     return client.virtualKey.update({
-      where: { id, projectId },
+      where: { id, organizationId },
       data: {
         hashedSecret: newHashedSecret,
         displayPrefix: newDisplayPrefix,
@@ -164,19 +273,25 @@ export class VirtualKeyRepository {
         previousSecretValidUntil,
         revision: { increment: 1n },
       },
-      include: { providerCredentials: { orderBy: { priority: "asc" } } },
+      include: {
+        scopes: true,
+        principalUser: { select: { id: true, name: true, email: true } },
+        routingPolicy: {
+          select: { id: true, modelAliases: true, policyRules: true },
+        },
+      },
     });
   }
 
   async revoke(
     id: string,
-    projectId: string,
+    organizationId: string,
     revokedById: string,
     tx?: Prisma.TransactionClient,
-  ): Promise<VirtualKeyWithChain> {
+  ): Promise<VirtualKeyWithScopes> {
     const client = tx ?? this.prisma;
     return client.virtualKey.update({
-      where: { id, projectId },
+      where: { id, organizationId },
       data: {
         status: "REVOKED",
         revokedAt: new Date(),
@@ -185,7 +300,13 @@ export class VirtualKeyRepository {
         previousSecretValidUntil: null,
         revision: { increment: 1n },
       },
-      include: { providerCredentials: { orderBy: { priority: "asc" } } },
+      include: {
+        scopes: true,
+        principalUser: { select: { id: true, name: true, email: true } },
+        routingPolicy: {
+          select: { id: true, modelAliases: true, policyRules: true },
+        },
+      },
     });
   }
 

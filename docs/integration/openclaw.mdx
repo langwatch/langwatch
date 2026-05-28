@@ -5,10 +5,10 @@ description: Send OpenTelemetry traces from your OpenClaw agent to LangWatch for
 ---
 
 <Note>
-**⚠️ Experimental** — OpenClaw's `diagnostics-otel` plugin is under active development. The instrumentation spec is stabilizing but may change. Follow the discussion at [PR #11100](https://github.com/openclaw/openclaw/pull/11100) for the latest.
+**⚠️ Experimental**: OpenClaw's `diagnostics-otel` plugin is under active development. The instrumentation spec is stabilizing but may change. Follow the discussion at [PR #11100](https://github.com/openclaw/openclaw/pull/11100) for the latest.
 </Note>
 
-[OpenClaw](https://github.com/openclaw/openclaw) is an open-source AI agent framework that runs as a personal assistant or production copilot — handling tasks like code reviews, monitoring, incident response, and more. Its built-in `diagnostics-otel` plugin emits [OpenTelemetry GenAI Semantic Conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/)-compliant traces that LangWatch can ingest natively.
+[OpenClaw](https://github.com/openclaw/openclaw) is an open-source AI agent framework that runs as a personal assistant or production copilot, handling tasks like code reviews, monitoring, incident response, and more. Its built-in `diagnostics-otel` plugin emits [OpenTelemetry GenAI Semantic Conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/)-compliant traces that LangWatch can ingest natively.
 
 ## Setup
 
@@ -77,11 +77,11 @@ run (root span)
 
 LLM spans are children of the run. Tool spans are children of the LLM call that invoked them. Each span includes:
 
-- **Model info** — which model was requested and which was used
-- **Token usage** — prompt tokens, completion tokens, cache read/write breakdown
-- **Latency** — duration of each LLM call and tool execution
-- **Cost** — calculated from token usage
-- **Content** — full input/output messages when `captureContent` is enabled
+- **Model info**: which model was requested and which was used
+- **Token usage**: prompt tokens, completion tokens, cache read/write breakdown
+- **Latency**: duration of each LLM call and tool execution
+- **Cost**: calculated from token usage
+- **Content**: full input/output messages when `captureContent` is enabled
 
 ## Content Capture
 
@@ -89,20 +89,20 @@ The `captureContent` flag controls whether message content is included in traces
 
 When **enabled**, traces include:
 
-- `gen_ai.input.messages` — the full prompt sent to the model
-- `gen_ai.output.messages` — the model's response
-- `gen_ai.system_instructions` — the system prompt
-- `gen_ai.request.tools` — tool definitions available to the model
+- `gen_ai.input.messages`, the full prompt sent to the model
+- `gen_ai.output.messages`, the model's response
+- `gen_ai.system_instructions`, the system prompt
+- `gen_ai.request.tools`, tool definitions available to the model
 - Tool input/output on execution spans
 
-When **disabled**, you still get the full trace structure, token counts, latency, and model metadata — just no message content. Useful if you want observability without logging sensitive conversations.
+When **disabled**, you still get the full trace structure, token counts, latency, and model metadata, just no message content. Useful if you want observability without logging sensitive conversations.
 
 ## Configuration Reference
 
 | Option | Description | Default |
 |--------|-------------|---------|
 | `diagnostics.otel.enabled` | Turn OTEL export on/off | `false` |
-| `diagnostics.otel.endpoint` | OTLP endpoint URL | — |
+| `diagnostics.otel.endpoint` | OTLP endpoint URL |, |
 | `diagnostics.otel.traces` | Export traces | `true` |
 | `diagnostics.otel.metrics` | Export metrics | `true` |
 | `diagnostics.otel.logs` | Export logs | `false` |

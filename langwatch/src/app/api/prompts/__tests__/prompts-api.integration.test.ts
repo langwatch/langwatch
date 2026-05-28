@@ -87,6 +87,7 @@ describe("Prompts API", () => {
       data: {
         ...testProject,
         teamId: testTeam.id,
+        personalFeatures: {},
       },
     });
 

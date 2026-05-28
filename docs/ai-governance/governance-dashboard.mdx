@@ -1,0 +1,118 @@
+---
+title: /governance dashboard
+description: The daily-use org governance home, spend, anomalies, ingestion-source health, per-user activity. Read-mostly; the admin-authoring CRUD pages still live under /settings/governance/*. Available only after the org's setup-state OR-of-flags trips.
+sidebarTitle: /governance dashboard
+---
+
+The `/governance` route is the **org governance daily home**: the read-mostly oversight dashboard an admin opens to answer *"is the gateway healthy, are we within budget, did anything anomalous happen overnight, are users actually using this?"*. It's the counterpart of `/me` for the admin persona.
+
+It is intentionally distinct from the **admin-authoring** surface at `/settings/governance/*`, see [Control plane → Daily-use vs admin-authoring](/ai-governance/control-plane#daily-use-surfaces-vs-admin-authoring-surfaces) for why the split exists.
+
+<Info>**Pairs with:** [Control plane & integration tiers](/ai-governance/control-plane) for the surface map and [Anomaly rules](/ai-governance/anomaly-rules) for what populates the anomalies strip.</Info>
+
+<Note>**Visibility**: the `/governance` entry only appears in the main sidebar once the org's setup-state OR-of-flags trips (see [When the entry shows up](#when-the-entry-shows-up) below). A brand-new org sees the **Settings → AI Governance** admin pages instead until they have data flowing.</Note>
+
+## What you see
+
+The dashboard groups data into four strips, top to bottom.
+
+### 1. KPI strip
+
+Five at-a-glance numbers for the selected window (default: last 30 days):
+
+| KPI | What it shows |
+|---|---|
+| **Total spend** | USD across every gateway request the org saw, summed |
+| **Active users** | Distinct principal IDs that hit the gateway in the window |
+| **Active sources** | IngestionSources in `active` state (have received at least one event) |
+| **Anomaly count** | `AnomalyAlert` rows in the window, broken down by severity (`anomalyBreakdown.{critical,warning,info}`) |
+| **Recent activity** | Count of governance-tagged events in the last 24h |
+
+The window selector at the top right adjusts every strip simultaneously.
+
+### 2. Spend over time
+
+A daily bar chart of org-wide spend. Click a bar to drill into the per-user breakdown for that day.
+
+The chart is the unified view across:
+
+- Personal Virtual Keys minted via `/me`.
+- Project Virtual Keys minted from project pages.
+- Anything else that hit the gateway with a `vk-lw-*` Bearer.
+
+It does not include Ingestion Source events (those are governance-tagged but don't carry cost), those land in [Ingestion-source health](#3-ingestion-source-health) below.
+
+### 3. Ingestion-source health
+
+A status row per active IngestionSource:
+
+- **Status pill**: `active`, `awaiting_first_event`, `error`.
+- **Source type**: `otel_generic`, `claude_cowork`, `workato`, etc.
+- **Last event**: relative timestamp of the most recent successful ingest.
+- **Event count**: 24h, 7d, 30d, picked from the same `ingestionSources.healthMetrics` tRPC procedure that `langwatch ingest health` uses (so the CLI and the web UI are byte-for-byte identical on `--json`).
+
+A red dot on a source means the receiver hasn't seen events in the configured window, see the [per-source detail page](/ai-gateway/governance/admin-setup#ingestion-sources) for the timeline + the receiver-side error log.
+
+### 4. Anomalies
+
+The list of `AnomalyAlert` rows in the window, sorted newest first. Each row shows:
+
+- **Severity chip** (critical, warning, info).
+- **Rule name** that fired.
+- **Triggered at** timestamp.
+- **Current vs baseline** values for spend-spike anomalies.
+- **Scope** (organization, source_type, source).
+
+Click a row to expand the AnomalyAlert detail (the rule definition that matched, the event window that triggered it, the per-actor breakdown). Click the rule name to navigate to the [anomaly-rule editor](/ai-governance/anomaly-rules).
+
+## When the entry shows up
+
+`/governance` is gated by an OR-of-flags signal that the org has *activated* governance. The signal is the `api.governance.setupState({ organizationId })` tRPC procedure (read-only, cheap, server-side):
+
+```ts
+{
+  hasPersonalVKs:      boolean,  // any user has minted a personal VK
+  hasRoutingPolicies:  boolean,  // at least one routing policy exists
+  hasIngestionSources: boolean,  // at least one source exists
+  hasAnomalyRules:     boolean,  // at least one rule defined
+  hasRecentActivity:   boolean,  // any governance event in the last 30d
+}
+```
+
+`Governance active = any 3 of 5`. After the [admin walkthrough](/ai-governance/getting-started-admin) you'll have at least 4 (routing policies + ingestion sources + recent activity from the dev pass + the budget you create implies personal VKs once a developer signs in).
+
+The same signal drives:
+
+- The **Govern (Preview)** entry visibility in the main sidebar.
+- The CLI `langwatch governance status` output (mirrors the same booleans).
+- The post-onboarding redirect, when an admin lands on `/`, the persona-2 home picker sends them to `/governance` if active, else to `/settings/governance` to keep configuring.
+
+## Permissions
+
+The `/governance` page itself is gated to `governance:view` (granted to ADMIN by default). Underlying procedures:
+
+- `governance.kpis(organizationId, window)`, KPI strip.
+- `governance.spendOverTime(organizationId, window)`, bar chart.
+- `ingestionSources.healthMetrics(organizationId)`, health strip.
+- `activityMonitor.recentAnomalies(organizationId, window)`, anomaly list (this lives in the `activityMonitor` router, not `governance`, for routing-through-service reasons).
+
+The activity monitor procedures cap at `activityMonitor:view`, the recommended permission to grant a security-analyst custom role that should see anomalies without managing rules.
+
+## What you can do FROM here
+
+The dashboard is read-mostly, but every section deep-links into the admin-authoring surface where you'd actually change something:
+
+- KPI strip → click "Total spend" KPI → drills into per-user breakdown table.
+- Spend over time chart → click a day → opens that day's per-user breakdown filtered to ±2 hours of the spike.
+- Ingestion-source health row → click into the per-source detail page.
+- Anomalies row → click the rule name → opens the [anomaly-rule editor](/ai-governance/anomaly-rules) at that rule.
+
+If the dashboard surfaces something you want to *act* on (rotate a key, edit a rule threshold, archive a source), follow the deep link into the corresponding admin-authoring page under `/settings/governance/*`.
+
+## Where to next
+
+- **Detect anomalies**: [Anomaly rules](/ai-governance/anomaly-rules).
+- **Inspect ingestion-source health from the terminal**: [CLI debug](/ai-governance/cli-debug).
+- **Export to your SIEM**: [Compliance architecture](/ai-governance/compliance-architecture).
+- **Tighten privacy**: [No-spy mode](/ai-governance/no-spy-mode).
+- **Audit who did what when**: [Audit log](/ai-governance/audit-log).

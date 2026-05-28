@@ -1,0 +1,40 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          { "key": "service.name", "value": { "stringValue": "forge-attempt-provenance" } },
+          { "key": "langwatch.template.id", "value": { "stringValue": "FORGE_template_other" } },
+          { "key": "langwatch.user_ingestion_binding.id", "value": { "stringValue": "FORGE_binding_other" } },
+          { "key": "langwatch.source", "value": { "stringValue": "FORGE_source_other" } },
+          { "key": "langwatch.origin", "value": { "stringValue": "FORGE_origin_evil" } },
+          { "key": "langwatch.organization_id", "value": { "stringValue": "FORGE_org_other" } }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": { "name": "dogfood.forge-attempt.provenance", "version": "0.0.0" },
+          "spans": [
+            {
+              "traceId": "00000000000000000000000000000000",
+              "spanId": "0000000000000000",
+              "name": "forge.provenance-keys",
+              "kind": 1,
+              "startTimeUnixNano": "1715175600000000000",
+              "endTimeUnixNano": "1715175600100000000",
+              "attributes": [
+                { "key": "forge.intent", "value": { "stringValue": "claim 5-key provenance set (template.id + user_ingestion_binding.id + langwatch.source + langwatch.origin + langwatch.organization_id); receiver MUST re-stamp ALL FIVE to binding-authoritative provenance. Forging origin OR organization_id can subvert the no-spy / strip-IO governance gate (gap #5)." } },
+                { "key": "langwatch.template.id", "value": { "stringValue": "FORGE_template_other" } },
+                { "key": "langwatch.user_ingestion_binding.id", "value": { "stringValue": "FORGE_binding_other" } },
+                { "key": "langwatch.source", "value": { "stringValue": "FORGE_source_other" } },
+                { "key": "langwatch.origin", "value": { "stringValue": "FORGE_origin_evil" } },
+                { "key": "langwatch.organization_id", "value": { "stringValue": "FORGE_org_other" } }
+              ],
+              "status": { "code": 1 }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

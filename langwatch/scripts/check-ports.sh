@@ -3,6 +3,7 @@
 #
 # Default port layout (PORT=5560):
 #   - PORT          (5560) Vite dev server (frontend)
+#   - PORT + 3      (5563) AI Gateway data plane (Go)
 #   - PORT + 1000   (6560) API / Hono backend
 #   - PORT - 2561   (2999) Worker metrics
 #
@@ -27,6 +28,7 @@ fi
 
 PORT="${PORT:-5560}"
 API_PORT=$((PORT + 1000))
+GATEWAY_PORT=$((PORT + 3))
 WORKER_METRICS_PORT="${WORKER_METRICS_PORT:-$((PORT - 2561))}"
 
 NODE_ENV_VAL="${NODE_ENV:-production}"
@@ -38,6 +40,11 @@ PORT_LABELS=()
 if [ "$NODE_ENV_VAL" = "development" ]; then
   PORTS_TO_CHECK+=("$PORT")          ; PORT_LABELS+=("vite frontend")
   PORTS_TO_CHECK+=("$API_PORT")      ; PORT_LABELS+=("api backend")
+  # The AI Gateway port (PORT + 3) is intentionally not flagged here:
+  # start.sh's gateway-autostart block reuses an existing listener on that
+  # port (e.g., another worktree's gateway or a manual `make service` run)
+  # rather than failing, so a busy gateway port is a normal path, not a
+  # conflict. Suggested-slot search below still factors it in.
 else
   PORTS_TO_CHECK+=("$PORT")          ; PORT_LABELS+=("api server")
 fi
@@ -70,8 +77,9 @@ if [ "${#conflicts[@]}" -eq 0 ]; then
   exit 0
 fi
 
-# Find the next free PORT slot in increments of 10. We need ALL three derived
-# ports (slot, slot+1000, slot-2561) free.
+# Find the next free PORT slot in increments of 10. We need vite/api/metrics
+# free; the gateway port is reuse-OK (start.sh shares it across worktrees)
+# so we don't gate the suggestion on it being free.
 suggested_port=""
 slot="$PORT"
 for _ in $(seq 1 30); do

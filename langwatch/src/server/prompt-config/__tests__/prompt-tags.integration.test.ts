@@ -34,6 +34,7 @@ describe("Feature: Prompt version tags", () => {
       data: {
         ...projectFactory.build({ slug: nanoid() }),
         teamId: testTeam.id,
+        personalFeatures: {},
       },
     });
 
@@ -41,6 +42,7 @@ describe("Feature: Prompt version tags", () => {
       data: {
         ...projectFactory.build({ slug: nanoid() }),
         teamId: testTeam.id,
+        personalFeatures: {},
       },
     });
 

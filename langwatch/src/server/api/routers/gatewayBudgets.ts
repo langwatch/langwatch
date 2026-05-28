@@ -216,20 +216,6 @@ async function resolveScopeTargetsBatch(
   for (const b of budgets) {
     ids[b.scopeType]?.add(b.scopeId);
   }
-  // VirtualKey is strictly project-scoped; the multitenancy middleware
-  // rejects findMany without projectId / projectId.in in the where
-  // clause. Derive the set of project ids for the budget's org up
-  // front so the VK lookup can filter inside that scope. Cheap — the
-  // Project table is tiny and this only runs when the page loads.
-  const orgProjectIds =
-    ids.VIRTUAL_KEY?.size && organizationId
-      ? await prisma.project
-          .findMany({
-            where: { team: { organizationId } },
-            select: { id: true },
-          })
-          .then((rows) => rows.map((r) => r.id))
-      : [];
   const [orgs, teams, projects, vks, users] = await Promise.all([
     ids.ORGANIZATION?.size
       ? prisma.organization.findMany({
@@ -249,17 +235,21 @@ async function resolveScopeTargetsBatch(
           select: { id: true, name: true, slug: true },
         })
       : Promise.resolve([]),
-    ids.VIRTUAL_KEY?.size && orgProjectIds.length
+    ids.VIRTUAL_KEY?.size && organizationId
       ? prisma.virtualKey.findMany({
           where: {
             id: { in: [...ids.VIRTUAL_KEY!] },
-            projectId: { in: orgProjectIds },
+            organizationId,
           },
           select: {
             id: true,
             name: true,
             displayPrefix: true,
-            project: { select: { slug: true } },
+            scopes: {
+              where: { scopeType: "PROJECT" },
+              select: { scopeId: true },
+              take: 1,
+            },
           },
         })
       : Promise.resolve([]),
@@ -295,13 +285,30 @@ async function resolveScopeTargetsBatch(
       secondary: p.slug,
     });
   }
+  // Derive the project slug (if any) from the first PROJECT-scope row
+  // on the VK — used only as a UI breadcrumb. Cheap inline lookup; the
+  // batch is bounded by `ids.VIRTUAL_KEY.size`.
+  const projectIdsForSlugs = vks
+    .map((vk) => vk.scopes[0]?.scopeId)
+    .filter((id): id is string => typeof id === "string");
+  const projectSlugById = new Map<string, string>(
+    projectIdsForSlugs.length
+      ? (
+          await prisma.project.findMany({
+            where: { id: { in: projectIdsForSlugs } },
+            select: { id: true, slug: true },
+          })
+        ).map((p) => [p.id, p.slug])
+      : [],
+  );
   for (const vk of vks) {
     out.set(`VIRTUAL_KEY:${vk.id}`, {
       kind: "VIRTUAL_KEY",
       id: vk.id,
       name: vk.name,
       secondary: vk.displayPrefix ? `${vk.displayPrefix}…` : null,
-      projectSlug: vk.project?.slug ?? null,
+      projectSlug:
+        projectSlugById.get(vk.scopes[0]?.scopeId ?? "") ?? null,
     });
   }
   for (const u of users) {

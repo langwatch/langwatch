@@ -25,6 +25,7 @@ import { prisma } from "../server/db";
 import { connection as redis } from "../server/redis";
 import { encrypt, decrypt } from "../utils/encryption";
 import { createLogger } from "../utils/logger/server";
+import { registerGovernanceMcpTools } from "./governance-tools";
 
 const logger = createLogger("langwatch:mcp");
 
@@ -111,6 +112,13 @@ function createRateLimiter({
 interface SessionState {
   transport: StreamableHTTPServerTransport;
   apiKey: string;
+  /**
+   * The OAuth-flowing user — populated when the session was minted via the
+   * /api/mcp/authorize PKCE flow, absent for direct-apiKey-as-Bearer sessions.
+   * Used by governance MCP tools to attribute audit rows + enforce RBAC at
+   * the tool layer.
+   */
+  userId?: string;
   lastActivityAt: number;
 }
 
@@ -118,12 +126,15 @@ interface SessionState {
 interface SseSessionState {
   transport: SSEServerTransport;
   apiKey: string;
+  userId?: string;
   lastActivityAt: number;
 }
 
 /** OAuth token entry stored in memory and Redis. */
 interface OAuthTokenEntry {
   apiKey: string;
+  /** OAuth-flowing user id captured at /mcp/authorize. */
+  userId?: string;
   expiresAt: number;
 }
 
@@ -323,16 +334,31 @@ export function createMcpHandler(): McpHandler {
   }
 
   /**
-   * Resolves a Bearer token to an API key.
-   * Checks in-memory OAuth tokens first, then Redis (encrypted), and falls
-   * back to treating the token as a direct API key.
+   * Resolves a Bearer token to an API key (legacy single-value return).
+   * Prefer `resolveSessionContext` for new code that needs the OAuth
+   * user identity alongside the apiKey.
    */
   async function resolveApiKey(token: string): Promise<string | null> {
+    const ctx = await resolveSessionContext(token);
+    return ctx?.apiKey ?? null;
+  }
+
+  /**
+   * Resolves a Bearer token to {apiKey, userId?}. The userId is set when
+   * the token was minted via the /mcp/authorize OAuth flow (we capture
+   * `session.user.id` at code creation), and undefined when the token is
+   * a direct project apiKey passed as Bearer. Governance MCP tools that
+   * need a caller identity (audit attribution, RBAC) read userId from
+   * here; tools that only need org context can ignore it.
+   */
+  async function resolveSessionContext(
+    token: string,
+  ): Promise<{ apiKey: string; userId?: string } | null> {
     // 1. Check in-memory OAuth token cache
     const memEntry = oauthTokens.get(token);
     if (memEntry) {
       if (Date.now() < memEntry.expiresAt) {
-        return memEntry.apiKey;
+        return { apiKey: memEntry.apiKey, userId: memEntry.userId };
       }
       oauthTokens.delete(token);
       return null;
@@ -345,13 +371,18 @@ export function createMcpHandler(): McpHandler {
         if (redisData) {
           const stored = JSON.parse(redisData) as {
             encryptedApiKey: string;
+            userId?: string;
             expiresAt: number;
           };
           if (Date.now() < stored.expiresAt) {
             const apiKey = decrypt(stored.encryptedApiKey);
             // Re-populate in-memory cache
-            oauthTokens.set(token, { apiKey, expiresAt: stored.expiresAt });
-            return apiKey;
+            oauthTokens.set(token, {
+              apiKey,
+              userId: stored.userId,
+              expiresAt: stored.expiresAt,
+            });
+            return { apiKey, userId: stored.userId };
           }
           await redis.del(`${REDIS_TOKEN_PREFIX}${token}`);
           return null;
@@ -365,8 +396,8 @@ export function createMcpHandler(): McpHandler {
     }
 
     // 3. Treat as direct API key (only reached when token was not found in
-    //    either the in-memory cache or Redis)
-    return token;
+    //    either the in-memory cache or Redis). No OAuth user identity.
+    return { apiKey: token };
   }
 
   /**
@@ -456,9 +487,11 @@ export function createMcpHandler(): McpHandler {
     accessToken: string,
     apiKey: string,
     expiresIn: number,
+    userId?: string,
   ): Promise<void> {
     const entry: OAuthTokenEntry = {
       apiKey,
+      userId,
       expiresAt: Date.now() + expiresIn * 1000,
     };
 
@@ -470,6 +503,7 @@ export function createMcpHandler(): McpHandler {
       try {
         const redisEntry = JSON.stringify({
           encryptedApiKey: encrypt(apiKey),
+          userId,
           expiresAt: entry.expiresAt,
         });
         await redis.set(
@@ -794,6 +828,7 @@ export function createMcpHandler(): McpHandler {
     let stored: {
       projectId: string;
       encryptedApiKey: string;
+      userId?: string;
       codeChallenge: string;
       codeChallengeMethod: string;
       expiresAt: number;
@@ -836,7 +871,7 @@ export function createMcpHandler(): McpHandler {
     const expiresIn = TOKEN_TTL_SECONDS;
     const accessToken = generateAccessToken();
 
-    await storeOAuthToken(accessToken, apiKey, expiresIn);
+    await storeOAuthToken(accessToken, apiKey, expiresIn, stored.userId);
 
     sendJson(res, 200, {
       access_token: accessToken,
@@ -868,6 +903,10 @@ export function createMcpHandler(): McpHandler {
     }
 
     const sessionId = req.headers["mcp-session-id"] as string | undefined;
+    // Extract once at the top — reused on session-recovery path to recover
+    // the OAuth-flowing userId (governance tools attribution) and on the
+    // existing-session path for Bearer match validation.
+    const incomingToken = extractBearerToken(req);
 
     // Existing session — check local Map first, then Redis
     if (sessionId) {
@@ -910,9 +949,15 @@ export function createMcpHandler(): McpHandler {
           inner._initialized = true;
           inner.sessionId = sessionId;
 
+          // Re-resolve to recover OAuth userId if the token still has one;
+          // graceful degradation to undefined for direct-apiKey sessions.
+          const recoveredCtx = incomingToken
+            ? await resolveSessionContext(incomingToken)
+            : null;
           session = {
             transport,
             apiKey: redisApiKey,
+            userId: recoveredCtx?.userId,
             lastActivityAt: Date.now(),
           };
           sessions.set(sessionId, session);
@@ -922,6 +967,11 @@ export function createMcpHandler(): McpHandler {
           };
 
           const sessionServer = createMcpServer();
+          registerGovernanceMcpTools(sessionServer, {
+            prisma,
+            apiKey: redisApiKey,
+            callerUserId: recoveredCtx?.userId,
+          });
           await handleWithSessionConfig(redisApiKey, () =>
             sessionServer.connect(transport),
           );
@@ -961,6 +1011,15 @@ export function createMcpHandler(): McpHandler {
       const apiKey = await authenticateRequest(req, res);
       if (!apiKey) return; // 401 already sent
 
+      // Re-resolve the token to recover the OAuth-flowing userId (if any)
+      // for governance MCP tool attribution. authenticateRequest only
+      // returns the apiKey, but resolveSessionContext is cheap and the
+      // entry was just populated.
+      const initialCtx = incomingToken
+        ? await resolveSessionContext(incomingToken)
+        : null;
+      const userId = initialCtx?.userId;
+
       // Per-key session limit (cross-pod via Redis)
       if ((await sessionCountForKey(apiKey)) >= MAX_SESSIONS_PER_KEY) {
         sendJson(res, 429, {
@@ -972,7 +1031,12 @@ export function createMcpHandler(): McpHandler {
       const transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: () => randomUUID(),
         onsessioninitialized: (id) => {
-          sessions.set(id, { transport, apiKey, lastActivityAt: Date.now() });
+          sessions.set(id, {
+            transport,
+            apiKey,
+            userId,
+            lastActivityAt: Date.now(),
+          });
           storeSessionInRedis(id, apiKey).catch(() => {});
         },
       });
@@ -985,6 +1049,11 @@ export function createMcpHandler(): McpHandler {
       };
 
       const sessionServer = createMcpServer();
+      registerGovernanceMcpTools(sessionServer, {
+        prisma,
+        apiKey,
+        callerUserId: userId,
+      });
       await handleWithSessionConfig(apiKey, () =>
         sessionServer.connect(transport),
       );
@@ -1078,6 +1147,10 @@ export function createMcpHandler(): McpHandler {
     const apiKey = await authenticateRequest(req, res);
     if (!apiKey) return;
 
+    const sseToken = extractBearerToken(req);
+    const sseCtx = sseToken ? await resolveSessionContext(sseToken) : null;
+    const sseUserId = sseCtx?.userId;
+
     if ((await sessionCountForKey(apiKey)) >= MAX_SESSIONS_PER_KEY) {
       sendJson(res, 429, {
         error: `Too many concurrent sessions (max ${MAX_SESSIONS_PER_KEY})`,
@@ -1089,10 +1162,16 @@ export function createMcpHandler(): McpHandler {
     sseSessions.set(transport.sessionId, {
       transport,
       apiKey,
+      userId: sseUserId,
       lastActivityAt: Date.now(),
     });
 
     const sessionServer = createMcpServer();
+    registerGovernanceMcpTools(sessionServer, {
+      prisma,
+      apiKey,
+      callerUserId: sseUserId,
+    });
 
     res.on("close", () => {
       sseSessions.delete(transport.sessionId);

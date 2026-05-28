@@ -41,6 +41,7 @@ describe("Workflows REST API", () => {
       data: {
         ...testProject,
         teamId: testTeam.id,
+        personalFeatures: {},
       },
     });
 

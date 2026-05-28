@@ -1,10 +1,54 @@
 import * as fs from "fs";
 import * as path from "path";
 import chalk from "chalk";
-import ora from "ora";
 import prompts from "prompts";
 import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
-import { getEndpoint } from "@/cli/utils/endpoint";
+import {
+  runDeviceFlowLogin,
+  runUnifiedLoginFlow,
+} from "@/cli/utils/governance/login-flow";
+import {
+  loadConfig,
+  saveConfig,
+} from "@/cli/utils/governance/config";
+
+/**
+ * Always-on agent-hint banner shown above the interactive prompts on
+ * `langwatch login` (no flags). Some agent harnesses fake a TTY but can't
+ * actually answer prompts — this banner names the escape-hatch flags so
+ * the agent (or the human staring at the stuck prompt) can re-invoke
+ * with the right flag and proceed.
+ *
+ * Spec: specs/ai-governance/cli-onboarding/login-unified.feature
+ */
+function printAgentHintBanner(): void {
+  console.log(
+    chalk.gray(
+      "Running interactively. To skip these prompts (CI / agents that already have a credential):",
+    ),
+  );
+  console.log(
+    chalk.gray(
+      "  --device                   AI tools / SSO (browser approval, no paste)",
+    ),
+  );
+  console.log(
+    chalk.gray(
+      "  --api-key <KEY>            project SDK key (writes .env)",
+    ),
+  );
+  console.log(
+    chalk.gray(
+      "  --token <TOKEN>            pre-minted device session (writes ~/.langwatch/config.json)",
+    ),
+  );
+  console.log(
+    chalk.gray(
+      "  --endpoint <URL>           self-hosted instance URL",
+    ),
+  );
+  console.log();
+}
 
 const updateEnvFile = (
   apiKey: string,
@@ -45,8 +89,65 @@ const updateEnvFile = (
   return { created: false, updated: found, path: envPath };
 };
 
-export const loginCommand = async (options?: { apiKey?: string }): Promise<void> => {
+export const loginCommand = async (
+  options?: {
+    apiKey?: string;
+    device?: boolean;
+    browser?: string;
+    endpoint?: string;
+    token?: string;
+  },
+): Promise<void> => {
   try {
+    // Honor `--endpoint` flag OR `LANGWATCH_ENDPOINT` env. Persist the
+    // resolved value BEFORE the chosen flow runs so subsequent reads
+    // (in the device flow, the API-key flow, any sub-command spawned
+    // later) see the right control-plane URL. The 4-source resolver
+    // (flag > env > config > default) honors this value via the
+    // persisted-config layer for any flow that doesn't explicitly take
+    // a flag. The env var has the same precedence as the flag for the
+    // login flow itself so users running `LANGWATCH_ENDPOINT=... langwatch
+    // login` skip the cloud/self-hosted picker.
+    const endpointFromEnv = process.env.LANGWATCH_ENDPOINT?.trim();
+    const presetEndpoint = options?.endpoint ?? endpointFromEnv;
+    if (presetEndpoint) {
+      const trimmed = presetEndpoint.replace(/\/+$/, "");
+      const cfg = loadConfig();
+      cfg.control_plane_url = trimmed;
+      saveConfig(cfg);
+    }
+
+    // --token: pre-minted device-session escape hatch (CI / agent contexts
+    // where the token was minted via the dashboard 'Personal Access Tokens'
+    // surface). No browser, no prompts — just persist the token so
+    // subsequent `langwatch claude/codex/...` invocations can use it.
+    if (options?.token) {
+      const token = options.token.trim();
+      if (token.length < 10) {
+        console.error(chalk.red("Error: token seems too short. Please check and try again."));
+        process.exit(1);
+      }
+      const cfg = loadConfig();
+      cfg.access_token = token;
+      // No refresh_token / expires_at — that's the trade-off of bypassing
+      // the device flow. The wrapper auto-login will mint a real session
+      // if this token expires, since loadConfig+isLoggedIn only checks
+      // access_token presence.
+      saveConfig(cfg);
+      console.log(chalk.green("✓ device-session token saved"));
+      console.log(chalk.gray("  ~/.langwatch/config.json"));
+      return;
+    }
+
+    // Device-flow mode: SSO via the control plane's RFC 8628 endpoints,
+    // mints a personal virtual key bound to the user. This is the
+    // governance-plane onboarding for enterprise users, distinct from the
+    // single-user API-key flow below.
+    if (options?.device) {
+      await runDeviceFlowLogin({ browser: options.browser });
+      return;
+    }
+
     // Non-interactive mode: --api-key flag provided
     if (options?.apiKey) {
       const apiKey = options.apiKey.trim();
@@ -67,80 +168,127 @@ export const loginCommand = async (options?: { apiKey?: string }): Promise<void>
       return;
     }
 
-    // Interactive mode: open browser and prompt for key
-    console.log(chalk.blue("🔐 LangWatch Login"));
-    console.log(
-      chalk.gray(
-        "This will open your browser to get an API key from LangWatch.",
-      ),
-    );
-    console.log();
-
-    // Get the authorization URL
-    const endpoint = getEndpoint();
-    const authUrl = `${endpoint}/authorize`;
-
-    console.log(chalk.cyan(`Opening: ${authUrl}`));
-
-    // Open browser
-    const spinner = ora("Opening browser...").start();
-
-    try {
-      const open = (await import("open")).default;
-      await open(authUrl);
-      spinner.succeed("Browser opened");
-    } catch {
-      spinner.fail("Failed to open browser");
-      console.log(chalk.yellow(`Please manually open: ${chalk.cyan(authUrl)}`));
+    // Interactive mode (no flags). Refuse on non-TTY contexts with an
+    // actionable hint pointing at the escape-hatch flags — agents and CI
+    // pipelines should pass the right flag rather than getting stuck on a
+    // hidden interactive prompt.
+    if (!process.stdin.isTTY) {
+      console.error(
+        chalk.red(
+          "Error: cannot run interactive `langwatch login` in a non-TTY context.",
+        ),
+      );
+      console.error(chalk.gray("Run one of:"));
+      console.error(chalk.gray("  langwatch login --device                # AI tools / SSO (recommended)"));
+      console.error(chalk.gray("  langwatch login --api-key <KEY>         # project SDK key (writes .env)"));
+      console.error(chalk.gray("  langwatch login --token <TOKEN>         # pre-minted device session"));
+      console.error(chalk.gray("  LANGWATCH_AUTO_LOGIN=1 langwatch <cmd>  # let the wrapper trigger device flow"));
+      process.exit(1);
     }
 
-    console.log();
-    console.log(chalk.gray("1. Log in to LangWatch in your browser"));
-    console.log(chalk.gray("2. Copy your API key"));
-    console.log(chalk.gray("3. Come back here and paste it"));
+    // Always-on agent-hint banner — fake-TTY agents see this BEFORE the
+    // prompt block so they (or the human watching) can re-invoke with the
+    // right flag instead of staring at a stuck prompt.
+    printAgentHintBanner();
+
+    console.log(chalk.blue("🔐 LangWatch Login"));
     console.log();
 
-    // Wait for user input using prompts library
-    const response = await prompts({
-      type: "password",
-      name: "apiKey",
-      message: "Paste your API key here:",
-      validate: (value: string) => {
-        if (!value || value.trim() === "") {
-          return "API key is required";
+    // Q1 — endpoint (cloud vs self-hosted). Skipped if --endpoint was
+    // passed (already persisted above). On 'self-hosted' the entered
+    // URL is persisted to ~/.langwatch/config.json so subsequent
+    // `runUnifiedLoginFlow` calls (and every CLI command's resolver
+    // read) target the right host.
+    if (!options?.endpoint) {
+      const where = await prompts({
+        type: "select",
+        name: "where",
+        message: "Where do you want to log in?",
+        choices: [
+          {
+            title: "LangWatch Cloud",
+            description: "app.langwatch.ai (default)",
+            value: "cloud",
+          },
+          {
+            title: "Self-hosted instance",
+            description: "Custom URL — your company's LangWatch deployment",
+            value: "self-hosted",
+          },
+        ],
+        initial: 0,
+      });
+      if (where.where === "self-hosted") {
+        const url = await prompts({
+          type: "text",
+          name: "url",
+          message: "Self-hosted LangWatch URL (e.g. https://lw.acme.internal):",
+          validate: (v: string) => {
+            try {
+              const parsed = new URL(v);
+              if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+                return "URL must start with http(s)://";
+              }
+              return true;
+            } catch {
+              return "URL must be absolute (https://...)";
+            }
+          },
+        });
+        if (!url.url) {
+          console.log(chalk.yellow("Login cancelled"));
+          process.exit(0);
         }
-        if (value.length < 10) {
-          return "API key seems too short. Please check and try again.";
-        }
-        return true;
-      },
+        const cfg = loadConfig();
+        cfg.control_plane_url = (url.url as string).replace(/\/+$/, "");
+        saveConfig(cfg);
+      }
+    }
+
+    // Q2 — auth mode (AI tools = device-flow vs Project SDK = API key)
+    const mode = await prompts({
+      type: "select",
+      name: "mode",
+      message: "How do you want to use LangWatch?",
+      choices: [
+        {
+          title: "AI tools / agentic flows",
+          description: "claude, codex, cursor, gemini, opencode — device-flow SSO",
+          value: "device",
+        },
+        {
+          title: "Project / SDK API key",
+          description: "langwatch sync, langwatch eval, SDK auto-instrumentation",
+          value: "api-key",
+        },
+        {
+          title: "Both",
+          description: "Run both flows in sequence",
+          value: "both",
+        },
+      ],
+      initial: 0,
     });
-
-    if (!response.apiKey) {
+    if (!mode.mode) {
       console.log(chalk.yellow("Login cancelled"));
       process.exit(0);
     }
 
-    const apiKey = response.apiKey.trim();
-
-    // Save to .env file
-    const envResult = updateEnvFile(apiKey);
-
-    console.log();
-    console.log(chalk.green("✓ API key saved successfully!"));
-
-    if (envResult.created) {
-      console.log(chalk.gray(`• Created .env file with your API key`));
-    } else if (envResult.updated) {
-      console.log(chalk.gray(`• Updated existing API key in .env file`));
-    } else {
-      console.log(chalk.gray(`• Added API key to existing .env file`));
+    if (mode.mode === "device" || mode.mode === "both") {
+      await runDeviceFlowLogin({ browser: options?.browser });
     }
-
-    console.log();
-    console.log(chalk.green("🎉 You're all set! You can now use:"));
-    console.log(chalk.cyan("  langwatch prompt add <name>"));
-    console.log(chalk.cyan("  langwatch prompt sync"));
+    if (mode.mode === "api-key" || mode.mode === "both") {
+      // No-paste convergence (sergey f9fcc3927 + alexis bfef4ebab):
+      // /authorize page shows a project-picker + 'Generate API key'
+      // button; the freshly-minted key flows back to the CLI over the
+      // same RFC 8628 poll endpoint as the device-session flow. No
+      // copy-paste of the credential ever.
+      await runUnifiedLoginFlow({
+        kind: "project_api_key",
+        browser: options?.browser,
+      });
+    }
+    return;
   } catch (error) {
     console.error(
       chalk.red(
@@ -152,3 +300,5 @@ export const loginCommand = async (options?: { apiKey?: string }): Promise<void>
     process.exit(1);
   }
 };
+
+

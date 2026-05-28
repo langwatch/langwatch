@@ -14,6 +14,8 @@ export const organizationFactory = Factory.define<
   createdAt: new Date(),
   updatedAt: new Date(),
   usageSpendingMaxLimit: null,
+  maxSessionDurationDays: 0,
+  governanceLogContentMode: "full",
   signupData: null,
   signedDPA: false,
   elasticsearchNodeUrl: null,

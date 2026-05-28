@@ -5,6 +5,7 @@ import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
 import { buildAuthHeaders } from "@/internal/api/auth";
 
+import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 export const createSecretCommand = async (
   name: string,
   options: { value: string; format?: string }
@@ -22,7 +23,7 @@ export const createSecretCommand = async (
 
   const apiKey = process.env.LANGWATCH_API_KEY ?? "";
   const endpoint =
-    process.env.LANGWATCH_ENDPOINT ?? "https://app.langwatch.ai";
+    resolveControlPlaneUrl();
 
   const spinner = ora(`Creating secret "${name}"...`).start();
 

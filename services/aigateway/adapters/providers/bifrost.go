@@ -157,9 +157,10 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 			return &domain.Response{
 				Body:       rawBody,
 				StatusCode: status,
+				Headers:    forwardableUpstreamHeaders(bifrostResponseHeaders(bfCtx)),
 			}, nil
 		}
-		return nil, classifyBifrostError(ctx, berr)
+		return nil, errFromBifrost(ctx, berr, bifrostResponseHeaders(bfCtx))
 	}
 
 	// /v1/messages callers (Anthropic SDK, claude-code, ...) expect the
@@ -216,9 +217,10 @@ func (r *BifrostRouter) dispatchResponses(
 			return &domain.Response{
 				Body:       rawBody,
 				StatusCode: status,
+				Headers:    forwardableUpstreamHeaders(bifrostResponseHeaders(bfCtx)),
 			}, nil
 		}
-		return nil, classifyBifrostError(ctx, berr)
+		return nil, errFromBifrost(ctx, berr, bifrostResponseHeaders(bfCtx))
 	}
 
 	// Prefer the provider's native response bytes so /v1/responses
@@ -270,9 +272,10 @@ func (r *BifrostRouter) dispatchEmbeddings(
 			return &domain.Response{
 				Body:       rawBody,
 				StatusCode: status,
+				Headers:    forwardableUpstreamHeaders(bifrostResponseHeaders(bfCtx)),
 			}, nil
 		}
-		return nil, classifyBifrostError(ctx, berr)
+		return nil, errFromBifrost(ctx, berr, bifrostResponseHeaders(bfCtx))
 	}
 
 	body, _ := sonic.Marshal(resp)
@@ -411,7 +414,7 @@ func (r *BifrostRouter) DispatchStream(ctx context.Context, req *domain.Request,
 
 	ch, berr := r.bf.ChatCompletionStreamRequest(bfCtx, bfReq)
 	if berr != nil {
-		return nil, classifyBifrostError(ctx, berr)
+		return nil, errFromBifrost(ctx, berr, bifrostResponseHeaders(bfCtx))
 	}
 
 	return &bifrostStreamIterator{ch: ch}, nil
@@ -444,7 +447,7 @@ func (r *BifrostRouter) dispatchResponsesStream(
 
 	ch, berr := r.bf.ResponsesStreamRequest(bfCtx, bfReq)
 	if berr != nil {
-		return nil, classifyBifrostError(ctx, berr)
+		return nil, errFromBifrost(ctx, berr, bifrostResponseHeaders(bfCtx))
 	}
 	return &bifrostStreamIterator{ch: ch}, nil
 }
@@ -471,9 +474,10 @@ func (r *BifrostRouter) dispatchPassthrough(
 			return &domain.Response{
 				Body:       rawBody,
 				StatusCode: status,
+				Headers:    forwardableUpstreamHeaders(bifrostResponseHeaders(bfCtx)),
 			}, nil
 		}
-		return nil, classifyBifrostError(ctx, berr)
+		return nil, errFromBifrost(ctx, berr, bifrostResponseHeaders(bfCtx))
 	}
 
 	status := resp.StatusCode
@@ -514,7 +518,7 @@ func (r *BifrostRouter) dispatchPassthroughStream(
 
 	ch, berr := r.bf.PassthroughStream(bfCtx, provider, bfReq)
 	if berr != nil {
-		return nil, classifyBifrostError(ctx, berr)
+		return nil, errFromBifrost(ctx, berr, bifrostResponseHeaders(bfCtx))
 	}
 	return &bifrostStreamIterator{ch: ch, rawFraming: true}, nil
 }
@@ -781,6 +785,75 @@ func mapProvider(id domain.ProviderID) bfschemas.ModelProvider {
 
 // --- Error classification ---
 
+// errFromBifrost turns a Bifrost dispatch error into the error the gateway
+// surfaces to the client. When the provider returned a real HTTP status, that
+// status (and the provider's native error body when Bifrost captured it) is
+// forwarded verbatim via UpstreamError — so a terminal upstream 4xx reaches
+// the client as that 4xx instead of a retryable 502, and the client can tell
+// terminal from retryable correctly. A zero status means there was no upstream
+// response (transport failure / timeout) — fall back to classification, which
+// maps it to provider_timeout / the gateway's own error taxonomy.
+//
+// This is the streaming-path counterpart to the non-stream
+// rawResponseFromBifrostError branch: streaming dispatch can only return an
+// error, so the upstream status + body ride on UpstreamError instead of a
+// *domain.Response.
+func errFromBifrost(ctx context.Context, berr *bfschemas.BifrostError, respHeaders map[string]string) error {
+	status := 0
+	if berr.StatusCode != nil {
+		status = *berr.StatusCode
+	}
+	if status <= 0 {
+		return classifyBifrostError(ctx, berr)
+	}
+	body, _ := extractRawResponseBytes(berr.ExtraFields.RawResponse)
+	return &domain.UpstreamError{
+		StatusCode: status,
+		Body:       body,
+		Message:    bfErrorMsg(berr),
+		Headers:    forwardableUpstreamHeaders(respHeaders),
+	}
+}
+
+// bifrostResponseHeaders reads the provider's HTTP response headers that
+// Bifrost stashes on the dispatch context (provider handlers call
+// ctx.SetValue(BifrostContextKeyProviderResponseHeaders, ...) before returning,
+// including on the non-2xx error path). Returns nil when absent.
+func bifrostResponseHeaders(bfCtx *bfschemas.BifrostContext) map[string]string {
+	if bfCtx == nil {
+		return nil
+	}
+	if v, ok := bfCtx.Value(bfschemas.BifrostContextKeyProviderResponseHeaders).(map[string]string); ok {
+		return v
+	}
+	return nil
+}
+
+// forwardableUpstreamHeaders selects the upstream response headers that are
+// safe and useful to forward to the client on an error: the retry-signaling
+// headers Retry-After (backoff hint on 429/503) and x-should-retry (the
+// provider's canonical terminal-vs-retryable signal). Everything else
+// (transport headers, content-length, auth echoes) is dropped. Match is
+// case-insensitive; output uses canonical names.
+func forwardableUpstreamHeaders(in map[string]string) map[string]string {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make(map[string]string, 2)
+	for k, v := range in {
+		switch strings.ToLower(k) {
+		case "retry-after":
+			out["Retry-After"] = v
+		case "x-should-retry":
+			out["x-should-retry"] = v
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
 func classifyBifrostError(ctx context.Context, berr *bfschemas.BifrostError) error {
 	status := 0
 	if berr.StatusCode != nil {
@@ -817,11 +890,16 @@ func extractUsage(resp *bfschemas.BifrostChatResponse) domain.Usage {
 	if resp == nil || resp.Usage == nil {
 		return domain.Usage{}
 	}
-	return domain.Usage{
+	u := domain.Usage{
 		PromptTokens:     resp.Usage.PromptTokens,
 		CompletionTokens: resp.Usage.CompletionTokens,
 		TotalTokens:      resp.Usage.TotalTokens,
 	}
+	if d := resp.Usage.PromptTokensDetails; d != nil {
+		u.CacheReadTokens = d.CachedReadTokens
+		u.CacheCreationTokens = d.CachedWriteTokens
+	}
+	return u
 }
 
 // extractResponsesUsage maps the Responses-API usage block onto the
@@ -832,11 +910,16 @@ func extractResponsesUsage(resp *bfschemas.BifrostResponsesResponse) domain.Usag
 	if resp == nil || resp.Usage == nil {
 		return domain.Usage{}
 	}
-	return domain.Usage{
+	u := domain.Usage{
 		PromptTokens:     resp.Usage.InputTokens,
 		CompletionTokens: resp.Usage.OutputTokens,
 		TotalTokens:      resp.Usage.TotalTokens,
 	}
+	if d := resp.Usage.InputTokensDetails; d != nil {
+		u.CacheReadTokens = d.CachedReadTokens
+		u.CacheCreationTokens = d.CachedWriteTokens
+	}
+	return u
 }
 
 // extractEmbeddingUsage maps Bifrost's embedding usage block. Embedding
@@ -892,12 +975,7 @@ func (it *bifrostStreamIterator) Next(ctx context.Context) bool {
 			data, _ := sonic.Marshal(chunk.BifrostChatResponse)
 			it.current = data
 			if chunk.BifrostChatResponse.Usage != nil {
-				u := chunk.BifrostChatResponse.Usage
-				it.usage = domain.Usage{
-					PromptTokens:     u.PromptTokens,
-					CompletionTokens: u.CompletionTokens,
-					TotalTokens:      u.TotalTokens,
-				}
+				it.usage = extractUsage(chunk.BifrostChatResponse)
 			}
 		} else if chunk.BifrostResponsesStreamResponse != nil {
 			// Responses API stream frames (response.created /
@@ -909,12 +987,7 @@ func (it *bifrostStreamIterator) Next(ctx context.Context) bool {
 			it.current = data
 			//nolint:staticcheck // explicit embedded-field reference matches the parallel branches above for readability.
 			if resp := chunk.BifrostResponsesStreamResponse.Response; resp != nil && resp.Usage != nil {
-				u := resp.Usage
-				it.usage = domain.Usage{
-					PromptTokens:     u.InputTokens,
-					CompletionTokens: u.OutputTokens,
-					TotalTokens:      u.TotalTokens,
-				}
+				it.usage = extractResponsesUsage(resp)
 			}
 		} else if chunk.BifrostPassthroughResponse != nil {
 			// Passthrough stream chunks carry the raw upstream bytes
@@ -972,13 +1045,14 @@ func parseGeminiPassthroughUsage(body []byte) (domain.Usage, bool) {
 	if total == 0 {
 		total = prompt + completion
 	}
-	// Note: cachedContentTokenCount (when present) is folded into prompt
-	// tokens upstream by Gemini; the trace pipeline derives cache_read
-	// from a separate gen_ai.usage.cache_read attr, not from total.
+	// Gemini folds cachedContentTokenCount into promptTokenCount, so it rides
+	// inside PromptTokens; surfacing it as CacheReadTokens lets the span report
+	// the fresh input separately. Gemini bills no distinct cache-write tokens.
 	return domain.Usage{
 		PromptTokens:     prompt,
 		CompletionTokens: completion,
 		TotalTokens:      total,
+		CacheReadTokens:  int(usage.Get("cachedContentTokenCount").Int()),
 	}, true
 }
 

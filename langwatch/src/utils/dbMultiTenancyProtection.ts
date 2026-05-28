@@ -61,21 +61,26 @@ const EXEMPT_MODELS = [
    */
   "ApiKey",
   /**
-   * AI Gateway models. Budgets are organization-level (scopeType +
-   * scopeId identifies which target); ledger rows descend from VirtualKey
-   * via virtualKeyId rather than a direct projectId column; change-events
-   * and audit logs both allow null projectId for org-level mutations;
-   * VirtualKeyProviderCredential is a join table whose composite PK is
-   * (virtualKeyId, providerCredentialId) — projectId is reachable via
-   * the parent VK but not a direct column. VirtualKey and
-   * GatewayProviderCredential are project-scoped and stay under the
-   * middleware's normal guard.
+   * AI Gateway models. Post-iter-110 (collapse-VK-binding refactor):
+   * - GatewayBudget: org-level (scopeType + scopeId identifies which
+   *   target); no projectId column by design.
+   * - GatewayBudgetLedger: descends from VirtualKey via virtualKeyId
+   *   rather than a direct projectId column.
+   * - GatewayChangeEvent / GatewayAuditLog: allow null projectId for
+   *   org-level mutations; org tenancy is checked at the service
+   *   layer before any write.
+   * - VirtualKeyProviderCredential + GatewayProviderCredential: tables
+   *   dropped in iter 110 (folded into ModelProvider).
+   * - VirtualKey itself moved to SCOPED_MODELS below — post-iter-110
+   *   it's org-scoped (organizationId mandatory) and access narrows
+   *   via VirtualKeyScope rows, so the legacy projectId guard no
+   *   longer applies. SCOPED_MODELS enforces a row-id / scope /
+   *   organizationId predicate on every read + write.
    */
   "GatewayBudget",
   "GatewayBudgetLedger",
   "GatewayChangeEvent",
   "GatewayAuditLog",
-  "VirtualKeyProviderCredential",
   /**
    * GatewayCacheRule is organization-level (authored once, applies
    * across every VK owned by the org based on matcher shape). Same
@@ -90,6 +95,81 @@ const EXEMPT_MODELS = [
    * that keeps system-scoped kill switches off PostHog.
    */
   "FeatureFlag",
+  /**
+   * RoutingPolicy (iter governance-platform) is org-scoped:
+   * (organizationId, scope, scopeId, name) is the natural key. Scope
+   * may be 'organization' | 'team' | 'project', but the row itself
+   * doesn't carry a projectId column. Resolution paths
+   * (`resolveDefaultForUser`) query by organizationId + scope +
+   * scopeId — projectId enforcement would block the lookup.
+   *
+   * Same rationale as ModelProvider above (also (scopeType, scopeId)-
+   * keyed). Service layer authorises ownership via organizationId
+   * before any mutation; the middleware exemption only relaxes the
+   * SQL guard.
+   */
+  "RoutingPolicy",
+  /**
+   * IngestionSource (iter governance-platform / D2 foundation) is
+   * org-scoped: the natural key is (organizationId, name). Optional
+   * teamId narrows scope but no projectId — the entire point is a
+   * cross-platform feed at the org level. Service layer authorises
+   * by organizationId / teamId membership before any mutation.
+   */
+  "IngestionSource",
+  /**
+   * AnomalyRule (iter governance-platform / D2 anomaly authoring) is
+   * org-scoped: the natural key is (organizationId, name). The rule's
+   * `scope` field (organization|team|project|source_type|source) is
+   * an EVALUATION-time narrowing, not a tenancy boundary — service
+   * layer authorises by organizationId membership before any mutation.
+   */
+  "AnomalyRule",
+  /**
+   * AnomalyAlert (iter governance-platform / D2 anomaly detection) is
+   * org-scoped persisted detections. Same rationale as AnomalyRule —
+   * org-scoped, no projectId, service layer authorises by
+   * organizationId before any mutation.
+   */
+  "AnomalyAlert",
+  /**
+   * AiToolEntry (iter governance-platform / Phase 7) is the org-scoped
+   * AI Tools Portal catalog. Entries can be scoped to organization or
+   * team via (scope, scopeId) but never carry a projectId — the portal
+   * surfaces tools at the org tier (cross-project / cross-team
+   * organization-default surface). Service layer authorises by
+   * organizationId membership before any mutation; team-scoped entries
+   * are authorised via TeamUser membership at read time.
+   */
+  "AiToolEntry",
+  /**
+   * AiToolEntryTeam (iter governance-platform / Phase 7 multi-team
+   * scope refactor) is the join table binding AiToolEntry rows to
+   * teams. Same rationale as AiToolEntry — org-scoped via the
+   * referenced entry, no projectId; service layer authorises by the
+   * parent entry's organizationId before any mutation.
+   */
+  "AiToolEntryTeam",
+  /**
+   * IngestionTemplate is org-scoped: organizationId nullable
+   * (NULL = platform-published default, NOT NULL = org-authored).
+   * No projectId column — admin queries walk by organizationId or
+   * by the platform-default scope. Service layer authorises by
+   * organizationId membership (or platform-team scope) before any
+   * mutation.
+   */
+  "IngestionTemplate",
+  /**
+   * UserIngestionBinding carries personalProjectId, but admin-side
+   * queries walk by organizationId (admin viewing all bindings in
+   * their org). User-side queries are scoped by userId. Service layer
+   * authorises by userId === caller for user-side ops, and by
+   * organizationId membership for admin-side ops; the cross-bind
+   * structural-impossibility guard (input shape MUST NOT accept
+   * personalProjectId) keeps user-side ops from binding into another
+   * user's project.
+   */
+  "UserIngestionBinding",
 ];
 
 /**
@@ -196,6 +276,17 @@ const validateRecursive = (
       if (validateRecursive(clause, passes)) return true;
     }
   }
+  // OR semantics: every alternative branch must independently carry a
+  // tenancy predicate, otherwise the unbounded branch leaks rows. The
+  // canonical case is `findByHashedSecret`, which ORs together a current
+  // hashedSecret + an in-grace previousHashedSecret; both branches name
+  // a uniquely-keyed secret, so the guard recognises the query as bounded.
+  if (Array.isArray(where.OR) && where.OR.length > 0) {
+    const allBranchesBounded = where.OR.every((clause: any) =>
+      validateRecursive(clause, passes),
+    );
+    if (allBranchesBounded) return true;
+  }
   return false;
 };
 
@@ -203,28 +294,22 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
   ModelProvider: {
     validateWhere: (where) => {
       if (!where) {
-        return "requires a 'projectId', row id, or scope predicate in the where clause";
+        return "requires a row id or scope predicate in the where clause";
       }
       const ok = validateRecursive(
         where,
-        (c) =>
-          typeof c.projectId === "string" ||
-          (c.projectId && Array.isArray(c.projectId.in)) ||
-          hasIdOrInPredicate(c) ||
-          hasScopePredicate(c),
+        (c) => hasIdOrInPredicate(c) || hasScopePredicate(c),
       );
       return ok
         ? null
-        : "requires a 'projectId', row id, or scope predicate in the where clause";
+        : "requires a row id or scope predicate in the where clause";
     },
     validateCreateData: (data) => {
       const records = Array.isArray(data) ? data : [data];
       for (const d of records) {
         if (!d) return "create requires a data payload";
-        const hasProjectId = typeof d.projectId === "string";
-        const hasScopes = !!d.scopes;
-        if (!hasProjectId && !hasScopes) {
-          return "create requires either a 'projectId' or a 'scopes' relation in the data payload";
+        if (!d.scopes) {
+          return "create requires a 'scopes' relation in the data payload";
         }
       }
       return null;
@@ -257,6 +342,75 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
           typeof d.scopeId !== "string"
         ) {
           return "create requires modelProviderId + scopeType + scopeId in the data payload";
+        }
+      }
+      return null;
+    },
+  },
+  VirtualKey: {
+    validateWhere: (where) => {
+      if (!where) {
+        return "requires an 'organizationId', row id, hashedSecret, principalUserId, or scope predicate";
+      }
+      const ok = validateRecursive(
+        where,
+        (c) =>
+          typeof c.organizationId === "string" ||
+          (c.organizationId && Array.isArray(c.organizationId.in)) ||
+          hasIdOrInPredicate(c) ||
+          typeof c.hashedSecret === "string" ||
+          // Rotation grace-window lookup: previousHashedSecret is a
+          // uniquely-keyed secret column too, so a where-clause that
+          // names it is bounded.
+          typeof c.previousHashedSecret === "string" ||
+          // Principal-identity lookup: "every VK this user owns" is a
+          // legitimate bounded query for user-deactivation / personal-VK
+          // listing flows. Cross-org by design but bounded by user.
+          typeof c.principalUserId === "string" ||
+          hasScopePredicate(c),
+      );
+      return ok
+        ? null
+        : "requires an 'organizationId', row id, hashedSecret, principalUserId, or scope predicate";
+    },
+    validateCreateData: (data) => {
+      const records = Array.isArray(data) ? data : [data];
+      for (const d of records) {
+        if (!d) return "create requires a data payload";
+        if (typeof d.organizationId !== "string") {
+          return "create requires an 'organizationId' in the data payload";
+        }
+      }
+      return null;
+    },
+  },
+  VirtualKeyScope: {
+    validateWhere: (where) => {
+      if (!where) {
+        return "requires a row id, virtualKeyId, or scope predicate";
+      }
+      const ok = validateRecursive(
+        where,
+        (c) =>
+          hasIdOrInPredicate(c) ||
+          typeof c.virtualKeyId === "string" ||
+          (c.virtualKeyId && Array.isArray(c.virtualKeyId.in)) ||
+          hasScopePredicate(c),
+      );
+      return ok
+        ? null
+        : "requires a row id, virtualKeyId, or scope predicate";
+    },
+    validateCreateData: (data) => {
+      const records = Array.isArray(data) ? data : [data];
+      for (const d of records) {
+        if (!d) return "create requires a data payload";
+        if (
+          typeof d.virtualKeyId !== "string" ||
+          typeof d.scopeType !== "string" ||
+          typeof d.scopeId !== "string"
+        ) {
+          return "create requires virtualKeyId + scopeType + scopeId in the data payload";
         }
       }
       return null;
@@ -358,7 +512,7 @@ const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
   }
 
   // Gateway auth resolver: findByHashedSecret is the hot-path lookup
-  // that converts an opaque `lw_vk_live_*` bearer token into a
+  // that converts an opaque `vk-lw-*` bearer token into a
   // VirtualKey row. The hashedSecret itself is a cryptographic
   // identifier unique across the platform (HMAC-SHA256 with a
   // per-deployment pepper), so projectId/organizationId cannot be
@@ -413,6 +567,7 @@ const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
     !params.args?.where?.projectId &&
     !params.args?.where?.projectId_slug &&
     !params.args?.where?.projectId_date &&
+    !params.args?.where?.projectId_modelProviderId_slot &&
     !params.args?.where?.projectId?.in &&
     !params.args?.where?.OR?.every((o: any) => o.projectId || o.organizationId)
   ) {

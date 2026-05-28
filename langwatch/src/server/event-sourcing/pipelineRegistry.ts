@@ -54,7 +54,15 @@ import { createExperimentMetricsSyncReactor } from "./pipelines/trace-processing
 import {
   createGatewayBudgetSyncReactor,
   type GatewayBudgetSyncReactorDeps,
-} from "./pipelines/trace-processing/reactors/gatewayBudgetSync.reactor";
+} from "@ee/governance/reactors/gatewayBudgetSync.reactor";
+import {
+  createGovernanceKpisSyncReactor,
+  type GovernanceKpisSyncReactorDeps,
+} from "@ee/governance/reactors/governanceKpisSync.reactor";
+import {
+  createGovernanceOcsfEventsSyncReactor,
+  type GovernanceOcsfEventsSyncReactorDeps,
+} from "@ee/governance/reactors/governanceOcsfEventsSync.reactor";
 import type { ComputeExperimentRunMetricsCommandData } from "./pipelines/experiment-run-processing/schemas/commands";
 
 import { createElasticsearchBatchEvaluationRepository } from "../experiments-v3/repositories/elasticsearchBatchEvaluation.repository";
@@ -86,7 +94,7 @@ import { createOrUpdateQueueItems } from "~/server/api/routers/annotation";
 import { createManyDatasetRecords } from "~/server/api/routers/datasetRecord.utils";
 import { getProtectionsForProject } from "~/server/api/utils";
 import { TraceService } from "~/server/traces/trace.service";
-import { createAlertTriggerReactor } from "./pipelines/trace-processing/reactors/alertTrigger.reactor";
+import { createAlertTriggerReactor } from "@ee/governance/reactors/alertTrigger.reactor";
 import { createEvaluationTriggerReactor } from "./pipelines/trace-processing/reactors/evaluationTrigger.reactor";
 import {
   createOriginGateReactor,
@@ -189,6 +197,8 @@ export interface PipelineRegistryDeps {
    * best-effort DELETEd after event_log INSERT succeeds.
    */
   blobStore?: import("~/server/app-layer/traces/blob-store.service").BlobStore;
+  governanceKpisSync?: GovernanceKpisSyncReactorDeps;
+  governanceOcsfEventsSync?: GovernanceOcsfEventsSyncReactorDeps;
 }
 
 /**
@@ -391,6 +401,14 @@ export class PipelineRegistry {
       ? createGatewayBudgetSyncReactor(this.deps.gatewayBudgetSync)
       : undefined;
 
+    const governanceKpisSyncReactor = this.deps.governanceKpisSync
+      ? createGovernanceKpisSyncReactor(this.deps.governanceKpisSync)
+      : undefined;
+
+    const governanceOcsfEventsSyncReactor = this.deps.governanceOcsfEventsSync
+      ? createGovernanceOcsfEventsSyncReactor(this.deps.governanceOcsfEventsSync)
+      : undefined;
+
     const tracePipeline = this.deps.eventSourcing.register(
       createTraceProcessingPipeline({
         spanAppendStore: new SpanAppendStore(this.deps.traces.spans.repository),
@@ -410,6 +428,8 @@ export class PipelineRegistry {
         // ADR-022: Wire BlobStore so RecordSpanCommand can reconstitute
         // oversized commands and best-effort delete the transient S3 spool.
         blobStore: this.deps.blobStore,
+        governanceKpisSyncReactor,
+        governanceOcsfEventsSyncReactor,
       }),
     );
 

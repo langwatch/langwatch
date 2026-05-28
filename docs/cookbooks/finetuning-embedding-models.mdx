@@ -375,7 +375,7 @@ Moving on, we’ll fine-tune a small open-source embedding model using just 256 
 
 One big reason to fine-tune open-source models is cost. After training, you can run them on your own hardware without worrying about per-query charges. If you’re handling a lot of traffic, this saves a lot of money fast.
 
-We’ll be using sentence-transformers — it’s easy to train, plays nicely with Hugging Face, and has plenty of community examples if you get stuck. Let's first transform our data in the format that sentence-transformer expects it.
+We’ll be using sentence-transformers, it’s easy to train, plays nicely with Hugging Face, and has plenty of community examples if you get stuck. Let's first transform our data in the format that sentence-transformer expects it.
 
 ```python
 from sentence_transformers import InputExample, losses

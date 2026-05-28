@@ -24,7 +24,9 @@ import { baseResponses } from "../../shared/base-responses";
 import { prisma } from "~/server/db";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
 import { GatewayCacheRuleService } from "~/server/gateway/cacheRule.service";
-import { GatewayProviderCredentialService } from "~/server/gateway/providerCredential.service";
+// GatewayProviderCredentialService removed in iter 110; /providers REST
+// routes return 410 Gone until A3 lands the ModelProvider-backed
+// replacement surface (current proposal: fold into /model-providers).
 import {
   VirtualKeyService,
   type CreateVirtualKeyInput,
@@ -124,7 +126,6 @@ const virtualKeyDtoSchema = z.object({
   display_prefix: z.string(),
   name: z.string(),
   description: z.string().nullable(),
-  environment: z.enum(["live", "test"]),
   status: z.enum(["active", "revoked"]),
   principal_user_id: z.string().nullable(),
   provider_credential_ids: z.array(z.string()),
@@ -217,7 +218,6 @@ async function orgIdForProject(projectId: string): Promise<string> {
 const createVirtualKeySchema = z.object({
   name: z.string().min(1).max(128),
   description: z.string().optional(),
-  environment: z.enum(["live", "test"]).default("live"),
   principal_user_id: z.string().nullable().optional(),
   provider_credential_ids: z.array(z.string()).min(1),
   config: virtualKeyConfigSchema.partial().optional(),
@@ -347,14 +347,14 @@ export const app = new Hono<{ Variables: Variables }>()
     }
     const organizationId = await orgIdForProject(project.id);
     const service = VirtualKeyService.create(prisma);
+    // REST wire still mints VKs scoped to the caller's project. Wire
+    // expansion to TEAM/ORG scopes lands with the S1b REST redesign.
     const input: CreateVirtualKeyInput = {
-      projectId: project.id,
       organizationId,
       name: body.data.name,
       description: body.data.description ?? null,
-      environment: body.data.environment,
       principalUserId: body.data.principal_user_id ?? null,
-      providerCredentialIds: body.data.provider_credential_ids,
+      scopes: [{ scopeType: "PROJECT", scopeId: project.id }],
       config: body.data.config,
       // Machine principal — no human actor.
       actorUserId: machineActorForProject(project.id),
@@ -399,7 +399,8 @@ export const app = new Hono<{ Variables: Variables }>()
       const project = c.get("project");
       const id = c.req.param("id");
       const service = VirtualKeyService.create(prisma);
-      const vk = await service.getById(id, project.id);
+      const organizationId = await orgIdForProject(project.id);
+      const vk = await service.getById(id, organizationId);
       if (!vk) {
         return c.json(
           { error: { type: "not_found", code: "virtual_key_not_found", message: "virtual key not found" } },
@@ -450,12 +451,10 @@ export const app = new Hono<{ Variables: Variables }>()
     const service = VirtualKeyService.create(prisma);
     const updated = await service.update({
       id,
-      projectId: project.id,
       organizationId,
       actorUserId: machineActorForProject(project.id),
       name: body.data.name,
       description: body.data.description ?? null,
-      providerCredentialIds: body.data.provider_credential_ids,
       config: body.data.config,
     });
     return c.json({ virtual_key: toVkDto(updated) });
@@ -493,7 +492,6 @@ export const app = new Hono<{ Variables: Variables }>()
     const service = VirtualKeyService.create(prisma);
     const { virtualKey, secret } = await service.rotate({
       id,
-      projectId: project.id,
       organizationId,
       actorUserId: machineActorForProject(project.id),
     });
@@ -527,7 +525,6 @@ export const app = new Hono<{ Variables: Variables }>()
     const service = VirtualKeyService.create(prisma);
     const updated = await service.revoke({
       id,
-      projectId: project.id,
       organizationId,
       actorUserId: machineActorForProject(project.id),
     });
@@ -576,25 +573,14 @@ export const app = new Hono<{ Variables: Variables }>()
     }),
     requireGatewayProvidersView,
     async (c) => {
-    const project = c.get("project");
-    const service = GatewayProviderCredentialService.create(prisma);
-    const rows = await service.getAll(project.id);
-    return c.json({
-      data: rows.map((row) => ({
-        id: row.id,
-        model_provider_id: row.modelProviderId,
-        model_provider_name: row.modelProvider.provider,
-        slot: row.slot,
-        rate_limit_rpm: row.rateLimitRpm,
-        rate_limit_tpm: row.rateLimitTpm,
-        rate_limit_rpd: row.rateLimitRpd,
-        rotation_policy: row.rotationPolicy.toLowerCase(),
-        fallback_priority_global: row.fallbackPriorityGlobal,
-        health_status: row.healthStatus.toLowerCase(),
-        disabled_at: row.disabledAt?.toISOString() ?? null,
-        created_at: row.createdAt.toISOString(),
-      })),
-    });
+    return c.json(
+      {
+        error: "gone",
+        message:
+          "Gateway provider bindings folded into ModelProvider in iter 110. Use GET /api/gateway-platform/v1/model-providers or the Advanced (Gateway) tab in the dashboard.",
+      },
+      410,
+    );
   })
 
   .post(
@@ -622,27 +608,14 @@ export const app = new Hono<{ Variables: Variables }>()
     }),
     requireGatewayProvidersManage,
     async (c) => {
-    const project = c.get("project");
-    const raw = (await c.req.json()) as Record<string, unknown>;
-    const organizationId = await orgIdForProject(project.id);
-    const service = GatewayProviderCredentialService.create(prisma);
-    const row = await service.create({
-      projectId: project.id,
-      organizationId,
-      modelProviderId: String(raw.model_provider_id ?? ""),
-      slot: typeof raw.slot === "string" ? raw.slot : undefined,
-      rateLimitRpm: (raw.rate_limit_rpm as number | null) ?? null,
-      rateLimitTpm: (raw.rate_limit_tpm as number | null) ?? null,
-      rateLimitRpd: (raw.rate_limit_rpd as number | null) ?? null,
-      rotationPolicy:
-        typeof raw.rotation_policy === "string" ? "MANUAL" : undefined,
-      extraHeaders: (raw.extra_headers as Prisma.InputJsonValue | null) ?? null,
-      providerConfig: (raw.provider_config as Prisma.InputJsonValue | null) ?? null,
-      fallbackPriorityGlobal:
-        (raw.fallback_priority_global as number | null) ?? null,
-      actorUserId: machineActorForProject(project.id),
-    });
-    return c.json({ provider_credential: { id: row.id } }, 201);
+    return c.json(
+      {
+        error: "gone",
+        message:
+          "Gateway provider bindings folded into ModelProvider in iter 110. Configure rate limits, providerConfig, fallback priority via the Advanced (Gateway) tab on /api/gateway-platform/v1/model-providers/:id.",
+      },
+      410,
+    );
   })
 
   // ── Budgets ─────────────────────────────────────────────────────────────
@@ -845,45 +818,14 @@ export const app = new Hono<{ Variables: Variables }>()
     }),
     requireGatewayProvidersUpdate,
     async (c) => {
-    const project = c.get("project");
-    const id = c.req.param("id");
-    const raw = (await c.req.json()) as Record<string, unknown>;
-    const organizationId = await orgIdForProject(project.id);
-    const service = GatewayProviderCredentialService.create(prisma);
-    const row = await service.update({
-      id,
-      projectId: project.id,
-      organizationId,
-      actorUserId: machineActorForProject(project.id),
-      slot: typeof raw.slot === "string" ? raw.slot : undefined,
-      rateLimitRpm:
-        raw.rate_limit_rpm === undefined
-          ? undefined
-          : (raw.rate_limit_rpm as number | null),
-      rateLimitTpm:
-        raw.rate_limit_tpm === undefined
-          ? undefined
-          : (raw.rate_limit_tpm as number | null),
-      rateLimitRpd:
-        raw.rate_limit_rpd === undefined
-          ? undefined
-          : (raw.rate_limit_rpd as number | null),
-      rotationPolicy:
-        typeof raw.rotation_policy === "string" ? "MANUAL" : undefined,
-      extraHeaders:
-        raw.extra_headers === undefined
-          ? undefined
-          : (raw.extra_headers as Prisma.InputJsonValue | null),
-      providerConfig:
-        raw.provider_config === undefined
-          ? undefined
-          : (raw.provider_config as Prisma.InputJsonValue | null),
-      fallbackPriorityGlobal:
-        raw.fallback_priority_global === undefined
-          ? undefined
-          : (raw.fallback_priority_global as number | null),
-    });
-    return c.json({ provider_credential: { id: row.id } });
+    return c.json(
+      {
+        error: "gone",
+        message:
+          "Gateway provider bindings folded into ModelProvider in iter 110. PATCH the advanced fields via PATCH /api/gateway-platform/v1/model-providers/:id.",
+      },
+      410,
+    );
   })
 
   .delete(
@@ -914,17 +856,14 @@ export const app = new Hono<{ Variables: Variables }>()
     }),
     requireGatewayProvidersManage,
     async (c) => {
-    const project = c.get("project");
-    const id = c.req.param("id");
-    const organizationId = await orgIdForProject(project.id);
-    const service = GatewayProviderCredentialService.create(prisma);
-    const row = await service.disable({
-      id,
-      projectId: project.id,
-      organizationId,
-      actorUserId: machineActorForProject(project.id),
-    });
-    return c.json({ provider_credential: { id: row.id, disabled_at: row.disabledAt?.toISOString() ?? null } });
+    return c.json(
+      {
+        error: "gone",
+        message:
+          "Gateway provider bindings folded into ModelProvider in iter 110. Disable the underlying ModelProvider via DELETE /api/gateway-platform/v1/model-providers/:id (soft-disable).",
+      },
+      410,
+    );
   })
 
   // ── Cache-control rules ────────────────────────────────────────────────

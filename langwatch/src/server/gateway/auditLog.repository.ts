@@ -20,6 +20,8 @@ export const GATEWAY_AUDIT_ACTIONS = [
   "gateway.virtual_key.rotated",
   "gateway.virtual_key.revoked",
   "gateway.virtual_key.deleted",
+  "gateway.virtual_key.guardrail_attached",
+  "gateway.virtual_key.guardrail_detached",
   "gateway.budget.created",
   "gateway.budget.updated",
   "gateway.budget.deleted",
@@ -29,6 +31,9 @@ export const GATEWAY_AUDIT_ACTIONS = [
   "gateway.cache_rule.created",
   "gateway.cache_rule.updated",
   "gateway.cache_rule.deleted",
+  "gateway.guardrail.created",
+  "gateway.guardrail.updated",
+  "gateway.guardrail.archived",
 ] as const;
 
 export type GatewayAuditAction = (typeof GATEWAY_AUDIT_ACTIONS)[number];
@@ -38,6 +43,7 @@ export const GATEWAY_AUDIT_TARGET_KINDS = [
   "budget",
   "provider_binding",
   "cache_rule",
+  "guardrail",
 ] as const;
 
 export type GatewayAuditTargetKind = (typeof GATEWAY_AUDIT_TARGET_KINDS)[number];

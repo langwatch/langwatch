@@ -21,6 +21,8 @@ import {
   LuPlay,
 } from "react-icons/lu";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { PersonalFeatureGateDialog } from "~/components/me/PersonalFeatureGateDialog";
+import { usePersonalFeatureGate } from "~/components/me/usePersonalFeatureGate";
 import { useGoToSpanInPlaygroundTabUrlBuilder } from "~/prompts/prompt-playground/hooks/useLoadSpanIntoPromptPlayground";
 import { AnnotationPopover } from "./conversationView/AnnotationPopover";
 import { IOViewerBody } from "./IOViewerBody";
@@ -133,15 +135,25 @@ function PlaygroundButton({ spanId }: { spanId: string }) {
 function AnnotateButton({ traceId }: { traceId: string }) {
   const { hasPermission } = useOrganizationTeamProject();
   const [open, setOpen] = useState(false);
+  const annotationsGate = usePersonalFeatureGate("annotations");
   if (!hasPermission("annotations:manage")) return null;
   return (
-    <AnnotationPopover
-      traceId={traceId}
-      mode="annotate"
-      open={open}
-      onOpenChange={setOpen}
-      trigger={<ActionButton icon={LuPencil} label="Annotate" />}
-    />
+    <>
+      <AnnotationPopover
+        traceId={traceId}
+        mode="annotate"
+        open={open}
+        onOpenChange={async (next) => {
+          if (next) {
+            const allowed = await annotationsGate.requestEnable();
+            if (!allowed) return;
+          }
+          setOpen(next);
+        }}
+        trigger={<ActionButton icon={LuPencil} label="Annotate" />}
+      />
+      <PersonalFeatureGateDialog state={annotationsGate.dialogState} />
+    </>
   );
 }
 

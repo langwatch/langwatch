@@ -1,7 +1,7 @@
 /**
  * GatewayChangeEvent is the monotonic revision feed the Go gateway long-polls
  * via `GET /api/internal/gateway/changes?since=<revision>`. Any mutation that
- * affects a gateway-visible artifact (VK, budget, provider binding) must
+ * affects a gateway-visible artifact (VK, budget, ModelProvider) must
  * append an event here.
  */
 import { Prisma, type GatewayChangeEventKind, type PrismaClient } from "@prisma/client";
@@ -12,7 +12,7 @@ export type AppendChangeEventInput = {
   kind: GatewayChangeEventKind;
   virtualKeyId?: string | null;
   budgetId?: string | null;
-  providerCredentialId?: string | null;
+  modelProviderId?: string | null;
   payload?: Prisma.InputJsonValue | null;
 };
 
@@ -31,7 +31,7 @@ export class ChangeEventRepository {
         kind: input.kind,
         virtualKeyId: input.virtualKeyId ?? null,
         budgetId: input.budgetId ?? null,
-        providerCredentialId: input.providerCredentialId ?? null,
+        modelProviderId: input.modelProviderId ?? null,
         payload: input.payload ?? Prisma.JsonNull,
       },
       select: { revision: true },
@@ -54,7 +54,7 @@ export class ChangeEventRepository {
       kind: GatewayChangeEventKind;
       virtualKeyId: string | null;
       budgetId: string | null;
-      providerCredentialId: string | null;
+      modelProviderId: string | null;
       projectId: string | null;
     }>;
   }> {
@@ -67,7 +67,7 @@ export class ChangeEventRepository {
         kind: true,
         virtualKeyId: true,
         budgetId: true,
-        providerCredentialId: true,
+        modelProviderId: true,
         projectId: true,
       },
     });

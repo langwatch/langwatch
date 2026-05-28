@@ -1,6 +1,13 @@
 import { formatApiErrorForOperation } from "@/client-sdk/services/_shared/format-api-error";
 import { DEFAULT_ENDPOINT } from "@/internal/constants";
 
+export type VirtualKeyScopeType = "ORGANIZATION" | "TEAM" | "PROJECT";
+
+export interface VirtualKeyScope {
+  scope_type: VirtualKeyScopeType;
+  scope_id: string;
+}
+
 export interface VirtualKey {
   id: string;
   name: string;
@@ -10,9 +17,16 @@ export interface VirtualKey {
   last_four: string;
   status: "ACTIVE" | "REVOKED";
   principal_user_id: string | null;
-  project_id: string;
   organization_id: string;
-  provider_credential_ids: string[];
+  /**
+   * Single-PROJECT-scope shorthand: present when the VK has exactly one
+   * PROJECT scope row. Null for ORG/TEAM-only VKs and for multi-project
+   * VKs (use `scopes[]` for the authoritative scope list in those cases).
+   * See vk-config-bundle.feature.
+   */
+  project_id: string | null;
+  scopes: VirtualKeyScope[];
+  routing_policy_id: string | null;
   config: Record<string, unknown>;
   created_at: string;
   updated_at: string;
@@ -25,14 +39,16 @@ export interface CreateVirtualKeyInput {
   description?: string;
   environment?: "live" | "test";
   principal_user_id?: string | null;
-  provider_credential_ids: string[];
+  scopes: VirtualKeyScope[];
+  routing_policy_id?: string | null;
   config?: Record<string, unknown>;
 }
 
 export interface UpdateVirtualKeyInput {
   name?: string;
   description?: string | null;
-  provider_credential_ids?: string[];
+  scopes?: VirtualKeyScope[];
+  routing_policy_id?: string | null;
   config?: Record<string, unknown>;
 }
 

@@ -108,10 +108,10 @@ groups:
         annotations:
           summary: "Outbox fill-pct > 50% on {{ $labels.pod }} for 5m"
           description: |
-            Approaching capacity. See production runbook Recipe 6 — normal
+            Approaching capacity. See production runbook Recipe 6, normal
             bursts self-heal; sustained climb is usually flush failure.
 
-      # Flush-failure rate leads depth climb — catches slow/unreachable
+      # Flush-failure rate leads depth climb, catches slow/unreachable
       # control plane BEFORE events back up enough to alert on depth.
       - alert: BudgetOutboxFlushFailures
         expr: rate(gateway_budget_debit_outbox_flush_failures_total[5m]) > 0
@@ -196,17 +196,17 @@ groups:
 
 The temptation with Prometheus rules is to alert on everything. Don't. Each rule above either:
 
-- **Represents real impact** (5xx rate, circuit open, usage missing) — customers or budgets are actively affected.
-- **Is a leading indicator of incoming impact** (excessive fallback, L1 cache drop, outbox stale) — things get worse soon if ignored.
-- **Is a cost guardrail** (streaming usage missing, cost anomaly) — silent over-spend is a real failure mode for AI infra.
+- **Represents real impact** (5xx rate, circuit open, usage missing), customers or budgets are actively affected.
+- **Is a leading indicator of incoming impact** (excessive fallback, L1 cache drop, outbox stale), things get worse soon if ignored.
+- **Is a cost guardrail** (streaming usage missing, cost anomaly), silent over-spend is a real failure mode for AI infra.
 
 Rules we explicitly **do NOT** have:
 
-- **Individual provider 429s** — these are normal operating state; fallback + circuit handle them without a human.
-- **High latency** — the gateway's added latency is bounded; if a provider is slow, alerting on it is alerting on the provider.
-- **Cache miss rate on upstream** — cache is passthrough; if Anthropic doesn't hit cache that's not the gateway's problem.
+- **Individual provider 429s**: these are normal operating state; fallback + circuit handle them without a human.
+- **High latency**: the gateway's added latency is bounded; if a provider is slow, alerting on it is alerting on the provider.
+- **Cache miss rate on upstream**: cache is passthrough; if Anthropic doesn't hit cache that's not the gateway's problem.
 
-## Slack / PagerDuty routing
+## Slack, PagerDuty routing
 
 Route `severity: page` to PagerDuty, `severity: warn` to Slack. Example Alertmanager config:
 
@@ -267,7 +267,7 @@ A matching Grafana dashboard JSON is at [/ai-gateway/self-hosting/helm#monitorin
 
 ## See also
 
-- [Troubleshooting](/ai-gateway/troubleshooting) — paged-at-3am runbook for each symptom.
-- [Observability](/ai-gateway/observability) — span attributes + metric names surface.
-- [Streaming](/ai-gateway/streaming) — the include_usage gotcha these alerts catch.
-- [Budgets](/ai-gateway/budgets) — why budget_debit_outbox_age matters.
+- [Troubleshooting](/ai-gateway/troubleshooting): paged-at-3am runbook for each symptom.
+- [Observability](/ai-gateway/observability): span attributes + metric names surface.
+- [Streaming](/ai-gateway/streaming): the include_usage gotcha these alerts catch.
+- [Budgets](/ai-gateway/budgets): why budget_debit_outbox_age matters.

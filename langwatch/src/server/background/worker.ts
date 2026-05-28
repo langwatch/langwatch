@@ -3,6 +3,7 @@ import "../../instrumentation.node";
 
 import type { Job, Worker } from "bullmq";
 import type {
+  AnomalyDetectionJob,
   CollectorJob,
   EvaluationJob,
   TopicClusteringJob,
@@ -47,6 +48,10 @@ import { SCENARIO_WORKER } from "../scenarios/scenario.constants";
 import { getScenarioExecutionHandle } from "../app-layer/presets";
 import { monitoredQueues } from "./queues";
 import { startUsageStatsWorker } from "./workers/usageStatsWorker";
+import { startAnomalyDetectionWorker } from "./workers/anomalyDetectionWorker";
+import { scheduleAnomalyDetection } from "./queues/anomalyDetectionQueue";
+import { startIngestionPullerWorker } from "@ee/governance/services/pullers/pullerWorker";
+import { scheduleIngestionPullers } from "./queues/ingestionPullerQueue";
 
 const logger = createLogger("langwatch:workers");
 
@@ -111,6 +116,7 @@ type Workers = {
   evaluationsWorker: Worker<EvaluationJob, any, EvaluatorTypes> | undefined;
   topicClusteringWorker: Worker<TopicClusteringJob, void, string> | undefined;
   usageStatsWorker: Worker<UsageStatsJob, void, string> | undefined;
+  anomalyDetectionWorker: Worker<AnomalyDetectionJob, void, string> | undefined;
   scenarioProcessor: { close: () => Promise<void> } | undefined;
 };
 
@@ -160,6 +166,10 @@ export const start = async (
     );
     const topicClusteringWorker = startTopicClusteringWorker();
     const usageStatsWorker = startUsageStatsWorker();
+    const anomalyDetectionWorker = startAnomalyDetectionWorker();
+    void scheduleAnomalyDetection();
+    const ingestionPullerWorker = startIngestionPullerWorker();
+    void scheduleIngestionPullers();
     const metricsServer = startMetricsServer();
 
     // Register all closeables for graceful shutdown
@@ -167,6 +177,10 @@ export const start = async (
     registerCloseable("evaluations", evaluationsWorker);
     registerCloseable("topicClustering", topicClusteringWorker);
     registerCloseable("usageStats", usageStatsWorker);
+    registerCloseable("anomalyDetection", anomalyDetectionWorker);
+    if (ingestionPullerWorker) {
+      registerCloseable("ingestionPuller", ingestionPullerWorker);
+    }
     registerCloseable("scenario", scenarioProcessor);
     registerCloseable("metricsServer", {
       close: () =>
@@ -205,6 +219,7 @@ export const start = async (
     evaluationsWorker?.on("closing", closingListener);
     topicClusteringWorker?.on("closing", closingListener);
     usageStatsWorker?.on("closing", closingListener);
+    anomalyDetectionWorker?.on("closing", closingListener);
     if (maxRuntimeMs) {
       setTimeout(() => {
         logger.info("max runtime reached, closing worker");
@@ -214,11 +229,13 @@ export const start = async (
           evaluationsWorker?.off("closing", closingListener);
           topicClusteringWorker?.off("closing", closingListener);
           usageStatsWorker?.off("closing", closingListener);
+          anomalyDetectionWorker?.off("closing", closingListener);
           await Promise.all([
             collectorWorker?.close(),
             evaluationsWorker?.close(),
             topicClusteringWorker?.close(),
             usageStatsWorker?.close(),
+            anomalyDetectionWorker?.close(),
             scenarioProcessor?.close(),
             new Promise<void>((resolve) =>
               metricsServer.close(() => resolve()),
@@ -238,6 +255,7 @@ export const start = async (
         evaluationsWorker,
         topicClusteringWorker,
         usageStatsWorker,
+        anomalyDetectionWorker,
         scenarioProcessor,
       });
     }

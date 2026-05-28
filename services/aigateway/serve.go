@@ -2,6 +2,7 @@ package aigateway
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/langwatch/langwatch/pkg/contexts"
 	"github.com/langwatch/langwatch/pkg/lifecycle"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/httpapi"
+	"github.com/langwatch/langwatch/services/aigateway/adapters/ottlserver"
 	"github.com/langwatch/langwatch/services/aigateway/app"
 )
 
@@ -17,6 +19,11 @@ import (
 // until shutdown signal.
 func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config) error {
 	deps.Logger.Info("aigateway_starting", zap.String("addr", cfg.Server.Addr))
+
+	ottlSrv, err := ottlserver.New(deps.Logger)
+	if err != nil {
+		return fmt.Errorf("ottlserver init: %w", err)
+	}
 
 	info := contexts.MustGetServiceInfo(ctx)
 	handler := httpapi.NewRouter(httpapi.RouterDeps{
@@ -26,6 +33,8 @@ func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config) er
 		Version:               info.Version,
 		TraceRegistry:         deps.TraceRegistry,
 		DefaultExportEndpoint: cfg.CustomerTraceBridge.BaseURL + "/api/otel",
+		OTTLServer:            ottlSrv,
+		InternalSecret:        cfg.ControlPlane.InternalSecret,
 		MaxRequestBodyBytes:   cfg.Server.MaxRequestBodyBytes,
 	})
 

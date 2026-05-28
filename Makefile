@@ -70,11 +70,23 @@ setup-hooks:
 # The gateway + control-plane intentionally share secrets (LW_GATEWAY_*,
 # LW_VIRTUAL_KEY_PEPPER etc.) — one flat .env is simpler than namespace
 # prefixes. Vars the Go service doesn't need are ignored.
+#
+# Pre-existing environment wins over .env: we snapshot the inbound env
+# (export -p), source .env (which would otherwise overwrite everything),
+# then re-apply the snapshot on top. This matches the "real env beats
+# dotenv" contract that vite.config.ts + start.ts already follow. It is
+# load-bearing for `pnpm dev` on a non-default PORT: start.sh derives
+# LW_GATEWAY_BASE_URL=localhost:$(PORT+1000) and exports it before
+# launching the gateway, but a flat `. .env` would clobber it back to
+# the hardcoded default and the gateway would hit a dead control-plane
+# port (every VK call → 401 invalid_api_key).
 DEV_ENV_FILE ?= langwatch/.env
 service:
 	@test -n "$(svc)" || (echo "usage: make service svc=<name>" && exit 1)
 	@test -f $(DEV_ENV_FILE) || (echo "$(DEV_ENV_FILE) not found — seed langwatch/.env first" && exit 1)
-	@set -a && . $(DEV_ENV_FILE) && set +a && \
+	@_snap=$$(export -p) && \
+		set -a && . $(DEV_ENV_FILE) && set +a && \
+		eval "$$_snap" && \
 		export LOG_FORMAT=pretty && \
 		exec go run ./cmd/service $(svc)
 
@@ -84,7 +96,9 @@ service-watch:
 	@test -n "$(svc)" || (echo "usage: make watch svc=<name>" && exit 1)
 	@test -f $(DEV_ENV_FILE) || (echo "$(DEV_ENV_FILE) not found — seed langwatch/.env first" && exit 1)
 	@which air > /dev/null 2>&1 || (echo "Installing air..." && go install github.com/air-verse/air@latest)
-	@set -a && . $(DEV_ENV_FILE) && set +a && \
+	@_snap=$$(export -p) && \
+		set -a && . $(DEV_ENV_FILE) && set +a && \
+		eval "$$_snap" && \
 		export LOG_FORMAT=pretty && \
 		air --build.cmd "go build -o ./tmp/$(svc) ./cmd/service" \
 			--build.bin "./tmp/$(svc) $(svc)" \

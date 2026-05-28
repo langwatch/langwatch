@@ -273,6 +273,119 @@ export class GatewayBudgetClickHouseRepository {
   }
 
   /**
+   * Same as `getSpendForBudgets` but sums spend across multiple tenants
+   * (projects). Used by `GatewayBudgetService.list()` /
+   * `listForProject()` to render the org-level budget table — those
+   * paths span every project in the org/team, and ORG/TEAM/PRINCIPAL-
+   * scoped budgets accumulate ledger rows under whichever project
+   * actually emitted the trace (TenantId on the ledger row = the
+   * project the trace landed in, not the budget's scope).
+   *
+   * Without this, list() reads `GatewayBudget.spentUsd` from PG which
+   * is the legacy column that's no longer updated post-cutover — every
+   * budget in the list view shows $0.00 / 0% even when CH has real
+   * ledger rows.
+   */
+  async getSpendForBudgetsAcrossTenants(
+    tenantIds: string[],
+    budgets: GatewayBudget[],
+  ): Promise<ScopeSpend[]> {
+    if (budgets.length === 0 || tenantIds.length === 0) return [];
+
+    const now = new Date();
+    const byWindow = new Map<GatewayBudgetWindow, GatewayBudget[]>();
+    for (const b of budgets) {
+      const list = byWindow.get(b.window) ?? [];
+      list.push(b);
+      byWindow.set(b.window, list);
+    }
+
+    const out: Map<string, ScopeSpend> = new Map();
+
+    for (const [window, budgetsForWindow] of byWindow) {
+      const periodStart = currentPeriodStart(window, now);
+      const scopeTuples = budgetsForWindow.map((b) => ({
+        scope: scopeToClickHouse(b.scopeType),
+        scopeId: b.scopeId,
+        budgetId: b.id,
+      }));
+
+      const scopeFilter = scopeTuples
+        .map((_, i) => `(Scope = {scope${i}:String} AND ScopeId = {scopeId${i}:String})`)
+        .join(" OR ");
+      const tenantPlaceholders = tenantIds
+        .map((_, i) => `{tenant${i}:String}`)
+        .join(",");
+      const params: Record<string, string | number> = {
+        window: windowToClickHouse(window),
+        periodStart: periodStart.getTime(),
+      };
+      for (let i = 0; i < tenantIds.length; i++) {
+        params[`tenant${i}`] = tenantIds[i]!;
+      }
+      for (let i = 0; i < scopeTuples.length; i++) {
+        params[`scope${i}`] = scopeTuples[i]!.scope;
+        params[`scopeId${i}`] = scopeTuples[i]!.scopeId;
+      }
+
+      try {
+        // Resolve any tenant for the client lookup — the query hits
+        // `gateway_budget_scope_totals` which is a single physical
+        // table; `resolveClient` only differs by project for routing.
+        const client = await this.resolveClient(tenantIds[0]!);
+        const result = await client.query({
+          query: `
+            SELECT
+              Scope,
+              ScopeId,
+              toString(sumMerge(SpendUSD)) AS SpentUSD
+            FROM ${TOTALS_TABLE}
+            WHERE TenantId IN (${tenantPlaceholders})
+              AND Window = {window:String}
+              AND PeriodStart = fromUnixTimestamp64Milli({periodStart:Int64})
+              AND (${scopeFilter})
+            GROUP BY Scope, ScopeId
+          `,
+          query_params: params,
+          format: "JSONEachRow",
+        });
+        type Row = { Scope: string; ScopeId: string; SpentUSD: string };
+        const rows = (await result.json()) as Row[];
+        const byKey = new Map<string, string>();
+        for (const r of rows) {
+          byKey.set(`${r.Scope}:${r.ScopeId}`, r.SpentUSD);
+        }
+        for (const t of scopeTuples) {
+          const key = `${t.scope}:${t.scopeId}`;
+          out.set(t.budgetId, {
+            budgetId: t.budgetId,
+            scope: budgetsForWindow.find((b) => b.id === t.budgetId)!
+              .scopeType,
+            scopeId: t.scopeId,
+            spentUsd: byKey.get(key) ?? "0",
+          });
+        }
+      } catch (error) {
+        logger.error(
+          { tenantIds, window, error },
+          "failed to read gateway budget scope totals across tenants",
+        );
+        throw error;
+      }
+    }
+
+    return budgets.map(
+      (b) =>
+        out.get(b.id) ?? {
+          budgetId: b.id,
+          scope: b.scopeType,
+          scopeId: b.scopeId,
+          spentUsd: "0",
+        },
+    );
+  }
+
+  /**
    * Most recent ledger events for a single budget, ordered by `OccurredAt`
    * descending. Used by the budget detail page to render the recent-activity
    * panel (post-cutover replacement for `prisma.gatewayBudgetLedger.findMany`

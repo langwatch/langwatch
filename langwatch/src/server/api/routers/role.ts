@@ -18,7 +18,13 @@ const permissionSchema = permissionFormatSchema;
 export const roleRouter = createTRPCRouter({
   getAll: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .use(checkOrganizationPermission("organization:view"))
+    // Tightened from organization:view (which MEMBER has) to manage —
+    // role definitions are an admin-surface read. All TS callers
+    // (settings/roles, settings/teams, AddMembersForm, TeamUserRoleField,
+    // GroupBindingInputRow) live in admin-context flows that already
+    // require manage anyway, so the bump is invisible to legitimate UX
+    // and closes a member-session direct-curl exfil path.
+    .use(checkOrganizationPermission("organization:manage"))
     .query(async ({ ctx, input }) => {
       const roleService = new RoleService(ctx.prisma);
       return roleService.getAllRoles(input.organizationId);

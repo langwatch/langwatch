@@ -84,16 +84,19 @@ export default async function main() {
 
   for (const project of projects) {
     const rows = await prisma.modelProvider.findMany({
-      where: { projectId: project.id },
+      where: {
+        scopes: { some: { scopeType: "PROJECT", scopeId: project.id } },
+      },
       select: {
         id: true,
-        projectId: true,
         customKeys: true,
       },
     });
 
     for (const row of rows) {
-      const encryptedKeys = migrateModelProviderKeysRow({ row });
+      const encryptedKeys = migrateModelProviderKeysRow({
+        row: { ...row, projectId: project.id },
+      });
 
       if (encryptedKeys === null) {
         skippedCount++;
@@ -101,7 +104,7 @@ export default async function main() {
       }
 
       await prisma.modelProvider.update({
-        where: { id: row.id, projectId: row.projectId },
+        where: { id: row.id },
         data: { customKeys: encryptedKeys },
       });
       updatedCount++;

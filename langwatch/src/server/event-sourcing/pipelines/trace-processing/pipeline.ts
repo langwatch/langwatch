@@ -42,6 +42,8 @@ export interface TraceProcessingPipelineDeps {
    * event_log INSERT succeeds. Optional — without it, the spool path is disabled.
    */
   blobStore?: BlobStore;
+  governanceKpisSyncReactor?: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
+  governanceOcsfEventsSyncReactor?: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
 }
 
 /**
@@ -90,6 +92,22 @@ export function createTraceProcessingPipeline(deps: TraceProcessingPipelineDeps)
       "traceSummary",
       "gatewayBudgetSync",
       deps.gatewayBudgetSyncReactor,
+    );
+  }
+
+  if (deps.governanceKpisSyncReactor) {
+    builder = builder.withReactor(
+      "traceSummary",
+      "governanceKpisSync",
+      deps.governanceKpisSyncReactor,
+    );
+  }
+
+  if (deps.governanceOcsfEventsSyncReactor) {
+    builder = builder.withReactor(
+      "traceSummary",
+      "governanceOcsfEventsSync",
+      deps.governanceOcsfEventsSyncReactor,
     );
   }
 

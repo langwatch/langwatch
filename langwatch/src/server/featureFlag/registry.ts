@@ -139,16 +139,31 @@ export const FEATURE_FLAGS = [
     defaultValue: false,
     description: "Reveals the AI Gateway menu in the project sidebar.",
   },
-  // Per-project gate for trace blob offload (#4215 / ADR-021). Checked ONCE per
+  // Per-project gate for trace blob offload (#4215 / ADR-022). Checked ONCE per
   // ingestion request (not per span) via the postgres-cached store, so the
-  // hot-path cost is one cached lookup. When on, over-threshold span field
-  // values are offloaded to object storage (preview + ref) at the edge.
+  // hot-path cost is one cached lookup. When on, over-threshold spans get
+  // routed via the transient S3 spool at the edge (ADR-022). Off = today's
+  // behavior — the existing capOversizedAttributes(256 KB) is the only cap.
   {
     key: "release_trace_blob_offload",
     scope: "PRODUCT",
     defaultValue: false,
     description:
-      "Offloads over-threshold trace span field values (input/output/contexts) to object storage at ingestion, storing a bounded preview + a blob reference inline. Off = current behavior (full value flows through the pipeline).",
+      "Routes over-threshold OTLP spans via a transient S3 spool at the ingestion edge (ADR-022). Off = current behavior (full value flows through the command queue; capOversizedAttributes(256 KB) is the only cap).",
+  },
+  {
+    key: "release_ui_ai_governance_enabled",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Gates the personal keys, admin oversight, RoutingPolicy, and IngestionSource UI surfaces. Distinct from release_ui_ai_gateway_menu_enabled — the existing gateway product ships unblocked while governance keeps cooking.",
+  },
+  {
+    key: "release_ui_traces_v2_enabled",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Enables the traces v2 surface (new drawer, lens-based saved views, interactive error chip popover). Per-device opt-in is layered on top via langwatch:traces-v2:* localStorage keys.",
   },
 ] as const satisfies readonly FeatureFlagDefinition[];
 

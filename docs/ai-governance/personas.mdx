@@ -1,0 +1,84 @@
+---
+title: Personas and default landing
+description: LangWatch detects four personas based on org membership + activity signals, and routes each to the home that fits their work, admin to the bird-eye, personal-only user to /me, project-only LLMOps user to their project, mixed user to /me with a workspace switcher.
+---
+
+# Personas and default landing
+
+LangWatch supports four distinct work patterns and routes each to its
+natural home page on first paint after sign-in. The detection is signal-
+based, your role, your org membership, and your recent activity, not a
+manual setting (though you can override it in your personal settings).
+
+This page explains who each persona is, where they land, and how to
+override the default.
+
+## The four personas
+
+| Persona | Detection signal | Default landing | Why this surface |
+|---------|------------------|-----------------|------------------|
+| **Org admin** (governance-relevant role on at least one org) | `RoleBinding` carries `organization:manage` OR `governance:view` | [`/governance`](/ai-governance/governance-dashboard): the bird-eye dashboard | Their job is org-wide oversight; first paint shows usage-by-team graphs, anomaly alerts, drill-in to per-team, per-user activity. Their own personal traces are secondary. |
+| **Personal-only user** (no project membership beyond their own personal workspace) | `OrganizationUser` role=member AND `Project.isPersonal=true` AND no `TeamUser` membership beyond personal | [`/me`](/ai-governance/personal-portal/end-user): the AI Tools Portal + Trace Ingest section | Their primary use case is *"sign in, install Claude Code, Cursor template, see my own usage"*. AI Tools Portal tile-grid + Trace Ingest catalog is the headline. |
+| **Project-only user** (LLMOps customer, no personal-workspace activity) | `TeamUser` membership exists with `Team.isPersonal=false` AND no traces in `Project.isPersonal` | `/<project>/messages`, the existing LLMOps trace explorer | Existing LLMOps customer story stays unchanged. First paint is the Messages explorer, not /me. |
+| **Mixed** (personal + project membership) | Combination of above | [`/me`](/ai-governance/personal-portal/end-user) (default) OR last-touched (cookie-tracked) | Cookie remembers where the user last spent time. New mixed user lands at /me first paint to discover the AI Tools Portal, then uses the workspace switcher to flip to project work. |
+
+## How detection works
+
+The persona resolver runs at sign-in and caches the result for the session.
+The exact algorithm is captured as BDD scenarios in
+[`governance-home-routing.feature`](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/governance/governance-home-routing.feature)
+and the resolver implementation:
+
+1. **Admin check**: does the user have a governance-relevant role binding
+   on any org? If yes AND no recent personal-workspace activity, route to
+   `/governance`. (Admins with active personal workspaces still default to
+   `/me`, they tend to wear both hats.)
+2. **Personal-only check**: does the user have NO `TeamUser` membership
+   beyond their personal team? If yes, route to `/me`.
+3. **Project-only check**: does the user have NO personal-workspace
+   activity (no traces in `Project.isPersonal=true` in the past 30 days)?
+   If yes, route to their default project's `/messages`.
+4. **Fallback**: for mixed users, route to `/me` unless a cookie remembers
+   they last spent time in a project.
+
+The signal-based default avoids two failure modes:
+
+- **Admin lands at /me and never finds the bird-eye.** The opposite was a
+  reported issue before persona-aware routing, admins would sign in,
+  see their own (often empty) personal workspace, and not realize the
+  governance dashboard existed.
+- **LLMOps customer lands at /me and is confused.** Existing customers
+  upgrading to the governance-aware tier kept their default landing
+  unchanged.
+
+## Overriding the default
+
+Every user can override the persona-based default in
+**`/me/settings → Default landing page`**:
+
+- **Auto** (default), uses the persona detection above.
+- **Always /me**: always lands on the AI Tools Portal + Trace Ingest
+  section, regardless of role.
+- **Always project home**: always lands on the user's last-active project's
+  `/messages`, regardless of role.
+
+Override applies after the next sign-in.
+
+## Per-org enforcement (admin)
+
+Org admins can enforce a persona-based default on all members of their org
+via the upcoming `/settings/governance/persona-policy` setting (deferred to
+a later iteration). Today, the per-user override is the only knob.
+
+## Related references
+
+- [Governance dashboard](/ai-governance/governance-dashboard): what the
+  admin sees when routed to `/governance`.
+- [Personal portal, end user](/ai-governance/personal-portal/end-user) —
+  what the personal-only user sees when routed to `/me`.
+- [Workspaces](/ai-governance/workspaces): how the workspace switcher
+  works for mixed-persona users.
+- [`governance-home-routing.feature`](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/governance/governance-home-routing.feature)
+ , the executable BDD spec that governs the routing logic.
+- [`persona-aware-chrome.feature`](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/governance/persona-aware-chrome.feature)
+ , what each persona sees in the navigation chrome.

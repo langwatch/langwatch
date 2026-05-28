@@ -1,0 +1,192 @@
+---
+title: Track your Claude Code usage
+description: A solo-developer walkthrough. Sign up for LangWatch (or run it locally), connect your Claude Code, see your own spend, set a personal budget. Two paths depending on whether you pay Anthropic with a Claude Max / Pro plan or with a pay-per-token API key.
+sidebarTitle: Track your Claude Code usage
+---
+
+This is the version of LangWatch for one person tracking one Claude Code seat. No org rollout, no IT admin, no Routing Policy. Pick the path that matches how you pay Anthropic and follow it end to end.
+
+When you finish you will have:
+
+- A LangWatch project (SaaS or local) bound to your account.
+- Claude Code emitting usage signals into that project.
+- A live `/me` dashboard showing your monthly spend, request count, most-used model, and per-tool cost breakdown.
+- (Optional) A personal budget that you can wire to an alert.
+
+If you are an admin setting LangWatch up for a team, jump to the [admin walkthrough](/ai-governance/getting-started-admin). If your team already runs LangWatch and you just need a Virtual Key, the [developer walkthrough](/ai-governance/getting-started-developer) is shorter.
+
+<Info>**Pairs with:** [Personal AI Tools Portal](/ai-governance/personal-portal/overview) (the `/me` page you will be living on) and [Ingestion Templates](/ai-governance/ingestion-templates) (the OTLP shape behind Path A).</Info>
+
+## Step 0: Get LangWatch
+
+Pick one:
+
+**SaaS (fastest).** Sign up at [app.langwatch.ai](https://app.langwatch.ai). The onboarding flow creates a personal organization, a workspace, and a project. You land on `/me` ready to go.
+
+**Self-hosted (one command).** Run LangWatch locally:
+
+```bash
+npx @langwatch/server
+```
+
+The CLI bootstraps Postgres, ClickHouse, Redis, and the app on `http://localhost:5560`. Open it in your browser, sign up with email + password, and you land on `/me`.
+
+Either way, the rest of the guide assumes you are signed in and looking at the `/me` page.
+
+## Step 1: Pick your path
+
+How do you pay Anthropic for Claude Code?
+
+| Your setup | Path |
+|------------|------|
+| Claude Max plan (the `5x` / `20x` subscription tier) | [Path A](#path-a-claude-max-subscription) |
+| Pay-per-token Anthropic API key | [Path B](#path-b-pay-per-token-api-key) |
+
+If you use both (subscription for personal work, API key for an automation), wire up Path A first, then add Path B on top. Both write to the same `/me` page.
+
+## Path A: Claude Max subscription
+
+You pay Anthropic flat per month and have a Claude Max seat (`5x` or `20x`). Anthropic does not give you per-request cost numbers from their billing surface; the only way to see your actual spend is to capture Claude Code's own OpenTelemetry usage emissions and let LangWatch normalise them.
+
+### A1. Install the Claude Code template
+
+On `/me`, scroll to the **Trace Ingest** section. You will see a few tiles, one per supported source. Click the **Claude Code** tile to open the install drawer.
+
+<Frame caption="The Claude Code tile in the Trace Ingest section. The install drawer mints a personal token and shows the env block you need to paste into your shell.">
+  ![Claude Code install drawer](/images/ai-governance/post-bypass/11-claude-code-install-drawer.png)
+</Frame>
+
+In the drawer, click **Use this template**. LangWatch creates a personal binding for the template, generates a one-time access token (prefix `ik-lw-`), and applies the OTLP shape rules that turn Claude Code's raw spans into LangWatch's canonical `gen_ai.*` cost/token/model fields.
+
+<Warning>The token is shown once. Copy it before closing the drawer. If you lose it, rotate it from the same tile and re-do the env block.</Warning>
+
+### A2. Set the env vars
+
+The drawer shows a shell block that looks like this:
+
+```bash
+export CLAUDE_CODE_ENABLE_TELEMETRY=1
+export OTEL_LOGS_EXPORTER=otlp
+export OTEL_METRICS_EXPORTER=otlp
+export OTEL_EXPORTER_OTLP_PROTOCOL=http/json
+export OTEL_EXPORTER_OTLP_ENDPOINT="https://app.langwatch.ai/api/otel"
+export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ik-lw-<the-token-you-just-copied>"
+```
+
+Paste it into your shell, then restart Claude Code so it picks up the new env. If you use a shell config file (`~/.zshrc`, `~/.bashrc`), drop it there to persist across sessions.
+
+For self-hosted, the endpoint is `http://localhost:5560/api/otel` instead.
+
+### A3. Use Claude Code as normal
+
+Run a Claude Code session. Anything works:
+
+```bash
+claude
+> Refactor src/auth/login.ts to use the new session API
+```
+
+Claude Code emits one OTLP span per `api_request` event plus a periodic `claude_code.cost.usage` metric. Both stream through your OTLP endpoint into the LangWatch ingestion source.
+
+### A4. Verify it landed
+
+Within 30 seconds of your first message, refresh `/me`. You should see:
+
+- At least one row in **Recent activity** with the model name, token counts, and a dollar cost.
+- A non-zero number in the **Spent this month** card.
+- The model breakdown in **By tool** with at least one entry.
+
+<Frame caption="My Usage panel populated by Claude Code. Spent-this-month, requests, most-used model, daily spending chart, per-model breakdown, and the recent-activity tail.">
+  ![My Usage populated](/images/ai-governance/post-bypass/37-me-usage-scrolled.png)
+</Frame>
+
+If those three signals are present, Path A is working. Skip to [What's next](#whats-next).
+
+If nothing shows, jump to [Troubleshooting](#troubleshooting).
+
+## Path B: Pay-per-token API key
+
+You pay Anthropic per request via an Anthropic API key. You want all your Claude Code spend to flow through a single LangWatch surface so you can budget it.
+
+### B1. Add your Anthropic credential
+
+On `/me`, scroll to **Model providers (issue your own virtual key)**. Click the **Anthropic** tile to open the provider drawer, then paste your Anthropic API key.
+
+This credential never leaves LangWatch. The Virtual Key you mint next is what Claude Code sees; LangWatch holds the upstream key and swaps it in at request time.
+
+### B2. Mint a Virtual Key
+
+In the same drawer, click **Issue Virtual Key**. LangWatch generates a token with the prefix `vk-lw-` and shows it to you once.
+
+<Frame caption="The Anthropic provider drawer with a freshly minted Virtual Key. Copy the vk-lw- value; you will paste it into Claude Code's env in the next step.">
+  ![Virtual Key issued](/images/ai-governance/post-bypass/11-claude-code-install-drawer.png)
+</Frame>
+
+<Warning>Same as Path A: the secret half is shown once. Re-mint if you lose it.</Warning>
+
+### B3. Point Claude Code at the gateway
+
+Set these env vars in your shell:
+
+```bash
+export ANTHROPIC_AUTH_TOKEN="vk-lw-<your-key>"
+export ANTHROPIC_BASE_URL="https://gateway.langwatch.ai"
+```
+
+For self-hosted, set `ANTHROPIC_BASE_URL="http://localhost:5563"` (the local gateway port).
+
+Restart Claude Code.
+
+### B4. Use Claude Code as normal
+
+Same as Path A. Every request now flows through the LangWatch AI Gateway, which authenticates with your Anthropic key, forwards the request, captures the response, and writes a trace.
+
+### B5. Verify it landed
+
+Within 30 seconds, refresh `/me`:
+
+- At least one row in **Recent activity** with model name, token counts, dollar cost.
+- A non-zero **Spent this month**.
+- The model breakdown in **By tool**.
+
+The signals are the same as Path A; the difference is the cost number comes from the gateway's per-request observation (exact, not sampled) and the spend is enforceable, the gateway will deny calls once you cross a budget.
+
+## What's next
+
+Same surface either way.
+
+### See the full traces
+
+`/me` is the summary. For per-request detail (prompts, responses, latency breakdown, span tree), open **Traces** in the sidebar.
+
+<Frame caption="Trace Explorer scoped to your personal project. Every Claude Code request shows up with tokens, cost, duration, and a deep-linkable span tree.">
+  ![Trace explorer populated](/images/ai-governance/post-bypass/12-traces-populated.png)
+</Frame>
+
+### Set a personal budget
+
+`/me` → **Settings** → **Personal budget**. Set a monthly dollar cap. For Path B, the gateway enforces it (requests fail with `budget_exceeded` once you cross). For Path A, you get an alert at 80% and 100%; the actual API calls keep flowing (Anthropic does not give the receiver a way to gate them).
+
+### Add anomaly rules (admin-scope only)
+
+Anomaly rules live on the org-admin surface, not `/me`, since they evaluate across every member's spend. If you have admin access, head to `/governance/anomaly-rules` to pick a metric (cost per day, spike vs baseline, token usage by model) and a threshold. See [Anomaly Rules](/ai-governance/anomaly-rules) for the full schema. Solo users on a personal org have admin scope by default.
+
+## Privacy
+
+Everything you mint here is scoped to your personal project. If you signed in to LangWatch via a shared org workspace, switch to your personal workspace before pasting any token; the workspace picker is at the top of the sidebar. The `/me` data is yours alone, your org admins cannot see your personal-project traces unless you explicitly share them.
+
+For self-hosted (`npx @langwatch/server`), data never leaves your machine. The Postgres, ClickHouse, and Redis containers all bind to localhost.
+
+## Troubleshooting
+
+**Nothing in Recent activity after 30 seconds.** Check that Claude Code picked up the env vars: in a new shell, run `env | grep -i 'OTEL\|CLAUDE_CODE\|ANTHROPIC'`. If the values are missing, source your shell config or set them inline before launching Claude Code.
+
+**401 from the gateway (Path B).** Verify the `ANTHROPIC_AUTH_TOKEN` value starts with `vk-lw-`. If it starts with `sk-ant-` you are passing the raw Anthropic key, which the gateway rejects (auth gate is on the Virtual Key). Re-mint from the drawer and copy the new value.
+
+**Cost shows $0 even though traces land.** The model alias in the span does not match a current entry in LangWatch's cost catalog. Check the span's `gen_ai.request.model` attribute and confirm it is a current-gen identifier (`claude-sonnet-4-6`, `claude-opus-4-7`, `claude-haiku-4-5`). Legacy aliases (`claude-3-5-sonnet-20241022`) silently produce NULL cost. Update Claude Code or pin the model alias to the current value.
+
+**Token works but Authorization header malformed (Path A).** Verify the env block has `Authorization=Bearer ik-lw-...` with an equals sign (not a colon) and no trailing whitespace from copy-paste. The `ik-lw-` token is the source identity itself, so the OTLP endpoint stays the same for every personal binding; only the bearer header changes per user.
+
+**Self-hosted: app starts but `/me` is empty.** Make sure you signed up with email/password (the SaaS SSO providers are disabled by default in `npx @langwatch/server`). If you signed up but the page is blank, check `docker logs` on the langwatch container for migration errors.
+
+For deeper failure modes see [CLI debug](/ai-governance/cli-debug) and the [Ingestion Templates reference](/ai-governance/ingestion-templates).

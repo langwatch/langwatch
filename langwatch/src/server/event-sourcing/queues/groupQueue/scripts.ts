@@ -43,6 +43,42 @@ local function refreshGroupKeyTtl(jobsKey, dataKey, nowMs)
 end
 `;
 
+// Lua helper for the per-tenant in-flight count that backs the soft cap.
+//
+// Modeled as a ZSET per tenant (member = groupId, score = the slot's expiry in
+// ms) instead of a scalar INCR/DECR counter. A scalar counter leaks UP when a
+// worker dies UNGRACEFULLY (no COMPLETE to decrement) and never self-heals,
+// because dispatch keeps refreshing its TTL — the 2026-05-28 incident, where an
+// ElastiCache node replacement dropped every worker's Redis connection mid-job,
+// stranding a live tenant permanently at cap with thousands of groups parked.
+//
+// Each in-flight slot instead carries the SAME expiry as its activeKey heartbeat
+// (renewed by REFRESH while the worker lives). A slot whose heartbeat lapses has
+// a past score, so it stops counting against the cap once its expiry passes: an
+// ungraceful mass death self-heals within the active TTL with no operator reset.
+// The live count GCs lapsed members first so dead-worker entries can't grow the
+// ZSET unbounded. Keys share the keyPrefix hash tag so they stay in one slot.
+// See specs/event-sourcing/tenant-soft-cap.feature (self-heal scenario).
+const TENANT_ACTIVE_HELPER_LUA = `
+local function tenantActiveAdd(taPrefix, tenantId, groupId, expiryMs)
+  redis.call("ZADD", taPrefix .. tenantId, expiryMs, groupId)
+end
+local function tenantActiveRemove(taPrefix, tenantId, groupId)
+  redis.call("ZREM", taPrefix .. tenantId, groupId)
+end
+-- Live in-flight count = members whose expiry score is strictly in the future
+-- (> nowMs). GC the lapsed members first (scores at-or-past nowMs: cheap, only
+-- removes already-expired entries) so a burst of dead-worker slots can't grow
+-- the ZSET without bound. A slot scored exactly nowMs has just reached its
+-- deadline = lapsed (mirrors the activeKey EX TTL, which vanishes at expiry),
+-- so it is removed and not counted.
+local function tenantActiveCount(taPrefix, tenantId, nowMs)
+  local key = taPrefix .. tenantId
+  redis.call("ZREMRANGEBYSCORE", key, "-inf", nowMs)
+  return redis.call("ZCARD", key)
+end
+`;
+
 // Lua helper for the tenant soft-cap "parking" model, prepended to every script
 // that writes the ready set. Over-cap groups are moved OUT of ready into a
 // per-tenant parked zset ONCE (not re-scored every poll), so the dispatch scan
@@ -55,7 +91,10 @@ end
 // (which is what re-creates the over-cap ZADD storm). The parked set and the
 // parked-tenants registry share the same hash tag as ready (keyPrefix carries
 // it), so all keys stay in one Redis Cluster slot.
-export const PARK_HELPER_LUA = `
+//
+// Prepends TENANT_ACTIVE_HELPER_LUA so reconcileParked can read the self-healing
+// in-flight count; every script that includes PARK_HELPER_LUA gets both.
+export const PARK_HELPER_LUA = TENANT_ACTIVE_HELPER_LUA + `
 -- Tenant segment of a groupId (everything before the first '/'), else the id.
 local function parkTenantOf(groupId)
   local slashPos = string.find(groupId, "/", 1, true)
@@ -131,21 +170,22 @@ local function unparkUpTo(readyKey, tenantId, slots)
   return moved
 end
 
--- Safety-net reconcile, run by DISPATCH on a cadence (not the normal path —
+-- Safety-net reconcile, run by DISPATCH on a cadence (not the normal path:
 -- COMPLETE-unpark frees slots as jobs finish). Restores parked groups whose
 -- tenant has dropped below cap, covering two cases COMPLETE cannot:
 --   * orphan recovery (TRAP 2): a crashed/timed-out tenant never fires COMPLETE,
---     so its tenant_active key TTL-expires; read missing as 0 = under cap = unpark,
---     else the parked groups strand forever (a new stranding mode).
+--     so its in-flight slots lapse out of tenantActiveCount once their expiry
+--     scores fall into the past; the live count drops below cap and the parked
+--     groups are restored, instead of stranding forever (a new stranding mode).
 --   * cap disabled: flipping LANGWATCH_DISPATCH_TENANT_CAP to 0 must not leave
 --     groups parked out of the dispatch scan, so drain the whole tenant.
 -- Self-limiting via unparkUpTo (bounded by cap - active), so it never over-unparks.
-local function reconcileParked(readyKey, keyPrefix, tenantCap)
+local function reconcileParked(readyKey, keyPrefix, tenantCap, nowMs)
   local tenants = redis.call("SMEMBERS", keyPrefix .. "parked-tenants")
   for _, tenantId in ipairs(tenants) do
     local slots
     if tenantCap > 0 then
-      local active = tonumber(redis.call("GET", keyPrefix .. "tenant_active:" .. tenantId)) or 0
+      local active = tenantActiveCount(keyPrefix .. "tenant_active_z:", tenantId, nowMs)
       slots = tenantCap - active
     else
       -- Cap disabled: drain the tenant, but in bounded chunks across reconciles
@@ -352,8 +392,9 @@ local activeUntil = nowMs + activeTtlSec * 1000
 -- Restore parked over-cap groups on a cadence (TRAP 2 orphan recovery + cap=0
 -- drain). COMPLETE-unpark handles the normal slot-freeing as jobs finish; this
 -- only backstops what it can't: a crashed/timed-out tenant that never fires
--- COMPLETE (its tenant_active TTL-expires to 0 = under cap = unpark), and
--- flipping the cap off (drain everything parked). Time-gated rather than
+-- COMPLETE (its in-flight slots lapse out of the live count as their expiry
+-- scores pass = back under cap = unpark), and flipping the cap off (drain
+-- everything parked). Time-gated rather than
 -- per-poll so under sustained load (dispatch rarely idle) orphan recovery is
 -- not starved, while the cap=0 steady state pays only a GET + an occasional
 -- empty SMEMBERS. SCARD-gated so it is a true no-op when nothing is parked.
@@ -362,7 +403,7 @@ local lastReconcile = tonumber(redis.call("GET", reconcileTsKey)) or 0
 if (nowMs - lastReconcile) >= 2000 then
   redis.call("SET", reconcileTsKey, nowMs)
   if redis.call("SCARD", keyPrefix .. "parked-tenants") > 0 then
-    reconcileParked(readyKey, keyPrefix, tenantCap)
+    reconcileParked(readyKey, keyPrefix, tenantCap, nowMs)
   end
 end
 
@@ -392,17 +433,15 @@ while offset < scanBudget do
     if redis.call("SISMEMBER", blockedKey, groupId) == 0 then
       -- Tenant soft-cap check (no-op when tenantCap == 0).
       local tenantOverCap = false
-      local tenantCountKey = nil
+      local capTenantId = nil
       if tenantCap > 0 then
         local slashPos = string.find(groupId, "/", 1, true)
         if slashPos and slashPos > 1 then
-          local tenantId = string.sub(groupId, 1, slashPos - 1)
-          tenantCountKey = keyPrefix .. "tenant_active:" .. tenantId
-          local cached = tenantCapCache[tenantId]
+          capTenantId = string.sub(groupId, 1, slashPos - 1)
+          local cached = tenantCapCache[capTenantId]
           if cached == nil then
-            local n = tonumber(redis.call("GET", tenantCountKey)) or 0
-            cached = n >= tenantCap
-            tenantCapCache[tenantId] = cached
+            cached = tenantActiveCount(keyPrefix .. "tenant_active_z:", capTenantId, nowMs) >= tenantCap
+            tenantCapCache[capTenantId] = cached
           end
           if cached then
             tenantOverCap = true
@@ -489,10 +528,11 @@ while offset < scanBudget do
             -- If process crashes, heartbeat stops, score becomes past, group becomes dispatchable again.
             redis.call("ZADD", readyKey, activeUntil, groupId)
 
-            -- Tenant in-flight counter (back-compat: only when cap is set).
-            if tenantCap > 0 and tenantCountKey then
-              redis.call("INCR", tenantCountKey)
-              redis.call("EXPIRE", tenantCountKey, activeTtlSec)
+            -- Tenant in-flight slot (self-healing ZSET; only when cap is set).
+            -- Score = activeUntil so a worker that dies without COMPLETE has its
+            -- slot lapse out of the live count instead of stranding the cap.
+            if tenantCap > 0 and capTenantId then
+              tenantActiveAdd(keyPrefix .. "tenant_active_z:", capTenantId, groupId, activeUntil)
             end
 
             local dataKey = keyPrefix .. "group:" .. groupId .. ":data"
@@ -552,7 +592,7 @@ local lastReconcile = tonumber(redis.call("GET", reconcileTsKey)) or 0
 if (nowMs - lastReconcile) >= 2000 then
   redis.call("SET", reconcileTsKey, nowMs)
   if redis.call("SCARD", keyPrefix .. "parked-tenants") > 0 then
-    reconcileParked(readyKey, keyPrefix, tenantCap)
+    reconcileParked(readyKey, keyPrefix, tenantCap, nowMs)
   end
 end
 
@@ -585,17 +625,15 @@ while offset < scanBudget and dispatched < maxJobs do
     -- Checked before SISMEMBER so over-cap groups skip with 0 Redis commands
     -- (the cap result is cached per-tenant in a Lua table).
     local tenantOverCap = false
-    local tenantCountKey = nil
+    local capTenantId = nil
     if tenantCap > 0 then
       local slashPos = string.find(groupId, "/", 1, true)
       if slashPos and slashPos > 1 then
-        local tenantId = string.sub(groupId, 1, slashPos - 1)
-        tenantCountKey = keyPrefix .. "tenant_active:" .. tenantId
-        local cached = tenantCapCache[tenantId]
+        capTenantId = string.sub(groupId, 1, slashPos - 1)
+        local cached = tenantCapCache[capTenantId]
         if cached == nil then
-          local n = tonumber(redis.call("GET", tenantCountKey)) or 0
-          cached = n >= tenantCap
-          tenantCapCache[tenantId] = cached
+          cached = tenantActiveCount(keyPrefix .. "tenant_active_z:", capTenantId, nowMs) >= tenantCap
+          tenantCapCache[capTenantId] = cached
         end
         if cached then
           tenantOverCap = true
@@ -676,15 +714,13 @@ while offset < scanBudget and dispatched < maxJobs do
             -- Mark group as actively-processing in ready zset (future score suppresses redispatch).
             redis.call("ZADD", readyKey, activeUntil, groupId)
 
-            -- Tenant in-flight counter (back-compat: only when cap is set).
-            if tenantCap > 0 and tenantCountKey then
-              redis.call("INCR", tenantCountKey)
-              redis.call("EXPIRE", tenantCountKey, activeTtlSec)
+            -- Tenant in-flight slot (self-healing ZSET; only when cap is set).
+            -- Score = activeUntil so a worker that dies without COMPLETE has its
+            -- slot lapse out of the live count instead of stranding the cap.
+            if tenantCap > 0 and capTenantId then
+              tenantActiveAdd(keyPrefix .. "tenant_active_z:", capTenantId, groupId, activeUntil)
               -- Invalidate cache — count changed, may now be at cap
-              local slashPos2 = string.find(groupId, "/", 1, true)
-              if slashPos2 then
-                tenantCapCache[string.sub(groupId, 1, slashPos2 - 1)] = nil
-              end
+              tenantCapCache[capTenantId] = nil
             end
 
             local dataKey = keyPrefix .. "group:" .. groupId .. ":data"
@@ -780,16 +816,17 @@ local errorKey        = KEYS[6]
 local groupId      = ARGV[1]
 local stagedJobId  = ARGV[2]
 local jobName      = ARGV[3]
--- Tenant in-flight key prefix (post-2026-05-11 follow-up). When the
--- soft-cap is enabled in DISPATCH_LUA, completing a job must DECR the
--- counter so freed slots are picked up by other tenants. Passing the
--- prefix in (not a derived tenantId) lets us keep the cap optional
--- without breaking back-compat with older call sites.
+-- Tenant in-flight ZSET key prefix. When the soft-cap is enabled in
+-- DISPATCH_LUA, completing a job must remove this group's slot from the
+-- per-tenant ZSET so freed slots are picked up by other tenants. Passing the
+-- prefix in (not a derived tenantId) lets us keep the cap optional without
+-- breaking back-compat with older call sites.
 local tenantCountKeyPrefix = ARGV[4]
 -- Tenant soft-cap (same value DISPATCH_LUA reads). When > 0, a completion
 -- frees a slot that may let one of the tenant's parked over-cap groups resume,
 -- so we unpark up to the freed headroom. 0 = cap disabled, no parking in play.
 local tenantCap = tonumber(ARGV[5]) or 0
+local nowMs = tonumber(ARGV[6])
 
 local currentActive = redis.call("GET", activeKey)
 if currentActive ~= stagedJobId then
@@ -798,18 +835,11 @@ end
 
 redis.call("DEL", activeKey)
 
--- Decrement tenant in-flight counter when the soft-cap is enabled.
+-- Free the tenant in-flight slot when the soft-cap is enabled.
 if tenantCountKeyPrefix and tenantCountKeyPrefix ~= "" then
   local slashPos = string.find(groupId, "/", 1, true)
   if slashPos and slashPos > 1 then
-    local tenantId = string.sub(groupId, 1, slashPos - 1)
-    local key = tenantCountKeyPrefix .. tenantId
-    local n = tonumber(redis.call("GET", key)) or 0
-    if n > 1 then
-      redis.call("DECR", key)
-    else
-      redis.call("DEL", key)
-    end
+    tenantActiveRemove(tenantCountKeyPrefix, string.sub(groupId, 1, slashPos - 1), groupId)
   end
 end
 
@@ -820,7 +850,7 @@ end
 -- reconcile can't over-unpark into re-park churn. The LPUSH below wakes a waiter.
 if tenantCap > 0 then
   local tenantId = parkTenantOf(groupId)
-  local active = tonumber(redis.call("GET", tenantCountKeyPrefix .. tenantId)) or 0
+  local active = tenantActiveCount(tenantCountKeyPrefix, tenantId, nowMs)
   unparkUpTo(readyKey, tenantId, tenantCap - active)
 end
 
@@ -864,10 +894,10 @@ local stagedJobId           = ARGV[1]
 local activeTtlSec          = tonumber(ARGV[2])
 local groupId               = ARGV[3]
 local nowMs                 = tonumber(ARGV[4])
--- Tenant counter prefix (post-2026-05-11 soft-cap). When provided, the
--- tenant_active counter's TTL is refreshed alongside the activeKey TTL
--- so long-running groups don't expire their tenant slot mid-execution
--- (which would let the same tenant grab another slot, drifting cap up).
+-- Tenant in-flight ZSET key prefix (soft-cap). When provided, this group's
+-- slot expiry score is bumped alongside the activeKey TTL so long-running
+-- groups keep counting against the cap mid-execution (a stale-scored slot
+-- would lapse out of the live count and let the same tenant grab another).
 local tenantCountKeyPrefix  = ARGV[5]
 
 local currentActive = redis.call("GET", activeKey)
@@ -889,11 +919,10 @@ if currentActive == stagedJobId then
   if tenantCountKeyPrefix and tenantCountKeyPrefix ~= "" then
     local slashPos = string.find(groupId, "/", 1, true)
     if slashPos and slashPos > 1 then
-      local tenantId = string.sub(groupId, 1, slashPos - 1)
-      local key = tenantCountKeyPrefix .. tenantId
-      if redis.call("EXISTS", key) == 1 then
-        redis.call("EXPIRE", key, activeTtlSec)
-      end
+      -- Bump this in-flight slot's expiry in lockstep with the activeKey
+      -- heartbeat. XX = only if the slot still exists, so we never re-create a
+      -- slot COMPLETE legitimately freed.
+      redis.call("ZADD", tenantCountKeyPrefix .. string.sub(groupId, 1, slashPos - 1), "XX", nowMs + activeTtlSec * 1000, groupId)
     end
   end
   return 1
@@ -914,10 +943,10 @@ local score                 = tonumber(ARGV[4])
 local jobDataJson           = ARGV[5]
 local errorMessage          = ARGV[6]
 local errorStack            = ARGV[7]
--- Same shape as COMPLETE_LUA's ARGV[4]: when non-empty, DECRs the
--- tenant_active counter so the soft cap doesn't leak slots when a
--- group exhausts retries. Without this, every exhausted-retry leaves
--- the counter +1 and the cap eventually starves the tenant.
+-- Same shape as COMPLETE_LUA's ARGV[4]: when non-empty, removes this
+-- group's slot from the per-tenant in-flight ZSET so the soft cap doesn't
+-- leak slots when a group exhausts retries. Without this the slot would
+-- count against the cap until its expiry score lapses on its own.
 local tenantCountKeyPrefix  = ARGV[8]
 
 local groupJobsKey = keyPrefix .. "group:" .. groupId .. ":jobs"
@@ -944,22 +973,15 @@ redis.call("PERSIST", groupDataKey)
 --    UNBLOCK_LUA re-adds the group when it is unblocked.
 redis.call("ZREM", readyKey, groupId)
 
--- 4. Free the in-flight slot. activeKey would expire on its own after
--- activeTtlSec, but the tenant_active counter wouldn't — Redis key
--- expiration has no callback. Mirror COMPLETE_LUA's free path.
+-- 4. Free the in-flight slot. The activeKey expires on its own after
+-- activeTtlSec; removing the ZSET slot here frees it immediately rather than
+-- waiting for its expiry score to lapse. Mirror COMPLETE_LUA's free path.
 redis.call("DEL", activeKey)
 
 if tenantCountKeyPrefix and tenantCountKeyPrefix ~= "" then
   local slashPos = string.find(groupId, "/", 1, true)
   if slashPos and slashPos > 1 then
-    local tenantId = string.sub(groupId, 1, slashPos - 1)
-    local key = tenantCountKeyPrefix .. tenantId
-    local n = tonumber(redis.call("GET", key)) or 0
-    if n > 1 then
-      redis.call("DECR", key)
-    else
-      redis.call("DEL", key)
-    end
+    redis.call("ZREM", tenantCountKeyPrefix .. string.sub(groupId, 1, slashPos - 1), groupId)
   end
 end
 
@@ -995,9 +1017,9 @@ local newStagedJobId        = ARGV[4]
 local dispatchAfterMs       = tonumber(ARGV[5])
 local jobDataJson           = ARGV[6]
 local retryTtlSec           = tonumber(ARGV[7])
--- Tenant counter prefix (post-2026-05-11 soft-cap). Keeps the tenant
--- counter TTL aligned with the activeKey TTL across backoff retries
--- so an in-flight retry doesn't expire its tenant slot.
+-- Tenant in-flight ZSET key prefix (soft-cap). Keeps this group's slot
+-- expiry score aligned with the activeKey TTL across backoff retries so an
+-- in-flight retry's slot doesn't lapse out of the live count.
 local tenantCountKeyPrefix  = ARGV[8]
 local nowMs                 = tonumber(ARGV[9])
 
@@ -1029,18 +1051,15 @@ addToReadyOrParked(readyKey, groupId, dispatchAfterMs, false)
 --    When it expires the dispatcher picks up the retry job on its next poll.
 redis.call("EXPIRE", activeKey, retryTtlSec)
 
--- 5. Mirror activeKey TTL onto tenant_active counter so the soft cap
--- stays accurate during backoff windows. Only set when the counter
--- exists to avoid silently re-creating a counter that COMPLETE_LUA
--- legitimately decremented to zero.
+-- 5. Bump this slot's expiry score in lockstep with the activeKey TTL so the
+-- soft cap stays accurate during backoff windows. XX (below) only updates an
+-- existing slot, so we never re-create a slot COMPLETE_LUA legitimately freed.
 if tenantCountKeyPrefix and tenantCountKeyPrefix ~= "" then
   local slashPos = string.find(groupId, "/", 1, true)
   if slashPos and slashPos > 1 then
-    local tenantId = string.sub(groupId, 1, slashPos - 1)
-    local key = tenantCountKeyPrefix .. tenantId
-    if redis.call("EXISTS", key) == 1 then
-      redis.call("EXPIRE", key, retryTtlSec)
-    end
+    -- Bump this slot's expiry to the backoff window so an in-flight retry keeps
+    -- its tenant slot. XX = only if still in-flight, never re-create a freed slot.
+    redis.call("ZADD", tenantCountKeyPrefix .. string.sub(groupId, 1, slashPos - 1), "XX", nowMs + retryTtlSec * 1000, groupId)
   end
 end
 
@@ -1389,8 +1408,9 @@ export class GroupStagingScripts {
       groupId,
       stagedJobId,
       jobName ?? "",
-      `${this.keyPrefix}tenant_active:`,
+      `${this.keyPrefix}tenant_active_z:`,
       String(readTenantCap()),
+      String(Date.now()),
     );
 
     return result === 1;
@@ -1468,7 +1488,7 @@ export class GroupStagingScripts {
       String(activeTtlSec),
       groupId,
       String(Date.now()),
-      `${this.keyPrefix}tenant_active:`,
+      `${this.keyPrefix}tenant_active_z:`,
     );
 
     return result === 1;
@@ -1512,7 +1532,7 @@ export class GroupStagingScripts {
       jobDataJson,
       errorMessage ?? "",
       errorStack ?? "",
-      `${this.keyPrefix}tenant_active:`,
+      `${this.keyPrefix}tenant_active_z:`,
     );
   }
 
@@ -1559,7 +1579,7 @@ export class GroupStagingScripts {
       String(dispatchAfterMs),
       jobDataJson,
       String(retryTtlSec),
-      `${this.keyPrefix}tenant_active:`,
+      `${this.keyPrefix}tenant_active_z:`,
       String(Date.now()),
     );
 

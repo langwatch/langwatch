@@ -6,15 +6,26 @@ sidebarTitle: Claude Code
 
 Claude Code is Anthropic's official agentic CLI. It speaks the Anthropic Messages API and streams tool-call deltas with specific ordering that must be preserved end-to-end.
 
-The LangWatch AI Gateway's `/v1/messages` endpoint is designed to be Claude-Code-compatible: tool-call deltas are forwarded byte-for-byte after the first chunk (see the [streaming contract](/ai-gateway/streaming)), `cache_control` blocks are passed through untouched (see [caching passthrough](/ai-gateway/caching-passthrough) — this is load-bearing because Claude Code uses prompt caching aggressively), and the `/v1/models` endpoint returns Anthropic-model shapes so Claude Code's model picker works.
+The LangWatch AI Gateway's `/v1/messages` endpoint is designed to be Claude-Code-compatible: tool-call deltas are forwarded byte-for-byte after the first chunk (see the [streaming contract](/ai-gateway/streaming)), `cache_control` blocks are passed through untouched (see [caching passthrough](/ai-gateway/caching-passthrough): this is load-bearing because Claude Code uses prompt caching aggressively), and the `/v1/models` endpoint returns Anthropic-model shapes so Claude Code's model picker works.
 
-## Setup
+## Quick path: `langwatch claude` wrapper (recommended for personal IDE keys)
 
-Assuming you've minted a VK — `lw_vk_live_01HZX…` — in the LangWatch UI:
+If you've authenticated via `langwatch login --device` ([Personal IDE keys](/ai-gateway/governance/personal-keys)), the simplest invocation is the wrapper. It exec's Claude Code with the right env vars already pointing at your gateway:
+
+```bash
+langwatch claude              # interactive
+langwatch claude "fix tests"  # non-interactive prompt
+```
+
+All Claude Code flags pass through unchanged, `langwatch claude` is byte-for-byte equivalent to the bare `claude` invocation, just with `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN` already set. No env vars to maintain.
+
+## Manual setup: service VK, shared workstation
+
+If you have a **service-virtual-key** for non-personal traffic, or you want every plain `claude` invocation in your shell to route through the gateway without the wrapper:
 
 ```bash
 export ANTHROPIC_BASE_URL="https://gateway.langwatch.ai"
-export ANTHROPIC_AUTH_TOKEN="lw_vk_live_01HZX..."
+export ANTHROPIC_AUTH_TOKEN="vk-lw-01HZX..."
 claude
 ```
 
@@ -28,7 +39,7 @@ Replace the hostname:
 
 ```bash
 export ANTHROPIC_BASE_URL="https://langwatch-gateway.your-corp.internal"
-export ANTHROPIC_AUTH_TOKEN="lw_vk_live_..."
+export ANTHROPIC_AUTH_TOKEN="vk-lw-..."
 ```
 
 The gateway's `/v1/messages` path is the same whether on the LangWatch cloud or self-hosted.
@@ -39,7 +50,7 @@ For engineers juggling projects with different budgets or provider allow-lists, 
 
 ```bash
 # .envrc
-export ANTHROPIC_AUTH_TOKEN="lw_vk_live_<project-specific-vk>"
+export ANTHROPIC_AUTH_TOKEN="vk-lw-<project-specific-vk>"
 ```
 
 Then every `claude` session inherits the project-scoped VK, its budget, and its guardrails.
@@ -84,7 +95,7 @@ Each engineer's Claude Code usage is metered against their personal cap; no one 
 - `fallback.on: [5xx, timeout, rate_limit]`.
 - `fallback.timeout_ms: 30000`.
 
-When Anthropic's API is degraded, Claude Code sessions continue through Bedrock's Anthropic models transparently — the engineer sees a tiny latency bump but no error.
+When Anthropic's API is degraded, Claude Code sessions continue through Bedrock's Anthropic models transparently, the engineer sees a tiny latency bump but no error.
 
 ## Known good model aliases for Claude Code
 
@@ -103,12 +114,12 @@ If the primary is Bedrock, point those aliases at the Bedrock equivalents and Cl
 ## Limits and caveats
 
 - **Pin to a dated model name.** Bifrost's model registry resolves concrete dated names like `claude-haiku-4-5-20251001`, not bare aliases like `claude-haiku-4-5`. A bare alias returns `504 provider is required` because the gateway can't resolve which provider to dispatch to. Pin via `--model claude-haiku-4-5-20251001` on the command line OR via the VK's `model_aliases` so callers can keep the friendly form.
-- **Fallback during streaming** sticks to the original provider once the first chunk has streamed, per the [streaming contract](/ai-gateway/streaming). If the primary drops mid-stream, the session ends with an SSE error and Claude Code will retry a fresh turn — which may then land on the fallback provider.
-- **Tool-call delta shape changes across provider** — e.g. Anthropic vs Bedrock-Anthropic have subtle differences. The gateway normalises what it can via bifrost/core; complex tool flows should be smoke-tested when flipping primaries.
+- **Fallback during streaming** sticks to the original provider once the first chunk has streamed, per the [streaming contract](/ai-gateway/streaming). If the primary drops mid-stream, the session ends with an SSE error and Claude Code will retry a fresh turn, which may then land on the fallback provider.
+- **Tool-call delta shape changes across provider**: e.g. Anthropic vs Bedrock-Anthropic have subtle differences. The gateway normalises what it can via bifrost/core; complex tool flows should be smoke-tested when flipping primaries.
 - **Prompt caching is provider-specific.** Claude Code relies on Anthropic's ephemeral cache blocks. If the VK fails over to a provider without prompt caching (e.g. a generic OpenAI-compatible), expect cost to jump until the primary comes back.
-- **Claude 4.5 prompt caching is in beta.** Cache_read may return 0 on `claude-haiku-4-5-20251001` even with `cache_control: ephemeral` set correctly — this is account-level beta-gating, not a gateway issue. Sonnet 4.5 / Opus 4.5 prompt caching is GA and works end-to-end through the gateway's `/v1/messages` raw-forward path.
+- **Claude 4.5 prompt caching is in beta.** Cache_read may return 0 on `claude-haiku-4-5-20251001` even with `cache_control: ephemeral` set correctly, this is account-level beta-gating, not a gateway issue. Sonnet 4.5, Opus 4.5 prompt caching is GA and works end-to-end through the gateway's `/v1/messages` raw-forward path.
 
-## Spawning Claude Code in tests / scripts
+## Spawning Claude Code in tests, scripts
 
 If you spawn `claude` programmatically (CI matrix, scenario tests, automation):
 

@@ -13,6 +13,7 @@ import { app as evaluatorsApp } from "../app/api/evaluators/[[...route]]/app";
 import { app as experimentsApp } from "../app/api/experiments/[[...route]]/app";
 import { app as exportTracesApp } from "../app/api/export/traces/[[...route]]/app";
 import { app as gatewayPlatformApp } from "../app/api/gateway-platform/[[...route]]/app";
+import { app as governanceApp } from "../app/api/governance/[[...route]]/app";
 import { app as graphsApp } from "../app/api/graphs/[[...route]]/app";
 import { app as modelDefaultsApp } from "../app/api/model-defaults/[[...route]]/app";
 import { app as modelProvidersApp } from "../app/api/model-providers/[[...route]]/app";
@@ -45,7 +46,9 @@ import { app as workflowsApp } from "./routes/workflows";
 import { app as adminApp } from "../../ee/admin/routes/admin";
 import { app as annotationsApp } from "./routes/annotations";
 import { app as authApp } from "./routes/auth";
+import { app as authCliApp } from "./routes/auth-cli";
 import { app as collectorApp } from "./routes/collector";
+import { app as ingestionRoutesApp } from "./routes/ingest/ingestionRoutes";
 import { app as cronApp } from "./routes/cron";
 import { app as evaluationsLegacyApp } from "./routes/evaluations-legacy";
 import { app as healthApp } from "./routes/health";
@@ -93,6 +96,7 @@ export function createApiRouter() {
   api.route("/", filesApp);
   api.route("/", exportTracesApp);
   api.route("/", gatewayPlatformApp);
+  api.route("/", governanceApp);
   api.route("/", graphsApp);
   api.route("/", modelDefaultsApp);
   api.route("/", modelProvidersApp);
@@ -119,8 +123,14 @@ export function createApiRouter() {
 
   api.route("/", adminApp);
   api.route("/", annotationsApp);
+  // ORDERING: authCliApp MUST be registered BEFORE authApp.
+  // authApp owns the BetterAuth catch-all (`/auth/*`), which would
+  // otherwise swallow `/auth/cli/*` and return 404 from BetterAuth.
+  // Register the more-specific basePath first so Hono routes match it.
+  api.route("/", authCliApp);  // /api/auth/cli/* — RFC 8628 device-flow for CLI
   api.route("/", authApp);
   api.route("/", collectorApp);
+  api.route("/", ingestionRoutesApp); // /api/ingest/* — Activity Monitor receivers
   api.route("/", cronApp);
   api.route("/", evaluationsLegacyApp);
   api.route("/", healthApp);

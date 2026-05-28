@@ -46,7 +46,11 @@ See `dev/docs/adr/004-docker-dev-environment.md` for architecture decisions.
 
 The gateway is a separate Go service (not in `compose.dev.yml`) that terminates
 virtual-key traffic, fans out to providers via Bifrost, and reports usage back to
-the control plane. Run it alongside `pnpm dev` / `make dev`:
+the control plane. `pnpm dev` auto-starts it alongside vite + api when the Go
+toolchain is on PATH; the process appears as `gateway` in the concurrent output
+and reuses an existing listener on :5563 if another worktree already booted one.
+Set `LANGWATCH_SKIP_AIGATEWAY=1` to opt out (e.g. TS-only contributors). To run
+the gateway standalone:
 
 ```bash
 make service svc=aigateway       # run once

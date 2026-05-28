@@ -204,17 +204,17 @@ Feature: Public REST API — /api/gateway/v1/*
 
   @integration @rest @unimplemented
   Scenario: Create a virtual key
-    Given a gateway-provider-credential "gpc_openai_primary" is bound on project "acme-prod"
+    Given a gateway-provider-credential "mp_openai_primary" is bound on project "acme-prod"
     When I send `POST /api/gateway/v1/virtual-keys` with token "sess_abc" and body:
       """
       {
         "name": "ci-key",
         "environment": "live",
-        "provider_credential_ids": ["gpc_openai_primary"]
+        "provider_model_provider_ids": ["mp_openai_primary"]
       }
       """
     Then the response status is 201
-    And the body has a non-empty `secret` field starting with "lw_vk_live_"
+    And the body has a non-empty `secret` field starting with "vk-lw-"
     And the body's `virtual_key.name` is "ci-key"
     And the body's `virtual_key.prefix` + "..." + `virtual_key.last_four` reconstructs the secret-visible portion
     And subsequent GET of the same key returns the virtual_key but NOT the secret
@@ -223,7 +223,7 @@ Feature: Public REST API — /api/gateway/v1/*
   Scenario: Reject VK creation without at least one provider
     When I send `POST /api/gateway/v1/virtual-keys` with body:
       """
-      { "name": "no-providers", "provider_credential_ids": [] }
+      { "name": "no-providers", "provider_model_provider_ids": [] }
       """
     Then the response status is 400
     And error.type = "bad_request"
@@ -293,17 +293,17 @@ Feature: Public REST API — /api/gateway/v1/*
       }
       """
     Then the response status is 201
-    And the body has `provider_credential.id` starting with "gpc_"
+    And the body has `model_provider.id` starting with "mp_"
     And subsequent `GET /providers` lists the new binding with `health_status` = "healthy"
 
   @integration @rest @unimplemented
   Scenario: Disable a provider binding stops it from being used on new VKs
-    Given a gateway-provider-credential "gpc_1" is bound and used by 2 VKs
-    When I send `DELETE /api/gateway/v1/providers/gpc_1`
+    Given a gateway-provider-credential "mp_openai_1" is bound and used by 2 VKs
+    When I send `DELETE /api/gateway/v1/providers/mp_openai_1`
     Then the response status is 200
-    And `provider_credential.disabled_at` is non-null
-    And existing VKs bound to gpc_1 still resolve successfully
-    But new `POST /virtual-keys` with `provider_credential_ids: ["gpc_1"]` returns 400 with error.code = "provider_disabled"
+    And `model_provider.disabled_at` is non-null
+    And existing VKs bound to mp_openai_1 still resolve successfully
+    But new `POST /virtual-keys` with `model_provider_ids: ["mp_openai_1"]` returns 400 with error.code = "provider_disabled"
 
   # ============================================================================
   # DTO shape (snake_case vs camelCase)

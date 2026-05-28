@@ -104,6 +104,10 @@ export const ATTR_KEYS = {
   LANGWATCH_METRICS: "langwatch.metrics",
   LANGWATCH_MODEL_INPUT_COST_PER_TOKEN: "langwatch.model.inputCostPerToken",
   LANGWATCH_MODEL_OUTPUT_COST_PER_TOKEN: "langwatch.model.outputCostPerToken",
+  LANGWATCH_MODEL_CACHE_READ_COST_PER_TOKEN:
+    "langwatch.model.cacheReadCostPerToken",
+  LANGWATCH_MODEL_CACHE_CREATION_COST_PER_TOKEN:
+    "langwatch.model.cacheCreationCostPerToken",
 
   // LangWatch attributes
   LANGWATCH_INPUT: "langwatch.input",

@@ -23,6 +23,7 @@ import { CustomModelInputSection } from "./ModelProviderCustomModelInput";
 // section on the model-providers settings page (DefaultModelsSection). See
 // specs/model-providers/hierarchical-default-models.feature.
 import { ExtraHeadersSection } from "./ModelProviderExtraHeadersSection";
+import { ModelProviderAdvancedSection } from "./ModelProviderAdvancedSection";
 import { ProviderScopeSection } from "./ModelProviderScopeSection";
 
 export type EditModelProviderFormProps = {
@@ -295,6 +296,36 @@ export const EditModelProviderForm = ({
             provider={provider}
           />
         )}
+
+        <ModelProviderAdvancedSection
+          modelProviderId={(provider as { id?: string }).id}
+          initial={{
+            rateLimitRpm:
+              (provider as { rateLimitRpm?: number | null }).rateLimitRpm ??
+              null,
+            rateLimitTpm:
+              (provider as { rateLimitTpm?: number | null }).rateLimitTpm ??
+              null,
+            rateLimitRpd:
+              (provider as { rateLimitRpd?: number | null }).rateLimitRpd ??
+              null,
+            fallbackPriorityGlobal:
+              (provider as { fallbackPriorityGlobal?: number | null })
+                .fallbackPriorityGlobal ?? null,
+            providerConfig: (provider as { providerConfig?: unknown })
+              .providerConfig,
+            healthStatus: (provider as { healthStatus?: string | null })
+              .healthStatus,
+            circuitOpenedAt: (provider as {
+              circuitOpenedAt?: Date | string | null;
+            }).circuitOpenedAt,
+            lastHealthCheckAt: (provider as {
+              lastHealthCheckAt?: Date | string | null;
+            }).lastHealthCheckAt,
+            disabledAt: (provider as { disabledAt?: Date | string | null })
+              .disabledAt,
+          }}
+        />
 
         <HStack width="full" justify="end">
           <Button

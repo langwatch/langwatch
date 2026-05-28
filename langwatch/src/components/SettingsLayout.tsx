@@ -70,7 +70,8 @@ export default function SettingsLayout({
   });
   const publicEnv = usePublicEnv();
   const isSaaS = publicEnv.data?.IS_SAAS ?? false;
-  const { isEnterprise } = useActivePlan();
+  const { isEnterprise, isLoading: isPlanLoading } = useActivePlan();
+  const showEnterpriseNav = isPlanLoading || isEnterprise;
   const { isLiteMember } = useLiteMemberGuard();
   const { hasAccess: hasOpsAccess } = useOpsPermission();
   // Backoffice is admin-only. Kept decoupled from `hasOpsAccess` so that if
@@ -132,7 +133,7 @@ export default function SettingsLayout({
               "/settings/members",
               "/settings/groups",
               "/settings/roles",
-              "/settings/access-audit",
+              "/settings/role-bindings",
               "/settings/authentication",
               "/settings/scim",
               "/settings/audit-log",
@@ -140,20 +141,20 @@ export default function SettingsLayout({
           >
             <MenuLink href="/settings/members" includePath="members">Members</MenuLink>
             <MenuLink href="/settings/teams">Teams & Projects</MenuLink>
-            {isEnterprise && !isLiteMember && (
+            {showEnterpriseNav && !isLiteMember && (
               <MenuLink href="/settings/groups">Groups</MenuLink>
             )}
-            {isEnterprise && !isLiteMember && (
+            {showEnterpriseNav && !isLiteMember && (
               <MenuLink href="/settings/roles">Roles & Permissions</MenuLink>
             )}
             <MenuLink href="/settings/authentication">Authentication</MenuLink>
-            {isEnterprise && !isLiteMember && (
+            {showEnterpriseNav && !isLiteMember && (
               <MenuLink href="/settings/scim">SCIM Provisioning</MenuLink>
             )}
-            {isEnterprise && !isLiteMember && (
-              <MenuLink href="/settings/access-audit">Access Audit</MenuLink>
+            {showEnterpriseNav && !isLiteMember && (
+              <MenuLink href="/settings/role-bindings">Role Bindings</MenuLink>
             )}
-            {isEnterprise && !isLiteMember && hasPermission("auditLog:view") && (
+            {showEnterpriseNav && !isLiteMember && hasPermission("auditLog:view") && (
               <MenuLink href="/settings/audit-log">Audit Log</MenuLink>
             )}
           </NavSection>
