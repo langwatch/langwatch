@@ -28,6 +28,15 @@ export const costCentersRouter = createTRPCRouter({
       });
     }),
 
+  assignments: protectedProcedure
+    .input(z.object({ organizationId: z.string() }))
+    .use(checkOrganizationPermission("governance:view"))
+    .query(async ({ ctx, input }) => {
+      return await CostCenterService.create(ctx.prisma).getAssignments({
+        organizationId: input.organizationId,
+      });
+    }),
+
   create: protectedProcedure
     .input(
       z.object({

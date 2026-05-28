@@ -221,6 +221,10 @@ const routes: RouteObject[] = [
     ...page(() => import("./pages/settings/governance/tool-catalog")),
   },
   {
+    path: "/settings/governance/cost-centers",
+    ...page(() => import("./pages/settings/governance/cost-centers")),
+  },
+  {
     // View-all teams listing — bird's-eye `View all teams →` lands here.
     // 500-row paginated list with sort chips for spend / requests /
     // last-activity. Per-row click-through routes to the team detail

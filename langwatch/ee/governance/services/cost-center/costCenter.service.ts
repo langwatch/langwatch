@@ -31,6 +31,18 @@ export interface CostCenterRow {
   updatedAt: Date;
 }
 
+export interface CostCenterAssignableEntity {
+  id: string;
+  name: string;
+  costCenterId: string | null;
+}
+
+export interface CostCenterAssignments {
+  users: CostCenterAssignableEntity[];
+  teams: CostCenterAssignableEntity[];
+  projects: CostCenterAssignableEntity[];
+}
+
 export class CostCenterService {
   constructor(
     private readonly prisma: PrismaClient,
@@ -59,6 +71,51 @@ export class CostCenterService {
   }): Promise<CostCenterRow | null> {
     const row = await this.repo.findById(this.prisma, { id, organizationId });
     return row ? toRow(row) : null;
+  }
+
+  /**
+   * The members, teams, and projects an admin can assign, each with the
+   * cost center currently stored on it. The admin UI joins these against
+   * `getAll` to render the assignment pickers. A user shows the email when
+   * no display name is set so the row is never blank.
+   */
+  async getAssignments({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<CostCenterAssignments> {
+    const [members, teams, projects] = await Promise.all([
+      this.prisma.organizationUser.findMany({
+        where: { organizationId },
+        select: {
+          userId: true,
+          costCenterId: true,
+          user: { select: { name: true, email: true } },
+        },
+      }),
+      this.prisma.team.findMany({
+        where: { organizationId },
+        select: { id: true, name: true, costCenterId: true },
+        orderBy: { name: "asc" },
+      }),
+      this.prisma.project.findMany({
+        where: { team: { organizationId } },
+        select: { id: true, name: true, costCenterId: true },
+        orderBy: { name: "asc" },
+      }),
+    ]);
+
+    return {
+      users: members
+        .map((m) => ({
+          id: m.userId,
+          name: m.user.name ?? m.user.email ?? m.userId,
+          costCenterId: m.costCenterId,
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+      teams,
+      projects,
+    };
   }
 
   async create({
