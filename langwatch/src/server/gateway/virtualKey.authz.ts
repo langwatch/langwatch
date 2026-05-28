@@ -1,0 +1,112 @@
+import type { PrismaClient } from "@prisma/client";
+import { TRPCError } from "@trpc/server";
+
+import type { Session } from "~/server/auth";
+import {
+  hasOrganizationPermission,
+  hasProjectPermission,
+  hasTeamPermission,
+  type Permission,
+} from "../api/rbac";
+
+/**
+ * Scope-aware authorization for VirtualKey write paths.
+ *
+ * A VirtualKey carries N `VirtualKeyScope` rows (ORGANIZATION / TEAM /
+ * PROJECT). The org-wide `virtualKeys:manage` gate on the router was too
+ * coarse: a team admin could mint or mutate org-level keys, and an
+ * org-level grant was required even to manage a single team's keys. These
+ * helpers move enforcement onto the individual scopes the call actually
+ * touches, using the existing `virtualKeys:*` permission vocabulary.
+ *
+ * Two shapes, matching the feature contract
+ * (specs/ai-gateway/governance/vk-scope-rbac.feature):
+ *
+ *   - CREATE authorizes against the *requested* scope set: the caller must
+ *     hold `virtualKeys:manage` on EVERY scope (fail-closed intersection,
+ *     so a team admin can't sneak a second team onto the key).
+ *   - UPDATE / ROTATE / DELETE authorize against the key's *existing*
+ *     scope set: the caller must hold the op permission on AT LEAST ONE of
+ *     the scopes the key is already reachable from.
+ *
+ * The upward cascade (a broader grant covers narrower scopes) is handled
+ * inside the rbac helpers: `hasTeamPermission` also reads the org-scoped
+ * binding, `hasProjectPermission` reads the team + org bindings.
+ *
+ * No new code here relies on the legacy `TeamUserRole.ADMIN` short-circuit
+ * in rbac.ts — every gate is an explicit per-scope permission check, so
+ * the eventual legacy-role-removal drops the short-circuit without a sweep
+ * (the @no-short-circuit invariant in the feature file).
+ */
+export type RBACContext = { prisma: PrismaClient; session: Session | null };
+
+export type Scope = {
+  scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+  scopeId: string;
+};
+
+function scopeLabel(scope: Scope): string {
+  return `${scope.scopeType}:${scope.scopeId}`;
+}
+
+async function hasPermissionAtScope(
+  ctx: RBACContext,
+  scope: Scope,
+  permission: Permission,
+): Promise<boolean> {
+  if (!ctx.session) return false;
+  if (scope.scopeType === "ORGANIZATION") {
+    return hasOrganizationPermission(
+      { prisma: ctx.prisma, session: ctx.session },
+      scope.scopeId,
+      permission,
+    );
+  }
+  if (scope.scopeType === "TEAM") {
+    return hasTeamPermission(ctx, scope.scopeId, permission);
+  }
+  return hasProjectPermission(ctx, scope.scopeId, permission);
+}
+
+/**
+ * Create gate: require `virtualKeys:manage` on every requested scope.
+ * Throws FORBIDDEN naming the first unauthorized scope so the caller sees
+ * exactly which grant is missing.
+ */
+export async function assertCanManageAllScopes(
+  ctx: RBACContext,
+  scopes: Scope[],
+): Promise<void> {
+  if (!ctx.session) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "permission_denied" });
+  }
+  for (const scope of scopes) {
+    if (!(await hasPermissionAtScope(ctx, scope, "virtualKeys:manage"))) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: `permission_denied: virtualKeys:manage at ${scopeLabel(scope)}`,
+      });
+    }
+  }
+}
+
+/**
+ * Update / rotate / delete gate: require the op permission on at least one
+ * of the key's existing scopes. Throws FORBIDDEN when the caller holds it
+ * on none of them.
+ */
+export async function assertCanOperateOnAnyScope(
+  ctx: RBACContext,
+  scopes: Scope[],
+  permission: Permission,
+): Promise<void> {
+  if (ctx.session) {
+    for (const scope of scopes) {
+      if (await hasPermissionAtScope(ctx, scope, permission)) return;
+    }
+  }
+  throw new TRPCError({
+    code: "FORBIDDEN",
+    message: `permission_denied: ${permission} at one of the virtual key's scopes`,
+  });
+}

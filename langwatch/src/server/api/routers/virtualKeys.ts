@@ -28,8 +28,16 @@ import {
 } from "~/server/gateway/virtualKey.config";
 import { toVirtualKeyCamelDto } from "~/server/gateway/virtualKey.dto";
 
-import { checkOrganizationPermission, hasProjectPermission } from "../rbac";
+import {
+  authorizeInResolver,
+  checkOrganizationPermission,
+  hasProjectPermission,
+} from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
+import {
+  assertCanManageAllScopes,
+  assertCanOperateOnAnyScope,
+} from "~/server/gateway/virtualKey.authz";
 
 const scopeInputSchema = z.object({
   scopeType: z.enum(["ORGANIZATION", "TEAM", "PROJECT"]),
@@ -158,8 +166,16 @@ export const virtualKeysRouter = createTRPCRouter({
         config: virtualKeyConfigSchema.partial().optional(),
       }),
     )
-    .use(checkOrganizationPermission("virtualKeys:manage"))
+    // Per-scope authz (manage on EVERY requested scope) is data-dependent,
+    // so it runs in the resolver; authorizeInResolver satisfies the
+    // builder's fail-closed permission gate without re-introducing the
+    // coarse org-wide check.
+    .use(authorizeInResolver)
     .mutation(async ({ ctx, input }) => {
+      await assertCanManageAllScopes(
+        { prisma: ctx.prisma, session: ctx.session },
+        input.scopes,
+      );
       const vkProjectId = await resolveVkProjectId(
         ctx.prisma,
         input.organizationId,
@@ -197,8 +213,28 @@ export const virtualKeysRouter = createTRPCRouter({
         config: virtualKeyConfigSchema.partial().optional(),
       }),
     )
-    .use(checkOrganizationPermission("virtualKeys:manage"))
+    .use(authorizeInResolver)
     .mutation(async ({ ctx, input }) => {
+      const service = VirtualKeyService.create(ctx.prisma);
+      const existing = await service.getById(input.id, input.organizationId);
+      if (!existing) {
+        throw new TRPCError({ code: "NOT_FOUND" });
+      }
+      // Mutating an existing key needs virtualKeys:update on one of the
+      // scopes it already lives in.
+      await assertCanOperateOnAnyScope(
+        { prisma: ctx.prisma, session: ctx.session },
+        existing.scopes,
+        "virtualKeys:update",
+      );
+      // Re-scoping additionally needs manage on every NEW scope, so a key
+      // can't be moved into a scope the caller doesn't control.
+      if (input.scopes) {
+        await assertCanManageAllScopes(
+          { prisma: ctx.prisma, session: ctx.session },
+          input.scopes,
+        );
+      }
       const vkProjectId = await resolveVkProjectId(
         ctx.prisma,
         input.organizationId,
@@ -210,7 +246,6 @@ export const virtualKeysRouter = createTRPCRouter({
         vkProjectId,
         input.config?.guardrailAttachments,
       );
-      const service = VirtualKeyService.create(ctx.prisma);
       const updated = await service.update({
         id: input.id,
         organizationId: input.organizationId,
@@ -226,9 +261,18 @@ export const virtualKeysRouter = createTRPCRouter({
 
   rotate: protectedProcedure
     .input(idInput)
-    .use(checkOrganizationPermission("virtualKeys:rotate"))
+    .use(authorizeInResolver)
     .mutation(async ({ ctx, input }) => {
       const service = VirtualKeyService.create(ctx.prisma);
+      const existing = await service.getById(input.id, input.organizationId);
+      if (!existing) {
+        throw new TRPCError({ code: "NOT_FOUND" });
+      }
+      await assertCanOperateOnAnyScope(
+        { prisma: ctx.prisma, session: ctx.session },
+        existing.scopes,
+        "virtualKeys:rotate",
+      );
       const { virtualKey, secret } = await service.rotate({
         id: input.id,
         organizationId: input.organizationId,
@@ -239,9 +283,18 @@ export const virtualKeysRouter = createTRPCRouter({
 
   revoke: protectedProcedure
     .input(idInput)
-    .use(checkOrganizationPermission("virtualKeys:delete"))
+    .use(authorizeInResolver)
     .mutation(async ({ ctx, input }) => {
       const service = VirtualKeyService.create(ctx.prisma);
+      const existing = await service.getById(input.id, input.organizationId);
+      if (!existing) {
+        throw new TRPCError({ code: "NOT_FOUND" });
+      }
+      await assertCanOperateOnAnyScope(
+        { prisma: ctx.prisma, session: ctx.session },
+        existing.scopes,
+        "virtualKeys:delete",
+      );
       const updated = await service.revoke({
         id: input.id,
         organizationId: input.organizationId,
