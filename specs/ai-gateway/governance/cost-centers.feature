@@ -116,7 +116,7 @@ Feature: Cost centers — org-chart spend attribution across people, teams, and 
   # pages that already paginate the org chart, not as one flat list.
   # ---------------------------------------------------------------------------
 
-  @bdd @cost-centers @ui @unimplemented
+  @bdd @cost-centers @ui
   Scenario: The cost-centers page manages centers and links out to assign them
     Given the admin opens the cost-centers page
     Then the page lets the admin create, rename, and archive cost centers
@@ -124,21 +124,21 @@ Feature: Cost centers — org-chart spend attribution across people, teams, and 
     And it links to the members and teams pages where people and teams are
       assigned
 
-  @bdd @cost-centers @ui @unimplemented
+  @bdd @cost-centers @ui
   Scenario: A member is assigned to a cost center from the members page
     Given a cost center "Marketing" exists in acme-corp
     When the admin sets "robin" to "Marketing" from the members page row
     Then robin's membership carries cost center "Marketing"
     And the change is visible without leaving the members page
 
-  @bdd @cost-centers @ui @unimplemented
+  @bdd @cost-centers @ui
   Scenario: A team is assigned to a cost center from the teams page
     Given a cost center "Engineering" exists in acme-corp
     When the admin sets the team "platform" to "Engineering" from the teams
       page row
     Then the team carries cost center "Engineering"
 
-  @bdd @cost-centers @ui @unimplemented
+  @bdd @cost-centers @ui
   Scenario: The cost-center control appears only once cost centers are configured
     Given the governance preview flag is enabled for acme-corp
     But no cost centers exist yet in acme-corp
