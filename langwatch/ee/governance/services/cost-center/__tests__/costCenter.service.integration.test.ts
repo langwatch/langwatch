@@ -8,7 +8,10 @@ import { OrganizationUserRole } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { CostCenterService } from "../costCenter.service";
+import {
+  CostCenterAssignmentTargetNotFoundError,
+  CostCenterService,
+} from "../costCenter.service";
 
 import { prisma } from "../../../../../src/server/db";
 import {
@@ -182,6 +185,36 @@ describe("CostCenterService", () => {
       expect(membership.costCenterId).toBe(legacy.id);
       const activeIds = listed.map((c) => c.id);
       expect(activeIds).not.toContain(membership.costCenterId);
+    });
+  });
+
+  describe("given an assignment target that does not exist in the org", () => {
+    it("throws instead of silently reporting success for a missing user/team/project", async () => {
+      const cc = await service().create({
+        organizationId: ORG_ID,
+        name: `Phantom-${nanoid(4)}`,
+      });
+      await expect(
+        service().assignUser({
+          organizationId: ORG_ID,
+          userId: `nope-${nanoid(6)}`,
+          costCenterId: cc.id,
+        }),
+      ).rejects.toBeInstanceOf(CostCenterAssignmentTargetNotFoundError);
+      await expect(
+        service().assignTeam({
+          organizationId: ORG_ID,
+          teamId: `nope-${nanoid(6)}`,
+          costCenterId: cc.id,
+        }),
+      ).rejects.toBeInstanceOf(CostCenterAssignmentTargetNotFoundError);
+      await expect(
+        service().assignProject({
+          organizationId: ORG_ID,
+          projectId: `nope-${nanoid(6)}`,
+          costCenterId: cc.id,
+        }),
+      ).rejects.toBeInstanceOf(CostCenterAssignmentTargetNotFoundError);
     });
   });
 });

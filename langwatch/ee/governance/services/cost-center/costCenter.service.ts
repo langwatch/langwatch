@@ -23,6 +23,18 @@ export class CostCenterNotFoundError extends Error {
   }
 }
 
+/**
+ * The user, team, or project an assignment targeted does not exist in the org.
+ * Surfaced so the caller never reports a no-op assignment as success.
+ */
+export class CostCenterAssignmentTargetNotFoundError extends Error {
+  readonly code = "cost_center_assignment_target_not_found" as const;
+  constructor(target: "user" | "team" | "project") {
+    super(`Assignment target ${target} not found in this organization`);
+    this.name = "CostCenterAssignmentTargetNotFoundError";
+  }
+}
+
 export interface CostCenterRow {
   id: string;
   name: string;
@@ -170,10 +182,13 @@ export class CostCenterService {
     costCenterId: string | null;
   }): Promise<void> {
     await this.assertCostCenterInOrg(params);
-    await this.prisma.organizationUser.updateMany({
+    const result = await this.prisma.organizationUser.updateMany({
       where: { userId: params.userId, organizationId: params.organizationId },
       data: { costCenterId: params.costCenterId },
     });
+    if (result.count === 0) {
+      throw new CostCenterAssignmentTargetNotFoundError("user");
+    }
   }
 
   async assignTeam(params: {
@@ -182,10 +197,13 @@ export class CostCenterService {
     costCenterId: string | null;
   }): Promise<void> {
     await this.assertCostCenterInOrg(params);
-    await this.prisma.team.updateMany({
+    const result = await this.prisma.team.updateMany({
       where: { id: params.teamId, organizationId: params.organizationId },
       data: { costCenterId: params.costCenterId },
     });
+    if (result.count === 0) {
+      throw new CostCenterAssignmentTargetNotFoundError("team");
+    }
   }
 
   async assignProject(params: {
@@ -194,13 +212,16 @@ export class CostCenterService {
     costCenterId: string | null;
   }): Promise<void> {
     await this.assertCostCenterInOrg(params);
-    await this.prisma.project.updateMany({
+    const result = await this.prisma.project.updateMany({
       where: {
         id: params.projectId,
         team: { organizationId: params.organizationId },
       },
       data: { costCenterId: params.costCenterId },
     });
+    if (result.count === 0) {
+      throw new CostCenterAssignmentTargetNotFoundError("project");
+    }
   }
 
   private async assertCostCenterInOrg({

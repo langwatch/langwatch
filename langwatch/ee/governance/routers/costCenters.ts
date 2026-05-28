@@ -11,6 +11,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import {
+  CostCenterAssignmentTargetNotFoundError,
   CostCenterNotFoundError,
   CostCenterService,
 } from "@ee/governance/services/cost-center/costCenter.service";
@@ -144,7 +145,10 @@ export const costCentersRouter = createTRPCRouter({
 });
 
 function mapError(err: unknown): TRPCError {
-  if (err instanceof CostCenterNotFoundError) {
+  if (
+    err instanceof CostCenterNotFoundError ||
+    err instanceof CostCenterAssignmentTargetNotFoundError
+  ) {
     return new TRPCError({ code: "NOT_FOUND", message: err.message });
   }
   return err instanceof TRPCError
