@@ -66,12 +66,15 @@ end
 local function tenantActiveRemove(taPrefix, tenantId, groupId)
   redis.call("ZREM", taPrefix .. tenantId, groupId)
 end
--- Live in-flight count = members whose expiry is still in the future. GC the
--- lapsed members first (cheap: only removes already-expired entries) so a burst
--- of dead-worker slots can't grow the ZSET without bound.
+-- Live in-flight count = members whose expiry score is strictly in the future
+-- (> nowMs). GC the lapsed members first (scores at-or-past nowMs: cheap, only
+-- removes already-expired entries) so a burst of dead-worker slots can't grow
+-- the ZSET without bound. A slot scored exactly nowMs has just reached its
+-- deadline = lapsed (mirrors the activeKey EX TTL, which vanishes at expiry),
+-- so it is removed and not counted.
 local function tenantActiveCount(taPrefix, tenantId, nowMs)
   local key = taPrefix .. tenantId
-  redis.call("ZREMRANGEBYSCORE", key, "-inf", "(" .. nowMs)
+  redis.call("ZREMRANGEBYSCORE", key, "-inf", nowMs)
   return redis.call("ZCARD", key)
 end
 `;

@@ -36,30 +36,30 @@ Feature: Per-tenant soft cap on in-flight dispatch
     Then it returns 0 and DISPATCH_LUA skips all cap-related branches
 
   @integration @tenant-cap @lifecycle
-  Scenario: Counter increments on dispatch, decrements on completion
+  Scenario: An in-flight slot is added on dispatch and removed on completion
     Given a tenant "proj_acme" with no in-flight groups
     When DISPATCH_LUA dispatches one of its groups under cap=10
-    Then the tenant_active:proj_acme counter equals 1
+    Then "proj_acme" has 1 live in-flight slot
     When COMPLETE_LUA completes that group
-    Then the tenant_active:proj_acme counter is deleted
+    Then "proj_acme" has 0 live in-flight slots
 
   @integration @tenant-cap @lifecycle
-  Scenario: RESTAGE_AND_BLOCK decrements the counter on exhausted retries
+  Scenario: RESTAGE_AND_BLOCK removes the in-flight slot on exhausted retries
     Given a tenant "proj_acme" with one dispatched in-flight group
     When RESTAGE_AND_BLOCK_LUA fires (retries exhausted)
-    Then the tenant_active:proj_acme counter is decremented
+    Then "proj_acme"'s in-flight slot is removed
 
   @integration @tenant-cap @lifecycle
-  Scenario: REFRESH keeps the tenant counter TTL aligned with activeKey
-    Given a tenant "proj_acme" with one in-flight group nearing TTL expiry
+  Scenario: REFRESH bumps the in-flight slot expiry in lockstep with activeKey
+    Given a tenant "proj_acme" with one in-flight group nearing slot expiry
     When REFRESH_LUA renews the heartbeat
-    Then the tenant_active:proj_acme TTL is renewed in lockstep with activeKey
+    Then "proj_acme"'s in-flight slot expiry is bumped in lockstep with the activeKey heartbeat
 
   @integration @tenant-cap @lifecycle
-  Scenario: RETRY_RESTAGE keeps the tenant counter TTL aligned through backoff
+  Scenario: RETRY_RESTAGE bumps the in-flight slot expiry to the retry window
     Given a tenant "proj_acme" with one in-flight group entering retry backoff
     When RETRY_RESTAGE_LUA reschedules the job
-    Then the tenant_active:proj_acme TTL is set to the retry TTL
+    Then "proj_acme"'s in-flight slot expiry is set to the retry window
 
   @integration @tenant-cap @enforcement
   Scenario: DISPATCH_LUA refuses to dispatch when tenant is at cap
@@ -78,10 +78,10 @@ Feature: Per-tenant soft cap on in-flight dispatch
     And "proj_quiet"'s group is dispatched
 
   @integration @tenant-cap @kill-switch
-  Scenario: cap=0 produces zero tenant counter keys (back-compat regression)
+  Scenario: cap=0 produces zero tenant in-flight slot keys (back-compat regression)
     Given the env var "LANGWATCH_DISPATCH_TENANT_CAP" is set to "0"
     When a full dispatch then completion lifecycle runs for any tenant
-    Then no tenant counter keys are ever created in Redis
+    Then no tenant in-flight slot keys are ever created in Redis
 
   # DISPATCH_BATCH_LUA parity — the batch path shares the same cap logic
   # but iterates multiple groups per EVAL. These scenarios guard against
@@ -142,12 +142,13 @@ Feature: Per-tenant soft cap on in-flight dispatch
     And it keeps the score it had before being parked
 
   # COMPLETE covers the normal case; a crashed tenant never completes, so its
-  # in-flight counter TTL-expires. A later poll must read the missing counter as
-  # zero and restore the parked groups, or they strand out of the scan forever.
+  # in-flight slots lapse out of the live count as their expiry scores pass. A
+  # later poll reads the live count as zero and restores the parked groups,
+  # or they strand out of the scan forever.
   @integration @tenant-cap @parking
-  Scenario: A crashed tenant's parked groups are restored once its in-flight count expires
+  Scenario: A crashed tenant's parked groups are restored once its in-flight slots lapse
     Given a tenant over cap with a parked group
-    And the tenant's in-flight counter has expired without a completion
+    And the tenant's in-flight slots have lapsed without a completion
     When dispatch is next polled past the reconcile interval
     Then the parked group is restored to ready and dispatched
 

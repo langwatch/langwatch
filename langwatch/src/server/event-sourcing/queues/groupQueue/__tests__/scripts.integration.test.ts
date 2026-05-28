@@ -2479,12 +2479,12 @@ describe("GroupStagingScripts", () => {
     }
 
     // Live in-flight count for a tenant = ZSET members whose expiry score is
-    // still in the future relative to nowMs (lapsed members no longer count).
+    // strictly in the future (> nowMs); a slot at-or-past nowMs has lapsed.
     async function tenantLiveCount(tenantId: string, nowMs: number) {
-      // Inclusive lower bound to mirror the Lua live-count contract: the script
-      // GCs only scores STRICTLY below nowMs (ZREMRANGEBYSCORE "-inf" "(nowMs")
-      // then ZCARDs, so a slot scored exactly nowMs is still live.
-      return redis.zcount(tenantActiveZKey(tenantId), `${nowMs}`, "+inf");
+      // Exclusive lower bound mirrors the Lua live-count contract: the script
+      // GCs scores at-or-below nowMs (ZREMRANGEBYSCORE "-inf" nowMs) then ZCARDs,
+      // so a slot scored exactly nowMs has lapsed and is not counted.
+      return redis.zcount(tenantActiveZKey(tenantId), `(${nowMs}`, "+inf");
     }
 
     async function stageOne({
@@ -2505,7 +2505,7 @@ describe("GroupStagingScripts", () => {
       return groupId;
     }
 
-    /** @scenario Counter increments on dispatch, decrements on completion */
+    /** @scenario An in-flight slot is added on dispatch and removed on completion */
     it("adds the group to the tenant ZSET on dispatch and removes it on completion", async () => {
       process.env[TENANT_CAP_ENV] = "10";
       const groupId = await stageOne({
@@ -2524,6 +2524,12 @@ describe("GroupStagingScripts", () => {
       // (nowMs + activeTtlSec*1000 = 2000 + 60000 = 62000).
       expect(await redis.zcard(tenantActiveZKey("proj_acme"))).toBe(1);
       expect(await redis.zscore(tenantActiveZKey("proj_acme"), groupId)).toBe("62000");
+
+      // Live-count boundary: a slot is live only while strictly in the future
+      // (score > nowMs). One ms before its 62000 expiry it counts; AT exactly
+      // 62000 it has lapsed and does not (mirrors the activeKey vanishing at TTL).
+      expect(await tenantLiveCount("proj_acme", 61999)).toBe(1);
+      expect(await tenantLiveCount("proj_acme", 62000)).toBe(0);
 
       // Completing the only in-flight group removes its slot, leaving the ZSET
       // empty (Redis drops a ZSET key once its last member is removed).
@@ -2570,7 +2576,7 @@ describe("GroupStagingScripts", () => {
       expect(await redis.zscore(tenantActiveZKey("proj_acme"), d1!.groupId)).toBeNull();
     });
 
-    /** @scenario RESTAGE_AND_BLOCK decrements the counter on exhausted retries */
+    /** @scenario RESTAGE_AND_BLOCK removes the in-flight slot on exhausted retries */
     it("RESTAGE_AND_BLOCK_LUA removes the tenant slot (preventing slot leak on terminal failures)", async () => {
       process.env[TENANT_CAP_ENV] = "10";
       const groupId = await stageOne({
@@ -2591,7 +2597,7 @@ describe("GroupStagingScripts", () => {
       expect(await redis.zcard(tenantActiveZKey("proj_acme"))).toBe(0);
     });
 
-    /** @scenario REFRESH keeps the tenant counter TTL aligned with activeKey */
+    /** @scenario REFRESH bumps the in-flight slot expiry in lockstep with activeKey */
     it("REFRESH_LUA bumps the tenant slot's expiry score in lockstep with activeKey", async () => {
       process.env[TENANT_CAP_ENV] = "10";
       const groupId = await stageOne({
@@ -2644,7 +2650,7 @@ describe("GroupStagingScripts", () => {
       expect(await redis.zscore(tenantActiveZKey("proj_acme"), groupId)).toBeNull();
     });
 
-    /** @scenario RETRY_RESTAGE keeps the tenant counter TTL aligned through backoff */
+    /** @scenario RETRY_RESTAGE bumps the in-flight slot expiry to the retry window */
     it("RETRY_RESTAGE_LUA bumps the tenant slot's expiry score to the retry window", async () => {
       process.env[TENANT_CAP_ENV] = "10";
       const groupId = await stageOne({
@@ -2833,7 +2839,7 @@ describe("GroupStagingScripts", () => {
       expect(await redis.zcount(`${keyPrefix()}ready`, "-inf", "2000")).toBe(0);
     });
 
-    /** @scenario cap=0 produces zero tenant counter keys (back-compat regression) */
+    /** @scenario cap=0 produces zero tenant in-flight slot keys (back-compat regression) */
     it("when cap=0 (kill switch), no tenant_active_z:* keys are ever created", async () => {
       process.env[TENANT_CAP_ENV] = "0";
 
@@ -2941,7 +2947,7 @@ describe("GroupStagingScripts", () => {
         expect(d2!.groupId).toBe("proj_acme/g2");
       });
 
-      /** @scenario A crashed tenant's parked groups are restored once its in-flight count expires */
+      /** @scenario A crashed tenant's parked groups are restored once its in-flight slots lapse */
       it("reconciles parked groups back to ready when the tenant's in-flight slots lapse (orphan recovery)", async () => {
         process.env[TENANT_CAP_ENV] = "1";
         await stageOne({
