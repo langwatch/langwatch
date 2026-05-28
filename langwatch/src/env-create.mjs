@@ -106,6 +106,22 @@ export function createEnvConfig() {
       LANGWATCH_NLP_SERVICE: z.string().optional(),
       TOPIC_CLUSTERING_SERVICE: z.string().optional(),
       LANGEVALS_ENDPOINT: z.string().optional(),
+      // S3 staging for outbound langevals POSTs is opt-in: only relevant
+      // when langevals is fronted by AWS Lambda (6 MB sync-invoke cap).
+      // Self-hosted langevals on a plain HTTP service has no such cap,
+      // so leave LANGEVALS_STAGING_THRESHOLD_BYTES unset and bodies
+      // always go inline. When set, bodies above the threshold are
+      // uploaded to S3 and the GET presigned URL is forwarded via
+      // X-Payload-S3-URL. EVAL_MAX_PAYLOAD_BYTES and
+      // TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES are hard upper bounds —
+      // anything larger is rejected before any network call.
+      // LANGEVALS_STAGING_TTL_SECONDS bounds how long the presigned URL
+      // stays valid; keep it short so a leaked URL doesn't grant
+      // long-window access.
+      LANGEVALS_STAGING_THRESHOLD_BYTES: z.coerce.number().int().positive().optional(),
+      LANGEVALS_STAGING_TTL_SECONDS: z.coerce.number().int().positive().default(600),
+      EVAL_MAX_PAYLOAD_BYTES: z.coerce.number().int().positive().default(16_000_000),
+      TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES: z.coerce.number().int().positive().default(180_000_000),
       DEMO_PROJECT_ID: z.string().optional(),
       DEMO_PROJECT_USER_ID: z.string().optional(),
       DEMO_PROJECT_SLUG: z.string().optional(),
@@ -276,6 +292,10 @@ export function createEnvConfig() {
         ? process.env.TOPIC_CLUSTERING_SERVICE
         : process.env.LANGWATCH_NLP_SERVICE,
       LANGEVALS_ENDPOINT: process.env.LANGEVALS_ENDPOINT,
+      LANGEVALS_STAGING_THRESHOLD_BYTES: process.env.LANGEVALS_STAGING_THRESHOLD_BYTES,
+      LANGEVALS_STAGING_TTL_SECONDS: process.env.LANGEVALS_STAGING_TTL_SECONDS,
+      EVAL_MAX_PAYLOAD_BYTES: process.env.EVAL_MAX_PAYLOAD_BYTES,
+      TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES: process.env.TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES,
       DEMO_PROJECT_ID: process.env.DEMO_PROJECT_ID,
       DEMO_PROJECT_USER_ID: process.env.DEMO_PROJECT_USER_ID,
       DEMO_PROJECT_SLUG: process.env.DEMO_PROJECT_SLUG,

@@ -3,7 +3,9 @@ import type { WithDateWrites } from "~/server/clickhouse/types";
 import {
   NormalizedSpanKind,
   NormalizedStatusCode,
+  type NormalizedSpan,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
 import { SecurityError } from "~/server/event-sourcing/services/errorHandling";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import type { ElasticSearchEvent, Span } from "~/server/tracer/types";
@@ -18,7 +20,10 @@ import type {
   SpanStorageRepository,
   SpanSummaryRow,
 } from "./span-storage.repository";
-import { LANGWATCH_SIGNAL_BUCKETS } from "./span-storage.repository";
+import {
+  clampSpanReadLimit,
+  LANGWATCH_SIGNAL_BUCKETS,
+} from "./span-storage.repository";
 
 const TABLE_NAME = "stored_spans" as const;
 
@@ -211,6 +216,13 @@ interface EventRow {
   project_id: string;
   started_at: string | number;
   event_type: string;
+  attributes: Record<string, string>;
+}
+
+interface TraceEventRow {
+  spanId: string;
+  timestamp: string | number;
+  name: string;
   attributes: Record<string, string>;
 }
 
@@ -610,15 +622,21 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
   async getSpansByTraceId({
     tenantId,
     traceId,
+    limit,
     occurredAtMs,
   }: {
     tenantId: string;
     traceId: string;
+    limit?: number;
   } & OccurredAtHint): Promise<Span[]> {
     EventUtils.validateTenantId(
       { tenantId },
       "SpanStorageClickHouseRepository.getSpansByTraceId",
     );
+
+    // Hard ceiling, applied unconditionally: a leaked trace_id with a huge span
+    // count can never load the pipeline through this path, regardless of caller.
+    const effectiveLimit = clampSpanReadLimit(limit);
 
     try {
       return await withPartitionHint<Span[]>(
@@ -636,8 +654,14 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
                 ${partition.sqlAnd}
                 AND ${dedupInTuple(partition.sqlAndInner)}
               ORDER BY StartTimeMs ASC
+              LIMIT {limit:UInt32}
             `,
-            query_params: { tenantId, traceId, ...partition.params },
+            query_params: {
+              tenantId,
+              traceId,
+              limit: effectiveLimit,
+              ...partition.params,
+            },
             format: "JSONEachRow",
           });
 
@@ -653,6 +677,71 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
           error: error instanceof Error ? error.message : String(error),
         },
         "Failed to get spans by trace ID from ClickHouse",
+      );
+      throw error;
+    }
+  }
+
+  async getNormalizedSpansByTraceId({
+    tenantId,
+    traceId,
+    limit,
+    occurredAtMs,
+  }: {
+    tenantId: string;
+    traceId: string;
+    limit?: number;
+  } & OccurredAtHint): Promise<NormalizedSpan[]> {
+    EventUtils.validateTenantId(
+      { tenantId },
+      "SpanStorageClickHouseRepository.getNormalizedSpansByTraceId",
+    );
+
+    // Hard ceiling so even a leaked trace_id can never load the pipeline.
+    const effectiveLimit = clampSpanReadLimit(limit);
+
+    // The ±window hint prunes partitions on the happy path; the empty-result
+    // fallback covers a stale/wrong hint. The window (±2 days) dwarfs any real
+    // trace duration, so a derivation read can't realistically split across it.
+    try {
+      return await withPartitionHint<NormalizedSpan[]>(
+        { occurredAtMs },
+        (rows) => rows.length === 0,
+        async (window) => {
+          const partition = partitionFragment(window);
+          const client = await this.resolveClient(tenantId);
+          const result = await client.query({
+            query: `
+              SELECT ${FULL_SPAN_SELECT}
+              FROM ${TABLE_NAME}
+              WHERE TenantId = {tenantId:String}
+                AND TraceId = {traceId:String}
+                ${partition.sqlAnd}
+                AND ${dedupInTuple(partition.sqlAndInner)}
+              ORDER BY StartTimeMs ASC
+              LIMIT {limit:UInt32}
+            `,
+            query_params: {
+              tenantId,
+              traceId,
+              limit: effectiveLimit,
+              ...partition.params,
+            },
+            format: "JSONEachRow",
+          });
+
+          const rows = (await result.json()) as FullSpanRow[];
+          return rows.map(mapChRowToNormalized);
+        },
+      );
+    } catch (error) {
+      logger.error(
+        {
+          tenantId,
+          traceId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "Failed to get normalized spans by trace ID from ClickHouse",
       );
       throw error;
     }
@@ -782,6 +871,76 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         }));
       },
     );
+  }
+
+  async getTraceEventsByTraceId({
+    tenantId,
+    traceId,
+    occurredAtMs,
+  }: {
+    tenantId: string;
+    traceId: string;
+  } & OccurredAtHint): Promise<DerivedTraceEvent[]> {
+    EventUtils.validateTenantId(
+      { tenantId },
+      "SpanStorageClickHouseRepository.getTraceEventsByTraceId",
+    );
+
+    try {
+      return await withPartitionHint<DerivedTraceEvent[]>(
+        { occurredAtMs },
+        (rows) => rows.length === 0,
+        async (window) => {
+          const partition = partitionFragment(window);
+          const client = await this.resolveClient(tenantId);
+          // Events-only ARRAY JOIN: reads just the `Events.*` columns, never
+          // the heavy span attribute/link payload. Includes exception events
+          // for parity with the trace-level list the fold used to carry.
+          const result = await client.query({
+            query: `
+              SELECT
+                SpanId AS spanId,
+                toUnixTimestamp64Milli(event_timestamp) AS timestamp,
+                event_name AS name,
+                event_attrs AS attributes
+              FROM ${TABLE_NAME}
+              WHERE TenantId = {tenantId:String}
+                AND TraceId = {traceId:String}
+                ${partition.sqlAnd}
+                AND ${dedupInTuple(partition.sqlAndInner)}
+              ARRAY JOIN
+                "Events.Timestamp" AS event_timestamp,
+                "Events.Name" AS event_name,
+                "Events.Attributes" AS event_attrs
+              ORDER BY event_timestamp ASC
+            `,
+            query_params: { tenantId, traceId, ...partition.params },
+            format: "JSONEachRow",
+          });
+
+          const rows = (await result.json()) as TraceEventRow[];
+          return rows.map((r) => ({
+            spanId: r.spanId,
+            timestamp:
+              typeof r.timestamp === "string"
+                ? parseInt(r.timestamp, 10)
+                : r.timestamp,
+            name: r.name,
+            attributes: r.attributes ?? {},
+          }));
+        },
+      );
+    } catch (error) {
+      logger.error(
+        {
+          tenantId,
+          traceId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "Failed to get trace events by trace ID from ClickHouse",
+      );
+      throw error;
+    }
   }
 
   async getEventsByTraceId({

@@ -18,6 +18,29 @@ export interface RedisCachedFoldStoreOptions {
 }
 
 /**
+ * Default cache TTL, in seconds. Sized to outlast the processing of a single
+ * aggregate's event stream so the fold state stays warm in Redis across
+ * consecutive events instead of expiring mid-stream and forcing a ClickHouse
+ * fallback read of the (potentially large) state on every event. Matches the
+ * queue's activeTtlSec — the upper bound on how long one aggregate stays
+ * in-flight.
+ *
+ * Overridable via LANGWATCH_FOLD_CACHE_TTL_SECONDS (read at call time, like
+ * LANGWATCH_DISPATCH_TENANT_CAP) so operators can dial residency down without a
+ * redeploy: the fold-cache key set is one entry per aggregate touched within
+ * the TTL window, so a longer TTL trades Redis memory for fewer ClickHouse
+ * fallback reads. Group-coalescing already collapses an aggregate's in-flight
+ * reads to one per batch, so this is a secondary lever, not the primary fix.
+ */
+function defaultFoldCacheTtlSeconds(): number {
+  const raw = process.env.LANGWATCH_FOLD_CACHE_TTL_SECONDS;
+  if (raw === undefined || raw === "") return 300;
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return 300;
+  return parsed;
+}
+
+/**
  * Wraps any FoldProjectionStore with a Redis write-through cache.
  *
  * - get(): Redis first, ClickHouse fallback on miss.
@@ -39,7 +62,7 @@ export class RedisCachedFoldStore<State>
     options: RedisCachedFoldStoreOptions,
   ) {
     this.keyPrefix = options.keyPrefix;
-    this.ttlSeconds = options.ttlSeconds ?? 30;
+    this.ttlSeconds = options.ttlSeconds ?? defaultFoldCacheTtlSeconds();
   }
 
   async get(

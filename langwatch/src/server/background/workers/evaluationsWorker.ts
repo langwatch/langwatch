@@ -37,6 +37,7 @@ class UserConfigError extends Error {
 }
 import { EvaluatorConfigError } from "~/server/app-layer/evaluations/errors";
 import { setupModelEnv } from "~/server/app-layer/evaluations/evaluation-execution.factories";
+import { stagedLangevalsFetch } from "~/server/langevals/stagedFetch";
 import { prisma } from "../../db";
 import {
   DEFAULT_MAPPINGS,
@@ -587,35 +588,31 @@ export const runEvaluation = async ({
 
   let response;
   try {
-    response = await fetch(
-      `${env.LANGEVALS_ENDPOINT}/${builtInEvaluatorType}/evaluate`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          data: [
-            {
-              input: tryAndConvertTo(data.data.input, "string"),
-              output: tryAndConvertTo(data.data.output, "string"),
-              contexts: tryAndConvertTo(data.data.contexts, "string[]"),
-              expected_contexts: tryAndConvertTo(
-                data.data.expected_contexts,
-                "string[]",
-              ),
-              expected_output: tryAndConvertTo(
-                data.data.expected_output,
-                "string",
-              ),
-              conversation: tryAndConvertTo(data.data.conversation, "array"),
-            },
-          ],
-          settings: settings && typeof settings === "object" ? settings : {},
-          env: evaluatorEnv,
-        }),
+    response = await stagedLangevalsFetch({
+      url: `${env.LANGEVALS_ENDPOINT}/${builtInEvaluatorType}/evaluate`,
+      projectId,
+      kind: "evaluation",
+      body: {
+        data: [
+          {
+            input: tryAndConvertTo(data.data.input, "string"),
+            output: tryAndConvertTo(data.data.output, "string"),
+            contexts: tryAndConvertTo(data.data.contexts, "string[]"),
+            expected_contexts: tryAndConvertTo(
+              data.data.expected_contexts,
+              "string[]",
+            ),
+            expected_output: tryAndConvertTo(
+              data.data.expected_output,
+              "string",
+            ),
+            conversation: tryAndConvertTo(data.data.conversation, "array"),
+          },
+        ],
+        settings: settings && typeof settings === "object" ? settings : {},
+        env: evaluatorEnv,
       },
-    );
+    });
   } catch (error) {
     if (error instanceof Error && error.message.includes("fetch failed")) {
       console.error({ error, path: `${env.LANGEVALS_ENDPOINT}/${builtInEvaluatorType}/evaluate` });

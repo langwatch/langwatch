@@ -27,6 +27,10 @@ export interface QueueInfo {
   activeGroupCount: number;
   totalPendingJobs: number;
   dlqCount: number;
+  // Groups a tenant soft-cap parked OUT of the ready scan because the tenant is
+  // at its in-flight cap. Surfaced so a parking spike (the over-cap ZADD storm
+  // root) or a parked-group strand is visible instead of invisible backlog.
+  parkedGroupCount: number;
   groups: GroupInfo[];
 }
 
@@ -38,6 +42,7 @@ export interface QueueSummaryInfo {
   activeGroupCount: number;
   totalPendingJobs: number;
   dlqCount: number;
+  parkedGroupCount: number;
 }
 
 export interface ThroughputPoint {
@@ -47,6 +52,7 @@ export interface ThroughputPoint {
   failedPerSec: number;
   pendingCount: number;
   blockedCount: number;
+  parkedCount: number;
 }
 
 export interface PhaseMetrics {
@@ -103,11 +109,17 @@ export interface RedisInfo {
   peakMemoryBytes: number;
   maxMemoryBytes: number;
   connectedClients: number;
+  // Engine CPU is derived between successive INFO cpu samples. We expose the
+  // raw cumulative counters here so the collector can diff them across collect
+  // cycles without a second piece of state.
+  usedCpuUserMainThreadSeconds: number;
+  usedCpuSysMainThreadSeconds: number;
 }
 
 export interface DashboardData {
   totalGroups: number;
   blockedGroups: number;
+  parkedGroups: number;
   totalPendingJobs: number;
   throughputIngestedPerSec: number;
   totalCompleted: number;
@@ -117,12 +129,14 @@ export interface DashboardData {
   peakCompletedPerSec: number;
   peakFailedPerSec: number;
   peakIngestedPerSec: number;
-  redisMemoryUsed: string;
-  redisMemoryPeak: string;
   redisMemoryUsedBytes: number;
   redisMemoryPeakBytes: number;
   redisMemoryMaxBytes: number;
   redisConnectedClients: number;
+  // null on the first collection cycle (need two samples to derive a rate)
+  // and on the cycle immediately after a Redis restart (cumulative counters
+  // go backwards). Rounded to one decimal place when present.
+  redisEngineCpuPercent: number | null;
   processCpuPercent: number;
   processMemoryUsedMb: number;
   processMemoryTotalMb: number;

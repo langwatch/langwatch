@@ -120,6 +120,24 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 		return r.dispatchPassthrough(ctx, req, provider, model, cred)
 	}
 
+	// Managed-Bedrock with a per-request runtime endpoint (the customer's
+	// VPC endpoint) dispatches through the official AWS SDK bedrockruntime
+	// client with BaseEndpoint pinned to that VPCE, so the request is
+	// SigV4-signed for and sent to that host instead of the public AWS
+	// endpoint. Without this, the customer's VPCE-conditioned IAM policy
+	// rejects the InvokeModel with a 403. Gated to RequestTypeChat only:
+	// /v1/messages must stay on the raw-forward path below (routing
+	// Anthropic-native bodies through Converse would drop messages-only
+	// fields like `thinking`); embeddings/responses/passthrough are handled
+	// above. A no-op for Bedrock credentials without a runtime endpoint.
+	if req.Type == domain.RequestTypeChat {
+		if endpoint, err := bedrockVPCEEndpoint(cred); err != nil {
+			return nil, err
+		} else if endpoint != "" {
+			return r.dispatchBedrockVPCE(ctx, req, provider, model, cred, endpoint)
+		}
+	}
+
 	bfReq, dispatchCtx, err := buildChatRequest(ctx, req, provider, model)
 	if err != nil {
 		return nil, err
@@ -368,6 +386,19 @@ func (r *BifrostRouter) DispatchStream(ctx context.Context, req *domain.Request,
 
 	if req.Type == domain.RequestTypePassthrough {
 		return r.dispatchPassthroughStream(ctx, req, provider, model, cred)
+	}
+
+	// Managed-Bedrock with a per-request runtime endpoint streams through the
+	// official Bedrock ConverseStream API over the customer's VPC endpoint —
+	// same rationale as the non-streaming Dispatch intercept above, and gated
+	// to RequestTypeChat for the same reason (/v1/messages stays raw-forward).
+	// A no-op for Bedrock credentials without a runtime endpoint.
+	if req.Type == domain.RequestTypeChat {
+		if endpoint, err := bedrockVPCEEndpoint(cred); err != nil {
+			return nil, err
+		} else if endpoint != "" {
+			return r.dispatchBedrockVPCEStream(ctx, req, provider, model, cred, endpoint)
+		}
 	}
 
 	if req.Type == domain.RequestTypeChat && isOpenAICompatibleProvider(provider) {
@@ -693,16 +724,21 @@ func credentialToBifrostKey(cred domain.Credential, provider bfschemas.ModelProv
 		k.AzureKeyConfig = cfg
 
 	case bfschemas.Bedrock:
+		// Two nlpgo routes feed Bedrock creds under different key names: the
+		// dispatcheradapter (Studio / workflows) translates to the canonical
+		// access_key / secret_key / session_token / region, while the
+		// gatewayproxy (/go/proxy) keeps the litellm aws_* names. Accept both
+		// so neither route lands here with empty credentials.
 		cfg := &bfschemas.BedrockKeyConfig{
-			AccessKey:   envVar(cred.Extra["access_key"]),
-			SecretKey:   envVar(cred.Extra["secret_key"]),
+			AccessKey:   envVar(credExtra(cred, "access_key", "aws_access_key_id")),
+			SecretKey:   envVar(credExtra(cred, "secret_key", "aws_secret_access_key")),
 			Deployments: cred.DeploymentMap,
 		}
-		if st, ok := cred.Extra["session_token"]; ok && st != "" {
+		if st := credExtra(cred, "session_token", "aws_session_token"); st != "" {
 			v := envVar(st)
 			cfg.SessionToken = &v
 		}
-		if region, ok := cred.Extra["region"]; ok && region != "" {
+		if region := credExtra(cred, "region", "aws_region_name"); region != "" {
 			v := envVar(region)
 			cfg.Region = &v
 		}

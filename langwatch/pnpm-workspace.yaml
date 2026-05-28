@@ -21,6 +21,8 @@ overrides:
   "@modelcontextprotocol/sdk@>=1.10.0 <=1.25.3": "1.26.0"
   # Security: langchain serialization injection (#223)
   "langchain@<0.3.37": "0.3.37"
+  # Security: langsmith SDK floor (from mcp-server)
+  "langsmith@<0.6.0": "0.6.0"
   # Security: merge prototype pollution (#194) via exec-sh
   "merge@<2.1.1": "2.1.1"
   # Security: validator incomplete filtering (#216) via class-validator

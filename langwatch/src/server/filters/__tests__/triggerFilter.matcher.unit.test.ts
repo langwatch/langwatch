@@ -7,6 +7,7 @@ import {
   classifyTriggerFilters,
   matchesEvaluationFilters,
   matchesTriggerFilters,
+  triggerFiltersReferenceEvents,
 } from "../triggerFilter.matcher";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 
@@ -889,7 +890,7 @@ describe("buildPreconditionTraceDataFromFoldState", () => {
     expect(result.annotationIds).toEqual(["ann-1"]);
   });
 
-  it("extracts events from hoisted fold state events", () => {
+  it("extracts events from derived events passed in", () => {
     const foldState = {
       traceId: "trace-1",
       traceName: "",
@@ -927,25 +928,24 @@ describe("buildPreconditionTraceDataFromFoldState", () => {
       lastUsedPromptSpanId: null,
       lastUsedPromptStartTimeMs: null,
       attributes: { "langwatch.origin": "application" },
-      events: [
-        {
-          spanId: "span-1",
-          timestamp: Date.now(),
-          name: "thumbs_up_down",
-          attributes: {
-            "event.type": "thumbs_up_down",
-            "event.metrics.score": "1",
-            "event.details.page": "/chat",
-          },
-        },
-      ],
       occurredAt: Date.now(),
       createdAt: Date.now(),
       updatedAt: Date.now(),
       LastEventOccurredAt: Date.now(),
     } as TraceSummaryData;
 
-    const result = buildPreconditionTraceDataFromFoldState(foldState);
+    const result = buildPreconditionTraceDataFromFoldState(foldState, [
+      {
+        spanId: "span-1",
+        timestamp: Date.now(),
+        name: "thumbs_up_down",
+        attributes: {
+          "event.type": "thumbs_up_down",
+          "event.metrics.score": "1",
+          "event.details.page": "/chat",
+        },
+      },
+    ]);
 
     expect(result.events).toHaveLength(1);
     expect(result.events![0]!.event_type).toBe("thumbs_up_down");
@@ -953,5 +953,52 @@ describe("buildPreconditionTraceDataFromFoldState", () => {
     expect(result.events![0]!.event_details).toEqual([
       { key: "page", value: "/chat" },
     ]);
+  });
+});
+
+describe("triggerFiltersReferenceEvents", () => {
+  describe("when filters reference a matchable event field", () => {
+    it("returns true for events.event_type", () => {
+      expect(
+        triggerFiltersReferenceEvents({
+          "events.event_type": ["thumbs_up_down"],
+        } as TriggerFilters),
+      ).toBe(true);
+    });
+
+    it("returns true for events.metrics.key and events.event_details.key", () => {
+      expect(
+        triggerFiltersReferenceEvents({
+          "events.metrics.key": { thumbs_up_down: ["score"] },
+        } as TriggerFilters),
+      ).toBe(true);
+      expect(
+        triggerFiltersReferenceEvents({
+          "events.event_details.key": { thumbs_up_down: ["page"] },
+        } as TriggerFilters),
+      ).toBe(true);
+    });
+  });
+
+  describe("when filters do not need the events list", () => {
+    it("returns false for non-event filters", () => {
+      expect(
+        triggerFiltersReferenceEvents({
+          "metadata.user_id": ["u1"],
+        } as TriggerFilters),
+      ).toBe(false);
+    });
+
+    it("returns false for value-only event fields (unsupported in-memory)", () => {
+      expect(
+        triggerFiltersReferenceEvents({
+          "events.metrics.value": { click: { count: ["5"] } },
+        } as TriggerFilters),
+      ).toBe(false);
+    });
+
+    it("returns false for an empty filter set", () => {
+      expect(triggerFiltersReferenceEvents({} as TriggerFilters)).toBe(false);
+    });
   });
 });

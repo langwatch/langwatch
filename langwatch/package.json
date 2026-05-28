@@ -56,6 +56,7 @@
     "test:e2e": "playwright test --config=e2e/playwright.config.ts",
     "test:e2e:save-auth-state": "tsx e2e/save-auth-state.ts",
     "test:e2e:codegen": "playwright codegen --load-storage=./e2e/auth.json http://localhost:5560/",
+    "test:e2e:langevals-staging": "bash -c 'eval \"$(aws --profile ${AWS_PROFILE:-lw-dev} configure export-credentials --format env)\" && S3_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID S3_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY S3_SESSION_TOKEN=$AWS_SESSION_TOKEN S3_BUCKET_NAME=${S3_BUCKET_NAME:-runtime-storage-dev} S3_REGION=${S3_REGION:-eu-central-1} LANGEVALS_E2E_ENABLED=1 LANGEVALS_STAGING_THRESHOLD_BYTES=200 EVAL_MAX_PAYLOAD_BYTES=20000000 TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES=200000000 vitest run src/server/langevals/__tests__/stagedFetch.e2e.test.ts --reporter verbose'",
     "licenses": "pnpx license-checker --summary && pnpx license-checker --json > licenses.json && echo \"Full licenses report saved to licenses.json\""
   },
   "dependencies": {
@@ -76,6 +77,7 @@
     "@aws-sdk/client-s3": "^3.1041.0",
     "@aws-sdk/client-ses": "^3.1041.0",
     "@aws-sdk/client-sts": "^3.1041.0",
+    "@aws-sdk/s3-request-presigner": "^3.1041.0",
     "@chakra-ui/react": "^3.35.0",
     "@clickhouse/client": "^1.18.3",
     "@copilotkit/react-core": "~1.8.14",

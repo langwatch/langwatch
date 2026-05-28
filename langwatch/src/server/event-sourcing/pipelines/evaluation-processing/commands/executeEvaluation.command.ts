@@ -251,6 +251,27 @@ export class ExecuteEvaluationCommand implements CommandHandler<
         workflowId,
       });
 
+      // A trace the service could not evaluate (no thread_id for a thread-based
+      // monitor, errored trace with no I/O, etc.) comes back as "skipped". Drop
+      // it with no event, like an unmet precondition: a skipped run has no
+      // score to fold, and a bulk re-evaluation over non-evaluatable traces
+      // would otherwise emit thousands of results, each paying the heavy
+      // evaluation-projection read. Config skips (monitor not found, provider
+      // not configured) are emitted earlier via their own path and still
+      // surface in the UI.
+      if (result.status === "skipped") {
+        logger.debug(
+          {
+            tenantId,
+            evaluatorId: data.evaluatorId,
+            traceId: data.traceId,
+            details: result.details,
+          },
+          "Trace not evaluatable — skipping with no result event",
+        );
+        return [];
+      }
+
       // 5. Record cost via service
       let costId: string | null = null;
       if (result.status === "processed" && result.cost) {

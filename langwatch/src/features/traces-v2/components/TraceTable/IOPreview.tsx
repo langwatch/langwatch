@@ -1,5 +1,6 @@
-import { Flex, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import { chakra, Flex, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { ArrowDown, ArrowUp, Bot, User, Wrench } from "lucide-react";
+import { Fragment, type ReactNode, useLayoutEffect, useRef } from "react";
 import type React from "react";
 import { useDensityTokens } from "../../hooks/useDensityTokens";
 import { useDensityStore } from "../../stores/densityStore";
@@ -28,39 +29,160 @@ export const IOPreview: React.FC<IOPreviewProps> = ({ input, output }) => {
  * one JSON.parse attempt on the same input).
  */
 /**
- * Render line breaks for the 2-line clamped preview cell.
+ * Non-selectable hard-newline marker, rendered at the END of the line
+ * that was broken — same affordance as a GitHub diff's `+`/`-` gutter:
+ * visible, but never part of what you select and copy.
  *
- * Trade-offs we're navigating:
- *  - We want the `↵` glyph as an explicit "there was a break here"
- *    marker, so wrapped text doesn't look like one continuous string.
- *  - CSS `-webkit-line-clamp` can truncate anywhere — including right
- *    after a glyph, which then renders as the ugly "…↵..." or pure
- *    "↵..." (an empty line whose only content is the glyph followed
- *    by the clamp ellipsis). Operator complaint, with screenshots.
- *
- * Strategy:
- *  - Strip trailing whitespace/blank lines so the text never ends on
- *    a break.
- *  - Collapse runs of blank lines to a single break (no more "↵\n↵\n"
- *    that renders as an empty middle line whose only character is the
- *    glyph).
- *  - Put the glyph at the START of every continuation line, not at
- *    the END of the previous one. That way the clamp ellipsis lands
- *    on real text content (or replaces it mid-word with "…"), never
- *    on the glyph itself. Reads as "↳ continuation" rather than
- *    "ends with ↵...".
+ * Two properties make that work:
+ *  - The glyph lives in a `::after` pseudo-element. Pseudo content is
+ *    never part of the DOM text, so it can't be selected or copied in
+ *    any browser (more robust than `user-select: none` alone, which
+ *    Firefox still copies). `user-select: none` is kept as a belt to
+ *    the pseudo's suspenders.
+ *  - The span itself is zero-width with `overflow: visible`, so the
+ *    glyph hangs past the last character without consuming layout
+ *    width. It therefore can't push the line wider and can't wrap onto
+ *    a line of its own.
  */
-function withGlyphBreaks(text: string): string {
-  // 1. Normalise: trim trailing whitespace/newlines so we never end
-  //    on a hard break.
-  const trimmed = text.replace(/\s+$/u, "");
-  // 2. Split on newline runs (one or more), so consecutive blanks
-  //    collapse to a single break point.
-  const lines = trimmed.split(/\n+/);
-  if (lines.length <= 1) return trimmed;
-  // 3. Re-join with `\n↵ ` — leading-glyph style. The first line
-  //    has no prefix; every subsequent line is "↵ <content>".
-  return lines.join("\n↵ ");
+const BreakMarker = () => (
+  <chakra.span
+    data-newline-marker=""
+    aria-hidden="true"
+    userSelect="none"
+    display="inline-block"
+    width="0"
+    overflow="visible"
+    whiteSpace="nowrap"
+    verticalAlign="baseline"
+    color="fg.subtle"
+    css={{ "&::after": { content: '"↵"', marginInlineStart: "0.45em" } }}
+  />
+);
+
+const CLAMP_LINES = 2;
+
+/**
+ * CSS rule that blanks a `BreakMarker` glyph once it's been tagged
+ * `data-newline-marker-hidden` by `useBreakMarkerClampGuard`. Hiding via
+ * the pseudo's `content` (rather than `display`/`visibility`) keeps the
+ * span's box on its line, so measuring it on the next resize pass stays
+ * stable.
+ */
+const HIDE_TRUNCATED_MARKER = {
+  "& [data-newline-marker][data-newline-marker-hidden]::after": {
+    content: '""',
+  },
+} as const;
+
+/**
+ * A `BreakMarker` only collides with the line clamp's `…` ellipsis when the
+ * cell overflows AND the marker sits on the last visible (clamped) line —
+ * that's the single line the clamp paints the ellipsis on. Markers on
+ * earlier, fully-visible lines are safe and keep showing. `markerTop` and
+ * `clampHeight` are measured relative to the clamped text box.
+ */
+export function shouldHideBreakMarker({
+  truncated,
+  markerTop,
+  clampHeight,
+}: {
+  truncated: boolean;
+  markerTop: number;
+  clampHeight: number;
+}): boolean {
+  if (!truncated) return false;
+  const lastVisibleLineTop = (clampHeight * (CLAMP_LINES - 1)) / CLAMP_LINES;
+  return markerTop >= lastVisibleLineTop - 1;
+}
+
+/**
+ * Tags the break markers that would overlap the clamp's `…` with
+ * `data-newline-marker-hidden` (see `shouldHideBreakMarker`). Re-evaluates
+ * on resize so it tracks column-width changes, not just the first paint.
+ * The text node is `position: relative` so each marker's `offsetTop` is
+ * measured against the clamped box.
+ */
+function useBreakMarkerClampGuard(text: string) {
+  const ref = useRef<HTMLParagraphElement>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const update = () => {
+      const truncated = el.scrollHeight > el.clientHeight + 1;
+      const clampHeight = el.clientHeight;
+      el.querySelectorAll<HTMLElement>("[data-newline-marker]").forEach((m) => {
+        m.toggleAttribute(
+          "data-newline-marker-hidden",
+          shouldHideBreakMarker({
+            truncated,
+            markerTop: m.offsetTop,
+            clampHeight,
+          }),
+        );
+      });
+    };
+    update();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [text]);
+  return ref;
+}
+
+/**
+ * Line-clamped preview text that renders hard breaks as non-selectable `↵`
+ * markers and suppresses only the marker on the truncated line (see
+ * `useBreakMarkerClampGuard`). Style props (`fontSize`, `color`,
+ * `textStyle`, …) are forwarded so both density rows can share it.
+ */
+const ClampedPreviewText: React.FC<
+  { text: string } & React.ComponentProps<typeof Text>
+> = ({ text, css, ...rest }) => {
+  const ref = useBreakMarkerClampGuard(text);
+  return (
+    <Text
+      ref={ref}
+      position="relative"
+      whiteSpace="pre-line"
+      lineClamp={CLAMP_LINES}
+      flex={1}
+      minWidth={0}
+      css={{ ...HIDE_TRUNCATED_MARKER, ...(css as object) }}
+      {...rest}
+    >
+      {renderWithBreakMarkers(text)}
+    </Text>
+  );
+};
+
+/**
+ * Render preview text with a hard break shown as a trailing `BreakMarker`
+ * on each broken line, followed by a real `\n` (the parent `Text` uses
+ * `whiteSpace="pre-line"`, so the `\n` produces the actual visual wrap).
+ * The text nodes stay clean — only the line content lands in the DOM, so
+ * a copy of the selection round-trips to the original two-line string.
+ */
+function renderWithBreakMarkers(text: string): ReactNode {
+  // Strip trailing whitespace so we never end on a break, normalize CRLF/CR so
+  // a stray `\r` can't cling to a line, then collapse runs of blank lines to a
+  // single break. A compact two-line preview shows content, not blank gaps,
+  // and its text is already a processed preview (markdown-unwrapped and
+  // truncated), not the verbatim source — so blank-line fidelity isn't a goal.
+  const normalized = text.replace(/\s+$/u, "").replace(/\r\n?/g, "\n");
+  const lines = normalized.split(/\n+/);
+  if (lines.length <= 1) return normalized;
+  return lines.map((line, i) => (
+    <Fragment key={i}>
+      {line}
+      {i < lines.length - 1 && (
+        <>
+          <BreakMarker />
+          {"\n"}
+        </>
+      )}
+    </Fragment>
+  ));
 }
 
 function buildRow(raw: string | null): {
@@ -70,13 +192,12 @@ function buildRow(raw: string | null): {
 } {
   if (raw === null) return { text: "", isChat: false, isTool: false };
   const parsed = tryParseChat(raw);
-  // Preserve newlines AND surface the `↵` glyph at the break point —
-  // operator preference: the glyph makes the soft-break explicit while
-  // the real `\n` lets CSS (whiteSpace="pre-line") actually wrap the
-  // next chunk to a new line.
+  // Keep newlines as real `\n` — the row text renders them with
+  // `whiteSpace="pre-line"`, and `renderWithBreakMarkers` decorates each
+  // break with a non-selectable marker at render time.
   const formatted = formatPreview(raw, { maxChars: 200, newlines: "preserve" });
   return {
-    text: withGlyphBreaks(formatted.text),
+    text: formatted.text,
     isChat: parsed.isChat,
     isTool: parsed.isTool,
   };
@@ -136,22 +257,17 @@ const CompactRow: React.FC<CompactRowProps> = ({
         </Icon>
         <RoleIcon row={row} color={accent} direction={direction} />
       </Flex>
-      <Text
+      {/* Preserve real newlines coming through formatPreview (the row text
+          used to inline-render `↵` glyphs — now wraps onto a real second
+          line). Capped at 2 lines so the preview stays compact in the
+          table. */}
+      <ClampedPreviewText
+        text={row.text}
         fontSize={fontSize}
         color={textColor}
         fontStyle="italic"
         fontWeight="400"
-        // Preserve real newlines coming through formatPreview (the row
-        // text used to inline-render `↵` glyphs — now wraps onto a real
-        // second line). Cap at 2 lines so the preview stays compact in
-        // the table.
-        whiteSpace="pre-line"
-        lineClamp={2}
-        flex={1}
-        minWidth={0}
-      >
-        {row.text}
-      </Text>
+      />
     </HStack>
   );
 };
@@ -192,9 +308,7 @@ const ComfortableIOPreview: React.FC<IOPreviewProps> = ({ input, output }) => (
         label="Input"
         labelColor={{ base: "blue.500", _dark: "blue.fg" }}
         textColor="fg.muted"
-        text={withGlyphBreaks(
-          formatPreview(input, { maxChars: 200, newlines: "preserve" }).text,
-        )}
+        text={formatPreview(input, { maxChars: 200, newlines: "preserve" }).text}
       />
     )}
     {output !== null && (
@@ -202,9 +316,7 @@ const ComfortableIOPreview: React.FC<IOPreviewProps> = ({ input, output }) => (
         label="Output"
         labelColor={{ base: "green.solid", _dark: "green.fg" }}
         textColor="fg"
-        text={withGlyphBreaks(
-          formatPreview(output, { maxChars: 200, newlines: "preserve" }).text,
-        )}
+        text={formatPreview(output, { maxChars: 200, newlines: "preserve" }).text}
       />
     )}
   </VStack>
@@ -226,15 +338,6 @@ const ComfortableRow: React.FC<{
     >
       {label}
     </Text>
-    <Text
-      textStyle="sm"
-      color={textColor}
-      whiteSpace="pre-line"
-      lineClamp={2}
-      flex={1}
-      minWidth={0}
-    >
-      {text}
-    </Text>
+    <ClampedPreviewText text={text} textStyle="sm" color={textColor} />
   </HStack>
 );

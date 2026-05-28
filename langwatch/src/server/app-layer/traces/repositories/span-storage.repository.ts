@@ -1,5 +1,31 @@
 import type { ElasticSearchEvent, Span } from "~/server/tracer/types";
+import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
 import type { SpanInsertData } from "../types";
+
+/**
+ * Per-trace safety ceiling for read-time derivation queries (trace events +
+ * scenario role costs derived from stored_spans). Production span-count per
+ * trace is p999=312, so this covers >99.9% of real traces; it exists only so a
+ * pathological leaked/looping trace_id (seen up to ~27k spans) can never make a
+ * single derivation read unbounded. Below the ceiling derivations are exact;
+ * above it only the hoisted trace-event list and scenario summary metrics
+ * truncate, while the paginated span detail view is a separate query and stays
+ * complete.
+ */
+export const MAX_DERIVATION_SPANS = 512;
+
+/**
+ * Clamps a requested span-read limit to the `[1, MAX_DERIVATION_SPANS]` range.
+ * `MAX_DERIVATION_SPANS` is a hard ceiling a caller can only lower, never raise,
+ * so every full-span / derivation read is bounded even for a leaked trace_id.
+ * A missing or non-finite limit (undefined, NaN, Infinity) defaults to the
+ * ceiling so the value never propagates into a ClickHouse `UInt32` param.
+ */
+export function clampSpanReadLimit(limit?: number): number {
+  const requested = Number.isFinite(limit) ? (limit as number) : MAX_DERIVATION_SPANS;
+  return Math.min(Math.max(1, Math.trunc(requested)), MAX_DERIVATION_SPANS);
+}
 
 export interface SpanSummaryRow {
   spanId: string;
@@ -63,9 +89,23 @@ export interface OccurredAtHint {
 export interface SpanStorageRepository {
   insertSpan(span: SpanInsertData): Promise<void>;
   insertSpans(spans: SpanInsertData[]): Promise<void>;
+  /**
+   * Full spans for a trace. Bounded by `MAX_DERIVATION_SPANS` (hard ceiling,
+   * always applied) so no caller can make this read unbounded on a leaked
+   * trace_id. `limit` may only lower the bound.
+   */
   getSpansByTraceId(
-    params: { tenantId: string; traceId: string } & OccurredAtHint,
+    params: { tenantId: string; traceId: string; limit?: number } & OccurredAtHint,
   ): Promise<Span[]>;
+  /**
+   * Normalized spans for a trace, used by read-time derivations (trace events
+   * + scenario role cost/latency) that need the canonicalized span attributes
+   * and parent links. Bounded by `MAX_DERIVATION_SPANS` so a pathological
+   * trace can't make the derivation read unbounded.
+   */
+  getNormalizedSpansByTraceId(
+    params: { tenantId: string; traceId: string; limit?: number } & OccurredAtHint,
+  ): Promise<NormalizedSpan[]>;
   getSpanByIds(
     params: {
       tenantId: string;
@@ -73,6 +113,16 @@ export interface SpanStorageRepository {
       spanId: string;
     } & OccurredAtHint,
   ): Promise<Span | null>;
+  /**
+   * Trace-level events ({spanId, timestamp, name, attributes}) for the
+   * trace-detail read, derived from the spans' OTel events. Events-only
+   * (ARRAY JOIN over the `Events.*` columns, no heavy span attribute scan),
+   * so it is far cheaper than fetching whole spans. Includes exception events
+   * for parity with the list the fold used to carry.
+   */
+  getTraceEventsByTraceId(
+    params: { tenantId: string; traceId: string } & OccurredAtHint,
+  ): Promise<DerivedTraceEvent[]>;
   getEventsByTraceId(
     params: { tenantId: string; traceId: string } & OccurredAtHint,
   ): Promise<ElasticSearchEvent[]>;
@@ -139,6 +189,12 @@ export class NullSpanStorageRepository implements SpanStorageRepository {
     return [];
   }
 
+  async getNormalizedSpansByTraceId(
+    _params: { tenantId: string; traceId: string; limit?: number } & OccurredAtHint,
+  ): Promise<NormalizedSpan[]> {
+    return [];
+  }
+
   async getSpanByIds(
     _params: {
       tenantId: string;
@@ -147,6 +203,12 @@ export class NullSpanStorageRepository implements SpanStorageRepository {
     } & OccurredAtHint,
   ): Promise<Span | null> {
     return null;
+  }
+
+  async getTraceEventsByTraceId(
+    _params: { tenantId: string; traceId: string } & OccurredAtHint,
+  ): Promise<DerivedTraceEvent[]> {
+    return [];
   }
 
   async getEventsByTraceId(

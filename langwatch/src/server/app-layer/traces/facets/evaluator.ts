@@ -6,11 +6,12 @@ import type {
 import { baseParams, buildTimeWhere } from "./helpers";
 
 /**
- * Evaluator facet: distinct `EvaluatorId`s with a human label that
- * combines the evaluator type and its display name. We project the
- * type/name composite as `facet_label` so the sidebar can show
- * `[llm_judge] Toxicity` while the underlying value (the id) round-trips
- * through saved queries unchanged.
+ * Evaluator facet: distinct `EvaluatorId`s labelled by the evaluator's
+ * display name (falling back to the id when no name is recorded). The
+ * evaluator type is intentionally omitted from the label — in practice a
+ * project's evaluators are mostly the same type, so the prefix added
+ * noise and ate the horizontal room the name needs. The id still
+ * round-trips through `facet_value` for saved queries.
  */
 export function buildEvaluatorFacetQuery(ctx: FacetQueryContext): FacetQuery {
   const where = buildTimeWhere("ScheduledAt");
@@ -22,17 +23,14 @@ export function buildEvaluatorFacetQuery(ctx: FacetQueryContext): FacetQuery {
     sql: `
       SELECT
         EvaluatorId AS facet_value,
-        if(ifNull(EvaluatorName, '') != '',
-           concat('[', EvaluatorType, '] ', EvaluatorName),
-           concat('[', EvaluatorType, '] ', EvaluatorId)
-        ) AS facet_label,
+        if(ifNull(EvaluatorName, '') != '', EvaluatorName, EvaluatorId) AS facet_label,
         count() AS cnt,
         count() OVER () AS total_distinct
       FROM evaluation_runs
       WHERE ${where}
         AND ifNull(EvaluatorId, '') != ''
         ${prefixFilter}
-      GROUP BY EvaluatorId, EvaluatorType, EvaluatorName
+      GROUP BY EvaluatorId, EvaluatorName
       ORDER BY cnt DESC
       LIMIT {limit:UInt32} OFFSET {offset:UInt32}
     `,

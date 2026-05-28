@@ -67,7 +67,7 @@ Feature: Per-tenant soft cap on in-flight dispatch
     And a third dispatchable group for the same tenant is on the ready zset
     When DISPATCH_LUA is invoked
     Then no group is dispatched for "proj_acme"
-    And the third group remains on the ready zset
+    And the third group is parked out of the ready scan
 
   @integration @tenant-cap @fairness
   Scenario: Over-cap tenant at the head of the zset does not starve other tenants
@@ -82,3 +82,95 @@ Feature: Per-tenant soft cap on in-flight dispatch
     Given the env var "LANGWATCH_DISPATCH_TENANT_CAP" is set to "0"
     When a full dispatch then completion lifecycle runs for any tenant
     Then no tenant counter keys are ever created in Redis
+
+  # DISPATCH_BATCH_LUA parity — the batch path shares the same cap logic
+  # but iterates multiple groups per EVAL. These scenarios guard against
+  # the batch branch drifting from the single-dispatch path above.
+
+  @integration @tenant-cap @batch @fairness
+  Scenario: DISPATCH_BATCH skips over-cap groups and dispatches under-cap groups in one call
+    Given a tenant "proj_noisy" with cap=1 and 5 groups on the ready zset
+    And a tenant "proj_quiet" with 1 group later in the zset
+    When DISPATCH_BATCH_LUA is invoked with maxJobs=10
+    Then "proj_noisy" dispatches exactly 1 group (hitting cap)
+    And "proj_quiet" dispatches its group in the same batch
+
+  @integration @tenant-cap @batch @blocked
+  Scenario: Over-cap tenant with a blocked group does not affect other tenants
+    Given a tenant "proj_noisy" at cap with a blocked group from a prior retry
+    And a tenant "proj_quiet" with dispatchable groups
+    When DISPATCH_BATCH_LUA is invoked
+    Then "proj_noisy"'s blocked group is not dispatched
+    And "proj_quiet"'s groups dispatch normally
+
+  @integration @tenant-cap @batch @cleanup
+  Scenario: Drift cleanup runs for under-cap tenants in batch dispatch
+    Given a tenant "proj_acme" with a zombie group (empty jobs zset) on the ready zset
+    When DISPATCH_BATCH_LUA is invoked
+    Then the zombie group is removed from the ready zset
+
+  # Over-cap groups are moved OUT of ready into a per-tenant parked set instead
+  # of being re-scored within ready on every poll, so dispatch write volume no
+  # longer scales with backlog size (the 2026-05-27 over-cap ZADD storm, where
+  # re-deferring a 442K-deep ready set every 5s saturated single-threaded Redis).
+  # A quiet tenant deeper in the zset is reached immediately, a follow-up poll
+  # returns nothing instead of re-walking the over-cap groups, and the parked
+  # groups are restored to ready once the tenant drops below cap.
+  @integration @tenant-cap @fairness
+  Scenario: Over-cap groups are parked out of ready so they don't starve other tenants on repeated polls
+    Given a tenant "proj_noisy" over cap with many groups at the head of ready
+    And a tenant "proj_quiet" with one group later in the zset
+    When dispatch is polled repeatedly at the same time
+    Then "proj_quiet"'s group is dispatched
+    And the over-cap groups are moved out of ready into the tenant's parked set so the next poll skips them
+    And they are restored to ready once the tenant drops below cap
+
+  @integration @tenant-cap @batch @fairness
+  Scenario: dispatchBatch parks over-cap groups the same way
+    Given a tenant over cap with groups on the ready zset
+    When DISPATCH_BATCH_LUA is invoked
+    Then the over-cap groups are moved out of ready into the tenant's parked set
+    And under-cap tenants are still served in the same batch
+
+  # Parked groups must come back. COMPLETE frees an in-flight slot and restores
+  # one parked group immediately (the normal path), preserving its priority.
+  @integration @tenant-cap @parking
+  Scenario: A freed in-flight slot restores a parked group on completion
+    Given a tenant over cap with a parked group
+    When one of the tenant's in-flight groups completes
+    Then the parked group is restored to ready and dispatchable
+    And it keeps the score it had before being parked
+
+  # COMPLETE covers the normal case; a crashed tenant never completes, so its
+  # in-flight counter TTL-expires. A later poll must read the missing counter as
+  # zero and restore the parked groups, or they strand out of the scan forever.
+  @integration @tenant-cap @parking
+  Scenario: A crashed tenant's parked groups are restored once its in-flight count expires
+    Given a tenant over cap with a parked group
+    And the tenant's in-flight counter has expired without a completion
+    When dispatch is next polled past the reconcile interval
+    Then the parked group is restored to ready and dispatched
+
+  # Disabling the cap must not leave work stranded out of the dispatch scan.
+  @integration @tenant-cap @parking @kill-switch
+  Scenario: Disabling the cap restores all parked groups
+    Given a tenant over cap with several parked groups
+    When the cap is set to 0 and dispatch is polled past the reconcile interval
+    Then all of the tenant's parked groups are restored to ready
+
+  # Restoring is bounded by the freed headroom so it can't overshoot the cap and
+  # churn groups back and forth between ready and parked.
+  @integration @tenant-cap @parking
+  Scenario: Restoring parked groups never exceeds the tenant cap
+    Given a tenant at cap=2 with three parked groups
+    When exactly one in-flight group completes
+    Then exactly one parked group is restored to ready
+    And the other two remain parked
+
+  # Every writer that returns a group to ready must respect parked membership,
+  # or it clobbers a parked group into the dispatch scan and re-creates the storm.
+  @integration @tenant-cap @parking
+  Scenario: Staging a new job for a parked group keeps it parked
+    Given a tenant over cap with a parked group
+    When a new job is staged for that parked group
+    Then the group stays in the parked set and does not reappear in ready

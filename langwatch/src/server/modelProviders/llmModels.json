@@ -1,7 +1,140 @@
 {
-  "updatedAt": "2026-05-18T03:12:55.840Z",
-  "modelCount": 355,
+  "updatedAt": "2026-05-25T03:13:45.304Z",
+  "modelCount": 357,
   "models": {
+    "qwen/qwen3.7-max": {
+      "id": "qwen/qwen3.7-max",
+      "name": "Qwen: Qwen3.7 Max",
+      "provider": "qwen",
+      "pricing": {
+        "inputCostPerToken": 0.0000025,
+        "outputCostPerToken": 0.0000075,
+        "inputCacheWritePerToken": 0.000003125
+      },
+      "contextLength": 1000000,
+      "maxCompletionTokens": 65536,
+      "supportedParameters": [
+        "include_reasoning",
+        "logprobs",
+        "max_tokens",
+        "presence_penalty",
+        "reasoning",
+        "response_format",
+        "seed",
+        "structured_outputs",
+        "temperature",
+        "tool_choice",
+        "tools",
+        "top_logprobs",
+        "top_p"
+      ],
+      "defaultParameters": {
+        "temperature": null,
+        "topP": null,
+        "frequencyPenalty": null
+      },
+      "modality": "text->text",
+      "mode": "chat",
+      "description": "Qwen3.7-Max is the flagship model in Alibaba's Qwen3.7 series. It supports text input and output and is designed for agent-centric workloads, with particular strengths in coding, office and productivity tasks,...",
+      "supportsImageInput": false,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    },
+    "xai/grok-build-0.1": {
+      "id": "xai/grok-build-0.1",
+      "name": "xAI: Grok Build 0.1",
+      "provider": "xai",
+      "pricing": {
+        "inputCostPerToken": 0.000001,
+        "outputCostPerToken": 0.000002,
+        "inputCacheReadPerToken": 2e-7,
+        "webSearchCostPerQuery": 0.005
+      },
+      "contextLength": 256000,
+      "maxCompletionTokens": null,
+      "supportedParameters": [
+        "frequency_penalty",
+        "include_reasoning",
+        "logprobs",
+        "max_tokens",
+        "presence_penalty",
+        "reasoning",
+        "response_format",
+        "seed",
+        "stop",
+        "structured_outputs",
+        "temperature",
+        "tool_choice",
+        "tools",
+        "top_logprobs",
+        "top_p"
+      ],
+      "defaultParameters": {
+        "temperature": null,
+        "topP": null,
+        "frequencyPenalty": null
+      },
+      "modality": "text+image->text",
+      "mode": "chat",
+      "description": "Grok Build 0.1 is xAI’s fast coding model trained specifically for agentic software engineering workflows. It supports text and image inputs with text output, and is optimized for interactive coding...",
+      "supportsImageInput": true,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    },
+    "gemini/gemini-3.5-flash": {
+      "id": "gemini/gemini-3.5-flash",
+      "name": "Google: Gemini 3.5 Flash",
+      "provider": "gemini",
+      "pricing": {
+        "inputCostPerToken": 0.0000015,
+        "outputCostPerToken": 0.000009,
+        "inputCacheReadPerToken": 1.5e-7,
+        "inputCacheWritePerToken": 8.333333333333334e-8,
+        "imageCostPerToken": 0.0000015,
+        "audioCostPerToken": 0.000003,
+        "internalReasoningCostPerToken": 0.000009,
+        "webSearchCostPerQuery": 0.014
+      },
+      "contextLength": 1048576,
+      "maxCompletionTokens": 65536,
+      "supportedParameters": [
+        "include_reasoning",
+        "max_tokens",
+        "reasoning",
+        "response_format",
+        "seed",
+        "stop",
+        "structured_outputs",
+        "temperature",
+        "tool_choice",
+        "tools",
+        "top_p"
+      ],
+      "defaultParameters": {
+        "temperature": null,
+        "topP": null,
+        "frequencyPenalty": null
+      },
+      "modality": "text+image+file+audio+video->text",
+      "mode": "chat",
+      "description": "Gemini 3.5 Flash is Google's high-efficiency multimodal model, bringing near-Pro level coding and reasoning at Flash-tier cost and speed. It is highly optimized for coding proficiency and parallel agentic execution...",
+      "supportsImageInput": true,
+      "supportsAudioInput": true,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false,
+      "reasoningConfig": {
+        "supported": true,
+        "parameterName": "thinkingLevel",
+        "allowedValues": [
+          "low",
+          "high"
+        ],
+        "defaultValue": "low",
+        "canDisable": false
+      }
+    },
     "anthropic/claude-opus-4-7-fast": {
       "id": "anthropic/claude-opus-4-7-fast",
       "name": "Anthropic: Claude Opus 4.7 (Fast)",
@@ -359,11 +492,7 @@
         "top_k",
         "top_p"
       ],
-      "defaultParameters": {
-        "temperature": null,
-        "topP": null,
-        "frequencyPenalty": null
-      },
+      "defaultParameters": null,
       "modality": "text->text",
       "mode": "chat",
       "description": "Owl Alpha is a high-performance foundation model designed for agentic workloads. Natively supports tool use, and long-context tasks, with strong performance in code generation, automated workflows, and complex instruction execution....",
@@ -541,13 +670,13 @@
       "name": "Google Gemini Flash Latest",
       "provider": "~google",
       "pricing": {
-        "inputCostPerToken": 5e-7,
-        "outputCostPerToken": 0.000003,
-        "inputCacheReadPerToken": 5e-8,
+        "inputCostPerToken": 0.0000015,
+        "outputCostPerToken": 0.000009,
+        "inputCacheReadPerToken": 1.5e-7,
         "inputCacheWritePerToken": 8.333333333333334e-8,
-        "imageCostPerToken": 5e-7,
-        "audioCostPerToken": 0.000001,
-        "internalReasoningCostPerToken": 0.000003,
+        "imageCostPerToken": 0.0000015,
+        "audioCostPerToken": 0.000003,
+        "internalReasoningCostPerToken": 0.000009,
         "webSearchCostPerQuery": 0.014
       },
       "contextLength": 1048576,
@@ -726,15 +855,15 @@
       "provider": "qwen",
       "pricing": {
         "inputCostPerToken": 1.5e-7,
-        "outputCostPerToken": 0.000001,
-        "inputCacheReadPerToken": 5e-8
+        "outputCostPerToken": 0.000001
       },
       "contextLength": 262144,
-      "maxCompletionTokens": 262144,
+      "maxCompletionTokens": 262140,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
         "logit_bias",
+        "logprobs",
         "max_tokens",
         "min_p",
         "presence_penalty",
@@ -748,6 +877,7 @@
         "tool_choice",
         "tools",
         "top_k",
+        "top_logprobs",
         "top_p"
       ],
       "defaultParameters": {
@@ -802,11 +932,11 @@
       "name": "Qwen: Qwen3.6 27B",
       "provider": "qwen",
       "pricing": {
-        "inputCostPerToken": 3.2e-7,
+        "inputCostPerToken": 3e-7,
         "outputCostPerToken": 0.0000032
       },
       "contextLength": 262144,
-      "maxCompletionTokens": 81920,
+      "maxCompletionTokens": 262144,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -961,12 +1091,12 @@
       "name": "DeepSeek: DeepSeek V4 Flash",
       "provider": "deepseek",
       "pricing": {
-        "inputCostPerToken": 1.12e-7,
-        "outputCostPerToken": 2.24e-7,
-        "inputCacheReadPerToken": 2.2e-8
+        "inputCostPerToken": 1e-7,
+        "outputCostPerToken": 2e-7,
+        "inputCacheReadPerToken": 2e-8
       },
       "contextLength": 1048576,
-      "maxCompletionTokens": null,
+      "maxCompletionTokens": 16384,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -1006,9 +1136,9 @@
       "name": "inclusionAI: Ling-2.6-1T",
       "provider": "inclusionai",
       "pricing": {
-        "inputCostPerToken": 3e-7,
-        "outputCostPerToken": 0.0000025,
-        "inputCacheReadPerToken": 6e-8
+        "inputCostPerToken": 7.5e-8,
+        "outputCostPerToken": 6.25e-7,
+        "inputCacheReadPerToken": 1.5e-8
       },
       "contextLength": 262144,
       "maxCompletionTokens": 32768,
@@ -2622,12 +2752,11 @@
       "name": "Qwen: Qwen3.5-35B-A3B",
       "provider": "qwen",
       "pricing": {
-        "inputCostPerToken": 1.4e-7,
-        "outputCostPerToken": 0.000001,
-        "inputCacheReadPerToken": 5e-8
+        "inputCostPerToken": 1.39e-7,
+        "outputCostPerToken": 0.000001
       },
       "contextLength": 262144,
-      "maxCompletionTokens": 81920,
+      "maxCompletionTokens": null,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -2715,7 +2844,7 @@
         "outputCostPerToken": 0.00000208
       },
       "contextLength": 262144,
-      "maxCompletionTokens": 65536,
+      "maxCompletionTokens": 262144,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -3090,8 +3219,7 @@
       "provider": "qwen",
       "pricing": {
         "inputCostPerToken": 3.9e-7,
-        "outputCostPerToken": 0.00000234,
-        "inputCacheReadPerToken": 1.95e-7
+        "outputCostPerToken": 0.00000234
       },
       "contextLength": 262144,
       "maxCompletionTokens": 65536,
@@ -3393,11 +3521,12 @@
       "name": "StepFun: Step 3.5 Flash",
       "provider": "stepfun",
       "pricing": {
-        "inputCostPerToken": 1e-7,
-        "outputCostPerToken": 3e-7
+        "inputCostPerToken": 9e-8,
+        "outputCostPerToken": 3e-7,
+        "inputCacheReadPerToken": 2e-8
       },
       "contextLength": 262144,
-      "maxCompletionTokens": 65536,
+      "maxCompletionTokens": 16384,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -3424,38 +3553,6 @@
       "modality": "text->text",
       "mode": "chat",
       "description": "Step 3.5 Flash is StepFun's most capable open-source foundation model. Built on a sparse Mixture of Experts (MoE) architecture, it selectively activates only 11B of its 196B parameters per token....",
-      "supportsImageInput": false,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
-    "arcee-ai/trinity-large-preview": {
-      "id": "arcee-ai/trinity-large-preview",
-      "name": "Arcee AI: Trinity Large Preview",
-      "provider": "arcee-ai",
-      "pricing": {
-        "inputCostPerToken": 1.5e-7,
-        "outputCostPerToken": 4.5e-7
-      },
-      "contextLength": 131000,
-      "maxCompletionTokens": null,
-      "supportedParameters": [
-        "max_tokens",
-        "response_format",
-        "structured_outputs",
-        "temperature",
-        "tools",
-        "top_k",
-        "top_p"
-      ],
-      "defaultParameters": {
-        "temperature": 0.8,
-        "topP": 0.8,
-        "frequencyPenalty": null
-      },
-      "modality": "text->text",
-      "mode": "chat",
-      "description": "Trinity-Large-Preview is a frontier-scale open-weight language model from Arcee, built as a 400B-parameter sparse Mixture-of-Experts with 13B active parameters per token using 4-of-256 expert routing. It excels in creative writing,...",
       "supportsImageInput": false,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
@@ -3729,7 +3826,8 @@
       "pricing": {
         "inputCostPerToken": 0.00000175,
         "outputCostPerToken": 0.000014,
-        "inputCacheReadPerToken": 1.75e-7
+        "inputCacheReadPerToken": 1.75e-7,
+        "webSearchCostPerQuery": 0.01
       },
       "contextLength": 400000,
       "maxCompletionTokens": 128000,
@@ -4070,7 +4168,8 @@
       "pricing": {
         "inputCostPerToken": 0.00000175,
         "outputCostPerToken": 0.000014,
-        "inputCacheReadPerToken": 1.75e-7
+        "inputCacheReadPerToken": 1.75e-7,
+        "webSearchCostPerQuery": 0.01
       },
       "contextLength": 128000,
       "maxCompletionTokens": 32000,
@@ -4159,7 +4258,8 @@
       "pricing": {
         "inputCostPerToken": 0.00000175,
         "outputCostPerToken": 0.000014,
-        "inputCacheReadPerToken": 1.75e-7
+        "inputCacheReadPerToken": 1.75e-7,
+        "webSearchCostPerQuery": 0.01
       },
       "contextLength": 400000,
       "maxCompletionTokens": 128000,
@@ -4287,6 +4387,7 @@
         "presence_penalty",
         "reasoning",
         "repetition_penalty",
+        "response_format",
         "seed",
         "stop",
         "temperature",
@@ -4988,7 +5089,8 @@
       "pricing": {
         "inputCostPerToken": 0.00000125,
         "outputCostPerToken": 0.00001,
-        "inputCacheReadPerToken": 1.3e-7
+        "inputCacheReadPerToken": 1.3e-7,
+        "webSearchCostPerQuery": 0.01
       },
       "contextLength": 400000,
       "maxCompletionTokens": 128000,
@@ -5081,7 +5183,8 @@
       "pricing": {
         "inputCostPerToken": 0.00000125,
         "outputCostPerToken": 0.00001,
-        "inputCacheReadPerToken": 1.25e-7
+        "inputCacheReadPerToken": 1.25e-7,
+        "webSearchCostPerQuery": 0.01
       },
       "contextLength": 400000,
       "maxCompletionTokens": 128000,
@@ -5128,7 +5231,8 @@
       "pricing": {
         "inputCostPerToken": 2.5e-7,
         "outputCostPerToken": 0.000002,
-        "inputCacheReadPerToken": 3e-8
+        "inputCacheReadPerToken": 3e-8,
+        "webSearchCostPerQuery": 0.01
       },
       "contextLength": 400000,
       "maxCompletionTokens": 128000,
@@ -5437,13 +5541,16 @@
         "outputCostPerToken": 1.12e-7
       },
       "contextLength": 131000,
-      "maxCompletionTokens": null,
+      "maxCompletionTokens": 131000,
       "supportedParameters": [
         "frequency_penalty",
+        "logit_bias",
         "max_tokens",
+        "min_p",
         "presence_penalty",
         "repetition_penalty",
         "seed",
+        "stop",
         "temperature",
         "top_k",
         "top_p"
@@ -6457,7 +6564,8 @@
       "pricing": {
         "inputCostPerToken": 0.00000125,
         "outputCostPerToken": 0.00001,
-        "inputCacheReadPerToken": 1.25e-7
+        "inputCacheReadPerToken": 1.25e-7,
+        "webSearchCostPerQuery": 0.01
       },
       "contextLength": 400000,
       "maxCompletionTokens": 128000,
@@ -7204,7 +7312,8 @@
       "pricing": {
         "inputCostPerToken": 0.00000125,
         "outputCostPerToken": 0.00001,
-        "inputCacheReadPerToken": 1.25e-7
+        "inputCacheReadPerToken": 1.25e-7,
+        "webSearchCostPerQuery": 0.01
       },
       "contextLength": 400000,
       "maxCompletionTokens": 128000,
@@ -7297,7 +7406,8 @@
       "pricing": {
         "inputCostPerToken": 5e-8,
         "outputCostPerToken": 4e-7,
-        "inputCacheReadPerToken": 1e-8
+        "inputCacheReadPerToken": 1e-8,
+        "webSearchCostPerQuery": 0.01
       },
       "contextLength": 400000,
       "maxCompletionTokens": null,
@@ -9170,7 +9280,8 @@
       "pricing": {
         "inputCostPerToken": 0.000002,
         "outputCostPerToken": 0.000008,
-        "inputCacheReadPerToken": 5e-7
+        "inputCacheReadPerToken": 5e-7,
+        "webSearchCostPerQuery": 0.01
       },
       "contextLength": 1047576,
       "maxCompletionTokens": null,
@@ -9402,7 +9513,8 @@
       "provider": "openai",
       "pricing": {
         "inputCostPerToken": 0.00015,
-        "outputCostPerToken": 0.0006
+        "outputCostPerToken": 0.0006,
+        "webSearchCostPerQuery": 0.01
       },
       "contextLength": 200000,
       "maxCompletionTokens": 100000,
@@ -9443,13 +9555,16 @@
         "outputCostPerToken": 5.55e-7
       },
       "contextLength": 128000,
-      "maxCompletionTokens": null,
+      "maxCompletionTokens": 128000,
       "supportedParameters": [
         "frequency_penalty",
+        "logit_bias",
         "max_tokens",
+        "min_p",
         "presence_penalty",
         "repetition_penalty",
         "seed",
+        "stop",
         "temperature",
         "top_k",
         "top_p"
@@ -9899,13 +10014,16 @@
         "outputCostPerToken": 3e-8
       },
       "contextLength": 131072,
-      "maxCompletionTokens": null,
+      "maxCompletionTokens": 131072,
       "supportedParameters": [
         "frequency_penalty",
+        "logit_bias",
         "max_tokens",
+        "min_p",
         "presence_penalty",
         "repetition_penalty",
         "seed",
+        "stop",
         "temperature",
         "top_k",
         "top_p"
@@ -9926,7 +10044,8 @@
       "pricing": {
         "inputCostPerToken": 0.0000011,
         "outputCostPerToken": 0.0000044,
-        "inputCacheReadPerToken": 5.5e-7
+        "inputCacheReadPerToken": 5.5e-7,
+        "webSearchCostPerQuery": 0.01
       },
       "contextLength": 200000,
       "maxCompletionTokens": 100000,
@@ -9978,7 +10097,7 @@
         "internalReasoningCostPerToken": 4e-7,
         "webSearchCostPerQuery": 0.014
       },
-      "contextLength": 1048576,
+      "contextLength": 1000000,
       "maxCompletionTokens": 8192,
       "supportedParameters": [
         "max_tokens",
@@ -10151,7 +10270,8 @@
       "pricing": {
         "inputCostPerToken": 0.0000011,
         "outputCostPerToken": 0.0000044,
-        "inputCacheReadPerToken": 5.5e-7
+        "inputCacheReadPerToken": 5.5e-7,
+        "webSearchCostPerQuery": 0.01
       },
       "contextLength": 200000,
       "maxCompletionTokens": 100000,
@@ -10572,7 +10692,8 @@
       "pricing": {
         "inputCostPerToken": 0.000015,
         "outputCostPerToken": 0.00006,
-        "inputCacheReadPerToken": 0.0000075
+        "inputCacheReadPerToken": 0.0000075,
+        "webSearchCostPerQuery": 0.01
       },
       "contextLength": 200000,
       "maxCompletionTokens": 100000,
@@ -10909,13 +11030,16 @@
         "outputCostPerToken": 0.000001
       },
       "contextLength": 128000,
-      "maxCompletionTokens": null,
+      "maxCompletionTokens": 32768,
       "supportedParameters": [
         "frequency_penalty",
+        "logit_bias",
         "max_tokens",
+        "min_p",
         "presence_penalty",
         "repetition_penalty",
         "seed",
+        "stop",
         "temperature",
         "top_k",
         "top_p"
@@ -11204,13 +11328,16 @@
         "outputCostPerToken": 2.01e-7
       },
       "contextLength": 131072,
-      "maxCompletionTokens": null,
+      "maxCompletionTokens": 60000,
       "supportedParameters": [
         "frequency_penalty",
+        "logit_bias",
         "max_tokens",
+        "min_p",
         "presence_penalty",
         "repetition_penalty",
         "seed",
+        "stop",
         "temperature",
         "top_k",
         "top_p"
@@ -11233,13 +11360,16 @@
         "outputCostPerToken": 3.35e-7
       },
       "contextLength": 131072,
-      "maxCompletionTokens": null,
+      "maxCompletionTokens": 80000,
       "supportedParameters": [
         "frequency_penalty",
+        "logit_bias",
         "max_tokens",
+        "min_p",
         "presence_penalty",
         "repetition_penalty",
         "seed",
+        "stop",
         "temperature",
         "top_k",
         "top_p"
@@ -11289,39 +11419,6 @@
       "supportsImageOutput": false,
       "supportsAudioOutput": false
     },
-    "cohere/command-r-plus-08-2024": {
-      "id": "cohere/command-r-plus-08-2024",
-      "name": "Cohere: Command R+ (08-2024)",
-      "provider": "cohere",
-      "pricing": {
-        "inputCostPerToken": 0.0000025,
-        "outputCostPerToken": 0.00001
-      },
-      "contextLength": 128000,
-      "maxCompletionTokens": 4000,
-      "supportedParameters": [
-        "frequency_penalty",
-        "max_tokens",
-        "presence_penalty",
-        "response_format",
-        "seed",
-        "stop",
-        "structured_outputs",
-        "temperature",
-        "tool_choice",
-        "tools",
-        "top_k",
-        "top_p"
-      ],
-      "defaultParameters": {},
-      "modality": "text->text",
-      "mode": "chat",
-      "description": "command-r-plus-08-2024 is an update of the [Command R+](/models/cohere/command-r-plus) with roughly 50% higher throughput and 25% lower latencies as compared to the previous Command R+ version, while keeping the hardware footprint...",
-      "supportsImageInput": false,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
     "cohere/command-r-08-2024": {
       "id": "cohere/command-r-08-2024",
       "name": "Cohere: Command R (08-2024)",
@@ -11350,6 +11447,39 @@
       "modality": "text->text",
       "mode": "chat",
       "description": "command-r-08-2024 is an update of the [Command R](/models/cohere/command-r) with improved performance for multilingual retrieval-augmented generation (RAG) and tool use. More broadly, it is better at math, code and reasoning and...",
+      "supportsImageInput": false,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    },
+    "cohere/command-r-plus-08-2024": {
+      "id": "cohere/command-r-plus-08-2024",
+      "name": "Cohere: Command R+ (08-2024)",
+      "provider": "cohere",
+      "pricing": {
+        "inputCostPerToken": 0.0000025,
+        "outputCostPerToken": 0.00001
+      },
+      "contextLength": 128000,
+      "maxCompletionTokens": 4000,
+      "supportedParameters": [
+        "frequency_penalty",
+        "max_tokens",
+        "presence_penalty",
+        "response_format",
+        "seed",
+        "stop",
+        "structured_outputs",
+        "temperature",
+        "tool_choice",
+        "tools",
+        "top_k",
+        "top_p"
+      ],
+      "defaultParameters": {},
+      "modality": "text->text",
+      "mode": "chat",
+      "description": "command-r-plus-08-2024 is an update of the [Command R+](/models/cohere/command-r-plus) with roughly 50% higher throughput and 25% lower latencies as compared to the previous Command R+ version, while keeping the hardware footprint...",
       "supportsImageInput": false,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
@@ -12117,41 +12247,6 @@
       "supportsImageOutput": false,
       "supportsAudioOutput": false
     },
-    "openai/gpt-4-turbo-preview": {
-      "id": "openai/gpt-4-turbo-preview",
-      "name": "OpenAI: GPT-4 Turbo Preview",
-      "provider": "openai",
-      "pricing": {
-        "inputCostPerToken": 0.00001,
-        "outputCostPerToken": 0.00003
-      },
-      "contextLength": 128000,
-      "maxCompletionTokens": 4096,
-      "supportedParameters": [
-        "frequency_penalty",
-        "logit_bias",
-        "logprobs",
-        "max_tokens",
-        "presence_penalty",
-        "response_format",
-        "seed",
-        "stop",
-        "structured_outputs",
-        "temperature",
-        "tool_choice",
-        "tools",
-        "top_logprobs",
-        "top_p"
-      ],
-      "defaultParameters": {},
-      "modality": "text->text",
-      "mode": "chat",
-      "description": "The preview GPT-4 model with improved instruction following, JSON mode, reproducible outputs, parallel function calling, and more. Training data: up to Dec 2023. **Note:** heavily rate limited by OpenAI while...",
-      "supportsImageInput": false,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
     "openai/gpt-3.5-turbo-0613": {
       "id": "openai/gpt-3.5-turbo-0613",
       "name": "OpenAI: GPT-3.5 Turbo (older v0613)",
@@ -12182,6 +12277,41 @@
       "modality": "text->text",
       "mode": "chat",
       "description": "GPT-3.5 Turbo is OpenAI's fastest model. It can understand and generate natural language or code, and is optimized for chat and traditional completion tasks. Training data up to Sep 2021.",
+      "supportsImageInput": false,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    },
+    "openai/gpt-4-turbo-preview": {
+      "id": "openai/gpt-4-turbo-preview",
+      "name": "OpenAI: GPT-4 Turbo Preview",
+      "provider": "openai",
+      "pricing": {
+        "inputCostPerToken": 0.00001,
+        "outputCostPerToken": 0.00003
+      },
+      "contextLength": 128000,
+      "maxCompletionTokens": 4096,
+      "supportedParameters": [
+        "frequency_penalty",
+        "logit_bias",
+        "logprobs",
+        "max_tokens",
+        "presence_penalty",
+        "response_format",
+        "seed",
+        "stop",
+        "structured_outputs",
+        "temperature",
+        "tool_choice",
+        "tools",
+        "top_logprobs",
+        "top_p"
+      ],
+      "defaultParameters": {},
+      "modality": "text->text",
+      "mode": "chat",
+      "description": "The preview GPT-4 model with improved instruction following, JSON mode, reproducible outputs, parallel function calling, and more. Training data: up to Dec 2023. **Note:** heavily rate limited by OpenAI while...",
       "supportsImageInput": false,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
@@ -12239,7 +12369,8 @@
       "provider": "openai",
       "pricing": {
         "inputCostPerToken": 0.00001,
-        "outputCostPerToken": 0.00003
+        "outputCostPerToken": 0.00003,
+        "webSearchCostPerQuery": 0.01
       },
       "contextLength": 128000,
       "maxCompletionTokens": 4096,
@@ -12277,13 +12408,16 @@
         "outputCostPerToken": 1.9e-7
       },
       "contextLength": 4096,
-      "maxCompletionTokens": null,
+      "maxCompletionTokens": 2824,
       "supportedParameters": [
         "frequency_penalty",
+        "logit_bias",
         "max_tokens",
+        "min_p",
         "presence_penalty",
         "repetition_penalty",
         "seed",
+        "stop",
         "temperature",
         "top_k",
         "top_p"

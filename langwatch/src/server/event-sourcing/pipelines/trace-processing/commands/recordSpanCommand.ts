@@ -26,6 +26,7 @@ import { OtlpSpanTokenEstimationService } from "~/server/app-layer/traces/span-t
 import { TiktokenClient } from "~/server/app-layer/clients/tokenizer/tiktoken.client";
 import { featureFlagService } from "~/server/featureFlag";
 import { TraceRequestUtils } from "../utils/traceRequest.utils";
+import { capOversizedAttributes } from "../utils/capOversizedAttributes";
 
 /**
  * Dependencies for RecordSpanCommand that can be injected for testing.
@@ -135,6 +136,23 @@ export class RecordSpanCommand implements CommandHandler<
           resourceToProcess,
           this.logger,
         );
+
+        // Cap oversized attribute values (multi-MB base64 images, huge params)
+        // before this span becomes a folded event. The trace-processing fold
+        // state is read-modify-written in Redis per event; multi-MB values
+        // saturate the single-threaded command loop and collapse folding
+        // throughput. Capping here keeps the fold state small for every
+        // ingestion path that dispatches recordSpan (collector REST and OTLP).
+        const cappedAttributeCount = capOversizedAttributes(
+          spanToProcess,
+          resourceToProcess,
+        );
+        if (cappedAttributeCount > 0) {
+          this.logger.warn(
+            { tenantId, traceId, spanId, cappedAttributeCount },
+            "Capped oversized span attribute value(s) before ingestion",
+          );
+        }
 
         const piiRedactionLevel =
           commandData.piiRedactionLevel ?? DEFAULT_PII_REDACTION_LEVEL;

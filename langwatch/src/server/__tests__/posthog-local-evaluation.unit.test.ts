@@ -8,6 +8,12 @@
  * definitions in the background and evaluates them in-process instead of
  * hitting the /flags endpoint per call.
  *
+ * Constructing the client with local evaluation starts that background poller,
+ * so the client is built lazily on first getPostHogInstance() call rather than
+ * at module load. A process that only reads SYSTEM flags from postgres (workers,
+ * the event-sourcing pipeline) imports this module but never requests the
+ * instance, so it never starts the poller and never burns the flags quota.
+ *
  * @see specs/analytics/posthog-cost-control.feature
  */
 import { describe, expect, it, vi, beforeEach } from "vitest";
@@ -42,26 +48,53 @@ describe("posthog-node initialization", () => {
     vi.resetModules();
   });
 
+  const mockLocalEvalEnv = () =>
+    vi.doMock("~/env.mjs", () => ({
+      env: {
+        POSTHOG_KEY: "phc_test_key",
+        POSTHOG_HOST: "https://us.i.posthog.com",
+        POSTHOG_FEATURE_FLAGS_KEY: "phx_personal_key",
+      },
+    }));
+
   describe("when POSTHOG_FEATURE_FLAGS_KEY is set", () => {
-    it("enables local evaluation with the configured personal API key", async () => {
-      vi.doMock("~/env.mjs", () => ({
-        env: {
-          POSTHOG_KEY: "phc_test_key",
-          POSTHOG_HOST: "https://us.i.posthog.com",
-          POSTHOG_FEATURE_FLAGS_KEY: "phx_personal_key",
-        },
-      }));
+    describe("when the module is imported but the instance is never requested", () => {
+      it("does not construct the client, so no background flag poller starts", async () => {
+        mockLocalEvalEnv();
 
-      await import("../posthog");
+        await import("../posthog");
 
-      expect(ctorSpy).toHaveBeenCalledWith(
-        "phc_test_key",
-        expect.objectContaining({
-          host: "https://us.i.posthog.com",
-          personalApiKey: "phx_personal_key",
-          featureFlagsPollingInterval: expect.any(Number),
-        }),
-      );
+        expect(ctorSpy).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the instance is first requested", () => {
+      it("enables local evaluation with the configured personal API key", async () => {
+        mockLocalEvalEnv();
+
+        const { getPostHogInstance } = await import("../posthog");
+        getPostHogInstance();
+
+        expect(ctorSpy).toHaveBeenCalledWith(
+          "phc_test_key",
+          expect.objectContaining({
+            host: "https://us.i.posthog.com",
+            personalApiKey: "phx_personal_key",
+            featureFlagsPollingInterval: expect.any(Number),
+          }),
+        );
+      });
+
+      it("memoizes the instance so the poller is started only once", async () => {
+        mockLocalEvalEnv();
+
+        const { getPostHogInstance } = await import("../posthog");
+        const first = getPostHogInstance();
+        const second = getPostHogInstance();
+
+        expect(ctorSpy).toHaveBeenCalledTimes(1);
+        expect(first).toBe(second);
+      });
     });
 
     it("respects an explicit polling interval override", async () => {
@@ -74,7 +107,8 @@ describe("posthog-node initialization", () => {
         },
       }));
 
-      await import("../posthog");
+      const { getPostHogInstance } = await import("../posthog");
+      getPostHogInstance();
 
       expect(ctorSpy).toHaveBeenCalledWith(
         "phc_test_key",
@@ -94,7 +128,8 @@ describe("posthog-node initialization", () => {
         },
       }));
 
-      await import("../posthog");
+      const { getPostHogInstance } = await import("../posthog");
+      getPostHogInstance();
 
       expect(ctorSpy).toHaveBeenCalledWith(
         "phc_test_key",
@@ -112,9 +147,11 @@ describe("posthog-node initialization", () => {
         env: {},
       }));
 
-      await import("../posthog");
+      const { getPostHogInstance } = await import("../posthog");
+      const instance = getPostHogInstance();
 
       expect(ctorSpy).not.toHaveBeenCalled();
+      expect(instance).toBeNull();
     });
   });
 });

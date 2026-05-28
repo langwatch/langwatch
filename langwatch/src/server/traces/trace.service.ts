@@ -336,6 +336,37 @@ export class TraceService {
   }
 
   /**
+   * Lazily fetch one evaluation's inputs, keyed by evaluation id so the read
+   * prunes ClickHouse granules instead of scanning the whole trace. Used by
+   * the v2 drawer when a single evaluation card is expanded.
+   *
+   * @param projectId - The project ID
+   * @param evaluationId - The evaluation to fetch inputs for
+   * @returns The parsed inputs, or null when none are available
+   */
+  async getEvaluationInputs(
+    projectId: string,
+    evaluationId: string,
+  ): Promise<Record<string, unknown> | null> {
+    return this.tracer.withActiveSpan(
+      "TraceService.getEvaluationInputs",
+      {
+        attributes: {
+          "tenant.id": projectId,
+          "evaluation.id": evaluationId,
+        },
+      },
+      async (span) => {
+        span.setAttribute("backend", "clickhouse");
+        return this.evaluationService.getEvaluationInputs({
+          projectId,
+          evaluationId,
+        });
+      },
+    );
+  }
+
+  /**
    * Get traces with spans by thread IDs.
    *
    * @param projectId - The project ID

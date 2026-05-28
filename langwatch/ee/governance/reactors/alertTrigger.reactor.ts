@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
 import {
   buildPreconditionTraceDataFromFoldState,
   classifyTriggerFilters,
   matchesTriggerFilters,
+  triggerFiltersReferenceEvents,
 } from "~/server/filters/triggerFilter.matcher";
 import { createLogger } from "~/utils/logger/server";
 import { captureException } from "~/utils/posthogErrorCapture";
@@ -18,7 +20,19 @@ import { defineOriginGuardedTraceReactor } from "~/server/event-sourcing/pipelin
 
 const logger = createLogger("langwatch:trace-processing:alert-trigger-reactor");
 
-export type AlertTriggerReactorDeps = TriggerActionDispatchDeps;
+export type AlertTriggerReactorDeps = TriggerActionDispatchDeps & {
+  /**
+   * Derives the trace-level events list from stored_spans. Only invoked when a
+   * trigger actually filters on event fields (see triggerFiltersReferenceEvents),
+   * so the common no-event-filter path pays nothing.
+   */
+  deriveEvents: (params: {
+    tenantId: string;
+    traceId: string;
+    occurredAtMs?: number;
+    foldVersion?: number;
+  }) => Promise<DerivedTraceEvent[]>;
+};
 
 /**
  * Evaluates user-defined trace-based triggers reactively when traces arrive.
@@ -42,7 +56,28 @@ export function createAlertTriggerReactor(
       );
       if (triggers.length === 0) return;
 
-      const traceData = buildPreconditionTraceDataFromFoldState(foldState);
+      // Derive the trace-level events list only if a trace-only trigger filters
+      // on event fields. Triggers with evaluation filters are skipped below
+      // (handled by evaluationAlertTrigger), so they don't need events here.
+      const needsEvents = triggers.some((t) => {
+        const { hasEvaluationFilters, traceFilters } = classifyTriggerFilters(
+          t.filters,
+        );
+        return !hasEvaluationFilters && triggerFiltersReferenceEvents(traceFilters);
+      });
+      const events = needsEvents
+        ? await deps.deriveEvents({
+            tenantId,
+            traceId,
+            occurredAtMs: foldState.occurredAt,
+            foldVersion: foldState.spanCount,
+          })
+        : null;
+
+      const traceData = buildPreconditionTraceDataFromFoldState(
+        foldState,
+        events,
+      );
 
       for (const trigger of triggers) {
         try {

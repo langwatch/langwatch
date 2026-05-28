@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.29.1](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.29.0...typescript-sdk@v0.29.1) (2026-05-27)
+
+
+### Bug Fixes
+
+* **sdk:** dedicated TracerProvider isolation for coexistence with other OTel SDKs ([#4204](https://github.com/langwatch/langwatch/issues/4204)) ([d5c9cfd](https://github.com/langwatch/langwatch/commit/d5c9cfd0ca55b7d31f08207970fb446ddda4fe85))
+
 ## [0.29.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.28.0...typescript-sdk@v0.29.0) (2026-05-22)
 
 

@@ -37,7 +37,7 @@ import {
   gqJobDurationMilliseconds,
 } from "./metrics";
 import { GroupQueueMetricsCollector } from "./metricsCollector";
-import { type DispatchResult, GroupStagingScripts } from "./scripts";
+import { type DispatchResult, type DrainedJob, GroupStagingScripts } from "./scripts";
 import {
   TenantRateTracker,
   tenantIdFromGroupId,
@@ -94,6 +94,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
   private readonly queueName: string;
   private readonly jobName: string;
   private readonly process: (payload: Payload) => Promise<void>;
+  private readonly processBatch?: (payloads: Payload[]) => Promise<void>;
+  private readonly coalesceMaxBatch?: (payload: Payload) => number | undefined;
   private readonly spanAttributes?: (payload: Payload) => SemConvAttributes;
   private readonly processingQueue: fastq.queueAsPromised<DispatchResult, void>;
   private readonly delay?: number;
@@ -121,6 +123,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     const {
       name,
       process,
+      processBatch,
+      coalesceMaxBatch,
       options: defOptions,
       delay,
       spanAttributes,
@@ -162,6 +166,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     this.queueName = name;
     this.jobName = "queue";
     this.process = process;
+    this.processBatch = processBatch;
+    this.coalesceMaxBatch = coalesceMaxBatch;
     this.globalConcurrency =
       defOptions?.globalConcurrency ??
       GROUP_QUEUE_CONFIG.defaultGlobalConcurrency;
@@ -171,6 +177,16 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       this.redisConnection,
       this.queueName,
     );
+
+    // Advertise this queue in the registry set so the ops dashboard enumerates
+    // it via SMEMBERS instead of an O(keyspace) `SCAN MATCH *:gq:ready`.
+    // Best-effort: a miss only degrades discovery to the scan fallback.
+    void this.scripts.registerQueue().catch((err) => {
+      this.logger.debug(
+        { err, queueName: this.queueName },
+        "queue registry registration failed",
+      );
+    });
 
     // Per-tenant rate tracker (post-2026-05-11 incident follow-up). Cheap
     // pipelined writes on the producer hot path. AnomalyDetector worker
@@ -443,6 +459,46 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     const routingLabels = { queue_name: this.queueName, pipeline_name: pipelineName, job_type: jobType, job_name: jobName };
     const payload = this.stripInternalFields(jobData);
 
+    // Opt-in batch coalescing: if this job type supports it, drain additional
+    // already-staged DUE jobs from the same group and fold them alongside the
+    // dispatched one in a single handler call. The group's active key (held by
+    // this job) guarantees no other worker dequeues from the group meanwhile,
+    // so the drain is exclusive. Drained siblings are re-staged on failure so
+    // they are not lost. When disabled (maxBatch <= 1) this is a no-op and the
+    // per-job path below is unchanged.
+    const maxBatch = this.coalesceMaxBatch?.(payload) ?? 1;
+    let batchPayloads: Payload[] | null = null;
+    let drainedSiblings: DrainedJob[] = [];
+    if (maxBatch > 1 && this.processBatch) {
+      try {
+        drainedSiblings = await this.scripts.drainGroupReady({
+          groupId,
+          nowMs: Date.now(),
+          maxJobs: maxBatch - 1,
+        });
+      } catch (err) {
+        this.logger.warn(
+          {
+            queueName: this.queueName,
+            groupId,
+            error: err instanceof Error ? err.message : String(err),
+          },
+          "Failed to drain group siblings for coalescing — processing single job",
+        );
+        drainedSiblings = [];
+      }
+      if (drainedSiblings.length > 0) {
+        const siblingPayloads: Payload[] = [];
+        for (const sibling of drainedSiblings) {
+          const parsed = this.parseDrainedPayload(sibling, groupId);
+          if (parsed) siblingPayloads.push(parsed);
+        }
+        if (siblingPayloads.length > 0) {
+          batchPayloads = [payload, ...siblingPayloads];
+        }
+      }
+    }
+
     const jobStartTime = performance.now();
     const heartbeat = this.startActiveKeyHeartbeat({ groupId, stagedJobId });
     this.activeJobCount++;
@@ -506,10 +562,17 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
               // Run the actual handler with request context propagation
               const requestContext = createContextFromJobData(contextMetadata);
               await runWithContext(requestContext, async () => {
-                await this.process(payload);
+                if (batchPayloads && this.processBatch) {
+                  span.setAttribute("queue.coalesced_batch_size", batchPayloads.length);
+                  await this.processBatch(batchPayloads);
+                } else {
+                  await this.process(payload);
+                }
               });
 
-              // Success — complete the group slot
+              // Success — complete the group slot. Drained siblings were
+              // removed from staging during the drain, so completing the
+              // dispatched job is enough to free the group.
               await this.scripts.complete({ groupId, stagedJobId, jobName });
               gqJobsCompletedTotal.inc(routingLabels);
 
@@ -526,6 +589,14 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
               const error = err instanceof Error ? err : new Error(String(err));
               const category = categorizeError(err);
               const isRetryable = category !== ErrorCategory.CRITICAL;
+
+              // The batch stores its fold state only once, at the very end, so a
+              // failure means nothing was persisted for the drained siblings.
+              // Re-stage them so they are re-dispatched (and re-coalesced) on the
+              // dispatched job's retry, rather than lost until an event replay.
+              if (drainedSiblings.length > 0) {
+                await this.restageDrainedSiblings(groupId, drainedSiblings);
+              }
 
               if (isRetryable && attempt < JOB_RETRY_CONFIG.maxAttempts) {
                 // Re-stage with backoff — frees the worker slot immediately
@@ -625,6 +696,59 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       delete clean[field];
     }
     return clean as Payload;
+  }
+
+  /**
+   * Parses a drained sibling's stored JSON into a clean payload. Returns null
+   * on parse failure (the job was already removed from staging; it is dropped
+   * here and recoverable via event replay, mirroring the dispatched job's own
+   * parse-failure handling).
+   */
+  private parseDrainedPayload(sibling: DrainedJob, groupId: string): Payload | null {
+    try {
+      const jobData = JSON.parse(sibling.jobDataJson) as Record<string, unknown>;
+      return this.stripInternalFields(jobData);
+    } catch {
+      this.logger.error(
+        { queueName: this.queueName, groupId, stagedJobId: sibling.stagedJobId },
+        "Failed to parse drained sibling job data — dropping (recoverable via replay)",
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Re-stages siblings drained for a batch that ultimately failed, so they are
+   * re-dispatched instead of lost. Each is staged with its original score and
+   * raw job data (context metadata preserved). Best-effort: a re-stage failure
+   * is logged, not thrown, so it never masks the original processing error.
+   */
+  private async restageDrainedSiblings(
+    groupId: string,
+    siblings: DrainedJob[],
+  ): Promise<void> {
+    for (const sibling of siblings) {
+      try {
+        await this.scripts.stage({
+          stagedJobId: sibling.stagedJobId,
+          groupId,
+          dispatchAfterMs: sibling.originalScore,
+          dedupId: "",
+          dedupTtlMs: 0,
+          jobDataJson: sibling.jobDataJson,
+        });
+      } catch (err) {
+        this.logger.error(
+          {
+            queueName: this.queueName,
+            groupId,
+            stagedJobId: sibling.stagedJobId,
+            error: err instanceof Error ? err.message : String(err),
+          },
+          "Failed to re-stage drained sibling after batch failure (recoverable via replay)",
+        );
+      }
+    }
   }
 
   /**

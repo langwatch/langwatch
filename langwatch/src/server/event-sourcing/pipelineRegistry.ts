@@ -19,6 +19,8 @@ import type { LogRecordStorageRepository } from "../app-layer/traces/repositorie
 import type { MetricRecordStorageRepository } from "../app-layer/traces/repositories/metric-record-storage.repository";
 import type { TraceSummaryRepository } from "../app-layer/traces/repositories/trace-summary.repository";
 import type { SpanStorageService } from "../app-layer/traces/span-storage.service";
+import { TraceReadDerivationService } from "../app-layer/traces/trace-read-derivation.service";
+import type { DerivedTraceEvent } from "./pipelines/trace-processing/projections/services/trace-events.derivation";
 import type { TraceSummaryService } from "../app-layer/traces/trace-summary.service";
 
 import { createEvaluationProcessingPipeline } from "./pipelines/evaluation-processing/pipeline";
@@ -220,7 +222,17 @@ export class PipelineRegistry {
   private buildTraceReactorContext(): Pick<
     TriggerActionDispatchDeps,
     "traceById" | "addToAnnotationQueue" | "addToDataset"
-  > {
+  > & {
+    deriveEvents: (params: {
+      tenantId: string;
+      traceId: string;
+      occurredAtMs?: number;
+      foldVersion?: number;
+    }) => Promise<DerivedTraceEvent[]>;
+  } {
+    const traceReadDerivation = new TraceReadDerivationService(
+      this.deps.traces.spans,
+    );
     return {
       traceById: async (projectId, traceId) => {
         const traceService = TraceService.create(this.deps.prisma);
@@ -235,6 +247,7 @@ export class PipelineRegistry {
       addToDataset: async (params) => {
         await createManyDatasetRecords(params);
       },
+      deriveEvents: (params) => traceReadDerivation.deriveEvents(params),
     };
   }
 
@@ -518,9 +531,14 @@ export class PipelineRegistry {
     const selfComputeRunMetrics = new Deferred<CommandDispatcher<ComputeRunMetricsCommandData>>("selfComputeRunMetrics");
     const scheduleRetry = new Deferred<(payload: ComputeRunMetricsCommandData) => Promise<void>>("scheduleRetry");
 
+    const traceReadDerivation = new TraceReadDerivationService(
+      this.deps.traces.spans,
+    );
     const computeRunMetricsCommand = new ComputeRunMetricsCommand({
       traceSummaryStore,
       scheduleRetry: scheduleRetry.fn,
+      deriveScenarioRoleMetrics: (params) =>
+        traceReadDerivation.deriveScenarioRoleMetrics(params),
     });
 
     const traceMetricsSyncReactor = createTraceMetricsSyncReactor({

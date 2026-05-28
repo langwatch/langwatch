@@ -43,10 +43,8 @@ import {
   TraceOriginService,
   TraceAttributeAccumulationService,
   TraceIOAccumulationService,
-  ScenarioRoleCostService,
   TracePromptAccumulationService,
   TraceNameResolutionService,
-  accumulateEvents,
   shouldOverrideOutput,
   extractIOFromLogRecord,
   OUTPUT_SOURCE,
@@ -75,11 +73,18 @@ const traceIOExtractionService = new TraceIOExtractionService();
 const traceIOAccumulationService = new TraceIOAccumulationService(
   traceIOExtractionService,
 );
-const scenarioRoleCostService = new ScenarioRoleCostService(spanCostService);
 const tracePromptAccumulationService = new TracePromptAccumulationService();
 const traceNameResolutionService = new TraceNameResolutionService();
 
 // ─── Main composition ───────────────────────────────────────────────
+
+/**
+ * Max spans we fully process (normalize + derive) into a trace summary. A
+ * handful of traces accumulate tens of thousands of spans (reused trace_id,
+ * runaway loops); deriving every one pays unbounded cost for no added value.
+ * Past the cap we only keep counting so the true magnitude stays visible.
+ */
+export const MAX_PROCESSED_SPANS = 512;
 
 /** @internal Exported for unit testing */
 export function applySpanToSummary({
@@ -91,12 +96,11 @@ export function applySpanToSummary({
 }): TraceSummaryData {
   if (SYNTHETIC_SPAN_NAMES.has(span.name)) {
     // Synthetic spans (e.g. `langwatch.track_event`) must not contribute to
-    // timing/cost/I-O — they don't represent real execution. But the
-    // `/api/track_event` endpoint stuffs the user-tracked event payload
-    // into `span.events`, so we still need to hoist those onto the trace
-    // summary; otherwise the event vanishes between the span and the
-    // trace-level events list.
-    return { ...state, events: accumulateEvents({ state, span }) };
+    // timing/cost/I-O -- they don't represent real execution. Their payload
+    // (the `/api/track_event` endpoint stuffs the user-tracked event into
+    // `span.events`) is still persisted to stored_spans like any other span,
+    // so the trace-level events list is derived from there at read time.
+    return state;
   }
 
   const timing = spanTimingService.accumulateTiming({ state, span });
@@ -121,11 +125,6 @@ export function applySpanToSummary({
       ? [...new Set([...state.models, ...newModels])].sort()
       : state.models;
 
-  const roleAccumulation = scenarioRoleCostService.accumulateRoleCostLatency({
-    state,
-    span,
-  });
-
   // Precedence rules for traceName / rootSpanType / rootSpanStartTimeMs
   // live in TraceNameResolutionService — see that file for the full set.
   const {
@@ -138,8 +137,6 @@ export function applySpanToSummary({
 
   const spanType = String(span.spanAttributes[ATTR_KEYS.SPAN_TYPE] ?? "");
   const containsAi = state.containsAi || AI_SPAN_TYPES.has(spanType);
-
-  const events = accumulateEvents({ state, span });
 
   const promptRollup = tracePromptAccumulationService.accumulate({ state, span });
 
@@ -166,8 +163,6 @@ export function applySpanToSummary({
     containsAi,
     ...promptRollup,
     attributes,
-    ...roleAccumulation,
-    events,
   };
 }
 
@@ -249,11 +244,14 @@ export class TraceSummaryFoldProjection
       traceNameFromFallback: false,
       rootMetadataFromFallback: false,
       attributes: {},
-      events: [],
-      scenarioRoleCosts: {},
-      scenarioRoleLatencies: {},
-      scenarioRoleSpans: {},
-      spanCosts: {},
+      // events, scenarioRoleCosts/Latencies/Spans and spanCosts are no longer
+      // accumulated in the fold state: they scaled O(span-count) and made each
+      // fold step O(n) (copy + re-serialize the whole growing blob), so a
+      // single long-lived trace turned folding into O(n^2). The trace-level
+      // events list and scenario role cost/latency are now derived from
+      // stored_spans at read time (events on the trace-detail read, scenario
+      // metrics when simulation metrics are computed), keeping all
+      // span-count-scaling collections off the hot path entirely.
       // Sentinel: 0 means "no spans received yet". The timing function uses
       // occurredAt > 0 to decide first-span vs min-of-existing. Using Date.now()
       // here would break Math.min logic -- wall-clock time >> span startTimeUnixMs.
@@ -265,6 +263,13 @@ export class TraceSummaryFoldProjection
     event: SpanReceivedEvent,
     state: TraceSummaryData,
   ): TraceSummaryData {
+    // Past the processing cap, keep counting but skip the expensive
+    // normalization + derivation — a runaway trace cannot keep growing the
+    // fold cost. Derived fields stay frozen at the first MAX_PROCESSED_SPANS.
+    if (state.spanCount >= MAX_PROCESSED_SPANS) {
+      return { ...state, spanCount: state.spanCount + 1 };
+    }
+
     const normalizedSpan =
       spanNormalizationPipelineService.normalizeSpanReceived(
         event.tenantId,

@@ -12,16 +12,19 @@ import { DEFERRED_CHECK_DELAY_MS } from "../originGate.reactor";
 function makeEvent(overrides: Partial<TraceProcessingEvent> = {}): TraceProcessingEvent {
   return {
     id: "evt-1",
-    type: "trace.span_received",
+    type: "lw.obs.trace.span_received",
     version: 1,
     aggregateType: "trace",
     aggregateId: "trace-1",
     tenantId: "project-1",
     createdAt: Date.now(),
     occurredAt: Date.now(),
-    data: {} as any,
+    data: {
+      span: { name: "openai.chat", spanId: "span-1", parentSpanId: null, attributes: [] },
+    },
+    metadata: { spanId: "span-1", traceId: "trace-1" },
     ...overrides,
-  } as TraceProcessingEvent;
+  } as unknown as TraceProcessingEvent;
 }
 
 function makeContext(

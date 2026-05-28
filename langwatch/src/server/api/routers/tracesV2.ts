@@ -12,6 +12,7 @@ import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to
 import type { SpanSummaryRow } from "~/server/app-layer/traces/repositories/span-storage.repository";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import { changeTraceNameInputSchema } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
+import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
 import {
   TRACE_NAME_MAX_LENGTH,
   TRACE_NAME_MIN_LENGTH,
@@ -126,7 +127,6 @@ function mapTraceSummaryToHeader(summary: TraceSummaryData): TraceHeader {
     lastUsedPromptVersionId: summary.lastUsedPromptVersionId ?? null,
     lastUsedPromptSpanId: summary.lastUsedPromptSpanId ?? null,
     attributes: summary.attributes,
-    events: summary.events ?? [],
   };
 }
 
@@ -880,7 +880,13 @@ export const tracesV2Router = createTRPCRouter({
       };
     }),
 
-  events: protectedProcedure
+  /**
+   * Trace-level events ({spanId, timestamp, name, attributes}) for the drawer.
+   * Split off the header so the header stays a pure summary read; the drawer
+   * fires this separately (like evals), and it reads only the `Events.*`
+   * columns rather than re-fetching the spans the tree already loads.
+   */
+  traceEvents: protectedProcedure
     .input(
       z.object({
         projectId: z.string(),
@@ -889,9 +895,9 @@ export const tracesV2Router = createTRPCRouter({
       }),
     )
     .use(checkProjectPermission("traces:view"))
-    .query(async ({ input }) => {
+    .query(async ({ input }): Promise<DerivedTraceEvent[]> => {
       const app = getApp();
-      return app.traces.spans.getEventsByTraceId({
+      return app.traces.spans.getTraceEventsByTraceId({
         tenantId: input.projectId,
         traceId: input.traceId,
         ...occurredAtFromInput(input),

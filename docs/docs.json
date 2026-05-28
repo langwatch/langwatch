@@ -299,6 +299,7 @@
                 ]
               },
               "integration/opentelemetry/guide",
+              "integration/opentelemetry/multiple-providers",
               "integration/metadata-and-labels",
               {
                 "group": "Tutorials",
@@ -460,6 +461,7 @@
             "group": "Direct Integrations",
             "pages": [
               "integration/opentelemetry/guide",
+              "integration/opentelemetry/multiple-providers",
               "integration/rest-api"
             ]
           }
@@ -1205,7 +1207,7 @@
   },
   "redirects": [
     {
-      "source": "/ci/cache/busted/1779531501",
+      "source": "/ci/cache/busted/1779914177",
       "destination": "/"
     },
     {

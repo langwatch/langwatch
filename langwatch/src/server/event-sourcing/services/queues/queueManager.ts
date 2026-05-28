@@ -35,6 +35,18 @@ export interface JobRegistryEntry {
   delay?: number;
   deduplication?: DeduplicationConfig<any>;
   spanAttributes?: (payload: any) => Record<string, string | number | boolean>;
+  /**
+   * Optional batch processor for group coalescing. When set together with
+   * `coalesceMaxBatch > 1`, the global queue may fold several same-group jobs
+   * into one call (the dispatched job plus drained siblings, in occurredAt
+   * order). The first payload is always the dispatched job.
+   */
+  processBatch?: (payloads: any[]) => Promise<void>;
+  /**
+   * Max number of same-group jobs to coalesce into one `processBatch` call
+   * (including the dispatched job). Defaults to 1 (no coalescing).
+   */
+  coalesceMaxBatch?: number;
 }
 
 /**
@@ -271,6 +283,7 @@ export class QueueManager<EventType extends Event = Event> {
     projections: Record<string, {
       name: string;
       groupKeyFn?: (event: EventType) => string;
+      coalesceMaxBatch?: number;
       options?: {
         killSwitch?: KillSwitchOptions;
       };
@@ -278,6 +291,11 @@ export class QueueManager<EventType extends Event = Event> {
     onEvent: (
       projectionName: string,
       event: EventType,
+      context: EventStoreReadContext<EventType>,
+    ) => Promise<void>,
+    onEventBatch?: (
+      projectionName: string,
+      events: EventType[],
       context: EventStoreReadContext<EventType>,
     ) => Promise<void>,
   ): void {
@@ -299,6 +317,7 @@ export class QueueManager<EventType extends Event = Event> {
           ? (event: any) => customGroupKeyFn(event)
           : (event: any) => `${event.aggregateType}:${String(event.aggregateId)}`,
       });
+      const coalesceMaxBatch = projectionDef.coalesceMaxBatch;
       const entry: JobRegistryEntry = {
         groupKeyFn,
         scoreFn: (event: any) => event.occurredAt ?? event.createdAt,
@@ -307,6 +326,18 @@ export class QueueManager<EventType extends Event = Event> {
             tenantId: event.tenantId,
           });
         },
+        // Same-group fold events are coalesced into one load/apply/store cycle.
+        // All events in a batch share the group (= same projection + aggregate),
+        // so the tenant is taken from the first event.
+        processBatch:
+          onEventBatch && coalesceMaxBatch && coalesceMaxBatch > 1
+            ? async (events: any[]) => {
+                await onEventBatch(projectionName, events, {
+                  tenantId: events[0]?.tenantId,
+                });
+              }
+            : undefined,
+        coalesceMaxBatch,
         spanAttributes: (event: any) => ({
           "projection.name": projectionName,
           "event.type": event.type,

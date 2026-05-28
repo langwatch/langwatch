@@ -1,5 +1,6 @@
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
 import type {
   PreconditionTraceData,
   PreconditionFieldMatcher,
@@ -25,6 +26,29 @@ const UNSUPPORTED_FIELDS: ReadonlySet<string> = new Set([
   "events.metrics.value",
   "events.event_details.value",
 ]);
+
+/**
+ * Event filter fields that ARE matched in-memory and therefore need the
+ * trace-level events list. The value-only fields (`events.metrics.value`,
+ * `events.event_details.value`) are unsupported in-memory (see
+ * UNSUPPORTED_FIELDS) so they do not require deriving events.
+ */
+const MATCHABLE_EVENT_FILTER_FIELDS: ReadonlySet<string> = new Set([
+  "events.event_type",
+  "events.metrics.key",
+  "events.event_details.key",
+]);
+
+/**
+ * Whether any of these filters match on event fields that need the trace-level
+ * events list. Reactors use this to derive events from stored_spans only when a
+ * trigger actually filters on them, keeping the common path off the read.
+ */
+export function triggerFiltersReferenceEvents(filters: TriggerFilters): boolean {
+  return Object.keys(filters).some((field) =>
+    MATCHABLE_EVENT_FILTER_FIELDS.has(field),
+  );
+}
 
 
 /**
@@ -60,9 +84,14 @@ export function classifyTriggerFilters(filters: TriggerFilters): {
  * Converts TraceSummaryData (fold state) into PreconditionTraceData for
  * in-memory filter matching. Extracts structured fields from the flat
  * attributes map, mirroring the logic in evaluationTrigger.reactor.ts.
+ *
+ * The trace-level events list is no longer carried on the fold state; callers
+ * that match event filters pass it in (derived from stored_spans, gated by
+ * `triggerFiltersReferenceEvents`). Omitting it leaves event filters unmatched.
  */
 export function buildPreconditionTraceDataFromFoldState(
   foldState: TraceSummaryData,
+  events?: DerivedTraceEvent[] | null,
 ): PreconditionTraceData {
   const attrs = foldState.attributes ?? {};
 
@@ -81,12 +110,12 @@ export function buildPreconditionTraceDataFromFoldState(
     spanModels: foldState.models.length > 0 ? foldState.models : null,
     customMetadata: extractCustomMetadata(attrs),
     annotationIds: foldState.annotationIds,
-    events: buildPreconditionEvents(foldState.events),
+    events: buildPreconditionEvents(events),
   };
 }
 
 function buildPreconditionEvents(
-  events: TraceSummaryData["events"],
+  events: DerivedTraceEvent[] | null | undefined,
 ): PreconditionTraceData["events"] {
   if (!events || events.length === 0) return null;
 

@@ -181,6 +181,10 @@ if (typeof window !== "undefined" && typeof window.matchMedia !== "function") {
 
 // Mock ResizeObserver for tests using floating-ui/popper (Chakra menus, tooltips, etc.)
 globalThis.ResizeObserver = class ResizeObserver {
+  // Match the real one-argument constructor signature so callers like
+  // `new ResizeObserver(cb)` aren't flagged as passing a superfluous arg.
+  // biome-ignore lint/suspicious/noEmptyBlockStatements: intentional no-op for test mock
+  constructor(_callback?: ResizeObserverCallback) {}
   // biome-ignore lint/suspicious/noEmptyBlockStatements: intentional no-op for test mock
   observe() {}
   // biome-ignore lint/suspicious/noEmptyBlockStatements: intentional no-op for test mock

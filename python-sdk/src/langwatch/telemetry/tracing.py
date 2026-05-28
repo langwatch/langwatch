@@ -138,9 +138,10 @@ class LangWatchTrace:
         self._disable_sending_request = disable_sending
         self._disable_sending_acquired = False
 
-        # Use the global tracer provider
-        self._tracer_provider = tracer_provider
-        self.tracer = (tracer_provider or trace_api).get_tracer(
+        from langwatch.client import Client
+
+        self._tracer_provider = tracer_provider or Client._tracer_provider
+        self.tracer = (self._tracer_provider or trace_api).get_tracer(
             instrumenting_module_name="langwatch",
             instrumenting_library_version=__version__,
         )

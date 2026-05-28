@@ -11,10 +11,10 @@ import {
 import { Edit3, Lightbulb, MessageSquare } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { api, type RouterOutputs } from "~/utils/api";
-
-type AnnotationByTraceIds =
-  RouterOutputs["annotation"]["getByTraceIds"][number];
+import {
+  type AnnotationByTrace,
+  useAnnotationsByTraceIds,
+} from "~/hooks/useAnnotationsByTraceIds";
 
 import { AnnotationPopover } from "./AnnotationPopover";
 import type { ParsedTurn } from "./types";
@@ -42,17 +42,11 @@ export function AnnotationsView({
     [parsedTurns],
   );
 
-  const annotations = api.annotation.getByTraceIds.useQuery(
-    { projectId: project?.id ?? "", traceIds },
-    {
-      enabled:
-        !!project?.id &&
-        traceIds.length > 0 &&
-        hasPermission("annotations:view"),
-      staleTime: 5 * 60_000,
-      refetchOnWindowFocus: false,
-    },
-  );
+  const annotations = useAnnotationsByTraceIds({
+    projectId: project?.id ?? "",
+    traceIds,
+    enabled: !!project?.id && hasPermission("annotations:view"),
+  });
 
   // Group annotations by trace so each turn's notes cluster together.
   const grouped = useMemo(() => {
@@ -136,7 +130,7 @@ function AnnotationRow({
 }: {
   traceId: string;
   output?: string | null;
-  annotation: AnnotationByTraceIds;
+  annotation: AnnotationByTrace;
 }) {
   const [open, setOpen] = useState(false);
   const { hasPermission } = useOrganizationTeamProject();

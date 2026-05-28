@@ -12,7 +12,8 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { Check, Copy } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { api, type RouterOutputs } from "~/utils/api";
+import { type RouterOutputs } from "~/utils/api";
+import { useAnnotationsByTraceIds } from "~/hooks/useAnnotationsByTraceIds";
 import { useConversationTurns } from "../../../hooks/useConversationTurns";
 import { useTraceDrawerNavigation } from "../../../hooks/useTraceDrawerNavigation";
 import type { TraceListItem } from "../../../types/trace";
@@ -71,18 +72,12 @@ export const ConversationView = memo(function ConversationView({
 
   const traceIds = useMemo(() => turns.map((t) => t.traceId), [turns]);
   const { project, hasPermission } = useOrganizationTeamProject();
-  const annotationsQuery = api.annotation.getByTraceIds.useQuery(
-    { projectId: project?.id ?? "", traceIds },
-    {
-      enabled:
-        !!project?.id &&
-        traceIds.length > 0 &&
-        hasPermission("annotations:view"),
-      keepPreviousData: true,
-      staleTime: 5 * 60_000,
-      refetchOnWindowFocus: false,
-    },
-  );
+  const annotationsQuery = useAnnotationsByTraceIds({
+    projectId: project?.id ?? "",
+    traceIds,
+    enabled: !!project?.id && hasPermission("annotations:view"),
+    keepPreviousData: true,
+  });
   const annotationsByTrace = useMemo<AnnotationsByTrace>(() => {
     const map: AnnotationsByTrace = new Map();
     for (const a of annotationsQuery.data ?? []) {

@@ -4,7 +4,162 @@ import type { Cluster } from "ioredis";
 // Lua scripts inlined as string constants.
 // This avoids loader incompatibilities across turbopack, webpack, vitest, and tsx.
 
-const STAGE_LUA = `
+/**
+ * Safety-net TTL (ms) refreshed on the per-group jobs/data keys every time they
+ * are written or dispatched. A live group is touched far more often than this
+ * (max gap between touches is one retry backoff, ~10 min), so the TTL never
+ * fires on real work. A group that falls out of the dispatch graph without
+ * draining (e.g. the ready set is cleared during incident mitigation) keeps its
+ * keys today forever; with the TTL they self-expire instead of accumulating.
+ * Interpolated into the Lua source so there is a single source of truth.
+ */
+export const GROUP_KEY_TTL_MS = 6 * 60 * 60 * 1000;
+
+/**
+ * Max groups any single unpark moves in one Lua eval. The cap=0 kill switch
+ * drains a tenant's entire parked set; without a bound, flipping the cap off
+ * while a tenant has a huge parked backlog (the May 27 incident parked ~442K)
+ * would do one ZRANGE + per-group ZREM/ZADD over the whole set in a single eval
+ * and block the single Redis thread — recreating the stall the kill switch
+ * exists to stop. Bounding the per-eval work lets the 2s-gated reconcile drain
+ * gradually instead. Interpolated into the Lua for a single source of truth.
+ */
+export const PARK_RECONCILE_MAX_DRAIN = 1000;
+
+// Lua helper, prepended to every script that writes group keys. Refreshes the
+// safety-net TTL on a group's jobs/data keys, deriving expiry from the LATEST
+// pending dispatch score so a job legitimately delayed past the window (e.g. a
+// monitor thread-idle timeout hours out) is never reaped before it is due. The
+// expiry is the later of (now + window) and (latest scheduled dispatch + window).
+export const TTL_HELPER_LUA = `
+local function refreshGroupKeyTtl(jobsKey, dataKey, nowMs)
+  local latest = redis.call("ZRANGE", jobsKey, -1, -1, "WITHSCORES")
+  if not latest[2] then return end
+  local ttl = ${GROUP_KEY_TTL_MS}
+  local untilDue = (tonumber(latest[2]) - nowMs) + ${GROUP_KEY_TTL_MS}
+  if untilDue > ttl then ttl = untilDue end
+  redis.call("PEXPIRE", jobsKey, ttl)
+  redis.call("PEXPIRE", dataKey, ttl)
+end
+`;
+
+// Lua helper for the tenant soft-cap "parking" model, prepended to every script
+// that writes the ready set. Over-cap groups are moved OUT of ready into a
+// per-tenant parked zset ONCE (not re-scored every poll), so the dispatch scan
+// never re-sees them and the write volume no longer scales with backlog size.
+// They are restored when the tenant's in-flight count drops below the cap.
+//
+// Invariant: a group is in exactly one of {ready, parked, blocked, active}.
+// Every ready-writer routes through addToReadyOrParked so a stage/unblock/retry/
+// complete-restage can never clobber a parked group back into the dispatch scan
+// (which is what re-creates the over-cap ZADD storm). The parked set and the
+// parked-tenants registry share the same hash tag as ready (keyPrefix carries
+// it), so all keys stay in one Redis Cluster slot.
+export const PARK_HELPER_LUA = `
+-- Tenant segment of a groupId (everything before the first '/'), else the id.
+local function parkTenantOf(groupId)
+  local slashPos = string.find(groupId, "/", 1, true)
+  if slashPos and slashPos > 1 then return string.sub(groupId, 1, slashPos - 1) end
+  return groupId
+end
+
+-- readyKey is always keyPrefix .. "ready"; recover keyPrefix so the parked keys
+-- can be derived without threading an extra ARGV through every script.
+local function parkKeyPrefixOf(readyKey)
+  return string.sub(readyKey, 1, #readyKey - 5)
+end
+
+-- Route a ready-write to the parked set instead when the group is already
+-- parked, preserving the parked state (cap-free: only DISPATCH/COMPLETE decide
+-- to park/unpark). useLT mirrors the call site's ZADD semantics.
+local function addToReadyOrParked(readyKey, groupId, score, useLT)
+  local kp = parkKeyPrefixOf(readyKey)
+  local parkedKey = kp .. "parked:" .. parkTenantOf(groupId)
+  local target = readyKey
+  if redis.call("ZSCORE", parkedKey, groupId) then target = parkedKey end
+  if useLT then
+    redis.call("ZADD", target, "LT", score, groupId)
+  else
+    redis.call("ZADD", target, score, groupId)
+  end
+end
+
+-- Move an over-cap group out of ready into its tenant's parked set, preserving
+-- its ready score so it keeps priority when restored. Registers the tenant so
+-- the dispatch-tail reconcile can find it even if no COMPLETE ever fires.
+local function parkGroup(readyKey, groupId)
+  local score = redis.call("ZSCORE", readyKey, groupId)
+  if not score then return end
+  local kp = parkKeyPrefixOf(readyKey)
+  local tenantId = parkTenantOf(groupId)
+  redis.call("ZREM", readyKey, groupId)
+  redis.call("ZADD", kp .. "parked:" .. tenantId, score, groupId)
+  redis.call("SADD", kp .. "parked-tenants", tenantId)
+end
+
+-- Restore up to "slots" of a tenant's parked groups (lowest score = earliest
+-- due first) back into ready. Self-limiting: callers pass slots = cap - active
+-- so COMPLETE-unpark and the dispatch-tail reconcile can never over-unpark into
+-- a re-park churn (TRAP 3). Returns how many were moved.
+local function unparkUpTo(readyKey, tenantId, slots)
+  local kp = parkKeyPrefixOf(readyKey)
+  -- A paused tenant's groups stay parked OUT of the ready scan regardless of cap
+  -- headroom or the cap=0 drain: pause is an explicit operator hold and must win.
+  -- Otherwise COMPLETE-unpark / reconcile would restore them into ready and a large
+  -- paused backlog would plug the bounded dispatch scan for every other tenant again.
+  if redis.call("SISMEMBER", kp .. "paused-jobs", "tenant:" .. tenantId) == 1 then
+    return 0
+  end
+  if slots <= 0 then return 0 end
+  -- Bound the per-eval work so no single caller can ZRANGE + ZREM/ZADD an
+  -- unbounded set and block the single Redis thread. The reconcile leaves the
+  -- tenant registered until its parked set is empty, so the rest drains in
+  -- later cycles. (Normal cap>0 unparks pass slots = cap - active, far below
+  -- this; the bound only bites the cap=0 kill-switch drain of a huge backlog.)
+  if slots > ${PARK_RECONCILE_MAX_DRAIN} then slots = ${PARK_RECONCILE_MAX_DRAIN} end
+  local parkedKey = kp .. "parked:" .. tenantId
+  local members = redis.call("ZRANGE", parkedKey, 0, slots - 1, "WITHSCORES")
+  local moved = 0
+  for i = 1, #members, 2 do
+    redis.call("ZREM", parkedKey, members[i])
+    redis.call("ZADD", readyKey, tonumber(members[i + 1]), members[i])
+    moved = moved + 1
+  end
+  if redis.call("ZCARD", parkedKey) == 0 then
+    redis.call("SREM", kp .. "parked-tenants", tenantId)
+  end
+  return moved
+end
+
+-- Safety-net reconcile, run by DISPATCH on a cadence (not the normal path —
+-- COMPLETE-unpark frees slots as jobs finish). Restores parked groups whose
+-- tenant has dropped below cap, covering two cases COMPLETE cannot:
+--   * orphan recovery (TRAP 2): a crashed/timed-out tenant never fires COMPLETE,
+--     so its tenant_active key TTL-expires; read missing as 0 = under cap = unpark,
+--     else the parked groups strand forever (a new stranding mode).
+--   * cap disabled: flipping LANGWATCH_DISPATCH_TENANT_CAP to 0 must not leave
+--     groups parked out of the dispatch scan, so drain the whole tenant.
+-- Self-limiting via unparkUpTo (bounded by cap - active), so it never over-unparks.
+local function reconcileParked(readyKey, keyPrefix, tenantCap)
+  local tenants = redis.call("SMEMBERS", keyPrefix .. "parked-tenants")
+  for _, tenantId in ipairs(tenants) do
+    local slots
+    if tenantCap > 0 then
+      local active = tonumber(redis.call("GET", keyPrefix .. "tenant_active:" .. tenantId)) or 0
+      slots = tenantCap - active
+    else
+      -- Cap disabled: drain the tenant, but in bounded chunks across reconciles
+      -- (unparkUpTo caps the per-eval work and keeps the tenant registered until
+      -- its parked set is empty), so flipping the kill switch with a huge parked
+      -- backlog can't block Redis in one eval.
+      slots = ${PARK_RECONCILE_MAX_DRAIN}
+    end
+    unparkUpTo(readyKey, tenantId, slots)
+  end
+end
+`;
+
+const STAGE_LUA = TTL_HELPER_LUA + PARK_HELPER_LUA + `
 local groupJobsKey    = KEYS[1]
 local readyKey        = KEYS[2]
 local signalKey       = KEYS[3]
@@ -22,6 +177,7 @@ local dedupTtlMs     = tonumber(ARGV[5])
 local jobDataJson    = ARGV[6]
 local shouldExtend   = tonumber(ARGV[7])
 local shouldReplace  = tonumber(ARGV[8])
+local nowMs          = tonumber(ARGV[9])
 
 -- Skip ready-score updates while the group is processing (active key set) or
 -- blocked. In those states the ready score is owned by REFRESH_LUA / COMPLETE_LUA
@@ -48,8 +204,9 @@ if dedupId ~= "" and dedupTtlMs > 0 then
       redis.call("SET", dedupKey, existingJobId, "PX", dedupTtlMs)
       -- Score = earliest pending dispatchAfter (LT keeps the smallest score per group)
       if shouldUpdateReady() then
-        redis.call("ZADD", readyKey, "LT", dispatchAfter, groupId)
+        addToReadyOrParked(readyKey, groupId, dispatchAfter, true)
       end
+      refreshGroupKeyTtl(groupJobsKey, dataKey, nowMs)
       redis.call("LPUSH", signalKey, "1")
       redis.call("LTRIM", signalKey, 0, 999)
       return 0
@@ -61,6 +218,7 @@ end
 
 redis.call("ZADD", groupJobsKey, dispatchAfter, stagedJobId)
 redis.call("HSET", dataKey, stagedJobId, jobDataJson)
+refreshGroupKeyTtl(groupJobsKey, dataKey, nowMs)
 
 if dedupId ~= "" and dedupTtlMs > 0 then
   redis.call("SET", dedupKey, stagedJobId, "PX", dedupTtlMs)
@@ -68,7 +226,7 @@ end
 
 -- Score = earliest pending dispatchAfter (LT keeps the smallest score per group)
 if shouldUpdateReady() then
-  redis.call("ZADD", readyKey, "LT", dispatchAfter, groupId)
+  addToReadyOrParked(readyKey, groupId, dispatchAfter, true)
 end
 
 redis.call("LPUSH", signalKey, "1")
@@ -80,13 +238,15 @@ redis.call("INCR", totalPendingKey)
 return 1
 `;
 
-const STAGE_BATCH_LUA = `
+const STAGE_BATCH_LUA = TTL_HELPER_LUA + PARK_HELPER_LUA + `
 local readyKey        = KEYS[1]
 local signalKey       = KEYS[2]
 local totalPendingKey = KEYS[3]
 
 local keyPrefix = ARGV[1]
 local count     = tonumber(ARGV[2])
+-- nowMs is appended after all per-job args, so it is always the last element.
+local nowMs     = tonumber(ARGV[#ARGV])
 
 local newStagedCount = 0
 local affectedGroups = {}
@@ -137,6 +297,8 @@ for i = 1, count do
     newStagedCount = newStagedCount + 1
   end
 
+  refreshGroupKeyTtl(groupJobsKey, dataKey, nowMs)
+
   -- Track minimum dispatchAfter per affected group
   local existingMin = affectedGroups[groupId]
   if existingMin == nil or dispatchAfter < existingMin then
@@ -152,7 +314,7 @@ for groupId, minScore in pairs(affectedGroups) do
   -- here would re-expose the group to ZRANGEBYSCORE before the next refresh.
   local activeKey = keyPrefix .. "group:" .. groupId .. ":active"
   if redis.call("EXISTS", activeKey) == 0 and redis.call("SISMEMBER", blockedKey, groupId) == 0 then
-    redis.call("ZADD", readyKey, "LT", minScore, groupId)
+    addToReadyOrParked(readyKey, groupId, minScore, true)
   end
 end
 
@@ -167,10 +329,11 @@ end
 return newStagedCount
 `;
 
-const DISPATCH_LUA = `
-local readyKey     = KEYS[1]
-local blockedKey   = KEYS[2]
-local pausedJobKey = KEYS[3]
+const DISPATCH_LUA = PARK_HELPER_LUA + `
+local readyKey         = KEYS[1]
+local blockedKey       = KEYS[2]
+local pausedJobKey     = KEYS[3]
+local totalPendingKey  = KEYS[4]
 
 local keyPrefix    = ARGV[1]
 local nowMs        = tonumber(ARGV[2])
@@ -185,6 +348,23 @@ local tenantCap    = tonumber(ARGV[4]) or 0
 
 local hasPauses = redis.call("SCARD", pausedJobKey) > 0
 local activeUntil = nowMs + activeTtlSec * 1000
+
+-- Restore parked over-cap groups on a cadence (TRAP 2 orphan recovery + cap=0
+-- drain). COMPLETE-unpark handles the normal slot-freeing as jobs finish; this
+-- only backstops what it can't: a crashed/timed-out tenant that never fires
+-- COMPLETE (its tenant_active TTL-expires to 0 = under cap = unpark), and
+-- flipping the cap off (drain everything parked). Time-gated rather than
+-- per-poll so under sustained load (dispatch rarely idle) orphan recovery is
+-- not starved, while the cap=0 steady state pays only a GET + an occasional
+-- empty SMEMBERS. SCARD-gated so it is a true no-op when nothing is parked.
+local reconcileTsKey = keyPrefix .. "reconcile-ts"
+local lastReconcile = tonumber(redis.call("GET", reconcileTsKey)) or 0
+if (nowMs - lastReconcile) >= 2000 then
+  redis.call("SET", reconcileTsKey, nowMs)
+  if redis.call("SCARD", keyPrefix .. "parked-tenants") > 0 then
+    reconcileParked(readyKey, keyPrefix, tenantCap)
+  end
+end
 
 -- Pull only groups whose earliest job is due now (legacy entries with score=1 also pass).
 -- Active groups carry future scores (nowMs + activeTtlSec*1000) and are excluded.
@@ -224,7 +404,31 @@ while offset < scanBudget do
             cached = n >= tenantCap
             tenantCapCache[tenantId] = cached
           end
-          if cached then tenantOverCap = true end
+          if cached then
+            tenantOverCap = true
+            -- Park the over-cap group OUT of ready (once) so subsequent polls
+            -- reach other tenants without re-scanning it. Restored when the
+            -- tenant's in-flight count drops below cap (COMPLETE / reconcile).
+            -- Replaces the per-poll ZADD defer that scaled writes with backlog.
+            parkGroup(readyKey, groupId)
+          end
+        end
+      end
+
+      -- Tenant-level pause: park the group OUT of ready (like over-cap) rather than
+      -- skip it in place. A paused tenant can hold a huge due-now backlog; left in
+      -- ready it sits at the front and the bounded scan burns its whole budget
+      -- skipping it, starving every other tenant (the 2026-05-27 head-of-line stall).
+      -- Parking moves it out so the scan reaches other tenants; the reconcile restores
+      -- it on unpause (unparkUpTo refuses to restore while still paused). Pipeline-level
+      -- pauses below stay skip-in-place (rarer, and need the job data to classify).
+      local tenantPaused = false
+      if hasPauses then
+        -- parkTenantOf handles both "tenant/..." and single-segment ids, so a
+        -- paused single-segment tenant is parked too, not left to skip-in-place.
+        if redis.call("SISMEMBER", pausedJobKey, "tenant:" .. parkTenantOf(groupId)) == 1 then
+          tenantPaused = true
+          parkGroup(readyKey, groupId)
         end
       end
 
@@ -232,7 +436,7 @@ while offset < scanBudget do
       -- Defensive activeKey check — covers legacy state during migration
       -- and the small race between ZADD ready and ZADD active.
       local activeJob = redis.call("GET", activeKey)
-      if (not activeJob) and (not tenantOverCap) then
+      if (not activeJob) and (not tenantOverCap) and (not tenantPaused) then
         local jobsKey = keyPrefix .. "group:" .. groupId .. ":jobs"
         local results = redis.call("ZRANGEBYSCORE", jobsKey, "-inf", nowMs, "WITHSCORES", "LIMIT", 0, 1)
 
@@ -278,6 +482,7 @@ while offset < scanBudget do
 
           if not paused then
             redis.call("ZREM", jobsKey, stagedJobId)
+            redis.call("DECR", totalPendingKey)
             redis.call("SET", activeKey, stagedJobId, "EX", activeTtlSec)
 
             -- Mark group as actively-processing in ready zset (future score suppresses redispatch).
@@ -320,10 +525,11 @@ end
 return nil
 `;
 
-const DISPATCH_BATCH_LUA = `
-local readyKey     = KEYS[1]
-local blockedKey   = KEYS[2]
-local pausedJobKey = KEYS[3]
+const DISPATCH_BATCH_LUA = PARK_HELPER_LUA + `
+local readyKey         = KEYS[1]
+local blockedKey       = KEYS[2]
+local pausedJobKey     = KEYS[3]
+local totalPendingKey  = KEYS[4]
 
 local keyPrefix      = ARGV[1]
 local nowMs          = tonumber(ARGV[2])
@@ -336,6 +542,19 @@ local hasPauses = redis.call("SCARD", pausedJobKey) > 0
 local activeUntil = nowMs + activeTtlSec * 1000
 local results = {}
 local dispatched = 0
+
+-- Restore parked over-cap groups on a cadence (TRAP 2 orphan recovery + cap=0
+-- drain) — see DISPATCH_LUA for the rationale. COMPLETE-unpark handles the
+-- normal slot-freeing; this backstops crashed tenants and cap-disable. Time-
+-- and SCARD-gated so it is a no-op at the cap=0 steady state.
+local reconcileTsKey = keyPrefix .. "reconcile-ts"
+local lastReconcile = tonumber(redis.call("GET", reconcileTsKey)) or 0
+if (nowMs - lastReconcile) >= 2000 then
+  redis.call("SET", reconcileTsKey, nowMs)
+  if redis.call("SCARD", keyPrefix .. "parked-tenants") > 0 then
+    reconcileParked(readyKey, keyPrefix, tenantCap)
+  end
+end
 
 -- Pull only groups whose earliest job is due now. Active groups carry future
 -- scores so they are naturally excluded. Over-fetch by 3x (min 30) per page to
@@ -362,26 +581,44 @@ while offset < scanBudget and dispatched < maxJobs do
   for _, groupId in ipairs(groups) do
     if dispatched >= maxJobs then break end
 
-    if redis.call("SISMEMBER", blockedKey, groupId) == 0 then
-      -- Tenant soft-cap check (no-op when tenantCap == 0).
-      local tenantOverCap = false
-      local tenantCountKey = nil
-      if tenantCap > 0 then
-        local slashPos = string.find(groupId, "/", 1, true)
-        if slashPos and slashPos > 1 then
-          local tenantId = string.sub(groupId, 1, slashPos - 1)
-          tenantCountKey = keyPrefix .. "tenant_active:" .. tenantId
-          local cached = tenantCapCache[tenantId]
-          if cached == nil then
-            local n = tonumber(redis.call("GET", tenantCountKey)) or 0
-            cached = n >= tenantCap
-            tenantCapCache[tenantId] = cached
-          end
-          if cached then tenantOverCap = true end
+    -- Tenant soft-cap check (no-op when tenantCap == 0).
+    -- Checked before SISMEMBER so over-cap groups skip with 0 Redis commands
+    -- (the cap result is cached per-tenant in a Lua table).
+    local tenantOverCap = false
+    local tenantCountKey = nil
+    if tenantCap > 0 then
+      local slashPos = string.find(groupId, "/", 1, true)
+      if slashPos and slashPos > 1 then
+        local tenantId = string.sub(groupId, 1, slashPos - 1)
+        tenantCountKey = keyPrefix .. "tenant_active:" .. tenantId
+        local cached = tenantCapCache[tenantId]
+        if cached == nil then
+          local n = tonumber(redis.call("GET", tenantCountKey)) or 0
+          cached = n >= tenantCap
+          tenantCapCache[tenantId] = cached
+        end
+        if cached then
+          tenantOverCap = true
+          parkGroup(readyKey, groupId)
         end
       end
+    end
 
-      if not tenantOverCap then
+    -- Tenant-level pause: park OUT of ready instead of skip-in-place, so a large
+    -- paused backlog cannot plug the bounded scan and starve other tenants
+    -- (head-of-line). See DISPATCH_LUA for the full rationale; unparkUpTo refuses
+    -- to restore a still-paused tenant, the reconcile restores it on unpause.
+    local tenantPaused = false
+    if hasPauses then
+      -- parkTenantOf handles single-segment ids too (see DISPATCH_LUA).
+      if redis.call("SISMEMBER", pausedJobKey, "tenant:" .. parkTenantOf(groupId)) == 1 then
+        tenantPaused = true
+        parkGroup(readyKey, groupId)
+      end
+    end
+
+    if not tenantOverCap and not tenantPaused then
+      if redis.call("SISMEMBER", blockedKey, groupId) == 0 then
         local activeKey = keyPrefix .. "group:" .. groupId .. ":active"
         -- Defensive activeKey check — covers legacy state during migration
         -- and the small race between ZADD ready and ZADD active.
@@ -433,6 +670,7 @@ while offset < scanBudget and dispatched < maxJobs do
 
           if not paused then
             redis.call("ZREM", jobsKey, stagedJobId)
+            redis.call("DECR", totalPendingKey)
             redis.call("SET", activeKey, stagedJobId, "EX", activeTtlSec)
 
             -- Mark group as actively-processing in ready zset (future score suppresses redispatch).
@@ -473,7 +711,7 @@ while offset < scanBudget and dispatched < maxJobs do
           end
         end
       end
-      end
+    end
     end
   end
 
@@ -484,14 +722,60 @@ end
 return results
 `;
 
-const COMPLETE_LUA = `
+/**
+ * Pop up to maxJobs additional DUE jobs from a single group's pending queue,
+ * WITHOUT touching the group's active/ready/blocked/signal state.
+ *
+ * Safe to call only while the caller already holds the group's active slot
+ * (dispatch sets group:<id>:active and excludes active groups from dispatch),
+ * so no other worker can concurrently dequeue from this group. Used to coalesce
+ * a backed-up group's queued events into a single fold load/apply/store cycle.
+ *
+ * Mirrors the per-job bookkeeping DISPATCH does for the jobs it removes:
+ * ZREM from the jobs zset, HDEL the job data, and DECR total-pending. It does
+ * NOT mark anything active and does NOT re-score ready — the caller's active
+ * job remains the one that frees the group on COMPLETE.
+ */
+const DRAIN_GROUP_LUA = `
+local jobsKey         = KEYS[1]
+local dataKey         = KEYS[2]
+local totalPendingKey = KEYS[3]
+
+local nowMs   = tonumber(ARGV[1])
+local maxJobs = tonumber(ARGV[2])
+
+local results = {}
+if maxJobs <= 0 then
+  return results
+end
+
+local entries = redis.call("ZRANGEBYSCORE", jobsKey, "-inf", nowMs, "WITHSCORES", "LIMIT", 0, maxJobs)
+local i = 1
+while i < #entries do
+  local stagedJobId   = entries[i]
+  local originalScore = entries[i + 1]
+  i = i + 2
+
+  redis.call("ZREM", jobsKey, stagedJobId)
+  local jobDataJson = redis.call("HGET", dataKey, stagedJobId)
+  redis.call("HDEL", dataKey, stagedJobId)
+  redis.call("DECR", totalPendingKey)
+
+  results[#results + 1] = stagedJobId
+  results[#results + 1] = jobDataJson or ""
+  results[#results + 1] = tostring(originalScore)
+end
+
+return results
+`;
+
+const COMPLETE_LUA = PARK_HELPER_LUA + `
 local activeKey       = KEYS[1]
 local jobsKey         = KEYS[2]
 local readyKey        = KEYS[3]
 local signalKey       = KEYS[4]
 local statsKey        = KEYS[5]
 local errorKey        = KEYS[6]
-local totalPendingKey = KEYS[7]
 
 local groupId      = ARGV[1]
 local stagedJobId  = ARGV[2]
@@ -502,6 +786,10 @@ local jobName      = ARGV[3]
 -- prefix in (not a derived tenantId) lets us keep the cap optional
 -- without breaking back-compat with older call sites.
 local tenantCountKeyPrefix = ARGV[4]
+-- Tenant soft-cap (same value DISPATCH_LUA reads). When > 0, a completion
+-- frees a slot that may let one of the tenant's parked over-cap groups resume,
+-- so we unpark up to the freed headroom. 0 = cap disabled, no parking in play.
+local tenantCap = tonumber(ARGV[5]) or 0
 
 local currentActive = redis.call("GET", activeKey)
 if currentActive ~= stagedJobId then
@@ -525,13 +813,26 @@ if tenantCountKeyPrefix and tenantCountKeyPrefix ~= "" then
   end
 end
 
+-- Freed slot: restore up to (cap - now-active) of this tenant's parked groups
+-- so over-cap work deferred by DISPATCH resumes the moment capacity opens. This
+-- is the normal-case unpark; the dispatch reconcile only backstops orphans.
+-- Self-limiting (TRAP 3): bounded to current headroom so COMPLETE-unpark and the
+-- reconcile can't over-unpark into re-park churn. The LPUSH below wakes a waiter.
+if tenantCap > 0 then
+  local tenantId = parkTenantOf(groupId)
+  local active = tonumber(redis.call("GET", tenantCountKeyPrefix .. tenantId)) or 0
+  unparkUpTo(readyKey, tenantId, tenantCap - active)
+end
+
 local pendingCount = redis.call("ZCARD", jobsKey)
 if pendingCount > 0 then
   -- Re-score ready with earliest pending job's dispatchAfter so dispatch sees
-  -- it again as soon as that job is due (could be past or future).
+  -- it again as soon as that job is due (could be past or future). Route through
+  -- the parked-aware write so the invariant holds even though a completing
+  -- (active) group is never itself parked.
   local nextJob = redis.call("ZRANGE", jobsKey, 0, 0, "WITHSCORES")
   if #nextJob >= 2 then
-    redis.call("ZADD", readyKey, tonumber(nextJob[2]), groupId)
+    addToReadyOrParked(readyKey, groupId, tonumber(nextJob[2]), false)
   else
     redis.call("ZREM", readyKey, groupId)
   end
@@ -550,16 +851,13 @@ if jobName and jobName ~= "" then
   redis.call("INCR", statsKey .. ":" .. jobName)
 end
 
--- Decrement total pending counter
-redis.call("DECR", totalPendingKey)
-
 -- Clear any leftover error from previous failures now that the job succeeded
 redis.call("DEL", errorKey)
 
 return 1
 `;
 
-const REFRESH_LUA = `
+const REFRESH_LUA = TTL_HELPER_LUA + `
 local activeKey    = KEYS[1]
 local readyKey     = KEYS[2]
 local stagedJobId           = ARGV[1]
@@ -575,6 +873,12 @@ local tenantCountKeyPrefix  = ARGV[5]
 local currentActive = redis.call("GET", activeKey)
 if currentActive == stagedJobId then
   redis.call("EXPIRE", activeKey, activeTtlSec)
+  -- Keep the pending-sibling jobs/data keys alive while this group is actively
+  -- processing: a long-running active job must not let staged siblings expire
+  -- under the safety-net TTL. Derive the group keys from activeKey (strip the
+  -- ":active" suffix) so no extra args are needed.
+  local groupBase = string.sub(activeKey, 1, #activeKey - 7)
+  refreshGroupKeyTtl(groupBase .. ":jobs", groupBase .. ":data", nowMs)
   -- Refresh ready-zset score so it stays "active" until heartbeat stops or completion.
   -- Only update if the group is currently in ready — if RESTAGE_AND_BLOCK_LUA fired
   -- while this heartbeat was in flight, the group has been removed and we must not
@@ -598,9 +902,10 @@ return 0
 `;
 
 const RESTAGE_AND_BLOCK_LUA = `
-local blockedKey = KEYS[1]
-local readyKey   = KEYS[2]
-local statsKey   = KEYS[3]
+local blockedKey      = KEYS[1]
+local readyKey        = KEYS[2]
+local statsKey        = KEYS[3]
+local totalPendingKey = KEYS[4]
 
 local keyPrefix             = ARGV[1]
 local groupId               = ARGV[2]
@@ -623,8 +928,17 @@ local activeKey    = keyPrefix .. "group:" .. groupId .. ":active"
 redis.call("SADD", blockedKey, groupId)
 
 -- 2. Re-stage the failed job with a new ID
-redis.call("ZADD", groupJobsKey, score, newStagedJobId)
+local inserted = redis.call("ZADD", groupJobsKey, score, newStagedJobId)
 redis.call("HSET", groupDataKey, newStagedJobId, jobDataJson)
+if inserted == 1 then
+  redis.call("INCR", totalPendingKey)
+end
+
+-- Blocked groups are operator-managed (DLQ triage / manual unblock) and must
+-- not be reaped by the group-key safety-net TTL, so clear any TTL set while the
+-- group was still in the active flow.
+redis.call("PERSIST", groupJobsKey)
+redis.call("PERSIST", groupDataKey)
 
 -- 3. Remove from ready set — blocked groups should not be scanned by dispatch.
 --    UNBLOCK_LUA re-adds the group when it is unblocked.
@@ -670,8 +984,9 @@ end
 return 1
 `;
 
-const RETRY_RESTAGE_LUA = `
-local activeKey = KEYS[1]
+const RETRY_RESTAGE_LUA = TTL_HELPER_LUA + PARK_HELPER_LUA + `
+local activeKey       = KEYS[1]
+local totalPendingKey = KEYS[2]
 
 local keyPrefix             = ARGV[1]
 local groupId               = ARGV[2]
@@ -684,6 +999,7 @@ local retryTtlSec           = tonumber(ARGV[7])
 -- counter TTL aligned with the activeKey TTL across backoff retries
 -- so an in-flight retry doesn't expire its tenant slot.
 local tenantCountKeyPrefix  = ARGV[8]
+local nowMs                 = tonumber(ARGV[9])
 
 -- 1. Validate active key matches
 local currentActive = redis.call("GET", activeKey)
@@ -694,13 +1010,19 @@ end
 -- 2. Re-stage job with future score (backoff delay)
 local groupJobsKey = keyPrefix .. "group:" .. groupId .. ":jobs"
 local groupDataKey = keyPrefix .. "group:" .. groupId .. ":data"
-redis.call("ZADD", groupJobsKey, dispatchAfterMs, newStagedJobId)
+local inserted = redis.call("ZADD", groupJobsKey, dispatchAfterMs, newStagedJobId)
 redis.call("HSET", groupDataKey, newStagedJobId, jobDataJson)
+if inserted == 1 then
+  redis.call("INCR", totalPendingKey)
+end
+refreshGroupKeyTtl(groupJobsKey, groupDataKey, nowMs)
 
 -- 3. Update ready set score = future dispatch time so the group becomes
---    eligible exactly when the backoff window expires.
+--    eligible exactly when the backoff window expires. Route through the
+--    parked-aware write so the invariant holds (an active group entering retry
+--    is never itself parked, so this normally writes straight to ready).
 local readyKey = keyPrefix .. "ready"
-redis.call("ZADD", readyKey, dispatchAfterMs, groupId)
+addToReadyOrParked(readyKey, groupId, dispatchAfterMs, false)
 
 -- 4. Set active key TTL to match backoff period.
 --    While the key exists the group is locked (preserves FIFO ordering).
@@ -732,6 +1054,17 @@ return 1
 export interface DispatchResult {
   stagedJobId: string;
   groupId: string;
+  jobDataJson: string;
+  originalScore: number;
+}
+
+/**
+ * A job drained from a group's pending queue for batch coalescing.
+ * Unlike a DispatchResult it carries no groupId (the caller already knows it)
+ * and is never marked active — it is folded alongside the active job.
+ */
+export interface DrainedJob {
+  stagedJobId: string;
   jobDataJson: string;
   originalScore: number;
 }
@@ -780,6 +1113,16 @@ export function readTenantCap(): number {
 }
 
 /**
+ * Set holding every active group-queue name (e.g. "{event-sourcing/jobs}").
+ * Producers register themselves here on construction so the ops dashboard can
+ * enumerate queues with an O(1) SMEMBERS instead of an O(keyspace)
+ * `SCAN MATCH *:gq:ready`, which scanned all ~190K keys to find a single ready
+ * set and pegged the Redis main thread once the keyspace grew. The dedicated
+ * hash tag keeps the set in a single Redis Cluster slot.
+ */
+export const GROUP_QUEUE_REGISTRY_KEY = "{gq-registry}:names";
+
+/**
  * TypeScript wrapper for the group queue Lua scripts.
  * All Redis keys use the `{queueName}` hash tag for Redis Cluster compatibility.
  * Lua scripts derive per-group keys dynamically (e.g. keyPrefix .. "group:" .. groupId)
@@ -788,13 +1131,23 @@ export function readTenantCap(): number {
  */
 export class GroupStagingScripts {
   private readonly keyPrefix: string;
+  private readonly queueName: string;
 
   constructor(
     private readonly redis: IORedis | Cluster,
     queueName: string,
   ) {
     // queueName already includes hash tags, e.g. "{pipeline/handler/spanStorage}"
+    this.queueName = queueName;
     this.keyPrefix = `${queueName}:gq:`;
+  }
+
+  /**
+   * Advertise this queue in the registry set so the ops dashboard discovers it
+   * without scanning the keyspace. Idempotent; safe to call once per process.
+   */
+  async registerQueue(): Promise<void> {
+    await this.redis.sadd(GROUP_QUEUE_REGISTRY_KEY, this.queueName);
   }
 
   /**
@@ -856,6 +1209,7 @@ export class GroupStagingScripts {
       jobDataJson,
       String(shouldExtend ? 1 : 0),
       String(shouldReplace ? 1 : 0),
+      String(Date.now()),
     );
 
     return result === 1;
@@ -897,6 +1251,8 @@ export class GroupStagingScripts {
         String((job.shouldReplace ?? true) ? 1 : 0),
       );
     }
+    // Appended last so the Lua reads it as ARGV[#ARGV] regardless of job count.
+    args.push(String(Date.now()));
 
     const result = await this.redis.eval(STAGE_BATCH_LUA, 3, readyKey, signalKey, totalPendingKey, ...args);
 
@@ -918,6 +1274,7 @@ export class GroupStagingScripts {
     const readyKey = `${this.keyPrefix}ready`;
     const blockedKey = `${this.keyPrefix}blocked`;
     const pausedJobKey = `${this.keyPrefix}paused-jobs`;
+    const totalPendingKey = `${this.keyPrefix}stats:total-pending`;
 
     // Tenant soft-cap (post-2026-05-11 follow-up). 0 = disabled.
     // Env var lets operators flip on per-environment without redeploy.
@@ -925,10 +1282,11 @@ export class GroupStagingScripts {
 
     const result = await this.redis.eval(
       DISPATCH_LUA,
-      3,
+      4,
       readyKey,
       blockedKey,
       pausedJobKey,
+      totalPendingKey,
       this.keyPrefix,
       String(nowMs),
       String(activeTtlSec),
@@ -963,15 +1321,17 @@ export class GroupStagingScripts {
     const readyKey = `${this.keyPrefix}ready`;
     const blockedKey = `${this.keyPrefix}blocked`;
     const pausedJobKey = `${this.keyPrefix}paused-jobs`;
+    const totalPendingKey = `${this.keyPrefix}stats:total-pending`;
 
     const tenantCap = readTenantCap();
 
     const result = await this.redis.eval(
       DISPATCH_BATCH_LUA,
-      3,
+      4,
       readyKey,
       blockedKey,
       pausedJobKey,
+      totalPendingKey,
       this.keyPrefix,
       String(nowMs),
       String(activeTtlSec),
@@ -1016,25 +1376,70 @@ export class GroupStagingScripts {
     const signalKey = `${this.keyPrefix}signal`;
     const statsKey = `${this.keyPrefix}stats:completed`;
     const errorKey = `${this.keyPrefix}group:${groupId}:error`;
-    const totalPendingKey = `${this.keyPrefix}stats:total-pending`;
 
     const result = await this.redis.eval(
       COMPLETE_LUA,
-      7,
+      6,
       activeKey,
       jobsKey,
       readyKey,
       signalKey,
       statsKey,
       errorKey,
-      totalPendingKey,
       groupId,
       stagedJobId,
       jobName ?? "",
       `${this.keyPrefix}tenant_active:`,
+      String(readTenantCap()),
     );
 
     return result === 1;
+  }
+
+  /**
+   * Drain up to maxJobs additional DUE jobs from a group's pending queue without
+   * altering the group's active/ready state. Only safe while the caller holds
+   * the group's active slot. Returns the drained jobs (may be empty).
+   */
+  async drainGroupReady({
+    groupId,
+    nowMs,
+    maxJobs,
+  }: {
+    groupId: string;
+    nowMs: number;
+    maxJobs: number;
+  }): Promise<DrainedJob[]> {
+    if (maxJobs <= 0) return [];
+
+    const jobsKey = `${this.keyPrefix}group:${groupId}:jobs`;
+    const dataKey = `${this.keyPrefix}group:${groupId}:data`;
+    const totalPendingKey = `${this.keyPrefix}stats:total-pending`;
+
+    const result = await this.redis.eval(
+      DRAIN_GROUP_LUA,
+      3,
+      jobsKey,
+      dataKey,
+      totalPendingKey,
+      String(nowMs),
+      String(maxJobs),
+    );
+
+    if (!result || !Array.isArray(result) || result.length < 3) {
+      return [];
+    }
+
+    const drained: DrainedJob[] = [];
+    for (let i = 0; i + 3 <= result.length; i += 3) {
+      drained.push({
+        stagedJobId: String(result[i]),
+        jobDataJson: String(result[i + 1]),
+        originalScore: Number(result[i + 2]),
+      });
+    }
+
+    return drained;
   }
 
   /**
@@ -1091,13 +1496,15 @@ export class GroupStagingScripts {
     const blockedKey = `${this.keyPrefix}blocked`;
     const readyKey = `${this.keyPrefix}ready`;
     const statsKey = `${this.keyPrefix}stats:failed`;
+    const totalPendingKey = `${this.keyPrefix}stats:total-pending`;
 
     await this.redis.eval(
       RESTAGE_AND_BLOCK_LUA,
-      3,
+      4,
       blockedKey,
       readyKey,
       statsKey,
+      totalPendingKey,
       this.keyPrefix,
       groupId,
       newStagedJobId,
@@ -1136,13 +1543,15 @@ export class GroupStagingScripts {
     backoffMs: number;
   }): Promise<boolean> {
     const activeKey = `${this.keyPrefix}group:${groupId}:active`;
+    const totalPendingKey = `${this.keyPrefix}stats:total-pending`;
     // TTL = backoff + 2s buffer so the key expires just after the job becomes eligible
     const retryTtlSec = Math.ceil(backoffMs / 1000) + 2;
 
     const result = await this.redis.eval(
       RETRY_RESTAGE_LUA,
-      1,
+      2,
       activeKey,
+      totalPendingKey,
       this.keyPrefix,
       groupId,
       stagedJobId,
@@ -1151,6 +1560,7 @@ export class GroupStagingScripts {
       jobDataJson,
       String(retryTtlSec),
       `${this.keyPrefix}tenant_active:`,
+      String(Date.now()),
     );
 
     return result === 1;

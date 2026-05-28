@@ -83,6 +83,15 @@ export function createApiRouter() {
   api.route("/", dashboardsApp);
   api.route("/", datasetApp);
   api.route("/", evaluatorsApp);
+  // experimentsV3App owns the session-authenticated execute/abort endpoints and
+  // the API-key-authenticated run/runs endpoints. It must mount before
+  // experimentsApp, whose project-API-key auth middleware spans the whole
+  // /api/experiments/* namespace. Mounted first, that middleware would run on
+  // POST /api/experiments/execute (a session-cookie request that carries no
+  // API key) and reject it before the session is ever checked. Mounting v3
+  // first lets its own handlers match and respond, short-circuiting the guard.
+  api.route("/", experimentsV3App);
+  api.route("/", experimentsV3LegacyAliasApp);  // /api/evaluations/v3/... → /api/experiments/...
   api.route("/", experimentsApp);
   api.route("/", filesApp);
   api.route("/", exportTracesApp);
@@ -105,8 +114,6 @@ export function createApiRouter() {
   api.route("/", triggersApp);
   api.route("/", workflowsCrudApp);      // CRUD — complements workflowsApp (code-completion, post_event)
 
-  api.route("/", experimentsV3App);
-  api.route("/", experimentsV3LegacyAliasApp);  // /api/evaluations/v3/... → /api/experiments/...
   api.route("/", gatewayInternalApp);
   api.route("/", otelApp);
   api.route("/", playgroundApp);
