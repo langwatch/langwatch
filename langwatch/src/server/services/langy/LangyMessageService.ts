@@ -10,6 +10,29 @@ export type CreateMessageInput = {
   tokenCount?: number | null;
 };
 
+/**
+ * Display shape the UI consumes when restoring a conversation. The raw
+ * row stores `parts` (JSONB); the UI only renders text, so we flatten
+ * the text parts into `content` here rather than leaking the JSONB blob.
+ */
+export type LangyMessageRecord = {
+  id: string;
+  role: MessageRole;
+  content: string;
+};
+
+function extractText(parts: unknown): string {
+  if (!Array.isArray(parts)) return "";
+  return parts
+    .map((p) =>
+      p && typeof (p as { text?: unknown }).text === "string"
+        ? (p as { text: string }).text
+        : "",
+    )
+    .filter(Boolean)
+    .join("\n");
+}
+
 export class LangyMessageRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
@@ -70,6 +93,24 @@ export class LangyMessageService {
       conversationId,
       projectId,
     });
+  }
+
+  async getRecordsByConversation({
+    conversationId,
+    projectId,
+  }: {
+    conversationId: string;
+    projectId: string;
+  }): Promise<LangyMessageRecord[]> {
+    const rows = await this.repository.findAllByConversation({
+      conversationId,
+      projectId,
+    });
+    return rows.map((r) => ({
+      id: r.id,
+      role: r.role as MessageRole,
+      content: extractText(r.parts),
+    }));
   }
 
   async append(input: CreateMessageInput): Promise<LangyMessage> {
