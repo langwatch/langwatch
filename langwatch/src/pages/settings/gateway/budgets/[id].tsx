@@ -75,6 +75,7 @@ function BudgetDetailPage() {
       toaster.create({
         title: err instanceof Error ? err.message : "Failed to archive",
         type: "error",
+        error: err,
       });
     }
   };

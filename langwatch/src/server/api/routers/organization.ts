@@ -1139,6 +1139,20 @@ export const organizationRouter = createTRPCRouter({
         });
       }
 
+      // Pairs with the existing `team_member_invited` event (which fires
+      // when the invite is SENT). Together they form the invite-acceptance
+      // funnel: invited → accepted. The gap is the expansion-conversion
+      // metric the founders track for collaboration features.
+      trackServerEvent({
+        userId: session.user.id,
+        event: "team_invite_accepted",
+        organizationId: invite.organizationId,
+        properties: {
+          inviteId: invite.id,
+          role: invite.role,
+        },
+      });
+
       void getApp()
         .notifications.sendSlackSignupEvent({
           userName: session.user.name,

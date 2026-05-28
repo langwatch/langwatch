@@ -15,6 +15,7 @@ import { SimulationFacade } from "~/server/simulations/simulation.facade";
 import { extractSuiteId } from "~/server/suites/suite-set-id";
 import type { SuiteRunSummary } from "~/server/scenarios/scenario-event.types";
 import { enforceLicenseLimit } from "~/server/license-enforcement";
+import { trackProjectEvent } from "~/server/posthog";
 import { checkProjectPermission } from "../../rbac";
 import { createSuiteSchema, projectSchema, suiteTargetSchema, updateSuiteSchema } from "./schemas";
 
@@ -25,7 +26,24 @@ export const suiteRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       await enforceLicenseLimit(ctx, input.projectId, "experiments");
       const service = SuiteService.create({ prisma: ctx.prisma, suiteRunService: getApp().suiteRuns.runs });
-      return service.create(input);
+      const suite = await service.create(input);
+
+      // Simulation suites are a key Scenarios-product adoption signal.
+      // Pairs with the existing `scenario_created` event: scenarios live
+      // inside suites, so suite_created is the "container" adoption while
+      // scenario_created is the "content" adoption. Both together give
+      // us creation→usage of the simulations product.
+      trackProjectEvent({
+        prisma: ctx.prisma,
+        userId: ctx.session.user.id,
+        event: "suite_created",
+        projectId: input.projectId,
+        properties: {
+          suiteId: suite.id,
+        },
+      });
+
+      return suite;
     }),
 
   getAll: protectedProcedure

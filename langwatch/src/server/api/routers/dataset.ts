@@ -9,6 +9,7 @@ import {
   datasetRecordInputSchema,
 } from "../../datasets/types.generated";
 import { enforceLicenseLimit } from "../../license-enforcement";
+import { trackProjectEvent } from "../../posthog";
 import { checkProjectPermission, hasProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
@@ -64,7 +65,7 @@ export const datasetRouter = createTRPCRouter({
       const datasetService = DatasetService.create(ctx.prisma);
 
       // Delegate all business logic to service
-      return await datasetService.upsertDataset({
+      const result = await datasetService.upsertDataset({
         projectId: input.projectId,
         name: "name" in input ? input.name : undefined,
         experimentId: "experimentId" in input ? input.experimentId : undefined,
@@ -72,6 +73,29 @@ export const datasetRouter = createTRPCRouter({
         datasetId: "datasetId" in input ? input.datasetId : undefined,
         datasetRecords: input.datasetRecords,
       });
+
+      // Gate to first-time creates: this is an upsert procedure, but the
+      // adoption metric we care about is "did the user CREATE a new
+      // dataset", not "did they update an existing one". Updates are
+      // implied by dataset_records_added on datasetRecord.create.
+      if (isNewDataset) {
+        trackProjectEvent({
+          prisma: ctx.prisma,
+          userId: ctx.session.user.id,
+          event: "dataset_created",
+          projectId: input.projectId,
+          properties: {
+            datasetId: result.id,
+            columnCount: input.columnTypes
+              ? Object.keys(input.columnTypes).length
+              : 0,
+            initialRecordCount: input.datasetRecords?.length ?? 0,
+            fromExperiment: "experimentId" in input,
+          },
+        });
+      }
+
+      return result;
     }),
 
   /**

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useDrawer } from "~/hooks/useDrawer";
+import { useTrackTraceOpened } from "~/hooks/useTrackTraceOpened";
 import { Drawer } from "../components/ui/drawer";
 import { useAnnotationCommentStore } from "../hooks/useAnnotationCommentStore";
 import { NewTracesPromo } from "./messages/NewTracesPromo";
@@ -14,6 +15,8 @@ interface TraceDetailsDrawerProps {
 export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
   const { goBack } = useDrawer();
   const commentState = useAnnotationCommentStore();
+
+  useTrackTraceOpened(props.traceId, "v1");
 
   const [traceView, setTraceView] = useState<"span" | "full">("span");
 

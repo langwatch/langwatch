@@ -167,6 +167,7 @@ function SeatsContent({
           err instanceof Error ? err.message : "An unexpected error occurred",
         type: "error",
         meta: { closable: true },
+        error: err,
       });
     } finally {
       setIsConfirming(false);

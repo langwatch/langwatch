@@ -27,6 +27,7 @@ import { isNlpGoEnabled } from "../../nlpgo/nlpgoFetch";
 import { checkProjectPermission, hasProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { fireWorkflowCreatedNurturing } from "~/../ee/billing/nurturing/hooks/featureAdoption";
+import { trackProjectEvent } from "~/server/posthog";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { autoComputeAgentMappings } from "../../workflows/auto-compute-agent-mappings";
 import { createLogger } from "../../../utils/logger/server";
@@ -113,6 +114,22 @@ export const workflowRouter = createTRPCRouter({
           });
         })
         .catch(captureException);
+
+      // Studio adoption signal. `autoPublished` lets us split "exploratory"
+      // workflows (saved but not published) from "production" workflows
+      // (published on first save, e.g. evaluator-shaped workflows). The
+      // ratio of those is a quality-of-use signal.
+      trackProjectEvent({
+        prisma: ctx.prisma,
+        userId: ctx.session.user.id,
+        event: "workflow_created",
+        projectId: input.projectId,
+        properties: {
+          workflowId: workflow.id,
+          autoPublished: Boolean(input.publish),
+          name: input.dsl.name,
+        },
+      });
 
       return { workflow, version };
     }),

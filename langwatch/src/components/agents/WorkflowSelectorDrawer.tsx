@@ -173,6 +173,7 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
           title: "Error",
           description: "Failed to create workflow agent",
           type: "error",
+          error: error,
         });
       }
     },

@@ -176,6 +176,7 @@ export function WorkflowSelectorForEvaluatorDrawer(
           title: "Error",
           description: "Failed to create workflow evaluator",
           type: "error",
+          error: error,
         });
       }
     },

@@ -15,6 +15,7 @@ import { getOnPlatformSetId } from "~/server/scenarios/internal-set-id";
 import { generateBatchRunId } from "~/server/scenarios/scenario.ids";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { createLogger } from "~/utils/logger/server";
+import { trackProjectEvent } from "~/server/posthog";
 import { checkProjectPermission } from "../../rbac";
 import { projectSchema } from "./schemas";
 
@@ -54,7 +55,7 @@ export const simulationRunnerRouter = createTRPCRouter({
   run: protectedProcedure
     .input(runScenarioSchema)
     .use(checkProjectPermission("scenarios:manage"))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const setId = input.setId ?? getOnPlatformSetId(input.projectId);
       const batchRunId = input.batchRunId ?? generateBatchRunId();
 
@@ -126,6 +127,22 @@ export const simulationRunnerRouter = createTRPCRouter({
       // No explicit job scheduling — the execution reactor picks up the queued
       // event via the GroupQueue and spawns the child process.
       logger.info({ batchRunId, scenarioRunId }, "Scenario queued via event-sourcing");
+
+      // Active-user signal. The SDK ingest path (/api/scenario-events) is
+      // API-key authed and has no user, so platform-triggered runs are the
+      // only ones attributable to a person — track them here.
+      trackProjectEvent({
+        prisma: ctx.prisma,
+        userId: ctx.session.user.id,
+        event: "scenario_run",
+        projectId: input.projectId,
+        properties: {
+          scenarioId: input.scenarioId,
+          scenarioRunId,
+          batchRunId,
+          targetType: input.target.type,
+        },
+      });
 
       return {
         scheduled: true,

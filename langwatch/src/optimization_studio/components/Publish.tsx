@@ -512,6 +512,7 @@ function PublishModalContent({
             meta: {
               closable: true,
             },
+            error: error,
           });
           throw error;
         }

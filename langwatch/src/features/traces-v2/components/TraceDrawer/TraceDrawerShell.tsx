@@ -1,6 +1,7 @@
 import { Box, CodeBlock, Flex } from "@chakra-ui/react";
 import { useRef } from "react";
 import { useColorMode } from "~/components/ui/color-mode";
+import { useTrackTraceOpened } from "~/hooks/useTrackTraceOpened";
 import { Drawer } from "~/components/ui/drawer";
 import { IsolatedErrorBoundary } from "~/components/ui/IsolatedErrorBoundary";
 import {
@@ -57,6 +58,10 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
     handleClose,
     drawerContentRef,
   } = useTraceDrawerScaffold();
+
+  // Only count a view once the trace has actually loaded — firing on the
+  // raw traceId would also count failed/empty fetches as `trace_opened`.
+  useTrackTraceOpened(trace ? trace.traceId : undefined, "v2");
 
   const viewMode = useDrawerStore((s) => s.viewMode);
   const widthPx = useDrawerStore((s) => s.widthPx);

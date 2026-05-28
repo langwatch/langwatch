@@ -136,6 +136,7 @@ function VirtualKeysPage() {
       toaster.create({
         title: err instanceof Error ? err.message : "Failed to rotate key",
         type: "error",
+        error: err,
       });
     }
   };
@@ -152,6 +153,7 @@ function VirtualKeysPage() {
       toaster.create({
         title: err instanceof Error ? err.message : "Failed to revoke key",
         type: "error",
+        error: err,
       });
     }
   };

@@ -155,6 +155,7 @@ export const useRunEvalution = () => {
               type: "error",
               duration: 5000,
               meta: { closable: true },
+              error: err,
             });
           }
         }
@@ -185,6 +186,7 @@ export const useRunEvalution = () => {
             type: "error",
             duration: 5000,
             meta: { closable: true },
+            error: err,
           });
           return;
         }

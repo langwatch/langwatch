@@ -91,6 +91,7 @@ export function ReplicateToProjectDialog({
         title: `Error replicating ${entityLabel.toLowerCase()}`,
         description: error instanceof Error ? error.message : "Unknown error",
         type: "error",
+        error: error,
       });
     }
   };

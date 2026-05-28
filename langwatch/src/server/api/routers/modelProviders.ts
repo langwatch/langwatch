@@ -26,6 +26,7 @@ import {
   hasProjectPermission,
 } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { trackProjectEvent } from "~/server/posthog";
 import {
   validateKeyWithCustomUrl,
   validateProviderApiKey,
@@ -169,6 +170,34 @@ export const modelProviderRouter = createTRPCRouter({
         },
         { prisma: ctx.prisma, session: ctx.session },
       );
+
+      // Fire only when this looks like a "credentials supplied" event
+      // (enabled + customKeys present). A pure toggle or unset wouldn't
+      // count as setup — those would inflate adoption metrics.
+      const customKeysProvided =
+        input.customKeys != null &&
+        typeof input.customKeys === "object" &&
+        Object.keys(input.customKeys).length > 0;
+      if (input.enabled && customKeysProvided) {
+        trackProjectEvent({
+          prisma: ctx.prisma,
+          userId: ctx.session.user.id,
+          event: "model_provider_configured",
+          projectId: input.projectId,
+          properties: {
+            provider: input.provider,
+            isUpdate: Boolean(input.id),
+            hasCustomModels: Boolean(input.customModels),
+            hasDefaultModel: Boolean(input.defaultModel),
+            // Only report scopeCount when the caller actually supplied scope
+            // input; a scope-preserving update omits it, and emitting 0 there
+            // would misclassify it as "scopes cleared".
+            ...(input.scopes !== undefined || input.scopeId !== undefined
+              ? { scopeCount: input.scopes?.length ?? (input.scopeId ? 1 : 0) }
+              : {}),
+          },
+        });
+      }
 
       return result;
     }),

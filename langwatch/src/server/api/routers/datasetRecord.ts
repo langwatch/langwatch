@@ -5,6 +5,7 @@ import { captureException } from "~/utils/posthogErrorCapture";
 import { stripNullBytes } from "../../datasets/sanitize";
 import { newDatasetEntriesSchema } from "../../datasets/types";
 import { prisma } from "../../db";
+import { trackProjectEvent } from "../../posthog";
 import { StorageService } from "../../storage";
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
@@ -44,11 +45,27 @@ export const datasetRecordRouter = createTRPCRouter({
         });
       }
 
-      return createManyDatasetRecords({
+      const created = await createManyDatasetRecords({
         datasetId: input.datasetId,
         projectId: input.projectId,
         datasetRecords: input.entries,
       });
+
+      // Batched per request — we capture once per add call regardless of
+      // how many records were appended, with `count` as a property. Per-
+      // record capture would explode event volume for large CSV uploads.
+      trackProjectEvent({
+        prisma: ctx.prisma,
+        userId: ctx.session.user.id,
+        event: "dataset_records_added",
+        projectId: input.projectId,
+        properties: {
+          datasetId: input.datasetId,
+          count: input.entries.length,
+        },
+      });
+
+      return created;
     }),
   update: protectedProcedure
     .input(

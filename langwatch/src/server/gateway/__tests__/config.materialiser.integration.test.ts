@@ -139,7 +139,6 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
     await prisma.modelProvider.create({
       data: {
         id: MP_ID,
-        organizationId: ORG_ID,
         name: "openai",
         provider: "openai",
         enabled: true,
@@ -251,11 +250,15 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
       where: { projectId: PROJECT_ID },
     });
     await prisma.monitor.deleteMany({
-      where: { id: { in: [MONITOR_ID, MONITOR_NOT_GUARDRAIL_ID] } },
+      where: {
+        projectId: PROJECT_ID,
+        id: { in: [MONITOR_ID, MONITOR_NOT_GUARDRAIL_ID] },
+      },
     });
-    await prisma.routingPolicyScope.deleteMany({
-      where: { routingPolicyId: RP_ID },
-    });
+    // RoutingPolicyScope rows cascade-delete with their RoutingPolicy
+    // (onDelete: Cascade), so deleting the policy below is enough — an
+    // explicit deleteMany here also trips the multi-tenancy guard, which
+    // has no RoutingPolicyScope predicate.
     await prisma.routingPolicy.deleteMany({ where: { id: RP_ID } });
     await prisma.modelProviderScope.deleteMany({
       where: { modelProviderId: MP_ID },

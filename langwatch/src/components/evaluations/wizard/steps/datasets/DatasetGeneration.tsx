@@ -285,6 +285,7 @@ export function DatasetGeneration() {
           meta: {
             closable: true,
           },
+          error: error,
         });
       }
     },

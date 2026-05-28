@@ -117,6 +117,7 @@ export function AddRowsFromCSVModal({
         meta: {
           closable: true,
         },
+        error: error,
       });
 
       return;
