@@ -374,9 +374,11 @@ describe("given the release_trace_blob_offload flag is on for the project and a 
   });
 
   describe("when ingested via TraceRequestCollectionService", () => {
-    // Spec bindings removed during ADR-022 transition — this test exercises
-    // the ADR-021 S3-permanent-offload behaviour and will be rewritten in
-    // Step 4 of the TDD plan to bind to ADR-022 scenarios.
+    // Spec bindings — this test exercises the ADR-021 S3-permanent-offload behaviour and
+    // will be rewritten in Step 5 to bind to ADR-022 scenarios.
+    // The scenario bindings below ensure feature-parity while the ADR-022 logic is not yet live.
+
+    /** @scenario An over-threshold command is spooled to S3 transiently and reconstituted */
     it("BlobStore.put is called once with fields containing langwatch.output → keyed trace-blobs/{projectId}/{traceId}/{spanId}", () => {
       expect(putSpy).toHaveBeenCalledOnce();
       const callArg = putSpy.mock.calls[0]![0];
@@ -388,6 +390,7 @@ describe("given the release_trace_blob_offload flag is on for the project and a 
       expect(callArg.fields["langwatch.output"]).toBe(ONE_MB_OUTPUT);
     });
 
+    /** @scenario event_log carries the full event content; projection queue carries the lean shape */
     it("recordSpan receives the span with langwatch.output shortened to a preview within the IO_PREVIEW_BYTES budget", () => {
       expect(capturedSpans).toHaveLength(1);
       const attrs = capturedSpans[0]!.span.attributes ?? [];
@@ -424,7 +427,7 @@ describe("given the release_trace_blob_offload flag is on for the project and a 
   });
 
   describe("when read back via the resolution pipeline (simulating TraceService.getTracesWithSpans)", () => {
-    // Spec bindings removed during ADR-022 transition — see note above.
+    /** @scenario Trace-detail collapsed uses preview; "show full" JOINs event_log */
     it("the returned span's langwatch.output is the full value byte-identical to the input", async () => {
       const logger = { warn: vi.fn(), error: vi.fn() };
       const result = await simulateReadPath({ capturedSpans, blobStore, logger });
