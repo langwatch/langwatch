@@ -127,6 +127,24 @@ describe("GET /api/auth/cli/governance/*", () => {
     await prisma.organizationUser.create({
       data: { organizationId: ORG_C, userId: USER_C, role: "ADMIN" },
     });
+    // hasOrganizationPermission resolves via RoleBindings, not the legacy
+    // OrganizationUser.role, so the CLI governance reads (now RBAC-gated)
+    // need an ORG-scoped ADMIN binding per caller.
+    for (const [orgId, userId] of [
+      [ORG_A, USER_A],
+      [ORG_B, USER_B],
+      [ORG_C, USER_C],
+    ] as const) {
+      await prisma.roleBinding.create({
+        data: {
+          organizationId: orgId,
+          userId,
+          role: "ADMIN",
+          scopeType: "ORGANIZATION",
+          scopeId: orgId,
+        },
+      });
+    }
 
     // One IngestionSource per org. The hashed secret + status are
     // arbitrary — these endpoints don't exercise the receiver path,
@@ -197,6 +215,9 @@ describe("GET /api/auth/cli/governance/*", () => {
       where: { id: { in: [SOURCE_A_ID, SOURCE_B_ID, SOURCE_C_ID] } },
     });
     await prisma.organizationUser.deleteMany({
+      where: { organizationId: { in: [ORG_A, ORG_B, ORG_C] } },
+    });
+    await prisma.roleBinding.deleteMany({
       where: { organizationId: { in: [ORG_A, ORG_B, ORG_C] } },
     });
     await prisma.user.deleteMany({

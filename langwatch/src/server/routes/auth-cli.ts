@@ -35,6 +35,8 @@ import { env } from "~/env.mjs";
 import { connection as redisConnection } from "~/server/redis";
 import { prisma } from "~/server/db";
 import { getServerAuthSession } from "~/server/auth";
+import { hasOrganizationPermission, hasProjectPermission } from "~/server/api/rbac";
+import type { Permission } from "~/server/api/rbac";
 import {
   PersonalVirtualKeyService,
   NoDefaultRoutingPolicyError,
@@ -1026,6 +1028,30 @@ async function ensureEnterpriseOr402(
   }
 }
 
+// The CLI governance reads mirror web/tRPC surfaces that gate on
+// governance RBAC. The bearer token only proves org membership, so without
+// this any org member could read sources / activity / status. Enforce the
+// same permission the web route requires for the caller's user.
+async function ensureGovernancePermissionOr403(
+  c: Context,
+  tokenRecord: { user_id: string; organization_id: string },
+  permission: Permission,
+): Promise<Response | null> {
+  const allowed = await hasOrganizationPermission(
+    { prisma, session: { user: { id: tokenRecord.user_id } } } as any,
+    tokenRecord.organization_id,
+    permission,
+  );
+  if (allowed) return null;
+  return c.json(
+    {
+      error: "forbidden",
+      error_description: `Missing required permission '${permission}' on this organization`,
+    },
+    403,
+  );
+}
+
 app.get("/governance/ingest/sources", async (c: Context) => {
   const tokenRecord = await validateAccessToken(c.req.header("Authorization"));
   if (!tokenRecord) {
@@ -1044,6 +1070,12 @@ app.get("/governance/ingest/sources", async (c: Context) => {
     ENTERPRISE_FEATURE_ERRORS.INGESTION_SOURCES,
   );
   if (gate) return gate;
+  const denied = await ensureGovernancePermissionOr403(
+    c,
+    tokenRecord,
+    "ingestionSources:view",
+  );
+  if (denied) return denied;
   const includeArchived = c.req.query("include_archived") === "1";
   const service = new IngestionSourceService(prisma);
   const sources = await service.list(tokenRecord.organization_id);
@@ -1082,6 +1114,12 @@ app.get("/governance/ingest/sources/:id/events", async (c: Context) => {
     ENTERPRISE_FEATURE_ERRORS.ACTIVITY_MONITOR,
   );
   if (gate) return gate;
+  const denied = await ensureGovernancePermissionOr403(
+    c,
+    tokenRecord,
+    "activityMonitor:view",
+  );
+  if (denied) return denied;
   const sourceId = c.req.param("id");
   if (!sourceId) {
     return c.json(
@@ -1136,6 +1174,12 @@ app.get("/governance/ingest/sources/:id/health", async (c: Context) => {
     ENTERPRISE_FEATURE_ERRORS.INGESTION_SOURCES,
   );
   if (gate) return gate;
+  const denied = await ensureGovernancePermissionOr403(
+    c,
+    tokenRecord,
+    "activityMonitor:view",
+  );
+  if (denied) return denied;
   const sourceId = c.req.param("id");
   if (!sourceId) {
     return c.json(
@@ -1362,6 +1406,26 @@ app.post("/approve", async (c: Context) => {
           error: "forbidden",
           error_description:
             "Project not found in this organization, or you do not have access to it",
+        },
+        403,
+      );
+    }
+
+    // The returned Project.apiKey is the shared write credential and is
+    // usable outside the UI's RBAC constraints, so team membership alone
+    // is not enough: require a write-capable project permission. A
+    // view-only member cannot extract it.
+    const canWriteProject = await hasProjectPermission(
+      { prisma, session },
+      project.id,
+      "project:update",
+    );
+    if (!canWriteProject) {
+      return c.json(
+        {
+          error: "forbidden",
+          error_description:
+            "You need write access to this project to retrieve its API key.",
         },
         403,
       );
