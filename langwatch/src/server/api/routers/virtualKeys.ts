@@ -23,6 +23,7 @@ import type { Session } from "~/server/auth";
 
 import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
 import {
+  parseVirtualKeyConfig,
   virtualKeyConfigSchema,
   type GuardrailAttachment,
 } from "~/server/gateway/virtualKey.config";
@@ -123,9 +124,14 @@ async function assertGuardrailAttachmentsAllowed(
 }
 
 export const virtualKeysRouter = createTRPCRouter({
+  // Reads are gated on organization membership, not the manage-tier
+  // `virtualKeys:view` permission: any member of the organization can see
+  // the org-scoped virtual keys (no secret is ever returned by list/get),
+  // mirroring how personalVirtualKeys gates a member's own keys. Mutations
+  // below keep the `virtualKeys:manage` / `:rotate` / `:delete` gates.
   list: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .use(checkOrganizationPermission("virtualKeys:view"))
+    .use(checkOrganizationPermission("organization:view"))
     .query(async ({ ctx, input }) => {
       const service = VirtualKeyService.create(ctx.prisma);
       const keys = await service.getAll(input.organizationId);
@@ -134,7 +140,7 @@ export const virtualKeysRouter = createTRPCRouter({
 
   get: protectedProcedure
     .input(idInput)
-    .use(checkOrganizationPermission("virtualKeys:view"))
+    .use(checkOrganizationPermission("organization:view"))
     .query(async ({ ctx, input }) => {
       const service = VirtualKeyService.create(ctx.prisma);
       const vk = await service.getById(input.id, input.organizationId);
@@ -203,11 +209,24 @@ export const virtualKeysRouter = createTRPCRouter({
         input.id,
         input.scopes,
       );
-      await assertGuardrailAttachmentsAllowed(
-        ctx,
-        vkProjectId,
-        input.config?.guardrailAttachments,
-      );
+      // Validate the guardrail attachments the key will actually carry
+      // after this update against its (possibly new) project. The service
+      // keeps the existing attachments when the caller omits them, so a
+      // scope move that changes the key's project without resending the
+      // config must revalidate those persisted attachments here, otherwise
+      // a key can be moved to a different project while still carrying
+      // attachments that only belong to the old one.
+      let effectiveAttachments = input.config?.guardrailAttachments;
+      if (input.scopes && effectiveAttachments === undefined) {
+        const existing = await ctx.prisma.virtualKey.findFirst({
+          where: { id: input.id, organizationId: input.organizationId },
+          select: { config: true },
+        });
+        effectiveAttachments = existing
+          ? parseVirtualKeyConfig(existing.config).guardrailAttachments
+          : undefined;
+      }
+      await assertGuardrailAttachmentsAllowed(ctx, vkProjectId, effectiveAttachments);
       const service = VirtualKeyService.create(ctx.prisma);
       const updated = await service.update({
         id: input.id,

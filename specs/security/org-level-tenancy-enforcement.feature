@@ -26,37 +26,42 @@ Feature: Organization-level multi-tenancy enforcement
     And a caller who is a member of "acme" but not of "globex"
 
   # ────────────────────────────────────────────────────────────────────────────
-  # SQL-layer organization guard
+  # Data isolation between organizations
   # ────────────────────────────────────────────────────────────────────────────
 
   @integration @unimplemented
-  Scenario: A query on an org-scoped model without an organization predicate throws
-    When RoleBinding.findMany is called with an empty WHERE
-    Then the organization guard throws because no organizationId or row id was supplied
-    # Bare findMany would return every organization's bindings.
+  Scenario: Reading org-scoped data never crosses organizations
+    Given roles, api keys, and routing policies exist in both "acme" and "globex"
+    When code reads any of those without naming an organization
+    Then the read is refused rather than returning every organization's rows
+    # The Prisma guard rejects a query on an org-scoped model that carries
+    # no organizationId (or single-row id) predicate.
 
   @integration @unimplemented
-  Scenario: A single-row lookup by id passes the organization guard
-    When CustomRole.findFirst is called with a row id
-    Then the organization guard allows the call
+  Scenario: A single record can still be looked up directly by its id
+    When code reads one custom role by its id
+    Then the read is allowed
+    # A by-id lookup is its own tenancy proof; the caller already named the row.
 
   @integration @unimplemented
-  Scenario: Creating an org-scoped row without an organizationId throws
-    When ApiKey.create is called without an organizationId
-    Then the organization guard throws because the row must declare its owning organization
+  Scenario: Saving an org-scoped record without an owner is refused
+    When code saves an api key without naming an owning organization
+    Then the save is refused
 
   @integration @unimplemented
-  Scenario: An OR predicate spanning two organizations throws
-    When RoutingPolicy.findMany is called with OR branches carrying two different organizationIds
-    Then the organization guard throws because the query spans more than one organization
-    # The single-organization invariant: every OR branch must carry
-    # organizationId and they must all be identical.
+  Scenario: A single read cannot mix two organizations
+    When code reads routing policies for two different organizations in one query
+    Then the read is refused
+    # The single-organization invariant: a query may not span more than one
+    # organization, so every alternative in it must name the same one.
 
   @unit @unimplemented
-  Scenario: Every Prisma model belongs to exactly one tenancy regime
-    When the tenancy-regime partition is checked
-    Then every model is in exactly one of ORG_SCOPED_MODELS, SCOPED_MODELS, or EXEMPT_MODELS
-    And a model in none of them fails the check
+  Scenario: A new org-scoped table is covered by the guard or the build fails
+    Given a new table that holds organization-scoped data
+    When it is added without being placed under the organization guard
+    Then the tenancy coverage check fails
+    # Every model must fall under exactly one tenancy regime; an uncovered
+    # model is a build failure, not a silent leak.
 
   # ────────────────────────────────────────────────────────────────────────────
   # tRPC organization guard

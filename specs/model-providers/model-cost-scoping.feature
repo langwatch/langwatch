@@ -70,14 +70,19 @@ Feature: Multi-scope model cost overrides
     And the static platform default cost is returned
 
   @integration @unimplemented
-  Scenario: Listing custom costs without an organization predicate throws
-    When CustomLLMModelCost.findMany is called with an empty WHERE
-    Then the tenancy guard throws because no organizationId or row id was supplied
+  Scenario: One organization only sees its own custom costs
+    Given "acme" and "globex" each have custom costs
+    When a member of "acme" views the custom costs
+    Then only "acme" custom costs are shown
+    And no "globex" custom cost is ever returned
+    # Every custom-cost read is constrained to the caller's organization at
+    # the data layer; an unconstrained read is rejected.
 
   @integration @unimplemented
-  Scenario: A custom cost row is created with its owning organization
-    When a custom cost is created without an organizationId
-    Then the tenancy guard throws because the row must declare its owning organization
+  Scenario: A custom cost always belongs to one organization
+    When a custom cost is saved
+    Then it is recorded against exactly one owning organization
+    # A save that fails to declare its owning organization is rejected.
 
   # ────────────────────────────────────────────────────────────────────────────
   # Authorization per scope
@@ -100,9 +105,10 @@ Feature: Multi-scope model cost overrides
   # ────────────────────────────────────────────────────────────────────────────
 
   @integration @unimplemented
-  Scenario: Existing project-only custom costs migrate to a project-tier scope
-    Given a legacy custom cost stored against project "web-app" before the migration
+  Scenario: An existing project custom cost keeps resolving after the migration
+    Given a legacy custom cost set for project "web-app" before the migration
     When the migration runs
-    Then the row carries organization "acme" as its anchor
-    And the row carries a PROJECT-tier scope pointing at "web-app"
-    And resolving the cost for "web-app" returns the same value as before the migration
+    Then resolving the cost for "web-app" returns the same value as before
+    And that cost still applies only within "acme"
+    And it stays a project-level override, not an organization-wide one
+    # The legacy row gains its owning organization and a project-tier scope.
