@@ -28,7 +28,8 @@ try {
   );
   mounted = true;
 } catch (err) {
-  fatal.push(`app did not mount within timeout: ${err.message}`);
+  const message = err instanceof Error ? err.message : String(err);
+  fatal.push(`app did not mount within timeout: ${message}`);
 }
 
 await browser.close();
