@@ -286,16 +286,11 @@ export function PromptTabbedSection({
             </Box>
           </Tabs.Content>
         )}
-        <Tabs.Content
-          value={PromptTab.Parameters}
-          flex={1}
-          width="full"
-          height="full"
-        >
+        <Tabs.Content value={PromptTab.Parameters} height="full">
           <Box
             height="full"
             width="full"
-            maxWidth={layoutMode === "horizontal" ? "full" : "768px"}
+            maxWidth="768px"
             margin="0 auto"
             padding={3}
           >
