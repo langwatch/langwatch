@@ -989,4 +989,29 @@ IGNORED_CONTENT`,
       },
     });
   });
+
+  it("lifts cost + tokens + model off claude_code api_request records", async () => {
+    const traces = await openTelemetryLogsRequestToTracesForCollection(
+      claudeCodeLogsRequest,
+    );
+
+    const apiRequestSpan = traces[0]?.spans.find(
+      (s) => s.name === "claude_code.api_request",
+    );
+    expect(apiRequestSpan?.model).toBe("claude-3-5-haiku-20241022");
+    expect(apiRequestSpan?.metrics).toEqual({
+      cost: 0.0001736,
+      prompt_tokens: 87,
+      completion_tokens: 26,
+      cache_read_input_tokens: 0,
+      cache_creation_input_tokens: 0,
+    });
+
+    // The user_prompt record carries no cost — it stays metric-less.
+    const promptSpan = traces[0]?.spans.find(
+      (s) => s.name === "claude_code.user_prompt",
+    );
+    expect(promptSpan?.metrics).toBeUndefined();
+    expect(promptSpan?.model).toBeUndefined();
+  });
 });
