@@ -54,12 +54,16 @@ process.on("uncaughtException", (err) => {
     tags: { source: "uncaughtException", process: "worker" },
   });
 
-  // Attempt graceful shutdown, abort if it takes too long. shutdownPostHog
-  // flushes the buffered $exception above — posthog-node batches events, so
-  // it would otherwise die with the process. Both run inside the 3s race.
+  // Flush PostHog BEFORE graceful shutdown, because gracefulShutdown() calls
+  // process.exit() and would otherwise kill the process before posthog-node
+  // (which batches events) delivers the buffered $exception above. The flush
+  // error is swallowed so a slow/unreachable PostHog can never skip the job
+  // drain; the whole sequence is still bounded by the 3s race.
   const { gracefulShutdown } = require("./server/background/worker");
   Promise.race([
-    Promise.all([gracefulShutdown(), shutdownPostHog()]),
+    shutdownPostHog()
+      .catch(() => {})
+      .then(() => gracefulShutdown()),
     new Promise((_, reject) => setTimeout(() => reject(new Error("Shutdown timeout")), 3000)),
   ])
     .catch(() => process.abort())

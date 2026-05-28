@@ -194,7 +194,12 @@ export const modelProviderRouter = createTRPCRouter({
             isUpdate: Boolean(input.id),
             hasCustomModels: Boolean(input.customModels),
             hasDefaultModel: Boolean(input.defaultModel),
-            scopeCount: input.scopes?.length ?? (input.scopeId ? 1 : 0),
+            // Only report scopeCount when the caller actually supplied scope
+            // input; a scope-preserving update omits it, and emitting 0 there
+            // would misclassify it as "scopes cleared".
+            ...(input.scopes !== undefined || input.scopeId !== undefined
+              ? { scopeCount: input.scopes?.length ?? (input.scopeId ? 1 : 0) }
+              : {}),
           },
         });
       }
