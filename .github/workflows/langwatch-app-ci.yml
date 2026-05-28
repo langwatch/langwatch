@@ -394,14 +394,14 @@ jobs:
         run: |
           pnpm exec vite preview --port 4173 --outDir dist/client &
           PREVIEW_PID=$!
+          trap 'kill $PREVIEW_PID 2>/dev/null || true' EXIT
           for i in $(seq 1 30); do
             curl -sf -o /dev/null http://localhost:4173/ && break
             sleep 1
           done
+          # Under the runner's `bash -e`, a non-zero exit here fails the step
+          # (the gate we want); the EXIT trap still stops the preview server.
           node scripts/smoke-boot.mjs
-          STATUS=$?
-          kill $PREVIEW_PID 2>/dev/null || true
-          exit $STATUS
 
       - name: Notify Slack on failure
         if: failure() && github.ref == 'refs/heads/main'

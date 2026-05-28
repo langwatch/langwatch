@@ -55,7 +55,12 @@ export default defineConfig({
     /* Collect trace on failure for debugging */
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
-    video: "retain-on-failure",
+    /* Video needs Playwright's own pinned ffmpeg binary, which the bundled
+     * Chromium download would normally supply. We skip that download in CI
+     * (system Chrome via channel), so video is opt-in via E2E_RECORD_VIDEO to
+     * avoid a separate ffmpeg install. Trace already captures DOM, network,
+     * and console for debugging. */
+    video: process.env.E2E_RECORD_VIDEO ? "retain-on-failure" : "off",
 
     /* Reasonable timeouts */
     actionTimeout: 15000,
