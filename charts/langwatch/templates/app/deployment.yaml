@@ -190,6 +190,19 @@ spec:
                   key: LW_GATEWAY_JWT_SECRET
             {{- end }}
 
+            # Langy agent pod. The app POSTs chats to OPENCODE_AGENT_URL with
+            # LANGY_INTERNAL_SECRET as the Bearer token; the agent verifies it
+            # against the same Secret. Hyphenated values key → index, not dot.
+            {{- if (index .Values "langy-agent").chartManaged }}
+            - name: OPENCODE_AGENT_URL
+              value: {{ (index .Values "langy-agent").controlPlane.agentUrl | default (printf "http://%s-langy-agent:80" .Release.Name) | quote }}
+            - name: LANGY_INTERNAL_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ (index .Values "langy-agent").secrets.existingSecretName | default "langwatch-langy-agent-auth" }}
+                  key: {{ (index .Values "langy-agent").secrets.internalSecretKey | default "LANGY_INTERNAL_SECRET" }}
+            {{- end }}
+
             # NextAuth configuration
             - name: NEXTAUTH_PROVIDER
               value: {{ .Values.app.nextAuth.provider | quote }}

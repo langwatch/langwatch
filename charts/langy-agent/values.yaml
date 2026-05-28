@@ -1,0 +1,110 @@
+image:
+  # Published by the `langy-agent` matrix entry in
+  # .github/workflows/publish-docker-app.yml on every `langwatch@*` release.
+  # Self-hosters who mirror to an internal registry override `repository`.
+  repository: docker.io/langwatch/langy-agent
+  tag: ""            # defaults to .Chart.AppVersion; releases also publish `latest` and `<short-sha>`
+  pullPolicy: IfNotPresent
+
+# Lift this pod as part of the umbrella chart. Set false to run the agent
+# externally or disable Langy's backend entirely.
+chartManaged: true
+
+# Single replica is intentional — see deployment.yaml. Do NOT bump this
+# without adding conversation-sticky routing first.
+replicaCount: 1
+
+# Sized for v1 (low traffic, ~5-15 concurrent sessions). Each OpenCode
+# subprocess costs memory; LANGY_MAX_WORKERS caps concurrency.
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    cpu: "2"
+    memory: 4Gi
+
+# server.js (the manager) tunables. Surfaced via the ConfigMap.
+manager:
+  port: 8080
+  maxWorkers: 20
+  workerIdleMs: 600000        # 10 min — idle workers are reaped
+  readinessTimeoutMs: 15000   # how long to wait for a worker's opencode to bind
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+
+# Auth secret shared with the control plane. Helm never materialises it —
+# the operator creates it out-of-band (terraform / external-secrets), and
+# the SAME value must be set as LANGY_INTERNAL_SECRET on langwatch-app.
+#   kubectl create secret generic langwatch-langy-agent-auth \
+#     --from-literal=LANGY_INTERNAL_SECRET=$(openssl rand -hex 32)
+secrets:
+  existingSecretName: langwatch-langy-agent-auth
+  internalSecretKey: LANGY_INTERNAL_SECRET
+
+# /health (server.js) backs both probes.
+probes:
+  readiness:
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+  liveness:
+    initialDelaySeconds: 10
+    periodSeconds: 20
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+# Single replica → PDB stays OFF (a minAvailable:1 PDB deadlocks drains).
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+
+terminationGracePeriodSeconds: 30
+
+# emptyDir for /workspace. Bump sizeLimit if many concurrent sessions write
+# large per-worker homes; leave {} for the cluster default.
+workspaceVolume: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+containerSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  readOnlyRootFilesystem: true
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: ["ALL"]
+
+networkPolicy:
+  enabled: true
+  # Only the control plane may call the agent. Adjust the selector to match
+  # your langwatch-app pod labels if you use a non-default release name.
+  ingressFrom:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: langwatch
+  controlPlanePort: 5560
+  egressToControlPlane:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: langwatch
+  gatewayPort: 80
+  egressToGateway:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/component: ai-gateway
+  # OpenCode may reach external hosts (its own update/telemetry). Set false
+  # once egress needs are pinned to tighten the policy.
+  allowExternalHttps: true
+
+nameOverride: ""
+fullnameOverride: ""
+nodeSelector: {}
+affinity: {}
+tolerations: []

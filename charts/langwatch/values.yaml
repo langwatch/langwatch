@@ -1611,3 +1611,23 @@ gateway:
     endpoint: ""
     authExistingSecretName: ""
     authSecretKey: token
+
+## The Langy agent is the OpenCode "manager" pod that backs the in-product
+## assistant. Internal-only (no ingress); the control plane reaches it over
+## cluster DNS. The subchart defaults (image, probes, NetworkPolicy,
+## SecurityContext, single-replica) live in charts/langy-agent/values.yaml.
+## `langy-agent.chartManaged: false` disables the agent (and the app's wiring
+## to it) — useful when running the agent externally or turning Langy off.
+## NOTE: hyphenated key — reference as (index .Values "langy-agent") in templates.
+langy-agent:
+  ## @param langy-agent.chartManaged [default: true] Lift the Langy agent pod as part of this chart (false = external or off).
+  chartManaged: true
+
+  ## @param langy-agent.controlPlane.agentUrl [string, default: http://<release>-langy-agent:80] URL the app uses to reach the agent Service. Leave empty to auto-derive from the release name.
+  controlPlane:
+    agentUrl: ""
+
+  ## @param langy-agent.secrets.existingSecretName [string, default: langwatch-langy-agent-auth] Secret carrying LANGY_INTERNAL_SECRET, shared between the app and the agent pod. Created out-of-band (terraform / external-secrets); the umbrella chart does NOT materialise it.
+  secrets:
+    existingSecretName: langwatch-langy-agent-auth
+    internalSecretKey: LANGY_INTERNAL_SECRET
