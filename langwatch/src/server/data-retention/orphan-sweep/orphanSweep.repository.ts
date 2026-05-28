@@ -8,6 +8,54 @@ export interface OrphanCleanupResult {
 export class OrphanSweepRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
+  async findCandidateTraceIds({
+    projectId,
+    limit = 1000,
+  }: {
+    projectId: string;
+    limit?: number;
+  }): Promise<string[]> {
+    const [annotations, queueItems, publicShares, triggerSents, pinnedTraces] =
+      await Promise.all([
+        this.prisma.annotation.findMany({
+          where: { projectId },
+          select: { traceId: true },
+          take: limit,
+        }),
+        this.prisma.annotationQueueItem.findMany({
+          where: { projectId },
+          select: { traceId: true },
+          take: limit,
+        }),
+        this.prisma.publicShare.findMany({
+          where: { projectId, resourceType: "TRACE" },
+          select: { resourceId: true },
+          take: limit,
+        }),
+        this.prisma.triggerSent.findMany({
+          where: { projectId, traceId: { not: null } },
+          select: { traceId: true },
+          take: limit,
+        }),
+        this.prisma.pinnedTrace.findMany({
+          where: { projectId },
+          select: { traceId: true },
+          take: limit,
+        }),
+      ]);
+
+    const traceIds = new Set<string>();
+    for (const row of annotations) traceIds.add(row.traceId);
+    for (const row of queueItems) traceIds.add(row.traceId);
+    for (const row of publicShares) traceIds.add(row.resourceId);
+    for (const row of triggerSents) {
+      if (row.traceId) traceIds.add(row.traceId);
+    }
+    for (const row of pinnedTraces) traceIds.add(row.traceId);
+
+    return [...traceIds].slice(0, limit);
+  }
+
   async deleteAnnotations({
     projectId,
     traceIds,

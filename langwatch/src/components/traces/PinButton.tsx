@@ -46,7 +46,7 @@ export function PinButton({
   const isLoading = pinMutation.isLoading || unpinMutation.isLoading;
 
   return (
-    <Tooltip content={isPinned ? "Unpin trace (allow retention deletion)" : "Pin trace (prevent retention deletion)"}>
+    <Tooltip content={isPinned ? "Unpin trace" : "Pin trace (mark as important)"}>
       <Button
         data-scope="header"
         colorPalette={isPinned ? "orange" : "gray"}

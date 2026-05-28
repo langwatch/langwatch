@@ -560,7 +560,7 @@ export const dataRetentionMutationProgressRatio = new Gauge({
 });
 
 register.removeSingleMetric("data_retention_orphans_swept_total");
-export const dataRetentionOrphansSsweptTotal = new Counter({
+export const dataRetentionOrphansSweptTotal = new Counter({
   name: "data_retention_orphans_swept_total",
   help: "Count of PG orphan records cleaned up by retention sweep",
   labelNames: ["model"] as const,
@@ -574,6 +574,6 @@ export function setMutationProgress(tenantId: string, table: string, ratio: numb
   dataRetentionMutationProgressRatio.set({ tenant_id: tenantId, table }, ratio);
 }
 
-export function incrementOrphansSswept(model: string, count: number): void {
-  dataRetentionOrphansSsweptTotal.inc({ model }, count);
+export function incrementOrphansSwept(model: string, count: number): void {
+  dataRetentionOrphansSweptTotal.inc({ model }, count);
 }

@@ -124,6 +124,7 @@ import { RetroactiveUpdateService } from "../data-retention/retroactive/retroact
 import { StorageMeterService } from "../data-retention/metering/storageMeter.service";
 import { OrphanSweepRepository } from "../data-retention/orphan-sweep/orphanSweep.repository";
 import { OrphanSweepService } from "../data-retention/orphan-sweep/orphanSweep.service";
+import { createRetentionOrphanSweepReactor } from "../data-retention/orphan-sweep/retentionOrphanSweep.reactor";
 import type { DataRetentionDependencies } from "./dependencies";
 
 /**
@@ -351,11 +352,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     retentionPolicyCache,
   );
   const pinnedTraceRepo = new PinnedTraceRepository(prisma);
-  const pinnedTraceService = new PinnedTraceService(
-    pinnedTraceRepo,
-    clickhouseEnabled ? resolveClickHouseClient : null,
-    retentionPolicyCache,
-  );
+  const pinnedTraceService = new PinnedTraceService(pinnedTraceRepo);
   const retroactiveUpdateService = new RetroactiveUpdateService(
     clickhouseEnabled ? resolveClickHouseClient : null,
   );
@@ -367,6 +364,10 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     orphanSweepRepo,
     clickhouseEnabled ? resolveClickHouseClient : null,
   );
+  const retentionOrphanSweepReactor = createRetentionOrphanSweepReactor({
+    orphanSweep: orphanSweepService,
+    retentionPolicyCache,
+  });
 
   const dataRetention: DataRetentionDependencies = {
     policy: dataRetentionPolicyService,
@@ -454,6 +455,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     gatewayBudgetSync,
     governanceKpisSync,
     governanceOcsfEventsSync,
+    retentionOrphanSweepReactor,
   });
   const commands = registry.registerAll();
   (globalForApp as any).__scenarioExecutionHandle = commands.scenarioExecutionHandle;
@@ -603,6 +605,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
 /** Tests — noop commands, null-backed services. */
 export function createTestApp(overrides?: Partial<AppDependencies>): App {
   const testPrisma = globalPrisma;
+  const testRetentionPolicyCache = new RetentionPolicyCache(testPrisma);
   const noop = async () => { };
   const config: AppConfig = {
     nodeEnv: "test",
@@ -730,10 +733,10 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       } as AppCommands["billing"],
       scenarioExecutionHandle: { reactor: { name: "scenarioExecution", options: { runIn: ["worker"] }, handle: async () => {} }, setPool: () => {} },
     },
-    retentionPolicyCache: new RetentionPolicyCache(testPrisma),
+    retentionPolicyCache: testRetentionPolicyCache,
     dataRetention: {
-      policy: new DataRetentionPolicyService(new DataRetentionPolicyRepository(testPrisma), new RetentionPolicyCache(testPrisma)),
-      pinning: new PinnedTraceService(new PinnedTraceRepository(testPrisma), null, new RetentionPolicyCache(testPrisma)),
+      policy: new DataRetentionPolicyService(new DataRetentionPolicyRepository(testPrisma), testRetentionPolicyCache),
+      pinning: new PinnedTraceService(new PinnedTraceRepository(testPrisma)),
       retroactive: new RetroactiveUpdateService(null),
       metering: new StorageMeterService(null),
       orphanSweep: new OrphanSweepService(new OrphanSweepRepository(testPrisma), null),

@@ -17,7 +17,7 @@ Feature: Retroactive retention changes
     And clicks "Apply to existing data"
     Then a ClickHouse mutation is issued for each trace-category table
     And the mutation updates _retention_days = 90 for this tenant
-    And pinned traces (_retention_days = 0) are not modified
+    And the update applies uniformly to every retention-managed table including event_log
 
   Scenario: Retroactive update progress is tracked
     When a retroactive update is in progress

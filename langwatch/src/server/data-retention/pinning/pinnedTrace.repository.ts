@@ -55,7 +55,13 @@ export class PinnedTraceRepository {
           traceId: params.traceId,
         },
       },
-      update: {},
+      update:
+        params.source === "manual"
+          ? {
+              ...(params.userId !== undefined ? { userId: params.userId } : {}),
+              reason: params.reason ?? null,
+            }
+          : {},
       create: {
         projectId: params.projectId,
         traceId: params.traceId,

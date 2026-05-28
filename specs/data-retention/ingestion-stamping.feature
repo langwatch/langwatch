@@ -36,12 +36,6 @@ Feature: Retention stamping at ingestion time
     When a span with 2KB of attributes is ingested
     Then the stored_spans record has _size_bytes approximately 2048
 
-  Scenario: Pinned trace overrides retention stamping
-    Given trace "abc123" is pinned for this project
-    When a new span for trace "abc123" is ingested
-    Then the stored_spans record has _retention_days = 0
-    And the span is kept indefinitely regardless of project retention
-
   Scenario: Existing data without retention policy keeps _retention_days = 0
     Given data was ingested before retention was configured
     When retention is later configured to 30 days

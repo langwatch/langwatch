@@ -7,13 +7,14 @@ import {
 
 const esc = (s: string) => s.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
 
-interface MutationProgress {
+export interface MutationProgress {
   mutationId: string;
   table: string;
   isDone: boolean;
   partsToDo: number;
   partsDone: number;
   createTime: string;
+  category: RetentionCategory | null;
 }
 
 interface TriggerRetroactiveUpdateParams {
@@ -57,7 +58,7 @@ export class RetroactiveUpdateService {
     const escapedProjectId = esc(projectId);
     for (const table of tables) {
       await client.command({
-        query: `ALTER TABLE ${table} UPDATE _retention_days = ${newRetentionDays} WHERE TenantId = '${escapedProjectId}' AND _retention_days != ${newRetentionDays} AND _retention_days != 0`,
+        query: `ALTER TABLE ${table} UPDATE _retention_days = ${newRetentionDays} WHERE TenantId = '${escapedProjectId}' AND _retention_days != ${newRetentionDays}`,
       });
     }
 
@@ -82,7 +83,7 @@ export class RetroactiveUpdateService {
           formatDateTime(create_time, '%Y-%m-%dT%H:%i:%S') AS createTime
         FROM system.mutations
         WHERE command LIKE '%_retention_days%'
-          AND command LIKE '%${esc(projectId)}%'
+          AND command LIKE '%WHERE TenantId = ''${esc(projectId)}''%'
           AND is_done = 0
         ORDER BY create_time DESC
       `,
@@ -104,6 +105,7 @@ export class RetroactiveUpdateService {
       partsToDo: r.partsToDo,
       partsDone: 0,
       createTime: r.createTime,
+      category: RETENTION_TABLE_CATEGORY_MAP[r.table] ?? null,
     }));
   }
 
@@ -118,7 +120,7 @@ export class RetroactiveUpdateService {
 
     const client = await this.resolveClickHouseClient(projectId);
     await client.command({
-      query: `KILL MUTATION WHERE mutation_id = '${esc(mutationId)}'`,
+      query: `KILL MUTATION WHERE mutation_id = '${esc(mutationId)}' AND command LIKE '%WHERE TenantId = ''${esc(projectId)}''%'`,
     });
   }
 
@@ -143,7 +145,7 @@ export class RetroactiveUpdateService {
         FROM system.mutations
         WHERE table IN (${tableList})
           AND command LIKE '%_retention_days%'
-          AND command LIKE '%${esc(projectId)}%'
+          AND command LIKE '%WHERE TenantId = ''${esc(projectId)}''%'
           AND is_done = 0
       `,
       format: "JSONEachRow",
@@ -164,6 +166,7 @@ export class RetroactiveUpdateService {
       partsToDo: r.partsToDo,
       partsDone: 0,
       createTime: r.createTime,
+      category: RETENTION_TABLE_CATEGORY_MAP[r.table] ?? null,
     }));
   }
 }

@@ -6,6 +6,9 @@ import { RETENTION_MANAGED_TABLES } from "../data-retention/retentionPolicy.sche
 
 const logger = createLogger("langwatch:clickhouse:ttl-reconciler");
 
+/** Sentinel date treated as "never expire" — UInt32 epoch limit ~2106. */
+const INDEFINITE_RETENTION_SENTINEL_DATE = "2106-01-01";
+
 export interface TableTTLEntry {
   table: string;
   ttlColumn: string;
@@ -212,7 +215,7 @@ export function buildRetentionTTLExpression(config: TableTTLEntry): string | nul
   const colExpr =
     config.retentionTTLColumnExpression ??
     `toDateTime(${config.retentionTTLColumn})`;
-  return `IF(_retention_days > 0, ${colExpr} + toIntervalDay(_retention_days), toDateTime('2106-01-01')) DELETE`;
+  return `IF(_retention_days > 0, ${colExpr} + toIntervalDay(_retention_days), toDateTime('${INDEFINITE_RETENTION_SENTINEL_DATE}')) DELETE`;
 }
 
 export function hasRetentionTTL(engineFull: string): boolean {
@@ -333,7 +336,16 @@ export async function reconcileTTL(
       const desiredDays = resolveHotDays(tableConfig);
       const currentDays = parseTTLDaysFromEngineMetadata(engineFull);
 
-      if (!shouldRewriteTTL({ currentDays, desiredDays, engineFull })) {
+      const retentionTTLExpr = buildRetentionTTLExpression(tableConfig);
+      const needsRetention =
+        retentionTTLExpr &&
+        RETENTION_MANAGED_TABLES.includes(tableConfig.table) &&
+        !hasRetentionTTL(engineFull);
+
+      if (
+        !shouldRewriteTTL({ currentDays, desiredDays, engineFull }) &&
+        !needsRetention
+      ) {
         skippedCount++;
         if (options.verbose) {
           logger.debug(
@@ -348,12 +360,6 @@ export async function reconcileTTL(
         config: tableConfig,
         days: desiredDays,
       });
-
-      const retentionTTLExpr = buildRetentionTTLExpression(tableConfig);
-      const needsRetention =
-        retentionTTLExpr &&
-        RETENTION_MANAGED_TABLES.includes(tableConfig.table) &&
-        !hasRetentionTTL(engineFull);
 
       const ttlClauses = [
         coldTTLExpr,

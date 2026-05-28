@@ -6,9 +6,8 @@ import {
   protectedProcedure,
   publicProcedure,
 } from "~/server/api/trpc";
-
-import { prisma } from "~/server/db";
 import { getApp } from "~/server/app-layer/app";
+import { prisma } from "~/server/db";
 import { createLogger } from "~/utils/logger/server";
 
 import {
@@ -157,6 +156,7 @@ export const createShare = async ({
       resourceId,
     },
   });
+  let createdShare = false;
 
   if (!share) {
     share = await prisma.publicShare.create({
@@ -167,13 +167,31 @@ export const createShare = async ({
         userId: userId ?? null,
       },
     });
+    createdShare = true;
   }
 
   if (resourceType === "TRACE") {
+    // Auto-pin is a UI annotation; the shared trace still follows the project's retention policy.
     try {
-      await getApp().dataRetention.pinning.autoPin({ projectId, traceId: resourceId });
+      await getApp().dataRetention.pinning.autoPin({
+        projectId,
+        traceId: resourceId,
+      });
     } catch (error) {
-      logger.error({ projectId, traceId: resourceId, error }, "Failed to auto-pin trace on share");
+      logger.error(
+        { projectId, traceId: resourceId, error },
+        "Failed to auto-pin trace on share",
+      );
+      if (createdShare) {
+        await prisma.publicShare.deleteMany({
+          where: {
+            projectId,
+            resourceType,
+            resourceId,
+          },
+        });
+      }
+      throw error;
     }
   }
 
@@ -189,6 +207,23 @@ export const unshareItem = async ({
   resourceType: "TRACE" | "THREAD";
   resourceId: string;
 }) => {
+  // Auto-unpin first so a failure leaves the share intact (consistent with the share path's rollback).
+  if (resourceType === "TRACE") {
+    // Auto-pin is a UI annotation; the shared trace still follows the project's retention policy.
+    try {
+      await getApp().dataRetention.pinning.autoUnpin({
+        projectId,
+        traceId: resourceId,
+      });
+    } catch (error) {
+      logger.error(
+        { projectId, traceId: resourceId, error },
+        "Failed to auto-unpin trace on unshare",
+      );
+      throw error;
+    }
+  }
+
   await prisma.publicShare.deleteMany({
     where: {
       projectId,
@@ -196,14 +231,6 @@ export const unshareItem = async ({
       resourceId,
     },
   });
-
-  if (resourceType === "TRACE") {
-    try {
-      await getApp().dataRetention.pinning.autoUnpin({ projectId, traceId: resourceId });
-    } catch (error) {
-      logger.error({ projectId, traceId: resourceId, error }, "Failed to auto-unpin trace on unshare");
-    }
-  }
 };
 
 export const revokeAllTraceShares = async (projectId: string) => {

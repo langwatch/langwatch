@@ -327,9 +327,7 @@ function DataRetentionForm({
           <VStack gap={3} align="stretch">
             {categories.map(({ key, label }) => {
               const currentValue = (projectPolicy as any)?.[key] ?? (orgPolicy as any)?.[key];
-              const activeMutations = mutationProgressQuery.data?.filter(
-                (m) => m.table.includes(key === "traces" ? "stored_spans" : key === "scenarios" ? "simulation_runs" : "experiment_runs"),
-              ) ?? [];
+              const activeMutations = mutationProgressQuery.data?.filter((m) => m.category === key) ?? [];
 
               return (
                 <HStack key={key} justifyContent="space-between">

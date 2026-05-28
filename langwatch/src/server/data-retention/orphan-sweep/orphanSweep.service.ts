@@ -1,11 +1,12 @@
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { createLogger } from "~/utils/logger/server";
-import { incrementOrphansSswept } from "~/server/metrics";
+import { incrementOrphansSwept } from "~/server/metrics";
 import type { OrphanSweepRepository } from "./orphanSweep.repository";
 
 const logger = createLogger("langwatch:data-retention:orphan-sweep");
 
 const BATCH_SIZE = 1000;
+const CANDIDATE_LIMIT = 1000;
 
 export class OrphanSweepService {
   constructor(
@@ -43,7 +44,10 @@ export class OrphanSweepService {
 
       return { existing, orphaned };
     } catch (error) {
-      logger.warn({ projectId, error }, "CH unavailable during orphan check, returning all as existing");
+      logger.warn(
+        { projectId, error },
+        "CH unavailable during orphan check, returning all as existing",
+      );
       return { existing: traceIds, orphaned: [] };
     }
   }
@@ -67,6 +71,21 @@ export class OrphanSweepService {
     }
   }
 
+  async sweepProject({ projectId }: { projectId: string }): Promise<void> {
+    const traceIds = await this.repository.findCandidateTraceIds({
+      projectId,
+      limit: CANDIDATE_LIMIT,
+    });
+    if (traceIds.length === 0) return;
+
+    const { orphaned } = await this.filterOrphanedTraceIds({
+      projectId,
+      traceIds,
+    });
+
+    await this.cleanupOrphans({ projectId, orphanedTraceIds: orphaned });
+  }
+
   private async cleanupBatch({
     projectId,
     traceIds,
@@ -75,27 +94,51 @@ export class OrphanSweepService {
     traceIds: string[];
   }): Promise<void> {
     const ops: Array<{ model: string; fn: () => Promise<number> }> = [
-      { model: "Annotation", fn: () => this.repository.deleteAnnotations({ projectId, traceIds }) },
-      { model: "AnnotationQueueItem", fn: () => this.repository.deleteAnnotationQueueItems({ projectId, traceIds }) },
-      { model: "PublicShare", fn: () => this.repository.deletePublicShares({ projectId, traceIds }) },
-      { model: "TriggerSent", fn: () => this.repository.nullifyTriggerSentTraceIds({ projectId, traceIds }) },
-      { model: "PinnedTrace", fn: () => this.repository.deletePinnedTraces({ projectId, traceIds }) },
+      {
+        model: "Annotation",
+        fn: () => this.repository.deleteAnnotations({ projectId, traceIds }),
+      },
+      {
+        model: "AnnotationQueueItem",
+        fn: () =>
+          this.repository.deleteAnnotationQueueItems({ projectId, traceIds }),
+      },
+      {
+        model: "PublicShare",
+        fn: () => this.repository.deletePublicShares({ projectId, traceIds }),
+      },
+      {
+        model: "TriggerSent",
+        fn: () =>
+          this.repository.nullifyTriggerSentTraceIds({ projectId, traceIds }),
+      },
+      {
+        model: "PinnedTrace",
+        fn: () => this.repository.deletePinnedTraces({ projectId, traceIds }),
+      },
     ];
 
     const results = await Promise.allSettled(
       ops.map(async ({ model, fn }) => {
         const count = await fn();
-        if (count > 0) incrementOrphansSswept(model, count);
+        if (count > 0) incrementOrphansSwept(model, count);
       }),
     );
 
-    for (const result of results) {
-      if (result.status === "rejected") {
-        logger.error(
-          { projectId, error: result.reason },
-          "Failed to clean orphaned PG record",
-        );
-      }
+    const failures = results.filter(
+      (result): result is PromiseRejectedResult => result.status === "rejected",
+    );
+    for (const failure of failures) {
+      logger.error(
+        { projectId, error: failure.reason },
+        "Failed to clean orphaned PG record",
+      );
+    }
+    if (failures.length > 0) {
+      throw new AggregateError(
+        failures.map((failure) => failure.reason),
+        "Failed to clean orphaned PG records",
+      );
     }
   }
 }

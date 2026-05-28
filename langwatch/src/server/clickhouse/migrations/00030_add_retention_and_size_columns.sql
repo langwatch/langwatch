@@ -144,5 +144,24 @@ ALTER TABLE ${CLICKHOUSE_DATABASE}.dspy_steps
 -- +goose StatementBegin
 -- ALTER TABLE ${CLICKHOUSE_DATABASE}.event_log DROP COLUMN IF EXISTS `_retention_days`;
 -- ALTER TABLE ${CLICKHOUSE_DATABASE}.event_log DROP COLUMN IF EXISTS `_size_bytes`;
--- ... (repeat for all 11 tables)
+-- ALTER TABLE ${CLICKHOUSE_DATABASE}.stored_spans DROP COLUMN IF EXISTS `_retention_days`;
+-- ALTER TABLE ${CLICKHOUSE_DATABASE}.stored_spans DROP COLUMN IF EXISTS `_size_bytes`;
+-- ALTER TABLE ${CLICKHOUSE_DATABASE}.stored_log_records DROP COLUMN IF EXISTS `_retention_days`;
+-- ALTER TABLE ${CLICKHOUSE_DATABASE}.stored_log_records DROP COLUMN IF EXISTS `_size_bytes`;
+-- ALTER TABLE ${CLICKHOUSE_DATABASE}.stored_metric_records DROP COLUMN IF EXISTS `_retention_days`;
+-- ALTER TABLE ${CLICKHOUSE_DATABASE}.stored_metric_records DROP COLUMN IF EXISTS `_size_bytes`;
+-- ALTER TABLE ${CLICKHOUSE_DATABASE}.trace_summaries DROP COLUMN IF EXISTS `_retention_days`;
+-- ALTER TABLE ${CLICKHOUSE_DATABASE}.trace_summaries DROP COLUMN IF EXISTS `_size_bytes`;
+-- ALTER TABLE ${CLICKHOUSE_DATABASE}.evaluation_runs DROP COLUMN IF EXISTS `_retention_days`;
+-- ALTER TABLE ${CLICKHOUSE_DATABASE}.evaluation_runs DROP COLUMN IF EXISTS `_size_bytes`;
+-- ALTER TABLE ${CLICKHOUSE_DATABASE}.experiment_runs DROP COLUMN IF EXISTS `_retention_days`;
+-- ALTER TABLE ${CLICKHOUSE_DATABASE}.experiment_runs DROP COLUMN IF EXISTS `_size_bytes`;
+-- ALTER TABLE ${CLICKHOUSE_DATABASE}.experiment_run_items DROP COLUMN IF EXISTS `_retention_days`;
+-- ALTER TABLE ${CLICKHOUSE_DATABASE}.experiment_run_items DROP COLUMN IF EXISTS `_size_bytes`;
+-- ALTER TABLE ${CLICKHOUSE_DATABASE}.simulation_runs DROP COLUMN IF EXISTS `_retention_days`;
+-- ALTER TABLE ${CLICKHOUSE_DATABASE}.simulation_runs DROP COLUMN IF EXISTS `_size_bytes`;
+-- ALTER TABLE ${CLICKHOUSE_DATABASE}.suite_runs DROP COLUMN IF EXISTS `_retention_days`;
+-- ALTER TABLE ${CLICKHOUSE_DATABASE}.suite_runs DROP COLUMN IF EXISTS `_size_bytes`;
+-- ALTER TABLE ${CLICKHOUSE_DATABASE}.dspy_steps DROP COLUMN IF EXISTS `_retention_days`;
+-- ALTER TABLE ${CLICKHOUSE_DATABASE}.dspy_steps DROP COLUMN IF EXISTS `_size_bytes`;
 -- +goose StatementEnd
