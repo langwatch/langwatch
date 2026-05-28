@@ -112,6 +112,16 @@ export function createAlertTriggerReactor(
             foldState,
           });
         } catch (error) {
+          // TODO(outbox): silent failures here are invisible to operators —
+          // a dispatch error is logged + captured but the trigger UI shows
+          // no signal. For the stake-sensitive dispatch reactors (this one
+          // and evaluationAlertTrigger — they send email/Slack/dataset/queue
+          // side effects to customers), a transactional outbox would give us:
+          //   1. durable retry with exponential backoff
+          //   2. a queryable "last delivery status" per (trigger, trace)
+          //   3. operator-facing surface for stuck/failed dispatches
+          // Most reactors don't need this (they're fold projections or
+          // idempotent syncs); scope the outbox to these two when we add it.
           logger.error(
             {
               tenantId,

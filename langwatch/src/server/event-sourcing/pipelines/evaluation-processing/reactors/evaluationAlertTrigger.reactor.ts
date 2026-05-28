@@ -188,6 +188,9 @@ export function createEvaluationAlertTriggerReactor(
             foldState: traceSummary,
           });
         } catch (error) {
+          // TODO(outbox): see alertTrigger.reactor — same silent-failure gap
+          // on the dispatch path. Both stake-sensitive dispatch reactors
+          // (this + alertTrigger) should share the outbox when we add it.
           logger.error(
             {
               tenantId,
