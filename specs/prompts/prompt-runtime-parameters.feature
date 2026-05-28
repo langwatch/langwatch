@@ -84,25 +84,45 @@ Feature: Prompt runtime parameters
     Then the sync result reports a conflict
     And the conflict payload includes the remote parameters {"remote": true}
 
-  @integration @unimplemented
-  Scenario: Prompt editor saves runtime parameters from a JSON editor
-    Given I am editing prompt "search-agent"
-    When I enter parameters {"output_schema": {"type": "object"}, "enabled": true} in the Runtime Parameters section
-    And I save a new version
-    Then the saved version contains parameters {"output_schema": {"type": "object"}, "enabled": true}
+  # --- UI: Editable Parameters Tab (mirrors Variables tab pattern) ---
 
-  @integration @unimplemented
-  Scenario: Prompt editor blocks invalid runtime parameters JSON
-    Given I am editing prompt "search-agent"
-    When I enter invalid JSON in the Runtime Parameters section
-    Then the editor shows a parameters validation error
-    And I cannot save the version
-
-  @integration @unimplemented
-  Scenario: Prompt playground shows runtime parameters as read-only version data
-    Given prompt "search-agent" has latest parameters {"readonly": true}
+  @integration
+  Scenario: Parameters tab shows explanation text distinguishing parameters from variables
     When I view "search-agent" in the prompt playground
-    Then the Parameters tab displays {"readonly": true}
+    Then the Parameters tab shows a description explaining that parameters are arbitrary configurations used outside the prompt itself
+    And the Variables tab shows a description explaining that variables are used as part of the prompt template
+
+  @integration
+  Scenario: Parameters tab shows "+ Add" button and allows adding key-value parameters
+    When I view "search-agent" in the prompt playground
+    And I click the Parameters tab
+    Then the Parameters tab displays a header with a "+ Add" button
+    When I click "+ Add"
+    Then a new parameter row appears with an editable key field and value field
+
+  @integration
+  Scenario: User edits parameter key and value inline
+    Given prompt "search-agent" has parameters {"environment": "production"}
+    When I view "search-agent" in the prompt playground
+    And I click the Parameters tab
+    Then the parameter "environment" is displayed with value "production"
+    And I can edit the key and value inline
+
+  @integration
+  Scenario: User deletes a parameter via the remove button
+    Given prompt "search-agent" has parameters {"old_key": "old_value", "keep": "this"}
+    When I view "search-agent" in the prompt playground
+    And I click the Parameters tab
+    And I click the remove button on parameter "old_key"
+    Then only parameter "keep" remains
+
+  @integration
+  Scenario: Parameters tab shows empty state when no parameters are defined
+    Given prompt "search-agent" has parameters {}
+    When I view "search-agent" in the prompt playground
+    And I click the Parameters tab
+    Then the Parameters tab shows "No parameters defined"
+    And the "+ Add" button is visible
 
   @unit @unimplemented
   Scenario: Runtime parameters validation accepts object JSON values

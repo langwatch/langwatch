@@ -1,4 +1,4 @@
-import { Box, Button, HStack, Tabs } from "@chakra-ui/react";
+import { Box, Button, HStack, Tabs, Text } from "@chakra-ui/react";
 import { useCallback, useRef, useState } from "react";
 import { useFormContext } from "react-hook-form";
 import { LuEraser } from "react-icons/lu";
@@ -6,7 +6,7 @@ import { useDebounceCallback } from "usehooks-ts";
 import { Tooltip } from "~/components/ui/tooltip";
 import { type Variable, VariablesSection } from "~/components/variables";
 import { transposeColumnsFirstToRowsFirstWithId } from "~/optimization_studio/utils/datasetUtils";
-import { RuntimeParametersReadonly } from "~/prompts/forms/fields/RuntimeParametersField";
+import { RuntimeParametersField } from "~/prompts/forms/fields/RuntimeParametersField";
 import type { PromptConfigFormValues } from "~/prompts/types";
 import type { LlmConfigInputType } from "~/types";
 import { useDraggableTabsBrowserStore } from "../../../prompt-playground-store/DraggableTabsBrowserStore";
@@ -60,7 +60,6 @@ export function PromptTabbedSection({
   const form = useFormContext<PromptConfigFormValues>();
   const tabId = useTabId();
   const inputs = form.watch("version.configData.inputs") ?? [];
-  const runtimeParameters = form.watch("version.parameters") ?? {};
   const demonstrations = form.watch("version.configData.demonstrations");
 
   // Get variable values from persisted store
@@ -252,6 +251,9 @@ export function PromptTabbedSection({
             margin="0 auto"
             padding={3}
           >
+            <Text fontSize="xs" color="fg.subtle" marginBottom={3}>
+              Variables are substituted into the prompt template at runtime.
+            </Text>
             <VariablesSection
               variables={variables}
               onChange={handleVariablesChange}
@@ -297,7 +299,12 @@ export function PromptTabbedSection({
             margin="0 auto"
             padding={3}
           >
-            <RuntimeParametersReadonly value={runtimeParameters} />
+            <Text fontSize="xs" color="fg.subtle" marginBottom={3}>
+              Parameters are arbitrary configurations returned with the prompt,
+              for use outside the prompt itself (e.g. RAG settings, pipeline
+              config).
+            </Text>
+            <RuntimeParametersField />
           </Box>
         </Tabs.Content>
       </HStack>

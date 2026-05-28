@@ -549,16 +549,13 @@ describe("PromptTabbedSection Layout Modes", () => {
       ).toBeInTheDocument();
     });
 
-    it("shows runtime parameters as read-only key-value rows", async () => {
-      /**
-       * @scenario Prompt playground shows runtime parameters as read-only version data
-       */
+    it("shows editable runtime parameters in the Parameters tab", async () => {
       const user = userEvent.setup();
       renderPromptTabbedSection(
         { layoutMode: "vertical" },
         {
           version: {
-            parameters: { readonly: true },
+            parameters: { environment: "production" },
             configData: {
               inputs: [],
               demonstrations: { inline: { records: {} } },
@@ -569,9 +566,35 @@ describe("PromptTabbedSection Layout Modes", () => {
 
       await user.click(screen.getByRole("tab", { name: /parameters/i }));
 
-      const container = screen.getByTestId("runtime-parameters-readonly");
-      expect(container).toHaveTextContent("readonly");
-      expect(container).toHaveTextContent("true");
+      expect(screen.getByTestId("param-key-0")).toHaveValue("environment");
+      expect(screen.getByTestId("param-value-0")).toHaveValue("production");
+      expect(screen.getByTestId("add-parameter-button")).toBeInTheDocument();
+    });
+
+    it("shows explanation text on Parameters and Variables tabs", async () => {
+      const user = userEvent.setup();
+      renderPromptTabbedSection(
+        { layoutMode: "vertical" },
+        {
+          version: {
+            parameters: {},
+            configData: {
+              inputs: [{ identifier: "input", type: "str" }],
+              demonstrations: { inline: { records: {} } },
+            },
+          } as any,
+        },
+      );
+
+      await user.click(screen.getByRole("tab", { name: /parameters/i }));
+      expect(
+        screen.getByText(/parameters are arbitrary configurations/i),
+      ).toBeInTheDocument();
+
+      await user.click(screen.getByRole("tab", { name: /variables/i }));
+      expect(
+        screen.getByText(/variables are substituted into the prompt/i),
+      ).toBeInTheDocument();
     });
   });
 });

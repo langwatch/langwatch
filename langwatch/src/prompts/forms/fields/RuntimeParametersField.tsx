@@ -1,29 +1,18 @@
 import {
   Button,
-  Collapsible,
   HStack,
   Input,
   Spacer,
   Text,
-  Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { ChevronDown, ChevronRight, Plus, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Plus, X } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { PromptConfigFormValues } from "~/prompts/types";
 
 type ParameterEntry = { key: string; value: string };
-
-function isSimpleValue(v: unknown): boolean {
-  return (
-    typeof v === "string" ||
-    typeof v === "number" ||
-    typeof v === "boolean" ||
-    v === null
-  );
-}
 
 function serializeValue(raw: string): unknown {
   const trimmed = raw.trim();
@@ -68,30 +57,18 @@ export function RuntimeParametersField() {
     control: methods.control,
     name: "version.parameters",
   });
-  const [open, setOpen] = useState(false);
-  const [showJsonEditor, setShowJsonEditor] = useState(false);
-  const [jsonDraft, setJsonDraft] = useState("");
-  const [jsonError, setJsonError] = useState<string | null>(null);
 
   const [entries, setEntries] = useState<ParameterEntry[]>(() =>
     recordToEntries((parameters as Record<string, unknown>) ?? {}),
   );
 
   useEffect(() => {
-    const incoming = recordToEntries((parameters as Record<string, unknown>) ?? {});
-    const current = entriesToRecord(entries);
     const incomingRecord = (parameters as Record<string, unknown>) ?? {};
+    const current = entriesToRecord(entries);
     if (JSON.stringify(current) !== JSON.stringify(incomingRecord)) {
-      setEntries(incoming);
+      setEntries(recordToEntries(incomingRecord));
     }
   }, [parameters]);
-
-  const hasComplexValues = useMemo(
-    () => entries.some((e) => !isSimpleValue(serializeValue(e.value))),
-    [entries],
-  );
-
-  const paramCount = entries.filter((e) => e.key.trim()).length;
 
   const syncToForm = useCallback(
     (newEntries: ParameterEntry[]) => {
@@ -126,190 +103,85 @@ export function RuntimeParametersField() {
     }
   };
 
-  const handleSwitchToJson = () => {
-    setJsonDraft(JSON.stringify(parameters ?? {}, null, 2));
-    setJsonError(null);
-    setShowJsonEditor(true);
-  };
-
-  const handleJsonApply = () => {
-    try {
-      const parsed = JSON.parse(jsonDraft || "{}");
-      if (typeof parsed !== "object" || Array.isArray(parsed) || parsed === null) {
-        setJsonError("Must be a JSON object");
-        return;
-      }
-      methods.setValue("version.parameters", parsed, {
-        shouldDirty: true,
-        shouldValidate: true,
-      });
-      setJsonError(null);
-      setShowJsonEditor(false);
-    } catch {
-      setJsonError("Invalid JSON");
-    }
-  };
-
   return (
-    <Collapsible.Root
-      open={open}
-      onOpenChange={(details) => setOpen(details.open)}
-      width="full"
-    >
-      <VStack width="full" align="stretch" gap={2}>
-        <Collapsible.Trigger asChild>
-          <Button variant="ghost" justifyContent="start" paddingX={0}>
-            <HStack gap={2}>
-              {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-              <Text fontWeight="medium">Runtime Parameters</Text>
-              {paramCount > 0 && (
-                <Text fontSize="xs" color="fg.muted">
-                  ({paramCount})
-                </Text>
-              )}
-            </HStack>
-          </Button>
-        </Collapsible.Trigger>
-        <Collapsible.Content>
-          {showJsonEditor ? (
-            <VStack align="stretch" gap={2}>
-              <Textarea
-                aria-label="Runtime Parameters JSON"
-                value={jsonDraft}
-                onChange={(e) => {
-                  setJsonDraft(e.target.value);
-                  setJsonError(null);
-                }}
-                minHeight="120px"
-                resize="vertical"
-                fontFamily="monospace"
+    <VStack align="stretch" gap={3} width="full">
+      <HStack width="full">
+        <Text
+          fontSize="xs"
+          fontWeight="bold"
+          textTransform="uppercase"
+          color="fg.muted"
+        >
+          Parameters
+        </Text>
+        <Spacer />
+        <Button
+          size="xs"
+          variant="outline"
+          onClick={handleAdd}
+          data-testid="add-parameter-button"
+        >
+          <Plus size={14} />
+          Add
+        </Button>
+      </HStack>
+
+      {entries.length === 0 ? (
+        <Text fontSize="13px" color="fg.subtle">
+          No parameters defined
+        </Text>
+      ) : (
+        <VStack align="stretch" gap={2}>
+          {entries.map((entry, index) => (
+            <HStack key={index} gap={2} width="full">
+              <Input
+                value={entry.key}
+                onChange={(e) => handleUpdate(index, "key", e.target.value)}
+                placeholder="key"
+                size="sm"
+                width="120px"
+                flexShrink={0}
+                fontFamily="mono"
                 fontSize="13px"
-                lineHeight="1.5"
+                data-testid={`param-key-${index}`}
               />
-              {jsonError && (
-                <Text fontSize="xs" color="fg.error">
-                  {jsonError}
-                </Text>
-              )}
-              <HStack>
-                <Button
-                  size="xs"
-                  variant="outline"
-                  onClick={() => setShowJsonEditor(false)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  size="xs"
-                  colorPalette="blue"
-                  onClick={handleJsonApply}
-                >
-                  Apply JSON
-                </Button>
-              </HStack>
-            </VStack>
-          ) : (
-            <VStack align="stretch" gap={3}>
-              <HStack width="full">
-                <Spacer />
-                <Button
-                  size="xs"
-                  variant="outline"
-                  onClick={handleAdd}
-                  data-testid="add-parameter-button"
-                >
-                  <Plus size={14} />
-                  Add Parameter
-                </Button>
+              <Text color="fg.subtle" fontSize="sm" flexShrink={0}>
+                =
+              </Text>
+              <Input
+                value={entry.value}
+                onChange={(e) => handleUpdate(index, "value", e.target.value)}
+                placeholder="value"
+                size="sm"
+                flex={1}
+                minWidth={0}
+                fontFamily="mono"
+                fontSize="13px"
+                variant="flushed"
+                borderColor="border"
+                data-testid={`param-value-${index}`}
+              />
+              <Tooltip
+                content="Remove parameter"
+                positioning={{ placement: "top" }}
+              >
                 <Button
                   size="xs"
                   variant="ghost"
-                  onClick={handleSwitchToJson}
-                  color="fg.muted"
-                >
-                  Edit as JSON
-                </Button>
-              </HStack>
-
-              {entries.length === 0 ? (
-                <Text
-                  fontSize="13px"
+                  colorPalette="gray"
+                  onClick={() => handleRemove(index)}
+                  flexShrink={0}
                   color="fg.subtle"
-                  textAlign="center"
-                  paddingY={4}
+                  data-testid={`remove-param-${index}`}
                 >
-                  No parameters defined
-                </Text>
-              ) : (
-                <VStack align="stretch" gap={2}>
-                  {entries.map((entry, index) => (
-                    <HStack key={index} gap={2}>
-                      <Input
-                        value={entry.key}
-                        onChange={(e) =>
-                          handleUpdate(index, "key", e.target.value)
-                        }
-                        placeholder="Key"
-                        size="sm"
-                        flex={1}
-                        fontFamily="monospace"
-                        fontSize="13px"
-                        data-testid={`param-key-${index}`}
-                      />
-                      {!isSimpleValue(serializeValue(entry.value)) ||
-                      hasComplexValues ? (
-                        <Textarea
-                          value={entry.value}
-                          onChange={(e) =>
-                            handleUpdate(index, "value", e.target.value)
-                          }
-                          placeholder="Value"
-                          size="sm"
-                          flex={2}
-                          fontFamily="monospace"
-                          fontSize="13px"
-                          rows={2}
-                          resize="vertical"
-                          data-testid={`param-value-${index}`}
-                        />
-                      ) : (
-                        <Input
-                          value={entry.value}
-                          onChange={(e) =>
-                            handleUpdate(index, "value", e.target.value)
-                          }
-                          placeholder="Value"
-                          size="sm"
-                          flex={2}
-                          fontFamily="monospace"
-                          fontSize="13px"
-                          data-testid={`param-value-${index}`}
-                        />
-                      )}
-                      <Tooltip
-                        content="Remove parameter"
-                        positioning={{ placement: "top" }}
-                      >
-                        <Button
-                          size="xs"
-                          variant="ghost"
-                          colorPalette="gray"
-                          onClick={() => handleRemove(index)}
-                          color="fg.subtle"
-                          data-testid={`remove-param-${index}`}
-                        >
-                          <X size={14} />
-                        </Button>
-                      </Tooltip>
-                    </HStack>
-                  ))}
-                </VStack>
-              )}
-            </VStack>
-          )}
-        </Collapsible.Content>
-      </VStack>
-    </Collapsible.Root>
+                  <X size={14} />
+                </Button>
+              </Tooltip>
+            </HStack>
+          ))}
+        </VStack>
+      )}
+    </VStack>
   );
 }
 

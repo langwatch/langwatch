@@ -2,7 +2,13 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { FormProvider, useForm, useFormContext } from "react-hook-form";
 import { afterEach, describe, expect, it } from "vitest";
@@ -53,25 +59,24 @@ function renderField(initialParameters: Record<string, unknown> = {}) {
   return render(<Wrapper />);
 }
 
-async function expandCollapsible(user: ReturnType<typeof userEvent.setup>) {
-  const triggers = screen.getAllByRole("button", {
-    name: /runtime parameters/i,
-  });
-  await user.click(triggers[0]!);
-}
-
 afterEach(cleanup);
 
 describe("<RuntimeParametersField />", () => {
+  describe("when rendering empty state", () => {
+    it("shows header with + Add button and empty state text", () => {
+      renderField();
+
+      expect(screen.getByText("Parameters")).toBeInTheDocument();
+      expect(screen.getByTestId("add-parameter-button")).toBeInTheDocument();
+      expect(screen.getByText("No parameters defined")).toBeInTheDocument();
+    });
+  });
+
   describe("when adding key-value parameters", () => {
     it("adds a parameter row and writes to the form", async () => {
-      /**
-       * @scenario Prompt editor saves runtime parameters from key-value inputs
-       */
       const user = userEvent.setup();
       renderField({ existing: "value" });
 
-      await expandCollapsible(user);
       await user.click(screen.getByTestId("add-parameter-button"));
 
       const keyInput = await waitFor(() => screen.getByTestId("param-key-1"));
@@ -88,13 +93,8 @@ describe("<RuntimeParametersField />", () => {
 
   describe("when removing a parameter", () => {
     it("removes the row and updates the form", async () => {
-      /**
-       * @scenario Prompt editor removes a runtime parameter
-       */
       const user = userEvent.setup();
       renderField({ enabled: true, retries: 3 });
-
-      await expandCollapsible(user);
 
       expect(screen.getByTestId("param-key-0")).toHaveValue("enabled");
       expect(screen.getByTestId("param-key-1")).toHaveValue("retries");
@@ -108,17 +108,11 @@ describe("<RuntimeParametersField />", () => {
   });
 
   describe("when loading existing parameters", () => {
-    it("displays pre-populated key-value rows", async () => {
-      /**
-       * @scenario Prompt editor displays existing runtime parameters as key-value rows
-       */
-      const user = userEvent.setup();
+    it("displays pre-populated key-value rows", () => {
       renderField({
         confidence: 0.85,
         use_documents: true,
       });
-
-      await expandCollapsible(user);
 
       expect(screen.getByTestId("param-key-0")).toHaveValue("confidence");
       expect(screen.getByTestId("param-value-0")).toHaveValue("0.85");
@@ -127,52 +121,29 @@ describe("<RuntimeParametersField />", () => {
     });
   });
 
-  describe("when collapsible shows parameter count", () => {
-    it("displays the count badge when parameters exist", () => {
-      renderField({ a: 1, b: 2, c: 3 });
+  describe("when editing a parameter value", () => {
+    it("updates the form with the new value", () => {
+      renderField({ environment: "production" });
 
-      expect(screen.getByText("(3)")).toBeInTheDocument();
+      const valueInput = screen.getByTestId("param-value-0");
+      fireEvent.change(valueInput, { target: { value: "staging" } });
+
+      expect(screen.getByTestId("parameters-value")).toHaveTextContent(
+        '"environment":"staging"',
+      );
     });
   });
 
-  describe("when using JSON editor fallback", () => {
-    it("switches to JSON editor and applies valid JSON", async () => {
-      /**
-       * @scenario Prompt editor allows editing parameters as raw JSON
-       */
-      const user = userEvent.setup();
-      renderField();
+  describe("when editing a parameter key", () => {
+    it("updates the form with the new key", () => {
+      renderField({ old_key: "value" });
 
-      await expandCollapsible(user);
-      await user.click(screen.getByText("Edit as JSON"));
-
-      const textarea = screen.getByRole("textbox", {
-        name: /runtime parameters json/i,
-      });
-      fireEvent.change(textarea, {
-        target: { value: '{"timeout_ms": 5000}' },
-      });
-      await user.click(screen.getByText("Apply JSON"));
+      const keyInput = screen.getByTestId("param-key-0");
+      fireEvent.change(keyInput, { target: { value: "new_key" } });
 
       expect(screen.getByTestId("parameters-value")).toHaveTextContent(
-        '{"timeout_ms":5000}',
+        '"new_key":"value"',
       );
-    });
-
-    it("shows error for invalid JSON", async () => {
-      const user = userEvent.setup();
-      renderField();
-
-      await expandCollapsible(user);
-      await user.click(screen.getByText("Edit as JSON"));
-
-      const textarea = screen.getByRole("textbox", {
-        name: /runtime parameters json/i,
-      });
-      fireEvent.change(textarea, { target: { value: "{invalid" } });
-      await user.click(screen.getByText("Apply JSON"));
-
-      expect(screen.getByText("Invalid JSON")).toBeInTheDocument();
     });
   });
 });
