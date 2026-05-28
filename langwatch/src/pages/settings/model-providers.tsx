@@ -86,8 +86,8 @@ export default function ModelsPage() {
   // Surface how many gateway bindings would be left orphaned by
 
   // One scope filter drives both tables on this page (Model Providers
-  // and Default Models). Shape matches the DefaultModelsScopeFilter
-  // primitive used in the header.
+  // and Default Models). Shape matches the shared ScopeFilter primitive
+  // used in the header (also reused on /settings/api-keys).
   const [scopeFilter, setScopeFilter] = useState<PageScopeFilter>({
     kind: "all",
   });
@@ -216,8 +216,8 @@ export default function ModelsPage() {
           <Spacer />
           {/* Single scope filter for the whole page — narrows both the
               Model Providers table and the Default Models table below.
-              The DefaultModelsScopeFilter primitive carries the caret
-              icon + "More Scopes" submenu (see scope-filter.feature). */}
+              The shared ScopeFilter primitive carries the caret icon +
+              "More Scopes" submenu (see scope-filter.feature). */}
           <ScopeFilterComponent
             value={scopeFilter}
             onChange={setScopeFilter}
