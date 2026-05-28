@@ -24,12 +24,13 @@ import {
   extractBlobRefsFromAttributes,
   hasBlobRefs,
 } from "~/server/app-layer/traces/blob-ref-attributes";
+import { BlobIntegrityError } from "~/server/app-layer/traces/blob-store.service";
 import type { SpanBlobResolutionService } from "~/server/app-layer/traces/span-blob-resolution.service";
 import type { ExtractedIO, TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 
 /** Minimal logger interface required by this module (subset of PinoLogger). */
-export type WarnLogger = Pick<PinoLogger, "warn">;
+export type WarnLogger = Pick<PinoLogger, "warn" | "error">;
 
 /**
  * Result of resolving offloaded blobs for a single trace's spans.
@@ -132,17 +133,30 @@ export async function resolveOffloadedTraces({
         anyResolved = true;
         return { ...span, spanAttributes: resolvedAttrs };
       } catch (err) {
-        // Missing blob or integrity failure — keep the preview, log a warning.
-        logger.warn(
-          {
-            projectId,
-            spanId: span.spanId,
-            traceId: span.traceId,
-            blobKeys: Object.values(blobRefs).map((r) => r.key),
-            error: err instanceof Error ? err.message : String(err),
-          },
-          "Failed to resolve offloaded blob for span — keeping preview value",
-        );
+        const logContext = {
+          projectId,
+          spanId: span.spanId,
+          traceId: span.traceId,
+          blobKeys: Object.values(blobRefs).map((r) => r.key),
+          error: err instanceof Error ? err.message : String(err),
+        };
+
+        if (err instanceof BlobIntegrityError) {
+          // SHA-256 mismatch: possible tampering or storage corruption.
+          // Log loudly so ops and auditors see this; still return the preview
+          // rather than throwing — a corrupt blob must not break trace reads.
+          logger.error(
+            logContext,
+            "Blob integrity check failed for span — SHA-256 mismatch, keeping preview value",
+          );
+        } else {
+          // Missing blob (NoSuchKey) or transient S3 error — log at warn level.
+          logger.warn(
+            logContext,
+            "Failed to resolve offloaded blob for span — keeping preview value",
+          );
+        }
+
         // Return the span with blob-ref keys stripped but preview values intact.
         // cleanedAttrs has the reserved keys removed; the preview value under
         // attrKey is still present (extractBlobRefsFromAttributes preserves it).

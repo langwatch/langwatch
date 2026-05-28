@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import {
-  mergeBlobRefsIntoAttributes,
   extractBlobRefsFromAttributes,
   hasBlobRefs,
   BLOB_REF_ATTR_PREFIX,
@@ -15,24 +14,24 @@ const ref = (key: string): TraceBlobRef => ({
 });
 
 describe("blob-ref-attributes", () => {
-  describe("given previewed attributes and blob refs", () => {
-    it("round-trips merge → extract back to the original split", () => {
-      const attributes = {
-        "langwatch.output": "preview…",
-        "gen_ai.system": "openai",
-      };
-      const blobRefs = { "langwatch.output": ref("trace-blobs/p/t/s/langwatch.output") };
+  describe("given attributes that carry encoded blob refs", () => {
+    describe("when extractBlobRefsFromAttributes is called", () => {
+      it("splits reserved keys into blobRefs and keeps user-facing attributes clean", () => {
+        const blobRef = ref("trace-blobs/p/t/s/langwatch.output");
+        const attributes = {
+          "langwatch.output": "preview…",
+          "gen_ai.system": "openai",
+          [`${BLOB_REF_ATTR_PREFIX}langwatch.output`]: JSON.stringify(blobRef),
+        };
 
-      const merged = mergeBlobRefsIntoAttributes(attributes, blobRefs);
-      // ref now lives under the reserved prefix, preview untouched
-      expect(merged[`${BLOB_REF_ATTR_PREFIX}langwatch.output`]).toBe(
-        JSON.stringify(blobRefs["langwatch.output"]),
-      );
-      expect(merged["langwatch.output"]).toBe("preview…");
+        const split = extractBlobRefsFromAttributes(attributes);
 
-      const split = extractBlobRefsFromAttributes(merged);
-      expect(split.attributes).toEqual(attributes); // reserved key stripped
-      expect(split.blobRefs).toEqual(blobRefs);
+        expect(split.attributes).toEqual({
+          "langwatch.output": "preview…",
+          "gen_ai.system": "openai",
+        });
+        expect(split.blobRefs).toEqual({ "langwatch.output": blobRef });
+      });
     });
   });
 

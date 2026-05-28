@@ -26,7 +26,7 @@ import {
 import { BLOB_REF_ATTR_PREFIX } from "~/server/app-layer/traces/blob-ref-attributes";
 import type { SpanBlobResolutionService } from "~/server/app-layer/traces/span-blob-resolution.service";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
-import type { TraceBlobRef } from "~/server/app-layer/traces/blob-store.service";
+import { BlobIntegrityError, type TraceBlobRef } from "~/server/app-layer/traces/blob-store.service";
 import { resolveOffloadedTraces } from "./resolve-offloaded-traces";
 
 // ---------------------------------------------------------------------------
@@ -94,7 +94,6 @@ function fakeBlobResolutionService(
         projectId: string;
         attributes: Record<string, string>;
         blobRefs: Record<string, TraceBlobRef>;
-        only?: readonly string[];
       }) => {
         const out = { ...attributes };
         for (const attrKey of Object.keys(blobRefs)) {
@@ -337,6 +336,65 @@ describe("resolveOffloadedTraces()", () => {
         });
 
         expect(result.anyResolved).toBe(false);
+      });
+    });
+  });
+
+  describe("given a BlobIntegrityError (SHA-256 mismatch)", () => {
+    const ref = testRef("trace-blobs/proj-1/trace-1/span-1/langwatch.output");
+
+    const spanWithRef = makeSpan({
+      spanAttributes: {
+        "langwatch.output": "preview…",
+        [`${BLOB_REF_ATTR_PREFIX}langwatch.output`]: JSON.stringify(ref),
+      },
+    });
+
+    function integrityFailingBlobResolutionService(): SpanBlobResolutionService {
+      const integrityError = new BlobIntegrityError(
+        ref.key,
+        "expectedhash",
+        "actualhash",
+      );
+      return {
+        resolve: vi.fn(async () => {
+          throw integrityError;
+        }),
+      } as unknown as SpanBlobResolutionService;
+    }
+
+    describe("when resolved", () => {
+      it("does not throw — returns normally with preview intact", async () => {
+        const blobSvc = integrityFailingBlobResolutionService();
+        const logger = createMockLogger();
+
+        const result = await resolveOffloadedTraces({
+          projectId: "proj-1",
+          normalizedSpans: [spanWithRef],
+          blobResolutionService: blobSvc,
+          ioExtractionService: realIOService,
+          logger,
+        });
+
+        expect(result.resolvedSpans[0]!.spanAttributes["langwatch.output"]).toBe(
+          "preview…",
+        );
+      });
+
+      it("logs at error level, not warn", async () => {
+        const blobSvc = integrityFailingBlobResolutionService();
+        const logger = createMockLogger();
+
+        await resolveOffloadedTraces({
+          projectId: "proj-1",
+          normalizedSpans: [spanWithRef],
+          blobResolutionService: blobSvc,
+          ioExtractionService: realIOService,
+          logger,
+        });
+
+        expect(logger.error).toHaveBeenCalledOnce();
+        expect(logger.warn).not.toHaveBeenCalled();
       });
     });
   });

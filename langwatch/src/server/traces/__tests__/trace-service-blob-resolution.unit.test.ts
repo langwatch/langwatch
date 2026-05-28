@@ -215,17 +215,33 @@ describe("TraceService.getTracesWithSpans() — blob resolution pipeline", () =>
         expect(traces[0]!.trace_id).toBe("trace-1");
       });
 
-      it("constructs SpanBlobResolutionService with the injected BlobStore", () => {
-        // Verify the TraceService accepted and stored the injected deps.
-        // This confirms the wiring in presets.ts produces a valid service.
-        expect(service).toBeDefined();
-        expect((service as any).blobResolutionService).toBe(
-          blobResolutionService,
+      it("delegates trace fetching to ClickHouseTraceService", async () => {
+        // Verify that TraceService.getTracesWithSpans delegates to
+        // clickHouseService.getTracesWithSpans and returns its result —
+        // confirming the resolution deps are accepted and the service is wired.
+        const traces = await service.getTracesWithSpans(
+          "proj-1",
+          ["trace-1"],
+          protections,
         );
+
+        expect(mockGetTracesWithSpansCH).toHaveBeenCalledWith(
+          "proj-1",
+          ["trace-1"],
+          protections,
+        );
+        expect(traces[0]!.trace_id).toBe("trace-1");
       });
 
-      it("constructs TraceIOExtractionService with the injected instance", () => {
-        expect((service as any).ioExtractionService).toBe(ioExtractionService);
+      it("constructs successfully without throwing when blob deps are provided", () => {
+        // Constructing TraceService with all three deps should not throw.
+        // The production wiring (presets.ts) exercises this path.
+        expect(() =>
+          new TraceService(
+            {} as any,
+            { blobStore, blobResolutionService, ioExtractionService },
+          ),
+        ).not.toThrow();
       });
     });
   });

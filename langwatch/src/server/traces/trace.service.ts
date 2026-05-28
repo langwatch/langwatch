@@ -122,9 +122,9 @@ export class TraceService {
   private readonly elasticsearchService: ElasticsearchTraceService;
   private readonly evaluationService: EvaluationService;
   /** Blob-offload resolution deps (optional — falls back to preview if absent). */
-  readonly blobResolutionService: SpanBlobResolutionService | undefined;
-  readonly ioExtractionService: TraceIOExtractionService | undefined;
-  readonly blobStore: BlobStore | undefined;
+  private readonly blobResolutionService: SpanBlobResolutionService | undefined;
+  private readonly ioExtractionService: TraceIOExtractionService | undefined;
+  private readonly blobStore: BlobStore | undefined;
 
   constructor(
     readonly prisma: PrismaClient,

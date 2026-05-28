@@ -40,27 +40,6 @@ describe("SpanBlobResolutionService", () => {
         expect(out["gen_ai.system"]).toBe("openai");
       });
     });
-
-    describe("when an allow-list is given", () => {
-      it("resolves only the requested keys (lazy)", async () => {
-        const blob = fakeBlobStore({ "k/in": "INPUT", "k/out": "OUTPUT" });
-        const svc = new SpanBlobResolutionService(blob);
-
-        const out = await svc.resolve({
-          projectId: "p",
-          attributes: { "langwatch.input": "ip…", "langwatch.output": "op…" },
-          blobRefs: {
-            "langwatch.input": ref("k/in"),
-            "langwatch.output": ref("k/out"),
-          },
-          only: ["langwatch.output"],
-        });
-
-        expect(blob.get).toHaveBeenCalledTimes(1);
-        expect(out["langwatch.output"]).toBe("OUTPUT");
-        expect(out["langwatch.input"]).toBe("ip…"); // untouched preview
-      });
-    });
   });
 
   describe("given no blob refs", () => {

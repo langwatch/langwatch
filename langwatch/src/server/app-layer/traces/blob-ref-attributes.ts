@@ -12,18 +12,6 @@ import type { TraceBlobRef } from "./blob-store.service";
  */
 export const BLOB_REF_ATTR_PREFIX = "langwatch.reserved.blobref.";
 
-/** Encode blob refs into reserved attributes so they flow through the pipeline. */
-export function mergeBlobRefsIntoAttributes(
-  attributes: Record<string, string>,
-  blobRefs: Record<string, TraceBlobRef>,
-): Record<string, string> {
-  const out = { ...attributes };
-  for (const [attrKey, ref] of Object.entries(blobRefs)) {
-    out[`${BLOB_REF_ATTR_PREFIX}${attrKey}`] = JSON.stringify(ref);
-  }
-  return out;
-}
-
 /**
  * Split reserved blob-ref attributes back out of a span's attribute map.
  * Returns the user-facing attributes (reserved ref keys removed) plus the

@@ -37,7 +37,10 @@ import {
 } from "~/server/app-layer/traces/blob-store.service";
 import { SpanBlobResolutionService } from "~/server/app-layer/traces/span-blob-resolution.service";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
-import { resolveOffloadedTraces } from "~/server/traces/resolve-offloaded-traces";
+import {
+  resolveOffloadedTraces,
+  type WarnLogger,
+} from "~/server/traces/resolve-offloaded-traces";
 import { BLOB_REF_ATTR_PREFIX } from "~/server/app-layer/traces/blob-ref-attributes";
 import type { OtlpKeyValue } from "~/server/event-sourcing/pipelines/trace-processing/schemas/otlp";
 import {
@@ -280,7 +283,7 @@ async function simulateReadPath({
 }: {
   capturedSpans: RecordSpanCommandData[];
   blobStore: BlobStore;
-  logger: { warn: ReturnType<typeof vi.fn> };
+  logger: WarnLogger;
 }) {
   // Reconstruct a NormalizedSpan from what recordSpan received.
   // The OtlpSpan.attributes is an OtlpKeyValue[]; to simulate what the
@@ -405,7 +408,7 @@ describe("given the release_trace_blob_offload flag is on for the project and a 
 
   describe("when read back via the resolution pipeline (simulating TraceService.getTracesWithSpans)", () => {
     it("the returned span's langwatch.output is the full value byte-identical to the input", async () => {
-      const logger = { warn: vi.fn() };
+      const logger = { warn: vi.fn(), error: vi.fn() };
       const result = await simulateReadPath({ capturedSpans, blobStore, logger });
 
       const resolvedAttrValue =
@@ -414,7 +417,7 @@ describe("given the release_trace_blob_offload flag is on for the project and a 
     });
 
     it("the reserved blob-ref attribute is stripped from the returned span attributes", async () => {
-      const logger = { warn: vi.fn() };
+      const logger = { warn: vi.fn(), error: vi.fn() };
       const result = await simulateReadPath({ capturedSpans, blobStore, logger });
 
       const attrs = result.resolvedSpans[0]?.spanAttributes ?? {};
@@ -425,7 +428,7 @@ describe("given the release_trace_blob_offload flag is on for the project and a 
     });
 
     it("the recomputed trace.output (via TraceIOExtractionService) is the full value, not the preview", async () => {
-      const logger = { warn: vi.fn() };
+      const logger = { warn: vi.fn(), error: vi.fn() };
       const result = await simulateReadPath({ capturedSpans, blobStore, logger });
 
       expect(result.recomputedOutput).not.toBeNull();
@@ -433,7 +436,7 @@ describe("given the release_trace_blob_offload flag is on for the project and a 
     });
 
     it("anyResolved is true", async () => {
-      const logger = { warn: vi.fn() };
+      const logger = { warn: vi.fn(), error: vi.fn() };
       const result = await simulateReadPath({ capturedSpans, blobStore, logger });
       expect(result.anyResolved).toBe(true);
     });
@@ -536,7 +539,7 @@ describe("given the release_trace_blob_offload flag is OFF for the project and a
         fakeFlagOff.blobStore,
       );
       const ioExtractionService = new TraceIOExtractionService();
-      const logger = { warn: vi.fn() };
+      const logger = { warn: vi.fn(), error: vi.fn() };
 
       const result = await resolveOffloadedTraces({
         projectId: PROJECT_ID,
@@ -594,7 +597,7 @@ describe("given the flag is on, a span was offloaded, but the blob is missing on
     it("does not throw to the caller", async () => {
       // Empty blob store — get will throw NoSuchKey for any key
       const { blobStore: emptyBlobStore } = makeFakeBlobStore(new Map());
-      const logger = { warn: vi.fn() };
+      const logger = { warn: vi.fn(), error: vi.fn() };
 
       await expect(
         simulateReadPath({
@@ -607,7 +610,7 @@ describe("given the flag is on, a span was offloaded, but the blob is missing on
 
     it("returns the preview value (not the full value)", async () => {
       const { blobStore: emptyBlobStore } = makeFakeBlobStore(new Map());
-      const logger = { warn: vi.fn() };
+      const logger = { warn: vi.fn(), error: vi.fn() };
 
       const result = await simulateReadPath({
         capturedSpans,
@@ -619,12 +622,12 @@ describe("given the flag is on, a span was offloaded, but the blob is missing on
         result.resolvedSpans[0]?.spanAttributes?.["langwatch.output"];
       expect(returnedValue).toBe(previewValue);
       // Preview is shorter than the original 1 MB value
-      expect(returnedValue!.length).toBeLessThan(ONE_MB_OUTPUT.length);
+      expect((returnedValue as string).length).toBeLessThan(ONE_MB_OUTPUT.length);
     });
 
     it("logs at warn level (not error or silent)", async () => {
       const { blobStore: emptyBlobStore } = makeFakeBlobStore(new Map());
-      const logger = { warn: vi.fn() };
+      const logger = { warn: vi.fn(), error: vi.fn() };
 
       await simulateReadPath({
         capturedSpans,
@@ -637,7 +640,7 @@ describe("given the flag is on, a span was offloaded, but the blob is missing on
 
     it("anyResolved is false (the span was not resolved)", async () => {
       const { blobStore: emptyBlobStore } = makeFakeBlobStore(new Map());
-      const logger = { warn: vi.fn() };
+      const logger = { warn: vi.fn(), error: vi.fn() };
 
       const result = await simulateReadPath({
         capturedSpans,

@@ -49,9 +49,15 @@ export class BlobIntegrityError extends Error {
  * Stores large trace field values in object storage, one object per field.
  *
  * Key shape: `trace-blobs/{projectId}/{traceId}/{spanId}/{attrKey}` — positional
- * (not content-hashed: trivial prefix-delete GC + natural tenant scoping). The
- * org bucket is resolved via the injected resolver, so a project can only ever
- * address its own org's bucket — cross-tenant fetch is structurally impossible.
+ * (not content-hashed: trivial prefix-delete GC). The org bucket is resolved via
+ * the injected `S3ClientResolver`; in per-org BYOC deployments each org has its
+ * own bucket and cross-org access is gated at the bucket boundary. In shared-bucket
+ * deployments (no BYOC configured), isolation is **API-enforced**: callers MUST
+ * pass their authenticated `projectId`, which is encoded into the key prefix.
+ * A caller cannot construct another project's key without already knowing that
+ * project's (traceId, spanId) AND being authorized to address it. There is no
+ * in-process ACL inside `BlobStore.get` — that is the auth layer's job at the
+ * request boundary.
  */
 export class BlobStore {
   constructor(private readonly resolveS3Client: S3ClientResolver) {}

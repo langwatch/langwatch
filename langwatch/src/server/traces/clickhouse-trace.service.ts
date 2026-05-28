@@ -160,44 +160,13 @@ export class ClickHouseTraceService {
           // Map to legacy Trace format and apply protections
           const traces: Trace[] = [];
           for (const [_traceId, { summary, spans }] of tracesWithSpans) {
-            // Resolve offloaded blob refs before mapping to legacy Span.
-            // When resolveTraceSpans is absent, spans are used as-is.
-            let resolvedSpans = spans;
-            let recomputedInput: ExtractedIO | null = null;
-            let recomputedOutput: ExtractedIO | null = null;
-
-            if (this.resolveTraceSpans) {
-              const resolution = await this.resolveTraceSpans(projectId, spans);
-              resolvedSpans = resolution.resolvedSpans;
-              if (resolution.anyResolved) {
-                recomputedInput = resolution.recomputedInput;
-                recomputedOutput = resolution.recomputedOutput;
-              }
-            }
-
-            const mappedSpans = mapNormalizedSpansToSpans(resolvedSpans);
-            let trace = mapTraceSummaryToTrace(
-              summary,
-              mappedSpans,
+            const trace = await this.resolveAndMerge({
               projectId,
-            );
-
-            // When blobs were resolved, patch trace.input / trace.output with
-            // the recomputed full values (overwriting the preview from trace_summaries).
-            if (recomputedInput !== null || recomputedOutput !== null) {
-              trace = {
-                ...trace,
-                ...(recomputedInput !== null
-                  ? { input: { value: recomputedInput.text } }
-                  : {}),
-                ...(recomputedOutput !== null
-                  ? { output: { value: recomputedOutput.text } }
-                  : {}),
-              };
-            }
-
-            // Apply redaction protections
-            traces.push(applyTraceProtections(trace, protections));
+              summary,
+              spans,
+              protections,
+            });
+            traces.push(trace);
           }
 
           this.logger.debug(
@@ -1746,6 +1715,61 @@ export class ClickHouseTraceService {
   }
 
   /**
+   * Resolve offloaded blob refs (if any), map normalized spans to legacy Span
+   * objects, build the Trace via mapTraceSummaryToTrace, patch recomputed I/O,
+   * and apply field-redaction protections.
+   *
+   * Extracted to remove the duplicated resolve+map+merge block that previously
+   * appeared in both getTracesWithSpans and enrichTracesWithSpans. Both call
+   * sites are now a single line.
+   *
+   * @internal
+   */
+  private async resolveAndMerge({
+    projectId,
+    summary,
+    spans,
+    protections,
+  }: {
+    projectId: string;
+    summary: TraceSummaryData;
+    spans: NormalizedSpan[];
+    protections: Protections;
+  }): Promise<Trace> {
+    let resolvedSpans = spans;
+    let recomputedInput: ExtractedIO | null = null;
+    let recomputedOutput: ExtractedIO | null = null;
+
+    if (this.resolveTraceSpans) {
+      const resolution = await this.resolveTraceSpans(projectId, spans);
+      resolvedSpans = resolution.resolvedSpans;
+      if (resolution.anyResolved) {
+        recomputedInput = resolution.recomputedInput;
+        recomputedOutput = resolution.recomputedOutput;
+      }
+    }
+
+    const mappedSpans = mapNormalizedSpansToSpans(resolvedSpans);
+    let trace = mapTraceSummaryToTrace(summary, mappedSpans, projectId);
+
+    // When blobs were resolved, patch trace.input / trace.output with
+    // the recomputed full values (overwriting the preview from trace_summaries).
+    if (recomputedInput !== null || recomputedOutput !== null) {
+      trace = {
+        ...trace,
+        ...(recomputedInput !== null
+          ? { input: { value: recomputedInput.text } }
+          : {}),
+        ...(recomputedOutput !== null
+          ? { output: { value: recomputedOutput.text } }
+          : {}),
+      };
+    }
+
+    return applyTraceProtections(trace, protections);
+  }
+
+  /**
    * Enrich traces (which have empty spans) with actual span data from ClickHouse.
    *
    * Fetches spans via fetchTracesWithSpansJoined and replaces the empty span
@@ -1772,35 +1796,12 @@ export class ClickHouseTraceService {
           return trace;
         }
 
-        let spans = data.spans;
-        let recomputedInput: ExtractedIO | null = null;
-        let recomputedOutput: ExtractedIO | null = null;
-
-        if (this.resolveTraceSpans) {
-          const resolution = await this.resolveTraceSpans(projectId, data.spans);
-          spans = resolution.resolvedSpans;
-          if (resolution.anyResolved) {
-            recomputedInput = resolution.recomputedInput;
-            recomputedOutput = resolution.recomputedOutput;
-          }
-        }
-
-        const mappedSpans = mapNormalizedSpansToSpans(spans);
-        let mapped = mapTraceSummaryToTrace(data.summary, mappedSpans, projectId);
-
-        if (recomputedInput !== null || recomputedOutput !== null) {
-          mapped = {
-            ...mapped,
-            ...(recomputedInput !== null
-              ? { input: { value: recomputedInput.text } }
-              : {}),
-            ...(recomputedOutput !== null
-              ? { output: { value: recomputedOutput.text } }
-              : {}),
-          };
-        }
-
-        return applyTraceProtections(mapped, protections);
+        return this.resolveAndMerge({
+          projectId,
+          summary: data.summary,
+          spans: data.spans,
+          protections,
+        });
       }),
     );
   }
