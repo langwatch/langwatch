@@ -103,7 +103,7 @@ Feature: Cost centers — org-chart spend attribution across people, teams, and 
   # Bird's-eye spend by cost center (the #5 fix: aggregate across all org projects)
   # ---------------------------------------------------------------------------
 
-  @bdd @cost-centers @birds-eye @integration @unimplemented
+  @bdd @cost-centers @birds-eye @integration
   Scenario: Spend by cost center aggregates across every project in the org
     Given members generate spend in their personal projects
     And teams generate spend in their team projects
@@ -116,14 +116,14 @@ Feature: Cost centers — org-chart spend attribution across people, teams, and 
       project, so a fully-active org with no ingestion source showed
       empty graphs)
 
-  @bdd @cost-centers @birds-eye @ch @integration @unimplemented
+  @bdd @cost-centers @birds-eye @ch @integration
   Scenario: Spend-by-cost-center query stays tenant-isolated
     Given two orgs each with spend under like-named cost centers
     When acme-corp's admin loads the dashboard
     Then the cost-center rollup contains zero spend from the other org
     And every underlying ClickHouse query filters by TenantId first
 
-  @bdd @cost-centers @birds-eye @integration @unimplemented
+  @bdd @cost-centers @birds-eye @integration
   Scenario: Marketing-versus-engineering comparison reads from cost centers
     Given members in "Marketing" and members in "Engineering" both have
       personal AI spend in the window
