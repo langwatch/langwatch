@@ -6,8 +6,13 @@ import { mapTraceEvaluationsToLegacyEvaluations } from "~/server/evaluations/eva
 import { EvaluationService } from "~/server/evaluations/evaluation.service";
 import type { Evaluation, Trace } from "~/server/tracer/types";
 import { createLogger } from "~/utils/logger/server";
+import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
+import type { SpanBlobResolutionService } from "~/server/app-layer/traces/span-blob-resolution.service";
+import type { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
+import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import { ClickHouseTraceService } from "./clickhouse-trace.service";
 import { ElasticsearchTraceService } from "./elasticsearch-trace.service";
+import { resolveOffloadedTraces } from "./resolve-offloaded-traces";
 
 /**
  * Minimum prefix length we will attempt to resolve. Shorter strings fall
@@ -80,6 +85,26 @@ import type {
 } from "./types";
 
 /**
+ * Optional blob-offload resolution dependencies injected into TraceService
+ * (issue #4215 — ADR-021 decision B: read-time recompute).
+ *
+ * When provided, every read path that returns `Trace[]` with spans passes
+ * each trace's normalized spans through `SpanBlobResolutionService` to
+ * restore full field values that were offloaded to S3 at ingestion time,
+ * then re-runs `TraceIOExtractionService` to recompute trace.input /
+ * trace.output from the resolved spans.
+ *
+ * When omitted (e.g. in tests or when S3 is not configured) the service
+ * falls back to the preview values from trace_summaries — identical to
+ * pre-#4215 behavior.
+ */
+export interface BlobResolutionDeps {
+  blobStore: BlobStore;
+  blobResolutionService: SpanBlobResolutionService;
+  ioExtractionService: TraceIOExtractionService;
+}
+
+/**
  * Unified service for fetching traces from ClickHouse.
  *
  * This service acts as a facade that routes all requests to the ClickHouse backend.
@@ -96,9 +121,42 @@ export class TraceService {
   private readonly clickHouseService: ClickHouseTraceService;
   private readonly elasticsearchService: ElasticsearchTraceService;
   private readonly evaluationService: EvaluationService;
+  /** Blob-offload resolution deps (optional — falls back to preview if absent). */
+  readonly blobResolutionService: SpanBlobResolutionService | undefined;
+  readonly ioExtractionService: TraceIOExtractionService | undefined;
+  readonly blobStore: BlobStore | undefined;
 
-  constructor(readonly prisma: PrismaClient) {
-    this.clickHouseService = ClickHouseTraceService.create(prisma);
+  constructor(
+    readonly prisma: PrismaClient,
+    blobResolutionDeps?: BlobResolutionDeps,
+  ) {
+    this.blobStore = blobResolutionDeps?.blobStore;
+    this.blobResolutionService = blobResolutionDeps?.blobResolutionService;
+    this.ioExtractionService = blobResolutionDeps?.ioExtractionService;
+
+    // Build the per-trace resolver callback when deps are present.
+    // The callback is passed to ClickHouseTraceService so resolution happens
+    // at the NormalizedSpan level (before mapping to legacy Span), which is
+    // the only level where spanAttributes carry the blob-ref keys.
+    const resolveTraceSpansFn =
+      blobResolutionDeps !== undefined
+        ? async (
+            projectId: string,
+            normalizedSpans: NormalizedSpan[],
+          ) =>
+            resolveOffloadedTraces({
+              projectId,
+              normalizedSpans,
+              blobResolutionService: blobResolutionDeps.blobResolutionService,
+              ioExtractionService: blobResolutionDeps.ioExtractionService,
+              logger: this.logger,
+            })
+        : undefined;
+
+    this.clickHouseService = ClickHouseTraceService.create(
+      prisma,
+      resolveTraceSpansFn,
+    );
     this.elasticsearchService = ElasticsearchTraceService.create(prisma);
     this.evaluationService = EvaluationService.create(prisma);
   }
@@ -107,10 +165,14 @@ export class TraceService {
    * Static factory method for creating TraceService with default dependencies.
    *
    * @param prisma - PrismaClient instance
+   * @param blobResolutionDeps - Optional blob-offload resolution deps (#4215)
    * @returns TraceService instance
    */
-  static create(prisma: PrismaClient = defaultPrisma): TraceService {
-    return new TraceService(prisma);
+  static create(
+    prisma: PrismaClient = defaultPrisma,
+    blobResolutionDeps?: BlobResolutionDeps,
+  ): TraceService {
+    return new TraceService(prisma, blobResolutionDeps);
   }
 
   /**
