@@ -74,39 +74,9 @@ describe("guardProjectId — exempt org-scoped gateway models", () => {
     });
   });
 
-  describe("createMany on VirtualKeyProviderCredential without projectId", () => {
-    it("does NOT throw — join table, projectId reachable via parent VK", async () => {
-      // This path is hit on every VK create + every update that changes the
-      // provider chain (see virtualKey.repository.replaceProviderChain).
-      await expect(
-        runGuard({
-          model: "VirtualKeyProviderCredential",
-          action: "createMany",
-          args: {
-            data: [
-              {
-                virtualKeyId: "vk_01",
-                providerCredentialId: "gpc_01",
-                priority: 0,
-              },
-            ],
-          },
-        }),
-      ).resolves.toBe("ok");
-    });
-  });
-
-  describe("deleteMany on VirtualKeyProviderCredential by virtualKeyId", () => {
-    it("does NOT throw — same join-table rationale", async () => {
-      await expect(
-        runGuard({
-          model: "VirtualKeyProviderCredential",
-          action: "deleteMany",
-          args: { where: { virtualKeyId: "vk_01" } },
-        }),
-      ).resolves.toBe("ok");
-    });
-  });
+  // VirtualKeyProviderCredential coverage retired in iter 110: the
+  // binding join table was dropped; chain ordering moved to
+  // RoutingPolicy.modelProviderIds.
 
   describe("findMany on GatewayCacheRule with only organizationId filter", () => {
     it("does NOT throw (org-scoped; cache rules apply across every VK in the org)", async () => {
@@ -115,6 +85,50 @@ describe("guardProjectId — exempt org-scoped gateway models", () => {
           model: "GatewayCacheRule",
           action: "findMany",
           args: { where: { organizationId: "org_01", archivedAt: null } },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("findFirst on RoutingPolicy with org-scoped filter", () => {
+    // Regression: /api/auth/cli/exchange → approveDeviceCode →
+    // PersonalVirtualKeyService.ensureDefault → RoutingPolicyService.
+    // resolveDefaultForUser threw "requires projectId" inside the
+    // device-flow approval handler, blocking every CLI dogfood. Caught
+    // by @ai_gateway_andre during e2e dogfood on :5660.
+    it("does NOT throw (org-scoped; (organizationId, scope, scopeId) is the natural key)", async () => {
+      await expect(
+        runGuard({
+          model: "RoutingPolicy",
+          action: "findFirst",
+          args: {
+            where: {
+              organizationId: "org_01",
+              scope: "team",
+              scopeId: "team_01",
+              isDefault: true,
+            },
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("create on RoutingPolicy without projectId in data", () => {
+    it("does NOT throw (org-scoped; admin-defined templates carry organizationId+scope)", async () => {
+      await expect(
+        runGuard({
+          model: "RoutingPolicy",
+          action: "create",
+          args: {
+            data: {
+              organizationId: "org_01",
+              scope: "organization",
+              scopeId: "org_01",
+              name: "developer-default",
+              providerCredentialIds: [],
+            },
+          },
         }),
       ).resolves.toBe("ok");
     });
@@ -143,42 +157,28 @@ describe("guardProjectId — exempt org-scoped gateway models", () => {
   });
 });
 
-describe("guardProjectId — project-scoped gateway models still guarded", () => {
-  describe("findMany on VirtualKey WITHOUT projectId in where", () => {
-    it("STILL throws — VirtualKey is project-scoped (regression guard)", async () => {
+describe("guardProjectId — org-scoped VirtualKey still guarded", () => {
+  describe("findMany on VirtualKey WITHOUT any tenancy predicate", () => {
+    it("STILL throws — VirtualKey requires organizationId/id/scope (regression guard)", async () => {
       await expect(
         runGuard({
           model: "VirtualKey",
           action: "findMany",
           args: { where: { status: "ACTIVE" } },
         }),
-      ).rejects.toThrow(/requires a 'projectId'/);
+      ).rejects.toThrow(/requires an 'organizationId'/);
     });
   });
 
-  describe("findMany on VirtualKey WITH projectId in where", () => {
-    it("does NOT throw (normal project-scoped query)", async () => {
+  describe("findMany on VirtualKey WITH organizationId in where", () => {
+    it("does NOT throw (canonical org-scoped query)", async () => {
       await expect(
         runGuard({
           model: "VirtualKey",
           action: "findMany",
-          args: { where: { projectId: "proj_01", status: "ACTIVE" } },
+          args: { where: { organizationId: "org_01", status: "ACTIVE" } },
         }),
       ).resolves.toBe("ok");
-    });
-  });
-
-  describe("create on GatewayProviderCredential WITHOUT projectId in data", () => {
-    it("STILL throws — provider credentials are project-scoped", async () => {
-      await expect(
-        runGuard({
-          model: "GatewayProviderCredential",
-          action: "create",
-          args: {
-            data: { modelProviderId: "mp_01", slot: "primary" },
-          },
-        }),
-      ).rejects.toThrow(/requires a 'projectId'/);
     });
   });
 });
@@ -205,7 +205,7 @@ describe("guardProjectId — SCOPED_MODELS (ModelProvider family)", () => {
           action: "findMany",
           args: { where: {} },
         }),
-      ).rejects.toThrow(/projectId.*row id.*scope predicate/);
+      ).rejects.toThrow(/row id or scope predicate/);
     });
   });
 
@@ -247,28 +247,16 @@ describe("guardProjectId — SCOPED_MODELS (ModelProvider family)", () => {
     });
   });
 
-  describe("ModelProvider.findMany with legacy projectId predicate", () => {
-    it("does NOT throw — legacy projectId column is still a valid tenancy clause", async () => {
-      await expect(
-        runGuard({
-          model: "ModelProvider",
-          action: "findMany",
-          args: { where: { projectId: "proj_01" } },
-        }),
-      ).resolves.toBe("ok");
-    });
-  });
-
-  describe("ModelProvider.create without scopes AND without projectId", () => {
-    /** @scenario A create without scopes or projectId throws */
-    it("THROWS — every create needs either projectId or scopes in the payload", async () => {
+  describe("ModelProvider.create without scopes", () => {
+    /** @scenario A create without scopes throws */
+    it("THROWS — every create needs a scopes relation in the payload", async () => {
       await expect(
         runGuard({
           model: "ModelProvider",
           action: "create",
           args: { data: { provider: "openai", enabled: true } },
         }),
-      ).rejects.toThrow(/either a 'projectId' or a 'scopes' relation/);
+      ).rejects.toThrow(/requires a 'scopes' relation/);
     });
   });
 

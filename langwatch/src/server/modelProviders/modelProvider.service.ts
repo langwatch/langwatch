@@ -1,7 +1,8 @@
-import type { PrismaClient, Project } from "@prisma/client";
+import type { Prisma, PrismaClient, Project } from "@prisma/client";
 import type { Session } from "~/server/auth";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import { env } from "~/env.mjs";
 import { KEY_CHECK, MASKED_KEY_PLACEHOLDER } from "../../utils/constants";
 import type { CustomModelsInput } from "./customModel.schema";
 import { toLegacyCompatibleCustomModels } from "./customModel.schema";
@@ -85,6 +86,84 @@ export class ModelProviderService {
   static create(prisma: PrismaClient): ModelProviderService {
     const repository = new ModelProviderRepository(prisma);
     return new ModelProviderService(prisma, repository);
+  }
+
+  /**
+   * Advanced gateway settings (rate limits, fallback priority, rotation
+   * policy, provider config) for a single ModelProvider.
+   *
+   * Authorizes by the provider's own scope set, not a caller-supplied
+   * organization id: a provider id alone is not proof of ownership.
+   * Unreadable rows surface as NOT_FOUND so ids can't be enumerated
+   * across tenants; the write then requires manage on every scope the
+   * provider is attached to (fail-closed, same contract as create/update).
+   */
+  async updateAdvancedSettings(
+    ctx: AuthzContext,
+    input: {
+      id: string;
+      rateLimitRpm?: number | null;
+      rateLimitTpm?: number | null;
+      rateLimitRpd?: number | null;
+      fallbackPriorityGlobal?: number | null;
+      rotationPolicy?: "MANUAL";
+      providerConfig?: Record<string, unknown> | null;
+    },
+  ) {
+    const provider = await this.prisma.modelProvider.findUnique({
+      where: { id: input.id },
+      select: { id: true, scopes: { select: { scopeType: true, scopeId: true } } },
+    });
+    const scopes = (provider?.scopes ?? []) as {
+      scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+      scopeId: string;
+    }[];
+    if (!provider || !(await canReadAnyScope(ctx, scopes))) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Model provider not found.",
+      });
+    }
+    await assertCanManageAllScopes(ctx, scopes);
+
+    return this.prisma.modelProvider.update({
+      where: { id: input.id },
+      data: {
+        ...(input.rateLimitRpm !== undefined && {
+          rateLimitRpm: input.rateLimitRpm,
+        }),
+        ...(input.rateLimitTpm !== undefined && {
+          rateLimitTpm: input.rateLimitTpm,
+        }),
+        ...(input.rateLimitRpd !== undefined && {
+          rateLimitRpd: input.rateLimitRpd,
+        }),
+        ...(input.fallbackPriorityGlobal !== undefined && {
+          fallbackPriorityGlobal: input.fallbackPriorityGlobal,
+        }),
+        ...(input.rotationPolicy !== undefined && {
+          rotationPolicy: input.rotationPolicy,
+        }),
+        ...(input.providerConfig !== undefined && {
+          providerConfig: (input.providerConfig ?? undefined) as
+            | Prisma.InputJsonValue
+            | undefined,
+        }),
+      },
+      select: {
+        id: true,
+        rateLimitRpm: true,
+        rateLimitTpm: true,
+        rateLimitRpd: true,
+        fallbackPriorityGlobal: true,
+        rotationPolicy: true,
+        providerConfig: true,
+        healthStatus: true,
+        circuitOpenedAt: true,
+        lastHealthCheckAt: true,
+        disabledAt: true,
+      },
+    });
   }
 
   /**
@@ -663,7 +742,21 @@ export class ModelProviderService {
       Object.entries(modelProviders)
         .filter(([_, modelProvider]) => modelProvider.enabledSince)
         .map(([providerKey, modelProvider]) => {
+          // Auto-enable from host env vars only when running in SaaS mode.
+          // In SaaS, the platform's `ANTHROPIC_API_KEY` (etc.) is the
+          // shared platform key that every org tenant inherits — that's
+          // the intended product behavior. In self-hosted, the host
+          // `.env` keys belong to whoever installed the deployment and
+          // should NOT silently leak into every fresh org as "already
+          // configured" (G79: Ariana's fresh-org Anthropic edit drawer
+          // pre-populated the API-key field with masked dots, making the
+          // admin think their org had a key when they didn't).
+          //
+          // Self-hosted operators who DO want global env-key sharing can
+          // still set `IS_SAAS=true` explicitly; the default is the
+          // safer multi-tenant isolation.
           const enabled =
+            env.IS_SAAS === true &&
             modelProvider.enabledSince! < project.createdAt &&
             !!process.env[modelProvider.apiKey] &&
             (providerKey !== "vertex_ai" || !!process.env.VERTEXAI_PROJECT);

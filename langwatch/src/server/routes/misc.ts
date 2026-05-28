@@ -535,6 +535,11 @@ app.post("/mcp/authorize", async (c) => {
   const authCodeEntry = JSON.stringify({
     projectId: project.id,
     encryptedApiKey: encrypt(project.apiKey),
+    // Captured here so MCP tools that need a caller identity (e.g.,
+    // governance install/uninstall/rotate) can attribute audit rows to
+    // the actual OAuth-flowing user instead of falling back to a project-
+    // wide identity. Read in handler.ts at the token-exchange step.
+    userId: session.user.id,
     codeChallenge: code_challenge,
     codeChallengeMethod: code_challenge_method ?? "S256",
     clientId: client_id ?? "",

@@ -1,5 +1,34 @@
 #!/bin/sh
 
+# Retry helper: re-runs a function up to 3 times with backoff. ts-to-zod
+# spawns its own worker_thread + ts-node JIT cold-start under the hood,
+# and when 4 generators fork simultaneously (see the parallel `&` block
+# below) the worker init handshake races a 10s timeout
+# ("Did not receive an init message from worker after 10000ms"). The
+# parallel form is faster on warm runs, so keep it — but wrap each
+# generator so a single cold-start collision doesn't crashloop the
+# entrypoint chain.
+#
+# ts-to-zod is deterministic: 3 failures in a row means a real error,
+# not a flake — exit hard so the operator sees the underlying issue.
+retry() {
+  fn="$1"
+  attempt=1
+  max=3
+  while [ "$attempt" -le "$max" ]; do
+    if "$fn"; then
+      return 0
+    fi
+    if [ "$attempt" -lt "$max" ]; then
+      echo "[generate-zod-types] $fn failed on attempt $attempt — retrying in $((attempt * 2))s" >&2
+      sleep $((attempt * 2))
+    fi
+    attempt=$((attempt + 1))
+  done
+  echo "[generate-zod-types] $fn failed after $max attempts" >&2
+  return 1
+}
+
 generate_tracer_types() {
   ts-to-zod src/server/tracer/types.ts src/server/tracer/types.generated.ts
   if [ "$(uname)" = "Darwin" ]; then
@@ -44,14 +73,16 @@ generate_experiments_types() {
 # set -eo pipefail
 set -e
 
-# Run all generators in parallel and store their PIDs
-generate_tracer_types &
+# Run all generators in parallel and store their PIDs. Each is wrapped
+# in `retry` so a worker_thread init handshake collision doesn't kill
+# the entrypoint chain — see retry() at the top of this file.
+retry generate_tracer_types &
 pid1=$!
-generate_evaluators_types &
+retry generate_evaluators_types &
 pid2=$!
-generate_datasets_types &
+retry generate_datasets_types &
 pid3=$!
-generate_experiments_types &
+retry generate_experiments_types &
 pid4=$!
 
 # Wait for each process and check its exit status

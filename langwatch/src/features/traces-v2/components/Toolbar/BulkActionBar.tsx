@@ -2,6 +2,8 @@ import { Box, Button, HStack, Text } from "@chakra-ui/react";
 import { Database, Download, X } from "lucide-react";
 import type React from "react";
 import { Tooltip } from "~/components/ui/tooltip";
+import { PersonalFeatureGateDialog } from "~/components/me/PersonalFeatureGateDialog";
+import { usePersonalFeatureGate } from "~/components/me/usePersonalFeatureGate";
 import { useDrawer } from "~/hooks/useDrawer";
 import {
   SELECT_ALL_MATCHING_CAP,
@@ -27,6 +29,7 @@ export const BulkActionBar: React.FC<BulkActionBarProps> = ({
   const enableAllMatching = useSelectionStore((s) => s.enableAllMatching);
   const clear = useSelectionStore((s) => s.clear);
   const { openDrawer } = useDrawer();
+  const datasetGate = usePersonalFeatureGate("datasets");
 
   const explicitCount = traceIds.size;
   const allMatchingCount = Math.min(totalHits, SELECT_ALL_MATCHING_CAP);
@@ -98,8 +101,10 @@ export const BulkActionBar: React.FC<BulkActionBarProps> = ({
             size="xs"
             variant="outline"
             disabled={isAllMatchingMode}
-            onClick={() => {
+            onClick={async () => {
               if (isAllMatchingMode) return;
+              const allowed = await datasetGate.requestEnable();
+              if (!allowed) return;
               openDrawer("addDatasetRecord", {
                 selectedTraceIds: idsArray,
               });
@@ -119,6 +124,7 @@ export const BulkActionBar: React.FC<BulkActionBarProps> = ({
           <X size={14} />
         </Button>
       </HStack>
+      <PersonalFeatureGateDialog state={datasetGate.dialogState} />
     </Box>
   );
 };

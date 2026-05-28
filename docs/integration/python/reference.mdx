@@ -89,7 +89,7 @@ client = langwatch.setup(
 
 ## Tracing
 
-### `@langwatch.trace()` / `langwatch.trace()`
+### `@langwatch.trace()`, `langwatch.trace()`
 
 This is the primary way to define the boundaries of a request or a significant operation in your application. It can be used as a decorator around a function or as a context manager.
 
@@ -338,7 +338,7 @@ When `langwatch.trace()` is used as a context manager, it yields a `LangWatchTra
   (Potentially) Revokes sharing for this trace if it was previously shared.
 </ParamField>
 
-### `@langwatch.span()` / `langwatch.span()`
+### `@langwatch.span()`, `langwatch.span()`
 
 Use this to instrument specific operations or blocks of code within a trace. Spans can be nested to create a hierarchical view of your application's execution flow.
 

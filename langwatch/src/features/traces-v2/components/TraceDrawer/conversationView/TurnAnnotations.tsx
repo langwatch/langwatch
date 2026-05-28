@@ -14,6 +14,8 @@ import { Tooltip } from "~/components/ui/tooltip";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
+import { PersonalFeatureGateDialog } from "~/components/me/PersonalFeatureGateDialog";
+import { usePersonalFeatureGate } from "~/components/me/usePersonalFeatureGate";
 import { AnnotationPopover } from "./AnnotationPopover";
 
 type AnnotationItem = RouterOutputs["annotation"]["getByTraceIds"][number];
@@ -40,6 +42,9 @@ export function TurnActionRow({ traceId, output }: TurnAnnotationProps) {
 
   const stop = (e: React.SyntheticEvent) => e.stopPropagation();
 
+  const annotationsGate = usePersonalFeatureGate("annotations");
+  const datasetsGate = usePersonalFeatureGate("datasets");
+
   if (!canManage) return null;
 
   return (
@@ -55,7 +60,13 @@ export function TurnActionRow({ traceId, output }: TurnAnnotationProps) {
         output={output}
         mode="annotate"
         open={openPopover === "annotate"}
-        onOpenChange={(open) => setOpenPopover(open ? "annotate" : null)}
+        onOpenChange={async (open) => {
+          if (open) {
+            const allowed = await annotationsGate.requestEnable();
+            if (!allowed) return;
+          }
+          setOpenPopover(open ? "annotate" : null);
+        }}
         triggerTooltip="Add a note or score"
         trigger={<ActionButton icon={Edit3} label="Annotate" />}
       />
@@ -64,7 +75,13 @@ export function TurnActionRow({ traceId, output }: TurnAnnotationProps) {
         output={output}
         mode="suggest"
         open={openPopover === "suggest"}
-        onOpenChange={(open) => setOpenPopover(open ? "suggest" : null)}
+        onOpenChange={async (open) => {
+          if (open) {
+            const allowed = await annotationsGate.requestEnable();
+            if (!allowed) return;
+          }
+          setOpenPopover(open ? "suggest" : null);
+        }}
         triggerTooltip="Suggest a corrected output"
         trigger={<ActionButton icon={Lightbulb} label="Suggest" />}
       />
@@ -78,8 +95,10 @@ export function TurnActionRow({ traceId, output }: TurnAnnotationProps) {
           color="fg.muted"
           gap={1}
           paddingX={2}
-          onClick={(e) => {
+          onClick={async (e) => {
             e.stopPropagation();
+            const allowed = await datasetsGate.requestEnable();
+            if (!allowed) return;
             openDrawer("addDatasetRecord", { traceId });
           }}
         >
@@ -87,6 +106,8 @@ export function TurnActionRow({ traceId, output }: TurnAnnotationProps) {
           <Text textStyle="2xs">Dataset</Text>
         </Button>
       </Tooltip>
+      <PersonalFeatureGateDialog state={annotationsGate.dialogState} />
+      <PersonalFeatureGateDialog state={datasetsGate.dialogState} />
     </HStack>
   );
 }

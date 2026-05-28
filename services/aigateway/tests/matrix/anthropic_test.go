@@ -40,6 +40,7 @@ func TestAnthropic_StructuredOutputs(t *testing.T) {
 	runCell(t, anthropicCell(t, "structured_outputs", chatBody_StructuredOutputs, false))
 }
 
+// @scenario "A real cached follow-up is billed at the cache rate, not full input price"
 func TestAnthropic_Cache(t *testing.T) {
 	// Anthropic cache cell hits /v1/messages with the native Anthropic body
 	// shape so cache_control markers + cache_*_input_tokens counters

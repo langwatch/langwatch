@@ -12,6 +12,8 @@ const getImportedModelCosts = () => {
       regex: string;
       inputCostPerToken: number;
       outputCostPerToken: number;
+      cacheReadCostPerToken?: number;
+      cacheCreationCostPerToken?: number;
     }
   > = {};
 
@@ -49,6 +51,8 @@ const getImportedModelCosts = () => {
         regex,
         inputCostPerToken: model.pricing.inputCostPerToken ?? 0,
         outputCostPerToken: model.pricing.outputCostPerToken ?? 0,
+        cacheReadCostPerToken: model.pricing.inputCacheReadPerToken,
+        cacheCreationCostPerToken: model.pricing.inputCacheWritePerToken,
       };
     }
   }
@@ -70,6 +74,8 @@ const getImportedModelCosts = () => {
         regex: model.regex,
         inputCostPerToken: model.inputCostPerToken,
         outputCostPerToken: model.outputCostPerToken,
+        cacheReadCostPerToken: model.cacheReadCostPerToken,
+        cacheCreationCostPerToken: model.cacheCreationCostPerToken,
       };
     });
 
@@ -96,6 +102,13 @@ export type MaybeStoredLLMModelCost = {
   regex: string;
   inputCostPerToken?: number;
   outputCostPerToken?: number;
+  // Per-token rates for prompt-cache tokens. Read tokens are billed far
+  // below the input rate (~0.1x); write tokens above it (~1.25x/2x). The
+  // static registry sources these from the catalog's inputCacheReadPerToken /
+  // inputCacheWritePerToken; custom overrides may set them too. When absent,
+  // cache tokens fall back to the input rate (counted, just not discounted).
+  cacheReadCostPerToken?: number;
+  cacheCreationCostPerToken?: number;
   updatedAt?: Date;
   createdAt?: Date;
 };
@@ -119,6 +132,8 @@ export const getStaticModelCosts = (): MaybeStoredLLMModelCost[] => {
         regex: value.regex,
         inputCostPerToken: value.inputCostPerToken,
         outputCostPerToken: value.outputCostPerToken,
+        cacheReadCostPerToken: value.cacheReadCostPerToken,
+        cacheCreationCostPerToken: value.cacheCreationCostPerToken,
       }))
       // Sort by the matched model suffix, not raw registry key length,
       // because vendor prefixes are optional in the generated regex.
@@ -154,6 +169,9 @@ export const getLLMModelCosts = async ({
           regex: record.regex,
           inputCostPerToken: record.inputCostPerToken ?? undefined,
           outputCostPerToken: record.outputCostPerToken ?? undefined,
+          cacheReadCostPerToken: record.cacheReadCostPerToken ?? undefined,
+          cacheCreationCostPerToken:
+            record.cacheCreationCostPerToken ?? undefined,
           updatedAt: record.updatedAt,
           createdAt: record.createdAt,
         }) as MaybeStoredLLMModelCost,

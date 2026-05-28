@@ -192,7 +192,11 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
         .deleteMany({ where: { organizationId } })
         .catch(() => {});
       await prisma.modelProvider
-        .deleteMany({ where: { projectId: { in: projectIds } } })
+        .deleteMany({
+          where: {
+            scopes: { some: { scopeType: "PROJECT", scopeId: { in: projectIds } } },
+          },
+        })
         .catch(() => {});
       await prisma.teamUser
         .deleteMany({ where: { team: { slug: { startsWith: `--team-` } } } })

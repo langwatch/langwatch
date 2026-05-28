@@ -10,7 +10,7 @@ OpenAI-compatible embeddings. Works against OpenAI, Azure OpenAI, Bedrock (Titan
 
 ```
 POST /v1/embeddings
-Authorization: Bearer lw_vk_live_<ULID>
+Authorization: Bearer vk-lw-<ULID>
 Content-Type: application/json
 ```
 
@@ -59,7 +59,7 @@ X-LangWatch-Model: text-embedding-3-small
 
 Subject to the same fallback rules as chat (see [Fallback Chains](/ai-gateway/providers/fallback-chains)). Embedding models are less prone to provider outages than chat models but the chain is there if needed.
 
-Caching: deterministic — identical `(model, input)` tuples produce identical vectors, so aggressive semantic caching is feasible. V1 does not enable gateway-level caching for embeddings; use a local cache in your application layer.
+Caching: deterministic, identical `(model, input)` tuples produce identical vectors, so aggressive semantic caching is feasible. V1 does not enable gateway-level caching for embeddings; use a local cache in your application layer.
 
 ## Errors
 

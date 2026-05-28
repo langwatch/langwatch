@@ -22,7 +22,13 @@ export const limitsRouter = createTRPCRouter({
         maxMonthlyUsageLimit: z.number(),
       }),
     )
-    .use(checkOrganizationPermission("organization:view"))
+    // Tightened from organization:view to manage — this mutation
+    // takes caller-supplied counts + limits and sends a usage-limit
+    // email to org admins. A non-admin should not be able to trigger
+    // an admin-targeted notification with arbitrary numbers (a low-
+    // impact spam vector). Zero TS callers, so the bump is invisible
+    // to legitimate UX.
+    .use(checkOrganizationPermission("organization:manage"))
     .mutation(async ({ input }) => {
       const notification = await getApp().usageLimits.checkAndSendWarning({
         organizationId: input.organizationId,

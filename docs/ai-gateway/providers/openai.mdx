@@ -15,7 +15,7 @@ Under **Settings → Model Providers** in the LangWatch app:
 3. Optionally set a custom organisation ID via the Organization field.
 4. Save.
 
-This creates a `ModelProvider` row that any VK in the same project can bind to. The same credential also powers the existing litellm / playground / evaluators path — no duplication.
+This creates a `ModelProvider` row that any VK in the same project can bind to. The same credential also powers the existing litellm, playground, evaluators path, no duplication.
 
 ## Bind the credential to a VK
 
@@ -23,9 +23,9 @@ When creating or editing a VK, select the OpenAI credential from the Primary pro
 
 Per-VK overrides available on the binding:
 
-- **Rate limits** — per-VK `rpm`, `tpm`, `rpd` enforced at the gateway before the upstream call.
-- **Extra headers** — appended to every request (e.g. `OpenAI-Beta: assistants=v2`).
-- **Rotation policy** — when a credential has multiple API keys (comma-separated), the gateway can rotate them round-robin or on rate-limit.
+- **Rate limits**: per-VK `rpm`, `tpm`, `rpd` enforced at the gateway before the upstream call.
+- **Extra headers**: appended to every request (e.g. `OpenAI-Beta: assistants=v2`).
+- **Rotation policy**: when a credential has multiple API keys (comma-separated), the gateway can rotate them round-robin or on rate-limit.
 
 ## Supported endpoints
 
@@ -42,7 +42,7 @@ Per-VK overrides available on the binding:
 
 ## Caching
 
-OpenAI automatically caches prompt prefixes ≥ 1024 tokens in most GPT-4 / GPT-5 / o-series models. There's no `cache_control` block to preserve — OpenAI just handles it. The gateway forwards requests untouched in `mode=respect`, so cache hits are observed naturally.
+OpenAI automatically caches prompt prefixes ≥ 1024 tokens in most GPT-4, GPT-5, o-series models. There's no `cache_control` block to preserve, OpenAI just handles it. The gateway forwards requests untouched in `mode=respect`, so cache hits are observed naturally.
 
 The `usage.prompt_tokens_details.cached_tokens` field in the response is populated on cache hits and mirrored into the trace as `gen_ai.usage.cache_read.input_tokens` (OTel GenAI semconv). OpenAI has no write-to-cache dimension, so `gen_ai.usage.cache_creation.input_tokens` is unset.
 
@@ -52,6 +52,6 @@ Reasoning models return a `reasoning_tokens` count in `usage.completion_tokens_d
 
 ## Known quirks
 
-- **Responses API vs Chat Completions API** — the two have slightly different payload shapes. The gateway proxies whichever endpoint the client hits; it does not translate between them. Codex users should see [Codex CLI](/ai-gateway/cli/codex) for guidance on `wire_api` config.
-- **Organization header on egress** — if the VK doesn't set a custom Organization, the upstream OpenAI request uses the ModelProvider's default.
-- **Rate-limit responses (429)** — OpenAI's 429 includes a `Retry-After` header the gateway surfaces to the client when there is no fallback, or uses as a signal to trigger fallback if `fallback.on` includes `rate_limit`.
+- **Responses API vs Chat Completions API**: the two have slightly different payload shapes. The gateway proxies whichever endpoint the client hits; it does not translate between them. Codex users should see [Codex CLI](/ai-gateway/cli/codex) for guidance on `wire_api` config.
+- **Organization header on egress**: if the VK doesn't set a custom Organization, the upstream OpenAI request uses the ModelProvider's default.
+- **Rate-limit responses (429)**: OpenAI's 429 includes a `Retry-After` header the gateway surfaces to the client when there is no fallback, or uses as a signal to trigger fallback if `fallback.on` includes `rate_limit`.

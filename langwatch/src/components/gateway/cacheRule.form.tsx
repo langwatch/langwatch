@@ -256,7 +256,7 @@ export function CacheRuleForm({ state, onChange }: FormProps) {
             <Field.Label>
               Virtual key id (exact)
               <FieldInfoTooltip
-                description="Exact match against the VK's display prefix (e.g. lw_vk_live_01HZX9K3M...)."
+                description="Exact match against the VK's display prefix (e.g. vk-lw-01HZX9K3M...)."
                 docHref="/ai-gateway/cache-control#matchers"
               />
             </Field.Label>
@@ -270,14 +270,14 @@ export function CacheRuleForm({ state, onChange }: FormProps) {
             <Field.Label>
               Virtual key display prefix (starts-with)
               <FieldInfoTooltip
-                description="strings.HasPrefix against the VK's display prefix. Useful for bulk-matching by env/team convention (e.g. 'lw_vk_eval_' to match every eval-suite VK)."
+                description="strings.HasPrefix against the VK's display prefix. Useful for bulk-matching by env/team convention (e.g. 'vk-lw-' to match every eval-suite VK)."
                 docHref="/ai-gateway/cache-control#matchers"
               />
             </Field.Label>
             <Input
               value={state.matchVkPrefix}
               onChange={(e) => set("matchVkPrefix", e.target.value)}
-              placeholder="lw_vk_live_"
+              placeholder="vk-lw-"
             />
           </Field.Root>
           <Field.Root>

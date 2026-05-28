@@ -4,29 +4,41 @@ description: Route Google's Gemini CLI through the LangWatch AI Gateway for cent
 sidebarTitle: Gemini CLI
 ---
 
-[Gemini CLI](https://github.com/google-gemini/gemini-cli) is Google's official agentic CLI for Gemini models. It speaks the native Gemini API (`/v1beta/models/{model}:generateContent` and `:streamGenerateContent`) and uses Google's own request and response shapes — distinct from the OpenAI Chat Completions or Responses APIs.
+[Gemini CLI](https://github.com/google-gemini/gemini-cli) is Google's official agentic CLI for Gemini models. It speaks the native Gemini API (`/v1beta/models/{model}:generateContent` and `:streamGenerateContent`) and uses Google's own request and response shapes, distinct from the OpenAI Chat Completions or Responses APIs.
 
 The LangWatch AI Gateway exposes a Gemini-native passthrough at `/v1beta/*` that forwards requests verbatim to `generativelanguage.googleapis.com`, with the standard auth + tracing + budget + cache + guardrail middleware applied. So Gemini CLI works against the gateway with one env-var change.
 
-## Setup
+## Quick path: `langwatch gemini` wrapper (recommended for personal IDE keys)
+
+If you've authenticated via `langwatch login --device` ([Personal IDE keys](/ai-gateway/governance/personal-keys)), the simplest invocation is the wrapper. It exec's the Gemini CLI with the right env vars already pointing at your gateway:
+
+```bash
+langwatch gemini "your task here"
+```
+
+All Gemini CLI flags pass through unchanged.
+
+## Manual setup: service VK, shared workstation
+
+If you have a **service-virtual-key** for non-personal traffic, or you want every plain `gemini` invocation to route through the gateway without the wrapper:
 
 ```bash
 export GOOGLE_GEMINI_BASE_URL="https://gateway.langwatch.ai"
-export GEMINI_API_KEY="lw_vk_live_01HZX..."
+export GEMINI_API_KEY="vk-lw-01HZX..."
 gemini "your task here"
 ```
 
 `GOOGLE_GEMINI_BASE_URL` is the documented endpoint override for Gemini CLI's `gemini-api-key` auth mode. The gateway accepts the request at `POST /v1beta/models/{model}:generateContent`, resolves the VK, dispatches through Bifrost's Gemini adapter (which injects the real `x-goog-api-key` from the bound credential), and streams the native Gemini response shape back unchanged.
 
 <Note>
-Gemini CLI sends the VK secret as `x-goog-api-key` (its native auth header). The gateway's auth middleware accepts that header, an `Authorization: Bearer …` header, OR an `x-api-key` header — whichever your client sends. All three paths resolve to the same VK.
+Gemini CLI sends the VK secret as `x-goog-api-key` (its native auth header). The gateway's auth middleware accepts that header, an `Authorization: Bearer …` header, OR an `x-api-key` header, whichever your client sends. All three paths resolve to the same VK.
 </Note>
 
 For Vertex AI rather than the public Gemini API:
 
 ```bash
 export GOOGLE_VERTEX_BASE_URL="https://gateway.langwatch.ai"
-export GEMINI_API_KEY="lw_vk_live_<vertex-bound-vk>"
+export GEMINI_API_KEY="vk-lw-<vertex-bound-vk>"
 ```
 
 ## Self-hosted gateway
@@ -43,12 +55,12 @@ The `/v1beta/*` route is the same on the LangWatch cloud and self-hosted.
 
 Every `/v1beta/*` path hits a single passthrough handler. Bifrost.Passthrough strips `/v1beta` from the incoming request, prepends Gemini's API base URL (`https://generativelanguage.googleapis.com/v1beta`), and forwards body + query + selected headers verbatim. Specifically:
 
-- `POST /v1beta/models/{model}:generateContent` — synchronous generation
-- `POST /v1beta/models/{model}:streamGenerateContent` (with `?alt=sse`) — streaming generation. SSE chunks pass through byte-for-byte (Google already emits proper `event:`/`data:` framing, the gateway does not re-wrap)
-- `POST /v1beta/cachedContents` — explicit Gemini context cache creation
-- `POST /v1beta/models/{model}:countTokens` / `:embedContent` / `:batchEmbedContents` — token counting and embeddings
+- `POST /v1beta/models/{model}:generateContent`, synchronous generation
+- `POST /v1beta/models/{model}:streamGenerateContent` (with `?alt=sse`), streaming generation. SSE chunks pass through byte-for-byte (Google already emits proper `event:`/`data:` framing, the gateway does not re-wrap)
+- `POST /v1beta/cachedContents`, explicit Gemini context cache creation
+- `POST /v1beta/models/{model}:countTokens`, `:embedContent`, `:batchEmbedContents`, token counting and embeddings
 
-The Authorization / x-api-key / x-goog-api-key headers are stripped from the outbound request — Bifrost re-injects the real Gemini credential's API key. The native upstream Content-Type and status code ride through; Content-Length and Content-Encoding are dropped to avoid framing mismatches.
+The Authorization, x-api-key, x-goog-api-key headers are stripped from the outbound request, Bifrost re-injects the real Gemini credential's API key. The native upstream Content-Type and status code ride through; Content-Length and Content-Encoding are dropped to avoid framing mismatches.
 
 ## Verifying the traffic flows
 
@@ -101,8 +113,8 @@ Implicit prefix caching (where Gemini caches >1024-token shared prefixes automat
 ## Limits and caveats
 
 - **Bring a Bifrost-recognised model name.** `gemini-2.5-flash`, `gemini-2.5-pro`, and `gemini-2.0-flash` are recognised today. Aliases like `gemini-flash` (no version suffix) return `400` because the Gemini adapter can't resolve the upstream model. Use Gemini CLI's `--model` flag or your VK's `model_aliases` to pin to a concrete name.
-- **Trace-level usage extraction is partial on streaming.** The gateway successfully forwards the Gemini SSE stream, but the trace pipeline's token-count parser for Gemini-native streams is still being completed — expect `prompt_tokens` to show on traces but `completion_tokens` may land null until the parser ships. Cost is still captured accurately.
-- **Vertex SA auth is per-environment.** The gateway's Vertex VK uses a Google service-account JSON key on the gateway side. Engineers running Gemini CLI with a `GEMINI_API_KEY` (which is a LangWatch VK) don't need their own SA — the gateway's bound Vertex credential handles upstream auth.
+- **Trace-level usage extraction is partial on streaming.** The gateway successfully forwards the Gemini SSE stream, but the trace pipeline's token-count parser for Gemini-native streams is still being completed, expect `prompt_tokens` to show on traces but `completion_tokens` may land null until the parser ships. Cost is still captured accurately.
+- **Vertex SA auth is per-environment.** The gateway's Vertex VK uses a Google service-account JSON key on the gateway side. Engineers running Gemini CLI with a `GEMINI_API_KEY` (which is a LangWatch VK) don't need their own SA, the gateway's bound Vertex credential handles upstream auth.
 - **`ListModels` is not yet routed natively.** Gemini CLI's model-discovery pings to `/v1beta/models` (no model suffix) currently fall through to the OpenAI-style `/v1/models` handler. List your available models in the LangWatch UI's VK detail page until this is fixed.
 
 ## Governance recipes

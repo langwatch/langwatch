@@ -1,0 +1,52 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          { "key": "service.name", "value": { "stringValue": "forge-attempt-attribution" } },
+          { "key": "langwatch.user.id", "value": { "stringValue": "FORGE_user_other" } },
+          { "key": "langwatch.user_id", "value": { "stringValue": "FORGE_user_other" } },
+          { "key": "langwatch.team.id", "value": { "stringValue": "FORGE_team_other" } },
+          { "key": "langwatch.team_id", "value": { "stringValue": "FORGE_team_other" } },
+          { "key": "langwatch.organization.id", "value": { "stringValue": "FORGE_org_other" } },
+          { "key": "langwatch.organization_id", "value": { "stringValue": "FORGE_org_other" } },
+          { "key": "langwatch.project.id", "value": { "stringValue": "FORGE_project_other" } },
+          { "key": "langwatch.project_id", "value": { "stringValue": "FORGE_project_other" } },
+          { "key": "langwatch.tenant_id", "value": { "stringValue": "FORGE_tenant_other" } },
+          { "key": "langwatch.virtual_key.id", "value": { "stringValue": "FORGE_vk_other" } },
+          { "key": "langwatch.virtual_key_id", "value": { "stringValue": "FORGE_vk_other" } },
+          { "key": "langwatch.origin.kind", "value": { "stringValue": "FORGE_origin" } },
+          { "key": "langwatch.ingestion_source.id", "value": { "stringValue": "FORGE_isource_other" } },
+          { "key": "langwatch.ingestion_source.source_type", "value": { "stringValue": "FORGE_stype" } },
+          { "key": "langwatch.ingestion_source.organization_id", "value": { "stringValue": "FORGE_org_other" } },
+          { "key": "langwatch.governance.retention_class", "value": { "stringValue": "FORGE_retention" } },
+          { "key": "langwatch.governance.anomaly_alert_id", "value": { "stringValue": "FORGE_alert_other" } }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": { "name": "dogfood.forge-attempt.attribution", "version": "0.0.0" },
+          "spans": [
+            {
+              "traceId": "00000000000000000000000000000000",
+              "spanId": "0000000000000000",
+              "name": "forge.attribution-keys",
+              "kind": 1,
+              "startTimeUnixNano": "1715175600000000000",
+              "endTimeUnixNano": "1715175600100000000",
+              "attributes": [
+                { "key": "forge.intent", "value": { "stringValue": "claim B6 16-key attribution set; receiver MUST re-stamp all to binding-authoritative principal" } },
+                { "key": "langwatch.user.id", "value": { "stringValue": "FORGE_user_other" } },
+                { "key": "langwatch.team.id", "value": { "stringValue": "FORGE_team_other" } },
+                { "key": "langwatch.organization.id", "value": { "stringValue": "FORGE_org_other" } },
+                { "key": "langwatch.project.id", "value": { "stringValue": "FORGE_project_other" } },
+                { "key": "langwatch.tenant_id", "value": { "stringValue": "FORGE_tenant_other" } }
+              ],
+              "status": { "code": 1 }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

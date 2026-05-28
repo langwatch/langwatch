@@ -9,22 +9,22 @@ sidebarTitle: Aider
 ## Setup
 
 ```bash
-export OPENAI_API_KEY="lw_vk_live_01HZX..."
+export OPENAI_API_KEY="vk-lw-01HZX..."
 export OPENAI_API_BASE="https://gateway.langwatch.ai/v1"
 
 aider --model gpt-5-mini
 ```
 
-For Anthropic Claude models, Aider uses `litellm` under the hood — it will route `anthropic/claude-*` model names through its Anthropic handler, which uses `ANTHROPIC_BASE_URL`:
+For Anthropic Claude models, Aider uses `litellm` under the hood, it will route `anthropic/claude-*` model names through its Anthropic handler, which uses `ANTHROPIC_BASE_URL`:
 
 ```bash
-export ANTHROPIC_API_KEY="lw_vk_live_01HZX..."
+export ANTHROPIC_API_KEY="vk-lw-01HZX..."
 export ANTHROPIC_BASE_URL="https://gateway.langwatch.ai"
 
 aider --model anthropic/claude-sonnet-4-6
 ```
 
-This hits the gateway's `/v1/messages` endpoint, which is Anthropic-native and preserves `cache_control` blocks byte-for-byte (load-bearing for Aider's repo-map caching — see below).
+This hits the gateway's `/v1/messages` endpoint, which is Anthropic-native and preserves `cache_control` blocks byte-for-byte (load-bearing for Aider's repo-map caching, see below).
 
 ## Cache-aware repo maps
 
@@ -33,7 +33,7 @@ Aider sends your repo map as a long system prompt (often 20–50k tokens). Anthr
 For this to work:
 
 1. Use `/v1/messages` (Anthropic shape), not `/v1/chat/completions`.
-2. Set VK `cache.mode: respect` (the default). Do NOT use `cache.mode: disable` with Aider — it 10×s your Claude bill.
+2. Set VK `cache.mode: respect` (the default). Do NOT use `cache.mode: disable` with Aider, it 10×s your Claude bill.
 
 See [Caching Passthrough](/ai-gateway/caching-passthrough) for the complete contract.
 
@@ -56,7 +56,7 @@ Every request from that Aider session shares a trace id; the gateway nests its s
 
 - Scope: `principal`, target: the engineer.
 - Window: `day`, limit: `$25`.
-- `on_breach`: `block` (Aider errors out cleanly — better than a $400 mistake).
+- `on_breach`: `block` (Aider errors out cleanly, better than a $400 mistake).
 
 ### Block destructive tools
 
@@ -74,7 +74,7 @@ When OpenAI rate-limits your primary, Aider keeps working at slightly degraded q
 
 ## Troubleshooting
 
-- **Aider complains "invalid_api_key"** — verify you exported `OPENAI_API_KEY` with the VK value, not your real OpenAI key.
-- **`ANTHROPIC_BASE_URL` ignored** — Aider's litellm handler needs litellm ≥ v1.40; earlier versions hardcode `api.anthropic.com`.
-- **Cache misses on repo maps** — confirm your model is `anthropic/*` (uses `/v1/messages`) and VK `cache.mode` is `respect`. `disable` defeats the Anthropic discount.
-- **Gateway returns `413 payload_too_large`** — Aider can send 100k+ token prompts on large repos. Check the gateway's `LW_GATEWAY_MAX_BODY_BYTES` setting (default 10MB).
+- **Aider complains "invalid_api_key"**: verify you exported `OPENAI_API_KEY` with the VK value, not your real OpenAI key.
+- **`ANTHROPIC_BASE_URL` ignored**, Aider's litellm handler needs litellm ≥ v1.40; earlier versions hardcode `api.anthropic.com`.
+- **Cache misses on repo maps**: confirm your model is `anthropic/*` (uses `/v1/messages`) and VK `cache.mode` is `respect`. `disable` defeats the Anthropic discount.
+- **Gateway returns `413 payload_too_large`**, Aider can send 100k+ token prompts on large repos. Check the gateway's `LW_GATEWAY_MAX_BODY_BYTES` setting (default 10MB).

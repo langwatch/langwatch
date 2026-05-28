@@ -271,8 +271,13 @@ export async function startHttpServer({
   const sseSessions: Record<string, SseSessionState> = {};
 
   app.get("/sse", async (req: Request, res: Response) => {
+    // SSE/EventSource clients cannot set custom Authorization headers, so
+    // the apiKey fallback via ?apiKey= is the standard pattern for SSE
+    // auth across the MCP/CLI ecosystem. The header form is preferred and
+    // checked first; this fallback is documented at the client level.
     const apiKey =
       extractBearerToken(req) ||
+      // lgtm[js/sensitive-get-query]
       (req.query["apiKey"] as string | undefined) ||
       null;
 

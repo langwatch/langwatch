@@ -8,8 +8,8 @@ description: 'Search, retrieve, and share LangWatch traces via the REST API. Tra
 The Traces API lets you search and retrieve traces for your project. Each trace captures a complete LLM pipeline execution, including nested spans (LLM calls, tool calls, RAG retrievals), evaluations, and metadata.
 
 Both search and get-trace endpoints support a `format` parameter:
-- **`digest`** (default) — Returns an AI-readable formatted trace with hierarchical span tree, timing, inputs/outputs, and errors. Optimized for LLM consumption.
-- **`json`** — Returns the full raw trace data with all fields.
+- **`digest`** (default), Returns an AI-readable formatted trace with hierarchical span tree, timing, inputs/outputs, and errors. Optimized for LLM consumption.
+- **`json`**, Returns the full raw trace data with all fields.
 
 ## Authentication
 

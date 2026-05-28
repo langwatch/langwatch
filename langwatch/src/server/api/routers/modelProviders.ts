@@ -20,6 +20,7 @@ import {
 } from "../../modelProviders/modelDefaults.service";
 import { ModelProviderService } from "../../modelProviders/modelProvider.service";
 import {
+  authorizeInResolver,
   checkOrganizationPermission,
   checkProjectPermission,
   hasProjectPermission,
@@ -147,7 +148,7 @@ export const modelProviderRouter = createTRPCRouter({
     .use(checkProjectPermission("project:update"))
     .mutation(async ({ input, ctx }) => {
       const service = ModelProviderService.create(ctx.prisma);
-      return await service.updateModelProvider(
+      const result = await service.updateModelProvider(
         {
           id: input.id,
           projectId: input.projectId,
@@ -168,6 +169,8 @@ export const modelProviderRouter = createTRPCRouter({
         },
         { prisma: ctx.prisma, session: ctx.session },
       );
+
+      return result;
     }),
 
   delete: protectedProcedure
@@ -215,6 +218,42 @@ export const modelProviderRouter = createTRPCRouter({
     .use(checkOrganizationPermission("organization:view"))
     .query(({ input }) => {
       return { managed: isManagedProvider(input.organizationId, input.provider) };
+    }),
+
+  /**
+   * Advanced gateway settings (rate limits, fallback priority, rotation
+   * policy, provider config) for a single ModelProvider. Split from the
+   * main `update` so the Advanced tab can ship its own payload without
+   * round-tripping the full provider (avoids reseeding credentials /
+   * scopes on every rate-limit tweak).
+   *
+   * Iter 110: fields landed on ModelProvider via S0 schema after
+   * GatewayProviderCredential was folded in. v1 ships MANUAL rotation
+   * only; AUTO + secret-store integration are v1.1 scope. Spec:
+   * specs/ai-gateway/gateway-provider-settings.feature.
+   */
+  updateAdvanced: protectedProcedure
+    .input(
+      z.object({
+        id: z.string().min(1),
+        rateLimitRpm: z.number().int().min(0).nullable().optional(),
+        rateLimitTpm: z.number().int().min(0).nullable().optional(),
+        rateLimitRpd: z.number().int().min(0).nullable().optional(),
+        fallbackPriorityGlobal: z.number().int().nullable().optional(),
+        rotationPolicy: z.enum(["MANUAL"]).optional(),
+        providerConfig: z.object({}).passthrough().nullable().optional(),
+      }),
+    )
+    // Scope authz is data-dependent (the provider's own scope set), so it
+    // runs inside updateAdvancedSettings; this satisfies the builder's
+    // fail-closed permission gate while keeping audit + domain-error.
+    .use(authorizeInResolver)
+    .mutation(async ({ input, ctx }) => {
+      const service = ModelProviderService.create(ctx.prisma);
+      return await service.updateAdvancedSettings(
+        { prisma: ctx.prisma, session: ctx.session },
+        input,
+      );
     }),
 
   /**

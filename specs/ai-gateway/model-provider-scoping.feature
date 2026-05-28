@@ -64,21 +64,27 @@ Feature: Cross-scope ModelProvider reuse
     Then the response contains all three entries (org + team + project all reachable)
 
   # ─────────────────────────────────────────────────────────────────────────
-  # §3. Binding — the gateway picker surfaces scope
+  # §3. Direct ModelProvider use by VKs (no binding indirection)
   # ─────────────────────────────────────────────────────────────────────────
 
-  Scenario: Bind drawer lists providers from every scope with visible scope label
+  # Post-refactor: there is no GatewayProviderCredential binding table.
+  # VKs reference ModelProviders directly via scope inheritance
+  # (see vk-scope-inheritance.feature). The "binding" verb collapses into
+  # "VK is in scope of the MP" via the scope-cascade resolver.
+
+  Scenario: VK create drawer lists eligible ModelProviders from every in-scope ladder
     Given the setup from the mixed-scope scenario above
-    When alice opens /gateway/providers → Bind provider on "acme-api"
-    Then the icon-tile list shows 3 entries
-    And each entry's caption shows "Org: acme" / "Team: acme-platform" / "Project: acme-api" respectively
+    When alice opens the VK create drawer at /settings/gateway/virtual-keys/new and picks scope PROJECT "acme-api"
+    Then the "Eligible Model Providers" panel shows 3 entries
+    And each entry's caption shows "Org: acme" / "Team: acme-platform" / "Project: acme-api" respectively (the "via" scope chip)
     And hovering an entry shows a tooltip with the scope-ladder rationale
 
-  Scenario: Creating a binding stores the source-provider reference, not a copy
-    When alice creates a GatewayProviderCredential binding to "OpenAI-enterprise" (ORG scope)
-    Then GatewayProviderCredential.modelProviderId = "OpenAI-enterprise".id
-    And the provider's API key is NOT duplicated — it stays in the ORG-scoped ModelProvider row
-    And rotating the key at Settings → Model Providers propagates to every binding that references it on the next /changes refresh (≤ 30 s)
+  Scenario: A VK references the ModelProvider directly via scope match, not via a binding row
+    When alice creates a VK scoped to PROJECT "acme-api" referencing models from "OpenAI-enterprise" (ORG scope)
+    Then no GatewayProviderCredential row is created (the table no longer exists)
+    And the VK bundle's `model_providers[]` resolves "OpenAI-enterprise" directly via the scope cascade
+    And rotating the key at Settings → Model Providers bumps ModelProvider.revision
+    And every dependent VK's revision bumps in turn, evicting the gateway auth-cache on next read (≤ 30 s)
 
   # ─────────────────────────────────────────────────────────────────────────
   # §4. Permission — who can create at each scope
@@ -105,23 +111,24 @@ Feature: Cross-scope ModelProvider reuse
     # Security property: visibility follows current role, not role-at-token-issuance.
 
   # ─────────────────────────────────────────────────────────────────────────
-  # §5. Existing bindings across a scope change
+  # §5. Existing VK references across a ModelProvider scope change
   # ─────────────────────────────────────────────────────────────────────────
 
-  Scenario: Changing a ModelProvider's scope doesn't break existing bindings
-    Given "OpenAI-prod" was PROJECT-scoped on "acme-api" with 3 bindings across 3 projects in the org
+  Scenario: Broadening a ModelProvider's scope keeps existing VKs working and unlocks new ones
+    Given "OpenAI-prod" was PROJECT-scoped on "acme-api" with 3 VKs in that project referencing it
     When an org admin edits "OpenAI-prod" to ORGANIZATION scope
-    Then all 3 bindings continue to resolve (they reference the provider by id, not by scope)
+    Then all 3 VKs continue to resolve "OpenAI-prod" (scope ladder unchanged for them)
+    And every VK in the org now has "OpenAI-prod" in its eligible set on next /config materialisation
     And the /changes long-poll fires a bundle refresh marking scope-changed
-    And operators can now create new bindings to "OpenAI-prod" from any project in the org
 
-  Scenario: Restricting scope from ORG → PROJECT archives out-of-scope bindings
-    Given "OpenAI-wide" was ORGANIZATION-scoped with bindings in 5 projects
+  Scenario: Restricting scope from ORG → PROJECT removes the MP from out-of-scope VKs' eligible sets
+    Given "OpenAI-wide" was ORGANIZATION-scoped and visible to 5 projects' VKs
     When an org admin narrows it to PROJECT scope on "acme-api" only
-    Then the 4 bindings outside "acme-api" are automatically archived (archivedAt set)
-    And a GatewayChangeEvent is emitted for each (kind = PROVIDER_BINDING_ARCHIVED)
-    And the admin sees a confirmation modal before the narrow lands
-    # Preserves the audit trail; never silent-revokes in a way operators can't reconstruct.
+    Then VKs scoped outside "acme-api" no longer see "OpenAI-wide" in their next bundle
+    And ModelProvider.revision advances; every dependent VK.revision bumps
+    And a GatewayChangeEvent fires per affected VK (kind = MP_SCOPE_NARROWED)
+    And the admin sees a confirmation modal naming impacted VKs before the narrow lands
+    # Preserves the audit trail; never silent-removes routing in a way operators can't reconstruct.
 
   # ─────────────────────────────────────────────────────────────────────────
   # §6. UI — Settings → Model Providers

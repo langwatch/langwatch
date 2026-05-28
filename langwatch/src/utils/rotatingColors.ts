@@ -108,3 +108,42 @@ export const getColorForString = (
   colorMap[key] = rotatingColors[set]![sum % rotatingColors[set]!.length]!;
   return colorMap[key]!;
 };
+
+/**
+ * Hex-string sibling of `getColorForString("colors", ...)` — same
+ * sum-of-char-codes hash, same 8-color palette ordering — but returns
+ * literal hex usable in Recharts SVG `fill` / `stroke`. Lets the
+ * governance bird's-eye chart segments paint the exact same hue as
+ * the ProjectAvatar / row-dot tokens for the same name, with no
+ * Chakra-token-to-hex translation step.
+ *
+ * Palette is the `colors` set hard-coded as Chakra v3 mid-saturation
+ * hex (orange-500/blue-500/green-500/yellow-500/purple-500/teal-500/
+ * cyan-500/pink-500). Order matters — must match `rotatingColors.colors`
+ * indices so a name that hashes to slot 3 paints `yellow.subtle` in
+ * the avatar AND `#eab308` (yellow-500) in the chart.
+ */
+const CHART_HEX_PALETTE = [
+  "#f97316", // orange.500 → matches rotatingColors.colors[0] (orange.subtle)
+  "#3b82f6", // blue.500   → [1] (blue.subtle)
+  "#22c55e", // green.500  → [2] (green.subtle)
+  "#eab308", // yellow.500 → [3] (yellow.subtle)
+  "#a855f7", // purple.500 → [4] (purple.subtle)
+  "#14b8a6", // teal.500   → [5] (teal.subtle)
+  "#06b6d4", // cyan.500   → [6] (cyan.subtle)
+  "#ec4899", // pink.500   → [7] (pink.subtle)
+] as const;
+
+const hexColorMap: Record<string, string> = {};
+
+export const getHexColorForString = (str: string): string => {
+  const cached = hexColorMap[str];
+  if (cached) return cached;
+  let sum = 0;
+  for (let i = 0; i < str.length; i++) {
+    sum += str.charCodeAt(i);
+  }
+  const hex = CHART_HEX_PALETTE[sum % CHART_HEX_PALETTE.length]!;
+  hexColorMap[str] = hex;
+  return hex;
+};

@@ -8,29 +8,29 @@ The gateway delegates provider-specific dispatch to [`bifrost/core`](https://git
 
 ## Configure a provider credential once, use from many VKs
 
-Every provider credential lives in the LangWatch **Model Providers** table (under **Settings → Model Providers**). It's the same surface that powers evaluators and the playground — no separate "gateway providers" store.
+Every provider credential lives in the LangWatch **Model Providers** table (under **Settings → Model Providers**). It's the same surface that powers evaluators and the playground, no separate "gateway providers" store.
 
-To use a credential in the gateway, create a `GatewayProviderCredential` binding that references it + layers on gateway-only settings (rate limits, rotation, extra headers). Each VK then binds to one or more `GatewayProviderCredential`s as its primary + fallback chain.
+Gateway-only settings (rate limits, fallback priority, providerConfig overrides) live directly on the **ModelProvider** itself, on the **Advanced (Gateway)** tab of the editor. There is no separate binding wrapper. VKs reference ModelProviders by id; the order in the bound routing policy drives primary + fallback selection.
 
 ```
-ModelProvider (raw credential)
-  └── GatewayProviderCredential (gateway-specific binding)
-       └── VirtualKey.providers[] (ordered primary + fallback)
+ModelProvider (raw credential + Advanced/Gateway settings)
+  └── RoutingPolicy.modelProviderIds[] (ordered primary + fallback)
+       └── VirtualKey.routingPolicyId (or default policy from the org)
 ```
 
-This layering means: rotating the raw OpenAI key rotates it everywhere; changing a rate limit or extra header only affects gateway traffic; binding a VK to a different provider is a one-click edit.
+This means: rotating the raw OpenAI key rotates it everywhere; changing a rate limit only affects gateway traffic (it's on the Advanced tab, not the basic credential); changing a VK's provider mix is one edit to the routing policy it references.
 
 ## Supported providers (v1)
 
 | Provider | Routes supported | Auth methods | Caching passthrough |
 |---|---|---|---|
-| [OpenAI](/ai-gateway/providers/openai) | chat / responses / embeddings / images / audio / moderations | API key | auto-prefix |
-| [Anthropic](/ai-gateway/providers/anthropic) | messages / chat (translated) / streaming | API key | `cache_control` blocks |
-| [Azure OpenAI](/ai-gateway/providers/azure-openai) | chat / responses / embeddings / images / audio | API key / AAD | auto-prefix |
-| [AWS Bedrock](/ai-gateway/providers/bedrock) | messages / chat / embeddings (Titan) | AWS SigV4 / IRSA | `cachePoint` |
-| [Google Vertex AI](/ai-gateway/providers/vertex) | messages / chat | GCP ADC / SA JSON | implicit context cache |
+| [OpenAI](/ai-gateway/providers/openai) | chat, responses, embeddings, images, audio, moderations | API key | auto-prefix |
+| [Anthropic](/ai-gateway/providers/anthropic) | messages, chat (translated), streaming | API key | `cache_control` blocks |
+| [Azure OpenAI](/ai-gateway/providers/azure-openai) | chat, responses, embeddings, images, audio | API key, AAD | auto-prefix |
+| [AWS Bedrock](/ai-gateway/providers/bedrock) | messages, chat, embeddings (Titan) | AWS SigV4, IRSA | `cachePoint` |
+| [Google Vertex AI](/ai-gateway/providers/vertex) | messages, chat | GCP ADC, SA JSON | implicit context cache |
 | [Google Gemini](/ai-gateway/providers/gemini) | chat | API key | implicit context cache |
-| [Custom OpenAI-compatible](/ai-gateway/providers/custom-openai-compatible) | chat / embeddings (depends on upstream) | Bearer / custom header | opaque |
+| [Custom OpenAI-compatible](/ai-gateway/providers/custom-openai-compatible) | chat, embeddings (depends on upstream) | Bearer, custom header | opaque |
 
 Behind the scenes bifrost/core also supports Groq, Cohere, Mistral, Ollama, vLLM, SGLang, Perplexity, ElevenLabs, and others. These will light up in the UI as LangWatch ships the per-provider configuration forms.
 
@@ -44,6 +44,6 @@ Most VKs end up with 1-2 fallback providers. Guidelines:
 
 See [Fallback Chains](/ai-gateway/providers/fallback-chains) for trigger semantics.
 
-## Multi-region / multi-account
+## Multi-region, multi-account
 
-Each provider binding pins a region (Azure endpoint, Bedrock region, Vertex project). If an organisation spans multiple regions, create one `GatewayProviderCredential` per region with a naming convention (e.g. `openai-eu`, `openai-us`) and use VK `model_aliases` to route `gpt-5-mini-eu` vs `gpt-5-mini-us` to the right credential.
+Each ModelProvider row pins a region (Azure endpoint, Bedrock region, Vertex project). If an organisation spans multiple regions, create sibling ModelProvider rows of the same family with a naming convention (e.g. `openai-eu`, `openai-us`) and use VK `model_aliases` to route `gpt-5-mini-eu` vs `gpt-5-mini-us` to the right ModelProvider id.

@@ -56,15 +56,35 @@ export function estimateCost({
   llmModelCost,
   inputTokens,
   outputTokens,
+  cacheReadTokens,
+  cacheCreationTokens,
 }: {
   llmModelCost: MaybeStoredLLMModelCost;
   inputTokens?: number;
   outputTokens?: number;
+  // Prompt-cache token counts, billed at their own rates. These are
+  // SEPARATE from `inputTokens` (the non-cached input) — the caller must
+  // pass the exclusive split, matching the Anthropic-native convention the
+  // gateway emits (input_tokens excludes cache read/write). When a rate is
+  // missing, that bucket falls back to the input rate so a cached request
+  // is never costed as free.
+  cacheReadTokens?: number;
+  cacheCreationTokens?: number;
 }): number | undefined {
-  return !!llmModelCost?.inputCostPerToken || !!llmModelCost?.outputCostPerToken
-    ? (inputTokens ?? 0) * (llmModelCost.inputCostPerToken ?? 0) +
-        (outputTokens ?? 0) * (llmModelCost.outputCostPerToken ?? 0)
-    : undefined;
+  const hasAnyRate =
+    !!llmModelCost?.inputCostPerToken || !!llmModelCost?.outputCostPerToken;
+  if (!hasAnyRate) return undefined;
+
+  const inputRate = llmModelCost.inputCostPerToken ?? 0;
+  const cacheReadRate = llmModelCost.cacheReadCostPerToken ?? inputRate;
+  const cacheCreationRate = llmModelCost.cacheCreationCostPerToken ?? inputRate;
+
+  return (
+    (inputTokens ?? 0) * inputRate +
+    (outputTokens ?? 0) * (llmModelCost.outputCostPerToken ?? 0) +
+    (cacheReadTokens ?? 0) * cacheReadRate +
+    (cacheCreationTokens ?? 0) * cacheCreationRate
+  );
 }
 
 const VENDOR_MAPPINGS: Record<string, string> = {

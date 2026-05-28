@@ -1,0 +1,132 @@
+---
+title: Your first 5 minutes (developer)
+description: A new-developer walkthrough, install the LangWatch CLI, sign in via your company SSO, land on /me, run your first request through the gateway, and read your spend back. Each step links into the deeper docs.
+sidebarTitle: First 5 minutes (dev)
+---
+
+You've just been added to a LangWatch organization and you want to use Claude Code (or Codex, Gemini, Cursor, opencode) without your IT team writing a wiki page. This page is the 5-minute version of that wiki page.
+
+When you finish you will have:
+
+- A signed-in `langwatch` CLI on your laptop.
+- A [Personal Virtual Key](/ai-gateway/governance/personal-keys) bound to your identity, your monthly budget, and your org's [Routing Policy](/ai-gateway/governance/routing-policies).
+- One real request flowing through the [AI Gateway](/ai-gateway/overview) that you can see in your own [/me dashboard](/ai-governance/personal-portal/overview).
+
+If you are an admin trying to make the org *ready* for developers to do this, jump to the [admin walkthrough](/ai-governance/getting-started-admin) instead.
+
+<Info>**Pairs with:** [Personal IDE keys](/ai-gateway/governance/personal-keys) (the device-flow login that runs underneath every step here) and [Coding CLI Integrations](/ai-gateway/cli/overview) (the deep reference for each supported assistant).</Info>
+
+## Prerequisites
+
+Before you start, your IT admin should already have:
+
+1. Provisioned your account in LangWatch (you should have an invite email or be able to sign in via your company SSO).
+2. Published at least one default [Routing Policy](/ai-gateway/governance/routing-policies). If they haven't, the CLI will fail with a friendly `409 no_default_routing_policy` error, see the [CLI error catalog](/ai-governance/cli-debug#error-catalog) and ping your admin.
+3. Optionally: published an [AI Tools Portal](/ai-governance/personal-portal/overview) catalog (the card grid you'll see on `/me`). If they haven't, your `/me` page will show a "your IT team is still setting things up" empty state, you can still use the CLI directly.
+
+If any of those are missing your admin's first stop is [From zero to first detected anomaly](/ai-governance/getting-started-admin).
+
+## Step 1: Install the CLI
+
+The `langwatch` CLI is the single binary that drives every step below.
+
+```bash
+# npm / pnpm, global install
+npm install -g langwatch
+# or, no install at all:
+npx langwatch --help
+```
+
+Either path works. The CLI is self-discoverable: `langwatch --help` lists every subcommand it supports, and `langwatch <command> --help` deep-dives into each one.
+
+## Step 2: Sign in via device flow
+
+```bash
+langwatch login --device
+```
+
+What happens:
+
+1. Your terminal prints a one-time device code and a URL.
+2. Your browser opens. You sign in via your company SSO (or email + password if your org runs the open-core flow).
+3. The CLI exchanges the device code for a [Personal Virtual Key](/ai-gateway/governance/personal-keys), persists it at `~/.langwatch/config.json` (mode `0600`), and prints `signed in`.
+
+The Personal VK is bound to your identity via JWT claims (`organization_id`, `principal_id`, `personal: true`). Every request the gateway sees from this key is attributed to **you**: your monthly budget, your audit trail, your usage chart.
+
+If sign-in fails, the [CLI error catalog](/ai-governance/cli-debug#error-catalog) maps every error code (`409 no_default_routing_policy`, `401 unauthorized`, `403 forbidden`) back to the admin action that fixes it.
+
+## Step 3: Land on /me
+
+Open `https://<your-langwatch-host>/me` in a browser. You're on your **personal home**.
+
+What you see (top to bottom):
+
+- **AI Tools Portal**: the card grid your IT admin published. Three card classes: [coding assistants](/ai-governance/personal-portal/end-user#coding-assistant-tiles), [model providers](/ai-governance/personal-portal/end-user#model-provider-tiles), and [external tools](/ai-governance/personal-portal/end-user#external-tool-tiles). See the [portal overview](/ai-governance/personal-portal/overview) for the full shape.
+- **My Usage**: spend this month vs your budget, request count, most-used model.
+- **Spending over time**: a daily bar chart for the last 30 days.
+- **By tool**: your spend split by coding assistant, model provider.
+- **Recent activity**: the last few requests you made (timestamp, model, cost). No prompt or completion content is rendered here even if the org runs in `full` [no-spy mode](/ai-governance/no-spy-mode): `/me` is a ledger view, not a trace viewer.
+
+If your admin has published a catalog, the next step is one click. If they haven't, skip to the alternative path at the bottom of this page.
+
+## Step 4: Click your favourite assistant tile
+
+Find the tile for your preferred CLI (Claude Code in this example). Click it. The tile expands inline with a setup walkthrough, typically a single command:
+
+```bash
+langwatch claude
+```
+
+Run it. The wrapper will:
+
+1. Read your Personal VK from `~/.langwatch/config.json`.
+2. Set the `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN` env vars to point at your org's gateway.
+3. `exec` the underlying `claude` binary with everything pre-injected.
+
+You should see Claude Code's normal startup banner. Make a request. The gateway proxies it transparently to Anthropic (or to whatever provider your admin's [Routing Policy](/ai-gateway/governance/routing-policies) sends it to, the CLI doesn't care).
+
+The same pattern works for [Codex](/ai-gateway/cli/codex) (`langwatch codex`), [Gemini CLI](/ai-gateway/cli/gemini-cli) (`langwatch gemini`), [Cursor](/ai-gateway/cli/cursor), and [opencode](/ai-gateway/cli/opencode). The full matrix lives in [Coding CLI Integrations](/ai-gateway/cli/overview).
+
+<Tip>
+**Always-on shell setup.** If you'd rather not type `langwatch claude` every time, paste this in your `~/.zshrc` (or `~/.bashrc`):
+
+```bash
+eval "$(langwatch init-shell zsh)"
+```
+
+After a shell restart, plain `claude` (or `codex`, `gemini`, etc.) will pick up the gateway automatically.
+</Tip>
+
+## Step 5: Read your spend back
+
+Refresh `/me`. You should see:
+
+- **Recent activity**: your request from Step 4 with timestamp, model, and cost.
+- **Spending over time**: today's bar updated.
+- **My Usage**: request count incremented, spend updated.
+
+If the request didn't appear, the [CLI debug commands](/ai-governance/cli-debug) tell you exactly where it stopped: `langwatch governance status` shows whether your org has data at all, and the [audit log](/ai-governance/audit-log) under `/settings/audit-log` (admin-only) shows every gateway action with timestamp, actor, and target.
+
+## Where to next
+
+- **Want to switch tools?** Every coding assistant has its own setup page: [Claude Code](/ai-gateway/cli/claude-code), [Codex](/ai-gateway/cli/codex), [Gemini CLI](/ai-gateway/cli/gemini-cli), [Cursor](/ai-gateway/cli/cursor), [opencode](/ai-gateway/cli/opencode), [Aider](/ai-gateway/cli/aider).
+- **Want to use a model provider directly from your code?** Click the provider tile on `/me` (OpenAI, Anthropic, Bedrock, Gemini), name a key, and copy the secret once. The form posts to `personalVirtualKeys.issuePersonal` and the result is a virtual key you drop into your app's config, same gateway, same budget, no provider credentials in your dotfiles. See [Model-provider tiles](/ai-governance/personal-portal/end-user#model-provider-tiles).
+- **Want to share a key with your team?** Don't use a personal VK, create a project and a project-scoped VK instead. The portal nudges you toward this with a "building an app for your team? Consider creating a project" hint.
+- **Want to know which devices are signed in?** [/me/sessions](/ai-governance/personal-portal/sessions) lists every active CLI session with platform, hostname, and last-used timestamp; revoke any session in one click.
+- **Got an error?** [CLI debug → Error catalog](/ai-governance/cli-debug#error-catalog) maps every CLI error to the admin action that fixes it.
+
+## Alternative path: admin hasn't published a catalog yet
+
+If `/me` shows the empty-state "your IT team is still setting things up" message, you can still use the CLI directly without the portal:
+
+```bash
+# Sign in
+langwatch login --device
+
+# Run any supported assistant, wrapper pulls VK + endpoint from your config
+langwatch claude
+langwatch codex
+langwatch gemini
+```
+
+Your spend, budget, and audit trail still flow normally, the portal grid is a convenience layer on top, not a gate.

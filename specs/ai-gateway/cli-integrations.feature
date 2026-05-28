@@ -21,7 +21,7 @@ Feature: AI Gateway — Coding CLI integrations
 
   Background:
     Given the LangWatch AI Gateway is running at "http://localhost:7400"
-    And a LangWatch virtual key "cli-key" exists with secret "lw_vk_live_01HZX..."
+    And a LangWatch virtual key "cli-key" exists with secret "vk-lw-01HZX..."
     And the key has providers [openai (primary), anthropic (fallback)]
     And the key has models_allowed ["gpt-5-mini", "claude-haiku-4-5-20251001"]
 
@@ -36,7 +36,7 @@ Feature: AI Gateway — Coding CLI integrations
     When I run `claude --print "say hi"`
     Then the exit code is 0
     And the Claude Code process sent a POST to "http://localhost:7400/v1/messages"
-    And the request used header "x-api-key: lw_vk_live_..."
+    And the request used header "x-api-key: vk-lw-..."
     And the request body was a valid Anthropic Messages payload
     And the response was OpenAI-compatible-error-free (no 401/402/403/404)
     And the LangWatch trace in project "gateway-demo" shows span "gateway.messages" with attribute "langwatch.client.name=claude-code"
@@ -70,7 +70,7 @@ Feature: AI Gateway — Coding CLI integrations
     When I run `codex exec "say hi"`
     Then the exit code is 0
     And Codex sent a POST to "http://localhost:7400/v1/chat/completions"
-    And the request used header "Authorization: Bearer lw_vk_live_..."
+    And the request used header "Authorization: Bearer vk-lw-..."
 
   @integration @cli @codex @responses-api @unimplemented
   Scenario: Codex with wire_api "responses" hits /v1/responses

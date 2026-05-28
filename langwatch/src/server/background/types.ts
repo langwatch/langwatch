@@ -92,3 +92,18 @@ export type UsageStatsJob = {
   timestamp: number;
 };
 
+export type AnomalyDetectionJob = {
+  /**
+   * Wall-clock timestamp the evaluator uses as `now`. Stored on the job
+   * so re-runs for the same scheduled tick are deterministic.
+   */
+  timestamp: number;
+};
+
+export type IngestionPullerJob = {
+  /** IngestionSource id this run targets. */
+  ingestionSourceId: string;
+  /** Wall-clock dispatch time (ms since epoch). */
+  scheduledAt: number;
+};
+

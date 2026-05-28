@@ -1,0 +1,237 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
+/**
+ * CliBootstrapService — shared logic for the Storyboard Screen 4
+ * login-completion ceremony. Returns inherited providers + monthly
+ * budget. Consumed by both:
+ *
+ *   - tRPC `api.user.cliBootstrap` (session-cookie auth, /me dashboard)
+ *   - REST `/api/auth/cli/bootstrap` (Bearer access_token, CLI device-flow)
+ *
+ * Both surfaces need the same shape so the CLI's
+ * `formatLoginCeremony({ providers, budget })` (typescript-sdk
+ * b8b21bb79) renders identically regardless of which path the data
+ * came through.
+ *
+ * Empty-state safe — returns providers=[] + budget={null, 0, MONTHLY}
+ * when the user has no personal workspace yet (fresh login flow,
+ * no admin VK provisioning yet).
+ *
+ * Spec contracts:
+ *   - Storyboard Screen 4 (gateway.md)
+ *   - Phase 1B.5 atomic-task block (PR-3524-DESCRIPTION.md)
+ */
+import type { PrismaClient } from "@prisma/client";
+
+import { env } from "~/env.mjs";
+import {
+  getClickHouseClientForProject,
+  isClickHouseEnabled,
+} from "~/server/clickhouse/clickhouseClient";
+import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
+import { GatewayBudgetService } from "~/server/gateway/budget.service";
+import { ModelProviderService } from "~/server/modelProviders/modelProvider.service";
+import {
+  getProviderModelOptions,
+  modelProviders as modelProviderRegistry,
+} from "~/server/modelProviders/registry";
+import { PersonalVirtualKeyService } from "./personalVirtualKey.service";
+import { PersonalWorkspaceService } from "./personalWorkspace.service";
+
+export interface CliBootstrapResult {
+  providers: Array<{
+    name: string;
+    displayName: string;
+    models: string[];
+  }>;
+  budget: {
+    monthlyLimitUsd: number | null;
+    monthlyUsedUsd: number;
+    period: string;
+  };
+  /**
+   * Authoritative gateway base URL for the CLI to use as `cfg.gateway_url`.
+   * Resolution order:
+   *   1. `LW_GATEWAY_PUBLIC_URL` — dedicated TS-side var, unambiguous.
+   *   2. `LW_GATEWAY_BASE_URL`   — legacy SaaS deploys where this var
+   *      still carried the public URL. In dev `scripts/start.sh`
+   *      hijacks it for the Go control-plane URL, so reading it on
+   *      dev would point the CLI at the Hono API (PORT+1000) and a
+   *      `langwatch claude` request would 404.
+   *   3. SaaS default `https://gateway.langwatch.com`.
+   *   4. Self-hosted default `http://localhost:5563`.
+   * Mirrors the same helper used by the personal-VK reveal card so /me
+   * and CLI surfaces report the same URL.
+   */
+  gatewayUrl: string;
+  /**
+   * Mailto target the CLI can render when preflight fails (gateway
+   * down, no provider configured, no personal VK). First org admin by
+   * createdAt, same selection used by the budget-exceeded payload so
+   * the user sees a consistent "ask this person" address across
+   * surfaces. Null when the org has no admin row yet.
+   */
+  adminEmail: string | null;
+}
+
+function resolveGatewayUrl(): string {
+  if (env.LW_GATEWAY_PUBLIC_URL) return env.LW_GATEWAY_PUBLIC_URL;
+  if (env.LW_GATEWAY_BASE_URL) return env.LW_GATEWAY_BASE_URL;
+  return env.IS_SAAS
+    ? "https://gateway.langwatch.com"
+    : "http://localhost:5563";
+}
+
+const SCOPE_RANK: Record<string, number> = {
+  PRINCIPAL: 0,
+  VIRTUAL_KEY: 1,
+  PROJECT: 2,
+  TEAM: 3,
+  ORGANIZATION: 4,
+};
+
+export class CliBootstrapService {
+  constructor(private readonly prisma: PrismaClient) {}
+
+  static create(prisma: PrismaClient): CliBootstrapService {
+    return new CliBootstrapService(prisma);
+  }
+
+  async resolve(input: {
+    userId: string;
+    organizationId: string;
+  }): Promise<CliBootstrapResult> {
+    const workspaceService = new PersonalWorkspaceService(this.prisma);
+    const workspace = await workspaceService.findExisting({
+      userId: input.userId,
+      organizationId: input.organizationId,
+    });
+    if (!workspace) {
+      return emptyBootstrap();
+    }
+
+    const providers = await this.resolveProviders(workspace.project.id);
+    const budget = await this.resolveBudget({
+      userId: input.userId,
+      organizationId: input.organizationId,
+      teamId: workspace.team.id,
+      projectId: workspace.project.id,
+    });
+    const adminEmail = await this.resolveAdminEmail(input.organizationId);
+
+    return { providers, budget, gatewayUrl: resolveGatewayUrl(), adminEmail };
+  }
+
+  private async resolveAdminEmail(
+    organizationId: string,
+  ): Promise<string | null> {
+    const admin = await this.prisma.organizationUser.findFirst({
+      where: { organizationId, role: "ADMIN" },
+      include: { user: { select: { email: true } } },
+      orderBy: { createdAt: "asc" },
+    });
+    return admin?.user.email ?? null;
+  }
+
+  private async resolveProviders(
+    personalProjectId: string,
+  ): Promise<CliBootstrapResult["providers"]> {
+    const providerService = ModelProviderService.create(this.prisma);
+    const accessibleProviders =
+      await providerService.getProjectModelProviders(personalProjectId);
+    return Object.entries(accessibleProviders)
+      .filter(([providerKey, mp]) => {
+        const def =
+          modelProviderRegistry[
+            providerKey as keyof typeof modelProviderRegistry
+          ];
+        if (!def || def.type !== "llm") return false;
+        return mp.enabled;
+      })
+      .map(([providerKey]) => {
+        const def =
+          modelProviderRegistry[
+            providerKey as keyof typeof modelProviderRegistry
+          ];
+        const models = getProviderModelOptions(providerKey, "chat").map(
+          (m) => m.value,
+        );
+        return {
+          name: providerKey,
+          displayName: def?.name ?? providerKey,
+          models,
+        };
+      })
+      .sort((a, b) => a.displayName.localeCompare(b.displayName));
+  }
+
+  private async resolveBudget(input: {
+    userId: string;
+    organizationId: string;
+    teamId: string;
+    projectId: string;
+  }): Promise<CliBootstrapResult["budget"]> {
+    const vkService = PersonalVirtualKeyService.create(this.prisma);
+    const vks = await vkService.list({
+      userId: input.userId,
+      organizationId: input.organizationId,
+    });
+    const personalVk = vks[0];
+
+    if (!personalVk || !isClickHouseEnabled()) {
+      return { monthlyLimitUsd: null, monthlyUsedUsd: 0, period: "MONTHLY" };
+    }
+
+    const chRepo = new GatewayBudgetClickHouseRepository(async (projectId) => {
+      const client = await getClickHouseClientForProject(projectId);
+      if (!client) {
+        throw new Error(
+          `ClickHouse enabled but no client for project ${projectId}`,
+        );
+      }
+      return client;
+    });
+    const budgetService = GatewayBudgetService.create(this.prisma, chRepo);
+    const decision = await budgetService.check({
+      organizationId: input.organizationId,
+      teamId: input.teamId,
+      projectId: input.projectId,
+      virtualKeyId: personalVk.id,
+      principalUserId: input.userId,
+      projectedCostUsd: 0,
+    });
+
+    const ranked = decision.scopes
+      .map((s) => ({
+        scope: s.scope,
+        spent: Number.parseFloat(s.spentUsd) || 0,
+        limit: Number.parseFloat(s.limitUsd) || 0,
+        window: s.window,
+        rank: SCOPE_RANK[s.scope] ?? 99,
+      }))
+      .filter((s) => s.limit > 0)
+      .sort((a, b) => a.rank - b.rank);
+    const chosen = ranked[0];
+    if (!chosen) {
+      return { monthlyLimitUsd: null, monthlyUsedUsd: 0, period: "MONTHLY" };
+    }
+    return {
+      monthlyLimitUsd: chosen.limit,
+      monthlyUsedUsd: chosen.spent,
+      period: chosen.window,
+    };
+  }
+}
+
+function emptyBootstrap(): CliBootstrapResult {
+  return {
+    providers: [],
+    budget: {
+      monthlyLimitUsd: null,
+      monthlyUsedUsd: 0,
+      period: "MONTHLY",
+    },
+    gatewayUrl: resolveGatewayUrl(),
+    adminEmail: null,
+  };
+}

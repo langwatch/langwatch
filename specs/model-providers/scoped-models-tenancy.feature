@@ -61,8 +61,8 @@ Feature: SCOPED_MODELS predicate-based tenancy guard
     # caller is asserting it already knows which row to read.
 
   @integration
-  Scenario: A create without scopes or projectId throws
-    When I call ModelProvider.create with data that has no scopes relation and no projectId
+  Scenario: A create without scopes throws
+    When I call ModelProvider.create with data that has no scopes relation
     Then the guard throws
     # Every new row must carry its tenancy at creation time. Adding the
     # scope later would leave the row orphaned and queryable by anyone.

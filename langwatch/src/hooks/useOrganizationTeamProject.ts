@@ -103,6 +103,10 @@ export const useOrganizationTeamProject = (
   );
   const [localStorageProjectSlug, setLocalStorageProjectSlug] =
     useLocalStorage<string>("selectedProjectSlug", "");
+  const [, setLastVisitedHomeKind] = useLocalStorage<"" | "project" | "personal">(
+    "lastVisitedHomeKind",
+    "",
+  );
 
   const reservedProjectSlugs = useMemo(
     () => ["analytics", "datasets", "evaluations", "experiments", "messages"],
@@ -226,6 +230,13 @@ export const useOrganizationTeamProject = (
     if (project && project.slug !== localStorageProjectSlug) {
       setLocalStorageProjectSlug(project.slug);
     }
+    // Visiting any /[project]/* page marks the implicit home preference
+    // as "project". Pairs with MyLayout's "personal" marker so the `/`
+    // index resolver can fall through to whichever home was visited
+    // last when the user has no explicit pin set via the picker.
+    if (project) {
+      setLastVisitedHomeKind("project");
+    }
     // We want to update localstorage values only once, forward, doesn't matter if localstorage
     // itself changes. This is because the user might have two tabs open in different projects,
     // and we don't want them fighting each other on who keeps localstorage in sync.
@@ -342,8 +353,19 @@ export const useOrganizationTeamProject = (
    * @example hasPermission("organization:manage")
    */
   const hasPermission = (permission: Permission) => {
-    // Check if this is an organization permission
-    const isOrgPermission = permission.startsWith("organization:");
+    // Org-scoped resources: organization itself + the AI Governance resource
+    // family (governance / ingestionSources / anomalyRules / complianceExport
+    // / activityMonitor — all live in ORGANIZATION_ROLE_PERMISSIONS, not in
+    // any team-role bag). Team admins do NOT get automatic governance perms;
+    // delegation flows through CustomRolePermissions JSON column at the team
+    // level if needed (matching the rest of the RBAC catalog).
+    const isOrgPermission =
+      permission.startsWith("organization:") ||
+      permission.startsWith("governance:") ||
+      permission.startsWith("ingestionSources:") ||
+      permission.startsWith("anomalyRules:") ||
+      permission.startsWith("complianceExport:") ||
+      permission.startsWith("activityMonitor:");
 
     if (isOrgPermission) {
       // Only check organization role - team admins do NOT get automatic organization permissions

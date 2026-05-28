@@ -1,31 +1,52 @@
 /**
  * Materialise the payload returned from `GET /api/internal/gateway/config/:vk_id`.
  *
- * Shape: contract §4.2. Caller loads the VirtualKey + its provider chain and
- * hands off to this module; we collect applicable budgets, normalise enums,
- * and assemble the JSON blob the Go gateway expects.
+ * Bundle shape lives in contract §4.2. Source of truth changed in the
+ * VK-binding collapse: GatewayProviderCredential is gone, ModelProvider
+ * absorbed its advanced gateway fields, and the VK's eligible-provider
+ * set is now computed from the VirtualKeyScope graph + an optional
+ * RoutingPolicy.modelProviderIds ordering. See `scopeResolver.ts` for
+ * the cascade walker.
  */
 import type {
   GatewayBudget,
   GatewayCacheRule,
-  GatewayProviderCredential,
   ModelProvider,
+  Prisma,
   PrismaClient,
-  Project,
-  Team,
   VirtualKey,
 } from "@prisma/client";
 
 import { decrypt } from "../../utils/encryption";
+import { GatewayBudgetClickHouseRepository } from "./budget.clickhouse.repository";
 import { GatewayCacheRuleService } from "./cacheRule.service";
+import {
+  eligibleModelProvidersForVk,
+  resolveTraceProject,
+} from "./scopeResolver";
 import { parseVirtualKeyConfig } from "./virtualKey.config";
-import type { VirtualKeyWithChain } from "./virtualKey.repository";
+import type { VirtualKeyWithScopes } from "./virtualKey.repository";
+
+export type GuardrailWire = {
+  id: string;
+  name: string;
+  evaluator_id: string;
+  evaluator_slug: string | null;
+  direction: "pre" | "post" | "stream_chunk";
+  failure_mode: "fail_open" | "fail_closed";
+};
+
+export type GuardrailAttachmentWire = {
+  direction: "pre" | "post" | "stream_chunk";
+  guardrail_ids: string[];
+};
 
 export type ProviderSlot = {
-  // `id` is the per-org-unique provider credential identifier the Go
-  // gateway keys on (auth.ProviderCred.ID, json:"id"). Was historically
-  // emitted as `credentials_ref` for the resolve-later opaque-ref model
-  // that never shipped; renamed in contract §4.2 to match wire reality.
+  /**
+   * ModelProvider.id — the Go gateway keys credentials on this directly
+   * post-collapse (was the GPC id pre-collapse; one-to-one fold means
+   * the wire name `id` stays the same).
+   */
   id: string;
   slot: string;
   type: string;
@@ -37,13 +58,8 @@ export type ProviderSlot = {
    * - Bedrock: `{access_key, secret_key, session_token?, region?}`
    * - Vertex: `{project_id, project_number, region, auth_credentials}`
    * Decrypted from ModelProvider.customKeys (AES-256-GCM at rest).
-   * Finding #26 fix: without this field the gateway surfaces
-   * "no keys found for provider: <name>" on every /v1/* request.
    */
   credentials: Record<string, unknown>;
-  // Promoted out of `config` per contract §4.2 so Go-side ProviderCred
-  // can unmarshal directly into its top-level fields. Omitted when
-  // unset so the JSON remains terse.
   base_url?: string;
   region?: string;
   deployment_map?: Record<string, string>;
@@ -51,20 +67,23 @@ export type ProviderSlot = {
 };
 
 export type GatewayConfigPayload = {
-  revision: string; // serialised bigint
+  revision: string;
   vk_id: string;
   status: "active" | "revoked";
   display_prefix: string;
-  environment: "live" | "test";
   organization_id: string;
-  project_id: string;
   /**
-   * Project API key the gateway uses as X-Auth-Token on OTLP span
-   * export so spans land in this VK's project's inbox. Not a new
-   * secret — same apiKey already authenticates /api/collector.
+   * project_id / project_otlp_token / team_id are populated when the VK
+   * has a single PROJECT scope, or when the org has an
+   * `internal_governance` project (TEAM/ORG-scoped VKs route traces
+   * there so the AI Governance ingestion view shows VK + receiver spans
+   * under one filter). Null for older self-hosted orgs without a
+   * governance project — the gateway skips span export rather than
+   * failing the config fetch.
    */
-  project_otlp_token: string;
-  team_id: string;
+  project_id: string | null;
+  project_otlp_token: string | null;
+  team_id: string | null;
   principal_id: string | null;
   providers: ProviderSlot[];
   fallback: {
@@ -76,13 +95,11 @@ export type GatewayConfigPayload = {
   model_aliases: Record<string, string>;
   models_allowed: string[] | null;
   cache: { mode: "respect" | "force" | "disable"; ttl_s: number };
-  guardrails: {
-    pre: { id: string; evaluator: string }[];
-    post: { id: string; evaluator: string }[];
-    stream_chunk: { id: string; evaluator: string }[];
-    request_fail_open: boolean;
-    response_fail_open: boolean;
-  };
+  // Flat per-project guardrail catalog the VK is allowed to reference.
+  // The Go dispatcher looks up entries by id from guardrail_attachments
+  // and invokes them per direction.
+  guardrails: GuardrailWire[];
+  guardrail_attachments: GuardrailAttachmentWire[];
   policy_rules: {
     tools: { deny: string[]; allow: string[] | null };
     mcp: { deny: string[]; allow: string[] | null };
@@ -99,22 +116,11 @@ export type GatewayConfigPayload = {
     scope: "organization" | "team" | "project" | "virtual_key" | "principal";
     scope_id: string;
     window: string;
-    limit_micro_usd: number; // microdollars (1/1_000_000 USD)
+    limit_micro_usd: number;
     spent_micro_usd: number;
-    /**
-     * Unix seconds (number). Must match the Go gateway's BudgetSpec.
-     * ResetsAt (int64) — previously emitted as ISO 8601 string here,
-     * which failed JSON decode on the Go side and cascaded into a
-     * "no VK config loaded" 400 on every dispatch against a VK with
-     * reachable budgets (finding #30 follow-up).
-     */
     resets_at: number;
     on_breach: "block" | "warn";
   }>;
-  // Cache-control rules pre-sorted by priority DESC, enabled-only.
-  // The gateway evaluates them first-match-wins in a linear scan on every
-  // request; the bundle-baked shape preserves the ~700 ns hot path (see
-  // specs/ai-gateway/cache-control-rules.feature §4).
   cache_rules: Array<{
     id: string;
     priority: number;
@@ -135,61 +141,49 @@ export type GatewayConfigPayload = {
   metadata: Record<string, unknown>;
 };
 
-type ProviderRow = GatewayProviderCredential & { modelProvider: ModelProvider };
-
 export class GatewayConfigMaterialiser {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly chRepo: GatewayBudgetClickHouseRepository | null = null,
+  ) {}
 
-  async materialise(vk: VirtualKeyWithChain): Promise<GatewayConfigPayload> {
-    const project = await this.requireProject(vk.projectId);
-    const chain = await this.loadProviderChain(vk);
-    const budgets = await this.applicableBudgets(vk, project);
-    const cacheRules = await this.applicableCacheRules(
-      project.team.organizationId,
-    );
+  async materialise(vk: VirtualKeyWithScopes): Promise<GatewayConfigPayload> {
+    const providers = await eligibleModelProvidersForVk(this.prisma, vk);
+    const traceProject = await resolveTraceProject(this.prisma, vk);
+    const budgets = await this.applicableBudgets(vk, traceProject);
+    const spendByBudgetId = await this.loadCurrentSpend(vk, budgets);
+    const cacheRules = await this.applicableCacheRules(vk.organizationId);
     const config = parseVirtualKeyConfig(vk.config);
+    const policySides = resolvePolicySideOfBundle(vk, config);
+    const guardrailSides = await this.resolveGuardrailSideOfBundle(
+      vk,
+      config,
+      traceProject,
+    );
 
     return {
       revision: vk.revision.toString(),
       vk_id: vk.id,
       status: vk.status === "ACTIVE" ? "active" : "revoked",
       display_prefix: vk.displayPrefix,
-      environment: vk.environment === "LIVE" ? "live" : "test",
-      organization_id: project.team.organizationId,
-      project_id: project.id,
-      // project_otlp_token lets the gateway authenticate span export to
-      // /api/otel on behalf of this project. The control-plane OTLP
-      // ingest authenticates exactly like /api/collector — per-project
-      // API token on X-Auth-Token — so using the project's apiKey here
-      // makes spans land in the VK's project's inbox (rchaves iter-66
-      // "traces not landing" ask). Bundles already travel inside the
-      // HMAC-signed internal gateway channel, so no new secret boundary.
-      project_otlp_token: project.apiKey,
-      team_id: project.teamId,
+      organization_id: vk.organizationId,
+      project_id: traceProject?.id ?? null,
+      project_otlp_token: traceProject?.apiKey ?? null,
+      team_id: traceProject?.teamId ?? null,
       principal_id: vk.principalUserId,
-      providers: chain.map((row, index) => buildProviderSlot(row, index)),
+      providers: providers.map((mp, index) => buildProviderSlot(mp, index)),
       fallback: {
         on: config.fallback.on,
-        chain: chain.map((row) => row.id),
+        chain: providers.map((mp) => mp.id),
         timeout_ms: config.fallback.timeoutMs,
         max_attempts: config.fallback.maxAttempts,
       },
-      model_aliases: config.modelAliases,
+      model_aliases: policySides.modelAliases,
       models_allowed: config.modelsAllowed,
       cache: { mode: config.cache.mode, ttl_s: config.cache.ttlS },
-      guardrails: {
-        pre: config.guardrails.pre,
-        post: config.guardrails.post,
-        stream_chunk: config.guardrails.streamChunk,
-        request_fail_open: config.guardrails.requestFailOpen,
-        response_fail_open: config.guardrails.responseFailOpen,
-      },
-      policy_rules: {
-        tools: config.policyRules.tools,
-        mcp: config.policyRules.mcp,
-        urls: config.policyRules.urls,
-        models: config.policyRules.models,
-      },
+      guardrails: guardrailSides.guardrails,
+      guardrail_attachments: guardrailSides.attachments,
+      policy_rules: policySides.policyRules,
       rate_limits: {
         rpm: config.rateLimits.rpm,
         tpm: config.rateLimits.tpm,
@@ -201,7 +195,9 @@ export class GatewayConfigMaterialiser {
         scope_id: b.scopeId,
         window: b.window.toLowerCase(),
         limit_micro_usd: decimalToMicroUSD(b.limitUsd),
-        spent_micro_usd: decimalToMicroUSD(b.spentUsd),
+        spent_micro_usd: spendByBudgetId.has(b.id)
+          ? decimalUSDStringToMicroUSD(spendByBudgetId.get(b.id)!)
+          : decimalToMicroUSD(b.spentUsd),
         resets_at: Math.floor(b.resetsAt.getTime() / 1000),
         on_breach: b.onBreach === "BLOCK" ? "block" : "warn",
       })),
@@ -216,65 +212,119 @@ export class GatewayConfigMaterialiser {
     return GatewayCacheRuleService.create(this.prisma).bundleFor(organizationId);
   }
 
-  private async requireProject(
-    projectId: string,
-  ): Promise<Project & { team: Team }> {
-    const project = await this.prisma.project.findUnique({
-      where: { id: projectId },
-      include: { team: true },
+  /**
+   * Project-scoped guardrails the gateway is allowed to invoke for this
+   * VK + the VK's attachment tuples. GatewayGuardrail is project-scoped
+   * so the flat catalog is fetched against the VK's resolved trace
+   * project. VKs without a trace project (ORG/TEAM-scoped without
+   * internal_governance fallback) cannot invoke any guardrail; both
+   * arrays come back empty in that case.
+   */
+  private async resolveGuardrailSideOfBundle(
+    vk: VirtualKeyWithScopes,
+    config: ReturnType<typeof parseVirtualKeyConfig>,
+    traceProject: { id: string; teamId: string } | null,
+  ): Promise<{
+    guardrails: GuardrailWire[];
+    attachments: GuardrailAttachmentWire[];
+  }> {
+    if (!traceProject) {
+      return { guardrails: [], attachments: [] };
+    }
+    const rows = await this.prisma.gatewayGuardrail.findMany({
+      where: { projectId: traceProject.id, archivedAt: null },
+      include: { evaluator: { select: { slug: true } } },
     });
-    if (!project) throw new Error(`project ${projectId} not found`);
-    return project;
+    const guardrails: GuardrailWire[] = rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      evaluator_id: r.evaluatorId,
+      evaluator_slug: r.evaluator?.slug ?? null,
+      direction:
+        r.direction === "PRE"
+          ? "pre"
+          : r.direction === "POST"
+            ? "post"
+            : "stream_chunk",
+      failure_mode: r.failureMode === "FAIL_OPEN" ? "fail_open" : "fail_closed",
+    }));
+    const guardrailIdSet = new Set(rows.map((r) => r.id));
+    // Drop attachment references to guardrails that no longer exist or
+    // belong to a different project; the gateway should never see a
+    // dangling id.
+    const attachments: GuardrailAttachmentWire[] = config.guardrailAttachments
+      .map((a) => ({
+        direction: a.direction,
+        guardrail_ids: a.guardrailIds.filter((id) => guardrailIdSet.has(id)),
+      }))
+      .filter((a) => a.guardrail_ids.length > 0);
+    return { guardrails, attachments };
   }
 
-  private async loadProviderChain(
-    vk: VirtualKeyWithChain,
-  ): Promise<ProviderRow[]> {
-    if (vk.providerCredentials.length === 0) return [];
-    // projectId is threaded through so the multitenancy middleware's
-    // guard is satisfied without adding GatewayProviderCredential to
-    // EXEMPT_MODELS. The VK we were handed was already tenancy-checked
-    // upstream, so we narrow the projectId to vk.projectId explicitly.
-    const rows = await this.prisma.gatewayProviderCredential.findMany({
-      where: {
-        projectId: vk.projectId,
-        id: { in: vk.providerCredentials.map((p) => p.providerCredentialId) },
-      },
-      include: { modelProvider: true },
-    });
-    // Preserve the chain ordering declared on the VK.
-    const byId = new Map(rows.map((r) => [r.id, r]));
-    return vk.providerCredentials
-      .map((p) => byId.get(p.providerCredentialId))
-      .filter((r): r is ProviderRow => Boolean(r));
+  /**
+   * CH spend rollup. Best-effort: falls back to PG `spentUsd` when CH
+   * isn't wired (test fixtures, deploys without CH). Tenant set = every
+   * project under the VK's organization so ORG/TEAM/PRINCIPAL-scoped
+   * budgets see ledger rows under whichever project emitted the trace.
+   */
+  private async loadCurrentSpend(
+    vk: VirtualKey,
+    budgets: GatewayBudget[],
+  ): Promise<Map<string, string>> {
+    if (this.chRepo === null || budgets.length === 0) {
+      return new Map();
+    }
+    try {
+      const orgProjects = await this.prisma.project.findMany({
+        where: { team: { organizationId: vk.organizationId } },
+        select: { id: true },
+      });
+      const tenantIds = orgProjects.map((p) => p.id);
+      if (tenantIds.length === 0) return new Map();
+      const spends = await this.chRepo.getSpendForBudgetsAcrossTenants(
+        tenantIds,
+        budgets,
+      );
+      const out = new Map<string, string>();
+      for (const s of spends) {
+        out.set(s.budgetId, s.spentUsd);
+      }
+      return out;
+    } catch {
+      return new Map();
+    }
   }
 
+  /**
+   * Every budget that applies to this VK. ORG-scope + VK-scope always
+   * apply. TEAM/PROJECT-scope apply only when a trace project resolves
+   * (single-project-scope VK or governance fallback).
+   */
   private async applicableBudgets(
     vk: VirtualKey,
-    project: Project & { team: Team },
+    traceProject: { id: string; teamId: string } | null,
   ): Promise<GatewayBudget[]> {
+    const ors: NonNullable<Prisma.GatewayBudgetWhereInput["OR"]> = [
+      { scopeType: "ORGANIZATION", scopeId: vk.organizationId },
+      { scopeType: "VIRTUAL_KEY", scopeId: vk.id },
+    ];
+    if (traceProject) {
+      ors.push({ scopeType: "TEAM", scopeId: traceProject.teamId });
+      ors.push({ scopeType: "PROJECT", scopeId: traceProject.id });
+    }
+    if (vk.principalUserId) {
+      ors.push({ scopeType: "PRINCIPAL", scopeId: vk.principalUserId });
+    }
     return this.prisma.gatewayBudget.findMany({
       where: {
-        organizationId: project.team.organizationId,
+        organizationId: vk.organizationId,
         archivedAt: null,
-        OR: [
-          { scopeType: "ORGANIZATION", scopeId: project.team.organizationId },
-          { scopeType: "TEAM", scopeId: project.teamId },
-          { scopeType: "PROJECT", scopeId: project.id },
-          { scopeType: "VIRTUAL_KEY", scopeId: vk.id },
-          vk.principalUserId
-            ? { scopeType: "PRINCIPAL", scopeId: vk.principalUserId }
-            : { id: "__never__" },
-        ],
+        OR: ors,
       },
     });
   }
 }
 
-// decryptCustomKeys turns ModelProvider.customKeys (AES-256-GCM
-// encrypted string, legacy plaintext objects accepted for back-compat)
-// into a plain key/value map. Mirrors
-// modelProvider.repository.ts#decryptCustomKeys.
 function decryptCustomKeys(raw: unknown): Record<string, unknown> {
   if (raw === null || raw === undefined) return {};
   if (typeof raw === "object") return raw as Record<string, unknown>;
@@ -288,14 +338,90 @@ function decryptCustomKeys(raw: unknown): Record<string, unknown> {
   return {};
 }
 
-// buildCredentials maps ModelProvider.customKeys (historical env-var-
-// style UPPER_SNAKE_CASE keys inherited from LiteLLM integration) to
-// the Go gateway's per-provider credential shape. See
-// services/gateway/internal/dispatch/account.go#pcToBifrostKey for the
-// consuming side.
-function buildCredentials(row: ProviderRow): Record<string, unknown> {
-  const provider = row.modelProvider.provider;
-  const customKeys = decryptCustomKeys(row.modelProvider.customKeys);
+// Resolve the policy-side of the bundle (model aliases + policy rules)
+// from the VK's RoutingPolicy when present, falling back to the VK
+// config defaults otherwise. Post-bug-7 step (iv) the legacy VK config
+// keys are stripped so the fallback is always the empty default shape;
+// the RP read becomes the source of truth as soon as the VK has a
+// routingPolicyId pointing at a populated policy.
+//
+// Empty-rules normalize: the DB columns can hold `{}` (default at
+// creation time) but the bundle wire shape is contracted at
+// `{tools:{deny:[],allow:null}, mcp:..., urls:..., models:...}`.
+// Materialise the wire-correct shape regardless of DB content so the Go
+// resolver gets a stable structure (ariana R-lane CR pin from step (i)).
+type BundlePolicyRules = GatewayConfigPayload["policy_rules"];
+
+const EMPTY_POLICY_RULE_DIM = { deny: [] as string[], allow: null as string[] | null };
+
+function emptyPolicyRules(): BundlePolicyRules {
+  return {
+    tools: { ...EMPTY_POLICY_RULE_DIM },
+    mcp: { ...EMPTY_POLICY_RULE_DIM },
+    urls: { ...EMPTY_POLICY_RULE_DIM },
+    models: { ...EMPTY_POLICY_RULE_DIM },
+  };
+}
+
+function mergePolicyDim(
+  raw: unknown,
+): { deny: string[]; allow: string[] | null } {
+  if (!raw || typeof raw !== "object") return { ...EMPTY_POLICY_RULE_DIM };
+  const r = raw as { deny?: unknown; allow?: unknown };
+  const deny = Array.isArray(r.deny) ? r.deny.filter((x): x is string => typeof x === "string") : [];
+  const allow =
+    r.allow === null || r.allow === undefined
+      ? null
+      : Array.isArray(r.allow)
+        ? r.allow.filter((x): x is string => typeof x === "string")
+        : null;
+  return { deny, allow };
+}
+
+function normalisePolicyRules(raw: unknown): BundlePolicyRules {
+  if (!raw || typeof raw !== "object") return emptyPolicyRules();
+  const r = raw as Record<string, unknown>;
+  return {
+    tools: mergePolicyDim(r.tools),
+    mcp: mergePolicyDim(r.mcp),
+    urls: mergePolicyDim(r.urls),
+    models: mergePolicyDim(r.models),
+  };
+}
+
+function resolvePolicySideOfBundle(
+  vk: VirtualKeyWithScopes,
+  _config: ReturnType<typeof parseVirtualKeyConfig>,
+): {
+  modelAliases: Record<string, string>;
+  policyRules: BundlePolicyRules;
+} {
+  const rp = vk.routingPolicy;
+  if (!rp) {
+    return { modelAliases: {}, policyRules: emptyPolicyRules() };
+  }
+  const aliasesRaw = rp.modelAliases;
+  const aliases: Record<string, string> =
+    aliasesRaw && typeof aliasesRaw === "object" && !Array.isArray(aliasesRaw)
+      ? Object.fromEntries(
+          Object.entries(aliasesRaw as Record<string, unknown>).filter(
+            ([, v]) => typeof v === "string",
+          ) as Array<[string, string]>,
+        )
+      : {};
+  return {
+    modelAliases: aliases,
+    policyRules: normalisePolicyRules(rp.policyRules),
+  };
+}
+
+// Map ModelProvider.customKeys (env-var-style UPPER_SNAKE_CASE inherited
+// from the LiteLLM integration) to the Go gateway's per-provider
+// credential shape. See services/aigateway/internal/dispatch/account.go
+// #pcToBifrostKey for the consuming side.
+function buildCredentials(mp: ModelProvider): Record<string, unknown> {
+  const provider = mp.provider;
+  const customKeys = decryptCustomKeys(mp.customKeys);
   const pick = (k: string): string =>
     typeof customKeys[k] === "string" ? (customKeys[k] as string) : "";
 
@@ -303,8 +429,12 @@ function buildCredentials(row: ProviderRow): Record<string, unknown> {
     case "azure": {
       return {
         api_key: pick("AZURE_OPENAI_API_KEY") || pick("api-key"),
-        endpoint: pick("AZURE_OPENAI_ENDPOINT") || pick("AZURE_API_GATEWAY_BASE_URL"),
-        api_version: pick("AZURE_OPENAI_API_VERSION") || pick("AZURE_API_GATEWAY_VERSION"),
+        endpoint:
+          pick("AZURE_OPENAI_ENDPOINT") ||
+          pick("AZURE_API_GATEWAY_BASE_URL"),
+        api_version:
+          pick("AZURE_OPENAI_API_VERSION") ||
+          pick("AZURE_API_GATEWAY_VERSION"),
       };
     }
     case "bedrock": {
@@ -344,7 +474,6 @@ function buildCredentials(row: ProviderRow): Record<string, unknown> {
     case "cloudflare":
       return { api_key: pick("CLOUDFLARE_API_KEY") };
     default: {
-      // Fallback: first UPPER_CASE_KEY ending in _API_KEY.
       const apiKey = Object.entries(customKeys).find(([k]) =>
         /_API_KEY$/.test(k),
       )?.[1];
@@ -353,48 +482,50 @@ function buildCredentials(row: ProviderRow): Record<string, unknown> {
   }
 }
 
-function buildProviderSlot(row: ProviderRow, index: number): ProviderSlot {
-  const credentials = buildCredentials(row);
-  const mp = row.modelProvider;
+function buildProviderSlot(mp: ModelProvider, index: number): ProviderSlot {
+  const credentials = buildCredentials(mp);
   const customKeys = decryptCustomKeys(mp.customKeys);
-  const baseURL = pickString(customKeys, "base_url") ?? pickString(customKeys, "BASE_URL");
-  // Region lives on credentials for Bedrock/Vertex; mirror to the
-  // top-level `region` field so the Go gateway's non-provider-specific
-  // code (logging, fallback, health probes) can read it without
-  // re-parsing the opaque credentials blob.
+  const baseURL =
+    pickString(customKeys, "base_url") ?? pickString(customKeys, "BASE_URL");
   const region = pickString(credentials, "region");
   const deploymentMap = mp.deploymentMapping
     ? (mp.deploymentMapping as Record<string, string>)
     : undefined;
   return {
-    id: row.id,
-    slot: row.slot ?? (index === 0 ? "primary" : `fallback_${index}`),
+    id: mp.id,
+    slot: index === 0 ? "primary" : `fallback_${index}`,
     type: mp.provider,
     credentials,
     ...(baseURL ? { base_url: baseURL } : {}),
     ...(region ? { region } : {}),
     ...(deploymentMap ? { deployment_map: deploymentMap } : {}),
-    config: buildProviderConfig(row),
+    config: buildProviderConfig(mp),
   };
 }
 
-function pickString(obj: Record<string, unknown>, key: string): string | undefined {
+function pickString(
+  obj: Record<string, unknown>,
+  key: string,
+): string | undefined {
   const v = obj[key];
   return typeof v === "string" && v.length > 0 ? v : undefined;
 }
 
-function buildProviderConfig(row: ProviderRow): Record<string, unknown> {
-  const gatewayExtras = (row.providerConfig ?? {}) as Record<string, unknown>;
+function buildProviderConfig(mp: ModelProvider): Record<string, unknown> {
+  const gatewayExtras = (mp.providerConfig ?? {}) as Record<string, unknown>;
   return {
     rate_limit: {
-      rpm: row.rateLimitRpm,
-      tpm: row.rateLimitTpm,
-      rpd: row.rateLimitRpd,
+      rpm: mp.rateLimitRpm,
+      tpm: mp.rateLimitTpm,
+      rpd: mp.rateLimitRpd,
     },
     health: {
-      status: row.healthStatus.toLowerCase(),
-      circuit_opened_at: row.circuitOpenedAt?.toISOString() ?? null,
+      status: mp.healthStatus.toLowerCase(),
+      circuit_opened_at: mp.circuitOpenedAt?.toISOString() ?? null,
     },
+    ...(mp.extraHeaders
+      ? { extra_headers: mp.extraHeaders as Record<string, unknown> }
+      : {}),
     ...gatewayExtras,
   };
 }
@@ -436,4 +567,10 @@ function cacheRuleToWire(rule: GatewayCacheRule): CacheRuleWire {
 
 function decimalToMicroUSD(d: { toNumber(): number }): number {
   return Math.round(d.toNumber() * 1_000_000);
+}
+
+function decimalUSDStringToMicroUSD(s: string): number {
+  const n = Number.parseFloat(s);
+  if (!Number.isFinite(n)) return 0;
+  return Math.round(n * 1_000_000);
 }

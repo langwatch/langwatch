@@ -1,0 +1,172 @@
+---
+title: Governance REST API
+description: Hono-mounted REST/JSON API at /api/governance/* with an auto-generated OpenAPI spec consumed by the TypeScript and Python SDKs. Every governance feature exposes the same CRUD verb set, sharing one service-layer source of truth with the dashboard tRPC procedures, no duplicated business logic, identical RBAC enforcement.
+sidebarTitle: REST API
+---
+
+<Info>**Pairs with:** [Governance CLI](/ai-governance/cli) (the CLI is a thin shell over this API) and [Governance MCP server](/ai-governance/mcp) (the MCP tools are a thin shell over this API). All three surfaces dispatch through the same service-layer functions; the dashboard tRPC procedures call into the same services. There is exactly one place each governance verb is implemented.</Info>
+
+<Note>**Service-layer-shared, repository-pattern-backed.** Per `specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature`, every Hono route delegates to a shared service-layer function (`IngestionTemplateService.updateOttlRules`, `UserIngestionBindingService.install`, etc.). Services use repositories for persistence; services never import `prisma` directly. The umbrella spec also locks the no-bypass invariant, no UI page, route handler, CLI command, or MCP tool may call `prisma.<governanceModel>.*` directly. Sergey's Lane B-5 commit at `8fffad4ad` locked the invariant for the two governance resources shipped in v1: see `langwatch/ee/governance/repositories/ingestionTemplate.repository.ts`, `userIngestionBinding.repository.ts`, and `governanceAudit.repository.ts` (the latter wraps every `AuditLog` write so audit emission also goes through the repository boundary). Repo methods accept `Prisma.TransactionClient | PrismaClient` so they work inside service `$transaction` blocks and against the top-level client transparently.</Note>
+
+## Why a separate REST API alongside tRPC
+
+LangWatch's dashboard already uses tRPC, type-safe, but coupled to the Next.js, React render path. The Hono-mounted REST API exists for the surfaces that *aren't* the dashboard:
+
+- **Agentic workflows**: Claude Code, Codex, Cursor running `langwatch governance …` commands need a stable, OpenAPI-described surface they can call directly.
+- **CI, scripting**: the same OpenAPI spec is consumed by the TypeScript and Python SDKs (auto-regen on build), so any pipeline language with a generated client gets the full governance feature set.
+- **Future integrations**: partner platforms (SIEMs, ticketing, ops automations) want a documented API contract, not a tRPC client.
+
+Both paths call into the same service-layer functions, there is no business-logic duplication. The umbrella coverage spec locks that invariant.
+
+## Where it lives
+
+| Property | Value |
+|---|---|
+| Mount point | `/api/governance/<resource>` |
+| Spec | Emitted into the canonical `openapiLangWatch.json` on the next `sdk:regen`, every governance route registers via the same `describeRoute` + `hono-openapi` pipeline as the rest of the public REST API |
+| Auth | Project API key, `Authorization: Bearer <projectApiKey>` or `X-Auth-Token`, same as `/api/dataset/*` and `/api/trace/*`. The org for the call derives from the project's team |
+| RBAC | Per-route ceiling permission for PAT-authed callers (`aiTools:view` on reads, `aiTools:manage` on writes for ingestion-templates; analogous `<resource>:view`, `<resource>:manage` on other resources). Legacy project tokens bypass the ceiling, same model as `gateway-platform` |
+| Tenancy | `organizationId` is derived from `project → team → organization`. Cross-org probes collapse to 404 at the service layer (no enumeration vector) |
+| Wire shape | Paths kebab-case, JSON fields snake_case (e.g. `ottl_rules`, `source_type`, `display_name`) per public-REST convention |
+
+## Resource × verb matrix
+
+Every governance resource exposes the full CRUD triple, `list`, `get`, `create`, `update`, `delete`, over Hono, the CLI, and the MCP server. The umbrella spec lists the resource set; each resource gets its own OpenAPI path group.
+
+| Resource | OpenAPI path group | Detail page |
+|---|---|---|
+| Anomaly rules | `/api/governance/anomaly-rules` | [Anomaly rules](/ai-governance/anomaly-rules) |
+| Audit log (read-only) | `/api/governance/audit-log` | [Audit log](/ai-governance/audit-log) |
+| Gateway budgets | `/api/governance/gateway-budgets` | [Control plane](/ai-governance/control-plane) |
+| Ingestion sources | `/api/governance/ingestion-sources` | [Ingestion sources](/ai-governance/ingestion-sources) |
+| Ingestion templates | `/api/governance/ingestion-templates` | [Ingestion templates](/ai-governance/ingestion-templates) |
+| User ingestion bindings | `/api/governance/user-ingestion-bindings` | [Ingestion templates](/ai-governance/ingestion-templates) |
+| Members | `/api/governance/members` | [Members and invites](/ai-governance/members-and-invites) |
+| Invites | `/api/governance/invites` | [Members and invites](/ai-governance/members-and-invites) |
+| Role bindings | `/api/governance/role-bindings` | [Roles and permissions](/ai-governance/roles-and-permissions) |
+| AI tool entries | `/api/governance/ai-tool-entries` | [Personas](/ai-governance/personas) |
+| Sessions | `/api/governance/sessions` | [No-spy mode](/ai-governance/no-spy-mode) (sessions live alongside in `/me/sessions`) |
+| Virtual keys | `/api/governance/virtual-keys` | [Control plane](/ai-governance/control-plane) |
+
+`audit-log` is intentionally read-only (no create, update, delete), audit rows are emitted by other state-changing routes and are immutable by design.
+
+## Verb shape: worked example
+
+The first surface to ship is `ingestion-templates` (Sergey's Lane B-1 commit). The verb set:
+
+| Verb | Method + path | Returns | RBAC |
+|---|---|---|---|
+| `list` | `GET /api/governance/ingestion-templates` | `{ data: IngestionTemplateDto[] }` (end-user shape, `ottl_rules` redacted) | `aiTools:view` |
+| `admin-list` | `GET /api/governance/ingestion-templates/admin` | `{ data: IngestionTemplateDto[] }` (admin shape, includes `ottl_rules`) | `aiTools:manage` |
+| `get` | `GET /api/governance/ingestion-templates/:id` | `{ ingestion_template: IngestionTemplateDto }` | `aiTools:view` |
+| `create` | `POST /api/governance/ingestion-templates` | `{ ingestion_template: IngestionTemplateDto }` (201) | `aiTools:manage` |
+| `update-ottl-rules` | `PATCH /api/governance/ingestion-templates/:id/ottl-rules` | `{ ingestion_template: IngestionTemplateDto }` | `aiTools:manage` |
+| `archive` | `DELETE /api/governance/ingestion-templates/:id` | `{ archived: true }` (soft-archive) | `aiTools:manage` |
+| `clone-from-platform` | `POST /api/governance/ingestion-templates/clone` | `{ ingestion_template: IngestionTemplateDto }` | `aiTools:manage` |
+
+A few resource-shape notes that generalise across the namespace:
+
+- **End-user vs admin shape**: list endpoints return a redacted shape by default and a separate `/admin` sub-route for the canonical shape. Avoids accidentally leaking the OTTL source to non-admins via list iteration.
+- **Resource-specific verbs**: `update-ottl-rules` (instead of generic `update`) and `clone-from-platform` (instead of generic `create`) reflect the domain, admins don't generically PATCH every field; they specifically replace OTTL or clone a platform row. Other resources will introduce their own resource-specific verbs (`rotate` on ingestion sources, `assign-to-user` on role bindings, `revoke` on sessions) the same way.
+- **Error mapping**: `403 PlatformTemplateImmutable` (admin tried to PATCH a platform-published row), `404 TemplateNotFound` (cross-org probe), `400 InvalidSourceType`, validation. All map to a common `errorSchema` with `{ type, code, message }`.
+
+The second resource to ship is `user-ingestion-bindings` (Sergey's Lane B-2 commit at `5275e7e11`). The verb set:
+
+| Verb | Method + path | Returns | RBAC |
+|---|---|---|---|
+| `list` | `GET /api/governance/user-ingestion-bindings` | `{ data: UserIngestionBindingDto[] }` (caller-scoped, cross-user reads are not possible) | `organization:view` + PAT bound to a User |
+| `install` | `POST /api/governance/user-ingestion-bindings` | `{ binding: ..., token: "ik-lw-…" }` (token returned exactly once; thereafter only `binding_access_token_prefix` is visible) | `organization:view` + PAT bound to a User |
+| `uninstall` | `DELETE /api/governance/user-ingestion-bindings/:id` | `{ uninstalled: true }` | `organization:view` + PAT bound to a User |
+| `rotate` | `POST /api/governance/user-ingestion-bindings/:id/rotate` | `{ binding: ..., token: "ik-lw-…" }` (hard-cut rotation per spec, old token is invalid immediately) | `organization:view` + PAT bound to a User |
+
+`user-ingestion-bindings` is **caller-scoped**: every org member manages their own bindings, no admin enumeration. Two consequences worth noting:
+
+- **PAT must be bound to a real User**: legacy project API keys without a `patUserId` reject with `403 human_caller_required`. Cross-binding requires a real human to own the personal project the binding routes traces into; project-token automation cannot install user-scoped bindings on someone else's behalf.
+- **Personal project is server-resolved**: the install request body MUST NOT carry `personalProjectId`. The personal project is derived from the caller's user id; the umbrella spec calls this the "structural cross-bind impossibility", the input shape simply does not accept the field that would let you bind to someone else's personal project. Returning `412 PersonalProjectMissing` if the caller's user has no personal project yet.
+
+The Zod schemas backing each request and response body are the same schemas the corresponding service-layer function consumes. The OpenAPI generator (`describeRoute` + `hono-openapi`) reads them directly, so the spec and the runtime are guaranteed in sync.
+
+## OpenAPI spec generation + SDK regen
+
+Governance routes register through the same `describeRoute` + `hono-openapi` pipeline as the rest of the public REST API. The canonical OpenAPI spec lives at `langwatch/openapiLangWatch.json`, and both SDKs regenerate from it on the standard build target.
+
+```bash
+pnpm openapi:emit                  # regenerate openapiLangWatch.json from Hono routes
+pnpm sdk:regen --target typescript # regenerate the TS SDK
+pnpm sdk:regen --target python     # regenerate the Python SDK
+```
+
+<Note>**TBD-IMPL, exact script names**: Sergey's first route SHA at `0bb951160` mounts ingestion-templates into `api-router` + `generateOpenAPISpec` so the OpenAPI shape lands in `openapiLangWatch.json` on the next regen. The exact `package.json` script names fold in once the SDK regen target lands.</Note>
+
+The TS SDK exposes `langwatch.governance.<resource>.<verb>(...)`, the Python SDK exposes `langwatch.governance.<resource>.<verb>(...)`. Type signatures match the Zod-derived schemas exactly.
+
+## Audit emission
+
+State-changing calls always emit an audit row from the service layer (the same row a dashboard tRPC mutation would emit, there is one service-layer audit emitter, not three). Every audit row carries a **surface attribution** tag stamped into `AuditLog.metadata.surface`:
+
+| Surface | `metadata.surface` value |
+|---|---|
+| Dashboard tRPC | `"trpc"` (default) |
+| Hono REST | `"hono"` |
+| CLI | `"cli"` |
+| MCP | `"mcp"` |
+
+The shared type lives at `@ee/governance/services/auditSurface.ts` (`GovernanceCallSurface`); every mutating service method on the governance services takes an optional `surface` parameter (default `"trpc"`) which is stamped into `metadata` at audit emission. Forensic readers query `metadata->>'surface'` to filter by surface.
+
+```sql
+-- "What did automation change in the last 24h?"
+SELECT * FROM "AuditLog"
+ WHERE "createdAt" > now() - interval '24 hours'
+   AND metadata->>'surface' IN ('cli', 'mcp')
+ ORDER BY "createdAt" DESC;
+```
+
+All four rows have **identical** payload shapes apart from the `metadata.surface` field, same event kind, same target, same actor. Surface attribution helps incident response (which automation made this change?) without changing the audit-row event-kind taxonomy.
+
+The seven mutating verbs across the two shipped resources (`createOrgTemplate`, `updateOttlRules`, `archiveOrgTemplate`, `cloneFromPlatform`, `install`, `uninstall`, `rotateToken`) all carry surface attribution as of Sergey's Lane B-3 commit at `fc6d54100`. The same commit also closed a forensic gap on `rotateToken`, token rotations now emit a `gateway.user_ingestion_binding.token_rotated` audit row (previously silent).
+
+## Verifying the contract
+
+The wire shape, request bodies, response envelopes, status-code mapping, and surface attribution, is locked by two integration tests that run against real Postgres + the real Hono pipeline (no service mocks):
+
+**Ingestion-templates wire shape**: `langwatch/src/app/api/governance/__tests__/governance-rest-api.integration.test.ts`. 14 scenarios (Lane B-4 at `1839d9f54`) covering the full ingestion-templates verb set, 401, 400, 403, 404 envelopes, and a wire-level audit-uniform assertion that `metadata.surface === "hono"` for state-changing calls.
+
+**User-ingestion-binding wire shape (PAT-gated)**: `langwatch/src/app/api/governance/__tests__/governance-bindings-rest-api.integration.test.ts`. 9 scenarios (Lane B-6 at `60f769498`) covering the binding flows. Specifically locks:
+
+- `403 human_caller_required` when called with a legacy project token (the binding routes invariant: a User-bound PAT is required, since cross-bind needs a real human to own the personal project)
+- `install`, `uninstall`, `rotate` audit rows all stamp `metadata.surface === "hono"` end-to-end (cross-validates the B-3 surface threading at `fc6d54100`)
+- `rotateToken` emits `gateway.user_ingestion_binding.token_rotated` (the audit row added in B-3) at the wire level, previously unit-only
+
+The PAT setup pattern in this file (PersonalAccessToken + RoleBinding(user, ADMIN) + RoleBinding(pat, MEMBER) + Personal Team + Personal Project) is the canonical reference for any downstream lane (CLI, MCP) that needs a PAT-test path.
+
+**No-bypass invariant (CI-enforced)**: `langwatch/ee/governance/repositories/__tests__/no-bypass.unit.test.ts`. 3 tests (Lane B-7 at `94c219035`) statically reject any future PR that adds a direct `prisma.ingestionTemplate.*` or `prisma.userIngestionBinding.*` call outside the allowlist. Locks the umbrella spec's `@no-bypass` invariant in CI so the repository-pattern boundary won't silently drift.
+
+**MCP audit-uniform regression**: `langwatch/src/mcp/__tests__/governance-tools.audit-uniform.integration.test.ts`. 3 cases (Lane B-MCP audit at `66fd35162`) prove the Path B contract end-to-end: `governance_ingestion_templates_create` and `governance_user_ingestion_bindings_install` both stamp `metadata.surface === "mcp"` against real Postgres, and the `AUTH_REQUIRED:` negative case stays closed (write tool with no `callerUserId` fails before any audit row is written).
+
+**Cross-surface audit-uniformity regression**: `langwatch/ee/governance/services/__tests__/auditSurface.crossSurface.integration.test.ts`. Invokes `createOrgTemplate` via all four surfaces, tRPC service-direct, Hono REST, CLI REST (with `X-LangWatch-Surface: cli`), and MCP service-direct, in one test (Lane B-8 at `d96cd4300`, extended to 4 surfaces at `cb4c8224c`); asserts the four audit rows have **identical** payload shape, same `action`, same `targetKind`, same `organizationId`, same metadata-key-set, with only `metadata.surface` varying (`"trpc"`, `"hono"`, `"cli"`, `"mcp"`). Slug regex format identical, no default-fallback leakage.
+
+**Surface-spoof rejection regression**: same file as above (Lane B-8 extension at `cb4c8224c`). Fires three Hono POSTs with `X-LangWatch-Surface` set to `trpc`, `mcp`, and `evil`; asserts all three audit rows fall back to `metadata.surface === "hono"`. Locks Alexis's `GovernanceCallSurface` enum filter at `resolveSurfaceFromRequest` as the defense against external HTTP callers forging in-process surface tags, the only legal value the Hono surface accepts on inbound is `cli`; everything else falls through to the route's default `"hono"`. Together with the cross-surface uniformity test this exhaustively pins the umbrella spec's `@audit-uniform` invariant for v1.
+
+To run locally:
+
+```bash
+cd langwatch
+pnpm test:integration governance-rest-api.integration.test.ts
+pnpm test:integration governance-bindings-rest-api.integration.test.ts
+pnpm test:integration governance-tools.audit-uniform.integration.test.ts
+pnpm test:integration auditSurface.crossSurface.integration.test.ts
+pnpm test:unit no-bypass.unit.test.ts
+```
+
+Use these files as the authoritative reference when implementing a CLI command or MCP tool against a governance route, the request/response shape and audit-stamping invariants that live there are exactly what each route accepts, returns, and emits, and the no-bypass test will reject any direct-prisma shortcut at PR time.
+
+## Cross-references
+
+- [Governance CLI](/ai-governance/cli): `langwatch governance <resource> <verb>` thin shell
+- [Governance MCP server](/ai-governance/mcp): same surface as MCP tools for agent use
+- [Roles and permissions](/ai-governance/roles-and-permissions): RBAC scopes that gate each verb
+- [Audit log](/ai-governance/audit-log): where state-change rows land
+- [Compliance architecture](/ai-governance/compliance-architecture): how the OCSF v1.1 export consumes the same audit stream
+- Spec, `specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature`
+- v1 scope-fence audit, `specs/ai-gateway/governance/agentic-first-parity-v1-status.md` (12-resource × 4-surface matrix on shipped SHAs; scoring 2/12 full parity, 8/12 tRPC-only deferred to follow-on)
+- Wire-shape lock, `langwatch/src/app/api/governance/__tests__/governance-rest-api.integration.test.ts`

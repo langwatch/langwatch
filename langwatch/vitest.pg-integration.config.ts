@@ -36,6 +36,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "~/": join(__dirname, "./src/"),
+      "@ee/": join(__dirname, "./ee/"),
       "@app/": join(__dirname, "./src/server/app-layer/"),
       "@injected-dependencies.client": join(
         __dirname,

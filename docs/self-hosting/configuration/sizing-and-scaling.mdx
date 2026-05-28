@@ -12,7 +12,7 @@ description: "Resource requirements, size profiles, and scaling recommendations 
 
 ### Kubernetes (production)
 
-- Minimum 3 nodes with 4 CPU / 16 GB each
+- Minimum 3 nodes with 4 CPU, 16 GB each
 - StorageClass that supports dynamic provisioning
 - See size profiles below for detailed per-component requirements
 
@@ -104,8 +104,8 @@ helm install langwatch langwatch/langwatch \
 
 | Bottleneck | Component to Scale | How |
 |---|---|---|
-| Trace ingestion is slow / queue backlog | LangWatch Workers | Increase `workers.replicaCount` |
-| UI is slow / many concurrent users | LangWatch App | Increase `app.replicaCount` |
+| Trace ingestion is slow, queue backlog | LangWatch Workers | Increase `workers.replicaCount` |
+| UI is slow, many concurrent users | LangWatch App | Increase `app.replicaCount` |
 | ClickHouse queries are slow | ClickHouse | Increase `clickhouse.cpu` and `clickhouse.memory` |
 | Evaluations are slow | LangEvals | Increase `langevals.replicaCount` |
 | Topic clustering is slow | LangWatch NLP | Increase `langwatch_nlp.replicaCount` |

@@ -237,7 +237,7 @@ beforeAll(async () => {
 
   const project = projectFactory.build({ slug: `--so-ingest-proj-${nanoid(6)}` });
   const created = await prisma.project.create({
-    data: { ...project, teamId: team.id },
+    data: { ...project, teamId: team.id, personalFeatures: {} },
   });
   testApiKey = created.apiKey;
   testProjectId = created.id;

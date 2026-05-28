@@ -1,35 +1,30 @@
-import { Badge, Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, Text, VStack } from "@chakra-ui/react";
 import type { Project } from "@prisma/client";
 import {
   Activity,
   Anvil,
   Film,
   Flag,
-  Gauge,
   History,
-  KeyRound,
-  LineChart,
-  Plug,
   Shield,
-  Zap,
 } from "lucide-react";
 import { useRouter } from "~/utils/compat/next-router";
 import React, { useState } from "react";
 import { useOpsPermission } from "../hooks/useOpsPermission";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
-import { useFeatureFlag } from "../hooks/useFeatureFlag";
 import { usePublicEnv } from "../hooks/usePublicEnv";
 import { api } from "../utils/api";
 import { featureIcons } from "../utils/featureIcons";
 import { projectRoutes } from "../utils/routes";
 import { useTableView } from "./messages/HeaderButtons";
 import { CollapsibleMenuGroup } from "./sidebar/CollapsibleMenuGroup";
+import { GovernSection } from "./sidebar/GovernSection";
 import { SideMenuLink } from "./sidebar/SideMenuLink";
 import { SupportMenu } from "./sidebar/SupportMenu";
 import { ThemeToggle } from "./sidebar/ThemeToggle";
 import { UsageIndicator } from "./sidebar/UsageIndicator";
 
-export const MENU_WIDTH_EXPANDED = "200px";
+export const MENU_WIDTH_EXPANDED = "228px";
 export const MENU_WIDTH_COMPACT = "56px";
 export const MENU_WIDTH = MENU_WIDTH_EXPANDED;
 
@@ -41,26 +36,13 @@ export const MainMenu = React.memo(function MainMenu({
   isCompact = false,
 }: MainMenuProps) {
   const router = useRouter();
-  const { organization, project, hasPermission, isPublicRoute } =
+  const { project, hasPermission, isPublicRoute } =
     useOrganizationTeamProject();
   const [isHovered, setIsHovered] = useState(false);
 
   const pendingItemsCount = api.annotation.getPendingItemsCount.useQuery(
     { projectId: project?.id ?? "" },
     { enabled: !!project?.id },
-  );
-
-  // AI Gateway menu is feature-flagged pre-GA. Flip it on for internal
-  // dogfooding by setting FEATURE_FLAG_FORCE_ENABLE=release_ui_ai_gateway_menu_enabled
-  // on the server (see featureFlagService.posthog.ts). Otherwise targeting
-  // is driven by PostHog release conditions.
-  const { enabled: gatewayMenuEnabled } = useFeatureFlag(
-    "release_ui_ai_gateway_menu_enabled",
-    {
-      projectId: project?.id,
-      organizationId: organization?.id,
-      enabled: !!project,
-    },
   );
 
   // In compact mode, show expanded view on hover
@@ -291,118 +273,7 @@ export const MainMenu = React.memo(function MainMenu({
               showLabel={showExpanded}
             />
 
-            {gatewayMenuEnabled && hasPermission("virtualKeys:view") && project && (
-              <>
-                {" "}
-                <HStack
-                  paddingX={2}
-                  paddingTop={3}
-                  paddingBottom={1}
-                  gap={1}
-                  align="center"
-                >
-                  <Text
-                    fontSize="11px"
-                    fontWeight="medium"
-                    textTransform="uppercase"
-                    color="gray.500"
-                  >
-                    {showExpanded ? "Gateway" : <>&nbsp;</>}
-                  </Text>
-                  {showExpanded && (
-                    <Badge
-                      colorPalette="blue"
-                      variant="subtle"
-                      fontSize="2xs"
-                      paddingX={1.5}
-                      lineHeight={1.2}
-                    >
-                      Beta
-                    </Badge>
-                  )}
-                </HStack>
-                <CollapsibleMenuGroup
-                  icon={featureIcons.gateway.icon}
-                  label={projectRoutes.gateway.title}
-                  project={project}
-                  showLabel={showExpanded}
-                  children={[
-                    {
-                      icon: KeyRound,
-                      label: projectRoutes.gateway_virtual_keys.title,
-                      href: projectRoutes.gateway_virtual_keys.path.replace(
-                        "[project]",
-                        project.slug,
-                      ),
-                      isActive: router.pathname.includes(
-                        "/gateway/virtual-keys",
-                      ),
-                    },
-                    ...(hasPermission("gatewayBudgets:view")
-                      ? [
-                          {
-                            icon: Gauge,
-                            label: projectRoutes.gateway_budgets.title,
-                            href: projectRoutes.gateway_budgets.path.replace(
-                              "[project]",
-                              project.slug,
-                            ),
-                            isActive:
-                              router.pathname.includes("/gateway/budgets"),
-                          },
-                        ]
-                      : []),
-                    ...(hasPermission("gatewayProviders:view")
-                      ? [
-                          {
-                            icon: Plug,
-                            label: projectRoutes.gateway_providers.title,
-                            href: projectRoutes.gateway_providers.path.replace(
-                              "[project]",
-                              project.slug,
-                            ),
-                            isActive:
-                              router.pathname.includes("/gateway/providers"),
-                          },
-                        ]
-                      : []),
-                    ...(hasPermission("gatewayCacheRules:view")
-                      ? [
-                          {
-                            icon: Zap,
-                            label: projectRoutes.gateway_cache_rules.title,
-                            href: projectRoutes.gateway_cache_rules.path.replace(
-                              "[project]",
-                              project.slug,
-                            ),
-                            isActive: router.pathname.includes(
-                              "/gateway/cache-rules",
-                            ),
-                          },
-                        ]
-                      : []),
-                    ...(hasPermission("gatewayUsage:view")
-                      ? [
-                          {
-                            icon: LineChart,
-                            label: projectRoutes.gateway_usage.title,
-                            href: projectRoutes.gateway_usage.path.replace(
-                              "[project]",
-                              project.slug,
-                            ),
-                            isActive:
-                              router.pathname.endsWith("/gateway/usage"),
-                          },
-                        ]
-                      : []),
-                    // Audit log entry removed — gateway audit rows are now
-                    // surfaced under /settings/audit-log alongside platform
-                    // governance events. Deep-links from VK / Budget detail
-                    // pages target /settings/audit-log directly.
-                  ]}
-                />
-              </>
-            )}
+            <GovernSection showExpanded={showExpanded} />
 
             <OpsSection showExpanded={showExpanded} />
           </VStack>
