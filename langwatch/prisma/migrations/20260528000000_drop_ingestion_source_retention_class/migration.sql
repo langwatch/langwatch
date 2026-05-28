@@ -1,1 +1,1 @@
-ALTER TABLE "IngestionSource" DROP COLUMN "retentionClass";
+ALTER TABLE "IngestionSource" DROP COLUMN IF EXISTS "retentionClass";

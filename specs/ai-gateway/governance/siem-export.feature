@@ -23,7 +23,6 @@
 #
 # Companion specs (this file references but does not duplicate):
 # - folds.feature                 → governance_ocsf_events fold derivation + cursor pull mechanics
-# - retention.feature             → per-origin TTL applied to fold rows in lockstep with source rows
 # - event-log-durability.feature  → projection rebuild from event_log; derived-data invariants
 # - compliance-baseline.feature   → SOC2/ISO/EU AI Act framework coverage; tamper-evidence deferral
 # - architecture-invariants.feature → cross-cutting unified-substrate + folds-as-derived invariants
@@ -156,4 +155,4 @@ Feature: SIEM export — OCSF read projection over the unified governance store
     Given a customer reads the SIEM export docs
     Then the docs do not claim signed-receipts or Merkle-root verification on exported rows
     And the docs link to the planned tamper-evidence ADR for customers needing that hardening layer
-    And the existing append-only event_log + retention + RBAC are named as the SOC2 Type II-grade non-repudiation foundation
+    And the existing append-only event_log + RBAC are named as the SOC2 Type II-grade non-repudiation foundation

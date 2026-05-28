@@ -13,8 +13,7 @@ Feature: Per-source OTLP shape on /api/ingest/* receivers
   context — the receiver never asks the caller to pick a project.
 
   Implementation: src/server/routes/ingest/ingestionRoutes.ts.
-  Companion: architecture-invariants.feature (cross-cutting),
-  retention.feature (TTL hook).
+  Companion: architecture-invariants.feature (cross-cutting).
 
   Background:
     Given the org "acme-corp" has a hidden Governance Project as its
