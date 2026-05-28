@@ -55,6 +55,8 @@ import { SpanStorageService } from "./traces/span-storage.service";
 import { SpanStorageClickHouseRepository } from "./traces/repositories/span-storage.clickhouse.repository";
 import { NullSpanStorageRepository } from "./traces/repositories/span-storage.repository";
 import { BlobStore } from "./traces/blob-store.service";
+import { SpanBlobResolutionService } from "./traces/span-blob-resolution.service";
+import { TraceIOExtractionService } from "./traces/trace-io-extraction.service";
 import { offloadOtlpSpanAttributes } from "./traces/otlp-span-offload";
 import { createS3Client } from "~/server/storage";
 import { getFeatureFlagStore } from "~/server/featureFlag/featureFlagStore.postgres";
@@ -222,7 +224,14 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     ),
     "OrganizationService",
   );
-  const traceService = TraceService.create(prisma);
+  const blobStore = new BlobStore(createS3Client);
+  const blobResolutionService = new SpanBlobResolutionService(blobStore);
+  const ioExtractionService = new TraceIOExtractionService();
+  const traceService = TraceService.create(prisma, {
+    blobStore,
+    blobResolutionService,
+    ioExtractionService,
+  });
 
   const evaluationExecution = traced(
     new EvaluationExecutionService({
@@ -402,7 +411,6 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     queueSimulationRun: commands.simulations.queueRun,
   });
 
-  const blobStore = new BlobStore(createS3Client);
   const traceCollection = traced(
     new TraceRequestCollectionService({
       dedup: spanDedup,
