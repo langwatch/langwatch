@@ -15,20 +15,22 @@ Feature: Token Created modal command snippets
   # dependency; the singleton highlighter lives in shikiAdapter.ts.
 
   @integration
-  Scenario: All command snippets are syntax-highlighted via the existing Shiki singleton
+  Scenario: All command snippets are syntax-highlighted
     When the Token Created dialog renders any of its command/config blocks
-    Then the highlight is produced by the existing shikiAdapter singleton highlighter
-    And the theme is "github-light" (settings UI is light-theme only)
-    And no second syntax-highlighting library is added to package.json
+    Then each snippet renders with token-level colour (not flat monospace text)
+    And the rendered colours use a light theme that matches the settings UI
 
-  @integration
-  Scenario: Required Shiki languages are registered up-front in shikiAdapter
+  @unit
+  Scenario: Highlight engine wiring — Shiki singleton with the required languages registered
+    # Structural invariant rather than user-observable behaviour, hence `@unit`.
+    # Asserted by grepping shikiAdapter.ts + the call sites in TokenCreatedDialog.
     Given today's shikiAdapter registers: markdown, json, bash, typescript, python, xml, html, yaml
     When this feature is implemented
     Then shikiAdapter additionally registers `ini` (for the .env tab) and keeps `bash` for terminal commands and `json` for the config block
     And the Bearer / Basic Auth tabs use `shellscript` (which Shiki ships as a bash alias) — no `http` or `curl` grammar is required
     And language registration happens inside shikiAdapter, not inline at the call site
     And no language is loaded with a hopeful "(or fallback)" — every block declares one concrete language
+    And no second syntax-highlighting library is added to package.json
 
   # ============================================================================
   # "Use in Code" section — three tabs (.env / Bearer / Basic Auth)
@@ -40,22 +42,20 @@ Feature: Token Created modal command snippets
   Scenario: .env tab renders as a highlighted ini command box
     When I select the ".env" tab inside "Use in Code"
     Then the snippet renders inside the new highlighted command-box style
-    And the language passed to shikiAdapter is `ini`
     And LANGWATCH_API_KEY, LANGWATCH_PROJECT_ID, and LANGWATCH_ENDPOINT keys are visually distinct from their string values
+    # (Highlighting language is `ini` — locked in by the `@unit` "Highlight engine wiring" scenario.)
 
   @integration
   Scenario: Bearer tab renders as a highlighted shell command box
     When I select the "Bearer" tab inside "Use in Code"
     Then the snippet renders inside the new highlighted command-box style
     And the snippet shows an `Authorization: Bearer <token>` line plus an `X-Project-Id` line
-    And the language passed to shikiAdapter is `shellscript` (bash-grammar alias already registered)
 
   @integration
   Scenario: Basic Auth tab renders as a highlighted shell command box
     When I select the "Basic Auth" tab inside "Use in Code"
     Then the snippet renders inside the new highlighted command-box style
     And the snippet shows an `Authorization: Basic base64(projectId:token)` line
-    And the language passed to shikiAdapter is `shellscript` (bash-grammar alias already registered)
 
   # ============================================================================
   # "Use with Code Assistants" section — terminal command + JSON config
@@ -65,18 +65,16 @@ Feature: Token Created modal command snippets
   Scenario: Claude Code tab shows a PostHog-style terminal command snippet
     When I select the "Claude Code" tab inside "Use with Code Assistants"
     Then the "Run in your terminal" snippet renders inside the new command-box style
-    And the language passed to shikiAdapter is `bash`
-    And the snippet displays a leading terminal prompt glyph ">_" on the left of the command (rendered as a CSS pseudo-element or sibling overlay — NOT part of the source string)
-    And the executable name "claude" is visually distinct from its flags and arguments via bash tokenization
-    And the api-key argument is visually distinct from the rest of the line via Shiki's bash tokenization (the `--api-key` flag and its value token render as visually distinct tokens via the github-light theme)
+    And the snippet displays a leading terminal prompt glyph ">_" on the left of the command (this glyph is decorative and must not enter the copy buffer — see the "prompt glyph is not in the copied value" scenario)
+    And the executable name "claude" is visually distinct from its flags and arguments
+    And the `--api-key` flag and its value are visually distinct from the rest of the line
 
   @integration
   Scenario: Codex tab shows a PostHog-style terminal command snippet
     When I select the "Codex" tab inside "Use with Code Assistants"
     Then the "Run in your terminal" snippet renders inside the new command-box style
-    And the language passed to shikiAdapter is `bash`
-    And the snippet displays a leading terminal prompt glyph ">_" on the left of the command (rendered as a CSS pseudo-element or sibling overlay — NOT part of the source string)
-    And the executable name "codex" is visually distinct from its `--env` / `--` / `npx` flags and arguments via bash tokenization
+    And the snippet displays a leading terminal prompt glyph ">_" on the left of the command (decorative — must not enter the copy buffer)
+    And the executable name "codex" is visually distinct from its `--env` / `--` / `npx` flags and arguments
 
   @integration
   Scenario: Terminal prompt glyph is not included in the copied value
@@ -120,9 +118,11 @@ Feature: Token Created modal command snippets
     When I click the hide (eye-off) toggle
     Then the masked value is shown again
 
-  @integration
+  @unit
   Scenario: Reveal toggle does not re-tokenize on every click
-    # Verify call count by spying on shikiAdapter.codeToHtml (vi.spyOn) before rendering.
+    # Structural invariant — preserves UI responsiveness when a user toggles
+    # reveal rapidly. Asserted by spying on shikiAdapter.codeToHtml call count
+    # (vi.spyOn) — not directly user-visible, hence `@unit`.
     Given the Token Created dialog has pre-computed Shiki token streams for both the masked and the unmasked form of each command box
     When I toggle the reveal eye N times rapidly
     Then shikiAdapter.codeToHtml is called at most twice per command box per dialog open (once for masked, once for unmasked — asserted via spy call count)

@@ -153,7 +153,10 @@ export default function ModelsPage() {
     if (name !== undefined) {
       setScopeFilter({ kind: "specific", scopeType, scopeId, name } as PageScopeFilter);
     } else {
-      setScopeFilter({ kind: "specific", scopeType, scopeId } as PageScopeFilter);
+      // Scope no longer exists in the org graph (deleted team/project from
+      // a stale URL) — fall back to "all" so the filter label doesn't render
+      // "Team: undefined" or similar.
+      setScopeFilter({ kind: "all" });
     }
   }, [router.query.scope, filterAvailable]);
 

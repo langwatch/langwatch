@@ -3,12 +3,20 @@ Feature: API Keys scope filter
   I want to filter the API keys list by the scope they grant access to
   So that I can focus on one branch of the org tree without losing the parent / child rows that resolve through it
 
+  # Implementation notes (non-runnable, document the design constraint behind
+  # this feature — kept here so future readers know why client-side filtering
+  # is safe):
+  #   - The API Keys list query returns each key with its full set of
+  #     roleBindings (scopeType + scopeId).
+  #   - The list is returned in one shot (no pagination), so client-side
+  #     filtering does not silently miss matching keys.
+  # See specs/api-keys/unified-api-keys.feature for the user-perspective
+  # contract of the list view.
+
   Background:
     Given I am signed in as a user in an organization
     And the organization has at least one team and at least one project
     And there are API keys with role bindings at the organization, team, and project scope
-    And the existing tRPC `apiKey.list` query returns each key with `roleBindings: [{ scopeType, scopeId }]`
-    And `apiKey.list` returns the full set of keys the current user can see in one shot (no pagination — client-side filtering is safe)
 
   # ============================================================================
   # Default view: everything I can see

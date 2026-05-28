@@ -299,7 +299,8 @@ describe("<ShikiCommandBox />", () => {
   describe("given a copy button that enters success state", () => {
     describe("when using fake timers to observe the 1-second flash", () => {
       /** @scenario Copy button flashes a success state on click */
-      /** @scenario All command snippets are syntax-highlighted via the existing Shiki singleton */
+      /** @scenario All command snippets are syntax-highlighted */
+      /** @scenario Highlight engine wiring — Shiki singleton with the required languages registered */
       it("flips data-state to 'copied' after click and back to 'idle' after 1 second", async () => {
         renderCommandBox({ command: "claude mcp add langwatch" });
 

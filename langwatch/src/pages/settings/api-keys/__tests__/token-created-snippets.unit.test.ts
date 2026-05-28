@@ -18,7 +18,7 @@ function readFile(rel: string): string {
 
 describe("given the token-created-snippets feature is implemented", () => {
   describe("when checking that Shiki languages are registered up-front in shikiAdapter", () => {
-    /** @scenario Required Shiki languages are registered up-front in shikiAdapter */
+    /** @scenario Highlight engine wiring — Shiki singleton with the required languages registered */
     it("shikiAdapter registers 'ini' for the .env tab", () => {
       const adapter = readFile(
         "src/features/traces-v2/components/TraceDrawer/markdownView/shikiAdapter.ts",
@@ -26,7 +26,7 @@ describe("given the token-created-snippets feature is implemented", () => {
       expect(adapter).toContain('"ini"');
     });
 
-    /** @scenario Required Shiki languages are registered up-front in shikiAdapter */
+    /** @scenario Highlight engine wiring — Shiki singleton with the required languages registered */
     it("shikiAdapter registers 'bash' for terminal commands", () => {
       const adapter = readFile(
         "src/features/traces-v2/components/TraceDrawer/markdownView/shikiAdapter.ts",
@@ -34,7 +34,7 @@ describe("given the token-created-snippets feature is implemented", () => {
       expect(adapter).toContain('"bash"');
     });
 
-    /** @scenario Required Shiki languages are registered up-front in shikiAdapter */
+    /** @scenario Highlight engine wiring — Shiki singleton with the required languages registered */
     it("shikiAdapter registers 'json' for the config block", () => {
       const adapter = readFile(
         "src/features/traces-v2/components/TraceDrawer/markdownView/shikiAdapter.ts",
