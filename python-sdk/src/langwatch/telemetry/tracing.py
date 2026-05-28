@@ -783,7 +783,12 @@ def trace(
     expected_output: Optional[str] = None,
     api_key: Optional[str] = None,
     disable_sending: bool = False,
-    max_string_length: Optional[int] = 5000,
+    # Raised from 5000 to 32 KB to match the LangWatchTrace constructor — see
+    # tracing.py:91 and issue #4215. The default must be the same on both the
+    # public `trace()` factory and the underlying constructor; otherwise users
+    # calling `langwatch.trace(...)` without an explicit kwarg would silently
+    # get 5000 KB while users calling `LangWatchTrace(...)` get 32 KB.
+    max_string_length: Optional[int] = 32 * 1024,
     # Root span parameters
     span_id: Optional[str] = None,
     capture_input: bool = True,
