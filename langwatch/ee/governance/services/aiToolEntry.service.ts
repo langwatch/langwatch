@@ -358,6 +358,23 @@ export class AiToolEntryService {
   }
 
   /**
+   * The starter-pack catalog the admin editor renders as a checklist so
+   * the admin picks which tools to publish instead of importing the whole
+   * set. Display-only projection of {@link STARTER_PACK_TILES}.
+   */
+  static listStarterPackTiles(): {
+    slug: string;
+    displayName: string;
+    type: AiToolType;
+  }[] {
+    return STARTER_PACK_TILES.map((t) => ({
+      slug: t.slug,
+      displayName: t.displayName,
+      type: t.type,
+    }));
+  }
+
+  /**
    * User-facing list. Returns enabled, non-archived entries visible to
    * the calling user. Org-scoped entries are visible to all members;
    * team-scoped entries are filtered to the user's team memberships.
@@ -669,7 +686,17 @@ export class AiToolEntryService {
   async seedStarterPack(input: {
     organizationId: string;
     actorUserId?: string | null;
+    /**
+     * When set, only these starter slugs are published; unknown slugs are
+     * ignored. Omitted = the full pack (keeps the idempotent re-run path
+     * and any existing caller working unchanged).
+     */
+    slugs?: string[];
   }): Promise<{ created: number; updated: number; skipped: number }> {
+    const selectedTiles =
+      input.slugs === undefined
+        ? STARTER_PACK_TILES
+        : STARTER_PACK_TILES.filter((t) => input.slugs!.includes(t.slug));
     const existing = await this.prisma.aiToolEntry.findMany({
       where: {
         organizationId: input.organizationId,
@@ -692,7 +719,7 @@ export class AiToolEntryService {
     const toUpdate: { id: string; iconAsset: string }[] = [];
     let skipped = 0;
 
-    for (const tile of STARTER_PACK_TILES) {
+    for (const tile of selectedTiles) {
       const match = byFingerprint.get(fingerprint(tile.type, tile.displayName));
       if (!match) {
         toCreate.push(tile);
