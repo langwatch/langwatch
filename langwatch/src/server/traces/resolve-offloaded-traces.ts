@@ -127,14 +127,42 @@ export async function resolveOffloadedTraces({
 
       // Separate eventref keys from regular attributes
       const cleanedAttrs: Record<string, string> = {};
-      const eventrefEntries: Array<{ attrKey: string; field: string }> = [];
+      const eventrefEntries: Array<{
+        attrKey: string;
+        field: string;
+        eventId: string;
+      }> = [];
 
       for (const [key, value] of Object.entries(attrs)) {
         if (key.startsWith(EVENTREF_ATTR_PREFIX)) {
           const attrKey = key.slice(EVENTREF_ATTR_PREFIX.length);
           try {
-            const ref = JSON.parse(value) as { field: string; eventId?: string };
-            eventrefEntries.push({ attrKey, field: ref.field ?? attrKey });
+            const ref = JSON.parse(value) as {
+              field?: string;
+              eventId?: string;
+            };
+            if (typeof ref.eventId !== "string" || ref.eventId.length === 0) {
+              // Eventref missing the embedded eventId — can't resolve. Strip
+              // the key so we don't leak the reserved namespace to the UI,
+              // but keep the preview that's already in cleanedAttrs (added
+              // by `else` branch below when the span attr was the IO key
+              // itself, not the reserved one).
+              logger.warn(
+                {
+                  projectId,
+                  spanId: span.spanId,
+                  traceId: span.traceId,
+                  attrKey,
+                },
+                "eventref missing eventId — keeping preview value",
+              );
+              continue;
+            }
+            eventrefEntries.push({
+              attrKey,
+              field: ref.field ?? attrKey,
+              eventId: ref.eventId,
+            });
           } catch {
             // Malformed eventref JSON — skip; preview in cleanedAttrs is still shown.
           }
@@ -144,33 +172,21 @@ export async function resolveOffloadedTraces({
       }
 
       if (eventrefEntries.length === 0) {
-        // All ref keys were malformed JSON — strip the reserved keys anyway.
+        // All ref keys were malformed JSON or missing eventId — strip
+        // reserved keys anyway so the UI never sees the namespace.
         return { ...span, spanAttributes: cleanedAttrs };
       }
 
-      // The eventId for this span's event: use the span's traceId as the aggregateId
-      // and look up the specific event by field. The event_log row was written by the
-      // command worker and carries the full span payload.
+      // ADR-022: aggregateId for the trace-processing pipeline IS the traceId.
+      // The eventref carries the eventId, written by leanForProjection from
+      // event.id at lean time — see lean-for-projection.ts:120.
       const aggregateId = span.traceId;
-      // Use span's eventId when available via metadata; fall back to traceId-based lookup.
-      // ADR-022: The eventref carries { field } only; eventId must be found by span context.
-      // We use the most recent event for this aggregate/span combination.
-      // For now, derive the eventId from the span's event log via a broad query:
-      // getFromEventLog accepts an eventId — we use the span's traceId as a proxy key
-      // since leanForProjection writes pointers without embedding the eventId explicitly.
-      // The correct production shape is: spanAttributes also carry an eventId (from the
-      // event_log row that created this span). As an interim, use the traceId as eventId
-      // proxy — this will be corrected when the schema is finalized.
-      //
-      // TODO: store eventId in eventref when the schema is promoted to stable.
-      // For now we pass traceId as a stand-in for tests that supply matching data.
-      const eventId = span.traceId;
 
       try {
         const resolvedAttrs = { ...cleanedAttrs };
         let resolvedCount = 0;
 
-        for (const { attrKey, field } of eventrefEntries) {
+        for (const { attrKey, field, eventId } of eventrefEntries) {
           try {
             const fullValue = await blobStore.getFromEventLog({
               eventId,

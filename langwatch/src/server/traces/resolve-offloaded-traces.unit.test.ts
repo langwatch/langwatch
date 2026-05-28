@@ -109,7 +109,7 @@ describe("resolveOffloadedTraces()", () => {
       spanAttributes: {
         "langwatch.output": "preview…",
         [`${EVENTREF_ATTR_PREFIX}langwatch.output`]:
-          JSON.stringify({ field: "langwatch.output" }),
+          JSON.stringify({ field: "langwatch.output", eventId: "evt-001" }),
       },
     });
 
@@ -245,7 +245,7 @@ describe("resolveOffloadedTraces()", () => {
       spanAttributes: {
         "langwatch.output": "preview…",
         [`${EVENTREF_ATTR_PREFIX}langwatch.output`]:
-          JSON.stringify({ field: "langwatch.output" }),
+          JSON.stringify({ field: "langwatch.output", eventId: "evt-001" }),
       },
     });
 

@@ -117,7 +117,10 @@ function leanSpanReceivedEvent(event: Event): Event {
       // Attach eventref pointer
       eventrefAttrs.push({
         key: `${EVENTREF_ATTR_PREFIX}${attr.key}`,
-        value: { stringValue: JSON.stringify({ field: attr.key }) },
+        // ADR-022: embed event.id so the read path can JOIN event_log by
+        // EventId without guessing. The eventref carries `{field, eventId}`;
+        // the read path uses both in `BlobStore.getFromEventLog`.
+        value: { stringValue: JSON.stringify({ field: attr.key, eventId: event.id }) },
       });
     } else {
       newAttrs.push({ ...attr, value: { ...attr.value } });
@@ -168,7 +171,8 @@ function leanLogRecordReceivedEvent(event: Event): Event {
       body: preview,
       attributes: {
         ...(data.attributes ?? {}),
-        [eventrefKey]: JSON.stringify({ field: "body" }),
+        // ADR-022: embed event.id so the read path can resolve via event_log.
+        [eventrefKey]: JSON.stringify({ field: "body", eventId: event.id }),
       },
     },
   };
