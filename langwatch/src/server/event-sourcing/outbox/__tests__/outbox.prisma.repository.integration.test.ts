@@ -17,44 +17,19 @@ import {
   it,
 } from "vitest";
 import { KSUID_RESOURCES } from "../../../../utils/constants";
+import { getTestProject } from "../../../../utils/testUtils";
 import { prisma } from "../../../db";
 import { PrismaOutboxRepository } from "../outbox.prisma.repository";
 
 const reactorName = `test-reactor-${generate(KSUID_RESOURCES.PROJECT)}`;
 
-async function ensureProject(): Promise<string> {
-  const projectId = `proj-${generate(KSUID_RESOURCES.PROJECT)}`;
-  // Minimal Project — relies on the test DB having Organization/Team
-  // fixtures available. We borrow whichever team already exists; if
-  // none, the test is skipped.
-  const team = await prisma.team.findFirst();
-  if (!team) {
-    throw new Error(
-      "ReactorOutbox integration tests need an existing Team fixture",
-    );
-  }
-  await prisma.project.create({
-    data: {
-      id: projectId,
-      name: "ReactorOutbox integration test",
-      slug: projectId,
-      apiKey: `key-${projectId}`,
-      teamId: team.id,
-      framework: "test",
-      language: "ts",
-    },
-  });
-  return projectId;
-}
-
 describe("PrismaOutboxRepository", () => {
   const repo = new PrismaOutboxRepository(prisma);
   let projectId: string;
-  const createdProjectIds: string[] = [];
 
   beforeAll(async () => {
-    projectId = await ensureProject();
-    createdProjectIds.push(projectId);
+    const project = await getTestProject("reactor-outbox");
+    projectId = project.id;
   });
 
   afterEach(async () => {
@@ -62,11 +37,8 @@ describe("PrismaOutboxRepository", () => {
   });
 
   afterAll(async () => {
-    if (createdProjectIds.length > 0) {
-      await prisma.project.deleteMany({
-        where: { id: { in: createdProjectIds } },
-      });
-    }
+    // Project / team / org are reused fixtures — don't delete them.
+    await prisma.reactorOutbox.deleteMany({ where: { reactorName } });
   });
 
   describe("insertIfAbsent", () => {

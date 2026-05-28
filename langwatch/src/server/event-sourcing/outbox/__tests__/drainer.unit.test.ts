@@ -1,23 +1,42 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DispatchError } from "../dispatchError";
-import { OutboxDrainer } from "../drainer";
+import { OutboxDrainer, type OutboxDrainerOptions } from "../drainer";
 import { OutboxService } from "../outbox.service";
-import type { OutboxRepository } from "../outbox.repository";
+import type {
+  OutboxLeaseQuery,
+  OutboxRepository,
+  OutboxRetryUpdate,
+} from "../outbox.repository";
 import type { OutboxRow } from "../outbox.types";
 import type { OutboxWakeup } from "../wakeupQueue";
 
 class StubRepository implements OutboxRepository {
   rows: OutboxRow[] = [];
-  insertIfAbsent = vi.fn(async () => true);
-  leaseNext = vi.fn(async () => null as OutboxRow | null);
-  recoverExpiredLeases = vi.fn(async () => 0);
-  markDispatched = vi.fn(async () => undefined);
-  markRetry = vi.fn(async () => undefined);
-  findById = vi.fn(async (id: string) =>
-    this.rows.find((r) => r.id === id) ?? null,
+  insertIfAbsent =
+    vi.fn<(row: { reactorName: string; dedupKey: string }) => Promise<boolean>>(
+      async () => true,
+    );
+  leaseNext = vi.fn<(query: OutboxLeaseQuery) => Promise<OutboxRow | null>>(
+    async () => null,
   );
-  list = vi.fn(async () => [] as OutboxRow[]);
+  recoverExpiredLeases =
+    vi.fn<(args: { now: Date; limit: number }) => Promise<number>>(
+      async () => 0,
+    );
+  markDispatched =
+    vi.fn<(args: { rowId: string; now: Date }) => Promise<void>>(
+      async () => undefined,
+    );
+  markRetry = vi.fn<(update: OutboxRetryUpdate) => Promise<void>>(
+    async () => undefined,
+  );
+  findById = vi.fn<(rowId: string) => Promise<OutboxRow | null>>(
+    async (id: string) => this.rows.find((r) => r.id === id) ?? null,
+  );
+  list = vi.fn<() => Promise<OutboxRow[]>>(async () => []);
 }
+
+type ScheduleWakeup = OutboxDrainerOptions["scheduleWakeup"];
 
 function makeRow(overrides: Partial<OutboxRow> = {}): OutboxRow {
   const now = new Date("2026-05-28T12:00:00Z");
@@ -51,13 +70,13 @@ const baseWakeup: OutboxWakeup = {
 describe("OutboxDrainer.handleWakeup", () => {
   let repo: StubRepository;
   let service: OutboxService;
-  let scheduleWakeup: ReturnType<typeof vi.fn>;
+  let scheduleWakeup: ReturnType<typeof vi.fn<ScheduleWakeup>>;
   let drainer: OutboxDrainer;
 
   beforeEach(() => {
     repo = new StubRepository();
     service = new OutboxService(repo);
-    scheduleWakeup = vi.fn(async () => undefined);
+    scheduleWakeup = vi.fn<ScheduleWakeup>(async () => undefined);
     drainer = new OutboxDrainer(service, {
       scheduleWakeup,
       maxRowsPerWakeup: 3,
