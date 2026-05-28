@@ -171,6 +171,33 @@ describe("LangyConversationService", () => {
     });
   });
 
+  describe("when getAll maps rows for the conversation list", () => {
+    it("exposes the row's updatedAt as lastActivityAt (the field the UI sorts on)", async () => {
+      const updatedAt = new Date("2026-05-01T10:00:00.000Z");
+      const repo = makeRepo({
+        findAllForUser: vi.fn().mockResolvedValue([
+          {
+            id: "c1",
+            title: "t",
+            isShared: false,
+            userId: "alice",
+            updatedAt,
+            _count: { messages: 3 },
+          },
+        ]),
+      });
+      const svc = new LangyConversationService(repo);
+      const result = await svc.getAll({ projectId: "p1", userId: "alice" });
+      expect(result[0]).toMatchObject({
+        id: "c1",
+        isOwn: true,
+        lastActivityAt: updatedAt,
+        messageCount: 3,
+      });
+      expect(result[0]).not.toHaveProperty("updatedAt");
+    });
+  });
+
   describe("when clearAllForUser is called", () => {
     it("soft-deletes all the user's conversations and returns the count", async () => {
       const repo = makeRepo({
