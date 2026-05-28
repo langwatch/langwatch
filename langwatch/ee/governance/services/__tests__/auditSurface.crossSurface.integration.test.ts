@@ -47,6 +47,7 @@ import {
   type PlanProvider,
 } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
+import { ApiKeyService } from "~/server/api-key/api-key.service";
 
 import { FREE_PLAN } from "../../../licensing/constants";
 
@@ -62,10 +63,20 @@ describe("Audit uniformity: identical payload shape across all governance surfac
   let testTeam: Team;
   let testProject: Project;
   let testUser: User;
+  let patToken: string;
 
   const orgIds: string[] = [];
   const userIds: string[] = [];
   const templateIds: string[] = [];
+
+  // The admin template-create route requires a user-bound caller (PAT);
+  // a legacy project key 403s. These HTTP entrypoints authenticate with a
+  // PAT carrying an org-scoped ADMIN binding (resolves aiTools:manage).
+  const patHeaders = () => ({
+    Authorization: `Bearer ${patToken}`,
+    "X-Project-Id": testProject.id,
+    "Content-Type": "application/json",
+  });
 
   beforeEach(async () => {
     resetApp();
@@ -128,6 +139,21 @@ describe("Audit uniformity: identical payload shape across all governance surfac
         scopeId: testOrg.id,
       },
     });
+
+    const apiKeyResult = await ApiKeyService.create(prisma).create({
+      name: `uniform-pat-${ns}`,
+      userId: testUser.id,
+      organizationId: testOrg.id,
+      permissionMode: "all",
+      bindings: [
+        {
+          role: TeamUserRole.ADMIN,
+          scopeType: RoleBindingScopeType.ORGANIZATION,
+          scopeId: testOrg.id,
+        },
+      ],
+    });
+    patToken = apiKeyResult.token;
   });
 
   afterEach(async () => {
@@ -140,7 +166,12 @@ describe("Audit uniformity: identical payload shape across all governance surfac
     await prisma.auditLog
       .deleteMany({ where: { organizationId: { in: orgIds } } })
       .catch(() => undefined);
+    // RoleBindings carry the required relation to the PAT's ApiKey, so they
+    // must be removed before the keys they belong to.
     await prisma.roleBinding
+      .deleteMany({ where: { organizationId: { in: orgIds } } })
+      .catch(() => undefined);
+    await prisma.apiKey
       .deleteMany({ where: { organizationId: { in: orgIds } } })
       .catch(() => undefined);
     await prisma.organizationUser
@@ -178,19 +209,16 @@ describe("Audit uniformity: identical payload shape across all governance surfac
     });
     templateIds.push(trpcRow.id);
 
-    // 2. Hono REST — real HTTP request through the mounted app. The
-    //    legacy project apiKey path bypasses the PAT ceiling, and the
-    //    callerUserId resolves to the synthetic `svc_<projectId>` actor;
-    //    the audit row's userId differs by design (no human caller on
-    //    the legacy token path), but every OTHER metadata key is uniform.
+    // 2. Hono REST — real HTTP request through the mounted app, driven by
+    //    a user-bound PAT (the admin create route rejects legacy project
+    //    keys). The audit row's userId resolves to the PAT's user; the
+    //    @audit-uniform contract only locks the payload SHAPE (keys minus
+    //    surface), not the actor, so the cross-surface comparison holds.
     const honoRes = await governanceApp.request(
       "/api/governance/ingestion-templates",
       {
         method: "POST",
-        headers: {
-          "X-Auth-Token": testProject.apiKey,
-          "Content-Type": "application/json",
-        },
+        headers: patHeaders(),
         body: JSON.stringify({
           source_type: SHARED_INPUT.sourceType,
           display_name: SHARED_INPUT.displayName,
@@ -232,11 +260,7 @@ describe("Audit uniformity: identical payload shape across all governance surfac
       "/api/governance/ingestion-templates",
       {
         method: "POST",
-        headers: {
-          "X-Auth-Token": testProject.apiKey,
-          "X-LangWatch-Surface": "cli",
-          "Content-Type": "application/json",
-        },
+        headers: { ...patHeaders(), "X-LangWatch-Surface": "cli" },
         body: JSON.stringify({
           source_type: SHARED_INPUT.sourceType,
           display_name: SHARED_INPUT.displayName,
@@ -333,11 +357,7 @@ describe("Audit uniformity: identical payload shape across all governance surfac
         "/api/governance/ingestion-templates",
         {
           method: "POST",
-          headers: {
-            "X-Auth-Token": testProject.apiKey,
-            "X-LangWatch-Surface": spoofValue,
-            "Content-Type": "application/json",
-          },
+          headers: { ...patHeaders(), "X-LangWatch-Surface": spoofValue },
           body: JSON.stringify({
             source_type: inputBase.sourceType,
             display_name: `${inputBase.displayName}-${spoofValue}`,

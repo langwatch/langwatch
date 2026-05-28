@@ -10,7 +10,15 @@
  *       specs/ai-gateway/governance/ingestion-templates-catalog.feature
  *       specs/ai-governance/admin-ottl-authoring.feature
  */
-import type { Organization, Project, Team } from "@prisma/client";
+import {
+  type Organization,
+  OrganizationUserRole,
+  type Project,
+  RoleBindingScopeType,
+  type Team,
+  TeamUserRole,
+  type User,
+} from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -22,6 +30,7 @@ import {
   type PlanProvider,
 } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
+import { ApiKeyService } from "~/server/api-key/api-key.service";
 
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import { app } from "../[[...route]]/app";
@@ -38,15 +47,23 @@ describe("Feature: Governance REST API", () => {
   let testOrganization: Organization;
   let testTeam: Team;
   let testProject: Project;
+  let testUser: User;
+  let patToken: string;
   let mockGetActivePlan: ReturnType<typeof vi.fn>;
   let api: ApiHelpers;
 
   const platformIds: string[] = [];
   const orgTemplateIds: string[] = [];
   const orgIds: string[] = [];
+  const userIds: string[] = [];
 
+  // Template administration is gated on a user-bound caller (PAT), not a
+  // shared project key: a legacy project token bypasses the aiTools:manage
+  // ceiling, so admin reads/mutations authenticate with a PAT carrying an
+  // org-scoped ADMIN binding (which resolves aiTools:manage + aiTools:view).
   const createAuthHeaders = () => ({
-    "X-Auth-Token": testApiKey,
+    Authorization: `Bearer ${patToken}`,
+    "X-Project-Id": testProject.id,
     "Content-Type": "application/json",
   });
 
@@ -93,9 +110,53 @@ describe("Feature: Governance REST API", () => {
 
     testApiKey = testProject.apiKey;
 
+    testUser = await prisma.user.create({
+      data: { email: `gov-${suffix}@example.com`, name: `Gov User ${suffix}` },
+    });
+    userIds.push(testUser.id);
+
+    await prisma.organizationUser.create({
+      data: {
+        userId: testUser.id,
+        organizationId: testOrganization.id,
+        role: OrganizationUserRole.ADMIN,
+      },
+    });
+
+    // ApiKeyService.create reads the creator's own RoleBindings to enforce
+    // the ceiling; an org-scoped ADMIN grant lets the PAT request the same.
+    await prisma.roleBinding.create({
+      data: {
+        organizationId: testOrganization.id,
+        userId: testUser.id,
+        role: TeamUserRole.ADMIN,
+        scopeType: RoleBindingScopeType.ORGANIZATION,
+        scopeId: testOrganization.id,
+      },
+    });
+
+    const apiKeyResult = await ApiKeyService.create(prisma).create({
+      name: `gov-pat-${suffix}`,
+      userId: testUser.id,
+      organizationId: testOrganization.id,
+      permissionMode: "all",
+      bindings: [
+        {
+          role: TeamUserRole.ADMIN,
+          scopeType: RoleBindingScopeType.ORGANIZATION,
+          scopeId: testOrganization.id,
+        },
+      ],
+    });
+    patToken = apiKeyResult.token;
+
+    const patHeaders = {
+      Authorization: `Bearer ${patToken}`,
+      "X-Project-Id": testProject.id,
+    };
+
     api = {
-      get: (path) =>
-        app.request(path, { headers: { "X-Auth-Token": testApiKey } }),
+      get: (path) => app.request(path, { headers: patHeaders }),
       post: (path, body) =>
         app.request(path, {
           method: "POST",
@@ -111,7 +172,7 @@ describe("Feature: Governance REST API", () => {
       delete: (path) =>
         app.request(path, {
           method: "DELETE",
-          headers: { "X-Auth-Token": testApiKey },
+          headers: patHeaders,
         }),
     };
   });
@@ -132,12 +193,29 @@ describe("Feature: Governance REST API", () => {
     await prisma.auditLog.deleteMany({
       where: { organizationId: { in: orgIds } },
     });
+    // RoleBindings carry the required relation to the PAT's ApiKey, so they
+    // must be removed before the keys they belong to.
+    await prisma.roleBinding.deleteMany({
+      where: { organizationId: { in: orgIds } },
+    });
+    await prisma.apiKey.deleteMany({
+      where: { organizationId: { in: orgIds } },
+    });
+    // dbOrganizationIdProtection requires organizationId in the WHERE clause
+    // for OrganizationUser writes.
+    await prisma.organizationUser
+      .deleteMany({ where: { organizationId: { in: orgIds } } })
+      .catch(() => undefined);
     if (testProject?.id) {
       await prisma.project.delete({ where: { id: testProject.id } });
     }
     if (testTeam?.id) {
       await prisma.team.delete({ where: { id: testTeam.id } });
     }
+    for (const id of userIds) {
+      await prisma.user.delete({ where: { id } }).catch(() => undefined);
+    }
+    userIds.length = 0;
     for (const id of orgIds) {
       await prisma.organization.delete({ where: { id } }).catch(() => undefined);
     }
@@ -155,6 +233,42 @@ describe("Feature: Governance REST API", () => {
         headers: { "X-Auth-Token": "not-a-real-key" },
       });
       expect(res.status).toBe(401);
+    });
+  });
+
+  describe("when authenticated with a legacy project key", () => {
+    it("still reads the user-facing template list (public read)", async () => {
+      const res = await app.request("/api/governance/ingestion-templates", {
+        headers: { "X-Auth-Token": testApiKey },
+      });
+      expect(res.status).toBe(200);
+    });
+
+    it("rejects the admin template list with 403 user_token_required", async () => {
+      const res = await app.request(
+        "/api/governance/ingestion-templates/admin",
+        { headers: { "X-Auth-Token": testApiKey } },
+      );
+      expect(res.status).toBe(403);
+      const body = (await res.json()) as { error: { code: string } };
+      expect(body.error.code).toBe("user_token_required");
+    });
+
+    it("rejects creating an org template with 403 user_token_required", async () => {
+      const res = await app.request("/api/governance/ingestion-templates", {
+        method: "POST",
+        headers: {
+          "X-Auth-Token": testApiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          source_type: "internal_codex",
+          display_name: "Should Be Forbidden",
+        }),
+      });
+      expect(res.status).toBe(403);
+      const body = (await res.json()) as { error: { code: string } };
+      expect(body.error.code).toBe("user_token_required");
     });
   });
 
