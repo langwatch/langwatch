@@ -291,6 +291,12 @@ export function IngestionTemplateInstallDrawer({
                   <code>/me/traces</code> filtered by source={template.slug}.
                 </Text>
 
+                <Text fontSize="xs" color="fg.muted">
+                  To keep this across new terminals, add these lines to your{" "}
+                  <code>~/.zshrc</code> (or <code>~/.bashrc</code>), then open
+                  a new shell.
+                </Text>
+
                 <HStack>
                   <Spacer />
                   <Button

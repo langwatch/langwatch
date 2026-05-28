@@ -4,6 +4,7 @@ import { type ZodError, z } from "zod";
 import { fromZodError } from "zod-validation-error";
 import type { DeepPartial } from "../../utils/types";
 import { openTelemetryLogsRequestToTracesForCollection } from "./otel.logs";
+import type { LLMSpan } from "./types";
 import { spanSchema } from "./types.generated";
 
 const springAICompleteChatRequest: DeepPartial<IExportLogsServiceRequest> = {
@@ -997,7 +998,7 @@ IGNORED_CONTENT`,
 
     const apiRequestSpan = traces[0]?.spans.find(
       (s) => s.name === "claude_code.api_request",
-    );
+    ) as LLMSpan | undefined;
     expect(apiRequestSpan?.model).toBe("claude-3-5-haiku-20241022");
     expect(apiRequestSpan?.metrics).toEqual({
       cost: 0.0001736,
@@ -1010,7 +1011,7 @@ IGNORED_CONTENT`,
     // The user_prompt record carries no cost — it stays metric-less.
     const promptSpan = traces[0]?.spans.find(
       (s) => s.name === "claude_code.user_prompt",
-    );
+    ) as LLMSpan | undefined;
     expect(promptSpan?.metrics).toBeUndefined();
     expect(promptSpan?.model).toBeUndefined();
   });
