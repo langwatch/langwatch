@@ -775,41 +775,46 @@ export class AiToolEntryService {
   }
 
   /**
-   * Returns the distinct set of `provider` strings the org has at
-   * least one *bindable* credential for — i.e. a live
-   * `GatewayProviderCredential` (`disabledAt: null`) on a project in
-   * the org whose parent `ModelProvider` is enabled. Drives the
-   * per-tile "Provider not configured" preflight on /me — without
-   * this, clicking an OpenAI tile in an Anthropic-only org silently
-   * mints a VK that 502s on first curl with `provider_error` (Sergey
-   * 3bbd7fbfc dogfood).
+   * Returns the distinct set of `provider` strings the caller can
+   * reach a *bindable* credential for — an enabled `ModelProvider`
+   * (`disabledAt: null`) scoped either org-wide or to a team/project
+   * the caller belongs to. Drives the per-tile "Provider not
+   * configured" preflight on /me — without this, clicking an OpenAI
+   * tile in an Anthropic-only org silently mints a VK that 502s on
+   * first curl with `provider_error` (Sergey 3bbd7fbfc dogfood).
+   *
+   * Scoping to the caller's memberships is load-bearing: a provider
+   * configured only on a team the caller is not a member of is not
+   * reachable by their personal VK, so reporting it as configured
+   * would green-light a tile that mints a VK which can't route.
    *
    * Why this exact predicate: it mirrors the materialiser's
    * fail-closed binding contract (a5601f80a). If a credential
-   * matching this shape exists anywhere in the org, the personal-VK
+   * matching this shape is reachable by the caller, the personal-VK
    * routing policy can route through it — guaranteeing the tile's
    * green state matches what the gateway will actually accept at
    * request time. Using the bare ModelProvider table (without the
    * `disabledAt: null` join) would over-report for orgs that have
    * an enabled MP but soft-disabled all of its bindings.
-   *
-   * Both `Project` and `ModelProvider` are exempt from
-   * `dbMultiTenancyProtection`. `GatewayProviderCredential` is NOT
-   * exempt but the `projectId: { in: ... }` shape satisfies the
-   * guard's `projectId.in` allowance (line 233 of that middleware).
    */
   async listConfiguredProvidersForUser({
     organizationId,
+    userId,
   }: {
     organizationId: string;
     userId: string;
   }): Promise<string[]> {
-    const teams = await this.prisma.team.findMany({
-      where: { organizationId },
-      select: { id: true, projects: { select: { id: true } } },
+    // Only teams the caller actually belongs to. A TEAM/PROJECT-scoped
+    // provider on a team the caller can't reach must not green-light the
+    // tile — ORGANIZATION-scoped credentials still count for every member.
+    const memberships = await this.prisma.teamUser.findMany({
+      where: { userId, team: { organizationId } },
+      select: { teamId: true, team: { select: { projects: { select: { id: true } } } } },
     });
-    const teamIds = teams.map((t) => t.id);
-    const projectIds = teams.flatMap((t) => t.projects.map((p) => p.id));
+    const teamIds = memberships.map((m) => m.teamId);
+    const projectIds = memberships.flatMap((m) =>
+      m.team.projects.map((p) => p.id),
+    );
 
     const rows = await this.prisma.modelProvider.findMany({
       where: {

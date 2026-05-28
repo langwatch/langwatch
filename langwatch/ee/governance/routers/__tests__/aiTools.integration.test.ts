@@ -694,6 +694,66 @@ describe("aiToolsRouter integration", () => {
     });
   });
 
+  describe("providerAvailability", () => {
+    it("scopes configured providers to the caller's team memberships", async () => {
+      const orgProvider = await prisma.modelProvider.create({
+        data: {
+          name: `org-anthropic-${ns}`,
+          provider: "anthropic",
+          enabled: true,
+          scopes: {
+            create: [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
+          },
+        },
+      });
+      const ownTeamProvider = await prisma.modelProvider.create({
+        data: {
+          name: `pf-openai-${ns}`,
+          provider: "openai",
+          enabled: true,
+          scopes: {
+            create: [{ scopeType: "TEAM", scopeId: teamPlatformId }],
+          },
+        },
+      });
+      const foreignTeamProvider = await prisma.modelProvider.create({
+        data: {
+          name: `ds-azure-${ns}`,
+          provider: "azure",
+          enabled: true,
+          scopes: {
+            create: [{ scopeType: "TEAM", scopeId: teamDataScienceId }],
+          },
+        },
+      });
+
+      try {
+        // memberPlatform belongs to teamPlatform only.
+        const platform = await callerFor(
+          memberPlatformUserId,
+        ).aiTools.providerAvailability({ organizationId });
+        expect(platform.configuredProviders).toContain("anthropic"); // org-wide
+        expect(platform.configuredProviders).toContain("openai"); // own team
+        // azure is scoped to a team the caller can't reach — must not leak.
+        expect(platform.configuredProviders).not.toContain("azure");
+
+        // memberOrphan belongs to no team — only org-wide providers count.
+        const orphan = await callerFor(
+          memberOrphanUserId,
+        ).aiTools.providerAvailability({ organizationId });
+        expect(orphan.configuredProviders).toContain("anthropic");
+        expect(orphan.configuredProviders).not.toContain("openai");
+        expect(orphan.configuredProviders).not.toContain("azure");
+      } finally {
+        const ids = [orgProvider.id, ownTeamProvider.id, foreignTeamProvider.id];
+        await prisma.modelProviderScope.deleteMany({
+          where: { modelProviderId: { in: ids } },
+        });
+        await prisma.modelProvider.deleteMany({ where: { id: { in: ids } } });
+      }
+    });
+  });
+
   describe("update", () => {
     // Pins the new mutation shape (Stage B+C) end-to-end:
     //   teamIds[] toggling round-trips through the AiToolEntryTeam
