@@ -1,18 +1,19 @@
 /**
  * Integration-flavored tests for TraceService.getTracesWithSpans with blob
- * resolution wired in. Uses a fake BlobStore and the real TraceIOExtractionService
- * to verify that the read-resolution pipeline (ADR-021 decision B) delivers
- * full IO values when offloaded blobs are present.
+ * resolution wired in (ADR-022). Uses a fake BlobStore (getFromEventLog stub)
+ * and the real TraceIOExtractionService to verify that the resolution pipeline
+ * accepts the updated deps shape and delegates correctly.
  *
  * "Integration-flavored": real TraceIOExtractionService, fake BlobStore,
  * controlled ClickHouseTraceService (in-process fake — no ClickHouse infra).
+ *
+ * BDD structure: given/when nested describes, action-based it() names.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Trace } from "~/server/tracer/types";
 import type { Protections } from "~/server/elasticsearch/protections";
-import type { TraceBlobRef } from "~/server/app-layer/traces/blob-store.service";
-import { BlobStore } from "~/server/app-layer/traces/blob-store.service";
-import { SpanBlobResolutionService } from "~/server/app-layer/traces/span-blob-resolution.service";
+import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
+import { BlobNotFoundError } from "~/server/app-layer/traces/blob-store.service";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import { TraceService } from "../trace.service";
 
@@ -86,15 +87,23 @@ const protections: Protections = {
 } as Protections;
 
 const fullOutput =
-  "This is the full 50 KB output value that was offloaded to S3 during ingestion";
+  "This is the full 50 KB output value that was offloaded to event_log during ingestion";
 
-const blobRef: TraceBlobRef = {
-  key: "trace-blobs/proj-1/trace-1/span-1",
-  field: "langwatch.output",
-  size: Buffer.byteLength(fullOutput, "utf-8"),
-  sha256: "placeholder-sha256",
-  encoding: "utf-8",
-};
+/**
+ * Builds a fake BlobStore whose getFromEventLog resolves from a static contents map.
+ * No S3 interaction — pure in-memory for fast unit tests.
+ */
+function makeEventRefBlobStore(contents: Record<string, string>): BlobStore {
+  return {
+    getFromEventLog: vi.fn(async ({ field }: { eventId: string; field: string; tenantId: string; aggregateType: string; aggregateId: string }) => {
+      if (field in contents) return contents[field]!;
+      throw new BlobNotFoundError("evt-test", field, "proj-1");
+    }),
+    putSpool: vi.fn(),
+    getSpool: vi.fn(),
+    deleteSpool: vi.fn(),
+  } as unknown as BlobStore;
+}
 
 /**
  * Builds a fake Trace that carries the offloaded-span preview as trace.output
@@ -115,21 +124,9 @@ function makeTraceWithPreview(): Trace {
         type: "span",
         name: "test",
         timestamps: { started_at: 0, finished_at: 1000 },
-        // Legacy Span carries the offloaded attrs encoded in params — not
-        // directly accessible as spanAttributes. The resolution is applied via
-        // the NormalizedSpan path inside ClickHouseTraceService, NOT here.
-        // This trace fixture represents what CH returns when refs are NOT yet
-        // resolved (preview still in output).
         params: {
           "langwatch": {
             "output": "preview…",
-            "reserved": {
-              "blobref": {
-                "langwatch": {
-                  "output": JSON.stringify(blobRef),
-                },
-              },
-            },
           },
         },
       },
@@ -137,70 +134,29 @@ function makeTraceWithPreview(): Trace {
   };
 }
 
-/**
- * Builds a fake in-memory BlobStore backed by a simple map.
- */
-function makeInMemoryBlobStore(
-  contents: Record<string, string>,
-): BlobStore {
-  const s3Client = {
-    send: vi.fn(async (cmd: any) => {
-      const { Bucket: _bucket, Key } = cmd.input;
-      if (cmd.constructor?.name === "GetObjectCommand") {
-        const val = contents[Key as string];
-        if (!val) {
-          const err = Object.assign(new Error("NoSuchKey"), {
-            name: "NoSuchKey",
-          });
-          throw err;
-        }
-        return {
-          Body: { transformToString: async () => val },
-        };
-      }
-      return {};
-    }),
-  };
-  const resolver = async (_projectId: string) => ({
-    s3Client: s3Client as any,
-    s3Bucket: "test-bucket",
-  });
-  return new BlobStore(resolver);
-}
-
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("TraceService.getTracesWithSpans() — blob resolution pipeline", () => {
+describe("TraceService.getTracesWithSpans() — ADR-022 blob resolution pipeline", () => {
   let service: TraceService;
   let blobStore: BlobStore;
-  let blobResolutionService: SpanBlobResolutionService;
   let ioExtractionService: TraceIOExtractionService;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    blobStore = makeInMemoryBlobStore({
-      [blobRef.key]: fullOutput,
-    });
-    blobResolutionService = new SpanBlobResolutionService(blobStore);
+    blobStore = makeEventRefBlobStore({ "langwatch.output": fullOutput });
     ioExtractionService = new TraceIOExtractionService();
 
     service = new TraceService(
       {} as any,
-      { blobStore, blobResolutionService, ioExtractionService },
+      { blobStore, ioExtractionService },
     );
   });
 
   describe("given ClickHouse returns a trace with offloaded-span preview output", () => {
     describe("when getTracesWithSpans is called", () => {
       beforeEach(() => {
-        // The ClickHouseTraceService mock returns the trace with preview only.
-        // In production this trace is returned after ClickHouseTraceService
-        // calls resolveTraceSpans internally (injected via TraceService).
-        // Here we verify that TraceService properly injects the resolver such
-        // that if ClickHouseTraceService were real it would resolve the preview.
-        // The integration seam is: TraceService accepts and holds the deps.
         mockGetTracesWithSpansCH.mockResolvedValue([makeTraceWithPreview()]);
       });
 
@@ -216,9 +172,6 @@ describe("TraceService.getTracesWithSpans() — blob resolution pipeline", () =>
       });
 
       it("delegates trace fetching to ClickHouseTraceService", async () => {
-        // Verify that TraceService.getTracesWithSpans delegates to
-        // clickHouseService.getTracesWithSpans and returns its result —
-        // confirming the resolution deps are accepted and the service is wired.
         const traces = await service.getTracesWithSpans(
           "proj-1",
           ["trace-1"],
@@ -234,12 +187,12 @@ describe("TraceService.getTracesWithSpans() — blob resolution pipeline", () =>
       });
 
       it("constructs successfully without throwing when blob deps are provided", () => {
-        // Constructing TraceService with all three deps should not throw.
-        // The production wiring (presets.ts) exercises this path.
+        // Constructing TraceService with ADR-022 deps (blobStore + ioExtractionService)
+        // should not throw. The production wiring (presets.ts) exercises this path.
         expect(() =>
           new TraceService(
             {} as any,
-            { blobStore, blobResolutionService, ioExtractionService },
+            { blobStore, ioExtractionService },
           ),
         ).not.toThrow();
       });

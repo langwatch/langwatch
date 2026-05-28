@@ -51,19 +51,16 @@ export interface TraceRequestCollectionDeps {
   dedup: SpanDedupService;
   recordSpan: (data: RecordSpanCommandData) => Promise<void>;
   /**
-   * Optional edge offload (#4215 / ADR-021). When provided, runs on each
-   * normalized span before it is recorded — replacing over-threshold attribute
-   * values with a bounded preview + a reserved blob-ref attribute so every
-   * downstream copy (queue job, fold cache, event log, stored_spans,
-   * trace_summaries) stays small. Wired by the composition root only when the
-   * project's `release_trace_blob_offload` flag is on; absent ⇒ unchanged
-   * behavior. `projectId` is the ingestion `tenantId` (== project.id, see
-   * routes/otel.ts).
+   * Optional edge command-data hook (ADR-022). When provided, receives the fully
+   * assembled RecordSpanCommandData before it is sent to the queue and may return
+   * a modified version (e.g., with `spoolRef` set and span attributes cleared for
+   * over-threshold payloads). Flag-gated by the composition root on
+   * `release_trace_blob_offload`; absent ⇒ unchanged behavior.
+   *
+   * FAIL-OPEN: errors from this hook are caught by the composition root wrapper
+   * and log at warn level, returning the original commandData unchanged.
    */
-  offloadSpanAttributes?: (args: {
-    projectId: string;
-    span: NormalizedIdSpan;
-  }) => Promise<NormalizedIdSpan>;
+  processCommandData?: (data: RecordSpanCommandData) => Promise<RecordSpanCommandData>;
 }
 
 /**
@@ -238,24 +235,23 @@ export class TraceRequestCollectionService {
       }
       lockAcquired = lockResult === true;
 
-      // Edge offload (#4215): replace over-threshold field values with
-      // preview + blob ref before recording, so the span is small through the
-      // rest of the pipeline. No-op unless wired (flag-gated by the root).
-      const spanToRecord = this.deps.offloadSpanAttributes
-        ? await this.deps.offloadSpanAttributes({
-            projectId: tenantId,
-            span: normalizedSpan,
-          })
-        : normalizedSpan;
-
-      await this.deps.recordSpan({
+      // ADR-022: Assemble the full command data, then pass it through the
+      // optional processCommandData hook (edge size-check + spool). No-op
+      // when the hook is absent (flag-gated by the composition root).
+      const baseCommandData: RecordSpanCommandData = {
         tenantId,
-        span: spanToRecord,
+        span: normalizedSpan,
         resource,
         instrumentationScope: scope,
         piiRedactionLevel,
         occurredAt: Date.now(),
-      });
+      };
+
+      const commandData = this.deps.processCommandData
+        ? await this.deps.processCommandData(baseCommandData)
+        : baseCommandData;
+
+      await this.deps.recordSpan(commandData);
 
       await this.deps.dedup.tryConfirmProcessed(
         tenantId,

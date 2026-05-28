@@ -1,20 +1,24 @@
+/**
+ * Unit tests for BlobStore spool operations (ADR-022 write/read path).
+ *
+ * Covers: putSpool, getSpool, deleteSpool.
+ * getFromEventLog is covered by blob-store.event-log.unit.test.ts.
+ *
+ * BDD structure: given/when nested describes, action-based it() names.
+ */
 import { describe, it, expect, vi } from "vitest";
 import {
+  DeleteObjectCommand,
   GetObjectCommand,
   PutObjectCommand,
 } from "@aws-sdk/client-s3";
 import {
   BlobStore,
-  BlobIntegrityError,
-  BlobFieldNotFoundError,
-  UnauthorizedBlobAccessError,
   type S3ClientResolver,
-  type TraceBlobRef,
 } from "./blob-store.service";
 
 /**
- * In-memory fake S3 keyed by `${bucket}/${key}`. Each project resolves to its
- * own org bucket, so the fake models cross-tenant isolation by bucket.
+ * In-memory fake S3 keyed by `${bucket}/${key}`.
  */
 function fakeS3() {
   const objects = new Map<string, Buffer>();
@@ -33,265 +37,123 @@ function fakeS3() {
         throw err;
       }
       return {
-        Body: { transformToString: async () => stored.toString("utf-8") },
+        Body: {
+          transformToByteArray: async () => new Uint8Array(stored),
+        },
       };
+    }
+    if (command instanceof DeleteObjectCommand) {
+      const { Bucket, Key } = command.input;
+      objects.delete(`${Bucket}/${Key}`);
+      return {};
     }
     throw new Error("unexpected command");
   });
   return { objects, s3Client: { send } as never };
 }
 
-/** Resolver that gives each org its own bucket: project "<org>:<n>" → "<org>-bucket". */
 function resolverFor(fake: ReturnType<typeof fakeS3>): S3ClientResolver {
-  return async (projectId: string) => ({
+  return async (_projectId: string) => ({
     s3Client: fake.s3Client,
-    s3Bucket: `${projectId.split(":")[0]}-bucket`,
+    s3Bucket: "test-bucket",
   });
 }
 
-const coords = {
-  projectId: "orgA:1",
+const spoolCoords = {
+  projectId: "orgA",
   traceId: "trace-1",
   spanId: "span-1",
 };
 
-describe("BlobStore — manifest-shaped (one object per span)", () => {
-  describe("given a span with multiple over-threshold fields", () => {
-    describe("when put is called with all fields", () => {
-      it("issues exactly ONE PutObjectCommand regardless of field count", async () => {
-        const fake = fakeS3();
-        const store = new BlobStore(resolverFor(fake));
+describe("BlobStore — spool operations (ADR-022)", () => {
+  describe("putSpool", () => {
+    describe("given a span payload body", () => {
+      describe("when putSpool is called", () => {
+        it("returns the spool key with the correct shape trace-blobs/spool/{projectId}/{traceId}/{spanId}", async () => {
+          const fake = fakeS3();
+          const store = new BlobStore(resolverFor(fake));
+          const body = Buffer.from("span payload data", "utf-8");
 
-        await store.put({
-          ...coords,
-          fields: {
-            "langwatch.input": "I".repeat(100_000),
-            "langwatch.output": "O".repeat(100_000),
-            "custom.context": "C".repeat(100_000),
-          },
+          const spoolRef = await store.putSpool({ ...spoolCoords, body });
+
+          expect(spoolRef).toBe(
+            `trace-blobs/spool/${spoolCoords.projectId}/${spoolCoords.traceId}/${spoolCoords.spanId}`,
+          );
         });
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const putCalls = (fake.s3Client as any).send.mock.calls.filter(
+        it("issues exactly ONE PutObjectCommand", async () => {
+          const fake = fakeS3();
+          const store = new BlobStore(resolverFor(fake));
+          const body = Buffer.from("payload", "utf-8");
+
+          await store.putSpool({ ...spoolCoords, body });
+
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (c: any) => c[0] instanceof PutObjectCommand,
-        );
-        expect(putCalls).toHaveLength(1);
-      });
-
-      it("returns one TraceBlobRef per field", async () => {
-        const fake = fakeS3();
-        const store = new BlobStore(resolverFor(fake));
-
-        const refs = await store.put({
-          ...coords,
-          fields: {
-            "langwatch.input": "hello input",
-            "langwatch.output": "hello output",
-          },
+          const putCalls = (fake.s3Client as any).send.mock.calls.filter(
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (c: any) => c[0] instanceof PutObjectCommand,
+          );
+          expect(putCalls).toHaveLength(1);
         });
-
-        expect(Object.keys(refs)).toEqual(
-          expect.arrayContaining(["langwatch.input", "langwatch.output"]),
-        );
-        expect(refs["langwatch.input"]!.field).toBe("langwatch.input");
-        expect(refs["langwatch.output"]!.field).toBe("langwatch.output");
-      });
-
-      it("each ref carries a per-field sha256 and byte size", async () => {
-        const fake = fakeS3();
-        const store = new BlobStore(resolverFor(fake));
-
-        const refs = await store.put({
-          ...coords,
-          fields: { "langwatch.output": "abc" },
-        });
-
-        const ref = refs["langwatch.output"]!;
-        // sha256("abc")
-        expect(ref.sha256).toBe(
-          "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
-        );
-        expect(ref.size).toBe(3);
-        expect(ref.encoding).toBe("utf-8");
-        // All refs for the same span share the span-level key (no attrKey in path)
-        expect(ref.key).toBe("trace-blobs/orgA:1/trace-1/span-1");
       });
     });
   });
 
-  describe("given a put followed by a get", () => {
-    describe("when get is called for a specific field", () => {
-      it("returns the exact original bytes for that field", async () => {
-        const fake = fakeS3();
-        const store = new BlobStore(resolverFor(fake));
-        const inputValue = "héllo 🌍 " + "I".repeat(100_000);
-        const outputValue = "héllo 🌍 " + "O".repeat(100_000);
+  describe("getSpool", () => {
+    describe("given a spool ref written by putSpool", () => {
+      describe("when getSpool is called with the same ref", () => {
+        it("returns the exact bytes that were put", async () => {
+          const fake = fakeS3();
+          const store = new BlobStore(resolverFor(fake));
+          const originalBody = Buffer.from("exact span body bytes", "utf-8");
 
-        const refs = await store.put({
-          ...coords,
-          fields: {
-            "langwatch.input": inputValue,
-            "langwatch.output": outputValue,
-          },
-        });
+          const spoolRef = await store.putSpool({ ...spoolCoords, body: originalBody });
+          const retrieved = await store.getSpool(spoolRef);
 
-        const gotInput = await store.get({
-          projectId: coords.projectId,
-          ref: refs["langwatch.input"]!,
+          expect(retrieved).toEqual(originalBody);
         });
-        const gotOutput = await store.get({
-          projectId: coords.projectId,
-          ref: refs["langwatch.output"]!,
-        });
-
-        expect(gotInput).toBe(inputValue);
-        expect(gotOutput).toBe(outputValue);
       });
+    });
+  });
 
-      it("with a manifest cache, the manifest is only fetched once for two fields on the same span", async () => {
-        const fake = fakeS3();
-        const store = new BlobStore(resolverFor(fake));
+  describe("deleteSpool", () => {
+    describe("given an existing spool object", () => {
+      describe("when deleteSpool is called", () => {
+        it("issues a DeleteObjectCommand for the spool key", async () => {
+          const fake = fakeS3();
+          const store = new BlobStore(resolverFor(fake));
+          const body = Buffer.from("to be deleted", "utf-8");
+          const spoolRef = await store.putSpool({ ...spoolCoords, body });
 
-        const refs = await store.put({
-          ...coords,
-          fields: {
-            "langwatch.input": "input value",
-            "langwatch.output": "output value",
-          },
-        });
+          await store.deleteSpool(spoolRef);
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const manifestCache = new Map<string, any>();
-        await store.get({
-          projectId: coords.projectId,
-          ref: refs["langwatch.input"]!,
-          manifestCache,
-        });
-        await store.get({
-          projectId: coords.projectId,
-          ref: refs["langwatch.output"]!,
-          manifestCache,
-        });
-
-        // One PutObjectCommand + ONE GetObjectCommand (not two)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const getCalls = (fake.s3Client as any).send.mock.calls.filter(
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (c: any) => c[0] instanceof GetObjectCommand,
-        );
-        expect(getCalls).toHaveLength(1);
-      });
-    });
-  });
-
-  describe("given a field whose value was tampered in the manifest", () => {
-    it("throws BlobIntegrityError (sha256 mismatch)", async () => {
-      const fake = fakeS3();
-      const store = new BlobStore(resolverFor(fake));
-
-      const refs = await store.put({
-        ...coords,
-        fields: { "langwatch.output": "original" },
-      });
-
-      // Overwrite the manifest with a tampered value for langwatch.output
-      const manifestKey = `orgA-bucket/trace-blobs/orgA:1/trace-1/span-1`;
-      const tampered = JSON.stringify({
-        version: 1,
-        encoding: "utf-8",
-        fields: { "langwatch.output": "tampered" },
-      });
-      fake.objects.set(manifestKey, Buffer.from(tampered, "utf-8"));
-
-      await expect(
-        store.get({ projectId: coords.projectId, ref: refs["langwatch.output"]! }),
-      ).rejects.toBeInstanceOf(BlobIntegrityError);
-    });
-  });
-
-  describe("given a manifest that is missing the requested field", () => {
-    it("throws BlobFieldNotFoundError", async () => {
-      const fake = fakeS3();
-      const store = new BlobStore(resolverFor(fake));
-
-      // Put manifest with only langwatch.input
-      const refs = await store.put({
-        ...coords,
-        fields: { "langwatch.input": "some input" },
-      });
-
-      // Construct a stale ref pointing at langwatch.output which is not in the manifest
-      const staleRef: TraceBlobRef = {
-        ...refs["langwatch.input"]!,
-        field: "langwatch.output",
-        sha256: "doesnotmatter",
-        size: 99,
-      };
-
-      await expect(
-        store.get({ projectId: coords.projectId, ref: staleRef }),
-      ).rejects.toBeInstanceOf(BlobFieldNotFoundError);
-    });
-  });
-
-  describe("given the positional key", () => {
-    it("is project/trace/span scoped under the trace-blobs prefix (no attrKey)", () => {
-      expect(BlobStore.blobKey(coords)).toBe(
-        "trace-blobs/orgA:1/trace-1/span-1",
-      );
-    });
-
-    it("rejects path-traversal components", () => {
-      expect(() =>
-        BlobStore.blobKey({ ...coords, traceId: "../escape" }),
-      ).toThrow(/path traversal/);
-    });
-  });
-
-  describe("given two organizations with separate buckets", () => {
-    describe("when org B tries to read a ref produced by org A", () => {
-      it("throws UnauthorizedBlobAccessError before even reaching S3", async () => {
-        const fake = fakeS3();
-        const store = new BlobStore(resolverFor(fake));
-        const refs = await store.put({
-          ...coords,
-          fields: { "langwatch.output": "secret" },
+          const deleteCalls = (fake.s3Client as any).send.mock.calls.filter(
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (c: any) => c[0] instanceof DeleteObjectCommand,
+          );
+          expect(deleteCalls).toHaveLength(1);
         });
-
-        await expect(
-          store.get({ projectId: "orgB:9", ref: refs["langwatch.output"]! }),
-        ).rejects.toBeInstanceOf(UnauthorizedBlobAccessError);
       });
     });
-  });
 
-  describe("given a blob ref whose key belongs to a different project", () => {
-    describe("when get is called with a mismatched projectId", () => {
-      it("throws UnauthorizedBlobAccessError without calling the S3 client", async () => {
-        const sendSpy = vi.fn(async (_command: unknown) => ({}));
-        const fakeWithSpy = {
-          objects: new Map<string, Buffer>(),
-          s3Client: { send: sendSpy } as never,
-        };
-        const store = new BlobStore(async (_projectId: string) => ({
-          s3Client: fakeWithSpy.s3Client,
-          s3Bucket: "any-bucket",
-        }));
+    describe("given a spool ref that does not exist", () => {
+      describe("when deleteSpool is called", () => {
+        it("does not throw (best-effort — errors are swallowed)", async () => {
+          const throwingS3 = {
+            send: vi.fn(async () => {
+              throw new Error("AccessDenied");
+            }),
+          };
+          const store = new BlobStore(async () => ({
+            s3Client: throwingS3 as never,
+            s3Bucket: "bucket",
+          }));
 
-        const foreignRef: TraceBlobRef = {
-          key: "trace-blobs/orgA:1/trace-1/span-1",
-          field: "langwatch.output",
-          size: 10,
-          sha256: "abc",
-          encoding: "utf-8",
-        };
-
-        await expect(
-          store.get({ projectId: "orgB:9", ref: foreignRef }),
-        ).rejects.toBeInstanceOf(UnauthorizedBlobAccessError);
-
-        expect(sendSpy).not.toHaveBeenCalled();
+          await expect(
+            store.deleteSpool("trace-blobs/spool/proj/trace/span"),
+          ).resolves.not.toThrow();
+        });
       });
     });
   });

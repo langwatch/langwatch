@@ -84,4 +84,39 @@ describe("RedisCachedFoldStore", () => {
       });
     });
   });
+
+  describe("given a toCacheable projection and a fold state carrying a 1 MB output", () => {
+    describe("when store() is called with the 1 MB output state", () => {
+      /** @scenario Folding a trace with a 1 MB output keeps the Redis cache entry lean */
+      it("the Redis cache entry does NOT contain the 1 MB output text", async () => {
+        const ONE_MB_OUTPUT = "x".repeat(1024 * 1024);
+        const { store, sets } = setup({
+          toCacheable: (s) => ({ ...s, computedOutput: null }),
+        });
+        const full: State = { spanCount: 5, computedOutput: ONE_MB_OUTPUT };
+
+        await store.store(full, context);
+
+        const cached = sets[0]!.value;
+        // The 1 MB output must NOT appear in the cached entry
+        expect(cached.length).toBeLessThan(ONE_MB_OUTPUT.length);
+        const parsed = JSON.parse(cached) as State;
+        expect(parsed.computedOutput).toBeNull();
+        expect(parsed.spanCount).toBe(5);
+      });
+
+      it("the inner (ClickHouse) store still receives the full 1 MB output state", async () => {
+        const ONE_MB_OUTPUT = "x".repeat(1024 * 1024);
+        const { store, inner } = setup({
+          toCacheable: (s) => ({ ...s, computedOutput: null }),
+        });
+        const full: State = { spanCount: 5, computedOutput: ONE_MB_OUTPUT };
+
+        await store.store(full, context);
+
+        // Full state (with 1 MB output) goes to ClickHouse — single source of truth
+        expect(inner.store).toHaveBeenCalledWith(full, context);
+      });
+    });
+  });
 });

@@ -1,20 +1,17 @@
 /**
- * Unit tests for the ClickHouseTraceService → blob-resolution seam.
+ * Unit tests for the ClickHouseTraceService → blob-resolution seam (ADR-022).
  *
  * Mocks only the lowest-level CH driver (getClickHouseClientForProject) and
- * wires a real SpanBlobResolutionService + real TraceIOExtractionService so the
- * full resolution + recomputed-IO pipeline fires end-to-end in both
- * getTracesWithSpans and enrichTracesWithSpans. These tests cover the
- * resolveAndMerge helper extracted in Fix E.
+ * wires a real BlobStore (via getFromEventLog stub) + real TraceIOExtractionService
+ * so the full resolution + recomputed-IO pipeline fires end-to-end.
  *
  * BDD structure: given/when nested describes, action-based it() names.
  */
-import { createHash } from "node:crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Protections } from "~/server/elasticsearch/protections";
-import { BLOB_REF_ATTR_PREFIX } from "~/server/app-layer/traces/blob-ref-attributes";
-import { BlobStore, type TraceBlobRef } from "~/server/app-layer/traces/blob-store.service";
-import { SpanBlobResolutionService } from "~/server/app-layer/traces/span-blob-resolution.service";
+import { EVENTREF_ATTR_PREFIX } from "~/server/app-layer/traces/lean-for-projection";
+import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
+import { BlobNotFoundError } from "~/server/app-layer/traces/blob-store.service";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import { resolveOffloadedTraces } from "../resolve-offloaded-traces";
 import { createLogger } from "~/utils/logger/server";
@@ -71,17 +68,7 @@ const protections: Protections = {
   canSeeTopics: true,
 } as Protections;
 
-const fullOutput = "The full 50 KB output value that was offloaded to S3";
-
-const blobRef: TraceBlobRef = {
-  key: "trace-blobs/proj-1/trace-1/span-1",
-  field: "langwatch.output",
-  size: Buffer.byteLength(fullOutput, "utf-8"),
-  sha256: createHash("sha256")
-    .update(Buffer.from(fullOutput, "utf-8"))
-    .digest("hex"),
-  encoding: "utf-8",
-};
+const fullOutput = "The full 50 KB output value that was offloaded to event_log";
 
 /** Minimal trace-summary row as returned by ClickHouse. */
 function makeSummaryRow(traceId: string) {
@@ -115,8 +102,8 @@ function makeSummaryRow(traceId: string) {
   };
 }
 
-/** Minimal span row with a blob-ref attribute for langwatch.output. */
-function makeSpanRowWithBlobRef(traceId: string, spanId: string) {
+/** Minimal span row with an eventref attribute for langwatch.output. */
+function makeSpanRowWithEventRef(traceId: string, spanId: string) {
   return {
     SpanId: spanId,
     TraceId: traceId,
@@ -133,7 +120,7 @@ function makeSpanRowWithBlobRef(traceId: string, spanId: string) {
     ResourceAttributes: {},
     SpanAttributes: {
       "langwatch.output": "preview…",
-      [`${BLOB_REF_ATTR_PREFIX}langwatch.output`]: JSON.stringify(blobRef),
+      [`${EVENTREF_ATTR_PREFIX}langwatch.output`]: JSON.stringify({ field: "langwatch.output" }),
     },
     StatusCode: 1,
     StatusMessage: "",
@@ -149,27 +136,18 @@ function makeSpanRowWithBlobRef(traceId: string, spanId: string) {
 }
 
 /**
- * Builds an in-memory BlobStore backed by a simple map whose sha256s match
- * what blobRef records (so integrity check passes).
+ * Builds a fake BlobStore whose getFromEventLog resolves from a static map.
  */
-function makeInMemoryBlobStore(contents: Record<string, string>): BlobStore {
-  const s3Client = {
-    send: vi.fn(async (cmd: any) => {
-      const { Key } = cmd.input;
-      if (cmd.constructor?.name === "GetObjectCommand") {
-        const val = contents[Key as string];
-        if (!val) {
-          throw Object.assign(new Error("NoSuchKey"), { name: "NoSuchKey" });
-        }
-        return { Body: { transformToString: async () => val } };
-      }
-      return {};
+function makeEventRefBlobStore(contents: Record<string, string>): BlobStore {
+  return {
+    getFromEventLog: vi.fn(async ({ field }: { eventId: string; field: string; tenantId: string; aggregateType: string; aggregateId: string }) => {
+      if (field in contents) return contents[field]!;
+      throw new BlobNotFoundError("evt-test", field, "proj-1");
     }),
-  };
-  return new BlobStore(async () => ({
-    s3Client: s3Client as any,
-    s3Bucket: "test-bucket",
-  }));
+    putSpool: vi.fn(),
+    getSpool: vi.fn(),
+    deleteSpool: vi.fn(),
+  } as unknown as BlobStore;
 }
 
 /** Set up the two CH queries fetchTracesWithSpansJoined fires in parallel. */
@@ -178,10 +156,8 @@ function setupGetTracesWithSpansMocks(traceId: string, spanId: string) {
     json: () => Promise.resolve([makeSummaryRow(traceId)]),
   };
   const spansResult = {
-    json: () => Promise.resolve([makeSpanRowWithBlobRef(traceId, spanId)]),
+    json: () => Promise.resolve([makeSpanRowWithEventRef(traceId, spanId)]),
   };
-  // The two queries are fired with Promise.all so their order depends on
-  // implementation — mock returns in call order.
   mockClickHouseQuery
     .mockResolvedValueOnce(summaryResult)
     .mockResolvedValueOnce(spansResult);
@@ -191,7 +167,7 @@ function setupGetTracesWithSpansMocks(traceId: string, spanId: string) {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("ClickHouseTraceService — blob resolution seam", () => {
+describe("ClickHouseTraceService — eventref resolution seam (ADR-022)", () => {
   let ClickHouseTraceService: typeof import("../clickhouse-trace.service").ClickHouseTraceService;
   let blobStore: BlobStore;
   let resolveTraceSpansFn: import("../clickhouse-trace.service").ResolveTraceSpansFn;
@@ -202,8 +178,7 @@ describe("ClickHouseTraceService — blob resolution seam", () => {
     const mod = await import("../clickhouse-trace.service");
     ClickHouseTraceService = mod.ClickHouseTraceService;
 
-    blobStore = makeInMemoryBlobStore({ [blobRef.key]: fullOutput });
-    const blobResolutionService = new SpanBlobResolutionService(blobStore);
+    blobStore = makeEventRefBlobStore({ "langwatch.output": fullOutput });
     const ioExtractionService = new TraceIOExtractionService();
     const logger = createLogger("test");
 
@@ -211,25 +186,23 @@ describe("ClickHouseTraceService — blob resolution seam", () => {
       resolveOffloadedTraces({
         projectId,
         normalizedSpans,
-        blobResolutionService,
+        blobStore,
         ioExtractionService,
         logger,
       });
   });
 
   describe("getTracesWithSpans()", () => {
-    describe("given a span carrying a reserved blob-ref for langwatch.output", () => {
+    describe("given a span carrying a reserved eventref for langwatch.output", () => {
       describe("when getTracesWithSpans is called with a real resolver", () => {
         // NOTE: assertions on the full restored trace.output value require
         // accurately mocking the SQL → row → TraceSummaryData → mapper pipeline
         // (parseComputedOutput, multi-step JOINs, etc.). The end-to-end
-        // restored-output behavior is already proven by the integration test at
-        // src/server/app-layer/traces/__tests__/large-trace-blob-offload.integration.test.ts
-        // ("the recomputed trace.output (via TraceIOExtractionService) is the
-        // full value, not the preview"). This file covers the CH-specific
-        // surface: that the resolver IS invoked and the reserved blob-ref attr
-        // is stripped from the returned span on its way out of CH.
-        it("strips the reserved blob-ref attr from the returned span", async () => {
+        // restored-output behavior is proven by the integration test at
+        // src/server/app-layer/traces/__tests__/large-trace-blob-offload.integration.test.ts.
+        // This file covers the CH-specific surface: that the resolver IS invoked
+        // and the reserved eventref attr is stripped from the returned span.
+        it("strips the reserved eventref attr from the returned span", async () => {
           setupGetTracesWithSpansMocks("trace-1", "span-1");
 
           const service = new ClickHouseTraceService(
@@ -244,9 +217,9 @@ describe("ClickHouseTraceService — blob resolution seam", () => {
           );
 
           const span = traces![0]!.spans[0];
-          // The span's params should not contain any blob-ref key
+          // The span's params should not contain any eventref key
           const spanStr = JSON.stringify(span);
-          expect(spanStr).not.toContain(BLOB_REF_ATTR_PREFIX);
+          expect(spanStr).not.toContain(EVENTREF_ATTR_PREFIX);
         });
       });
     });

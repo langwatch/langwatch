@@ -7,7 +7,6 @@ import { EvaluationService } from "~/server/evaluations/evaluation.service";
 import type { Evaluation, Trace } from "~/server/tracer/types";
 import { createLogger } from "~/utils/logger/server";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
-import type { SpanBlobResolutionService } from "~/server/app-layer/traces/span-blob-resolution.service";
 import type { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import { ClickHouseTraceService } from "./clickhouse-trace.service";
@@ -86,21 +85,20 @@ import type {
 
 /**
  * Optional blob-offload resolution dependencies injected into TraceService
- * (issue #4215 — ADR-021 decision B: read-time recompute).
+ * (ADR-022: read-time recompute via event_log).
  *
  * When provided, every read path that returns `Trace[]` with spans passes
- * each trace's normalized spans through `SpanBlobResolutionService` to
- * restore full field values that were offloaded to S3 at ingestion time,
+ * each trace's normalized spans through `resolveOffloadedTraces` to
+ * restore full field values that were offloaded by `leanForProjection`,
  * then re-runs `TraceIOExtractionService` to recompute trace.input /
  * trace.output from the resolved spans.
  *
  * When omitted (e.g. in tests or when S3 is not configured) the service
  * falls back to the preview values from trace_summaries — identical to
- * pre-#4215 behavior.
+ * pre-ADR-022 behavior.
  */
 export interface BlobResolutionDeps {
   blobStore: BlobStore;
-  blobResolutionService: SpanBlobResolutionService;
   ioExtractionService: TraceIOExtractionService;
 }
 
@@ -122,7 +120,6 @@ export class TraceService {
   private readonly elasticsearchService: ElasticsearchTraceService;
   private readonly evaluationService: EvaluationService;
   /** Blob-offload resolution deps (optional — falls back to preview if absent). */
-  private readonly blobResolutionService: SpanBlobResolutionService | undefined;
   private readonly ioExtractionService: TraceIOExtractionService | undefined;
   private readonly blobStore: BlobStore | undefined;
 
@@ -131,13 +128,12 @@ export class TraceService {
     blobResolutionDeps?: BlobResolutionDeps,
   ) {
     this.blobStore = blobResolutionDeps?.blobStore;
-    this.blobResolutionService = blobResolutionDeps?.blobResolutionService;
     this.ioExtractionService = blobResolutionDeps?.ioExtractionService;
 
     // Build the per-trace resolver callback when deps are present.
     // The callback is passed to ClickHouseTraceService so resolution happens
     // at the NormalizedSpan level (before mapping to legacy Span), which is
-    // the only level where spanAttributes carry the blob-ref keys.
+    // the only level where spanAttributes carry the eventref keys.
     const resolveTraceSpansFn =
       blobResolutionDeps !== undefined
         ? async (
@@ -147,7 +143,7 @@ export class TraceService {
             resolveOffloadedTraces({
               projectId,
               normalizedSpans,
-              blobResolutionService: blobResolutionDeps.blobResolutionService,
+              blobStore: blobResolutionDeps.blobStore,
               ioExtractionService: blobResolutionDeps.ioExtractionService,
               logger: this.logger,
             })

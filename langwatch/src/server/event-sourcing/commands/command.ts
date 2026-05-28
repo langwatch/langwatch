@@ -83,6 +83,14 @@ export interface CommandHandler<
    * - Create and return events (framework will store them)
    */
   handle(command: TCommand): CommandHandlerResult<EventType>;
+
+  /**
+   * Optional post-store cleanup hook. When present, `processCommand` invokes this
+   * after `storeEventsFn` succeeds (event_log INSERT is durable). This is the
+   * correct place for best-effort side-effects that MUST NOT run before persistence
+   * (e.g., deleting a transient S3 spool). ADR-022.
+   */
+  cleanupAfterStore?(): Promise<void>;
 }
 
 /**

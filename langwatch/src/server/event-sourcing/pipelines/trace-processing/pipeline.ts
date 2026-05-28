@@ -101,7 +101,7 @@ export function createTraceProcessingPipeline(deps: TraceProcessingPipelineDeps)
     ? builder.withCommandInstance(
         "recordSpan",
         RecordSpanCommand,
-        new RecordSpanCommand(undefined, deps.blobStore),
+        new RecordSpanCommand({ blobStore: deps.blobStore }),
       )
     : builder.withCommand("recordSpan", RecordSpanCommand);
 

@@ -55,9 +55,8 @@ import { SpanStorageService } from "./traces/span-storage.service";
 import { SpanStorageClickHouseRepository } from "./traces/repositories/span-storage.clickhouse.repository";
 import { NullSpanStorageRepository } from "./traces/repositories/span-storage.repository";
 import { BlobStore } from "./traces/blob-store.service";
-import { SpanBlobResolutionService } from "./traces/span-blob-resolution.service";
 import { TraceIOExtractionService } from "./traces/trace-io-extraction.service";
-import { offloadOtlpSpanAttributes } from "./traces/otlp-span-offload";
+import { maybeSpool } from "./traces/edge-spool";
 import { createS3Client } from "~/server/storage";
 import { getFeatureFlagStore } from "~/server/featureFlag/featureFlagStore.postgres";
 import { TokenizerService } from "./traces/tokenizer.service";
@@ -228,11 +227,9 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   // ADR-022: Pass the shared ClickHouse client so BlobStore.getFromEventLog
   // can SELECT from event_log (event_log read path for "show full" / eval).
   const blobStore = new BlobStore(createS3Client, getSharedClickHouseClient() ?? undefined);
-  const blobResolutionService = new SpanBlobResolutionService(blobStore);
   const ioExtractionService = new TraceIOExtractionService();
   const traceService = TraceService.create(prisma, {
     blobStore,
-    blobResolutionService,
     ioExtractionService,
   });
 
@@ -422,40 +419,37 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     new TraceRequestCollectionService({
       dedup: spanDedup,
       recordSpan: commands.traces.recordSpan,
-      // Edge offload (#4215), flag-gated per project. projectId === tenantId
-      // (routes/otel.ts passes project.id). Checked per span via the 5s-cached
-      // flag store, so effectively once per request.
+      // ADR-022: Edge size-check + transient S3 spool, flag-gated per project.
+      // projectId === tenantId (routes/otel.ts passes project.id). Flag checked
+      // per span via the 5s-cached flag store, so effectively once per request.
       //
       // FAIL-OPEN: any error from the flag store (Postgres/network blip) or
-      // from offloadOtlpSpanAttributes (S3 outage, BlobStore.put throws) is
-      // caught here. We log at warn level and return the original span unchanged
-      // so that ingestion is never blocked by the offload path. CR-3 (#4215).
-      offloadSpanAttributes: async ({ projectId, span }) => {
+      // from maybeSpool (S3 outage, BlobStore.putSpool throws) is caught here.
+      // We log at warn level and return the original commandData unchanged so
+      // that ingestion is never blocked by the spool path. ADR-022.
+      processCommandData: async (data) => {
         try {
           const enabled = await getFeatureFlagStore().get(
             "release_trace_blob_offload",
-            { projectId },
+            { projectId: data.tenantId },
           );
-          if (enabled !== true) return span;
-          const attributes = await offloadOtlpSpanAttributes({
-            attributes: span.attributes,
-            projectId,
-            traceId: span.traceId,
-            spanId: span.spanId,
+          if (enabled !== true) return data;
+          return await maybeSpool({
+            data,
             blobStore,
+            logger: createLogger("langwatch:traces:edge-spool"),
           });
-          return attributes === span.attributes ? span : { ...span, attributes };
         } catch (err) {
-          createLogger("langwatch:traces:edge-offload-fail-open").warn(
+          createLogger("langwatch:traces:edge-spool-fail-open").warn(
             {
-              projectId,
-              traceId: span.traceId,
-              spanId: span.spanId,
+              projectId: data.tenantId,
+              traceId: data.span.traceId,
+              spanId: data.span.spanId,
               error: err instanceof Error ? err.message : String(err),
             },
-            "Edge offload failed — falling back to unmodified span (fail-open)",
+            "Edge spool failed — falling back to unmodified command data (fail-open)",
           );
-          return span;
+          return data;
         }
       },
     }),

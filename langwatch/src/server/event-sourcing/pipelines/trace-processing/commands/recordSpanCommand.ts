@@ -51,6 +51,11 @@ export interface RecordSpanCommandDependencies {
       tenantId?: string;
     }) => Promise<void>;
   };
+  /**
+   * ADR-022: Optional BlobStore for spool fetch (when command carries spoolRef)
+   * and post-store spool deletion. When absent, spoolRef commands are rejected.
+   */
+  blobStore?: import("~/server/app-layer/traces/blob-store.service").BlobStore;
 }
 
 function createDefaultDependencies(): RecordSpanCommandDependencies {
@@ -91,9 +96,44 @@ export class RecordSpanCommand implements CommandHandler<
   private readonly deps: RecordSpanCommandDependencies;
   private readonly blobStore?: import("~/server/app-layer/traces/blob-store.service").BlobStore;
 
-  constructor(deps?: RecordSpanCommandDependencies, blobStore?: import("~/server/app-layer/traces/blob-store.service").BlobStore) {
-    this.deps = deps ?? createDefaultDependencies();
-    this.blobStore = blobStore;
+  /**
+   * ADR-022: Set during handle() when the command carried a spoolRef.
+   * Read by cleanupAfterStore() which is called by processCommand() after
+   * storeEventsFn succeeds. Storing on the instance is safe because command
+   * handlers are instantiated per-queue-job (each job gets a fresh instance
+   * via `new Handler()`).
+   */
+  private _pendingSpoolRef?: string;
+
+  /**
+   * @param deps - Optional partial of injectable dependencies. Any omitted
+   *   required field is filled in from `createDefaultDependencies()`. This lets
+   *   call sites inject just one dependency (e.g. `{ blobStore }` from the
+   *   composition root for ADR-022 spool support) without having to also
+   *   construct PII / cost / token services.
+   *
+   *   Preserves the lazy-require pattern: `createDefaultDependencies()` (which
+   *   pulls in prisma) is only invoked when at least one required field is
+   *   missing. Tests that pass a complete deps object skip the prisma require
+   *   entirely.
+   */
+  constructor(deps?: Partial<RecordSpanCommandDependencies>) {
+    let resolved: RecordSpanCommandDependencies;
+    if (!deps) {
+      resolved = createDefaultDependencies();
+    } else if (
+      deps.piiRedactionService &&
+      deps.costEnrichmentService &&
+      deps.tokenEstimationService
+    ) {
+      // Caller provided every required field — use as-is, skip the prisma require.
+      resolved = deps as RecordSpanCommandDependencies;
+    } else {
+      // Partial deps — fill in missing required fields from defaults.
+      resolved = { ...createDefaultDependencies(), ...deps };
+    }
+    this.deps = resolved;
+    this.blobStore = resolved.blobStore;
   }
 
   async handle(
@@ -261,25 +301,36 @@ export class RecordSpanCommand implements CommandHandler<
 
         const events = [spanReceivedEvent];
 
-        // ADR-022: After event_log INSERT (which happens when storeEvents is called
-        // by the caller), best-effort delete the transient spool object.
-        // The deleteSpool happens here (within handle) after the events are
-        // constructed, as a best-effort cleanup. The actual INSERT hasn't happened
-        // yet (that's done by storeEvents externally), but we delete after
-        // successful event construction to keep the spool lifecycle in the
-        // command handler's scope. The 24h lifecycle policy is the safety net.
+        // ADR-022: Record the spool ref so cleanupAfterStore() can delete it
+        // AFTER storeEventsFn (event_log INSERT) succeeds. Deleting here (before
+        // the INSERT) would be a durability bug: if storeEventsFn throws the
+        // event is lost but the spool is already gone. cleanupAfterStore() is
+        // called by processCommand() only after the INSERT commits.
         if (commandData.spoolRef && this.blobStore) {
-          await this.blobStore.deleteSpool(commandData.spoolRef).catch((err: unknown) => {
-            this.logger.warn(
-              { spoolRef: commandData.spoolRef, error: err instanceof Error ? err.message : String(err) },
-              "Best-effort spool deletion failed — lifecycle policy will clean up",
-            );
-          });
+          this._pendingSpoolRef = commandData.spoolRef;
         }
 
         return events;
       },
     );
+  }
+
+  /**
+   * ADR-022: Best-effort spool deletion, invoked by processCommand() AFTER
+   * storeEventsFn (event_log INSERT) commits. This ordering ensures the spool
+   * is only deleted once the event is durable — if the INSERT fails the spool
+   * survives so the command can be retried. The 24h S3 lifecycle policy is the
+   * safety net for orphans if this call itself fails.
+   */
+  async cleanupAfterStore(): Promise<void> {
+    if (this._pendingSpoolRef && this.blobStore) {
+      await this.blobStore.deleteSpool(this._pendingSpoolRef).catch((err: unknown) => {
+        this.logger.warn(
+          { spoolRef: this._pendingSpoolRef, error: err instanceof Error ? err.message : String(err) },
+          "Best-effort spool deletion failed — lifecycle policy will clean up",
+        );
+      });
+    }
   }
 
   static getAggregateId(payload: RecordSpanCommandData): string {

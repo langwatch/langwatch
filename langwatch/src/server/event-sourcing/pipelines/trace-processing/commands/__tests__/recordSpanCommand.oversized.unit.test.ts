@@ -157,7 +157,7 @@ describe("given a RecordSpanCommand that carries a spoolRef (oversized path)", (
       } as unknown as BlobStore;
 
       const deps = makeDeps();
-      const handler = new RecordSpanCommand(deps, blobStore);
+      const handler = new RecordSpanCommand({ ...deps, blobStore });
       const command = makeOversizedCommand({ spoolRef: SPOOL_REF });
 
       const events = await handler.handle(command);
@@ -179,7 +179,7 @@ describe("given a RecordSpanCommand that carries a spoolRef (oversized path)", (
       } as unknown as BlobStore;
 
       const deps = makeDeps();
-      const handler = new RecordSpanCommand(deps, blobStore);
+      const handler = new RecordSpanCommand({ ...deps, blobStore });
       const command = makeRegularCommand();
 
       await handler.handle(command);
@@ -187,7 +187,7 @@ describe("given a RecordSpanCommand that carries a spoolRef (oversized path)", (
       expect((blobStore as unknown as { getSpool: ReturnType<typeof vi.fn> }).getSpool).not.toHaveBeenCalled();
     });
 
-    it("calls BlobStore.deleteSpool best-effort after successful event_log INSERT when command has a spoolRef", async () => {
+    it("does NOT call BlobStore.deleteSpool inside handle() — deletion is deferred to cleanupAfterStore()", async () => {
       const deleteSpoolMock = vi.fn().mockResolvedValue(undefined);
       const blobStore = {
         getSpool: vi.fn().mockResolvedValue(Buffer.from(spoolBody, "utf-8")),
@@ -195,14 +195,53 @@ describe("given a RecordSpanCommand that carries a spoolRef (oversized path)", (
       } as unknown as BlobStore;
 
       const deps = makeDeps();
-      const handler = new RecordSpanCommand(deps, blobStore);
+      const handler = new RecordSpanCommand({ ...deps, blobStore });
       const command = makeOversizedCommand({ spoolRef: SPOOL_REF });
 
       await handler.handle(command);
 
+      // deleteSpool must NOT be called inside handle() — only after storeEvents succeeds
+      expect(deleteSpoolMock).not.toHaveBeenCalled();
+    });
+
+    it("calls BlobStore.deleteSpool via cleanupAfterStore() after successful event_log INSERT", async () => {
+      const deleteSpoolMock = vi.fn().mockResolvedValue(undefined);
+      const blobStore = {
+        getSpool: vi.fn().mockResolvedValue(Buffer.from(spoolBody, "utf-8")),
+        deleteSpool: deleteSpoolMock,
+      } as unknown as BlobStore;
+
+      const deps = makeDeps();
+      const handler = new RecordSpanCommand({ ...deps, blobStore });
+      const command = makeOversizedCommand({ spoolRef: SPOOL_REF });
+
+      // Simulate processCommand: handle first, then cleanupAfterStore (post storeEvents)
+      await handler.handle(command);
+      await handler.cleanupAfterStore();
+
       // deleteSpool is called once with the spool ref
       expect(deleteSpoolMock).toHaveBeenCalledOnce();
       expect(deleteSpoolMock).toHaveBeenCalledWith(SPOOL_REF);
+    });
+
+    it("does NOT call BlobStore.deleteSpool when storeEvents throws (handle() succeeded but INSERT failed)", async () => {
+      const deleteSpoolMock = vi.fn();
+      const blobStore = {
+        getSpool: vi.fn().mockResolvedValue(Buffer.from(spoolBody, "utf-8")),
+        deleteSpool: deleteSpoolMock,
+      } as unknown as BlobStore;
+
+      const deps = makeDeps();
+      const handler = new RecordSpanCommand({ ...deps, blobStore });
+      const command = makeOversizedCommand({ spoolRef: SPOOL_REF });
+
+      // handle() succeeds — events are produced
+      await handler.handle(command);
+
+      // Simulate storeEvents throwing (ClickHouse INSERT failed)
+      // processCommand would catch and rethrow, never calling cleanupAfterStore
+      // Therefore deleteSpool must NOT have been called at any point
+      expect(deleteSpoolMock).not.toHaveBeenCalled();
     });
 
     it("does NOT call BlobStore.deleteSpool when the command handling fails (event_log INSERT would not have succeeded)", async () => {
@@ -219,7 +258,7 @@ describe("given a RecordSpanCommand that carries a spoolRef (oversized path)", (
         new Error("PII redaction failed"),
       );
 
-      const handler = new RecordSpanCommand(deps, blobStore);
+      const handler = new RecordSpanCommand({ ...deps, blobStore });
       const command = makeOversizedCommand({ spoolRef: SPOOL_REF });
 
       await expect(handler.handle(command)).rejects.toThrow("PII redaction failed");
@@ -235,7 +274,7 @@ describe("given a RecordSpanCommand that carries a spoolRef (oversized path)", (
       } as unknown as BlobStore;
 
       const deps = makeDeps();
-      const handler = new RecordSpanCommand(deps, blobStore);
+      const handler = new RecordSpanCommand({ ...deps, blobStore });
       const command = makeOversizedCommand({ spoolRef: SPOOL_REF });
 
       await expect(handler.handle(command)).rejects.toThrow("S3 GET failed");
@@ -248,7 +287,7 @@ describe("given a RecordSpanCommand that carries a spoolRef (oversized path)", (
       } as unknown as BlobStore;
 
       const deps = makeDeps();
-      const handler = new RecordSpanCommand(deps, blobStore);
+      const handler = new RecordSpanCommand({ ...deps, blobStore });
       const command = makeOversizedCommand({ spoolRef: SPOOL_REF });
 
       const events = await handler.handle(command);

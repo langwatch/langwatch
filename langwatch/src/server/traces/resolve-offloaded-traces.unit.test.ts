@@ -1,7 +1,7 @@
 /**
  * Unit tests for the resolveOffloadedTraces helper — per-trace span-level
- * blob ref resolution and TraceIO recompute (read-resolution half of ADR-021,
- * decision B: read-time recompute). Each test covers one assertion.
+ * eventref resolution and TraceIO recompute (read-resolution half of ADR-022).
+ * Each test covers one assertion.
  *
  * BDD structure: given/when nested describes, action-based it() names.
  */
@@ -23,23 +23,15 @@ import {
   NormalizedStatusCode,
   type NormalizedSpan,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
-import { BLOB_REF_ATTR_PREFIX } from "~/server/app-layer/traces/blob-ref-attributes";
-import type { SpanBlobResolutionService } from "~/server/app-layer/traces/span-blob-resolution.service";
+import { EVENTREF_ATTR_PREFIX } from "~/server/app-layer/traces/lean-for-projection";
+import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
+import { BlobNotFoundError } from "~/server/app-layer/traces/blob-store.service";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
-import { BlobIntegrityError, type TraceBlobRef } from "~/server/app-layer/traces/blob-store.service";
 import { resolveOffloadedTraces } from "./resolve-offloaded-traces";
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-const testRef = (key: string, field = "langwatch.output"): TraceBlobRef => ({
-  key,
-  field,
-  size: 100,
-  sha256: "abc123",
-  encoding: "utf-8",
-});
 
 function makeSpan(
   overrides: Partial<NormalizedSpan> & {
@@ -83,30 +75,22 @@ function createMockLogger() {
   };
 }
 
-function fakeBlobResolutionService(
-  resolvedValues: Record<string, string>,
-): SpanBlobResolutionService {
+/**
+ * Creates a fake BlobStore whose getFromEventLog returns a pre-configured map
+ * of field → fullValue for the given eventId / aggregateId combination.
+ */
+function fakeBlobStore(resolvedValues: Record<string, string>): BlobStore {
   return {
-    resolve: vi.fn(
-      async ({
-        attributes,
-        blobRefs,
-      }: {
-        projectId: string;
-        attributes: Record<string, string>;
-        blobRefs: Record<string, TraceBlobRef>;
-      }) => {
-        const out = { ...attributes };
-        for (const attrKey of Object.keys(blobRefs)) {
-          const key = blobRefs[attrKey]!.key;
-          if (key in resolvedValues) {
-            out[attrKey] = resolvedValues[key]!;
-          }
-        }
-        return out;
-      },
-    ),
-  } as unknown as SpanBlobResolutionService;
+    getFromEventLog: vi.fn(async ({ field }: { eventId: string; field: string; tenantId: string; aggregateType: string; aggregateId: string }) => {
+      if (field in resolvedValues) {
+        return resolvedValues[field]!;
+      }
+      throw new BlobNotFoundError("evt-test", field, "proj-1");
+    }),
+    putSpool: vi.fn(),
+    getSpool: vi.fn(),
+    deleteSpool: vi.fn(),
+  } as unknown as BlobStore;
 }
 
 const realIOService = new TraceIOExtractionService();
@@ -116,27 +100,28 @@ const realIOService = new TraceIOExtractionService();
 // ---------------------------------------------------------------------------
 
 describe("resolveOffloadedTraces()", () => {
-  describe("given a trace whose winning span has a reserved blob-ref", () => {
-    const fullOutput = "The full 50 KB output value that was offloaded to S3";
-    const ref = testRef("trace-blobs/proj-1/trace-1/span-1");
+  describe("given a trace whose span has a reserved eventref pointer", () => {
+    const fullOutput = "The full 50 KB output value that was offloaded via event_log";
 
     const spanWithRef = makeSpan({
+      traceId: "trace-1",
+      spanId: "span-1",
       spanAttributes: {
         "langwatch.output": "preview…",
-        [`${BLOB_REF_ATTR_PREFIX}langwatch.output`]:
-          JSON.stringify(ref),
+        [`${EVENTREF_ATTR_PREFIX}langwatch.output`]:
+          JSON.stringify({ field: "langwatch.output" }),
       },
     });
 
     describe("when resolved", () => {
       it("resolved span attributes contain the full value, not the preview", async () => {
-        const blobSvc = fakeBlobResolutionService({ [ref.key]: fullOutput });
+        const blobSvc = fakeBlobStore({ "langwatch.output": fullOutput });
         const logger = createMockLogger();
 
         const result = await resolveOffloadedTraces({
           projectId: "proj-1",
           normalizedSpans: [spanWithRef],
-          blobResolutionService: blobSvc,
+          blobStore: blobSvc,
           ioExtractionService: realIOService,
           logger,
         });
@@ -146,33 +131,33 @@ describe("resolveOffloadedTraces()", () => {
         ).toBe(fullOutput);
       });
 
-      it("reserved blob-ref keys are stripped from the resolved span attributes", async () => {
-        const blobSvc = fakeBlobResolutionService({ [ref.key]: fullOutput });
+      it("reserved eventref keys are stripped from the resolved span attributes", async () => {
+        const blobSvc = fakeBlobStore({ "langwatch.output": fullOutput });
         const logger = createMockLogger();
 
         const result = await resolveOffloadedTraces({
           projectId: "proj-1",
           normalizedSpans: [spanWithRef],
-          blobResolutionService: blobSvc,
+          blobStore: blobSvc,
           ioExtractionService: realIOService,
           logger,
         });
 
         const attrs = result.resolvedSpans[0]!.spanAttributes;
         const hasRef = Object.keys(attrs).some((k) =>
-          k.startsWith(BLOB_REF_ATTR_PREFIX),
+          k.startsWith(EVENTREF_ATTR_PREFIX),
         );
         expect(hasRef).toBe(false);
       });
 
       it("trace.output is recomputed from the full span value", async () => {
-        const blobSvc = fakeBlobResolutionService({ [ref.key]: fullOutput });
+        const blobSvc = fakeBlobStore({ "langwatch.output": fullOutput });
         const logger = createMockLogger();
 
         const result = await resolveOffloadedTraces({
           projectId: "proj-1",
           normalizedSpans: [spanWithRef],
-          blobResolutionService: blobSvc,
+          blobStore: blobSvc,
           ioExtractionService: realIOService,
           logger,
         });
@@ -181,13 +166,13 @@ describe("resolveOffloadedTraces()", () => {
       });
 
       it("anyResolved is true", async () => {
-        const blobSvc = fakeBlobResolutionService({ [ref.key]: fullOutput });
+        const blobSvc = fakeBlobStore({ "langwatch.output": fullOutput });
         const logger = createMockLogger();
 
         const result = await resolveOffloadedTraces({
           projectId: "proj-1",
           normalizedSpans: [spanWithRef],
-          blobResolutionService: blobSvc,
+          blobStore: blobSvc,
           ioExtractionService: realIOService,
           logger,
         });
@@ -197,7 +182,7 @@ describe("resolveOffloadedTraces()", () => {
     });
   });
 
-  describe("given a trace with no blob refs in any span", () => {
+  describe("given a trace with no eventref pointers in any span", () => {
     const spanClean = makeSpan({
       spanAttributes: {
         "langwatch.output": "a normal non-offloaded output",
@@ -206,13 +191,13 @@ describe("resolveOffloadedTraces()", () => {
 
     describe("when resolved", () => {
       it("returns spans unchanged", async () => {
-        const blobSvc = fakeBlobResolutionService({});
+        const blobSvc = fakeBlobStore({});
         const logger = createMockLogger();
 
         const result = await resolveOffloadedTraces({
           projectId: "proj-1",
           normalizedSpans: [spanClean],
-          blobResolutionService: blobSvc,
+          blobStore: blobSvc,
           ioExtractionService: realIOService,
           logger,
         });
@@ -220,30 +205,30 @@ describe("resolveOffloadedTraces()", () => {
         expect(result.resolvedSpans[0]).toBe(spanClean);
       });
 
-      it("calls SpanBlobResolutionService.resolve zero times", async () => {
-        const blobSvc = fakeBlobResolutionService({});
-        const resolveSpy = blobSvc.resolve as ReturnType<typeof vi.fn>;
+      it("calls BlobStore.getFromEventLog zero times", async () => {
+        const blobSvc = fakeBlobStore({});
+        const getFromEventLogSpy = blobSvc.getFromEventLog as ReturnType<typeof vi.fn>;
         const logger = createMockLogger();
 
         await resolveOffloadedTraces({
           projectId: "proj-1",
           normalizedSpans: [spanClean],
-          blobResolutionService: blobSvc,
+          blobStore: blobSvc,
           ioExtractionService: realIOService,
           logger,
         });
 
-        expect(resolveSpy).not.toHaveBeenCalled();
+        expect(getFromEventLogSpy).not.toHaveBeenCalled();
       });
 
       it("anyResolved is false", async () => {
-        const blobSvc = fakeBlobResolutionService({});
+        const blobSvc = fakeBlobStore({});
         const logger = createMockLogger();
 
         const result = await resolveOffloadedTraces({
           projectId: "proj-1",
           normalizedSpans: [spanClean],
-          blobResolutionService: blobSvc,
+          blobStore: blobSvc,
           ioExtractionService: realIOService,
           logger,
         });
@@ -253,38 +238,38 @@ describe("resolveOffloadedTraces()", () => {
     });
   });
 
-  describe("given a missing blob (BlobStore.get throws a NoSuchKey error)", () => {
-    const ref = testRef("trace-blobs/proj-1/trace-1/span-1");
-
+  describe("given a missing event_log row (BlobStore.getFromEventLog throws BlobNotFoundError)", () => {
     const spanWithRef = makeSpan({
+      traceId: "trace-1",
+      spanId: "span-1",
       spanAttributes: {
         "langwatch.output": "preview…",
-        [`${BLOB_REF_ATTR_PREFIX}langwatch.output`]:
-          JSON.stringify(ref),
+        [`${EVENTREF_ATTR_PREFIX}langwatch.output`]:
+          JSON.stringify({ field: "langwatch.output" }),
       },
     });
 
-    function failingBlobResolutionService(): SpanBlobResolutionService {
-      const noSuchKey = Object.assign(new Error("NoSuchKey"), {
-        name: "NoSuchKey",
-      });
+    function failingBlobStore(): BlobStore {
       return {
-        resolve: vi.fn(async () => {
-          throw noSuchKey;
+        getFromEventLog: vi.fn(async () => {
+          throw new BlobNotFoundError("evt-test", "langwatch.output", "proj-1");
         }),
-      } as unknown as SpanBlobResolutionService;
+        putSpool: vi.fn(),
+        getSpool: vi.fn(),
+        deleteSpool: vi.fn(),
+      } as unknown as BlobStore;
     }
 
     describe("when resolved", () => {
       it("does not throw — returns normally", async () => {
-        const blobSvc = failingBlobResolutionService();
+        const blobSvc = failingBlobStore();
         const logger = createMockLogger();
 
         await expect(
           resolveOffloadedTraces({
             projectId: "proj-1",
             normalizedSpans: [spanWithRef],
-            blobResolutionService: blobSvc,
+            blobStore: blobSvc,
             ioExtractionService: realIOService,
             logger,
           }),
@@ -292,13 +277,13 @@ describe("resolveOffloadedTraces()", () => {
       });
 
       it("keeps the preview value intact in the span attributes", async () => {
-        const blobSvc = failingBlobResolutionService();
+        const blobSvc = failingBlobStore();
         const logger = createMockLogger();
 
         const result = await resolveOffloadedTraces({
           projectId: "proj-1",
           normalizedSpans: [spanWithRef],
-          blobResolutionService: blobSvc,
+          blobStore: blobSvc,
           ioExtractionService: realIOService,
           logger,
         });
@@ -309,13 +294,13 @@ describe("resolveOffloadedTraces()", () => {
       });
 
       it("logs a warning at warn level", async () => {
-        const blobSvc = failingBlobResolutionService();
+        const blobSvc = failingBlobStore();
         const logger = createMockLogger();
 
         await resolveOffloadedTraces({
           projectId: "proj-1",
           normalizedSpans: [spanWithRef],
-          blobResolutionService: blobSvc,
+          blobStore: blobSvc,
           ioExtractionService: realIOService,
           logger,
         });
@@ -324,13 +309,13 @@ describe("resolveOffloadedTraces()", () => {
       });
 
       it("anyResolved is false (span was not resolved)", async () => {
-        const blobSvc = failingBlobResolutionService();
+        const blobSvc = failingBlobStore();
         const logger = createMockLogger();
 
         const result = await resolveOffloadedTraces({
           projectId: "proj-1",
           normalizedSpans: [spanWithRef],
-          blobResolutionService: blobSvc,
+          blobStore: blobSvc,
           ioExtractionService: realIOService,
           logger,
         });
@@ -340,92 +325,32 @@ describe("resolveOffloadedTraces()", () => {
     });
   });
 
-  describe("given a span with a reserved blob-ref attribute set to malformed JSON", () => {
+  describe("given a span with a reserved eventref attribute set to malformed JSON", () => {
     const spanWithMalformedRef = makeSpan({
       spanAttributes: {
         "langwatch.output": "preview…",
-        [`${BLOB_REF_ATTR_PREFIX}langwatch.output`]: 'not-json{',
+        [`${EVENTREF_ATTR_PREFIX}langwatch.output`]: 'not-json{',
       },
     });
 
     describe("when resolved", () => {
-      it("strips the reserved blob-ref key from returned span attributes", async () => {
-        const blobSvc = fakeBlobResolutionService({});
+      it("strips the reserved eventref key from returned span attributes", async () => {
+        const blobSvc = fakeBlobStore({});
         const logger = createMockLogger();
 
         const result = await resolveOffloadedTraces({
           projectId: "proj-1",
           normalizedSpans: [spanWithMalformedRef],
-          blobResolutionService: blobSvc,
+          blobStore: blobSvc,
           ioExtractionService: realIOService,
           logger,
         });
 
         const attrs = result.resolvedSpans[0]!.spanAttributes;
         const hasReservedKey = Object.keys(attrs).some((k) =>
-          k.startsWith(BLOB_REF_ATTR_PREFIX),
+          k.startsWith(EVENTREF_ATTR_PREFIX),
         );
         expect(hasReservedKey).toBe(false);
-      });
-    });
-  });
-
-  describe("given a BlobIntegrityError (SHA-256 mismatch)", () => {
-    const ref = testRef("trace-blobs/proj-1/trace-1/span-1");
-
-    const spanWithRef = makeSpan({
-      spanAttributes: {
-        "langwatch.output": "preview…",
-        [`${BLOB_REF_ATTR_PREFIX}langwatch.output`]: JSON.stringify(ref),
-      },
-    });
-
-    function integrityFailingBlobResolutionService(): SpanBlobResolutionService {
-      const integrityError = new BlobIntegrityError(
-        ref.key,
-        "langwatch.output",
-        "expectedhash",
-        "actualhash",
-      );
-      return {
-        resolve: vi.fn(async () => {
-          throw integrityError;
-        }),
-      } as unknown as SpanBlobResolutionService;
-    }
-
-    describe("when resolved", () => {
-      it("does not throw — returns normally with preview intact", async () => {
-        const blobSvc = integrityFailingBlobResolutionService();
-        const logger = createMockLogger();
-
-        const result = await resolveOffloadedTraces({
-          projectId: "proj-1",
-          normalizedSpans: [spanWithRef],
-          blobResolutionService: blobSvc,
-          ioExtractionService: realIOService,
-          logger,
-        });
-
-        expect(result.resolvedSpans[0]!.spanAttributes["langwatch.output"]).toBe(
-          "preview…",
-        );
-      });
-
-      it("logs at error level, not warn", async () => {
-        const blobSvc = integrityFailingBlobResolutionService();
-        const logger = createMockLogger();
-
-        await resolveOffloadedTraces({
-          projectId: "proj-1",
-          normalizedSpans: [spanWithRef],
-          blobResolutionService: blobSvc,
-          ioExtractionService: realIOService,
-          logger,
-        });
-
-        expect(logger.error).toHaveBeenCalledOnce();
-        expect(logger.warn).not.toHaveBeenCalled();
       });
     });
   });
