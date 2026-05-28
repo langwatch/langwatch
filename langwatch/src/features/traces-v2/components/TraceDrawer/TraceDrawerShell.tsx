@@ -1,3 +1,4 @@
+import { useTrackTraceOpened } from "~/hooks/useTrackTraceOpened";
 import { Drawer } from "~/components/ui/drawer";
 import { DrawerSpotlights } from "../../onboarding/spotlights/DrawerSpotlights";
 import {
@@ -40,6 +41,8 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
     handleClose,
     drawerContentRef,
   } = useTraceDrawerScaffold();
+
+  useTrackTraceOpened(traceId, "v2");
 
   const widthPx = useDrawerStore((s) => s.widthPx);
   const shortcutsOpen = useDrawerStore((s) => s.shortcutsOpen);
