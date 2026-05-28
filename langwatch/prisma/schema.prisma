@@ -378,6 +378,7 @@ model Project {
   annotations              Annotation[]
   projectSecrets           ProjectSecret[]
   TriggerSent              TriggerSent[]
+  ReactorOutbox            ReactorOutbox[]
   annotationScores         AnnotationScore[]
   publicShares             PublicShare[]
   workflows                Workflow[]
@@ -2641,4 +2642,64 @@ model FeatureFlag {
     lastEditedBy String?
     createdAt    DateTime @default(now())
     updatedAt    DateTime @default(now()) @updatedAt
+}
+
+// Durable outbox for stake-sensitive reactor dispatch.
+// See dev/docs/adr/021–024 for rationale. Reactors registered via
+// `.withOutbox` enqueue rows here instead of dispatching inline; a
+// drainer leases rows, calls the dispatch endpoint, and records the
+// outcome (dispatched / failed_retryable / dead). The unique
+// (reactorName, dedupKey) is the claim primitive that makes replays
+// safe — `createMany skipDuplicates` is a no-op on collision.
+enum ReactorOutboxStatus {
+    queued
+    dispatching
+    dispatched
+    failed_retryable
+    dead
+}
+
+model ReactorOutbox {
+    id             String              @id @default(nanoid())
+    projectId      String
+    project        Project             @relation(fields: [projectId], references: [id])
+    // Stable identifier of the reactor that enqueued the row. Matches
+    // the reactor's `name` in the pipeline builder.
+    reactorName    String
+    // Deduplication key scoped to (reactorName, ...). Typically encodes
+    // the match identity, e.g. `${triggerId}:${traceId}`. Collisions on
+    // (reactorName, dedupKey) are the claim primitive that makes
+    // replays safe.
+    dedupKey       String
+    // GroupQueue routing key for the wakeup payload. Drives per-group
+    // FIFO and fair scheduling across tenants. Typically the projectId
+    // or tenantId.
+    groupKey       String
+    // Reactor-defined dispatch payload (trigger config, target ids,
+    // rendered template inputs, etc). Variable-size data lives here so
+    // wakeup payloads stay constant-size.
+    payload        Json
+    status         ReactorOutboxStatus @default(queued)
+    attempts       Int                 @default(0)
+    maxAttempts    Int                 @default(8)
+    // Set to a future timestamp by the drainer when the row enters
+    // `dispatching`. A wakeup that arrives after `leasedUntil` may
+    // re-lease the row (assumed crashed worker).
+    leasedUntil    DateTime?
+    nextAttemptAt  DateTime            @default(now())
+    lastError      String?
+    lastErrorAt    DateTime?
+    dispatchedAt   DateTime?
+    createdAt      DateTime            @default(now())
+    updatedAt      DateTime            @default(now()) @updatedAt
+
+    @@unique([reactorName, dedupKey])
+    // Drainer hot path: pick the next claimable row for a (project,
+    // reactor) whose backoff has elapsed.
+    @@index([projectId, reactorName, status, nextAttemptAt])
+    // Operator surface: list stuck/dead dispatches per project.
+    @@index([projectId, status, updatedAt])
+    // Crash recovery scan: find leased rows whose worker never came
+    // back.
+    @@index([status, leasedUntil])
 }

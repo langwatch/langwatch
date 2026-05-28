@@ -5,6 +5,7 @@ import {
   createMockMapProjectionDefinition,
 } from "../../services/__tests__/testHelpers";
 import type { Event } from "../../domain/types";
+import type { OutboxReactorDefinition } from "../../outbox/outboxReactor.types";
 import type { ReactorDefinition } from "../../reactors/reactor.types";
 
 describe("StaticPipelineBuilder validations", () => {
@@ -130,6 +131,117 @@ describe("StaticPipelineBuilder validations", () => {
           .withFoldProjection("myFold", fold)
           .withReactor("myFold", "sameName", reactor1)
           .withReactor("myFold", "sameName", reactor2),
+      ).toThrow(/already exists/);
+    });
+  });
+
+  describe("when outbox reactor is registered on a fold projection", () => {
+    it("stores it in foldOutboxReactors and leaves foldReactors empty", () => {
+      const fold = createMockFoldProjectionDefinition<Event>("myFold");
+      const outboxReactor: OutboxReactorDefinition<Event> = {
+        name: "alertDispatch",
+        decide: vi.fn().mockResolvedValue([]),
+      };
+
+      const pipeline = definePipeline<Event>()
+        .withName("test-pipeline")
+        .withAggregateType("trace")
+        .withFoldProjection("myFold", fold)
+        .withOutbox("myFold", "alertDispatch", outboxReactor)
+        .build();
+
+      expect(pipeline.foldOutboxReactors.size).toBe(1);
+      expect(pipeline.foldReactors.size).toBe(0);
+      expect(pipeline.mapOutboxReactors.size).toBe(0);
+      expect(
+        pipeline.foldOutboxReactors.get("alertDispatch")?.projectionName,
+      ).toBe("myFold");
+    });
+  });
+
+  describe("when outbox reactor is registered on a map projection", () => {
+    it("stores it in mapOutboxReactors", () => {
+      const mapProj = createMockMapProjectionDefinition<Event>("myMap");
+      const outboxReactor: OutboxReactorDefinition<Event> = {
+        name: "datasetWrite",
+        decide: vi.fn().mockResolvedValue([]),
+      };
+
+      const pipeline = definePipeline<Event>()
+        .withName("test-pipeline")
+        .withAggregateType("trace")
+        .withMapProjection("myMap", mapProj)
+        .withOutbox("myMap", "datasetWrite", outboxReactor)
+        .build();
+
+      expect(pipeline.mapOutboxReactors.size).toBe(1);
+      expect(pipeline.foldOutboxReactors.size).toBe(0);
+      expect(
+        pipeline.mapOutboxReactors.get("datasetWrite")?.projectionName,
+      ).toBe("myMap");
+    });
+  });
+
+  describe("when outbox reactor is registered on a non-existent projection", () => {
+    it("throws ConfigurationError", () => {
+      const fold = createMockFoldProjectionDefinition<Event>("myFold");
+      const outboxReactor: OutboxReactorDefinition<Event> = {
+        name: "alertDispatch",
+        decide: vi.fn().mockResolvedValue([]),
+      };
+
+      expect(() =>
+        definePipeline<Event>()
+          .withName("test-pipeline")
+          .withAggregateType("trace")
+          .withFoldProjection("myFold", fold)
+          .withOutbox("missing" as any, "alertDispatch", outboxReactor),
+      ).toThrow(/projection not found/);
+    });
+  });
+
+  describe("when an outbox reactor reuses an existing reactor name", () => {
+    it("throws ConfigurationError", () => {
+      const fold = createMockFoldProjectionDefinition<Event>("myFold");
+      const reactor: ReactorDefinition<Event> = {
+        name: "shared",
+        handle: vi.fn(),
+      };
+      const outboxReactor: OutboxReactorDefinition<Event> = {
+        name: "shared",
+        decide: vi.fn().mockResolvedValue([]),
+      };
+
+      expect(() =>
+        definePipeline<Event>()
+          .withName("test-pipeline")
+          .withAggregateType("trace")
+          .withFoldProjection("myFold", fold)
+          .withReactor("myFold", "shared", reactor)
+          .withOutbox("myFold", "shared", outboxReactor),
+      ).toThrow(/already exists/);
+    });
+  });
+
+  describe("when a regular reactor reuses an existing outbox-reactor name", () => {
+    it("throws ConfigurationError", () => {
+      const fold = createMockFoldProjectionDefinition<Event>("myFold");
+      const reactor: ReactorDefinition<Event> = {
+        name: "shared",
+        handle: vi.fn(),
+      };
+      const outboxReactor: OutboxReactorDefinition<Event> = {
+        name: "shared",
+        decide: vi.fn().mockResolvedValue([]),
+      };
+
+      expect(() =>
+        definePipeline<Event>()
+          .withName("test-pipeline")
+          .withAggregateType("trace")
+          .withFoldProjection("myFold", fold)
+          .withOutbox("myFold", "shared", outboxReactor)
+          .withReactor("myFold", "shared", reactor),
       ).toThrow(/already exists/);
     });
   });
