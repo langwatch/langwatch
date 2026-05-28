@@ -84,12 +84,13 @@ export function createApiRouter() {
   api.route("/", datasetApp);
   api.route("/", evaluatorsApp);
   // experimentsV3App owns the session-authenticated execute/abort endpoints and
-  // the API-key-authenticated run/runs endpoints. It must mount before
-  // experimentsApp, whose project-API-key auth middleware spans the whole
-  // /api/experiments/* namespace. Mounted first, that middleware would run on
-  // POST /api/experiments/execute (a session-cookie request that carries no
-  // API key) and reject it before the session is ever checked. Mounting v3
-  // first lets its own handlers match and respond, short-circuiting the guard.
+  // the API-key-authenticated run/runs endpoints; experimentsApp owns the
+  // project-API-key list endpoint (GET /api/experiments). Both live under
+  // /api/experiments. v3 mounts first so its specific handlers (e.g. POST
+  // /api/experiments/execute, a session-cookie request) match before any
+  // sibling route resolution. experimentsApp authenticates per-route via the
+  // SecuredApp builder (no namespace-wide guard), so this ordering is
+  // belt-and-suspenders; the experiments-route-auth regression test pins it.
   api.route("/", experimentsV3App);
   api.route("/", experimentsV3LegacyAliasApp);  // /api/evaluations/v3/... → /api/experiments/...
   api.route("/", experimentsApp);
