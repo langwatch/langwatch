@@ -71,11 +71,8 @@ import { checkIpRateLimit, extractClientIp } from "./rateLimit";
  *
  * Spec: receiver-shapes.feature, retention.feature.
  */
-function stampOriginAttrs(
-  request: IExportTraceServiceRequest,
-  source: IngestionSource,
-): void {
-  const originAttrs = [
+function buildOriginAttrs(source: IngestionSource) {
+  return [
     { key: "langwatch.origin.kind", value: { stringValue: "ingestion_source" } },
     { key: "langwatch.ingestion_source.id", value: { stringValue: source.id } },
     {
@@ -91,11 +88,33 @@ function stampOriginAttrs(
       value: { stringValue: source.retentionClass },
     },
   ];
+}
+
+function stampOriginAttrs(
+  request: IExportTraceServiceRequest,
+  source: IngestionSource,
+): void {
+  const originAttrs = buildOriginAttrs(source);
   for (const rs of request.resourceSpans ?? []) {
     for (const ss of rs.scopeSpans ?? []) {
       for (const span of ss.spans ?? []) {
         const existing = span.attributes ?? [];
         span.attributes = [...existing, ...originAttrs];
+      }
+    }
+  }
+}
+
+function stampLogOriginAttrs(
+  request: IExportLogsServiceRequest,
+  source: IngestionSource,
+): void {
+  const originAttrs = buildOriginAttrs(source);
+  for (const rl of request.resourceLogs ?? []) {
+    for (const sl of rl.scopeLogs ?? []) {
+      for (const record of sl.logRecords ?? []) {
+        const existing = record.attributes ?? [];
+        record.attributes = [...existing, ...originAttrs];
       }
     }
   }
@@ -143,28 +162,7 @@ function buildWebhookLogRequest(
                 severityNumber: 9, // SeverityNumber.INFO
                 severityText: "INFO",
                 body: { stringValue: rawBody },
-                attributes: [
-                  {
-                    key: "langwatch.origin.kind",
-                    value: { stringValue: "ingestion_source" },
-                  },
-                  {
-                    key: "langwatch.ingestion_source.id",
-                    value: { stringValue: source.id },
-                  },
-                  {
-                    key: "langwatch.ingestion_source.organization_id",
-                    value: { stringValue: source.organizationId },
-                  },
-                  {
-                    key: "langwatch.ingestion_source.source_type",
-                    value: { stringValue: source.sourceType },
-                  },
-                  {
-                    key: "langwatch.governance.retention_class",
-                    value: { stringValue: source.retentionClass },
-                  },
-                ],
+                attributes: buildOriginAttrs(source),
                 droppedAttributesCount: 0,
                 traceId: new Uint8Array(0),
                 spanId: new Uint8Array(0),
@@ -584,16 +582,18 @@ app.post("/otel/:sourceId/v1/logs", async (c: Context) => {
         0,
       );
 
-      // Audit / forensics: hand the raw LogRecords to the existing log
+      // Audit / forensics: hand the LogRecords to the existing log
       // pipeline so they show up alongside spans in the trace viewer
-      // + /me Recent Activity. Origin-stamping happens at the resource
-      // attr level; the existing pipeline picks them up the same way
-      // it does for the webhook receiver.
+      // + /me Recent Activity. Stamp origin + retention attrs on every
+      // record first — governance retention/origin filtering reads them
+      // off the log attributes, mirroring the trace path and the
+      // webhook receiver.
       if (logRecordCount > 0) {
         const govProject = await ensureHiddenGovernanceProject(
           prisma,
           source.organizationId,
         );
+        stampLogOriginAttrs(parsed.request, source);
         try {
           await getApp().traces.logCollection.handleOtlpLogRequest({
             tenantId: govProject.id,

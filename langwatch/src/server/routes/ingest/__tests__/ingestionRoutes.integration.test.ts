@@ -182,6 +182,35 @@ function buildOtlpJsonBody(
   return { body, spanCount };
 }
 
+function buildOtlpLogsJsonBody(): ArrayBuffer {
+  const nowNano = String(BigInt(Date.now()) * 1_000_000n);
+  const payload = {
+    resourceLogs: [
+      {
+        resource: { attributes: [] },
+        scopeLogs: [
+          {
+            scope: { name: "test", version: "1.0" },
+            logRecords: [
+              {
+                timeUnixNano: nowNano,
+                observedTimeUnixNano: nowNano,
+                severityNumber: 9,
+                severityText: "INFO",
+                body: { stringValue: "ingest-canary-log" },
+                attributes: [
+                  { key: "event.name", value: { stringValue: "canary" } },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+  return new TextEncoder().encode(JSON.stringify(payload)).buffer as ArrayBuffer;
+}
+
 const handleTraceSpy = vi.fn(
   async (
     _tenantId: string,
@@ -528,6 +557,43 @@ describe("/api/ingest/* — end-to-end HTTP receiver contract", () => {
             before.lastEventAt.getTime(),
           );
         }
+      });
+    });
+  });
+
+  describe("POST /api/ingest/otel/:sourceId/v1/logs — OTLP log records", () => {
+    describe("happy path: valid Bearer + valid OTLP logs body", () => {
+      it("stamps origin + retention metadata on every log record before handing off to the log pipeline", async () => {
+        handleLogSpy.mockClear();
+        const res = await ingestApp.request(
+          `/api/ingest/otel/${otelSeed!.ingestionSourceId}/v1/logs`,
+          {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+              authorization: `Bearer ${otelSeed!.ingestSecret}`,
+            },
+            body: new Uint8Array(buildOtlpLogsJsonBody()),
+          },
+        );
+        expect(res.status).toBe(202);
+        expect(handleLogSpy).toHaveBeenCalledTimes(1);
+
+        const { logRequest } = handleLogSpy.mock.calls[0]![0] as {
+          logRequest: {
+            resourceLogs?: {
+              scopeLogs?: { logRecords?: { attributes?: { key: string }[] }[] }[];
+            }[];
+          };
+        };
+        const record =
+          logRequest.resourceLogs?.[0]?.scopeLogs?.[0]?.logRecords?.[0];
+        const attrKeys = (record?.attributes ?? []).map((a) => a.key);
+        expect(attrKeys).toContain("langwatch.origin.kind");
+        expect(attrKeys).toContain("langwatch.ingestion_source.id");
+        expect(attrKeys).toContain("langwatch.governance.retention_class");
+        // The caller's own attributes survive alongside the stamped origin.
+        expect(attrKeys).toContain("event.name");
       });
     });
   });
