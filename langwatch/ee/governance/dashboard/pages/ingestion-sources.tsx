@@ -161,33 +161,6 @@ const STATUS_META: Record<
   disabled: { icon: CircleX, label: "Disabled", color: "fg.muted" },
 };
 
-type RetentionClass = "thirty_days" | "one_year" | "seven_years";
-
-const RETENTION_CLASS_OPTIONS: Array<{
-  value: RetentionClass;
-  label: string;
-  blurb: string;
-}> = [
-  {
-    value: "thirty_days",
-    label: "Operational (30 days)",
-    blurb:
-      "Default. Debugging window for application traces. SOC2 / ISO 27001 baseline retention.",
-  },
-  {
-    value: "one_year",
-    label: "Compliance (1 year)",
-    blurb:
-      "EU AI Act / GDPR / HIPAA-most-uses retention. Use when this source feeds compliance audit obligations.",
-  },
-  {
-    value: "seven_years",
-    label: "Long-form audit (7 years)",
-    blurb:
-      "Regulated industry retention (financial services, healthcare). Org plan ceiling enforced.",
-  },
-];
-
 interface ComposerState {
   sourceType: SourceType;
   name: string;
@@ -200,7 +173,6 @@ interface ComposerState {
    * pull-mode sources ignore.
    */
   ottlStatements: string[];
-  retentionClass: RetentionClass;
   /**
    * Phase 10: optional cron override for puller-mode sources. When the
    * source-type maps to a registered PullerAdapter, the composer
@@ -244,7 +216,6 @@ const blankComposer = (): ComposerState => ({
   description: "",
   parserConfig: {},
   ottlStatements: [],
-  retentionClass: "thirty_days",
   pullSchedule: "",
 });
 
@@ -391,7 +362,6 @@ function IngestionSourcesPage() {
       name: composer.name.trim(),
       description: composer.description.trim() || null,
       parserConfig: buildParserConfig(composer),
-      retentionClass: composer.retentionClass,
       pullConfig,
       pullSchedule: pullAdapter
         ? composer.pullSchedule.trim() ||
@@ -681,17 +651,14 @@ function SourceComposerDrawer({
   onClose: () => void;
 }) {
   const meta = SOURCE_TYPE_OPTIONS.find((o) => o.value === composer.sourceType);
-  // 4b-3 license gate: non-enterprise plans see only otel_generic +
-  // thirty_days. Surfaces the available-tier list in the dropdown so the
-  // upsell narrative aligns with the EnterpriseLockedSurface page-level
-  // gate already shipped in 4b-2.
+  // 4b-3 license gate: non-enterprise plans see only otel_generic.
+  // Surfaces the available-tier list in the dropdown so the upsell
+  // narrative aligns with the EnterpriseLockedSurface page-level gate
+  // already shipped in 4b-2.
   const { isEnterprise } = useActivePlan();
   const sourceTypeOptions = isEnterprise
     ? SOURCE_TYPE_OPTIONS
     : SOURCE_TYPE_OPTIONS.filter((o) => o.value === "otel_generic");
-  const retentionOptions = isEnterprise
-    ? RETENTION_CLASS_OPTIONS
-    : RETENTION_CLASS_OPTIONS.filter((o) => o.value === "thirty_days");
   return (
     <Drawer.Root
       open={isOpen}
@@ -803,44 +770,6 @@ function SourceComposerDrawer({
           onChange={(pullSchedule) => setComposer({ ...composer, pullSchedule })}
         />
 
-        <VStack align="stretch" gap={1}>
-          <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-            Retention class
-          </Text>
-          <select
-            value={composer.retentionClass}
-            onChange={(e) =>
-              setComposer({
-                ...composer,
-                retentionClass: e.target.value as RetentionClass,
-              })
-            }
-            style={{
-              padding: "8px",
-              border: "1px solid var(--chakra-colors-border-muted)",
-              borderRadius: "var(--chakra-radii-sm)",
-              background: "white",
-              fontSize: "14px",
-            }}
-          >
-            {retentionOptions.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-          <Text fontSize="xs" color="fg.muted">
-            {RETENTION_CLASS_OPTIONS.find(
-              (o) => o.value === composer.retentionClass,
-            )?.blurb}
-          </Text>
-          {!isEnterprise && (
-            <Text fontSize="xs" color="fg.muted">
-              Longer retention classes are available on Enterprise plans.
-            </Text>
-          )}
-        </VStack>
-
           </VStack>
         </Drawer.Body>
         <Drawer.Footer>
@@ -870,9 +799,9 @@ function SourceComposerDrawer({
  * are safe to mutate without affecting the upstream operator's pasted
  * env block — name, description, parserConfig (incl. ottlStatements).
  *
- * Source type + retention class are immutable after create (changing
- * them would invalidate the upstream's running configuration); admins
- * who need to change those archive + recreate.
+ * Source type is immutable after create (changing it would invalidate
+ * the upstream's running configuration); admins who need to change it
+ * archive + recreate.
  */
 function SourceEditDrawer({
   organizationId,
@@ -995,9 +924,9 @@ function SourceEditDrawer({
             />
 
             <Text fontSize="xs" color="fg.muted">
-              Source type, retention class, and ingest secret are
-              immutable after create. Use “Rotate secret” for the secret;
-              archive + recreate to change source type or retention.
+              Source type and ingest secret are immutable after create.
+              Use “Rotate secret” for the secret; archive + recreate to
+              change source type.
             </Text>
           </VStack>
         </Drawer.Body>

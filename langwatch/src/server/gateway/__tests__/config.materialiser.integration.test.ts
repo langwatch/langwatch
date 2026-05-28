@@ -139,7 +139,6 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
     await prisma.modelProvider.create({
       data: {
         id: MP_ID,
-        organizationId: ORG_ID,
         name: "openai",
         provider: "openai",
         enabled: true,
@@ -251,7 +250,7 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
       where: { projectId: PROJECT_ID },
     });
     await prisma.monitor.deleteMany({
-      where: { id: { in: [MONITOR_ID, MONITOR_NOT_GUARDRAIL_ID] } },
+      where: { projectId: PROJECT_ID, id: { in: [MONITOR_ID, MONITOR_NOT_GUARDRAIL_ID] } },
     });
     await prisma.routingPolicyScope.deleteMany({
       where: { routingPolicyId: RP_ID },

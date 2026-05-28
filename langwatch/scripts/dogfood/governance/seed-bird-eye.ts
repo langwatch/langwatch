@@ -268,7 +268,6 @@ async function ensureSourcesAcrossTeams({
         ingestSecretHash: hex(20),
         status: "active",
         lastEventAt: new Date(),
-        retentionClass: "thirty_days",
       },
     });
     sources.push({ id: created.id, teamId: team.id, teamName: team.name });
@@ -291,7 +290,6 @@ async function ensureSourcesAcrossTeams({
         ingestSecretHash: hex(20),
         status: "active",
         lastEventAt: new Date(),
-        retentionClass: "thirty_days",
       },
     });
     sources.push({ id: created.id, teamId: null, teamName: "Org-wide" });
@@ -378,7 +376,6 @@ async function seedTraceSummaries({
         "langwatch.ingestion_source.id": source.id,
         "langwatch.ingestion_source.source_type": "otel_generic",
         "langwatch.ingestion_source.organization_id": args.organizationId,
-        "langwatch.governance.retention_class": "thirty_days",
         "langwatch.user_id": persona,
       },
       OccurredAt: occurredAtMs,

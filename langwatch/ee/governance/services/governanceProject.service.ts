@@ -7,7 +7,7 @@
  * branch correction):
  *   - IngestionSource ingest data lives in the existing trace pipeline
  *     (recorded_spans + log_records), tagged with origin metadata.
- *   - Project tenancy is reused for RBAC + retention; the receiver
+ *   - Project tenancy is reused for RBAC; the receiver
  *     resolves a hidden per-org Project (kind = "internal_governance")
  *     to anchor those writes.
  *   - The hidden Governance Project is INTERNAL ONLY — never appears in
@@ -27,7 +27,6 @@
  *   - specs/ai-gateway/governance/architecture-invariants.feature
  *   - specs/ai-gateway/governance/ui-contract.feature
  *   - specs/ai-gateway/governance/receiver-shapes.feature
- *   - specs/ai-gateway/governance/retention.feature
  */
 import { Prisma, type PrismaClient, type Project } from "@prisma/client";
 import { nanoid } from "nanoid";
