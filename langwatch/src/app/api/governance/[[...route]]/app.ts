@@ -21,6 +21,7 @@
  * Spec: specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature
  */
 import { Hono } from "hono";
+import type { MiddlewareHandler } from "hono";
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
 import { z } from "zod";
@@ -66,6 +67,28 @@ const requireAiToolsManage = requireApiKeyPermission({
   prisma,
   permission: "aiTools:manage",
 });
+// Org governance template administration (list-with-secrets, create,
+// update, archive, clone) must be driven by a real user, not a shared
+// project key: legacy project tokens bypass the aiTools:manage ceiling
+// (same model as gateway-platform), so without this a project-key holder
+// could read every org template's OTTL rules and mutate org config.
+const requireUserBoundCaller: MiddlewareHandler<{ Variables: Variables }> =
+  async (c, next) => {
+    if (!c.get("apiKeyUserId")) {
+      return c.json(
+        {
+          error: {
+            type: "forbidden",
+            code: "user_token_required",
+            message:
+              "This endpoint requires a personal access token bound to a user; legacy project API keys cannot administer organization governance templates.",
+          },
+        },
+        403,
+      );
+    }
+    return next();
+  };
 // UserIngestionBinding routes are caller-scoped: every org member can
 // install / list / uninstall / rotate their OWN bindings, so the ceiling
 // is `organization:view` (member-of-org) rather than aiTools:* admin.
@@ -410,6 +433,7 @@ export const app = new Hono<{ Variables: Variables }>()
       },
     }),
     requireAiToolsManage,
+    requireUserBoundCaller,
     async (c) => {
       const project = c.get("project");
       const organizationId = await orgIdForProject(project.id);
@@ -495,6 +519,7 @@ export const app = new Hono<{ Variables: Variables }>()
       },
     }),
     requireAiToolsManage,
+    requireUserBoundCaller,
     async (c) => {
       const project = c.get("project");
       const body = createTemplateSchema.safeParse(await c.req.json());
@@ -574,6 +599,7 @@ export const app = new Hono<{ Variables: Variables }>()
       },
     }),
     requireAiToolsManage,
+    requireUserBoundCaller,
     async (c) => {
       const project = c.get("project");
       const id = c.req.param("id");
@@ -641,6 +667,7 @@ export const app = new Hono<{ Variables: Variables }>()
       },
     }),
     requireAiToolsManage,
+    requireUserBoundCaller,
     async (c) => {
       const project = c.get("project");
       const id = c.req.param("id");
@@ -692,6 +719,7 @@ export const app = new Hono<{ Variables: Variables }>()
       },
     }),
     requireAiToolsManage,
+    requireUserBoundCaller,
     async (c) => {
       const project = c.get("project");
       const body = cloneTemplateSchema.safeParse(await c.req.json());
