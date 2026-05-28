@@ -9,6 +9,7 @@ import {
 } from "../evaluationTrigger.reactor";
 import { DEFERRED_CHECK_DELAY_MS } from "../originGate.reactor";
 import { TRACK_EVENT_SPAN_NAME } from "~/server/tracer/constants";
+import { MAX_PROCESSED_SPANS } from "../../projections/traceSummary.foldProjection";
 
 function createFoldState(
   overrides: Partial<TraceSummaryData> = {},
@@ -258,6 +259,39 @@ describe("evaluationTrigger reactor", () => {
       await reactor.handle(createSpanEvent(), createContext(state));
 
       expect(deps.evaluation).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when the trace exceeds the processing cap", () => {
+    /** @scenario Evaluations run for a trace under the processing cap */
+    it("dispatches evaluations for a trace just under the cap", async () => {
+      const deps = createDeps();
+      const reactor = createEvaluationTriggerReactor(deps);
+      const state = createFoldState({
+        attributes: { "langwatch.origin": "application" },
+        spanCount: MAX_PROCESSED_SPANS - 1,
+        occurredAt: Date.now(),
+      });
+
+      await reactor.handle(createSpanEvent(), createContext(state));
+
+      expect(deps.evaluation).toHaveBeenCalledTimes(1);
+    });
+
+    /** @scenario Evaluations are skipped for a trace over the processing cap */
+    it("skips evaluation dispatch once the trace passes the cap (span still stored elsewhere)", async () => {
+      const deps = createDeps();
+      const reactor = createEvaluationTriggerReactor(deps);
+      const state = createFoldState({
+        attributes: { "langwatch.origin": "application" },
+        spanCount: MAX_PROCESSED_SPANS,
+        occurredAt: Date.now(),
+      });
+
+      await reactor.handle(createSpanEvent(), createContext(state));
+
+      expect(deps.monitors.getEnabledOnMessageMonitors).not.toHaveBeenCalled();
+      expect(deps.evaluation).not.toHaveBeenCalled();
     });
   });
 
