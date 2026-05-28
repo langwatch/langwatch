@@ -11,6 +11,7 @@ const SHIKI_LANGS = [
   "xml",
   "html",
   "yaml",
+  "ini",
 ] as const;
 
 const SHIKI_THEMES = ["github-dark", "github-light"] as const;
@@ -77,4 +78,29 @@ export function useShikiAdapter(colorMode: string) {
       }),
     [colorMode],
   );
+}
+
+/**
+ * Renders `code` to an HTML string using the shared singleton highlighter.
+ * Uses `github-light` theme (settings UI is light-theme only).
+ *
+ * The result is a stable string for a given (code, lang) pair — callers
+ * may pre-compute both the masked and unmasked forms at mount and then
+ * simply swap between the two strings to avoid re-tokenizing on reveal.
+ *
+ * Exposed as a named export so integration tests can spy on it:
+ *   `vi.spyOn(shikiAdapter, 'codeToHtml')`
+ */
+export async function codeToHtml({
+  code,
+  lang,
+}: {
+  code: string;
+  lang: string;
+}): Promise<string> {
+  const highlighter = await getSharedHighlighter();
+  return highlighter.codeToHtml(code, {
+    lang,
+    theme: "github-light",
+  });
 }

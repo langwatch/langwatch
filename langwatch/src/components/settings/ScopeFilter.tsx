@@ -1,28 +1,17 @@
 /**
- * Scope filter for the Default Models settings table.
+ * Shared scope filter component used by both the Model Providers settings
+ * page and the API Keys settings page.
  *
  * Renders an "All you can see" toggle in the table header that opens a
  * dropdown with three quick choices ("All you can see" / "This Team" /
  * "This Project") plus a "More Scopes ▸" submenu that lists every org,
  * team, and project the caller can manage.
  *
- * Two render modes downstream:
- *   - When the active filter is "all", the table shows one row per
- *     config the caller can see, listing only overridden keys.
- *   - When the active filter is a single scope, the table shows the
- *     resolved per-role + per-feature view at that scope after the
- *     cascade.
- *
  * `value` is the active filter; `onChange` swaps it. The component is
  * presentational only — it does not own any state.
  */
 
-import {
-  Box,
-  Button,
-  HStack,
-  Text,
-} from "@chakra-ui/react";
+import { Box, Button, HStack, Text } from "@chakra-ui/react";
 import { Building2, ChevronDown, Folder, Users } from "lucide-react";
 import { useState } from "react";
 import { Menu } from "~/components/ui/menu";
@@ -38,7 +27,7 @@ export type ScopeFilter =
       name: string;
     };
 
-interface AvailableScopes {
+export interface AvailableScopes {
   organization?: { id: string; name: string } | null;
   teams: Array<{ id: string; name: string }>;
   projects: Array<{ id: string; name: string; teamId?: string | null }>;
@@ -52,7 +41,12 @@ interface Props {
   currentProjectId?: string | null;
 }
 
-export function DefaultModelsScopeFilter({
+/**
+ * Presentational scope filter dropdown. Shared between the model-providers
+ * and api-keys settings pages. Both pages lift their available-scopes
+ * derivation into `useAvailableScopes(organization)`.
+ */
+export function ScopeFilter({
   value,
   onChange,
   available,
@@ -219,10 +213,11 @@ function filterLabel(
     const project = available.projects.find((p) => p.id === currentProjectId);
     return project ? `Project: ${project.name}` : "This Project";
   }
-  const prefix = filter.scopeType === "ORGANIZATION"
-    ? "Organization"
-    : filter.scopeType === "TEAM"
-      ? "Team"
-      : "Project";
+  const prefix =
+    filter.scopeType === "ORGANIZATION"
+      ? "Organization"
+      : filter.scopeType === "TEAM"
+        ? "Team"
+        : "Project";
   return `${prefix}: ${filter.name}`;
 }

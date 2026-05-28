@@ -14,14 +14,15 @@ import {
 import { BrainCircuit, Edit, MoreVertical, Plus, Trash2 } from "lucide-react";
 import { DefaultModelsSection } from "../../components/settings/DefaultModelsSection";
 import {
-  DefaultModelsScopeFilter,
+  ScopeFilter as ScopeFilterComponent,
   type ScopeFilter as PageScopeFilter,
-} from "../../components/settings/DefaultModelsScopeFilter";
+} from "../../components/settings/ScopeFilter";
 import { ProviderScopeChips } from "../../components/settings/ProviderScopeChips";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "~/utils/compat/next-router";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { useDrawer } from "~/hooks/useDrawer";
+import { useAvailableScopes } from "~/hooks/useAvailableScopes";
 import { api } from "~/utils/api";
 import SettingsLayout from "../../components/SettingsLayout";
 import { Dialog } from "../../components/ui/dialog";
@@ -96,22 +97,7 @@ export default function ModelsPage() {
   // projects). Pulled from the current organization graph so the page
   // doesn't have to wait on the default-models query before the header
   // filter can render.
-  const filterAvailable = useMemo(() => {
-    const teams = organization?.teams ?? [];
-    return {
-      organization: organization
-        ? { id: organization.id, name: organization.name }
-        : null,
-      teams: teams.map((t) => ({ id: t.id, name: t.name })),
-      projects: teams.flatMap((t) =>
-        (t.projects ?? []).map((p) => ({
-          id: p.id,
-          name: p.name,
-          teamId: t.id,
-        })),
-      ),
-    };
-  }, [organization]);
+  const filterAvailable = useAvailableScopes(organization);
 
   // Hydrate scope filter from `?scope=TYPE:id` deep-links (e.g. the
   // "Configure" link on the VK create / edit drawer's Eligible Model
@@ -232,7 +218,7 @@ export default function ModelsPage() {
               Model Providers table and the Default Models table below.
               The DefaultModelsScopeFilter primitive carries the caret
               icon + "More Scopes" submenu (see scope-filter.feature). */}
-          <DefaultModelsScopeFilter
+          <ScopeFilterComponent
             value={scopeFilter}
             onChange={setScopeFilter}
             available={filterAvailable}
