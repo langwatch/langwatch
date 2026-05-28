@@ -74,7 +74,8 @@ const protections: Protections = {
 const fullOutput = "The full 50 KB output value that was offloaded to S3";
 
 const blobRef: TraceBlobRef = {
-  key: "trace-blobs/proj-1/trace-1/span-1/langwatch.output",
+  key: "trace-blobs/proj-1/trace-1/span-1",
+  field: "langwatch.output",
   size: Buffer.byteLength(fullOutput, "utf-8"),
   sha256: createHash("sha256")
     .update(Buffer.from(fullOutput, "utf-8"))

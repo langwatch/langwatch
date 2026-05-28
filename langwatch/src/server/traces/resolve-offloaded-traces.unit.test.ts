@@ -33,8 +33,9 @@ import { resolveOffloadedTraces } from "./resolve-offloaded-traces";
 // Helpers
 // ---------------------------------------------------------------------------
 
-const testRef = (key: string): TraceBlobRef => ({
+const testRef = (key: string, field = "langwatch.output"): TraceBlobRef => ({
   key,
+  field,
   size: 100,
   sha256: "abc123",
   encoding: "utf-8",
@@ -117,7 +118,7 @@ const realIOService = new TraceIOExtractionService();
 describe("resolveOffloadedTraces()", () => {
   describe("given a trace whose winning span has a reserved blob-ref", () => {
     const fullOutput = "The full 50 KB output value that was offloaded to S3";
-    const ref = testRef("trace-blobs/proj-1/trace-1/span-1/langwatch.output");
+    const ref = testRef("trace-blobs/proj-1/trace-1/span-1");
 
     const spanWithRef = makeSpan({
       spanAttributes: {
@@ -253,7 +254,7 @@ describe("resolveOffloadedTraces()", () => {
   });
 
   describe("given a missing blob (BlobStore.get throws a NoSuchKey error)", () => {
-    const ref = testRef("trace-blobs/proj-1/trace-1/span-1/langwatch.output");
+    const ref = testRef("trace-blobs/proj-1/trace-1/span-1");
 
     const spanWithRef = makeSpan({
       spanAttributes: {
@@ -370,7 +371,7 @@ describe("resolveOffloadedTraces()", () => {
   });
 
   describe("given a BlobIntegrityError (SHA-256 mismatch)", () => {
-    const ref = testRef("trace-blobs/proj-1/trace-1/span-1/langwatch.output");
+    const ref = testRef("trace-blobs/proj-1/trace-1/span-1");
 
     const spanWithRef = makeSpan({
       spanAttributes: {
@@ -382,6 +383,7 @@ describe("resolveOffloadedTraces()", () => {
     function integrityFailingBlobResolutionService(): SpanBlobResolutionService {
       const integrityError = new BlobIntegrityError(
         ref.key,
+        "langwatch.output",
         "expectedhash",
         "actualhash",
       );

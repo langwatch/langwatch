@@ -42,6 +42,7 @@ import {
   type WarnLogger,
 } from "~/server/traces/resolve-offloaded-traces";
 import { BLOB_REF_ATTR_PREFIX } from "~/server/app-layer/traces/blob-ref-attributes";
+import { IO_PREVIEW_BYTES } from "~/server/app-layer/traces/span-field-offload.service";
 import type { OtlpKeyValue } from "~/server/event-sourcing/pipelines/trace-processing/schemas/otlp";
 import {
   NormalizedSpanKind,
@@ -98,15 +99,21 @@ const ONE_MB_OUTPUT_SHA256 = createHash("sha256")
   .update(Buffer.from(ONE_MB_OUTPUT, "utf-8"))
   .digest("hex");
 
-/** Bounded preview kept inline in place of an offloaded value (2 KB per span-field-offload.service). */
-const PREVIEW_BYTES = 2 * 1024;
+/**
+ * langwatch.output is an IO attribute; it now gets IO_PREVIEW_BYTES (32 KB)
+ * rather than the default 2 KB preview budget. ADR-021 Concern 2.
+ */
+const PREVIEW_BYTES = IO_PREVIEW_BYTES;
 
-/** Expected blob key for langwatch.output. */
-const EXPECTED_BLOB_KEY = `trace-blobs/${PROJECT_ID}/${TRACE_ID}/${SPAN_ID}/langwatch.output`;
+/** Expected span-level blob key (no attrKey suffix — manifest shape). */
+const EXPECTED_BLOB_KEY = `trace-blobs/${PROJECT_ID}/${TRACE_ID}/${SPAN_ID}`;
 
 /**
  * Builds an in-process BlobStore backed by a simple Map.
  * Returns the store and the spy functions for assertions.
+ *
+ * put() now takes `fields: Record<attrKey, string>` and returns
+ * `Record<attrKey, TraceBlobRef>` — one manifest object per span.
  */
 function makeFakeBlobStore(initialContents: Map<string, string> = new Map()): {
   blobStore: BlobStore;
@@ -120,26 +127,29 @@ function makeFakeBlobStore(initialContents: Map<string, string> = new Map()): {
       projectId,
       traceId,
       spanId,
-      attrKey,
-      value,
+      fields,
     }: {
       projectId: string;
       traceId: string;
       spanId: string;
-      attrKey: string;
-      value: string;
-    }): Promise<TraceBlobRef> => {
-      const key = BlobStore.blobKey({ projectId, traceId, spanId, attrKey });
-      storage.set(key, value);
-      const sha256 = createHash("sha256")
-        .update(Buffer.from(value, "utf-8"))
-        .digest("hex");
-      return {
-        key,
-        size: Buffer.byteLength(value, "utf-8"),
-        sha256,
-        encoding: "utf-8",
-      };
+      fields: Record<string, string>;
+    }): Promise<Record<string, TraceBlobRef>> => {
+      const key = BlobStore.blobKey({ projectId, traceId, spanId });
+      const refs: Record<string, TraceBlobRef> = {};
+      for (const [attrKey, value] of Object.entries(fields)) {
+        storage.set(`${key}::${attrKey}`, value);
+        const sha256 = createHash("sha256")
+          .update(Buffer.from(value, "utf-8"))
+          .digest("hex");
+        refs[attrKey] = {
+          key,
+          field: attrKey,
+          size: Buffer.byteLength(value, "utf-8"),
+          sha256,
+          encoding: "utf-8",
+        };
+      }
+      return refs;
     },
   );
 
@@ -150,7 +160,7 @@ function makeFakeBlobStore(initialContents: Map<string, string> = new Map()): {
       projectId: string;
       ref: TraceBlobRef;
     }): Promise<string> => {
-      const val = storage.get(ref.key);
+      const val = storage.get(`${ref.key}::${ref.field}`);
       if (val === undefined) {
         const err = Object.assign(new Error("NoSuchKey"), { name: "NoSuchKey" });
         throw err;
@@ -366,17 +376,18 @@ describe("given the release_trace_blob_offload flag is on for the project and a 
   describe("when ingested via TraceRequestCollectionService", () => {
     /** @scenario An over-threshold field is offloaded once with preview inline and ref recorded */
     /** @scenario Offloaded blob round-trips with byte integrity */
-    it("BlobStore.put is called once with the over-threshold value keyed trace-blobs/{projectId}/{traceId}/{spanId}/langwatch.output", () => {
+    it("BlobStore.put is called once with fields containing langwatch.output → keyed trace-blobs/{projectId}/{traceId}/{spanId}", () => {
       expect(putSpy).toHaveBeenCalledOnce();
       const callArg = putSpy.mock.calls[0]![0];
       expect(callArg.projectId).toBe(PROJECT_ID);
       expect(callArg.traceId).toBe(TRACE_ID);
       expect(callArg.spanId).toBe(SPAN_ID);
-      expect(callArg.attrKey).toBe("langwatch.output");
-      expect(callArg.value).toBe(ONE_MB_OUTPUT);
+      // Manifest-shape: fields map, not per-field attrKey
+      expect(callArg.fields).toBeDefined();
+      expect(callArg.fields["langwatch.output"]).toBe(ONE_MB_OUTPUT);
     });
 
-    it("recordSpan receives the span with langwatch.output shortened to a preview within the preview byte budget", () => {
+    it("recordSpan receives the span with langwatch.output shortened to a preview within the IO_PREVIEW_BYTES budget", () => {
       expect(capturedSpans).toHaveLength(1);
       const attrs = capturedSpans[0]!.span.attributes ?? [];
       const outputAttr = (attrs as OtlpKeyValue[]).find(
@@ -393,7 +404,7 @@ describe("given the release_trace_blob_offload flag is on for the project and a 
       );
     });
 
-    it("recordSpan receives a reserved blob-ref attribute langwatch.reserved.blobref.langwatch.output with parseable ref JSON", () => {
+    it("recordSpan receives a reserved blob-ref attribute langwatch.reserved.blobref.langwatch.output with parseable ref JSON including field selector", () => {
       const attrs = capturedSpans[0]!.span.attributes ?? [];
       const refAttr = (attrs as OtlpKeyValue[]).find(
         (kv) => kv.key === `${BLOB_REF_ATTR_PREFIX}langwatch.output`,
@@ -401,7 +412,10 @@ describe("given the release_trace_blob_offload flag is on for the project and a 
       expect(refAttr).toBeDefined();
 
       const ref = JSON.parse(refAttr!.value?.stringValue ?? "{}") as TraceBlobRef;
+      // key is now span-level (no attrKey suffix)
       expect(ref.key).toBe(EXPECTED_BLOB_KEY);
+      // field selector points at the attr inside the manifest
+      expect(ref.field).toBe("langwatch.output");
       expect(ref.size).toBe(Buffer.byteLength(ONE_MB_OUTPUT, "utf-8"));
       expect(ref.sha256).toBe(ONE_MB_OUTPUT_SHA256);
       expect(ref.encoding).toBe("utf-8");

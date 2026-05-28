@@ -6,8 +6,9 @@ import {
 } from "./blob-ref-attributes";
 import type { TraceBlobRef } from "./blob-store.service";
 
-const ref = (key: string): TraceBlobRef => ({
+const ref = (key: string, field = "langwatch.output"): TraceBlobRef => ({
   key,
+  field,
   size: 40000,
   sha256: "abc123",
   encoding: "utf-8",
@@ -17,7 +18,7 @@ describe("blob-ref-attributes", () => {
   describe("given attributes that carry encoded blob refs", () => {
     describe("when extractBlobRefsFromAttributes is called", () => {
       it("splits reserved keys into blobRefs and keeps user-facing attributes clean", () => {
-        const blobRef = ref("trace-blobs/p/t/s/langwatch.output");
+        const blobRef = ref("trace-blobs/p/t/s");
         const attributes = {
           "langwatch.output": "preview…",
           "gen_ai.system": "openai",

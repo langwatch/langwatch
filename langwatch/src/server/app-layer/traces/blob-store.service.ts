@@ -11,15 +11,29 @@ import {
  * value, so the queue job / fold cache / ClickHouse rows stay small. The full
  * value is fetched from S3 only on the rare read that needs it (eval, "open
  * full"). See ADR-021 and issue #4215.
+ *
+ * Key shape: `trace-blobs/{projectId}/{traceId}/{spanId}` — one object per
+ * span containing all over-threshold fields as a JSON manifest. `field` is
+ * the attrKey selector within that manifest. Per-span (not per-trace) so
+ * each OTLP ingest is one atomic PUT with no contention. ADR-021 / #4215.
  */
 export interface TraceBlobRef {
-  /** Positional, project-scoped key inside the org-resolved bucket. */
+  /** Positional, project-scoped key inside the org-resolved bucket (span-level). */
   key: string;
-  /** UTF-8 byte length of the original value. */
+  /** The attribute key within the manifest's `fields` map. */
+  field: string;
+  /** UTF-8 byte length of THIS field's value. */
   size: number;
-  /** SHA-256 of the original bytes — doubles as an integrity check on read. */
+  /** SHA-256 of THIS field's value bytes — integrity check on read. */
   sha256: string;
   encoding: "utf-8";
+}
+
+/** Wire format of the per-span blob manifest stored in S3. */
+interface BlobManifest {
+  version: 1;
+  encoding: "utf-8";
+  fields: Record<string, string>;
 }
 
 export interface S3ClientResolution {
@@ -35,11 +49,12 @@ export type S3ClientResolver = (
 export class BlobIntegrityError extends Error {
   constructor(
     readonly key: string,
+    readonly field: string,
     readonly expectedSha256: string,
     readonly actualSha256: string,
   ) {
     super(
-      `Blob integrity check failed for ${key}: expected ${expectedSha256}, got ${actualSha256}`,
+      `Blob integrity check failed for ${key}#${field}: expected ${expectedSha256}, got ${actualSha256}`,
     );
     this.name = "BlobIntegrityError";
   }
@@ -60,18 +75,33 @@ export class UnauthorizedBlobAccessError extends Error {
 }
 
 /**
- * Stores large trace field values in object storage, one object per field.
+ * Thrown by `BlobStore.get` when the manifest was fetched successfully but
+ * the requested `field` is not present. Indicates a corrupted manifest or a
+ * stale ref pointing at an object that was overwritten.
+ */
+export class BlobFieldNotFoundError extends Error {
+  constructor(readonly key: string, readonly field: string) {
+    super(`Field "${field}" not found in blob manifest at key ${key}`);
+    this.name = "BlobFieldNotFoundError";
+  }
+}
+
+/**
+ * Stores large trace field values in object storage, ONE object per span
+ * (manifest-shaped). All over-threshold fields for a span are batched into a
+ * single JSON manifest and written with one PutObjectCommand, eliminating the
+ * 3–5× per-field PUTs of the previous per-field shape.
  *
- * Key shape: `trace-blobs/{projectId}/{traceId}/{spanId}/{attrKey}` — positional
+ * Key shape: `trace-blobs/{projectId}/{traceId}/{spanId}` — positional
  * (not content-hashed: trivial prefix-delete GC). The org bucket is resolved via
  * the injected `S3ClientResolver`; in per-org BYOC deployments each org has its
  * own bucket and cross-org access is gated at the bucket boundary. In shared-bucket
  * deployments (no BYOC configured), isolation is **API-enforced**: callers MUST
  * pass their authenticated `projectId`, which is encoded into the key prefix.
- * A caller cannot construct another project's key without already knowing that
- * project's (traceId, spanId) AND being authorized to address it. There is no
- * in-process ACL inside `BlobStore.get` — that is the auth layer's job at the
- * request boundary.
+ *
+ * Read coalescing: `get` accepts an optional manifest cache (Map<key, manifest>)
+ * so the caller can pass the same cache across multiple `get` calls for the same
+ * span, ensuring the manifest is fetched only once. ADR-021 / #4215.
  */
 export class BlobStore {
   constructor(private readonly resolveS3Client: S3ClientResolver) {}
@@ -80,60 +110,83 @@ export class BlobStore {
     projectId,
     traceId,
     spanId,
-    attrKey,
   }: {
     projectId: string;
     traceId: string;
     spanId: string;
-    attrKey: string;
   }): string {
-    for (const part of [projectId, traceId, spanId, attrKey]) {
+    for (const part of [projectId, traceId, spanId]) {
       if (part.includes("..")) {
         throw new Error(
           `Invalid blob key component (path traversal): ${part}`,
         );
       }
     }
-    // attrKey (e.g. "langwatch.output") is dotted but never contains slashes;
-    // encode defensively so an unexpected value can't escape the prefix.
-    const safeAttr = encodeURIComponent(attrKey);
-    return `trace-blobs/${projectId}/${traceId}/${spanId}/${safeAttr}`;
+    return `trace-blobs/${projectId}/${traceId}/${spanId}`;
   }
 
+  /**
+   * Writes all over-threshold fields for one span as a single manifest object.
+   * Returns a per-field map of TraceBlobRef (one per entry in `fields`).
+   *
+   * @param fields - Record mapping attrKey → full string value for every
+   *   field that needs to be offloaded for this span.
+   */
   async put({
     projectId,
     traceId,
     spanId,
-    attrKey,
-    value,
+    fields,
   }: {
     projectId: string;
     traceId: string;
     spanId: string;
-    attrKey: string;
-    value: string;
-  }): Promise<TraceBlobRef> {
-    const body = Buffer.from(value, "utf-8");
-    const sha256 = createHash("sha256").update(body).digest("hex");
-    const key = BlobStore.blobKey({ projectId, traceId, spanId, attrKey });
+    fields: Record<string, string>;
+  }): Promise<Record<string, TraceBlobRef>> {
+    const key = BlobStore.blobKey({ projectId, traceId, spanId });
+    const manifest: BlobManifest = { version: 1, encoding: "utf-8", fields };
+    const body = Buffer.from(JSON.stringify(manifest), "utf-8");
+
     const { s3Client, s3Bucket } = await this.resolveS3Client(projectId);
     await s3Client.send(
       new PutObjectCommand({
         Bucket: s3Bucket,
         Key: key,
         Body: body,
-        ContentType: "text/plain; charset=utf-8",
+        ContentType: "application/json; charset=utf-8",
       }),
     );
-    return { key, size: body.byteLength, sha256, encoding: "utf-8" };
+
+    // Build per-field refs — sha256 is over the field value bytes, not the manifest.
+    const refs: Record<string, TraceBlobRef> = {};
+    for (const [attrKey, value] of Object.entries(fields)) {
+      const fieldBytes = Buffer.from(value, "utf-8");
+      const sha256 = createHash("sha256").update(fieldBytes).digest("hex");
+      refs[attrKey] = {
+        key,
+        field: attrKey,
+        size: fieldBytes.byteLength,
+        sha256,
+        encoding: "utf-8",
+      };
+    }
+    return refs;
   }
 
+  /**
+   * Fetches the manifest for `ref.key` and returns the value of `ref.field`.
+   * Verifies per-field sha256 integrity. Accepts an optional `manifestCache`
+   * so multiple gets on the same span share one S3 fetch.
+   */
   async get({
     projectId,
     ref,
+    manifestCache,
   }: {
     projectId: string;
     ref: TraceBlobRef;
+    /** Optional cross-field cache keyed by manifest key. */
+    manifestCache?: Map<string, BlobManifest>;
   }): Promise<string> {
     // Defense-in-depth: reject refs that don't belong to this project before
     // even resolving the S3 client. Prevents cross-project data access in
@@ -142,17 +195,32 @@ export class BlobStore {
     if (!ref.key.startsWith(`trace-blobs/${projectId}/`)) {
       throw new UnauthorizedBlobAccessError(ref.key, projectId);
     }
-    const { s3Client, s3Bucket } = await this.resolveS3Client(projectId);
-    const { Body } = await s3Client.send(
-      new GetObjectCommand({ Bucket: s3Bucket, Key: ref.key }),
-    );
-    const content = (await Body?.transformToString("utf-8")) ?? "";
+
+    let manifest: BlobManifest;
+
+    if (manifestCache?.has(ref.key)) {
+      manifest = manifestCache.get(ref.key)!;
+    } else {
+      const { s3Client, s3Bucket } = await this.resolveS3Client(projectId);
+      const { Body } = await s3Client.send(
+        new GetObjectCommand({ Bucket: s3Bucket, Key: ref.key }),
+      );
+      const raw = (await Body?.transformToString("utf-8")) ?? "";
+      manifest = JSON.parse(raw) as BlobManifest;
+      manifestCache?.set(ref.key, manifest);
+    }
+
+    if (!(ref.field in manifest.fields)) {
+      throw new BlobFieldNotFoundError(ref.key, ref.field);
+    }
+
+    const value = manifest.fields[ref.field]!;
     const actual = createHash("sha256")
-      .update(Buffer.from(content, "utf-8"))
+      .update(Buffer.from(value, "utf-8"))
       .digest("hex");
     if (actual !== ref.sha256) {
-      throw new BlobIntegrityError(ref.key, ref.sha256, actual);
+      throw new BlobIntegrityError(ref.key, ref.field, ref.sha256, actual);
     }
-    return content;
+    return value;
   }
 }

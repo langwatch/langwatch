@@ -89,7 +89,8 @@ const fullOutput =
   "This is the full 50 KB output value that was offloaded to S3 during ingestion";
 
 const blobRef: TraceBlobRef = {
-  key: "trace-blobs/proj-1/trace-1/span-1/langwatch.output",
+  key: "trace-blobs/proj-1/trace-1/span-1",
+  field: "langwatch.output",
   size: Buffer.byteLength(fullOutput, "utf-8"),
   sha256: "placeholder-sha256",
   encoding: "utf-8",
