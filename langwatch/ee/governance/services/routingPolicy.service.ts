@@ -21,9 +21,13 @@
  *     3. else null — caller should fall back to a no-policy VK that
  *        relies on the scope-cascade-resolved ModelProvider set.
  *
- * `setDefault` runs in a transaction so the "exactly one default per
- * scope" invariant (enforced by partial unique idx) can never observe
- * two defaults briefly during the swap.
+ * The "exactly one default per scope" invariant is maintained by the
+ * `setDefault` transaction (clear other defaults, then set this one),
+ * not a DB constraint: scope lives in the child RoutingPolicyScope table
+ * so a partial unique index can't express it. `resolveDefaultForUser`
+ * therefore orders deterministically so that even if a concurrent write
+ * briefly leaves two defaults at a scope, resolution always returns the
+ * most recently set one rather than an arbitrary row.
  */
 import {
   Prisma,
@@ -322,6 +326,9 @@ export class RoutingPolicyService {
             some: { scopeType: RoutingPolicyScopeType.TEAM, scopeId: personalTeamId },
           },
         },
+        // Deterministic tiebreak: if a concurrent setDefault briefly left
+        // two defaults at this scope, resolve to the most recently set one.
+        orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
         include: { scopes: true },
       });
       if (teamDefault) return teamDefault;
@@ -335,6 +342,7 @@ export class RoutingPolicyService {
           some: { scopeType: RoutingPolicyScopeType.ORGANIZATION, scopeId: organizationId },
         },
       },
+      orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
       include: { scopes: true },
     });
   }
