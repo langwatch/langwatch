@@ -10,13 +10,21 @@ import type { EventSourcedQueueDefinition } from "../queues/queue.types";
  */
 export interface OutboxWakeup extends Record<string, unknown> {
   reactorName: string;
-  groupKey: string;
   /**
-   * Tenant for fair scheduling (`TenantRateTracker` reads this).
-   * Typically identical to `groupKey`, but kept explicit so callers
-   * can group by something other than tenant if needed.
+   * The wakeup's GroupQueue routing key. MUST start with `${projectId}/`
+   * because the outbox queue is free-standing — it bypasses
+   * `queueManager`'s automatic `${tenantId}/` wrapping, so the
+   * producer is responsible for the prefix so `tenantIdFromGroupId`
+   * (see `src/server/observability/tenantRateTracker.ts`) can extract
+   * the tenant for per-tenant fairness via `TenantRateTracker`.
+   *
+   * Convention for trigger reactors:
+   *   `${projectId}/${reactorName}:${triggerId}`
+   *
+   * Per-trigger FIFO falls out of this shape: every wakeup for the
+   * same trigger lands in the same group and is processed serially.
    */
-  tenantId: string;
+  groupKey: string;
   /**
    * Wall-clock score for global ordering — see ADR-023. Defaults to
    * the enqueue time but callers may override (e.g. retry scheduling
@@ -42,7 +50,11 @@ export function defineOutboxWakeupQueue({
   return {
     name,
     process,
-    groupKey: (payload) => `${payload.reactorName}:${payload.groupKey}`,
+    // groupKey IS already the full `${projectId}/${reactorName}:${triggerId}`
+    // form (or equivalent) — see the field comment on OutboxWakeup. The
+    // queue's per-group FIFO uses it as-is; `tenantIdFromGroupId` parses
+    // the projectId out for fair scheduling.
+    groupKey: (payload) => payload.groupKey,
     score: (payload) => payload.scheduledAt,
     options: {
       // Drainer workload is IO-bound (PG lease + HTTP dispatch). The

@@ -11,11 +11,25 @@ export interface OutboxEnqueueRequest {
   /**
    * Stable identity of the match. (reactorName, dedupKey) is the
    * claim primitive — collisions deduplicate. See ADR-022.
+   *
+   * Convention (subject-namespaced so a future trigger type cannot
+   * collide):
+   *   - Trace/evaluation triggers: `${triggerId}:trace:${traceId}`
+   *   - Custom-graph alerts:       `${triggerId}:graph:${customGraphId}`
    */
   dedupKey: string;
   /**
-   * GroupQueue routing key for the wakeup. Typically projectId or
-   * tenantId. See ADR-023.
+   * GroupQueue routing key for the wakeup — see ADR-023. MUST begin
+   * with `${projectId}/` because the outbox queue is free-standing
+   * and bypasses `queueManager`'s automatic `${tenantId}/` wrapping;
+   * the producer is responsible for the prefix so
+   * `tenantIdFromGroupId` can extract the tenant for per-tenant
+   * fairness via `TenantRateTracker`.
+   *
+   * Convention for trigger reactors:
+   *   `${projectId}/${reactorName}:${triggerId}`
+   *
+   * Per-trigger FIFO falls out of this shape.
    */
   groupKey: string;
   /**

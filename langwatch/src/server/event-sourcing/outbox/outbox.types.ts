@@ -17,13 +17,27 @@ export interface EnqueueOutboxParams {
   /**
    * Stable identifier of the match. Collisions on (reactorName, dedupKey)
    * are the claim primitive that makes pipeline replays safe — see
-   * ADR-022. Typical shape: `${entityId}:${targetId}`.
+   * ADR-022.
+   *
+   * Convention (subject-namespaced so a future trigger type cannot
+   * collide):
+   *   - Trace/evaluation triggers: `${triggerId}:trace:${traceId}`
+   *   - Custom-graph alerts:       `${triggerId}:graph:${customGraphId}`
    */
   dedupKey: string;
   /**
-   * GroupQueue routing key for the wakeup payload. Drives per-group
-   * FIFO and fair scheduling — typically the projectId or tenantId.
-   * See ADR-023.
+   * GroupQueue routing key for the wakeup payload — see ADR-023.
+   * MUST begin with `${projectId}/` so `tenantIdFromGroupId` can
+   * extract the tenant for per-tenant fairness via
+   * `TenantRateTracker`. The outbox queue is free-standing and
+   * bypasses `queueManager`'s automatic `${tenantId}/` wrapping, so
+   * the producer is responsible for the prefix.
+   *
+   * Convention for trigger reactors:
+   *   `${projectId}/${reactorName}:${triggerId}`
+   *
+   * Per-trigger FIFO falls out of this shape — every wakeup for the
+   * same trigger lands in the same group.
    */
   groupKey: string;
   payload: OutboxPayload;

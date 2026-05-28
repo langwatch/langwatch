@@ -69,8 +69,20 @@ export class OutboxService {
    * the same (reactorName, dedupKey) is a no-op and returns
    * `enqueued: false`. The caller is responsible for posting a
    * wakeup to the GroupQueue afterwards.
+   *
+   * Validates that `groupKey` starts with `${projectId}/` so the
+   * wakeup parses cleanly under `tenantIdFromGroupId` (ADR-023). A
+   * misformatted key would silently land in the wrong tenant bucket
+   * for fair-scheduling purposes — failing here at enqueue is much
+   * cheaper to debug than a starvation bug in production.
    */
   async enqueue(params: EnqueueOutboxParams): Promise<EnqueueOutboxResult> {
+    const required = `${params.projectId}/`;
+    if (!params.groupKey.startsWith(required)) {
+      throw new Error(
+        `OutboxService.enqueue: groupKey must start with "${required}" (got "${params.groupKey}"). See ADR-023.`,
+      );
+    }
     const enqueued = await this.repository.insertIfAbsent({
       projectId: params.projectId,
       reactorName: params.reactorName,

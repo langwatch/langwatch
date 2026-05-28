@@ -1,6 +1,7 @@
 import type { EventSourcedQueueProcessor } from "../queues/queue.types";
 import { createLogger } from "../../../utils/logger/server";
 import { captureException } from "../../../utils/posthogErrorCapture";
+import { tenantIdFromGroupId } from "../../observability/tenantRateTracker";
 import { isDispatchError } from "./dispatchError";
 import type { OutboxService } from "./outbox.service";
 import type { OutboxRow } from "./outbox.types";
@@ -80,10 +81,14 @@ export class OutboxDrainer {
   }
 
   /**
-   * Handle a wakeup payload. Leases rows for (reactorName, groupKey)
+   * Handle a wakeup payload. Leases rows for (projectId, reactorName)
    * up to `maxRowsPerWakeup` and dispatches them through the
    * registered dispatcher. Yields when the cap is hit by scheduling
    * a follow-up wakeup.
+   *
+   * `projectId` is derived from `wakeup.groupKey` via
+   * `tenantIdFromGroupId` — the producer is contracted to format
+   * groupKey as `${projectId}/...`. See ADR-023.
    */
   async handleWakeup(wakeup: OutboxWakeup): Promise<void> {
     const dispatcher = this.dispatchers.get(wakeup.reactorName);
@@ -95,10 +100,19 @@ export class OutboxDrainer {
       return;
     }
 
+    const projectId = tenantIdFromGroupId(wakeup.groupKey);
+    if (!projectId) {
+      logger.error(
+        { reactorName: wakeup.reactorName, groupKey: wakeup.groupKey },
+        "Wakeup groupKey missing `${projectId}/` prefix — dropping (see ADR-023)",
+      );
+      return;
+    }
+
     let dispatched = 0;
     while (dispatched < this.maxRowsPerWakeup) {
       const row = await this.outboxService.leaseNext({
-        projectId: wakeup.groupKey,
+        projectId,
         reactorName: wakeup.reactorName,
         leaseDurationMs: this.leaseDurationMs,
       });
@@ -186,7 +200,6 @@ export class OutboxDrainer {
           wakeup: {
             reactorName: row.reactorName,
             groupKey: row.groupKey,
-            tenantId: row.projectId,
             scheduledAt: result.nextAttemptAt.getTime(),
           },
           delayMs,

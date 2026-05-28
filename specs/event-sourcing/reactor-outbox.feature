@@ -78,6 +78,12 @@ Feature: Reactor Outbox for stake-sensitive dispatch
     When a new row is enqueued
     Then a wakeup payload {reactorName, groupKey} is sent to the GroupQueue
     And the wakeup payload does NOT carry the row's variable-size data
+    And the groupKey begins with "${projectId}/" so per-tenant fairness routing works
+
+  Scenario: A groupKey missing the project prefix is rejected at enqueue
+    When the producer calls enqueue with a groupKey that does NOT start with "${projectId}/"
+    Then enqueue throws before any row is written
+    And the contract violation is surfaced to the producer rather than landing in the wrong tenant bucket
 
   Scenario: Backoff retries schedule a delayed wakeup
     Given a row moved to "failed_retryable" with nextAttemptAt in the future

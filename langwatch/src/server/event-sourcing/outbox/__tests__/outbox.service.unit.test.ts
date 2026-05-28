@@ -152,7 +152,7 @@ describe("OutboxService", () => {
           projectId: "proj1",
           reactorName: "alertDispatch",
           dedupKey: "trigger1:trace1",
-          groupKey: "proj1",
+          groupKey: "proj1/alertDispatch:trigger1",
           payload: { triggerId: "trigger1" },
         });
         expect(result.enqueued).toBe(true);
@@ -168,18 +168,46 @@ describe("OutboxService", () => {
           projectId: "proj1",
           reactorName: "alertDispatch",
           dedupKey: "trigger1:trace1",
-          groupKey: "proj1",
+          groupKey: "proj1/alertDispatch:trigger1",
           payload: {},
         });
         const second = await service.enqueue({
           projectId: "proj1",
           reactorName: "alertDispatch",
           dedupKey: "trigger1:trace1",
-          groupKey: "proj1",
+          groupKey: "proj1/alertDispatch:trigger1",
           payload: {},
         });
         expect(second.enqueued).toBe(false);
         expect(repo.rows).toHaveLength(1);
+      });
+    });
+
+    describe("when groupKey does not start with `${projectId}/`", () => {
+      it("throws so the contract violation surfaces at enqueue (ADR-023)", async () => {
+        const { service } = buildService();
+        await expect(
+          service.enqueue({
+            projectId: "proj1",
+            reactorName: "alertDispatch",
+            dedupKey: "trigger1:trace1",
+            groupKey: "alertDispatch:trigger1",
+            payload: {},
+          }),
+        ).rejects.toThrow(/must start with "proj1\/"/);
+      });
+
+      it("also rejects a groupKey for a different project", async () => {
+        const { service } = buildService();
+        await expect(
+          service.enqueue({
+            projectId: "proj1",
+            reactorName: "alertDispatch",
+            dedupKey: "trigger1:trace1",
+            groupKey: "proj2/alertDispatch:trigger1",
+            payload: {},
+          }),
+        ).rejects.toThrow(/must start with "proj1\/"/);
       });
     });
   });
@@ -193,7 +221,7 @@ describe("OutboxService", () => {
           projectId: "proj1",
           reactorName: "alertDispatch",
           dedupKey: "k",
-          groupKey: "proj1",
+          groupKey: "proj1/alertDispatch:trigger1",
           payload: {},
         });
         const row = await service.leaseNext({
@@ -234,7 +262,7 @@ describe("OutboxService", () => {
           projectId: "proj1",
           reactorName: "alertDispatch",
           dedupKey: "k",
-          groupKey: "proj1",
+          groupKey: "proj1/alertDispatch:trigger1",
           payload: {},
         });
         const leased = await service.leaseNext({
@@ -265,7 +293,7 @@ describe("OutboxService", () => {
           projectId: "proj1",
           reactorName: "alertDispatch",
           dedupKey: "k",
-          groupKey: "proj1",
+          groupKey: "proj1/alertDispatch:trigger1",
           payload: {},
           maxAttempts: 1,
         });
@@ -293,7 +321,7 @@ describe("OutboxService", () => {
           projectId: "proj1",
           reactorName: "alertDispatch",
           dedupKey: "k",
-          groupKey: "proj1",
+          groupKey: "proj1/alertDispatch:trigger1",
           payload: {},
         });
         const leased = await service.leaseNext({
@@ -319,7 +347,7 @@ describe("OutboxService", () => {
           projectId: "proj1",
           reactorName: "alertDispatch",
           dedupKey: "k",
-          groupKey: "proj1",
+          groupKey: "proj1/alertDispatch:trigger1",
           payload: {},
         });
         await service.leaseNext({

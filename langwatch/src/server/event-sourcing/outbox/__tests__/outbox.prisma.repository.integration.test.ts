@@ -76,7 +76,7 @@ describe("PrismaOutboxRepository", () => {
           projectId,
           reactorName,
           dedupKey: "trigger-A:trace-1",
-          groupKey: projectId,
+          groupKey: `${projectId}/${reactorName}:trigger-A`,
           payload: { triggerId: "trigger-A" },
         });
         expect(inserted).toBe(true);
@@ -95,14 +95,14 @@ describe("PrismaOutboxRepository", () => {
           projectId,
           reactorName,
           dedupKey: "trigger-A:trace-1",
-          groupKey: projectId,
+          groupKey: `${projectId}/${reactorName}:trigger-A`,
           payload: { v: 1 },
         });
         const second = await repo.insertIfAbsent({
           projectId,
           reactorName,
           dedupKey: "trigger-A:trace-1",
-          groupKey: projectId,
+          groupKey: `${projectId}/${reactorName}:trigger-A`,
           payload: { v: 2 },
         });
         expect(second).toBe(false);
@@ -122,7 +122,7 @@ describe("PrismaOutboxRepository", () => {
           projectId,
           reactorName,
           dedupKey: "only-one",
-          groupKey: projectId,
+          groupKey: `${projectId}/${reactorName}:trigger-A`,
           payload: {},
         });
 
@@ -147,7 +147,7 @@ describe("PrismaOutboxRepository", () => {
             projectId,
             reactorName,
             dedupKey: "backoff",
-            groupKey: projectId,
+            groupKey: `${projectId}/${reactorName}:trigger-A`,
             payload: {},
             nextAttemptAt: future,
             status: "failed_retryable",
@@ -174,7 +174,7 @@ describe("PrismaOutboxRepository", () => {
             projectId,
             reactorName,
             dedupKey: "expired",
-            groupKey: projectId,
+            groupKey: `${projectId}/${reactorName}:trigger-A`,
             payload: {},
             status: "dispatching",
             leasedUntil: past,

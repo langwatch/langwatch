@@ -25,8 +25,8 @@ function makeRow(overrides: Partial<OutboxRow> = {}): OutboxRow {
     id: "row-1",
     projectId: "proj1",
     reactorName: "alertDispatch",
-    dedupKey: "k",
-    groupKey: "proj1",
+    dedupKey: "trigger1:trace:trace1",
+    groupKey: "proj1/alertDispatch:trigger1",
     payload: {},
     status: "dispatching",
     attempts: 1,
@@ -44,8 +44,7 @@ function makeRow(overrides: Partial<OutboxRow> = {}): OutboxRow {
 
 const baseWakeup: OutboxWakeup = {
   reactorName: "alertDispatch",
-  groupKey: "proj1",
-  tenantId: "proj1",
+  groupKey: "proj1/alertDispatch:trigger1",
   scheduledAt: Date.now(),
 };
 
@@ -69,6 +68,22 @@ describe("OutboxDrainer.handleWakeup", () => {
     it("returns without leasing or calling scheduleWakeup", async () => {
       await drainer.handleWakeup(baseWakeup);
       expect(repo.leaseNext).not.toHaveBeenCalled();
+      expect(scheduleWakeup).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the wakeup groupKey is missing the `${projectId}/` prefix", () => {
+    it("drops it without leasing (ADR-023 contract)", async () => {
+      const dispatcher = vi.fn(async () => undefined);
+      drainer.registerDispatcher("alertDispatch", dispatcher);
+
+      await drainer.handleWakeup({
+        ...baseWakeup,
+        groupKey: "alertDispatch:trigger1",
+      });
+
+      expect(repo.leaseNext).not.toHaveBeenCalled();
+      expect(dispatcher).not.toHaveBeenCalled();
       expect(scheduleWakeup).not.toHaveBeenCalled();
     });
   });
