@@ -162,6 +162,7 @@ export function VirtualKeyCreateDrawer({
         title:
           error instanceof Error ? error.message : "Failed to create virtual key",
         type: "error",
+        error: error,
       });
     }
   };

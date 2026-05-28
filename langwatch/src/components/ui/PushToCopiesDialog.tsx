@@ -75,6 +75,7 @@ export function PushToCopiesDialog({
             ? String((err as { message: unknown }).message)
             : "Unknown error",
         type: "error",
+        error: err,
       });
     }
   };

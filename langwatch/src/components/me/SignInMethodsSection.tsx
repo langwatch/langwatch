@@ -122,6 +122,7 @@ export function SignInMethodsSection() {
           error instanceof Error ? error.message : "Please try again",
         type: "error",
         meta: { closable: true },
+        error,
       });
     }
   };

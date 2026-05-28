@@ -209,6 +209,7 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
             }
           : undefined,
         meta: { closable: true },
+        error: error,
       });
     }
   }, [

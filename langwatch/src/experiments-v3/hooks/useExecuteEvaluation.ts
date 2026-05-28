@@ -787,6 +787,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
         title: "Abort Failed",
         description: message,
         type: "error",
+        error: err,
       });
     }
     // Note: No finally block - isAborting stays true until `stopped` event

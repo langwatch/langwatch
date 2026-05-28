@@ -120,6 +120,7 @@ export const NewWorkflowModal = ({
               error instanceof Error ? error.message : "Unknown error occurred",
             type: "error",
             meta: { closable: true },
+            error: error,
           });
         }
       };

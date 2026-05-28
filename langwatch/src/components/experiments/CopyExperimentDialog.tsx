@@ -116,6 +116,7 @@ export const CopyExperimentDialog = ({
         title: "Error replicating experiment",
         description: error instanceof Error ? error.message : "Unknown error",
         type: "error",
+        error: error,
       });
     }
   };

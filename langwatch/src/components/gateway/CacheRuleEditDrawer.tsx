@@ -86,6 +86,7 @@ export function CacheRuleEditDrawer({ rule, onOpenChange, onSaved }: Props) {
       toaster.create({
         title: e instanceof Error ? e.message : "Failed to save cache rule",
         type: "error",
+        error: e,
       });
     }
   };

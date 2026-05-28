@@ -9,6 +9,7 @@ import {
   Toast,
 } from "@chakra-ui/react";
 import { Info } from "react-feather";
+import { captureException } from "~/utils/posthogErrorCapture";
 
 const toaster_ = createToaster({
   placement: "top-end",
@@ -18,12 +19,23 @@ const toaster_ = createToaster({
 // Workaround for https://github.com/chakra-ui/chakra-ui/issues/9490#issuecomment-2601014577
 export const toaster = {
   ...toaster_,
-  create: (args: Parameters<typeof toaster_.create>[0]) => {
+  // Opt-in error reporting: pass the caught `error` and it's forwarded to
+  // PostHog as a $exception, so handled failures (not just uncaught crashes)
+  // reach the error/quality metrics. Validation toasts pass no `error` and
+  // stay silent — the presence of a real error is the signal, so we never
+  // report plain "field required" messages.
+  create: (
+    args: Parameters<typeof toaster_.create>[0] & { error?: unknown },
+  ) => {
+    const { error, ...toastArgs } = args;
+    if (error !== undefined) {
+      captureException(error, { tags: { source: "toaster" } });
+    }
     return toaster_.create({
       duration: 5000,
-      ...args,
+      ...toastArgs,
       meta: {
-        ...args.meta,
+        ...toastArgs.meta,
         placement: "top-end",
       },
     });

@@ -130,6 +130,7 @@ export function useProviderFormSubmit({
           type: "error",
           duration: 4000,
           meta: { closable: true },
+          error: err,
         });
       }
     },
@@ -469,6 +470,7 @@ export function useProviderFormSubmit({
         type: "error",
         duration: 4000,
         meta: { closable: true },
+        error: err,
       });
     } finally {
       setIsSaving(false);
