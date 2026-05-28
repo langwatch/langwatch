@@ -1,0 +1,58 @@
+# Langy agent pod image — the OpenCode "manager" (server.js) plus the
+# LangWatch CLI + MCP server the per-session workers shell out to.
+#
+# Built by the `langy-agent` matrix entry in
+# .github/workflows/publish-docker-app.yml on `langwatch@*` releases, and
+# usable locally for the Minikube scenario loop:
+#   docker build -f Dockerfile.langy_agent -t langy-agent:dev .
+#
+# Build context is the repo root (context: .), so the COPYs below reach
+# into services/langy-agent/.
+FROM ubuntu:24.04
+
+# Pin the CLI + MCP versions the agent was validated against. Bump these
+# in lockstep with a tested release rather than tracking `latest`.
+ARG LANGWATCH_CLI_VERSION=0.29.0
+ARG LANGWATCH_MCP_VERSION=0.9.0
+
+RUN apt-get update && apt-get install -y \
+    curl git ca-certificates unzip build-essential python3 \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
+    && apt-get install -y nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install opencode as root (its installer drops files in $HOME), then copy the
+# binary to /usr/local/bin so the non-root agent user can execute it without
+# needing access to /root.
+RUN curl -fsSL https://opencode.ai/install | bash && \
+    find /root -name opencode -type f 2>/dev/null | head -1 | xargs -I{} cp {} /usr/local/bin/opencode && \
+    chmod +x /usr/local/bin/opencode
+
+# CLI (`langwatch`) + MCP server (`langwatch-mcp-server`) from npm. Replaces
+# the old locally-`pnpm pack`'d tarballs so the image builds reproducibly in
+# CI with no host-side build step.
+RUN npm install -g "langwatch@${LANGWATCH_CLI_VERSION}" \
+    "@langwatch/mcp-server@${LANGWATCH_MCP_VERSION}"
+
+COPY services/langy-agent/entrypoint.sh /entrypoint.sh
+COPY services/langy-agent/server.js /server.js
+RUN chmod +x /entrypoint.sh
+
+# Non-root user so the pod can run with runAsNonRoot: true + readOnlyRootFilesystem.
+# ubuntu:24.04 ships a default `ubuntu` user already at UID 1000, so we remove
+# it first — otherwise `useradd -u 1000` fails with "UID already in use".
+# /workspace is owned by the agent user because the entrypoint creates skills/
+# and per-session directories there at runtime.
+RUN userdel -r ubuntu 2>/dev/null || true && \
+    useradd -m -u 1000 -s /bin/bash agent && \
+    mkdir -p /workspace && \
+    chown -R agent:agent /workspace
+
+ENV HOME=/home/agent
+USER agent
+WORKDIR /workspace
+EXPOSE 8080
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["node", "/server.js"]

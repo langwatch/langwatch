@@ -1,0 +1,68 @@
+{{- if .Values.networkPolicy.enabled }}
+# NetworkPolicy for the Langy agent. Deny-by-default; only the rules below
+# reach the pod.
+#
+# Ingress (who may talk TO the agent):
+#   - ONLY the LangWatch control plane (langwatch-app) on the manager port.
+#     Unlike the gateway, the agent has no public surface — there is no LB
+#     or ingress-controller allow rule on purpose.
+#
+# Egress (what the agent may talk to):
+#   - DNS (kube-system:53).
+#   - Control plane (langwatch-app) — the per-session MCP server calls the
+#     LangWatch API at LANGWATCH_ENDPOINT.
+#   - AI gateway (langwatch-gateway) — OpenCode's LLM traffic goes out via
+#     OPENAI_BASE_URL pointed at the gateway, not direct to providers.
+#   - 443 to anywhere (optional, default on) — OpenCode may reach external
+#     hosts (e.g. its own update/telemetry). Tighten by setting
+#     networkPolicy.allowExternalHttps=false once egress needs are pinned.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "langy-agent.fullname" . }}
+  labels: {{- include "langy-agent.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels: {{- include "langy-agent.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        {{- toYaml .Values.networkPolicy.ingressFrom | nindent 8 }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.manager.port }}
+  egress:
+    # DNS — must resolve before anything else.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Control plane (LangWatch app) — MCP -> LangWatch API.
+    - to:
+        {{- toYaml .Values.networkPolicy.egressToControlPlane | nindent 8 }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.networkPolicy.controlPlanePort }}
+    # AI gateway — OpenCode LLM traffic (OPENAI_BASE_URL).
+    - to:
+        {{- toYaml .Values.networkPolicy.egressToGateway | nindent 8 }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.networkPolicy.gatewayPort }}
+    {{- if .Values.networkPolicy.allowExternalHttps }}
+    # External HTTPS (OpenCode update/telemetry, etc.). Loosen/tighten here.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - protocol: TCP
+          port: 443
+    {{- end }}
+{{- end }}
