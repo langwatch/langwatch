@@ -143,6 +143,34 @@ export function parseTTLDaysFromEngineMetadata(
 }
 
 /**
+ * Detects a legacy per-origin retention TTL clause (the removed
+ * `RetentionClass`-based DELETE policy). The cold-storage day count alone can
+ * match the desired value while these DELETE clauses still linger, so any table
+ * carrying them must be rewritten to the clean MOVE-only expression regardless.
+ */
+export function hasLegacyRetentionTTL(engineFull: string): boolean {
+  return /RetentionClass/i.test(engineFull);
+}
+
+/**
+ * Decides whether a table's TTL needs rewriting. A rewrite is required when the
+ * cold-storage day count differs from desired, OR when the current expression
+ * still carries a legacy retention DELETE clause that must be stripped.
+ */
+export function shouldRewriteTTL({
+  currentDays,
+  desiredDays,
+  engineFull,
+}: {
+  currentDays: number | null;
+  desiredDays: number;
+  engineFull: string;
+}): boolean {
+  if (hasLegacyRetentionTTL(engineFull)) return true;
+  return currentDays !== desiredDays;
+}
+
+/**
  * Builds the desired TTL SQL expression for a table.
  */
 export function buildDesiredTTLExpression({
@@ -249,7 +277,7 @@ export async function reconcileTTL(
       const desiredDays = resolveHotDays(tableConfig);
       const currentDays = parseTTLDaysFromEngineMetadata(engineFull);
 
-      if (currentDays === desiredDays) {
+      if (!shouldRewriteTTL({ currentDays, desiredDays, engineFull })) {
         skippedCount++;
         if (options.verbose) {
           logger.debug(
