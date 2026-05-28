@@ -58,6 +58,7 @@ import { TokenizerService } from "./traces/tokenizer.service";
 import { LogRequestCollectionService } from "./traces/log-request-collection.service";
 import { MetricRequestCollectionService } from "./traces/metric-request-collection.service";
 import { TraceRequestCollectionService } from "./traces/trace-request-collection.service";
+import { TraceSpanBoundService } from "./traces/trace-span-bound.service";
 import { TraceListService } from "./traces/trace-list.service";
 import { TraceListClickHouseRepository } from "./traces/repositories/trace-list.clickhouse.repository";
 import { NullTraceListRepository } from "./traces/repositories/trace-list.repository";
@@ -398,10 +399,15 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     queueSimulationRun: commands.simulations.queueRun,
   });
 
+  const traceSpanBound = redis
+    ? new TraceSpanBoundService({ redis })
+    : undefined;
+
   const traceCollection = traced(
     new TraceRequestCollectionService({
       dedup: spanDedup,
       recordSpan: commands.traces.recordSpan,
+      spanBound: traceSpanBound,
     }),
     "TraceRequestCollectionService",
   );
@@ -429,6 +435,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     collection: traceCollection,
     logCollection,
     metricCollection,
+    spanBound: traceSpanBound,
   };
 
   // Collect closeables for graceful shutdown

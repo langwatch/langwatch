@@ -18,6 +18,7 @@ import type { LogRequestCollectionService } from "./traces/log-request-collectio
 import type { MetricRequestCollectionService } from "./traces/metric-request-collection.service";
 import type { TraceListService } from "./traces/trace-list.service";
 import type { TraceRequestCollectionService } from "./traces/trace-request-collection.service";
+import type { TraceSpanBoundService } from "./traces/trace-span-bound.service";
 import type { TraceSummaryService } from "./traces/trace-summary.service";
 import type { PlanProvider } from "./subscription/plan-provider";
 import type { SubscriptionService } from "./subscription/subscription.service";
@@ -56,6 +57,7 @@ export interface AppDependencies {
     collection: TraceRequestCollectionService;
     logCollection: LogRequestCollectionService;
     metricCollection: MetricRequestCollectionService;
+    spanBound?: TraceSpanBoundService;
   };
   evaluations: {
     runs: EvaluationRunService;

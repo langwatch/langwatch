@@ -13,6 +13,7 @@ import {
   spanSchema,
 } from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
 import { TraceRequestUtils } from "../../event-sourcing/pipelines/trace-processing/utils/traceRequest.utils";
+import type { TraceSpanBoundService } from "./trace-span-bound.service";
 import type { SpanDedupService } from "./span-dedupe.service";
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
@@ -50,6 +51,7 @@ export interface TraceRequestCollectionResult {
 export interface TraceRequestCollectionDeps {
   dedup: SpanDedupService;
   recordSpan: (data: RecordSpanCommandData) => Promise<void>;
+  spanBound?: TraceSpanBoundService;
 }
 
 /**
@@ -223,6 +225,25 @@ export class TraceRequestCollectionService {
         return { status: "deduped" };
       }
       lockAcquired = lockResult === true;
+
+      // Front-drop spans for a trace that has hit its ingestion ceiling, before
+      // staging recordSpan (which is what triggers storage + fold). Checked
+      // after dedup so retries don't inflate the count. Confirm the span as
+      // processed so retries are deduped away instead of re-hitting the bound.
+      if (
+        this.deps.spanBound &&
+        !(await this.deps.spanBound.admit(tenantId, normalizedSpan.traceId))
+      ) {
+        await this.deps.dedup.tryConfirmProcessed(
+          tenantId,
+          normalizedSpan.traceId,
+          normalizedSpan.spanId,
+        );
+        return {
+          status: "dropped",
+          error: "trace span ingestion bound exceeded",
+        };
+      }
 
       await this.deps.recordSpan({
         tenantId,

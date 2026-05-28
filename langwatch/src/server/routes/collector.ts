@@ -27,6 +27,7 @@ import {
   spanValidatorSchema,
 } from "../tracer/types.generated";
 import { CollectorSpanUtils } from "../traces/collectorSpan.utils";
+import { TraceRequestUtils } from "../event-sourcing/pipelines/trace-processing/utils/traceRequest.utils";
 import { createLogger } from "../../utils/logger/server";
 import { TokenResolver } from "../api-key/token-resolver";
 import {
@@ -554,25 +555,51 @@ app.post(
       });
 
       const results = await Promise.allSettled(
-        spans.map((span) =>
-          getApp().traces.recordSpan({
+        spans.map(async (span) => {
+          const otlpSpan = CollectorSpanUtils.convertSpanToOtlp(span);
+
+          // Front-drop spans for a trace over its ingestion ceiling, before
+          // dispatching recordSpan (which triggers storage + fold). Keyed on the
+          // same normalized trace id the command uses so both paths agree.
+          const spanBound = getApp().traces.spanBound;
+          if (spanBound) {
+            const { traceId: normalizedTraceId } =
+              TraceRequestUtils.normalizeOtlpSpanIds(otlpSpan);
+            if (!(await spanBound.admit(project.id, normalizedTraceId))) {
+              return { dropped: true as const };
+            }
+          }
+
+          await getApp().traces.recordSpan({
             tenantId: project.id,
-            span: CollectorSpanUtils.convertSpanToOtlp(span),
+            span: otlpSpan,
             resource,
             instrumentationScope: { name: "langwatch.rest.collector" },
             piiRedactionLevel: project.piiRedactionLevel,
             occurredAt: Date.now(),
-          }),
-        ),
+          });
+          return { dropped: false as const };
+        }),
       );
 
       const failures = results.filter(
         (r): r is PromiseRejectedResult => r.status === "rejected",
       );
-      rejectedSpans = failures.length;
+      const boundDrops = results.filter(
+        (r) => r.status === "fulfilled" && r.value.dropped,
+      ).length;
+      // Bound-drops are accept-but-drop: reported as rejectedSpans (the OTLP
+      // partial-success signal is non-retryable) so the drop is visible and the
+      // SDK does not retry-storm re-sending spans we will only drop again.
+      rejectedSpans = failures.length + boundDrops;
       rejectionErrors = failures.map((f) =>
         f.reason instanceof Error ? f.reason.message : String(f.reason),
       );
+      if (boundDrops > 0) {
+        rejectionErrors.push(
+          `${boundDrops} span(s) dropped: trace span ingestion bound exceeded`,
+        );
+      }
       if (failures.length > 0) {
         logger.error(
           {
