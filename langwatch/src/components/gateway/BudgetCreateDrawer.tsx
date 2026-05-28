@@ -114,6 +114,7 @@ export function BudgetCreateDrawer({
       toaster.create({
         title: error instanceof Error ? error.message : "Failed to create budget",
         type: "error",
+        error: error,
       });
     }
   };

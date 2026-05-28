@@ -55,6 +55,7 @@ export function CacheRuleCreateDrawer({ open, onOpenChange, onCreated }: Props) 
       toaster.create({
         title: e instanceof Error ? e.message : "Failed to create cache rule",
         type: "error",
+        error: e,
       });
     }
   };

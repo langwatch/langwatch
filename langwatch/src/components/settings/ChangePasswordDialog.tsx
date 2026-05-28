@@ -72,6 +72,7 @@ export function ChangePasswordDialog({
           error instanceof Error ? error.message : "Please try again",
         type: "error",
         meta: { closable: true },
+        error: error,
       });
     }
   };

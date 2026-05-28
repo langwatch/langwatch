@@ -284,6 +284,7 @@ export function OptimizeModalContent({
             title: "Error",
             description: "Failed to save version",
             type: "error",
+            error: error,
           });
           throw error;
         }

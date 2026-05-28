@@ -186,6 +186,7 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
         type: "error",
         duration: TOAST_DURATION_MS,
         meta: { closable: true },
+        error: error,
       });
     }
   }, [

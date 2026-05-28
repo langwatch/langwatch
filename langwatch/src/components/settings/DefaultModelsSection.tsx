@@ -143,6 +143,7 @@ export function DefaultModelsSection({
         type: "error",
         duration: 6000,
         meta: { closable: true },
+        error: err,
       });
     }
   };

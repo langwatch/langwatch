@@ -120,6 +120,7 @@ export default function AuthenticationSettings() {
         meta: {
           closable: true,
         },
+        error: error,
       });
     }
   };

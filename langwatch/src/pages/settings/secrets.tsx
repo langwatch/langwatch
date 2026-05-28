@@ -70,6 +70,7 @@ export default function SecretsPage() {
       toaster.create({
         title: error instanceof Error ? error.message : "Failed to create secret",
         type: "error",
+        error: error,
       });
     }
   };
@@ -87,6 +88,7 @@ export default function SecretsPage() {
       toaster.create({
         title: error instanceof Error ? error.message : "Failed to delete secret",
         type: "error",
+        error: error,
       });
     }
   };
@@ -106,6 +108,7 @@ export default function SecretsPage() {
       toaster.create({
         title: error instanceof Error ? error.message : "Failed to update secret",
         type: "error",
+        error: error,
       });
     }
   };

@@ -335,6 +335,7 @@ export function CSVReaderComponent({
               meta: {
                 closable: true,
               },
+              error: error,
             });
           }
         } else {
