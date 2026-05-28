@@ -23,6 +23,7 @@ import type { Session } from "~/server/auth";
 
 import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
 import {
+  parseVirtualKeyConfig,
   virtualKeyConfigSchema,
   type GuardrailAttachment,
 } from "~/server/gateway/virtualKey.config";
@@ -66,6 +67,68 @@ async function resolveVkProjectId(
   }
   const projectScopes = (scopes ?? []).filter((s) => s.scopeType === "PROJECT");
   return projectScopes.length === 1 ? projectScopes[0]!.scopeId : null;
+}
+
+/**
+ * Every requested scope must belong to the VK's own organization.
+ * `assertCanManageAllScopes` only proves the caller controls each scope,
+ * not that the scope lives in `organizationId` — without this, a caller
+ * with manage rights in org A could submit `organizationId` for org B
+ * plus a scope from org A and write a cross-org VK row. ORGANIZATION
+ * scopes must equal the org; TEAM/PROJECT scopes must resolve to it.
+ */
+async function assertScopesBelongToOrg(
+  prisma: PrismaClient,
+  organizationId: string,
+  scopes: { scopeType: string; scopeId: string }[],
+): Promise<void> {
+  const teamIds = scopes
+    .filter((s) => s.scopeType === "TEAM")
+    .map((s) => s.scopeId);
+  const projectIds = scopes
+    .filter((s) => s.scopeType === "PROJECT")
+    .map((s) => s.scopeId);
+
+  for (const s of scopes) {
+    if (s.scopeType === "ORGANIZATION" && s.scopeId !== organizationId) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: `scope_org_mismatch: scope ${s.scopeId} is not in organization ${organizationId}`,
+      });
+    }
+  }
+
+  if (teamIds.length > 0) {
+    const found = await prisma.team.findMany({
+      where: { id: { in: teamIds }, organizationId },
+      select: { id: true },
+    });
+    const foundIds = new Set(found.map((t) => t.id));
+    for (const id of teamIds) {
+      if (!foundIds.has(id)) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `scope_org_mismatch: team ${id} is not in organization ${organizationId}`,
+        });
+      }
+    }
+  }
+
+  if (projectIds.length > 0) {
+    const found = await prisma.project.findMany({
+      where: { id: { in: projectIds }, team: { organizationId } },
+      select: { id: true },
+    });
+    const foundIds = new Set(found.map((p) => p.id));
+    for (const id of projectIds) {
+      if (!foundIds.has(id)) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `scope_org_mismatch: project ${id} is not in organization ${organizationId}`,
+        });
+      }
+    }
+  }
 }
 
 /**
@@ -197,6 +260,11 @@ export const virtualKeysRouter = createTRPCRouter({
         { prisma: ctx.prisma, session: ctx.session },
         input.scopes,
       );
+      await assertScopesBelongToOrg(
+        ctx.prisma,
+        input.organizationId,
+        input.scopes,
+      );
       const vkProjectId = await resolveVkProjectId(
         ctx.prisma,
         input.organizationId,
@@ -255,6 +323,11 @@ export const virtualKeysRouter = createTRPCRouter({
           { prisma: ctx.prisma, session: ctx.session },
           input.scopes,
         );
+        await assertScopesBelongToOrg(
+          ctx.prisma,
+          input.organizationId,
+          input.scopes,
+        );
       }
       const vkProjectId = await resolveVkProjectId(
         ctx.prisma,
@@ -262,10 +335,18 @@ export const virtualKeysRouter = createTRPCRouter({
         input.id,
         input.scopes,
       );
+      // Revalidate the EFFECTIVE post-update attachments, not just the
+      // ones in this request. A scope change can move the VK to a new
+      // project, leaving previously-stored attachments pointing at the old
+      // project's guardrails; when config isn't re-sent, fall back to the
+      // existing attachments so they're rechecked against the new project.
+      const effectiveAttachments =
+        input.config?.guardrailAttachments ??
+        parseVirtualKeyConfig(existing.config).guardrailAttachments;
       await assertGuardrailAttachmentsAllowed(
         ctx,
         vkProjectId,
-        input.config?.guardrailAttachments,
+        effectiveAttachments,
       );
       const updated = await service.update({
         id: input.id,

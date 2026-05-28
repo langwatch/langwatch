@@ -337,6 +337,45 @@ describe("virtualKeys — scope-aware RBAC", () => {
     });
   });
 
+  describe("given organizationId must own every requested scope", () => {
+    /** @scenario A create cannot bind a scope from a different org than its organizationId */
+    it("rejects a create whose organizationId differs from a team scope's org", async () => {
+      // Caller legitimately manages TEAM_PLATFORM in ORG_ID, so the
+      // per-scope manage gate passes — only the org-ownership check stops
+      // the cross-org write.
+      const caller = await seedUser(["virtualKeys:manage"], [
+        { scopeType: TEAM, scopeId: TEAM_PLATFORM },
+      ]);
+      await expect(
+        caller.virtualKeys.create({
+          organizationId: `org-foreign-${ns}`,
+          name: "cross-org-create",
+          scopes: [{ scopeType: "TEAM", scopeId: TEAM_PLATFORM }],
+        }),
+      ).rejects.toMatchObject({
+        code: "BAD_REQUEST",
+        message: expect.stringContaining("scope_org_mismatch"),
+      });
+    });
+
+    /** @scenario An ORGANIZATION scope must equal the organizationId */
+    it("rejects a create whose ORGANIZATION scope differs from organizationId", async () => {
+      const caller = await seedUser(["virtualKeys:manage"], [
+        { scopeType: ORG, scopeId: ORG_ID },
+      ]);
+      await expect(
+        caller.virtualKeys.create({
+          organizationId: `org-foreign-${ns}`,
+          name: "cross-org-orgscope",
+          scopes: [{ scopeType: "ORGANIZATION", scopeId: ORG_ID }],
+        }),
+      ).rejects.toMatchObject({
+        code: "BAD_REQUEST",
+        message: expect.stringContaining("scope_org_mismatch"),
+      });
+    });
+  });
+
   describe("given update / rotate / delete authorize the op-perm on one existing scope", () => {
     /** @scenario Updating a VK requires virtualKeys:update at one of the VK's scopes */
     it("allows an update-holder on the VK's team to rename it", async () => {
