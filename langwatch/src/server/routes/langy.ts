@@ -416,7 +416,7 @@ app.get("/langy/conversations/:id", async (c) => {
   });
   if (!conv) return c.json({ error: "Not found" }, { status: 404 });
   const msgService = LangyMessageService.create(prisma);
-  const messages = await msgService.getAllByConversation({
+  const messages = await msgService.getRecordsByConversation({
     conversationId: conv.id,
     projectId: projectId!,
   });
