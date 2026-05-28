@@ -6,7 +6,7 @@ Feature: AI Gateway Governance — Architecture Invariants
   in scope (filed as follow-up).
 
   This file is the high-level contract. The implementation-adjacent
-  specs (Sergey's receiver-shapes / folds / retention /
+  specs (Sergey's receiver-shapes / folds /
   event-log-durability; Andre's compliance-baseline / siem-export;
   Lane-B's ui-contract) refine the details. If any of those drift
   from this file's invariants, this file wins — open a discussion
@@ -27,14 +27,13 @@ Feature: AI Gateway Governance — Architecture Invariants
        unified store; choice is per source type.
     3. Hidden internal Governance Project per organization, as
        routing/tenancy artifact only. Never user-visible. Never
-       a composer-visible field. Carries the org's per-origin
-       retention class + RBAC for governance data.
+       a composer-visible field. Carries the org's RBAC for
+       governance data.
     4. Origin metadata convention: `langwatch.origin.*` for
        source identity (kind, ingestion_source_id,
        organization_id), `langwatch.governance.*` for
-       system-derived attributes (retention_class,
-       anomaly_alert_id, etc.). Reserved namespaces; not
-       user-settable.
+       system-derived attributes (anomaly_alert_id, etc.).
+       Reserved namespaces; not user-settable.
     5. Governance fold projections derive KPIs + OCSF read shape
        from the unified store. governance_kpis fold powers the
        /governance dashboard + anomaly reactor.
@@ -48,7 +47,7 @@ Feature: AI Gateway Governance — Architecture Invariants
        durability invariant. Every receiver write goes through
        event_log → projections rebuild from it.
     8. Cryptographic tamper-evidence is DEFERRED. Append-only
-       event_log + per-origin retention + RBAC is the SOC2 Type
+       event_log + RBAC is the SOC2 Type
        II / ISO 27001 / EU AI Act / GDPR / HIPAA-most-uses
        baseline. Cryptographic Merkle-root publication is a
        follow-up hardening layer for regulated-industry
@@ -60,7 +59,6 @@ Feature: AI Gateway Governance — Architecture Invariants
     - specs/ai-gateway/governance/siem-export.feature              (Andre)
     - specs/ai-gateway/governance/receiver-shapes.feature          (Sergey)
     - specs/ai-gateway/governance/folds.feature                    (Sergey)
-    - specs/ai-gateway/governance/retention.feature                (Sergey)
     - specs/ai-gateway/governance/event-log-durability.feature     (Sergey)
 
   # ---------------------------------------------------------------------------
@@ -136,7 +134,7 @@ Feature: AI Gateway Governance — Architecture Invariants
   @bdd @architecture @hidden-project @critical
   Scenario: The hidden Governance Project is internal routing only
     Given the hidden Governance Project exists
-    Then its purpose is exactly: holding tenancy + retention + RBAC
+    Then its purpose is exactly: holding tenancy + RBAC
       context for IngestionSource data
     And it is NEVER presented as a user-facing project (see
       ui-contract.feature for UI-side enforcement scenarios)
@@ -153,8 +151,8 @@ Feature: AI Gateway Governance — Architecture Invariants
     When it lands in recorded_spans / log_records
     Then its Project tenancy is the hidden Governance Project of
       that source's organization
-    And the existing project-scoped CH partitioning + RBAC +
-      retention machinery applies to it unchanged
+    And the existing project-scoped CH partitioning + RBAC
+      applies to it unchanged
     And NO new "org-tenancy" axis is introduced at the trace store
       level (no parallel partition key, no nullable Project on
       Trace/Span)
@@ -175,8 +173,6 @@ Feature: AI Gateway Governance — Architecture Invariants
       | langwatch.origin.ingestion_source_id        | lw_is_<source-id>       |
       | langwatch.origin.organization_id            | <org-id>                |
     And the span/log carries any source-config-driven attributes too
-      (e.g. langwatch.governance.retention_class from the source's
-       retention setting)
 
   @bdd @architecture @namespaces @critical
   Scenario: User-supplied langwatch.* attributes are rejected
@@ -197,8 +193,8 @@ Feature: AI Gateway Governance — Architecture Invariants
     Then langwatch.origin.* attributes describe WHERE this event
       came from (source identity, kind, organization)
     And langwatch.governance.* attributes describe DERIVED
-      governance state (retention class applied, anomaly alert
-      that flagged this span, severity classification, etc.)
+      governance state (anomaly alert that flagged this span,
+      severity classification, etc.)
     And neither namespace is meant for user-supplied trace
       annotations (those use other span attributes)
 
@@ -336,7 +332,6 @@ Feature: AI Gateway Governance — Architecture Invariants
     Then this PR ships:
       | invariant                                            |
       | Append-only event_log (durability)                   |
-      | Per-origin retention class (configurable per source) |
       | RBAC via hidden Governance Project membership         |
       | Origin metadata + reserved namespaces                |
       | OCSF read projection (SIEM forwarding via API)       |
@@ -354,7 +349,7 @@ Feature: AI Gateway Governance — Architecture Invariants
       compliance-architecture.mdx) explicitly name tamper-evidence
       as the next hardening layer, not part of this PR's baseline
     And this is by design (rchaves + master call: append-only +
-      retention + RBAC is sufficient for the broad market;
+      RBAC is sufficient for the broad market;
       cryptographic Merkle proofs are a regulated-industry-specific
       add-on shipped when a customer with that contractual ask is
       in pipeline)

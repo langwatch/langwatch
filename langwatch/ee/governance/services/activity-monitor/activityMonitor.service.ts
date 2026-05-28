@@ -36,6 +36,10 @@ import {
   GOVERNANCE_ATTR,
   GOVERNANCE_ORIGIN_KIND_VALUE,
 } from "../governanceAttributeKeys";
+import {
+  UNASSIGNED_COST_CENTER,
+  resolveTraceCostCenterId,
+} from "../cost-center/costCenterAttribution";
 
 export interface SummaryResult {
   spentThisWindowUsd: number;
@@ -96,6 +100,16 @@ export interface SpendByTeamRow {
   lastActivityIso: string | null;
   /** Number of distinct ingestion sources rolled up under this team. */
   sourceCount: number;
+}
+
+export interface SpendByCostCenterRow {
+  /** CostCenter.id, or null for the synthetic "Unassigned" bucket. */
+  costCenterId: string | null;
+  /** CostCenter.name, or "Unassigned". */
+  costCenterName: string;
+  spendUsd: number;
+  requestCount: number;
+  lastActivityIso: string | null;
 }
 
 export interface IngestionSourceHealthRow {
@@ -488,6 +502,192 @@ export class ActivityMonitorService {
       hasPriorBaseline: false,
       mostUsedTarget: r.mostUsedTarget && r.mostUsedTarget !== "" ? r.mostUsedTarget : null,
     }));
+  }
+
+  /**
+   * Spend rolled up by cost center across EVERY project in the org — the
+   * fix for the empty bird's-eye graphs. Unlike `summary`/`spendByUser`,
+   * which read only the hidden governance project and the governance
+   * ingestion origin, this aggregates the whole org's AI spend so an org
+   * with real traffic but no ingestion source still populates.
+   *
+   * A trace's cost center is resolved by precedence (principal user → the
+   * user's team → the project, else Unassigned), so a person's personal
+   * use and the autonomous agents their team runs can land in the same
+   * cost center. The principal user is the `langwatch.user_id` attribute;
+   * traces without it (plain application traffic) attribute by project.
+   *
+   * Tenancy: the project tenant IDs come from Prisma scoped to the org, so
+   * the ClickHouse `WHERE TenantId IN (...)` can only ever read this org's
+   * own projects — cross-org isolation holds by construction.
+   *
+   * Spec: specs/ai-gateway/governance/cost-centers.feature
+   *       (the @birds-eye scenarios)
+   */
+  async spendByCostCenter(input: {
+    organizationId: string;
+    windowDays: number;
+  }): Promise<SpendByCostCenterRow[]> {
+    const projects = await this.prisma.project.findMany({
+      where: { team: { organizationId: input.organizationId }, archivedAt: null },
+      select: { id: true, costCenterId: true },
+    });
+    if (projects.length === 0) return [];
+
+    const ch = await this.getClickhouse(input.organizationId);
+    if (!ch) return [];
+
+    const projectCostCenterById = new Map(
+      projects.map((p) => [p.id, p.costCenterId] as const),
+    );
+    const tenantIds = projects.map((p) => p.id);
+
+    const { userCostCenterByEmail, userTeamCostCenterByEmail } =
+      await this.resolveUserCostCenters(input.organizationId);
+    const activeCostCenterNames = await this.activeCostCenterNames(
+      input.organizationId,
+    );
+
+    const now = Date.now();
+    const windowStart = now - input.windowDays * 24 * 60 * 60 * 1000;
+
+    const result = await ch.query({
+      query: `
+        SELECT
+          ts.TenantId AS projectId,
+          ts.Attributes[{userKey:String}] AS actor,
+          toString(sum(coalesce(ts.TotalCost, 0))) AS spendUsdStr,
+          toString(count()) AS requests,
+          toString(toUnixTimestamp64Milli(max(ts.OccurredAt))) AS lastActivityMs
+        FROM trace_summaries ts
+        WHERE ts.TenantId IN ({tenantIds:Array(String)})
+          AND ts.OccurredAt >= fromUnixTimestamp64Milli({windowStart:UInt64})
+          AND (ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (
+            SELECT TenantId, TraceId, max(UpdatedAt)
+            FROM trace_summaries
+            WHERE TenantId IN ({tenantIds:Array(String)})
+              AND OccurredAt >= fromUnixTimestamp64Milli({windowStart:UInt64})
+            GROUP BY TenantId, TraceId
+          )
+        GROUP BY projectId, actor
+      `,
+      query_params: {
+        tenantIds,
+        windowStart,
+        userKey: ATTR_USER_ID,
+      },
+      format: "JSONEachRow",
+    });
+    const rows = (await result.json()) as Array<{
+      projectId: string;
+      actor: string;
+      spendUsdStr: string;
+      requests: string;
+      lastActivityMs: string;
+    }>;
+
+    const acc = new Map<
+      string,
+      { spendUsd: number; requestCount: number; lastActivityMs: number }
+    >();
+    for (const r of rows) {
+      const hasPrincipalUser = r.actor !== "";
+      const costCenterId = resolveTraceCostCenterId({
+        hasPrincipalUser,
+        userCostCenterId: userCostCenterByEmail.get(r.actor),
+        userTeamCostCenterId: userTeamCostCenterByEmail.get(r.actor),
+        projectCostCenterId: projectCostCenterById.get(r.projectId) ?? null,
+      });
+      // An archived or otherwise-unknown cost center rolls up as Unassigned
+      // without a backfill: it is simply absent from the active name map.
+      const key =
+        costCenterId !== UNASSIGNED_COST_CENTER &&
+        activeCostCenterNames.has(costCenterId)
+          ? costCenterId
+          : UNASSIGNED_COST_CENTER;
+      const prior = acc.get(key) ?? {
+        spendUsd: 0,
+        requestCount: 0,
+        lastActivityMs: 0,
+      };
+      acc.set(key, {
+        spendUsd: prior.spendUsd + Number(r.spendUsdStr),
+        requestCount: prior.requestCount + Number(r.requests),
+        lastActivityMs: Math.max(prior.lastActivityMs, Number(r.lastActivityMs)),
+      });
+    }
+
+    return [...acc.entries()]
+      .map(([key, v]) => ({
+        costCenterId: key === UNASSIGNED_COST_CENTER ? null : key,
+        costCenterName:
+          key === UNASSIGNED_COST_CENTER
+            ? "Unassigned"
+            : activeCostCenterNames.get(key)!,
+        spendUsd: v.spendUsd,
+        requestCount: v.requestCount,
+        lastActivityIso:
+          v.lastActivityMs > 0
+            ? new Date(v.lastActivityMs).toISOString()
+            : null,
+      }))
+      .sort((a, b) => b.spendUsd - a.spendUsd);
+  }
+
+  private async activeCostCenterNames(
+    organizationId: string,
+  ): Promise<Map<string, string>> {
+    const rows = await this.prisma.costCenter.findMany({
+      where: { organizationId, archivedAt: null },
+      select: { id: true, name: true },
+    });
+    return new Map(rows.map((r) => [r.id, r.name] as const));
+  }
+
+  /**
+   * Maps a principal user's email (the `langwatch.user_id` attribute) to
+   * their own cost center and, separately, an inherited team cost center.
+   * A member can belong to several teams; the inherited default is the
+   * first non-personal team that carries a cost center.
+   */
+  private async resolveUserCostCenters(organizationId: string): Promise<{
+    userCostCenterByEmail: Map<string, string | null>;
+    userTeamCostCenterByEmail: Map<string, string | null>;
+  }> {
+    const members = await this.prisma.organizationUser.findMany({
+      where: { organizationId },
+      select: {
+        costCenterId: true,
+        user: {
+          select: {
+            email: true,
+            teamMemberships: {
+              where: {
+                team: {
+                  organizationId,
+                  isPersonal: false,
+                  costCenterId: { not: null },
+                },
+              },
+              select: { team: { select: { costCenterId: true } } },
+            },
+          },
+        },
+      },
+    });
+
+    const userCostCenterByEmail = new Map<string, string | null>();
+    const userTeamCostCenterByEmail = new Map<string, string | null>();
+    for (const m of members) {
+      const email = m.user.email;
+      if (!email) continue;
+      userCostCenterByEmail.set(email, m.costCenterId);
+      const inherited = m.user.teamMemberships.find(
+        (tm) => tm.team.costCenterId,
+      )?.team.costCenterId;
+      userTeamCostCenterByEmail.set(email, inherited ?? null);
+    }
+    return { userCostCenterByEmail, userTeamCostCenterByEmail };
   }
 
   /**

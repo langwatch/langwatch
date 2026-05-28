@@ -12,6 +12,7 @@ import {
   PackageOpen,
   PlugZap,
   Route,
+  Wallet,
 } from "lucide-react";
 import { type PropsWithChildren } from "react";
 
@@ -96,6 +97,13 @@ export default function GovernanceLayout({
                   icon={<PackageOpen size={14} />}
                 >
                   Tool Catalog
+                </MenuLink>
+                <MenuLink
+                  href="/settings/governance/cost-centers"
+                  includePath="/settings/governance/cost-centers"
+                  icon={<Wallet size={14} />}
+                >
+                  Cost Centers
                 </MenuLink>
               </VStack>
               <Box paddingX={3} paddingTop={4}>

@@ -291,14 +291,33 @@ export const aiToolsRouter = createTRPCRouter({
    * handler).
    */
   importStarterPack: protectedProcedure
-    .input(z.object({ organizationId: z.string() }))
+    .input(
+      z.object({
+        organizationId: z.string(),
+        // The admin's checkbox selection. Omitted = the full pack.
+        slugs: z.array(z.string()).min(1).optional(),
+      }),
+    )
     .use(checkOrganizationPermission("aiTools:manage"))
     .mutation(async ({ ctx, input }) => {
       const service = AiToolEntryService.create(ctx.prisma);
       return await service.seedStarterPack({
         organizationId: input.organizationId,
         actorUserId: ctx.session.user.id,
+        slugs: input.slugs,
       });
+    }),
+
+  /**
+   * The starter-pack catalog the admin editor renders as a checklist.
+   * Static org-agnostic projection — gated on aiTools:manage to match the
+   * editor's own access (only catalog admins ever see it).
+   */
+  starterPackCatalog: protectedProcedure
+    .input(z.object({ organizationId: z.string() }))
+    .use(checkOrganizationPermission("aiTools:manage"))
+    .query(() => {
+      return AiToolEntryService.listStarterPackTiles();
     }),
 
   /**

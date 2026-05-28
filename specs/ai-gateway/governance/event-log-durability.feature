@@ -12,7 +12,7 @@ Feature: Append-only event_log durability for governance ingestion
   filed for the regulated-industry segment — explicitly NOT shipped
   in this PR.
 
-  Companion: folds.feature, retention.feature, compliance-baseline.feature.
+  Companion: folds.feature, compliance-baseline.feature.
 
   Background:
     Given the unified observability substrate is live
@@ -39,7 +39,7 @@ Feature: Append-only event_log durability for governance ingestion
       Given a span/log_record landed via IngestionSource is in the store
       When the admin attempts to delete it
       Then no product API surface (UI, tRPC, REST) permits in-place deletion
-      And the only data-removal path is CH TTL eval per the retention class
+      And the event_log is append-only with no automatic data-removal path
 
     Scenario: an admin cannot retroactively edit a governance event's attributes
       Given a span/log_record landed via IngestionSource is in the store

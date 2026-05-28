@@ -167,9 +167,16 @@ model OrganizationUser {
   createdAt      DateTime             @default(now())
   updatedAt      DateTime             @default(now()) @updatedAt
 
+  /// Cost-center assignment for spend attribution (the people lens).
+  /// Single-valued, org-scoped, accounting-only (never gates access).
+  /// Plain column ref (relationMode="prisma"); the service validates the
+  /// id belongs to this org. See cost-centers.feature.
+  costCenterId String?
+
   @@id([userId, organizationId])
   @@index([organizationId])
   @@index([userId])
+  @@index([costCenterId])
 }
 
 model Team {
@@ -195,8 +202,13 @@ model Team {
   ingestionSources IngestionSource[]
   aiToolEntryTeams AiToolEntryTeam[]
 
+  /// Cost-center assignment inherited as the default for members and
+  /// projects that have none of their own. Accounting-only.
+  costCenterId String?
+
   @@index([organizationId])
   @@index([isPersonal])
+  @@index([costCenterId])
 }
 
 model Organization {
@@ -421,10 +433,31 @@ model Project {
   /// is meaningful only when `isPersonal=true`.
   personalFeatures Json @default("{}")
 
+  /// Cost-center assignment for spend attribution (the project / agent
+  /// lens, used when a trace has no principal user). Accounting-only.
+  costCenterId String?
+
   @@index([teamId])
   @@index([isPersonal])
   @@index([ownerUserId])
   @@index([teamId, kind])
+  @@index([costCenterId])
+}
+
+/// A cost center is a single-valued accounting dimension, separate from
+/// RBAC, for rolling up AI spend by org unit (Engineering, Marketing,
+/// ...). Assigned to OrganizationUser, Team, and Project via their
+/// `costCenterId` column. Pure accounting: never grants or restricts
+/// access. See specs/ai-gateway/governance/cost-centers.feature.
+model CostCenter {
+  id             String    @id @default(nanoid())
+  organizationId String
+  name           String
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @default(now()) @updatedAt
+  archivedAt     DateTime?
+
+  @@index([organizationId])
 }
 
 enum INVITE_STATUS {
@@ -2039,19 +2072,6 @@ model IngestionSource {
   /// Status flag. 'active' (default), 'disabled' (admin paused), or
   /// 'awaiting_first_event' (created but never received).
   status String @default("awaiting_first_event")
-
-  /// Per-origin retention class applied to every span/log emitted by
-  /// this source's events when they land in the unified observability
-  /// store (recorded_spans / log_records). Drives the CH TTL policy.
-  /// Values:
-  ///   - "thirty_days": operational debugging window (default)
-  ///   - "one_year":    compliance baseline (SOC2 / ISO 27001 / EU AI Act)
-  ///   - "seven_years": long-form audit (regulated industry)
-  /// Org plan ceiling enforced at the composer / API layer.
-  /// Stored as string for extensibility — the canonical set lives in
-  /// code (governance retention policy registry).
-  /// Spec: specs/ai-gateway/governance/retention.feature
-  retentionClass String @default("thirty_days")
 
   /// Last event timestamp observed (any direction). Surfaces in the
   /// admin UI as "last event 2 minutes ago".

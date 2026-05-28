@@ -60,8 +60,19 @@ export interface GovernanceOcsfExportRow {
 
 export interface GovernanceOcsfExportPage {
   events: GovernanceOcsfExportRow[];
-  /** Pass back as `sinceMs` on the next request. null when the page is empty. */
+  /**
+   * Pass back as `sinceMs` on the next request. null when the page is empty.
+   * Kept for callers that only track the millisecond watermark.
+   */
   nextCursor: number | null;
+  /**
+   * Compound watermark of the last row: pass `eventTimeMs` back as `sinceMs`
+   * and `eventId` back as `sinceEventId`. This is the cursor SIEM consumers
+   * should persist: it disambiguates rows that share a millisecond, so a page
+   * boundary inside a same-ms batch neither skips nor (with a stale ms-only
+   * cursor) re-delivers the rest of that millisecond.
+   */
+  nextCursorCompound: { eventTimeMs: number; eventId: string } | null;
 }
 
 interface CHRow {
@@ -95,16 +106,22 @@ export class GovernanceOcsfExportService {
   async list(input: {
     organizationId: string;
     sinceMs: number;
+    /**
+     * EventId watermark paired with sinceMs. Defaults to "" so a fresh pull
+     * (or a legacy ms-only caller) still works; supplying it makes the cursor
+     * exact across rows that share a millisecond.
+     */
+    sinceEventId?: string;
     limit: number;
   }): Promise<GovernanceOcsfExportPage> {
     const govProjectId = await this.resolveGovProjectId(input.organizationId);
     if (!govProjectId) {
-      return { events: [], nextCursor: null };
+      return { events: [], nextCursor: null, nextCursorCompound: null };
     }
 
     const ch = await this.getClickhouse(input.organizationId);
     if (!ch) {
-      return { events: [], nextCursor: null };
+      return { events: [], nextCursor: null, nextCursorCompound: null };
     }
 
     const result = await ch.query({
@@ -130,12 +147,12 @@ export class GovernanceOcsfExportService {
           RawOcsfJson
         FROM governance_ocsf_events
         WHERE TenantId = {tenantId:String}
-          AND EventTime > fromUnixTimestamp64Milli({sinceMs:UInt64})
+          AND (EventTime, EventId) > (fromUnixTimestamp64Milli({sinceMs:UInt64}), {sinceEventId:String})
           AND (TenantId, EventId, LastUpdatedAt) IN (
             SELECT TenantId, EventId, max(LastUpdatedAt)
             FROM governance_ocsf_events
             WHERE TenantId = {tenantId:String}
-              AND EventTime > fromUnixTimestamp64Milli({sinceMs:UInt64})
+              AND (EventTime, EventId) > (fromUnixTimestamp64Milli({sinceMs:UInt64}), {sinceEventId:String})
             GROUP BY TenantId, EventId
           )
         ORDER BY EventTime ASC, EventId ASC
@@ -144,6 +161,7 @@ export class GovernanceOcsfExportService {
       query_params: {
         tenantId: govProjectId,
         sinceMs: input.sinceMs,
+        sinceEventId: input.sinceEventId ?? "",
         limit: input.limit,
       },
       format: "JSONEachRow",
@@ -175,6 +193,9 @@ export class GovernanceOcsfExportService {
     return {
       events,
       nextCursor: lastEvent ? lastEvent.eventTimeMs : null,
+      nextCursorCompound: lastEvent
+        ? { eventTimeMs: lastEvent.eventTimeMs, eventId: lastEvent.eventId }
+        : null,
     };
   }
 

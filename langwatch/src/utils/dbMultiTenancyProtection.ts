@@ -61,6 +61,12 @@ const EXEMPT_MODELS = [
    */
   "ApiKey",
   /**
+   * Cost centers are organization-level accounting dimensions, scoped by
+   * organizationId (never projectId). The service layer enforces org
+   * scoping on every query. See cost-centers.feature.
+   */
+  "CostCenter",
+  /**
    * AI Gateway models. Post-iter-110 (collapse-VK-binding refactor):
    * - GatewayBudget: org-level (scopeType + scopeId identifies which
    *   target); no projectId column by design.
@@ -342,6 +348,38 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
           typeof d.scopeId !== "string"
         ) {
           return "create requires modelProviderId + scopeType + scopeId in the data payload";
+        }
+      }
+      return null;
+    },
+  },
+  RoutingPolicyScope: {
+    validateWhere: (where) => {
+      if (!where) {
+        return "requires a row id, routingPolicyId, or scope predicate";
+      }
+      const ok = validateRecursive(
+        where,
+        (c) =>
+          hasIdOrInPredicate(c) ||
+          typeof c.routingPolicyId === "string" ||
+          (c.routingPolicyId && Array.isArray(c.routingPolicyId.in)) ||
+          hasScopePredicate(c),
+      );
+      return ok
+        ? null
+        : "requires a row id, routingPolicyId, or scope predicate";
+    },
+    validateCreateData: (data) => {
+      const records = Array.isArray(data) ? data : [data];
+      for (const d of records) {
+        if (!d) return "create requires a data payload";
+        if (
+          typeof d.routingPolicyId !== "string" ||
+          typeof d.scopeType !== "string" ||
+          typeof d.scopeId !== "string"
+        ) {
+          return "create requires routingPolicyId + scopeType + scopeId in the data payload";
         }
       }
       return null;
