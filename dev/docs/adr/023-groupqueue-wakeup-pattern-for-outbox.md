@@ -68,6 +68,7 @@ If runtime testing in Phase 1 reveals that `extend: false` doesn't behave as the
 - **The dispatch worker is a `GroupQueue` processor**, not a standalone polling cron. Its process role is `worker` (same as other event-sourcing workers).
 - **Per-tenant fairness comes for free** via `TenantRateTracker`. No hand-rolled "LIMIT 100 per tenantId" logic.
 - **One wakeup per cadence window per trigger** is the structural property that lets a single dispatch handler invocation see all queued matches for that trigger in one batch — the digest semantic.
+- **GroupQueue wakeup is a cadence primitive, not a deadline primitive.** "Cadence" = open a window at first match, flush whatever accumulated when the window expires (what this ADR designs). "Deadline" = at +Nmin, re-read state and decide whether to fire — the shape needed by regression-confirmation triggers ("evaluation score dropped; wait 5 min, only fire if it hasn't recovered"). A deadline re-reads source state when it fires; a cadence just drains an inbox. Out of scope here; flagged so a future deadline primitive isn't conflated with `extend: false` wakeups (which would just delay the existing batch flush, not re-query state).
 
 ## References
 

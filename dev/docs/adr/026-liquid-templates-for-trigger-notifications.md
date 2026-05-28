@@ -133,7 +133,7 @@ Silent failure of customer-authored content (with operator visibility) is strict
 ## Consequences
 
 - **Four new nullable `Trigger` columns.** Single `ALTER TABLE`; trivial migration.
-- **New `templating/liquid.ts` module** wrapping engine setup, render, and validation.
+- **New module at `src/server/event-sourcing/outbox/templating/`** wrapping engine setup, render, validation, and the Block Kit allowlist. Lives under `outbox/` (not under `triggers/` or `app-layer/`) because the rendering surface — sandboxed user templates with a digest `matches[]` shape — is reusable by any future outbox reactor that needs customer-customizable output. Keeping it framework-side means the eventual schema split (templates moving off the `Trigger` row onto a `NotificationPolicy`, see ADR-021's consequences) is a column move, not a code move.
 - **Default templates extracted from current hardcoded output.** Existing customers see no change.
 - **Operator-facing surfaces** (Phase 6, see plan):
   - Split-pane editor with live preview (CodeMirror + Liquid mode).

@@ -19,7 +19,12 @@ Add `.withOutbox(projectionName, reactorName, definition)` to `StaticPipelineBui
 The two definition types have distinct shapes:
 
 ```ts
-// Existing (unchanged)
+// Existing — extended with isReplay
+type ReactorContext<FoldState> = {
+  // ...existing fields...
+  isReplay: boolean;   // true when the event was produced by a stream replay
+};
+
 type ReactorDefinition<Event, FoldState> = {
   handle: (event: Event, context: ReactorContext<FoldState>, deps: Deps) => Promise<void>;
   options?: { makeJobId, ttl, delay };
@@ -36,6 +41,8 @@ type OutboxReactorDefinition<Event, FoldState> = {
 ```
 
 `match` runs in the event-sourcing queue with the existing `_originGuardedReactor` guards (loop prevention, stale-event filter, 24h trace-age cap). It returns the outbox entries to persist; it does NOT perform side effects.
+
+**Replay safety for `.withOutbox`**: the framework wrapper short-circuits `match` when `context.isReplay === true` — no outbox row is inserted, no wakeup is scheduled. Without this, replaying historical events (after the outbox row's 30/90-day retention has pruned the original dispatch record) would insert fresh `queued` rows and re-fire customer-visible side effects. `match` may still inspect `context.isReplay` directly for reactor-specific replay handling, but the safe default is on by construction. `.withReactor` handlers receive the same flag and are expected to make their own call — best-effort reactors generally don't need it, but having the field present at registration time costs nothing and avoids a coordinated context-shape migration later.
 
 `dispatch` runs in the outbox dispatch worker. It receives the batched payloads for a triggered wakeup, performs the actual side effect, and throws `DispatchError` ([ADR-027](./027-typed-dispatcherror-contract.md)) on failure.
 
@@ -95,6 +102,7 @@ App-layer code (the trigger-specific match/dispatch logic) stays in `app-layer/t
 - **Backwards-compatible.** Every existing `.withReactor` call is unchanged. Migration to `.withOutbox` is opt-in, one reactor at a time.
 - **Future framework additions** (e.g., new dispatch handler types, per-reactor retention overrides) extend `OutboxReactorDefinition` without touching `ReactorDefinition`.
 - **The default for new reactors should be `.withReactor`** unless the side effect is auditable. Reactors-that-might-need-retry can always be promoted later.
+- **Customer-supplied destinations are out of scope for v1, but the `dispatch` handler is endpoint-agnostic by design.** Today's Slack/email targets are fixed providers (Slack incoming webhooks the customer enters, but the request shape and TLS endpoint are Slack's; SES/SendGrid for email). The moment a customer-defined webhook URL lands as a trigger destination, the framework needs: SSRF blocking (deny private IP ranges, link-local, cloud-metadata endpoints like `169.254.169.254`); HMAC request signing so receivers can verify origin; payload size caps; per-destination secret encryption at rest. These are framework concerns, not per-endpoint concerns — every future customer-webhook-like dispatch should share one outbound utility rather than each `dispatch` reinventing them. Captured here so the next reactor author knows to extend the shared utility, not roll their own `fetch`.
 
 ## References
 

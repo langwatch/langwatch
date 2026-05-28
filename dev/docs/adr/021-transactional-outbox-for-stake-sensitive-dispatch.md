@@ -60,6 +60,8 @@ A PG table gives us durability (outlives Redis), queryability (operator UI reads
 - **Two reactor classes now exist** in the system: best-effort (`.withReactor`) and stake-sensitive (`.withOutbox`). Authors and reviewers must choose at definition time. The default for new reactors should be `.withReactor` unless the side effect is auditable.
 - **Operator surfaces** (activity tab, retry buttons, Grafana alarms on stuck-queue depth) become possible and necessary. Without them the outbox is just an extra hop.
 - **`evaluationTrigger.reactor` stays on `.withReactor`.** It dispatches commands (event-sourced, in-band), not side effects. Outbox is for out-of-band side effects only.
+- **Silencing has no integration point yet.** Notify-side mute ("stop pinging me for an hour, prod is degraded") is a common follow-up ask, and it belongs between match and dispatch — not inside the outbox state machine itself, not inside the dispatch handler. Today's pipeline has no such hook. Out of scope for this ADR; flagged so the next person designing silencing knows the outbox is the scaffolding, not the home.
+- **Match + delivery are currently bundled on the `Trigger` row.** Filters, action, channel, cadence (ADR-025), templates (ADR-026) all live on one row. Workable for one-action-per-trigger. The natural future split is a separate `NotificationPolicy` (or similarly named) row that holds delivery config, leaving `Trigger` as the match definition — same migration cost whenever it happens, but worth flagging that the new cadence/template columns being added by ADR-025/026 could equally land on a new table now. This PR doesn't make that split; capturing it here so the trade-off is visible the next time the schema is touched.
 
 ## References
 

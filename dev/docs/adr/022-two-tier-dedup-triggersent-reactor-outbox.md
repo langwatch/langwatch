@@ -29,10 +29,10 @@ Keep **two separate tables** with distinct roles:
 
 - `TriggerSent` remains the **match-claim ledger**. Unchanged. Continues to serve as the cross-reactor race winner via its unique constraint.
 - `ReactorOutbox` is the **dispatch-state table**. Row-per-match (one row per match-subject for trigger outbox reactors). Unique constraint is `(reactorName, dedupKey)` where:
-  - Trace/evaluation triggers: `dedupKey = ${triggerId}:trace:${traceId}`.
-  - Custom-graph alerts: `dedupKey = ${triggerId}:graph:${customGraphId}` (the subject is the graph, not a trace — alerts can re-fire across resolution cycles, so the dedupKey is scoped per claim, not lifetime).
+  - Trace/evaluation triggers: `dedupKey = ${projectId}/${triggerId}:trace:${traceId}`.
+  - Custom-graph alerts: `dedupKey = ${projectId}/${triggerId}:graph:${customGraphId}` (the subject is the graph, not a trace — alerts can re-fire across resolution cycles, so the dedupKey is scoped per claim, not lifetime).
 
-  The `:trace:` / `:graph:` discriminator keeps the two subject types in separate namespaces so a future trigger type cannot collide.
+  The `${projectId}/` prefix mirrors the `groupKey` convention from [ADR-023](./023-groupqueue-wakeup-pattern-for-outbox.md) and makes tenant scoping structural in the key itself — `triggerId` is a globally-unique cuid so the prefix isn't load-bearing for uniqueness, but it keeps every dedup/group identifier in the outbox layer self-describing for an operator scanning rows. The `:trace:` / `:graph:` discriminator keeps the two subject types in separate namespaces so a future trigger type cannot collide.
 
 Outbox row insertion is **gated on `TriggerSent` claim succeeding**: the reactor's match phase first calls `TriggerSent.claimSend`; only on a successful claim does it write the corresponding `ReactorOutbox` row.
 
@@ -65,6 +65,7 @@ Gating insertion on the `TriggerSent` claim means: if a match has already been c
 - **Digest worker does a small batch SELECT** on each wakeup. With `(reactorName, status, scheduledFor)` indexes this is sub-millisecond at expected volumes.
 - **Operator queries can join `TriggerSent` and `ReactorOutbox`** on the appropriate subject column (`traceId` or `customGraphId`) — useful for the activity tab ("show me every match for this trigger and where it is in the dispatch lifecycle").
 - **Migration**: `TriggerSent` schema unchanged. `ReactorOutbox` is a new table.
+- **The per-subject dedupKey is trace-path-only by design.** `${projectId}/${triggerId}:trace:${traceId}` and `${projectId}/${triggerId}:graph:${customGraphId}` both encode a per-occurrence subject identity that exists in the current trigger shape. Aggregate-driven triggers — anything that fires on "metric crossed threshold over window" without a single owning row — don't have such a subject. When those land (custom-graph alerts already partially fit this shape; the existing `resolvedAt` lifecycle covers the gap today), the natural dedupKey is `${projectId}/${triggerId}:${groupByLabelsHash}:${windowBucket}`, not per-subject. That's a new namespace in the same `(reactorName, dedupKey)` constraint, not a schema change — captured here so the next person isn't tempted to retrofit aggregate triggers onto the per-trace key.
 
 ## References
 
