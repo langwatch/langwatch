@@ -68,14 +68,14 @@ Feature: Cost centers — org-chart spend attribution across people, teams, and 
   # Cost center entity + assignment (service + DB)
   # ---------------------------------------------------------------------------
 
-  @bdd @cost-centers @integration @unimplemented
+  @bdd @cost-centers @integration
   Scenario: Admin creates and names a cost center
     When the admin creates a cost center named "Engineering"
     Then the cost center belongs to acme-corp
     And it appears in the cost-center list for the org
     And a member of another org never sees it
 
-  @bdd @cost-centers @integration @unimplemented
+  @bdd @cost-centers @integration
   Scenario: A person is assigned to a single cost center per org
     Given a cost center "Marketing" exists in acme-corp
     When the admin assigns the member "robin" to "Marketing"
@@ -83,7 +83,7 @@ Feature: Cost centers — org-chart spend attribution across people, teams, and 
     And assigning robin to a different cost center replaces the prior one
       rather than adding a second
 
-  @bdd @cost-centers @integration @unimplemented
+  @bdd @cost-centers @integration
   Scenario: Teams and projects are assignable to a cost center
     Given a cost center "Engineering" exists in acme-corp
     When the admin assigns the team "platform" to "Engineering"
@@ -91,7 +91,7 @@ Feature: Cost centers — org-chart spend attribution across people, teams, and 
     Then the team and the project both carry cost center "Engineering"
     And a person, a team, and a project can all share one cost center
 
-  @bdd @cost-centers @integration @unimplemented
+  @bdd @cost-centers @integration
   Scenario: Archiving a cost center leaves assignments resolvable as Unassigned
     Given a cost center "Legacy" with assigned members and projects
     When the admin archives "Legacy"
