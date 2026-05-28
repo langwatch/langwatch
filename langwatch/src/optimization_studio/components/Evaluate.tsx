@@ -287,6 +287,7 @@ export function EvaluateModalContent({
               type: "error",
               duration: 5000,
               meta: { closable: true },
+              error: error,
             });
             throw error;
           }

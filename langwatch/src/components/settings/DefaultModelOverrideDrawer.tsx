@@ -320,6 +320,7 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
         type: "error",
         duration: 6000,
         meta: { closable: true },
+        error: err,
       });
     } finally {
       setBusy(false);

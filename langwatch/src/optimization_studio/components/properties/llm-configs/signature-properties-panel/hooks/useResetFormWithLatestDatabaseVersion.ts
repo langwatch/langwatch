@@ -56,6 +56,7 @@ export function useResetFormWithLatestDatabaseVersion(params: {
         title: "Failed to load latest version",
         description: "Please try again",
         type: "error",
+        error: error,
       });
     }
   }, [getPromptById, formProps, configId]);

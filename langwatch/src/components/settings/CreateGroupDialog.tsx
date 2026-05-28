@@ -73,7 +73,7 @@ export function CreateGroupDialog({
       reset();
       onClose();
     } catch (e: any) {
-      toaster.create({ title: e.message ?? "Failed to create group", type: "error" });
+      toaster.create({ title: e.message ?? "Failed to create group", type: "error", error: e });
     }
   }
 

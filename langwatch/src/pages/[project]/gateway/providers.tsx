@@ -72,6 +72,7 @@ function ProvidersPage() {
       toaster.create({
         title: error instanceof Error ? error.message : "Failed to disable",
         type: "error",
+        error: error,
       });
     }
   };

@@ -90,6 +90,7 @@ export function ProviderBindingEditDrawer({
         title:
           error instanceof Error ? error.message : "Failed to update binding",
         type: "error",
+        error: error,
       });
     }
   };

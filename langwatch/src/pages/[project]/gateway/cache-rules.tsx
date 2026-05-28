@@ -97,6 +97,7 @@ function CacheRulesPage() {
       toaster.create({
         title: error instanceof Error ? error.message : "Failed to archive",
         type: "error",
+        error: error,
       });
     }
   };
@@ -113,6 +114,7 @@ function CacheRulesPage() {
       toaster.create({
         title: error instanceof Error ? error.message : "Failed to toggle rule",
         type: "error",
+        error: error,
       });
     }
   };

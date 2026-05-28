@@ -116,6 +116,7 @@ export const CopyEvaluationDialog = ({
         title: "Error replicating evaluation",
         description: error instanceof Error ? error.message : "Unknown error",
         type: "error",
+        error: error,
       });
     }
   };

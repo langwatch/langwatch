@@ -110,6 +110,7 @@ export function ProviderBindingCreateDrawer({
         title:
           error instanceof Error ? error.message : "Failed to bind provider",
         type: "error",
+        error: error,
       });
     }
   };

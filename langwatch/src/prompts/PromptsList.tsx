@@ -117,6 +117,7 @@ export function PromptsList({
           meta: {
             closable: true,
           },
+          error: error,
         });
       }
     },

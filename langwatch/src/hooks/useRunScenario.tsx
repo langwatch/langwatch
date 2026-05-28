@@ -121,6 +121,7 @@ export function useRunScenario({
           description: message,
           type: "error",
           meta: { closable: true },
+          error: error,
         });
       } finally {
         setIsPolling(false);

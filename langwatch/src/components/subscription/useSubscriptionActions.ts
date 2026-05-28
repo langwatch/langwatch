@@ -94,6 +94,7 @@ export function useSubscriptionActions({
           err instanceof Error ? err.message : "An unexpected error occurred",
         type: "error",
         meta: { closable: true },
+        error: err,
       });
     }
   };
@@ -134,6 +135,7 @@ export function useSubscriptionActions({
               err instanceof Error ? err.message : "An unexpected error occurred",
             type: "error",
             meta: { closable: true },
+            error: err,
           });
         }
       },
@@ -159,6 +161,7 @@ export function useSubscriptionActions({
           err instanceof Error ? err.message : "An unexpected error occurred",
         type: "error",
         meta: { closable: true },
+        error: err,
       });
     }
   };

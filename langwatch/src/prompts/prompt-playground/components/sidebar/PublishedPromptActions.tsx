@@ -87,6 +87,7 @@ export function PublishedPromptActions({
         meta: {
           closable: true,
         },
+        error: error,
       });
     }
   }, [syncFromSource, project, utils, promptId, promptHandle]);
@@ -123,6 +124,7 @@ export function PublishedPromptActions({
         description:
           error instanceof Error ? error.message : "An unknown error occurred",
         type: "error",
+        error: error,
       });
     } finally {
       setIsDeleteDialogOpen(false);
