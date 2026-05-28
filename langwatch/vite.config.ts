@@ -152,6 +152,27 @@ export default defineConfig({
   build: {
     outDir: "dist/client",
     sourcemap: true,
+    rollupOptions: {
+      output: {
+        manualChunks(id: string) {
+          // Keep the whole Shiki ecosystem in one self-contained chunk.
+          // Under the rolldown bundler the default split hoists Shiki's
+          // singleton factory into the entry chunk and leaves the Shiki
+          // chunk calling back into it at module top level. Because the
+          // entry eagerly loads Shiki, that call runs before the entry has
+          // initialized the export, throwing "undefined is not a function"
+          // at boot and white-screening the app. One chunk removes the
+          // cross-chunk cycle.
+          if (
+            /[\\/]node_modules[\\/](\.pnpm[\\/])?(@shikijs[\\/+]|shiki[\\/@]|oniguruma-to-es|oniguruma-parser|hast-util-to-html)/.test(
+              id,
+            )
+          ) {
+            return "shiki";
+          }
+        },
+      },
+    },
   },
   server: {
     watch: {
