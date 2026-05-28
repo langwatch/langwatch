@@ -175,7 +175,10 @@ export function registerGovernanceMcpTools(
     {},
     async () => {
       const r = await resolve();
-      const denied = await requireRead(r, "aiTools:manage");
+      // Admin catalog returns OTTL source (org config secret) and gates
+      // on aiTools:manage — treat it like a write: project-apiKey-only
+      // sessions without a user identity are rejected, not silently allowed.
+      const denied = await requirePermission(r, "aiTools:manage");
       if (denied) return text(denied);
       const rows = await templateService.listForOrgAdmin({
         organizationId: r.organizationId,
