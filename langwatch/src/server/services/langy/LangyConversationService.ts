@@ -18,7 +18,9 @@ export type ConversationListItem = {
   title: string | null;
   isShared: boolean;
   isOwn: boolean;
-  updatedAt: Date;
+  // Serialized to an ISO string on the wire; the UI sorts on it as
+  // `lastActivityAt`. Named for the domain, not the DB column (`updatedAt`).
+  lastActivityAt: Date;
   messageCount: number;
 };
 
@@ -181,7 +183,7 @@ export class LangyConversationService {
       title: r.title,
       isShared: r.isShared,
       isOwn: r.userId === userId,
-      updatedAt: r.updatedAt,
+      lastActivityAt: r.updatedAt,
       messageCount: r._count.messages,
     }));
   }
